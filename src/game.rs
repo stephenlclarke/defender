@@ -10,6 +10,9 @@ const HUMAN_LANDING_SCORE: u16 = 500;
 const BONUS_STOCK_SCORE: u32 = 10_000;
 const MAX_WAVE_HUMANOID_BONUS: u32 = 500;
 const PLAYER_MAX_SPEED: i32 = 1;
+const SWARMER_SPEED: i32 = 2;
+const POD_SWARMER_BURST: usize = 4;
+const MAX_SWARMERS: usize = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
@@ -18,6 +21,8 @@ pub enum EntityKind {
     EnemyShot,
     Lander,
     Mutant,
+    Pod,
+    Swarmer,
     Human,
 }
 
@@ -29,12 +34,21 @@ impl EntityKind {
             Self::EnemyShot => '!',
             Self::Lander => 'L',
             Self::Mutant => 'M',
+            Self::Pod => 'P',
+            Self::Swarmer => 'S',
             Self::Human => 'h',
         }
     }
 
     pub fn is_enemy(self) -> bool {
-        matches!(self, Self::Lander | Self::Mutant)
+        matches!(
+            self,
+            Self::Lander | Self::Mutant | Self::Pod | Self::Swarmer
+        )
+    }
+
+    fn can_fire(self) -> bool {
+        matches!(self, Self::Lander | Self::Mutant | Self::Swarmer)
     }
 }
 
@@ -250,7 +264,7 @@ impl World {
                         .y
                         .min(terrain_surface_y(terrain, entity.position.x));
                 }
-                EntityKind::Lander | EntityKind::Mutant => {
+                EntityKind::Lander | EntityKind::Mutant | EntityKind::Pod | EntityKind::Swarmer => {
                     entity.position.x =
                         wrap_coordinate(entity.position.x + entity.velocity.dx, max_x);
                     entity.position.y += entity.velocity.dy;
@@ -533,7 +547,7 @@ impl World {
         for entity in &mut self.entities {
             match entity.kind {
                 EntityKind::Human | EntityKind::PlayerShip => {}
-                EntityKind::Lander | EntityKind::Mutant => {
+                EntityKind::Lander | EntityKind::Mutant | EntityKind::Pod | EntityKind::Swarmer => {
                     entity.position.x =
                         wrap_coordinate(entity.position.x + entity.velocity.dx, max_x);
                     entity.position.y += entity.velocity.dy;
@@ -596,7 +610,7 @@ impl World {
         let Some(enemy) = self
             .entities
             .iter()
-            .filter(|entity| entity.kind.is_enemy())
+            .filter(|entity| entity.kind.can_fire())
             .min_by_key(|entity| (entity.position.x - player_position.x).abs())
             .cloned()
         else {
@@ -621,6 +635,7 @@ impl World {
         let free_humans = self.free_human_positions();
         let world_span = self.world_span;
         let world_max_x = self.world_max_x();
+        let swarmer_follow_distance = (self.width as i32 / 2).max(8);
 
         for enemy in self
             .entities
@@ -650,6 +665,40 @@ impl World {
                     enemy.velocity.dy = (target.y - enemy.position.y).signum();
                     if enemy.velocity.dy == 0 {
                         enemy.velocity.dy = if self.tick.is_multiple_of(2) { -1 } else { 1 };
+                    }
+                }
+                EntityKind::Pod => {
+                    if enemy.velocity.dx == 0 {
+                        enemy.velocity.dx = if self.tick.is_multiple_of(2) { 1 } else { -1 };
+                    }
+                    if enemy.velocity.dy == 0 {
+                        enemy.velocity.dy = if self.tick.is_multiple_of(3) { 1 } else { -1 };
+                    }
+                }
+                EntityKind::Swarmer => {
+                    let target = player_position.unwrap_or(enemy.position);
+                    let delta_x = shortest_wrapped_delta(enemy.position.x, target.x, world_span);
+                    let desired_dx = if delta_x == 0 {
+                        enemy.velocity.dx.signum().max(1) * SWARMER_SPEED
+                    } else {
+                        delta_x.signum() * SWARMER_SPEED
+                    };
+                    let current_direction = enemy.velocity.dx.signum();
+                    let should_reverse = current_direction == 0
+                        || (desired_dx.signum() != current_direction
+                            && delta_x.abs() > swarmer_follow_distance);
+                    if should_reverse {
+                        enemy.velocity.dx = desired_dx;
+                    }
+
+                    let vertical_delta = target.y - enemy.position.y;
+                    if vertical_delta != 0
+                        && (self.tick + enemy.position.x as u32).is_multiple_of(2)
+                    {
+                        enemy.velocity.dy = vertical_delta.signum();
+                    }
+                    if enemy.velocity.dy == 0 {
+                        enemy.velocity.dy = if self.tick.is_multiple_of(2) { 1 } else { -1 };
                     }
                 }
                 _ => {}
@@ -767,6 +816,7 @@ impl World {
         let mut remove_indices_set = Vec::new();
         let mut score_delta = 0;
         let mut released_carriers = Vec::new();
+        let mut burst_pods = Vec::new();
 
         for (shot_index, shot) in self.entities.iter().enumerate() {
             if shot.kind != EntityKind::PlayerShot || remove_indices_set.contains(&shot_index) {
@@ -791,6 +841,8 @@ impl World {
                     if enemy.kind == EntityKind::Lander && enemy.state == EntityState::CarryingHuman
                     {
                         released_carriers.push(enemy.position);
+                    } else if enemy.kind == EntityKind::Pod {
+                        burst_pods.push(enemy.position);
                     }
                 }
             }
@@ -801,6 +853,9 @@ impl World {
         }
         self.add_score(score_delta);
         remove_indices(&mut self.entities, &remove_indices_set);
+        for pod_position in burst_pods {
+            self.spawn_swarmer_burst_at(pod_position);
+        }
     }
 
     fn handle_player_collisions(
@@ -821,7 +876,7 @@ impl World {
         let mut collided_enemies = Vec::new();
         for (index, enemy) in self.entities.iter().enumerate() {
             let collision = match enemy.kind {
-                EntityKind::Lander | EntityKind::Mutant => {
+                EntityKind::Lander | EntityKind::Mutant | EntityKind::Pod | EntityKind::Swarmer => {
                     positions_overlap(player_position, enemy.position, 1, 1)
                 }
                 EntityKind::EnemyShot => positions_overlap(player_position, enemy.position, 0, 0),
@@ -906,7 +961,7 @@ impl World {
 
     fn hyperspace_destination_is_unsafe(&self, player_position: Position) -> bool {
         self.entities.iter().any(|entity| match entity.kind {
-            EntityKind::Lander | EntityKind::Mutant => {
+            EntityKind::Lander | EntityKind::Mutant | EntityKind::Pod | EntityKind::Swarmer => {
                 positions_overlap(player_position, entity.position, 1, 1)
             }
             EntityKind::EnemyShot => positions_overlap(player_position, entity.position, 0, 0),
@@ -936,6 +991,8 @@ impl World {
             .filter(|entity| {
                 entity.kind == EntityKind::Lander
                     || entity.kind == EntityKind::Mutant
+                    || entity.kind == EntityKind::Pod
+                    || entity.kind == EntityKind::Swarmer
                     || entity.kind == EntityKind::EnemyShot
             })
             .map(|entity| entity.position)
@@ -1008,6 +1065,41 @@ impl World {
             } else {
                 0
             };
+        }
+    }
+
+    fn spawn_swarmer_burst_at(&mut self, pod_position: Position) {
+        let available = MAX_SWARMERS.saturating_sub(self.entity_count_by_kind(EntityKind::Swarmer));
+        if available == 0 {
+            return;
+        }
+
+        let count = POD_SWARMER_BURST.min(available);
+        let player_position = self.player_position();
+        let direction = player_position
+            .map(|player| shortest_wrapped_delta(pod_position.x, player.x, self.world_span))
+            .map(|delta| if delta == 0 { 1 } else { delta.signum() })
+            .unwrap_or(1);
+        let vertical_offsets = [-1, 0, 1, 0];
+        let horizontal_offsets = [0, direction, 0, -direction];
+        let max_x = self.world_max_x();
+        let min_y = 1;
+
+        for index in 0..count {
+            let x = wrap_coordinate(pod_position.x + horizontal_offsets[index], max_x);
+            let safe_y = self.safe_altitude_at_world_x(x);
+            let y = (pod_position.y + vertical_offsets[index]).clamp(min_y, safe_y);
+            let dy = player_position
+                .map(|player| (player.y - y).signum())
+                .filter(|delta| *delta != 0)
+                .unwrap_or(vertical_offsets[index].signum());
+            self.entities.push(Entity::new(
+                EntityKind::Swarmer,
+                x,
+                y,
+                direction * SWARMER_SPEED,
+                dy,
+            ));
         }
     }
 
@@ -1262,6 +1354,10 @@ impl World {
         }
         if self.status.wave >= 3 {
             enemies.push(Entity::new(EntityKind::Mutant, 8, 4, 1, 1));
+            enemies.push(Entity::new(EntityKind::Pod, width / 2, 5, -1, 1));
+        }
+        if self.status.wave >= 5 {
+            enemies.push(Entity::new(EntityKind::Pod, width - 20, 4, 1, -1));
         }
 
         self.entities.extend(enemies);
@@ -1400,6 +1496,8 @@ fn score_for_enemy(kind: EntityKind) -> u32 {
     match kind {
         EntityKind::Lander => 150,
         EntityKind::Mutant => 250,
+        EntityKind::Pod => 1_000,
+        EntityKind::Swarmer => 150,
         _ => 0,
     }
 }
@@ -1425,9 +1523,9 @@ mod tests {
     use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS, PLAYER_START_X};
 
     use super::{
-        Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput, World,
-        WorldEvent, hyperspace_result, nearest_wrapped_target, shortest_wrapped_delta,
-        wrap_coordinate,
+        Entity, EntityKind, EntityState, HorizontalDirection, POD_SWARMER_BURST, Position,
+        SWARMER_SPEED, Status, UpdateInput, World, WorldEvent, hyperspace_result,
+        nearest_wrapped_target, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -1843,6 +1941,33 @@ mod tests {
             .find(|entity| entity.kind == EntityKind::Mutant)
             .expect("mutant");
         assert_eq!(mutant.position, Position { x: 9, y: 5 });
+    }
+
+    #[test]
+    fn live_step_swarmers_home_toward_the_player() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 3,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0),
+                Entity::new(EntityKind::Swarmer, 12, 6, 0, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let swarmer = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Swarmer)
+            .expect("swarmer");
+        assert_eq!(swarmer.velocity.dx, -SWARMER_SPEED);
+        assert_eq!(swarmer.position, Position { x: 10, y: 5 });
     }
 
     #[test]
@@ -2302,6 +2427,37 @@ mod tests {
     }
 
     #[test]
+    fn live_step_destroying_a_pod_releases_swarmers_and_scores_bonus() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 3,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 4, 0, 0),
+                Entity::new(EntityKind::PlayerShot, 8, 4, 1, 0),
+                Entity::new(EntityKind::Pod, 9, 5, 0, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Pod), 0);
+        assert_eq!(
+            world.entity_count_by_kind(EntityKind::Swarmer),
+            POD_SWARMER_BURST
+        );
+        assert_eq!(world.status().score, 1_000);
+        assert!(events.contains(&WorldEvent::EnemyDestroyed));
+        assert!(world.entities().iter().all(|entity| {
+            entity.kind != EntityKind::Swarmer || entity.velocity.dx == -SWARMER_SPEED
+        }));
+    }
+
+    #[test]
     fn live_step_removes_enemy_shots_when_they_leave_the_world() {
         let mut world = World::with_entities(
             12,
@@ -2393,6 +2549,35 @@ mod tests {
         assert_eq!(world.status().wave, 2);
         assert!(world.enemy_count() >= 2);
         assert!(events.contains(&WorldEvent::WaveAdvanced));
+    }
+
+    #[test]
+    fn wave_three_and_five_add_pod_enemies() {
+        let mut wave_three = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 3,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+        );
+        wave_three.spawn_wave();
+        assert_eq!(wave_three.entity_count_by_kind(EntityKind::Pod), 1);
+
+        let mut wave_five = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 5,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+        );
+        wave_five.spawn_wave();
+        assert_eq!(wave_five.entity_count_by_kind(EntityKind::Pod), 2);
     }
 
     #[test]

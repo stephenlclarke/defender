@@ -123,7 +123,9 @@ Extra keys while `xyzzy` mode is active:
   momentum preserved until you counter-thrust, and risky hyperspace behavior
   outside `xyzzy` mode, while `xyzzy` hyperspace deliberately relocates the
   ship away from enemy clusters, with automatic unlimited smart bombs in
-  `xyzzy` mode and a separate `g` invincibility toggle,
+  `xyzzy` mode and a separate `G` invincibility toggle, plus later-wave pods
+  that burst into swarmer packs when shot and swarmer pursuit behavior that
+  preserves the classic follow-from-behind counterplay,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
@@ -203,6 +205,9 @@ the final runtime self-contained:
 - <https://www.dougmahugh.com/defender-chapter02/>: control-analysis reference
   used for hyperspace risk, stopped re-entry speed, and direction changes on
   rematerialization.
+- <https://www.dougmahugh.com/defender-chapter05/>: swarmer-behavior reference
+  used to model pod bursts, delayed swarmer turnback, and the follow-from-
+  behind movement pattern.
 - <https://www.andysarcade.net/personal/defcolours/index.htm>: cabinet colour
   and palette reference for later presentation work.
 - <https://mdk.cab/game/defender>: artwork, screenshots, and general cabinet
