@@ -36,6 +36,8 @@ pub enum EntityState {
     Normal,
     CarryingHuman,
     Abducted,
+    Falling,
+    PlayerCarried,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -313,7 +315,9 @@ impl World {
             .entities
             .iter()
             .filter(|entity| {
-                entity.kind == EntityKind::Human && entity.state != EntityState::Abducted
+                entity.kind == EntityKind::Human
+                    && entity.state != EntityState::Abducted
+                    && entity.state != EntityState::PlayerCarried
             })
             .map(|entity| entity.position)
             .collect();
@@ -452,6 +456,9 @@ impl World {
         self.retain_projectiles(max_x, min_y, max_y);
 
         self.update_abducted_humans(min_y, &mut events);
+        self.update_falling_humans(max_y);
+        self.handle_player_human_interactions(&mut events);
+        self.resolve_falling_human_impacts(&mut events);
         self.handle_human_losses(&mut events);
         self.handle_player_shot_hits(&mut events);
         self.handle_player_collisions(input.invincible, &mut events);
@@ -584,7 +591,7 @@ impl World {
         for enemy in self.entities.iter().filter(|entity| entity.kind.is_enemy()) {
             if let Some((index, _)) = self.entities.iter().enumerate().find(|(index, entity)| {
                 entity.kind == EntityKind::Human
-                    && entity.state == EntityState::Normal
+                    && matches!(entity.state, EntityState::Normal | EntityState::Falling)
                     && !human_indices.contains(index)
                     && positions_overlap(enemy.position, entity.position, 1, 1)
             }) {
@@ -599,7 +606,7 @@ impl World {
     fn handle_player_shot_hits(&mut self, events: &mut Vec<WorldEvent>) {
         let mut remove_indices_set = Vec::new();
         let mut score_delta = 0;
-        let mut rescued_carriers = Vec::new();
+        let mut released_carriers = Vec::new();
 
         for (shot_index, shot) in self.entities.iter().enumerate() {
             if shot.kind != EntityKind::PlayerShot || remove_indices_set.contains(&shot_index) {
@@ -623,14 +630,14 @@ impl World {
                     events.push(WorldEvent::EnemyDestroyed);
                     if enemy.kind == EntityKind::Lander && enemy.state == EntityState::CarryingHuman
                     {
-                        rescued_carriers.push(enemy.position);
+                        released_carriers.push(enemy.position);
                     }
                 }
             }
         }
 
-        for carrier_position in rescued_carriers {
-            self.release_abducted_human_at(carrier_position, events);
+        for carrier_position in released_carriers {
+            self.release_abducted_human_at(carrier_position);
         }
         self.add_score(score_delta);
         remove_indices(&mut self.entities, &remove_indices_set);
@@ -666,7 +673,7 @@ impl World {
         }
 
         if invincible {
-            let rescued_carriers: Vec<Position> = collided_enemies
+            let released_carriers: Vec<Position> = collided_enemies
                 .iter()
                 .filter_map(|index| self.entities.get(*index))
                 .filter(|entity| {
@@ -679,8 +686,8 @@ impl World {
                 .filter_map(|index| self.entities.get(*index))
                 .map(|entity| score_for_enemy(entity.kind))
                 .sum();
-            for carrier_position in rescued_carriers {
-                self.release_abducted_human_at(carrier_position, events);
+            for carrier_position in released_carriers {
+                self.release_abducted_human_at(carrier_position);
             }
             remove_indices(&mut self.entities, &collided_enemies);
             self.add_score(score_delta);
@@ -690,7 +697,19 @@ impl World {
             return;
         }
 
+        let released_carriers: Vec<Position> = collided_enemies
+            .iter()
+            .filter_map(|index| self.entities.get(*index))
+            .filter(|entity| {
+                entity.kind == EntityKind::Lander && entity.state == EntityState::CarryingHuman
+            })
+            .map(|entity| entity.position)
+            .collect();
         remove_indices(&mut self.entities, &collided_enemies);
+        for carrier_position in released_carriers {
+            self.release_abducted_human_at(carrier_position);
+        }
+        self.release_player_carried_human_at(player_position);
         if self.status.lives > 0 {
             self.status.lives -= 1;
         }
@@ -735,23 +754,15 @@ impl World {
             .map(|(index, _)| index)
     }
 
-    fn release_abducted_human_at(
-        &mut self,
-        carrier_position: Position,
-        events: &mut Vec<WorldEvent>,
-    ) {
+    fn release_abducted_human_at(&mut self, carrier_position: Position) {
         let Some(human_index) = self.find_abducted_human_near(carrier_position) else {
             return;
         };
 
-        let rescue_x = self.entities[human_index].position.x;
-        let safe_y = self.safe_altitude_at_world_x(rescue_x);
         if let Some(human) = self.entities.get_mut(human_index) {
-            human.state = EntityState::Normal;
-            human.velocity = Velocity { dx: 0, dy: 0 };
-            human.position.y = safe_y;
+            human.state = EntityState::Falling;
+            human.velocity = Velocity { dx: 0, dy: 1 };
         }
-        events.push(WorldEvent::HumanRescued);
     }
 
     fn can_use_smart_bomb(&self, invincible: bool) -> bool {
@@ -769,24 +780,123 @@ impl World {
 
         let mut remove_indices_set = Vec::new();
         let mut score_delta = 0;
-        let mut rescued_carriers = Vec::new();
+        let mut released_carriers = Vec::new();
 
         for (index, entity) in self.entities.iter().enumerate() {
             if entity.kind.is_enemy() || entity.kind == EntityKind::EnemyShot {
                 remove_indices_set.push(index);
                 score_delta += score_for_enemy(entity.kind);
                 if entity.kind == EntityKind::Lander && entity.state == EntityState::CarryingHuman {
-                    rescued_carriers.push(entity.position);
+                    released_carriers.push(entity.position);
                 }
             }
         }
 
-        for carrier_position in rescued_carriers {
-            self.release_abducted_human_at(carrier_position, events);
+        for carrier_position in released_carriers {
+            self.release_abducted_human_at(carrier_position);
         }
         remove_indices(&mut self.entities, &remove_indices_set);
         self.add_score(score_delta);
         events.push(WorldEvent::SmartBombDetonated);
+    }
+
+    fn update_falling_humans(&mut self, max_y: i32) {
+        for human in self.entities.iter_mut().filter(|entity| {
+            entity.kind == EntityKind::Human && entity.state == EntityState::Falling
+        }) {
+            human.position.y = (human.position.y + human.velocity.dy.max(1)).min(max_y);
+        }
+    }
+
+    fn handle_player_human_interactions(&mut self, events: &mut Vec<WorldEvent>) {
+        let Some(player_position) = self.player_position() else {
+            return;
+        };
+
+        if let Some(human_index) = self.find_player_carried_human() {
+            let safe_y = self.safe_altitude_at_world_x(player_position.x);
+            let should_land = player_position.y >= safe_y - 1;
+            let carried_y = (player_position.y + 1).min(safe_y);
+            if let Some(human) = self.entities.get_mut(human_index) {
+                human.position.x = player_position.x;
+                human.position.y = if should_land { safe_y } else { carried_y };
+                human.velocity = Velocity { dx: 0, dy: 0 };
+                if should_land {
+                    human.state = EntityState::Normal;
+                    events.push(WorldEvent::HumanRescued);
+                }
+            }
+            return;
+        }
+
+        let Some(human_index) = self
+            .entities
+            .iter()
+            .enumerate()
+            .find(|(_, entity)| {
+                entity.kind == EntityKind::Human
+                    && entity.state == EntityState::Falling
+                    && positions_overlap(player_position, entity.position, 1, 1)
+            })
+            .map(|(index, _)| index)
+        else {
+            return;
+        };
+
+        let carried_y =
+            (player_position.y + 1).min(self.safe_altitude_at_world_x(player_position.x));
+        if let Some(human) = self.entities.get_mut(human_index) {
+            human.state = EntityState::PlayerCarried;
+            human.position.x = player_position.x;
+            human.position.y = carried_y;
+            human.velocity = Velocity { dx: 0, dy: 0 };
+        }
+    }
+
+    fn resolve_falling_human_impacts(&mut self, events: &mut Vec<WorldEvent>) {
+        let lost_humans: Vec<usize> = self
+            .entities
+            .iter()
+            .enumerate()
+            .filter(|(_, entity)| {
+                entity.kind == EntityKind::Human && entity.state == EntityState::Falling
+            })
+            .filter(|(_, entity)| {
+                entity.position.y >= self.safe_altitude_at_world_x(entity.position.x)
+            })
+            .map(|(index, _)| index)
+            .collect();
+
+        if !lost_humans.is_empty() {
+            events.extend(std::iter::repeat_n(
+                WorldEvent::HumanLost,
+                lost_humans.len(),
+            ));
+            remove_indices(&mut self.entities, &lost_humans);
+        }
+    }
+
+    fn find_player_carried_human(&self) -> Option<usize> {
+        self.entities
+            .iter()
+            .enumerate()
+            .find(|(_, entity)| {
+                entity.kind == EntityKind::Human && entity.state == EntityState::PlayerCarried
+            })
+            .map(|(index, _)| index)
+    }
+
+    fn release_player_carried_human_at(&mut self, player_position: Position) {
+        let Some(human_index) = self.find_player_carried_human() else {
+            return;
+        };
+
+        if let Some(human) = self.entities.get_mut(human_index) {
+            human.state = EntityState::Falling;
+            human.position.x = player_position.x;
+            human.position.y = player_position.y + 1;
+            human.velocity = Velocity { dx: 0, dy: 1 };
+        }
     }
 
     fn retain_projectiles(&mut self, max_x: i32, min_y: i32, max_y: i32) {
@@ -1207,7 +1317,7 @@ mod tests {
     }
 
     #[test]
-    fn destroying_a_carrying_lander_rescues_the_human() {
+    fn destroying_a_carrying_lander_makes_the_human_fall() {
         let mut world = World::with_entities(
             16,
             10,
@@ -1233,15 +1343,107 @@ mod tests {
             .entities()
             .iter()
             .find(|entity| entity.kind == EntityKind::Human)
-            .expect("rescued human");
+            .expect("falling human");
         assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
-        assert_eq!(human.state, EntityState::Normal);
-        assert_eq!(
-            human.position.y,
-            world.safe_altitude_at_world_x(human.position.x)
-        );
+        assert_eq!(human.state, EntityState::Falling);
         assert!(events.contains(&WorldEvent::EnemyDestroyed));
-        assert!(events.contains(&WorldEvent::HumanRescued));
+        assert!(!events.contains(&WorldEvent::HumanRescued));
+    }
+
+    #[test]
+    fn player_catches_a_falling_human_and_lands_them_safely() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 6, 5, 0, 0),
+                Entity::with_state(EntityKind::Human, 6, 4, 0, 1, EntityState::Falling),
+                Entity::new(EntityKind::Mutant, 16, 4, 0, 0),
+            ],
+        );
+
+        let first_events = world.step_live(UpdateInput::default());
+        let carried_human = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Human)
+            .expect("carried human");
+        assert_eq!(carried_human.state, EntityState::PlayerCarried);
+        assert!(!first_events.contains(&WorldEvent::HumanRescued));
+
+        let second_events = world.step_live(UpdateInput {
+            down: true,
+            ..UpdateInput::default()
+        });
+
+        let rescued_human = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Human)
+            .expect("rescued human");
+        assert_eq!(rescued_human.state, EntityState::Normal);
+        assert_eq!(
+            rescued_human.position.y,
+            world.safe_altitude_at_world_x(rescued_human.position.x)
+        );
+        assert!(second_events.contains(&WorldEvent::HumanRescued));
+    }
+
+    #[test]
+    fn uncaught_falling_humans_are_lost_on_ground_impact() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::with_state(EntityKind::Human, 14, 6, 0, 1, EntityState::Falling),
+                Entity::new(EntityKind::Mutant, 18, 4, 0, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Human), 0);
+        assert!(events.contains(&WorldEvent::HumanLost));
+    }
+
+    #[test]
+    fn player_hit_drops_a_carried_human_back_into_the_world() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 2,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 6, 4, 0, 0),
+                Entity::with_state(EntityKind::Human, 6, 5, 0, 0, EntityState::PlayerCarried),
+                Entity::new(EntityKind::Lander, 6, 4, 0, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        let human = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Human)
+            .expect("dropped human");
+        assert_eq!(human.state, EntityState::Falling);
+        assert_eq!(world.status().lives, 1);
+        assert!(events.contains(&WorldEvent::PlayerHit));
     }
 
     #[test]

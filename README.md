@@ -14,13 +14,16 @@
 
 ---
 
-This repository is the first native Rust pass at Williams' `Defender`.
+This repository is a native Rust reimplementation of Williams' `Defender`.
 
 The current milestone focuses on a solid native-Rust foundation for the start
 logo, attract sequence, high-score presentation, ROM-set auditing, CI, and test
 coverage before a richer live arcade loop lands. The game logic is native Rust;
 ROMs are treated as reference material only, and the current sound cues are
 synthesized in-process so the app does not depend on external audio files.
+The target is a faithful recreation of the original arcade game, with hidden
+`xyzzy` god-mode controls as the deliberate extra behavior outside the original
+cabinet rules.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -121,14 +124,17 @@ Extra keys while `xyzzy` mode is active:
   path.
 - `defender --play-live` now runs a real text-mode play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
-  hyperspace, enemy hits, wave progression, human abductions, rescue on
-  carrying-lander kills, mutant conversion after successful abductions,
-  persistent five-entry high-score tracking with initials entry, game-over
-  handling, restart support, a wrapped scrolling camera, and an `xyzzy`/`g`
-  secret god-mode path on top of the same native Rust world model.
+  hyperspace, enemy hits, wave progression, human abductions, falling-human
+  recovery, safe drop-off after catches, mutant conversion after successful
+  abductions, persistent five-entry high-score tracking with initials entry,
+  game-over handling, restart support, a wrapped scrolling camera, and an
+  `xyzzy`/`g` secret god-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
   instead of a flat floor, so demo and live frames show a moving landscape and
   projectiles are clipped by terrain.
+- Gameplay work is being prioritized toward faithful Williams-arcade behavior in
+  Rust first; hidden `xyzzy` options remain the only intentional rules
+  extension outside that baseline.
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
   adding a fuller terminal graphics path.
