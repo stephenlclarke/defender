@@ -51,6 +51,7 @@ struct XyzzyState {
     active: bool,
     sequence_index: usize,
     invincible: bool,
+    auto_fire: bool,
 }
 
 impl Default for SessionState {
@@ -110,6 +111,10 @@ impl SessionState {
         self.xyzzy.invincible
     }
 
+    pub fn auto_fire(&self) -> bool {
+        self.xyzzy.auto_fire
+    }
+
     pub fn tick(&mut self, input: SessionInput) -> Vec<SessionEvent> {
         if !matches!(self.mode, SessionMode::EnteringInitials) {
             self.handle_easter_egg_input(&input.typed_chars);
@@ -141,6 +146,7 @@ impl SessionState {
     fn tick_playing(&mut self, mut input: UpdateInput) -> Vec<SessionEvent> {
         input.secret_mode = self.xyzzy.active;
         input.invincible = self.xyzzy.invincible;
+        input.auto_fire = self.xyzzy.auto_fire;
         let mut events: Vec<SessionEvent> = self
             .world
             .step_live(input)
@@ -215,6 +221,8 @@ impl SessionState {
             self.update_easter_egg_sequence(character);
             if self.xyzzy.active && character == 'g' {
                 self.xyzzy.invincible = !self.xyzzy.invincible;
+            } else if self.xyzzy.active && character == 'f' {
+                self.xyzzy.auto_fire = !self.xyzzy.auto_fire;
             }
         }
     }
@@ -237,6 +245,7 @@ impl SessionState {
         self.xyzzy.sequence_index = 0;
         if !self.xyzzy.active {
             self.xyzzy.invincible = false;
+            self.xyzzy.auto_fire = false;
         }
     }
 
@@ -472,7 +481,7 @@ mod tests {
     }
 
     #[test]
-    fn xyzzy_toggles_secret_mode_and_resets_invincibility() {
+    fn xyzzy_toggles_secret_mode_and_resets_hidden_toggles() {
         let mut session = SessionState::new();
 
         session.tick(SessionInput {
@@ -481,12 +490,14 @@ mod tests {
         });
         assert!(session.xyzzy_active());
         assert!(!session.invincible());
+        assert!(!session.auto_fire());
 
         session.tick(SessionInput {
-            typed_chars: vec!['G'],
+            typed_chars: vec!['G', 'F'],
             ..SessionInput::default()
         });
         assert!(session.invincible());
+        assert!(session.auto_fire());
 
         session.tick(SessionInput {
             typed_chars: vec!['X', 'Y', 'Z', 'Z', 'Y'],
@@ -494,6 +505,7 @@ mod tests {
         });
         assert!(!session.xyzzy_active());
         assert!(!session.invincible());
+        assert!(!session.auto_fire());
     }
 
     #[test]
@@ -506,5 +518,17 @@ mod tests {
         });
 
         assert!(!session.invincible());
+    }
+
+    #[test]
+    fn secret_auto_fire_requires_xyzzy_mode() {
+        let mut session = SessionState::new();
+
+        session.tick(SessionInput {
+            typed_chars: vec!['f'],
+            ..SessionInput::default()
+        });
+
+        assert!(!session.auto_fire());
     }
 }

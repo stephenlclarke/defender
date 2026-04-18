@@ -76,6 +76,7 @@ fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
             session.high_score(),
             session.xyzzy_active(),
             session.invincible(),
+            session.auto_fire(),
         ),
         SessionMode::EnteringInitials => {
             let pending = session
@@ -92,6 +93,7 @@ fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
                     initials: &display_letters,
                     xyzzy_active: session.xyzzy_active(),
                     invincible: session.invincible(),
+                    auto_fire: session.auto_fire(),
                 },
             )
         }
@@ -99,12 +101,14 @@ fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
             session.world(),
             session.xyzzy_active(),
             session.invincible(),
+            session.auto_fire(),
         ),
         SessionMode::GameOver => render::render_game_over_screen_with_flags(
             session.world(),
             session.high_score(),
             session.xyzzy_active(),
             session.invincible(),
+            session.auto_fire(),
         ),
     };
     write!(stdout, "{text}").context("writing live frame")?;
@@ -432,11 +436,11 @@ mod tests {
     }
 
     #[test]
-    fn input_tracker_collects_typed_chars_for_xyzzy_and_god_mode() {
+    fn input_tracker_collects_typed_chars_for_xyzzy_god_mode_and_auto_fire() {
         let mut tracker = InputTracker::default();
         let mut input = PolledInput::default();
 
-        for key in ['X', 'Y', 'Z', 'Z', 'Y', 'G'] {
+        for key in ['X', 'Y', 'Z', 'Z', 'Y', 'G', 'F'] {
             tracker.handle_key_event(
                 KeyEvent::new(KeyCode::Char(key), KeyModifiers::SHIFT),
                 &mut input,
@@ -445,7 +449,7 @@ mod tests {
 
         assert_eq!(
             input.session.typed_chars,
-            vec!['x', 'y', 'z', 'z', 'y', 'g']
+            vec!['x', 'y', 'z', 'z', 'y', 'g', 'f']
         );
     }
 

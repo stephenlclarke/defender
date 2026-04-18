@@ -90,7 +90,7 @@ During a live session, type `X`, `Y`, `Z`, `Z`, `Y` to toggle hidden `XYZZY`
 mode on or off.
 
 Typing `XYZZY` a second time turns the mode off and resets the hidden
-invincibility toggle back to its default state.
+invincibility and auto-fire toggles back to their default state.
 
 Extra keys while `xyzzy` mode is active:
 
@@ -99,6 +99,9 @@ Extra keys while `xyzzy` mode is active:
 - `H`: hyperspace becomes safe and cannot destroy the player ship while
   `xyzzy` mode is active, and the rematerialization point is chosen as far away
   from enemies as possible.
+- `F`: toggle fully automatic firing. While active, the ship fires
+  automatically when a current laser shot would destroy an alien directly ahead
+  in the active firing lane.
 - `G`: toggle god mode. While active, enemy fire and mines cannot kill the
   player, and ramming an enemy destroys it and awards its normal score instead
   of costing a ship.
@@ -125,16 +128,17 @@ Extra keys while `xyzzy` mode is active:
   momentum preserved until you counter-thrust, and risky hyperspace behavior
   outside `xyzzy` mode, while `xyzzy` hyperspace deliberately relocates the
   ship away from enemy clusters, with automatic unlimited smart bombs in
-  `xyzzy` mode and a separate `G` invincibility toggle, plus later-wave pods
-  that burst into swarmer packs when shot and swarmer pursuit behavior that
-  preserves the classic follow-from-behind counterplay, a full-width radar
-  scanner strip that compresses the wrapped world into the top HUD, bomber
-  waves that arrive from wave two onward and leave persistent mine trails that
-  normal smart bombs do not clear, smart bombs that now only destroy enemies on
-  the main screen instead of globally in normal play, with `xyzzy` mode
-  extending the bomb to clear on-screen bullets and mines too, and baiters that
-  beam in when a wave drags on so cleanup is no longer risk-free, plus
-  arcade-style collision scoring where ramming enemies still awards their
+  `xyzzy` mode, a separate `G` invincibility toggle, and an `F` auto-fire
+  toggle that only shoots when the current firing lane has a direct alien kill,
+  plus later-wave pods that burst into swarmer packs when shot and swarmer
+  pursuit behavior that preserves the classic follow-from-behind counterplay, a
+  full-width radar scanner strip that compresses the wrapped world into the top
+  HUD, bomber waves that arrive from wave two onward and leave persistent mine
+  trails that normal smart bombs do not clear, smart bombs that now only
+  destroy enemies on the main screen instead of globally in normal play, with
+  `xyzzy` mode extending the bomb to clear on-screen bullets and mines too, and
+  baiters that beam in when a wave drags on so cleanup is no longer risk-free,
+  plus arcade-style collision scoring where ramming enemies still awards their
   normal value and dying on bullets or mines still grants `25` points, while
   `G` god mode blocks bullet and mine deaths and turns direct enemy crashes
   into safe kills that still pay their normal value,

@@ -117,6 +117,7 @@ pub struct UpdateInput {
     pub thrust: bool,
     pub reverse: bool,
     pub fire: bool,
+    pub auto_fire: bool,
     pub smart_bomb: bool,
     pub hyperspace: bool,
     pub secret_mode: bool,
@@ -562,7 +563,15 @@ impl World {
             self.detonate_smart_bomb(input.secret_mode, &mut events);
         }
 
-        if input.fire
+        self.update_enemy_intents(min_y, max_y);
+        self.begin_human_abductions();
+
+        let auto_fire = input.secret_mode
+            && input.auto_fire
+            && !hyperspaced_this_tick
+            && self.fire_cooldown == 0
+            && shot_origin.is_some_and(|origin| self.should_auto_fire(origin, max_x, min_y, max_y));
+        if (input.fire || auto_fire)
             && !hyperspaced_this_tick
             && self.fire_cooldown == 0
             && let Some(origin) = shot_origin
@@ -578,9 +587,6 @@ impl World {
             self.fire_cooldown = 2;
             events.push(WorldEvent::ShotFired);
         }
-
-        self.update_enemy_intents(min_y, max_y);
-        self.begin_human_abductions();
 
         for entity in &mut self.entities {
             match entity.kind {
@@ -1117,6 +1123,36 @@ impl World {
             .iter()
             .find(|entity| entity.kind == EntityKind::PlayerShip)
             .map(|entity| entity.velocity)
+    }
+
+    fn should_auto_fire(&self, origin: Position, max_x: i32, min_y: i32, max_y: i32) -> bool {
+        let shot_position = Position {
+            x: wrap_coordinate(origin.x + self.player_facing.step() * 3, max_x),
+            y: origin.y,
+        };
+
+        self.entities
+            .iter()
+            .filter(|entity| entity.kind.is_enemy())
+            .map(|entity| self.project_enemy_position_after_movement(entity, max_x, min_y, max_y))
+            .any(|enemy_position| positions_overlap(shot_position, enemy_position, 1, 0))
+    }
+
+    fn project_enemy_position_after_movement(
+        &self,
+        entity: &Entity,
+        max_x: i32,
+        min_y: i32,
+        max_y: i32,
+    ) -> Position {
+        let x = wrap_coordinate(entity.position.x + entity.velocity.dx, max_x);
+        let mut y = entity.position.y + entity.velocity.dy;
+        let surface = terrain_surface_y(&self.terrain, x);
+        if y <= min_y || y >= max_y.min(surface) {
+            y = y.clamp(min_y, max_y.min(surface));
+        }
+
+        Position { x, y }
     }
 
     fn hyperspace_destination_is_unsafe(&self, player_position: Position) -> bool {
@@ -3391,5 +3427,64 @@ mod tests {
         assert_eq!(world.smart_bombs(), 0);
         assert_eq!(world.status().score, 0);
         assert!(!events.contains(&WorldEvent::SmartBombDetonated));
+    }
+
+    #[test]
+    fn live_step_auto_fire_destroys_enemy_directly_ahead_in_secret_mode() {
+        let mut world = World::with_entities(
+            16,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0),
+                Entity::new(EntityKind::Bomber, 9, 4, -1, 0),
+                Entity::with_state(EntityKind::Human, 1, 1, 0, 0, EntityState::Abducted),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput {
+            secret_mode: true,
+            auto_fire: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Bomber), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::PlayerShot), 0);
+        assert_eq!(world.status().score, 250);
+        assert!(events.contains(&WorldEvent::ShotFired));
+        assert!(events.contains(&WorldEvent::EnemyDestroyed));
+    }
+
+    #[test]
+    fn live_step_auto_fire_waits_for_a_direct_target() {
+        let mut world = World::with_entities(
+            16,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0),
+                Entity::new(EntityKind::Bomber, 13, 4, -1, 0),
+                Entity::with_state(EntityKind::Human, 1, 1, 0, 0, EntityState::Abducted),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput {
+            secret_mode: true,
+            auto_fire: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Bomber), 1);
+        assert_eq!(world.entity_count_by_kind(EntityKind::PlayerShot), 0);
+        assert_eq!(world.status().score, 0);
+        assert!(!events.contains(&WorldEvent::ShotFired));
     }
 }

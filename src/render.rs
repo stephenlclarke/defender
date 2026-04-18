@@ -9,6 +9,7 @@ pub struct InitialsEntryView<'a> {
     pub initials: &'a str,
     pub xyzzy_active: bool,
     pub invincible: bool,
+    pub auto_fire: bool,
 }
 
 pub fn render_grid(world: &World) -> Vec<String> {
@@ -110,17 +111,22 @@ fn plot_scanner_glyph(cell: &mut char, glyph: char) {
 }
 
 pub fn render(world: &World) -> String {
-    render_with_flags(world, false, false)
+    render_with_flags(world, false, false, false)
 }
 
-pub fn render_with_flags(world: &World, xyzzy_active: bool, invincible: bool) -> String {
+pub fn render_with_flags(
+    world: &World,
+    xyzzy_active: bool,
+    invincible: bool,
+    auto_fire: bool,
+) -> String {
     let mut lines = render_grid(world);
     if world.is_game_over() {
         lines.push(String::from(
             "GAME OVER. Press `q` or `Esc` to leave the live session.",
         ));
     }
-    lines.extend(secret_mode_lines(xyzzy_active, invincible));
+    lines.extend(secret_mode_lines(xyzzy_active, invincible, auto_fire));
     lines.push(String::from(
         "Controls: `A` up, `Z` down, `Shift` thrust, `Space` flip direction, `Enter` fire, `Tab` smart bomb, `H` hyperspace, `q` quits.",
     ));
@@ -131,13 +137,14 @@ pub fn render_with_flags(world: &World, xyzzy_active: bool, invincible: bool) ->
 }
 
 pub fn render_title_screen(high_score: u32) -> String {
-    render_title_screen_with_flags(high_score, false, false)
+    render_title_screen_with_flags(high_score, false, false, false)
 }
 
 pub fn render_title_screen_with_flags(
     high_score: u32,
     xyzzy_active: bool,
     invincible: bool,
+    auto_fire: bool,
 ) -> String {
     [
         r" ____  _____ _____ _____ _   _ ____  _____ ____  ".to_string(),
@@ -159,13 +166,13 @@ pub fn render_title_screen_with_flags(
         String::from("LASER: `Enter`"),
         String::from("SMART BOMB: `Tab`"),
         String::from("HYPERSPACE: `H`"),
-        secret_mode_lines(xyzzy_active, invincible).join("\n"),
+        secret_mode_lines(xyzzy_active, invincible, auto_fire).join("\n"),
     ]
     .join("\n")
 }
 
 pub fn render_game_over_screen(world: &World, high_score: u32) -> String {
-    render_game_over_screen_with_flags(world, high_score, false, false)
+    render_game_over_screen_with_flags(world, high_score, false, false, false)
 }
 
 pub fn render_game_over_screen_with_flags(
@@ -173,6 +180,7 @@ pub fn render_game_over_screen_with_flags(
     high_score: u32,
     xyzzy_active: bool,
     invincible: bool,
+    auto_fire: bool,
 ) -> String {
     let mut lines = render_grid(world);
     lines.push(String::new());
@@ -181,7 +189,7 @@ pub fn render_game_over_screen_with_flags(
         world.status().score,
         high_score
     ));
-    lines.extend(secret_mode_lines(xyzzy_active, invincible));
+    lines.extend(secret_mode_lines(xyzzy_active, invincible, auto_fire));
     lines.push(String::from("PRESS `ENTER` OR `1` TO RESTART"));
     lines.push(String::from("PRESS `q` OR `Esc` TO QUIT"));
     lines.join("\n")
@@ -205,12 +213,16 @@ pub fn render_initials_entry_screen(world: &World, view: &InitialsEntryView<'_>)
     lines.push(String::from(" RANK  INITIALS   SCORE"));
     lines.push(String::from(" ----  --------  -------"));
     lines.extend(view.high_scores.rows());
-    lines.extend(secret_mode_lines(view.xyzzy_active, view.invincible));
+    lines.extend(secret_mode_lines(
+        view.xyzzy_active,
+        view.invincible,
+        view.auto_fire,
+    ));
     lines.push(String::from("PRESS `q` OR `Esc` TO QUIT"));
     lines.join("\n")
 }
 
-fn secret_mode_lines(xyzzy_active: bool, invincible: bool) -> Vec<String> {
+fn secret_mode_lines(xyzzy_active: bool, invincible: bool, auto_fire: bool) -> Vec<String> {
     if !xyzzy_active {
         return Vec::new();
     }
@@ -220,7 +232,12 @@ fn secret_mode_lines(xyzzy_active: bool, invincible: bool) -> Vec<String> {
         if invincible {
             String::from("SMART BOMBS INF  GOD MODE ON  INVINCIBLE")
         } else {
-            String::from("SMART BOMBS INF  GOD MODE OFF  PRESS `g` TO TOGGLE INVINCIBILITY")
+            String::from("SMART BOMBS INF  GOD MODE OFF  PRESS `G` TO TOGGLE INVINCIBILITY")
+        },
+        if auto_fire {
+            String::from("AUTO FIRE ON  PRESS `F` TO TOGGLE")
+        } else {
+            String::from("AUTO FIRE OFF  PRESS `F` TO TOGGLE")
         },
     ]
 }
@@ -310,10 +327,11 @@ mod tests {
 
     #[test]
     fn render_with_secret_mode_shows_xyzzy_indicator() {
-        let output = super::render_with_flags(&World::bootstrap(), true, true);
+        let output = super::render_with_flags(&World::bootstrap(), true, true, true);
 
         assert!(output.contains("XYZZY MODE ENABLED"));
         assert!(output.contains("SMART BOMBS INF"));
+        assert!(output.contains("AUTO FIRE ON"));
     }
 
     #[test]
@@ -360,6 +378,7 @@ mod tests {
                 initials: "RO_",
                 xyzzy_active: false,
                 invincible: false,
+                auto_fire: false,
             },
         );
 
