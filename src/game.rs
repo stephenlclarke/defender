@@ -632,6 +632,7 @@ impl World {
             &mut events,
         );
         self.mutate_landers_if_humans_extinct();
+        self.clear_baiters_if_landers_gone();
 
         self.spawn_baiter_if_needed(min_y, max_y);
 
@@ -1554,6 +1555,15 @@ impl World {
         }
     }
 
+    fn clear_baiters_if_landers_gone(&mut self) {
+        if self.entity_count_by_kind(EntityKind::Lander) > 0 {
+            return;
+        }
+
+        self.entities
+            .retain(|entity| entity.kind != EntityKind::Baiter);
+    }
+
     fn retain_projectiles(&mut self, max_x: i32, min_y: i32, max_y: i32) {
         let terrain = &self.terrain;
         self.entities.retain(|entity| match entity.kind {
@@ -1567,7 +1577,9 @@ impl World {
     }
 
     fn spawn_baiter_if_needed(&mut self, min_y: i32, max_y: i32) {
-        if self.entity_count_by_kind(EntityKind::Baiter) >= MAX_BAITERS {
+        if self.entity_count_by_kind(EntityKind::Baiter) >= MAX_BAITERS
+            || self.entity_count_by_kind(EntityKind::Lander) == 0
+        {
             return;
         }
 
@@ -2285,8 +2297,10 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 4, 4, 1, 0),
+                Entity::new(EntityKind::Lander, 18, 1, 0, 0),
                 Entity::new(EntityKind::Baiter, 12, 6, 0, 0),
                 Entity::new(EntityKind::Pod, 18, 3, 0, 0),
+                Entity::new(EntityKind::Human, 1, 8, 0, 0),
             ],
         );
 
@@ -3126,15 +3140,67 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 3, 4, 0, 0),
+                Entity::new(EntityKind::Lander, 18, 4, 0, 0),
+                Entity::new(EntityKind::Pod, 18, 4, 0, 0),
+                Entity::new(EntityKind::Human, 1, 8, 0, 0),
+            ],
+        );
+        world.tick = BAITER_BASE_DELAY + 4;
+
+        world.step_live(UpdateInput::default());
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Baiter), 1);
+    }
+
+    #[test]
+    fn live_step_does_not_spawn_baiters_once_landers_are_gone() {
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 99,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 3, 4, 0, 0),
+                Entity::new(EntityKind::Pod, 18, 4, 0, 0),
+            ],
+        );
+        world.tick = BAITER_BASE_DELAY;
+
+        world.step_live(UpdateInput::default());
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Baiter), 0);
+    }
+
+    #[test]
+    fn baiters_disappear_when_the_last_lander_is_destroyed() {
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 4, 0, 0),
+                Entity::new(EntityKind::PlayerShot, 8, 4, 1, 0),
+                Entity::new(EntityKind::Lander, 9, 4, 0, 0),
+                Entity::new(EntityKind::Baiter, 14, 4, 0, 0),
                 Entity::new(EntityKind::Pod, 18, 4, 0, 0),
             ],
         );
 
-        for _ in 0..=BAITER_BASE_DELAY {
-            world.step_live(UpdateInput::default());
-        }
+        let events = world.step_live(UpdateInput::default());
 
-        assert_eq!(world.entity_count_by_kind(EntityKind::Baiter), 1);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Baiter), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Pod), 1);
+        assert_eq!(world.status().score, 150);
+        assert!(events.contains(&WorldEvent::EnemyDestroyed));
+        assert!(!events.contains(&WorldEvent::WaveAdvanced));
     }
 
     #[test]

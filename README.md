@@ -92,7 +92,7 @@ mode on or off.
 Typing `XYZZY` a second time turns the mode off and resets the hidden
 invincibility and auto-fire toggles back to their default state.
 
-Extra keys while `xyzzy` mode is active:
+Extra keys and game behaviour while `xyzzy` mode is active:
 
 - smart bombs become unlimited automatically while `xyzzy` mode is enabled,
   and `xyzzy` smart bombs also clear bullets and mines on the main screen.
@@ -138,8 +138,9 @@ Extra keys while `xyzzy` mode is active:
   trails that normal smart bombs do not clear, smart bombs that now only
   destroy enemies on the main screen instead of globally in normal play, with
   `xyzzy` mode extending the bomb to clear on-screen bullets and mines too, and
-  baiters that beam in when a wave drags on so cleanup is no longer risk-free,
-  plus arcade-style collision scoring where ramming enemies still awards their
+  baiters that beam in when a wave drags on while landers remain, then clear as
+  soon as the last lander is gone, plus arcade-style collision scoring where
+  ramming enemies still awards their
   normal value and dying on bullets or mines still grants `25` points, while
   `G` god mode blocks bullet and mine deaths and turns direct enemy crashes
   into safe kills that still pay their normal value,
