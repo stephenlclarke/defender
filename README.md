@@ -134,8 +134,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   the current firing lane has a direct alien kill, plus pod waves that now
   start on wave two and ramp up to four ships by wave four, release
   deterministic five-to-seven swarmer bursts when shot, and preserve the
-  classic follow-from-behind swarmer counterplay, with opening attack waves now
-  led by five landers before later-wave bombers and pods layer on top, a
+  classic follow-from-behind swarmer counterplay, with 15-enemy attack waves
+  now opening with five landers and then delivering two later five-ship
+  reinforcement groups before later-wave bombers and pods layer on top, while
+  destroyed-planet mutant phases follow the same staged reinforcement pattern, a
   full-width radar scanner strip that compresses the wrapped world into the top
   HUD,
   bomber waves that arrive from wave two onward and leave persistent mine
@@ -209,10 +211,10 @@ the final runtime self-contained:
   revision history and ROM-set background for Williams Defender releases.
 - <https://www.dougmahugh.com/defender-chapter01/>: general arcade-rules
   reference used for bomber wave timing, bomber-mine danger, radar behavior,
-  ten-humanoid/fifth-wave restoration rules, mutant-only post-extinction wave
-  behavior, and the scoring rule that collision deaths on bullets or mines
-  still award `25` points while ramming enemies still scores their normal
-  value.
+  ten-humanoid/fifth-wave restoration rules, the three-group 15-enemy attack
+  wave structure, mutant-only post-extinction wave behavior, and the scoring
+  rule that collision deaths on bullets or mines still award `25` points while
+  ramming enemies still scores their normal value.
 - <https://williamsarcades.com/Defender>: original cabinet and control-panel
   reference used to keep the Rust controls and cabinet assumptions aligned with
   Williams' arcade hardware.
@@ -224,8 +226,9 @@ the final runtime self-contained:
   bomb award behavior.
 - <https://strategywiki.org/wiki/Defender/Gameplay>: gameplay reference used to
   cross-check live enemy and humanoid behavior against the original arcade
-  rules, including opening five-lander attack waves, later pod scheduling, and
-  the destroyed-planet mutant-wave cycle until the next fifth-round restore.
+  rules, including opening five-lander attack waves, later five-ship
+  reinforcement groups, later pod scheduling, and the destroyed-planet mutant-
+  wave cycle until the next fifth-round restore.
 - <https://strategywiki.org/wiki/Defender/Walkthrough>: rescue-strategy and
   scoring reference used for the current `500` catch / `500` return humanoid
   rescue implementation.

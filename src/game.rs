@@ -23,6 +23,9 @@ const POD_SWARMER_BURST_RANGE: usize = 3;
 const MAX_SWARMERS: usize = 20;
 const BOMBER_MINE_DROP_DELAY: u32 = 3;
 const MAX_MINES: usize = 24;
+const ATTACK_WAVE_GROUP_SIZE: u8 = 5;
+const ATTACK_WAVE_TOTAL_OPENERS: u8 = 15;
+const ATTACK_WAVE_REINFORCEMENT_DELAY: u32 = 18;
 const DEFAULT_HUMAN_WORLD_XS: [i32; 10] = [8, 26, 44, 62, 80, 98, 116, 134, 152, 170];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -204,6 +207,9 @@ pub struct World {
     smart_bombs: u8,
     wave_started_at: u32,
     last_baiter_tick: u32,
+    pending_wave_openers: u8,
+    spawned_wave_opener_groups: u8,
+    next_wave_reinforcement_tick: u32,
     game_over: bool,
     status: Status,
     terrain: Vec<usize>,
@@ -224,6 +230,7 @@ impl World {
             WORLD_SPAN as i32,
             DEFAULT_WAVE,
             EntityKind::Lander,
+            0,
         ));
         entities.extend(default_humans(&terrain));
         Self {
@@ -238,6 +245,9 @@ impl World {
             smart_bombs: DEFAULT_SMART_BOMBS,
             wave_started_at: 0,
             last_baiter_tick: 0,
+            pending_wave_openers: ATTACK_WAVE_TOTAL_OPENERS - ATTACK_WAVE_GROUP_SIZE,
+            spawned_wave_opener_groups: 1,
+            next_wave_reinforcement_tick: ATTACK_WAVE_REINFORCEMENT_DELAY,
             game_over: false,
             status: Status {
                 score: 0,
@@ -267,6 +277,9 @@ impl World {
             smart_bombs: DEFAULT_SMART_BOMBS,
             wave_started_at: 0,
             last_baiter_tick: 0,
+            pending_wave_openers: 0,
+            spawned_wave_opener_groups: 0,
+            next_wave_reinforcement_tick: 0,
             game_over: false,
             status,
             terrain: build_flat_terrain(width, height),
@@ -321,6 +334,7 @@ impl World {
         }
 
         self.retain_projectiles(max_x, min_y, max_y);
+        self.spawn_attack_wave_reinforcements_if_due();
         self.sync_camera_to_player();
     }
 
@@ -409,6 +423,7 @@ impl World {
             .iter()
             .filter(|entity| entity.kind.is_enemy() && entity.kind != EntityKind::Baiter)
             .count()
+            + usize::from(self.pending_wave_openers)
     }
 
     pub fn human_count(&self) -> usize {
@@ -643,6 +658,7 @@ impl World {
         );
         self.mutate_landers_if_humans_extinct();
         self.clear_baiters_if_landers_gone();
+        self.spawn_attack_wave_reinforcements_if_due();
 
         self.spawn_baiter_if_needed(min_y, max_y);
 
@@ -1649,7 +1665,7 @@ impl World {
         } else {
             EntityKind::Mutant
         };
-        let mut enemies = default_attack_wave_openers(width, self.status.wave, opening_enemy);
+        let mut enemies = default_attack_wave_openers(width, self.status.wave, opening_enemy, 0);
 
         if self.status.wave >= 2 {
             enemies.push(Entity::new(
@@ -1704,6 +1720,9 @@ impl World {
         self.entities.extend(enemies);
         self.wave_started_at = self.tick;
         self.last_baiter_tick = self.tick;
+        self.pending_wave_openers = ATTACK_WAVE_TOTAL_OPENERS - ATTACK_WAVE_GROUP_SIZE;
+        self.spawned_wave_opener_groups = 1;
+        self.next_wave_reinforcement_tick = self.tick + ATTACK_WAVE_REINFORCEMENT_DELAY;
     }
 
     fn has_humanoids(&self) -> bool {
@@ -1716,6 +1735,35 @@ impl World {
         self.entities
             .retain(|entity| entity.kind != EntityKind::Human);
         self.entities.extend(default_humans(&self.terrain));
+    }
+
+    fn spawn_attack_wave_reinforcements_if_due(&mut self) {
+        if self.pending_wave_openers == 0 || self.tick < self.next_wave_reinforcement_tick {
+            return;
+        }
+
+        let opening_enemy = if self.has_humanoids() {
+            EntityKind::Lander
+        } else {
+            EntityKind::Mutant
+        };
+        let group_index = self.spawned_wave_opener_groups;
+        let group_size = ATTACK_WAVE_GROUP_SIZE.min(self.pending_wave_openers);
+        let mut reinforcements = default_attack_wave_openers(
+            self.world_span,
+            self.status.wave,
+            opening_enemy,
+            group_index,
+        );
+        reinforcements.truncate(group_size as usize);
+        self.entities.extend(reinforcements);
+
+        self.pending_wave_openers = self.pending_wave_openers.saturating_sub(group_size);
+        self.spawned_wave_opener_groups = self.spawned_wave_opener_groups.saturating_add(1);
+        if self.pending_wave_openers > 0 {
+            self.next_wave_reinforcement_tick =
+                self.tick.saturating_add(ATTACK_WAVE_REINFORCEMENT_DELAY);
+        }
     }
 
     fn sync_camera_to_player(&mut self) {
@@ -1880,15 +1928,21 @@ fn default_humans(terrain: &[usize]) -> Vec<Entity> {
         .collect()
 }
 
-fn default_attack_wave_openers(world_span: i32, wave: u8, kind: EntityKind) -> Vec<Entity> {
+fn default_attack_wave_openers(
+    world_span: i32,
+    wave: u8,
+    kind: EntityKind,
+    group_index: u8,
+) -> Vec<Entity> {
     let max_x = world_span - 1;
     let wave_offset = i32::from(wave % 6);
+    let group_offset = i32::from(group_index) * 14;
     [
-        (world_span - 12, 3 + wave_offset % 3, -1, 1),
-        (world_span - 6, 6, -1, 1),
-        (18 + wave_offset, 8, 1, -1),
-        (world_span / 2 + 8, 4, -1, 1),
-        (world_span / 2 - 10, 7, 1, -1),
+        (world_span - 12 - group_offset, 3 + wave_offset % 3, -1, 1),
+        (world_span - 6 - group_offset, 6, -1, 1),
+        (18 + wave_offset + group_offset, 8, 1, -1),
+        (world_span / 2 + 8 + group_offset, 4, -1, 1),
+        (world_span / 2 - 10 - group_offset, 7, 1, -1),
     ]
     .into_iter()
     .map(|(x, y, dx, dy)| Entity::new(kind, wrap_coordinate(x, max_x), y, dx, dy))
@@ -1910,10 +1964,11 @@ mod tests {
     use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS, PLAYER_START_X};
 
     use super::{
-        BAITER_BASE_DELAY, BOMBER_EVASIVE_SPEED, Entity, EntityKind, EntityState,
-        HAZARD_COLLISION_SCORE, HorizontalDirection, POD_SWARMER_BURST_MIN,
-        POD_SWARMER_BURST_RANGE, Position, SWARMER_SPEED, Status, UpdateInput, World, WorldEvent,
-        hyperspace_result, nearest_wrapped_target, shortest_wrapped_delta, wrap_coordinate,
+        ATTACK_WAVE_REINFORCEMENT_DELAY, BAITER_BASE_DELAY, BOMBER_EVASIVE_SPEED, Entity,
+        EntityKind, EntityState, HAZARD_COLLISION_SCORE, HorizontalDirection,
+        POD_SWARMER_BURST_MIN, POD_SWARMER_BURST_RANGE, Position, SWARMER_SPEED, Status,
+        UpdateInput, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
+        shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -3193,6 +3248,76 @@ mod tests {
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Bomber), 3);
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Pod), 4);
         assert_eq!(wave_five.human_count(), 10);
+    }
+
+    #[test]
+    fn attack_waves_arrive_in_three_five_ship_groups() {
+        let mut world = World::bootstrap();
+
+        for _ in 0..ATTACK_WAVE_REINFORCEMENT_DELAY {
+            world.step();
+        }
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 10);
+
+        for _ in 0..ATTACK_WAVE_REINFORCEMENT_DELAY {
+            world.step();
+        }
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 15);
+    }
+
+    #[test]
+    fn mutant_reinforcements_follow_the_same_three_group_schedule() {
+        let mut world = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+        );
+
+        world.spawn_wave();
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 5);
+
+        for _ in 0..ATTACK_WAVE_REINFORCEMENT_DELAY {
+            world.step();
+        }
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 10);
+
+        for _ in 0..ATTACK_WAVE_REINFORCEMENT_DELAY {
+            world.step();
+        }
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 15);
+    }
+
+    #[test]
+    fn waves_do_not_advance_while_reinforcement_groups_are_still_pending() {
+        let mut world = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Human, 8, 9, 0, 0),
+            ],
+        );
+
+        world.spawn_wave();
+        world
+            .entities
+            .retain(|entity| entity.kind != EntityKind::Lander);
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.status().wave, 1);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
+        assert!(!events.contains(&WorldEvent::WaveAdvanced));
     }
 
     #[test]
