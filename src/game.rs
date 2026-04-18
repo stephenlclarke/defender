@@ -178,7 +178,6 @@ pub struct World {
     camera_x: i32,
     player_facing: HorizontalDirection,
     tick: u32,
-    fire_cooldown: u8,
     next_stock_award: u32,
     smart_bombs: u8,
     wave_started_at: u32,
@@ -217,7 +216,6 @@ impl World {
             camera_x: PLAYER_START_X,
             player_facing: HorizontalDirection::Right,
             tick: 0,
-            fire_cooldown: 0,
             next_stock_award: next_stock_award_score(0),
             smart_bombs: DEFAULT_SMART_BOMBS,
             wave_started_at: 0,
@@ -249,7 +247,6 @@ impl World {
             camera_x: width as i32 / 2,
             player_facing: HorizontalDirection::Right,
             tick: 0,
-            fire_cooldown: 0,
             next_stock_award: next_stock_award_score(status.score),
             smart_bombs: DEFAULT_SMART_BOMBS,
             wave_started_at: 0,
@@ -310,9 +307,9 @@ impl World {
             }
         }
 
+        self.sync_camera_to_player();
         self.retain_projectiles(max_x, min_y, max_y);
         self.spawn_attack_wave_reinforcements_if_due();
-        self.sync_camera_to_player();
     }
 
     pub fn width(&self) -> usize {
@@ -486,9 +483,6 @@ impl World {
         }
 
         self.tick += 1;
-        if self.fire_cooldown > 0 {
-            self.fire_cooldown -= 1;
-        }
 
         let max_x = self.world_max_x();
         let min_y = 1;
@@ -576,14 +570,17 @@ impl World {
         let auto_fire = input.secret_mode
             && input.auto_fire
             && !hyperspaced_this_tick
-            && self.fire_cooldown == 0
+            && self.can_fire_player_shot(input.secret_mode)
             && shot_origin.is_some_and(|origin| self.should_auto_fire(origin, max_x, min_y, max_y));
         if (input.fire || auto_fire)
             && !hyperspaced_this_tick
-            && self.fire_cooldown == 0
+            && self.can_fire_player_shot(input.secret_mode)
             && let Some(origin) = shot_origin
         {
-            let shot_dx = self.player_facing.step() * 2;
+            let shot_dx = self.player_facing.step() * arcade_tables().player_shot_speed;
+            // Doug Mahugh chapter 02 describes Defender's laser as a four-shot
+            // weapon whose bursts remain active only until they outrun the main
+            // screen. XYZZY deliberately lifts the cap.
             self.entities.push(Entity::new(
                 EntityKind::PlayerShot,
                 wrap_coordinate(origin.x + self.player_facing.step(), max_x),
@@ -591,7 +588,6 @@ impl World {
                 shot_dx,
                 0,
             ));
-            self.fire_cooldown = 2;
             events.push(WorldEvent::ShotFired);
         }
 
@@ -624,6 +620,7 @@ impl World {
 
         self.drop_bomber_mines(min_y, max_y);
         self.spawn_enemy_fire(max_x, min_y, max_y, &mut events);
+        self.sync_camera_to_player();
         self.retain_projectiles(max_x, min_y, max_y);
 
         self.update_abducted_humans(min_y, &mut events);
@@ -1158,7 +1155,10 @@ impl World {
 
     fn should_auto_fire(&self, origin: Position, max_x: i32, min_y: i32, max_y: i32) -> bool {
         let shot_position = Position {
-            x: wrap_coordinate(origin.x + self.player_facing.step() * 3, max_x),
+            x: wrap_coordinate(
+                origin.x + self.player_facing.step() * (arcade_tables().player_shot_speed + 1),
+                max_x,
+            ),
             y: origin.y,
         };
 
@@ -1610,14 +1610,28 @@ impl World {
 
     fn retain_projectiles(&mut self, max_x: i32, min_y: i32, max_y: i32) {
         let terrain = &self.terrain;
+        let width = self.width;
+        let world_span = self.world_span;
+        let left_edge = self.left_edge();
         self.entities.retain(|entity| match entity.kind {
-            EntityKind::PlayerShot | EntityKind::EnemyShot => {
+            EntityKind::PlayerShot => {
+                screen_x_for_world_x(entity.position.x, left_edge, width, world_span, max_x)
+                    .is_some()
+                    && (min_y..=max_y).contains(&entity.position.y)
+                    && entity.position.y < terrain_surface_y(terrain, entity.position.x) + 1
+            }
+            EntityKind::EnemyShot => {
                 (0..=max_x).contains(&entity.position.x)
                     && (min_y..=max_y).contains(&entity.position.y)
                     && entity.position.y < terrain_surface_y(terrain, entity.position.x) + 1
             }
             _ => true,
         });
+    }
+
+    fn can_fire_player_shot(&self, secret_mode: bool) -> bool {
+        secret_mode
+            || self.entity_count_by_kind(EntityKind::PlayerShot) < arcade_tables().player_shot_limit
     }
 
     fn spawn_baiter_if_needed(&mut self, min_y: i32, max_y: i32) {
@@ -1856,6 +1870,21 @@ fn build_scrolling_terrain(span: usize, height: usize) -> Vec<usize> {
 fn terrain_surface_y(terrain: &[usize], world_x: i32) -> i32 {
     let index = wrap_coordinate(world_x, terrain.len() as i32 - 1) as usize;
     terrain[index] as i32 - 1
+}
+
+fn screen_x_for_world_x(
+    world_x: i32,
+    left_edge: i32,
+    width: usize,
+    world_span: i32,
+    world_max_x: i32,
+) -> Option<usize> {
+    if !(0..=world_max_x).contains(&world_x) {
+        return None;
+    }
+
+    let offset = (world_x - left_edge).rem_euclid(world_span);
+    (offset < width as i32).then_some(offset as usize)
 }
 
 fn wrapped_horizontal_step(from: i32, to: i32, max_x: i32) -> i32 {
@@ -2159,6 +2188,69 @@ mod tests {
         assert_eq!(world.player_facing(), HorizontalDirection::Right);
         assert_eq!(world.entity_count_by_kind(EntityKind::PlayerShot), 1);
         assert!(events.contains(&WorldEvent::ShotFired));
+    }
+
+    #[test]
+    fn live_step_caps_player_shots_at_four_in_normal_play() {
+        let mut world = World::with_entities(
+            64,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 10, 4, 0, 0),
+                Entity::new(EntityKind::Bomber, 50, 1, 0, 0),
+            ],
+        );
+
+        for _ in 0..arcade_tables().player_shot_limit {
+            world.step_live(UpdateInput {
+                fire: true,
+                ..UpdateInput::default()
+            });
+        }
+        let events = world.step_live(UpdateInput {
+            fire: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(
+            world.entity_count_by_kind(EntityKind::PlayerShot),
+            arcade_tables().player_shot_limit
+        );
+        assert!(!events.contains(&WorldEvent::ShotFired));
+    }
+
+    #[test]
+    fn xyzzy_mode_removes_the_four_shot_cap() {
+        let mut world = World::with_entities(
+            64,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 10, 4, 0, 0),
+                Entity::new(EntityKind::Bomber, 50, 1, 0, 0),
+            ],
+        );
+
+        for _ in 0..=arcade_tables().player_shot_limit {
+            world.step_live(UpdateInput {
+                fire: true,
+                secret_mode: true,
+                ..UpdateInput::default()
+            });
+        }
+
+        assert!(
+            world.entity_count_by_kind(EntityKind::PlayerShot) > arcade_tables().player_shot_limit
+        );
     }
 
     #[test]
@@ -3178,6 +3270,34 @@ mod tests {
 
         world.step_live(UpdateInput::default());
         assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+    }
+
+    #[test]
+    fn live_step_removes_player_shots_that_leave_the_main_screen() {
+        let mut world = World::bootstrap();
+        let player_x = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player")
+            .position
+            .x;
+        let offscreen_x =
+            wrap_coordinate(player_x + world.width() as i32 / 2 + 2, world.world_max_x());
+        let shot_y = world.safe_altitude_at_world_x(offscreen_x).min(4);
+        world.spawn_entity(Entity::new(
+            EntityKind::PlayerShot,
+            offscreen_x,
+            shot_y,
+            2,
+            0,
+        ));
+
+        assert!(world.screen_x_for_world_x(offscreen_x).is_none());
+
+        world.step_live(UpdateInput::default());
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::PlayerShot), 0);
     }
 
     #[test]

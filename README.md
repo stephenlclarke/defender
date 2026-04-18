@@ -94,6 +94,8 @@ invincibility and auto-fire toggles back to their default state.
 
 Extra keys and game behaviour while `xyzzy` mode is active:
 
+- the normal four-shot arcade laser cap is removed while `xyzzy` mode is
+  active.
 - smart bombs become unlimited automatically while `xyzzy` mode is enabled,
   and `xyzzy` smart bombs also clear bullets and mines on the main screen.
 - `F`: toggle fully automatic firing. While active, the ship fires
@@ -129,13 +131,15 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   pursuit of free humans, mutant pursuit of the player, and an arcade-style
   facing model where `Space` flips the ship direction while `Shift` thrust and
   `Enter` fire follow the current heading, with horizontal momentum preserved
-  until you counter-thrust, and risky hyperspace behavior outside `xyzzy` mode,
-  while `xyzzy` hyperspace deliberately relocates the ship away from enemy
-  clusters, with automatic unlimited smart bombs in `xyzzy` mode, a separate
-  `G` invincibility toggle, an `F` auto-fire toggle that only shoots when the
-  current firing lane has a direct alien kill, and secret-mode full-height
-  humanoid fall survival, plus pod waves that now start on wave two and ramp
-  up to four ships by wave four, release
+  until you counter-thrust, with the arcade four-shot laser cap restored in
+  normal play and player shots now expiring at the main-screen edge instead of
+  wandering the whole wrapped world, and risky hyperspace behavior outside
+  `xyzzy` mode, while `xyzzy` hyperspace deliberately relocates the ship away
+  from enemy clusters, with automatic unlimited smart bombs in `xyzzy` mode,
+  the normal shot cap removed in `xyzzy`, a separate `G` invincibility toggle,
+  an `F` auto-fire toggle that only shoots when the current firing lane has a
+  direct alien kill, and secret-mode full-height humanoid fall survival, plus
+  pod waves that now start on wave two and ramp up to four ships by wave four, release
   deterministic five-to-seven swarmer bursts when shot, and preserve the
   classic follow-from-behind swarmer counterplay, with 15-enemy attack waves
   now opening with five landers and then delivering two later five-ship
@@ -248,8 +252,10 @@ the final runtime self-contained:
   ship keeps its current momentum until thrust changes it.
 - <https://www.dougmahugh.com/defender-chapter02/>: control-analysis reference
   used for hyperspace risk, stopped re-entry speed, direction changes on
-  rematerialization, and the rules that smart bombs only destroy enemies on the
-  main screen while leaving bullets and bomber minefields alone.
+  rematerialization, the four-shot laser cap, the rule that shots only remain
+  active until they outrun the main screen, and the rules that smart bombs only
+  destroy enemies on the main screen while leaving bullets and bomber
+  minefields alone.
 - <https://www.dougmahugh.com/defender-chapter05/>: swarmer-behavior reference
   used to model pod bursts, delayed swarmer turnback, and the follow-from-
   behind movement pattern.
@@ -309,6 +315,15 @@ Meaning: upper cap on the end-of-wave surviving-humanoid bonus.
 `player_max_speed`
 Default: `1`
 Meaning: maximum horizontal thrust increment applied to the player ship.
+
+`player_shot_limit`
+Default: `4`
+Meaning: maximum number of player laser shots that can be active at once
+outside `xyzzy` mode.
+
+`player_shot_speed`
+Default: `2`
+Meaning: horizontal speed of the player's laser burst tip.
 
 `swarmer_speed`
 Default: `2`
