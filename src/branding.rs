@@ -42,6 +42,16 @@ fn load_embedded_png(bytes: &'static [u8]) -> Arc<RenderedImage> {
     Arc::new(decode_png_image(bytes).expect("embedded branding asset should decode"))
 }
 
+#[cfg(test)]
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
+}
+
 fn decode_png_image(bytes: &[u8]) -> anyhow::Result<RenderedImage> {
     let cursor = Cursor::new(bytes);
     let mut decoder = Decoder::new(cursor);
@@ -88,7 +98,7 @@ fn decode_png_image(bytes: &[u8]) -> anyhow::Result<RenderedImage> {
 
 #[cfg(test)]
 mod tests {
-    use super::arcade_branding;
+    use super::{arcade_branding, fnv1a64};
 
     #[test]
     fn logo_page_decodes_with_visible_pixels() {
@@ -106,5 +116,22 @@ mod tests {
         let logo = branding.defender_logo();
 
         assert!(logo.width > logo.height * 4);
+    }
+
+    #[test]
+    fn logo_page_matches_rom_derived_layout() {
+        let branding = arcade_branding();
+
+        assert_eq!(fnv1a64(&branding.logo_page().pixels), 0x1486_86f7_920d_c186);
+    }
+
+    #[test]
+    fn defender_logo_matches_rom_derived_wordmark() {
+        let branding = arcade_branding();
+
+        assert_eq!(
+            fnv1a64(&branding.defender_logo().pixels),
+            0x1322_29d3_4e9c_ab3b
+        );
     }
 }

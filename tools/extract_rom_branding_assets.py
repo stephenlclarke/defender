@@ -102,7 +102,7 @@ def main() -> None:
     logo_page = compose_logo_page(font_sheet, williams_logo, defender_logo, copyright_line)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    scale_display_aspect(williams_logo).save(OUTPUT_DIR / "williams-logo.png")
+    scale_display_aspect(crop_to_visible_bounds(williams_logo)).save(OUTPUT_DIR / "williams-logo.png")
     scale_display_aspect(defender_logo).save(OUTPUT_DIR / "defender-logo.png")
     scale_display_aspect(copyright_line).save(OUTPUT_DIR / "copyright-1980.png")
     logo_page.save(OUTPUT_DIR / "logo-page.png")
@@ -170,7 +170,7 @@ def decode_williams_logo(amode_lines: list[str]) -> Image.Image:
             cursor_y = data[index + 1]
             index += 2
 
-    return image.crop(image.getbbox())
+    return image
 
 
 def decode_defender_logo(amode_lines: list[str]) -> Image.Image:
@@ -186,7 +186,7 @@ def decode_defender_logo(amode_lines: list[str]) -> Image.Image:
     for byte in data:
         for nibble in (byte >> 4, byte & 0xF):
             if nibble & 0xC:
-                run_length = (nibble & 0x3) + run_length
+                run_length = ((nibble & 0x3) + run_length) & 0xFF
                 color = color_table[(nibble & 0xC) >> 2]
                 if cursor >= columns * rows:
                     cursor = cursor + 1 - columns * rows
@@ -195,24 +195,30 @@ def decode_defender_logo(amode_lines: list[str]) -> Image.Image:
                     if cursor < len(buffer):
                         buffer[cursor] = (buffer[cursor] & 0xF0) | (color & 0x0F)
                     cursor += rows
-                    run_length -= 1
-                    if run_length < 0:
+                    run_length = (run_length - 1) & 0xFF
+                    if run_length & 0x80:
                         odd_nibble = 0
                         run_length = 0
                         continue
                 else:
                     odd_nibble = 0xFF
 
-                while run_length >= 0:
+                while True:
                     if cursor < len(buffer):
                         buffer[cursor] = color
+                    run_length = (run_length - 1) & 0xFF
+                    if run_length & 0x80:
+                        break
                     cursor += rows
-                    run_length -= 1
+                    run_length = (run_length - 1) & 0xFF
+                    if not (run_length & 0x80):
+                        continue
+                    odd_nibble = 0
+                    break
 
-                odd_nibble = 0
                 run_length = 0
             else:
-                run_length = (nibble + run_length) * 4
+                run_length = ((nibble + run_length) * 4) & 0xFF
 
     image = Image.new("RGBA", (columns * 2, rows), (0, 0, 0, 0))
     for x_byte in range(columns):
@@ -230,7 +236,7 @@ def decode_defender_logo(amode_lines: list[str]) -> Image.Image:
                     (x_byte * 2 + 1, y),
                     DEFENDER_SHADOW if right == 0x2 else DEFENDER_FACE,
                 )
-    return image
+    return crop_to_visible_bounds(image)
 
 
 def decode_copyright(amode_lines: list[str]) -> Image.Image:
@@ -311,6 +317,13 @@ def parse_token(token: str) -> int:
 
 def scale_display_aspect(image: Image.Image) -> Image.Image:
     return image.resize((image.width * 5 // 4, image.height), Image.Resampling.NEAREST)
+
+
+def crop_to_visible_bounds(image: Image.Image) -> Image.Image:
+    bounds = image.getbbox()
+    if bounds is None:
+        return image
+    return image.crop(bounds)
 
 
 if __name__ == "__main__":
