@@ -7,6 +7,7 @@ const SAFE_FALL_HEIGHT: i32 = 2;
 const SAFE_FALL_SCORE: u16 = 250;
 const HUMAN_CATCH_SCORE: u32 = 500;
 const HUMAN_LANDING_SCORE: u16 = 500;
+const HAZARD_COLLISION_SCORE: u32 = 25;
 const BONUS_STOCK_SCORE: u32 = 10_000;
 const MAX_WAVE_HUMANOID_BONUS: u32 = 500;
 const PLAYER_MAX_SPEED: i32 = 1;
@@ -1075,10 +1076,16 @@ impl World {
             })
             .map(|entity| entity.position)
             .collect();
+        let score_delta: u32 = collided_enemies
+            .iter()
+            .filter_map(|index| self.entities.get(*index))
+            .map(|entity| score_for_player_collision(entity.kind))
+            .sum();
         remove_indices(&mut self.entities, &collided_enemies);
         for carrier_position in released_carriers {
             self.release_abducted_human_at(carrier_position);
         }
+        self.add_score(score_delta);
         self.lose_player_life(player_position, events);
     }
 
@@ -1741,6 +1748,14 @@ fn score_for_enemy(kind: EntityKind) -> u32 {
     }
 }
 
+fn score_for_player_collision(kind: EntityKind) -> u32 {
+    match kind {
+        EntityKind::EnemyShot | EntityKind::Mine => HAZARD_COLLISION_SCORE,
+        _ if kind.is_enemy() => score_for_enemy(kind),
+        _ => 0,
+    }
+}
+
 fn next_stock_award_score(score: u32) -> u32 {
     (score / BONUS_STOCK_SCORE)
         .saturating_add(1)
@@ -1763,9 +1778,9 @@ mod tests {
 
     use super::{
         BAITER_BASE_DELAY, BOMBER_EVASIVE_SPEED, Entity, EntityKind, EntityState,
-        HorizontalDirection, POD_SWARMER_BURST, Position, SWARMER_SPEED, Status, UpdateInput,
-        World, WorldEvent, hyperspace_result, nearest_wrapped_target, shortest_wrapped_delta,
-        wrap_coordinate,
+        HAZARD_COLLISION_SCORE, HorizontalDirection, POD_SWARMER_BURST, Position, SWARMER_SPEED,
+        Status, UpdateInput, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
+        shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -2749,6 +2764,7 @@ mod tests {
         assert_eq!(world.status().lives, 0);
         assert!(world.is_game_over());
         assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+        assert_eq!(world.status().score, HAZARD_COLLISION_SCORE);
         assert!(events.contains(&WorldEvent::PlayerHit));
         assert!(events.contains(&WorldEvent::GameOver));
     }
@@ -2774,6 +2790,34 @@ mod tests {
         assert_eq!(world.status().lives, 0);
         assert!(world.is_game_over());
         assert_eq!(world.entity_count_by_kind(EntityKind::Mine), 0);
+        assert_eq!(world.status().score, HAZARD_COLLISION_SCORE);
+        assert!(events.contains(&WorldEvent::PlayerHit));
+        assert!(events.contains(&WorldEvent::GameOver));
+    }
+
+    #[test]
+    fn live_step_ramming_an_enemy_still_awards_its_score() {
+        let mut world = World::with_entities(
+            12,
+            8,
+            Status {
+                score: 0,
+                lives: 1,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 3, 3, 0, 0),
+                Entity::new(EntityKind::Bomber, 1, 3, 0, 0),
+                Entity::with_state(EntityKind::Human, 1, 1, 0, 0, EntityState::Abducted),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.status().lives, 0);
+        assert!(world.is_game_over());
+        assert_eq!(world.entity_count_by_kind(EntityKind::Bomber), 0);
+        assert_eq!(world.status().score, 250);
         assert!(events.contains(&WorldEvent::PlayerHit));
         assert!(events.contains(&WorldEvent::GameOver));
     }

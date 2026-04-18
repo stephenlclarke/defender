@@ -129,7 +129,9 @@ Extra keys while `xyzzy` mode is active:
   scanner strip that compresses the wrapped world into the top HUD, bomber
   waves that arrive from wave two onward and leave persistent mine trails that
   smart bombs do not clear, and baiters that beam in when a wave drags on so
-  cleanup is no longer risk-free,
+  cleanup is no longer risk-free, plus arcade-style collision scoring where
+  ramming enemies still awards their normal value and dying on bullets or mines
+  still grants `25` points,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
@@ -185,6 +187,10 @@ the final runtime self-contained:
   comparison point, especially for the red-label `defend.*` program ROM names.
 - <https://www.thedefenderproject.com/defender-rom-versions-the-history/>:
   revision history and ROM-set background for Williams Defender releases.
+- <https://www.dougmahugh.com/defender-chapter01/>: general arcade-rules
+  reference used for bomber wave timing, bomber-mine danger, radar behavior,
+  and the scoring rule that collision deaths on bullets or mines still award
+  `25` points while ramming enemies still scores their normal value.
 - <https://williamsarcades.com/Defender>: original cabinet and control-panel
   reference used to keep the Rust controls and cabinet assumptions aligned with
   Williams' arcade hardware.
