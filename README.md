@@ -96,15 +96,15 @@ Extra keys while `xyzzy` mode is active:
 
 - smart bombs become unlimited automatically while `xyzzy` mode is enabled,
   and `xyzzy` smart bombs also clear bullets and mines on the main screen.
-- `H`: hyperspace becomes safe and cannot destroy the player ship while
-  `xyzzy` mode is active, and the rematerialization point is chosen as far away
-  from enemies as possible.
 - `F`: toggle fully automatic firing. While active, the ship fires
   automatically when a current laser shot would destroy an alien directly ahead
   in the active firing lane.
 - `G`: toggle god mode. While active, enemy fire and mines cannot kill the
   player, and ramming an enemy destroys it and awards its normal score instead
   of costing a ship.
+- `H`: hyperspace becomes safe and cannot destroy the player ship while
+  `xyzzy` mode is active, and the rematerialization point is chosen as far away
+  from enemies as possible.
 
 ## Current Notes
 
