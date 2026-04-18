@@ -1,8 +1,8 @@
-use std::io::{self, Stdout, Write};
+use std::io::{self, IsTerminal, Stdout, Write};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     event::{
@@ -23,6 +23,7 @@ use crate::session::{SessionEvent, SessionInput, SessionMode, SessionState};
 const FRAME_DURATION: Duration = Duration::from_millis(90);
 
 pub fn run_live(play_audio: bool) -> Result<()> {
+    ensure_interactive_terminal()?;
     let audio = AudioManager::new();
     let mut stdout = io::stdout();
     let _guard = TerminalGuard::enter(&mut stdout)?;
@@ -52,6 +53,20 @@ pub fn run_live(play_audio: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn ensure_interactive_terminal() -> Result<()> {
+    validate_interactive_terminal(io::stdin().is_terminal(), io::stdout().is_terminal())
+}
+
+fn validate_interactive_terminal(stdin_is_terminal: bool, stdout_is_terminal: bool) -> Result<()> {
+    if stdin_is_terminal && stdout_is_terminal {
+        Ok(())
+    } else {
+        bail!(
+            "live mode requires an interactive terminal; run `cargo run` in a real terminal window"
+        )
+    }
 }
 
 fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
@@ -309,7 +324,7 @@ impl Drop for TerminalGuard {
 mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode};
 
-    use super::{InputTracker, PolledInput, cue_for_events};
+    use super::{InputTracker, PolledInput, cue_for_events, validate_interactive_terminal};
     use crate::audio::SoundCue;
     use crate::game::WorldEvent;
     use crate::session::SessionEvent;
@@ -449,5 +464,11 @@ mod tests {
 
         tracker.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE), &mut input);
         assert!(input.quit_requested);
+    }
+
+    #[test]
+    fn live_mode_rejects_non_interactive_terminals() {
+        let error = validate_interactive_terminal(false, true).expect_err("terminal guard");
+        assert!(error.to_string().contains("interactive terminal"));
     }
 }

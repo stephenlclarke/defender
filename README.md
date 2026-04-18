@@ -40,19 +40,10 @@ cabinet rules.
 Run targets:
 
 - `cargo run`
-- `cargo run -- --audio-demo`
-- `cargo run -- --play-demo`
-- `cargo run -- --play-demo --mute --no-sleep`
-- `cargo run -- --play-attract`
-- `cargo run -- --play-attract --mute --no-sleep`
-- `cargo run -- --play-live`
-- `cargo run -- --play-live --mute`
-- `cargo run -- --scene logo`
-- `cargo run -- --scene attract`
-- `cargo run -- --scene high-score`
-- `cargo run -- --frames 8`
+- `cargo run -- --mute`
 - `cargo run -- --rom-report assets/roms/defender`
 - `make live`
+- `make live-muted`
 - `cargo test`
 - `cargo fmt --check`
 - `cargo clippy --all-targets -- -D warnings`
@@ -71,13 +62,8 @@ Install directly from git with Cargo:
 After installation, run the prototype with:
 
 - `defender`
-- `defender --audio-demo`
-- `defender --play-demo`
-- `defender --play-attract`
-- `defender --play-live`
-- `defender --scene attract`
-- `defender --scene high-score`
-- `defender --frames 8`
+- `defender --mute`
+- `defender --rom-report assets/roms/defender`
 
 ## Controls
 
@@ -112,18 +98,12 @@ Extra keys while `xyzzy` mode is active:
 
 ## Current Notes
 
-- The app now has explicit `logo`, `attract`, `high-score`, and gameplay
-  presentation paths so the README screenshot and animated preview are
-  generated from real application output rather than mocked assets.
+- The public CLI is now intentionally narrow: `cargo run` launches the live
+  game, `--mute` disables audio, and `--rom-report` stays as the one
+  non-interactive inspection path.
 - All current sounds are embedded in the app via synthesized `rodio` cues,
   following the same self-contained runtime principle used in `../battlezone`.
-- `defender --play-attract` now runs the logo, attract, and high-score sequence
-  as a real terminal playback path; use `--mute --no-sleep` for deterministic
-  test or capture runs.
-- `defender --play-demo` now runs a scripted gameplay showcase with score,
-  wave, life, enemy, and human-count changes through the same playback/audio
-  path.
-- `defender --play-live` now runs a real text-mode play loop with keyboard
+- `cargo run` / `defender` now launch the real text-mode play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, falling-human
   recovery, safe drop-off after catches, mutant conversion after successful
@@ -150,7 +130,7 @@ Extra keys while `xyzzy` mode is active:
   coverage report as CI and then runs `sonar-scanner` when `SONAR_TOKEN` is set.
 - `examples/generate_readme_media.rs` regenerates `docs/defender.png` from the
   gameplay demo path and `docs/start-sequence.gif` from the shared attract
-  cycle used by the app.
+  builders used by the app and README media pipeline.
 - High scores persist between live runs in `~/.defender/high_scores.txt`; set
   `DEFENDER_DATA_DIR` to redirect that file for local experiments or tests.
 
@@ -195,15 +175,16 @@ the final runtime self-contained:
 ## Platform Support
 
 The current build stays in plain ANSI terminal output rather than Kitty
-graphics, so the attract/demo modes should run anywhere a recent Rust toolchain
-is available.
+graphics, so the non-interactive tooling paths such as `--rom-report` and the
+README media generator should run anywhere a recent Rust toolchain is
+available.
 
-The new live loop uses `crossterm` raw-mode keyboard input, so `--play-live`
-must be launched from a real interactive terminal session rather than piped or
-captured stdout. The long-term target is still a richer terminal arcade
-presentation similar to the sibling Rust repos in this directory, but the
-current milestone keeps the renderer text-first so CI, leak detection, input
-handling, and ROM validation can land before a fuller graphics path.
+The live loop uses `crossterm` raw-mode keyboard input, so `cargo run` /
+`defender` must be launched from a real interactive terminal session rather
+than piped or captured stdout. The long-term target is still a richer terminal
+arcade presentation similar to the sibling Rust repos in this directory, but
+the current milestone keeps the renderer text-first so CI, leak detection,
+input handling, and ROM validation can land before a fuller graphics path.
 
 The live session now requests terminal keyboard-enhancement reporting so
 standalone `Shift` thrust input can be captured in terminals that support the

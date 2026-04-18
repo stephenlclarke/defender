@@ -115,10 +115,10 @@ pub fn logo_scene() -> Scene {
             String::new(),
             String::from("             NATIVE RUST PROTOTYPE"),
             String::new(),
-            String::from("         START LOGO / ATTRACT / HIGH SCORE"),
+            String::from("         LIVE TITLE / ATTRACT / HIGH SCORE"),
             String::new(),
-            String::from("         RUN `cargo run -- --scene attract`"),
-            String::from("       RUN `cargo run -- --scene high-score`"),
+            String::from("              RUN `cargo run` TO PLAY"),
+            String::from("         RUN `cargo run -- --mute` FOR QUIET"),
         ],
     }
 }
@@ -177,12 +177,12 @@ mod tests {
     }
 
     #[test]
-    fn logo_scene_contains_title_and_scene_hints() {
+    fn logo_scene_contains_live_launch_hints() {
         let scene = logo_scene();
         let text = scene.text();
 
         assert!(text.contains("NATIVE RUST PROTOTYPE"));
-        assert!(text.contains("high-score"));
+        assert!(text.contains("cargo run"));
     }
 
     #[test]
