@@ -73,7 +73,7 @@ Live mode controls:
 - `A`: move up
 - `Z`: move down
 - `Shift`: thrust forward
-- `Space`: reverse
+- `Space`: flip the ship's facing direction
 - `Enter`: fire the laser bolt
 - `Tab`: detonate a smart bomb
 - `H`: trigger hyperspace
@@ -112,7 +112,9 @@ Extra keys while `xyzzy` mode is active:
   `10,000`-point extra ship and smart-bomb awards, mutant conversion after
   successful abductions, full lander-to-mutant conversion once humanity is
   wiped out, persistent five-entry high-score tracking with initials entry,
-  active lander pursuit of free humans, mutant pursuit of the player,
+  active lander pursuit of free humans, mutant pursuit of the player, and an
+  arcade-style facing model where `Space` flips the ship direction while
+  `Shift` thrust and `Enter` fire follow the current heading,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret god-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
@@ -183,6 +185,9 @@ the final runtime self-contained:
 - <https://strategywiki.org/wiki/Defender/Walkthrough>: rescue-strategy and
   scoring reference used for the current `500` catch / `500` return humanoid
   rescue implementation.
+- <https://www.mamechannel.it/files_free/arcade_manuals_unpacked/defenderw.pdf>:
+  Defender operations manual used to confirm that `Reverse` flips ship
+  direction while `Thrust` controls forward movement.
 - <https://www.andysarcade.net/personal/defcolours/index.htm>: cabinet colour
   and palette reference for later presentation work.
 - <https://mdk.cab/game/defender>: artwork, screenshots, and general cabinet

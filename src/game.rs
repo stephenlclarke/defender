@@ -48,6 +48,36 @@ pub enum EntityState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HorizontalDirection {
+    Left,
+    #[default]
+    Right,
+}
+
+impl HorizontalDirection {
+    fn reversed(self) -> Self {
+        match self {
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+        }
+    }
+
+    fn step(self) -> i32 {
+        match self {
+            Self::Left => -1,
+            Self::Right => 1,
+        }
+    }
+
+    pub fn glyph(self) -> char {
+        match self {
+            Self::Left => '<',
+            Self::Right => '>',
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct UpdateInput {
     pub up: bool,
     pub down: bool,
@@ -130,6 +160,7 @@ pub struct World {
     height: usize,
     world_span: i32,
     camera_x: i32,
+    player_facing: HorizontalDirection,
     tick: u32,
     fire_cooldown: u8,
     next_stock_award: u32,
@@ -150,6 +181,7 @@ impl World {
             height: WORLD_HEIGHT,
             world_span: WORLD_SPAN as i32,
             camera_x: PLAYER_START_X,
+            player_facing: HorizontalDirection::Right,
             tick: 0,
             fire_cooldown: 0,
             next_stock_award: next_stock_award_score(0),
@@ -182,6 +214,7 @@ impl World {
             height,
             world_span: width as i32,
             camera_x: width as i32 / 2,
+            player_facing: HorizontalDirection::Right,
             tick: 0,
             fire_cooldown: 0,
             next_stock_award: next_stock_award_score(status.score),
@@ -251,6 +284,10 @@ impl World {
 
     pub fn camera_x(&self) -> i32 {
         self.camera_x
+    }
+
+    pub fn player_facing(&self) -> HorizontalDirection {
+        self.player_facing
     }
 
     pub fn tick(&self) -> u32 {
@@ -396,15 +433,20 @@ impl World {
         let min_y = 1;
         let max_y = self.height as i32 - 3;
 
+        if input.reverse {
+            self.player_facing = self.player_facing.reversed();
+        }
+
         let mut shot_origin = None;
         {
             let terrain = &self.terrain;
+            let facing = self.player_facing;
             if let Some(player) = self
                 .entities
                 .iter_mut()
                 .find(|entity| entity.kind == EntityKind::PlayerShip)
             {
-                let dx = input.thrust as i32 - input.reverse as i32;
+                let dx = if input.thrust { facing.step() } else { 0 };
                 let dy = input.down as i32 - input.up as i32;
                 player.position.x = wrap_coordinate(player.position.x + dx, max_x);
                 player.position.y = (player.position.y + dy).clamp(min_y, max_y);
@@ -435,11 +477,12 @@ impl World {
             && self.fire_cooldown == 0
             && let Some(origin) = shot_origin
         {
+            let shot_dx = self.player_facing.step() * 2;
             self.entities.push(Entity::new(
                 EntityKind::PlayerShot,
-                (origin.x + 1).min(max_x),
+                wrap_coordinate(origin.x + self.player_facing.step(), max_x),
                 origin.y,
-                2,
+                shot_dx,
                 0,
             ));
             self.fire_cooldown = 2;
@@ -807,6 +850,7 @@ impl World {
             player.position.x = PLAYER_START_X;
             player.position.y = PLAYER_START_Y.min(terrain_surface_y(terrain, PLAYER_START_X));
         }
+        self.player_facing = HorizontalDirection::Right;
         self.sync_camera_to_player();
     }
 
@@ -1227,7 +1271,8 @@ mod tests {
     use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS};
 
     use super::{
-        Entity, EntityKind, EntityState, Position, Status, UpdateInput, World, WorldEvent,
+        Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput,
+        World, WorldEvent,
         hyperspace_destination, nearest_wrapped_target, shortest_wrapped_delta, wrap_coordinate,
     };
 
@@ -1377,7 +1422,88 @@ mod tests {
             .find(|entity| entity.kind == EntityKind::PlayerShip)
             .expect("player");
         assert_eq!(player.position.x, start.x + 1);
+        assert_eq!(world.player_facing(), HorizontalDirection::Right);
         assert_eq!(world.entity_count_by_kind(EntityKind::PlayerShot), 1);
+        assert!(events.contains(&WorldEvent::ShotFired));
+    }
+
+    #[test]
+    fn live_step_reverse_flips_player_direction_without_moving() {
+        let mut world = World::with_entities(
+            16,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 6, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 14, 1, 0, 0),
+            ],
+        );
+
+        let start = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player")
+            .position;
+        world.step_live(UpdateInput {
+            reverse: true,
+            ..UpdateInput::default()
+        });
+
+        let player = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player");
+        assert_eq!(player.position, start);
+        assert_eq!(world.player_facing(), HorizontalDirection::Left);
+    }
+
+    #[test]
+    fn live_step_thrust_and_fire_follow_reversed_direction() {
+        let mut world = World::with_entities(
+            16,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 6, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 14, 1, 0, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput {
+            reverse: true,
+            ..UpdateInput::default()
+        });
+        let events = world.step_live(UpdateInput {
+            thrust: true,
+            fire: true,
+            ..UpdateInput::default()
+        });
+
+        let player = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player");
+        let shot = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShot)
+            .expect("shot");
+
+        assert_eq!(world.player_facing(), HorizontalDirection::Left);
+        assert_eq!(player.position.x, 5);
+        assert_eq!(shot.position.x, 2);
+        assert_eq!(shot.velocity.dx, -2);
         assert!(events.contains(&WorldEvent::ShotFired));
     }
 

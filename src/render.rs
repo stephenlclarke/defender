@@ -26,7 +26,11 @@ pub fn render_grid(world: &World) -> Vec<String> {
             && y >= 0
             && (y as usize) < world.height()
         {
-            buffer[y as usize][screen_x] = entity.kind.glyph();
+            buffer[y as usize][screen_x] = if entity.kind == crate::game::EntityKind::PlayerShip {
+                world.player_facing().glyph()
+            } else {
+                entity.kind.glyph()
+            };
         }
     }
 
@@ -70,7 +74,7 @@ pub fn render_with_flags(world: &World, xyzzy_active: bool, invincible: bool) ->
     }
     lines.extend(secret_mode_lines(xyzzy_active, invincible));
     lines.push(String::from(
-        "Controls: `A` up, `Z` down, `Shift` thrust, `Space` reverse, `Enter` fire, `Tab` smart bomb, `H` hyperspace, `q` quits.",
+        "Controls: `A` up, `Z` down, `Shift` thrust, `Space` flip direction, `Enter` fire, `Tab` smart bomb, `H` hyperspace, `q` quits.",
     ));
     lines.push(String::from(
         "Use `cargo run -- --rom-report assets/roms/defender` to inspect local ROM references.",
@@ -103,7 +107,7 @@ pub fn render_title_screen_with_flags(
         String::new(),
         String::from("CONTROLS"),
         String::from("VERTICAL: `A` UP / `Z` DOWN"),
-        String::from("DRIVE: `Shift` THRUST / `Space` REVERSE"),
+        String::from("DRIVE: `Shift` THRUST / `Space` FLIP DIRECTION"),
         String::from("LASER: `Enter`"),
         String::from("SMART BOMB: `Tab`"),
         String::from("HYPERSPACE: `H`"),
@@ -209,7 +213,7 @@ mod tests {
         let rows: Vec<&str> = output.lines().collect();
 
         assert_eq!(rows[2], "|        |");
-        assert_eq!(rows[3], "| ^      |");
+        assert_eq!(rows[3], "| >      |");
         assert_eq!(rows[5], "|   h    |");
         assert_eq!(rows[6], "|________|");
     }

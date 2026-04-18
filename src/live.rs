@@ -160,7 +160,6 @@ struct HeldInput {
     up: bool,
     down: bool,
     thrust: bool,
-    reverse: bool,
 }
 
 #[derive(Debug, Default)]
@@ -182,7 +181,6 @@ impl InputTracker {
         input.session.update.up |= self.held.up;
         input.session.update.down |= self.held.down;
         input.session.update.thrust |= self.held.thrust;
-        input.session.update.reverse |= self.held.reverse;
 
         Ok(input)
     }
@@ -223,11 +221,7 @@ impl InputTracker {
                 key_event.kind,
                 &mut input.session.update.thrust,
             ),
-            KeyCode::Char(' ') => set_held_flag(
-                &mut self.held.reverse,
-                key_event.kind,
-                &mut input.session.update.reverse,
-            ),
+            KeyCode::Char(' ') if pressed => input.session.update.reverse = true,
             KeyCode::Tab if pressed => input.session.update.smart_bomb = true,
             KeyCode::Char('h') | KeyCode::Char('H') if pressed => {
                 input.session.update.hyperspace = true;
@@ -412,6 +406,13 @@ mod tests {
             &mut released,
         );
         assert!(!tracker.held.thrust);
+
+        let mut space_release = PolledInput::default();
+        tracker.handle_key_event(
+            KeyEvent::new_with_kind(KeyCode::Char(' '), KeyModifiers::NONE, KeyEventKind::Release),
+            &mut space_release,
+        );
+        assert!(!space_release.session.update.reverse);
     }
 
     #[test]
