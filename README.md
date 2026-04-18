@@ -94,7 +94,8 @@ invincibility toggle back to its default state.
 
 Extra keys while `xyzzy` mode is active:
 
-- smart bombs become unlimited automatically while `xyzzy` mode is enabled.
+- smart bombs become unlimited automatically while `xyzzy` mode is enabled,
+  and `xyzzy` smart bombs also clear bullets and mines on the main screen.
 - `H`: hyperspace becomes safe and cannot destroy the player ship while
   `xyzzy` mode is active, and the rematerialization point is chosen as far away
   from enemies as possible.
@@ -128,10 +129,12 @@ Extra keys while `xyzzy` mode is active:
   preserves the classic follow-from-behind counterplay, a full-width radar
   scanner strip that compresses the wrapped world into the top HUD, bomber
   waves that arrive from wave two onward and leave persistent mine trails that
-  smart bombs do not clear, and baiters that beam in when a wave drags on so
-  cleanup is no longer risk-free, plus arcade-style collision scoring where
-  ramming enemies still awards their normal value and dying on bullets or mines
-  still grants `25` points,
+  normal smart bombs do not clear, smart bombs that now only destroy enemies on
+  the main screen instead of globally in normal play, with `xyzzy` mode
+  extending the bomb to clear on-screen bullets and mines too, and baiters that
+  beam in when a wave drags on so cleanup is no longer risk-free, plus
+  arcade-style collision scoring where ramming enemies still awards their
+  normal value and dying on bullets or mines still grants `25` points,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
@@ -216,8 +219,8 @@ the final runtime self-contained:
   ship keeps its current momentum until thrust changes it.
 - <https://www.dougmahugh.com/defender-chapter02/>: control-analysis reference
   used for hyperspace risk, stopped re-entry speed, direction changes on
-  rematerialization, and the rule that smart bombs do not clear bullets or
-  bomber minefields.
+  rematerialization, and the rules that smart bombs only destroy enemies on the
+  main screen while leaving bullets and bomber minefields alone.
 - <https://www.dougmahugh.com/defender-chapter05/>: swarmer-behavior reference
   used to model pod bursts, delayed swarmer turnback, and the follow-from-
   behind movement pattern.

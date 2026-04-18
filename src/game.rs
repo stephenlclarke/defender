@@ -1287,7 +1287,16 @@ impl World {
         let mut released_carriers = Vec::new();
 
         for (index, entity) in self.entities.iter().enumerate() {
-            if entity.kind.is_enemy() || entity.kind == EntityKind::EnemyShot {
+            let on_main_screen = self.screen_x_for_world_x(entity.position.x).is_some();
+            let destroyed_by_bomb = if secret_mode {
+                on_main_screen
+                    && (entity.kind.is_enemy()
+                        || matches!(entity.kind, EntityKind::EnemyShot | EntityKind::Mine))
+            } else {
+                on_main_screen && entity.kind.is_enemy()
+            };
+
+            if destroyed_by_bomb {
                 remove_indices_set.push(index);
                 score_delta += score_for_enemy(entity.kind);
                 if entity.kind == EntityKind::Lander && entity.state == EntityState::CarryingHuman {
@@ -2286,6 +2295,40 @@ mod tests {
     }
 
     #[test]
+    fn smart_bomb_only_destroys_enemies_on_the_main_screen() {
+        let mut world = World::bootstrap();
+        let player_x = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player")
+            .position
+            .x;
+        let visible_x = wrap_coordinate(player_x + 5, world.world_max_x());
+        let offscreen_x = wrap_coordinate(player_x + world.width() as i32, world.world_max_x());
+        let safe_y = world.safe_altitude_at_world_x(player_x).min(4);
+        world.camera_x = player_x;
+        world.entities = vec![
+            Entity::new(EntityKind::PlayerShip, player_x, safe_y, 0, 0),
+            Entity::new(EntityKind::Lander, visible_x, safe_y, 0, 0),
+            Entity::new(EntityKind::Bomber, offscreen_x, safe_y, 0, 0),
+        ];
+
+        assert!(world.screen_x_for_world_x(visible_x).is_some());
+        assert!(world.screen_x_for_world_x(offscreen_x).is_none());
+
+        let events = world.step_live(UpdateInput {
+            smart_bomb: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Bomber), 1);
+        assert_eq!(world.status().score, 150);
+        assert!(events.contains(&WorldEvent::SmartBombDetonated));
+    }
+
+    #[test]
     fn live_step_swarmers_home_toward_the_player() {
         let mut world = World::with_entities(
             20,
@@ -3114,6 +3157,7 @@ mod tests {
                 Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
                 Entity::new(EntityKind::Lander, 8, 3, 0, 0),
                 Entity::new(EntityKind::EnemyShot, 6, 3, -1, 0),
+                Entity::with_state(EntityKind::Human, 1, 1, 0, 0, EntityState::Abducted),
             ],
         );
 
@@ -3124,7 +3168,7 @@ mod tests {
 
         assert_eq!(world.smart_bombs(), DEFAULT_SMART_BOMBS - 1);
         assert_eq!(world.status().score, 150);
-        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 1);
         assert!(events.contains(&WorldEvent::SmartBombDetonated));
     }
 
@@ -3259,7 +3303,7 @@ mod tests {
     }
 
     #[test]
-    fn xyzzy_mode_allows_unlimited_smart_bombs() {
+    fn xyzzy_mode_allows_unlimited_smart_bombs_and_clears_bullets_and_mines() {
         let mut world = World::with_entities(
             16,
             8,
@@ -3271,6 +3315,9 @@ mod tests {
             vec![
                 Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
                 Entity::new(EntityKind::Lander, 8, 3, 0, 0),
+                Entity::new(EntityKind::EnemyShot, 6, 3, -1, 0),
+                Entity::new(EntityKind::Mine, 7, 3, 0, 0),
+                Entity::with_state(EntityKind::Human, 1, 1, 0, 0, EntityState::Abducted),
             ],
         );
         world.set_smart_bombs(0);
@@ -3283,6 +3330,8 @@ mod tests {
 
         assert_eq!(world.smart_bombs(), 0);
         assert_eq!(world.status().score, 150);
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mine), 0);
         assert!(events.contains(&WorldEvent::SmartBombDetonated));
     }
 
