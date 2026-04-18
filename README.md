@@ -177,12 +177,14 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   enemy fire now limited to visible main-screen threats, with lander/mutant/
   baiter volleys using the arcade-style lob-versus-chaser split and swarmer
   shots using the quarter-screen focal-point model from the original game, plus
-  pod waves that now start on wave two and ramp up to four ships by wave four, release
-  deterministic five-to-seven swarmer bursts when shot, and preserve the
-  classic follow-from-behind swarmer counterplay, with 15-enemy attack waves
-  now opening with five landers and then delivering two later five-ship
-  reinforcement groups before later-wave bombers and pods layer on top, while
-  destroyed-planet mutant phases follow the same staged reinforcement pattern, a
+  pod waves that now follow the red-label `WVTAB` counts from `blk71.src`,
+  release deterministic five-to-seven swarmer bursts when shot, and preserve
+  the classic follow-from-behind swarmer counterplay, with lander reserve
+  counts and reinforcement timing now coming from that same `WVTAB` data, so
+  wave one still opens as three five-ship lander groups while wave two and
+  later use the ROM-recorded twenty-lander/four-group opener before the
+  recorded Bomber/TIE and Pod/PROBE counts layer on top, while destroyed-planet
+  mutant phases follow the same staged reinforcement pattern, a
   full-width radar scanner strip that compresses the wrapped world into the top
   HUD,
   bomber waves that arrive from wave two onward and leave persistent mine
@@ -210,10 +212,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   projectiles are clipped by terrain. When the last humanoid is lost, the live
   renderer now drops the terrain line and marks the HUD as `DEEP SPACE` until a
   fifth-wave restoration brings the planet and all ten humanoids back.
-- Defender’s gameplay-fidelity and AI tuning values now live in
-  `assets/arcade/arcade-rules.txt`, loaded through `src/arcade.rs` in the same
-  embedded-text-table style used by `../pacman` and `../battlezone`, so future
-  arcade-rule adjustments do not add more hard-coded tuning constants to
+- Defender’s remaining gameplay-fidelity and AI tuning values still live in
+  `assets/arcade/arcade-rules.txt`, while the baseline red-label wave roster
+  and launch cadence now live in `assets/arcade/red-label-wave-table.txt`
+  extracted from `blk71.src` `WVTAB`, so the live game no longer depends on
+  hand-authored attack-wave counts or reinforcement timing constants in
   `src/game.rs`.
 - Gameplay work is being prioritized toward faithful Williams-arcade behavior in
   Rust first; hidden `xyzzy` options remain the only intentional rules
@@ -233,6 +236,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - `tools/extract_rom_branding_assets.py` regenerates the embedded Williams
   logo page, Defender wordmark, and copyright art directly from the red-label
   source tables.
+- `tools/extract_rom_wave_table.py` regenerates the embedded
+  `assets/arcade/red-label-wave-table.txt` data from the red-label `blk71.src`
+  `WVTAB` records.
 - The title, attract legend, and hall-of-fame seed data now use the red-label
   ROM message/default tables instead of the earlier placeholder prototype
   strings.
@@ -273,7 +279,8 @@ the final runtime self-contained:
   names, the `mess0.src` `CHRTBL` / `CHARACTERS` font tables used to build the
   embedded `assets/arcade/font-sheet.png`, and the `amode1.src` `LGOTAB`,
   `DEFDAT`, and `CPRTAB` tables used to reconstruct the embedded attract-logo
-  page and `DEFENDER` wordmark assets.
+  page and `DEFENDER` wordmark assets, plus the `blk71.src` `WVTAB` records
+  used to reconstruct the embedded red-label wave table.
 - <https://seanriddle.com/ripper.html>: Williams graphics-ripper reference used
   to confirm Defender's screen-format sprite layout and the red-label object
   sprite list/rip used to build the embedded `assets/arcade/*.png` object art.
@@ -339,11 +346,12 @@ the final runtime self-contained:
 
 ## Customisation
 
-Arcade tuning defaults ship in `assets/arcade/arcade-rules.txt`. To override
-them locally, copy that file to `~/.xyzzy/defender/arcade-rules.txt` and only
-include the keys you want to change. Omitted keys keep their embedded defaults.
-If `DEFENDER_DATA_DIR` is set, the game reads `arcade-rules.txt` from that
-directory instead.
+Arcade tuning defaults ship in `assets/arcade/arcade-rules.txt`, and the
+baseline red-label wave records ship in
+`assets/arcade/red-label-wave-table.txt`. To override them locally, copy either
+file to `~/.xyzzy/defender/` and only include the keys you want to change.
+Omitted keys keep their embedded defaults. If `DEFENDER_DATA_DIR` is set, the
+game reads both files from that directory instead.
 
 ### `arcade-rules.txt`
 
@@ -432,10 +440,6 @@ Meaning: faster bomber speed used when they cross the player altitude.
 Default: `4`
 Meaning: maximum number of baiters allowed on-screen at once.
 
-`baiter_base_delay`
-Default: `40`
-Meaning: initial delay before baiters start appearing in a slow wave.
-
 `baiter_repeat_delay`
 Default: `20`
 Meaning: delay between additional baiter spawns while the wave stalls.
@@ -460,21 +464,47 @@ Meaning: tick delay between mine drops from a bomber.
 Default: `24`
 Meaning: maximum number of live bomber mines allowed at once.
 
-`attack_wave_group_size`
-Default: `5`
-Meaning: size of each staged attack-wave enemy group.
-
-`attack_wave_total_openers`
-Default: `15`
-Meaning: total number of staged opener enemies in a standard attack wave.
-
-`attack_wave_reinforcement_delay`
-Default: `18`
-Meaning: delay between staged reinforcement groups in an attack wave.
-
 `default_human_world_xs`
 Default: `8,26,44,62,80,98,116,134,152,170`
 Meaning: default world X positions for the ten starting humanoids.
+
+### `red-label-wave-table.txt`
+
+Record format: `max,min,intra_delta,inter_delta|wave1,wave2,wave3,wave4`
+
+`landers`
+Default: `20,0,0,0|15,20,20,20`
+Meaning: red-label lander reserve count per wave, including the four-group
+twenty-lander opener used from wave two onward.
+
+`bombers`
+Default: `3,0,0,0|0,3,4,5`
+Meaning: red-label TIE/Bomber count per wave.
+
+`pods`
+Default: `6,0,0,0|0,1,3,4`
+Meaning: red-label PROBE/Pod count per wave.
+
+`mutants`
+Default: `10,0,0,0|0,0,0,0`
+Meaning: red-label SCHITZO/Mutant baseline count record.
+
+`swarmers`
+Default: `10,0,0,0|0,0,0,0`
+Meaning: red-label baseline swarmer reserve record.
+
+`wave_time`
+Default: `30,0,0,0|30,25,20,16`
+Meaning: red-label delay between successive lander squad launches.
+
+`wave_size`
+Default: `5,0,0,0|5,5,5,5`
+Meaning: red-label size of each launched lander squad.
+
+`baiter_time`
+Default: `192,24,-12,-4|212,196,164,148`
+Meaning: red-label UFO/Baiter spoiler timer used as the first-spawn delay for
+the live baiter-pressure path.
 
 ## Platform Support
 

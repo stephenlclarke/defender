@@ -3,6 +3,7 @@ use crate::constants::{
     DEFAULT_LIVES, DEFAULT_SMART_BOMBS, DEFAULT_WAVE, GROUND_ROW, PLAYER_START_X, PLAYER_START_Y,
     WORLD_HEIGHT, WORLD_SPAN, WORLD_WIDTH,
 };
+use crate::red_label_wave::red_label_wave_table;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
@@ -201,14 +202,15 @@ impl World {
             0,
             0,
         )];
+        let wave_profile = red_label_wave_table().profile_for_wave(DEFAULT_WAVE);
         entities.extend(default_attack_wave_openers(
             WORLD_SPAN as i32,
             DEFAULT_WAVE,
             EntityKind::Lander,
             0,
+            wave_profile.wave_size as usize,
         ));
         entities.extend(default_humans(&terrain));
-        let tables = arcade_tables();
         Self {
             width: WORLD_WIDTH,
             height: WORLD_HEIGHT,
@@ -220,9 +222,9 @@ impl World {
             smart_bombs: DEFAULT_SMART_BOMBS,
             wave_started_at: 0,
             last_baiter_tick: 0,
-            pending_wave_openers: tables.attack_wave_total_openers - tables.attack_wave_group_size,
+            pending_wave_openers: wave_profile.landers.saturating_sub(wave_profile.wave_size),
             spawned_wave_opener_groups: 1,
-            next_wave_reinforcement_tick: tables.attack_wave_reinforcement_delay,
+            next_wave_reinforcement_tick: wave_profile.wave_time,
             game_over: false,
             status: Status {
                 score: 0,
@@ -1732,6 +1734,7 @@ impl World {
 
     fn spawn_baiter_if_needed(&mut self, min_y: i32, max_y: i32) {
         let tables = arcade_tables();
+        let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         if self.entity_count_by_kind(EntityKind::Baiter) >= tables.max_baiters
             || self.entity_count_by_kind(EntityKind::Lander) == 0
         {
@@ -1747,7 +1750,7 @@ impl World {
         // Baiters as pressure for taking too long, not as baseline wave members.
         let elapsed = self.tick.saturating_sub(self.wave_started_at);
         let since_last_baiter = self.tick.saturating_sub(self.last_baiter_tick);
-        let due_tick = tables.baiter_base_delay + remaining.saturating_sub(1) as u32 * 4;
+        let due_tick = wave_profile.baiter_delay;
         if elapsed < due_tick || since_last_baiter < tables.baiter_repeat_delay {
             return;
         }
@@ -1783,6 +1786,7 @@ impl World {
 
     fn spawn_wave(&mut self) {
         let tables = arcade_tables();
+        let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         let width = self.world_span;
         let bomber_origin = self
             .player_position()
@@ -1799,60 +1803,54 @@ impl World {
         } else {
             EntityKind::Mutant
         };
-        // Doug Mahugh chapter 01 and StrategyWiki both describe attack waves as
-        // 15-enemy groups that open with Landers or Mutants depending on whether
-        // the planet still has humanoids.
-        let mut enemies = default_attack_wave_openers(width, self.status.wave, opening_enemy, 0);
+        // `WVTAB` in `blk71.src` drives the baseline red-label wave roster:
+        // landers launch in repeated squads, while TIEs/Bombers and
+        // PROBEs/Pods are restored immediately for the current wave.
+        let group_size = wave_profile.wave_size.min(wave_profile.landers).max(1);
+        let mut enemies = default_attack_wave_openers(
+            width,
+            self.status.wave,
+            opening_enemy,
+            0,
+            group_size as usize,
+        );
 
-        if self.status.wave >= 2 {
-            // Doug Mahugh chapter 06 places Bombers into the later-wave mix
-            // rather than in the opening red-label wave.
-            enemies.push(Entity::new(
-                EntityKind::Bomber,
-                bomber_origin,
-                self.safe_altitude_at_world_x(bomber_origin)
-                    .saturating_sub(1),
-                -tables.bomber_base_speed,
-                0,
-            ));
-        }
-        if self.status.wave >= 3 {
-            let second_bomber_x = wrap_coordinate(bomber_origin + 10, width - 1);
-            enemies.push(Entity::new(
-                EntityKind::Bomber,
-                second_bomber_x,
-                self.safe_altitude_at_world_x(second_bomber_x)
-                    .saturating_sub(1),
+        let bomber_slots = [
+            (bomber_origin, -tables.bomber_base_speed),
+            (
+                wrap_coordinate(bomber_origin + 10, width - 1),
                 tables.bomber_base_speed,
-                0,
-            ));
-        }
-        if self.status.wave >= 5 {
-            let third_bomber_x = wrap_coordinate(bomber_origin - 10, width - 1);
+            ),
+            (
+                wrap_coordinate(bomber_origin - 10, width - 1),
+                -tables.bomber_base_speed,
+            ),
+            (
+                wrap_coordinate(bomber_origin + 20, width - 1),
+                tables.bomber_base_speed,
+            ),
+            (
+                wrap_coordinate(bomber_origin - 20, width - 1),
+                -tables.bomber_base_speed,
+            ),
+        ];
+        for (x, dx) in bomber_slots.into_iter().take(wave_profile.bombers as usize) {
             enemies.push(Entity::new(
                 EntityKind::Bomber,
-                third_bomber_x,
-                self.safe_altitude_at_world_x(third_bomber_x)
-                    .saturating_sub(1),
-                -tables.bomber_base_speed,
+                x,
+                self.safe_altitude_at_world_x(x).saturating_sub(1),
+                dx,
                 0,
             ));
         }
 
-        let pod_count = match self.status.wave {
-            0 | 1 => 0,
-            2 => 1,
-            3 => 3,
-            _ => 4,
-        };
-        // StrategyWiki's later-wave summaries anchor the current Pod schedule.
         let pod_slots = [
             (width / 2, 5, -1, 1),
             (wrap_coordinate(width - 20, width - 1), 4, 1, -1),
             (wrap_coordinate(bomber_origin + 18, width - 1), 6, -1, -1),
             (wrap_coordinate(bomber_origin - 18, width - 1), 4, 1, 1),
         ];
-        for (x, desired_y, dx, dy) in pod_slots.into_iter().take(pod_count) {
+        for (x, desired_y, dx, dy) in pod_slots.into_iter().take(wave_profile.pods as usize) {
             let y = desired_y.min(self.safe_altitude_at_world_x(x)).max(1);
             enemies.push(Entity::new(EntityKind::Pod, x, y, dx, dy));
         }
@@ -1860,10 +1858,9 @@ impl World {
         self.entities.extend(enemies);
         self.wave_started_at = self.tick;
         self.last_baiter_tick = self.tick;
-        self.pending_wave_openers =
-            tables.attack_wave_total_openers - tables.attack_wave_group_size;
+        self.pending_wave_openers = wave_profile.landers.saturating_sub(group_size);
         self.spawned_wave_opener_groups = 1;
-        self.next_wave_reinforcement_tick = self.tick + tables.attack_wave_reinforcement_delay;
+        self.next_wave_reinforcement_tick = self.tick + wave_profile.wave_time;
     }
 
     fn has_humanoids(&self) -> bool {
@@ -1883,31 +1880,27 @@ impl World {
             return;
         }
 
-        let tables = arcade_tables();
+        let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         let opening_enemy = if self.has_humanoids() {
             EntityKind::Lander
         } else {
             EntityKind::Mutant
         };
-        // Doug Mahugh chapter 01 describes the red-label opener as three
-        // staged five-enemy groups rather than one simultaneous spawn.
         let group_index = self.spawned_wave_opener_groups;
-        let group_size = tables.attack_wave_group_size.min(self.pending_wave_openers);
-        let mut reinforcements = default_attack_wave_openers(
+        let group_size = wave_profile.wave_size.min(self.pending_wave_openers);
+        let reinforcements = default_attack_wave_openers(
             self.world_span,
             self.status.wave,
             opening_enemy,
             group_index,
+            group_size as usize,
         );
-        reinforcements.truncate(group_size as usize);
         self.entities.extend(reinforcements);
 
         self.pending_wave_openers = self.pending_wave_openers.saturating_sub(group_size);
         self.spawned_wave_opener_groups = self.spawned_wave_opener_groups.saturating_add(1);
         if self.pending_wave_openers > 0 {
-            self.next_wave_reinforcement_tick = self
-                .tick
-                .saturating_add(tables.attack_wave_reinforcement_delay);
+            self.next_wave_reinforcement_tick = self.tick.saturating_add(wave_profile.wave_time);
         }
     }
 
@@ -2096,6 +2089,7 @@ fn default_attack_wave_openers(
     wave: u8,
     kind: EntityKind,
     group_index: u8,
+    count: usize,
 ) -> Vec<Entity> {
     let max_x = world_span - 1;
     let wave_offset = i32::from(wave % 6);
@@ -2108,6 +2102,7 @@ fn default_attack_wave_openers(
         (world_span / 2 - 10 - group_offset, 7, 1, -1),
     ]
     .into_iter()
+    .take(count)
     .map(|(x, y, dx, dy)| Entity::new(kind, wrap_coordinate(x, max_x), y, dx, dy))
     .collect()
 }
@@ -2126,6 +2121,7 @@ fn remove_indices(entities: &mut Vec<Entity>, indices: &[usize]) {
 mod tests {
     use crate::arcade::arcade_tables;
     use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS, PLAYER_START_X};
+    use crate::red_label_wave::red_label_wave_table;
 
     use super::{
         Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput,
@@ -3562,6 +3558,11 @@ mod tests {
 
     #[test]
     fn wave_two_and_later_add_arcade_like_wave_openers() {
+        let wave_two_profile = red_label_wave_table().profile_for_wave(2);
+        let wave_three_profile = red_label_wave_table().profile_for_wave(3);
+        let wave_four_profile = red_label_wave_table().profile_for_wave(4);
+        let wave_five_profile = red_label_wave_table().profile_for_wave(5);
+
         let mut wave_two = World::with_entities(
             64,
             12,
@@ -3578,8 +3579,14 @@ mod tests {
         wave_two.spawn_wave();
         assert_eq!(wave_two.entity_count_by_kind(EntityKind::Lander), 5);
         assert_eq!(wave_two.entity_count_by_kind(EntityKind::Mutant), 0);
-        assert_eq!(wave_two.entity_count_by_kind(EntityKind::Bomber), 1);
-        assert_eq!(wave_two.entity_count_by_kind(EntityKind::Pod), 1);
+        assert_eq!(
+            wave_two.entity_count_by_kind(EntityKind::Bomber),
+            wave_two_profile.bombers as usize
+        );
+        assert_eq!(
+            wave_two.entity_count_by_kind(EntityKind::Pod),
+            wave_two_profile.pods as usize
+        );
 
         let mut wave_three = World::with_entities(
             64,
@@ -3597,8 +3604,14 @@ mod tests {
         wave_three.spawn_wave();
         assert_eq!(wave_three.entity_count_by_kind(EntityKind::Lander), 5);
         assert_eq!(wave_three.entity_count_by_kind(EntityKind::Mutant), 0);
-        assert_eq!(wave_three.entity_count_by_kind(EntityKind::Bomber), 2);
-        assert_eq!(wave_three.entity_count_by_kind(EntityKind::Pod), 3);
+        assert_eq!(
+            wave_three.entity_count_by_kind(EntityKind::Bomber),
+            wave_three_profile.bombers as usize
+        );
+        assert_eq!(
+            wave_three.entity_count_by_kind(EntityKind::Pod),
+            wave_three_profile.pods as usize
+        );
 
         let mut wave_four = World::with_entities(
             64,
@@ -3615,8 +3628,14 @@ mod tests {
         );
         wave_four.spawn_wave();
         assert_eq!(wave_four.entity_count_by_kind(EntityKind::Lander), 5);
-        assert_eq!(wave_four.entity_count_by_kind(EntityKind::Bomber), 2);
-        assert_eq!(wave_four.entity_count_by_kind(EntityKind::Pod), 4);
+        assert_eq!(
+            wave_four.entity_count_by_kind(EntityKind::Bomber),
+            wave_four_profile.bombers as usize
+        );
+        assert_eq!(
+            wave_four.entity_count_by_kind(EntityKind::Pod),
+            wave_four_profile.pods as usize
+        );
 
         let mut wave_five = World::with_entities(
             64,
@@ -3633,28 +3652,71 @@ mod tests {
         );
         wave_five.spawn_wave();
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Lander), 5);
-        assert_eq!(wave_five.entity_count_by_kind(EntityKind::Bomber), 3);
-        assert_eq!(wave_five.entity_count_by_kind(EntityKind::Pod), 4);
+        assert_eq!(
+            wave_five.entity_count_by_kind(EntityKind::Bomber),
+            wave_five_profile.bombers as usize
+        );
+        assert_eq!(
+            wave_five.entity_count_by_kind(EntityKind::Pod),
+            wave_five_profile.pods as usize
+        );
         assert_eq!(wave_five.human_count(), 10);
     }
 
     #[test]
     fn attack_waves_arrive_in_three_five_ship_groups() {
         let mut world = World::bootstrap();
+        let wave_profile = red_label_wave_table().profile_for_wave(world.status().wave);
 
-        for _ in 0..arcade_tables().attack_wave_reinforcement_delay {
+        for _ in 0..wave_profile.wave_time {
             world.step();
         }
         assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 10);
 
-        for _ in 0..arcade_tables().attack_wave_reinforcement_delay {
+        for _ in 0..wave_profile.wave_time {
             world.step();
         }
         assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 15);
     }
 
     #[test]
-    fn mutant_reinforcements_follow_the_same_three_group_schedule() {
+    fn wave_two_uses_four_rom_recorded_lander_groups() {
+        let mut world = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Human, 8, 9, 0, 0),
+            ],
+        );
+        let wave_profile = red_label_wave_table().profile_for_wave(2);
+
+        world.spawn_wave();
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 5);
+
+        for _ in 0..wave_profile.wave_time {
+            world.step();
+        }
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 10);
+
+        for _ in 0..wave_profile.wave_time {
+            world.step();
+        }
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 15);
+
+        for _ in 0..wave_profile.wave_time {
+            world.step();
+        }
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 20);
+    }
+
+    #[test]
+    fn mutant_reinforcements_follow_the_same_rom_group_schedule() {
         let mut world = World::with_entities(
             64,
             12,
@@ -3669,15 +3731,22 @@ mod tests {
         world.spawn_wave();
         assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 5);
 
-        for _ in 0..arcade_tables().attack_wave_reinforcement_delay {
+        let wave_profile = red_label_wave_table().profile_for_wave(world.status().wave);
+
+        for _ in 0..wave_profile.wave_time {
             world.step();
         }
         assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 10);
 
-        for _ in 0..arcade_tables().attack_wave_reinforcement_delay {
+        for _ in 0..wave_profile.wave_time {
             world.step();
         }
         assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 15);
+
+        for _ in 0..wave_profile.wave_time {
+            world.step();
+        }
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 20);
     }
 
     #[test]
@@ -3710,6 +3779,7 @@ mod tests {
 
     #[test]
     fn mutant_stages_replace_landers_until_the_next_fifth_wave() {
+        let wave_profile = red_label_wave_table().profile_for_wave(2);
         let mut world = World::with_entities(
             64,
             12,
@@ -3726,8 +3796,14 @@ mod tests {
         assert_eq!(world.human_count(), 0);
         assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
         assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 5);
-        assert_eq!(world.entity_count_by_kind(EntityKind::Bomber), 1);
-        assert_eq!(world.entity_count_by_kind(EntityKind::Pod), 1);
+        assert_eq!(
+            world.entity_count_by_kind(EntityKind::Bomber),
+            wave_profile.bombers as usize
+        );
+        assert_eq!(
+            world.entity_count_by_kind(EntityKind::Pod),
+            wave_profile.pods as usize
+        );
         assert!(world.planet_destroyed());
     }
 
@@ -3777,7 +3853,7 @@ mod tests {
                 Entity::new(EntityKind::Human, 1, 8, 0, 0),
             ],
         );
-        world.tick = arcade_tables().baiter_base_delay + 4;
+        world.tick = red_label_wave_table().profile_for_wave(2).baiter_delay + 4;
 
         world.step_live(UpdateInput::default());
 
@@ -3799,7 +3875,7 @@ mod tests {
                 Entity::new(EntityKind::Pod, 18, 4, 0, 0),
             ],
         );
-        world.tick = arcade_tables().baiter_base_delay;
+        world.tick = red_label_wave_table().profile_for_wave(2).baiter_delay;
 
         world.step_live(UpdateInput::default());
 

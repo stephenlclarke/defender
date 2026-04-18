@@ -13,6 +13,7 @@ pub mod game;
 pub mod high_scores;
 pub mod kitty;
 pub mod live;
+pub mod red_label_wave;
 pub mod render;
 pub mod rom;
 pub mod session;
