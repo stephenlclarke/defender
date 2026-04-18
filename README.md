@@ -170,8 +170,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live title screen now idles into a real attract loop instead of staying
   static: a ROM-ordered scanner/enemy legend reveal cycles into a split
-  `TODAYS GREATEST` / `ALL TIME GREATEST` hall-of-fame page, with the latter
-  fed from the persistent high-score table.
+  `TODAYS GREATEST` / `ALL TIME GREATEST` hall-of-fame page, with a volatile
+  per-run left table and a persistent right table.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
   instead of a flat floor, so demo and live frames show a moving landscape and
   projectiles are clipped by terrain. When the last humanoid is lost, the live
@@ -205,6 +205,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   strings.
 - High scores persist between live runs in `~/.xyzzy/defender/high_scores.txt`;
   set `DEFENDER_DATA_DIR` to redirect that file for local experiments or tests.
+  The attract-mode `TODAYS GREATEST` table is intentionally volatile and resets
+  from the red-label ROM defaults each new app launch.
 
 ## SonarQube
 

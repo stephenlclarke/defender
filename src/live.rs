@@ -84,7 +84,8 @@ fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
                 session.world(),
                 &render::InitialsEntryView {
                     high_score: session.high_score(),
-                    high_scores: session.high_scores(),
+                    todays_high_scores: session.todays_high_scores(),
+                    all_time_high_scores: session.high_scores(),
                     entry_score: pending.score(),
                     entry_rank: pending.rank(),
                     initials: &display_letters,
@@ -131,7 +132,7 @@ fn render_title_mode(session: &SessionState) -> String {
     // uses the red-label defaults on the left and the persisted table on the right.
     scene_for_elapsed_ms(
         attract_elapsed_ms,
-        &crate::high_scores::HighScoreTable::default(),
+        session.todays_high_scores(),
         session.high_scores(),
     )
     .text()

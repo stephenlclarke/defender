@@ -32,6 +32,7 @@ pub enum SessionEvent {
 pub struct SessionState {
     mode: SessionMode,
     world: World,
+    todays_high_scores: HighScoreTable,
     high_scores: HighScoreTable,
     high_score: u32,
     title_ticks: u64,
@@ -43,7 +44,8 @@ pub struct SessionState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingInitials {
     score: u32,
-    rank: usize,
+    todays_rank: Option<usize>,
+    all_time_rank: Option<usize>,
     letters: String,
 }
 
@@ -76,6 +78,10 @@ impl SessionState {
         Self {
             mode: SessionMode::Title,
             world: World::bootstrap(),
+            // Red-label `THSTAB` starts from the ROM defaults each power cycle,
+            // while `CRHSTD` persists in CMOS. We mirror that split here by
+            // resetting the left-hand today's table on load/new session.
+            todays_high_scores: HighScoreTable::default(),
             high_score: high_scores.top_score(),
             high_scores,
             title_ticks: 0,
@@ -94,11 +100,17 @@ impl SessionState {
     }
 
     pub fn high_score(&self) -> u32 {
-        self.high_score.max(self.high_scores.top_score())
+        self.high_score
+            .max(self.todays_high_scores.top_score())
+            .max(self.high_scores.top_score())
     }
 
     pub fn high_scores(&self) -> &HighScoreTable {
         &self.high_scores
+    }
+
+    pub fn todays_high_scores(&self) -> &HighScoreTable {
+        &self.todays_high_scores
     }
 
     pub fn title_ticks(&self) -> u64 {
@@ -169,7 +181,7 @@ impl SessionState {
         }
 
         if self.world.is_game_over() {
-            if self.high_scores.qualifies(score) {
+            if self.todays_high_scores.qualifies(score) || self.high_scores.qualifies(score) {
                 self.begin_initials_entry(score);
             } else {
                 self.mode = SessionMode::GameOver;
@@ -262,7 +274,8 @@ impl SessionState {
         self.mode = SessionMode::EnteringInitials;
         self.pending_initials = Some(PendingInitials {
             score,
-            rank: self.high_scores.projected_rank(score).unwrap_or(1),
+            todays_rank: self.todays_high_scores.projected_rank(score),
+            all_time_rank: self.high_scores.projected_rank(score),
             letters: String::new(),
         });
     }
@@ -272,7 +285,13 @@ impl SessionState {
             return;
         };
 
-        self.high_scores.insert(&initials.letters, initials.score);
+        if initials.todays_rank.is_some() {
+            self.todays_high_scores
+                .insert(&initials.letters, initials.score);
+        }
+        if initials.all_time_rank.is_some() {
+            self.high_scores.insert(&initials.letters, initials.score);
+        }
         self.high_score = self.high_score.max(self.high_scores.top_score());
         self.mode = SessionMode::GameOver;
 
@@ -288,7 +307,7 @@ impl PendingInitials {
     }
 
     pub fn rank(&self) -> usize {
-        self.rank
+        self.todays_rank.or(self.all_time_rank).unwrap_or(1)
     }
 
     pub fn letters(&self) -> &str {
@@ -453,7 +472,8 @@ mod tests {
         session.mode = SessionMode::EnteringInitials;
         session.pending_initials = Some(super::PendingInitials {
             score: 60_000,
-            rank: 1,
+            todays_rank: Some(1),
+            all_time_rank: Some(1),
             letters: String::new(),
         });
 
@@ -486,8 +506,39 @@ mod tests {
         });
         assert_eq!(events, vec![SessionEvent::HighScoreSaved]);
         assert_eq!(session.mode(), SessionMode::GameOver);
+        assert_eq!(session.todays_high_scores().entries()[0].initials, "RMX");
+        assert_eq!(session.todays_high_scores().entries()[0].score, 60_000);
         assert_eq!(session.high_scores().entries()[0].initials, "RMX");
         assert_eq!(session.high_scores().entries()[0].score, 60_000);
+    }
+
+    #[test]
+    fn todays_greatest_accepts_scores_that_do_not_make_all_time() {
+        let mut all_time = HighScoreTable::default();
+        all_time.insert("ZZZ", 30_000);
+        let mut session = SessionState::with_high_scores(all_time);
+        session.tick(SessionInput {
+            start_requested: true,
+            ..SessionInput::default()
+        });
+        session.world = World::with_entities(
+            12,
+            8,
+            Status {
+                score: 7_500,
+                lives: 1,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 3, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 3, 3, 0, 0),
+            ],
+        );
+
+        session.tick(SessionInput::default());
+
+        assert_eq!(session.mode(), SessionMode::EnteringInitials);
+        assert_eq!(session.pending_initials().map(|entry| entry.rank()), Some(8));
     }
 
     #[test]

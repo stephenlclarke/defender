@@ -3,7 +3,8 @@ use crate::high_scores::HighScoreTable;
 
 pub struct InitialsEntryView<'a> {
     pub high_score: u32,
-    pub high_scores: &'a HighScoreTable,
+    pub todays_high_scores: &'a HighScoreTable,
+    pub all_time_high_scores: &'a HighScoreTable,
     pub entry_score: u32,
     pub entry_rank: usize,
     pub initials: &'a str,
@@ -220,10 +221,21 @@ pub fn render_initials_entry_screen(world: &World, view: &InitialsEntryView<'_>)
         "TYPE LETTERS A-Z, `Backspace` DELETES, `Enter` SAVES",
     ));
     lines.push(String::new());
-    lines.push(String::from("ALL TIME GREATEST"));
-    lines.push(String::from(" RANK  INITIALS   SCORE"));
-    lines.push(String::from(" ----  --------  -------"));
-    lines.extend(view.high_scores.rows());
+    lines.push(format!("{:<24}{}", "TODAYS GREATEST", "ALL TIME GREATEST"));
+    lines.push(format!(
+        "{:<24}{}",
+        " RANK  INITIALS SCORE", " RANK  INITIALS SCORE"
+    ));
+    let row_count = view
+        .todays_high_scores
+        .entries()
+        .len()
+        .max(view.all_time_high_scores.entries().len());
+    for index in 0..row_count {
+        let left = compact_score_row(index + 1, view.todays_high_scores.entries().get(index));
+        let right = compact_score_row(index + 1, view.all_time_high_scores.entries().get(index));
+        lines.push(format!("{left:<24}{right}"));
+    }
     lines.extend(secret_mode_lines(
         view.xyzzy_active,
         view.invincible,
@@ -231,6 +243,13 @@ pub fn render_initials_entry_screen(world: &World, view: &InitialsEntryView<'_>)
     ));
     lines.push(String::from("PRESS `q` OR `Esc` TO QUIT"));
     lines.join("\n")
+}
+
+fn compact_score_row(rank: usize, entry: Option<&crate::high_scores::HighScoreEntry>) -> String {
+    match entry {
+        Some(entry) => format!("{rank:>2}. {:<3} {:>6}", entry.initials, entry.score),
+        None => format!("{rank:>2}. --- ------"),
+    }
 }
 
 fn secret_mode_lines(xyzzy_active: bool, invincible: bool, auto_fire: bool) -> Vec<String> {
@@ -383,7 +402,8 @@ mod tests {
             &world,
             &super::InitialsEntryView {
                 high_score: 21_270,
-                high_scores: &HighScoreTable::default(),
+                todays_high_scores: &HighScoreTable::default(),
+                all_time_high_scores: &HighScoreTable::default(),
                 entry_score: 60_000,
                 entry_rank: 1,
                 initials: "RO_",
@@ -397,6 +417,7 @@ mod tests {
         assert!(output.contains("QUALIFIES FOR RANK  1"));
         assert!(output.contains("[RO_]"));
         assert!(output.contains("TYPE LETTERS A-Z"));
+        assert!(output.contains("TODAYS GREATEST"));
         assert!(output.contains("ALL TIME GREATEST"));
     }
 }
