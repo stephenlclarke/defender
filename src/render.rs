@@ -1,4 +1,15 @@
 use crate::game::World;
+use crate::high_scores::HighScoreTable;
+
+pub struct InitialsEntryView<'a> {
+    pub high_score: u32,
+    pub high_scores: &'a HighScoreTable,
+    pub entry_score: u32,
+    pub entry_rank: usize,
+    pub initials: &'a str,
+    pub xyzzy_active: bool,
+    pub invincible: bool,
+}
 
 pub fn render_grid(world: &World) -> Vec<String> {
     let mut buffer = vec![vec![' '; world.width()]; world.height()];
@@ -85,7 +96,7 @@ pub fn render_title_screen_with_flags(
         String::new(),
         String::from("LIVE TERMINAL PROTOTYPE"),
         String::new(),
-        format!("SESSION HIGH SCORE {:06}", high_score),
+        format!("HIGH SCORE {:06}", high_score),
         String::new(),
         String::from("PRESS `ENTER` OR `1` TO START"),
         String::from("PRESS `q` OR `Esc` TO QUIT"),
@@ -124,6 +135,29 @@ pub fn render_game_over_screen_with_flags(
     lines.join("\n")
 }
 
+pub fn render_initials_entry_screen(world: &World, view: &InitialsEntryView<'_>) -> String {
+    let mut lines = render_grid(world);
+    lines.push(String::new());
+    lines.push(format!(
+        "GREAT SCORE {:06}  HIGH SCORE {:06}",
+        view.entry_score, view.high_score
+    ));
+    lines.push(format!("QUALIFIES FOR RANK {:>2}", view.entry_rank));
+    lines.push(String::from("ENTER INITIALS"));
+    lines.push(format!("  [{}]", view.initials));
+    lines.push(String::from(
+        "TYPE LETTERS A-Z, `Backspace` DELETES, `Enter` SAVES",
+    ));
+    lines.push(String::new());
+    lines.push(String::from("HIGH SCORES"));
+    lines.push(String::from(" RANK  INITIALS   SCORE"));
+    lines.push(String::from(" ----  --------  -------"));
+    lines.extend(view.high_scores.rows());
+    lines.extend(secret_mode_lines(view.xyzzy_active, view.invincible));
+    lines.push(String::from("PRESS `q` OR `Esc` TO QUIT"));
+    lines.join("\n")
+}
+
 fn secret_mode_lines(xyzzy_active: bool, invincible: bool) -> Vec<String> {
     if !xyzzy_active {
         return Vec::new();
@@ -142,6 +176,7 @@ fn secret_mode_lines(xyzzy_active: bool, invincible: bool) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use crate::game::{Entity, EntityKind, Status, World};
+    use crate::high_scores::HighScoreTable;
 
     #[test]
     fn render_includes_status_header() {
@@ -245,7 +280,7 @@ mod tests {
     fn title_screen_mentions_start_and_high_score() {
         let output = super::render_title_screen(1234);
         assert!(output.contains("LIVE TERMINAL PROTOTYPE"));
-        assert!(output.contains("SESSION HIGH SCORE 001234"));
+        assert!(output.contains("HIGH SCORE 001234"));
         assert!(output.contains("PRESS `ENTER` OR `1` TO START"));
         assert!(output.contains("LASER: `Enter`"));
     }
@@ -257,5 +292,28 @@ mod tests {
         assert!(output.contains("GAME OVER"));
         assert!(output.contains("HIGH SCORE 004321"));
         assert!(output.contains("PRESS `ENTER` OR `1` TO RESTART"));
+    }
+
+    #[test]
+    fn initials_entry_screen_mentions_rank_and_entry_controls() {
+        let world = World::bootstrap();
+        let output = super::render_initials_entry_screen(
+            &world,
+            &super::InitialsEntryView {
+                high_score: 250_000,
+                high_scores: &HighScoreTable::default(),
+                entry_score: 60_000,
+                entry_rank: 5,
+                initials: "RO_",
+                xyzzy_active: false,
+                invincible: false,
+            },
+        );
+
+        assert!(output.contains("GREAT SCORE 060000"));
+        assert!(output.contains("QUALIFIES FOR RANK  5"));
+        assert!(output.contains("[RO_]"));
+        assert!(output.contains("TYPE LETTERS A-Z"));
+        assert!(output.contains("HIGH SCORES"));
     }
 }

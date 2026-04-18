@@ -6,6 +6,7 @@ pub mod audio;
 pub mod constants;
 pub mod demo;
 pub mod game;
+pub mod high_scores;
 pub mod live;
 pub mod render;
 pub mod rom;

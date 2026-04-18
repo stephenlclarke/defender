@@ -27,7 +27,7 @@ pub fn run_live(play_audio: bool) -> Result<()> {
     let mut stdout = io::stdout();
     let _guard = TerminalGuard::enter(&mut stdout)?;
     let mut input_tracker = InputTracker::default();
-    let mut session = SessionState::new();
+    let mut session = SessionState::load();
 
     draw_frame(&mut stdout, &session)?;
 
@@ -62,6 +62,24 @@ fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
             session.xyzzy_active(),
             session.invincible(),
         ),
+        SessionMode::EnteringInitials => {
+            let pending = session
+                .pending_initials()
+                .expect("initials mode should have pending entry");
+            let display_letters = pending.display_letters();
+            render::render_initials_entry_screen(
+                session.world(),
+                &render::InitialsEntryView {
+                    high_score: session.high_score(),
+                    high_scores: session.high_scores(),
+                    entry_score: pending.score(),
+                    entry_rank: pending.rank(),
+                    initials: &display_letters,
+                    xyzzy_active: session.xyzzy_active(),
+                    invincible: session.invincible(),
+                },
+            )
+        }
         SessionMode::Playing => render::render_with_flags(
             session.world(),
             session.xyzzy_active(),
@@ -83,7 +101,9 @@ fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
     if events.contains(&SessionEvent::GameStarted) || events.contains(&SessionEvent::GameRestarted)
     {
         Some(SoundCue::LogoFanfare)
-    } else if events.contains(&SessionEvent::HighScoreUpdated) {
+    } else if events.contains(&SessionEvent::HighScoreUpdated)
+        || events.contains(&SessionEvent::HighScoreSaved)
+    {
         Some(SoundCue::HighScoreChime)
     } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired))
         || events.contains(&SessionEvent::World(
@@ -166,6 +186,7 @@ impl InputTracker {
         match key_event.code {
             KeyCode::Esc if pressed => input.quit_requested = true,
             KeyCode::Char('q') | KeyCode::Char('Q') if pressed => input.quit_requested = true,
+            KeyCode::Backspace if pressed => input.session.backspace_requested = true,
             KeyCode::Enter if pressed => {
                 input.session.start_requested = true;
                 input.session.update.fire = true;
@@ -318,6 +339,10 @@ mod tests {
             cue_for_events(&[SessionEvent::World(WorldEvent::HumanRescued)]),
             Some(SoundCue::HumanSaved)
         );
+        assert_eq!(
+            cue_for_events(&[SessionEvent::HighScoreSaved]),
+            Some(SoundCue::HighScoreChime)
+        );
     }
 
     #[test]
@@ -402,6 +427,19 @@ mod tests {
             input.session.typed_chars,
             vec!['x', 'y', 'z', 'z', 'y', 'g']
         );
+    }
+
+    #[test]
+    fn input_tracker_maps_backspace_for_initials_entry() {
+        let mut tracker = InputTracker::default();
+        let mut input = PolledInput::default();
+
+        tracker.handle_key_event(
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+            &mut input,
+        );
+
+        assert!(input.session.backspace_requested);
     }
 
     #[test]

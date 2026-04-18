@@ -87,6 +87,7 @@ Live mode controls:
 - `Enter`: fire the laser bolt
 - `Tab`: detonate a smart bomb
 - `H`: trigger hyperspace
+- `Backspace`: delete the previous letter during high-score initials entry
 - `q` or `Esc`: quit
 
 The live key layout is currently modelled on the BBC Micro `Planetoid`
@@ -122,8 +123,9 @@ Extra keys while `xyzzy` mode is active:
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, rescue on
   carrying-lander kills, mutant conversion after successful abductions,
-  game-over handling, restart support, a wrapped scrolling camera, and an
-  `xyzzy`/`g` secret god-mode path on top of the same native Rust world model.
+  persistent five-entry high-score tracking with initials entry, game-over
+  handling, restart support, a wrapped scrolling camera, and an `xyzzy`/`g`
+  secret god-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
   instead of a flat floor, so demo and live frames show a moving landscape and
   projectiles are clipped by terrain.
@@ -141,6 +143,8 @@ Extra keys while `xyzzy` mode is active:
 - `examples/generate_readme_media.rs` regenerates `docs/defender.png` from the
   gameplay demo path and `docs/start-sequence.gif` from the shared attract
   cycle used by the app.
+- High scores persist between live runs in `~/.defender/high_scores.txt`; set
+  `DEFENDER_DATA_DIR` to redirect that file for local experiments or tests.
 
 ## SonarQube
 

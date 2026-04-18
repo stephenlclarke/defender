@@ -1,5 +1,6 @@
 use crate::audio::SoundCue;
 use crate::game::World;
+use crate::high_scores::HighScoreTable;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SceneKind {
@@ -149,15 +150,7 @@ pub fn high_score_scene() -> Scene {
         String::from(" ----  --------  -------"),
     ];
 
-    for (rank, initials, score) in [
-        (1, "SLC", 250_000),
-        (2, "ACE", 175_000),
-        (3, "ROM", 125_000),
-        (4, "ARC", 90_000),
-        (5, "CPU", 50_000),
-    ] {
-        lines.push(format!("  {:>2}.  {:<8}  {:>7}", rank, initials, score));
-    }
+    lines.extend(HighScoreTable::default().rows());
 
     lines.push(String::new());
     lines.push(String::from("BONUS SHIP EVERY 10000 POINTS"));
