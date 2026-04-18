@@ -108,10 +108,11 @@ Extra keys while `xyzzy` mode is active:
   hyperspace, enemy hits, wave progression, human abductions, falling-human
   recovery, grounded-human pickup and redeploy, Defender-style rescue scoring
   with `500` catch bonuses, `500` return-to-ground bonuses, and `250`
-  low-altitude safe-fall saves, mutant conversion after successful abductions,
-  full lander-to-mutant conversion once humanity is wiped out, persistent
-  five-entry high-score tracking with initials entry, active lander pursuit of
-  free humans, mutant pursuit of the player,
+  low-altitude safe-fall saves, wave-end humanoid survivor bonuses, default
+  `10,000`-point extra ship and smart-bomb awards, mutant conversion after
+  successful abductions, full lander-to-mutant conversion once humanity is
+  wiped out, persistent five-entry high-score tracking with initials entry,
+  active lander pursuit of free humans, mutant pursuit of the player,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret god-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
@@ -173,6 +174,9 @@ the final runtime self-contained:
 - <https://www.arcade-history.com/?id=614&n=defender&page=detail>: scoring and
   gameplay reference used for humanoid rescue values, safe-fall saves, and wave
   bonus behavior.
+- <https://en.wikipedia.org/wiki/Defender_%281981_video_game%29>: general rules
+  reference used to cross-check the default `10,000`-point extra ship and smart
+  bomb award behavior.
 - <https://strategywiki.org/wiki/Defender/Gameplay>: gameplay reference used to
   cross-check live enemy and humanoid behavior against the original arcade
   rules.

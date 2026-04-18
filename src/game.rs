@@ -7,6 +7,8 @@ const SAFE_FALL_HEIGHT: i32 = 2;
 const SAFE_FALL_SCORE: u16 = 250;
 const HUMAN_CATCH_SCORE: u32 = 500;
 const HUMAN_LANDING_SCORE: u16 = 500;
+const BONUS_STOCK_SCORE: u32 = 10_000;
+const MAX_WAVE_HUMANOID_BONUS: u32 = 500;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
@@ -130,6 +132,7 @@ pub struct World {
     camera_x: i32,
     tick: u32,
     fire_cooldown: u8,
+    next_stock_award: u32,
     smart_bombs: u8,
     game_over: bool,
     status: Status,
@@ -149,6 +152,7 @@ impl World {
             camera_x: PLAYER_START_X,
             tick: 0,
             fire_cooldown: 0,
+            next_stock_award: next_stock_award_score(0),
             smart_bombs: DEFAULT_SMART_BOMBS,
             game_over: false,
             status: Status {
@@ -180,6 +184,7 @@ impl World {
             camera_x: width as i32 / 2,
             tick: 0,
             fire_cooldown: 0,
+            next_stock_award: next_stock_award_score(status.score),
             smart_bombs: DEFAULT_SMART_BOMBS,
             game_over: false,
             status,
@@ -344,6 +349,11 @@ impl World {
 
     pub fn add_score(&mut self, delta: u32) {
         self.status.score = self.status.score.saturating_add(delta);
+        while self.status.score >= self.next_stock_award {
+            self.status.lives = self.status.lives.saturating_add(1);
+            self.smart_bombs = self.smart_bombs.saturating_add(1);
+            self.next_stock_award = self.next_stock_award.saturating_add(BONUS_STOCK_SCORE);
+        }
     }
 
     pub fn set_wave(&mut self, wave: u8) {
@@ -472,7 +482,8 @@ impl World {
         self.handle_player_collisions(input.invincible, &mut events);
         self.mutate_landers_if_humans_extinct();
 
-        if !self.game_over && self.enemy_count() == 0 {
+        if !self.game_over && self.enemy_count() == 0 && !self.has_unresolved_humans() {
+            self.add_score(self.wave_humanoid_bonus());
             self.status.wave = self.status.wave.saturating_add(1);
             self.spawn_wave();
             events.push(WorldEvent::WaveAdvanced);
@@ -1022,6 +1033,26 @@ impl World {
         }
     }
 
+    fn has_unresolved_humans(&self) -> bool {
+        self.entities.iter().any(|entity| {
+            entity.kind == EntityKind::Human
+                && matches!(
+                    entity.state,
+                    EntityState::Abducted | EntityState::Falling | EntityState::PlayerCarried
+                )
+        })
+    }
+
+    fn wave_humanoid_bonus(&self) -> u32 {
+        let per_humanoid = (u32::from(self.status.wave) * 100).min(MAX_WAVE_HUMANOID_BONUS);
+        let survivors = self
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Human)
+            .count() as u32;
+        per_humanoid.saturating_mul(survivors)
+    }
+
     fn mutate_landers_if_humans_extinct(&mut self) {
         if self.entity_count_by_kind(EntityKind::Human) > 0 {
             return;
@@ -1175,6 +1206,12 @@ fn score_for_enemy(kind: EntityKind) -> u32 {
     }
 }
 
+fn next_stock_award_score(score: u32) -> u32 {
+    (score / BONUS_STOCK_SCORE)
+        .saturating_add(1)
+        .saturating_mul(BONUS_STOCK_SCORE)
+}
+
 fn remove_indices(entities: &mut Vec<Entity>, indices: &[usize]) {
     let mut sorted = indices.to_vec();
     sorted.sort_unstable();
@@ -1187,7 +1224,7 @@ fn remove_indices(entities: &mut Vec<Entity>, indices: &[usize]) {
 
 #[cfg(test)]
 mod tests {
-    use crate::constants::DEFAULT_SMART_BOMBS;
+    use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS};
 
     use super::{
         Entity, EntityKind, EntityState, Position, Status, UpdateInput, World, WorldEvent,
@@ -1305,6 +1342,17 @@ mod tests {
         assert_eq!(world.smart_bombs(), 1);
         assert_eq!(world.enemy_count(), 1);
         assert_eq!(world.human_count(), 3);
+    }
+
+    #[test]
+    fn score_thresholds_award_extra_lives_and_smart_bombs() {
+        let mut world = World::bootstrap();
+
+        world.add_score(20_050);
+
+        assert_eq!(world.status().score, 20_050);
+        assert_eq!(world.status().lives, DEFAULT_LIVES + 2);
+        assert_eq!(world.smart_bombs(), DEFAULT_SMART_BOMBS + 2);
     }
 
     #[test]
@@ -1736,7 +1784,8 @@ mod tests {
             human.position.y,
             world.safe_altitude_at_world_x(human.position.x)
         );
-        assert_eq!(world.status().score, 400);
+        assert_eq!(world.status().score, 500);
+        assert_eq!(world.status().wave, 2);
         assert!(events.contains(&WorldEvent::HumanRescued));
     }
 
@@ -2016,6 +2065,67 @@ mod tests {
         assert_eq!(world.status().wave, 2);
         assert!(world.enemy_count() >= 2);
         assert!(events.contains(&WorldEvent::WaveAdvanced));
+    }
+
+    #[test]
+    fn wave_advance_awards_humanoid_survivor_bonus() {
+        let mut world = World::with_entities(
+            16,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 3,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 5, 3, 0, 0),
+                Entity::new(EntityKind::Human, 8, 5, 0, 0),
+                Entity::new(EntityKind::Human, 12, 5, 0, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput {
+            smart_bomb: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.status().wave, 4);
+        assert_eq!(world.status().score, 750);
+        assert!(events.contains(&WorldEvent::WaveAdvanced));
+    }
+
+    #[test]
+    fn wave_advance_waits_for_falling_humans_to_resolve() {
+        let mut world = World::with_entities(
+            16,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 1, 4, 0, 0),
+                Entity::with_state(EntityKind::Lander, 5, 5, 0, 0, EntityState::CarryingHuman),
+                Entity::with_state(EntityKind::Human, 5, 6, 0, -1, EntityState::Abducted),
+            ],
+        );
+
+        let first_events = world.step_live(UpdateInput {
+            fire: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.status().wave, 2);
+        assert!(!first_events.contains(&WorldEvent::WaveAdvanced));
+
+        world.step_live(UpdateInput::default());
+        let third_events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.status().wave, 3);
+        assert_eq!(world.status().score, 600);
+        assert!(third_events.contains(&WorldEvent::WaveAdvanced));
     }
 
     #[test]
