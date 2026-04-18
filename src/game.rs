@@ -629,7 +629,7 @@ impl World {
         self.update_abducted_humans(min_y, &mut events);
         self.update_falling_humans(max_y);
         self.handle_player_human_interactions(&mut events);
-        self.resolve_falling_human_impacts(&mut events);
+        self.resolve_falling_human_impacts(input.secret_mode, &mut events);
         self.handle_human_losses(&mut events);
         self.handle_player_shot_hits(&mut events);
         self.handle_player_collisions(
@@ -1445,7 +1445,7 @@ impl World {
         }
     }
 
-    fn resolve_falling_human_impacts(&mut self, events: &mut Vec<WorldEvent>) {
+    fn resolve_falling_human_impacts(&mut self, secret_mode: bool, events: &mut Vec<WorldEvent>) {
         let grounded_humans: Vec<usize> = self
             .entities
             .iter()
@@ -1472,7 +1472,7 @@ impl World {
             let Some(human) = self.entities.get_mut(index) else {
                 continue;
             };
-            if human.rescue_value == arcade_tables().safe_fall_score {
+            if secret_mode || human.rescue_value == arcade_tables().safe_fall_score {
                 human.state = EntityState::Normal;
                 human.position.y = safe_y;
                 human.velocity = Velocity { dx: 0, dy: 0 };
@@ -2938,6 +2938,47 @@ mod tests {
         assert_eq!(world.entity_count_by_kind(EntityKind::Human), 0);
         assert_eq!(world.status().score, 0);
         assert!(events.contains(&WorldEvent::HumanLost));
+    }
+
+    #[test]
+    fn xyzzy_mode_allows_humans_to_survive_full_height_falls() {
+        let mut world = World::with_entities(
+            20,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::with_state(EntityKind::Human, 14, 1, 0, 1, EntityState::Falling),
+            ],
+        );
+
+        let fall_ticks = world.safe_altitude_at_world_x(14) - 1;
+
+        let mut all_events = Vec::new();
+        for _ in 0..fall_ticks {
+            all_events.extend(world.step_live(UpdateInput {
+                secret_mode: true,
+                ..UpdateInput::default()
+            }));
+        }
+
+        let human = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Human)
+            .expect("surviving human");
+        assert_eq!(human.state, EntityState::Normal);
+        assert_eq!(
+            human.position.y,
+            world.safe_altitude_at_world_x(human.position.x)
+        );
+        assert!(world.status().score >= u32::from(arcade_tables().safe_fall_score));
+        assert!(all_events.contains(&WorldEvent::HumanRescued));
+        assert!(!all_events.contains(&WorldEvent::HumanLost));
     }
 
     #[test]

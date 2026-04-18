@@ -105,6 +105,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - `H`: hyperspace becomes safe and cannot destroy the player ship while
   `xyzzy` mode is active, and the rematerialization point is chosen as far away
   from enemies as possible.
+- falling humanoids always survive the landing while `xyzzy` mode is active,
+  even after a full-height drop.
 
 ## Current Notes
 
@@ -130,9 +132,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   until you counter-thrust, and risky hyperspace behavior outside `xyzzy` mode,
   while `xyzzy` hyperspace deliberately relocates the ship away from enemy
   clusters, with automatic unlimited smart bombs in `xyzzy` mode, a separate
-  `G` invincibility toggle, and an `F` auto-fire toggle that only shoots when
-  the current firing lane has a direct alien kill, plus pod waves that now
-  start on wave two and ramp up to four ships by wave four, release
+  `G` invincibility toggle, an `F` auto-fire toggle that only shoots when the
+  current firing lane has a direct alien kill, and secret-mode full-height
+  humanoid fall survival, plus pod waves that now start on wave two and ramp
+  up to four ships by wave four, release
   deterministic five-to-seven swarmer bursts when shot, and preserve the
   classic follow-from-behind swarmer counterplay, with 15-enemy attack waves
   now opening with five landers and then delivering two later five-ship
