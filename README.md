@@ -19,10 +19,11 @@ This repository is a native Rust reimplementation of Williams' `Defender`,
 rendered through the Kitty graphics protocol.
 
 The game logic is native Rust; ROMs are treated as reference material only, and
-the current sound cues are synthesized in-process so the app does not depend on
-external audio files. The target is a faithful recreation of the original
-red-label arcade game, with hidden `xyzzy` extras as the deliberate behavior
-outside the original cabinet rules.
+the app now embeds its gameplay object art as PNGs from `assets/arcade/` and
+its cue audio as WAVs from `assets/sounds/`, so compile and runtime do not
+depend on a local ROM or sound directory. The target is a faithful recreation
+of the original red-label arcade game, with hidden `xyzzy` extras as the
+deliberate behavior outside the original cabinet rules.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -133,8 +134,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `--rom-report` now prints the embedded canonical red-label filename list when
   no directory is supplied, and only touches the filesystem when you pass an
   explicit ROM path.
-- All current sounds are embedded in the app via synthesized `rodio` cues,
-  following the same self-contained runtime principle used in `../battlezone`.
+- Gameplay object art now loads from embedded `assets/arcade/*.png` sprites,
+  following the same bundled-asset layout used in `../pacman`.
+- All current sounds are embedded in the app via bundled `assets/sounds/*.wav`
+  cue files decoded by `rodio`, so the live runtime stays self-contained while
+  matching the sibling repos' asset layout.
 - `cargo run` / `defender` now launch the real Kitty-graphics play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, falling-human
@@ -229,11 +233,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 ## Reference Repos
 
 - `../battlezone`: the primary local template for crate layout, CI, SonarCloud,
-  README structure, and self-contained synthesized audio for these terminal
-  arcade rewrites.
+  README structure, and Kitty-graphics terminal workflow for these arcade
+  rewrites.
 - `../pacman`: secondary local reference for README/media conventions and
-  workflow shape across the sibling Rust arcade repos, including an
-  embedded-audio path based on bundled sound assets.
+  workflow shape across the sibling Rust arcade repos, including the direct
+  `assets/arcade/*.png` and `assets/sounds/*` embedding pattern.
 - <https://github.com/mwenge/defender>: external Defender rewrite used to
   compare canonical ROM naming and overall project direction.
 
@@ -247,6 +251,9 @@ the final runtime self-contained:
   'Red Label' version of the game. Used for reference implementation and ROM
   layout comparison point, especially for the red-label `defend.*` program ROM
   names.
+- <https://seanriddle.com/ripper.html>: Williams graphics-ripper reference used
+  to confirm Defender's screen-format sprite layout and the red-label object
+  sprite list/rip used to build the embedded `assets/arcade/*.png` object art.
 - <https://www.thedefenderproject.com/defender-rom-versions-the-history/>:
   revision history and ROM-set background for Williams Defender releases.
 - <https://www.mamechannel.it/files_free/arcade_manuals_unpacked/defenderw.pdf>:

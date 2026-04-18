@@ -3,9 +3,10 @@
 use font8x8::{BASIC_FONTS, UnicodeFonts};
 
 use crate::{
-    game::{EntityKind, HorizontalDirection, World},
+    game::{Entity, EntityKind, HorizontalDirection, World},
     high_scores::{HighScoreEntry, HighScoreTable},
     render::InitialsEntryView,
+    sprites::arcade_sprites,
     terminal::TerminalGeometry,
 };
 
@@ -620,12 +621,12 @@ impl Renderer {
                     + ((entity.position.y as f32 + 0.5) * cell_height).round() as i32;
                 let scale = cell_width.min(cell_height).round() as i32;
                 self.draw_entity(
+                    entity,
                     world.player_facing(),
-                    entity.kind,
+                    world.tick(),
                     cx,
                     cy,
                     scale.max(4),
-                    show_status_overlay,
                 );
             }
         }
@@ -643,137 +644,21 @@ impl Renderer {
 
     fn draw_entity(
         &mut self,
+        entity: &Entity,
         facing: HorizontalDirection,
-        kind: EntityKind,
+        tick: u32,
         cx: i32,
         cy: i32,
         scale: i32,
-        _highlight_player: bool,
     ) {
-        match kind {
-            EntityKind::PlayerShip => {
-                let color = Color::from_rgba(PLAYER_COLOR);
-                let dir = if facing == HorizontalDirection::Right {
-                    1
-                } else {
-                    -1
-                };
-                self.draw_line(
-                    cx - dir * scale,
-                    cy - scale / 2,
-                    cx + dir * scale,
-                    cy,
-                    color,
-                    2,
-                );
-                self.draw_line(
-                    cx - dir * scale,
-                    cy + scale / 2,
-                    cx + dir * scale,
-                    cy,
-                    color,
-                    2,
-                );
-                self.draw_line(
-                    cx - dir * scale,
-                    cy - scale / 2,
-                    cx - dir * scale,
-                    cy + scale / 2,
-                    color,
-                    2,
-                );
-            }
-            EntityKind::PlayerShot => {
-                self.draw_line(
-                    cx - scale,
-                    cy,
-                    cx + scale,
-                    cy,
-                    Color::from_rgba(PLAYER_SHOT_COLOR),
-                    2,
-                );
-            }
-            EntityKind::EnemyShot => {
-                self.draw_line(
-                    cx - scale / 2,
-                    cy - scale / 2,
-                    cx + scale / 2,
-                    cy + scale / 2,
-                    Color::from_rgba(ENEMY_SHOT_COLOR),
-                    2,
-                );
-                self.draw_line(
-                    cx - scale / 2,
-                    cy + scale / 2,
-                    cx + scale / 2,
-                    cy - scale / 2,
-                    Color::from_rgba(ENEMY_SHOT_COLOR),
-                    2,
-                );
-            }
-            EntityKind::Human => {
-                let color = Color::from_rgba(HUMAN_COLOR);
-                self.draw_dot(cx, cy - scale / 2, color, 2);
-                self.draw_line(cx, cy - scale / 2 + 2, cx, cy + scale / 2, color, 1);
-                self.draw_line(cx, cy, cx - scale / 2, cy + scale / 2, color, 1);
-                self.draw_line(cx, cy, cx + scale / 2, cy + scale / 2, color, 1);
-            }
-            EntityKind::Lander => {
-                let color = Color::from_rgba(LANDER_COLOR);
-                self.draw_line(
-                    cx - scale,
-                    cy - scale / 3,
-                    cx + scale,
-                    cy - scale / 3,
-                    color,
-                    2,
-                );
-                self.draw_line(cx - scale, cy - scale / 3, cx, cy + scale / 2, color, 2);
-                self.draw_line(cx + scale, cy - scale / 3, cx, cy + scale / 2, color, 2);
-            }
-            EntityKind::Mutant => {
-                let color = Color::from_rgba(MUTANT_COLOR);
-                self.draw_line(cx - scale, cy - scale, cx + scale, cy + scale, color, 2);
-                self.draw_line(cx - scale, cy + scale, cx + scale, cy - scale, color, 2);
-            }
-            EntityKind::Baiter => {
-                let color = Color::from_rgba(BAITER_COLOR);
-                self.draw_line(cx - scale, cy, cx, cy - scale, color, 2);
-                self.draw_line(cx, cy - scale, cx + scale, cy, color, 2);
-                self.draw_line(cx + scale, cy, cx, cy + scale, color, 2);
-                self.draw_line(cx, cy + scale, cx - scale, cy, color, 2);
-            }
-            EntityKind::Bomber => {
-                let color = Color::from_rgba(BOMBER_COLOR);
-                self.stroke_rect(
-                    Rect {
-                        x: cx - scale,
-                        y: cy - scale / 2,
-                        width: scale * 2,
-                        height: scale,
-                    },
-                    color,
-                    2,
-                );
-                self.draw_line(cx, cy - scale / 2, cx, cy + scale / 2, color, 2);
-            }
-            EntityKind::Pod => {
-                self.draw_circle_outline(cx, cy, scale, Color::from_rgba(POD_COLOR), 2);
-            }
-            EntityKind::Swarmer => {
-                let color = Color::from_rgba(SWARMER_COLOR);
-                self.draw_line(cx - scale, cy, cx + scale, cy, color, 2);
-                self.draw_line(cx, cy - scale, cx, cy + scale, color, 2);
-                self.draw_line(cx - scale, cy - scale, cx + scale, cy + scale, color, 1);
-                self.draw_line(cx - scale, cy + scale, cx + scale, cy - scale, color, 1);
-            }
-            EntityKind::Mine => {
-                let color = Color::from_rgba(MINE_COLOR);
-                self.draw_circle_outline(cx, cy, scale / 2 + 1, color, 2);
-                self.draw_line(cx - scale, cy, cx + scale, cy, color, 1);
-                self.draw_line(cx, cy - scale, cx, cy + scale, color, 1);
-            }
-        }
+        let sprites = arcade_sprites();
+        let image = sprites.sprite_for_entity(entity, tick, facing);
+        self.draw_scaled_image_centered(
+            image.as_ref(),
+            cx,
+            cy,
+            sprite_draw_height(entity.kind, scale),
+        );
     }
 
     fn draw_score_tables(
@@ -973,6 +858,45 @@ impl Renderer {
         }
     }
 
+    fn draw_scaled_image_centered(
+        &mut self,
+        image: &RenderedImage,
+        center_x: i32,
+        center_y: i32,
+        target_height: i32,
+    ) {
+        if image.width == 0 || image.height == 0 {
+            return;
+        }
+
+        let target_height = target_height.max(1);
+        let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
+        let origin_x = center_x - target_width / 2;
+        let origin_y = center_y - target_height / 2;
+
+        for dy in 0..target_height {
+            let src_y = ((dy as u32) * image.height / target_height as u32).min(image.height - 1);
+            for dx in 0..target_width {
+                let src_x = ((dx as u32) * image.width / target_width as u32).min(image.width - 1);
+                let index = ((src_y * image.width + src_x) * 4) as usize;
+                let alpha = image.pixels[index + 3];
+                if alpha == 0 {
+                    continue;
+                }
+                self.render_target.blend_pixel(
+                    origin_x + dx,
+                    origin_y + dy,
+                    Color(
+                        image.pixels[index],
+                        image.pixels[index + 1],
+                        image.pixels[index + 2],
+                        alpha,
+                    ),
+                );
+            }
+        }
+    }
+
     fn fill_rect(&mut self, rect: Rect, color: Color) {
         for y in rect.y.max(0)..(rect.y + rect.height).min(self.image_height as i32) {
             for x in rect.x.max(0)..(rect.x + rect.width).min(self.image_width as i32) {
@@ -1051,39 +975,6 @@ impl Renderer {
         }
     }
 
-    fn draw_circle_outline(&mut self, cx: i32, cy: i32, radius: i32, color: Color, thickness: i32) {
-        let radius = radius.max(1);
-        let mut x = radius;
-        let mut y = 0;
-        let mut decision = 1 - radius;
-        while y <= x {
-            self.draw_ring_points(cx, cy, x, y, color, thickness);
-            y += 1;
-            if decision <= 0 {
-                decision += 2 * y + 1;
-            } else {
-                x -= 1;
-                decision += 2 * (y - x) + 1;
-            }
-        }
-    }
-
-    fn draw_ring_points(&mut self, cx: i32, cy: i32, x: i32, y: i32, color: Color, thickness: i32) {
-        let points = [
-            (cx + x, cy + y),
-            (cx + y, cy + x),
-            (cx - y, cy + x),
-            (cx - x, cy + y),
-            (cx - x, cy - y),
-            (cx - y, cy - x),
-            (cx + y, cy - x),
-            (cx + x, cy - y),
-        ];
-        for (px, py) in points {
-            self.stamp(px, py, color, thickness);
-        }
-    }
-
     fn stamp(&mut self, x: i32, y: i32, color: Color, thickness: i32) {
         let radius = thickness.saturating_sub(1);
         for dy in -radius..=radius {
@@ -1140,6 +1031,42 @@ impl RenderedImage {
         self.pixels[index + 1] = color.1;
         self.pixels[index + 2] = color.2;
         self.pixels[index + 3] = color.3;
+    }
+
+    fn blend_pixel(&mut self, x: i32, y: i32, color: Color) {
+        if x < 0 || y < 0 {
+            return;
+        }
+
+        let x = usize::try_from(x).ok();
+        let y = usize::try_from(y).ok();
+        let (Some(x), Some(y)) = (x, y) else {
+            return;
+        };
+        if x >= self.width as usize || y >= self.height as usize {
+            return;
+        }
+
+        let index = (y * self.width as usize + x) * 4;
+        if color.3 == 255 {
+            self.pixels[index] = color.0;
+            self.pixels[index + 1] = color.1;
+            self.pixels[index + 2] = color.2;
+            self.pixels[index + 3] = 255;
+            return;
+        }
+
+        let alpha = u16::from(color.3);
+        let inverse = 255_u16.saturating_sub(alpha);
+        self.pixels[index] =
+            ((u16::from(color.0) * alpha + u16::from(self.pixels[index]) * inverse) / 255) as u8;
+        self.pixels[index + 1] = ((u16::from(color.1) * alpha
+            + u16::from(self.pixels[index + 1]) * inverse)
+            / 255) as u8;
+        self.pixels[index + 2] = ((u16::from(color.2) * alpha
+            + u16::from(self.pixels[index + 2]) * inverse)
+            / 255) as u8;
+        self.pixels[index + 3] = 255;
     }
 }
 
@@ -1242,6 +1169,19 @@ fn scanner_color(kind: EntityKind) -> [u8; 4] {
         EntityKind::Swarmer => SWARMER_COLOR,
         EntityKind::Mine => MINE_COLOR,
         EntityKind::Human => HUMAN_COLOR,
+    }
+}
+
+fn sprite_draw_height(kind: EntityKind, scale: i32) -> i32 {
+    match kind {
+        EntityKind::PlayerShip => scale * 2,
+        EntityKind::PlayerShot => (scale / 2).max(3),
+        EntityKind::EnemyShot => scale.max(5),
+        EntityKind::Human => (scale * 2).max(8),
+        EntityKind::Lander | EntityKind::Mutant | EntityKind::Bomber | EntityKind::Pod => {
+            (scale * 2).max(10)
+        }
+        EntityKind::Baiter | EntityKind::Swarmer | EntityKind::Mine => (scale * 3 / 2).max(8),
     }
 }
 

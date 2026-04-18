@@ -14,5 +14,6 @@ pub mod live;
 pub mod render;
 pub mod rom;
 pub mod session;
+pub mod sprites;
 pub mod terminal;
 pub mod video;
