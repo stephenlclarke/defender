@@ -1,48 +1,46 @@
-use std::io::{self, IsTerminal, Stdout, Write};
+use std::io::{self, IsTerminal, Write};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
-use crossterm::{
-    cursor::{Hide, MoveTo, Show},
-    event::{
-        self, Event, KeyCode, KeyEvent, KeyEventKind, KeyboardEnhancementFlags, ModifierKeyCode,
-        PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
-    },
-    execute,
-    terminal::{
-        Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
-        enable_raw_mode, supports_keyboard_enhancement,
-    },
-};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, ModifierKeyCode};
 
-use crate::attract::scene_for_elapsed_ms;
+use crate::attract::{AttractBeat, SceneKind, beat_for_elapsed_ms};
 use crate::audio::{AudioManager, SoundCue};
-use crate::render;
+use crate::kitty::KittyGraphics;
 use crate::session::{SessionEvent, SessionInput, SessionMode, SessionState};
+use crate::terminal::{TerminalSession, geometry};
+use crate::video::{RenderedImage, Renderer, Screen};
 
 const FRAME_DURATION: Duration = Duration::from_millis(90);
 const TITLE_STATIC_HOLD_TICKS: u64 = 24;
 
 pub fn run_live(play_audio: bool) -> Result<()> {
     ensure_interactive_terminal()?;
+    KittyGraphics::ensure_supported()?;
+
     let audio = AudioManager::new();
     let mut stdout = io::stdout();
-    let _guard = TerminalGuard::enter(&mut stdout)?;
+    let _terminal = TerminalSession::enter(&mut stdout)?;
     let mut input_tracker = InputTracker::default();
     let mut session = SessionState::load();
+    let mut terminal_geometry = geometry()?;
+    let mut renderer = Renderer::new(terminal_geometry);
+    let mut graphics = KittyGraphics::new(terminal_geometry.cols, terminal_geometry.rows);
 
-    draw_frame(&mut stdout, &session)?;
+    draw_frame(&mut stdout, &session, &mut renderer, &mut graphics)?;
 
     loop {
         let frame_started = Instant::now();
+        sync_terminal_geometry(&mut terminal_geometry, &mut renderer, &mut graphics)?;
+
         let input = input_tracker.poll().context("polling live input")?;
         if input.quit_requested {
             break;
         }
 
         let events = session.tick(input.session);
-        draw_frame(&mut stdout, &session)?;
+        draw_frame(&mut stdout, &session, &mut renderer, &mut graphics)?;
 
         if play_audio && let Some(cue) = cue_for_events(&events) {
             audio.play_cue_blocking(cue);
@@ -54,6 +52,8 @@ pub fn run_live(play_audio: bool) -> Result<()> {
         }
     }
 
+    graphics.clear(&mut stdout)?;
+    stdout.flush().context("flushing kitty clear escape")?;
     Ok(())
 }
 
@@ -71,71 +71,114 @@ fn validate_interactive_terminal(stdin_is_terminal: bool, stdout_is_terminal: bo
     }
 }
 
-fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
-    execute!(stdout, MoveTo(0, 0), Clear(ClearType::All)).context("clearing live frame")?;
-    let text = match session.mode() {
-        SessionMode::Title => render_title_mode(session),
+fn sync_terminal_geometry(
+    terminal_geometry: &mut crate::terminal::TerminalGeometry,
+    renderer: &mut Renderer,
+    graphics: &mut KittyGraphics,
+) -> Result<()> {
+    let latest_geometry = geometry()?;
+    if latest_geometry != *terminal_geometry {
+        *terminal_geometry = latest_geometry;
+        renderer.resize(*terminal_geometry);
+        graphics.resize(terminal_geometry.cols, terminal_geometry.rows);
+    }
+    Ok(())
+}
+
+fn draw_frame(
+    stdout: &mut io::Stdout,
+    session: &SessionState,
+    renderer: &mut Renderer,
+    graphics: &mut KittyGraphics,
+) -> Result<()> {
+    let image = render_session_frame(renderer, session);
+    graphics
+        .draw_frame(stdout, image)
+        .context("drawing kitty graphics frame")?;
+    stdout.flush().context("flushing kitty graphics frame")?;
+    Ok(())
+}
+
+fn render_session_frame<'a>(
+    renderer: &'a mut Renderer,
+    session: &SessionState,
+) -> &'a RenderedImage {
+    match session.mode() {
+        SessionMode::Title => render_title_frame(renderer, session),
+        SessionMode::Playing => renderer.render(Screen::Playing {
+            world: session.world(),
+            xyzzy_active: session.xyzzy_active(),
+            invincible: session.invincible(),
+            auto_fire: session.auto_fire(),
+        }),
+        SessionMode::GameOver => renderer.render(Screen::GameOver {
+            world: session.world(),
+            high_score: session.high_score(),
+            xyzzy_active: session.xyzzy_active(),
+            invincible: session.invincible(),
+            auto_fire: session.auto_fire(),
+        }),
         SessionMode::EnteringInitials => {
             let pending = session
                 .pending_initials()
                 .expect("initials mode should have pending entry");
             let display_letters = pending.display_letters();
-            render::render_initials_entry_screen(
-                session.world(),
-                &render::InitialsEntryView {
-                    high_score: session.high_score(),
-                    todays_high_scores: session.todays_high_scores(),
-                    all_time_high_scores: session.high_scores(),
-                    entry_score: pending.score(),
-                    entry_rank: pending.rank(),
-                    initials: &display_letters,
-                    xyzzy_active: session.xyzzy_active(),
-                    invincible: session.invincible(),
-                    auto_fire: session.auto_fire(),
-                },
-            )
+            let view = crate::render::InitialsEntryView {
+                high_score: session.high_score(),
+                todays_high_scores: session.todays_high_scores(),
+                all_time_high_scores: session.high_scores(),
+                entry_score: pending.score(),
+                entry_rank: pending.rank(),
+                initials: &display_letters,
+                xyzzy_active: session.xyzzy_active(),
+                invincible: session.invincible(),
+                auto_fire: session.auto_fire(),
+            };
+            renderer.render(Screen::InitialsEntry {
+                world: session.world(),
+                view: &view,
+            })
         }
-        SessionMode::Playing => render::render_with_flags(
-            session.world(),
-            session.xyzzy_active(),
-            session.invincible(),
-            session.auto_fire(),
-        ),
-        SessionMode::GameOver => render::render_game_over_screen_with_flags(
-            session.world(),
-            session.high_score(),
-            session.xyzzy_active(),
-            session.invincible(),
-            session.auto_fire(),
-        ),
-    };
-    write!(stdout, "{text}").context("writing live frame")?;
-    stdout.flush().context("flushing live frame")?;
-    Ok(())
+    }
 }
 
-fn render_title_mode(session: &SessionState) -> String {
+fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) -> &'a RenderedImage {
+    if let Some(beat) = title_beat_for_session(session) {
+        match beat.kind {
+            SceneKind::Logo => renderer.render(Screen::Logo),
+            SceneKind::Attract => {
+                let mut world = crate::game::World::bootstrap();
+                for _ in 0..beat.world_steps {
+                    world.step();
+                }
+                renderer.render(Screen::Attract {
+                    world: &world,
+                    revealed_score_entries: beat.revealed_score_entries,
+                })
+            }
+            SceneKind::HighScore => renderer.render(Screen::HighScores {
+                todays: session.todays_high_scores(),
+                all_time: session.high_scores(),
+            }),
+        }
+    } else {
+        renderer.render(Screen::Title {
+            high_score: session.high_score(),
+            xyzzy_active: session.xyzzy_active(),
+            invincible: session.invincible(),
+            auto_fire: session.auto_fire(),
+        })
+    }
+}
+
+fn title_beat_for_session(session: &SessionState) -> Option<AttractBeat> {
     if session.title_ticks() < TITLE_STATIC_HOLD_TICKS {
-        return render::render_title_screen_with_flags(
-            session.high_score(),
-            session.xyzzy_active(),
-            session.invincible(),
-            session.auto_fire(),
-        );
+        return None;
     }
 
     let attract_elapsed_ms = (session.title_ticks() - TITLE_STATIC_HOLD_TICKS)
         .saturating_mul(FRAME_DURATION.as_millis() as u64);
-    // The cabinet keeps a volatile `THSTAB` "TODAYS GREATEST" list alongside
-    // the persistent CMOS-backed `CRHSTD` "ALL TIME GREATEST" table. Until the
-    // session model carries a dedicated today's table, the live attract screen
-    // uses the red-label defaults on the left and the persisted table on the right.
-    scene_for_elapsed_ms(
-        attract_elapsed_ms,
-        session.todays_high_scores(),
-        session.high_scores(),
-    )
-    .text()
+    Some(beat_for_elapsed_ms(attract_elapsed_ms))
 }
 
 fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
@@ -267,91 +310,19 @@ fn set_held_flag(held: &mut bool, kind: KeyEventKind, output: &mut bool) {
     }
 }
 
-struct TerminalGuard {
-    keyboard_enhancement_supported: bool,
-}
-
-impl TerminalGuard {
-    fn enter(stdout: &mut Stdout) -> Result<Self> {
-        enable_raw_mode().context("enabling raw mode for live session")?;
-        let mut keyboard_enhancement_supported = false;
-        let result = (|| {
-            keyboard_enhancement_supported = supports_keyboard_enhancement().unwrap_or(false);
-            if keyboard_enhancement_supported {
-                execute!(
-                    stdout,
-                    EnterAlternateScreen,
-                    Hide,
-                    MoveTo(0, 0),
-                    Clear(ClearType::All),
-                    PushKeyboardEnhancementFlags(
-                        KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                            | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
-                    )
-                )
-                .context("switching into the live terminal screen with modifier reporting")?;
-            } else {
-                execute!(
-                    stdout,
-                    EnterAlternateScreen,
-                    Hide,
-                    MoveTo(0, 0),
-                    Clear(ClearType::All)
-                )
-                .context("switching into the live terminal screen")?;
-            }
-            Ok(Self {
-                keyboard_enhancement_supported,
-            })
-        })();
-
-        if result.is_err() {
-            if keyboard_enhancement_supported {
-                let _ = execute!(
-                    stdout,
-                    PopKeyboardEnhancementFlags,
-                    Show,
-                    LeaveAlternateScreen
-                );
-            } else {
-                let _ = execute!(stdout, Show, LeaveAlternateScreen);
-            }
-            let _ = disable_raw_mode();
-        }
-
-        result
-    }
-}
-
-impl Drop for TerminalGuard {
-    fn drop(&mut self) {
-        let mut stdout = io::stdout();
-        if self.keyboard_enhancement_supported {
-            let _ = execute!(
-                stdout,
-                PopKeyboardEnhancementFlags,
-                Show,
-                LeaveAlternateScreen
-            );
-        } else {
-            let _ = execute!(stdout, Show, LeaveAlternateScreen);
-        }
-        let _ = disable_raw_mode();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode};
 
     use super::{
-        InputTracker, PolledInput, TITLE_STATIC_HOLD_TICKS, cue_for_events, render_title_mode,
-        validate_interactive_terminal,
+        InputTracker, PolledInput, TITLE_STATIC_HOLD_TICKS, cue_for_events, render_title_frame,
+        title_beat_for_session, validate_interactive_terminal,
     };
     use crate::audio::SoundCue;
     use crate::game::WorldEvent;
     use crate::high_scores::HighScoreTable;
     use crate::session::{SessionEvent, SessionInput, SessionState};
+    use crate::video::Renderer;
 
     #[test]
     fn event_priorities_prefer_game_over_and_hits() {
@@ -521,12 +492,16 @@ mod tests {
             session.tick(SessionInput::default());
         }
 
-        let output = render_title_mode(&session);
+        let beat = title_beat_for_session(&session).expect("title should be in attract mode");
+        assert!(matches!(
+            beat.kind,
+            crate::attract::SceneKind::Logo
+                | crate::attract::SceneKind::Attract
+                | crate::attract::SceneKind::HighScore
+        ));
 
-        assert!(
-            output.contains("PRESS 1 OR 2 PLAYER START")
-                || output.contains("HALL OF FAME")
-                || output.contains("WILLIAMS")
-        );
+        let mut renderer = Renderer::with_size(960, 720);
+        let image = render_title_frame(&mut renderer, &session);
+        assert!(image.pixels.iter().any(|pixel| *pixel != 0));
     }
 }

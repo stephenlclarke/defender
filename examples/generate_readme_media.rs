@@ -2,23 +2,16 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use font8x8::{BASIC_FONTS, UnicodeFonts};
 use gif::{Encoder, Frame, Repeat};
 use png::{BitDepth, ColorType, Compression, Encoder as PngEncoder};
 
 use defender::{
-    attract::{AttractBeat, Scene, attract_cycle},
+    attract::{AttractBeat, attract_cycle},
     demo::gameplay_demo_cycle,
-    game::{Entity, EntityKind},
-    render,
+    game::{Entity, EntityKind, World},
+    high_scores::HighScoreTable,
+    video::{RenderedImage, Renderer, Screen},
 };
-
-const CELL_SIZE: u32 = 8;
-const GIF_SCALE: u32 = 3;
-const SCREENSHOT_SCALE: u32 = 6;
-const PADDING: u32 = 16;
-const BACKGROUND: [u8; 4] = [4, 8, 14, 255];
-const FOREGROUND: [u8; 4] = [80, 255, 140, 255];
 const OUTPUT_WIDTH: u32 = 3456;
 const OUTPUT_HEIGHT: u32 = 1864;
 const WINDOW_X: u32 = 112;
@@ -52,34 +45,52 @@ fn main() -> Result<()> {
     ensure_parent_dir(&screenshot_path)?;
     ensure_parent_dir(&gif_path)?;
 
-    let screenshot_scene = gameplay_screenshot_scene();
+    let screenshot = render_gameplay_screenshot();
     let sequence = build_sequence();
-    let (screenshot_cols, screenshot_rows) = scene_bounds(std::slice::from_ref(&screenshot_scene));
-    let (gif_cols, gif_rows) = scene_bounds_from_frames(&sequence);
-
-    let screenshot = rasterize_scene(
-        &screenshot_scene,
-        screenshot_cols,
-        screenshot_rows,
-        SCREENSHOT_SCALE,
-    );
     let screenshot = compose_windowed_screenshot(&screenshot);
     write_png(&screenshot_path, &screenshot)?;
-    write_gif(&gif_path, &sequence, gif_cols, gif_rows)?;
+    write_gif(&gif_path, &sequence)?;
 
     println!("wrote {}", screenshot_path.display());
     println!("wrote {}", gif_path.display());
     Ok(())
 }
 
-fn build_sequence() -> Vec<(Scene, u16)> {
+fn build_sequence() -> Vec<(RgbaImage, u16)> {
+    let mut renderer = Renderer::with_size(1_024, 768);
+    let todays = HighScoreTable::default();
+    let all_time = HighScoreTable::default();
     attract_cycle()
         .into_iter()
-        .map(|beat| (beat.scene(), centiseconds_for_beat(beat)))
+        .map(|beat| {
+            let image = match beat.kind {
+                defender::attract::SceneKind::Logo => renderer.render(Screen::Logo).clone(),
+                defender::attract::SceneKind::Attract => {
+                    let mut world = World::bootstrap();
+                    for _ in 0..beat.world_steps {
+                        world.step();
+                    }
+                    renderer
+                        .render(Screen::Attract {
+                            world: &world,
+                            revealed_score_entries: beat.revealed_score_entries,
+                        })
+                        .clone()
+                }
+                defender::attract::SceneKind::HighScore => renderer
+                    .render(Screen::HighScores {
+                        todays: &todays,
+                        all_time: &all_time,
+                    })
+                    .clone(),
+            };
+
+            (image.into(), centiseconds_for_beat(beat))
+        })
         .collect()
 }
 
-fn gameplay_screenshot_scene() -> Scene {
+fn gameplay_screenshot_world() -> World {
     let mut world = gameplay_demo_cycle()[4].world.clone();
     world.add_score(375);
     world.set_lives(2);
@@ -96,39 +107,7 @@ fn gameplay_screenshot_scene() -> Scene {
         0,
         0,
     ));
-
-    Scene {
-        kind: defender::attract::SceneKind::Attract,
-        lines: render::render_grid(&world),
-    }
-}
-
-fn scene_bounds(scenes: &[Scene]) -> (usize, usize) {
-    let mut max_cols = 0;
-    let mut max_rows = 0;
-
-    for scene in scenes {
-        max_rows = max_rows.max(scene.lines.len());
-        for line in &scene.lines {
-            max_cols = max_cols.max(line.len());
-        }
-    }
-
-    (max_cols, max_rows)
-}
-
-fn scene_bounds_from_frames(frames: &[(Scene, u16)]) -> (usize, usize) {
-    let mut max_cols = 0;
-    let mut max_rows = 0;
-
-    for (scene, _) in frames {
-        max_rows = max_rows.max(scene.lines.len());
-        for line in &scene.lines {
-            max_cols = max_cols.max(line.len());
-        }
-    }
-
-    (max_cols, max_rows)
+    world
 }
 
 fn centiseconds_for_beat(beat: AttractBeat) -> u16 {
@@ -136,62 +115,18 @@ fn centiseconds_for_beat(beat: AttractBeat) -> u16 {
     centiseconds.min(u16::MAX as u64) as u16
 }
 
-struct RgbaImage {
-    width: u32,
-    height: u32,
-    pixels: Vec<u8>,
-}
-
-fn rasterize_scene(scene: &Scene, cols: usize, rows: usize, scale: u32) -> RgbaImage {
-    let width = PADDING * 2 + cols as u32 * CELL_SIZE * scale;
-    let height = PADDING * 2 + rows as u32 * CELL_SIZE * scale;
-    let mut pixels = vec![0; (width * height * 4) as usize];
-
-    for chunk in pixels.chunks_exact_mut(4) {
-        chunk.copy_from_slice(&BACKGROUND);
-    }
-
-    for (row, line) in scene.lines.iter().enumerate() {
-        for (col, ch) in line.chars().enumerate() {
-            draw_char(
-                &mut pixels,
-                width,
-                PADDING + col as u32 * CELL_SIZE * scale,
-                PADDING + row as u32 * CELL_SIZE * scale,
-                ch,
-                scale,
-            );
-        }
-    }
-
-    RgbaImage {
-        width,
-        height,
-        pixels,
-    }
-}
-
-fn draw_char(pixels: &mut [u8], width: u32, origin_x: u32, origin_y: u32, ch: char, scale: u32) {
-    let Some(glyph) = BASIC_FONTS.get(ch) else {
-        return;
-    };
-
-    for (row_index, row_bits) in glyph.iter().enumerate() {
-        for col_index in 0..8u32 {
-            if row_bits & (1 << col_index) == 0 {
-                continue;
-            }
-
-            for dy in 0..scale {
-                for dx in 0..scale {
-                    let x = origin_x + col_index * scale + dx;
-                    let y = origin_y + row_index as u32 * scale + dy;
-                    let pixel_index = ((y * width + x) * 4) as usize;
-                    pixels[pixel_index..pixel_index + 4].copy_from_slice(&FOREGROUND);
-                }
-            }
-        }
-    }
+fn render_gameplay_screenshot() -> RgbaImage {
+    let world = gameplay_screenshot_world();
+    let mut renderer = Renderer::with_size(1_600, 900);
+    renderer
+        .render(Screen::Playing {
+            world: &world,
+            xyzzy_active: false,
+            invincible: false,
+            auto_fire: false,
+        })
+        .clone()
+        .into()
 }
 
 fn compose_windowed_screenshot(image: &RgbaImage) -> RgbaImage {
@@ -450,8 +385,8 @@ fn write_png(path: &Path, image: &RgbaImage) -> Result<()> {
     Ok(())
 }
 
-fn write_gif(path: &Path, frames: &[(Scene, u16)], cols: usize, rows: usize) -> Result<()> {
-    let image = rasterize_scene(&frames[0].0, cols, rows, GIF_SCALE);
+fn write_gif(path: &Path, frames: &[(RgbaImage, u16)]) -> Result<()> {
+    let image = &frames[0].0;
     let file = File::create(path).with_context(|| format!("creating gif {}", path.display()))?;
     let mut encoder = Encoder::new(file, image.width as u16, image.height as u16, &[])
         .with_context(|| format!("creating gif encoder for {}", path.display()))?;
@@ -459,8 +394,7 @@ fn write_gif(path: &Path, frames: &[(Scene, u16)], cols: usize, rows: usize) -> 
         .set_repeat(Repeat::Infinite)
         .context("setting gif repeat mode")?;
 
-    for (scene, delay) in frames {
-        let image = rasterize_scene(scene, cols, rows, GIF_SCALE);
+    for (image, delay) in frames {
         let mut pixels = image.pixels.clone();
         let mut frame =
             Frame::from_rgba_speed(image.width as u16, image.height as u16, &mut pixels, 10);
@@ -479,6 +413,12 @@ fn ensure_parent_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 
+struct RgbaImage {
+    width: u32,
+    height: u32,
+    pixels: Vec<u8>,
+}
+
 impl RgbaImage {
     fn new(width: u32, height: u32, color: [u8; 4]) -> Self {
         let mut pixels = vec![0; (width * height * 4) as usize];
@@ -490,6 +430,16 @@ impl RgbaImage {
             width,
             height,
             pixels,
+        }
+    }
+}
+
+impl From<RenderedImage> for RgbaImage {
+    fn from(image: RenderedImage) -> Self {
+        Self {
+            width: image.width,
+            height: image.height,
+            pixels: image.pixels,
         }
     }
 }

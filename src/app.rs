@@ -96,6 +96,8 @@ fn print_help() {
     println!("  cargo run -- --mute");
     println!("  cargo run -- --rom-report");
     println!("  cargo run -- --rom-report /path/to/roms");
+    println!();
+    println!("Live play requires an interactive terminal with Kitty graphics support.");
 }
 
 #[cfg(test)]

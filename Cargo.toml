@@ -11,10 +11,12 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"
+base64 = "0.22"
 crossterm = "0.29"
+font8x8 = "0.3"
+libc = "0.2"
+png = "0.18"
 rodio = "0.21"
 
 [dev-dependencies]
-font8x8 = "0.3"
 gif = "0.13"
-png = "0.18"

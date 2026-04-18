@@ -15,15 +15,14 @@
 
 ---
 
-This repository is a native Rust reimplementation of Williams' `Defender`.
+This repository is a native Rust reimplementation of Williams' `Defender`,
+rendered through the Kitty graphics protocol.
 
-The current milestone focuses on a solid native-Rust foundation for the start
-logo, attract sequence, high-score presentation, ROM-set auditing, CI, and test
-coverage before a richer live arcade loop lands. The game logic is native Rust;
-ROMs are treated as reference material only, and the current sound cues are
-synthesized in-process so the app does not depend on external audio files.
-The target is a faithful recreation of the original arcade game, with hidden
-`xyzzy` extras as the deliberate behavior outside the original cabinet rules.
+The game logic is native Rust; ROMs are treated as reference material only, and
+the current sound cues are synthesized in-process so the app does not depend on
+external audio files. The target is a faithful recreation of the original
+red-label arcade game, with hidden `xyzzy` extras as the deliberate behavior
+outside the original cabinet rules.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -53,6 +52,10 @@ Run targets:
 - `make sq`
 - `make readme-media`
 
+Run the live game inside `kitty`, `ghostty`, `warp`, or another terminal that
+supports the Kitty graphics protocol. `--rom-report` remains non-interactive
+and does not require a compatible graphics terminal.
+
 ## Install
 
 Install directly from git with Cargo:
@@ -65,6 +68,15 @@ After installation, run the prototype with:
 - `defender --mute`
 - `defender --rom-report`
 - `defender --rom-report /path/to/roms`
+
+Notes:
+
+- Run `defender` inside `kitty`, `ghostty`, `warp`, or another terminal that
+  supports the Kitty graphics protocol.
+- Download Ghostty: <https://ghostty.org/download>
+- Download Warp: <https://www.warp.dev/download>
+- High scores persist between live runs in `~/.xyzzy/defender/high_scores.txt`;
+  set `DEFENDER_DATA_DIR` to redirect that file for local experiments or tests.
 
 ## Controls
 
@@ -123,7 +135,7 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   explicit ROM path.
 - All current sounds are embedded in the app via synthesized `rodio` cues,
   following the same self-contained runtime principle used in `../battlezone`.
-- `cargo run` / `defender` now launch the real text-mode play loop with keyboard
+- `cargo run` / `defender` now launch the real Kitty-graphics play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, falling-human
   recovery, grounded-human pickup and redeploy, Defender-style rescue scoring
@@ -185,9 +197,6 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - Gameplay work is being prioritized toward faithful Williams-arcade behavior in
   Rust first; hidden `xyzzy` options remain the only intentional rules
   extension outside that baseline.
-- The current renderer is still deliberately text-first so the repo can
-  establish game-state, ROM-reference, CI, and test coverage foundations before
-  adding a fuller terminal graphics path.
 - `defender --rom-report` works without a ROM directory and prints the embedded
   expected Williams ROM filenames; `defender --rom-report /path/to/roms`
   compares a local directory and reports missing or unexpected files.
@@ -197,9 +206,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   on both Linux and macOS.
 - Local SonarQube wiring is exposed through `make sq`, which generates the same
   coverage report as CI and then runs `sonar-scanner` when `SONAR_TOKEN` is set.
-- `examples/generate_readme_media.rs` regenerates `docs/defender.png` from the
-  gameplay demo path and `docs/start-sequence.gif` from the shared attract
-  builders used by the app and README media pipeline.
+- `examples/generate_readme_media.rs` now regenerates `docs/defender.png` and
+  `docs/start-sequence.gif` from the same Kitty-graphics renderer used by the
+  live game and attract flow.
 - The title, attract legend, and hall-of-fame seed data now use the red-label
   ROM message/default tables instead of the earlier placeholder prototype
   strings.
@@ -439,17 +448,15 @@ Meaning: default world X positions for the ten starting humanoids.
 
 ## Platform Support
 
-The current build stays in plain ANSI terminal output rather than Kitty
-graphics, so the non-interactive tooling paths such as `--rom-report` and the
-README media generator should run anywhere a recent Rust toolchain is
-available.
+The live loop now depends on a terminal that supports the Kitty graphics
+protocol. `cargo run` / `defender` should be launched from a real interactive
+terminal session inside `kitty`, `ghostty`, `warp`, or a compatible emulator.
+If your terminal supports the protocol but is not recognised by name, set
+`DEFENDER_FORCE_KITTY=1` to bypass the terminal-name guard.
 
-The live loop uses `crossterm` raw-mode keyboard input, so `cargo run` /
-`defender` must be launched from a real interactive terminal session rather
-than piped or captured stdout. The long-term target is still a richer terminal
-arcade presentation similar to the sibling Rust repos in this directory, but
-the current milestone keeps the renderer text-first so CI, leak detection,
-input handling, and ROM validation can land before a fuller graphics path.
+Non-interactive tooling paths such as `--rom-report` and
+`cargo run --example generate_readme_media` remain usable anywhere a recent
+Rust toolchain is available.
 
 The live session now requests terminal keyboard-enhancement reporting so
 standalone `Shift` thrust input can be captured in terminals that support the

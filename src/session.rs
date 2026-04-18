@@ -538,7 +538,10 @@ mod tests {
         session.tick(SessionInput::default());
 
         assert_eq!(session.mode(), SessionMode::EnteringInitials);
-        assert_eq!(session.pending_initials().map(|entry| entry.rank()), Some(8));
+        assert_eq!(
+            session.pending_initials().map(|entry| entry.rank()),
+            Some(8)
+        );
     }
 
     #[test]

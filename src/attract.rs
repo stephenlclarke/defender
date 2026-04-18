@@ -143,6 +143,10 @@ pub fn scene_for_elapsed_ms(
     todays: &HighScoreTable,
     all_time: &HighScoreTable,
 ) -> Scene {
+    beat_for_elapsed_ms(elapsed_ms).scene_with_tables(todays, all_time)
+}
+
+pub fn beat_for_elapsed_ms(elapsed_ms: u64) -> AttractBeat {
     let cycle = attract_cycle();
     let cycle_ms = cycle.iter().map(|beat| beat.hold_ms).sum::<u64>();
     let mut remaining = if cycle_ms == 0 {
@@ -153,12 +157,12 @@ pub fn scene_for_elapsed_ms(
 
     for beat in cycle {
         if remaining < beat.hold_ms {
-            return beat.scene_with_tables(todays, all_time);
+            return beat;
         }
         remaining -= beat.hold_ms;
     }
 
-    cycle[0].scene_with_tables(todays, all_time)
+    cycle[0]
 }
 
 pub fn logo_scene() -> Scene {
