@@ -711,10 +711,14 @@ impl World {
         {
             match enemy.kind {
                 EntityKind::Lander if enemy.state == EntityState::CarryingHuman => {
+                    // StrategyWiki gameplay notes and the red-label disassembly
+                    // both treat carrying Landers as a straight-up abduction run.
                     enemy.velocity.dx = 0;
                     enemy.velocity.dy = -1;
                 }
                 EntityKind::Lander => {
+                    // StrategyWiki documents the classic Lander priority: hunt a
+                    // free humanoid first, then pressure the player if none remain.
                     let target = nearest_wrapped_target(enemy.position, &free_humans, world_span)
                         .or(player_position)
                         .unwrap_or(enemy.position);
@@ -726,6 +730,8 @@ impl World {
                     }
                 }
                 EntityKind::Mutant => {
+                    // Once a humanoid is lost, StrategyWiki and Arcade History
+                    // describe Mutants as relentless player hunters.
                     let target = player_position.unwrap_or(enemy.position);
                     enemy.velocity.dx =
                         wrapped_horizontal_step(enemy.position.x, target.x, world_max_x);
@@ -737,6 +743,9 @@ impl World {
                 EntityKind::Baiter => {
                     let tables = arcade_tables();
                     let target = player_position.unwrap_or(enemy.position);
+                    // Doug Mahugh chapter 07 describes Baiters as fast harassment
+                    // enemies that key off the player's motion rather than acting
+                    // like another simple chase drone.
                     let relative_dx =
                         wrapped_horizontal_step(enemy.position.x, target.x, world_max_x)
                             * tables.baiter_speed;
@@ -754,6 +763,8 @@ impl World {
                 }
                 EntityKind::Bomber => {
                     let tables = arcade_tables();
+                    // Doug Mahugh chapter 06 notes that Bombers become more
+                    // dangerous when they line up on the player's altitude.
                     let target_y = player_position
                         .map(|target| target.y)
                         .unwrap_or(enemy.position.y);
@@ -774,6 +785,8 @@ impl World {
                     }
                 }
                 EntityKind::Pod => {
+                    // Pods are intentionally simpler here: the arcade sources use
+                    // them mainly as carriers that matter once they burst.
                     if enemy.velocity.dx == 0 {
                         enemy.velocity.dx = if self.tick.is_multiple_of(2) { 1 } else { -1 };
                     }
@@ -784,6 +797,9 @@ impl World {
                 EntityKind::Swarmer => {
                     let tables = arcade_tables();
                     let target = player_position.unwrap_or(enemy.position);
+                    // Doug Mahugh chapter 05 calls out the "follow from behind"
+                    // counterplay, so Swarmers should not instantly reverse on
+                    // every shorter wrapped path change.
                     let delta_x = shortest_wrapped_delta(enemy.position.x, target.x, world_span);
                     let desired_dx = if delta_x == 0 {
                         enemy.velocity.dx.signum().max(1) * tables.swarmer_speed
@@ -1278,6 +1294,8 @@ impl World {
         if let Some(human) = self.entities.get_mut(human_index) {
             human.state = EntityState::Falling;
             human.velocity = Velocity { dx: 0, dy: 1 };
+            // Arcade History and StrategyWiki both describe only shallow drops as
+            // survivable without an actual catch.
             human.rescue_value = if safe_y - human.position.y <= tables.safe_fall_height {
                 tables.safe_fall_score
             } else {
@@ -1301,6 +1319,8 @@ impl World {
             .map(|player| shortest_wrapped_delta(pod_position.x, player.x, self.world_span))
             .map(|delta| if delta == 0 { 1 } else { delta.signum() })
             .unwrap_or(1);
+        // Doug Mahugh chapter 05 notes that Pod bursts should fan out enough to
+        // create a real pack rather than a stacked single-lane release.
         let spawn_offsets = [
             (0, -1),
             (direction, 0),
@@ -1358,6 +1378,9 @@ impl World {
 
         for (index, entity) in self.entities.iter().enumerate() {
             let on_main_screen = self.screen_x_for_world_x(entity.position.x).is_some();
+            // Doug Mahugh chapter 02 documents the arcade Smart Bomb rule:
+            // enemies on the main screen are destroyed, but bullets and mines
+            // survive in normal play. XYZZY intentionally extends that.
             let destroyed_by_bomb = if secret_mode {
                 on_main_screen
                     && (entity.kind.is_enemy()
@@ -1472,6 +1495,8 @@ impl World {
             let Some(human) = self.entities.get_mut(index) else {
                 continue;
             };
+            // Arcade History and StrategyWiki describe only safe-drop saves in
+            // the cabinet game; XYZZY deliberately overrides that rule.
             if secret_mode || human.rescue_value == arcade_tables().safe_fall_score {
                 human.state = EntityState::Normal;
                 human.position.y = safe_y;
@@ -1608,6 +1633,8 @@ impl World {
             return;
         }
 
+        // Doug Mahugh chapter 07 and the Arcade History notes both frame
+        // Baiters as pressure for taking too long, not as baseline wave members.
         let elapsed = self.tick.saturating_sub(self.wave_started_at);
         let since_last_baiter = self.tick.saturating_sub(self.last_baiter_tick);
         let due_tick = tables.baiter_base_delay + remaining.saturating_sub(1) as u32 * 4;
@@ -1652,6 +1679,8 @@ impl World {
             .map(|player| wrap_coordinate(player.x + width / 2, width - 1))
             .unwrap_or(width / 2);
         if self.status.wave.is_multiple_of(5) {
+            // Doug Mahugh chapter 01 and StrategyWiki both call out the
+            // five-wave planet restore with a fresh humanoid population.
             self.restore_default_humans();
         }
 
@@ -1660,9 +1689,14 @@ impl World {
         } else {
             EntityKind::Mutant
         };
+        // Doug Mahugh chapter 01 and StrategyWiki both describe attack waves as
+        // 15-enemy groups that open with Landers or Mutants depending on whether
+        // the planet still has humanoids.
         let mut enemies = default_attack_wave_openers(width, self.status.wave, opening_enemy, 0);
 
         if self.status.wave >= 2 {
+            // Doug Mahugh chapter 06 places Bombers into the later-wave mix
+            // rather than in the opening red-label wave.
             enemies.push(Entity::new(
                 EntityKind::Bomber,
                 bomber_origin,
@@ -1701,6 +1735,7 @@ impl World {
             3 => 3,
             _ => 4,
         };
+        // StrategyWiki's later-wave summaries anchor the current Pod schedule.
         let pod_slots = [
             (width / 2, 5, -1, 1),
             (wrap_coordinate(width - 20, width - 1), 4, 1, -1),
@@ -1744,6 +1779,8 @@ impl World {
         } else {
             EntityKind::Mutant
         };
+        // Doug Mahugh chapter 01 describes the red-label opener as three
+        // staged five-enemy groups rather than one simultaneous spawn.
         let group_index = self.spawned_wave_opener_groups;
         let group_size = tables.attack_wave_group_size.min(self.pending_wave_openers);
         let mut reinforcements = default_attack_wave_openers(
