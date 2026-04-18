@@ -57,6 +57,41 @@ pub fn render(world: &World) -> String {
     lines.join("\n")
 }
 
+pub fn render_title_screen(high_score: u32) -> String {
+    [
+        r" ____  _____ _____ _____ _   _ ____  _____ ____  ".to_string(),
+        r"|  _ \| ____|  ___| ____| \ | |  _ \| ____|  _ \ ".to_string(),
+        r"| | | |  _| | |_  |  _| |  \| | | | |  _| | |_) |".to_string(),
+        r"| |_| | |___|  _| | |___| |\  | |_| | |___|  _ < ".to_string(),
+        r"|____/|_____|_|   |_____|_| \_|____/|_____|_| \_\".to_string(),
+        String::new(),
+        String::from("LIVE TERMINAL PROTOTYPE"),
+        String::new(),
+        format!("SESSION HIGH SCORE {:06}", high_score),
+        String::new(),
+        String::from("PRESS `ENTER` OR `1` TO START"),
+        String::from("PRESS `q` OR `Esc` TO QUIT"),
+        String::new(),
+        String::from("CONTROLS"),
+        String::from("MOVE: `A`/`D`/`W`/`S` OR ARROWS"),
+        String::from("FIRE: `Space`"),
+    ]
+    .join("\n")
+}
+
+pub fn render_game_over_screen(world: &World, high_score: u32) -> String {
+    let mut lines = render_grid(world);
+    lines.push(String::new());
+    lines.push(format!(
+        "GAME OVER  SCORE {:06}  HIGH SCORE {:06}",
+        world.status().score,
+        high_score
+    ));
+    lines.push(String::from("PRESS `ENTER` OR `1` TO RESTART"));
+    lines.push(String::from("PRESS `q` OR `Esc` TO QUIT"));
+    lines.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use crate::game::{Entity, EntityKind, Status, World};
@@ -134,5 +169,22 @@ mod tests {
         let output = super::render(&world);
         assert!(output.contains("Controls:"));
         assert!(output.contains("GAME OVER"));
+    }
+
+    #[test]
+    fn title_screen_mentions_start_and_high_score() {
+        let output = super::render_title_screen(1234);
+        assert!(output.contains("LIVE TERMINAL PROTOTYPE"));
+        assert!(output.contains("SESSION HIGH SCORE 001234"));
+        assert!(output.contains("PRESS `ENTER` OR `1` TO START"));
+    }
+
+    #[test]
+    fn game_over_screen_includes_restart_hint() {
+        let world = World::bootstrap();
+        let output = super::render_game_over_screen(&world, 4321);
+        assert!(output.contains("GAME OVER"));
+        assert!(output.contains("HIGH SCORE 004321"));
+        assert!(output.contains("PRESS `ENTER` OR `1` TO RESTART"));
     }
 }

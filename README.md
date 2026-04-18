@@ -76,6 +76,7 @@ After installation, run the prototype with:
 
 Live mode controls:
 
+- `Enter` or `1`: start from the title screen, or restart after game over
 - `A` / `D` or `Left` / `Right`: move horizontally
 - `W` / `S` or `Up` / `Down`: move vertically
 - `Space`: fire
@@ -95,8 +96,9 @@ Live mode controls:
   wave, life, enemy, and human-count changes through the same playback/audio
   path.
 - `defender --play-live` now runs a real text-mode play loop with keyboard
-  input, shots, enemy hits, wave progression, human losses, and game-over
-  handling on top of the same native Rust world model.
+  input, title/start flow, shots, enemy hits, wave progression, human losses,
+  game-over handling, and restart support on top of the same native Rust world
+  model.
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
   adding a fuller terminal graphics path.

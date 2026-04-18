@@ -14,8 +14,8 @@ use crossterm::{
 };
 
 use crate::audio::{AudioManager, SoundCue};
-use crate::game::{UpdateInput, World, WorldEvent};
 use crate::render;
+use crate::session::{SessionEvent, SessionInput, SessionMode, SessionState};
 
 const FRAME_DURATION: Duration = Duration::from_millis(90);
 
@@ -24,9 +24,9 @@ pub fn run_live(play_audio: bool) -> Result<()> {
     let mut stdout = io::stdout();
     let _guard = TerminalGuard::enter(&mut stdout)?;
     let mut input_tracker = InputTracker::default();
-    let mut world = World::bootstrap();
+    let mut session = SessionState::new();
 
-    draw_frame(&mut stdout, &world)?;
+    draw_frame(&mut stdout, &session)?;
 
     loop {
         let frame_started = Instant::now();
@@ -35,8 +35,8 @@ pub fn run_live(play_audio: bool) -> Result<()> {
             break;
         }
 
-        let events = world.step_live(input.update);
-        draw_frame(&mut stdout, &world)?;
+        let events = session.tick(input.session);
+        draw_frame(&mut stdout, &session)?;
 
         if play_audio && let Some(cue) = cue_for_events(&events) {
             audio.play_cue_blocking(cue);
@@ -51,23 +51,39 @@ pub fn run_live(play_audio: bool) -> Result<()> {
     Ok(())
 }
 
-fn draw_frame(stdout: &mut Stdout, world: &World) -> Result<()> {
+fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
     execute!(stdout, MoveTo(0, 0), Clear(ClearType::All)).context("clearing live frame")?;
-    write!(stdout, "{}", render::render(world)).context("writing live frame")?;
+    let text = match session.mode() {
+        SessionMode::Title => render::render_title_screen(session.high_score()),
+        SessionMode::Playing => render::render(session.world()),
+        SessionMode::GameOver => {
+            render::render_game_over_screen(session.world(), session.high_score())
+        }
+    };
+    write!(stdout, "{text}").context("writing live frame")?;
     stdout.flush().context("flushing live frame")?;
     Ok(())
 }
 
-fn cue_for_events(events: &[WorldEvent]) -> Option<SoundCue> {
-    if events.contains(&WorldEvent::GameOver) || events.contains(&WorldEvent::PlayerHit) {
-        Some(SoundCue::Explosion)
-    } else if events.contains(&WorldEvent::WaveAdvanced) {
+fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
+    if events.contains(&SessionEvent::GameStarted) || events.contains(&SessionEvent::GameRestarted)
+    {
+        Some(SoundCue::LogoFanfare)
+    } else if events.contains(&SessionEvent::HighScoreUpdated) {
         Some(SoundCue::HighScoreChime)
-    } else if events.contains(&WorldEvent::EnemyDestroyed) {
+    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::GameOver))
+        || events.contains(&SessionEvent::World(crate::game::WorldEvent::PlayerHit))
+    {
         Some(SoundCue::Explosion)
-    } else if events.contains(&WorldEvent::HumanLost) {
+    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::WaveAdvanced)) {
+        Some(SoundCue::HighScoreChime)
+    } else if events.contains(&SessionEvent::World(
+        crate::game::WorldEvent::EnemyDestroyed,
+    )) {
+        Some(SoundCue::Explosion)
+    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::HumanLost)) {
         Some(SoundCue::AttractHum)
-    } else if events.contains(&WorldEvent::ShotFired) {
+    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::ShotFired)) {
         Some(SoundCue::PlayerShot)
     } else {
         None
@@ -90,7 +106,7 @@ struct HeldInput {
 
 #[derive(Debug, Default)]
 struct PolledInput {
-    update: UpdateInput,
+    session: SessionInput,
     quit_requested: bool,
 }
 
@@ -104,11 +120,11 @@ impl InputTracker {
             }
         }
 
-        input.update.left |= self.held.left;
-        input.update.right |= self.held.right;
-        input.update.up |= self.held.up;
-        input.update.down |= self.held.down;
-        input.update.fire |= self.held.fire;
+        input.session.update.left |= self.held.left;
+        input.session.update.right |= self.held.right;
+        input.session.update.up |= self.held.up;
+        input.session.update.down |= self.held.down;
+        input.session.update.fire |= self.held.fire;
 
         Ok(input)
     }
@@ -119,35 +135,53 @@ impl InputTracker {
         match key_event.code {
             KeyCode::Esc if pressed => input.quit_requested = true,
             KeyCode::Char('q') | KeyCode::Char('Q') if pressed => input.quit_requested = true,
-            KeyCode::Left => {
-                set_held_flag(&mut self.held.left, key_event.kind, &mut input.update.left)
-            }
+            KeyCode::Enter if pressed => input.session.start_requested = true,
+            KeyCode::Char('1') if pressed => input.session.start_requested = true,
+            KeyCode::Left => set_held_flag(
+                &mut self.held.left,
+                key_event.kind,
+                &mut input.session.update.left,
+            ),
             KeyCode::Right => set_held_flag(
                 &mut self.held.right,
                 key_event.kind,
-                &mut input.update.right,
+                &mut input.session.update.right,
             ),
-            KeyCode::Up => set_held_flag(&mut self.held.up, key_event.kind, &mut input.update.up),
-            KeyCode::Down => {
-                set_held_flag(&mut self.held.down, key_event.kind, &mut input.update.down)
-            }
-            KeyCode::Char('a') | KeyCode::Char('A') => {
-                set_held_flag(&mut self.held.left, key_event.kind, &mut input.update.left)
-            }
+            KeyCode::Up => set_held_flag(
+                &mut self.held.up,
+                key_event.kind,
+                &mut input.session.update.up,
+            ),
+            KeyCode::Down => set_held_flag(
+                &mut self.held.down,
+                key_event.kind,
+                &mut input.session.update.down,
+            ),
+            KeyCode::Char('a') | KeyCode::Char('A') => set_held_flag(
+                &mut self.held.left,
+                key_event.kind,
+                &mut input.session.update.left,
+            ),
             KeyCode::Char('d') | KeyCode::Char('D') => set_held_flag(
                 &mut self.held.right,
                 key_event.kind,
-                &mut input.update.right,
+                &mut input.session.update.right,
             ),
-            KeyCode::Char('w') | KeyCode::Char('W') => {
-                set_held_flag(&mut self.held.up, key_event.kind, &mut input.update.up)
-            }
-            KeyCode::Char('s') | KeyCode::Char('S') => {
-                set_held_flag(&mut self.held.down, key_event.kind, &mut input.update.down)
-            }
-            KeyCode::Char(' ') => {
-                set_held_flag(&mut self.held.fire, key_event.kind, &mut input.update.fire)
-            }
+            KeyCode::Char('w') | KeyCode::Char('W') => set_held_flag(
+                &mut self.held.up,
+                key_event.kind,
+                &mut input.session.update.up,
+            ),
+            KeyCode::Char('s') | KeyCode::Char('S') => set_held_flag(
+                &mut self.held.down,
+                key_event.kind,
+                &mut input.session.update.down,
+            ),
+            KeyCode::Char(' ') => set_held_flag(
+                &mut self.held.fire,
+                key_event.kind,
+                &mut input.session.update.fire,
+            ),
             _ => {}
         }
     }
@@ -195,15 +229,19 @@ mod tests {
     use super::{InputTracker, PolledInput, cue_for_events};
     use crate::audio::SoundCue;
     use crate::game::WorldEvent;
+    use crate::session::SessionEvent;
 
     #[test]
     fn event_priorities_prefer_game_over_and_hits() {
         assert_eq!(
-            cue_for_events(&[WorldEvent::ShotFired, WorldEvent::GameOver]),
+            cue_for_events(&[
+                SessionEvent::World(WorldEvent::ShotFired),
+                SessionEvent::World(WorldEvent::GameOver),
+            ]),
             Some(SoundCue::Explosion)
         );
         assert_eq!(
-            cue_for_events(&[WorldEvent::WaveAdvanced]),
+            cue_for_events(&[SessionEvent::World(WorldEvent::WaveAdvanced)]),
             Some(SoundCue::HighScoreChime)
         );
     }
@@ -217,7 +255,7 @@ mod tests {
             KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE),
             &mut input,
         );
-        assert!(input.update.right);
+        assert!(input.session.update.right);
 
         let mut released = PolledInput::default();
         tracker.handle_key_event(
@@ -229,6 +267,18 @@ mod tests {
             &mut released,
         );
         assert!(!tracker.held.right);
+    }
+
+    #[test]
+    fn input_tracker_maps_start_keys() {
+        let mut tracker = InputTracker::default();
+        let mut input = PolledInput::default();
+
+        tracker.handle_key_event(
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            &mut input,
+        );
+        assert!(input.session.start_requested);
     }
 
     #[test]

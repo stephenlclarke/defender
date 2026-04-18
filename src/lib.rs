@@ -9,3 +9,4 @@ pub mod game;
 pub mod live;
 pub mod render;
 pub mod rom;
+pub mod session;
