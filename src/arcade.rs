@@ -18,6 +18,11 @@ pub struct ArcadeTables {
     pub player_max_speed: i32,
     pub player_shot_limit: usize,
     pub player_shot_speed: i32,
+    pub enemy_shot_limit: usize,
+    pub enemy_fire_base_delay: u32,
+    pub enemy_fire_chaser_cycle: u32,
+    pub swarmer_fire_delay: u32,
+    pub swarmer_fire_lead_divisor: u32,
     pub swarmer_speed: i32,
     pub baiter_speed: i32,
     pub bomber_base_speed: i32,
@@ -55,6 +60,11 @@ fn parse_arcade_tables(text: &str) -> ArcadeTables {
     let mut player_max_speed = None;
     let mut player_shot_limit = None;
     let mut player_shot_speed = None;
+    let mut enemy_shot_limit = None;
+    let mut enemy_fire_base_delay = None;
+    let mut enemy_fire_chaser_cycle = None;
+    let mut swarmer_fire_delay = None;
+    let mut swarmer_fire_lead_divisor = None;
     let mut swarmer_speed = None;
     let mut baiter_speed = None;
     let mut bomber_base_speed = None;
@@ -91,6 +101,11 @@ fn parse_arcade_tables(text: &str) -> ArcadeTables {
             "player_max_speed" => player_max_speed = Some(parse_i32(value)),
             "player_shot_limit" => player_shot_limit = Some(parse_usize(value)),
             "player_shot_speed" => player_shot_speed = Some(parse_i32(value)),
+            "enemy_shot_limit" => enemy_shot_limit = Some(parse_usize(value)),
+            "enemy_fire_base_delay" => enemy_fire_base_delay = Some(parse_u32(value)),
+            "enemy_fire_chaser_cycle" => enemy_fire_chaser_cycle = Some(parse_u32(value)),
+            "swarmer_fire_delay" => swarmer_fire_delay = Some(parse_u32(value)),
+            "swarmer_fire_lead_divisor" => swarmer_fire_lead_divisor = Some(parse_u32(value)),
             "swarmer_speed" => swarmer_speed = Some(parse_i32(value)),
             "baiter_speed" => baiter_speed = Some(parse_i32(value)),
             "bomber_base_speed" => bomber_base_speed = Some(parse_i32(value)),
@@ -126,6 +141,14 @@ fn parse_arcade_tables(text: &str) -> ArcadeTables {
         player_max_speed: player_max_speed.expect("player_max_speed should be defined"),
         player_shot_limit: player_shot_limit.expect("player_shot_limit should be defined"),
         player_shot_speed: player_shot_speed.expect("player_shot_speed should be defined"),
+        enemy_shot_limit: enemy_shot_limit.expect("enemy_shot_limit should be defined"),
+        enemy_fire_base_delay: enemy_fire_base_delay
+            .expect("enemy_fire_base_delay should be defined"),
+        enemy_fire_chaser_cycle: enemy_fire_chaser_cycle
+            .expect("enemy_fire_chaser_cycle should be defined"),
+        swarmer_fire_delay: swarmer_fire_delay.expect("swarmer_fire_delay should be defined"),
+        swarmer_fire_lead_divisor: swarmer_fire_lead_divisor
+            .expect("swarmer_fire_lead_divisor should be defined"),
         swarmer_speed: swarmer_speed.expect("swarmer_speed should be defined"),
         baiter_speed: baiter_speed.expect("baiter_speed should be defined"),
         bomber_base_speed: bomber_base_speed.expect("bomber_base_speed should be defined"),
@@ -189,6 +212,9 @@ mod tests {
         assert_eq!(tables.attack_wave_group_size, 5);
         assert_eq!(tables.player_shot_limit, 4);
         assert_eq!(tables.player_shot_speed, 2);
+        assert_eq!(tables.enemy_shot_limit, 6);
+        assert_eq!(tables.enemy_fire_base_delay, 5);
+        assert_eq!(tables.swarmer_fire_delay, 3);
         assert_eq!(tables.default_human_world_xs.len(), 10);
         assert_eq!(tables.default_human_world_xs[0], 8);
         assert_eq!(tables.default_human_world_xs[9], 170);

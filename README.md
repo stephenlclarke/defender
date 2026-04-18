@@ -139,6 +139,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   the normal shot cap removed in `xyzzy`, a separate `G` invincibility toggle,
   an `F` auto-fire toggle that only shoots when the current firing lane has a
   direct alien kill, and secret-mode full-height humanoid fall survival, plus
+  enemy fire now limited to visible main-screen threats, with lander/mutant/
+  baiter volleys using the arcade-style lob-versus-chaser split and swarmer
+  shots using the quarter-screen focal-point model from the original game, plus
   pod waves that now start on wave two and ramp up to four ships by wave four, release
   deterministic five-to-seven swarmer bursts when shot, and preserve the
   classic follow-from-behind swarmer counterplay, with 15-enemy attack waves
@@ -256,9 +259,16 @@ the final runtime self-contained:
   active until they outrun the main screen, and the rules that smart bombs only
   destroy enemies on the main screen while leaving bullets and bomber
   minefields alone.
+- <https://www.dougmahugh.com/defender-chapter03/>: lander-fire reference used
+  for the broad-arc shot model, the alternating chaser/lob split shared with
+  mutants and baiters, and the requirement that enemies only fire while they
+  are on the main screen.
+- <https://www.dougmahugh.com/defender-chapter04/>: mutant-behaviour reference
+  used to keep the more aggressive mutant fire path aligned with the same
+  broad-arc/chaser model as the original game.
 - <https://www.dougmahugh.com/defender-chapter05/>: swarmer-behavior reference
-  used to model pod bursts, delayed swarmer turnback, and the follow-from-
-  behind movement pattern.
+  used to model pod bursts, delayed swarmer turnback, the follow-from-behind
+  movement pattern, and the quarter-screen-ahead swarmer firing focal point.
 - <https://www.dougmahugh.com/defender-chapter06/>: bomber-behavior reference
   used to model wave-two bomber introduction, altitude-triggered speed boosts,
   and the persistent mine trails they leave behind.
@@ -324,6 +334,28 @@ outside `xyzzy` mode.
 `player_shot_speed`
 Default: `2`
 Meaning: horizontal speed of the player's laser burst tip.
+
+`enemy_shot_limit`
+Default: `6`
+Meaning: maximum number of enemy shots allowed to remain active at once.
+
+`enemy_fire_base_delay`
+Default: `5`
+Meaning: shared firing cadence for landers, mutants, and baiters.
+
+`enemy_fire_chaser_cycle`
+Default: `2`
+Meaning: every Nth non-swarmer firing volley becomes a chaser that adds the
+player's horizontal motion to the shot.
+
+`swarmer_fire_delay`
+Default: `3`
+Meaning: faster firing cadence used by swarmers.
+
+`swarmer_fire_lead_divisor`
+Default: `4`
+Meaning: quarter-screen lead factor used for the swarmer focal-point shot
+model.
 
 `swarmer_speed`
 Default: `2`

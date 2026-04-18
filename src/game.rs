@@ -662,35 +662,131 @@ impl World {
         max_y: i32,
         events: &mut Vec<WorldEvent>,
     ) {
-        if !self.tick.is_multiple_of(5) {
+        let tables = arcade_tables();
+        let available = tables
+            .enemy_shot_limit
+            .saturating_sub(self.entity_count_by_kind(EntityKind::EnemyShot));
+        if available == 0 {
             return;
         }
 
-        let Some(player_position) = self.player_position() else {
-            return;
-        };
-
-        let Some(enemy) = self
-            .entities
-            .iter()
-            .filter(|entity| entity.kind.can_fire())
-            .min_by_key(|entity| (entity.position.x - player_position.x).abs())
-            .cloned()
+        let Some((player_position, player_screen_x)) =
+            self.player_position().and_then(|position| {
+                self.screen_x_for_world_x(position.x)
+                    .map(|x| (position, x as i32))
+            })
         else {
             return;
         };
 
-        let dx = if enemy.position.x >= player_position.x {
-            -1
-        } else {
-            1
-        };
-        let dy = (player_position.y - enemy.position.y).signum();
-        let shot_x = (enemy.position.x + dx).clamp(0, max_x);
-        let shot_y = (enemy.position.y + dy).clamp(min_y, max_y);
-        self.entities
-            .push(Entity::new(EntityKind::EnemyShot, shot_x, shot_y, dx, dy));
+        let player_velocity = self.player_velocity().unwrap_or(Velocity { dx: 0, dy: 0 });
+        // StrategyWiki's attack-wave advice calls out that opponents must be on
+        // the main screen before they can shoot, so off-screen enemies are
+        // filtered out here before any firing solution is attempted.
+        let firing_enemies: Vec<(Position, Velocity)> = self
+            .entities
+            .iter()
+            .filter(|entity| entity.kind.can_fire())
+            .filter_map(|entity| {
+                let enemy_screen_x = self.screen_x_for_world_x(entity.position.x)? as i32;
+                self.enemy_shot_velocity(
+                    entity,
+                    enemy_screen_x,
+                    player_position,
+                    player_screen_x,
+                    player_velocity,
+                )
+                .map(|velocity| (entity.position, velocity))
+            })
+            .take(available)
+            .collect();
+        if firing_enemies.is_empty() {
+            return;
+        }
+
+        for (enemy_position, velocity) in firing_enemies {
+            let shot_x = (enemy_position.x + velocity.dx.signum()).clamp(0, max_x);
+            let shot_y = (enemy_position.y + velocity.dy.signum()).clamp(min_y, max_y);
+            self.entities.push(Entity::new(
+                EntityKind::EnemyShot,
+                shot_x,
+                shot_y,
+                velocity.dx,
+                velocity.dy,
+            ));
+        }
         events.push(WorldEvent::EnemyFired);
+    }
+
+    fn enemy_shot_velocity(
+        &self,
+        enemy: &Entity,
+        enemy_screen_x: i32,
+        player_position: Position,
+        player_screen_x: i32,
+        player_velocity: Velocity,
+    ) -> Option<Velocity> {
+        let tables = arcade_tables();
+        match enemy.kind {
+            EntityKind::Lander | EntityKind::Mutant | EntityKind::Baiter => {
+                if !self.tick.is_multiple_of(tables.enemy_fire_base_delay) {
+                    return None;
+                }
+
+                // Doug Mahugh chapter 03 notes that Landers, Mutants, and
+                // Baiters all fire in the general direction of the player, with
+                // every other volley becoming a horizontal chaser.
+                let horizontal_delta = player_screen_x - enemy_screen_x;
+                let mut dx = horizontal_delta.signum();
+                let aim_dy = (player_position.y - enemy.position.y).signum();
+                let spread_index = ((self.tick / tables.enemy_fire_base_delay) as i32
+                    + enemy.position.x
+                    + enemy.position.y)
+                    .rem_euclid(3);
+                let spread = spread_index - 1;
+                let dy = (aim_dy + spread).clamp(-1, 1);
+
+                if (self.tick / tables.enemy_fire_base_delay)
+                    .is_multiple_of(tables.enemy_fire_chaser_cycle)
+                {
+                    dx = (dx + player_velocity.dx).clamp(-2, 2);
+                }
+
+                if dx == 0 && dy == 0 {
+                    dx = if horizontal_delta == 0 {
+                        match enemy.velocity.dx.signum() {
+                            -1 | 1 => enemy.velocity.dx.signum(),
+                            _ => 1,
+                        }
+                    } else {
+                        horizontal_delta.signum()
+                    };
+                }
+
+                Some(Velocity { dx, dy })
+            }
+            EntityKind::Swarmer => {
+                if !self.tick.is_multiple_of(tables.swarmer_fire_delay) {
+                    return None;
+                }
+
+                // Doug Mahugh chapter 05 explains that Swarmers fire through a
+                // focal point about a quarter-screen ahead at the player's
+                // altitude, rather than solving for exact distance.
+                let mut dx = enemy.velocity.dx.signum();
+                if dx == 0 {
+                    dx = (player_screen_x - enemy_screen_x).signum().max(1);
+                }
+                let lead = (self.width as i32 / tables.swarmer_fire_lead_divisor as i32).max(1);
+                let vertical_delta = player_position.y - enemy.position.y;
+                let mut dy = (vertical_delta / lead.max(1)).clamp(-1, 1);
+                if dy == 0 && vertical_delta.abs() >= (lead / 2).max(1) {
+                    dy = vertical_delta.signum();
+                }
+                Some(Velocity { dx, dy })
+            }
+            _ => None,
+        }
     }
 
     fn update_enemy_intents(&mut self, min_y: i32, max_y: i32) {
@@ -2032,9 +2128,9 @@ mod tests {
     use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS, PLAYER_START_X};
 
     use super::{
-        Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput, World,
-        WorldEvent, hyperspace_result, nearest_wrapped_target, shortest_wrapped_delta,
-        wrap_coordinate,
+        Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput,
+        Velocity, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
+        shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -2434,6 +2530,96 @@ mod tests {
 
         assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 1);
         assert!(events.contains(&WorldEvent::EnemyFired));
+    }
+
+    #[test]
+    fn live_step_does_not_allow_offscreen_enemies_to_fire() {
+        let mut world = World::bootstrap();
+        let player_x = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player")
+            .position
+            .x;
+        let offscreen_x = wrap_coordinate(player_x + world.width() as i32, world.world_max_x());
+        let safe_y = world.safe_altitude_at_world_x(player_x).min(4);
+        world.camera_x = player_x;
+        world.entities = vec![
+            Entity::new(EntityKind::PlayerShip, player_x, safe_y, 0, 0),
+            Entity::new(EntityKind::Lander, offscreen_x, safe_y, 0, 0),
+        ];
+
+        for _ in 0..arcade_tables().enemy_fire_base_delay {
+            world.step_live(UpdateInput::default());
+        }
+
+        assert!(world.screen_x_for_world_x(offscreen_x).is_none());
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+    }
+
+    #[test]
+    fn swarmer_fire_uses_the_faster_enemy_cycle() {
+        let mut world = World::with_entities(
+            32,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 3,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 6, 4, 0, 0),
+                Entity::new(
+                    EntityKind::Swarmer,
+                    18,
+                    4,
+                    -arcade_tables().swarmer_speed,
+                    0,
+                ),
+            ],
+        );
+
+        let mut events = Vec::new();
+        for _ in 0..arcade_tables().swarmer_fire_delay {
+            events = world.step_live(UpdateInput::default());
+        }
+
+        let shot = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::EnemyShot)
+            .expect("enemy shot");
+        assert_eq!(shot.velocity.dx, -1);
+        assert_eq!(shot.velocity.dy, 0);
+        assert!(events.contains(&WorldEvent::EnemyFired));
+    }
+
+    #[test]
+    fn lander_chaser_shots_add_player_velocity_to_horizontal_fire() {
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0)],
+        );
+        world.tick =
+            arcade_tables().enemy_fire_base_delay * arcade_tables().enemy_fire_chaser_cycle;
+        let velocity = world
+            .enemy_shot_velocity(
+                &Entity::new(EntityKind::Lander, 12, 5, 0, 0),
+                12,
+                Position { x: 4, y: 5 },
+                4,
+                Velocity { dx: -1, dy: 0 },
+            )
+            .expect("chaser shot");
+
+        assert_eq!(velocity.dx, -2);
     }
 
     #[test]
