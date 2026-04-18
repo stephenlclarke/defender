@@ -144,7 +144,10 @@ fn render_session_frame<'a>(
 fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) -> &'a RenderedImage {
     let beat = title_beat_for_session(session);
     match beat.kind {
-        SceneKind::Logo => renderer.render(Screen::Logo),
+        SceneKind::Logo => renderer.render(Screen::Logo {
+            stage: beat.logo_stage,
+            palette_phase: beat.palette_phase,
+        }),
         SceneKind::Attract => {
             let mut world = crate::game::World::bootstrap();
             for _ in 0..beat.world_steps {
@@ -153,11 +156,13 @@ fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) ->
             renderer.render(Screen::Attract {
                 world: &world,
                 revealed_score_entries: beat.revealed_score_entries,
+                palette_phase: beat.palette_phase,
             })
         }
         SceneKind::HighScore => renderer.render(Screen::HighScores {
             todays: session.todays_high_scores(),
             all_time: session.high_scores(),
+            palette_phase: beat.palette_phase,
         }),
     }
 }

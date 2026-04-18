@@ -64,7 +64,12 @@ fn build_sequence() -> Vec<(RgbaImage, u16)> {
         .into_iter()
         .map(|beat| {
             let image = match beat.kind {
-                defender::attract::SceneKind::Logo => renderer.render(Screen::Logo).clone(),
+                defender::attract::SceneKind::Logo => renderer
+                    .render(Screen::Logo {
+                        stage: beat.logo_stage,
+                        palette_phase: beat.palette_phase,
+                    })
+                    .clone(),
                 defender::attract::SceneKind::Attract => {
                     let mut world = World::bootstrap();
                     for _ in 0..beat.world_steps {
@@ -74,6 +79,7 @@ fn build_sequence() -> Vec<(RgbaImage, u16)> {
                         .render(Screen::Attract {
                             world: &world,
                             revealed_score_entries: beat.revealed_score_entries,
+                            palette_phase: beat.palette_phase,
                         })
                         .clone()
                 }
@@ -81,6 +87,7 @@ fn build_sequence() -> Vec<(RgbaImage, u16)> {
                     .render(Screen::HighScores {
                         todays: &todays,
                         all_time: &all_time,
+                        palette_phase: beat.palette_phase,
                     })
                     .clone(),
             };

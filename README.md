@@ -203,7 +203,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   separate modern title page: the ROM-ordered Williams / Presents logo page
   leads into the split `TODAYS GREATEST` / `ALL TIME GREATEST` hall-of-fame
   page and then the instruction/demo page, with the volatile per-run left table
-  and persistent right table matching the original attract flow more closely.
+  and persistent right table matching the original attract flow more closely,
+  and the staged logo/scoring cadence now cross-checked against the original
+  arcade attract video reference.
 - The live game-over state now uses a sparse arcade-style overlay instead of
   the earlier restart panel: a thin top strip with score and scanner, the open
   playfield below it, amber terrain, and a centered `GAME OVER` message.
@@ -341,6 +343,9 @@ the final runtime self-contained:
 - <https://bbcmicro.co.uk/game.php?id=11>: BBC Micro `Planetoid` archive entry
   used to anchor the current keyboard layout to the Acornsoft 1982 home-port
   control scheme.
+- <https://www.youtube.com/watch?v=6w2cKBWx2Uc>: original arcade attract-mode
+  capture used to verify the full attract-sequence order, Williams logo-page
+  composition, and the scoring legend reveal shown around `0:26`.
 
 ## Customisation
 

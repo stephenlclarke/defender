@@ -8,7 +8,7 @@ const ATTRACT_SCORE_CARD: [(&str, u32); 6] = [
     ("BAITER", 200),
     ("BOMBER", 250),
     ("POD", 1000),
-    ("SWARMR", 150),
+    ("SWARMER", 150),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,6 +16,17 @@ pub enum SceneKind {
     Logo,
     Attract,
     HighScore,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogoStage {
+    WilliamsTraceStart,
+    WilliamsTraceQuarter,
+    WilliamsTraceHalf,
+    WilliamsTraceFull,
+    TextOnly,
+    DefenderReveal,
+    FullPage,
 }
 
 impl SceneKind {
@@ -48,6 +59,8 @@ pub struct AttractBeat {
     pub hold_ms: u64,
     pub world_steps: usize,
     pub revealed_score_entries: usize,
+    pub palette_phase: usize,
+    pub logo_stage: LogoStage,
 }
 
 impl AttractBeat {
@@ -70,72 +83,268 @@ impl AttractBeat {
     }
 }
 
-pub fn attract_cycle() -> [AttractBeat; 9] {
-    [
+pub fn attract_cycle() -> Vec<AttractBeat> {
+    vec![
         AttractBeat {
             kind: SceneKind::Logo,
             cue: Some(SoundCue::LogoFanfare),
-            // `AMODES` starts on the Williams / Presents page before the ROM
-            // jumps to `HALDIS` for the hall-of-fame page.
-            hold_ms: 2_200,
+            hold_ms: 1_000,
             world_steps: 0,
             revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::WilliamsTraceStart,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 1_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::WilliamsTraceQuarter,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 1_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::WilliamsTraceHalf,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 1_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::WilliamsTraceFull,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 1_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::TextOnly,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 1_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::DefenderReveal,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 2_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 2_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 1,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 2_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 2,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 2_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 3,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 2_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 1,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 2_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::FullPage,
         },
         AttractBeat {
             kind: SceneKind::HighScore,
             cue: Some(SoundCue::HighScoreChime),
-            hold_ms: 2_400,
+            hold_ms: 2_000,
             world_steps: 0,
             revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::HighScore,
+            cue: Some(SoundCue::HighScoreChime),
+            hold_ms: 2_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 1,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::HighScore,
+            cue: Some(SoundCue::HighScoreChime),
+            hold_ms: 2_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 2,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::HighScore,
+            cue: Some(SoundCue::HighScoreChime),
+            hold_ms: 2_000,
+            world_steps: 0,
+            revealed_score_entries: 0,
+            palette_phase: 3,
+            logo_stage: LogoStage::FullPage,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::AttractHum),
-            hold_ms: 550,
-            world_steps: 0,
+            hold_ms: 2_000,
+            world_steps: 24,
             revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::AttractHum),
+            hold_ms: 2_000,
+            world_steps: 28,
+            revealed_score_entries: 0,
+            palette_phase: 1,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::AttractHum),
+            hold_ms: 2_000,
+            world_steps: 32,
+            revealed_score_entries: 0,
+            palette_phase: 2,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::AttractHum),
+            hold_ms: 2_000,
+            world_steps: 36,
+            revealed_score_entries: 0,
+            palette_phase: 3,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::AttractHum),
+            hold_ms: 2_000,
+            world_steps: 40,
+            revealed_score_entries: 0,
+            palette_phase: 0,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::AttractHum),
+            hold_ms: 2_000,
+            world_steps: 44,
+            revealed_score_entries: 0,
+            palette_phase: 1,
+            logo_stage: LogoStage::FullPage,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::AttractHum),
+            hold_ms: 2_000,
+            world_steps: 48,
+            revealed_score_entries: 0,
+            palette_phase: 2,
+            logo_stage: LogoStage::FullPage,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::EnemySweep),
-            hold_ms: 500,
-            world_steps: 4,
+            hold_ms: 4_000,
+            world_steps: 52,
             revealed_score_entries: 1,
+            palette_phase: 1,
+            logo_stage: LogoStage::FullPage,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::PlayerShot),
-            hold_ms: 500,
-            world_steps: 6,
+            hold_ms: 4_000,
+            world_steps: 56,
             revealed_score_entries: 2,
+            palette_phase: 0,
+            logo_stage: LogoStage::FullPage,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::EnemySweep),
-            hold_ms: 500,
-            world_steps: 8,
+            hold_ms: 4_000,
+            world_steps: 60,
             revealed_score_entries: 3,
+            palette_phase: 1,
+            logo_stage: LogoStage::FullPage,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::Explosion),
-            hold_ms: 500,
-            world_steps: 10,
+            hold_ms: 2_000,
+            world_steps: 64,
             revealed_score_entries: 4,
+            palette_phase: 2,
+            logo_stage: LogoStage::FullPage,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::EnemySweep),
-            hold_ms: 550,
-            world_steps: 12,
+            hold_ms: 4_000,
+            world_steps: 68,
             revealed_score_entries: 5,
+            palette_phase: 3,
+            logo_stage: LogoStage::FullPage,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::HumanSaved),
-            hold_ms: 700,
-            world_steps: 14,
+            hold_ms: 6_000,
+            world_steps: 72,
             revealed_score_entries: 6,
+            palette_phase: 2,
+            logo_stage: LogoStage::FullPage,
         },
     ]
 }
@@ -157,7 +366,7 @@ pub fn beat_for_elapsed_ms(elapsed_ms: u64) -> AttractBeat {
         elapsed_ms % cycle_ms
     };
 
-    for beat in cycle {
+    for beat in cycle.iter().copied() {
         if remaining < beat.hold_ms {
             return beat;
         }
@@ -187,11 +396,11 @@ pub fn logo_scene() -> Scene {
 }
 
 pub fn attract_scene(world: &World, revealed_score_entries: usize) -> Scene {
-    let mut lines = vec![String::from("PRESS 1 OR 2 PLAYER START"), String::new()];
+    let mut lines = vec![String::new()];
     lines.extend(crate::render::render_grid(world));
     lines.push(String::new());
     // `TEXTAB` / `TENT` in `amode1.src` rotate the instruction legend in this
-    // order: SCANNER, LANDER, MUTANT, BAITER, BOMBER, POD, SWARMR.
+    // order: SCANNER, LANDER, MUTANT, BAITER, BOMBER, POD, SWARMER.
     lines.push(String::from("SCANNER"));
     lines.extend(
         ATTRACT_SCORE_CARD
@@ -271,10 +480,9 @@ mod tests {
         let scene = attract_scene(&World::bootstrap(), 6);
         let text = scene.text();
 
-        assert!(text.contains("PRESS 1 OR 2 PLAYER START"));
         assert!(text.contains("SCANNER"));
         assert!(text.contains("LANDER"));
-        assert!(text.contains("SWARMR"));
+        assert!(text.contains("SWARMER"));
         assert!(text.contains("THREAT"));
     }
 
@@ -296,9 +504,15 @@ mod tests {
 
         assert_eq!(cycle[0].kind, SceneKind::Logo);
         assert_eq!(cycle[0].cue, Some(SoundCue::LogoFanfare));
-        assert_eq!(cycle[1].kind, SceneKind::HighScore);
-        assert_eq!(cycle[2].kind, SceneKind::Attract);
-        assert_eq!(cycle[8].kind, SceneKind::Attract);
+        assert!(cycle.iter().any(|beat| beat.kind == SceneKind::HighScore));
+        assert!(cycle.iter().any(|beat| beat.kind == SceneKind::Attract));
+        assert_eq!(
+            cycle
+                .last()
+                .expect("attract cycle should not be empty")
+                .kind,
+            SceneKind::Attract
+        );
     }
 
     #[test]
@@ -306,14 +520,32 @@ mod tests {
         let cycle = attract_cycle();
 
         assert!(cycle[0].scene().text().contains("WILLIAMS"));
-        assert!(cycle[1].scene().text().contains("HALL OF FAME"));
         assert!(
-            cycle[2]
+            cycle
+                .iter()
+                .find(|beat| beat.kind == SceneKind::HighScore)
+                .expect("attract cycle should include the hall of fame page")
                 .scene()
                 .text()
-                .contains("PRESS 1 OR 2 PLAYER START")
+                .contains("HALL OF FAME")
         );
-        assert!(cycle[8].scene().text().contains("SWARMR"));
+        assert!(
+            cycle
+                .iter()
+                .find(|beat| beat.kind == SceneKind::Attract)
+                .expect("attract cycle should include the score-card demo")
+                .scene()
+                .text()
+                .contains("SCANNER")
+        );
+        assert!(
+            cycle
+                .last()
+                .expect("attract cycle should not be empty")
+                .scene()
+                .text()
+                .contains("SWARMER")
+        );
     }
 
     #[test]
@@ -326,9 +558,7 @@ mod tests {
         let text = scene.text();
 
         assert!(
-            text.contains("PRESS 1 OR 2 PLAYER START")
-                || text.contains("HALL OF FAME")
-                || text.contains("WILLIAMS")
+            text.contains("SCANNER") || text.contains("HALL OF FAME") || text.contains("WILLIAMS")
         );
     }
 }

@@ -14,6 +14,8 @@ use crate::video::RenderedImage;
 pub struct ArcadeBranding {
     logo_page: Arc<RenderedImage>,
     defender_logo: Arc<RenderedImage>,
+    williams_logo: Arc<RenderedImage>,
+    copyright_line: Arc<RenderedImage>,
 }
 
 pub fn arcade_branding() -> &'static ArcadeBranding {
@@ -26,6 +28,10 @@ impl ArcadeBranding {
         Self {
             logo_page: load_embedded_png(include_bytes!("../assets/arcade/logo-page.png")),
             defender_logo: load_embedded_png(include_bytes!("../assets/arcade/defender-logo.png")),
+            williams_logo: load_embedded_png(include_bytes!("../assets/arcade/williams-logo.png")),
+            copyright_line: load_embedded_png(include_bytes!(
+                "../assets/arcade/copyright-1980.png"
+            )),
         }
     }
 
@@ -35,6 +41,14 @@ impl ArcadeBranding {
 
     pub fn defender_logo(&self) -> &RenderedImage {
         self.defender_logo.as_ref()
+    }
+
+    pub fn williams_logo(&self) -> &RenderedImage {
+        self.williams_logo.as_ref()
+    }
+
+    pub fn copyright_line(&self) -> &RenderedImage {
+        self.copyright_line.as_ref()
     }
 }
 
