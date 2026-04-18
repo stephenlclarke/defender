@@ -25,6 +25,8 @@ const TEXT_WARNING: [u8; 4] = [255, 200, 88, 255];
 const TEXT_DANGER: [u8; 4] = [255, 96, 88, 255];
 const TEXT_SCORE_BLUE: [u8; 4] = [84, 196, 255, 255];
 const TEXT_ARCADE_WHITE: [u8; 4] = [246, 246, 246, 255];
+const TEXT_ATTRACT_PURPLE: [u8; 4] = [182, 96, 255, 255];
+const TEXT_ATTRACT_MAGENTA: [u8; 4] = [220, 116, 255, 255];
 const TERRAIN_LINE: [u8; 4] = [72, 224, 96, 255];
 const TERRAIN_FILL: [u8; 4] = [11, 50, 22, 255];
 const TERRAIN_AMBER_LINE: [u8; 4] = [255, 164, 40, 255];
@@ -132,9 +134,11 @@ struct AttractLegendEntry {
 struct AttractPalette {
     williams: [u8; 4],
     title_text: [u8; 4],
-    score_text: [u8; 4],
     defender_face: [u8; 4],
     defender_shadow: [u8; 4],
+    hall_text: [u8; 4],
+    scanner_text: [u8; 4],
+    scanner_border: [u8; 4],
 }
 
 #[derive(Clone, Copy)]
@@ -334,6 +338,10 @@ impl Renderer {
     fn render_attract_screen(&mut self, frame: &AttractFrame, palette_phase: usize) {
         let world = &frame.world;
         let palette = attract_palette(palette_phase, 0);
+        // `LEDRET` rebuilds the cabinet playfield via `SCINIT`, `BORDER`,
+        // `SCPROC`, and `TEXTP`, so the attract demo uses the same broad
+        // scanner/playfield composition as the cabinet instead of the normal
+        // gameplay HUD.
         let strip_y = 118;
         self.draw_attract_scanner(
             frame,
@@ -349,14 +357,14 @@ impl Renderer {
             strip_y,
             self.image_width as i32,
             strip_y,
-            Color::from_rgba([68, 69, 192, 255]),
+            Color::from_rgba(palette.scanner_border),
             2,
         );
         self.draw_centered_text(
             self.image_width as i32 / 2,
             128,
             "SCANNER",
-            palette.score_text,
+            palette.scanner_text,
             3,
         );
         let playfield = Rect {
@@ -401,9 +409,9 @@ impl Renderer {
         }
         self.draw_attract_demo_objects(frame, playfield);
         if let Some(bonus_text) = frame.bonus_text {
-            self.draw_attract_bonus_text(bonus_text, playfield, palette.score_text);
+            self.draw_attract_bonus_text(bonus_text, playfield, TEXT_WARNING);
         }
-        self.draw_attract_legend_entries(frame.revealed_score_entries, palette.score_text);
+        self.draw_attract_legend_entries(frame.revealed_score_entries);
     }
 
     fn render_high_scores_screen(
@@ -423,12 +431,15 @@ impl Renderer {
             },
             Color::from_rgba(BACKGROUND),
         );
-        self.draw_defender_logo(self.image_width as i32 / 2, 72, 78, Some(palette));
+        // `HALDIS` writes the whole `DEFENDER` logo through `CWRIT` with
+        // yellow face / red shadow on this page. The cabinet video keeps that
+        // ROM logo stable while the headings and tables cycle in purple.
+        self.draw_defender_logo(self.image_width as i32 / 2, 72, 78, None);
         self.draw_centered_text(
             self.image_width as i32 / 2,
             142,
             "HALL OF FAME",
-            palette.score_text,
+            palette.hall_text,
             2,
         );
         self.draw_score_tables(
@@ -440,7 +451,7 @@ impl Renderer {
             },
             todays,
             all_time,
-            palette.score_text,
+            palette.hall_text,
         );
     }
 
@@ -745,7 +756,7 @@ impl Renderer {
 
     fn draw_attract_scanner(&mut self, frame: &AttractFrame, rect: Rect) {
         let world = &frame.world;
-        self.stroke_rect(rect, Color::from_rgba(TERRAIN_LINE), 2);
+        self.stroke_rect(rect, Color::from_rgba(SCANNER_BORDER), 2);
         let inner = rect.inset(2);
         self.fill_rect(inner, Color::from_rgba(BACKGROUND));
 
@@ -1050,7 +1061,7 @@ impl Renderer {
         self.draw_text(x, y + 22, "SMART BOMBS INF", TEXT_PRIMARY, 1);
     }
 
-    fn draw_attract_legend_entries(&mut self, revealed_score_entries: usize, color: [u8; 4]) {
+    fn draw_attract_legend_entries(&mut self, revealed_score_entries: usize) {
         for entry in ATTRACT_SCORE_CARD.into_iter().take(revealed_score_entries) {
             let sprite = Entity::new(entry.kind, 0, 0, 0, 0);
             self.draw_entity(
@@ -1061,6 +1072,7 @@ impl Renderer {
                 entry.y - 30,
                 26,
             );
+            let color = attract_legend_color(entry.kind);
             self.draw_centered_text(entry.x, entry.y, entry.label, color, 2);
             self.draw_centered_text(entry.x, entry.y + 22, &entry.score.to_string(), color, 2);
         }
@@ -1688,30 +1700,38 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
         0 => AttractPalette {
             williams: [255, 72, 96, 255],
             title_text: [248, 192, 64, 255],
-            score_text: [84, 196, 255, 255],
             defender_face: [112, 255, 52, 255],
             defender_shadow: [255, 48, 48, 255],
+            hall_text: TEXT_ATTRACT_PURPLE,
+            scanner_text: TEXT_ATTRACT_PURPLE,
+            scanner_border: [67, 114, 198, 255],
         },
         1 => AttractPalette {
             williams: [255, 92, 112, 255],
             title_text: [248, 208, 96, 255],
-            score_text: [104, 212, 255, 255],
             defender_face: [144, 255, 80, 255],
             defender_shadow: [255, 72, 56, 255],
+            hall_text: TEXT_ATTRACT_MAGENTA,
+            scanner_text: TEXT_ATTRACT_MAGENTA,
+            scanner_border: [82, 132, 220, 255],
         },
         2 => AttractPalette {
             williams: [255, 64, 88, 255],
             title_text: [236, 184, 56, 255],
-            score_text: [76, 184, 255, 255],
             defender_face: [96, 240, 48, 255],
             defender_shadow: [236, 40, 72, 255],
+            hall_text: [164, 88, 244, 255],
+            scanner_text: [164, 88, 244, 255],
+            scanner_border: [60, 106, 188, 255],
         },
         _ => AttractPalette {
             williams: [255, 80, 104, 255],
             title_text: [255, 216, 120, 255],
-            score_text: [120, 216, 255, 255],
             defender_face: [176, 255, 96, 255],
             defender_shadow: [255, 108, 64, 255],
+            hall_text: [206, 108, 255, 255],
+            scanner_text: [206, 108, 255, 255],
+            scanner_border: [94, 146, 230, 255],
         },
     }
 }
@@ -1755,6 +1775,18 @@ fn scanner_color(kind: EntityKind) -> [u8; 4] {
         EntityKind::Swarmer => SWARMER_COLOR,
         EntityKind::Mine => MINE_COLOR,
         EntityKind::Human => HUMAN_COLOR,
+    }
+}
+
+fn attract_legend_color(kind: EntityKind) -> [u8; 4] {
+    match kind {
+        EntityKind::Lander => [248, 232, 132, 255],
+        EntityKind::Mutant => [102, 232, 255, 255],
+        EntityKind::Baiter => [182, 120, 255, 255],
+        EntityKind::Bomber => [108, 255, 120, 255],
+        EntityKind::Pod => [255, 176, 96, 255],
+        EntityKind::Swarmer => [232, 96, 255, 255],
+        _ => TEXT_ATTRACT_PURPLE,
     }
 }
 
