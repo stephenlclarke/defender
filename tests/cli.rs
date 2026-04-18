@@ -87,6 +87,22 @@ fn play_attract_mode_renders_the_whole_sequence_without_sleep() {
 }
 
 #[test]
+fn play_demo_mode_renders_the_gameplay_sequence_without_sleep() {
+    let output = Command::new(env!("CARGO_BIN_EXE_defender"))
+        .args(["--play-demo", "--mute", "--no-sleep"])
+        .output()
+        .expect("run defender");
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf8");
+    assert!(stdout.contains("DEFENDER"));
+    assert!(stdout.contains("WAVE 2"));
+    assert!(stdout.contains("LIVES 2"));
+    assert!(stdout.contains("SCORE 000800"));
+}
+
+#[test]
 fn rom_report_summarises_canonical_files() {
     let temp_dir = TempDir::new();
     fs::write(temp_dir.path().join("defend.1"), []).expect("write rom");

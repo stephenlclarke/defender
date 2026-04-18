@@ -37,6 +37,8 @@ Run targets:
 
 - `cargo run`
 - `cargo run -- --audio-demo`
+- `cargo run -- --play-demo`
+- `cargo run -- --play-demo --mute --no-sleep`
 - `cargo run -- --play-attract`
 - `cargo run -- --play-attract --mute --no-sleep`
 - `cargo run -- --scene logo`
@@ -60,6 +62,7 @@ After installation, run the prototype with:
 
 - `defender`
 - `defender --audio-demo`
+- `defender --play-demo`
 - `defender --play-attract`
 - `defender --scene attract`
 - `defender --scene high-score`
@@ -75,6 +78,9 @@ After installation, run the prototype with:
 - `defender --play-attract` now runs the logo, attract, and high-score sequence
   as a real terminal playback path; use `--mute --no-sleep` for deterministic
   test or capture runs.
+- `defender --play-demo` now runs a scripted gameplay showcase with score,
+  wave, life, enemy, and human-count changes through the same playback/audio
+  path.
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
   adding a fuller terminal graphics path.

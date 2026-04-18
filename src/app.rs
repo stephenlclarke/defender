@@ -8,16 +8,25 @@ use anyhow::{Context, Result, bail};
 
 use crate::attract::{SceneKind, attract_cycle, attract_scene, high_score_scene, logo_scene};
 use crate::audio::{AudioManager, SoundCue};
+use crate::demo::gameplay_demo_cycle;
 use crate::game::World;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
     AudioDemo,
     Gameplay { frames: usize },
+    PlayDemo { play_audio: bool, sleep: bool },
     PlayAttract { play_audio: bool, sleep: bool },
     Scene { kind: SceneKind },
     RomReport { path: PathBuf },
     Help,
+}
+
+#[derive(Debug, Clone)]
+struct PlaybackBeat {
+    text: String,
+    cue: Option<SoundCue>,
+    hold_ms: u64,
 }
 
 pub fn run() -> Result<()> {
@@ -27,6 +36,7 @@ pub fn run() -> Result<()> {
             Ok(())
         }
         Command::Gameplay { frames } => run_demo(frames),
+        Command::PlayDemo { play_audio, sleep } => run_play_demo(play_audio, sleep),
         Command::PlayAttract { play_audio, sleep } => run_play_attract(play_audio, sleep),
         Command::Scene { kind } => run_scene(kind),
         Command::RomReport { path } => run_rom_report(&path),
@@ -47,28 +57,27 @@ fn run_demo(frames: usize) -> Result<()> {
 }
 
 fn run_play_attract(play_audio: bool, sleep: bool) -> Result<()> {
-    let audio = AudioManager::new();
-    let mut stdout = io::stdout();
+    play_sequence(
+        attract_cycle().into_iter().map(|beat| PlaybackBeat {
+            text: beat.scene().text(),
+            cue: beat.cue,
+            hold_ms: beat.hold_ms,
+        }),
+        play_audio,
+        sleep,
+    )
+}
 
-    for beat in attract_cycle() {
-        let scene = beat.scene();
-        writeln!(stdout, "\x1B[2J\x1B[H{}", scene.text()).context("writing attract frame")?;
-        stdout.flush().context("flushing attract frame")?;
-
-        if play_audio && let Some(cue) = beat.cue {
-            audio.play_cue_blocking(cue);
-        }
-
-        if sleep {
-            let elapsed_ms = beat.cue.map(SoundCue::duration_ms).unwrap_or(0);
-            let remaining_ms = beat.hold_ms.saturating_sub(elapsed_ms);
-            if remaining_ms > 0 {
-                thread::sleep(Duration::from_millis(remaining_ms));
-            }
-        }
-    }
-
-    Ok(())
+fn run_play_demo(play_audio: bool, sleep: bool) -> Result<()> {
+    play_sequence(
+        gameplay_demo_cycle().into_iter().map(|beat| PlaybackBeat {
+            text: crate::render::render(&beat.world),
+            cue: beat.cue,
+            hold_ms: beat.hold_ms,
+        }),
+        play_audio,
+        sleep,
+    )
 }
 
 fn run_scene(kind: SceneKind) -> Result<()> {
@@ -105,6 +114,33 @@ fn run_rom_report(path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn play_sequence<I>(beats: I, play_audio: bool, sleep: bool) -> Result<()>
+where
+    I: IntoIterator<Item = PlaybackBeat>,
+{
+    let audio = AudioManager::new();
+    let mut stdout = io::stdout();
+
+    for beat in beats {
+        writeln!(stdout, "\x1B[2J\x1B[H{}", beat.text).context("writing playback frame")?;
+        stdout.flush().context("flushing playback frame")?;
+
+        if play_audio && let Some(cue) = beat.cue {
+            audio.play_cue_blocking(cue);
+        }
+
+        if sleep {
+            let elapsed_ms = beat.cue.map(SoundCue::duration_ms).unwrap_or(0);
+            let remaining_ms = beat.hold_ms.saturating_sub(elapsed_ms);
+            if remaining_ms > 0 {
+                thread::sleep(Duration::from_millis(remaining_ms));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn parse_args<I>(args: I) -> Result<Command>
 where
     I: IntoIterator<Item = String>,
@@ -123,6 +159,20 @@ where
                 bail!("--audio-demo does not accept extra arguments");
             }
             Ok(Command::AudioDemo)
+        }
+        "--play-demo" => {
+            let mut play_audio = true;
+            let mut sleep = true;
+
+            for arg in args {
+                match arg.as_str() {
+                    "--mute" => play_audio = false,
+                    "--no-sleep" => sleep = false,
+                    other => bail!("unsupported --play-demo option: {other}"),
+                }
+            }
+
+            Ok(Command::PlayDemo { play_audio, sleep })
         }
         "--play-attract" => {
             let mut play_audio = true;
@@ -188,6 +238,8 @@ fn print_help() {
     println!("defender");
     println!("  cargo run");
     println!("  cargo run -- --audio-demo");
+    println!("  cargo run -- --play-demo");
+    println!("  cargo run -- --play-demo --mute --no-sleep");
     println!("  cargo run -- --play-attract");
     println!("  cargo run -- --play-attract --mute --no-sleep");
     println!("  cargo run -- --scene logo");
@@ -266,6 +318,23 @@ mod tests {
     }
 
     #[test]
+    fn parse_args_reads_play_demo_with_switches() {
+        let command = parse_args(vec![
+            String::from("--play-demo"),
+            String::from("--mute"),
+            String::from("--no-sleep"),
+        ])
+        .expect("parse args");
+        assert_eq!(
+            command,
+            Command::PlayDemo {
+                play_audio: false,
+                sleep: false
+            }
+        );
+    }
+
+    #[test]
     fn parse_args_uses_default_rom_directory() {
         let command = parse_args(vec![String::from("--rom-report")]).expect("parse args");
         assert_eq!(
@@ -327,5 +396,15 @@ mod tests {
                 .to_string()
                 .contains("unsupported --play-attract option")
         );
+    }
+
+    #[test]
+    fn parse_args_rejects_unknown_play_demo_option() {
+        let error = parse_args(vec![
+            String::from("--play-demo"),
+            String::from("--warp-speed"),
+        ])
+        .expect_err("parse args");
+        assert!(error.to_string().contains("unsupported --play-demo option"));
     }
 }

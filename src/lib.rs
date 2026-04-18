@@ -4,6 +4,7 @@ pub mod app;
 pub mod attract;
 pub mod audio;
 pub mod constants;
+pub mod demo;
 pub mod game;
 pub mod render;
 pub mod rom;

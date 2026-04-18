@@ -196,6 +196,31 @@ impl World {
             })
             .count()
     }
+
+    pub fn add_score(&mut self, delta: u32) {
+        self.status.score = self.status.score.saturating_add(delta);
+    }
+
+    pub fn set_wave(&mut self, wave: u8) {
+        self.status.wave = wave;
+    }
+
+    pub fn set_lives(&mut self, lives: u8) {
+        self.status.lives = lives;
+    }
+
+    pub fn spawn_entity(&mut self, entity: Entity) {
+        self.entities.push(entity);
+    }
+
+    pub fn remove_first_by_kind(&mut self, kind: EntityKind) -> bool {
+        if let Some(index) = self.entities.iter().position(|entity| entity.kind == kind) {
+            self.entities.remove(index);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 fn wrap_coordinate(value: i32, max: i32) -> i32 {
@@ -281,5 +306,22 @@ mod tests {
 
         assert_eq!(after_first_tick, start_y - 1);
         assert_eq!(after_second_tick, start_y);
+    }
+
+    #[test]
+    fn world_can_update_status_and_entities_for_scripted_sequences() {
+        let mut world = World::bootstrap();
+
+        world.add_score(250);
+        world.set_wave(2);
+        world.set_lives(2);
+        world.spawn_entity(Entity::new(EntityKind::Human, 50, 10, 0, 0));
+        assert!(world.remove_first_by_kind(EntityKind::Lander));
+
+        assert_eq!(world.status().score, 250);
+        assert_eq!(world.status().wave, 2);
+        assert_eq!(world.status().lives, 2);
+        assert_eq!(world.enemy_count(), 1);
+        assert_eq!(world.human_count(), 3);
     }
 }
