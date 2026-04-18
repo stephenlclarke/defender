@@ -17,6 +17,13 @@ const ATTRACT_WORLD_HEIGHT: usize = 18;
 const ATTRACT_PLAYER_Y: i32 = 7;
 const ATTRACT_PLAYER_START_X: i32 = 8;
 const ATTRACT_ROM_HZ: u64 = 60;
+const TITLE_TRACE_SLEEP_TICKS: u64 = 2;
+const TITLE_PRESENTS_TICKS: u64 = 5;
+const TITLE_DEFENDER_DELAY_TICKS: u64 = 0x30;
+const TITLE_DEFENDER_APPEAR_TICKS: u8 = 0x2E;
+const TITLE_PRE_COPYRIGHT_HOLD_TICKS: u64 = 0x28;
+const TITLE_COPYRIGHT_HOLD_TICKS: u64 = 600;
+const HALL_OF_FAME_HOLD_TICKS: u64 = 600;
 const RESCUE_DESCENT_TICKS: u16 = 0xE6;
 const RESCUE_ASCENT_TICKS: u16 = 0xA0;
 const RESCUE_LASER_TICKS: u16 = 0x15;
@@ -109,6 +116,7 @@ pub struct AttractBeat {
     pub palette_phase: usize,
     pub logo_trace_points: usize,
     pub logo_show_title_text: bool,
+    pub logo_show_full_defender: bool,
     pub logo_defender_appear_tick: Option<u8>,
     pub logo_show_copyright: bool,
 }
@@ -134,21 +142,39 @@ pub fn attract_cycle() -> Vec<AttractBeat> {
     let mut beats = Vec::new();
     beats.extend(logo_trace_beats());
     beats.extend(logo_beat(
-        ticks_to_ms(48),
+        ticks_to_ms(TITLE_PRESENTS_TICKS),
         WILLIAMS_TRACE_POINT_COUNT,
         true,
+        false,
+        None,
+        false,
+    ));
+    beats.extend(logo_beat(
+        ticks_to_ms(TITLE_DEFENDER_DELAY_TICKS),
+        WILLIAMS_TRACE_POINT_COUNT,
+        true,
+        false,
         None,
         false,
     ));
     beats.extend(logo_appear_beats());
     beats.extend(logo_beat(
-        ticks_to_ms(600),
+        ticks_to_ms(TITLE_PRE_COPYRIGHT_HOLD_TICKS),
         WILLIAMS_TRACE_POINT_COUNT,
         true,
-        Some(0x2E),
+        true,
+        None,
+        false,
+    ));
+    beats.extend(logo_beat(
+        ticks_to_ms(TITLE_COPYRIGHT_HOLD_TICKS),
+        WILLIAMS_TRACE_POINT_COUNT,
+        true,
+        true,
+        None,
         true,
     ));
-    beats.push(high_score_beat(ticks_to_ms(600)));
+    beats.push(high_score_beat(ticks_to_ms(HALL_OF_FAME_HOLD_TICKS)));
     beats.extend(demo_beats());
     beats
 }
@@ -161,6 +187,7 @@ fn logo_beat(
     hold_ms: u64,
     logo_trace_points: usize,
     logo_show_title_text: bool,
+    logo_show_full_defender: bool,
     logo_defender_appear_tick: Option<u8>,
     logo_show_copyright: bool,
 ) -> Vec<AttractBeat> {
@@ -174,13 +201,14 @@ fn logo_beat(
         palette_phase: 0,
         logo_trace_points,
         logo_show_title_text,
+        logo_show_full_defender,
         logo_defender_appear_tick,
         logo_show_copyright,
     }]
 }
 
 fn logo_appear_beats() -> Vec<AttractBeat> {
-    (0..=0x2E)
+    (0..TITLE_DEFENDER_APPEAR_TICKS)
         .map(|tick| AttractBeat {
             kind: SceneKind::Logo,
             cue: Some(SoundCue::LogoFanfare),
@@ -191,6 +219,7 @@ fn logo_appear_beats() -> Vec<AttractBeat> {
             palette_phase: 0,
             logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
             logo_show_title_text: true,
+            logo_show_full_defender: false,
             logo_defender_appear_tick: Some(tick),
             logo_show_copyright: false,
         })
@@ -207,13 +236,14 @@ fn logo_trace_beats() -> Vec<AttractBeat> {
         beats.push(AttractBeat {
             kind: SceneKind::Logo,
             cue: Some(SoundCue::LogoFanfare),
-            hold_ms: ticks_to_ms(2),
+            hold_ms: ticks_to_ms(TITLE_TRACE_SLEEP_TICKS),
             world_steps: 0,
             revealed_score_entries: 0,
             demo_tick: None,
             palette_phase: 0,
             logo_trace_points: prefixes[end],
             logo_show_title_text: false,
+            logo_show_full_defender: false,
             logo_defender_appear_tick: None,
             logo_show_copyright: false,
         });
@@ -234,6 +264,7 @@ fn high_score_beat(hold_ms: u64) -> AttractBeat {
         palette_phase: 0,
         logo_trace_points: 0,
         logo_show_title_text: false,
+        logo_show_full_defender: false,
         logo_defender_appear_tick: None,
         logo_show_copyright: false,
     }
@@ -251,6 +282,7 @@ fn demo_beats() -> Vec<AttractBeat> {
             palette_phase: 0,
             logo_trace_points: 0,
             logo_show_title_text: false,
+            logo_show_full_defender: false,
             logo_defender_appear_tick: None,
             logo_show_copyright: false,
         })

@@ -152,7 +152,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The live attract renderer now also decodes the red-label `LGOTAB` and
   `DEFDAT` tables directly in Rust, so the opening page traces the Williams
   script and materializes the `DEFENDER` wordmark from ROM-derived data before
-  falling back to the exact embedded page asset for the held frame.
+  falling back to the exact embedded page asset for the held frame. The title
+  page now also preserves the ROM's short full-logo hold before the copyright
+  line appears, rather than jumping straight from the reverse explosion to the
+  final page.
 - The instruction/demo page now uses the ROM-timed `LEDRET` rescue/scoring
   sequence in native fixed-point attract coordinates rather than routing those
   poses through the normal gameplay world update loop.
@@ -243,9 +246,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   coverage report as CI and then runs `sonar-scanner` when `SONAR_TOKEN` is set.
 - `examples/generate_readme_media.rs` now regenerates `docs/defender.png` and
   `docs/start-sequence.gif` from the same Kitty-graphics renderer used by the
-  live game and attract flow, with the README GIF sampled on a tighter interval
+  live game and attract flow, with the README GIF sampled at a denser interval
   so the Williams handwriting, reverse-explosion title reveal, and opening
-  colour cycling stay smooth in the page.
+  colour cycling stay smooth while preserving the cabinet sequence timing.
 - `tools/extract_rom_branding_assets.py` regenerates the embedded Williams
   logo page, Defender wordmark, and copyright art directly from the red-label
   source tables.

@@ -26,8 +26,16 @@ pub fn run_live(play_audio: bool) -> Result<()> {
     let mut terminal_geometry = geometry()?;
     let mut renderer = Renderer::new(terminal_geometry);
     let mut graphics = KittyGraphics::new(terminal_geometry.cols, terminal_geometry.rows);
+    let mut title_started_at = Instant::now();
+    let mut previous_mode = session.mode();
 
-    draw_frame(&mut stdout, &session, &mut renderer, &mut graphics)?;
+    draw_frame(
+        &mut stdout,
+        &session,
+        &mut renderer,
+        &mut graphics,
+        title_started_at.elapsed().as_millis() as u64,
+    )?;
 
     loop {
         let frame_started = Instant::now();
@@ -39,7 +47,19 @@ pub fn run_live(play_audio: bool) -> Result<()> {
         }
 
         let events = session.tick(input.session);
-        draw_frame(&mut stdout, &session, &mut renderer, &mut graphics)?;
+        if session.mode() != previous_mode {
+            if session.mode() == SessionMode::Title {
+                title_started_at = Instant::now();
+            }
+            previous_mode = session.mode();
+        }
+        draw_frame(
+            &mut stdout,
+            &session,
+            &mut renderer,
+            &mut graphics,
+            title_started_at.elapsed().as_millis() as u64,
+        )?;
 
         if play_audio && let Some(cue) = cue_for_events(&events) {
             audio.play_cue_blocking(cue);
@@ -89,8 +109,9 @@ fn draw_frame(
     session: &SessionState,
     renderer: &mut Renderer,
     graphics: &mut KittyGraphics,
+    attract_elapsed_ms: u64,
 ) -> Result<()> {
-    let image = render_session_frame(renderer, session);
+    let image = render_session_frame(renderer, session, attract_elapsed_ms);
     graphics
         .draw_frame(stdout, image)
         .context("drawing kitty graphics frame")?;
@@ -101,9 +122,10 @@ fn draw_frame(
 fn render_session_frame<'a>(
     renderer: &'a mut Renderer,
     session: &SessionState,
+    attract_elapsed_ms: u64,
 ) -> &'a RenderedImage {
     match session.mode() {
-        SessionMode::Title => render_title_frame(renderer, session),
+        SessionMode::Title => render_title_frame(renderer, session, attract_elapsed_ms),
         SessionMode::Playing => renderer.render(Screen::Playing {
             world: session.world(),
             xyzzy_active: session.xyzzy_active(),
@@ -141,14 +163,19 @@ fn render_session_frame<'a>(
     }
 }
 
-fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) -> &'a RenderedImage {
-    let beat = title_beat_for_session(session);
+fn render_title_frame<'a>(
+    renderer: &'a mut Renderer,
+    session: &SessionState,
+    attract_elapsed_ms: u64,
+) -> &'a RenderedImage {
+    let beat = title_beat_for_elapsed_ms(attract_elapsed_ms);
     match beat.kind {
         SceneKind::Logo => renderer.render(Screen::Logo {
             palette_phase: beat.palette_phase,
-            elapsed_ms: attract_elapsed_ms_for_session(session),
+            elapsed_ms: attract_elapsed_ms,
             trace_points: beat.logo_trace_points,
             show_title_text: beat.logo_show_title_text,
+            show_full_defender: beat.logo_show_full_defender,
             defender_appear_tick: beat.logo_defender_appear_tick,
             show_copyright: beat.logo_show_copyright,
         }),
@@ -163,19 +190,13 @@ fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) ->
             todays: session.todays_high_scores(),
             all_time: session.high_scores(),
             palette_phase: beat.palette_phase,
-            elapsed_ms: attract_elapsed_ms_for_session(session),
+            elapsed_ms: attract_elapsed_ms,
         }),
     }
 }
 
-fn title_beat_for_session(session: &SessionState) -> AttractBeat {
-    beat_for_elapsed_ms(attract_elapsed_ms_for_session(session))
-}
-
-fn attract_elapsed_ms_for_session(session: &SessionState) -> u64 {
-    session
-        .title_ticks()
-        .saturating_mul(FRAME_DURATION.as_millis() as u64)
+fn title_beat_for_elapsed_ms(elapsed_ms: u64) -> AttractBeat {
+    beat_for_elapsed_ms(elapsed_ms)
 }
 
 fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
@@ -312,7 +333,7 @@ mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode};
 
     use super::{
-        InputTracker, PolledInput, cue_for_events, render_title_frame, title_beat_for_session,
+        InputTracker, PolledInput, cue_for_events, render_title_frame, title_beat_for_elapsed_ms,
         validate_interactive_terminal,
     };
     use crate::audio::SoundCue;
@@ -485,14 +506,14 @@ mod tests {
     #[test]
     fn title_mode_renders_the_arcade_attract_cycle_immediately() {
         let mut session = SessionState::with_high_scores(HighScoreTable::default());
-        let beat = title_beat_for_session(&session);
+        let beat = title_beat_for_elapsed_ms(0);
         assert_eq!(beat.kind, crate::attract::SceneKind::Logo);
 
         for _ in 0..30 {
             session.tick(SessionInput::default());
         }
 
-        let beat = title_beat_for_session(&session);
+        let beat = title_beat_for_elapsed_ms(2_000);
         assert!(matches!(
             beat.kind,
             crate::attract::SceneKind::Logo
@@ -501,7 +522,7 @@ mod tests {
         ));
 
         let mut renderer = Renderer::with_size(960, 720);
-        let image = render_title_frame(&mut renderer, &session);
+        let image = render_title_frame(&mut renderer, &session, 2_000);
         assert!(image.pixels.iter().any(|pixel| *pixel != 0));
     }
 }

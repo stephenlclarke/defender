@@ -62,6 +62,7 @@ pub enum Screen<'a> {
         elapsed_ms: u64,
         trace_points: usize,
         show_title_text: bool,
+        show_full_defender: bool,
         defender_appear_tick: Option<u8>,
         show_copyright: bool,
     },
@@ -136,6 +137,17 @@ struct AttractPalette {
     defender_shadow: [u8; 4],
 }
 
+#[derive(Clone, Copy)]
+struct LogoScreenState {
+    palette_phase: usize,
+    elapsed_ms: u64,
+    trace_points: usize,
+    show_title_text: bool,
+    show_full_defender: bool,
+    defender_appear_tick: Option<u8>,
+    show_copyright: bool,
+}
+
 impl AttractLegendEntry {
     const fn new(kind: EntityKind, label: &'static str, score: u32, x: i32, y: i32) -> Self {
         Self {
@@ -187,16 +199,18 @@ impl Renderer {
                 elapsed_ms,
                 trace_points,
                 show_title_text,
+                show_full_defender,
                 defender_appear_tick,
                 show_copyright,
-            } => self.render_logo_screen(
+            } => self.render_logo_screen(LogoScreenState {
                 palette_phase,
                 elapsed_ms,
                 trace_points,
                 show_title_text,
+                show_full_defender,
                 defender_appear_tick,
                 show_copyright,
-            ),
+            }),
             Screen::Attract {
                 frame,
                 palette_phase,
@@ -228,15 +242,7 @@ impl Renderer {
         &self.render_target
     }
 
-    fn render_logo_screen(
-        &mut self,
-        palette_phase: usize,
-        elapsed_ms: u64,
-        trace_points: usize,
-        show_title_text: bool,
-        defender_appear_tick: Option<u8>,
-        show_copyright: bool,
-    ) {
+    fn render_logo_screen(&mut self, state: LogoScreenState) {
         self.fill_rect(
             Rect {
                 x: 0,
@@ -248,7 +254,7 @@ impl Renderer {
         );
         let branding = arcade_branding();
         let rom = attract_rom();
-        let palette = attract_palette(palette_phase, elapsed_ms);
+        let palette = attract_palette(state.palette_phase, state.elapsed_ms);
         let max_width = (self.image_width as i32 - 64).max(1);
         let max_height = (self.image_height as i32 - 24).max(1);
         let scale = (max_width as f32 / 320.0).min(max_height as f32 / 256.0);
@@ -259,8 +265,6 @@ impl Renderer {
         let page_scale = page_height as f32 / 256.0;
         let page_x_at = |x: f32| page_x + (x * page_width as f32 / 320.0).round() as i32;
         let page_y_at = |y: f32| page_y + (y * page_height as f32 / 256.0).round() as i32;
-        let full_logo_page_visible =
-            trace_points >= rom.williams_points().len() && show_title_text && show_copyright;
         let page_rect = Rect {
             x: page_x,
             y: page_y,
@@ -268,18 +272,26 @@ impl Renderer {
             height: page_height,
         };
 
-        if full_logo_page_visible {
+        if state.trace_points >= rom.williams_points().len()
+            && state.show_title_text
+            && state.show_full_defender
+        {
             // Once the ROM-driven trace and object-appearance phases have
-            // completed, show the exact embedded red-label page composition.
+            // completed, show the exact embedded red-label page composition,
+            // optionally masking the copyright line during the ROM's short
+            // post-appear hold.
             self.recolor_attract_page(page_rect, palette);
+            if !state.show_copyright {
+                self.clear_copyright_line(page_rect, page_scale);
+            }
             return;
         }
 
-        for &(x, y) in rom.williams_points().iter().take(trace_points) {
+        for &(x, y) in rom.williams_points().iter().take(state.trace_points) {
             self.draw_scaled_logo_trace_pixel(page_rect, x, y, Color::from_rgba(palette.williams));
         }
 
-        if show_title_text {
+        if state.show_title_text {
             self.draw_centered_text(
                 page_x_at(187.0),
                 page_y_at(88.0),
@@ -296,8 +308,8 @@ impl Renderer {
             );
         }
 
-        if let Some(defender_appear_tick) = defender_appear_tick
-            && !show_copyright
+        if let Some(defender_appear_tick) = state.defender_appear_tick
+            && !state.show_full_defender
         {
             self.draw_defender_appear_phase(
                 page_rect,
@@ -307,7 +319,7 @@ impl Renderer {
             );
         }
 
-        if show_copyright {
+        if state.show_copyright {
             self.draw_scaled_image_centered(
                 branding.copyright_line(),
                 page_x_at(197.0),
@@ -1277,49 +1289,51 @@ impl Renderer {
             return;
         }
 
-        const LOGO_LEFT_NATIVE: i32 = 118;
-        const LOGO_TOP_NATIVE: i32 = 144;
-        const CELL_PIXELS: i32 = 2;
-        const CHUNK_COLUMNS: i32 = 4;
-        const CHUNK_ROWS: i32 = 12;
+        const LOGO_LEFT_BYTE: i32 = 0x30;
+        const LOGO_TOP_SCANLINE: i32 = 0x90;
+        const CHUNK_WIDTH_BYTES: i32 = 4;
+        const CHUNK_HEIGHT_ROW_PAIRS: i32 = 12;
+        const CHUNK_CENTER_X_BYTES: i32 = 2;
+        const CHUNK_CENTER_Y_SCANLINES: i32 = 12;
 
-        let size = (0x2F_i32 - i32::from(defender_appear_tick)).max(1);
-        let step = size * CELL_PIXELS;
+        // `EXPU4` starts drawing at size $2E and counts down to 1 before the
+        // attract task swaps in the full-width `CWRIT` logo.
+        let size = (0x2E_i32 - i32::from(defender_appear_tick)).max(1);
+        let row_pair_step = size * 2;
 
         for (chunk_index, chunk) in chunks.iter().enumerate() {
-            let chunk_left = chunk_index as i32 * chunk.width as i32;
-            let start_y = 12 - 6 * step;
+            let logo_left_byte = LOGO_LEFT_BYTE + chunk_index as i32 * CHUNK_WIDTH_BYTES;
+            let start_x_byte = logo_left_byte + CHUNK_CENTER_X_BYTES - CHUNK_CENTER_X_BYTES * size;
+            let start_y =
+                LOGO_TOP_SCANLINE + CHUNK_CENTER_Y_SCANLINES - CHUNK_CENTER_Y_SCANLINES * size;
 
-            for block_column in 0..CHUNK_COLUMNS {
-                let target_x = chunk_left + block_column * step;
-                let src_x = (block_column * CELL_PIXELS) as usize;
+            for byte_column in 0..CHUNK_WIDTH_BYTES {
+                let target_x_byte = start_x_byte + byte_column * size;
+                let source_x = (byte_column * 2) as usize;
 
-                for block_row in 0..CHUNK_ROWS {
-                    let target_y = start_y + block_row * step;
-                    let src_y = (block_row * CELL_PIXELS) as usize;
-                    self.draw_native_logo_cell(
+                for row_pair in 0..CHUNK_HEIGHT_ROW_PAIRS {
+                    let target_y = start_y + row_pair * row_pair_step;
+                    let source_y = (row_pair * 2) as usize;
+                    self.draw_native_logo_word(
                         page_rect,
                         chunk,
-                        (src_x, src_y),
-                        (LOGO_LEFT_NATIVE + target_x, LOGO_TOP_NATIVE + target_y),
+                        (source_x, source_y),
+                        (target_x_byte, target_y),
                         palette,
                     );
                 }
             }
 
-            // `EWRITE` clears the center cell after each expanded-object write.
-            self.fill_native_page_rect(
+            // `DONE` erases the center word after each expanded-object write.
+            self.clear_native_logo_word(
                 page_rect,
-                LOGO_LEFT_NATIVE + chunk_left,
-                LOGO_TOP_NATIVE + 12,
-                CELL_PIXELS,
-                CELL_PIXELS,
-                Color::from_rgba(BACKGROUND),
+                logo_left_byte + CHUNK_CENTER_X_BYTES,
+                LOGO_TOP_SCANLINE + CHUNK_CENTER_Y_SCANLINES,
             );
         }
     }
 
-    fn draw_native_logo_cell(
+    fn draw_native_logo_word(
         &mut self,
         page_rect: Rect,
         chunk: &RenderedImage,
@@ -1341,9 +1355,9 @@ impl Renderer {
                     continue;
                 }
 
-                self.fill_native_page_rect(
+                self.fill_raw_page_rect(
                     page_rect,
-                    native_origin.0 + dx as i32,
+                    native_origin.0 * 2 + dx as i32,
                     native_origin.1 + dy as i32,
                     1,
                     1,
@@ -1361,17 +1375,46 @@ impl Renderer {
         }
     }
 
-    fn fill_native_page_rect(
+    fn clear_native_logo_word(&mut self, page_rect: Rect, byte_x: i32, scanline_y: i32) {
+        self.fill_raw_page_rect(
+            page_rect,
+            byte_x * 2,
+            scanline_y,
+            2,
+            2,
+            Color::from_rgba(BACKGROUND),
+        );
+    }
+
+    fn clear_copyright_line(&mut self, page_rect: Rect, page_scale: f32) {
+        let copyright = arcade_branding().copyright_line();
+        let target_height = (copyright.height as f32 * page_scale).round().max(1.0) as i32;
+        let target_width =
+            (((copyright.width as i32) * target_height) / copyright.height as i32).max(1);
+        let center_x = page_rect.x + (197.0 * page_rect.width as f32 / 320.0).round() as i32;
+        let center_y = page_rect.y + (211.0 * page_rect.height as f32 / 256.0).round() as i32;
+        self.fill_rect(
+            Rect {
+                x: center_x - target_width / 2 - 4,
+                y: center_y - target_height / 2 - 4,
+                width: target_width + 8,
+                height: target_height + 8,
+            },
+            Color::from_rgba(BACKGROUND),
+        );
+    }
+
+    fn fill_raw_page_rect(
         &mut self,
         page_rect: Rect,
-        native_x: i32,
+        raw_x: i32,
         native_y: i32,
-        native_width: i32,
+        raw_width: i32,
         native_height: i32,
         color: Color,
     ) {
-        let x0 = page_rect.x + native_x * page_rect.width / 320;
-        let x1 = page_rect.x + (native_x + native_width) * page_rect.width / 320;
+        let x0 = page_rect.x + (raw_x * 5 / 4) * page_rect.width / 320;
+        let x1 = page_rect.x + ((raw_x + raw_width) * 5 / 4) * page_rect.width / 320;
         let y0 = page_rect.y + native_y * page_rect.height / 256;
         let y1 = page_rect.y + (native_y + native_height) * page_rect.height / 256;
         self.fill_rect(
@@ -1857,7 +1900,8 @@ mod tests {
                 elapsed_ms: 0,
                 trace_points: crate::attract_rom::WILLIAMS_TRACE_POINT_COUNT,
                 show_title_text: true,
-                defender_appear_tick: Some(0x2E),
+                show_full_defender: true,
+                defender_appear_tick: None,
                 show_copyright: true,
             })
             .clone();
@@ -1867,7 +1911,8 @@ mod tests {
                 elapsed_ms: 240,
                 trace_points: crate::attract_rom::WILLIAMS_TRACE_POINT_COUNT,
                 show_title_text: true,
-                defender_appear_tick: Some(0x2E),
+                show_full_defender: true,
+                defender_appear_tick: None,
                 show_copyright: true,
             })
             .clone();

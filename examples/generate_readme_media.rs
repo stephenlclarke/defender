@@ -33,7 +33,7 @@ const TRAFFIC_GREEN: [u8; 4] = [40, 200, 64, 255];
 const GHOST_BADGE: [u8; 4] = [240, 240, 248, 255];
 const GHOST_EYE: [u8; 4] = [18, 18, 26, 255];
 const README_GIF_SAMPLE_MS: u64 = 33;
-const README_GIF_REALTIME_PERCENT: u64 = 65;
+const README_GIF_REALTIME_PERCENT: u64 = 100;
 const README_GIF_MIN_DELAY_CS: u16 = 2;
 
 fn main() -> Result<()> {
@@ -66,12 +66,15 @@ fn build_sequence() -> Vec<(RgbaImage, u16)> {
     let all_time = HighScoreTable::default();
     let cycle = attract_cycle();
     let cycle_ms = cycle.iter().map(|beat| beat.hold_ms).sum::<u64>();
-    let frame_delay = scaled_centiseconds(README_GIF_SAMPLE_MS);
     let mut frames = Vec::new();
     let mut elapsed_ms = 0;
+    let mut centisecond_carry_ms = 0;
 
     while elapsed_ms < cycle_ms {
         let image = render_attract_sample(&mut renderer, &todays, &all_time, &cycle, elapsed_ms);
+        let (frame_delay, next_carry_ms) =
+            scaled_centiseconds_with_carry(README_GIF_SAMPLE_MS, centisecond_carry_ms);
+        centisecond_carry_ms = next_carry_ms;
         frames.push((image.into(), frame_delay));
         elapsed_ms += README_GIF_SAMPLE_MS;
     }
@@ -117,6 +120,7 @@ fn render_attract_sample(
                 elapsed_ms,
                 trace_points: beat.logo_trace_points,
                 show_title_text: beat.logo_show_title_text,
+                show_full_defender: beat.logo_show_full_defender,
                 defender_appear_tick: beat.logo_defender_appear_tick,
                 show_copyright: beat.logo_show_copyright,
             })
@@ -165,13 +169,20 @@ fn cycle_entry_for_elapsed(cycle: &[AttractBeat], elapsed_ms: u64) -> (usize, u6
     (0, 0, cycle[0])
 }
 
+#[cfg(test)]
 fn scaled_centiseconds(duration_ms: u64) -> u16 {
+    scaled_centiseconds_with_carry(duration_ms, 0).0
+}
+
+fn scaled_centiseconds_with_carry(duration_ms: u64, carry_ms: u64) -> (u16, u64) {
     let scaled_ms = duration_ms
         .saturating_mul(README_GIF_REALTIME_PERCENT)
+        .saturating_add(carry_ms.saturating_mul(100))
         .checked_div(100)
-        .unwrap_or(duration_ms);
-    let centiseconds = ((scaled_ms + 5) / 10).max(u64::from(README_GIF_MIN_DELAY_CS));
-    centiseconds.min(u16::MAX as u64) as u16
+        .unwrap_or(duration_ms.saturating_add(carry_ms));
+    let centiseconds = (scaled_ms / 10).max(u64::from(README_GIF_MIN_DELAY_CS));
+    let remainder_ms = scaled_ms.saturating_sub(centiseconds * 10);
+    (centiseconds.min(u16::MAX as u64) as u16, remainder_ms)
 }
 
 fn collapse_identical_frames(frames: Vec<(RgbaImage, u16)>) -> Vec<(RgbaImage, u16)> {
@@ -524,15 +535,25 @@ impl From<RenderedImage> for RgbaImage {
 mod tests {
     use super::{
         README_GIF_MIN_DELAY_CS, README_GIF_SAMPLE_MS, RgbaImage, collapse_identical_frames,
-        scaled_centiseconds,
+        scaled_centiseconds, scaled_centiseconds_with_carry,
     };
 
     #[test]
-    fn scaled_centiseconds_speeds_up_realtime_for_readme_media() {
+    fn scaled_centiseconds_respects_realtime_sampling_floor() {
         let delay = scaled_centiseconds(README_GIF_SAMPLE_MS);
 
-        assert!(delay < (README_GIF_SAMPLE_MS / 10) as u16);
+        let expected = (README_GIF_SAMPLE_MS / 10) as u16;
+        assert_eq!(delay, expected.max(README_GIF_MIN_DELAY_CS));
         assert!(delay >= README_GIF_MIN_DELAY_CS);
+    }
+
+    #[test]
+    fn scaled_centiseconds_carries_fractional_realtime_forward() {
+        let (first, carry) = scaled_centiseconds_with_carry(README_GIF_SAMPLE_MS, 0);
+        let (second, _) = scaled_centiseconds_with_carry(README_GIF_SAMPLE_MS, carry);
+
+        assert!(first >= README_GIF_MIN_DELAY_CS);
+        assert!(second >= first);
     }
 
     #[test]
