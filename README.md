@@ -183,8 +183,10 @@ These references were used for reverse engineering, rules verification, attract
 screen reconstruction, and extraction of historical arcade data while keeping
 the final runtime self-contained:
 
-- <https://github.com/mwenge/defender>: reference implementation and ROM layout
-  comparison point, especially for the red-label `defend.*` program ROM names.
+- <https://github.com/mwenge/defender>: Motorola 6809 assembly language for the
+  'Red Label' version of the game. Used for reference implementation and ROM
+  layout comparison point, especially for the red-label `defend.*` program ROM
+  names.
 - <https://www.thedefenderproject.com/defender-rom-versions-the-history/>:
   revision history and ROM-set background for Williams Defender releases.
 - <https://www.dougmahugh.com/defender-chapter01/>: general arcade-rules
