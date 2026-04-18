@@ -120,9 +120,10 @@ Extra keys while `xyzzy` mode is active:
   path.
 - `defender --play-live` now runs a real text-mode play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
-  hyperspace, enemy hits, wave progression, human losses, game-over handling,
-  restart support, a wrapped scrolling camera, and an `xyzzy`/`g` secret
-  god-mode path on top of the same native Rust world model.
+  hyperspace, enemy hits, wave progression, human abductions, rescue on
+  carrying-lander kills, mutant conversion after successful abductions,
+  game-over handling, restart support, a wrapped scrolling camera, and an
+  `xyzzy`/`g` secret god-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
   instead of a flat floor, so demo and live frames show a moving landscape and
   projectiles are clipped by terrain.

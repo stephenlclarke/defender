@@ -100,6 +100,8 @@ fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
         Some(SoundCue::Explosion)
     } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::WaveAdvanced)) {
         Some(SoundCue::HighScoreChime)
+    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::HumanRescued)) {
+        Some(SoundCue::HumanSaved)
     } else if events.contains(&SessionEvent::World(
         crate::game::WorldEvent::EnemyDestroyed,
     )) {
@@ -311,6 +313,10 @@ mod tests {
         assert_eq!(
             cue_for_events(&[SessionEvent::World(WorldEvent::SmartBombDetonated)]),
             Some(SoundCue::Explosion)
+        );
+        assert_eq!(
+            cue_for_events(&[SessionEvent::World(WorldEvent::HumanRescued)]),
+            Some(SoundCue::HumanSaved)
         );
     }
 
