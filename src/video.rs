@@ -20,6 +20,7 @@ const TEXT_PRIMARY: [u8; 4] = [240, 244, 255, 255];
 const TEXT_SECONDARY: [u8; 4] = [130, 212, 255, 255];
 const TEXT_WARNING: [u8; 4] = [255, 200, 88, 255];
 const TEXT_DANGER: [u8; 4] = [255, 96, 88, 255];
+const TEXT_SCORE_BLUE: [u8; 4] = [84, 196, 255, 255];
 const TERRAIN_LINE: [u8; 4] = [72, 224, 96, 255];
 const TERRAIN_FILL: [u8; 4] = [11, 50, 22, 255];
 const VIEWPORT_BORDER: [u8; 4] = [68, 94, 180, 255];
@@ -330,23 +331,33 @@ impl Renderer {
     }
 
     fn render_high_scores_screen(&mut self, todays: &HighScoreTable, all_time: &HighScoreTable) {
-        self.draw_space_backdrop(9, None);
-        self.draw_title_logo(self.image_width as i32 / 2, 150);
-        let panel = Rect {
-            x: 68,
-            y: 250,
-            width: self.image_width as i32 - 136,
-            height: self.image_height as i32 - 310,
-        };
-        self.draw_panel(panel);
-        self.draw_centered_text(
-            panel.center_x(),
-            panel.y + 24,
-            "HALL OF FAME",
-            TEXT_WARNING,
-            3,
+        self.fill_rect(
+            Rect {
+                x: 0,
+                y: 0,
+                width: self.image_width as i32,
+                height: self.image_height as i32,
+            },
+            Color::from_rgba(BACKGROUND),
         );
-        self.draw_score_tables(panel, todays, all_time);
+        self.draw_arcade_logo(self.image_width as i32 / 2, 66, 5);
+        self.draw_centered_text(
+            self.image_width as i32 / 2,
+            142,
+            "HALL OF FAME",
+            TEXT_SCORE_BLUE,
+            2,
+        );
+        self.draw_score_tables(
+            Rect {
+                x: 96,
+                y: 186,
+                width: self.image_width as i32 - 192,
+                height: self.image_height as i32 - 236,
+            },
+            todays,
+            all_time,
+        );
     }
 
     fn render_playing_screen(
@@ -666,38 +677,30 @@ impl Renderer {
         todays: &HighScoreTable,
         all_time: &HighScoreTable,
     ) {
-        let left_x = rect.x + 22;
-        let right_x = rect.center_x() + 10;
-        self.draw_text(left_x, rect.y + 16, "TODAYS GREATEST", TEXT_WARNING, 2);
-        self.draw_text(right_x, rect.y + 16, "ALL TIME GREATEST", TEXT_WARNING, 2);
-        self.draw_text(
-            left_x,
-            rect.y + 44,
-            "RANK  INITIALS SCORE",
-            TEXT_SECONDARY,
-            1,
-        );
-        self.draw_text(
-            right_x,
-            rect.y + 44,
-            "RANK  INITIALS SCORE",
-            TEXT_SECONDARY,
-            1,
-        );
+        let left_center = rect.x + rect.width / 4;
+        let right_center = rect.x + rect.width * 3 / 4;
+        let table_top = rect.y + 6;
+        self.draw_centered_text(left_center, table_top, "TODAYS", TEXT_SCORE_BLUE, 2);
+        self.draw_centered_text(left_center, table_top + 20, "GREATEST", TEXT_SCORE_BLUE, 2);
+        self.draw_centered_text(right_center, table_top, "ALL TIME", TEXT_SCORE_BLUE, 2);
+        self.draw_centered_text(right_center, table_top + 20, "GREATEST", TEXT_SCORE_BLUE, 2);
+
+        let left_x = rect.x + 40;
+        let right_x = rect.center_x() + 24;
         let row_count = todays.entries().len().max(all_time.entries().len());
         for index in 0..row_count {
             self.draw_text(
                 left_x,
-                rect.y + 70 + index as i32 * 24,
-                &score_row(index + 1, todays.entries().get(index)),
-                TEXT_PRIMARY,
+                rect.y + 58 + index as i32 * 24,
+                &arcade_score_row(index + 1, todays.entries().get(index)),
+                TEXT_SCORE_BLUE,
                 2,
             );
             self.draw_text(
                 right_x,
-                rect.y + 70 + index as i32 * 24,
-                &score_row(index + 1, all_time.entries().get(index)),
-                TEXT_PRIMARY,
+                rect.y + 58 + index as i32 * 24,
+                &arcade_score_row(index + 1, all_time.entries().get(index)),
+                TEXT_SCORE_BLUE,
                 2,
             );
         }
@@ -741,6 +744,19 @@ impl Renderer {
             Color::from_rgba([36, 64, 120, 255]),
             2,
         );
+    }
+
+    fn draw_arcade_logo(&mut self, center_x: i32, top_y: i32, scale: i32) {
+        for depth in (1..=3).rev() {
+            self.draw_centered_text(
+                center_x + depth * scale,
+                top_y + depth * scale,
+                "DEFENDER",
+                TEXT_DANGER,
+                scale,
+            );
+        }
+        self.draw_centered_text(center_x, top_y, "DEFENDER", TEXT_WARNING, scale);
     }
 
     fn draw_secret_status(
@@ -1147,10 +1163,10 @@ fn hash32(mut value: u32) -> u32 {
     value ^ (value >> 16)
 }
 
-fn score_row(rank: usize, entry: Option<&HighScoreEntry>) -> String {
+fn arcade_score_row(rank: usize, entry: Option<&HighScoreEntry>) -> String {
     match entry {
-        Some(entry) => format!("{rank:>2}. {:<3} {:>6}", entry.initials, entry.score),
-        None => format!("{rank:>2}. --- ------"),
+        Some(entry) => format!("{rank} {:<3} {:>5}", entry.initials, entry.score),
+        None => format!("{rank} --- -----"),
     }
 }
 

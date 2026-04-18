@@ -191,7 +191,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The live title screen now idles into a real attract loop instead of staying
   static: a ROM-ordered scanner/enemy legend reveal cycles into a split
   `TODAYS GREATEST` / `ALL TIME GREATEST` hall-of-fame page, with a volatile
-  per-run left table and a persistent right table.
+  per-run left table and a persistent right table, using the original black-
+  screen two-column attract layout instead of the earlier boxed panel.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
   instead of a flat floor, so demo and live frames show a moving landscape and
   projectiles are clipped by terrain. When the last humanoid is lost, the live
