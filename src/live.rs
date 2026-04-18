@@ -71,6 +71,8 @@ fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
         Some(SoundCue::LogoFanfare)
     } else if events.contains(&SessionEvent::HighScoreUpdated) {
         Some(SoundCue::HighScoreChime)
+    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired)) {
+        Some(SoundCue::EnemySweep)
     } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::GameOver))
         || events.contains(&SessionEvent::World(crate::game::WorldEvent::PlayerHit))
     {
@@ -243,6 +245,10 @@ mod tests {
         assert_eq!(
             cue_for_events(&[SessionEvent::World(WorldEvent::WaveAdvanced)]),
             Some(SoundCue::HighScoreChime)
+        );
+        assert_eq!(
+            cue_for_events(&[SessionEvent::World(WorldEvent::EnemyFired)]),
+            Some(SoundCue::EnemySweep)
         );
     }
 

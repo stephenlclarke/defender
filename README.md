@@ -96,9 +96,9 @@ Live mode controls:
   wave, life, enemy, and human-count changes through the same playback/audio
   path.
 - `defender --play-live` now runs a real text-mode play loop with keyboard
-  input, title/start flow, shots, enemy hits, wave progression, human losses,
-  game-over handling, and restart support on top of the same native Rust world
-  model.
+  input, title/start flow, player shots, incoming enemy fire, enemy hits, wave
+  progression, human losses, game-over handling, and restart support on top of
+  the same native Rust world model.
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
   adding a fuller terminal graphics path.

@@ -7,6 +7,7 @@ use crate::constants::{
 pub enum EntityKind {
     PlayerShip,
     PlayerShot,
+    EnemyShot,
     Lander,
     Mutant,
     Human,
@@ -17,6 +18,7 @@ impl EntityKind {
         match self {
             Self::PlayerShip => '^',
             Self::PlayerShot => '-',
+            Self::EnemyShot => '!',
             Self::Lander => 'L',
             Self::Mutant => 'M',
             Self::Human => 'h',
@@ -40,6 +42,7 @@ pub struct UpdateInput {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorldEvent {
     ShotFired,
+    EnemyFired,
     EnemyDestroyed,
     HumanLost,
     PlayerHit,
@@ -161,15 +164,14 @@ impl World {
                         entity.position.y = entity.position.y.clamp(min_y, max_y);
                     }
                 }
-                EntityKind::PlayerShot => {
+                EntityKind::PlayerShot | EntityKind::EnemyShot => {
                     entity.position.x += entity.velocity.dx;
+                    entity.position.y += entity.velocity.dy;
                 }
             }
         }
 
-        self.entities.retain(|entity| {
-            entity.kind != EntityKind::PlayerShot || (0..=max_x).contains(&entity.position.x)
-        });
+        self.retain_projectiles(max_x, min_y, max_y);
     }
 
     pub fn width(&self) -> usize {
@@ -323,16 +325,15 @@ impl World {
                         entity.position.y = entity.position.y.clamp(min_y, max_y);
                     }
                 }
-                EntityKind::PlayerShot => {
+                EntityKind::PlayerShot | EntityKind::EnemyShot => {
                     entity.position.x += entity.velocity.dx;
                     entity.position.y += entity.velocity.dy;
                 }
             }
         }
 
-        self.entities.retain(|entity| {
-            entity.kind != EntityKind::PlayerShot || (0..=max_x).contains(&entity.position.x)
-        });
+        self.spawn_enemy_fire(max_x, min_y, max_y, &mut events);
+        self.retain_projectiles(max_x, min_y, max_y);
 
         self.handle_human_losses(&mut events);
         self.handle_player_shot_hits(&mut events);
@@ -345,6 +346,44 @@ impl World {
         }
 
         events
+    }
+
+    fn spawn_enemy_fire(
+        &mut self,
+        max_x: i32,
+        min_y: i32,
+        max_y: i32,
+        events: &mut Vec<WorldEvent>,
+    ) {
+        if !self.tick.is_multiple_of(5) {
+            return;
+        }
+
+        let Some(player_position) = self.player_position() else {
+            return;
+        };
+
+        let Some(enemy) = self
+            .entities
+            .iter()
+            .filter(|entity| entity.kind.is_enemy())
+            .min_by_key(|entity| (entity.position.x - player_position.x).abs())
+            .cloned()
+        else {
+            return;
+        };
+
+        let dx = if enemy.position.x >= player_position.x {
+            -1
+        } else {
+            1
+        };
+        let dy = (player_position.y - enemy.position.y).signum();
+        let shot_x = (enemy.position.x + dx).clamp(0, max_x);
+        let shot_y = (enemy.position.y + dy).clamp(min_y, max_y);
+        self.entities
+            .push(Entity::new(EntityKind::EnemyShot, shot_x, shot_y, dx, dy));
+        events.push(WorldEvent::EnemyFired);
     }
 
     fn handle_human_losses(&mut self, events: &mut Vec<WorldEvent>) {
@@ -378,15 +417,17 @@ impl World {
                     .iter()
                     .enumerate()
                     .find(|(enemy_index, entity)| {
-                        entity.kind.is_enemy()
+                        (entity.kind.is_enemy() || entity.kind == EntityKind::EnemyShot)
                             && !remove_indices_set.contains(enemy_index)
                             && positions_overlap(shot.position, entity.position, 1, 0)
                     })
             {
                 remove_indices_set.push(shot_index);
                 remove_indices_set.push(enemy_index);
-                score_delta += score_for_enemy(enemy.kind);
-                events.push(WorldEvent::EnemyDestroyed);
+                if enemy.kind.is_enemy() {
+                    score_delta += score_for_enemy(enemy.kind);
+                    events.push(WorldEvent::EnemyDestroyed);
+                }
             }
         }
 
@@ -406,7 +447,15 @@ impl World {
 
         let mut collided_enemies = Vec::new();
         for (index, enemy) in self.entities.iter().enumerate() {
-            if enemy.kind.is_enemy() && positions_overlap(player_position, enemy.position, 1, 1) {
+            let collision = match enemy.kind {
+                EntityKind::Lander | EntityKind::Mutant => {
+                    positions_overlap(player_position, enemy.position, 1, 1)
+                }
+                EntityKind::EnemyShot => positions_overlap(player_position, enemy.position, 0, 0),
+                _ => false,
+            };
+
+            if collision {
                 collided_enemies.push(index);
             }
         }
@@ -437,6 +486,23 @@ impl World {
             player.position.x = PLAYER_START_X;
             player.position.y = PLAYER_START_Y;
         }
+    }
+
+    fn player_position(&self) -> Option<Position> {
+        self.entities
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .map(|entity| entity.position)
+    }
+
+    fn retain_projectiles(&mut self, max_x: i32, min_y: i32, max_y: i32) {
+        self.entities.retain(|entity| match entity.kind {
+            EntityKind::PlayerShot | EntityKind::EnemyShot => {
+                (0..=max_x).contains(&entity.position.x)
+                    && (min_y..=max_y).contains(&entity.position.y)
+            }
+            _ => true,
+        });
     }
 
     fn spawn_wave(&mut self) {
@@ -612,6 +678,31 @@ mod tests {
     }
 
     #[test]
+    fn live_step_spawns_enemy_shots_on_the_fire_tick() {
+        let mut world = World::with_entities(
+            20,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 12, 3, 0, 0),
+            ],
+        );
+
+        let mut events = Vec::new();
+        for _ in 0..5 {
+            events = world.step_live(UpdateInput::default());
+        }
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 1);
+        assert!(events.contains(&WorldEvent::EnemyFired));
+    }
+
+    #[test]
     fn live_step_scores_when_a_shot_hits_an_enemy() {
         let mut world = World::with_entities(
             12,
@@ -659,6 +750,51 @@ mod tests {
 
         assert_eq!(world.human_count(), 0);
         assert!(events.contains(&WorldEvent::HumanLost));
+    }
+
+    #[test]
+    fn live_step_enemy_shots_can_hit_the_player() {
+        let mut world = World::with_entities(
+            12,
+            8,
+            Status {
+                score: 0,
+                lives: 1,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 3, 3, 0, 0),
+                Entity::new(EntityKind::EnemyShot, 2, 3, 1, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.status().lives, 0);
+        assert!(world.is_game_over());
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+        assert!(events.contains(&WorldEvent::PlayerHit));
+        assert!(events.contains(&WorldEvent::GameOver));
+    }
+
+    #[test]
+    fn live_step_removes_enemy_shots_when_they_leave_the_world() {
+        let mut world = World::with_entities(
+            12,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 3, 3, 0, 0),
+                Entity::new(EntityKind::EnemyShot, 0, 3, -1, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
     }
 
     #[test]
