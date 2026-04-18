@@ -112,8 +112,8 @@ mod tests {
     fn gameplay_demo_cycle_changes_entity_counts() {
         let cycle = gameplay_demo_cycle();
 
-        assert_eq!(cycle[0].world.enemy_count(), 2);
-        assert_eq!(cycle[2].world.enemy_count(), 1);
+        assert_eq!(cycle[0].world.enemy_count(), 5);
+        assert_eq!(cycle[2].world.enemy_count(), 4);
         assert_eq!(cycle[3].world.human_count(), 3);
         assert_eq!(cycle[5].world.human_count(), 2);
     }

@@ -214,6 +214,16 @@ impl World {
         let terrain = build_scrolling_terrain(WORLD_SPAN, WORLD_HEIGHT);
         let human0_y = terrain_surface_y(&terrain, 8);
         let human1_y = terrain_surface_y(&terrain, 30);
+        let mut entities = vec![Entity::new(
+            EntityKind::PlayerShip,
+            PLAYER_START_X,
+            PLAYER_START_Y,
+            0,
+            0,
+        )];
+        entities.extend(default_attack_wave_landers(WORLD_SPAN as i32, DEFAULT_WAVE));
+        entities.push(Entity::new(EntityKind::Human, 8, human0_y, 0, 0));
+        entities.push(Entity::new(EntityKind::Human, 30, human1_y, 0, 0));
         Self {
             width: WORLD_WIDTH,
             height: WORLD_HEIGHT,
@@ -233,13 +243,7 @@ impl World {
                 wave: DEFAULT_WAVE,
             },
             terrain,
-            entities: vec![
-                Entity::new(EntityKind::PlayerShip, PLAYER_START_X, PLAYER_START_Y, 0, 0),
-                Entity::new(EntityKind::Lander, 36, 4, -1, 1),
-                Entity::new(EntityKind::Mutant, 22, 9, 1, -1),
-                Entity::new(EntityKind::Human, 8, human0_y, 0, 0),
-                Entity::new(EntityKind::Human, 30, human1_y, 0, 0),
-            ],
+            entities,
         }
     }
 
@@ -1626,19 +1630,13 @@ impl World {
 
     fn spawn_wave(&mut self) {
         let width = self.world_span;
-        let base_y = 3 + (self.status.wave as i32 % 4);
-        let wave = self.status.wave as i32;
         let bomber_origin = self
             .player_position()
             .map(|player| wrap_coordinate(player.x + width / 2, width - 1))
             .unwrap_or(width / 2);
-        let mut enemies = vec![
-            Entity::new(EntityKind::Lander, width - 12, base_y, -1, 1),
-            Entity::new(EntityKind::Mutant, 18 + (wave % 8), 8, 1, -1),
-        ];
+        let mut enemies = default_attack_wave_landers(width, self.status.wave);
 
         if self.status.wave >= 2 {
-            enemies.push(Entity::new(EntityKind::Lander, width - 6, 6, -1, 1));
             enemies.push(Entity::new(
                 EntityKind::Bomber,
                 bomber_origin,
@@ -1649,7 +1647,6 @@ impl World {
             ));
         }
         if self.status.wave >= 3 {
-            enemies.push(Entity::new(EntityKind::Mutant, 8, 4, 1, 1));
             let second_bomber_x = wrap_coordinate(bomber_origin + 10, width - 1);
             enemies.push(Entity::new(
                 EntityKind::Bomber,
@@ -1849,6 +1846,21 @@ fn next_stock_award_score(score: u32) -> u32 {
         .saturating_mul(BONUS_STOCK_SCORE)
 }
 
+fn default_attack_wave_landers(world_span: i32, wave: u8) -> Vec<Entity> {
+    let max_x = world_span - 1;
+    let wave_offset = i32::from(wave % 6);
+    [
+        (world_span - 12, 3 + wave_offset % 3, -1, 1),
+        (world_span - 6, 6, -1, 1),
+        (18 + wave_offset, 8, 1, -1),
+        (world_span / 2 + 8, 4, -1, 1),
+        (world_span / 2 - 10, 7, 1, -1),
+    ]
+    .into_iter()
+    .map(|(x, y, dx, dy)| Entity::new(EntityKind::Lander, wrap_coordinate(x, max_x), y, dx, dy))
+    .collect()
+}
+
 fn remove_indices(entities: &mut Vec<Entity>, indices: &[usize]) {
     let mut sorted = indices.to_vec();
     sorted.sort_unstable();
@@ -1875,7 +1887,9 @@ mod tests {
         let world = World::bootstrap();
 
         assert!(world.world_span() > world.width() as i32);
-        assert_eq!(world.enemy_count(), 2);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 5);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 0);
+        assert_eq!(world.enemy_count(), 5);
         assert_eq!(world.human_count(), 2);
         assert_eq!(world.status().lives, 3);
         assert_eq!(world.entities()[0].kind, EntityKind::PlayerShip);
@@ -1979,7 +1993,7 @@ mod tests {
         assert_eq!(world.status().wave, 2);
         assert_eq!(world.status().lives, 2);
         assert_eq!(world.smart_bombs(), 1);
-        assert_eq!(world.enemy_count(), 1);
+        assert_eq!(world.enemy_count(), 4);
         assert_eq!(world.human_count(), 3);
     }
 
@@ -3070,7 +3084,7 @@ mod tests {
     }
 
     #[test]
-    fn wave_two_and_later_add_bombers_and_pods_on_arcade_like_schedule() {
+    fn wave_two_and_later_add_arcade_like_wave_openers() {
         let mut wave_two = World::with_entities(
             64,
             12,
@@ -3082,6 +3096,8 @@ mod tests {
             vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
         );
         wave_two.spawn_wave();
+        assert_eq!(wave_two.entity_count_by_kind(EntityKind::Lander), 5);
+        assert_eq!(wave_two.entity_count_by_kind(EntityKind::Mutant), 0);
         assert_eq!(wave_two.entity_count_by_kind(EntityKind::Bomber), 1);
         assert_eq!(wave_two.entity_count_by_kind(EntityKind::Pod), 1);
 
@@ -3096,6 +3112,8 @@ mod tests {
             vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
         );
         wave_three.spawn_wave();
+        assert_eq!(wave_three.entity_count_by_kind(EntityKind::Lander), 5);
+        assert_eq!(wave_three.entity_count_by_kind(EntityKind::Mutant), 0);
         assert_eq!(wave_three.entity_count_by_kind(EntityKind::Bomber), 2);
         assert_eq!(wave_three.entity_count_by_kind(EntityKind::Pod), 3);
 
@@ -3110,6 +3128,7 @@ mod tests {
             vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
         );
         wave_four.spawn_wave();
+        assert_eq!(wave_four.entity_count_by_kind(EntityKind::Lander), 5);
         assert_eq!(wave_four.entity_count_by_kind(EntityKind::Bomber), 2);
         assert_eq!(wave_four.entity_count_by_kind(EntityKind::Pod), 4);
 
@@ -3124,6 +3143,7 @@ mod tests {
             vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
         );
         wave_five.spawn_wave();
+        assert_eq!(wave_five.entity_count_by_kind(EntityKind::Lander), 5);
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Bomber), 3);
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Pod), 4);
     }

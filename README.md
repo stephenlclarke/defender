@@ -132,8 +132,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   toggle that only shoots when the current firing lane has a direct alien kill,
   plus pod waves that now start on wave two and ramp up to four ships by wave
   four, release deterministic five-to-seven swarmer bursts when shot, and
-  preserve the classic follow-from-behind swarmer counterplay, a full-width
-  radar scanner strip that compresses the wrapped world into the top HUD,
+  preserve the classic follow-from-behind swarmer counterplay, with opening
+  attack waves now led by five landers before later-wave bombers and pods layer
+  on top, a full-width radar scanner strip that compresses the wrapped world
+  into the top HUD,
   bomber waves that arrive from wave two onward and leave persistent mine
   trails that normal smart bombs do not clear, smart bombs that now only
   destroy enemies on the main screen instead of globally in normal play, with
@@ -216,7 +218,7 @@ the final runtime self-contained:
   bomb award behavior.
 - <https://strategywiki.org/wiki/Defender/Gameplay>: gameplay reference used to
   cross-check live enemy and humanoid behavior against the original arcade
-  rules.
+  rules, including opening five-lander attack waves and later pod scheduling.
 - <https://strategywiki.org/wiki/Defender/Walkthrough>: rescue-strategy and
   scoring reference used for the current `500` catch / `500` return humanoid
   rescue implementation.
