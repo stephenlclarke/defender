@@ -385,7 +385,7 @@ mod tests {
         let mut tracker = InputTracker::default();
         let mut input = PolledInput::default();
 
-        for key in ['x', 'y', 'z', 'z', 'y', 'i'] {
+        for key in ['x', 'y', 'z', 'z', 'y', 'g'] {
             tracker.handle_key_event(
                 KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE),
                 &mut input,
@@ -394,7 +394,7 @@ mod tests {
 
         assert_eq!(
             input.session.typed_chars,
-            vec!['x', 'y', 'z', 'z', 'y', 'i']
+            vec!['x', 'y', 'z', 'z', 'y', 'g']
         );
     }
 

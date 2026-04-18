@@ -102,7 +102,7 @@ invincibility toggle back to its default state.
 
 Extra keys while `xyzzy` mode is active:
 
-- `i`: toggle invincibility. While active, the player cannot be killed by
+- `g`: toggle god mode. While active, the player cannot be killed by
   enemy fire or direct enemy collisions, and smart bombs become unlimited.
 
 ## Current Notes
@@ -121,7 +121,7 @@ Extra keys while `xyzzy` mode is active:
 - `defender --play-live` now runs a real text-mode play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human losses, game-over handling,
-  restart support, and an `xyzzy`/`i` secret god-mode path on top of the same
+  restart support, and an `xyzzy`/`g` secret god-mode path on top of the same
   native Rust world model.
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
