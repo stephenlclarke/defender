@@ -114,7 +114,8 @@ Extra keys while `xyzzy` mode is active:
   wiped out, persistent five-entry high-score tracking with initials entry,
   active lander pursuit of free humans, mutant pursuit of the player, and an
   arcade-style facing model where `Space` flips the ship direction while
-  `Shift` thrust and `Enter` fire follow the current heading,
+  `Shift` thrust and `Enter` fire follow the current heading, with horizontal
+  momentum preserved until you counter-thrust,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret god-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
@@ -188,6 +189,9 @@ the final runtime self-contained:
 - <https://www.mamechannel.it/files_free/arcade_manuals_unpacked/defenderw.pdf>:
   Defender operations manual used to confirm that `Reverse` flips ship
   direction while `Thrust` controls forward movement.
+- <https://www.digitpress.com/reviews/defender.htm>: secondary gameplay
+  reference used to model Defender's reverse-with-inertia handling, where the
+  ship keeps its current momentum until thrust changes it.
 - <https://www.andysarcade.net/personal/defcolours/index.htm>: cabinet colour
   and palette reference for later presentation work.
 - <https://mdk.cab/game/defender>: artwork, screenshots, and general cabinet

@@ -9,6 +9,7 @@ const HUMAN_CATCH_SCORE: u32 = 500;
 const HUMAN_LANDING_SCORE: u16 = 500;
 const BONUS_STOCK_SCORE: u32 = 10_000;
 const MAX_WAVE_HUMANOID_BONUS: u32 = 500;
+const PLAYER_MAX_SPEED: i32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
@@ -446,9 +447,12 @@ impl World {
                 .iter_mut()
                 .find(|entity| entity.kind == EntityKind::PlayerShip)
             {
-                let dx = if input.thrust { facing.step() } else { 0 };
+                if input.thrust {
+                    player.velocity.dx =
+                        (player.velocity.dx + facing.step()).clamp(-PLAYER_MAX_SPEED, PLAYER_MAX_SPEED);
+                }
                 let dy = input.down as i32 - input.up as i32;
-                player.position.x = wrap_coordinate(player.position.x + dx, max_x);
+                player.position.x = wrap_coordinate(player.position.x + player.velocity.dx, max_x);
                 player.position.y = (player.position.y + dy).clamp(min_y, max_y);
                 player.position.y = player
                     .position
@@ -849,6 +853,8 @@ impl World {
         {
             player.position.x = PLAYER_START_X;
             player.position.y = PLAYER_START_Y.min(terrain_surface_y(terrain, PLAYER_START_X));
+            player.velocity.dx = 0;
+            player.velocity.dy = 0;
         }
         self.player_facing = HorizontalDirection::Right;
         self.sync_camera_to_player();
@@ -1508,6 +1514,54 @@ mod tests {
     }
 
     #[test]
+    fn reverse_preserves_player_momentum_until_counter_thrust() {
+        let mut world = World::with_entities(
+            16,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 6, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 14, 1, 0, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput {
+            thrust: true,
+            ..UpdateInput::default()
+        });
+        world.step_live(UpdateInput {
+            reverse: true,
+            ..UpdateInput::default()
+        });
+
+        let drifting_player = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player");
+        assert_eq!(world.player_facing(), HorizontalDirection::Left);
+        assert_eq!(drifting_player.position.x, 8);
+        assert_eq!(drifting_player.velocity.dx, 1);
+
+        world.step_live(UpdateInput {
+            thrust: true,
+            ..UpdateInput::default()
+        });
+
+        let braked_player = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player");
+        assert_eq!(braked_player.position.x, 8);
+        assert_eq!(braked_player.velocity.dx, 0);
+    }
+
+    #[test]
     fn live_step_wraps_player_and_recenters_the_camera() {
         let mut world = World::bootstrap();
         let world_max_x = world.world_span() - 1;
@@ -2012,7 +2066,7 @@ mod tests {
             .find(|entity| entity.kind == EntityKind::Human)
             .expect("landed human");
         assert_eq!(landed_human.state, EntityState::Normal);
-        assert_eq!(landed_human.position.x, 7);
+        assert_eq!(landed_human.position.x, 8);
         assert_eq!(
             landed_human.position.y,
             world.safe_altitude_at_world_x(landed_human.position.x)
