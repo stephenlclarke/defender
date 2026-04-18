@@ -99,8 +99,9 @@ Extra keys while `xyzzy` mode is active:
 - `H`: hyperspace becomes safe and cannot destroy the player ship while
   `xyzzy` mode is active, and the rematerialization point is chosen as far away
   from enemies as possible.
-- `G`: toggle god mode. While active, the player cannot be killed by
-  enemy fire or direct enemy collisions.
+- `G`: toggle god mode. While active, enemy fire cannot kill the player, and
+  ramming an enemy destroys it and awards its normal score instead of costing a
+  ship.
 
 ## Current Notes
 
@@ -134,7 +135,9 @@ Extra keys while `xyzzy` mode is active:
   extending the bomb to clear on-screen bullets and mines too, and baiters that
   beam in when a wave drags on so cleanup is no longer risk-free, plus
   arcade-style collision scoring where ramming enemies still awards their
-  normal value and dying on bullets or mines still grants `25` points,
+  normal value and dying on bullets or mines still grants `25` points, while
+  `G` god mode turns direct enemy crashes into safe kills that still pay their
+  normal value,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile

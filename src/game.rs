@@ -3303,6 +3303,36 @@ mod tests {
     }
 
     #[test]
+    fn invincible_live_step_ramming_enemy_destroys_it_and_awards_score() {
+        let mut world = World::with_entities(
+            12,
+            8,
+            Status {
+                score: 0,
+                lives: 2,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 3, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 2, 3, 0, 0),
+                Entity::with_state(EntityKind::Human, 1, 1, 0, 0, EntityState::Abducted),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput {
+            invincible: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.status().lives, 2);
+        assert!(!world.is_game_over());
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
+        assert_eq!(world.status().score, 150);
+        assert!(events.contains(&WorldEvent::EnemyDestroyed));
+        assert!(!events.contains(&WorldEvent::PlayerHit));
+    }
+
+    #[test]
     fn xyzzy_mode_allows_unlimited_smart_bombs_and_clears_bullets_and_mines() {
         let mut world = World::with_entities(
             16,
