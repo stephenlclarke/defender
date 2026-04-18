@@ -126,8 +126,10 @@ Extra keys while `xyzzy` mode is active:
   `xyzzy` mode and a separate `G` invincibility toggle, plus later-wave pods
   that burst into swarmer packs when shot and swarmer pursuit behavior that
   preserves the classic follow-from-behind counterplay, a full-width radar
-  scanner strip that compresses the wrapped world into the top HUD, and baiters
-  that beam in when a wave drags on so cleanup is no longer risk-free,
+  scanner strip that compresses the wrapped world into the top HUD, bomber
+  waves that arrive from wave two onward and leave persistent mine trails that
+  smart bombs do not clear, and baiters that beam in when a wave drags on so
+  cleanup is no longer risk-free,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
@@ -205,11 +207,15 @@ the final runtime self-contained:
   reference used to model Defender's reverse-with-inertia handling, where the
   ship keeps its current momentum until thrust changes it.
 - <https://www.dougmahugh.com/defender-chapter02/>: control-analysis reference
-  used for hyperspace risk, stopped re-entry speed, and direction changes on
-  rematerialization.
+  used for hyperspace risk, stopped re-entry speed, direction changes on
+  rematerialization, and the rule that smart bombs do not clear bullets or
+  bomber minefields.
 - <https://www.dougmahugh.com/defender-chapter05/>: swarmer-behavior reference
   used to model pod bursts, delayed swarmer turnback, and the follow-from-
   behind movement pattern.
+- <https://www.dougmahugh.com/defender-chapter06/>: bomber-behavior reference
+  used to model wave-two bomber introduction, altitude-triggered speed boosts,
+  and the persistent mine trails they leave behind.
 - <https://www.dougmahugh.com/defender-chapter07/>: baiter-behavior reference
   used to model wave-delay baiter pressure and relative pursuit behavior.
 - <https://www.andysarcade.net/personal/defcolours/index.htm>: cabinet colour

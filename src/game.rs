@@ -12,11 +12,15 @@ const MAX_WAVE_HUMANOID_BONUS: u32 = 500;
 const PLAYER_MAX_SPEED: i32 = 1;
 const SWARMER_SPEED: i32 = 2;
 const BAITER_SPEED: i32 = 2;
+const BOMBER_BASE_SPEED: i32 = 1;
+const BOMBER_EVASIVE_SPEED: i32 = 2;
 const MAX_BAITERS: usize = 4;
 const BAITER_BASE_DELAY: u32 = 40;
 const BAITER_REPEAT_DELAY: u32 = 20;
 const POD_SWARMER_BURST: usize = 4;
 const MAX_SWARMERS: usize = 20;
+const BOMBER_MINE_DROP_DELAY: u32 = 3;
+const MAX_MINES: usize = 24;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
@@ -26,8 +30,10 @@ pub enum EntityKind {
     Lander,
     Mutant,
     Baiter,
+    Bomber,
     Pod,
     Swarmer,
+    Mine,
     Human,
 }
 
@@ -40,8 +46,10 @@ impl EntityKind {
             Self::Lander => 'L',
             Self::Mutant => 'M',
             Self::Baiter => 'B',
+            Self::Bomber => 'V',
             Self::Pod => 'P',
             Self::Swarmer => 'S',
+            Self::Mine => 'x',
             Self::Human => 'h',
         }
     }
@@ -49,7 +57,7 @@ impl EntityKind {
     pub fn is_enemy(self) -> bool {
         matches!(
             self,
-            Self::Lander | Self::Mutant | Self::Baiter | Self::Pod | Self::Swarmer
+            Self::Lander | Self::Mutant | Self::Baiter | Self::Bomber | Self::Pod | Self::Swarmer
         )
     }
 
@@ -282,6 +290,7 @@ impl World {
                 EntityKind::Lander
                 | EntityKind::Mutant
                 | EntityKind::Baiter
+                | EntityKind::Bomber
                 | EntityKind::Pod
                 | EntityKind::Swarmer => {
                     entity.position.x =
@@ -298,6 +307,7 @@ impl World {
                     entity.position.x += entity.velocity.dx;
                     entity.position.y += entity.velocity.dy;
                 }
+                EntityKind::Mine => {}
             }
         }
 
@@ -415,9 +425,10 @@ impl World {
 
         self.entities
             .iter()
-            .filter(|entity| entity.kind.is_enemy())
+            .filter(|entity| entity.kind.is_enemy() || entity.kind == EntityKind::Mine)
             .filter(|entity| {
-                entity.position.y >= self.safe_altitude_at_world_x(entity.position.x) - 3
+                entity.kind == EntityKind::Mine
+                    || entity.position.y >= self.safe_altitude_at_world_x(entity.position.x) - 3
                     || humans.iter().any(|human| {
                         (entity.position.x - human.x).abs() <= 6
                             && (entity.position.y - human.y).abs() <= 4
@@ -576,6 +587,7 @@ impl World {
                 EntityKind::Lander
                 | EntityKind::Mutant
                 | EntityKind::Baiter
+                | EntityKind::Bomber
                 | EntityKind::Pod
                 | EntityKind::Swarmer => {
                     entity.position.x =
@@ -592,9 +604,11 @@ impl World {
                     entity.position.x += entity.velocity.dx;
                     entity.position.y += entity.velocity.dy;
                 }
+                EntityKind::Mine => {}
             }
         }
 
+        self.drop_bomber_mines(min_y, max_y);
         self.spawn_enemy_fire(max_x, min_y, max_y, &mut events);
         self.retain_projectiles(max_x, min_y, max_y);
 
@@ -721,6 +735,26 @@ impl World {
                     }
                     enemy.velocity.dy = (target.y - enemy.position.y).signum();
                 }
+                EntityKind::Bomber => {
+                    let target_y = player_position
+                        .map(|target| target.y)
+                        .unwrap_or(enemy.position.y);
+                    let direction = match enemy.velocity.dx.signum() {
+                        -1 | 1 => enemy.velocity.dx.signum(),
+                        _ => 1,
+                    };
+                    enemy.velocity.dx = direction
+                        * if target_y == enemy.position.y {
+                            BOMBER_EVASIVE_SPEED
+                        } else {
+                            BOMBER_BASE_SPEED
+                        };
+                    if target_y == enemy.position.y {
+                        enemy.velocity.dy = 0;
+                    } else if (self.tick + enemy.position.x as u32).is_multiple_of(3) {
+                        enemy.velocity.dy = (target_y - enemy.position.y).signum();
+                    }
+                }
                 EntityKind::Pod => {
                     if enemy.velocity.dx == 0 {
                         enemy.velocity.dx = if self.tick.is_multiple_of(2) { 1 } else { -1 };
@@ -761,6 +795,51 @@ impl World {
             enemy.velocity.dy = enemy.velocity.dy.clamp(-1, 1);
             enemy.position.y = enemy.position.y.clamp(min_y, max_y);
         }
+    }
+
+    fn drop_bomber_mines(&mut self, min_y: i32, max_y: i32) {
+        if !self.tick.is_multiple_of(BOMBER_MINE_DROP_DELAY)
+            || self.entity_count_by_kind(EntityKind::Mine) >= MAX_MINES
+        {
+            return;
+        }
+
+        let max_x = self.world_max_x();
+        let mut new_mines = Vec::new();
+
+        for bomber in self
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Bomber)
+        {
+            let mine_x = wrap_coordinate(bomber.position.x - bomber.velocity.dx.signum(), max_x);
+            let mine_position = Position {
+                x: mine_x,
+                y: bomber
+                    .position
+                    .y
+                    .clamp(min_y, self.safe_altitude_at_world_x(mine_x).min(max_y)),
+            };
+
+            let already_present =
+                self.entities.iter().any(|entity| {
+                    entity.kind == EntityKind::Mine && entity.position == mine_position
+                }) || new_mines
+                    .iter()
+                    .any(|entity: &Entity| entity.position == mine_position);
+            if !already_present {
+                new_mines.push(Entity::new(
+                    EntityKind::Mine,
+                    mine_position.x,
+                    mine_position.y,
+                    0,
+                    0,
+                ));
+            }
+        }
+
+        let available = MAX_MINES.saturating_sub(self.entity_count_by_kind(EntityKind::Mine));
+        self.entities.extend(new_mines.into_iter().take(available));
     }
 
     fn free_human_positions(&self) -> Vec<Position> {
@@ -933,8 +1012,10 @@ impl World {
                 EntityKind::Lander
                 | EntityKind::Mutant
                 | EntityKind::Baiter
+                | EntityKind::Bomber
                 | EntityKind::Pod
                 | EntityKind::Swarmer => positions_overlap(player_position, enemy.position, 1, 1),
+                EntityKind::Mine => positions_overlap(player_position, enemy.position, 0, 0),
                 EntityKind::EnemyShot => positions_overlap(player_position, enemy.position, 0, 0),
                 _ => false,
             };
@@ -953,7 +1034,16 @@ impl World {
         }
 
         if invincible {
-            let released_carriers: Vec<Position> = collided_enemies
+            let removable_collisions: Vec<usize> = collided_enemies
+                .iter()
+                .copied()
+                .filter(|index| {
+                    self.entities
+                        .get(*index)
+                        .is_some_and(|entity| entity.kind != EntityKind::Mine)
+                })
+                .collect();
+            let released_carriers: Vec<Position> = removable_collisions
                 .iter()
                 .filter_map(|index| self.entities.get(*index))
                 .filter(|entity| {
@@ -961,7 +1051,7 @@ impl World {
                 })
                 .map(|entity| entity.position)
                 .collect();
-            let score_delta = collided_enemies
+            let score_delta = removable_collisions
                 .iter()
                 .filter_map(|index| self.entities.get(*index))
                 .map(|entity| score_for_enemy(entity.kind))
@@ -969,7 +1059,7 @@ impl World {
             for carrier_position in released_carriers {
                 self.release_abducted_human_at(carrier_position);
             }
-            remove_indices(&mut self.entities, &collided_enemies);
+            remove_indices(&mut self.entities, &removable_collisions);
             self.add_score(score_delta);
             if score_delta > 0 {
                 events.push(WorldEvent::EnemyDestroyed);
@@ -1027,8 +1117,10 @@ impl World {
             EntityKind::Lander
             | EntityKind::Mutant
             | EntityKind::Baiter
+            | EntityKind::Bomber
             | EntityKind::Pod
             | EntityKind::Swarmer => positions_overlap(player_position, entity.position, 1, 1),
+            EntityKind::Mine => positions_overlap(player_position, entity.position, 0, 0),
             EntityKind::EnemyShot => positions_overlap(player_position, entity.position, 0, 0),
             _ => false,
         })
@@ -1056,8 +1148,10 @@ impl World {
             .filter(|entity| {
                 entity.kind == EntityKind::Lander
                     || entity.kind == EntityKind::Mutant
+                    || entity.kind == EntityKind::Bomber
                     || entity.kind == EntityKind::Pod
                     || entity.kind == EntityKind::Swarmer
+                    || entity.kind == EntityKind::Mine
                     || entity.kind == EntityKind::EnemyShot
             })
             .map(|entity| entity.position)
@@ -1455,6 +1549,10 @@ impl World {
         let width = self.world_span;
         let base_y = 3 + (self.status.wave as i32 % 4);
         let wave = self.status.wave as i32;
+        let bomber_origin = self
+            .player_position()
+            .map(|player| wrap_coordinate(player.x + width / 2, width - 1))
+            .unwrap_or(width / 2);
         let mut enemies = vec![
             Entity::new(EntityKind::Lander, width - 12, base_y, -1, 1),
             Entity::new(EntityKind::Mutant, 18 + (wave % 8), 8, 1, -1),
@@ -1462,13 +1560,39 @@ impl World {
 
         if self.status.wave >= 2 {
             enemies.push(Entity::new(EntityKind::Lander, width - 6, 6, -1, 1));
+            enemies.push(Entity::new(
+                EntityKind::Bomber,
+                bomber_origin,
+                self.safe_altitude_at_world_x(bomber_origin)
+                    .saturating_sub(1),
+                -BOMBER_BASE_SPEED,
+                0,
+            ));
         }
         if self.status.wave >= 3 {
             enemies.push(Entity::new(EntityKind::Mutant, 8, 4, 1, 1));
             enemies.push(Entity::new(EntityKind::Pod, width / 2, 5, -1, 1));
+            let second_bomber_x = wrap_coordinate(bomber_origin + 10, width - 1);
+            enemies.push(Entity::new(
+                EntityKind::Bomber,
+                second_bomber_x,
+                self.safe_altitude_at_world_x(second_bomber_x)
+                    .saturating_sub(1),
+                BOMBER_BASE_SPEED,
+                0,
+            ));
         }
         if self.status.wave >= 5 {
             enemies.push(Entity::new(EntityKind::Pod, width - 20, 4, 1, -1));
+            let third_bomber_x = wrap_coordinate(bomber_origin - 10, width - 1);
+            enemies.push(Entity::new(
+                EntityKind::Bomber,
+                third_bomber_x,
+                self.safe_altitude_at_world_x(third_bomber_x)
+                    .saturating_sub(1),
+                -BOMBER_BASE_SPEED,
+                0,
+            ));
         }
 
         self.entities.extend(enemies);
@@ -1610,6 +1734,7 @@ fn score_for_enemy(kind: EntityKind) -> u32 {
         EntityKind::Lander => 150,
         EntityKind::Mutant => 250,
         EntityKind::Baiter => 200,
+        EntityKind::Bomber => 250,
         EntityKind::Pod => 1_000,
         EntityKind::Swarmer => 150,
         _ => 0,
@@ -1637,9 +1762,10 @@ mod tests {
     use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS, PLAYER_START_X};
 
     use super::{
-        BAITER_BASE_DELAY, Entity, EntityKind, EntityState, HorizontalDirection, POD_SWARMER_BURST,
-        Position, SWARMER_SPEED, Status, UpdateInput, World, WorldEvent, hyperspace_result,
-        nearest_wrapped_target, shortest_wrapped_delta, wrap_coordinate,
+        BAITER_BASE_DELAY, BOMBER_EVASIVE_SPEED, Entity, EntityKind, EntityState,
+        HorizontalDirection, POD_SWARMER_BURST, Position, SWARMER_SPEED, Status, UpdateInput,
+        World, WorldEvent, hyperspace_result, nearest_wrapped_target, shortest_wrapped_delta,
+        wrap_coordinate,
     };
 
     #[test]
@@ -2083,6 +2209,65 @@ mod tests {
             .expect("baiter");
         assert_eq!(baiter.velocity.dx, -1);
         assert_eq!(baiter.position, Position { x: 11, y: 5 });
+    }
+
+    #[test]
+    fn live_step_bombers_accelerate_when_crossing_the_players_altitude() {
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0),
+                Entity::new(EntityKind::Bomber, 12, 4, -1, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let bomber = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Bomber)
+            .expect("bomber");
+        assert_eq!(bomber.velocity.dx, -BOMBER_EVASIVE_SPEED);
+        assert_eq!(bomber.position, Position { x: 10, y: 4 });
+    }
+
+    #[test]
+    fn live_step_bombers_leave_mines_that_survive_smart_bombs() {
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0),
+                Entity::new(EntityKind::Bomber, 12, 6, -1, 0),
+                Entity::with_state(EntityKind::Human, 2, 2, 0, 0, EntityState::Abducted),
+            ],
+        );
+
+        for _ in 0..3 {
+            world.step_live(UpdateInput::default());
+        }
+        assert!(world.entity_count_by_kind(EntityKind::Mine) > 0);
+
+        let events = world.step_live(UpdateInput {
+            smart_bomb: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Bomber), 0);
+        assert!(world.entity_count_by_kind(EntityKind::Mine) > 0);
+        assert!(events.contains(&WorldEvent::SmartBombDetonated));
     }
 
     #[test]
@@ -2569,6 +2754,31 @@ mod tests {
     }
 
     #[test]
+    fn live_step_mines_can_destroy_the_player() {
+        let mut world = World::with_entities(
+            12,
+            8,
+            Status {
+                score: 0,
+                lives: 1,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 3, 3, 0, 0),
+                Entity::new(EntityKind::Mine, 3, 3, 0, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.status().lives, 0);
+        assert!(world.is_game_over());
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mine), 0);
+        assert!(events.contains(&WorldEvent::PlayerHit));
+        assert!(events.contains(&WorldEvent::GameOver));
+    }
+
+    #[test]
     fn live_step_destroying_a_pod_releases_swarmers_and_scores_bonus() {
         let mut world = World::with_entities(
             20,
@@ -2694,7 +2904,21 @@ mod tests {
     }
 
     #[test]
-    fn wave_three_and_five_add_pod_enemies() {
+    fn wave_two_and_later_add_bombers_and_pods() {
+        let mut wave_two = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+        );
+        wave_two.spawn_wave();
+        assert_eq!(wave_two.entity_count_by_kind(EntityKind::Bomber), 1);
+        assert_eq!(wave_two.entity_count_by_kind(EntityKind::Pod), 0);
+
         let mut wave_three = World::with_entities(
             64,
             12,
@@ -2706,6 +2930,7 @@ mod tests {
             vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
         );
         wave_three.spawn_wave();
+        assert_eq!(wave_three.entity_count_by_kind(EntityKind::Bomber), 2);
         assert_eq!(wave_three.entity_count_by_kind(EntityKind::Pod), 1);
 
         let mut wave_five = World::with_entities(
@@ -2719,6 +2944,7 @@ mod tests {
             vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
         );
         wave_five.spawn_wave();
+        assert_eq!(wave_five.entity_count_by_kind(EntityKind::Bomber), 3);
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Pod), 2);
     }
 

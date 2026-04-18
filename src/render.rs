@@ -87,16 +87,19 @@ fn scanner_glyph(kind: crate::game::EntityKind) -> char {
         crate::game::EntityKind::Lander => 'L',
         crate::game::EntityKind::Mutant => 'M',
         crate::game::EntityKind::Baiter => 'B',
+        crate::game::EntityKind::Bomber => 'V',
         crate::game::EntityKind::Pod => 'P',
         crate::game::EntityKind::Swarmer => 'S',
+        crate::game::EntityKind::Mine => 'x',
     }
 }
 
 fn plot_scanner_glyph(cell: &mut char, glyph: char) {
     let priority = |value: char| match value {
-        '^' | '<' | '>' => 4,
-        'h' => 3,
-        'L' | 'M' | 'B' | 'P' | 'S' => 2,
+        '^' | '<' | '>' => 5,
+        'h' => 4,
+        'L' | 'M' | 'B' | 'V' | 'P' | 'S' => 3,
+        'x' => 2,
         '!' => 1,
         _ => 0,
     };
