@@ -2,6 +2,8 @@
 
 use std::sync::OnceLock;
 
+use crate::customization;
+
 const ARCADE_RULES: &str = include_str!("../assets/arcade/arcade-rules.txt");
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,7 +36,10 @@ pub struct ArcadeTables {
 
 pub fn arcade_tables() -> &'static ArcadeTables {
     static TABLES: OnceLock<ArcadeTables> = OnceLock::new();
-    TABLES.get_or_init(|| parse_arcade_tables(ARCADE_RULES))
+    TABLES.get_or_init(|| {
+        let rules = customization::load_arcade_text("arcade-rules.txt", ARCADE_RULES);
+        parse_arcade_tables(&rules)
+    })
 }
 
 fn parse_arcade_tables(text: &str) -> ArcadeTables {

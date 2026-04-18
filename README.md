@@ -263,6 +263,114 @@ the final runtime self-contained:
   used to anchor the current keyboard layout to the Acornsoft 1982 home-port
   control scheme.
 
+## Customisation
+
+Arcade tuning defaults ship in `assets/arcade/arcade-rules.txt`. To override
+them locally, copy that file to `~/.xyzzy/defender/arcade-rules.txt` and only
+include the keys you want to change. Omitted keys keep their embedded defaults.
+If `DEFENDER_DATA_DIR` is set, the game reads `arcade-rules.txt` from that
+directory instead.
+
+### `arcade-rules.txt`
+
+`safe_fall_height`
+Default: `2`
+Meaning: maximum drop height that still counts as a safe humanoid landing.
+
+`safe_fall_score`
+Default: `250`
+Meaning: rescue score awarded when an uncaught humanoid survives a safe fall.
+
+`human_catch_score`
+Default: `500`
+Meaning: score awarded when the player catches a falling humanoid.
+
+`human_landing_score`
+Default: `500`
+Meaning: score awarded when a carried humanoid is returned safely to the
+ground.
+
+`hazard_collision_score`
+Default: `25`
+Meaning: score awarded when a bullet or mine kills the player, matching the
+arcade hazard rule.
+
+`bonus_stock_score`
+Default: `10000`
+Meaning: score interval that awards an extra ship and smart bomb.
+
+`max_wave_humanoid_bonus`
+Default: `500`
+Meaning: upper cap on the end-of-wave surviving-humanoid bonus.
+
+`player_max_speed`
+Default: `1`
+Meaning: maximum horizontal thrust increment applied to the player ship.
+
+`swarmer_speed`
+Default: `2`
+Meaning: horizontal speed used by swarmer enemies.
+
+`baiter_speed`
+Default: `2`
+Meaning: horizontal speed used by baiter enemies.
+
+`bomber_base_speed`
+Default: `1`
+Meaning: normal horizontal speed used by bomber enemies.
+
+`bomber_evasive_speed`
+Default: `2`
+Meaning: faster bomber speed used when they cross the player altitude.
+
+`max_baiters`
+Default: `4`
+Meaning: maximum number of baiters allowed on-screen at once.
+
+`baiter_base_delay`
+Default: `40`
+Meaning: initial delay before baiters start appearing in a slow wave.
+
+`baiter_repeat_delay`
+Default: `20`
+Meaning: delay between additional baiter spawns while the wave stalls.
+
+`pod_swarmer_burst_min`
+Default: `5`
+Meaning: minimum number of swarmers released when a pod is destroyed.
+
+`pod_swarmer_burst_range`
+Default: `3`
+Meaning: additional swarmer burst range above the minimum.
+
+`max_swarmers`
+Default: `20`
+Meaning: maximum number of live swarmers allowed at one time.
+
+`bomber_mine_drop_delay`
+Default: `3`
+Meaning: tick delay between mine drops from a bomber.
+
+`max_mines`
+Default: `24`
+Meaning: maximum number of live bomber mines allowed at once.
+
+`attack_wave_group_size`
+Default: `5`
+Meaning: size of each staged attack-wave enemy group.
+
+`attack_wave_total_openers`
+Default: `15`
+Meaning: total number of staged opener enemies in a standard attack wave.
+
+`attack_wave_reinforcement_delay`
+Default: `18`
+Meaning: delay between staged reinforcement groups in an attack wave.
+
+`default_human_world_xs`
+Default: `8,26,44,62,80,98,116,134,152,170`
+Meaning: default world X positions for the ten starting humanoids.
+
 ## Platform Support
 
 The current build stays in plain ANSI terminal output rather than Kitty
