@@ -1,6 +1,7 @@
 //! Renders Defender scenes into RGBA frames for Kitty graphics output and README media.
 
 use crate::{
+    branding::arcade_branding,
     font::arcade_font,
     game::{Entity, EntityKind, HorizontalDirection, World},
     high_scores::{HighScoreEntry, HighScoreTable},
@@ -191,29 +192,20 @@ impl Renderer {
     }
 
     fn render_logo_screen(&mut self) {
-        self.draw_space_backdrop(0, None);
-        self.draw_centered_text(self.image_width as i32 / 2, 90, "WILLIAMS", TEXT_DANGER, 4);
-        self.draw_centered_text(
-            self.image_width as i32 / 2,
-            154,
-            "ELECTRONICS INC.",
-            TEXT_WARNING,
-            2,
+        self.fill_rect(
+            Rect {
+                x: 0,
+                y: 0,
+                width: self.image_width as i32,
+                height: self.image_height as i32,
+            },
+            Color::from_rgba(BACKGROUND),
         );
-        self.draw_centered_text(
+        self.draw_scaled_image_centered(
+            arcade_branding().logo_page(),
             self.image_width as i32 / 2,
-            214,
-            "PRESENTS",
-            TEXT_SECONDARY,
-            2,
-        );
-        self.draw_arcade_logo(self.image_width as i32 / 2, 356, 6);
-        self.draw_centered_text(
-            self.image_width as i32 / 2,
-            self.image_height as i32 - 92,
-            "COPYRIGHT 1980",
-            TEXT_SECONDARY,
-            2,
+            self.image_height as i32 / 2,
+            self.image_height as i32,
         );
     }
 
@@ -263,7 +255,7 @@ impl Renderer {
             },
             Color::from_rgba(BACKGROUND),
         );
-        self.draw_arcade_logo(self.image_width as i32 / 2, 66, 5);
+        self.draw_defender_logo(self.image_width as i32 / 2, 72, 78);
         self.draw_centered_text(
             self.image_width as i32 / 2,
             142,
@@ -751,17 +743,13 @@ impl Renderer {
         }
     }
 
-    fn draw_arcade_logo(&mut self, center_x: i32, top_y: i32, scale: i32) {
-        for depth in (1..=3).rev() {
-            self.draw_centered_text(
-                center_x + depth * scale,
-                top_y + depth * scale,
-                "DEFENDER",
-                TEXT_DANGER,
-                scale,
-            );
-        }
-        self.draw_centered_text(center_x, top_y, "DEFENDER", TEXT_WARNING, scale);
+    fn draw_defender_logo(&mut self, center_x: i32, center_y: i32, target_height: i32) {
+        self.draw_scaled_image_centered(
+            arcade_branding().defender_logo(),
+            center_x,
+            center_y,
+            target_height,
+        );
     }
 
     fn draw_secret_status(

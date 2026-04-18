@@ -4,6 +4,7 @@ pub mod app;
 pub mod arcade;
 pub mod attract;
 pub mod audio;
+pub mod branding;
 pub mod constants;
 mod customization;
 pub mod demo;

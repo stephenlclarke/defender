@@ -21,10 +21,12 @@ rendered through the Kitty graphics protocol.
 The game logic is native Rust; ROMs are treated as reference material only, and
 the app now embeds its gameplay object art as PNGs from `assets/arcade/` and
 its cue audio as WAVs from `assets/sounds/`, with the red-label text font
-bundled as `assets/arcade/font-sheet.png`, so compile and runtime do not
-depend on a local ROM or sound directory. The target is a faithful recreation
-of the original red-label arcade game, with hidden `xyzzy` extras as the
-deliberate behavior outside the original cabinet rules.
+bundled as `assets/arcade/font-sheet.png`, plus ROM-derived branding art in
+`assets/arcade/logo-page.png` and `assets/arcade/defender-logo.png`, so
+compile and runtime do not depend on a local ROM or sound directory. The
+target is a faithful recreation of the original red-label arcade game, with
+hidden `xyzzy` extras as the deliberate behavior outside the original cabinet
+rules.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -143,6 +145,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - UI and attract text now render through the embedded
   `assets/arcade/font-sheet.png` sheet built from the red-label `mess0.src`
   character tables instead of the old generic bitmap font.
+- The first attract page and the shared `DEFENDER` wordmark now come from
+  ROM-derived assets generated from the red-label `amode1.src` `LGOTAB`,
+  `DEFDAT`, and `CPRTAB` tables, embedded as
+  `assets/arcade/logo-page.png` and `assets/arcade/defender-logo.png`.
 - All current sounds are embedded in the app via bundled `assets/sounds/*.wav`
   cue files decoded by `rodio`, so the live runtime stays self-contained while
   matching the sibling repos' asset layout.
@@ -224,6 +230,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - `examples/generate_readme_media.rs` now regenerates `docs/defender.png` and
   `docs/start-sequence.gif` from the same Kitty-graphics renderer used by the
   live game and attract flow.
+- `tools/extract_rom_branding_assets.py` regenerates the embedded Williams
+  logo page, Defender wordmark, and copyright art directly from the red-label
+  source tables.
 - The title, attract legend, and hall-of-fame seed data now use the red-label
   ROM message/default tables instead of the earlier placeholder prototype
   strings.
@@ -261,8 +270,10 @@ the final runtime self-contained:
 - <https://github.com/mwenge/defender>: Motorola 6809 assembly language for the
   'Red Label' version of the game. Used for reference implementation and ROM
   layout comparison point, especially for the red-label `defend.*` program ROM
-  names and the `mess0.src` `CHRTBL` / `CHARACTERS` font tables used to build
-  the embedded `assets/arcade/font-sheet.png`.
+  names, the `mess0.src` `CHRTBL` / `CHARACTERS` font tables used to build the
+  embedded `assets/arcade/font-sheet.png`, and the `amode1.src` `LGOTAB`,
+  `DEFDAT`, and `CPRTAB` tables used to reconstruct the embedded attract-logo
+  page and `DEFENDER` wordmark assets.
 - <https://seanriddle.com/ripper.html>: Williams graphics-ripper reference used
   to confirm Defender's screen-format sprite layout and the red-label object
   sprite list/rip used to build the embedded `assets/arcade/*.png` object art.
