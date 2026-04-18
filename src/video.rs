@@ -58,6 +58,7 @@ const ATTRACT_SCORE_CARD: [AttractLegendEntry; 6] = [
 pub enum Screen<'a> {
     Logo {
         palette_phase: usize,
+        elapsed_ms: u64,
         trace_points: usize,
         show_title_text: bool,
         visible_defender_chunks: usize,
@@ -72,6 +73,7 @@ pub enum Screen<'a> {
         todays: &'a HighScoreTable,
         all_time: &'a HighScoreTable,
         palette_phase: usize,
+        elapsed_ms: u64,
     },
     Playing {
         world: &'a World,
@@ -130,6 +132,8 @@ struct AttractPalette {
     williams: [u8; 4],
     title_text: [u8; 4],
     score_text: [u8; 4],
+    defender_face: [u8; 4],
+    defender_shadow: [u8; 4],
 }
 
 impl AttractLegendEntry {
@@ -180,12 +184,14 @@ impl Renderer {
         match screen {
             Screen::Logo {
                 palette_phase,
+                elapsed_ms,
                 trace_points,
                 show_title_text,
                 visible_defender_chunks,
                 show_copyright,
             } => self.render_logo_screen(
                 palette_phase,
+                elapsed_ms,
                 trace_points,
                 show_title_text,
                 visible_defender_chunks,
@@ -200,7 +206,8 @@ impl Renderer {
                 todays,
                 all_time,
                 palette_phase,
-            } => self.render_high_scores_screen(todays, all_time, palette_phase),
+                elapsed_ms,
+            } => self.render_high_scores_screen(todays, all_time, palette_phase, elapsed_ms),
             Screen::Playing {
                 world,
                 xyzzy_active,
@@ -225,6 +232,7 @@ impl Renderer {
     fn render_logo_screen(
         &mut self,
         palette_phase: usize,
+        elapsed_ms: u64,
         trace_points: usize,
         show_title_text: bool,
         visible_defender_chunks: usize,
@@ -241,7 +249,7 @@ impl Renderer {
         );
         let branding = arcade_branding();
         let rom = attract_rom();
-        let palette = attract_palette(palette_phase);
+        let palette = attract_palette(palette_phase, elapsed_ms);
         let max_width = (self.image_width as i32 - 64).max(1);
         let max_height = (self.image_height as i32 - 24).max(1);
         let scale = (max_width as f32 / 320.0).min(max_height as f32 / 256.0);
@@ -261,11 +269,14 @@ impl Renderer {
         if full_logo_page_visible {
             // Once the ROM-driven trace and object-appearance phases have
             // completed, show the exact embedded red-label page composition.
-            self.draw_scaled_image_centered(
-                branding.logo_page(),
-                self.image_width as i32 / 2,
-                self.image_height as i32 / 2,
-                page_height,
+            self.recolor_attract_page(
+                Rect {
+                    x: page_x,
+                    y: page_y,
+                    width: page_width,
+                    height: page_height,
+                },
+                palette,
             );
             return;
         }
@@ -346,7 +357,7 @@ impl Renderer {
         revealed_score_entries: usize,
         palette_phase: usize,
     ) {
-        let palette = attract_palette(palette_phase);
+        let palette = attract_palette(palette_phase, 0);
         let strip_y = 118;
         self.draw_arcade_game_over_scanner(
             world,
@@ -394,8 +405,9 @@ impl Renderer {
         todays: &HighScoreTable,
         all_time: &HighScoreTable,
         palette_phase: usize,
+        elapsed_ms: u64,
     ) {
-        let palette = attract_palette(palette_phase);
+        let palette = attract_palette(palette_phase, elapsed_ms);
         self.fill_rect(
             Rect {
                 x: 0,
@@ -405,7 +417,7 @@ impl Renderer {
             },
             Color::from_rgba(BACKGROUND),
         );
-        self.draw_defender_logo(self.image_width as i32 / 2, 72, 78);
+        self.draw_defender_logo(self.image_width as i32 / 2, 72, 78, Some(palette));
         self.draw_centered_text(
             self.image_width as i32 / 2,
             142,
@@ -896,13 +908,31 @@ impl Renderer {
         }
     }
 
-    fn draw_defender_logo(&mut self, center_x: i32, center_y: i32, target_height: i32) {
-        self.draw_scaled_image_centered(
-            arcade_branding().defender_logo(),
-            center_x,
-            center_y,
-            target_height,
-        );
+    fn draw_defender_logo(
+        &mut self,
+        center_x: i32,
+        center_y: i32,
+        target_height: i32,
+        palette: Option<AttractPalette>,
+    ) {
+        match palette {
+            Some(palette) => self.draw_scaled_image_centered_remapped(
+                arcade_branding().defender_logo(),
+                center_x,
+                center_y,
+                target_height,
+                &[
+                    ([112, 255, 52, 255], palette.defender_face),
+                    ([255, 48, 48, 255], palette.defender_shadow),
+                ],
+            ),
+            None => self.draw_scaled_image_centered(
+                arcade_branding().defender_logo(),
+                center_x,
+                center_y,
+                target_height,
+            ),
+        }
     }
 
     fn draw_secret_status(
@@ -1083,6 +1113,72 @@ impl Renderer {
                 );
             }
         }
+    }
+
+    fn draw_scaled_image_centered_remapped(
+        &mut self,
+        image: &RenderedImage,
+        center_x: i32,
+        center_y: i32,
+        target_height: i32,
+        remap: &[([u8; 4], [u8; 4])],
+    ) {
+        if image.width == 0 || image.height == 0 {
+            return;
+        }
+
+        let target_height = target_height.max(1);
+        let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
+        let origin_x = center_x - target_width / 2;
+        let origin_y = center_y - target_height / 2;
+
+        for dy in 0..target_height {
+            let src_y = ((dy as u32) * image.height / target_height as u32).min(image.height - 1);
+            for dx in 0..target_width {
+                let src_x = ((dx as u32) * image.width / target_width as u32).min(image.width - 1);
+                let index = ((src_y * image.width + src_x) * 4) as usize;
+                let alpha = image.pixels[index + 3];
+                if alpha == 0 {
+                    continue;
+                }
+                let mut rgba = [
+                    image.pixels[index],
+                    image.pixels[index + 1],
+                    image.pixels[index + 2],
+                    alpha,
+                ];
+                if let Some((_, replacement)) = remap.iter().find(|(source, _)| {
+                    source[0] == rgba[0]
+                        && source[1] == rgba[1]
+                        && source[2] == rgba[2]
+                        && source[3] == rgba[3]
+                }) {
+                    rgba = *replacement;
+                    rgba[3] = alpha;
+                }
+                self.render_target.blend_pixel(
+                    origin_x + dx,
+                    origin_y + dy,
+                    Color(rgba[0], rgba[1], rgba[2], rgba[3]),
+                );
+            }
+        }
+    }
+
+    fn recolor_attract_page(&mut self, rect: Rect, palette: AttractPalette) {
+        let page = arcade_branding().logo_page();
+        self.draw_scaled_image_centered_remapped(
+            page,
+            rect.center_x(),
+            rect.center_y(),
+            rect.height,
+            &[
+                ([237, 42, 47, 255], palette.williams),
+                ([241, 182, 57, 255], palette.title_text),
+                ([112, 255, 52, 255], palette.defender_face),
+                ([255, 48, 48, 255], palette.defender_shadow),
+            ],
+        );
     }
 
     fn fill_rect(&mut self, rect: Rect, color: Color) {
@@ -1332,27 +1428,43 @@ fn arcade_score_row(rank: usize, entry: Option<&HighScoreEntry>) -> String {
     }
 }
 
-fn attract_palette(phase: usize) -> AttractPalette {
-    match phase % 4 {
+const ATTRACT_COLOR_CYCLE_MS: u64 = 120;
+
+fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
+    // The red-label attract path keeps the `COLR` and `TIECOL` color tasks
+    // alive while the Williams page and hall-of-fame page are on screen. The
+    // hardware color values are packed pseudo-color bytes, so the visible RGB
+    // tones here stay video-matched, but the phase advancement follows the
+    // ROM's continuously running attract color tasks instead of a static
+    // per-page palette.
+    match (phase + (elapsed_ms / ATTRACT_COLOR_CYCLE_MS) as usize) % 4 {
         0 => AttractPalette {
             williams: [255, 72, 96, 255],
             title_text: [248, 192, 64, 255],
             score_text: [84, 196, 255, 255],
+            defender_face: [112, 255, 52, 255],
+            defender_shadow: [255, 48, 48, 255],
         },
         1 => AttractPalette {
             williams: [255, 92, 112, 255],
             title_text: [248, 208, 96, 255],
             score_text: [104, 212, 255, 255],
+            defender_face: [144, 255, 80, 255],
+            defender_shadow: [255, 72, 56, 255],
         },
         2 => AttractPalette {
             williams: [255, 64, 88, 255],
             title_text: [236, 184, 56, 255],
             score_text: [76, 184, 255, 255],
+            defender_face: [96, 240, 48, 255],
+            defender_shadow: [236, 40, 72, 255],
         },
         _ => AttractPalette {
             williams: [255, 80, 104, 255],
             title_text: [255, 216, 120, 255],
             score_text: [120, 216, 255, 255],
+            defender_face: [176, 255, 96, 255],
+            defender_shadow: [255, 108, 64, 255],
         },
     }
 }
@@ -1503,5 +1615,59 @@ mod tests {
             scale_to_fit(0, 0, 1_280, 960),
             (super::LOGICAL_WIDTH, super::LOGICAL_HEIGHT)
         );
+    }
+
+    #[test]
+    fn logo_screen_palette_cycles_over_elapsed_time() {
+        let mut renderer = Renderer::with_size(960, 720);
+
+        let frame_a = renderer
+            .render(Screen::Logo {
+                palette_phase: 0,
+                elapsed_ms: 0,
+                trace_points: crate::attract_rom::WILLIAMS_TRACE_POINT_COUNT,
+                show_title_text: true,
+                visible_defender_chunks: crate::attract_rom::DEFENDER_LOGO_CHUNK_COUNT,
+                show_copyright: true,
+            })
+            .clone();
+        let frame_b = renderer
+            .render(Screen::Logo {
+                palette_phase: 0,
+                elapsed_ms: 240,
+                trace_points: crate::attract_rom::WILLIAMS_TRACE_POINT_COUNT,
+                show_title_text: true,
+                visible_defender_chunks: crate::attract_rom::DEFENDER_LOGO_CHUNK_COUNT,
+                show_copyright: true,
+            })
+            .clone();
+
+        assert_ne!(frame_a.pixels, frame_b.pixels);
+    }
+
+    #[test]
+    fn hall_of_fame_palette_cycles_over_elapsed_time() {
+        let mut renderer = Renderer::with_size(960, 720);
+        let todays = HighScoreTable::default();
+        let all_time = HighScoreTable::default();
+
+        let frame_a = renderer
+            .render(Screen::HighScores {
+                todays: &todays,
+                all_time: &all_time,
+                palette_phase: 0,
+                elapsed_ms: 0,
+            })
+            .clone();
+        let frame_b = renderer
+            .render(Screen::HighScores {
+                todays: &todays,
+                all_time: &all_time,
+                palette_phase: 0,
+                elapsed_ms: 240,
+            })
+            .clone();
+
+        assert_ne!(frame_a.pixels, frame_b.pixels);
     }
 }

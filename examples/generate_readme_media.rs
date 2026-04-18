@@ -32,7 +32,7 @@ const TRAFFIC_YELLOW: [u8; 4] = [254, 188, 46, 255];
 const TRAFFIC_GREEN: [u8; 4] = [40, 200, 64, 255];
 const GHOST_BADGE: [u8; 4] = [240, 240, 248, 255];
 const GHOST_EYE: [u8; 4] = [18, 18, 26, 255];
-const README_GIF_SAMPLE_MS: u64 = 300;
+const README_GIF_SAMPLE_MS: u64 = 120;
 const README_GIF_REALTIME_PERCENT: u64 = 40;
 const README_GIF_MIN_DELAY_CS: u16 = 4;
 
@@ -114,6 +114,7 @@ fn render_attract_sample(
         defender::attract::SceneKind::Logo => renderer
             .render(Screen::Logo {
                 palette_phase: beat.palette_phase,
+                elapsed_ms,
                 trace_points: beat.logo_trace_points,
                 show_title_text: beat.logo_show_title_text,
                 visible_defender_chunks: beat.logo_visible_defender_chunks,
@@ -139,6 +140,7 @@ fn render_attract_sample(
                 todays,
                 all_time,
                 palette_phase: beat.palette_phase,
+                elapsed_ms,
             })
             .clone(),
     }

@@ -153,6 +153,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `DEFDAT` tables directly in Rust, so the opening page traces the Williams
   script and materializes the `DEFENDER` wordmark from ROM-derived data before
   falling back to the exact embedded page asset for the held frame.
+- The first attract-page and hall-of-fame screens now keep a live
+  elapsed-time colour cycle running during the first `16` seconds of the
+  cabinet sequence, matching the flashing/cycling behaviour visible in the
+  original attract-mode capture instead of holding a fixed palette per beat.
 - All current sounds are embedded in the app via bundled `assets/sounds/*.wav`
   cue files decoded by `rodio`, so the live runtime stays self-contained while
   matching the sibling repos' asset layout.
@@ -236,8 +240,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   coverage report as CI and then runs `sonar-scanner` when `SONAR_TOKEN` is set.
 - `examples/generate_readme_media.rs` now regenerates `docs/defender.png` and
   `docs/start-sequence.gif` from the same Kitty-graphics renderer used by the
-  live game and attract flow, with the README GIF time-sampled and sped up so
-  the attract sequence reads smoothly in the page.
+  live game and attract flow, with the README GIF sampled fast enough to keep
+  the opening attract colour cycling visible while still reading smoothly in
+  the page.
 - `tools/extract_rom_branding_assets.py` regenerates the embedded Williams
   logo page, Defender wordmark, and copyright art directly from the red-label
   source tables.

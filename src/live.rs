@@ -146,6 +146,7 @@ fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) ->
     match beat.kind {
         SceneKind::Logo => renderer.render(Screen::Logo {
             palette_phase: beat.palette_phase,
+            elapsed_ms: attract_elapsed_ms_for_session(session),
             trace_points: beat.logo_trace_points,
             show_title_text: beat.logo_show_title_text,
             visible_defender_chunks: beat.logo_visible_defender_chunks,
@@ -166,15 +167,19 @@ fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) ->
             todays: session.todays_high_scores(),
             all_time: session.high_scores(),
             palette_phase: beat.palette_phase,
+            elapsed_ms: attract_elapsed_ms_for_session(session),
         }),
     }
 }
 
 fn title_beat_for_session(session: &SessionState) -> AttractBeat {
-    let attract_elapsed_ms = session
+    beat_for_elapsed_ms(attract_elapsed_ms_for_session(session))
+}
+
+fn attract_elapsed_ms_for_session(session: &SessionState) -> u64 {
+    session
         .title_ticks()
-        .saturating_mul(FRAME_DURATION.as_millis() as u64);
-    beat_for_elapsed_ms(attract_elapsed_ms)
+        .saturating_mul(FRAME_DURATION.as_millis() as u64)
 }
 
 fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
