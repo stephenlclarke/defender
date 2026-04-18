@@ -1,32 +1,8 @@
+use crate::arcade::arcade_tables;
 use crate::constants::{
     DEFAULT_LIVES, DEFAULT_SMART_BOMBS, DEFAULT_WAVE, GROUND_ROW, PLAYER_START_X, PLAYER_START_Y,
     WORLD_HEIGHT, WORLD_SPAN, WORLD_WIDTH,
 };
-
-const SAFE_FALL_HEIGHT: i32 = 2;
-const SAFE_FALL_SCORE: u16 = 250;
-const HUMAN_CATCH_SCORE: u32 = 500;
-const HUMAN_LANDING_SCORE: u16 = 500;
-const HAZARD_COLLISION_SCORE: u32 = 25;
-const BONUS_STOCK_SCORE: u32 = 10_000;
-const MAX_WAVE_HUMANOID_BONUS: u32 = 500;
-const PLAYER_MAX_SPEED: i32 = 1;
-const SWARMER_SPEED: i32 = 2;
-const BAITER_SPEED: i32 = 2;
-const BOMBER_BASE_SPEED: i32 = 1;
-const BOMBER_EVASIVE_SPEED: i32 = 2;
-const MAX_BAITERS: usize = 4;
-const BAITER_BASE_DELAY: u32 = 40;
-const BAITER_REPEAT_DELAY: u32 = 20;
-const POD_SWARMER_BURST_MIN: usize = 5;
-const POD_SWARMER_BURST_RANGE: usize = 3;
-const MAX_SWARMERS: usize = 20;
-const BOMBER_MINE_DROP_DELAY: u32 = 3;
-const MAX_MINES: usize = 24;
-const ATTACK_WAVE_GROUP_SIZE: u8 = 5;
-const ATTACK_WAVE_TOTAL_OPENERS: u8 = 15;
-const ATTACK_WAVE_REINFORCEMENT_DELAY: u32 = 18;
-const DEFAULT_HUMAN_WORLD_XS: [i32; 10] = [8, 26, 44, 62, 80, 98, 116, 134, 152, 170];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
@@ -233,6 +209,7 @@ impl World {
             0,
         ));
         entities.extend(default_humans(&terrain));
+        let tables = arcade_tables();
         Self {
             width: WORLD_WIDTH,
             height: WORLD_HEIGHT,
@@ -245,9 +222,9 @@ impl World {
             smart_bombs: DEFAULT_SMART_BOMBS,
             wave_started_at: 0,
             last_baiter_tick: 0,
-            pending_wave_openers: ATTACK_WAVE_TOTAL_OPENERS - ATTACK_WAVE_GROUP_SIZE,
+            pending_wave_openers: tables.attack_wave_total_openers - tables.attack_wave_group_size,
             spawned_wave_opener_groups: 1,
-            next_wave_reinforcement_tick: ATTACK_WAVE_REINFORCEMENT_DELAY,
+            next_wave_reinforcement_tick: tables.attack_wave_reinforcement_delay,
             game_over: false,
             status: Status {
                 score: 0,
@@ -466,11 +443,14 @@ impl World {
     }
 
     pub fn add_score(&mut self, delta: u32) {
+        let tables = arcade_tables();
         self.status.score = self.status.score.saturating_add(delta);
         while self.status.score >= self.next_stock_award {
             self.status.lives = self.status.lives.saturating_add(1);
             self.smart_bombs = self.smart_bombs.saturating_add(1);
-            self.next_stock_award = self.next_stock_award.saturating_add(BONUS_STOCK_SCORE);
+            self.next_stock_award = self
+                .next_stock_award
+                .saturating_add(tables.bonus_stock_score);
         }
     }
 
@@ -564,8 +544,9 @@ impl World {
                     }
                 } else {
                     if input.thrust {
+                        let tables = arcade_tables();
                         player.velocity.dx = (player.velocity.dx + self.player_facing.step())
-                            .clamp(-PLAYER_MAX_SPEED, PLAYER_MAX_SPEED);
+                            .clamp(-tables.player_max_speed, tables.player_max_speed);
                     }
                     player.position.x =
                         wrap_coordinate(player.position.x + player.velocity.dx, max_x);
@@ -754,23 +735,25 @@ impl World {
                     }
                 }
                 EntityKind::Baiter => {
+                    let tables = arcade_tables();
                     let target = player_position.unwrap_or(enemy.position);
                     let relative_dx =
                         wrapped_horizontal_step(enemy.position.x, target.x, world_max_x)
-                            * BAITER_SPEED;
+                            * tables.baiter_speed;
                     let inherited_dx = player_velocity.map(|velocity| velocity.dx).unwrap_or(0);
-                    enemy.velocity.dx =
-                        (inherited_dx + relative_dx).clamp(-(BAITER_SPEED + 1), BAITER_SPEED + 1);
+                    enemy.velocity.dx = (inherited_dx + relative_dx)
+                        .clamp(-(tables.baiter_speed + 1), tables.baiter_speed + 1);
                     if enemy.velocity.dx == 0 {
                         enemy.velocity.dx = if self.tick.is_multiple_of(2) {
-                            BAITER_SPEED
+                            tables.baiter_speed
                         } else {
-                            -BAITER_SPEED
+                            -tables.baiter_speed
                         };
                     }
                     enemy.velocity.dy = (target.y - enemy.position.y).signum();
                 }
                 EntityKind::Bomber => {
+                    let tables = arcade_tables();
                     let target_y = player_position
                         .map(|target| target.y)
                         .unwrap_or(enemy.position.y);
@@ -780,9 +763,9 @@ impl World {
                     };
                     enemy.velocity.dx = direction
                         * if target_y == enemy.position.y {
-                            BOMBER_EVASIVE_SPEED
+                            tables.bomber_evasive_speed
                         } else {
-                            BOMBER_BASE_SPEED
+                            tables.bomber_base_speed
                         };
                     if target_y == enemy.position.y {
                         enemy.velocity.dy = 0;
@@ -799,12 +782,13 @@ impl World {
                     }
                 }
                 EntityKind::Swarmer => {
+                    let tables = arcade_tables();
                     let target = player_position.unwrap_or(enemy.position);
                     let delta_x = shortest_wrapped_delta(enemy.position.x, target.x, world_span);
                     let desired_dx = if delta_x == 0 {
-                        enemy.velocity.dx.signum().max(1) * SWARMER_SPEED
+                        enemy.velocity.dx.signum().max(1) * tables.swarmer_speed
                     } else {
-                        delta_x.signum() * SWARMER_SPEED
+                        delta_x.signum() * tables.swarmer_speed
                     };
                     let current_direction = enemy.velocity.dx.signum();
                     let should_reverse = current_direction == 0
@@ -833,8 +817,9 @@ impl World {
     }
 
     fn drop_bomber_mines(&mut self, min_y: i32, max_y: i32) {
-        if !self.tick.is_multiple_of(BOMBER_MINE_DROP_DELAY)
-            || self.entity_count_by_kind(EntityKind::Mine) >= MAX_MINES
+        let tables = arcade_tables();
+        if !self.tick.is_multiple_of(tables.bomber_mine_drop_delay)
+            || self.entity_count_by_kind(EntityKind::Mine) >= tables.max_mines
         {
             return;
         }
@@ -873,7 +858,9 @@ impl World {
             }
         }
 
-        let available = MAX_MINES.saturating_sub(self.entity_count_by_kind(EntityKind::Mine));
+        let available = tables
+            .max_mines
+            .saturating_sub(self.entity_count_by_kind(EntityKind::Mine));
         self.entities.extend(new_mines.into_iter().take(available));
     }
 
@@ -1287,11 +1274,12 @@ impl World {
         };
 
         let safe_y = self.safe_altitude_at_world_x(self.entities[human_index].position.x);
+        let tables = arcade_tables();
         if let Some(human) = self.entities.get_mut(human_index) {
             human.state = EntityState::Falling;
             human.velocity = Velocity { dx: 0, dy: 1 };
-            human.rescue_value = if safe_y - human.position.y <= SAFE_FALL_HEIGHT {
-                SAFE_FALL_SCORE
+            human.rescue_value = if safe_y - human.position.y <= tables.safe_fall_height {
+                tables.safe_fall_score
             } else {
                 0
             };
@@ -1299,7 +1287,10 @@ impl World {
     }
 
     fn spawn_swarmer_burst_at(&mut self, pod_position: Position) {
-        let available = MAX_SWARMERS.saturating_sub(self.entity_count_by_kind(EntityKind::Swarmer));
+        let tables = arcade_tables();
+        let available = tables
+            .max_swarmers
+            .saturating_sub(self.entity_count_by_kind(EntityKind::Swarmer));
         if available == 0 {
             return;
         }
@@ -1334,17 +1325,18 @@ impl World {
                 EntityKind::Swarmer,
                 x,
                 y,
-                direction * SWARMER_SPEED,
+                direction * tables.swarmer_speed,
                 dy,
             ));
         }
     }
 
     fn pod_swarmer_burst_count(&self, pod_position: Position) -> usize {
+        let tables = arcade_tables();
         let variance =
             ((self.tick as usize) + (pod_position.x as usize) + (pod_position.y as usize))
-                % POD_SWARMER_BURST_RANGE;
-        POD_SWARMER_BURST_MIN + variance
+                % tables.pod_swarmer_burst_range;
+        tables.pod_swarmer_burst_min + variance
     }
 
     fn can_use_smart_bomb(&self, secret_mode: bool) -> bool {
@@ -1431,7 +1423,7 @@ impl World {
         };
 
         let rescue_bonus = if self.entities[human_index].state == EntityState::Falling {
-            HUMAN_CATCH_SCORE
+            arcade_tables().human_catch_score
         } else {
             0
         };
@@ -1443,7 +1435,7 @@ impl World {
             human.position.y = carried_y;
             human.velocity = Velocity { dx: 0, dy: 0 };
             human.rescue_value = if rescue_bonus > 0 {
-                HUMAN_LANDING_SCORE
+                arcade_tables().human_landing_score
             } else {
                 0
             };
@@ -1480,13 +1472,13 @@ impl World {
             let Some(human) = self.entities.get_mut(index) else {
                 continue;
             };
-            if human.rescue_value == SAFE_FALL_SCORE {
+            if human.rescue_value == arcade_tables().safe_fall_score {
                 human.state = EntityState::Normal;
                 human.position.y = safe_y;
                 human.velocity = Velocity { dx: 0, dy: 0 };
                 human.rescue_value = 0;
                 rescued_count += 1;
-                rescued_score += u32::from(SAFE_FALL_SCORE);
+                rescued_score += u32::from(arcade_tables().safe_fall_score);
             } else {
                 lost_humans.push(index);
             }
@@ -1538,7 +1530,7 @@ impl World {
             human.position.y = player_position.y + 1;
             human.velocity = Velocity { dx: 0, dy: 1 };
             if human.rescue_value > 0 {
-                human.rescue_value = SAFE_FALL_SCORE;
+                human.rescue_value = arcade_tables().safe_fall_score;
             }
         }
     }
@@ -1554,7 +1546,8 @@ impl World {
     }
 
     fn wave_humanoid_bonus(&self) -> u32 {
-        let per_humanoid = (u32::from(self.status.wave) * 100).min(MAX_WAVE_HUMANOID_BONUS);
+        let per_humanoid =
+            (u32::from(self.status.wave) * 100).min(arcade_tables().max_wave_humanoid_bonus);
         let survivors = self
             .entities
             .iter()
@@ -1603,7 +1596,8 @@ impl World {
     }
 
     fn spawn_baiter_if_needed(&mut self, min_y: i32, max_y: i32) {
-        if self.entity_count_by_kind(EntityKind::Baiter) >= MAX_BAITERS
+        let tables = arcade_tables();
+        if self.entity_count_by_kind(EntityKind::Baiter) >= tables.max_baiters
             || self.entity_count_by_kind(EntityKind::Lander) == 0
         {
             return;
@@ -1616,8 +1610,8 @@ impl World {
 
         let elapsed = self.tick.saturating_sub(self.wave_started_at);
         let since_last_baiter = self.tick.saturating_sub(self.last_baiter_tick);
-        let due_tick = BAITER_BASE_DELAY + remaining.saturating_sub(1) as u32 * 4;
-        if elapsed < due_tick || since_last_baiter < BAITER_REPEAT_DELAY {
+        let due_tick = tables.baiter_base_delay + remaining.saturating_sub(1) as u32 * 4;
+        if elapsed < due_tick || since_last_baiter < tables.baiter_repeat_delay {
             return;
         }
 
@@ -1625,7 +1619,7 @@ impl World {
             return;
         };
 
-        let phase = (self.tick / BAITER_REPEAT_DELAY) as i32;
+        let phase = (self.tick / tables.baiter_repeat_delay) as i32;
         let horizontal_offset = self.width as i32 / 2 + (phase % 9);
         let x = if phase % 2 == 0 {
             wrap_coordinate(player_position.x + horizontal_offset, self.world_max_x())
@@ -1651,6 +1645,7 @@ impl World {
     }
 
     fn spawn_wave(&mut self) {
+        let tables = arcade_tables();
         let width = self.world_span;
         let bomber_origin = self
             .player_position()
@@ -1673,7 +1668,7 @@ impl World {
                 bomber_origin,
                 self.safe_altitude_at_world_x(bomber_origin)
                     .saturating_sub(1),
-                -BOMBER_BASE_SPEED,
+                -tables.bomber_base_speed,
                 0,
             ));
         }
@@ -1684,7 +1679,7 @@ impl World {
                 second_bomber_x,
                 self.safe_altitude_at_world_x(second_bomber_x)
                     .saturating_sub(1),
-                BOMBER_BASE_SPEED,
+                tables.bomber_base_speed,
                 0,
             ));
         }
@@ -1695,7 +1690,7 @@ impl World {
                 third_bomber_x,
                 self.safe_altitude_at_world_x(third_bomber_x)
                     .saturating_sub(1),
-                -BOMBER_BASE_SPEED,
+                -tables.bomber_base_speed,
                 0,
             ));
         }
@@ -1720,9 +1715,10 @@ impl World {
         self.entities.extend(enemies);
         self.wave_started_at = self.tick;
         self.last_baiter_tick = self.tick;
-        self.pending_wave_openers = ATTACK_WAVE_TOTAL_OPENERS - ATTACK_WAVE_GROUP_SIZE;
+        self.pending_wave_openers =
+            tables.attack_wave_total_openers - tables.attack_wave_group_size;
         self.spawned_wave_opener_groups = 1;
-        self.next_wave_reinforcement_tick = self.tick + ATTACK_WAVE_REINFORCEMENT_DELAY;
+        self.next_wave_reinforcement_tick = self.tick + tables.attack_wave_reinforcement_delay;
     }
 
     fn has_humanoids(&self) -> bool {
@@ -1742,13 +1738,14 @@ impl World {
             return;
         }
 
+        let tables = arcade_tables();
         let opening_enemy = if self.has_humanoids() {
             EntityKind::Lander
         } else {
             EntityKind::Mutant
         };
         let group_index = self.spawned_wave_opener_groups;
-        let group_size = ATTACK_WAVE_GROUP_SIZE.min(self.pending_wave_openers);
+        let group_size = tables.attack_wave_group_size.min(self.pending_wave_openers);
         let mut reinforcements = default_attack_wave_openers(
             self.world_span,
             self.status.wave,
@@ -1761,8 +1758,9 @@ impl World {
         self.pending_wave_openers = self.pending_wave_openers.saturating_sub(group_size);
         self.spawned_wave_opener_groups = self.spawned_wave_opener_groups.saturating_add(1);
         if self.pending_wave_openers > 0 {
-            self.next_wave_reinforcement_tick =
-                self.tick.saturating_add(ATTACK_WAVE_REINFORCEMENT_DELAY);
+            self.next_wave_reinforcement_tick = self
+                .tick
+                .saturating_add(tables.attack_wave_reinforcement_delay);
         }
     }
 
@@ -1909,21 +1907,24 @@ fn score_for_enemy(kind: EntityKind) -> u32 {
 
 fn score_for_player_collision(kind: EntityKind) -> u32 {
     match kind {
-        EntityKind::EnemyShot | EntityKind::Mine => HAZARD_COLLISION_SCORE,
+        EntityKind::EnemyShot | EntityKind::Mine => arcade_tables().hazard_collision_score,
         _ if kind.is_enemy() => score_for_enemy(kind),
         _ => 0,
     }
 }
 
 fn next_stock_award_score(score: u32) -> u32 {
-    (score / BONUS_STOCK_SCORE)
+    let bonus_stock_score = arcade_tables().bonus_stock_score;
+    (score / bonus_stock_score)
         .saturating_add(1)
-        .saturating_mul(BONUS_STOCK_SCORE)
+        .saturating_mul(bonus_stock_score)
 }
 
 fn default_humans(terrain: &[usize]) -> Vec<Entity> {
-    DEFAULT_HUMAN_WORLD_XS
-        .into_iter()
+    arcade_tables()
+        .default_human_world_xs
+        .iter()
+        .copied()
         .map(|x| Entity::new(EntityKind::Human, x, terrain_surface_y(terrain, x), 0, 0))
         .collect()
 }
@@ -1961,14 +1962,13 @@ fn remove_indices(entities: &mut Vec<Entity>, indices: &[usize]) {
 
 #[cfg(test)]
 mod tests {
+    use crate::arcade::arcade_tables;
     use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS, PLAYER_START_X};
 
     use super::{
-        ATTACK_WAVE_REINFORCEMENT_DELAY, BAITER_BASE_DELAY, BOMBER_EVASIVE_SPEED, Entity,
-        EntityKind, EntityState, HAZARD_COLLISION_SCORE, HorizontalDirection,
-        POD_SWARMER_BURST_MIN, POD_SWARMER_BURST_RANGE, Position, SWARMER_SPEED, Status,
-        UpdateInput, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
-        shortest_wrapped_delta, wrap_coordinate,
+        Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput, World,
+        WorldEvent, hyperspace_result, nearest_wrapped_target, shortest_wrapped_delta,
+        wrap_coordinate,
     };
 
     #[test]
@@ -2441,7 +2441,7 @@ mod tests {
             .iter()
             .find(|entity| entity.kind == EntityKind::Bomber)
             .expect("bomber");
-        assert_eq!(bomber.velocity.dx, -BOMBER_EVASIVE_SPEED);
+        assert_eq!(bomber.velocity.dx, -arcade_tables().bomber_evasive_speed);
         assert_eq!(bomber.position, Position { x: 10, y: 4 });
     }
 
@@ -2534,7 +2534,7 @@ mod tests {
             .iter()
             .find(|entity| entity.kind == EntityKind::Swarmer)
             .expect("swarmer");
-        assert_eq!(swarmer.velocity.dx, -SWARMER_SPEED);
+        assert_eq!(swarmer.velocity.dx, -arcade_tables().swarmer_speed);
         assert_eq!(swarmer.position, Position { x: 10, y: 5 });
     }
 
@@ -2990,7 +2990,7 @@ mod tests {
         assert_eq!(world.status().lives, 0);
         assert!(world.is_game_over());
         assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
-        assert_eq!(world.status().score, HAZARD_COLLISION_SCORE);
+        assert_eq!(world.status().score, arcade_tables().hazard_collision_score);
         assert!(events.contains(&WorldEvent::PlayerHit));
         assert!(events.contains(&WorldEvent::GameOver));
     }
@@ -3016,7 +3016,7 @@ mod tests {
         assert_eq!(world.status().lives, 0);
         assert!(world.is_game_over());
         assert_eq!(world.entity_count_by_kind(EntityKind::Mine), 0);
-        assert_eq!(world.status().score, HAZARD_COLLISION_SCORE);
+        assert_eq!(world.status().score, arcade_tables().hazard_collision_score);
         assert!(events.contains(&WorldEvent::PlayerHit));
         assert!(events.contains(&WorldEvent::GameOver));
     }
@@ -3069,12 +3069,16 @@ mod tests {
         let swarmer_count = world.entity_count_by_kind(EntityKind::Swarmer);
 
         assert_eq!(world.entity_count_by_kind(EntityKind::Pod), 0);
-        assert!(swarmer_count >= POD_SWARMER_BURST_MIN);
-        assert!(swarmer_count < POD_SWARMER_BURST_MIN + POD_SWARMER_BURST_RANGE);
+        assert!(swarmer_count >= arcade_tables().pod_swarmer_burst_min);
+        assert!(
+            swarmer_count
+                < arcade_tables().pod_swarmer_burst_min + arcade_tables().pod_swarmer_burst_range
+        );
         assert_eq!(world.status().score, 1_000);
         assert!(events.contains(&WorldEvent::EnemyDestroyed));
         assert!(world.entities().iter().all(|entity| {
-            entity.kind != EntityKind::Swarmer || entity.velocity.dx == -SWARMER_SPEED
+            entity.kind != EntityKind::Swarmer
+                || entity.velocity.dx == -arcade_tables().swarmer_speed
         }));
     }
 
@@ -3254,12 +3258,12 @@ mod tests {
     fn attack_waves_arrive_in_three_five_ship_groups() {
         let mut world = World::bootstrap();
 
-        for _ in 0..ATTACK_WAVE_REINFORCEMENT_DELAY {
+        for _ in 0..arcade_tables().attack_wave_reinforcement_delay {
             world.step();
         }
         assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 10);
 
-        for _ in 0..ATTACK_WAVE_REINFORCEMENT_DELAY {
+        for _ in 0..arcade_tables().attack_wave_reinforcement_delay {
             world.step();
         }
         assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 15);
@@ -3281,12 +3285,12 @@ mod tests {
         world.spawn_wave();
         assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 5);
 
-        for _ in 0..ATTACK_WAVE_REINFORCEMENT_DELAY {
+        for _ in 0..arcade_tables().attack_wave_reinforcement_delay {
             world.step();
         }
         assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 10);
 
-        for _ in 0..ATTACK_WAVE_REINFORCEMENT_DELAY {
+        for _ in 0..arcade_tables().attack_wave_reinforcement_delay {
             world.step();
         }
         assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 15);
@@ -3389,7 +3393,7 @@ mod tests {
                 Entity::new(EntityKind::Human, 1, 8, 0, 0),
             ],
         );
-        world.tick = BAITER_BASE_DELAY + 4;
+        world.tick = arcade_tables().baiter_base_delay + 4;
 
         world.step_live(UpdateInput::default());
 
@@ -3411,7 +3415,7 @@ mod tests {
                 Entity::new(EntityKind::Pod, 18, 4, 0, 0),
             ],
         );
-        world.tick = BAITER_BASE_DELAY;
+        world.tick = arcade_tables().baiter_base_delay;
 
         world.step_live(UpdateInput::default());
 

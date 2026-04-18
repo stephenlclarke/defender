@@ -1,0 +1,25 @@
+# Defender arcade fidelity and AI tuning
+safe_fall_height=2
+safe_fall_score=250
+human_catch_score=500
+human_landing_score=500
+hazard_collision_score=25
+bonus_stock_score=10000
+max_wave_humanoid_bonus=500
+player_max_speed=1
+swarmer_speed=2
+baiter_speed=2
+bomber_base_speed=1
+bomber_evasive_speed=2
+max_baiters=4
+baiter_base_delay=40
+baiter_repeat_delay=20
+pod_swarmer_burst_min=5
+pod_swarmer_burst_range=3
+max_swarmers=20
+bomber_mine_drop_delay=3
+max_mines=24
+attack_wave_group_size=5
+attack_wave_total_openers=15
+attack_wave_reinforcement_delay=18
+default_human_world_xs=8,26,44,62,80,98,116,134,152,170

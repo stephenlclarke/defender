@@ -157,6 +157,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   projectiles are clipped by terrain. When the last humanoid is lost, the live
   renderer now drops the terrain line and marks the HUD as `DEEP SPACE` until a
   fifth-wave restoration brings the planet and all ten humanoids back.
+- Defender’s gameplay-fidelity and AI tuning values now live in
+  `assets/arcade/arcade-rules.txt`, loaded through `src/arcade.rs` in the same
+  embedded-text-table style used by `../pacman` and `../battlezone`, so future
+  arcade-rule adjustments do not add more hard-coded tuning constants to
+  `src/game.rs`.
 - Gameplay work is being prioritized toward faithful Williams-arcade behavior in
   Rust first; hidden `xyzzy` options remain the only intentional rules
   extension outside that baseline.
