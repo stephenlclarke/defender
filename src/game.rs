@@ -1623,7 +1623,6 @@ impl World {
         }
         if self.status.wave >= 3 {
             enemies.push(Entity::new(EntityKind::Mutant, 8, 4, 1, 1));
-            enemies.push(Entity::new(EntityKind::Pod, width / 2, 5, -1, 1));
             let second_bomber_x = wrap_coordinate(bomber_origin + 10, width - 1);
             enemies.push(Entity::new(
                 EntityKind::Bomber,
@@ -1635,7 +1634,6 @@ impl World {
             ));
         }
         if self.status.wave >= 5 {
-            enemies.push(Entity::new(EntityKind::Pod, width - 20, 4, 1, -1));
             let third_bomber_x = wrap_coordinate(bomber_origin - 10, width - 1);
             enemies.push(Entity::new(
                 EntityKind::Bomber,
@@ -1645,6 +1643,23 @@ impl World {
                 -BOMBER_BASE_SPEED,
                 0,
             ));
+        }
+
+        let pod_count = match self.status.wave {
+            0 | 1 => 0,
+            2 => 1,
+            3 => 3,
+            _ => 4,
+        };
+        let pod_slots = [
+            (width / 2, 5, -1, 1),
+            (wrap_coordinate(width - 20, width - 1), 4, 1, -1),
+            (wrap_coordinate(bomber_origin + 18, width - 1), 6, -1, -1),
+            (wrap_coordinate(bomber_origin - 18, width - 1), 4, 1, 1),
+        ];
+        for (x, desired_y, dx, dy) in pod_slots.into_iter().take(pod_count) {
+            let y = desired_y.min(self.safe_altitude_at_world_x(x)).max(1);
+            enemies.push(Entity::new(EntityKind::Pod, x, y, dx, dy));
         }
 
         self.entities.extend(enemies);
@@ -3027,7 +3042,7 @@ mod tests {
     }
 
     #[test]
-    fn wave_two_and_later_add_bombers_and_pods() {
+    fn wave_two_and_later_add_bombers_and_pods_on_arcade_like_schedule() {
         let mut wave_two = World::with_entities(
             64,
             12,
@@ -3040,7 +3055,7 @@ mod tests {
         );
         wave_two.spawn_wave();
         assert_eq!(wave_two.entity_count_by_kind(EntityKind::Bomber), 1);
-        assert_eq!(wave_two.entity_count_by_kind(EntityKind::Pod), 0);
+        assert_eq!(wave_two.entity_count_by_kind(EntityKind::Pod), 1);
 
         let mut wave_three = World::with_entities(
             64,
@@ -3054,7 +3069,21 @@ mod tests {
         );
         wave_three.spawn_wave();
         assert_eq!(wave_three.entity_count_by_kind(EntityKind::Bomber), 2);
-        assert_eq!(wave_three.entity_count_by_kind(EntityKind::Pod), 1);
+        assert_eq!(wave_three.entity_count_by_kind(EntityKind::Pod), 3);
+
+        let mut wave_four = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 4,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+        );
+        wave_four.spawn_wave();
+        assert_eq!(wave_four.entity_count_by_kind(EntityKind::Bomber), 2);
+        assert_eq!(wave_four.entity_count_by_kind(EntityKind::Pod), 4);
 
         let mut wave_five = World::with_entities(
             64,
@@ -3068,7 +3097,7 @@ mod tests {
         );
         wave_five.spawn_wave();
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Bomber), 3);
-        assert_eq!(wave_five.entity_count_by_kind(EntityKind::Pod), 2);
+        assert_eq!(wave_five.entity_count_by_kind(EntityKind::Pod), 4);
     }
 
     #[test]
