@@ -107,9 +107,10 @@ Extra keys while `xyzzy` mode is active:
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, falling-human
   recovery, grounded-human pickup and redeploy, safe drop-off after catches,
-  mutant conversion after successful abductions, persistent five-entry
-  high-score tracking with initials entry, active lander pursuit of free
-  humans, mutant pursuit of the player,
+  mutant conversion after successful abductions, full lander-to-mutant
+  conversion once humanity is wiped out, persistent five-entry high-score
+  tracking with initials entry, active lander pursuit of free humans, mutant
+  pursuit of the player,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret god-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile

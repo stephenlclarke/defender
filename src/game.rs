@@ -463,6 +463,7 @@ impl World {
         self.handle_human_losses(&mut events);
         self.handle_player_shot_hits(&mut events);
         self.handle_player_collisions(input.invincible, &mut events);
+        self.mutate_landers_if_humans_extinct();
 
         if !self.game_over && self.enemy_count() == 0 {
             self.status.wave = self.status.wave.saturating_add(1);
@@ -954,6 +955,24 @@ impl World {
             human.position.x = player_position.x;
             human.position.y = player_position.y + 1;
             human.velocity = Velocity { dx: 0, dy: 1 };
+        }
+    }
+
+    fn mutate_landers_if_humans_extinct(&mut self) {
+        if self.entity_count_by_kind(EntityKind::Human) > 0 {
+            return;
+        }
+
+        for lander in self
+            .entities
+            .iter_mut()
+            .filter(|entity| entity.kind == EntityKind::Lander)
+        {
+            lander.kind = EntityKind::Mutant;
+            lander.state = EntityState::Normal;
+            if lander.velocity.dy == 0 {
+                lander.velocity.dy = 1;
+            }
         }
     }
 
@@ -1529,6 +1548,59 @@ mod tests {
 
         assert_eq!(world.entity_count_by_kind(EntityKind::Human), 0);
         assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 1);
+        assert!(events.contains(&WorldEvent::HumanLost));
+    }
+
+    #[test]
+    fn losing_the_last_human_mutates_remaining_landers() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 12, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 16, 5, 0, 0),
+                Entity::new(EntityKind::Mutant, 6, 5, 0, 0),
+                Entity::new(EntityKind::Human, 6, 5, 0, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Human), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 3);
+        assert!(events.contains(&WorldEvent::HumanLost));
+    }
+
+    #[test]
+    fn last_human_abduction_completion_mutates_all_landers() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::with_state(EntityKind::Lander, 6, 2, 0, -1, EntityState::CarryingHuman),
+                Entity::with_state(EntityKind::Human, 6, 3, 0, -1, EntityState::Abducted),
+                Entity::new(EntityKind::Lander, 16, 5, 0, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Human), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 2);
         assert!(events.contains(&WorldEvent::HumanLost));
     }
 
