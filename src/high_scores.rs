@@ -166,11 +166,14 @@ pub fn default_storage_path() -> PathBuf {
 
     if let Some(home) = env::var_os("HOME") {
         return PathBuf::from(home)
-            .join(".defender")
+            .join(".xyzzy")
+            .join("defender")
             .join("high_scores.txt");
     }
 
-    PathBuf::from(".defender-high-scores.txt")
+    PathBuf::from(".xyzzy")
+        .join("defender")
+        .join("high_scores.txt")
 }
 
 pub fn sanitize_initials(initials: &str) -> String {

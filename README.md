@@ -168,8 +168,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - `examples/generate_readme_media.rs` regenerates `docs/defender.png` from the
   gameplay demo path and `docs/start-sequence.gif` from the shared attract
   builders used by the app and README media pipeline.
-- High scores persist between live runs in `~/.defender/high_scores.txt`; set
-  `DEFENDER_DATA_DIR` to redirect that file for local experiments or tests.
+- High scores persist between live runs in `~/.xyzzy/defender/high_scores.txt`;
+  set `DEFENDER_DATA_DIR` to redirect that file for local experiments or tests.
 
 ## SonarQube
 
