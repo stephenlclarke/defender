@@ -51,6 +51,7 @@ pub fn render_grid(world: &World) -> Vec<String> {
             world.smart_bombs(),
             world.camera_x(),
         ),
+        render_scanner(world),
     ];
 
     lines.extend(
@@ -59,6 +60,50 @@ pub fn render_grid(world: &World) -> Vec<String> {
             .map(|row| format!("|{}|", row.into_iter().collect::<String>())),
     );
     lines
+}
+
+fn render_scanner(world: &World) -> String {
+    let mut scanner = vec!['.'; world.width()];
+
+    for entity in world.entities() {
+        let index = ((entity.position.x.rem_euclid(world.world_span()) as usize) * world.width())
+            / world.world_span() as usize;
+        let glyph = if entity.kind == crate::game::EntityKind::PlayerShip {
+            world.player_facing().glyph()
+        } else {
+            scanner_glyph(entity.kind)
+        };
+        plot_scanner_glyph(&mut scanner[index.min(world.width() - 1)], glyph);
+    }
+
+    format!("SCANNER |{}|", scanner.into_iter().collect::<String>())
+}
+
+fn scanner_glyph(kind: crate::game::EntityKind) -> char {
+    match kind {
+        crate::game::EntityKind::PlayerShip => '^',
+        crate::game::EntityKind::PlayerShot | crate::game::EntityKind::EnemyShot => '!',
+        crate::game::EntityKind::Human => 'h',
+        crate::game::EntityKind::Lander => 'L',
+        crate::game::EntityKind::Mutant => 'M',
+        crate::game::EntityKind::Baiter => 'B',
+        crate::game::EntityKind::Pod => 'P',
+        crate::game::EntityKind::Swarmer => 'S',
+    }
+}
+
+fn plot_scanner_glyph(cell: &mut char, glyph: char) {
+    let priority = |value: char| match value {
+        '^' | '<' | '>' => 4,
+        'h' => 3,
+        'L' | 'M' | 'B' | 'P' | 'S' => 2,
+        '!' => 1,
+        _ => 0,
+    };
+
+    if priority(glyph) >= priority(*cell) {
+        *cell = glyph;
+    }
 }
 
 pub fn render(world: &World) -> String {
@@ -191,6 +236,7 @@ mod tests {
         assert!(output.contains("THREAT"));
         assert!(output.contains("BOMBS 3"));
         assert!(output.contains("CAM"));
+        assert!(output.contains("SCANNER |"));
     }
 
     #[test]
@@ -212,10 +258,10 @@ mod tests {
         let output = super::render(&world);
         let rows: Vec<&str> = output.lines().collect();
 
-        assert_eq!(rows[2], "|        |");
-        assert_eq!(rows[3], "| >      |");
-        assert_eq!(rows[5], "|   h    |");
-        assert_eq!(rows[6], "|________|");
+        assert_eq!(rows[3], "|        |");
+        assert_eq!(rows[4], "| >      |");
+        assert_eq!(rows[6], "|   h    |");
+        assert_eq!(rows[7], "|________|");
     }
 
     #[test]
@@ -232,7 +278,7 @@ mod tests {
         );
 
         let output = super::render(&world);
-        let frame_rows: Vec<&str> = output.lines().skip(2).take(world.height()).collect();
+        let frame_rows: Vec<&str> = output.lines().skip(3).take(world.height()).collect();
 
         assert!(frame_rows.iter().all(|row| !row.contains('M')));
     }
@@ -272,7 +318,7 @@ mod tests {
         let output = super::render(&World::bootstrap());
         let frame_rows: Vec<&str> = output
             .lines()
-            .skip(2)
+            .skip(3)
             .take(World::bootstrap().height())
             .collect();
         let terrain_rows = frame_rows.iter().filter(|row| row.contains('_')).count();

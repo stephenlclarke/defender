@@ -11,6 +11,10 @@ const BONUS_STOCK_SCORE: u32 = 10_000;
 const MAX_WAVE_HUMANOID_BONUS: u32 = 500;
 const PLAYER_MAX_SPEED: i32 = 1;
 const SWARMER_SPEED: i32 = 2;
+const BAITER_SPEED: i32 = 2;
+const MAX_BAITERS: usize = 4;
+const BAITER_BASE_DELAY: u32 = 40;
+const BAITER_REPEAT_DELAY: u32 = 20;
 const POD_SWARMER_BURST: usize = 4;
 const MAX_SWARMERS: usize = 20;
 
@@ -21,6 +25,7 @@ pub enum EntityKind {
     EnemyShot,
     Lander,
     Mutant,
+    Baiter,
     Pod,
     Swarmer,
     Human,
@@ -34,6 +39,7 @@ impl EntityKind {
             Self::EnemyShot => '!',
             Self::Lander => 'L',
             Self::Mutant => 'M',
+            Self::Baiter => 'B',
             Self::Pod => 'P',
             Self::Swarmer => 'S',
             Self::Human => 'h',
@@ -43,12 +49,15 @@ impl EntityKind {
     pub fn is_enemy(self) -> bool {
         matches!(
             self,
-            Self::Lander | Self::Mutant | Self::Pod | Self::Swarmer
+            Self::Lander | Self::Mutant | Self::Baiter | Self::Pod | Self::Swarmer
         )
     }
 
     fn can_fire(self) -> bool {
-        matches!(self, Self::Lander | Self::Mutant | Self::Swarmer)
+        matches!(
+            self,
+            Self::Lander | Self::Mutant | Self::Baiter | Self::Swarmer
+        )
     }
 }
 
@@ -181,6 +190,8 @@ pub struct World {
     fire_cooldown: u8,
     next_stock_award: u32,
     smart_bombs: u8,
+    wave_started_at: u32,
+    last_baiter_tick: u32,
     game_over: bool,
     status: Status,
     terrain: Vec<usize>,
@@ -202,6 +213,8 @@ impl World {
             fire_cooldown: 0,
             next_stock_award: next_stock_award_score(0),
             smart_bombs: DEFAULT_SMART_BOMBS,
+            wave_started_at: 0,
+            last_baiter_tick: 0,
             game_over: false,
             status: Status {
                 score: 0,
@@ -235,6 +248,8 @@ impl World {
             fire_cooldown: 0,
             next_stock_award: next_stock_award_score(status.score),
             smart_bombs: DEFAULT_SMART_BOMBS,
+            wave_started_at: 0,
+            last_baiter_tick: 0,
             game_over: false,
             status,
             terrain: build_flat_terrain(width, height),
@@ -264,7 +279,11 @@ impl World {
                         .y
                         .min(terrain_surface_y(terrain, entity.position.x));
                 }
-                EntityKind::Lander | EntityKind::Mutant | EntityKind::Pod | EntityKind::Swarmer => {
+                EntityKind::Lander
+                | EntityKind::Mutant
+                | EntityKind::Baiter
+                | EntityKind::Pod
+                | EntityKind::Swarmer => {
                     entity.position.x =
                         wrap_coordinate(entity.position.x + entity.velocity.dx, max_x);
                     entity.position.y += entity.velocity.dy;
@@ -363,6 +382,13 @@ impl World {
         self.entities
             .iter()
             .filter(|entity| entity.kind.is_enemy())
+            .count()
+    }
+
+    fn remaining_wave_enemy_count(&self) -> usize {
+        self.entities
+            .iter()
+            .filter(|entity| entity.kind.is_enemy() && entity.kind != EntityKind::Baiter)
             .count()
     }
 
@@ -547,7 +573,11 @@ impl World {
         for entity in &mut self.entities {
             match entity.kind {
                 EntityKind::Human | EntityKind::PlayerShip => {}
-                EntityKind::Lander | EntityKind::Mutant | EntityKind::Pod | EntityKind::Swarmer => {
+                EntityKind::Lander
+                | EntityKind::Mutant
+                | EntityKind::Baiter
+                | EntityKind::Pod
+                | EntityKind::Swarmer => {
                     entity.position.x =
                         wrap_coordinate(entity.position.x + entity.velocity.dx, max_x);
                     entity.position.y += entity.velocity.dy;
@@ -581,9 +611,15 @@ impl World {
         );
         self.mutate_landers_if_humans_extinct();
 
-        if !self.game_over && self.enemy_count() == 0 && !self.has_unresolved_humans() {
+        self.spawn_baiter_if_needed(min_y, max_y);
+
+        if !self.game_over
+            && self.remaining_wave_enemy_count() == 0
+            && !self.has_unresolved_humans()
+        {
             self.add_score(self.wave_humanoid_bonus());
             self.status.wave = self.status.wave.saturating_add(1);
+            self.clear_wave_carryover_entities();
             self.spawn_wave();
             events.push(WorldEvent::WaveAdvanced);
         }
@@ -632,6 +668,7 @@ impl World {
 
     fn update_enemy_intents(&mut self, min_y: i32, max_y: i32) {
         let player_position = self.player_position();
+        let player_velocity = self.player_velocity();
         let free_humans = self.free_human_positions();
         let world_span = self.world_span;
         let world_max_x = self.world_max_x();
@@ -666,6 +703,23 @@ impl World {
                     if enemy.velocity.dy == 0 {
                         enemy.velocity.dy = if self.tick.is_multiple_of(2) { -1 } else { 1 };
                     }
+                }
+                EntityKind::Baiter => {
+                    let target = player_position.unwrap_or(enemy.position);
+                    let relative_dx =
+                        wrapped_horizontal_step(enemy.position.x, target.x, world_max_x)
+                            * BAITER_SPEED;
+                    let inherited_dx = player_velocity.map(|velocity| velocity.dx).unwrap_or(0);
+                    enemy.velocity.dx =
+                        (inherited_dx + relative_dx).clamp(-(BAITER_SPEED + 1), BAITER_SPEED + 1);
+                    if enemy.velocity.dx == 0 {
+                        enemy.velocity.dx = if self.tick.is_multiple_of(2) {
+                            BAITER_SPEED
+                        } else {
+                            -BAITER_SPEED
+                        };
+                    }
+                    enemy.velocity.dy = (target.y - enemy.position.y).signum();
                 }
                 EntityKind::Pod => {
                     if enemy.velocity.dx == 0 {
@@ -876,9 +930,11 @@ impl World {
         let mut collided_enemies = Vec::new();
         for (index, enemy) in self.entities.iter().enumerate() {
             let collision = match enemy.kind {
-                EntityKind::Lander | EntityKind::Mutant | EntityKind::Pod | EntityKind::Swarmer => {
-                    positions_overlap(player_position, enemy.position, 1, 1)
-                }
+                EntityKind::Lander
+                | EntityKind::Mutant
+                | EntityKind::Baiter
+                | EntityKind::Pod
+                | EntityKind::Swarmer => positions_overlap(player_position, enemy.position, 1, 1),
                 EntityKind::EnemyShot => positions_overlap(player_position, enemy.position, 0, 0),
                 _ => false,
             };
@@ -959,11 +1015,20 @@ impl World {
             .map(|entity| entity.position)
     }
 
+    fn player_velocity(&self) -> Option<Velocity> {
+        self.entities
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .map(|entity| entity.velocity)
+    }
+
     fn hyperspace_destination_is_unsafe(&self, player_position: Position) -> bool {
         self.entities.iter().any(|entity| match entity.kind {
-            EntityKind::Lander | EntityKind::Mutant | EntityKind::Pod | EntityKind::Swarmer => {
-                positions_overlap(player_position, entity.position, 1, 1)
-            }
+            EntityKind::Lander
+            | EntityKind::Mutant
+            | EntityKind::Baiter
+            | EntityKind::Pod
+            | EntityKind::Swarmer => positions_overlap(player_position, entity.position, 1, 1),
             EntityKind::EnemyShot => positions_overlap(player_position, entity.position, 0, 0),
             _ => false,
         })
@@ -1340,6 +1405,52 @@ impl World {
         });
     }
 
+    fn spawn_baiter_if_needed(&mut self, min_y: i32, max_y: i32) {
+        if self.entity_count_by_kind(EntityKind::Baiter) >= MAX_BAITERS {
+            return;
+        }
+
+        let remaining = self.remaining_wave_enemy_count();
+        if remaining == 0 {
+            return;
+        }
+
+        let elapsed = self.tick.saturating_sub(self.wave_started_at);
+        let since_last_baiter = self.tick.saturating_sub(self.last_baiter_tick);
+        let due_tick = BAITER_BASE_DELAY + remaining.saturating_sub(1) as u32 * 4;
+        if elapsed < due_tick || since_last_baiter < BAITER_REPEAT_DELAY {
+            return;
+        }
+
+        let Some(player_position) = self.player_position() else {
+            return;
+        };
+
+        let phase = (self.tick / BAITER_REPEAT_DELAY) as i32;
+        let horizontal_offset = self.width as i32 / 2 + (phase % 9);
+        let x = if phase % 2 == 0 {
+            wrap_coordinate(player_position.x + horizontal_offset, self.world_max_x())
+        } else {
+            wrap_coordinate(player_position.x - horizontal_offset, self.world_max_x())
+        };
+        let safe_y = self.safe_altitude_at_world_x(x).min(max_y);
+        let vertical_offset = if phase % 3 == 0 { -2 } else { 2 };
+        let y = (player_position.y + vertical_offset).clamp(min_y, safe_y);
+
+        self.entities
+            .push(Entity::new(EntityKind::Baiter, x, y, 0, 0));
+        self.last_baiter_tick = self.tick;
+    }
+
+    fn clear_wave_carryover_entities(&mut self) {
+        self.entities.retain(|entity| {
+            !matches!(
+                entity.kind,
+                EntityKind::PlayerShot | EntityKind::EnemyShot | EntityKind::Baiter
+            )
+        });
+    }
+
     fn spawn_wave(&mut self) {
         let width = self.world_span;
         let base_y = 3 + (self.status.wave as i32 % 4);
@@ -1361,6 +1472,8 @@ impl World {
         }
 
         self.entities.extend(enemies);
+        self.wave_started_at = self.tick;
+        self.last_baiter_tick = self.tick;
     }
 
     fn sync_camera_to_player(&mut self) {
@@ -1496,6 +1609,7 @@ fn score_for_enemy(kind: EntityKind) -> u32 {
     match kind {
         EntityKind::Lander => 150,
         EntityKind::Mutant => 250,
+        EntityKind::Baiter => 200,
         EntityKind::Pod => 1_000,
         EntityKind::Swarmer => 150,
         _ => 0,
@@ -1523,8 +1637,8 @@ mod tests {
     use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS, PLAYER_START_X};
 
     use super::{
-        Entity, EntityKind, EntityState, HorizontalDirection, POD_SWARMER_BURST, Position,
-        SWARMER_SPEED, Status, UpdateInput, World, WorldEvent, hyperspace_result,
+        BAITER_BASE_DELAY, Entity, EntityKind, EntityState, HorizontalDirection, POD_SWARMER_BURST,
+        Position, SWARMER_SPEED, Status, UpdateInput, World, WorldEvent, hyperspace_result,
         nearest_wrapped_target, shortest_wrapped_delta, wrap_coordinate,
     };
 
@@ -1941,6 +2055,34 @@ mod tests {
             .find(|entity| entity.kind == EntityKind::Mutant)
             .expect("mutant");
         assert_eq!(mutant.position, Position { x: 9, y: 5 });
+    }
+
+    #[test]
+    fn live_step_baiters_home_toward_the_player() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 4, 1, 0),
+                Entity::new(EntityKind::Baiter, 12, 6, 0, 0),
+                Entity::new(EntityKind::Pod, 18, 3, 0, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let baiter = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Baiter)
+            .expect("baiter");
+        assert_eq!(baiter.velocity.dx, -1);
+        assert_eq!(baiter.position, Position { x: 11, y: 5 });
     }
 
     #[test]
@@ -2578,6 +2720,53 @@ mod tests {
         );
         wave_five.spawn_wave();
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Pod), 2);
+    }
+
+    #[test]
+    fn live_step_spawns_baiters_when_a_wave_drags_on() {
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 99,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 3, 4, 0, 0),
+                Entity::new(EntityKind::Pod, 18, 4, 0, 0),
+            ],
+        );
+
+        for _ in 0..=BAITER_BASE_DELAY {
+            world.step_live(UpdateInput::default());
+        }
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Baiter), 1);
+    }
+
+    #[test]
+    fn baiters_do_not_block_wave_advance() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0),
+                Entity::new(EntityKind::Baiter, 12, 4, 0, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(world.status().wave, 2);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Baiter), 0);
+        assert!(world.enemy_count() >= 2);
+        assert!(events.contains(&WorldEvent::WaveAdvanced));
     }
 
     #[test]

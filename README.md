@@ -125,7 +125,9 @@ Extra keys while `xyzzy` mode is active:
   ship away from enemy clusters, with automatic unlimited smart bombs in
   `xyzzy` mode and a separate `G` invincibility toggle, plus later-wave pods
   that burst into swarmer packs when shot and swarmer pursuit behavior that
-  preserves the classic follow-from-behind counterplay,
+  preserves the classic follow-from-behind counterplay, a full-width radar
+  scanner strip that compresses the wrapped world into the top HUD, and baiters
+  that beam in when a wave drags on so cleanup is no longer risk-free,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
@@ -208,6 +210,8 @@ the final runtime self-contained:
 - <https://www.dougmahugh.com/defender-chapter05/>: swarmer-behavior reference
   used to model pod bursts, delayed swarmer turnback, and the follow-from-
   behind movement pattern.
+- <https://www.dougmahugh.com/defender-chapter07/>: baiter-behavior reference
+  used to model wave-delay baiter pressure and relative pursuit behavior.
 - <https://www.andysarcade.net/personal/defcolours/index.htm>: cabinet colour
   and palette reference for later presentation work.
 - <https://mdk.cab/game/defender>: artwork, screenshots, and general cabinet
