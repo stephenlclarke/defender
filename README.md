@@ -149,6 +149,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   ROM-derived assets generated from the red-label `amode1.src` `LGOTAB`,
   `DEFDAT`, and `CPRTAB` tables, embedded as
   `assets/arcade/logo-page.png` and `assets/arcade/defender-logo.png`.
+- The live attract renderer now also decodes the red-label `LGOTAB` and
+  `DEFDAT` tables directly in Rust, so the opening page traces the Williams
+  script and materializes the `DEFENDER` wordmark from ROM-derived data before
+  falling back to the exact embedded page asset for the held frame.
 - All current sounds are embedded in the app via bundled `assets/sounds/*.wav`
   cue files decoded by `rodio`, so the live runtime stays self-contained while
   matching the sibling repos' asset layout.
@@ -237,6 +241,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - `tools/extract_rom_branding_assets.py` regenerates the embedded Williams
   logo page, Defender wordmark, and copyright art directly from the red-label
   source tables.
+- `tools/extract_rom_attract_data.py` regenerates the Rust tables used by the
+  live attract-page Williams trace and `DEFENDER` materialization code.
 - `tools/extract_rom_wave_table.py` regenerates the red-label `WVTAB` block
   inside `assets/arcade/arcade-rules.txt` from the source `blk71.src` records.
 - The title, attract legend, and hall-of-fame seed data now use the red-label

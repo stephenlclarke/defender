@@ -3,6 +3,7 @@
 pub mod app;
 pub mod arcade;
 pub mod attract;
+pub mod attract_rom;
 pub mod audio;
 pub mod branding;
 pub mod constants;

@@ -1,7 +1,7 @@
 //! Renders Defender scenes into RGBA frames for Kitty graphics output and README media.
 
 use crate::{
-    attract::LogoStage,
+    attract_rom::attract_rom,
     branding::arcade_branding,
     font::arcade_font,
     game::{Entity, EntityKind, HorizontalDirection, World},
@@ -57,8 +57,11 @@ const ATTRACT_SCORE_CARD: [AttractLegendEntry; 6] = [
 
 pub enum Screen<'a> {
     Logo {
-        stage: LogoStage,
         palette_phase: usize,
+        trace_points: usize,
+        show_title_text: bool,
+        visible_defender_chunks: usize,
+        show_copyright: bool,
     },
     Attract {
         world: &'a World,
@@ -176,9 +179,18 @@ impl Renderer {
 
         match screen {
             Screen::Logo {
-                stage,
                 palette_phase,
-            } => self.render_logo_screen(stage, palette_phase),
+                trace_points,
+                show_title_text,
+                visible_defender_chunks,
+                show_copyright,
+            } => self.render_logo_screen(
+                palette_phase,
+                trace_points,
+                show_title_text,
+                visible_defender_chunks,
+                show_copyright,
+            ),
             Screen::Attract {
                 world,
                 revealed_score_entries,
@@ -210,7 +222,14 @@ impl Renderer {
         &self.render_target
     }
 
-    fn render_logo_screen(&mut self, stage: LogoStage, palette_phase: usize) {
+    fn render_logo_screen(
+        &mut self,
+        palette_phase: usize,
+        trace_points: usize,
+        show_title_text: bool,
+        visible_defender_chunks: usize,
+        show_copyright: bool,
+    ) {
         self.fill_rect(
             Rect {
                 x: 0,
@@ -221,6 +240,7 @@ impl Renderer {
             Color::from_rgba(BACKGROUND),
         );
         let branding = arcade_branding();
+        let rom = attract_rom();
         let palette = attract_palette(palette_phase);
         let max_width = (self.image_width as i32 - 64).max(1);
         let max_height = (self.image_height as i32 - 24).max(1);
@@ -232,28 +252,34 @@ impl Renderer {
         let page_scale = page_height as f32 / 256.0;
         let page_x_at = |x: f32| page_x + (x * page_width as f32 / 320.0).round() as i32;
         let page_y_at = |y: f32| page_y + (y * page_height as f32 / 256.0).round() as i32;
-        let williams_reveal = match stage {
-            LogoStage::WilliamsTraceStart => 0.22,
-            LogoStage::WilliamsTraceQuarter => 0.46,
-            LogoStage::WilliamsTraceHalf => 0.74,
-            _ => 1.0,
-        };
+        let point_radius = (page_scale.ceil() as i32 / 2).max(0);
+        let full_logo_page_visible = trace_points >= rom.williams_points().len()
+            && show_title_text
+            && visible_defender_chunks >= rom.defender_chunks().len()
+            && show_copyright;
 
-        self.draw_scaled_image_centered_clipped(
-            branding.williams_logo(),
-            page_x_at(193.0),
-            page_y_at(69.0),
-            (branding.williams_logo().height as f32 * page_scale)
-                .round()
-                .max(1.0) as i32,
-            williams_reveal,
-            Some(palette.williams),
-        );
+        if full_logo_page_visible {
+            // Once the ROM-driven trace and object-appearance phases have
+            // completed, show the exact embedded red-label page composition.
+            self.draw_scaled_image_centered(
+                branding.logo_page(),
+                self.image_width as i32 / 2,
+                self.image_height as i32 / 2,
+                page_height,
+            );
+            return;
+        }
 
-        if matches!(
-            stage,
-            LogoStage::TextOnly | LogoStage::DefenderReveal | LogoStage::FullPage
-        ) {
+        for &(x, y) in rom.williams_points().iter().take(trace_points) {
+            self.draw_dot(
+                page_x_at(x as f32),
+                page_y_at(y as f32),
+                Color::from_rgba(palette.williams),
+                point_radius,
+            );
+        }
+
+        if show_title_text {
             self.draw_centered_text(
                 page_x_at(187.0),
                 page_y_at(88.0),
@@ -270,34 +296,46 @@ impl Renderer {
             );
         }
 
-        if matches!(stage, LogoStage::DefenderReveal | LogoStage::FullPage) {
-            let defender_reveal = if stage == LogoStage::DefenderReveal {
-                0.62
+        if visible_defender_chunks > 0 {
+            let chunk_height = (24.0 * page_scale).round().max(1.0) as i32;
+            let chunk_width = (10.0 * page_scale).round().max(1.0) as i32;
+            let logo_left = page_x_at(118.0);
+            let logo_center_y = page_y_at(156.0);
+            let full_chunks = if visible_defender_chunks >= rom.defender_chunks().len() {
+                rom.defender_chunks().len()
             } else {
-                1.0
+                visible_defender_chunks.saturating_sub(1)
             };
-            self.draw_scaled_image_centered_clipped(
-                branding.defender_logo(),
-                page_x_at(193.0),
-                page_y_at(156.0),
-                (branding.defender_logo().height as f32 * page_scale)
-                    .round()
-                    .max(1.0) as i32,
-                defender_reveal,
-                None,
-            );
+
+            for (index, chunk) in rom.defender_chunks().iter().take(full_chunks).enumerate() {
+                let center_x = logo_left + index as i32 * chunk_width + chunk_width / 2;
+                self.draw_scaled_image_centered(chunk, center_x, logo_center_y, chunk_height);
+            }
+
+            if visible_defender_chunks < rom.defender_chunks().len() {
+                let materializing_index = visible_defender_chunks.saturating_sub(1);
+                if let Some(chunk) = rom.defender_chunks().get(materializing_index) {
+                    let center_x =
+                        logo_left + materializing_index as i32 * chunk_width + chunk_width / 2;
+                    let expanded_height = ((chunk_height as f32) * 1.8).round() as i32;
+                    self.draw_scaled_image_centered(
+                        chunk,
+                        center_x,
+                        logo_center_y,
+                        expanded_height.max(chunk_height),
+                    );
+                }
+            }
         }
 
-        if stage == LogoStage::FullPage {
-            self.draw_scaled_image_centered_clipped(
+        if show_copyright {
+            self.draw_scaled_image_centered(
                 branding.copyright_line(),
                 page_x_at(197.0),
                 page_y_at(211.0),
                 (branding.copyright_line().height as f32 * page_scale)
                     .round()
                     .max(1.0) as i32,
-                1.0,
-                Some(palette.title_text),
             );
         }
     }
@@ -1043,51 +1081,6 @@ impl Renderer {
                         alpha,
                     ),
                 );
-            }
-        }
-    }
-
-    fn draw_scaled_image_centered_clipped(
-        &mut self,
-        image: &RenderedImage,
-        center_x: i32,
-        center_y: i32,
-        target_height: i32,
-        reveal_fraction: f32,
-        tint: Option<[u8; 4]>,
-    ) {
-        if image.width == 0 || image.height == 0 {
-            return;
-        }
-
-        let target_height = target_height.max(1);
-        let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
-        let visible_width =
-            ((target_width as f32 * reveal_fraction.clamp(0.0, 1.0)).round() as i32).max(0);
-        let origin_x = center_x - target_width / 2;
-        let origin_y = center_y - target_height / 2;
-
-        for dy in 0..target_height {
-            let src_y = ((dy as u32) * image.height / target_height as u32).min(image.height - 1);
-            for dx in 0..visible_width {
-                let src_x = ((dx as u32) * image.width / target_width as u32).min(image.width - 1);
-                let index = ((src_y * image.width + src_x) * 4) as usize;
-                let alpha = image.pixels[index + 3];
-                if alpha == 0 {
-                    continue;
-                }
-                let color = if let Some([r, g, b, _]) = tint {
-                    Color(r, g, b, alpha)
-                } else {
-                    Color(
-                        image.pixels[index],
-                        image.pixels[index + 1],
-                        image.pixels[index + 2],
-                        alpha,
-                    )
-                };
-                self.render_target
-                    .blend_pixel(origin_x + dx, origin_y + dy, color);
             }
         }
     }

@@ -113,8 +113,11 @@ fn render_attract_sample(
     match beat.kind {
         defender::attract::SceneKind::Logo => renderer
             .render(Screen::Logo {
-                stage: beat.logo_stage,
                 palette_phase: beat.palette_phase,
+                trace_points: beat.logo_trace_points,
+                show_title_text: beat.logo_show_title_text,
+                visible_defender_chunks: beat.logo_visible_defender_chunks,
+                show_copyright: beat.logo_show_copyright,
             })
             .clone(),
         defender::attract::SceneKind::Attract => {

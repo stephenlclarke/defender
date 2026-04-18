@@ -145,8 +145,11 @@ fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) ->
     let beat = title_beat_for_session(session);
     match beat.kind {
         SceneKind::Logo => renderer.render(Screen::Logo {
-            stage: beat.logo_stage,
             palette_phase: beat.palette_phase,
+            trace_points: beat.logo_trace_points,
+            show_title_text: beat.logo_show_title_text,
+            visible_defender_chunks: beat.logo_visible_defender_chunks,
+            show_copyright: beat.logo_show_copyright,
         }),
         SceneKind::Attract => {
             let mut world = crate::game::World::bootstrap();
