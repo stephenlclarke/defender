@@ -88,12 +88,22 @@ Live mode controls:
 - `Tab`: detonate a smart bomb
 - `H`: trigger hyperspace
 - `q` or `Esc`: quit
-- `xyzzy`: toggle the hidden mode
-- `i`: while `xyzzy` mode is active, toggle invincibility with unlimited
-  smart bombs
 
 The live key layout is currently modelled on the BBC Micro `Planetoid`
 control scheme from Acornsoft's 1982 release of its `Defender` variant.
+
+## XYZZY Mode
+
+During a live session, type `x`, `y`, `z`, `z`, `y` to toggle hidden `xyzzy`
+mode on or off.
+
+Typing `xyzzy` a second time turns the mode off and resets the hidden
+invincibility toggle back to its default state.
+
+Extra keys while `xyzzy` mode is active:
+
+- `i`: toggle invincibility. While active, the player cannot be killed by
+  enemy fire or direct enemy collisions, and smart bombs become unlimited.
 
 ## Current Notes
 
