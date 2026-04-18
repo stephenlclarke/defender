@@ -212,12 +212,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   projectiles are clipped by terrain. When the last humanoid is lost, the live
   renderer now drops the terrain line and marks the HUD as `DEEP SPACE` until a
   fifth-wave restoration brings the planet and all ten humanoids back.
-- Defender’s remaining gameplay-fidelity and AI tuning values still live in
-  `assets/arcade/arcade-rules.txt`, while the baseline red-label wave roster
-  and launch cadence now live in `assets/arcade/red-label-wave-table.txt`
-  extracted from `blk71.src` `WVTAB`, so the live game no longer depends on
-  hand-authored attack-wave counts or reinforcement timing constants in
-  `src/game.rs`.
+- Defender’s gameplay-fidelity, AI tuning, and the ROM-derived red-label
+  wave/fire records now all live in `assets/arcade/arcade-rules.txt`, so the
+  live game no longer depends on hand-authored attack-wave counts or
+  reinforcement timing constants in `src/game.rs`.
 - Gameplay work is being prioritized toward faithful Williams-arcade behavior in
   Rust first; hidden `xyzzy` options remain the only intentional rules
   extension outside that baseline.
@@ -236,9 +234,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - `tools/extract_rom_branding_assets.py` regenerates the embedded Williams
   logo page, Defender wordmark, and copyright art directly from the red-label
   source tables.
-- `tools/extract_rom_wave_table.py` regenerates the embedded
-  `assets/arcade/red-label-wave-table.txt` data from the red-label `blk71.src`
-  `WVTAB` records.
+- `tools/extract_rom_wave_table.py` regenerates the red-label `WVTAB` block
+  inside `assets/arcade/arcade-rules.txt` from the source `blk71.src` records.
 - The title, attract legend, and hall-of-fame seed data now use the red-label
   ROM message/default tables instead of the earlier placeholder prototype
   strings.
@@ -280,7 +277,8 @@ the final runtime self-contained:
   embedded `assets/arcade/font-sheet.png`, and the `amode1.src` `LGOTAB`,
   `DEFDAT`, and `CPRTAB` tables used to reconstruct the embedded attract-logo
   page and `DEFENDER` wordmark assets, plus the `blk71.src` `WVTAB` records
-  used to reconstruct the embedded red-label wave table.
+  used to reconstruct the ROM-derived wave/fire block in
+  `assets/arcade/arcade-rules.txt`.
 - <https://seanriddle.com/ripper.html>: Williams graphics-ripper reference used
   to confirm Defender's screen-format sprite layout and the red-label object
   sprite list/rip used to build the embedded `assets/arcade/*.png` object art.
@@ -346,12 +344,11 @@ the final runtime self-contained:
 
 ## Customisation
 
-Arcade tuning defaults ship in `assets/arcade/arcade-rules.txt`, and the
-baseline red-label wave records ship in
-`assets/arcade/red-label-wave-table.txt`. To override them locally, copy either
-file to `~/.xyzzy/defender/` and only include the keys you want to change.
-Omitted keys keep their embedded defaults. If `DEFENDER_DATA_DIR` is set, the
-game reads both files from that directory instead.
+Arcade tuning defaults and the ROM-derived red-label wave/fire records ship in
+`assets/arcade/arcade-rules.txt`. To override them locally, copy that file to
+`~/.xyzzy/defender/` and only include the keys you want to change. Omitted keys
+keep their embedded defaults. If `DEFENDER_DATA_DIR` is set, the game reads
+that file from the override directory instead.
 
 ### `arcade-rules.txt`
 
@@ -468,9 +465,8 @@ Meaning: maximum number of live bomber mines allowed at once.
 Default: `8,26,44,62,80,98,116,134,152,170`
 Meaning: default world X positions for the ten starting humanoids.
 
-### `red-label-wave-table.txt`
-
-Record format: `max,min,intra_delta,inter_delta|wave1,wave2,wave3,wave4`
+Record format for the ROM-derived wave/fire keys:
+`max,min,intra_delta,inter_delta|wave1,wave2,wave3,wave4`
 
 `landers`
 Default: `20,0,0,0|15,20,20,20`
@@ -501,10 +497,70 @@ Meaning: red-label delay between successive lander squad launches.
 Default: `5,0,0,0|5,5,5,5`
 Meaning: red-label size of each launched lander squad.
 
+`lander_x_velocity`
+Default: `96,0,3,2|22,30,38,46`
+Meaning: red-label lander horizontal-speed record from `WVTAB`.
+
+`lander_y_velocity_msb`
+Default: `1,0,0,0|0,0,1,1`
+Meaning: red-label lander vertical-speed MSB record from `WVTAB`.
+
+`lander_y_velocity_lsb`
+Default: `255,0,16,0|112,176,0,0`
+Meaning: red-label lander vertical-speed LSB record from `WVTAB`.
+
+`lander_shot_time`
+Default: `128,16,-4,-2|74,58,42,42`
+Meaning: red-label lander shot-timer record from `WVTAB`.
+
+`bomber_x_velocity`
+Default: `48,0,0,0|32,40,44,48`
+Meaning: red-label bomber horizontal-speed record from `WVTAB`.
+
+`mutant_random_y`
+Default: `2,0,0,0|1,1,2,2`
+Meaning: red-label mutant vertical-randomness record from `WVTAB`.
+
+`mutant_y_velocity_msb`
+Default: `1,0,0,0|0,0,1,1`
+Meaning: red-label mutant vertical-speed MSB record from `WVTAB`.
+
+`mutant_y_velocity_lsb`
+Default: `255,0,8,6|98,224,2,18`
+Meaning: red-label mutant vertical-speed LSB record from `WVTAB`.
+
+`mutant_x_velocity`
+Default: `96,0,8,4|12,28,36,40`
+Meaning: red-label mutant horizontal-speed record from `WVTAB`.
+
+`mutant_shot_time`
+Default: `255,8,-2,-2|42,34,30,28`
+Meaning: red-label mutant shot-timer record from `WVTAB`.
+
+`swarmer_x_velocity`
+Default: `96,0,8,2|22,30,32,34`
+Meaning: red-label swarmer horizontal-speed record from `WVTAB`.
+
+`swarmer_shot_time`
+Default: `40,10,-2,-1|25,25,25,25`
+Meaning: red-label swarmer shot-timer record from `WVTAB`.
+
+`swarmer_acceleration_mask`
+Default: `63,0,0,0|31,31,31,63`
+Meaning: red-label swarmer acceleration-mask record from `WVTAB`.
+
 `baiter_time`
 Default: `192,24,-12,-4|212,196,164,148`
 Meaning: red-label UFO/Baiter spoiler timer used as the first-spawn delay for
 the live baiter-pressure path.
+
+`baiter_shot_time`
+Default: `10,3,-1,-1|15,13,12,10`
+Meaning: red-label baiter shot-timer record from `WVTAB`.
+
+`baiter_seek_probability`
+Default: `200,40,-12,-8|240,220,200,200`
+Meaning: red-label baiter seek-probability record from `WVTAB`.
 
 ## Platform Support
 

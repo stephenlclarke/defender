@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 use crate::customization;
 
-const DEFAULT_WAVE_TABLE: &str = include_str!("../assets/arcade/red-label-wave-table.txt");
+const ARCADE_RULES: &str = include_str!("../assets/arcade/arcade-rules.txt");
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct WaveRecord {
@@ -42,7 +42,7 @@ pub struct WaveProfile {
 pub fn red_label_wave_table() -> &'static RedLabelWaveTable {
     static TABLE: OnceLock<RedLabelWaveTable> = OnceLock::new();
     TABLE.get_or_init(|| {
-        let text = customization::load_arcade_text("red-label-wave-table.txt", DEFAULT_WAVE_TABLE);
+        let text = customization::load_arcade_text("arcade-rules.txt", ARCADE_RULES);
         parse_wave_table(&text)
     })
 }
@@ -106,16 +106,15 @@ fn parse_wave_table(text: &str) -> RedLabelWaveTable {
         let (key, value) = line
             .split_once('=')
             .expect("red-label wave table should use key=value lines");
-        let record = parse_record(value);
         match key {
-            "landers" => landers = Some(record),
-            "bombers" => bombers = Some(record),
-            "pods" => pods = Some(record),
-            "mutants" => mutants = Some(record),
-            "swarmers" => swarmers = Some(record),
-            "wave_time" => wave_time = Some(record),
-            "wave_size" => wave_size = Some(record),
-            "baiter_time" => baiter_time = Some(record),
+            "landers" => landers = Some(parse_record(value)),
+            "bombers" => bombers = Some(parse_record(value)),
+            "pods" => pods = Some(parse_record(value)),
+            "mutants" => mutants = Some(parse_record(value)),
+            "swarmers" => swarmers = Some(parse_record(value)),
+            "wave_time" => wave_time = Some(parse_record(value)),
+            "wave_size" => wave_size = Some(parse_record(value)),
+            "baiter_time" => baiter_time = Some(parse_record(value)),
             _ => {}
         }
     }

@@ -110,7 +110,7 @@ fn parse_arcade_tables(text: &str) -> ArcadeTables {
             "bomber_mine_drop_delay" => bomber_mine_drop_delay = Some(parse_u32(value)),
             "max_mines" => max_mines = Some(parse_usize(value)),
             "default_human_world_xs" => default_human_world_xs = Some(parse_i32_list(value)),
-            _ => panic!("unknown arcade rule key {key}"),
+            _ => {}
         }
     }
 

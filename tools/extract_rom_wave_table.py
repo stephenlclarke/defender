@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Extract the red-label Defender wave table from blk71.src.
 
-The generated text file is embedded by the Rust runtime so gameplay does not
-depend on a local ROM/source checkout at compile time or runtime.
+The generated records are written into `assets/arcade/arcade-rules.txt`, which
+is embedded by the Rust runtime so gameplay does not depend on a local
+ROM/source checkout at compile time or runtime.
 """
 
 from __future__ import annotations
@@ -11,7 +12,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = Path("/tmp/defender-src/src/blk71.src")
-OUTPUT_PATH = ROOT / "assets/arcade/red-label-wave-table.txt"
+ARCADE_RULES_PATH = ROOT / "assets/arcade/arcade-rules.txt"
+START_MARKER = "# BEGIN RED_LABEL_WAVE_TABLE"
+END_MARKER = "# END RED_LABEL_WAVE_TABLE"
 
 RECORDS = [
     ("landers", "LANDERS"),
@@ -58,6 +61,7 @@ def main() -> None:
         raise SystemExit(f"expected {len(RECORDS) * 2} FCB rows, found {len(rows)}")
 
     output = [
+        START_MARKER,
         "# Extracted from blk71.src WVTAB in the Williams red-label source release.",
         "# Format: name=max,min,intra_delta,inter_delta|wave1,wave2,wave3,wave4",
     ]
@@ -77,7 +81,18 @@ def main() -> None:
             f" # {comment}"
         )
 
-    OUTPUT_PATH.write_text("\n".join(output) + "\n")
+    output.append(END_MARKER)
+
+    arcade_rules = ARCADE_RULES_PATH.read_text()
+    start = arcade_rules.find(START_MARKER)
+    end = arcade_rules.find(END_MARKER)
+    if start == -1 or end == -1 or end < start:
+        raise SystemExit("red-label wave markers not found in arcade-rules.txt")
+
+    end += len(END_MARKER)
+    replacement = "\n".join(output)
+    updated = f"{arcade_rules[:start]}{replacement}{arcade_rules[end:]}"
+    ARCADE_RULES_PATH.write_text(updated)
 
 
 def parse_token(token: str) -> int:

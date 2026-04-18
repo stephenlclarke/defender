@@ -26,3 +26,30 @@ max_swarmers=20
 bomber_mine_drop_delay=3
 max_mines=24
 default_human_world_xs=8,26,44,62,80,98,116,134,152,170
+# BEGIN RED_LABEL_WAVE_TABLE
+# Extracted from blk71.src WVTAB in the Williams red-label source release.
+# Format: name=max,min,intra_delta,inter_delta|wave1,wave2,wave3,wave4
+landers=20,0,0,0|15,20,20,20 # LANDERS
+bombers=3,0,0,0|0,3,4,5 # TIES
+pods=6,0,0,0|0,1,3,4 # PROBES
+mutants=10,0,0,0|0,0,0,0 # SCHITZOS
+swarmers=10,0,0,0|0,0,0,0 # SWARMERS
+wave_time=30,0,0,0|30,25,20,16 # WAVE TIME
+wave_size=5,0,0,0|5,5,5,5 # WAVE SIZE
+lander_x_velocity=96,0,3,2|22,30,38,46 # LANDER XV
+lander_y_velocity_msb=1,0,0,0|0,0,1,1 # LANDER YV MSB
+lander_y_velocity_lsb=255,0,16,0|112,176,0,0 # LSB
+lander_shot_time=128,16,-4,-2|74,58,42,42 # LDSTIM
+bomber_x_velocity=48,0,0,0|32,40,44,48 # TIE XV
+mutant_random_y=2,0,0,0|1,1,2,2 # SZRY
+mutant_y_velocity_msb=1,0,0,0|0,0,1,1 # SZYV MSB
+mutant_y_velocity_lsb=255,0,8,6|98,224,2,18 # " LSB
+mutant_x_velocity=96,0,8,4|12,28,36,40 # SZXV
+mutant_shot_time=255,8,-2,-2|42,34,30,28 # SZSTIM
+swarmer_x_velocity=96,0,8,2|22,30,32,34 # SWXV
+swarmer_shot_time=40,10,-2,-1|25,25,25,25 # SWSTIM
+swarmer_acceleration_mask=63,0,0,0|31,31,31,63 # SWAC
+baiter_time=192,24,-12,-4|212,196,164,148 # UFOTIM
+baiter_shot_time=10,3,-1,-1|15,13,12,10 # UFSTIM
+baiter_seek_probability=200,40,-12,-8|240,220,200,200 # UFOSK
+# END RED_LABEL_WAVE_TABLE
