@@ -1,5 +1,7 @@
 use crate::game::{UpdateInput, World, WorldEvent};
 
+const EASTER_EGG_CODE: [char; 5] = ['x', 'y', 'z', 'z', 'y'];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionMode {
     Title,
@@ -7,10 +9,11 @@ pub enum SessionMode {
     GameOver,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SessionInput {
     pub update: UpdateInput,
     pub start_requested: bool,
+    pub typed_chars: Vec<char>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +29,14 @@ pub struct SessionState {
     mode: SessionMode,
     world: World,
     high_score: u32,
+    xyzzy: XyzzyState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct XyzzyState {
+    active: bool,
+    sequence_index: usize,
+    invincible: bool,
 }
 
 impl Default for SessionState {
@@ -40,6 +51,7 @@ impl SessionState {
             mode: SessionMode::Title,
             world: World::bootstrap(),
             high_score: 0,
+            xyzzy: XyzzyState::default(),
         }
     }
 
@@ -55,16 +67,26 @@ impl SessionState {
         self.high_score
     }
 
+    pub fn xyzzy_active(&self) -> bool {
+        self.xyzzy.active
+    }
+
+    pub fn invincible(&self) -> bool {
+        self.xyzzy.invincible
+    }
+
     pub fn tick(&mut self, input: SessionInput) -> Vec<SessionEvent> {
+        self.handle_easter_egg_input(&input.typed_chars);
+
         match self.mode {
-            SessionMode::Title => self.tick_title(input),
-            SessionMode::Playing => self.tick_playing(input),
-            SessionMode::GameOver => self.tick_game_over(input),
+            SessionMode::Title => self.tick_title(input.start_requested),
+            SessionMode::Playing => self.tick_playing(input.update),
+            SessionMode::GameOver => self.tick_game_over(input.start_requested),
         }
     }
 
-    fn tick_title(&mut self, input: SessionInput) -> Vec<SessionEvent> {
-        if input.start_requested {
+    fn tick_title(&mut self, start_requested: bool) -> Vec<SessionEvent> {
+        if start_requested {
             self.world = World::bootstrap();
             self.mode = SessionMode::Playing;
             vec![SessionEvent::GameStarted]
@@ -73,10 +95,11 @@ impl SessionState {
         }
     }
 
-    fn tick_playing(&mut self, input: SessionInput) -> Vec<SessionEvent> {
+    fn tick_playing(&mut self, mut input: UpdateInput) -> Vec<SessionEvent> {
+        input.invincible = self.xyzzy.invincible;
         let mut events: Vec<SessionEvent> = self
             .world
-            .step_live(input.update)
+            .step_live(input)
             .into_iter()
             .map(SessionEvent::World)
             .collect();
@@ -94,13 +117,43 @@ impl SessionState {
         events
     }
 
-    fn tick_game_over(&mut self, input: SessionInput) -> Vec<SessionEvent> {
-        if input.start_requested {
+    fn tick_game_over(&mut self, start_requested: bool) -> Vec<SessionEvent> {
+        if start_requested {
             self.world = World::bootstrap();
             self.mode = SessionMode::Playing;
             vec![SessionEvent::GameRestarted]
         } else {
             Vec::new()
+        }
+    }
+
+    fn handle_easter_egg_input(&mut self, typed_chars: &[char]) {
+        for &character in typed_chars {
+            self.update_easter_egg_sequence(character);
+            if self.xyzzy.active && character == 'i' {
+                self.xyzzy.invincible = !self.xyzzy.invincible;
+            }
+        }
+    }
+
+    fn update_easter_egg_sequence(&mut self, character: char) -> bool {
+        if character == EASTER_EGG_CODE[self.xyzzy.sequence_index] {
+            self.xyzzy.sequence_index += 1;
+            if self.xyzzy.sequence_index == EASTER_EGG_CODE.len() {
+                self.toggle_easter_egg_mode();
+            }
+            return true;
+        }
+
+        self.xyzzy.sequence_index = usize::from(character == EASTER_EGG_CODE[0]);
+        character == EASTER_EGG_CODE[0]
+    }
+
+    fn toggle_easter_egg_mode(&mut self) {
+        self.xyzzy.active = !self.xyzzy.active;
+        self.xyzzy.sequence_index = 0;
+        if !self.xyzzy.active {
+            self.xyzzy.invincible = false;
         }
     }
 }
@@ -216,5 +269,42 @@ mod tests {
         });
 
         assert_eq!(session.high_score(), 900);
+    }
+
+    #[test]
+    fn xyzzy_toggles_secret_mode_and_resets_invincibility() {
+        let mut session = SessionState::new();
+
+        session.tick(SessionInput {
+            typed_chars: vec!['x', 'y', 'z', 'z', 'y'],
+            ..SessionInput::default()
+        });
+        assert!(session.xyzzy_active());
+        assert!(!session.invincible());
+
+        session.tick(SessionInput {
+            typed_chars: vec!['i'],
+            ..SessionInput::default()
+        });
+        assert!(session.invincible());
+
+        session.tick(SessionInput {
+            typed_chars: vec!['x', 'y', 'z', 'z', 'y'],
+            ..SessionInput::default()
+        });
+        assert!(!session.xyzzy_active());
+        assert!(!session.invincible());
+    }
+
+    #[test]
+    fn secret_invincibility_requires_xyzzy_mode() {
+        let mut session = SessionState::new();
+
+        session.tick(SessionInput {
+            typed_chars: vec!['i'],
+            ..SessionInput::default()
+        });
+
+        assert!(!session.invincible());
     }
 }

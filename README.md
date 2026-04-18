@@ -80,10 +80,17 @@ After installation, run the prototype with:
 Live mode controls:
 
 - `Enter` or `1`: start from the title screen, or restart after game over
-- `A` / `D` or `Left` / `Right`: move horizontally
-- `W` / `S` or `Up` / `Down`: move vertically
-- `Space`: fire
+- `A`: move up
+- `Z`: move down
+- `Shift`: thrust forward
+- `Space`: reverse
+- `Enter`: fire the laser bolt
+- `Tab`: detonate a smart bomb
+- `H`: trigger hyperspace
 - `q` or `Esc`: quit
+- `xyzzy`: toggle the hidden mode
+- `i`: while `xyzzy` mode is active, toggle invincibility with unlimited
+  smart bombs
 
 ## Current Notes
 
@@ -99,9 +106,10 @@ Live mode controls:
   wave, life, enemy, and human-count changes through the same playback/audio
   path.
 - `defender --play-live` now runs a real text-mode play loop with keyboard
-  input, title/start flow, player shots, incoming enemy fire, enemy hits, wave
-  progression, human losses, game-over handling, and restart support on top of
-  the same native Rust world model.
+  input, title/start flow, player shots, incoming enemy fire, smart bombs,
+  hyperspace, enemy hits, wave progression, human losses, game-over handling,
+  restart support, and an `xyzzy`/`i` secret god-mode path on top of the same
+  native Rust world model.
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
   adding a fuller terminal graphics path.
@@ -164,3 +172,7 @@ captured stdout. The long-term target is still a richer terminal arcade
 presentation similar to the sibling Rust repos in this directory, but the
 current milestone keeps the renderer text-first so CI, leak detection, input
 handling, and ROM validation can land before a fuller graphics path.
+
+The live session now requests terminal keyboard-enhancement reporting so
+standalone `Shift` thrust input can be captured in terminals that support the
+extended key protocol.

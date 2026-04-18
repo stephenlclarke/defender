@@ -5,11 +5,14 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    event::{
+        self, Event, KeyCode, KeyEvent, KeyEventKind, KeyboardEnhancementFlags, ModifierKeyCode,
+        PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute,
     terminal::{
         Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
-        enable_raw_mode,
+        enable_raw_mode, supports_keyboard_enhancement,
     },
 };
 
@@ -54,11 +57,22 @@ pub fn run_live(play_audio: bool) -> Result<()> {
 fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
     execute!(stdout, MoveTo(0, 0), Clear(ClearType::All)).context("clearing live frame")?;
     let text = match session.mode() {
-        SessionMode::Title => render::render_title_screen(session.high_score()),
-        SessionMode::Playing => render::render(session.world()),
-        SessionMode::GameOver => {
-            render::render_game_over_screen(session.world(), session.high_score())
-        }
+        SessionMode::Title => render::render_title_screen_with_flags(
+            session.high_score(),
+            session.xyzzy_active(),
+            session.invincible(),
+        ),
+        SessionMode::Playing => render::render_with_flags(
+            session.world(),
+            session.xyzzy_active(),
+            session.invincible(),
+        ),
+        SessionMode::GameOver => render::render_game_over_screen_with_flags(
+            session.world(),
+            session.high_score(),
+            session.xyzzy_active(),
+            session.invincible(),
+        ),
     };
     write!(stdout, "{text}").context("writing live frame")?;
     stdout.flush().context("flushing live frame")?;
@@ -71,10 +85,17 @@ fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
         Some(SoundCue::LogoFanfare)
     } else if events.contains(&SessionEvent::HighScoreUpdated) {
         Some(SoundCue::HighScoreChime)
-    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired)) {
+    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired))
+        || events.contains(&SessionEvent::World(
+            crate::game::WorldEvent::HyperspaceUsed,
+        ))
+    {
         Some(SoundCue::EnemySweep)
     } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::GameOver))
         || events.contains(&SessionEvent::World(crate::game::WorldEvent::PlayerHit))
+        || events.contains(&SessionEvent::World(
+            crate::game::WorldEvent::SmartBombDetonated,
+        ))
     {
         Some(SoundCue::Explosion)
     } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::WaveAdvanced)) {
@@ -99,11 +120,10 @@ struct InputTracker {
 
 #[derive(Debug, Default)]
 struct HeldInput {
-    left: bool,
-    right: bool,
     up: bool,
     down: bool,
-    fire: bool,
+    thrust: bool,
+    reverse: bool,
 }
 
 #[derive(Debug, Default)]
@@ -122,68 +142,58 @@ impl InputTracker {
             }
         }
 
-        input.session.update.left |= self.held.left;
-        input.session.update.right |= self.held.right;
         input.session.update.up |= self.held.up;
         input.session.update.down |= self.held.down;
-        input.session.update.fire |= self.held.fire;
+        input.session.update.thrust |= self.held.thrust;
+        input.session.update.reverse |= self.held.reverse;
 
         Ok(input)
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent, input: &mut PolledInput) {
         let pressed = !matches!(key_event.kind, KeyEventKind::Release);
+        if matches!(key_event.kind, KeyEventKind::Press)
+            && let KeyCode::Char(character) = key_event.code
+        {
+            input
+                .session
+                .typed_chars
+                .push(character.to_ascii_lowercase());
+        }
 
         match key_event.code {
             KeyCode::Esc if pressed => input.quit_requested = true,
             KeyCode::Char('q') | KeyCode::Char('Q') if pressed => input.quit_requested = true,
-            KeyCode::Enter if pressed => input.session.start_requested = true,
+            KeyCode::Enter if pressed => {
+                input.session.start_requested = true;
+                input.session.update.fire = true;
+            }
             KeyCode::Char('1') if pressed => input.session.start_requested = true,
-            KeyCode::Left => set_held_flag(
-                &mut self.held.left,
-                key_event.kind,
-                &mut input.session.update.left,
-            ),
-            KeyCode::Right => set_held_flag(
-                &mut self.held.right,
-                key_event.kind,
-                &mut input.session.update.right,
-            ),
-            KeyCode::Up => set_held_flag(
-                &mut self.held.up,
-                key_event.kind,
-                &mut input.session.update.up,
-            ),
-            KeyCode::Down => set_held_flag(
-                &mut self.held.down,
-                key_event.kind,
-                &mut input.session.update.down,
-            ),
             KeyCode::Char('a') | KeyCode::Char('A') => set_held_flag(
-                &mut self.held.left,
-                key_event.kind,
-                &mut input.session.update.left,
-            ),
-            KeyCode::Char('d') | KeyCode::Char('D') => set_held_flag(
-                &mut self.held.right,
-                key_event.kind,
-                &mut input.session.update.right,
-            ),
-            KeyCode::Char('w') | KeyCode::Char('W') => set_held_flag(
                 &mut self.held.up,
                 key_event.kind,
                 &mut input.session.update.up,
             ),
-            KeyCode::Char('s') | KeyCode::Char('S') => set_held_flag(
+            KeyCode::Char('z') | KeyCode::Char('Z') => set_held_flag(
                 &mut self.held.down,
                 key_event.kind,
                 &mut input.session.update.down,
+            ),
+            KeyCode::Modifier(ModifierKeyCode::LeftShift)
+            | KeyCode::Modifier(ModifierKeyCode::RightShift) => set_held_flag(
+                &mut self.held.thrust,
+                key_event.kind,
+                &mut input.session.update.thrust,
             ),
             KeyCode::Char(' ') => set_held_flag(
-                &mut self.held.fire,
+                &mut self.held.reverse,
                 key_event.kind,
-                &mut input.session.update.fire,
+                &mut input.session.update.reverse,
             ),
+            KeyCode::Tab if pressed => input.session.update.smart_bomb = true,
+            KeyCode::Char('h') | KeyCode::Char('H') if pressed => {
+                input.session.update.hyperspace = true;
+            }
             _ => {}
         }
     }
@@ -199,34 +209,82 @@ fn set_held_flag(held: &mut bool, kind: KeyEventKind, output: &mut bool) {
     }
 }
 
-struct TerminalGuard;
+struct TerminalGuard {
+    keyboard_enhancement_supported: bool,
+}
 
 impl TerminalGuard {
     fn enter(stdout: &mut Stdout) -> Result<Self> {
         enable_raw_mode().context("enabling raw mode for live session")?;
-        execute!(
-            stdout,
-            EnterAlternateScreen,
-            Hide,
-            MoveTo(0, 0),
-            Clear(ClearType::All)
-        )
-        .context("switching into the live terminal screen")?;
-        Ok(Self)
+        let mut keyboard_enhancement_supported = false;
+        let result = (|| {
+            keyboard_enhancement_supported = supports_keyboard_enhancement().unwrap_or(false);
+            if keyboard_enhancement_supported {
+                execute!(
+                    stdout,
+                    EnterAlternateScreen,
+                    Hide,
+                    MoveTo(0, 0),
+                    Clear(ClearType::All),
+                    PushKeyboardEnhancementFlags(
+                        KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                            | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+                    )
+                )
+                .context("switching into the live terminal screen with modifier reporting")?;
+            } else {
+                execute!(
+                    stdout,
+                    EnterAlternateScreen,
+                    Hide,
+                    MoveTo(0, 0),
+                    Clear(ClearType::All)
+                )
+                .context("switching into the live terminal screen")?;
+            }
+            Ok(Self {
+                keyboard_enhancement_supported,
+            })
+        })();
+
+        if result.is_err() {
+            if keyboard_enhancement_supported {
+                let _ = execute!(
+                    stdout,
+                    PopKeyboardEnhancementFlags,
+                    Show,
+                    LeaveAlternateScreen
+                );
+            } else {
+                let _ = execute!(stdout, Show, LeaveAlternateScreen);
+            }
+            let _ = disable_raw_mode();
+        }
+
+        result
     }
 }
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
         let mut stdout = io::stdout();
-        let _ = execute!(stdout, Show, LeaveAlternateScreen);
+        if self.keyboard_enhancement_supported {
+            let _ = execute!(
+                stdout,
+                PopKeyboardEnhancementFlags,
+                Show,
+                LeaveAlternateScreen
+            );
+        } else {
+            let _ = execute!(stdout, Show, LeaveAlternateScreen);
+        }
         let _ = disable_raw_mode();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode};
 
     use super::{InputTracker, PolledInput, cue_for_events};
     use crate::audio::SoundCue;
@@ -250,29 +308,64 @@ mod tests {
             cue_for_events(&[SessionEvent::World(WorldEvent::EnemyFired)]),
             Some(SoundCue::EnemySweep)
         );
+        assert_eq!(
+            cue_for_events(&[SessionEvent::World(WorldEvent::SmartBombDetonated)]),
+            Some(SoundCue::Explosion)
+        );
     }
 
     #[test]
-    fn input_tracker_maps_letter_keys_and_releases() {
+    fn input_tracker_maps_live_controls_and_releases() {
         let mut tracker = InputTracker::default();
         let mut input = PolledInput::default();
 
         tracker.handle_key_event(
-            KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE),
             &mut input,
         );
-        assert!(input.session.update.right);
+        assert!(input.session.update.up);
+
+        tracker.handle_key_event(
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftShift),
+                KeyModifiers::NONE,
+                KeyEventKind::Press,
+            ),
+            &mut input,
+        );
+        assert!(input.session.update.thrust);
+
+        tracker.handle_key_event(
+            KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE),
+            &mut input,
+        );
+        assert!(input.session.update.reverse);
+
+        tracker.handle_key_event(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE), &mut input);
+        assert!(input.session.update.smart_bomb);
+
+        tracker.handle_key_event(
+            KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE),
+            &mut input,
+        );
+        assert!(input.session.update.hyperspace);
+
+        tracker.handle_key_event(
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            &mut input,
+        );
+        assert!(input.session.update.fire);
 
         let mut released = PolledInput::default();
         tracker.handle_key_event(
             KeyEvent::new_with_kind(
-                KeyCode::Char('d'),
+                KeyCode::Modifier(ModifierKeyCode::LeftShift),
                 KeyModifiers::NONE,
                 KeyEventKind::Release,
             ),
             &mut released,
         );
-        assert!(!tracker.held.right);
+        assert!(!tracker.held.thrust);
     }
 
     #[test]
@@ -285,6 +378,24 @@ mod tests {
             &mut input,
         );
         assert!(input.session.start_requested);
+    }
+
+    #[test]
+    fn input_tracker_collects_typed_chars_for_xyzzy_and_god_mode() {
+        let mut tracker = InputTracker::default();
+        let mut input = PolledInput::default();
+
+        for key in ['x', 'y', 'z', 'z', 'y', 'i'] {
+            tracker.handle_key_event(
+                KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE),
+                &mut input,
+            );
+        }
+
+        assert_eq!(
+            input.session.typed_chars,
+            vec!['x', 'y', 'z', 'z', 'y', 'i']
+        );
     }
 
     #[test]

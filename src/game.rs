@@ -1,6 +1,6 @@
 use crate::constants::{
-    DEFAULT_LIVES, DEFAULT_WAVE, GROUND_ROW, PLAYER_START_X, PLAYER_START_Y, WORLD_HEIGHT,
-    WORLD_WIDTH,
+    DEFAULT_LIVES, DEFAULT_SMART_BOMBS, DEFAULT_WAVE, GROUND_ROW, PLAYER_START_X, PLAYER_START_Y,
+    WORLD_HEIGHT, WORLD_WIDTH,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,11 +32,14 @@ impl EntityKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct UpdateInput {
-    pub left: bool,
-    pub right: bool,
     pub up: bool,
     pub down: bool,
+    pub thrust: bool,
+    pub reverse: bool,
     pub fire: bool,
+    pub smart_bomb: bool,
+    pub hyperspace: bool,
+    pub invincible: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,6 +48,8 @@ pub enum WorldEvent {
     EnemyFired,
     EnemyDestroyed,
     HumanLost,
+    SmartBombDetonated,
+    HyperspaceUsed,
     PlayerHit,
     WaveAdvanced,
     GameOver,
@@ -92,6 +97,7 @@ pub struct World {
     height: usize,
     tick: u32,
     fire_cooldown: u8,
+    smart_bombs: u8,
     game_over: bool,
     status: Status,
     entities: Vec<Entity>,
@@ -104,6 +110,7 @@ impl World {
             height: WORLD_HEIGHT,
             tick: 0,
             fire_cooldown: 0,
+            smart_bombs: DEFAULT_SMART_BOMBS,
             game_over: false,
             status: Status {
                 score: 0,
@@ -131,6 +138,7 @@ impl World {
             height,
             tick: 0,
             fire_cooldown: 0,
+            smart_bombs: DEFAULT_SMART_BOMBS,
             game_over: false,
             status,
             entities,
@@ -198,6 +206,10 @@ impl World {
         self.status
     }
 
+    pub fn smart_bombs(&self) -> u8 {
+        self.smart_bombs
+    }
+
     pub fn entities(&self) -> &[Entity] {
         &self.entities
     }
@@ -256,6 +268,10 @@ impl World {
         self.status.lives = lives;
     }
 
+    pub fn set_smart_bombs(&mut self, smart_bombs: u8) {
+        self.smart_bombs = smart_bombs;
+    }
+
     pub fn spawn_entity(&mut self, entity: Entity) {
         self.entities.push(entity);
     }
@@ -290,11 +306,22 @@ impl World {
             .iter_mut()
             .find(|entity| entity.kind == EntityKind::PlayerShip)
         {
-            let dx = input.right as i32 - input.left as i32;
+            let dx = input.thrust as i32 - input.reverse as i32;
             let dy = input.down as i32 - input.up as i32;
             player.position.x = (player.position.x + dx).clamp(0, max_x);
             player.position.y = (player.position.y + dy).clamp(min_y, max_y);
+
+            if input.hyperspace {
+                player.position =
+                    hyperspace_destination(self.tick, self.status.score, max_x, min_y, max_y);
+                events.push(WorldEvent::HyperspaceUsed);
+            }
+
             shot_origin = Some(player.position);
+        }
+
+        if input.smart_bomb && self.can_use_smart_bomb(input.invincible) {
+            self.detonate_smart_bomb(input.invincible, &mut events);
         }
 
         if input.fire
@@ -337,7 +364,7 @@ impl World {
 
         self.handle_human_losses(&mut events);
         self.handle_player_shot_hits(&mut events);
-        self.handle_player_collisions(&mut events);
+        self.handle_player_collisions(input.invincible, &mut events);
 
         if !self.game_over && self.enemy_count() == 0 {
             self.status.wave = self.status.wave.saturating_add(1);
@@ -435,7 +462,7 @@ impl World {
         remove_indices(&mut self.entities, &remove_indices_set);
     }
 
-    fn handle_player_collisions(&mut self, events: &mut Vec<WorldEvent>) {
+    fn handle_player_collisions(&mut self, invincible: bool, events: &mut Vec<WorldEvent>) {
         let Some(player_position) = self
             .entities
             .iter()
@@ -461,6 +488,20 @@ impl World {
         }
 
         if collided_enemies.is_empty() {
+            return;
+        }
+
+        if invincible {
+            let score_delta = collided_enemies
+                .iter()
+                .filter_map(|index| self.entities.get(*index))
+                .map(|entity| score_for_enemy(entity.kind))
+                .sum();
+            remove_indices(&mut self.entities, &collided_enemies);
+            self.add_score(score_delta);
+            if score_delta > 0 {
+                events.push(WorldEvent::EnemyDestroyed);
+            }
             return;
         }
 
@@ -493,6 +534,34 @@ impl World {
             .iter()
             .find(|entity| entity.kind == EntityKind::PlayerShip)
             .map(|entity| entity.position)
+    }
+
+    fn can_use_smart_bomb(&self, invincible: bool) -> bool {
+        invincible || self.smart_bombs > 0
+    }
+
+    fn detonate_smart_bomb(&mut self, invincible: bool, events: &mut Vec<WorldEvent>) {
+        if !self.can_use_smart_bomb(invincible) {
+            return;
+        }
+
+        if !invincible {
+            self.smart_bombs -= 1;
+        }
+
+        let mut remove_indices_set = Vec::new();
+        let mut score_delta = 0;
+
+        for (index, entity) in self.entities.iter().enumerate() {
+            if entity.kind.is_enemy() || entity.kind == EntityKind::EnemyShot {
+                remove_indices_set.push(index);
+                score_delta += score_for_enemy(entity.kind);
+            }
+        }
+
+        remove_indices(&mut self.entities, &remove_indices_set);
+        self.add_score(score_delta);
+        events.push(WorldEvent::SmartBombDetonated);
     }
 
     fn retain_projectiles(&mut self, max_x: i32, min_y: i32, max_y: i32) {
@@ -539,6 +608,19 @@ fn positions_overlap(left: Position, right: Position, horizontal: i32, vertical:
     (left.x - right.x).abs() <= horizontal && (left.y - right.y).abs() <= vertical
 }
 
+fn hyperspace_destination(tick: u32, score: u32, max_x: i32, min_y: i32, max_y: i32) -> Position {
+    let width = (max_x + 1).max(1) as u32;
+    let height = (max_y - min_y + 1).max(1) as u32;
+    let seed = tick
+        .wrapping_mul(17)
+        .wrapping_add(score.wrapping_mul(3))
+        .wrapping_add(11);
+    Position {
+        x: (seed % width) as i32,
+        y: min_y + ((seed / width) % height) as i32,
+    }
+}
+
 fn score_for_enemy(kind: EntityKind) -> u32 {
     match kind {
         EntityKind::Lander => 150,
@@ -559,8 +641,11 @@ fn remove_indices(entities: &mut Vec<Entity>, indices: &[usize]) {
 
 #[cfg(test)]
 mod tests {
+    use crate::constants::DEFAULT_SMART_BOMBS;
+
     use super::{
-        Entity, EntityKind, Position, Status, UpdateInput, World, WorldEvent, wrap_coordinate,
+        Entity, EntityKind, Position, Status, UpdateInput, World, WorldEvent,
+        hyperspace_destination, wrap_coordinate,
     };
 
     #[test]
@@ -641,12 +726,14 @@ mod tests {
         world.add_score(250);
         world.set_wave(2);
         world.set_lives(2);
+        world.set_smart_bombs(1);
         world.spawn_entity(Entity::new(EntityKind::Human, 50, 10, 0, 0));
         assert!(world.remove_first_by_kind(EntityKind::Lander));
 
         assert_eq!(world.status().score, 250);
         assert_eq!(world.status().wave, 2);
         assert_eq!(world.status().lives, 2);
+        assert_eq!(world.smart_bombs(), 1);
         assert_eq!(world.enemy_count(), 1);
         assert_eq!(world.human_count(), 3);
     }
@@ -662,7 +749,7 @@ mod tests {
             .position;
 
         let events = world.step_live(UpdateInput {
-            right: true,
+            thrust: true,
             fire: true,
             ..UpdateInput::default()
         });
@@ -845,5 +932,119 @@ mod tests {
         assert_eq!(world.status().wave, 2);
         assert!(world.enemy_count() >= 2);
         assert!(events.contains(&WorldEvent::WaveAdvanced));
+    }
+
+    #[test]
+    fn live_step_detonates_smart_bombs_and_consumes_inventory() {
+        let mut world = World::with_entities(
+            16,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 8, 3, 0, 0),
+                Entity::new(EntityKind::EnemyShot, 6, 3, -1, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput {
+            smart_bomb: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.smart_bombs(), DEFAULT_SMART_BOMBS - 1);
+        assert_eq!(world.status().score, 150);
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+        assert!(events.contains(&WorldEvent::SmartBombDetonated));
+    }
+
+    #[test]
+    fn live_step_hyperspace_moves_the_player_to_a_deterministic_location() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 12, 3, 0, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput {
+            hyperspace: true,
+            ..UpdateInput::default()
+        });
+
+        let player = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player");
+        assert_eq!(player.position, hyperspace_destination(1, 0, 19, 1, 7));
+        assert!(events.contains(&WorldEvent::HyperspaceUsed));
+    }
+
+    #[test]
+    fn invincible_live_step_blocks_enemy_shots_without_spending_lives() {
+        let mut world = World::with_entities(
+            12,
+            8,
+            Status {
+                score: 0,
+                lives: 1,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 3, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 10, 3, 0, 0),
+                Entity::new(EntityKind::EnemyShot, 2, 3, 1, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput {
+            invincible: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.status().lives, 1);
+        assert!(!world.is_game_over());
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+        assert!(!events.contains(&WorldEvent::PlayerHit));
+    }
+
+    #[test]
+    fn invincible_mode_allows_unlimited_smart_bombs() {
+        let mut world = World::with_entities(
+            16,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 8, 3, 0, 0),
+            ],
+        );
+        world.set_smart_bombs(0);
+
+        let events = world.step_live(UpdateInput {
+            smart_bomb: true,
+            invincible: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.smart_bombs(), 0);
+        assert_eq!(world.status().score, 150);
+        assert!(events.contains(&WorldEvent::SmartBombDetonated));
     }
 }

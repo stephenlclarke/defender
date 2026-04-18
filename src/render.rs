@@ -26,10 +26,11 @@ pub fn render_grid(world: &World) -> Vec<String> {
             world.tick()
         ),
         format!(
-            "ENEMIES {}  HUMANS {}  THREAT {}",
+            "ENEMIES {}  HUMANS {}  THREAT {}  BOMBS {}",
             world.enemy_count(),
             world.human_count(),
-            world.threat_score()
+            world.threat_score(),
+            world.smart_bombs()
         ),
     ];
 
@@ -42,14 +43,19 @@ pub fn render_grid(world: &World) -> Vec<String> {
 }
 
 pub fn render(world: &World) -> String {
+    render_with_flags(world, false, false)
+}
+
+pub fn render_with_flags(world: &World, xyzzy_active: bool, invincible: bool) -> String {
     let mut lines = render_grid(world);
     if world.is_game_over() {
         lines.push(String::from(
             "GAME OVER. Press `q` or `Esc` to leave the live session.",
         ));
     }
+    lines.extend(secret_mode_lines(xyzzy_active, invincible));
     lines.push(String::from(
-        "Controls: `A`/`D`/`W`/`S` or arrows move, `Space` fires, `q` quits.",
+        "Controls: `A` up, `Z` down, `Shift` thrust, `Space` reverse, `Enter` fire, `Tab` smart bomb, `H` hyperspace, `q` quits.",
     ));
     lines.push(String::from(
         "Use `cargo run -- --rom-report assets/roms/defender` to inspect local ROM references.",
@@ -58,6 +64,14 @@ pub fn render(world: &World) -> String {
 }
 
 pub fn render_title_screen(high_score: u32) -> String {
+    render_title_screen_with_flags(high_score, false, false)
+}
+
+pub fn render_title_screen_with_flags(
+    high_score: u32,
+    xyzzy_active: bool,
+    invincible: bool,
+) -> String {
     [
         r" ____  _____ _____ _____ _   _ ____  _____ ____  ".to_string(),
         r"|  _ \| ____|  ___| ____| \ | |  _ \| ____|  _ \ ".to_string(),
@@ -73,13 +87,26 @@ pub fn render_title_screen(high_score: u32) -> String {
         String::from("PRESS `q` OR `Esc` TO QUIT"),
         String::new(),
         String::from("CONTROLS"),
-        String::from("MOVE: `A`/`D`/`W`/`S` OR ARROWS"),
-        String::from("FIRE: `Space`"),
+        String::from("VERTICAL: `A` UP / `Z` DOWN"),
+        String::from("DRIVE: `Shift` THRUST / `Space` REVERSE"),
+        String::from("LASER: `Enter`"),
+        String::from("SMART BOMB: `Tab`"),
+        String::from("HYPERSPACE: `H`"),
+        secret_mode_lines(xyzzy_active, invincible).join("\n"),
     ]
     .join("\n")
 }
 
 pub fn render_game_over_screen(world: &World, high_score: u32) -> String {
+    render_game_over_screen_with_flags(world, high_score, false, false)
+}
+
+pub fn render_game_over_screen_with_flags(
+    world: &World,
+    high_score: u32,
+    xyzzy_active: bool,
+    invincible: bool,
+) -> String {
     let mut lines = render_grid(world);
     lines.push(String::new());
     lines.push(format!(
@@ -87,9 +114,25 @@ pub fn render_game_over_screen(world: &World, high_score: u32) -> String {
         world.status().score,
         high_score
     ));
+    lines.extend(secret_mode_lines(xyzzy_active, invincible));
     lines.push(String::from("PRESS `ENTER` OR `1` TO RESTART"));
     lines.push(String::from("PRESS `q` OR `Esc` TO QUIT"));
     lines.join("\n")
+}
+
+fn secret_mode_lines(xyzzy_active: bool, invincible: bool) -> Vec<String> {
+    if !xyzzy_active {
+        return Vec::new();
+    }
+
+    vec![
+        String::from("XYZZY MODE ENABLED"),
+        if invincible {
+            String::from("GOD MODE ON  INVINCIBLE  SMART BOMBS INF")
+        } else {
+            String::from("GOD MODE OFF  PRESS `i` TO TOGGLE INVINCIBILITY")
+        },
+    ]
 }
 
 #[cfg(test)]
@@ -103,6 +146,7 @@ mod tests {
         assert!(output.contains("DEFENDER"));
         assert!(output.contains("LIVES 3"));
         assert!(output.contains("THREAT"));
+        assert!(output.contains("BOMBS 3"));
     }
 
     #[test]
@@ -172,11 +216,20 @@ mod tests {
     }
 
     #[test]
+    fn render_with_secret_mode_shows_xyzzy_indicator() {
+        let output = super::render_with_flags(&World::bootstrap(), true, true);
+
+        assert!(output.contains("XYZZY MODE ENABLED"));
+        assert!(output.contains("SMART BOMBS INF"));
+    }
+
+    #[test]
     fn title_screen_mentions_start_and_high_score() {
         let output = super::render_title_screen(1234);
         assert!(output.contains("LIVE TERMINAL PROTOTYPE"));
         assert!(output.contains("SESSION HIGH SCORE 001234"));
         assert!(output.contains("PRESS `ENTER` OR `1` TO START"));
+        assert!(output.contains("LASER: `Enter`"));
     }
 
     #[test]
