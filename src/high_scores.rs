@@ -3,13 +3,17 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-const MAX_HIGH_SCORES: usize = 5;
+const MAX_HIGH_SCORES: usize = 8;
 const DEFAULT_HIGH_SCORES: [(&str, u32); MAX_HIGH_SCORES] = [
-    ("SLC", 250_000),
-    ("ACE", 175_000),
-    ("ROM", 125_000),
-    ("ARC", 90_000),
-    ("CPU", 50_000),
+    // Red-label ROM default table from `DEFALT` in `romc8.src`.
+    ("DRJ", 21_270),
+    ("SAM", 18_315),
+    ("LED", 15_920),
+    ("PGD", 14_285),
+    ("CRB", 12_520),
+    ("MRS", 11_035),
+    ("SSR", 8_265),
+    ("TMH", 6_010),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -231,21 +235,21 @@ mod tests {
     fn default_table_exposes_seeded_scores() {
         let table = HighScoreTable::default();
 
-        assert_eq!(table.entries().len(), 5);
-        assert_eq!(table.top_score(), 250_000);
-        assert_eq!(table.rows()[0], "   1.  SLC        250000");
+        assert_eq!(table.entries().len(), 8);
+        assert_eq!(table.top_score(), 21_270);
+        assert_eq!(table.rows()[0], "   1.  DRJ         21270");
     }
 
     #[test]
     fn qualifying_rank_requires_beating_the_last_seeded_score() {
         let table = HighScoreTable::default();
 
-        assert_eq!(table.projected_rank(200_000), Some(2));
-        assert_eq!(table.projected_rank(50_000), None);
+        assert_eq!(table.projected_rank(20_000), Some(2));
+        assert_eq!(table.projected_rank(6_010), None);
     }
 
     #[test]
-    fn insert_sorts_descending_and_truncates_to_five_scores() {
+    fn insert_sorts_descending_and_truncates_to_eight_scores() {
         let mut table = HighScoreTable::default();
 
         let rank = table.insert("zap", 300_000);
@@ -253,10 +257,10 @@ mod tests {
         assert_eq!(rank, 1);
         assert_eq!(table.entries()[0].initials, "ZAP");
         assert_eq!(table.entries()[0].score, 300_000);
-        assert_eq!(table.entries().len(), 5);
+        assert_eq!(table.entries().len(), 8);
         assert_eq!(
             table.entries().last().map(|entry| entry.initials.as_str()),
-            Some("ARC")
+            Some("SSR")
         );
     }
 

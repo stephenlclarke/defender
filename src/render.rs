@@ -154,17 +154,19 @@ pub fn render_title_screen_with_flags(
     auto_fire: bool,
 ) -> String {
     [
+        String::from("                 WILLIAMS"),
+        String::from("             ELECTRONICS INC."),
+        String::from("                  PRESENTS"),
+        String::new(),
         r" ____  _____ _____ _____ _   _ ____  _____ ____  ".to_string(),
         r"|  _ \| ____|  ___| ____| \ | |  _ \| ____|  _ \ ".to_string(),
         r"| | | |  _| | |_  |  _| |  \| | | | |  _| | |_) |".to_string(),
         r"| |_| | |___|  _| | |___| |\  | |_| | |___|  _ < ".to_string(),
         r"|____/|_____|_|   |_____|_| \_|____/|_____|_| \_\".to_string(),
         String::new(),
-        String::from("LIVE TERMINAL PROTOTYPE"),
+        format!("HIGH SCORE TO DATE {:05}", high_score),
         String::new(),
-        format!("HIGH SCORE {:06}", high_score),
-        String::new(),
-        String::from("PRESS `ENTER` OR `1` TO START"),
+        String::from("PRESS `ENTER` OR `1` PLAYER START"),
         String::from("PRESS `q` OR `Esc` TO QUIT"),
         String::new(),
         String::from("CONTROLS"),
@@ -205,8 +207,10 @@ pub fn render_game_over_screen_with_flags(
 pub fn render_initials_entry_screen(world: &World, view: &InitialsEntryView<'_>) -> String {
     let mut lines = render_grid(world);
     lines.push(String::new());
+    lines.push(String::from("YOU HAVE QUALIFIED FOR"));
+    lines.push(String::from("THE DEFENDER HALL OF FAME"));
     lines.push(format!(
-        "GREAT SCORE {:06}  HIGH SCORE {:06}",
+        "SCORE {:06}  HIGH SCORE TO DATE {:05}",
         view.entry_score, view.high_score
     ));
     lines.push(format!("QUALIFIES FOR RANK {:>2}", view.entry_rank));
@@ -216,7 +220,7 @@ pub fn render_initials_entry_screen(world: &World, view: &InitialsEntryView<'_>)
         "TYPE LETTERS A-Z, `Backspace` DELETES, `Enter` SAVES",
     ));
     lines.push(String::new());
-    lines.push(String::from("HIGH SCORES"));
+    lines.push(String::from("ALL TIME GREATEST"));
     lines.push(String::from(" RANK  INITIALS   SCORE"));
     lines.push(String::from(" ----  --------  -------"));
     lines.extend(view.high_scores.rows());
@@ -357,9 +361,9 @@ mod tests {
     #[test]
     fn title_screen_mentions_start_and_high_score() {
         let output = super::render_title_screen(1234);
-        assert!(output.contains("LIVE TERMINAL PROTOTYPE"));
-        assert!(output.contains("HIGH SCORE 001234"));
-        assert!(output.contains("PRESS `ENTER` OR `1` TO START"));
+        assert!(output.contains("WILLIAMS"));
+        assert!(output.contains("HIGH SCORE TO DATE 01234"));
+        assert!(output.contains("PRESS `ENTER` OR `1` PLAYER START"));
         assert!(output.contains("LASER: `Enter`"));
     }
 
@@ -378,10 +382,10 @@ mod tests {
         let output = super::render_initials_entry_screen(
             &world,
             &super::InitialsEntryView {
-                high_score: 250_000,
+                high_score: 21_270,
                 high_scores: &HighScoreTable::default(),
                 entry_score: 60_000,
-                entry_rank: 5,
+                entry_rank: 1,
                 initials: "RO_",
                 xyzzy_active: false,
                 invincible: false,
@@ -389,10 +393,10 @@ mod tests {
             },
         );
 
-        assert!(output.contains("GREAT SCORE 060000"));
-        assert!(output.contains("QUALIFIES FOR RANK  5"));
+        assert!(output.contains("THE DEFENDER HALL OF FAME"));
+        assert!(output.contains("QUALIFIES FOR RANK  1"));
         assert!(output.contains("[RO_]"));
         assert!(output.contains("TYPE LETTERS A-Z"));
-        assert!(output.contains("HIGH SCORES"));
+        assert!(output.contains("ALL TIME GREATEST"));
     }
 }

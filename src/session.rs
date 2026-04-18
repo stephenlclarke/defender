@@ -304,8 +304,8 @@ mod tests {
     fn session_starts_at_the_title_screen_with_seeded_high_score() {
         let session = SessionState::new();
         assert_eq!(session.mode(), SessionMode::Title);
-        assert_eq!(session.high_score(), 250_000);
-        assert_eq!(session.high_scores().entries().len(), 5);
+        assert_eq!(session.high_score(), 21_270);
+        assert_eq!(session.high_scores().entries().len(), 8);
     }
 
     #[test]
@@ -420,7 +420,7 @@ mod tests {
         assert_eq!(session.mode(), SessionMode::EnteringInitials);
         assert_eq!(
             session.pending_initials().map(|entry| entry.rank()),
-            Some(5)
+            Some(1)
         );
     }
 
@@ -430,7 +430,7 @@ mod tests {
         session.mode = SessionMode::EnteringInitials;
         session.pending_initials = Some(super::PendingInitials {
             score: 60_000,
-            rank: 5,
+            rank: 1,
             letters: String::new(),
         });
 
@@ -463,8 +463,8 @@ mod tests {
         });
         assert_eq!(events, vec![SessionEvent::HighScoreSaved]);
         assert_eq!(session.mode(), SessionMode::GameOver);
-        assert_eq!(session.high_scores().entries()[4].initials, "RMX");
-        assert_eq!(session.high_scores().entries()[4].score, 60_000);
+        assert_eq!(session.high_scores().entries()[0].initials, "RMX");
+        assert_eq!(session.high_scores().entries()[0].score, 60_000);
     }
 
     #[test]
@@ -477,7 +477,7 @@ mod tests {
             ..SessionInput::default()
         });
 
-        assert_eq!(session.high_score(), 250_000);
+        assert_eq!(session.high_score(), 21_270);
     }
 
     #[test]

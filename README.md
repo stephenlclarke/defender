@@ -133,7 +133,7 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   that now restores on every fifth wave, mutant conversion after successful
   abductions, full lander-to-mutant conversion when the last humanoid is lost,
   and mutant replacement waves until the next fifth-wave planet restoration,
-  persistent five-entry high-score tracking with initials entry, active lander
+  persistent eight-entry high-score tracking with initials entry, active lander
   pursuit of free humans, mutant pursuit of the player, and an arcade-style
   facing model where `Space` flips the ship direction while `Shift` thrust and
   `Enter` fire follow the current heading, with horizontal momentum preserved
@@ -196,6 +196,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - `examples/generate_readme_media.rs` regenerates `docs/defender.png` from the
   gameplay demo path and `docs/start-sequence.gif` from the shared attract
   builders used by the app and README media pipeline.
+- The title, attract legend, and hall-of-fame seed data now use the red-label
+  ROM message/default tables instead of the earlier placeholder prototype
+  strings.
 - High scores persist between live runs in `~/.xyzzy/defender/high_scores.txt`;
   set `DEFENDER_DATA_DIR` to redirect that file for local experiments or tests.
 
