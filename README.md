@@ -131,18 +131,18 @@ Extra keys while `xyzzy` mode is active:
   `xyzzy` mode, a separate `G` invincibility toggle, and an `F` auto-fire
   toggle that only shoots when the current firing lane has a direct alien kill,
   plus pod waves that now start on wave two and ramp up to four ships by wave
-  four, burst into swarmer packs when shot, and preserve the classic
-  follow-from-behind swarmer counterplay, a full-width radar scanner strip that
-  compresses the wrapped world into the top HUD, bomber waves that arrive from
-  wave two onward and leave persistent mine trails that normal smart bombs do
-  not clear, smart bombs that now only destroy enemies on the main screen
-  instead of globally in normal play, with `xyzzy` mode extending the bomb to
-  clear on-screen bullets and mines too, and baiters that beam in when a wave
-  drags on so cleanup is no longer risk-free, plus arcade-style collision
-  scoring where ramming enemies still awards their normal value and dying on
-  bullets or mines still grants `25` points, while `G` god mode blocks bullet
-  and mine deaths and turns direct enemy crashes into safe kills that still pay
-  their normal value,
+  four, release deterministic five-to-seven swarmer bursts when shot, and
+  preserve the classic follow-from-behind swarmer counterplay, a full-width
+  radar scanner strip that compresses the wrapped world into the top HUD,
+  bomber waves that arrive from wave two onward and leave persistent mine
+  trails that normal smart bombs do not clear, smart bombs that now only
+  destroy enemies on the main screen instead of globally in normal play, with
+  `xyzzy` mode extending the bomb to clear on-screen bullets and mines too, and
+  baiters that beam in when a wave drags on so cleanup is no longer risk-free,
+  plus arcade-style collision scoring where ramming enemies still awards their
+  normal value and dying on bullets or mines still grants `25` points, while
+  `G` god mode blocks bullet and mine deaths and turns direct enemy crashes
+  into safe kills that still pay their normal value,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile

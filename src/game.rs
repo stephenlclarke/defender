@@ -18,7 +18,8 @@ const BOMBER_EVASIVE_SPEED: i32 = 2;
 const MAX_BAITERS: usize = 4;
 const BAITER_BASE_DELAY: u32 = 40;
 const BAITER_REPEAT_DELAY: u32 = 20;
-const POD_SWARMER_BURST: usize = 4;
+const POD_SWARMER_BURST_MIN: usize = 5;
+const POD_SWARMER_BURST_RANGE: usize = 3;
 const MAX_SWARMERS: usize = 20;
 const BOMBER_MINE_DROP_DELAY: u32 = 3;
 const MAX_MINES: usize = 24;
@@ -1276,25 +1277,32 @@ impl World {
             return;
         }
 
-        let count = POD_SWARMER_BURST.min(available);
+        let count = self.pod_swarmer_burst_count(pod_position).min(available);
         let player_position = self.player_position();
         let direction = player_position
             .map(|player| shortest_wrapped_delta(pod_position.x, player.x, self.world_span))
             .map(|delta| if delta == 0 { 1 } else { delta.signum() })
             .unwrap_or(1);
-        let vertical_offsets = [-1, 0, 1, 0];
-        let horizontal_offsets = [0, direction, 0, -direction];
+        let spawn_offsets = [
+            (0, -1),
+            (direction, 0),
+            (0, 1),
+            (-direction, 0),
+            (direction, -1),
+            (direction, 1),
+            (-2 * direction, 0),
+        ];
         let max_x = self.world_max_x();
         let min_y = 1;
 
-        for index in 0..count {
-            let x = wrap_coordinate(pod_position.x + horizontal_offsets[index], max_x);
+        for &(horizontal_offset, vertical_offset) in spawn_offsets.iter().take(count) {
+            let x = wrap_coordinate(pod_position.x + horizontal_offset, max_x);
             let safe_y = self.safe_altitude_at_world_x(x);
-            let y = (pod_position.y + vertical_offsets[index]).clamp(min_y, safe_y);
+            let y = (pod_position.y + vertical_offset).clamp(min_y, safe_y);
             let dy = player_position
                 .map(|player| (player.y - y).signum())
                 .filter(|delta| *delta != 0)
-                .unwrap_or(vertical_offsets[index].signum());
+                .unwrap_or(vertical_offset.signum());
             self.entities.push(Entity::new(
                 EntityKind::Swarmer,
                 x,
@@ -1303,6 +1311,13 @@ impl World {
                 dy,
             ));
         }
+    }
+
+    fn pod_swarmer_burst_count(&self, pod_position: Position) -> usize {
+        let variance =
+            ((self.tick as usize) + (pod_position.x as usize) + (pod_position.y as usize))
+                % POD_SWARMER_BURST_RANGE;
+        POD_SWARMER_BURST_MIN + variance
     }
 
     fn can_use_smart_bomb(&self, secret_mode: bool) -> bool {
@@ -1838,9 +1853,9 @@ mod tests {
 
     use super::{
         BAITER_BASE_DELAY, BOMBER_EVASIVE_SPEED, Entity, EntityKind, EntityState,
-        HAZARD_COLLISION_SCORE, HorizontalDirection, POD_SWARMER_BURST, Position, SWARMER_SPEED,
-        Status, UpdateInput, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
-        shortest_wrapped_delta, wrap_coordinate,
+        HAZARD_COLLISION_SCORE, HorizontalDirection, POD_SWARMER_BURST_MIN,
+        POD_SWARMER_BURST_RANGE, Position, SWARMER_SPEED, Status, UpdateInput, World, WorldEvent,
+        hyperspace_result, nearest_wrapped_target, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -2934,12 +2949,11 @@ mod tests {
         );
 
         let events = world.step_live(UpdateInput::default());
+        let swarmer_count = world.entity_count_by_kind(EntityKind::Swarmer);
 
         assert_eq!(world.entity_count_by_kind(EntityKind::Pod), 0);
-        assert_eq!(
-            world.entity_count_by_kind(EntityKind::Swarmer),
-            POD_SWARMER_BURST
-        );
+        assert!(swarmer_count >= POD_SWARMER_BURST_MIN);
+        assert!(swarmer_count < POD_SWARMER_BURST_MIN + POD_SWARMER_BURST_RANGE);
         assert_eq!(world.status().score, 1_000);
         assert!(events.contains(&WorldEvent::EnemyDestroyed));
         assert!(world.entities().iter().all(|entity| {
