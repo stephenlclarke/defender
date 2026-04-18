@@ -193,6 +193,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `TODAYS GREATEST` / `ALL TIME GREATEST` hall-of-fame page, with a volatile
   per-run left table and a persistent right table, using the original black-
   screen two-column attract layout instead of the earlier boxed panel.
+- The live game-over state now uses a sparse arcade-style overlay instead of
+  the earlier restart panel: a thin top strip with score and scanner, the open
+  playfield below it, amber terrain, and a centered `GAME OVER` message.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
   instead of a flat floor, so demo and live frames show a moving landscape and
   projectiles are clipped by terrain. When the last humanoid is lost, the live

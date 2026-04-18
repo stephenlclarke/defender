@@ -21,8 +21,11 @@ const TEXT_SECONDARY: [u8; 4] = [130, 212, 255, 255];
 const TEXT_WARNING: [u8; 4] = [255, 200, 88, 255];
 const TEXT_DANGER: [u8; 4] = [255, 96, 88, 255];
 const TEXT_SCORE_BLUE: [u8; 4] = [84, 196, 255, 255];
+const TEXT_ARCADE_WHITE: [u8; 4] = [246, 246, 246, 255];
 const TERRAIN_LINE: [u8; 4] = [72, 224, 96, 255];
 const TERRAIN_FILL: [u8; 4] = [11, 50, 22, 255];
+const TERRAIN_AMBER_LINE: [u8; 4] = [255, 164, 40, 255];
+const TERRAIN_AMBER_FILL: [u8; 4] = [72, 40, 0, 255];
 const VIEWPORT_BORDER: [u8; 4] = [68, 94, 180, 255];
 const VIEWPORT_BACKGROUND: [u8; 4] = [0, 0, 0, 255];
 const SCANNER_BACKGROUND: [u8; 4] = [5, 8, 18, 255];
@@ -384,44 +387,66 @@ impl Renderer {
     fn render_game_over_screen(
         &mut self,
         world: &World,
-        high_score: u32,
-        xyzzy_active: bool,
-        invincible: bool,
-        auto_fire: bool,
+        _high_score: u32,
+        _xyzzy_active: bool,
+        _invincible: bool,
+        _auto_fire: bool,
     ) {
-        self.render_playing_screen(world, xyzzy_active, invincible, auto_fire);
-        let panel = Rect {
-            x: 180,
-            y: 238,
-            width: self.image_width as i32 - 360,
-            height: 186,
+        self.fill_rect(
+            Rect {
+                x: 0,
+                y: 0,
+                width: self.image_width as i32,
+                height: self.image_height as i32,
+            },
+            Color::from_rgba(BACKGROUND),
+        );
+        let strip_y = 82;
+        self.draw_text(
+            36,
+            28,
+            &format!("{:>5}", world.status().score),
+            TEXT_ARCADE_WHITE,
+            2,
+        );
+        self.draw_arcade_game_over_scanner(
+            world,
+            Rect {
+                x: self.image_width as i32 / 2 - 160,
+                y: 8,
+                width: 320,
+                height: 60,
+            },
+        );
+        self.draw_line(
+            0,
+            strip_y,
+            self.image_width as i32,
+            strip_y,
+            Color::from_rgba(TERRAIN_LINE),
+            2,
+        );
+
+        let playfield = Rect {
+            x: 0,
+            y: strip_y + 4,
+            width: self.image_width as i32,
+            height: self.image_height as i32 - strip_y - 4,
         };
-        self.draw_panel(panel);
-        self.draw_centered_text(panel.center_x(), panel.y + 30, "GAME OVER", TEXT_DANGER, 4);
-        self.draw_centered_text(
-            panel.center_x(),
-            panel.y + 92,
-            &format!(
-                "SCORE {:06}   HIGH SCORE {:06}",
-                world.status().score,
-                high_score
-            ),
-            TEXT_PRIMARY,
-            2,
+        self.draw_world_panel_with_style(
+            world,
+            playfield,
+            false,
+            None,
+            TERRAIN_AMBER_FILL,
+            TERRAIN_AMBER_LINE,
         );
         self.draw_centered_text(
-            panel.center_x(),
-            panel.y + 128,
-            "PRESS ENTER OR 1 TO RESTART",
-            TEXT_WARNING,
-            2,
-        );
-        self.draw_centered_text(
-            panel.center_x(),
-            panel.y + 152,
-            "PRESS Q OR ESC TO QUIT",
-            TEXT_SECONDARY,
-            2,
+            self.image_width as i32 / 2,
+            playfield.y + playfield.height / 2 - 18,
+            "GAME OVER",
+            TEXT_ARCADE_WHITE,
+            3,
         );
     }
 
@@ -589,12 +614,84 @@ impl Renderer {
         }
     }
 
-    fn draw_world_panel(&mut self, world: &World, rect: Rect, show_status_overlay: bool) {
-        self.fill_rect(rect, Color::from_rgba(VIEWPORT_BACKGROUND));
-        self.stroke_rect(rect, Color::from_rgba(VIEWPORT_BORDER), 2);
-        self.draw_space_backdrop(world.tick().wrapping_add(17), Some(rect.inset(2)));
+    fn draw_arcade_game_over_scanner(&mut self, world: &World, rect: Rect) {
+        self.stroke_rect(rect, Color::from_rgba(TERRAIN_LINE), 2);
+        let inner = rect.inset(2);
+        self.fill_rect(inner, Color::from_rgba(BACKGROUND));
 
-        let terrain_rect = rect.inset(2);
+        if !world.planet_destroyed() {
+            let terrain_y = inner.y + inner.height - 10;
+            let mut previous = None;
+            for screen_x in 0..world.width() {
+                let x = inner.x
+                    + ((screen_x as f32 + 0.5) * inner.width as f32 / world.width() as f32).round()
+                        as i32;
+                let terrain_row = world.terrain_row_at_screen_x(screen_x) as f32;
+                let terrain_offset =
+                    ((terrain_row / world.height() as f32) * 12.0).round() as i32 - 6;
+                let y = terrain_y + terrain_offset;
+                if let Some((prev_x, prev_y)) = previous {
+                    self.draw_line(
+                        prev_x,
+                        prev_y,
+                        x,
+                        y,
+                        Color::from_rgba(TERRAIN_AMBER_LINE),
+                        1,
+                    );
+                }
+                previous = Some((x, y));
+            }
+        }
+
+        for entity in world.entities() {
+            let x = inner.x
+                + ((entity.position.x.rem_euclid(world.world_span()) as f32) * inner.width as f32
+                    / world.world_span() as f32)
+                    .round() as i32;
+            let y = inner.y
+                + ((entity.position.y as f32 + 0.5) * inner.height as f32 / world.height() as f32)
+                    .round() as i32;
+            let radius = if entity.kind == EntityKind::PlayerShip {
+                3
+            } else {
+                2
+            };
+            self.draw_dot(x, y, Color::from_rgba(scanner_color(entity.kind)), radius);
+        }
+    }
+
+    fn draw_world_panel(&mut self, world: &World, rect: Rect, show_status_overlay: bool) {
+        self.draw_world_panel_with_style(
+            world,
+            rect,
+            show_status_overlay,
+            Some(VIEWPORT_BORDER),
+            TERRAIN_FILL,
+            TERRAIN_LINE,
+        );
+    }
+
+    fn draw_world_panel_with_style(
+        &mut self,
+        world: &World,
+        rect: Rect,
+        show_status_overlay: bool,
+        border_color: Option<[u8; 4]>,
+        terrain_fill_color: [u8; 4],
+        terrain_line_color: [u8; 4],
+    ) {
+        self.fill_rect(rect, Color::from_rgba(VIEWPORT_BACKGROUND));
+        if let Some(border_color) = border_color {
+            self.stroke_rect(rect, Color::from_rgba(border_color), 2);
+        }
+        let terrain_rect = if border_color.is_some() {
+            rect.inset(2)
+        } else {
+            rect
+        };
+        self.draw_space_backdrop(world.tick().wrapping_add(17), Some(terrain_rect));
+
         if !world.planet_destroyed() {
             let mut previous = None;
             for screen_x in 0..world.width() {
@@ -611,11 +708,18 @@ impl Renderer {
                     y,
                     x,
                     terrain_rect.y + terrain_rect.height - 1,
-                    Color::from_rgba(TERRAIN_FILL),
+                    Color::from_rgba(terrain_fill_color),
                     1,
                 );
                 if let Some((prev_x, prev_y)) = previous {
-                    self.draw_line(prev_x, prev_y, x, y, Color::from_rgba(TERRAIN_LINE), 2);
+                    self.draw_line(
+                        prev_x,
+                        prev_y,
+                        x,
+                        y,
+                        Color::from_rgba(terrain_line_color),
+                        2,
+                    );
                 }
                 previous = Some((x, y));
             }
@@ -1289,6 +1393,34 @@ mod tests {
 
         assert_ne!(
             sample_pixel(&image.pixels, image.width, image.width / 2, 140),
+            super::BACKGROUND
+        );
+    }
+
+    #[test]
+    fn game_over_screen_renders_arcade_strip_and_center_overlay() {
+        let mut renderer = Renderer::with_size(960, 720);
+        let world = crate::game::World::bootstrap();
+
+        let image = renderer.render(Screen::GameOver {
+            world: &world,
+            high_score: 10_000,
+            xyzzy_active: false,
+            invincible: false,
+            auto_fire: false,
+        });
+
+        assert_ne!(
+            sample_pixel(&image.pixels, image.width, 20, 82),
+            super::BACKGROUND
+        );
+        assert_ne!(
+            sample_pixel(
+                &image.pixels,
+                image.width,
+                image.width / 2,
+                image.height / 2
+            ),
             super::BACKGROUND
         );
     }
