@@ -41,11 +41,14 @@ Run targets:
 - `cargo run -- --play-demo --mute --no-sleep`
 - `cargo run -- --play-attract`
 - `cargo run -- --play-attract --mute --no-sleep`
+- `cargo run -- --play-live`
+- `cargo run -- --play-live --mute`
 - `cargo run -- --scene logo`
 - `cargo run -- --scene attract`
 - `cargo run -- --scene high-score`
 - `cargo run -- --frames 8`
 - `cargo run -- --rom-report assets/roms/defender`
+- `make live`
 - `cargo test`
 - `cargo fmt --check`
 - `cargo clippy --all-targets -- -D warnings`
@@ -64,9 +67,19 @@ After installation, run the prototype with:
 - `defender --audio-demo`
 - `defender --play-demo`
 - `defender --play-attract`
+- `defender --play-live`
 - `defender --scene attract`
 - `defender --scene high-score`
 - `defender --frames 8`
+
+## Controls
+
+Live mode controls:
+
+- `A` / `D` or `Left` / `Right`: move horizontally
+- `W` / `S` or `Up` / `Down`: move vertically
+- `Space`: fire
+- `q` or `Esc`: quit
 
 ## Current Notes
 
@@ -81,6 +94,9 @@ After installation, run the prototype with:
 - `defender --play-demo` now runs a scripted gameplay showcase with score,
   wave, life, enemy, and human-count changes through the same playback/audio
   path.
+- `defender --play-live` now runs a real text-mode play loop with keyboard
+  input, shots, enemy hits, wave progression, human losses, and game-over
+  handling on top of the same native Rust world model.
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
   adding a fuller terminal graphics path.
@@ -122,8 +138,13 @@ the final runtime self-contained:
 
 ## Platform Support
 
-The current bootstrap is plain terminal output and should run anywhere a recent
-Rust toolchain is available. The long-term target is still a richer terminal
-arcade presentation similar to the sibling Rust repos in this directory, but
-the first milestone keeps the runtime simple so CI, leak detection, and ROM
-validation can land early.
+The current build stays in plain ANSI terminal output rather than Kitty
+graphics, so the attract/demo modes should run anywhere a recent Rust toolchain
+is available.
+
+The new live loop uses `crossterm` raw-mode keyboard input, so `--play-live`
+must be launched from a real interactive terminal session rather than piped or
+captured stdout. The long-term target is still a richer terminal arcade
+presentation similar to the sibling Rust repos in this directory, but the
+current milestone keeps the renderer text-first so CI, leak detection, input
+handling, and ROM validation can land before a fuller graphics path.

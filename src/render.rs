@@ -43,6 +43,14 @@ pub fn render_grid(world: &World) -> Vec<String> {
 
 pub fn render(world: &World) -> String {
     let mut lines = render_grid(world);
+    if world.is_game_over() {
+        lines.push(String::from(
+            "GAME OVER. Press `q` or `Esc` to leave the live session.",
+        ));
+    }
+    lines.push(String::from(
+        "Controls: `A`/`D`/`W`/`S` or arrows move, `Space` fires, `q` quits.",
+    ));
     lines.push(String::from(
         "Use `cargo run -- --rom-report assets/roms/defender` to inspect local ROM references.",
     ));
@@ -104,5 +112,27 @@ mod tests {
         let frame_rows: Vec<&str> = output.lines().skip(2).take(world.height()).collect();
 
         assert!(frame_rows.iter().all(|row| !row.contains('M')));
+    }
+
+    #[test]
+    fn render_appends_live_controls_and_game_over_notice() {
+        let mut world = World::with_entities(
+            8,
+            6,
+            Status {
+                score: 0,
+                lives: 1,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 2, 0, 0),
+                Entity::new(EntityKind::Lander, 2, 2, 0, 0),
+            ],
+        );
+        world.step_live(crate::game::UpdateInput::default());
+
+        let output = super::render(&world);
+        assert!(output.contains("Controls:"));
+        assert!(output.contains("GAME OVER"));
     }
 }

@@ -103,6 +103,19 @@ fn play_demo_mode_renders_the_gameplay_sequence_without_sleep() {
 }
 
 #[test]
+fn help_mentions_the_live_mode() {
+    let output = Command::new(env!("CARGO_BIN_EXE_defender"))
+        .args(["--help"])
+        .output()
+        .expect("run defender");
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf8");
+    assert!(stdout.contains("--play-live"));
+}
+
+#[test]
 fn rom_report_summarises_canonical_files() {
     let temp_dir = TempDir::new();
     fs::write(temp_dir.path().join("defend.1"), []).expect("write rom");

@@ -10,6 +10,7 @@ use crate::attract::{SceneKind, attract_cycle, attract_scene, high_score_scene, 
 use crate::audio::{AudioManager, SoundCue};
 use crate::demo::gameplay_demo_cycle;
 use crate::game::World;
+use crate::live::run_live;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
@@ -17,6 +18,7 @@ enum Command {
     Gameplay { frames: usize },
     PlayDemo { play_audio: bool, sleep: bool },
     PlayAttract { play_audio: bool, sleep: bool },
+    PlayLive { play_audio: bool },
     Scene { kind: SceneKind },
     RomReport { path: PathBuf },
     Help,
@@ -38,6 +40,7 @@ pub fn run() -> Result<()> {
         Command::Gameplay { frames } => run_demo(frames),
         Command::PlayDemo { play_audio, sleep } => run_play_demo(play_audio, sleep),
         Command::PlayAttract { play_audio, sleep } => run_play_attract(play_audio, sleep),
+        Command::PlayLive { play_audio } => run_live(play_audio),
         Command::Scene { kind } => run_scene(kind),
         Command::RomReport { path } => run_rom_report(&path),
         Command::Help => {
@@ -188,6 +191,18 @@ where
 
             Ok(Command::PlayAttract { play_audio, sleep })
         }
+        "--play-live" => {
+            let mut play_audio = true;
+
+            for arg in args {
+                match arg.as_str() {
+                    "--mute" => play_audio = false,
+                    other => bail!("unsupported --play-live option: {other}"),
+                }
+            }
+
+            Ok(Command::PlayLive { play_audio })
+        }
         "--scene" => {
             let Some(value) = args.next() else {
                 bail!("--scene requires one of: logo, attract, high-score");
@@ -242,6 +257,8 @@ fn print_help() {
     println!("  cargo run -- --play-demo --mute --no-sleep");
     println!("  cargo run -- --play-attract");
     println!("  cargo run -- --play-attract --mute --no-sleep");
+    println!("  cargo run -- --play-live");
+    println!("  cargo run -- --play-live --mute");
     println!("  cargo run -- --scene logo");
     println!("  cargo run -- --scene attract");
     println!("  cargo run -- --scene high-score");
@@ -335,6 +352,13 @@ mod tests {
     }
 
     #[test]
+    fn parse_args_reads_play_live_with_mute() {
+        let command = parse_args(vec![String::from("--play-live"), String::from("--mute")])
+            .expect("parse args");
+        assert_eq!(command, Command::PlayLive { play_audio: false });
+    }
+
+    #[test]
     fn parse_args_uses_default_rom_directory() {
         let command = parse_args(vec![String::from("--rom-report")]).expect("parse args");
         assert_eq!(
@@ -406,5 +430,15 @@ mod tests {
         ])
         .expect_err("parse args");
         assert!(error.to_string().contains("unsupported --play-demo option"));
+    }
+
+    #[test]
+    fn parse_args_rejects_unknown_play_live_option() {
+        let error = parse_args(vec![
+            String::from("--play-live"),
+            String::from("--no-sleep"),
+        ])
+        .expect_err("parse args");
+        assert!(error.to_string().contains("unsupported --play-live option"));
     }
 }
