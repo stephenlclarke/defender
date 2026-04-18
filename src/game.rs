@@ -429,6 +429,7 @@ impl World {
             events.push(WorldEvent::ShotFired);
         }
 
+        self.update_enemy_intents(min_y, max_y);
         self.begin_human_abductions();
 
         for entity in &mut self.entities {
@@ -511,6 +512,60 @@ impl World {
         events.push(WorldEvent::EnemyFired);
     }
 
+    fn update_enemy_intents(&mut self, min_y: i32, max_y: i32) {
+        let player_position = self.player_position();
+        let free_humans = self.free_human_positions();
+        let world_span = self.world_span;
+        let world_max_x = self.world_max_x();
+
+        for enemy in self
+            .entities
+            .iter_mut()
+            .filter(|entity| entity.kind.is_enemy())
+        {
+            match enemy.kind {
+                EntityKind::Lander if enemy.state == EntityState::CarryingHuman => {
+                    enemy.velocity.dx = 0;
+                    enemy.velocity.dy = -1;
+                }
+                EntityKind::Lander => {
+                    let target = nearest_wrapped_target(enemy.position, &free_humans, world_span)
+                        .or(player_position)
+                        .unwrap_or(enemy.position);
+                    enemy.velocity.dx =
+                        wrapped_horizontal_step(enemy.position.x, target.x, world_max_x);
+                    enemy.velocity.dy = (target.y - enemy.position.y).signum();
+                    if enemy.velocity.dy == 0 && enemy.position.y <= min_y {
+                        enemy.velocity.dy = 1;
+                    }
+                }
+                EntityKind::Mutant => {
+                    let target = player_position.unwrap_or(enemy.position);
+                    enemy.velocity.dx =
+                        wrapped_horizontal_step(enemy.position.x, target.x, world_max_x);
+                    enemy.velocity.dy = (target.y - enemy.position.y).signum();
+                    if enemy.velocity.dy == 0 {
+                        enemy.velocity.dy = if self.tick.is_multiple_of(2) { -1 } else { 1 };
+                    }
+                }
+                _ => {}
+            }
+
+            enemy.velocity.dy = enemy.velocity.dy.clamp(-1, 1);
+            enemy.position.y = enemy.position.y.clamp(min_y, max_y);
+        }
+    }
+
+    fn free_human_positions(&self) -> Vec<Position> {
+        self.entities
+            .iter()
+            .filter(|entity| {
+                entity.kind == EntityKind::Human && entity.state == EntityState::Normal
+            })
+            .map(|entity| entity.position)
+            .collect()
+    }
+
     fn begin_human_abductions(&mut self) {
         let mut claimed_humans = Vec::new();
 
@@ -538,6 +593,7 @@ impl World {
 
             claimed_humans.push(human_index);
             self.entities[lander_index].state = EntityState::CarryingHuman;
+            self.entities[lander_index].velocity.dx = 0;
             self.entities[lander_index].velocity.dy = -1;
             self.entities[human_index].state = EntityState::Abducted;
             self.entities[human_index].position.x = lander_position.x;
@@ -987,6 +1043,32 @@ fn terrain_surface_y(terrain: &[usize], world_x: i32) -> i32 {
     terrain[index] as i32 - 1
 }
 
+fn wrapped_horizontal_step(from: i32, to: i32, max_x: i32) -> i32 {
+    shortest_wrapped_delta(from, to, max_x + 1).signum()
+}
+
+fn shortest_wrapped_delta(from: i32, to: i32, span: i32) -> i32 {
+    let forward = (to - from).rem_euclid(span);
+    let backward = forward - span;
+    if forward.abs() <= backward.abs() {
+        forward
+    } else {
+        backward
+    }
+}
+
+fn nearest_wrapped_target(
+    origin: Position,
+    candidates: &[Position],
+    span: i32,
+) -> Option<Position> {
+    candidates.iter().copied().min_by_key(|candidate| {
+        let horizontal = shortest_wrapped_delta(origin.x, candidate.x, span).abs();
+        let vertical = (origin.y - candidate.y).abs();
+        horizontal * 2 + vertical
+    })
+}
+
 fn hyperspace_destination(tick: u32, score: u32, max_x: i32, min_y: i32, max_y: i32) -> Position {
     let width = (max_x + 1).max(1) as u32;
     let height = (max_y - min_y + 1).max(1) as u32;
@@ -1024,7 +1106,7 @@ mod tests {
 
     use super::{
         Entity, EntityKind, EntityState, Position, Status, UpdateInput, World, WorldEvent,
-        hyperspace_destination, wrap_coordinate,
+        hyperspace_destination, nearest_wrapped_target, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -1047,6 +1129,24 @@ mod tests {
         assert_eq!(wrap_coordinate(-1, 63), 63);
         assert_eq!(wrap_coordinate(64, 63), 0);
         assert_eq!(wrap_coordinate(12, 63), 12);
+    }
+
+    #[test]
+    fn shortest_wrapped_delta_prefers_the_shorter_arc() {
+        assert_eq!(shortest_wrapped_delta(1, 14, 16), -3);
+        assert_eq!(shortest_wrapped_delta(14, 1, 16), 3);
+    }
+
+    #[test]
+    fn nearest_wrapped_target_picks_the_closest_candidate() {
+        let origin = Position { x: 14, y: 4 };
+        let target = nearest_wrapped_target(
+            origin,
+            &[Position { x: 2, y: 4 }, Position { x: 12, y: 6 }],
+            16,
+        );
+
+        assert_eq!(target, Some(Position { x: 12, y: 6 }));
     }
 
     #[test]
@@ -1204,6 +1304,120 @@ mod tests {
     }
 
     #[test]
+    fn live_step_landers_seek_the_nearest_free_human() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 10, 3, 0, 0),
+                Entity::new(EntityKind::Human, 14, 5, 0, 0),
+                Entity::new(EntityKind::Human, 3, 7, 0, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let lander = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Lander)
+            .expect("lander");
+        assert_eq!(lander.position, Position { x: 11, y: 4 });
+    }
+
+    #[test]
+    fn live_step_landers_chase_the_player_when_no_free_humans_remain() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 5, 0, 0),
+                Entity::new(EntityKind::Lander, 10, 3, 0, 0),
+                Entity::with_state(EntityKind::Human, 12, 4, 0, 0, EntityState::Falling),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let lander = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Lander)
+            .expect("lander");
+        assert_eq!(lander.position, Position { x: 9, y: 4 });
+    }
+
+    #[test]
+    fn live_step_mutants_home_toward_the_player() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 10, 6, 0, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let mutant = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Mutant)
+            .expect("mutant");
+        assert_eq!(mutant.position, Position { x: 9, y: 5 });
+    }
+
+    #[test]
+    fn live_step_carrying_landers_rise_straight_up() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::with_state(EntityKind::Lander, 8, 5, 1, 1, EntityState::CarryingHuman),
+                Entity::with_state(EntityKind::Human, 8, 6, 0, -1, EntityState::Abducted),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let lander = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Lander)
+            .expect("lander");
+        assert_eq!(lander.position, Position { x: 8, y: 4 });
+        let human = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Human)
+            .expect("human");
+        assert_eq!(human.position, Position { x: 8, y: 5 });
+    }
+
+    #[test]
     fn live_step_scores_when_a_shot_hits_an_enemy() {
         let mut world = World::with_entities(
             12,
@@ -1328,8 +1542,8 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
-                Entity::with_state(EntityKind::Lander, 5, 3, 0, 0, EntityState::CarryingHuman),
-                Entity::with_state(EntityKind::Human, 5, 4, 0, 0, EntityState::Abducted),
+                Entity::with_state(EntityKind::Lander, 5, 4, 0, 0, EntityState::CarryingHuman),
+                Entity::with_state(EntityKind::Human, 5, 5, 0, 0, EntityState::Abducted),
                 Entity::new(EntityKind::Mutant, 11, 3, 0, 0),
             ],
         );
