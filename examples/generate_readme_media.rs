@@ -7,8 +7,7 @@ use png::{BitDepth, ColorType, Compression, Encoder as PngEncoder};
 
 use defender::{
     attract::{AttractBeat, attract_cycle, attract_frame_for_beat},
-    demo::gameplay_demo_cycle,
-    game::{Entity, EntityKind, World},
+    game::{Entity, EntityKind, EntityState, HorizontalDirection, World},
     high_scores::HighScoreTable,
     video::{RenderedImage, Renderer, Screen},
 };
@@ -83,19 +82,47 @@ fn build_sequence() -> Vec<(RgbaImage, u16)> {
 }
 
 fn gameplay_screenshot_world() -> World {
-    let mut world = gameplay_demo_cycle()[4].world.clone();
-    world.add_score(375);
-    world.set_lives(2);
-    world.set_smart_bombs(1);
-    world.spawn_entity(Entity::new(EntityKind::Lander, 18, 5, -1, 1));
-    world.spawn_entity(Entity::new(EntityKind::Lander, 26, 8, -1, 0));
-    world.spawn_entity(Entity::new(EntityKind::Mutant, 22, 6, 1, -1));
-    world.spawn_entity(Entity::new(EntityKind::EnemyShot, 20, 7, 1, -1));
-    world.spawn_entity(Entity::new(EntityKind::PlayerShot, 15, 6, 2, 0));
+    let mut world = World::bootstrap();
+    for _ in 0..8 {
+        world.step();
+    }
+
+    world.add_score(13_850);
+    world.set_lives(3);
+    world.set_wave(5);
+    world.set_smart_bombs(2);
+    world.set_player_facing(HorizontalDirection::Left);
+
+    // Use a deterministic live-play showcase frame rather than a staged demo
+    // card so the README screenshot reads like a real combat moment.
+    world.spawn_entity(Entity::new(EntityKind::Mutant, 10, 6, 1, -1));
+    world.spawn_entity(Entity::new(EntityKind::Bomber, 16, 4, -1, 0));
+    world.spawn_entity(Entity::new(EntityKind::Pod, 22, 7, -1, 0));
+    world.spawn_entity(Entity::new(EntityKind::Swarmer, 27, 6, -1, -1));
+    world.spawn_entity(Entity::new(EntityKind::Baiter, 31, 3, -1, 1));
+    world.spawn_entity(Entity::new(EntityKind::EnemyShot, 15, 6, -1, 0));
+    world.spawn_entity(Entity::new(EntityKind::EnemyShot, 23, 7, -1, -1));
+    world.spawn_entity(Entity::new(EntityKind::PlayerShot, 7, 5, -2, 0));
+    world.spawn_entity(Entity::new(EntityKind::PlayerShot, 5, 5, -2, 0));
+    world.spawn_entity(Entity::new(
+        EntityKind::Mine,
+        29,
+        world.safe_altitude_at_world_x(29) - 3,
+        0,
+        0,
+    ));
+    world.spawn_entity(Entity::with_state(
+        EntityKind::Human,
+        18,
+        8,
+        0,
+        1,
+        EntityState::Falling,
+    ));
     world.spawn_entity(Entity::new(
         EntityKind::Human,
-        20,
-        world.safe_altitude_at_world_x(20),
+        33,
+        world.safe_altitude_at_world_x(33),
         0,
         0,
     ));
