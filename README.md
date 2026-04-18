@@ -41,16 +41,16 @@ Run targets:
 - `cargo run`
 - `cargo run -- --mute`
 - `cargo run -- --rom-report assets/roms/defender`
-- `make live`
-- `make live-muted`
+- `make run`
+- `make run-muted`
 - `cargo test`
 - `cargo fmt --check`
 - `cargo clippy --all-targets -- -D warnings`
+- `make ci`
 - `make coverage`
 - `make sq-ci`
 - `make sq`
-- `cargo run --example generate_readme_media`
-- `make ci`
+- `make readme-media`
 
 ## Install
 

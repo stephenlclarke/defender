@@ -1,4 +1,4 @@
-.PHONY: fmt test clippy ci coverage sq sq-ci sonar live live-muted readme-media
+.PHONY: fmt test clippy ci coverage sq sq-ci sonar run run-muted live live-muted readme-media
 
 SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
@@ -42,11 +42,15 @@ sq:
 
 sonar: sq
 
-live:
+run:
 	cargo run
 
-live-muted:
+run-muted:
 	cargo run -- --mute
+
+live: run
+
+live-muted: run-muted
 
 readme-media:
 	cargo run --example generate_readme_media
