@@ -19,7 +19,8 @@ This repository is the first native Rust pass at Williams' `Defender`.
 The current milestone focuses on a solid native-Rust foundation for the start
 logo, attract sequence, high-score presentation, ROM-set auditing, CI, and test
 coverage before a richer live arcade loop lands. The game logic is native Rust;
-ROMs are treated as reference material only.
+ROMs are treated as reference material only, and the current sound cues are
+synthesized in-process so the app does not depend on external audio files.
 
 ![Defender](docs/defender.png)
 
@@ -35,6 +36,7 @@ ROMs are treated as reference material only.
 Run targets:
 
 - `cargo run`
+- `cargo run -- --audio-demo`
 - `cargo run -- --scene logo`
 - `cargo run -- --scene attract`
 - `cargo run -- --scene high-score`
@@ -55,6 +57,7 @@ Install directly from git with Cargo:
 After installation, run the prototype with:
 
 - `defender`
+- `defender --audio-demo`
 - `defender --scene attract`
 - `defender --scene high-score`
 - `defender --frames 8`
@@ -64,6 +67,8 @@ After installation, run the prototype with:
 - The app now has explicit `logo`, `attract`, and `high-score` scenes so the
   README screenshot and animated preview are generated from real application
   output rather than mocked assets.
+- All current sounds are embedded in the app via synthesized `rodio` cues,
+  following the same self-contained runtime principle used in `../battlezone`.
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
   adding a fuller terminal graphics path.
@@ -79,9 +84,11 @@ After installation, run the prototype with:
 ## Reference Repos
 
 - `../battlezone`: the primary local template for crate layout, CI, SonarCloud,
-  and README structure for these terminal arcade rewrites.
+  README structure, and self-contained synthesized audio for these terminal
+  arcade rewrites.
 - `../pacman`: secondary local reference for README/media conventions and
-  workflow shape across the sibling Rust arcade repos.
+  workflow shape across the sibling Rust arcade repos, including an
+  embedded-audio path based on bundled sound assets.
 - <https://github.com/mwenge/defender>: external Defender rewrite used to
   compare canonical ROM naming and overall project direction.
 

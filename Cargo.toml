@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"
+rodio = "0.21"
 
 [dev-dependencies]
 font8x8 = "0.3"

@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod attract;
+pub mod audio;
 pub mod constants;
 pub mod game;
 pub mod render;

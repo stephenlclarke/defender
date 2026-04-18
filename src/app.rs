@@ -4,10 +4,12 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 
 use crate::attract::{SceneKind, attract_scene, high_score_scene, logo_scene};
+use crate::audio::AudioManager;
 use crate::game::World;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
+    AudioDemo,
     Gameplay { frames: usize },
     Scene { kind: SceneKind },
     RomReport { path: PathBuf },
@@ -16,6 +18,10 @@ enum Command {
 
 pub fn run() -> Result<()> {
     match parse_args(env::args().skip(1))? {
+        Command::AudioDemo => {
+            AudioManager::new().play_demo();
+            Ok(())
+        }
         Command::Gameplay { frames } => run_demo(frames),
         Command::Scene { kind } => run_scene(kind),
         Command::RomReport { path } => run_rom_report(&path),
@@ -82,6 +88,12 @@ where
 
     match first.as_str() {
         "--help" | "-h" => Ok(Command::Help),
+        "--audio-demo" => {
+            if args.next().is_some() {
+                bail!("--audio-demo does not accept extra arguments");
+            }
+            Ok(Command::AudioDemo)
+        }
         "--scene" => {
             let Some(value) = args.next() else {
                 bail!("--scene requires one of: logo, attract, high-score");
@@ -131,6 +143,7 @@ where
 fn print_help() {
     println!("defender");
     println!("  cargo run");
+    println!("  cargo run -- --audio-demo");
     println!("  cargo run -- --scene logo");
     println!("  cargo run -- --scene attract");
     println!("  cargo run -- --scene high-score");
@@ -184,6 +197,12 @@ mod tests {
     }
 
     #[test]
+    fn parse_args_reads_audio_demo() {
+        let command = parse_args(vec![String::from("--audio-demo")]).expect("parse args");
+        assert_eq!(command, Command::AudioDemo);
+    }
+
+    #[test]
     fn parse_args_uses_default_rom_directory() {
         let command = parse_args(vec![String::from("--rom-report")]).expect("parse args");
         assert_eq!(
@@ -220,5 +239,16 @@ mod tests {
         let error = parse_args(vec![String::from("--scene"), String::from("warp")])
             .expect_err("parse args");
         assert!(error.to_string().contains("unsupported scene"));
+    }
+
+    #[test]
+    fn parse_args_rejects_extra_audio_demo_arguments() {
+        let error = parse_args(vec![String::from("--audio-demo"), String::from("extra")])
+            .expect_err("parse args");
+        assert!(
+            error
+                .to_string()
+                .contains("does not accept extra arguments")
+        );
     }
 }
