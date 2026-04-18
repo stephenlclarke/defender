@@ -92,6 +92,9 @@ Live mode controls:
 - `i`: while `xyzzy` mode is active, toggle invincibility with unlimited
   smart bombs
 
+The live key layout is currently modelled on the BBC Micro `Planetoid`
+control scheme from Acornsoft's 1982 release of its `Defender` variant.
+
 ## Current Notes
 
 - The app now has explicit `logo`, `attract`, and `high-score` scenes so the
@@ -159,6 +162,9 @@ the final runtime self-contained:
   and palette reference for later presentation work.
 - <https://mdk.cab/game/defender>: artwork, screenshots, and general cabinet
   reference material for start-screen and attract-sequence planning.
+- <https://bbcmicro.co.uk/game.php?id=11>: BBC Micro `Planetoid` archive entry
+  used to anchor the current keyboard layout to the Acornsoft 1982 home-port
+  control scheme.
 
 ## Platform Support
 
