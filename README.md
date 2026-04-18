@@ -52,6 +52,9 @@ Run targets:
 - `cargo test`
 - `cargo fmt --check`
 - `cargo clippy --all-targets -- -D warnings`
+- `make coverage`
+- `make sq-ci`
+- `make sq`
 - `cargo run --example generate_readme_media`
 - `make ci`
 
@@ -108,9 +111,20 @@ Live mode controls:
   data and is ignored by git.
 - CI runs formatting, tests, clippy, Sonar coverage, and Miri-based leak checks
   on both Linux and macOS.
+- Local SonarQube wiring is exposed through `make sq`, which generates the same
+  coverage report as CI and then runs `sonar-scanner` when `SONAR_TOKEN` is set.
 - `examples/generate_readme_media.rs` regenerates `docs/defender.png` and
   `docs/start-sequence.gif` from the same shared attract-cycle definition used
   by the app.
+
+## SonarQube
+
+- `make sq-ci` generates the Cobertura coverage report used by the SonarCloud
+  workflow in CI.
+- `make sq` runs the same coverage step locally and then invokes
+  `sonar-scanner`.
+- Local SonarQube scans require `cargo-llvm-cov`, `sonar-scanner`, and a
+  `SONAR_TOKEN` environment variable.
 
 ## Reference Repos
 

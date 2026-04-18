@@ -27,14 +27,8 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cargo fmt
-        run: cargo fmt --check
-
-      - name: Cargo test
-        run: cargo test --all-targets
-
-      - name: Cargo clippy
-        run: cargo clippy --all-targets -- -D warnings
+      - name: Make CI
+        run: make ci
 
   leaks:
     name: Leak checks (${{ matrix.os }})
