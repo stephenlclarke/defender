@@ -87,6 +87,7 @@ pub struct UpdateInput {
     pub fire: bool,
     pub smart_bomb: bool,
     pub hyperspace: bool,
+    pub secret_mode: bool,
     pub invincible: bool,
 }
 
@@ -438,46 +439,79 @@ impl World {
             self.player_facing = self.player_facing.reversed();
         }
 
+        let hyperspace_result = input.hyperspace.then(|| {
+            if input.secret_mode {
+                HyperspaceResult {
+                    position: self.safest_hyperspace_destination(max_x, min_y, max_y),
+                    facing: self.player_facing,
+                    explodes: false,
+                }
+            } else {
+                hyperspace_result(
+                    self.tick,
+                    self.status.score,
+                    self.player_facing,
+                    max_x,
+                    min_y,
+                    max_y,
+                )
+            }
+        });
+
         let mut shot_origin = None;
+        let mut hyperspaced_this_tick = false;
+        let mut hyperspace_failure_check = None;
         {
             let terrain = &self.terrain;
-            let facing = self.player_facing;
             if let Some(player) = self
                 .entities
                 .iter_mut()
                 .find(|entity| entity.kind == EntityKind::PlayerShip)
             {
-                if input.thrust {
-                    player.velocity.dx =
-                        (player.velocity.dx + facing.step()).clamp(-PLAYER_MAX_SPEED, PLAYER_MAX_SPEED);
-                }
                 let dy = input.down as i32 - input.up as i32;
-                player.position.x = wrap_coordinate(player.position.x + player.velocity.dx, max_x);
-                player.position.y = (player.position.y + dy).clamp(min_y, max_y);
-                player.position.y = player
-                    .position
-                    .y
-                    .min(terrain_surface_y(terrain, player.position.x));
-
-                if input.hyperspace {
-                    player.position =
-                        hyperspace_destination(self.tick, self.status.score, max_x, min_y, max_y);
+                if let Some(result) = hyperspace_result {
+                    player.position = result.position;
+                    player.velocity = Velocity { dx: 0, dy: 0 };
+                    self.player_facing = result.facing;
                     player.position.y = player
                         .position
                         .y
                         .min(terrain_surface_y(terrain, player.position.x));
+                    hyperspaced_this_tick = true;
                     events.push(WorldEvent::HyperspaceUsed);
+                    shot_origin = Some(player.position);
+                    if !input.secret_mode {
+                        hyperspace_failure_check = Some((player.position, result.explodes));
+                    }
+                } else {
+                    if input.thrust {
+                        player.velocity.dx = (player.velocity.dx + self.player_facing.step())
+                            .clamp(-PLAYER_MAX_SPEED, PLAYER_MAX_SPEED);
+                    }
+                    player.position.x =
+                        wrap_coordinate(player.position.x + player.velocity.dx, max_x);
+                    player.position.y = (player.position.y + dy).clamp(min_y, max_y);
+                    player.position.y = player
+                        .position
+                        .y
+                        .min(terrain_surface_y(terrain, player.position.x));
+                    shot_origin = Some(player.position);
                 }
-
-                shot_origin = Some(player.position);
             }
         }
 
-        if input.smart_bomb && self.can_use_smart_bomb(input.invincible) {
-            self.detonate_smart_bomb(input.invincible, &mut events);
+        if let Some((player_position, explodes)) = hyperspace_failure_check
+            && (explodes || self.hyperspace_destination_is_unsafe(player_position))
+        {
+            self.lose_player_life(player_position, &mut events);
+        }
+
+        if input.smart_bomb && self.can_use_smart_bomb(input.secret_mode) {
+            self.detonate_smart_bomb(input.secret_mode, &mut events);
         }
 
         if input.fire
+            && !hyperspaced_this_tick
             && self.fire_cooldown == 0
             && let Some(origin) = shot_origin
         {
@@ -526,7 +560,11 @@ impl World {
         self.resolve_falling_human_impacts(&mut events);
         self.handle_human_losses(&mut events);
         self.handle_player_shot_hits(&mut events);
-        self.handle_player_collisions(input.invincible, &mut events);
+        self.handle_player_collisions(
+            input.invincible,
+            hyperspaced_this_tick && input.secret_mode,
+            &mut events,
+        );
         self.mutate_landers_if_humans_extinct();
 
         if !self.game_over && self.enemy_count() == 0 && !self.has_unresolved_humans() {
@@ -765,7 +803,12 @@ impl World {
         remove_indices(&mut self.entities, &remove_indices_set);
     }
 
-    fn handle_player_collisions(&mut self, invincible: bool, events: &mut Vec<WorldEvent>) {
+    fn handle_player_collisions(
+        &mut self,
+        invincible: bool,
+        collision_immunity: bool,
+        events: &mut Vec<WorldEvent>,
+    ) {
         let Some(player_position) = self
             .entities
             .iter()
@@ -791,6 +834,10 @@ impl World {
         }
 
         if collided_enemies.is_empty() {
+            return;
+        }
+
+        if collision_immunity {
             return;
         }
 
@@ -831,17 +878,7 @@ impl World {
         for carrier_position in released_carriers {
             self.release_abducted_human_at(carrier_position);
         }
-        self.release_player_carried_human_at(player_position);
-        if self.status.lives > 0 {
-            self.status.lives -= 1;
-        }
-        self.reset_player_position();
-        events.push(WorldEvent::PlayerHit);
-
-        if self.status.lives == 0 {
-            self.game_over = true;
-            events.push(WorldEvent::GameOver);
-        }
+        self.lose_player_life(player_position, events);
     }
 
     fn reset_player_position(&mut self) {
@@ -865,6 +902,84 @@ impl World {
             .iter()
             .find(|entity| entity.kind == EntityKind::PlayerShip)
             .map(|entity| entity.position)
+    }
+
+    fn hyperspace_destination_is_unsafe(&self, player_position: Position) -> bool {
+        self.entities.iter().any(|entity| match entity.kind {
+            EntityKind::Lander | EntityKind::Mutant => {
+                positions_overlap(player_position, entity.position, 1, 1)
+            }
+            EntityKind::EnemyShot => positions_overlap(player_position, entity.position, 0, 0),
+            _ => false,
+        })
+    }
+
+    fn lose_player_life(&mut self, player_position: Position, events: &mut Vec<WorldEvent>) {
+        self.release_player_carried_human_at(player_position);
+        if self.status.lives > 0 {
+            self.status.lives -= 1;
+        }
+        self.reset_player_position();
+        events.push(WorldEvent::PlayerHit);
+
+        if self.status.lives == 0 {
+            self.game_over = true;
+            events.push(WorldEvent::GameOver);
+        }
+    }
+
+    fn safest_hyperspace_destination(&self, max_x: i32, min_y: i32, max_y: i32) -> Position {
+        let fallback = hyperspace_destination(self.tick, self.status.score, max_x, min_y, max_y);
+        let hazards: Vec<Position> = self
+            .entities
+            .iter()
+            .filter(|entity| {
+                entity.kind == EntityKind::Lander
+                    || entity.kind == EntityKind::Mutant
+                    || entity.kind == EntityKind::EnemyShot
+            })
+            .map(|entity| entity.position)
+            .collect();
+
+        if hazards.is_empty() {
+            return fallback;
+        }
+
+        let span = max_x + 1;
+        let mut best = fallback;
+        let mut best_score = i32::MIN;
+        let mut best_fallback_delta = i32::MAX;
+
+        for x in 0..=max_x {
+            let surface = terrain_surface_y(&self.terrain, x);
+            let max_candidate_y = max_y.min(surface);
+            for y in min_y..=max_candidate_y {
+                let candidate = Position { x, y };
+                let hazard_distance = hazards
+                    .iter()
+                    .map(|hazard| {
+                        shortest_wrapped_delta(candidate.x, hazard.x, span).abs() * 2
+                            + (candidate.y - hazard.y).abs()
+                    })
+                    .min()
+                    .unwrap_or(i32::MAX);
+                let fallback_delta = shortest_wrapped_delta(candidate.x, fallback.x, span).abs()
+                    + (candidate.y - fallback.y).abs();
+
+                if hazard_distance > best_score
+                    || (hazard_distance == best_score && fallback_delta < best_fallback_delta)
+                    || (hazard_distance == best_score
+                        && fallback_delta == best_fallback_delta
+                        && (candidate.x, candidate.y) < (best.x, best.y))
+                {
+                    best = candidate;
+                    best_score = hazard_distance;
+                    best_fallback_delta = fallback_delta;
+                }
+            }
+        }
+
+        best
     }
 
     fn find_abducted_human_near(&self, carrier_position: Position) -> Option<usize> {
@@ -896,16 +1011,16 @@ impl World {
         }
     }
 
-    fn can_use_smart_bomb(&self, invincible: bool) -> bool {
-        invincible || self.smart_bombs > 0
+    fn can_use_smart_bomb(&self, secret_mode: bool) -> bool {
+        secret_mode || self.smart_bombs > 0
     }
 
-    fn detonate_smart_bomb(&mut self, invincible: bool, events: &mut Vec<WorldEvent>) {
-        if !self.can_use_smart_bomb(invincible) {
+    fn detonate_smart_bomb(&mut self, secret_mode: bool, events: &mut Vec<WorldEvent>) {
+        if !self.can_use_smart_bomb(secret_mode) {
             return;
         }
 
-        if !invincible {
+        if !secret_mode {
             self.smart_bombs -= 1;
         }
 
@@ -1248,6 +1363,39 @@ fn hyperspace_destination(tick: u32, score: u32, max_x: i32, min_y: i32, max_y: 
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HyperspaceResult {
+    position: Position,
+    facing: HorizontalDirection,
+    explodes: bool,
+}
+
+fn hyperspace_result(
+    tick: u32,
+    score: u32,
+    current_facing: HorizontalDirection,
+    max_x: i32,
+    min_y: i32,
+    max_y: i32,
+) -> HyperspaceResult {
+    let position = hyperspace_destination(tick, score, max_x, min_y, max_y);
+    let seed = tick
+        .wrapping_mul(13)
+        .wrapping_add(score.wrapping_mul(7))
+        .wrapping_add(5);
+    let facing = if seed.is_multiple_of(2) {
+        current_facing
+    } else {
+        current_facing.reversed()
+    };
+
+    HyperspaceResult {
+        position,
+        facing,
+        explodes: seed % 4 == 3,
+    }
+}
+
 fn score_for_enemy(kind: EntityKind) -> u32 {
     match kind {
         EntityKind::Lander => 150,
@@ -1274,12 +1422,12 @@ fn remove_indices(entities: &mut Vec<Entity>, indices: &[usize]) {
 
 #[cfg(test)]
 mod tests {
-    use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS};
+    use crate::constants::{DEFAULT_LIVES, DEFAULT_SMART_BOMBS, PLAYER_START_X};
 
     use super::{
-        Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput,
-        World, WorldEvent,
-        hyperspace_destination, nearest_wrapped_target, shortest_wrapped_delta, wrap_coordinate,
+        Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput, World,
+        WorldEvent, hyperspace_result, nearest_wrapped_target, shortest_wrapped_delta,
+        wrap_coordinate,
     };
 
     #[test]
@@ -2352,6 +2500,7 @@ mod tests {
             ],
         );
 
+        let expected = hyperspace_result(1, 0, HorizontalDirection::Right, 19, 1, 7);
         let events = world.step_live(UpdateInput {
             hyperspace: true,
             ..UpdateInput::default()
@@ -2362,8 +2511,79 @@ mod tests {
             .iter()
             .find(|entity| entity.kind == EntityKind::PlayerShip)
             .expect("player");
-        assert_eq!(player.position, hyperspace_destination(1, 0, 19, 1, 7));
+        assert_eq!(player.position, expected.position);
+        assert_eq!(player.velocity.dx, 0);
+        assert_eq!(world.player_facing(), expected.facing);
         assert!(events.contains(&WorldEvent::HyperspaceUsed));
+        assert!(!events.contains(&WorldEvent::PlayerHit));
+    }
+
+    #[test]
+    fn live_step_hyperspace_can_destroy_the_player_outside_secret_mode() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 3,
+                lives: 2,
+                wave: 1,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 2, 3, 1, 0)],
+        );
+
+        let events = world.step_live(UpdateInput {
+            hyperspace: true,
+            ..UpdateInput::default()
+        });
+
+        let player = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player");
+        assert_eq!(world.status().lives, 1);
+        assert_eq!(player.position.x, PLAYER_START_X);
+        assert_eq!(player.velocity.dx, 0);
+        assert_eq!(world.player_facing(), HorizontalDirection::Right);
+        assert!(events.contains(&WorldEvent::HyperspaceUsed));
+        assert!(events.contains(&WorldEvent::PlayerHit));
+    }
+
+    #[test]
+    fn xyzzy_mode_makes_hyperspace_safe_even_when_it_would_fail() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 3,
+                lives: 2,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 1, 0),
+                Entity::new(EntityKind::Lander, 17, 2, 0, 0),
+                Entity::new(EntityKind::Mutant, 8, 4, 0, 0),
+                Entity::new(EntityKind::EnemyShot, 12, 5, 0, 0),
+            ],
+        );
+        let destination = world.safest_hyperspace_destination(19, 1, 7);
+
+        let events = world.step_live(UpdateInput {
+            hyperspace: true,
+            secret_mode: true,
+            ..UpdateInput::default()
+        });
+
+        let player = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player");
+        assert_eq!(world.status().lives, 2);
+        assert_eq!(player.position, destination);
+        assert_eq!(player.velocity.dx, 0);
+        assert!(events.contains(&WorldEvent::HyperspaceUsed));
+        assert!(!events.contains(&WorldEvent::PlayerHit));
     }
 
     #[test]
@@ -2395,7 +2615,35 @@ mod tests {
     }
 
     #[test]
-    fn invincible_mode_allows_unlimited_smart_bombs() {
+    fn xyzzy_mode_allows_unlimited_smart_bombs() {
+        let mut world = World::with_entities(
+            16,
+            8,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 8, 3, 0, 0),
+            ],
+        );
+        world.set_smart_bombs(0);
+
+        let events = world.step_live(UpdateInput {
+            smart_bomb: true,
+            secret_mode: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.smart_bombs(), 0);
+        assert_eq!(world.status().score, 150);
+        assert!(events.contains(&WorldEvent::SmartBombDetonated));
+    }
+
+    #[test]
+    fn invincible_mode_does_not_grant_unlimited_smart_bombs() {
         let mut world = World::with_entities(
             16,
             8,
@@ -2418,7 +2666,7 @@ mod tests {
         });
 
         assert_eq!(world.smart_bombs(), 0);
-        assert_eq!(world.status().score, 150);
-        assert!(events.contains(&WorldEvent::SmartBombDetonated));
+        assert_eq!(world.status().score, 0);
+        assert!(!events.contains(&WorldEvent::SmartBombDetonated));
     }
 }

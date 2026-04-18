@@ -23,8 +23,7 @@ coverage before a richer live arcade loop lands. The game logic is native Rust;
 ROMs are treated as reference material only, and the current sound cues are
 synthesized in-process so the app does not depend on external audio files.
 The target is a faithful recreation of the original arcade game, with hidden
-`xyzzy` god-mode controls as the deliberate extra behavior outside the original
-cabinet rules.
+`xyzzy` extras as the deliberate behavior outside the original cabinet rules.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -93,8 +92,12 @@ invincibility toggle back to its default state.
 
 Extra keys while `xyzzy` mode is active:
 
+- smart bombs become unlimited automatically while `xyzzy` mode is enabled.
+- `H`: hyperspace becomes safe and cannot destroy the player ship while
+  `xyzzy` mode is active, and the rematerialization point is chosen as far away
+  from enemies as possible.
 - `g`: toggle god mode. While active, the player cannot be killed by
-  enemy fire or direct enemy collisions, and smart bombs become unlimited.
+  enemy fire or direct enemy collisions.
 
 ## Current Notes
 
@@ -115,9 +118,12 @@ Extra keys while `xyzzy` mode is active:
   active lander pursuit of free humans, mutant pursuit of the player, and an
   arcade-style facing model where `Space` flips the ship direction while
   `Shift` thrust and `Enter` fire follow the current heading, with horizontal
-  momentum preserved until you counter-thrust,
+  momentum preserved until you counter-thrust, and risky hyperspace behavior
+  outside `xyzzy` mode, while `xyzzy` hyperspace deliberately relocates the
+  ship away from enemy clusters, with automatic unlimited smart bombs in
+  `xyzzy` mode and a separate `g` invincibility toggle,
   game-over handling, restart support, a wrapped scrolling camera, and an
-  `xyzzy`/`g` secret god-mode path on top of the same native Rust world model.
+  `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
   instead of a flat floor, so demo and live frames show a moving landscape and
   projectiles are clipped by terrain.
@@ -192,6 +198,9 @@ the final runtime self-contained:
 - <https://www.digitpress.com/reviews/defender.htm>: secondary gameplay
   reference used to model Defender's reverse-with-inertia handling, where the
   ship keeps its current momentum until thrust changes it.
+- <https://www.dougmahugh.com/defender-chapter02/>: control-analysis reference
+  used for hyperspace risk, stopped re-entry speed, and direction changes on
+  rematerialization.
 - <https://www.andysarcade.net/personal/defcolours/index.htm>: cabinet colour
   and palette reference for later presentation work.
 - <https://mdk.cab/game/defender>: artwork, screenshots, and general cabinet

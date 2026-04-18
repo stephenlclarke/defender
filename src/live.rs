@@ -120,12 +120,6 @@ fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
         || events.contains(&SessionEvent::HighScoreSaved)
     {
         Some(SoundCue::HighScoreChime)
-    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired))
-        || events.contains(&SessionEvent::World(
-            crate::game::WorldEvent::HyperspaceUsed,
-        ))
-    {
-        Some(SoundCue::EnemySweep)
     } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::GameOver))
         || events.contains(&SessionEvent::World(crate::game::WorldEvent::PlayerHit))
         || events.contains(&SessionEvent::World(
@@ -133,6 +127,12 @@ fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
         ))
     {
         Some(SoundCue::Explosion)
+    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired))
+        || events.contains(&SessionEvent::World(
+            crate::game::WorldEvent::HyperspaceUsed,
+        ))
+    {
+        Some(SoundCue::EnemySweep)
     } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::WaveAdvanced)) {
         Some(SoundCue::HighScoreChime)
     } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::HumanRescued)) {
@@ -327,7 +327,7 @@ mod tests {
     fn event_priorities_prefer_game_over_and_hits() {
         assert_eq!(
             cue_for_events(&[
-                SessionEvent::World(WorldEvent::ShotFired),
+                SessionEvent::World(WorldEvent::HyperspaceUsed),
                 SessionEvent::World(WorldEvent::GameOver),
             ]),
             Some(SoundCue::Explosion)
@@ -409,7 +409,11 @@ mod tests {
 
         let mut space_release = PolledInput::default();
         tracker.handle_key_event(
-            KeyEvent::new_with_kind(KeyCode::Char(' '), KeyModifiers::NONE, KeyEventKind::Release),
+            KeyEvent::new_with_kind(
+                KeyCode::Char(' '),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
             &mut space_release,
         );
         assert!(!space_release.session.update.reverse);

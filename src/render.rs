@@ -170,9 +170,9 @@ fn secret_mode_lines(xyzzy_active: bool, invincible: bool) -> Vec<String> {
     vec![
         String::from("XYZZY MODE ENABLED"),
         if invincible {
-            String::from("GOD MODE ON  INVINCIBLE  SMART BOMBS INF")
+            String::from("SMART BOMBS INF  GOD MODE ON  INVINCIBLE")
         } else {
-            String::from("GOD MODE OFF  PRESS `g` TO TOGGLE INVINCIBILITY")
+            String::from("SMART BOMBS INF  GOD MODE OFF  PRESS `g` TO TOGGLE INVINCIBILITY")
         },
     ]
 }

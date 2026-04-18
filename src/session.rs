@@ -139,6 +139,7 @@ impl SessionState {
     }
 
     fn tick_playing(&mut self, mut input: UpdateInput) -> Vec<SessionEvent> {
+        input.secret_mode = self.xyzzy.active;
         input.invincible = self.xyzzy.invincible;
         let mut events: Vec<SessionEvent> = self
             .world
