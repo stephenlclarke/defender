@@ -1,3 +1,4 @@
+use crate::audio::SoundCue;
 use crate::game::World;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +29,77 @@ impl Scene {
     pub fn text(&self) -> String {
         self.lines.join("\n")
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AttractBeat {
+    pub kind: SceneKind,
+    pub cue: Option<SoundCue>,
+    pub hold_ms: u64,
+    pub world_steps: usize,
+}
+
+impl AttractBeat {
+    pub fn scene(self) -> Scene {
+        match self.kind {
+            SceneKind::Logo => logo_scene(),
+            SceneKind::Attract => {
+                let mut world = World::bootstrap();
+                for _ in 0..self.world_steps {
+                    world.step();
+                }
+                attract_scene(&world)
+            }
+            SceneKind::HighScore => high_score_scene(),
+        }
+    }
+}
+
+pub fn attract_cycle() -> [AttractBeat; 7] {
+    [
+        AttractBeat {
+            kind: SceneKind::Logo,
+            cue: Some(SoundCue::LogoFanfare),
+            hold_ms: 900,
+            world_steps: 0,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::AttractHum),
+            hold_ms: 750,
+            world_steps: 0,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::EnemySweep),
+            hold_ms: 550,
+            world_steps: 2,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::PlayerShot),
+            hold_ms: 500,
+            world_steps: 4,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::HumanSaved),
+            hold_ms: 550,
+            world_steps: 6,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::Explosion),
+            hold_ms: 600,
+            world_steps: 8,
+        },
+        AttractBeat {
+            kind: SceneKind::HighScore,
+            cue: Some(SoundCue::HighScoreChime),
+            hold_ms: 950,
+            world_steps: 0,
+        },
+    ]
 }
 
 pub fn logo_scene() -> Scene {
@@ -99,9 +171,9 @@ pub fn high_score_scene() -> Scene {
 
 #[cfg(test)]
 mod tests {
-    use crate::game::World;
+    use crate::{audio::SoundCue, game::World};
 
-    use super::{SceneKind, attract_scene, high_score_scene, logo_scene};
+    use super::{SceneKind, attract_cycle, attract_scene, high_score_scene, logo_scene};
 
     #[test]
     fn parse_scene_kind_recognises_supported_values() {
@@ -137,5 +209,24 @@ mod tests {
         assert!(text.contains("HIGH SCORES"));
         assert!(text.contains("1."));
         assert!(text.contains("250000"));
+    }
+
+    #[test]
+    fn attract_cycle_covers_logo_attract_and_high_score() {
+        let cycle = attract_cycle();
+
+        assert_eq!(cycle[0].kind, SceneKind::Logo);
+        assert_eq!(cycle[0].cue, Some(SoundCue::LogoFanfare));
+        assert_eq!(cycle[1].kind, SceneKind::Attract);
+        assert_eq!(cycle[6].kind, SceneKind::HighScore);
+    }
+
+    #[test]
+    fn attract_beat_scene_renders_the_expected_variant() {
+        let cycle = attract_cycle();
+
+        assert!(cycle[0].scene().text().contains("NATIVE RUST PROTOTYPE"));
+        assert!(cycle[1].scene().text().contains("ATTRACT MODE"));
+        assert!(cycle[6].scene().text().contains("HIGH SCORES"));
     }
 }

@@ -1,16 +1,20 @@
 use std::env;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 
-use crate::attract::{SceneKind, attract_scene, high_score_scene, logo_scene};
-use crate::audio::AudioManager;
+use crate::attract::{SceneKind, attract_cycle, attract_scene, high_score_scene, logo_scene};
+use crate::audio::{AudioManager, SoundCue};
 use crate::game::World;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
     AudioDemo,
     Gameplay { frames: usize },
+    PlayAttract { play_audio: bool, sleep: bool },
     Scene { kind: SceneKind },
     RomReport { path: PathBuf },
     Help,
@@ -23,6 +27,7 @@ pub fn run() -> Result<()> {
             Ok(())
         }
         Command::Gameplay { frames } => run_demo(frames),
+        Command::PlayAttract { play_audio, sleep } => run_play_attract(play_audio, sleep),
         Command::Scene { kind } => run_scene(kind),
         Command::RomReport { path } => run_rom_report(&path),
         Command::Help => {
@@ -38,6 +43,31 @@ fn run_demo(frames: usize) -> Result<()> {
         world.step();
     }
     println!("{}", crate::render::render(&world));
+    Ok(())
+}
+
+fn run_play_attract(play_audio: bool, sleep: bool) -> Result<()> {
+    let audio = AudioManager::new();
+    let mut stdout = io::stdout();
+
+    for beat in attract_cycle() {
+        let scene = beat.scene();
+        writeln!(stdout, "\x1B[2J\x1B[H{}", scene.text()).context("writing attract frame")?;
+        stdout.flush().context("flushing attract frame")?;
+
+        if play_audio && let Some(cue) = beat.cue {
+            audio.play_cue_blocking(cue);
+        }
+
+        if sleep {
+            let elapsed_ms = beat.cue.map(SoundCue::duration_ms).unwrap_or(0);
+            let remaining_ms = beat.hold_ms.saturating_sub(elapsed_ms);
+            if remaining_ms > 0 {
+                thread::sleep(Duration::from_millis(remaining_ms));
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -94,6 +124,20 @@ where
             }
             Ok(Command::AudioDemo)
         }
+        "--play-attract" => {
+            let mut play_audio = true;
+            let mut sleep = true;
+
+            for arg in args {
+                match arg.as_str() {
+                    "--mute" => play_audio = false,
+                    "--no-sleep" => sleep = false,
+                    other => bail!("unsupported --play-attract option: {other}"),
+                }
+            }
+
+            Ok(Command::PlayAttract { play_audio, sleep })
+        }
         "--scene" => {
             let Some(value) = args.next() else {
                 bail!("--scene requires one of: logo, attract, high-score");
@@ -144,6 +188,8 @@ fn print_help() {
     println!("defender");
     println!("  cargo run");
     println!("  cargo run -- --audio-demo");
+    println!("  cargo run -- --play-attract");
+    println!("  cargo run -- --play-attract --mute --no-sleep");
     println!("  cargo run -- --scene logo");
     println!("  cargo run -- --scene attract");
     println!("  cargo run -- --scene high-score");
@@ -203,6 +249,23 @@ mod tests {
     }
 
     #[test]
+    fn parse_args_reads_play_attract_with_switches() {
+        let command = parse_args(vec![
+            String::from("--play-attract"),
+            String::from("--mute"),
+            String::from("--no-sleep"),
+        ])
+        .expect("parse args");
+        assert_eq!(
+            command,
+            Command::PlayAttract {
+                play_audio: false,
+                sleep: false
+            }
+        );
+    }
+
+    #[test]
     fn parse_args_uses_default_rom_directory() {
         let command = parse_args(vec![String::from("--rom-report")]).expect("parse args");
         assert_eq!(
@@ -249,6 +312,20 @@ mod tests {
             error
                 .to_string()
                 .contains("does not accept extra arguments")
+        );
+    }
+
+    #[test]
+    fn parse_args_rejects_unknown_play_attract_option() {
+        let error = parse_args(vec![
+            String::from("--play-attract"),
+            String::from("--warp-speed"),
+        ])
+        .expect_err("parse args");
+        assert!(
+            error
+                .to_string()
+                .contains("unsupported --play-attract option")
         );
     }
 }

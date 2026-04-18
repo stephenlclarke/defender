@@ -6,14 +6,11 @@ use font8x8::{BASIC_FONTS, UnicodeFonts};
 use gif::{Encoder, Frame, Repeat};
 use png::{BitDepth, ColorType, Compression, Encoder as PngEncoder};
 
-use defender::attract::{Scene, attract_scene, high_score_scene, logo_scene};
-use defender::game::World;
+use defender::attract::{AttractBeat, Scene, attract_cycle};
 
 const CELL_SIZE: u32 = 8;
 const SCALE: u32 = 3;
 const PADDING: u32 = 16;
-const GIF_DELAY_CS: u16 = 16;
-const HOLD_DELAY_CS: u16 = 45;
 const BACKGROUND: [u8; 4] = [4, 8, 14, 255];
 const FOREGROUND: [u8; 4] = [80, 255, 140, 255];
 
@@ -30,7 +27,8 @@ fn main() -> Result<()> {
     ensure_parent_dir(&screenshot_path)?;
     ensure_parent_dir(&gif_path)?;
 
-    let screenshot_scene = build_attract_scene(6);
+    let cycle = attract_cycle();
+    let screenshot_scene = cycle[3].scene();
     let sequence = build_sequence();
     let (cols, rows) = scene_bounds(&sequence);
 
@@ -44,25 +42,10 @@ fn main() -> Result<()> {
 }
 
 fn build_sequence() -> Vec<(Scene, u16)> {
-    let mut frames = vec![(logo_scene(), HOLD_DELAY_CS)];
-
-    let mut world = World::bootstrap();
-    for _ in 0..8 {
-        frames.push((attract_scene(&world), GIF_DELAY_CS));
-        world.step();
-        world.step();
-    }
-
-    frames.push((high_score_scene(), HOLD_DELAY_CS));
-    frames
-}
-
-fn build_attract_scene(steps: usize) -> Scene {
-    let mut world = World::bootstrap();
-    for _ in 0..steps {
-        world.step();
-    }
-    attract_scene(&world)
+    attract_cycle()
+        .into_iter()
+        .map(|beat| (beat.scene(), centiseconds_for_beat(beat)))
+        .collect()
 }
 
 fn scene_bounds(frames: &[(Scene, u16)]) -> (usize, usize) {
@@ -77,6 +60,11 @@ fn scene_bounds(frames: &[(Scene, u16)]) -> (usize, usize) {
     }
 
     (max_cols, max_rows)
+}
+
+fn centiseconds_for_beat(beat: AttractBeat) -> u16 {
+    let centiseconds = (beat.hold_ms / 10).max(1);
+    centiseconds.min(u16::MAX as u64) as u16
 }
 
 struct RgbaImage {

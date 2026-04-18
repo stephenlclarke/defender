@@ -37,6 +37,8 @@ Run targets:
 
 - `cargo run`
 - `cargo run -- --audio-demo`
+- `cargo run -- --play-attract`
+- `cargo run -- --play-attract --mute --no-sleep`
 - `cargo run -- --scene logo`
 - `cargo run -- --scene attract`
 - `cargo run -- --scene high-score`
@@ -58,6 +60,7 @@ After installation, run the prototype with:
 
 - `defender`
 - `defender --audio-demo`
+- `defender --play-attract`
 - `defender --scene attract`
 - `defender --scene high-score`
 - `defender --frames 8`
@@ -69,6 +72,9 @@ After installation, run the prototype with:
   output rather than mocked assets.
 - All current sounds are embedded in the app via synthesized `rodio` cues,
   following the same self-contained runtime principle used in `../battlezone`.
+- `defender --play-attract` now runs the logo, attract, and high-score sequence
+  as a real terminal playback path; use `--mute --no-sleep` for deterministic
+  test or capture runs.
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
   adding a fuller terminal graphics path.
@@ -79,7 +85,8 @@ After installation, run the prototype with:
 - CI runs formatting, tests, clippy, Sonar coverage, and Miri-based leak checks
   on both Linux and macOS.
 - `examples/generate_readme_media.rs` regenerates `docs/defender.png` and
-  `docs/start-sequence.gif` from the current scene definitions.
+  `docs/start-sequence.gif` from the same shared attract-cycle definition used
+  by the app.
 
 ## Reference Repos
 

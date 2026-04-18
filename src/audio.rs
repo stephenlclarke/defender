@@ -37,6 +37,18 @@ impl SoundCue {
             Self::HighScoreChime => "high-score-chime",
         }
     }
+
+    pub const fn duration_ms(self) -> u64 {
+        match self {
+            Self::LogoFanfare => 440,
+            Self::AttractHum => 650,
+            Self::EnemySweep => 270,
+            Self::PlayerShot => 140,
+            Self::HumanSaved => 310,
+            Self::Explosion => 440,
+            Self::HighScoreChime => 480,
+        }
+    }
 }
 
 struct AudioOutput {
@@ -160,6 +172,7 @@ mod tests {
         for cue in SoundCue::ALL {
             assert!(!cue.label().is_empty());
             assert!(cue.label().contains('-'));
+            assert!(cue.duration_ms() > 0);
         }
     }
 

@@ -72,6 +72,21 @@ fn scene_mode_renders_high_scores() {
 }
 
 #[test]
+fn play_attract_mode_renders_the_whole_sequence_without_sleep() {
+    let output = Command::new(env!("CARGO_BIN_EXE_defender"))
+        .args(["--play-attract", "--mute", "--no-sleep"])
+        .output()
+        .expect("run defender");
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf8");
+    assert!(stdout.contains("NATIVE RUST PROTOTYPE"));
+    assert!(stdout.contains("ATTRACT MODE"));
+    assert!(stdout.contains("HIGH SCORES"));
+}
+
+#[test]
 fn rom_report_summarises_canonical_files() {
     let temp_dir = TempDir::new();
     fs::write(temp_dir.path().join("defend.1"), []).expect("write rom");
