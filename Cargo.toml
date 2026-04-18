@@ -1,0 +1,13 @@
+[package]
+name = "defender"
+version = "0.1.0"
+edition = "2024"
+autobins = false
+default-run = "defender"
+
+[[bin]]
+name = "defender"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
