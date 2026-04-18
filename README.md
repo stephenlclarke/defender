@@ -119,23 +119,25 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   recovery, grounded-human pickup and redeploy, Defender-style rescue scoring
   with `500` catch bonuses, `500` return-to-ground bonuses, and `250`
   low-altitude safe-fall saves, wave-end humanoid survivor bonuses, default
-  `10,000`-point extra ship and smart-bomb awards, mutant conversion after
-  successful abductions, full lander-to-mutant conversion once humanity is
-  wiped out, persistent five-entry high-score tracking with initials entry,
-  active lander pursuit of free humans, mutant pursuit of the player, and an
-  arcade-style facing model where `Space` flips the ship direction while
-  `Shift` thrust and `Enter` fire follow the current heading, with horizontal
-  momentum preserved until you counter-thrust, and risky hyperspace behavior
-  outside `xyzzy` mode, while `xyzzy` hyperspace deliberately relocates the
-  ship away from enemy clusters, with automatic unlimited smart bombs in
-  `xyzzy` mode, a separate `G` invincibility toggle, and an `F` auto-fire
-  toggle that only shoots when the current firing lane has a direct alien kill,
-  plus pod waves that now start on wave two and ramp up to four ships by wave
-  four, release deterministic five-to-seven swarmer bursts when shot, and
-  preserve the classic follow-from-behind swarmer counterplay, with opening
-  attack waves now led by five landers before later-wave bombers and pods layer
-  on top, a full-width radar scanner strip that compresses the wrapped world
-  into the top HUD,
+  `10,000`-point extra ship and smart-bomb awards, a ten-humanoid population
+  that now restores on every fifth wave, mutant conversion after successful
+  abductions, full lander-to-mutant conversion when the last humanoid is lost,
+  and mutant replacement waves until the next fifth-wave planet restoration,
+  persistent five-entry high-score tracking with initials entry, active lander
+  pursuit of free humans, mutant pursuit of the player, and an arcade-style
+  facing model where `Space` flips the ship direction while `Shift` thrust and
+  `Enter` fire follow the current heading, with horizontal momentum preserved
+  until you counter-thrust, and risky hyperspace behavior outside `xyzzy` mode,
+  while `xyzzy` hyperspace deliberately relocates the ship away from enemy
+  clusters, with automatic unlimited smart bombs in `xyzzy` mode, a separate
+  `G` invincibility toggle, and an `F` auto-fire toggle that only shoots when
+  the current firing lane has a direct alien kill, plus pod waves that now
+  start on wave two and ramp up to four ships by wave four, release
+  deterministic five-to-seven swarmer bursts when shot, and preserve the
+  classic follow-from-behind swarmer counterplay, with opening attack waves now
+  led by five landers before later-wave bombers and pods layer on top, a
+  full-width radar scanner strip that compresses the wrapped world into the top
+  HUD,
   bomber waves that arrive from wave two onward and leave persistent mine
   trails that normal smart bombs do not clear, smart bombs that now only
   destroy enemies on the main screen instead of globally in normal play, with
@@ -150,7 +152,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
   instead of a flat floor, so demo and live frames show a moving landscape and
-  projectiles are clipped by terrain.
+  projectiles are clipped by terrain. When the last humanoid is lost, the live
+  renderer now drops the terrain line and marks the HUD as `DEEP SPACE` until a
+  fifth-wave restoration brings the planet and all ten humanoids back.
 - Gameplay work is being prioritized toward faithful Williams-arcade behavior in
   Rust first; hidden `xyzzy` options remain the only intentional rules
   extension outside that baseline.
@@ -205,8 +209,10 @@ the final runtime self-contained:
   revision history and ROM-set background for Williams Defender releases.
 - <https://www.dougmahugh.com/defender-chapter01/>: general arcade-rules
   reference used for bomber wave timing, bomber-mine danger, radar behavior,
-  and the scoring rule that collision deaths on bullets or mines still award
-  `25` points while ramming enemies still scores their normal value.
+  ten-humanoid/fifth-wave restoration rules, mutant-only post-extinction wave
+  behavior, and the scoring rule that collision deaths on bullets or mines
+  still award `25` points while ramming enemies still scores their normal
+  value.
 - <https://williamsarcades.com/Defender>: original cabinet and control-panel
   reference used to keep the Rust controls and cabinet assumptions aligned with
   Williams' arcade hardware.
@@ -218,7 +224,8 @@ the final runtime self-contained:
   bomb award behavior.
 - <https://strategywiki.org/wiki/Defender/Gameplay>: gameplay reference used to
   cross-check live enemy and humanoid behavior against the original arcade
-  rules, including opening five-lander attack waves and later pod scheduling.
+  rules, including opening five-lander attack waves, later pod scheduling, and
+  the destroyed-planet mutant-wave cycle until the next fifth-round restore.
 - <https://strategywiki.org/wiki/Defender/Walkthrough>: rescue-strategy and
   scoring reference used for the current `500` catch / `500` return humanoid
   rescue implementation.

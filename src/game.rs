@@ -23,6 +23,7 @@ const POD_SWARMER_BURST_RANGE: usize = 3;
 const MAX_SWARMERS: usize = 20;
 const BOMBER_MINE_DROP_DELAY: u32 = 3;
 const MAX_MINES: usize = 24;
+const DEFAULT_HUMAN_WORLD_XS: [i32; 10] = [8, 26, 44, 62, 80, 98, 116, 134, 152, 170];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
@@ -212,8 +213,6 @@ pub struct World {
 impl World {
     pub fn bootstrap() -> Self {
         let terrain = build_scrolling_terrain(WORLD_SPAN, WORLD_HEIGHT);
-        let human0_y = terrain_surface_y(&terrain, 8);
-        let human1_y = terrain_surface_y(&terrain, 30);
         let mut entities = vec![Entity::new(
             EntityKind::PlayerShip,
             PLAYER_START_X,
@@ -221,9 +220,12 @@ impl World {
             0,
             0,
         )];
-        entities.extend(default_attack_wave_landers(WORLD_SPAN as i32, DEFAULT_WAVE));
-        entities.push(Entity::new(EntityKind::Human, 8, human0_y, 0, 0));
-        entities.push(Entity::new(EntityKind::Human, 30, human1_y, 0, 0));
+        entities.extend(default_attack_wave_openers(
+            WORLD_SPAN as i32,
+            DEFAULT_WAVE,
+            EntityKind::Lander,
+        ));
+        entities.extend(default_humans(&terrain));
         Self {
             width: WORLD_WIDTH,
             height: WORLD_HEIGHT,
@@ -416,6 +418,10 @@ impl World {
                 entity.kind == EntityKind::Human && entity.state != EntityState::Abducted
             })
             .count()
+    }
+
+    pub fn planet_destroyed(&self) -> bool {
+        !self.has_humanoids()
     }
 
     pub fn threat_score(&self) -> usize {
@@ -1542,7 +1548,7 @@ impl World {
     }
 
     fn mutate_landers_if_humans_extinct(&mut self) {
-        if self.entity_count_by_kind(EntityKind::Human) > 0 {
+        if self.has_humanoids() {
             return;
         }
 
@@ -1634,7 +1640,16 @@ impl World {
             .player_position()
             .map(|player| wrap_coordinate(player.x + width / 2, width - 1))
             .unwrap_or(width / 2);
-        let mut enemies = default_attack_wave_landers(width, self.status.wave);
+        if self.status.wave.is_multiple_of(5) {
+            self.restore_default_humans();
+        }
+
+        let opening_enemy = if self.has_humanoids() {
+            EntityKind::Lander
+        } else {
+            EntityKind::Mutant
+        };
+        let mut enemies = default_attack_wave_openers(width, self.status.wave, opening_enemy);
 
         if self.status.wave >= 2 {
             enemies.push(Entity::new(
@@ -1689,6 +1704,18 @@ impl World {
         self.entities.extend(enemies);
         self.wave_started_at = self.tick;
         self.last_baiter_tick = self.tick;
+    }
+
+    fn has_humanoids(&self) -> bool {
+        self.entities
+            .iter()
+            .any(|entity| entity.kind == EntityKind::Human)
+    }
+
+    fn restore_default_humans(&mut self) {
+        self.entities
+            .retain(|entity| entity.kind != EntityKind::Human);
+        self.entities.extend(default_humans(&self.terrain));
     }
 
     fn sync_camera_to_player(&mut self) {
@@ -1846,7 +1873,14 @@ fn next_stock_award_score(score: u32) -> u32 {
         .saturating_mul(BONUS_STOCK_SCORE)
 }
 
-fn default_attack_wave_landers(world_span: i32, wave: u8) -> Vec<Entity> {
+fn default_humans(terrain: &[usize]) -> Vec<Entity> {
+    DEFAULT_HUMAN_WORLD_XS
+        .into_iter()
+        .map(|x| Entity::new(EntityKind::Human, x, terrain_surface_y(terrain, x), 0, 0))
+        .collect()
+}
+
+fn default_attack_wave_openers(world_span: i32, wave: u8, kind: EntityKind) -> Vec<Entity> {
     let max_x = world_span - 1;
     let wave_offset = i32::from(wave % 6);
     [
@@ -1857,7 +1891,7 @@ fn default_attack_wave_landers(world_span: i32, wave: u8) -> Vec<Entity> {
         (world_span / 2 - 10, 7, 1, -1),
     ]
     .into_iter()
-    .map(|(x, y, dx, dy)| Entity::new(EntityKind::Lander, wrap_coordinate(x, max_x), y, dx, dy))
+    .map(|(x, y, dx, dy)| Entity::new(kind, wrap_coordinate(x, max_x), y, dx, dy))
     .collect()
 }
 
@@ -1890,7 +1924,7 @@ mod tests {
         assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 5);
         assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 0);
         assert_eq!(world.enemy_count(), 5);
-        assert_eq!(world.human_count(), 2);
+        assert_eq!(world.human_count(), 10);
         assert_eq!(world.status().lives, 3);
         assert_eq!(world.entities()[0].kind, EntityKind::PlayerShip);
         assert_eq!(
@@ -1994,7 +2028,7 @@ mod tests {
         assert_eq!(world.status().lives, 2);
         assert_eq!(world.smart_bombs(), 1);
         assert_eq!(world.enemy_count(), 4);
-        assert_eq!(world.human_count(), 3);
+        assert_eq!(world.human_count(), 11);
     }
 
     #[test]
@@ -3093,7 +3127,10 @@ mod tests {
                 lives: 3,
                 wave: 2,
             },
-            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Human, 8, 9, 0, 0),
+            ],
         );
         wave_two.spawn_wave();
         assert_eq!(wave_two.entity_count_by_kind(EntityKind::Lander), 5);
@@ -3109,7 +3146,10 @@ mod tests {
                 lives: 3,
                 wave: 3,
             },
-            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Human, 8, 9, 0, 0),
+            ],
         );
         wave_three.spawn_wave();
         assert_eq!(wave_three.entity_count_by_kind(EntityKind::Lander), 5);
@@ -3125,7 +3165,10 @@ mod tests {
                 lives: 3,
                 wave: 4,
             },
-            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Human, 8, 9, 0, 0),
+            ],
         );
         wave_four.spawn_wave();
         assert_eq!(wave_four.entity_count_by_kind(EntityKind::Lander), 5);
@@ -3140,12 +3183,68 @@ mod tests {
                 lives: 3,
                 wave: 5,
             },
-            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Human, 8, 9, 0, 0),
+            ],
         );
         wave_five.spawn_wave();
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Lander), 5);
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Bomber), 3);
         assert_eq!(wave_five.entity_count_by_kind(EntityKind::Pod), 4);
+        assert_eq!(wave_five.human_count(), 10);
+    }
+
+    #[test]
+    fn mutant_stages_replace_landers_until_the_next_fifth_wave() {
+        let mut world = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+        );
+
+        world.spawn_wave();
+
+        assert_eq!(world.human_count(), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 5);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Bomber), 1);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Pod), 1);
+        assert!(world.planet_destroyed());
+    }
+
+    #[test]
+    fn fifth_waves_restore_the_full_humanoid_population() {
+        let mut world = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 5,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Human, 3, 9, 0, 0),
+            ],
+        );
+
+        world.spawn_wave();
+
+        assert_eq!(world.human_count(), 10);
+        assert!(
+            !world
+                .entities()
+                .iter()
+                .any(|entity| entity.kind == EntityKind::Human && entity.position.x == 3)
+        );
+        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 5);
+        assert!(!world.planet_destroyed());
     }
 
     #[test]

@@ -14,10 +14,12 @@ pub struct InitialsEntryView<'a> {
 
 pub fn render_grid(world: &World) -> Vec<String> {
     let mut buffer = vec![vec![' '; world.width()]; world.height()];
-    for screen_x in 0..world.width() {
-        let terrain_row = world.terrain_row_at_screen_x(screen_x);
-        if terrain_row < buffer.len() {
-            buffer[terrain_row][screen_x] = '_';
+    if !world.planet_destroyed() {
+        for screen_x in 0..world.width() {
+            let terrain_row = world.terrain_row_at_screen_x(screen_x);
+            if terrain_row < buffer.len() {
+                buffer[terrain_row][screen_x] = '_';
+            }
         }
     }
 
@@ -45,12 +47,17 @@ pub fn render_grid(world: &World) -> Vec<String> {
             world.tick()
         ),
         format!(
-            "ENEMIES {}  HUMANS {}  THREAT {}  BOMBS {}  CAM {:03}",
+            "ENEMIES {}  HUMANS {}  THREAT {}  BOMBS {}  CAM {:03}  {}",
             world.enemy_count(),
             world.human_count(),
             world.threat_score(),
             world.smart_bombs(),
             world.camera_x(),
+            if world.planet_destroyed() {
+                "DEEP SPACE"
+            } else {
+                "PLANET ACTIVE"
+            },
         ),
         render_scanner(world),
     ];

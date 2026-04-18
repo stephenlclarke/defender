@@ -42,13 +42,6 @@ pub fn gameplay_demo_cycle() -> [GameplayBeat; 6] {
         world.step();
     }
     world.add_score(250);
-    world.spawn_entity(Entity::new(
-        EntityKind::Human,
-        54,
-        world.safe_altitude_at_world_x(54),
-        0,
-        0,
-    ));
     let beat3 = GameplayBeat {
         world: world.clone(),
         cue: Some(SoundCue::HumanSaved),
@@ -114,7 +107,7 @@ mod tests {
 
         assert_eq!(cycle[0].world.enemy_count(), 5);
         assert_eq!(cycle[2].world.enemy_count(), 4);
-        assert_eq!(cycle[3].world.human_count(), 3);
-        assert_eq!(cycle[5].world.human_count(), 2);
+        assert_eq!(cycle[3].world.human_count(), 10);
+        assert_eq!(cycle[5].world.human_count(), 9);
     }
 }
