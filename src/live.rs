@@ -13,7 +13,6 @@ use crate::terminal::{TerminalSession, geometry};
 use crate::video::{RenderedImage, Renderer, Screen};
 
 const FRAME_DURATION: Duration = Duration::from_millis(90);
-const TITLE_STATIC_HOLD_TICKS: u64 = 24;
 
 pub fn run_live(play_audio: bool) -> Result<()> {
     ensure_interactive_terminal()?;
@@ -143,42 +142,31 @@ fn render_session_frame<'a>(
 }
 
 fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) -> &'a RenderedImage {
-    if let Some(beat) = title_beat_for_session(session) {
-        match beat.kind {
-            SceneKind::Logo => renderer.render(Screen::Logo),
-            SceneKind::Attract => {
-                let mut world = crate::game::World::bootstrap();
-                for _ in 0..beat.world_steps {
-                    world.step();
-                }
-                renderer.render(Screen::Attract {
-                    world: &world,
-                    revealed_score_entries: beat.revealed_score_entries,
-                })
+    let beat = title_beat_for_session(session);
+    match beat.kind {
+        SceneKind::Logo => renderer.render(Screen::Logo),
+        SceneKind::Attract => {
+            let mut world = crate::game::World::bootstrap();
+            for _ in 0..beat.world_steps {
+                world.step();
             }
-            SceneKind::HighScore => renderer.render(Screen::HighScores {
-                todays: session.todays_high_scores(),
-                all_time: session.high_scores(),
-            }),
+            renderer.render(Screen::Attract {
+                world: &world,
+                revealed_score_entries: beat.revealed_score_entries,
+            })
         }
-    } else {
-        renderer.render(Screen::Title {
-            high_score: session.high_score(),
-            xyzzy_active: session.xyzzy_active(),
-            invincible: session.invincible(),
-            auto_fire: session.auto_fire(),
-        })
+        SceneKind::HighScore => renderer.render(Screen::HighScores {
+            todays: session.todays_high_scores(),
+            all_time: session.high_scores(),
+        }),
     }
 }
 
-fn title_beat_for_session(session: &SessionState) -> Option<AttractBeat> {
-    if session.title_ticks() < TITLE_STATIC_HOLD_TICKS {
-        return None;
-    }
-
-    let attract_elapsed_ms = (session.title_ticks() - TITLE_STATIC_HOLD_TICKS)
+fn title_beat_for_session(session: &SessionState) -> AttractBeat {
+    let attract_elapsed_ms = session
+        .title_ticks()
         .saturating_mul(FRAME_DURATION.as_millis() as u64);
-    Some(beat_for_elapsed_ms(attract_elapsed_ms))
+    beat_for_elapsed_ms(attract_elapsed_ms)
 }
 
 fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
@@ -315,8 +303,8 @@ mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode};
 
     use super::{
-        InputTracker, PolledInput, TITLE_STATIC_HOLD_TICKS, cue_for_events, render_title_frame,
-        title_beat_for_session, validate_interactive_terminal,
+        InputTracker, PolledInput, cue_for_events, render_title_frame, title_beat_for_session,
+        validate_interactive_terminal,
     };
     use crate::audio::SoundCue;
     use crate::game::WorldEvent;
@@ -486,13 +474,16 @@ mod tests {
     }
 
     #[test]
-    fn title_mode_switches_to_attract_pages_after_the_hold_period() {
+    fn title_mode_renders_the_arcade_attract_cycle_immediately() {
         let mut session = SessionState::with_high_scores(HighScoreTable::default());
-        for _ in 0..=TITLE_STATIC_HOLD_TICKS {
+        let beat = title_beat_for_session(&session);
+        assert_eq!(beat.kind, crate::attract::SceneKind::Logo);
+
+        for _ in 0..30 {
             session.tick(SessionInput::default());
         }
 
-        let beat = title_beat_for_session(&session).expect("title should be in attract mode");
+        let beat = title_beat_for_session(&session);
         assert!(matches!(
             beat.kind,
             crate::attract::SceneKind::Logo

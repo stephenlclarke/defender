@@ -41,23 +41,20 @@ const SWARMER_COLOR: [u8; 4] = [255, 170, 92, 255];
 const ENEMY_SHOT_COLOR: [u8; 4] = [255, 94, 94, 255];
 const PLAYER_SHOT_COLOR: [u8; 4] = [255, 255, 140, 255];
 const MINE_COLOR: [u8; 4] = [255, 74, 34, 255];
-const ATTRACT_SCORE_CARD: [(&str, u32); 6] = [
-    ("LANDER", 150),
-    ("MUTANT", 150),
-    ("BAITER", 200),
-    ("BOMBER", 250),
-    ("POD", 1000),
-    ("SWARMER", 150),
+// These screen positions mirror the `TEXTAB` legend placement from the attract
+// instruction page in `amode1.src`, adapted to the Kitty renderer's logical
+// 960x720 canvas.
+const ATTRACT_SCORE_CARD: [AttractLegendEntry; 6] = [
+    AttractLegendEntry::new(EntityKind::Lander, "LANDER", 150, 176, 284),
+    AttractLegendEntry::new(EntityKind::Mutant, "MUTANT", 150, 478, 284),
+    AttractLegendEntry::new(EntityKind::Baiter, "BAITER", 200, 776, 284),
+    AttractLegendEntry::new(EntityKind::Bomber, "BOMBER", 250, 176, 554),
+    AttractLegendEntry::new(EntityKind::Pod, "POD", 1000, 478, 554),
+    AttractLegendEntry::new(EntityKind::Swarmer, "SWARMR", 150, 776, 554),
 ];
 
 pub enum Screen<'a> {
     Logo,
-    Title {
-        high_score: u32,
-        xyzzy_active: bool,
-        invincible: bool,
-        auto_fire: bool,
-    },
     Attract {
         world: &'a World,
         revealed_score_entries: usize,
@@ -109,6 +106,27 @@ struct Rect {
     height: i32,
 }
 
+#[derive(Clone, Copy)]
+struct AttractLegendEntry {
+    kind: EntityKind,
+    label: &'static str,
+    score: u32,
+    x: i32,
+    y: i32,
+}
+
+impl AttractLegendEntry {
+    const fn new(kind: EntityKind, label: &'static str, score: u32, x: i32, y: i32) -> Self {
+        Self {
+            kind,
+            label,
+            score,
+            x,
+            y,
+        }
+    }
+}
+
 impl Renderer {
     pub fn new(geometry: TerminalGeometry) -> Self {
         let (image_width, image_height) = raster_size(geometry);
@@ -144,12 +162,6 @@ impl Renderer {
 
         match screen {
             Screen::Logo => self.render_logo_screen(),
-            Screen::Title {
-                high_score,
-                xyzzy_active,
-                invincible,
-                auto_fire,
-            } => self.render_title_screen(high_score, xyzzy_active, invincible, auto_fire),
             Screen::Attract {
                 world,
                 revealed_score_entries,
@@ -180,10 +192,10 @@ impl Renderer {
 
     fn render_logo_screen(&mut self) {
         self.draw_space_backdrop(0, None);
-        self.draw_centered_text(self.image_width as i32 / 2, 96, "WILLIAMS", TEXT_WARNING, 4);
+        self.draw_centered_text(self.image_width as i32 / 2, 90, "WILLIAMS", TEXT_DANGER, 4);
         self.draw_centered_text(
             self.image_width as i32 / 2,
-            146,
+            154,
             "ELECTRONICS INC.",
             TEXT_WARNING,
             2,
@@ -195,142 +207,50 @@ impl Renderer {
             TEXT_SECONDARY,
             2,
         );
-        self.draw_title_logo(self.image_width as i32 / 2, 370);
+        self.draw_arcade_logo(self.image_width as i32 / 2, 356, 6);
         self.draw_centered_text(
             self.image_width as i32 / 2,
-            self.image_height as i32 - 78,
-            "COPYRIGHT 1980 - WILLIAMS ELECTRONICS",
+            self.image_height as i32 - 92,
+            "COPYRIGHT 1980",
             TEXT_SECONDARY,
             2,
         );
-    }
-
-    fn render_title_screen(
-        &mut self,
-        high_score: u32,
-        xyzzy_active: bool,
-        invincible: bool,
-        auto_fire: bool,
-    ) {
-        self.draw_space_backdrop(3, None);
-        self.draw_title_logo(self.image_width as i32 / 2, 210);
-        self.draw_centered_text(
-            self.image_width as i32 / 2,
-            334,
-            &format!("HIGH SCORE TO DATE {:05}", high_score),
-            TEXT_PRIMARY,
-            3,
-        );
-        self.draw_centered_text(
-            self.image_width as i32 / 2,
-            404,
-            "PRESS ENTER OR 1 PLAYER START",
-            TEXT_WARNING,
-            3,
-        );
-        self.draw_centered_text(
-            self.image_width as i32 / 2,
-            452,
-            "PRESS Q OR ESC TO QUIT",
-            TEXT_SECONDARY,
-            2,
-        );
-
-        let controls_panel = Rect {
-            x: 104,
-            y: 502,
-            width: self.image_width as i32 - 208,
-            height: 170,
-        };
-        self.draw_panel(controls_panel);
-        self.draw_text(
-            controls_panel.x + 24,
-            controls_panel.y + 20,
-            "CONTROLS",
-            TEXT_WARNING,
-            2,
-        );
-        let lines = [
-            "A / Z      MOVE UP / DOWN",
-            "SHIFT      THRUST",
-            "SPACE      FLIP DIRECTION",
-            "ENTER      FIRE",
-            "TAB        SMART BOMB",
-            "H          HYPERSPACE",
-        ];
-        for (index, line) in lines.into_iter().enumerate() {
-            self.draw_text(
-                controls_panel.x + 24,
-                controls_panel.y + 52 + index as i32 * 18,
-                line,
-                TEXT_PRIMARY,
-                2,
-            );
-        }
-
-        self.draw_secret_status(xyzzy_active, invincible, auto_fire, 24, 26);
     }
 
     fn render_attract_screen(&mut self, world: &World, revealed_score_entries: usize) {
-        let sidebar = Rect {
-            x: self.image_width as i32 - 248,
-            y: 122,
-            width: 200,
-            height: self.image_height as i32 - 168,
-        };
         let playfield = Rect {
-            x: 36,
-            y: 122,
-            width: self.image_width as i32 - sidebar.width - 96,
-            height: self.image_height as i32 - 168,
+            x: 88,
+            y: 196,
+            width: self.image_width as i32 - 176,
+            height: self.image_height as i32 - 250,
         };
 
         self.draw_space_backdrop(world.tick(), Some(playfield));
         self.draw_centered_text(
             self.image_width as i32 / 2,
-            40,
+            34,
             "PRESS 1 OR 2 PLAYER START",
             TEXT_WARNING,
             3,
         );
+        self.draw_arcade_game_over_scanner(
+            world,
+            Rect {
+                x: self.image_width as i32 / 2 - 168,
+                y: 86,
+                width: 336,
+                height: 70,
+            },
+        );
         self.draw_centered_text(
             self.image_width as i32 / 2,
-            78,
-            "DEFENDER ATTRACT MODE",
-            TEXT_SECONDARY,
+            162,
+            "SCANNER",
+            TEXT_SCORE_BLUE,
             2,
         );
         self.draw_world_panel(world, playfield, false);
-
-        self.draw_panel(sidebar);
-        self.draw_text(sidebar.x + 24, sidebar.y + 18, "SCANNER", TEXT_WARNING, 2);
-        self.draw_text(
-            sidebar.x + 24,
-            sidebar.y + 50,
-            "TARGET VALUES",
-            TEXT_PRIMARY,
-            2,
-        );
-        for (index, (name, score)) in ATTRACT_SCORE_CARD
-            .into_iter()
-            .take(revealed_score_entries)
-            .enumerate()
-        {
-            self.draw_text(
-                sidebar.x + 24,
-                sidebar.y + 92 + index as i32 * 42,
-                name,
-                color_for_enemy_name(name),
-                2,
-            );
-            self.draw_text(
-                sidebar.x + 24,
-                sidebar.y + 110 + index as i32 * 42,
-                &format!("{score:>4}"),
-                TEXT_PRIMARY,
-                3,
-            );
-        }
+        self.draw_attract_legend_entries(revealed_score_entries);
     }
 
     fn render_high_scores_screen(&mut self, todays: &HighScoreTable, all_time: &HighScoreTable) {
@@ -831,25 +751,6 @@ impl Renderer {
         }
     }
 
-    fn draw_title_logo(&mut self, center_x: i32, top_y: i32) {
-        self.draw_centered_text(center_x, top_y - 64, "DEFENDER", TEXT_DANGER, 7);
-        self.draw_centered_text(
-            center_x,
-            top_y + 6,
-            "RED LABEL ARCADE REIMPLEMENTATION",
-            TEXT_SECONDARY,
-            2,
-        );
-        self.draw_line(
-            150,
-            top_y + 40,
-            self.image_width as i32 - 150,
-            top_y + 40,
-            Color::from_rgba([36, 64, 120, 255]),
-            2,
-        );
-    }
-
     fn draw_arcade_logo(&mut self, center_x: i32, top_y: i32, scale: i32) {
         for depth in (1..=3).rev() {
             self.draw_centered_text(
@@ -907,6 +808,28 @@ impl Renderer {
             2,
         );
         self.draw_text(x, y + 22, "SMART BOMBS INF", TEXT_PRIMARY, 1);
+    }
+
+    fn draw_attract_legend_entries(&mut self, revealed_score_entries: usize) {
+        for entry in ATTRACT_SCORE_CARD.into_iter().take(revealed_score_entries) {
+            let sprite = Entity::new(entry.kind, 0, 0, 0, 0);
+            self.draw_entity(
+                &sprite,
+                HorizontalDirection::Right,
+                0,
+                entry.x,
+                entry.y - 30,
+                26,
+            );
+            self.draw_centered_text(entry.x, entry.y, entry.label, TEXT_SCORE_BLUE, 2);
+            self.draw_centered_text(
+                entry.x,
+                entry.y + 22,
+                &entry.score.to_string(),
+                TEXT_SCORE_BLUE,
+                2,
+            );
+        }
     }
 
     fn default_scanner_rect(&self) -> Rect {
@@ -1271,18 +1194,6 @@ fn arcade_score_row(rank: usize, entry: Option<&HighScoreEntry>) -> String {
     match entry {
         Some(entry) => format!("{rank} {:<3} {:>5}", entry.initials, entry.score),
         None => format!("{rank} --- -----"),
-    }
-}
-
-fn color_for_enemy_name(name: &str) -> [u8; 4] {
-    match name {
-        "LANDER" => LANDER_COLOR,
-        "MUTANT" => MUTANT_COLOR,
-        "BAITER" => BAITER_COLOR,
-        "BOMBER" => BOMBER_COLOR,
-        "POD" => POD_COLOR,
-        "SWARMER" => SWARMER_COLOR,
-        _ => TEXT_PRIMARY,
     }
 }
 

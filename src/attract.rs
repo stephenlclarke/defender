@@ -8,7 +8,7 @@ const ATTRACT_SCORE_CARD: [(&str, u32); 6] = [
     ("BAITER", 200),
     ("BOMBER", 250),
     ("POD", 1000),
-    ("SWARMER", 150),
+    ("SWARMR", 150),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,14 +75,23 @@ pub fn attract_cycle() -> [AttractBeat; 9] {
         AttractBeat {
             kind: SceneKind::Logo,
             cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 1_000,
+            // `AMODES` starts on the Williams / Presents page before the ROM
+            // jumps to `HALDIS` for the hall-of-fame page.
+            hold_ms: 2_200,
+            world_steps: 0,
+            revealed_score_entries: 0,
+        },
+        AttractBeat {
+            kind: SceneKind::HighScore,
+            cue: Some(SoundCue::HighScoreChime),
+            hold_ms: 2_400,
             world_steps: 0,
             revealed_score_entries: 0,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::AttractHum),
-            hold_ms: 650,
+            hold_ms: 550,
             world_steps: 0,
             revealed_score_entries: 0,
         },
@@ -90,50 +99,43 @@ pub fn attract_cycle() -> [AttractBeat; 9] {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::EnemySweep),
             hold_ms: 500,
-            world_steps: 2,
+            world_steps: 4,
             revealed_score_entries: 1,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::PlayerShot),
             hold_ms: 500,
-            world_steps: 4,
+            world_steps: 6,
             revealed_score_entries: 2,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::EnemySweep),
             hold_ms: 500,
-            world_steps: 6,
+            world_steps: 8,
             revealed_score_entries: 3,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::Explosion),
             hold_ms: 500,
-            world_steps: 8,
+            world_steps: 10,
             revealed_score_entries: 4,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::EnemySweep),
-            hold_ms: 500,
-            world_steps: 10,
+            hold_ms: 550,
+            world_steps: 12,
             revealed_score_entries: 5,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::HumanSaved),
-            hold_ms: 550,
-            world_steps: 12,
+            hold_ms: 700,
+            world_steps: 14,
             revealed_score_entries: 6,
-        },
-        AttractBeat {
-            kind: SceneKind::HighScore,
-            cue: Some(SoundCue::HighScoreChime),
-            hold_ms: 1_250,
-            world_steps: 0,
-            revealed_score_entries: 0,
         },
     ]
 }
@@ -169,19 +171,17 @@ pub fn logo_scene() -> Scene {
     Scene {
         kind: SceneKind::Logo,
         lines: vec![
-            // Red-label attract text follows the `WILLIAMS` / `ELECTRONICS INC.` /
-            // `PRESENTS` / `DEFENDER` sequence from `mess0.src` and `amode1.src`.
+            // `AMODES` builds this first page as one Williams / Electronics Inc. /
+            // Presents / Defender / copyright composition.
             String::from("                 WILLIAMS"),
+            String::new(),
             String::from("             ELECTRONICS INC."),
+            String::new(),
             String::from("                  PRESENTS"),
             String::new(),
-            String::from(r" ____  _____ _____ _____ _   _ ____  _____ ____  "),
-            String::from(r"|  _ \| ____|  ___| ____| \ | |  _ \| ____|  _ \ "),
-            String::from(r"| | | |  _| | |_  |  _| |  \| | | | |  _| | |_) |"),
-            String::from(r"| |_| | |___|  _| | |___| |\  | |_| | |___|  _ < "),
-            String::from(r"|____/|_____|_|   |_____|_| \_|____/|_____|_| \_\"),
+            String::from("                  DEFENDER"),
             String::new(),
-            String::from("      COPYRIGHT 1980 - WILLIAMS ELECTRONICS"),
+            String::from("               COPYRIGHT 1980"),
         ],
     }
 }
@@ -190,7 +190,8 @@ pub fn attract_scene(world: &World, revealed_score_entries: usize) -> Scene {
     let mut lines = vec![String::from("PRESS 1 OR 2 PLAYER START"), String::new()];
     lines.extend(crate::render::render_grid(world));
     lines.push(String::new());
-    // `TEXTAB` in `amode1.src` rotates the attract score legend in this order.
+    // `TEXTAB` / `TENT` in `amode1.src` rotate the instruction legend in this
+    // order: SCANNER, LANDER, MUTANT, BAITER, BOMBER, POD, SWARMR.
     lines.push(String::from("SCANNER"));
     lines.extend(
         ATTRACT_SCORE_CARD
@@ -273,7 +274,7 @@ mod tests {
         assert!(text.contains("PRESS 1 OR 2 PLAYER START"));
         assert!(text.contains("SCANNER"));
         assert!(text.contains("LANDER"));
-        assert!(text.contains("SWARMER"));
+        assert!(text.contains("SWARMR"));
         assert!(text.contains("THREAT"));
     }
 
@@ -295,8 +296,9 @@ mod tests {
 
         assert_eq!(cycle[0].kind, SceneKind::Logo);
         assert_eq!(cycle[0].cue, Some(SoundCue::LogoFanfare));
-        assert_eq!(cycle[1].kind, SceneKind::Attract);
-        assert_eq!(cycle[8].kind, SceneKind::HighScore);
+        assert_eq!(cycle[1].kind, SceneKind::HighScore);
+        assert_eq!(cycle[2].kind, SceneKind::Attract);
+        assert_eq!(cycle[8].kind, SceneKind::Attract);
     }
 
     #[test]
@@ -304,14 +306,14 @@ mod tests {
         let cycle = attract_cycle();
 
         assert!(cycle[0].scene().text().contains("WILLIAMS"));
+        assert!(cycle[1].scene().text().contains("HALL OF FAME"));
         assert!(
-            cycle[1]
+            cycle[2]
                 .scene()
                 .text()
                 .contains("PRESS 1 OR 2 PLAYER START")
         );
-        assert!(cycle[7].scene().text().contains("POD"));
-        assert!(cycle[8].scene().text().contains("HALL OF FAME"));
+        assert!(cycle[8].scene().text().contains("SWARMR"));
     }
 
     #[test]

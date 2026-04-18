@@ -32,7 +32,10 @@ deliberate behavior outside the original cabinet rules.
 <p align="center">
   <img
     src="docs/start-sequence.gif"
-    alt="Defender attract sequence with logo, attract panel, and high-score screen"
+    alt="
+      Defender attract sequence with Williams logo page, hall of fame, and
+      instruction page
+    "
   />
 </p>
 <!-- markdownlint-enable MD033 -->
@@ -84,7 +87,7 @@ Notes:
 
 Live mode controls:
 
-- `ENTER` or `1`: start from the title screen, or restart after game over
+- `ENTER` or `1`: start from the attract sequence, or restart after game over
 - `A`: move up
 - `Z`: move down
 - `SHIFT`: thrust forward
@@ -188,11 +191,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   into safe kills that still pay their normal value,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
-- The live title screen now idles into a real attract loop instead of staying
-  static: a ROM-ordered scanner/enemy legend reveal cycles into a split
-  `TODAYS GREATEST` / `ALL TIME GREATEST` hall-of-fame page, with a volatile
-  per-run left table and a persistent right table, using the original black-
-  screen two-column attract layout instead of the earlier boxed panel.
+- Live startup now goes straight into the cabinet attract sequence instead of a
+  separate modern title page: the ROM-ordered Williams / Presents logo page
+  leads into the split `TODAYS GREATEST` / `ALL TIME GREATEST` hall-of-fame
+  page and then the instruction/demo page, with the volatile per-run left table
+  and persistent right table matching the original attract flow more closely.
 - The live game-over state now uses a sparse arcade-style overlay instead of
   the earlier restart panel: a thin top strip with score and scanner, the open
   playfield below it, amber terrain, and a centered `GAME OVER` message.
