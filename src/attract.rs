@@ -1,6 +1,6 @@
-use crate::attract_rom::{DEFENDER_LOGO_CHUNK_COUNT, WILLIAMS_TRACE_POINT_COUNT};
+use crate::attract_rom::{WILLIAMS_TRACE_POINT_COUNT, attract_rom};
 use crate::audio::SoundCue;
-use crate::game::World;
+use crate::game::{Entity, EntityKind, EntityState, HorizontalDirection, Status, World};
 use crate::high_scores::{HighScoreEntry, HighScoreTable};
 
 const ATTRACT_SCORE_CARD: [(&str, u32); 6] = [
@@ -11,6 +11,62 @@ const ATTRACT_SCORE_CARD: [(&str, u32); 6] = [
     ("POD", 1000),
     ("SWARMER", 150),
 ];
+
+const ATTRACT_WORLD_WIDTH: usize = 64;
+const ATTRACT_WORLD_HEIGHT: usize = 18;
+const ATTRACT_PLAYER_Y: i32 = 7;
+const ATTRACT_PLAYER_START_X: i32 = 8;
+const ATTRACT_ROM_HZ: u64 = 60;
+const RESCUE_DESCENT_TICKS: u16 = 0xE6;
+const RESCUE_ASCENT_TICKS: u16 = 0xA0;
+const RESCUE_LASER_TICKS: u16 = 0x15;
+const RESCUE_FALL_TICKS: u16 = 44 * 2;
+const RESCUE_SCORE_TICKS: u16 = 0x50;
+const RESCUE_RETURN_TICKS: u16 = 0x60;
+const LEGEND_APPROACH_TICKS: u16 = 0x5F;
+const LEGEND_LASER_TICKS: u16 = 0x17;
+const LEGEND_TEXT_TICKS: u16 = 0x20;
+const LEGEND_SETTLE_TICKS: u16 = 0x20;
+const LEGEND_ENTRY_TICKS: u16 =
+    LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TEXT_TICKS + LEGEND_SETTLE_TICKS;
+const LEGEND_HOLD_TICKS: u16 = 0xFF + 0xFF;
+const ATTRACT_TABLE_XS: [i32; 6] = [0x0900, 0x1100, 0x1980, 0x0960, 0x1160, 0x19E0];
+const ATTRACT_TABLE_YS: [i32; 6] = [0x6000, 0x6000, 0x6200, 0x9800, 0x9800, 0x9A00];
+const ATTRACT_PLAYER_X16: i32 = 0x0800;
+const ATTRACT_PLAYER_Y16: i32 = 0x5000;
+const ATTRACT_HUMAN_X16: i32 = 0x1E00;
+const ATTRACT_HUMAN_Y16: i32 = 0xDB00;
+const ATTRACT_LANDER_X16: i32 = 0x1DA0;
+const ATTRACT_LANDER_Y16: i32 = 0x4000;
+const ATTRACT_SCORE_BONUS_X16: i32 = 0x1DFF;
+const ATTRACT_SCORE_BONUS_Y16: i32 = 0x9000;
+const ATTRACT_SCORE_BONUS_DROP_X16: i32 = 0x1C00;
+const ATTRACT_SCORE_BONUS_DROP_Y16: i32 = 0xE000;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttractFrame {
+    pub world: World,
+    pub objects: Vec<AttractObject>,
+    pub revealed_score_entries: usize,
+    pub bonus_text: Option<AttractBonusText>,
+    pub player_facing: HorizontalDirection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AttractObject {
+    pub kind: EntityKind,
+    pub x16: i32,
+    pub y16: i32,
+    pub state: EntityState,
+    pub facing: HorizontalDirection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AttractBonusText {
+    pub text: &'static str,
+    pub x16: i32,
+    pub y16: i32,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SceneKind {
@@ -49,10 +105,11 @@ pub struct AttractBeat {
     pub hold_ms: u64,
     pub world_steps: usize,
     pub revealed_score_entries: usize,
+    pub demo_tick: Option<u16>,
     pub palette_phase: usize,
     pub logo_trace_points: usize,
     pub logo_show_title_text: bool,
-    pub logo_visible_defender_chunks: usize,
+    pub logo_defender_appear_tick: Option<u8>,
     pub logo_show_copyright: bool,
 }
 
@@ -65,11 +122,8 @@ impl AttractBeat {
         match self.kind {
             SceneKind::Logo => logo_scene(),
             SceneKind::Attract => {
-                let mut world = World::bootstrap();
-                for _ in 0..self.world_steps {
-                    world.step();
-                }
-                attract_scene(&world, self.revealed_score_entries)
+                let frame = attract_frame_for_beat(self);
+                attract_scene(&frame.world, frame.revealed_score_entries)
             }
             SceneKind::HighScore => high_score_scene_with_tables(todays, all_time),
         }
@@ -77,356 +131,504 @@ impl AttractBeat {
 }
 
 pub fn attract_cycle() -> Vec<AttractBeat> {
-    vec![
-        AttractBeat {
+    let mut beats = Vec::new();
+    beats.extend(logo_trace_beats());
+    beats.extend(logo_beat(
+        ticks_to_ms(48),
+        WILLIAMS_TRACE_POINT_COUNT,
+        true,
+        None,
+        false,
+    ));
+    beats.extend(logo_appear_beats());
+    beats.extend(logo_beat(
+        ticks_to_ms(600),
+        WILLIAMS_TRACE_POINT_COUNT,
+        true,
+        Some(0x2E),
+        true,
+    ));
+    beats.push(high_score_beat(ticks_to_ms(600)));
+    beats.extend(demo_beats());
+    beats
+}
+
+fn ticks_to_ms(ticks: u64) -> u64 {
+    (ticks * 1_000 + (ATTRACT_ROM_HZ / 2)) / ATTRACT_ROM_HZ
+}
+
+fn logo_beat(
+    hold_ms: u64,
+    logo_trace_points: usize,
+    logo_show_title_text: bool,
+    logo_defender_appear_tick: Option<u8>,
+    logo_show_copyright: bool,
+) -> Vec<AttractBeat> {
+    vec![AttractBeat {
+        kind: SceneKind::Logo,
+        cue: Some(SoundCue::LogoFanfare),
+        hold_ms,
+        world_steps: 0,
+        revealed_score_entries: 0,
+        demo_tick: None,
+        palette_phase: 0,
+        logo_trace_points,
+        logo_show_title_text,
+        logo_defender_appear_tick,
+        logo_show_copyright,
+    }]
+}
+
+fn logo_appear_beats() -> Vec<AttractBeat> {
+    (0..=0x2E)
+        .map(|tick| AttractBeat {
             kind: SceneKind::Logo,
             cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 500,
+            hold_ms: ticks_to_ms(1),
             world_steps: 0,
             revealed_score_entries: 0,
-            palette_phase: 0,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT / 8,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 500,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 0,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT / 3,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 500,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 0,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT * 2 / 3,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 500,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 0,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 700,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 0,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
-            logo_show_title_text: true,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 350,
-            world_steps: 0,
-            revealed_score_entries: 0,
+            demo_tick: None,
             palette_phase: 0,
             logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
             logo_show_title_text: true,
-            logo_visible_defender_chunks: 3,
+            logo_defender_appear_tick: Some(tick),
             logo_show_copyright: false,
-        },
-        AttractBeat {
+        })
+        .collect()
+}
+
+fn logo_trace_beats() -> Vec<AttractBeat> {
+    let prefixes = attract_rom().williams_point_prefixes();
+    let mut beats = Vec::new();
+    let mut byte_index = 0usize;
+
+    while byte_index < prefixes.len() {
+        let end = (byte_index + 3).min(prefixes.len()) - 1;
+        beats.push(AttractBeat {
             kind: SceneKind::Logo,
             cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 350,
+            hold_ms: ticks_to_ms(2),
             world_steps: 0,
             revealed_score_entries: 0,
+            demo_tick: None,
             palette_phase: 0,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
-            logo_show_title_text: true,
-            logo_visible_defender_chunks: 6,
+            logo_trace_points: prefixes[end],
+            logo_show_title_text: false,
+            logo_defender_appear_tick: None,
             logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 350,
+        });
+        byte_index += 3;
+    }
+
+    beats
+}
+
+fn high_score_beat(hold_ms: u64) -> AttractBeat {
+    AttractBeat {
+        kind: SceneKind::HighScore,
+        cue: Some(SoundCue::HighScoreChime),
+        hold_ms,
+        world_steps: 0,
+        revealed_score_entries: 0,
+        demo_tick: None,
+        palette_phase: 0,
+        logo_trace_points: 0,
+        logo_show_title_text: false,
+        logo_defender_appear_tick: None,
+        logo_show_copyright: false,
+    }
+}
+
+fn demo_beats() -> Vec<AttractBeat> {
+    (0..demo_total_ticks())
+        .map(|tick| AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(demo_cue_for_tick(tick)),
+            hold_ms: ticks_to_ms(1),
             world_steps: 0,
             revealed_score_entries: 0,
-            palette_phase: 1,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
-            logo_show_title_text: true,
-            logo_visible_defender_chunks: 9,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 350,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 2,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
-            logo_show_title_text: true,
-            logo_visible_defender_chunks: 12,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 350,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 3,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
-            logo_show_title_text: true,
-            logo_visible_defender_chunks: DEFENDER_LOGO_CHUNK_COUNT,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 1_500,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 0,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
-            logo_show_title_text: true,
-            logo_visible_defender_chunks: DEFENDER_LOGO_CHUNK_COUNT,
-            logo_show_copyright: true,
-        },
-        AttractBeat {
-            kind: SceneKind::Logo,
-            cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 1_500,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 1,
-            logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
-            logo_show_title_text: true,
-            logo_visible_defender_chunks: DEFENDER_LOGO_CHUNK_COUNT,
-            logo_show_copyright: true,
-        },
-        AttractBeat {
-            kind: SceneKind::HighScore,
-            cue: Some(SoundCue::HighScoreChime),
-            hold_ms: 2_000,
-            world_steps: 0,
-            revealed_score_entries: 0,
+            demo_tick: Some(tick),
             palette_phase: 0,
             logo_trace_points: 0,
             logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
+            logo_defender_appear_tick: None,
             logo_show_copyright: false,
+        })
+        .collect()
+}
+
+fn demo_total_ticks() -> u16 {
+    RESCUE_DESCENT_TICKS
+        + RESCUE_ASCENT_TICKS
+        + RESCUE_LASER_TICKS
+        + RESCUE_FALL_TICKS
+        + RESCUE_SCORE_TICKS
+        + RESCUE_RETURN_TICKS
+        + LEGEND_ENTRY_TICKS * ATTRACT_SCORE_CARD.len() as u16
+        + LEGEND_HOLD_TICKS
+}
+
+fn demo_cue_for_tick(tick: u16) -> SoundCue {
+    let rescue_tick_1 = RESCUE_DESCENT_TICKS;
+    let rescue_tick_2 = rescue_tick_1 + RESCUE_ASCENT_TICKS;
+    let rescue_tick_3 = rescue_tick_2 + RESCUE_LASER_TICKS;
+    let rescue_tick_4 = rescue_tick_3 + RESCUE_FALL_TICKS;
+    let rescue_tick_5 = rescue_tick_4 + RESCUE_SCORE_TICKS;
+    let rescue_tick_6 = rescue_tick_5 + RESCUE_RETURN_TICKS;
+
+    if tick == rescue_tick_1 || tick == rescue_tick_2 {
+        SoundCue::AttractHum
+    } else if tick == rescue_tick_2 {
+        SoundCue::PlayerShot
+    } else if tick == rescue_tick_3 {
+        SoundCue::Explosion
+    } else if tick == rescue_tick_4 {
+        SoundCue::HumanSaved
+    } else if tick >= rescue_tick_6 {
+        let local = tick - rescue_tick_6;
+        let stage = local % LEGEND_ENTRY_TICKS;
+        if stage == 0 {
+            SoundCue::EnemySweep
+        } else if stage == LEGEND_APPROACH_TICKS {
+            SoundCue::PlayerShot
+        } else if stage == LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS {
+            SoundCue::Explosion
+        } else {
+            SoundCue::AttractHum
+        }
+    } else {
+        SoundCue::AttractHum
+    }
+}
+
+pub fn attract_frame_for_beat(beat: AttractBeat) -> AttractFrame {
+    match beat.demo_tick {
+        Some(tick) => scripted_attract_frame_for_tick(tick),
+        None => {
+            let mut world = World::bootstrap();
+            for _ in 0..beat.world_steps {
+                world.step();
+            }
+            AttractFrame {
+                world,
+                objects: Vec::new(),
+                revealed_score_entries: beat.revealed_score_entries,
+                bonus_text: None,
+                player_facing: HorizontalDirection::Right,
+            }
+        }
+    }
+}
+
+pub fn attract_world_for_beat(beat: AttractBeat) -> (World, usize) {
+    let frame = attract_frame_for_beat(beat);
+    (frame.world, frame.revealed_score_entries)
+}
+
+fn scripted_world(
+    score: u32,
+    player_x: i32,
+    player_y: i32,
+    facing: HorizontalDirection,
+    mut entities: Vec<Entity>,
+) -> World {
+    entities.insert(
+        0,
+        Entity::new(EntityKind::PlayerShip, player_x, player_y, 0, 0),
+    );
+    let mut world = World::with_entities(
+        ATTRACT_WORLD_WIDTH,
+        ATTRACT_WORLD_HEIGHT,
+        Status {
+            score,
+            lives: 3,
+            wave: 1,
         },
-        AttractBeat {
-            kind: SceneKind::HighScore,
-            cue: Some(SoundCue::HighScoreChime),
-            hold_ms: 2_000,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 1,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::HighScore,
-            cue: Some(SoundCue::HighScoreChime),
-            hold_ms: 2_000,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 2,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::HighScore,
-            cue: Some(SoundCue::HighScoreChime),
-            hold_ms: 2_000,
-            world_steps: 0,
-            revealed_score_entries: 0,
-            palette_phase: 3,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::AttractHum),
-            hold_ms: 2_000,
-            world_steps: 24,
-            revealed_score_entries: 0,
-            palette_phase: 0,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::AttractHum),
-            hold_ms: 2_000,
-            world_steps: 28,
-            revealed_score_entries: 0,
-            palette_phase: 1,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::AttractHum),
-            hold_ms: 2_000,
-            world_steps: 32,
-            revealed_score_entries: 0,
-            palette_phase: 2,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::AttractHum),
-            hold_ms: 2_000,
-            world_steps: 36,
-            revealed_score_entries: 0,
-            palette_phase: 3,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::AttractHum),
-            hold_ms: 2_000,
-            world_steps: 40,
-            revealed_score_entries: 0,
-            palette_phase: 0,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::AttractHum),
-            hold_ms: 2_000,
-            world_steps: 44,
-            revealed_score_entries: 0,
-            palette_phase: 1,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::AttractHum),
-            hold_ms: 2_000,
-            world_steps: 48,
-            revealed_score_entries: 0,
-            palette_phase: 2,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::EnemySweep),
-            hold_ms: 4_000,
-            world_steps: 52,
-            revealed_score_entries: 1,
-            palette_phase: 1,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::PlayerShot),
-            hold_ms: 4_000,
-            world_steps: 56,
-            revealed_score_entries: 2,
-            palette_phase: 0,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::EnemySweep),
-            hold_ms: 4_000,
-            world_steps: 60,
-            revealed_score_entries: 3,
-            palette_phase: 1,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::Explosion),
-            hold_ms: 2_000,
-            world_steps: 64,
-            revealed_score_entries: 4,
-            palette_phase: 2,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::EnemySweep),
-            hold_ms: 4_000,
-            world_steps: 68,
-            revealed_score_entries: 5,
-            palette_phase: 3,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::HumanSaved),
-            hold_ms: 6_000,
-            world_steps: 72,
-            revealed_score_entries: 6,
-            palette_phase: 2,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_visible_defender_chunks: 0,
-            logo_show_copyright: false,
-        },
-    ]
+        entities,
+    );
+    world.set_player_facing(facing);
+    world
+}
+
+fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
+    let rescue_phase_end = RESCUE_DESCENT_TICKS + RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS;
+    let rescue_score_end = rescue_phase_end + RESCUE_FALL_TICKS + RESCUE_SCORE_TICKS;
+    let rescue_return_end = rescue_score_end + RESCUE_RETURN_TICKS;
+    let mut facing = HorizontalDirection::Right;
+    let mut objects = Vec::new();
+    let mut bonus_text = None;
+
+    if tick < RESCUE_DESCENT_TICKS {
+        objects.push(attract_object(
+            EntityKind::Lander,
+            ATTRACT_LANDER_X16,
+            ATTRACT_LANDER_Y16 + i32::from(tick) * 0x00A0,
+        ));
+        objects.push(attract_object(
+            EntityKind::Human,
+            ATTRACT_HUMAN_X16,
+            ATTRACT_HUMAN_Y16,
+        ));
+        objects.push(attract_object(
+            EntityKind::PlayerShip,
+            ATTRACT_PLAYER_X16,
+            ATTRACT_PLAYER_Y16,
+        ));
+    } else if tick < rescue_phase_end {
+        let rise_tick = tick - RESCUE_DESCENT_TICKS;
+        let total_rise_tick = rise_tick.min(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS);
+        let enemy_y = ATTRACT_LANDER_Y16 + i32::from(RESCUE_DESCENT_TICKS) * 0x00A0
+            - i32::from(total_rise_tick) * 0x00B0;
+        let human_y = ATTRACT_HUMAN_Y16 - i32::from(total_rise_tick) * 0x00B0;
+        objects.push(attract_object(
+            EntityKind::Lander,
+            ATTRACT_LANDER_X16,
+            enemy_y,
+        ));
+        objects.push(attract_object_with_state(
+            EntityKind::Human,
+            ATTRACT_HUMAN_X16,
+            human_y,
+            EntityState::Abducted,
+        ));
+        objects.push(attract_object(
+            EntityKind::PlayerShip,
+            ATTRACT_PLAYER_X16,
+            ATTRACT_PLAYER_Y16,
+        ));
+        if rise_tick >= RESCUE_ASCENT_TICKS {
+            add_laser_column(
+                &mut objects,
+                ATTRACT_PLAYER_X16,
+                ATTRACT_PLAYER_Y16,
+                ATTRACT_LANDER_X16,
+                enemy_y,
+            );
+        }
+    } else if tick < rescue_score_end {
+        let fall_tick = tick - rescue_phase_end;
+        let human_y = rescue_fall_human_y16(fall_tick);
+        let ship_x = ATTRACT_PLAYER_X16 + i32::from(fall_tick) * 0x0040;
+        let ship_y = ATTRACT_PLAYER_Y16 + i32::from(fall_tick) * 0x00D4;
+        objects.push(attract_object(EntityKind::PlayerShip, ship_x, ship_y));
+        objects.push(attract_object_with_state(
+            EntityKind::Human,
+            ATTRACT_HUMAN_X16,
+            human_y,
+            EntityState::Falling,
+        ));
+        if fall_tick >= RESCUE_FALL_TICKS {
+            bonus_text = Some(AttractBonusText {
+                text: "500",
+                x16: ATTRACT_SCORE_BONUS_X16,
+                y16: ATTRACT_SCORE_BONUS_Y16,
+            });
+        }
+    } else if tick < rescue_return_end {
+        let return_tick = tick - rescue_score_end;
+        facing = HorizontalDirection::Left;
+        let ship_start_x = ATTRACT_PLAYER_X16 + i32::from(RESCUE_FALL_TICKS) * 0x0040;
+        let ship_start_y = ATTRACT_PLAYER_Y16
+            + i32::from(RESCUE_FALL_TICKS) * 0x00D4
+            + i32::from(RESCUE_SCORE_TICKS) * 0x00C0;
+        let human_start_y = ATTRACT_HUMAN_Y16
+            - i32::from(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS) * 0x00B0
+            + i32::from(RESCUE_SCORE_TICKS) * 0x00C0;
+        objects.push(attract_object_facing(
+            EntityKind::PlayerShip,
+            ship_start_x - i32::from(return_tick) * 0x0040,
+            ship_start_y - i32::from(return_tick) * 0x0180,
+            HorizontalDirection::Left,
+        ));
+        objects.push(attract_object(EntityKind::Human, 0x1E80, human_start_y));
+        bonus_text = Some(AttractBonusText {
+            text: "500",
+            x16: ATTRACT_SCORE_BONUS_DROP_X16,
+            y16: ATTRACT_SCORE_BONUS_DROP_Y16,
+        });
+    } else {
+        let table_tick = tick - rescue_return_end;
+        let player_x = ATTRACT_PLAYER_X16 + i32::from(RESCUE_FALL_TICKS) * 0x0040
+            - i32::from(RESCUE_RETURN_TICKS) * 0x0040;
+        let player_y = ATTRACT_PLAYER_Y16
+            + i32::from(RESCUE_FALL_TICKS) * 0x00D4
+            + i32::from(RESCUE_SCORE_TICKS) * 0x00C0
+            - i32::from(RESCUE_RETURN_TICKS) * 0x0180;
+        objects.push(attract_object(EntityKind::PlayerShip, player_x, player_y));
+        objects.push(attract_object(EntityKind::Human, 0x1E80, 0xDEE0));
+        append_legend_entities(&mut objects, table_tick, player_x, player_y);
+    }
+
+    let revealed_score_entries = revealed_score_entries_for_tick(tick);
+    let entities: Vec<Entity> = objects
+        .iter()
+        .map(|object| rom_entity_with_state(object.kind, object.x16, object.y16, object.state))
+        .collect();
+    AttractFrame {
+        world: scripted_world(
+            0,
+            rom_x_to_world(ATTRACT_PLAYER_START_X << 8),
+            ATTRACT_PLAYER_Y,
+            facing,
+            entities,
+        ),
+        objects,
+        revealed_score_entries,
+        bonus_text,
+        player_facing: facing,
+    }
+}
+
+fn append_legend_entities(
+    objects: &mut Vec<AttractObject>,
+    table_tick: u16,
+    player_x16: i32,
+    player_y16: i32,
+) {
+    let hold_start = LEGEND_ENTRY_TICKS * ATTRACT_SCORE_CARD.len() as u16;
+    for index in 0..ATTRACT_SCORE_CARD.len() {
+        let entry_start = index as u16 * LEGEND_ENTRY_TICKS;
+        let entry_show_tick = entry_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
+        if table_tick >= entry_show_tick {
+            objects.push(attract_object(
+                legend_kind(index),
+                ATTRACT_TABLE_XS[index],
+                ATTRACT_TABLE_YS[index],
+            ));
+            continue;
+        }
+
+        if table_tick >= entry_start {
+            let local = table_tick - entry_start;
+            let enemy_y = 0xA000 - i32::from(local.min(entry_show_tick - entry_start)) * 0x00C0;
+            objects.push(attract_object(legend_kind(index), 0x1F00, enemy_y));
+            if local >= LEGEND_APPROACH_TICKS && local < entry_show_tick - entry_start {
+                add_laser_column(objects, player_x16, player_y16, 0x1F00, enemy_y);
+            }
+            break;
+        }
+    }
+
+    if table_tick >= hold_start {
+        for index in 0..ATTRACT_SCORE_CARD.len() {
+            objects.push(attract_object(
+                legend_kind(index),
+                ATTRACT_TABLE_XS[index],
+                ATTRACT_TABLE_YS[index],
+            ));
+        }
+    }
+}
+
+fn revealed_score_entries_for_tick(tick: u16) -> usize {
+    let table_tick = tick.saturating_sub(
+        RESCUE_DESCENT_TICKS
+            + RESCUE_ASCENT_TICKS
+            + RESCUE_LASER_TICKS
+            + RESCUE_FALL_TICKS
+            + RESCUE_SCORE_TICKS
+            + RESCUE_RETURN_TICKS,
+    );
+    let mut visible = 0;
+    for index in 0..ATTRACT_SCORE_CARD.len() {
+        let show_tick =
+            index as u16 * LEGEND_ENTRY_TICKS + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
+        if table_tick >= show_tick {
+            visible += 1;
+        }
+    }
+    visible
+}
+
+fn add_laser_column(
+    objects: &mut Vec<AttractObject>,
+    ship_x16: i32,
+    ship_y16: i32,
+    target_x16: i32,
+    target_y16: i32,
+) {
+    let laser_x = ship_x16 + ((target_x16 - ship_x16) / 2);
+    let mut y16 = ship_y16 + 0x0704;
+    while y16 < target_y16 {
+        objects.push(attract_object(EntityKind::PlayerShot, laser_x, y16));
+        y16 += 0x0800;
+    }
+}
+
+fn rescue_fall_human_y16(fall_tick: u16) -> i32 {
+    let mut y = ATTRACT_HUMAN_Y16 - i32::from(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS) * 0x00B0;
+    let mut tick_cursor = 0;
+    let mut velocity = 0;
+
+    for _ in 0..44 {
+        velocity += 0x0008;
+        for _ in 0..2 {
+            if tick_cursor >= fall_tick {
+                return y;
+            }
+            y += velocity;
+            tick_cursor += 1;
+        }
+    }
+
+    y
+}
+
+fn attract_object(kind: EntityKind, x16: i32, y16: i32) -> AttractObject {
+    attract_object_with_state(kind, x16, y16, EntityState::Normal)
+}
+
+fn attract_object_with_state(
+    kind: EntityKind,
+    x16: i32,
+    y16: i32,
+    state: EntityState,
+) -> AttractObject {
+    AttractObject {
+        kind,
+        x16,
+        y16,
+        state,
+        facing: HorizontalDirection::Right,
+    }
+}
+
+fn attract_object_facing(
+    kind: EntityKind,
+    x16: i32,
+    y16: i32,
+    facing: HorizontalDirection,
+) -> AttractObject {
+    AttractObject {
+        kind,
+        x16,
+        y16,
+        state: EntityState::Normal,
+        facing,
+    }
+}
+
+fn rom_entity_with_state(kind: EntityKind, x16: i32, y16: i32, state: EntityState) -> Entity {
+    Entity::with_state(kind, rom_x_to_world(x16), rom_y_to_world(y16), 0, 0, state)
+}
+
+fn rom_x_to_world(x16: i32) -> i32 {
+    ((x16 + 0x80) >> 8).clamp(0, ATTRACT_WORLD_WIDTH as i32 - 1)
+}
+
+fn rom_y_to_world(y16: i32) -> i32 {
+    ((y16 + 0x0800) >> 12).clamp(1, ATTRACT_WORLD_HEIGHT as i32 - 2)
+}
+
+fn legend_kind(index: usize) -> EntityKind {
+    match index {
+        0 => EntityKind::Lander,
+        1 => EntityKind::Mutant,
+        2 => EntityKind::Baiter,
+        3 => EntityKind::Bomber,
+        4 => EntityKind::Pod,
+        _ => EntityKind::Swarmer,
+    }
 }
 
 pub fn scene_for_elapsed_ms(

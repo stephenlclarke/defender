@@ -334,6 +334,10 @@ impl World {
         self.player_facing
     }
 
+    pub fn set_player_facing(&mut self, facing: HorizontalDirection) {
+        self.player_facing = facing;
+    }
+
     pub fn tick(&self) -> u32 {
         self.tick
     }

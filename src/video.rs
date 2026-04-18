@@ -1,6 +1,7 @@
 //! Renders Defender scenes into RGBA frames for Kitty graphics output and README media.
 
 use crate::{
+    attract::AttractFrame,
     attract_rom::attract_rom,
     branding::arcade_branding,
     font::arcade_font,
@@ -61,12 +62,11 @@ pub enum Screen<'a> {
         elapsed_ms: u64,
         trace_points: usize,
         show_title_text: bool,
-        visible_defender_chunks: usize,
+        defender_appear_tick: Option<u8>,
         show_copyright: bool,
     },
     Attract {
-        world: &'a World,
-        revealed_score_entries: usize,
+        frame: &'a AttractFrame,
         palette_phase: usize,
     },
     HighScores {
@@ -187,21 +187,20 @@ impl Renderer {
                 elapsed_ms,
                 trace_points,
                 show_title_text,
-                visible_defender_chunks,
+                defender_appear_tick,
                 show_copyright,
             } => self.render_logo_screen(
                 palette_phase,
                 elapsed_ms,
                 trace_points,
                 show_title_text,
-                visible_defender_chunks,
+                defender_appear_tick,
                 show_copyright,
             ),
             Screen::Attract {
-                world,
-                revealed_score_entries,
+                frame,
                 palette_phase,
-            } => self.render_attract_screen(world, revealed_score_entries, palette_phase),
+            } => self.render_attract_screen(frame, palette_phase),
             Screen::HighScores {
                 todays,
                 all_time,
@@ -235,7 +234,7 @@ impl Renderer {
         elapsed_ms: u64,
         trace_points: usize,
         show_title_text: bool,
-        visible_defender_chunks: usize,
+        defender_appear_tick: Option<u8>,
         show_copyright: bool,
     ) {
         self.fill_rect(
@@ -260,34 +259,24 @@ impl Renderer {
         let page_scale = page_height as f32 / 256.0;
         let page_x_at = |x: f32| page_x + (x * page_width as f32 / 320.0).round() as i32;
         let page_y_at = |y: f32| page_y + (y * page_height as f32 / 256.0).round() as i32;
-        let point_radius = (page_scale.ceil() as i32 / 2).max(0);
-        let full_logo_page_visible = trace_points >= rom.williams_points().len()
-            && show_title_text
-            && visible_defender_chunks >= rom.defender_chunks().len()
-            && show_copyright;
+        let full_logo_page_visible =
+            trace_points >= rom.williams_points().len() && show_title_text && show_copyright;
+        let page_rect = Rect {
+            x: page_x,
+            y: page_y,
+            width: page_width,
+            height: page_height,
+        };
 
         if full_logo_page_visible {
             // Once the ROM-driven trace and object-appearance phases have
             // completed, show the exact embedded red-label page composition.
-            self.recolor_attract_page(
-                Rect {
-                    x: page_x,
-                    y: page_y,
-                    width: page_width,
-                    height: page_height,
-                },
-                palette,
-            );
+            self.recolor_attract_page(page_rect, palette);
             return;
         }
 
         for &(x, y) in rom.williams_points().iter().take(trace_points) {
-            self.draw_dot(
-                page_x_at(x as f32),
-                page_y_at(y as f32),
-                Color::from_rgba(palette.williams),
-                point_radius,
-            );
+            self.draw_scaled_logo_trace_pixel(page_rect, x, y, Color::from_rgba(palette.williams));
         }
 
         if show_title_text {
@@ -307,36 +296,15 @@ impl Renderer {
             );
         }
 
-        if visible_defender_chunks > 0 {
-            let chunk_height = (24.0 * page_scale).round().max(1.0) as i32;
-            let chunk_width = (10.0 * page_scale).round().max(1.0) as i32;
-            let logo_left = page_x_at(118.0);
-            let logo_center_y = page_y_at(156.0);
-            let full_chunks = if visible_defender_chunks >= rom.defender_chunks().len() {
-                rom.defender_chunks().len()
-            } else {
-                visible_defender_chunks.saturating_sub(1)
-            };
-
-            for (index, chunk) in rom.defender_chunks().iter().take(full_chunks).enumerate() {
-                let center_x = logo_left + index as i32 * chunk_width + chunk_width / 2;
-                self.draw_scaled_image_centered(chunk, center_x, logo_center_y, chunk_height);
-            }
-
-            if visible_defender_chunks < rom.defender_chunks().len() {
-                let materializing_index = visible_defender_chunks.saturating_sub(1);
-                if let Some(chunk) = rom.defender_chunks().get(materializing_index) {
-                    let center_x =
-                        logo_left + materializing_index as i32 * chunk_width + chunk_width / 2;
-                    let expanded_height = ((chunk_height as f32) * 1.8).round() as i32;
-                    self.draw_scaled_image_centered(
-                        chunk,
-                        center_x,
-                        logo_center_y,
-                        expanded_height.max(chunk_height),
-                    );
-                }
-            }
+        if let Some(defender_appear_tick) = defender_appear_tick
+            && !show_copyright
+        {
+            self.draw_defender_appear_phase(
+                page_rect,
+                rom.defender_chunks(),
+                defender_appear_tick,
+                palette,
+            );
         }
 
         if show_copyright {
@@ -351,16 +319,12 @@ impl Renderer {
         }
     }
 
-    fn render_attract_screen(
-        &mut self,
-        world: &World,
-        revealed_score_entries: usize,
-        palette_phase: usize,
-    ) {
+    fn render_attract_screen(&mut self, frame: &AttractFrame, palette_phase: usize) {
+        let world = &frame.world;
         let palette = attract_palette(palette_phase, 0);
         let strip_y = 118;
-        self.draw_arcade_game_over_scanner(
-            world,
+        self.draw_attract_scanner(
+            frame,
             Rect {
                 x: self.image_width as i32 / 2 - 168,
                 y: 18,
@@ -389,15 +353,45 @@ impl Renderer {
             width: self.image_width as i32,
             height: self.image_height as i32 - strip_y - 6,
         };
-        self.draw_world_panel_with_style(
-            world,
-            playfield,
-            false,
-            None,
-            BACKGROUND,
-            TERRAIN_AMBER_LINE,
-        );
-        self.draw_attract_legend_entries(revealed_score_entries, palette.score_text);
+        self.fill_rect(playfield, Color::from_rgba(VIEWPORT_BACKGROUND));
+        self.draw_space_backdrop(world.tick().wrapping_add(17), Some(playfield));
+        if !world.planet_destroyed() {
+            let mut previous = None;
+            for screen_x in 0..world.width() {
+                let x = playfield.x
+                    + ((screen_x as f32 + 0.5) * playfield.width as f32 / world.width() as f32)
+                        .round() as i32;
+                let y = playfield.y
+                    + ((world.terrain_row_at_screen_x(screen_x) as f32 + 0.5)
+                        * playfield.height as f32
+                        / world.height() as f32)
+                        .round() as i32;
+                self.draw_line(
+                    x,
+                    y,
+                    x,
+                    playfield.y + playfield.height - 1,
+                    Color::from_rgba(TERRAIN_AMBER_FILL),
+                    1,
+                );
+                if let Some((prev_x, prev_y)) = previous {
+                    self.draw_line(
+                        prev_x,
+                        prev_y,
+                        x,
+                        y,
+                        Color::from_rgba(TERRAIN_AMBER_LINE),
+                        2,
+                    );
+                }
+                previous = Some((x, y));
+            }
+        }
+        self.draw_attract_demo_objects(frame, playfield);
+        if let Some(bonus_text) = frame.bonus_text {
+            self.draw_attract_bonus_text(bonus_text, playfield, palette.score_text);
+        }
+        self.draw_attract_legend_entries(frame.revealed_score_entries, palette.score_text);
     }
 
     fn render_high_scores_screen(
@@ -737,6 +731,49 @@ impl Renderer {
         }
     }
 
+    fn draw_attract_scanner(&mut self, frame: &AttractFrame, rect: Rect) {
+        let world = &frame.world;
+        self.stroke_rect(rect, Color::from_rgba(TERRAIN_LINE), 2);
+        let inner = rect.inset(2);
+        self.fill_rect(inner, Color::from_rgba(BACKGROUND));
+
+        if !world.planet_destroyed() {
+            let terrain_y = inner.y + inner.height - 10;
+            let mut previous = None;
+            for screen_x in 0..world.width() {
+                let x = inner.x
+                    + ((screen_x as f32 + 0.5) * inner.width as f32 / world.width() as f32).round()
+                        as i32;
+                let terrain_row = world.terrain_row_at_screen_x(screen_x) as f32;
+                let terrain_offset =
+                    ((terrain_row / world.height() as f32) * 12.0).round() as i32 - 6;
+                let y = terrain_y + terrain_offset;
+                if let Some((prev_x, prev_y)) = previous {
+                    self.draw_line(
+                        prev_x,
+                        prev_y,
+                        x,
+                        y,
+                        Color::from_rgba(TERRAIN_AMBER_LINE),
+                        1,
+                    );
+                }
+                previous = Some((x, y));
+            }
+        }
+
+        for object in &frame.objects {
+            let x = project_attract_x(inner, object.x16);
+            let y = project_attract_y(inner, object.y16);
+            let radius = if object.kind == EntityKind::PlayerShip {
+                3
+            } else {
+                2
+            };
+            self.draw_dot(x, y, Color::from_rgba(scanner_color(object.kind)), radius);
+        }
+    }
+
     fn draw_world_panel(&mut self, world: &World, rect: Rect, show_status_overlay: bool) {
         self.draw_world_panel_with_style(
             world,
@@ -849,6 +886,26 @@ impl Renderer {
             cy,
             sprite_draw_height(entity.kind, scale),
         );
+    }
+
+    fn draw_attract_demo_objects(&mut self, frame: &AttractFrame, rect: Rect) {
+        for object in &frame.objects {
+            let cx = project_attract_x(rect, object.x16);
+            let cy = project_attract_y(rect, object.y16);
+            let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
+            self.draw_entity(&entity, object.facing, 0, cx, cy, 24);
+        }
+    }
+
+    fn draw_attract_bonus_text(
+        &mut self,
+        bonus_text: crate::attract::AttractBonusText,
+        rect: Rect,
+        color: [u8; 4],
+    ) {
+        let x = project_attract_x(rect, bonus_text.x16);
+        let y = project_attract_y(rect, bonus_text.y16);
+        self.draw_centered_text(x, y, bonus_text.text, color, 2);
     }
 
     fn draw_score_tables(
@@ -1181,6 +1238,153 @@ impl Renderer {
         );
     }
 
+    fn draw_scaled_logo_trace_pixel(
+        &mut self,
+        page_rect: Rect,
+        native_x: u16,
+        native_y: u16,
+        color: Color,
+    ) {
+        let display_x0 = i32::from(native_x) * 5 / 4;
+        let display_x1 = (i32::from(native_x) + 1) * 5 / 4;
+        let display_y0 = i32::from(native_y);
+        let display_y1 = i32::from(native_y) + 1;
+
+        let x0 = page_rect.x + display_x0 * page_rect.width / 320;
+        let x1 = page_rect.x + display_x1 * page_rect.width / 320;
+        let y0 = page_rect.y + display_y0 * page_rect.height / 256;
+        let y1 = page_rect.y + display_y1 * page_rect.height / 256;
+
+        self.fill_rect(
+            Rect {
+                x: x0,
+                y: y0,
+                width: (x1 - x0).max(1),
+                height: (y1 - y0).max(1),
+            },
+            color,
+        );
+    }
+
+    fn draw_defender_appear_phase(
+        &mut self,
+        page_rect: Rect,
+        chunks: &[RenderedImage],
+        defender_appear_tick: u8,
+        palette: AttractPalette,
+    ) {
+        if chunks.is_empty() {
+            return;
+        }
+
+        const LOGO_LEFT_NATIVE: i32 = 118;
+        const LOGO_TOP_NATIVE: i32 = 144;
+        const CELL_PIXELS: i32 = 2;
+        const CHUNK_COLUMNS: i32 = 4;
+        const CHUNK_ROWS: i32 = 12;
+
+        let size = (0x2F_i32 - i32::from(defender_appear_tick)).max(1);
+        let step = size * CELL_PIXELS;
+
+        for (chunk_index, chunk) in chunks.iter().enumerate() {
+            let chunk_left = chunk_index as i32 * chunk.width as i32;
+            let start_y = 12 - 6 * step;
+
+            for block_column in 0..CHUNK_COLUMNS {
+                let target_x = chunk_left + block_column * step;
+                let src_x = (block_column * CELL_PIXELS) as usize;
+
+                for block_row in 0..CHUNK_ROWS {
+                    let target_y = start_y + block_row * step;
+                    let src_y = (block_row * CELL_PIXELS) as usize;
+                    self.draw_native_logo_cell(
+                        page_rect,
+                        chunk,
+                        (src_x, src_y),
+                        (LOGO_LEFT_NATIVE + target_x, LOGO_TOP_NATIVE + target_y),
+                        palette,
+                    );
+                }
+            }
+
+            // `EWRITE` clears the center cell after each expanded-object write.
+            self.fill_native_page_rect(
+                page_rect,
+                LOGO_LEFT_NATIVE + chunk_left,
+                LOGO_TOP_NATIVE + 12,
+                CELL_PIXELS,
+                CELL_PIXELS,
+                Color::from_rgba(BACKGROUND),
+            );
+        }
+    }
+
+    fn draw_native_logo_cell(
+        &mut self,
+        page_rect: Rect,
+        chunk: &RenderedImage,
+        source_origin: (usize, usize),
+        native_origin: (i32, i32),
+        palette: AttractPalette,
+    ) {
+        for dy in 0..2usize {
+            for dx in 0..2usize {
+                let pixel_x = source_origin.0 + dx;
+                let pixel_y = source_origin.1 + dy;
+                if pixel_x >= chunk.width as usize || pixel_y >= chunk.height as usize {
+                    continue;
+                }
+
+                let index = (pixel_y * chunk.width as usize + pixel_x) * 4;
+                let alpha = chunk.pixels[index + 3];
+                if alpha == 0 {
+                    continue;
+                }
+
+                self.fill_native_page_rect(
+                    page_rect,
+                    native_origin.0 + dx as i32,
+                    native_origin.1 + dy as i32,
+                    1,
+                    1,
+                    Color::from_rgba(remap_defender_logo_color(
+                        [
+                            chunk.pixels[index],
+                            chunk.pixels[index + 1],
+                            chunk.pixels[index + 2],
+                            alpha,
+                        ],
+                        palette,
+                    )),
+                );
+            }
+        }
+    }
+
+    fn fill_native_page_rect(
+        &mut self,
+        page_rect: Rect,
+        native_x: i32,
+        native_y: i32,
+        native_width: i32,
+        native_height: i32,
+        color: Color,
+    ) {
+        let x0 = page_rect.x + native_x * page_rect.width / 320;
+        let x1 = page_rect.x + (native_x + native_width) * page_rect.width / 320;
+        let y0 = page_rect.y + native_y * page_rect.height / 256;
+        let y1 = page_rect.y + (native_y + native_height) * page_rect.height / 256;
+        self.fill_rect(
+            Rect {
+                x: x0,
+                y: y0,
+                width: (x1 - x0).max(1),
+                height: (y1 - y0).max(1),
+            },
+            color,
+        );
+    }
+
     fn fill_rect(&mut self, rect: Rect, color: Color) {
         for y in rect.y.max(0)..(rect.y + rect.height).min(self.image_height as i32) {
             for x in rect.x.max(0)..(rect.x + rect.width).min(self.image_width as i32) {
@@ -1469,6 +1673,32 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
     }
 }
 
+fn remap_defender_logo_color(source: [u8; 4], palette: AttractPalette) -> [u8; 4] {
+    if source == [112, 255, 52, 255] {
+        palette.defender_face
+    } else if source == [255, 48, 48, 255] {
+        palette.defender_shadow
+    } else {
+        source
+    }
+}
+
+fn native_attract_x(x16: i32) -> i32 {
+    ((x16 + 0x20) >> 6) - 0x18 * 4
+}
+
+fn native_attract_y(y16: i32) -> i32 {
+    ((y16 + 0x80) >> 8).clamp(0, 255)
+}
+
+fn project_attract_x(rect: Rect, x16: i32) -> i32 {
+    rect.x + native_attract_x(x16) * rect.width / 320
+}
+
+fn project_attract_y(rect: Rect, y16: i32) -> i32 {
+    rect.y + native_attract_y(y16) * rect.height / 256
+}
+
 fn scanner_color(kind: EntityKind) -> [u8; 4] {
     match kind {
         EntityKind::PlayerShip => PLAYER_COLOR,
@@ -1627,7 +1857,7 @@ mod tests {
                 elapsed_ms: 0,
                 trace_points: crate::attract_rom::WILLIAMS_TRACE_POINT_COUNT,
                 show_title_text: true,
-                visible_defender_chunks: crate::attract_rom::DEFENDER_LOGO_CHUNK_COUNT,
+                defender_appear_tick: Some(0x2E),
                 show_copyright: true,
             })
             .clone();
@@ -1637,7 +1867,7 @@ mod tests {
                 elapsed_ms: 240,
                 trace_points: crate::attract_rom::WILLIAMS_TRACE_POINT_COUNT,
                 show_title_text: true,
-                visible_defender_chunks: crate::attract_rom::DEFENDER_LOGO_CHUNK_COUNT,
+                defender_appear_tick: Some(0x2E),
                 show_copyright: true,
             })
             .clone();

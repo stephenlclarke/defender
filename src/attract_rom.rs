@@ -11,17 +11,14 @@ mod data {
 pub const WILLIAMS_TRACE_POINT_COUNT: usize = 661;
 pub const DEFENDER_LOGO_CHUNK_COUNT: usize = 15;
 
-const DISPLAY_WIDTH_SCALE_NUMERATOR: u16 = 5;
-const DISPLAY_WIDTH_SCALE_DENOMINATOR: u16 = 4;
 const DEFENDER_NATIVE_CHUNK_WIDTH: usize = 8;
 const DEFENDER_NATIVE_HEIGHT: usize = 24;
-const DEFENDER_DISPLAY_CHUNK_WIDTH: u32 = 10;
-const DEFENDER_DISPLAY_HEIGHT: u32 = 24;
 const DEFENDER_FACE: [u8; 4] = [112, 255, 52, 255];
 const DEFENDER_SHADOW: [u8; 4] = [255, 48, 48, 255];
 
 pub struct AttractRom {
     williams_points: Vec<(u16, u16)>,
+    williams_point_prefixes: Vec<usize>,
     defender_chunks: Vec<RenderedImage>,
 }
 
@@ -39,9 +36,14 @@ impl AttractRom {
         &self.defender_chunks
     }
 
+    pub fn williams_point_prefixes(&self) -> &[usize] {
+        &self.williams_point_prefixes
+    }
+
     fn decode() -> Self {
         Self {
             williams_points: decode_williams_points(),
+            williams_point_prefixes: decode_williams_point_prefixes(),
             defender_chunks: decode_defender_chunks(),
         }
     }
@@ -82,10 +84,7 @@ fn decode_williams_points() -> Vec<(u16, u16)> {
                 }
                 accumulator <<= 1;
 
-                points.push((
-                    cursor_x * DISPLAY_WIDTH_SCALE_NUMERATOR / DISPLAY_WIDTH_SCALE_DENOMINATOR,
-                    cursor_y,
-                ));
+                points.push((cursor_x, cursor_y));
 
                 if accumulator == 0 {
                     break;
@@ -107,6 +106,39 @@ fn decode_williams_points() -> Vec<(u16, u16)> {
     }
 
     points
+}
+
+fn decode_williams_point_prefixes() -> Vec<usize> {
+    let mut prefixes = Vec::with_capacity(data::WILLIAMS_TRACE_DATA.len());
+    let mut points = 0usize;
+    let mut index = 0usize;
+
+    while index < data::WILLIAMS_TRACE_DATA.len() {
+        let value = data::WILLIAMS_TRACE_DATA[index];
+        index += 1;
+
+        if value <= 0xAA {
+            let mut accumulator = value;
+            loop {
+                accumulator <<= 4;
+                points += 1;
+                if accumulator == 0 {
+                    break;
+                }
+            }
+            prefixes.push(points);
+            continue;
+        }
+
+        let instruction = (!value).wrapping_sub(1);
+        if instruction != 0 {
+            break;
+        }
+        index += 2;
+        prefixes.push(points);
+    }
+
+    prefixes
 }
 
 fn decode_defender_chunks() -> Vec<RenderedImage> {
@@ -137,24 +169,7 @@ fn decode_defender_chunks() -> Vec<RenderedImage> {
 }
 
 fn scale_chunk_to_display(chunk: RenderedImage) -> RenderedImage {
-    let mut pixels = vec![0; (DEFENDER_DISPLAY_CHUNK_WIDTH * DEFENDER_DISPLAY_HEIGHT * 4) as usize];
-
-    for y in 0..DEFENDER_DISPLAY_HEIGHT {
-        let source_y = y as usize;
-        for x in 0..DEFENDER_DISPLAY_CHUNK_WIDTH {
-            let source_x =
-                (x * chunk.width / DEFENDER_DISPLAY_CHUNK_WIDTH).min(chunk.width.saturating_sub(1));
-            let source = ((source_y * chunk.width as usize) + source_x as usize) * 4;
-            let destination = ((y * DEFENDER_DISPLAY_CHUNK_WIDTH + x) * 4) as usize;
-            pixels[destination..destination + 4].copy_from_slice(&chunk.pixels[source..source + 4]);
-        }
-    }
-
-    RenderedImage {
-        width: DEFENDER_DISPLAY_CHUNK_WIDTH,
-        height: DEFENDER_DISPLAY_HEIGHT,
-        pixels,
-    }
+    chunk
 }
 
 fn decode_defender_logo_native() -> RenderedImage {
@@ -260,6 +275,10 @@ mod tests {
 
         assert_eq!(rom.williams_points().len(), WILLIAMS_TRACE_POINT_COUNT);
         assert!(!rom.williams_points().is_empty());
+        assert_eq!(
+            rom.williams_point_prefixes().last().copied(),
+            Some(WILLIAMS_TRACE_POINT_COUNT)
+        );
     }
 
     #[test]

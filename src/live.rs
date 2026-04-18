@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, ModifierKeyCode};
 
-use crate::attract::{AttractBeat, SceneKind, beat_for_elapsed_ms};
+use crate::attract::{AttractBeat, SceneKind, attract_frame_for_beat, beat_for_elapsed_ms};
 use crate::audio::{AudioManager, SoundCue};
 use crate::kitty::KittyGraphics;
 use crate::session::{SessionEvent, SessionInput, SessionMode, SessionState};
@@ -149,17 +149,13 @@ fn render_title_frame<'a>(renderer: &'a mut Renderer, session: &SessionState) ->
             elapsed_ms: attract_elapsed_ms_for_session(session),
             trace_points: beat.logo_trace_points,
             show_title_text: beat.logo_show_title_text,
-            visible_defender_chunks: beat.logo_visible_defender_chunks,
+            defender_appear_tick: beat.logo_defender_appear_tick,
             show_copyright: beat.logo_show_copyright,
         }),
         SceneKind::Attract => {
-            let mut world = crate::game::World::bootstrap();
-            for _ in 0..beat.world_steps {
-                world.step();
-            }
+            let frame = attract_frame_for_beat(beat);
             renderer.render(Screen::Attract {
-                world: &world,
-                revealed_score_entries: beat.revealed_score_entries,
+                frame: &frame,
                 palette_phase: beat.palette_phase,
             })
         }

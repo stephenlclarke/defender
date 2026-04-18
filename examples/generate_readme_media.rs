@@ -6,7 +6,7 @@ use gif::{Encoder, Frame, Repeat};
 use png::{BitDepth, ColorType, Compression, Encoder as PngEncoder};
 
 use defender::{
-    attract::{AttractBeat, attract_cycle},
+    attract::{AttractBeat, attract_cycle, attract_frame_for_beat},
     demo::gameplay_demo_cycle,
     game::{Entity, EntityKind, World},
     high_scores::HighScoreTable,
@@ -32,9 +32,9 @@ const TRAFFIC_YELLOW: [u8; 4] = [254, 188, 46, 255];
 const TRAFFIC_GREEN: [u8; 4] = [40, 200, 64, 255];
 const GHOST_BADGE: [u8; 4] = [240, 240, 248, 255];
 const GHOST_EYE: [u8; 4] = [18, 18, 26, 255];
-const README_GIF_SAMPLE_MS: u64 = 120;
-const README_GIF_REALTIME_PERCENT: u64 = 40;
-const README_GIF_MIN_DELAY_CS: u16 = 4;
+const README_GIF_SAMPLE_MS: u64 = 33;
+const README_GIF_REALTIME_PERCENT: u64 = 65;
+const README_GIF_MIN_DELAY_CS: u16 = 2;
 
 fn main() -> Result<()> {
     let screenshot_path = std::env::args_os()
@@ -117,20 +117,19 @@ fn render_attract_sample(
                 elapsed_ms,
                 trace_points: beat.logo_trace_points,
                 show_title_text: beat.logo_show_title_text,
-                visible_defender_chunks: beat.logo_visible_defender_chunks,
+                defender_appear_tick: beat.logo_defender_appear_tick,
                 show_copyright: beat.logo_show_copyright,
             })
             .clone(),
         defender::attract::SceneKind::Attract => {
-            let mut world = World::bootstrap();
-            let world_steps = interpolated_world_steps(beat, next_beat, offset_ms);
-            for _ in 0..world_steps {
-                world.step();
-            }
+            let frame = attract_frame_for_beat(if offset_ms >= beat.hold_ms {
+                next_beat
+            } else {
+                beat
+            });
             renderer
                 .render(Screen::Attract {
-                    world: &world,
-                    revealed_score_entries: beat.revealed_score_entries,
+                    frame: &frame,
                     palette_phase: beat.palette_phase,
                 })
                 .clone()
@@ -164,20 +163,6 @@ fn cycle_entry_for_elapsed(cycle: &[AttractBeat], elapsed_ms: u64) -> (usize, u6
     }
 
     (0, 0, cycle[0])
-}
-
-fn interpolated_world_steps(beat: AttractBeat, next_beat: AttractBeat, offset_ms: u64) -> usize {
-    if beat.kind != defender::attract::SceneKind::Attract
-        || next_beat.kind != defender::attract::SceneKind::Attract
-        || beat.hold_ms == 0
-    {
-        return beat.world_steps;
-    }
-
-    let progress = (offset_ms as f32 / beat.hold_ms as f32).clamp(0.0, 1.0);
-    let start = beat.world_steps as f32;
-    let end = next_beat.world_steps as f32;
-    (start + (end - start) * progress).round().max(0.0) as usize
 }
 
 fn scaled_centiseconds(duration_ms: u64) -> u16 {
