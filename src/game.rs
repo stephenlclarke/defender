@@ -885,17 +885,7 @@ impl World {
             return;
         }
 
-        let Some(human_index) = self
-            .entities
-            .iter()
-            .enumerate()
-            .find(|(_, entity)| {
-                entity.kind == EntityKind::Human
-                    && entity.state == EntityState::Falling
-                    && positions_overlap(player_position, entity.position, 1, 1)
-            })
-            .map(|(index, _)| index)
-        else {
+        let Some(human_index) = self.find_collectable_human(player_position) else {
             return;
         };
 
@@ -938,6 +928,18 @@ impl World {
             .enumerate()
             .find(|(_, entity)| {
                 entity.kind == EntityKind::Human && entity.state == EntityState::PlayerCarried
+            })
+            .map(|(index, _)| index)
+    }
+
+    fn find_collectable_human(&self, player_position: Position) -> Option<usize> {
+        self.entities
+            .iter()
+            .enumerate()
+            .find(|(_, entity)| {
+                entity.kind == EntityKind::Human
+                    && matches!(entity.state, EntityState::Normal | EntityState::Falling)
+                    && positions_overlap(player_position, entity.position, 1, 1)
             })
             .map(|(index, _)| index)
     }
@@ -1606,6 +1608,64 @@ mod tests {
             world.safe_altitude_at_world_x(rescued_human.position.x)
         );
         assert!(second_events.contains(&WorldEvent::HumanRescued));
+    }
+
+    #[test]
+    fn player_picks_up_a_grounded_human_and_redeploys_them() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 6, 6, 0, 0),
+                Entity::new(EntityKind::Human, 6, 7, 0, 0),
+                Entity::new(EntityKind::Mutant, 16, 4, 0, 0),
+            ],
+        );
+
+        let pickup_events = world.step_live(UpdateInput::default());
+        let carried_human = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Human)
+            .expect("carried human");
+        assert_eq!(carried_human.state, EntityState::PlayerCarried);
+        assert!(!pickup_events.contains(&WorldEvent::HumanRescued));
+
+        let carry_events = world.step_live(UpdateInput {
+            up: true,
+            thrust: true,
+            ..UpdateInput::default()
+        });
+        let repositioned_human = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Human)
+            .expect("repositioned human");
+        assert_eq!(repositioned_human.state, EntityState::PlayerCarried);
+        assert_eq!(repositioned_human.position.x, 7);
+        assert!(!carry_events.contains(&WorldEvent::HumanRescued));
+
+        let landing_events = world.step_live(UpdateInput {
+            down: true,
+            ..UpdateInput::default()
+        });
+        let landed_human = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Human)
+            .expect("landed human");
+        assert_eq!(landed_human.state, EntityState::Normal);
+        assert_eq!(landed_human.position.x, 7);
+        assert_eq!(
+            landed_human.position.y,
+            world.safe_altitude_at_world_x(landed_human.position.x)
+        );
+        assert!(landing_events.contains(&WorldEvent::HumanRescued));
     }
 
     #[test]
