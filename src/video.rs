@@ -1,8 +1,7 @@
 //! Renders Defender scenes into RGBA frames for Kitty graphics output and README media.
 
-use font8x8::{BASIC_FONTS, UnicodeFonts};
-
 use crate::{
+    font::arcade_font,
     game::{Entity, EntityKind, HorizontalDirection, World},
     high_scores::{HighScoreEntry, HighScoreTable},
     render::InitialsEntryView,
@@ -814,12 +813,14 @@ impl Renderer {
     }
 
     fn draw_text(&mut self, x: i32, y: i32, text: &str, color: [u8; 4], scale: i32) {
+        let font = arcade_font();
         let glyph_color = Color::from_rgba(color);
         let scale = scale.max(1);
         let mut pen_x = x;
         for ch in text.chars() {
-            self.draw_char(pen_x, y, ch, glyph_color, scale);
-            pen_x += 8 * scale;
+            let glyph = font.glyph_for_char(ch);
+            self.draw_scaled_glyph(glyph.image(), pen_x, y, glyph_color, scale);
+            pen_x += glyph.advance() * scale;
         }
     }
 
@@ -831,26 +832,35 @@ impl Renderer {
         color: [u8; 4],
         scale: i32,
     ) {
-        let width = text.chars().count() as i32 * 8 * scale.max(1);
+        let width = arcade_font().text_width(text, scale);
         self.draw_text(center_x - width / 2, y, text, color, scale);
     }
 
-    fn draw_char(&mut self, x: i32, y: i32, ch: char, color: Color, scale: i32) {
-        let Some(glyph) = BASIC_FONTS.get(ch) else {
+    fn draw_scaled_glyph(
+        &mut self,
+        glyph: &RenderedImage,
+        origin_x: i32,
+        origin_y: i32,
+        color: Color,
+        scale: i32,
+    ) {
+        if glyph.width == 0 || glyph.height == 0 {
             return;
-        };
+        }
 
-        for (row_index, row_bits) in glyph.iter().enumerate() {
-            for col_index in 0..8u8 {
-                if row_bits & (1u8 << col_index) == 0 {
+        for src_y in 0..glyph.height {
+            for src_x in 0..glyph.width {
+                let index = ((src_y * glyph.width + src_x) * 4) as usize;
+                let alpha = glyph.pixels[index + 3];
+                if alpha == 0 {
                     continue;
                 }
                 for sy in 0..scale {
                     for sx in 0..scale {
-                        self.render_target.put_pixel(
-                            x + (col_index as i32) * scale + sx,
-                            y + row_index as i32 * scale + sy,
-                            color,
+                        self.render_target.blend_pixel(
+                            origin_x + src_x as i32 * scale + sx,
+                            origin_y + src_y as i32 * scale + sy,
+                            Color(color.0, color.1, color.2, alpha),
                         );
                     }
                 }

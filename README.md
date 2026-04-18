@@ -20,7 +20,8 @@ rendered through the Kitty graphics protocol.
 
 The game logic is native Rust; ROMs are treated as reference material only, and
 the app now embeds its gameplay object art as PNGs from `assets/arcade/` and
-its cue audio as WAVs from `assets/sounds/`, so compile and runtime do not
+its cue audio as WAVs from `assets/sounds/`, with the red-label text font
+bundled as `assets/arcade/font-sheet.png`, so compile and runtime do not
 depend on a local ROM or sound directory. The target is a faithful recreation
 of the original red-label arcade game, with hidden `xyzzy` extras as the
 deliberate behavior outside the original cabinet rules.
@@ -136,6 +137,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   explicit ROM path.
 - Gameplay object art now loads from embedded `assets/arcade/*.png` sprites,
   following the same bundled-asset layout used in `../pacman`.
+- UI and attract text now render through the embedded
+  `assets/arcade/font-sheet.png` sheet built from the red-label `mess0.src`
+  character tables instead of the old generic bitmap font.
 - All current sounds are embedded in the app via bundled `assets/sounds/*.wav`
   cue files decoded by `rodio`, so the live runtime stays self-contained while
   matching the sibling repos' asset layout.
@@ -250,7 +254,8 @@ the final runtime self-contained:
 - <https://github.com/mwenge/defender>: Motorola 6809 assembly language for the
   'Red Label' version of the game. Used for reference implementation and ROM
   layout comparison point, especially for the red-label `defend.*` program ROM
-  names.
+  names and the `mess0.src` `CHRTBL` / `CHARACTERS` font tables used to build
+  the embedded `assets/arcade/font-sheet.png`.
 - <https://seanriddle.com/ripper.html>: Williams graphics-ripper reference used
   to confirm Defender's screen-format sprite layout and the red-label object
   sprite list/rip used to build the embedded `assets/arcade/*.png` object art.

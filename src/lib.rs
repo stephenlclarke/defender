@@ -7,6 +7,7 @@ pub mod audio;
 pub mod constants;
 mod customization;
 pub mod demo;
+pub mod font;
 pub mod game;
 pub mod high_scores;
 pub mod kitty;
