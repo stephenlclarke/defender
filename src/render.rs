@@ -1,6 +1,6 @@
 use crate::game::World;
 
-pub fn render(world: &World) -> String {
+pub fn render_grid(world: &World) -> Vec<String> {
     let mut buffer = vec![vec![' '; world.width()]; world.height()];
     let ground_row = world.ground_row();
 
@@ -38,7 +38,11 @@ pub fn render(world: &World) -> String {
             .into_iter()
             .map(|row| format!("|{}|", row.into_iter().collect::<String>())),
     );
+    lines
+}
 
+pub fn render(world: &World) -> String {
+    let mut lines = render_grid(world);
     lines.push(String::from(
         "Use `cargo run -- --rom-report assets/roms/defender` to inspect local ROM references.",
     ));

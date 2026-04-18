@@ -3,18 +3,21 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 
+use crate::attract::{SceneKind, attract_scene, high_score_scene, logo_scene};
 use crate::game::World;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
-    Demo { frames: usize },
+    Gameplay { frames: usize },
+    Scene { kind: SceneKind },
     RomReport { path: PathBuf },
     Help,
 }
 
 pub fn run() -> Result<()> {
     match parse_args(env::args().skip(1))? {
-        Command::Demo { frames } => run_demo(frames),
+        Command::Gameplay { frames } => run_demo(frames),
+        Command::Scene { kind } => run_scene(kind),
         Command::RomReport { path } => run_rom_report(&path),
         Command::Help => {
             print_help();
@@ -29,6 +32,23 @@ fn run_demo(frames: usize) -> Result<()> {
         world.step();
     }
     println!("{}", crate::render::render(&world));
+    Ok(())
+}
+
+fn run_scene(kind: SceneKind) -> Result<()> {
+    let text = match kind {
+        SceneKind::Logo => logo_scene().text(),
+        SceneKind::Attract => {
+            let mut world = World::bootstrap();
+            for _ in 0..4 {
+                world.step();
+            }
+            attract_scene(&world).text()
+        }
+        SceneKind::HighScore => high_score_scene().text(),
+    };
+
+    println!("{text}");
     Ok(())
 }
 
@@ -55,11 +75,27 @@ where
 {
     let mut args = args.into_iter();
     let Some(first) = args.next() else {
-        return Ok(Command::Demo { frames: 3 });
+        return Ok(Command::Scene {
+            kind: SceneKind::Logo,
+        });
     };
 
     match first.as_str() {
         "--help" | "-h" => Ok(Command::Help),
+        "--scene" => {
+            let Some(value) = args.next() else {
+                bail!("--scene requires one of: logo, attract, high-score");
+            };
+            if args.next().is_some() {
+                bail!("--scene only accepts one value");
+            }
+
+            let Some(kind) = SceneKind::parse(&value) else {
+                bail!("unsupported scene: {value}");
+            };
+
+            Ok(Command::Scene { kind })
+        }
         "--frames" => {
             let Some(value) = args.next() else {
                 bail!("--frames requires a positive integer");
@@ -72,7 +108,7 @@ where
                 .parse::<usize>()
                 .context("--frames requires a positive integer")?;
 
-            Ok(Command::Demo {
+            Ok(Command::Gameplay {
                 frames: parsed.max(1),
             })
         }
@@ -95,6 +131,9 @@ where
 fn print_help() {
     println!("defender");
     println!("  cargo run");
+    println!("  cargo run -- --scene logo");
+    println!("  cargo run -- --scene attract");
+    println!("  cargo run -- --scene high-score");
     println!("  cargo run -- --frames 8");
     println!("  cargo run -- --rom-report assets/roms/defender");
 }
@@ -103,26 +142,45 @@ fn print_help() {
 mod tests {
     use std::path::PathBuf;
 
+    use crate::attract::SceneKind;
+
     use super::{Command, parse_args};
 
     #[test]
-    fn parse_args_defaults_to_demo_mode() {
+    fn parse_args_defaults_to_logo_scene() {
         let command = parse_args(Vec::<String>::new()).expect("parse args");
-        assert_eq!(command, Command::Demo { frames: 3 });
+        assert_eq!(
+            command,
+            Command::Scene {
+                kind: SceneKind::Logo
+            }
+        );
     }
 
     #[test]
     fn parse_args_reads_frame_override() {
         let command =
             parse_args(vec![String::from("--frames"), String::from("8")]).expect("parse args");
-        assert_eq!(command, Command::Demo { frames: 8 });
+        assert_eq!(command, Command::Gameplay { frames: 8 });
     }
 
     #[test]
     fn parse_args_clamps_zero_frames_to_one() {
         let command =
             parse_args(vec![String::from("--frames"), String::from("0")]).expect("parse args");
-        assert_eq!(command, Command::Demo { frames: 1 });
+        assert_eq!(command, Command::Gameplay { frames: 1 });
+    }
+
+    #[test]
+    fn parse_args_reads_scene_selection() {
+        let command =
+            parse_args(vec![String::from("--scene"), String::from("attract")]).expect("parse args");
+        assert_eq!(
+            command,
+            Command::Scene {
+                kind: SceneKind::Attract
+            }
+        );
     }
 
     #[test]
@@ -155,5 +213,12 @@ mod tests {
     fn parse_args_rejects_unknown_flags() {
         let error = parse_args(vec![String::from("--unknown")]).expect_err("parse args");
         assert!(error.to_string().contains("unknown argument"));
+    }
+
+    #[test]
+    fn parse_args_rejects_unknown_scene() {
+        let error = parse_args(vec![String::from("--scene"), String::from("warp")])
+            .expect_err("parse args");
+        assert!(error.to_string().contains("unsupported scene"));
     }
 }

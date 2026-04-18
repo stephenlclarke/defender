@@ -16,20 +16,34 @@
 
 This repository is the first native Rust pass at Williams' `Defender`.
 
-The current milestone focuses on project scaffolding rather than full arcade
-fidelity: it boots a small Defender-style world model, renders a text-mode
-snapshot in the terminal, and can audit a local ROM directory against the
-canonical Williams red-label file list. The game logic is native Rust; ROMs are
-treated as reference material only.
+The current milestone focuses on a solid native-Rust foundation for the start
+logo, attract sequence, high-score presentation, ROM-set auditing, CI, and test
+coverage before a richer live arcade loop lands. The game logic is native Rust;
+ROMs are treated as reference material only.
+
+![Defender](docs/defender.png)
+
+<!-- markdownlint-disable MD033 -->
+<p align="center">
+  <img
+    src="docs/start-sequence.gif"
+    alt="Defender logo, attract panel, and high-score sequence"
+  />
+</p>
+<!-- markdownlint-enable MD033 -->
 
 Run targets:
 
 - `cargo run`
+- `cargo run -- --scene logo`
+- `cargo run -- --scene attract`
+- `cargo run -- --scene high-score`
 - `cargo run -- --frames 8`
 - `cargo run -- --rom-report assets/roms/defender`
 - `cargo test`
 - `cargo fmt --check`
 - `cargo clippy --all-targets -- -D warnings`
+- `cargo run --example generate_readme_media`
 - `make ci`
 
 ## Install
@@ -41,19 +55,26 @@ Install directly from git with Cargo:
 After installation, run the prototype with:
 
 - `defender`
+- `defender --scene attract`
+- `defender --scene high-score`
 - `defender --frames 8`
 
 ## Current Notes
 
-- The current renderer is deliberately text-first so the project can establish
-  game-state, ROM-reference, CI, and test coverage foundations before adding a
-  full terminal graphics path.
+- The app now has explicit `logo`, `attract`, and `high-score` scenes so the
+  README screenshot and animated preview are generated from real application
+  output rather than mocked assets.
+- The current renderer is still deliberately text-first so the repo can
+  establish game-state, ROM-reference, CI, and test coverage foundations before
+  adding a fuller terminal graphics path.
 - `defender --rom-report` checks the expected Williams ROM filenames and reports
   missing or unexpected files from a local directory.
 - Local ROM material under `assets/roms/` remains development-only reference
   data and is ignored by git.
 - CI runs formatting, tests, clippy, Sonar coverage, and Miri-based leak checks
   on both Linux and macOS.
+- `examples/generate_readme_media.rs` regenerates `docs/defender.png` and
+  `docs/start-sequence.gif` from the current scene definitions.
 
 ## Reference Repos
 
