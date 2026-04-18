@@ -232,7 +232,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   coverage report as CI and then runs `sonar-scanner` when `SONAR_TOKEN` is set.
 - `examples/generate_readme_media.rs` now regenerates `docs/defender.png` and
   `docs/start-sequence.gif` from the same Kitty-graphics renderer used by the
-  live game and attract flow.
+  live game and attract flow, with the README GIF time-sampled and sped up so
+  the attract sequence reads smoothly in the page.
 - `tools/extract_rom_branding_assets.py` regenerates the embedded Williams
   logo page, Defender wordmark, and copyright art directly from the red-label
   source tables.

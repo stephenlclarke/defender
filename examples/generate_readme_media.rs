@@ -12,6 +12,7 @@ use defender::{
     high_scores::HighScoreTable,
     video::{RenderedImage, Renderer, Screen},
 };
+
 const OUTPUT_WIDTH: u32 = 3456;
 const OUTPUT_HEIGHT: u32 = 1864;
 const WINDOW_X: u32 = 112;
@@ -31,6 +32,9 @@ const TRAFFIC_YELLOW: [u8; 4] = [254, 188, 46, 255];
 const TRAFFIC_GREEN: [u8; 4] = [40, 200, 64, 255];
 const GHOST_BADGE: [u8; 4] = [240, 240, 248, 255];
 const GHOST_EYE: [u8; 4] = [18, 18, 26, 255];
+const README_GIF_SAMPLE_MS: u64 = 300;
+const README_GIF_REALTIME_PERCENT: u64 = 40;
+const README_GIF_MIN_DELAY_CS: u16 = 4;
 
 fn main() -> Result<()> {
     let screenshot_path = std::env::args_os()
@@ -60,41 +64,19 @@ fn build_sequence() -> Vec<(RgbaImage, u16)> {
     let mut renderer = Renderer::with_size(1_024, 768);
     let todays = HighScoreTable::default();
     let all_time = HighScoreTable::default();
-    attract_cycle()
-        .into_iter()
-        .map(|beat| {
-            let image = match beat.kind {
-                defender::attract::SceneKind::Logo => renderer
-                    .render(Screen::Logo {
-                        stage: beat.logo_stage,
-                        palette_phase: beat.palette_phase,
-                    })
-                    .clone(),
-                defender::attract::SceneKind::Attract => {
-                    let mut world = World::bootstrap();
-                    for _ in 0..beat.world_steps {
-                        world.step();
-                    }
-                    renderer
-                        .render(Screen::Attract {
-                            world: &world,
-                            revealed_score_entries: beat.revealed_score_entries,
-                            palette_phase: beat.palette_phase,
-                        })
-                        .clone()
-                }
-                defender::attract::SceneKind::HighScore => renderer
-                    .render(Screen::HighScores {
-                        todays: &todays,
-                        all_time: &all_time,
-                        palette_phase: beat.palette_phase,
-                    })
-                    .clone(),
-            };
+    let cycle = attract_cycle();
+    let cycle_ms = cycle.iter().map(|beat| beat.hold_ms).sum::<u64>();
+    let frame_delay = scaled_centiseconds(README_GIF_SAMPLE_MS);
+    let mut frames = Vec::new();
+    let mut elapsed_ms = 0;
 
-            (image.into(), centiseconds_for_beat(beat))
-        })
-        .collect()
+    while elapsed_ms < cycle_ms {
+        let image = render_attract_sample(&mut renderer, &todays, &all_time, &cycle, elapsed_ms);
+        frames.push((image.into(), frame_delay));
+        elapsed_ms += README_GIF_SAMPLE_MS;
+    }
+
+    collapse_identical_frames(frames)
 }
 
 fn gameplay_screenshot_world() -> World {
@@ -117,9 +99,105 @@ fn gameplay_screenshot_world() -> World {
     world
 }
 
-fn centiseconds_for_beat(beat: AttractBeat) -> u16 {
-    let centiseconds = (beat.hold_ms / 10).max(1);
+fn render_attract_sample(
+    renderer: &mut Renderer,
+    todays: &HighScoreTable,
+    all_time: &HighScoreTable,
+    cycle: &[AttractBeat],
+    elapsed_ms: u64,
+) -> RenderedImage {
+    let (beat_index, beat_start_ms, beat) = cycle_entry_for_elapsed(cycle, elapsed_ms);
+    let offset_ms = elapsed_ms.saturating_sub(beat_start_ms);
+    let next_beat = cycle[(beat_index + 1) % cycle.len()];
+
+    match beat.kind {
+        defender::attract::SceneKind::Logo => renderer
+            .render(Screen::Logo {
+                stage: beat.logo_stage,
+                palette_phase: beat.palette_phase,
+            })
+            .clone(),
+        defender::attract::SceneKind::Attract => {
+            let mut world = World::bootstrap();
+            let world_steps = interpolated_world_steps(beat, next_beat, offset_ms);
+            for _ in 0..world_steps {
+                world.step();
+            }
+            renderer
+                .render(Screen::Attract {
+                    world: &world,
+                    revealed_score_entries: beat.revealed_score_entries,
+                    palette_phase: beat.palette_phase,
+                })
+                .clone()
+        }
+        defender::attract::SceneKind::HighScore => renderer
+            .render(Screen::HighScores {
+                todays,
+                all_time,
+                palette_phase: beat.palette_phase,
+            })
+            .clone(),
+    }
+}
+
+fn cycle_entry_for_elapsed(cycle: &[AttractBeat], elapsed_ms: u64) -> (usize, u64, AttractBeat) {
+    let cycle_ms = cycle.iter().map(|beat| beat.hold_ms).sum::<u64>();
+    let mut beat_start_ms = 0;
+    let mut remaining_ms = if cycle_ms == 0 {
+        0
+    } else {
+        elapsed_ms % cycle_ms
+    };
+
+    for (index, beat) in cycle.iter().copied().enumerate() {
+        if remaining_ms < beat.hold_ms {
+            return (index, beat_start_ms, beat);
+        }
+        remaining_ms -= beat.hold_ms;
+        beat_start_ms += beat.hold_ms;
+    }
+
+    (0, 0, cycle[0])
+}
+
+fn interpolated_world_steps(beat: AttractBeat, next_beat: AttractBeat, offset_ms: u64) -> usize {
+    if beat.kind != defender::attract::SceneKind::Attract
+        || next_beat.kind != defender::attract::SceneKind::Attract
+        || beat.hold_ms == 0
+    {
+        return beat.world_steps;
+    }
+
+    let progress = (offset_ms as f32 / beat.hold_ms as f32).clamp(0.0, 1.0);
+    let start = beat.world_steps as f32;
+    let end = next_beat.world_steps as f32;
+    (start + (end - start) * progress).round().max(0.0) as usize
+}
+
+fn scaled_centiseconds(duration_ms: u64) -> u16 {
+    let scaled_ms = duration_ms
+        .saturating_mul(README_GIF_REALTIME_PERCENT)
+        .checked_div(100)
+        .unwrap_or(duration_ms);
+    let centiseconds = ((scaled_ms + 5) / 10).max(u64::from(README_GIF_MIN_DELAY_CS));
     centiseconds.min(u16::MAX as u64) as u16
+}
+
+fn collapse_identical_frames(frames: Vec<(RgbaImage, u16)>) -> Vec<(RgbaImage, u16)> {
+    let mut collapsed: Vec<(RgbaImage, u16)> = Vec::new();
+
+    for (image, delay) in frames {
+        if let Some((previous, previous_delay)) = collapsed.last_mut()
+            && previous == &image
+        {
+            *previous_delay = previous_delay.saturating_add(delay);
+        } else {
+            collapsed.push((image, delay));
+        }
+    }
+
+    collapsed
 }
 
 fn render_gameplay_screenshot() -> RgbaImage {
@@ -420,6 +498,7 @@ fn ensure_parent_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 
+#[derive(Clone, PartialEq, Eq)]
 struct RgbaImage {
     width: u32,
     height: u32,
@@ -448,5 +527,39 @@ impl From<RenderedImage> for RgbaImage {
             height: image.height,
             pixels: image.pixels,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        README_GIF_MIN_DELAY_CS, README_GIF_SAMPLE_MS, RgbaImage, collapse_identical_frames,
+        scaled_centiseconds,
+    };
+
+    #[test]
+    fn scaled_centiseconds_speeds_up_realtime_for_readme_media() {
+        let delay = scaled_centiseconds(README_GIF_SAMPLE_MS);
+
+        assert!(delay < (README_GIF_SAMPLE_MS / 10) as u16);
+        assert!(delay >= README_GIF_MIN_DELAY_CS);
+    }
+
+    #[test]
+    fn collapse_identical_frames_merges_static_runs() {
+        let black = RgbaImage::new(4, 4, [0, 0, 0, 255]);
+        let white = RgbaImage::new(4, 4, [255, 255, 255, 255]);
+        let frames = vec![
+            (black.clone(), 4),
+            (black, 4),
+            (white.clone(), 5),
+            (white, 6),
+        ];
+
+        let collapsed = collapse_identical_frames(frames);
+
+        assert_eq!(collapsed.len(), 2);
+        assert_eq!(collapsed[0].1, 8);
+        assert_eq!(collapsed[1].1, 11);
     }
 }
