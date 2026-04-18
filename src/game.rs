@@ -3,6 +3,11 @@ use crate::constants::{
     WORLD_HEIGHT, WORLD_SPAN, WORLD_WIDTH,
 };
 
+const SAFE_FALL_HEIGHT: i32 = 2;
+const SAFE_FALL_SCORE: u16 = 250;
+const HUMAN_CATCH_SCORE: u32 = 500;
+const HUMAN_LANDING_SCORE: u16 = 500;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
     PlayerShip,
@@ -84,6 +89,7 @@ pub struct Entity {
     pub position: Position,
     pub velocity: Velocity,
     pub state: EntityState,
+    pub rescue_value: u16,
 }
 
 impl Entity {
@@ -104,6 +110,7 @@ impl Entity {
             position: Position { x, y },
             velocity: Velocity { dx, dy },
             state,
+            rescue_value: 0,
         }
     }
 }
@@ -816,9 +823,15 @@ impl World {
             return;
         };
 
+        let safe_y = self.safe_altitude_at_world_x(self.entities[human_index].position.x);
         if let Some(human) = self.entities.get_mut(human_index) {
             human.state = EntityState::Falling;
             human.velocity = Velocity { dx: 0, dy: 1 };
+            human.rescue_value = if safe_y - human.position.y <= SAFE_FALL_HEIGHT {
+                SAFE_FALL_SCORE
+            } else {
+                0
+            };
         }
     }
 
@@ -874,14 +887,20 @@ impl World {
             let safe_y = self.safe_altitude_at_world_x(player_position.x);
             let should_land = player_position.y >= safe_y - 1;
             let carried_y = (player_position.y + 1).min(safe_y);
+            let mut landing_bonus = 0;
             if let Some(human) = self.entities.get_mut(human_index) {
                 human.position.x = player_position.x;
                 human.position.y = if should_land { safe_y } else { carried_y };
                 human.velocity = Velocity { dx: 0, dy: 0 };
                 if should_land {
                     human.state = EntityState::Normal;
-                    events.push(WorldEvent::HumanRescued);
+                    landing_bonus = human.rescue_value;
+                    human.rescue_value = 0;
                 }
+            }
+            if should_land {
+                self.add_score(u32::from(landing_bonus));
+                events.push(WorldEvent::HumanRescued);
             }
             return;
         }
@@ -890,6 +909,11 @@ impl World {
             return;
         };
 
+        let rescue_bonus = if self.entities[human_index].state == EntityState::Falling {
+            HUMAN_CATCH_SCORE
+        } else {
+            0
+        };
         let carried_y =
             (player_position.y + 1).min(self.safe_altitude_at_world_x(player_position.x));
         if let Some(human) = self.entities.get_mut(human_index) {
@@ -897,11 +921,19 @@ impl World {
             human.position.x = player_position.x;
             human.position.y = carried_y;
             human.velocity = Velocity { dx: 0, dy: 0 };
+            human.rescue_value = if rescue_bonus > 0 {
+                HUMAN_LANDING_SCORE
+            } else {
+                0
+            };
+        }
+        if rescue_bonus > 0 {
+            self.add_score(rescue_bonus);
         }
     }
 
     fn resolve_falling_human_impacts(&mut self, events: &mut Vec<WorldEvent>) {
-        let lost_humans: Vec<usize> = self
+        let grounded_humans: Vec<usize> = self
             .entities
             .iter()
             .enumerate()
@@ -914,6 +946,35 @@ impl World {
             .map(|(index, _)| index)
             .collect();
 
+        if grounded_humans.is_empty() {
+            return;
+        }
+
+        let mut lost_humans = Vec::new();
+        let mut rescued_count = 0;
+        let mut rescued_score = 0;
+
+        for index in grounded_humans {
+            let safe_y = self.safe_altitude_at_world_x(self.entities[index].position.x);
+            let Some(human) = self.entities.get_mut(index) else {
+                continue;
+            };
+            if human.rescue_value == SAFE_FALL_SCORE {
+                human.state = EntityState::Normal;
+                human.position.y = safe_y;
+                human.velocity = Velocity { dx: 0, dy: 0 };
+                human.rescue_value = 0;
+                rescued_count += 1;
+                rescued_score += u32::from(SAFE_FALL_SCORE);
+            } else {
+                lost_humans.push(index);
+            }
+        }
+
+        if rescued_count > 0 {
+            self.add_score(rescued_score);
+            events.extend(std::iter::repeat_n(WorldEvent::HumanRescued, rescued_count));
+        }
         if !lost_humans.is_empty() {
             events.extend(std::iter::repeat_n(
                 WorldEvent::HumanLost,
@@ -955,6 +1016,9 @@ impl World {
             human.position.x = player_position.x;
             human.position.y = player_position.y + 1;
             human.velocity = Velocity { dx: 0, dy: 1 };
+            if human.rescue_value > 0 {
+                human.rescue_value = SAFE_FALL_SCORE;
+            }
         }
     }
 
@@ -1639,6 +1703,44 @@ mod tests {
     }
 
     #[test]
+    fn low_altitude_falling_humans_can_land_safely_on_their_own() {
+        let mut world = World::with_entities(
+            16,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 1, 4, 0, 0),
+                Entity::with_state(EntityKind::Lander, 5, 5, 0, 0, EntityState::CarryingHuman),
+                Entity::with_state(EntityKind::Human, 5, 6, 0, -1, EntityState::Abducted),
+            ],
+        );
+
+        world.step_live(UpdateInput {
+            fire: true,
+            ..UpdateInput::default()
+        });
+        world.step_live(UpdateInput::default());
+        let events = world.step_live(UpdateInput::default());
+
+        let human = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Human)
+            .expect("landed human");
+        assert_eq!(human.state, EntityState::Normal);
+        assert_eq!(
+            human.position.y,
+            world.safe_altitude_at_world_x(human.position.x)
+        );
+        assert_eq!(world.status().score, 400);
+        assert!(events.contains(&WorldEvent::HumanRescued));
+    }
+
+    #[test]
     fn player_catches_a_falling_human_and_lands_them_safely() {
         let mut world = World::with_entities(
             20,
@@ -1662,6 +1764,7 @@ mod tests {
             .find(|entity| entity.kind == EntityKind::Human)
             .expect("carried human");
         assert_eq!(carried_human.state, EntityState::PlayerCarried);
+        assert_eq!(world.status().score, 500);
         assert!(!first_events.contains(&WorldEvent::HumanRescued));
 
         let second_events = world.step_live(UpdateInput {
@@ -1679,6 +1782,7 @@ mod tests {
             rescued_human.position.y,
             world.safe_altitude_at_world_x(rescued_human.position.x)
         );
+        assert_eq!(world.status().score, 1000);
         assert!(second_events.contains(&WorldEvent::HumanRescued));
     }
 
@@ -1706,6 +1810,7 @@ mod tests {
             .find(|entity| entity.kind == EntityKind::Human)
             .expect("carried human");
         assert_eq!(carried_human.state, EntityState::PlayerCarried);
+        assert_eq!(world.status().score, 0);
         assert!(!pickup_events.contains(&WorldEvent::HumanRescued));
 
         let carry_events = world.step_live(UpdateInput {
@@ -1737,6 +1842,7 @@ mod tests {
             landed_human.position.y,
             world.safe_altitude_at_world_x(landed_human.position.x)
         );
+        assert_eq!(world.status().score, 0);
         assert!(landing_events.contains(&WorldEvent::HumanRescued));
     }
 
@@ -1760,6 +1866,7 @@ mod tests {
         let events = world.step_live(UpdateInput::default());
 
         assert_eq!(world.entity_count_by_kind(EntityKind::Human), 0);
+        assert_eq!(world.status().score, 0);
         assert!(events.contains(&WorldEvent::HumanLost));
     }
 

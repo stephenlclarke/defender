@@ -106,11 +106,12 @@ Extra keys while `xyzzy` mode is active:
 - `cargo run` / `defender` now launch the real text-mode play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, falling-human
-  recovery, grounded-human pickup and redeploy, safe drop-off after catches,
-  mutant conversion after successful abductions, full lander-to-mutant
-  conversion once humanity is wiped out, persistent five-entry high-score
-  tracking with initials entry, active lander pursuit of free humans, mutant
-  pursuit of the player,
+  recovery, grounded-human pickup and redeploy, Defender-style rescue scoring
+  with `500` catch bonuses, `500` return-to-ground bonuses, and `250`
+  low-altitude safe-fall saves, mutant conversion after successful abductions,
+  full lander-to-mutant conversion once humanity is wiped out, persistent
+  five-entry high-score tracking with initials entry, active lander pursuit of
+  free humans, mutant pursuit of the player,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret god-mode path on top of the same native Rust world model.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
@@ -166,6 +167,18 @@ the final runtime self-contained:
   comparison point, especially for the red-label `defend.*` program ROM names.
 - <https://www.thedefenderproject.com/defender-rom-versions-the-history/>:
   revision history and ROM-set background for Williams Defender releases.
+- <https://williamsarcades.com/Defender>: original cabinet and control-panel
+  reference used to keep the Rust controls and cabinet assumptions aligned with
+  Williams' arcade hardware.
+- <https://www.arcade-history.com/?id=614&n=defender&page=detail>: scoring and
+  gameplay reference used for humanoid rescue values, safe-fall saves, and wave
+  bonus behavior.
+- <https://strategywiki.org/wiki/Defender/Gameplay>: gameplay reference used to
+  cross-check live enemy and humanoid behavior against the original arcade
+  rules.
+- <https://strategywiki.org/wiki/Defender/Walkthrough>: rescue-strategy and
+  scoring reference used for the current `500` catch / `500` return humanoid
+  rescue implementation.
 - <https://www.andysarcade.net/personal/defcolours/index.htm>: cabinet colour
   and palette reference for later presentation work.
 - <https://mdk.cab/game/defender>: artwork, screenshots, and general cabinet
