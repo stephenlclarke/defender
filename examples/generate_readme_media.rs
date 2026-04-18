@@ -6,7 +6,11 @@ use font8x8::{BASIC_FONTS, UnicodeFonts};
 use gif::{Encoder, Frame, Repeat};
 use png::{BitDepth, ColorType, Compression, Encoder as PngEncoder};
 
-use defender::attract::{AttractBeat, Scene, attract_cycle};
+use defender::{
+    attract::{AttractBeat, Scene, attract_cycle},
+    demo::gameplay_demo_cycle,
+    render,
+};
 
 const CELL_SIZE: u32 = 8;
 const SCALE: u32 = 3;
@@ -27,14 +31,14 @@ fn main() -> Result<()> {
     ensure_parent_dir(&screenshot_path)?;
     ensure_parent_dir(&gif_path)?;
 
-    let cycle = attract_cycle();
-    let screenshot_scene = cycle[3].scene();
+    let screenshot_scene = gameplay_screenshot_scene();
     let sequence = build_sequence();
-    let (cols, rows) = scene_bounds(&sequence);
+    let (screenshot_cols, screenshot_rows) = scene_bounds(std::slice::from_ref(&screenshot_scene));
+    let (gif_cols, gif_rows) = scene_bounds_from_frames(&sequence);
 
-    let screenshot = rasterize_scene(&screenshot_scene, cols, rows);
+    let screenshot = rasterize_scene(&screenshot_scene, screenshot_cols, screenshot_rows);
     write_png(&screenshot_path, &screenshot)?;
-    write_gif(&gif_path, &sequence, cols, rows)?;
+    write_gif(&gif_path, &sequence, gif_cols, gif_rows)?;
 
     println!("wrote {}", screenshot_path.display());
     println!("wrote {}", gif_path.display());
@@ -48,7 +52,31 @@ fn build_sequence() -> Vec<(Scene, u16)> {
         .collect()
 }
 
-fn scene_bounds(frames: &[(Scene, u16)]) -> (usize, usize) {
+fn gameplay_screenshot_scene() -> Scene {
+    let gameplay = gameplay_demo_cycle();
+    let world = &gameplay[gameplay.len() - 1].world;
+
+    Scene {
+        kind: defender::attract::SceneKind::Attract,
+        lines: render::render_grid(world),
+    }
+}
+
+fn scene_bounds(scenes: &[Scene]) -> (usize, usize) {
+    let mut max_cols = 0;
+    let mut max_rows = 0;
+
+    for scene in scenes {
+        max_rows = max_rows.max(scene.lines.len());
+        for line in &scene.lines {
+            max_cols = max_cols.max(line.len());
+        }
+    }
+
+    (max_cols, max_rows)
+}
+
+fn scene_bounds_from_frames(frames: &[(Scene, u16)]) -> (usize, usize) {
     let mut max_cols = 0;
     let mut max_rows = 0;
 

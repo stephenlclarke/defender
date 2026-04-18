@@ -22,13 +22,13 @@ coverage before a richer live arcade loop lands. The game logic is native Rust;
 ROMs are treated as reference material only, and the current sound cues are
 synthesized in-process so the app does not depend on external audio files.
 
-![Defender](docs/defender.png)
+![Defender gameplay frame](docs/defender.png)
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
   <img
     src="docs/start-sequence.gif"
-    alt="Defender logo, attract panel, and high-score sequence"
+    alt="Defender attract sequence with logo, attract panel, and high-score screen"
   />
 </p>
 <!-- markdownlint-enable MD033 -->
@@ -107,9 +107,9 @@ Extra keys while `xyzzy` mode is active:
 
 ## Current Notes
 
-- The app now has explicit `logo`, `attract`, and `high-score` scenes so the
-  README screenshot and animated preview are generated from real application
-  output rather than mocked assets.
+- The app now has explicit `logo`, `attract`, `high-score`, and gameplay
+  presentation paths so the README screenshot and animated preview are
+  generated from real application output rather than mocked assets.
 - All current sounds are embedded in the app via synthesized `rodio` cues,
   following the same self-contained runtime principle used in `../battlezone`.
 - `defender --play-attract` now runs the logo, attract, and high-score sequence
@@ -137,9 +137,9 @@ Extra keys while `xyzzy` mode is active:
   on both Linux and macOS.
 - Local SonarQube wiring is exposed through `make sq`, which generates the same
   coverage report as CI and then runs `sonar-scanner` when `SONAR_TOKEN` is set.
-- `examples/generate_readme_media.rs` regenerates `docs/defender.png` and
-  `docs/start-sequence.gif` from the same shared attract-cycle definition used
-  by the app.
+- `examples/generate_readme_media.rs` regenerates `docs/defender.png` from the
+  gameplay demo path and `docs/start-sequence.gif` from the shared attract
+  cycle used by the app.
 
 ## SonarQube
 
