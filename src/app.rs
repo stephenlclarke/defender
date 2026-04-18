@@ -8,14 +8,14 @@ use crate::live::run_live;
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
     PlayLive { play_audio: bool },
-    RomReport { path: PathBuf },
+    RomReport { path: Option<PathBuf> },
     Help,
 }
 
 pub fn run() -> Result<()> {
     match parse_args(env::args().skip(1))? {
         Command::PlayLive { play_audio } => run_live(play_audio),
-        Command::RomReport { path } => run_rom_report(&path),
+        Command::RomReport { path } => run_rom_report(path.as_deref()),
         Command::Help => {
             print_help();
             Ok(())
@@ -23,7 +23,21 @@ pub fn run() -> Result<()> {
     }
 }
 
-fn run_rom_report(path: &Path) -> Result<()> {
+fn run_rom_report(path: Option<&Path>) -> Result<()> {
+    let Some(path) = path else {
+        println!(
+            "Expected Williams Defender red-label ROM filenames ({} files):",
+            crate::rom::CANONICAL_ROM_SET.len()
+        );
+        for file_name in crate::rom::CANONICAL_ROM_SET {
+            println!("  {file_name}");
+        }
+        println!();
+        println!("Pass a directory to compare against a local ROM set:");
+        println!("  defender --rom-report /path/to/roms");
+        return Ok(());
+    };
+
     let report = crate::rom::scan_dir(path)
         .with_context(|| format!("failed to inspect ROM directory {}", path.display()))?;
 
@@ -53,11 +67,7 @@ where
         "--help" | "-h" => Ok(Command::Help),
         "--mute" => parse_live_options(args, false),
         "--rom-report" => {
-            let path = args
-                .next()
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("assets/roms/defender"));
-
+            let path = args.next().map(PathBuf::from);
             if args.next().is_some() {
                 bail!("--rom-report only accepts one optional path");
             }
@@ -84,7 +94,8 @@ fn print_help() {
     println!("defender");
     println!("  cargo run");
     println!("  cargo run -- --mute");
-    println!("  cargo run -- --rom-report assets/roms/defender");
+    println!("  cargo run -- --rom-report");
+    println!("  cargo run -- --rom-report /path/to/roms");
 }
 
 #[cfg(test)]
@@ -106,14 +117,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_args_uses_default_rom_directory() {
+    fn parse_args_supports_rom_report_without_a_directory() {
         let command = parse_args(vec![String::from("--rom-report")]).expect("parse args");
-        assert_eq!(
-            command,
-            Command::RomReport {
-                path: PathBuf::from("assets/roms/defender")
-            }
-        );
+        assert_eq!(command, Command::RomReport { path: None });
     }
 
     #[test]
@@ -126,7 +132,7 @@ mod tests {
         assert_eq!(
             command,
             Command::RomReport {
-                path: PathBuf::from("/tmp/defender")
+                path: Some(PathBuf::from("/tmp/defender"))
             }
         );
     }

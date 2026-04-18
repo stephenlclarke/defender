@@ -59,6 +59,24 @@ fn help_mentions_the_live_mode() {
 }
 
 #[test]
+fn rom_report_without_a_directory_lists_embedded_filenames() {
+    let temp_dir = TempDir::new();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_defender"))
+        .args(["--rom-report"])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("run defender");
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf8");
+    assert!(stdout.contains("Expected Williams Defender red-label ROM filenames"));
+    assert!(stdout.contains("defend.1"));
+    assert!(stdout.contains("video_sound_rom_1.ic12"));
+}
+
+#[test]
 fn rom_report_summarises_canonical_files() {
     let temp_dir = TempDir::new();
     fs::write(temp_dir.path().join("defend.1"), []).expect("write rom");

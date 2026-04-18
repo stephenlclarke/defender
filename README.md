@@ -40,7 +40,8 @@ Run targets:
 
 - `cargo run`
 - `cargo run -- --mute`
-- `cargo run -- --rom-report assets/roms/defender`
+- `cargo run -- --rom-report`
+- `cargo run -- --rom-report /path/to/roms`
 - `make run`
 - `make run-muted`
 - `cargo test`
@@ -62,7 +63,8 @@ After installation, run the prototype with:
 
 - `defender`
 - `defender --mute`
-- `defender --rom-report assets/roms/defender`
+- `defender --rom-report`
+- `defender --rom-report /path/to/roms`
 
 ## Controls
 
@@ -115,6 +117,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The public CLI is now intentionally narrow: `cargo run` launches the live
   game, `--mute` disables audio, and `--rom-report` stays as the one
   non-interactive inspection path.
+- The executable does not require `assets/roms/` at compile time or runtime.
+  `--rom-report` now prints the embedded canonical red-label filename list when
+  no directory is supplied, and only touches the filesystem when you pass an
+  explicit ROM path.
 - All current sounds are embedded in the app via synthesized `rodio` cues,
   following the same self-contained runtime principle used in `../battlezone`.
 - `cargo run` / `defender` now launch the real text-mode play loop with keyboard
@@ -178,8 +184,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The current renderer is still deliberately text-first so the repo can
   establish game-state, ROM-reference, CI, and test coverage foundations before
   adding a fuller terminal graphics path.
-- `defender --rom-report` checks the expected Williams ROM filenames and reports
-  missing or unexpected files from a local directory.
+- `defender --rom-report` works without a ROM directory and prints the embedded
+  expected Williams ROM filenames; `defender --rom-report /path/to/roms`
+  compares a local directory and reports missing or unexpected files.
 - Local ROM material under `assets/roms/` remains development-only reference
   data and is ignored by git.
 - CI runs formatting, tests, clippy, Sonar coverage, and Miri-based leak checks
@@ -224,35 +231,22 @@ the final runtime self-contained:
   names.
 - <https://www.thedefenderproject.com/defender-rom-versions-the-history/>:
   revision history and ROM-set background for Williams Defender releases.
+- <https://www.mamechannel.it/files_free/arcade_manuals_unpacked/defenderw.pdf>:
+  Defender operations manual used to confirm that `Reverse` flips ship
+  direction while `Thrust` controls forward movement.
+- <https://williamsarcades.com/Defender>: original cabinet and control-panel
+  reference used to keep the Rust controls and cabinet assumptions aligned with
+  Williams' arcade hardware.
+- <https://mdk.cab/game/defender>: artwork, screenshots, and general cabinet
+  reference material for start-screen and attract-sequence planning.
+- <https://www.andysarcade.net/personal/defcolours/index.htm>: cabinet colour
+  and palette reference for later presentation work.
 - <https://www.dougmahugh.com/defender-chapter01/>: general arcade-rules
   reference used for bomber wave timing, bomber-mine danger, radar behavior,
   ten-humanoid/fifth-wave restoration rules, the three-group 15-enemy attack
   wave structure, mutant-only post-extinction wave behavior, and the scoring
   rule that collision deaths on bullets or mines still award `25` points while
   ramming enemies still scores their normal value.
-- <https://williamsarcades.com/Defender>: original cabinet and control-panel
-  reference used to keep the Rust controls and cabinet assumptions aligned with
-  Williams' arcade hardware.
-- <https://www.arcade-history.com/?id=614&n=defender&page=detail>: scoring and
-  gameplay reference used for humanoid rescue values, safe-fall saves, and wave
-  bonus behavior.
-- <https://en.wikipedia.org/wiki/Defender_%281981_video_game%29>: general rules
-  reference used to cross-check the default `10,000`-point extra ship and smart
-  bomb award behavior.
-- <https://strategywiki.org/wiki/Defender/Gameplay>: gameplay reference used to
-  cross-check live enemy and humanoid behavior against the original arcade
-  rules, including opening five-lander attack waves, later five-ship
-  reinforcement groups, later pod scheduling, and the destroyed-planet mutant-
-  wave cycle until the next fifth-round restore.
-- <https://strategywiki.org/wiki/Defender/Walkthrough>: rescue-strategy and
-  scoring reference used for the current `500` catch / `500` return humanoid
-  rescue implementation.
-- <https://www.mamechannel.it/files_free/arcade_manuals_unpacked/defenderw.pdf>:
-  Defender operations manual used to confirm that `Reverse` flips ship
-  direction while `Thrust` controls forward movement.
-- <https://www.digitpress.com/reviews/defender.htm>: secondary gameplay
-  reference used to model Defender's reverse-with-inertia handling, where the
-  ship keeps its current momentum until thrust changes it.
 - <https://www.dougmahugh.com/defender-chapter02/>: control-analysis reference
   used for hyperspace risk, stopped re-entry speed, direction changes on
   rematerialization, the four-shot laser cap, the rule that shots only remain
@@ -274,10 +268,23 @@ the final runtime self-contained:
   and the persistent mine trails they leave behind.
 - <https://www.dougmahugh.com/defender-chapter07/>: baiter-behavior reference
   used to model wave-delay baiter pressure and relative pursuit behavior.
-- <https://www.andysarcade.net/personal/defcolours/index.htm>: cabinet colour
-  and palette reference for later presentation work.
-- <https://mdk.cab/game/defender>: artwork, screenshots, and general cabinet
-  reference material for start-screen and attract-sequence planning.
+- <https://www.arcade-history.com/?id=614&n=defender&page=detail>: scoring and
+  gameplay reference used for humanoid rescue values, safe-fall saves, and wave
+  bonus behavior.
+- <https://strategywiki.org/wiki/Defender/Gameplay>: gameplay reference used to
+  cross-check live enemy and humanoid behavior against the original arcade
+  rules, including opening five-lander attack waves, later five-ship
+  reinforcement groups, later pod scheduling, and the destroyed-planet mutant-
+  wave cycle until the next fifth-round restore.
+- <https://strategywiki.org/wiki/Defender/Walkthrough>: rescue-strategy and
+  scoring reference used for the current `500` catch / `500` return humanoid
+  rescue implementation.
+- <https://en.wikipedia.org/wiki/Defender_%281981_video_game%29>: general rules
+  reference used to cross-check the default `10,000`-point extra ship and smart
+  bomb award behavior.
+- <https://www.digitpress.com/reviews/defender.htm>: secondary gameplay
+  reference used to model Defender's reverse-with-inertia handling, where the
+  ship keeps its current momentum until thrust changes it.
 - <https://bbcmicro.co.uk/game.php?id=11>: BBC Micro `Planetoid` archive entry
   used to anchor the current keyboard layout to the Acornsoft 1982 home-port
   control scheme.

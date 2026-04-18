@@ -138,7 +138,7 @@ pub fn render_with_flags(
         "Controls: `A` up, `Z` down, `Shift` thrust, `Space` flip direction, `Enter` fire, `Tab` smart bomb, `H` hyperspace, `q` quits.",
     ));
     lines.push(String::from(
-        "Use `cargo run -- --rom-report assets/roms/defender` to inspect local ROM references.",
+        "Use `cargo run -- --rom-report [PATH]` to compare an optional local ROM directory against the embedded red-label filename list.",
     ));
     lines.join("\n")
 }
