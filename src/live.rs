@@ -16,11 +16,13 @@ use crossterm::{
     },
 };
 
+use crate::attract::scene_for_elapsed_ms;
 use crate::audio::{AudioManager, SoundCue};
 use crate::render;
 use crate::session::{SessionEvent, SessionInput, SessionMode, SessionState};
 
 const FRAME_DURATION: Duration = Duration::from_millis(90);
+const TITLE_STATIC_HOLD_TICKS: u64 = 24;
 
 pub fn run_live(play_audio: bool) -> Result<()> {
     ensure_interactive_terminal()?;
@@ -72,12 +74,7 @@ fn validate_interactive_terminal(stdin_is_terminal: bool, stdout_is_terminal: bo
 fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
     execute!(stdout, MoveTo(0, 0), Clear(ClearType::All)).context("clearing live frame")?;
     let text = match session.mode() {
-        SessionMode::Title => render::render_title_screen_with_flags(
-            session.high_score(),
-            session.xyzzy_active(),
-            session.invincible(),
-            session.auto_fire(),
-        ),
+        SessionMode::Title => render_title_mode(session),
         SessionMode::EnteringInitials => {
             let pending = session
                 .pending_initials()
@@ -114,6 +111,30 @@ fn draw_frame(stdout: &mut Stdout, session: &SessionState) -> Result<()> {
     write!(stdout, "{text}").context("writing live frame")?;
     stdout.flush().context("flushing live frame")?;
     Ok(())
+}
+
+fn render_title_mode(session: &SessionState) -> String {
+    if session.title_ticks() < TITLE_STATIC_HOLD_TICKS {
+        return render::render_title_screen_with_flags(
+            session.high_score(),
+            session.xyzzy_active(),
+            session.invincible(),
+            session.auto_fire(),
+        );
+    }
+
+    let attract_elapsed_ms = (session.title_ticks() - TITLE_STATIC_HOLD_TICKS)
+        .saturating_mul(FRAME_DURATION.as_millis() as u64);
+    // The cabinet keeps a volatile `THSTAB` "TODAYS GREATEST" list alongside
+    // the persistent CMOS-backed `CRHSTD` "ALL TIME GREATEST" table. Until the
+    // session model carries a dedicated today's table, the live attract screen
+    // uses the red-label defaults on the left and the persisted table on the right.
+    scene_for_elapsed_ms(
+        attract_elapsed_ms,
+        &crate::high_scores::HighScoreTable::default(),
+        session.high_scores(),
+    )
+    .text()
 }
 
 fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
@@ -322,10 +343,14 @@ impl Drop for TerminalGuard {
 mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode};
 
-    use super::{InputTracker, PolledInput, cue_for_events, validate_interactive_terminal};
+    use super::{
+        InputTracker, PolledInput, TITLE_STATIC_HOLD_TICKS, cue_for_events, render_title_mode,
+        validate_interactive_terminal,
+    };
     use crate::audio::SoundCue;
     use crate::game::WorldEvent;
-    use crate::session::SessionEvent;
+    use crate::high_scores::HighScoreTable;
+    use crate::session::{SessionEvent, SessionInput, SessionState};
 
     #[test]
     fn event_priorities_prefer_game_over_and_hits() {
@@ -486,5 +511,21 @@ mod tests {
     fn live_mode_rejects_non_interactive_terminals() {
         let error = validate_interactive_terminal(false, true).expect_err("terminal guard");
         assert!(error.to_string().contains("interactive terminal"));
+    }
+
+    #[test]
+    fn title_mode_switches_to_attract_pages_after_the_hold_period() {
+        let mut session = SessionState::with_high_scores(HighScoreTable::default());
+        for _ in 0..=TITLE_STATIC_HOLD_TICKS {
+            session.tick(SessionInput::default());
+        }
+
+        let output = render_title_mode(&session);
+
+        assert!(
+            output.contains("PRESS 1 OR 2 PLAYER START")
+                || output.contains("HALL OF FAME")
+                || output.contains("WILLIAMS")
+        );
     }
 }

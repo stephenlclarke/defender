@@ -168,6 +168,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   into safe kills that still pay their normal value,
   game-over handling, restart support, a wrapped scrolling camera, and an
   `xyzzy`/`g` secret-mode path on top of the same native Rust world model.
+- The live title screen now idles into a real attract loop instead of staying
+  static: a ROM-ordered scanner/enemy legend reveal cycles into a split
+  `TODAYS GREATEST` / `ALL TIME GREATEST` hall-of-fame page, with the latter
+  fed from the persistent high-score table.
 - The live/bootstrap world now uses a deterministic scrolling terrain profile
   instead of a flat floor, so demo and live frames show a moving landscape and
   projectiles are clipped by terrain. When the last humanoid is lost, the live

@@ -1,6 +1,6 @@
 use crate::audio::SoundCue;
 use crate::game::World;
-use crate::high_scores::HighScoreTable;
+use crate::high_scores::{HighScoreEntry, HighScoreTable};
 
 const ATTRACT_SCORE_CARD: [(&str, u32); 6] = [
     ("LANDER", 150),
@@ -47,10 +47,15 @@ pub struct AttractBeat {
     pub cue: Option<SoundCue>,
     pub hold_ms: u64,
     pub world_steps: usize,
+    pub revealed_score_entries: usize,
 }
 
 impl AttractBeat {
     pub fn scene(self) -> Scene {
+        self.scene_with_tables(&HighScoreTable::default(), &HighScoreTable::default())
+    }
+
+    pub fn scene_with_tables(self, todays: &HighScoreTable, all_time: &HighScoreTable) -> Scene {
         match self.kind {
             SceneKind::Logo => logo_scene(),
             SceneKind::Attract => {
@@ -58,58 +63,102 @@ impl AttractBeat {
                 for _ in 0..self.world_steps {
                     world.step();
                 }
-                attract_scene(&world)
+                attract_scene(&world, self.revealed_score_entries)
             }
-            SceneKind::HighScore => high_score_scene(),
+            SceneKind::HighScore => high_score_scene_with_tables(todays, all_time),
         }
     }
 }
 
-pub fn attract_cycle() -> [AttractBeat; 7] {
+pub fn attract_cycle() -> [AttractBeat; 9] {
     [
         AttractBeat {
             kind: SceneKind::Logo,
             cue: Some(SoundCue::LogoFanfare),
-            hold_ms: 900,
+            hold_ms: 1_000,
             world_steps: 0,
+            revealed_score_entries: 0,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::AttractHum),
-            hold_ms: 750,
+            hold_ms: 650,
             world_steps: 0,
+            revealed_score_entries: 0,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::EnemySweep),
-            hold_ms: 550,
+            hold_ms: 500,
             world_steps: 2,
+            revealed_score_entries: 1,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::PlayerShot),
             hold_ms: 500,
             world_steps: 4,
+            revealed_score_entries: 2,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::EnemySweep),
+            hold_ms: 500,
+            world_steps: 6,
+            revealed_score_entries: 3,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::Explosion),
+            hold_ms: 500,
+            world_steps: 8,
+            revealed_score_entries: 4,
+        },
+        AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(SoundCue::EnemySweep),
+            hold_ms: 500,
+            world_steps: 10,
+            revealed_score_entries: 5,
         },
         AttractBeat {
             kind: SceneKind::Attract,
             cue: Some(SoundCue::HumanSaved),
             hold_ms: 550,
-            world_steps: 6,
-        },
-        AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(SoundCue::Explosion),
-            hold_ms: 600,
-            world_steps: 8,
+            world_steps: 12,
+            revealed_score_entries: 6,
         },
         AttractBeat {
             kind: SceneKind::HighScore,
             cue: Some(SoundCue::HighScoreChime),
-            hold_ms: 950,
+            hold_ms: 1_250,
             world_steps: 0,
+            revealed_score_entries: 0,
         },
     ]
+}
+
+pub fn scene_for_elapsed_ms(
+    elapsed_ms: u64,
+    todays: &HighScoreTable,
+    all_time: &HighScoreTable,
+) -> Scene {
+    let cycle = attract_cycle();
+    let cycle_ms = cycle.iter().map(|beat| beat.hold_ms).sum::<u64>();
+    let mut remaining = if cycle_ms == 0 {
+        0
+    } else {
+        elapsed_ms % cycle_ms
+    };
+
+    for beat in cycle {
+        if remaining < beat.hold_ms {
+            return beat.scene_with_tables(todays, all_time);
+        }
+        remaining -= beat.hold_ms;
+    }
+
+    cycle[0].scene_with_tables(todays, all_time)
 }
 
 pub fn logo_scene() -> Scene {
@@ -133,7 +182,7 @@ pub fn logo_scene() -> Scene {
     }
 }
 
-pub fn attract_scene(world: &World) -> Scene {
+pub fn attract_scene(world: &World, revealed_score_entries: usize) -> Scene {
     let mut lines = vec![String::from("PRESS 1 OR 2 PLAYER START"), String::new()];
     lines.extend(crate::render::render_grid(world));
     lines.push(String::new());
@@ -142,6 +191,7 @@ pub fn attract_scene(world: &World) -> Scene {
     lines.extend(
         ATTRACT_SCORE_CARD
             .into_iter()
+            .take(revealed_score_entries)
             .map(|(name, score)| format!("{name:<8}{score:>8}")),
     );
 
@@ -152,16 +202,26 @@ pub fn attract_scene(world: &World) -> Scene {
 }
 
 pub fn high_score_scene() -> Scene {
+    high_score_scene_with_tables(&HighScoreTable::default(), &HighScoreTable::default())
+}
+
+pub fn high_score_scene_with_tables(todays: &HighScoreTable, all_time: &HighScoreTable) -> Scene {
     let mut lines = vec![
         String::from("DEFENDER"),
         String::from("HALL OF FAME"),
-        String::from("ALL TIME GREATEST"),
         String::new(),
-        String::from(" RANK  INITIALS   SCORE"),
-        String::from(" ----  --------  -------"),
+        format!("{:<24}{}", "TODAYS GREATEST", "ALL TIME GREATEST"),
+        format!("{:<24}{}", " RANK  INITIALS SCORE", " RANK  INITIALS SCORE"),
     ];
 
-    lines.extend(HighScoreTable::default().rows());
+    // Red-label `HALDIS` renders the volatile `THSTAB` "TODAYS GREATEST" table on
+    // the left and the CMOS-backed `CRHSTD` "ALL TIME GREATEST" table on the right.
+    let row_count = todays.entries().len().max(all_time.entries().len());
+    for index in 0..row_count {
+        let left = compact_score_row(index + 1, todays.entries().get(index));
+        let right = compact_score_row(index + 1, all_time.entries().get(index));
+        lines.push(format!("{left:<24}{right}"));
+    }
 
     Scene {
         kind: SceneKind::HighScore,
@@ -169,11 +229,20 @@ pub fn high_score_scene() -> Scene {
     }
 }
 
+fn compact_score_row(rank: usize, entry: Option<&HighScoreEntry>) -> String {
+    match entry {
+        Some(entry) => format!("{rank:>2}. {:<3} {:>6}", entry.initials, entry.score),
+        None => format!("{rank:>2}. --- ------"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{audio::SoundCue, game::World};
+    use crate::{audio::SoundCue, game::World, high_scores::HighScoreTable};
 
-    use super::{SceneKind, attract_cycle, attract_scene, high_score_scene, logo_scene};
+    use super::{
+        SceneKind, attract_cycle, attract_scene, high_score_scene, logo_scene, scene_for_elapsed_ms,
+    };
 
     #[test]
     fn parse_scene_kind_recognises_supported_values() {
@@ -194,11 +263,12 @@ mod tests {
 
     #[test]
     fn attract_scene_wraps_rendered_world() {
-        let scene = attract_scene(&World::bootstrap());
+        let scene = attract_scene(&World::bootstrap(), 6);
         let text = scene.text();
 
         assert!(text.contains("PRESS 1 OR 2 PLAYER START"));
         assert!(text.contains("SCANNER"));
+        assert!(text.contains("LANDER"));
         assert!(text.contains("SWARMER"));
         assert!(text.contains("THREAT"));
     }
@@ -209,6 +279,8 @@ mod tests {
         let text = scene.text();
 
         assert!(text.contains("HALL OF FAME"));
+        assert!(text.contains("TODAYS GREATEST"));
+        assert!(text.contains("ALL TIME GREATEST"));
         assert!(text.contains("1."));
         assert!(text.contains("21270"));
     }
@@ -220,7 +292,7 @@ mod tests {
         assert_eq!(cycle[0].kind, SceneKind::Logo);
         assert_eq!(cycle[0].cue, Some(SoundCue::LogoFanfare));
         assert_eq!(cycle[1].kind, SceneKind::Attract);
-        assert_eq!(cycle[6].kind, SceneKind::HighScore);
+        assert_eq!(cycle[8].kind, SceneKind::HighScore);
     }
 
     #[test]
@@ -234,6 +306,23 @@ mod tests {
                 .text()
                 .contains("PRESS 1 OR 2 PLAYER START")
         );
-        assert!(cycle[6].scene().text().contains("HALL OF FAME"));
+        assert!(cycle[7].scene().text().contains("POD"));
+        assert!(cycle[8].scene().text().contains("HALL OF FAME"));
+    }
+
+    #[test]
+    fn scene_for_elapsed_ms_wraps_across_the_attract_cycle() {
+        let scene = scene_for_elapsed_ms(
+            4_200,
+            &HighScoreTable::default(),
+            &HighScoreTable::default(),
+        );
+        let text = scene.text();
+
+        assert!(
+            text.contains("PRESS 1 OR 2 PLAYER START")
+                || text.contains("HALL OF FAME")
+                || text.contains("WILLIAMS")
+        );
     }
 }

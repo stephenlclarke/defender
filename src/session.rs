@@ -34,6 +34,7 @@ pub struct SessionState {
     world: World,
     high_scores: HighScoreTable,
     high_score: u32,
+    title_ticks: u64,
     pending_initials: Option<PendingInitials>,
     persist_high_scores: bool,
     xyzzy: XyzzyState,
@@ -77,6 +78,7 @@ impl SessionState {
             world: World::bootstrap(),
             high_score: high_scores.top_score(),
             high_scores,
+            title_ticks: 0,
             pending_initials: None,
             persist_high_scores: false,
             xyzzy: XyzzyState::default(),
@@ -97,6 +99,10 @@ impl SessionState {
 
     pub fn high_scores(&self) -> &HighScoreTable {
         &self.high_scores
+    }
+
+    pub fn title_ticks(&self) -> u64 {
+        self.title_ticks
     }
 
     pub fn pending_initials(&self) -> Option<&PendingInitials> {
@@ -135,10 +141,12 @@ impl SessionState {
     fn tick_title(&mut self, start_requested: bool) -> Vec<SessionEvent> {
         if start_requested {
             self.world = World::bootstrap();
+            self.title_ticks = 0;
             self.pending_initials = None;
             self.mode = SessionMode::Playing;
             vec![SessionEvent::GameStarted]
         } else {
+            self.title_ticks = self.title_ticks.saturating_add(1);
             Vec::new()
         }
     }
@@ -207,6 +215,7 @@ impl SessionState {
     fn tick_game_over(&mut self, start_requested: bool) -> Vec<SessionEvent> {
         if start_requested {
             self.world = World::bootstrap();
+            self.title_ticks = 0;
             self.pending_initials = None;
             self.mode = SessionMode::Playing;
             vec![SessionEvent::GameRestarted]
@@ -315,13 +324,27 @@ mod tests {
         let events = session.tick(SessionInput::default());
         assert!(events.is_empty());
         assert_eq!(session.mode(), SessionMode::Title);
+        assert_eq!(session.title_ticks(), 1);
 
         let events = session.tick(SessionInput {
             start_requested: true,
             ..SessionInput::default()
         });
         assert_eq!(session.mode(), SessionMode::Playing);
+        assert_eq!(session.title_ticks(), 0);
         assert_eq!(events, vec![SessionEvent::GameStarted]);
+    }
+
+    #[test]
+    fn title_ticks_accumulate_while_waiting_at_the_title_screen() {
+        let mut session = SessionState::new();
+
+        session.tick(SessionInput::default());
+        session.tick(SessionInput::default());
+        session.tick(SessionInput::default());
+
+        assert_eq!(session.mode(), SessionMode::Title);
+        assert_eq!(session.title_ticks(), 3);
     }
 
     #[test]
