@@ -68,26 +68,28 @@ After installation, run the prototype with:
 
 Live mode controls:
 
-- `Enter` or `1`: start from the title screen, or restart after game over
+- `ENTER` or `1`: start from the title screen, or restart after game over
 - `A`: move up
 - `Z`: move down
-- `Shift`: thrust forward
-- `Space`: flip the ship's facing direction
-- `Enter`: fire the laser bolt
-- `Tab`: detonate a smart bomb
+- `SHIFT`: thrust forward
+- `SPACE`: flip the ship's facing direction
+- `ENTER`: fire the laser bolt
+- `TAB`: detonate a smart bomb
 - `H`: trigger hyperspace
-- `Backspace`: delete the previous letter during high-score initials entry
-- `q` or `Esc`: quit
+- `BACKSPACE`: delete the previous letter during high-score initials entry
+- `Q` or `ESC`: quit
+
+Letter-key controls accept either upper- or lower-case input.
 
 The live key layout is currently modelled on the BBC Micro `Planetoid`
 control scheme from Acornsoft's 1982 release of its `Defender` variant.
 
 ## XYZZY Mode
 
-During a live session, type `x`, `y`, `z`, `z`, `y` to toggle hidden `xyzzy`
+During a live session, type `X`, `Y`, `Z`, `Z`, `Y` to toggle hidden `XYZZY`
 mode on or off.
 
-Typing `xyzzy` a second time turns the mode off and resets the hidden
+Typing `XYZZY` a second time turns the mode off and resets the hidden
 invincibility toggle back to its default state.
 
 Extra keys while `xyzzy` mode is active:
@@ -96,7 +98,7 @@ Extra keys while `xyzzy` mode is active:
 - `H`: hyperspace becomes safe and cannot destroy the player ship while
   `xyzzy` mode is active, and the rematerialization point is chosen as far away
   from enemies as possible.
-- `g`: toggle god mode. While active, the player cannot be killed by
+- `G`: toggle god mode. While active, the player cannot be killed by
   enemy fire or direct enemy collisions.
 
 ## Current Notes

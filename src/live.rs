@@ -360,7 +360,7 @@ mod tests {
         let mut input = PolledInput::default();
 
         tracker.handle_key_event(
-            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('A'), KeyModifiers::SHIFT),
             &mut input,
         );
         assert!(input.session.update.up);
@@ -385,7 +385,7 @@ mod tests {
         assert!(input.session.update.smart_bomb);
 
         tracker.handle_key_event(
-            KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT),
             &mut input,
         );
         assert!(input.session.update.hyperspace);
@@ -436,9 +436,9 @@ mod tests {
         let mut tracker = InputTracker::default();
         let mut input = PolledInput::default();
 
-        for key in ['x', 'y', 'z', 'z', 'y', 'g'] {
+        for key in ['X', 'Y', 'Z', 'Z', 'Y', 'G'] {
             tracker.handle_key_event(
-                KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE),
+                KeyEvent::new(KeyCode::Char(key), KeyModifiers::SHIFT),
                 &mut input,
             );
         }
@@ -467,6 +467,13 @@ mod tests {
         let mut tracker = InputTracker::default();
         let mut input = PolledInput::default();
 
+        tracker.handle_key_event(
+            KeyEvent::new(KeyCode::Char('Q'), KeyModifiers::SHIFT),
+            &mut input,
+        );
+        assert!(input.quit_requested);
+
+        let mut input = PolledInput::default();
         tracker.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE), &mut input);
         assert!(input.quit_requested);
     }

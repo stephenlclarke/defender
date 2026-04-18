@@ -211,6 +211,7 @@ impl SessionState {
 
     fn handle_easter_egg_input(&mut self, typed_chars: &[char]) {
         for &character in typed_chars {
+            let character = character.to_ascii_lowercase();
             self.update_easter_egg_sequence(character);
             if self.xyzzy.active && character == 'g' {
                 self.xyzzy.invincible = !self.xyzzy.invincible;
@@ -475,20 +476,20 @@ mod tests {
         let mut session = SessionState::new();
 
         session.tick(SessionInput {
-            typed_chars: vec!['x', 'y', 'z', 'z', 'y'],
+            typed_chars: vec!['X', 'Y', 'Z', 'Z', 'Y'],
             ..SessionInput::default()
         });
         assert!(session.xyzzy_active());
         assert!(!session.invincible());
 
         session.tick(SessionInput {
-            typed_chars: vec!['g'],
+            typed_chars: vec!['G'],
             ..SessionInput::default()
         });
         assert!(session.invincible());
 
         session.tick(SessionInput {
-            typed_chars: vec!['x', 'y', 'z', 'z', 'y'],
+            typed_chars: vec!['X', 'Y', 'Z', 'Z', 'Y'],
             ..SessionInput::default()
         });
         assert!(!session.xyzzy_active());
