@@ -45,7 +45,7 @@ pub fn gameplay_demo_cycle() -> [GameplayBeat; 6] {
     world.spawn_entity(Entity::new(
         EntityKind::Human,
         54,
-        world.ground_row() as i32 - 1,
+        world.safe_altitude_at_world_x(54),
         0,
         0,
     ));

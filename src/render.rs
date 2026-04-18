@@ -2,17 +2,20 @@ use crate::game::World;
 
 pub fn render_grid(world: &World) -> Vec<String> {
     let mut buffer = vec![vec![' '; world.width()]; world.height()];
-    let ground_row = world.ground_row();
-
-    if ground_row < buffer.len() {
-        buffer[ground_row].fill('_');
+    for screen_x in 0..world.width() {
+        let terrain_row = world.terrain_row_at_screen_x(screen_x);
+        if terrain_row < buffer.len() {
+            buffer[terrain_row][screen_x] = '_';
+        }
     }
 
     for entity in world.entities() {
-        let x = entity.position.x;
         let y = entity.position.y;
-        if x >= 0 && (x as usize) < world.width() && y >= 0 && (y as usize) < world.height() {
-            buffer[y as usize][x as usize] = entity.kind.glyph();
+        if let Some(screen_x) = world.screen_x_for_world_x(entity.position.x)
+            && y >= 0
+            && (y as usize) < world.height()
+        {
+            buffer[y as usize][screen_x] = entity.kind.glyph();
         }
     }
 
@@ -26,11 +29,12 @@ pub fn render_grid(world: &World) -> Vec<String> {
             world.tick()
         ),
         format!(
-            "ENEMIES {}  HUMANS {}  THREAT {}  BOMBS {}",
+            "ENEMIES {}  HUMANS {}  THREAT {}  BOMBS {}  CAM {:03}",
             world.enemy_count(),
             world.human_count(),
             world.threat_score(),
-            world.smart_bombs()
+            world.smart_bombs(),
+            world.camera_x(),
         ),
     ];
 
@@ -147,6 +151,7 @@ mod tests {
         assert!(output.contains("LIVES 3"));
         assert!(output.contains("THREAT"));
         assert!(output.contains("BOMBS 3"));
+        assert!(output.contains("CAM"));
     }
 
     #[test]
@@ -221,6 +226,19 @@ mod tests {
 
         assert!(output.contains("XYZZY MODE ENABLED"));
         assert!(output.contains("SMART BOMBS INF"));
+    }
+
+    #[test]
+    fn bootstrap_render_shows_stepped_terrain_profile() {
+        let output = super::render(&World::bootstrap());
+        let frame_rows: Vec<&str> = output
+            .lines()
+            .skip(2)
+            .take(World::bootstrap().height())
+            .collect();
+        let terrain_rows = frame_rows.iter().filter(|row| row.contains('_')).count();
+
+        assert!(terrain_rows > 1);
     }
 
     #[test]

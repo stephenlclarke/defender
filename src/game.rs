@@ -1,6 +1,6 @@
 use crate::constants::{
     DEFAULT_LIVES, DEFAULT_SMART_BOMBS, DEFAULT_WAVE, GROUND_ROW, PLAYER_START_X, PLAYER_START_Y,
-    WORLD_HEIGHT, WORLD_WIDTH,
+    WORLD_HEIGHT, WORLD_SPAN, WORLD_WIDTH,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,19 +95,27 @@ pub struct Status {
 pub struct World {
     width: usize,
     height: usize,
+    world_span: i32,
+    camera_x: i32,
     tick: u32,
     fire_cooldown: u8,
     smart_bombs: u8,
     game_over: bool,
     status: Status,
+    terrain: Vec<usize>,
     entities: Vec<Entity>,
 }
 
 impl World {
     pub fn bootstrap() -> Self {
+        let terrain = build_scrolling_terrain(WORLD_SPAN, WORLD_HEIGHT);
+        let human0_y = terrain_surface_y(&terrain, 8);
+        let human1_y = terrain_surface_y(&terrain, 30);
         Self {
             width: WORLD_WIDTH,
             height: WORLD_HEIGHT,
+            world_span: WORLD_SPAN as i32,
+            camera_x: PLAYER_START_X,
             tick: 0,
             fire_cooldown: 0,
             smart_bombs: DEFAULT_SMART_BOMBS,
@@ -117,12 +125,13 @@ impl World {
                 lives: DEFAULT_LIVES,
                 wave: DEFAULT_WAVE,
             },
+            terrain,
             entities: vec![
                 Entity::new(EntityKind::PlayerShip, PLAYER_START_X, PLAYER_START_Y, 0, 0),
-                Entity::new(EntityKind::Lander, 48, 4, -1, 1),
-                Entity::new(EntityKind::Mutant, 28, 9, 1, -1),
-                Entity::new(EntityKind::Human, 18, GROUND_ROW as i32 - 1, 0, 0),
-                Entity::new(EntityKind::Human, 42, GROUND_ROW as i32 - 1, 0, 0),
+                Entity::new(EntityKind::Lander, 36, 4, -1, 1),
+                Entity::new(EntityKind::Mutant, 22, 9, 1, -1),
+                Entity::new(EntityKind::Human, 8, human0_y, 0, 0),
+                Entity::new(EntityKind::Human, 30, human1_y, 0, 0),
             ],
         }
     }
@@ -136,11 +145,14 @@ impl World {
         Self {
             width,
             height,
+            world_span: width as i32,
+            camera_x: width as i32 / 2,
             tick: 0,
             fire_cooldown: 0,
             smart_bombs: DEFAULT_SMART_BOMBS,
             game_over: false,
             status,
+            terrain: build_flat_terrain(width, height),
             entities,
         }
     }
@@ -148,9 +160,10 @@ impl World {
     pub fn step(&mut self) {
         self.tick += 1;
 
-        let max_x = self.width as i32 - 1;
+        let max_x = self.world_max_x();
         let min_y = 1;
         let max_y = self.height as i32 - 3;
+        let terrain = &self.terrain;
 
         for entity in &mut self.entities {
             match entity.kind {
@@ -161,15 +174,20 @@ impl World {
                     } else {
                         entity.position.y = (entity.position.y - 1).max(min_y);
                     }
+                    entity.position.y = entity
+                        .position
+                        .y
+                        .min(terrain_surface_y(terrain, entity.position.x));
                 }
                 EntityKind::Lander | EntityKind::Mutant => {
                     entity.position.x =
                         wrap_coordinate(entity.position.x + entity.velocity.dx, max_x);
                     entity.position.y += entity.velocity.dy;
+                    let surface = terrain_surface_y(terrain, entity.position.x);
 
-                    if entity.position.y <= min_y || entity.position.y >= max_y {
+                    if entity.position.y <= min_y || entity.position.y >= max_y.min(surface) {
                         entity.velocity.dy *= -1;
-                        entity.position.y = entity.position.y.clamp(min_y, max_y);
+                        entity.position.y = entity.position.y.clamp(min_y, max_y.min(surface));
                     }
                 }
                 EntityKind::PlayerShot | EntityKind::EnemyShot => {
@@ -180,6 +198,7 @@ impl World {
         }
 
         self.retain_projectiles(max_x, min_y, max_y);
+        self.sync_camera_to_player();
     }
 
     pub fn width(&self) -> usize {
@@ -188,6 +207,14 @@ impl World {
 
     pub fn height(&self) -> usize {
         self.height
+    }
+
+    pub fn world_span(&self) -> i32 {
+        self.world_span
+    }
+
+    pub fn camera_x(&self) -> i32 {
+        self.camera_x
     }
 
     pub fn tick(&self) -> u32 {
@@ -200,6 +227,28 @@ impl World {
 
     pub fn ground_row(&self) -> usize {
         self.height.saturating_sub(2)
+    }
+
+    pub fn terrain_row_at_world_x(&self, world_x: i32) -> usize {
+        let index = wrap_coordinate(world_x, self.world_max_x()) as usize;
+        self.terrain[index]
+    }
+
+    pub fn terrain_row_at_screen_x(&self, screen_x: usize) -> usize {
+        self.terrain_row_at_world_x(self.world_x_for_screen_x(screen_x))
+    }
+
+    pub fn safe_altitude_at_world_x(&self, world_x: i32) -> i32 {
+        self.terrain_row_at_world_x(world_x) as i32 - 1
+    }
+
+    pub fn screen_x_for_world_x(&self, world_x: i32) -> Option<usize> {
+        if !(0..=self.world_max_x()).contains(&world_x) {
+            return None;
+        }
+
+        let offset = (world_x - self.left_edge()).rem_euclid(self.world_span);
+        (offset < self.width as i32).then_some(offset as usize)
     }
 
     pub fn status(&self) -> Status {
@@ -247,7 +296,7 @@ impl World {
             .iter()
             .filter(|entity| entity.kind.is_enemy())
             .filter(|entity| {
-                entity.position.y >= self.ground_row() as i32 - 4
+                entity.position.y >= self.safe_altitude_at_world_x(entity.position.x) - 3
                     || humans.iter().any(|human| {
                         (entity.position.x - human.x).abs() <= 6
                             && (entity.position.y - human.y).abs() <= 4
@@ -296,28 +345,39 @@ impl World {
             self.fire_cooldown -= 1;
         }
 
-        let max_x = self.width as i32 - 1;
+        let max_x = self.world_max_x();
         let min_y = 1;
         let max_y = self.height as i32 - 3;
 
         let mut shot_origin = None;
-        if let Some(player) = self
-            .entities
-            .iter_mut()
-            .find(|entity| entity.kind == EntityKind::PlayerShip)
         {
-            let dx = input.thrust as i32 - input.reverse as i32;
-            let dy = input.down as i32 - input.up as i32;
-            player.position.x = (player.position.x + dx).clamp(0, max_x);
-            player.position.y = (player.position.y + dy).clamp(min_y, max_y);
+            let terrain = &self.terrain;
+            if let Some(player) = self
+                .entities
+                .iter_mut()
+                .find(|entity| entity.kind == EntityKind::PlayerShip)
+            {
+                let dx = input.thrust as i32 - input.reverse as i32;
+                let dy = input.down as i32 - input.up as i32;
+                player.position.x = wrap_coordinate(player.position.x + dx, max_x);
+                player.position.y = (player.position.y + dy).clamp(min_y, max_y);
+                player.position.y = player
+                    .position
+                    .y
+                    .min(terrain_surface_y(terrain, player.position.x));
 
-            if input.hyperspace {
-                player.position =
-                    hyperspace_destination(self.tick, self.status.score, max_x, min_y, max_y);
-                events.push(WorldEvent::HyperspaceUsed);
+                if input.hyperspace {
+                    player.position =
+                        hyperspace_destination(self.tick, self.status.score, max_x, min_y, max_y);
+                    player.position.y = player
+                        .position
+                        .y
+                        .min(terrain_surface_y(terrain, player.position.x));
+                    events.push(WorldEvent::HyperspaceUsed);
+                }
+
+                shot_origin = Some(player.position);
             }
-
-            shot_origin = Some(player.position);
         }
 
         if input.smart_bomb && self.can_use_smart_bomb(input.invincible) {
@@ -346,10 +406,11 @@ impl World {
                     entity.position.x =
                         wrap_coordinate(entity.position.x + entity.velocity.dx, max_x);
                     entity.position.y += entity.velocity.dy;
+                    let surface = terrain_surface_y(&self.terrain, entity.position.x);
 
-                    if entity.position.y <= min_y || entity.position.y >= max_y {
+                    if entity.position.y <= min_y || entity.position.y >= max_y.min(surface) {
                         entity.velocity.dy *= -1;
-                        entity.position.y = entity.position.y.clamp(min_y, max_y);
+                        entity.position.y = entity.position.y.clamp(min_y, max_y.min(surface));
                     }
                 }
                 EntityKind::PlayerShot | EntityKind::EnemyShot => {
@@ -372,6 +433,7 @@ impl World {
             events.push(WorldEvent::WaveAdvanced);
         }
 
+        self.sync_camera_to_player();
         events
     }
 
@@ -519,14 +581,16 @@ impl World {
     }
 
     fn reset_player_position(&mut self) {
+        let terrain = &self.terrain;
         if let Some(player) = self
             .entities
             .iter_mut()
             .find(|entity| entity.kind == EntityKind::PlayerShip)
         {
             player.position.x = PLAYER_START_X;
-            player.position.y = PLAYER_START_Y;
+            player.position.y = PLAYER_START_Y.min(terrain_surface_y(terrain, PLAYER_START_X));
         }
+        self.sync_camera_to_player();
     }
 
     fn player_position(&self) -> Option<Position> {
@@ -565,17 +629,19 @@ impl World {
     }
 
     fn retain_projectiles(&mut self, max_x: i32, min_y: i32, max_y: i32) {
+        let terrain = &self.terrain;
         self.entities.retain(|entity| match entity.kind {
             EntityKind::PlayerShot | EntityKind::EnemyShot => {
                 (0..=max_x).contains(&entity.position.x)
                     && (min_y..=max_y).contains(&entity.position.y)
+                    && entity.position.y < terrain_surface_y(terrain, entity.position.x) + 1
             }
             _ => true,
         });
     }
 
     fn spawn_wave(&mut self) {
-        let width = self.width as i32;
+        let width = self.world_span;
         let base_y = 3 + (self.status.wave as i32 % 4);
         let wave = self.status.wave as i32;
         let mut enemies = vec![
@@ -592,20 +658,62 @@ impl World {
 
         self.entities.extend(enemies);
     }
+
+    fn sync_camera_to_player(&mut self) {
+        if let Some(player_position) = self.player_position() {
+            self.camera_x = player_position.x;
+        }
+    }
+
+    fn world_max_x(&self) -> i32 {
+        self.world_span - 1
+    }
+
+    fn left_edge(&self) -> i32 {
+        self.camera_x - self.width as i32 / 2
+    }
+
+    fn world_x_for_screen_x(&self, screen_x: usize) -> i32 {
+        wrap_coordinate(self.left_edge() + screen_x as i32, self.world_max_x())
+    }
 }
 
 fn wrap_coordinate(value: i32, max: i32) -> i32 {
-    if value < 0 {
-        max
-    } else if value > max {
-        0
-    } else {
-        value
-    }
+    value.rem_euclid(max + 1)
 }
 
 fn positions_overlap(left: Position, right: Position, horizontal: i32, vertical: i32) -> bool {
     (left.x - right.x).abs() <= horizontal && (left.y - right.y).abs() <= vertical
+}
+
+fn build_flat_terrain(width: usize, height: usize) -> Vec<usize> {
+    vec![height.saturating_sub(2); width]
+}
+
+fn build_scrolling_terrain(span: usize, height: usize) -> Vec<usize> {
+    const TERRAIN_STEP_PATTERN: [i32; 24] = [
+        0, 0, -1, 0, 1, 0, 0, -1, -1, 1, 0, 1, 0, -1, 0, 1, 0, 0, -1, 1, 0, 0, 1, -1,
+    ];
+
+    let min_row = height.saturating_sub(7) as i32;
+    let max_row = height.saturating_sub(2) as i32;
+    let mut row = GROUND_ROW as i32;
+    let mut terrain = Vec::with_capacity(span);
+
+    for x in 0..span {
+        if x % 4 == 0 {
+            let delta = TERRAIN_STEP_PATTERN[(x / 4) % TERRAIN_STEP_PATTERN.len()];
+            row = (row + delta).clamp(min_row, max_row);
+        }
+        terrain.push(row as usize);
+    }
+
+    terrain
+}
+
+fn terrain_surface_y(terrain: &[usize], world_x: i32) -> i32 {
+    let index = wrap_coordinate(world_x, terrain.len() as i32 - 1) as usize;
+    terrain[index] as i32 - 1
 }
 
 fn hyperspace_destination(tick: u32, score: u32, max_x: i32, min_y: i32, max_y: i32) -> Position {
@@ -652,10 +760,15 @@ mod tests {
     fn bootstrap_creates_expected_entities() {
         let world = World::bootstrap();
 
+        assert!(world.world_span() > world.width() as i32);
         assert_eq!(world.enemy_count(), 2);
         assert_eq!(world.human_count(), 2);
         assert_eq!(world.status().lives, 3);
         assert_eq!(world.entities()[0].kind, EntityKind::PlayerShip);
+        assert_eq!(
+            world.screen_x_for_world_x(world.entities()[0].position.x),
+            Some(world.width() / 2)
+        );
     }
 
     #[test]
@@ -762,6 +875,36 @@ mod tests {
         assert_eq!(player.position.x, start.x + 1);
         assert_eq!(world.entity_count_by_kind(EntityKind::PlayerShot), 1);
         assert!(events.contains(&WorldEvent::ShotFired));
+    }
+
+    #[test]
+    fn live_step_wraps_player_and_recenters_the_camera() {
+        let mut world = World::bootstrap();
+        let world_max_x = world.world_span() - 1;
+        let player = world
+            .entities
+            .iter_mut()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player");
+        player.position.x = world_max_x;
+        world.camera_x = player.position.x;
+
+        world.step_live(UpdateInput {
+            thrust: true,
+            ..UpdateInput::default()
+        });
+
+        let wrapped_player = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player");
+        assert_eq!(wrapped_player.position.x, 0);
+        assert_eq!(world.camera_x(), 0);
+        assert_eq!(
+            world.screen_x_for_world_x(wrapped_player.position.x),
+            Some(world.width() / 2)
+        );
     }
 
     #[test]
@@ -881,6 +1024,30 @@ mod tests {
         );
 
         world.step_live(UpdateInput::default());
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+    }
+
+    #[test]
+    fn live_step_removes_projectiles_that_hit_the_terrain() {
+        let mut world = World::bootstrap();
+        let player_x = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::PlayerShip)
+            .expect("player")
+            .position
+            .x;
+        let terrain_row = world.terrain_row_at_world_x(player_x) as i32;
+        world.spawn_entity(Entity::new(
+            EntityKind::EnemyShot,
+            player_x,
+            terrain_row - 1,
+            0,
+            1,
+        ));
+
+        world.step_live(UpdateInput::default());
+
         assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
     }
 

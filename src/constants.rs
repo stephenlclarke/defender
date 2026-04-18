@@ -1,5 +1,6 @@
 pub const WORLD_WIDTH: usize = 64;
 pub const WORLD_HEIGHT: usize = 18;
+pub const WORLD_SPAN: usize = 192;
 pub const GROUND_ROW: usize = WORLD_HEIGHT - 2;
 pub const DEFAULT_LIVES: u8 = 3;
 pub const DEFAULT_WAVE: u8 = 1;
