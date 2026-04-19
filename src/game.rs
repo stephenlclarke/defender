@@ -519,10 +519,11 @@ impl World {
 
         if hyperspace_result.is_some() {
             // Red-label `HYPER` walks the shell list through `KILSHL` before the
-            // player reappears, so active player lasers do not survive
+            // player reappears, so active shell objects do not survive
             // hyperspace.
-            self.entities
-                .retain(|entity| entity.kind != EntityKind::PlayerShot);
+            self.entities.retain(|entity| {
+                !matches!(entity.kind, EntityKind::PlayerShot | EntityKind::EnemyShot)
+            });
         }
 
         let mut shot_origin = None;
@@ -4073,7 +4074,7 @@ mod tests {
     }
 
     #[test]
-    fn live_step_hyperspace_clears_active_player_shots() {
+    fn live_step_hyperspace_clears_active_shells() {
         let mut world = World::with_entities(
             20,
             10,
@@ -4086,6 +4087,7 @@ mod tests {
                 Entity::new(EntityKind::PlayerShip, 2, 3, 1, 0),
                 Entity::new(EntityKind::PlayerShot, 6, 3, 2, 0),
                 Entity::new(EntityKind::PlayerShot, 7, 4, 2, 0),
+                Entity::new(EntityKind::EnemyShot, 10, 5, -2, 0),
             ],
         );
 
@@ -4095,6 +4097,7 @@ mod tests {
         });
 
         assert_eq!(world.entity_count_by_kind(EntityKind::PlayerShot), 0);
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
         assert!(events.contains(&WorldEvent::HyperspaceUsed));
     }
 

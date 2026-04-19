@@ -224,8 +224,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `LFIRE` switch process instead of harming the ship, and player shots now
   expiring at the main-screen edge instead of wandering the whole wrapped
   world, and risky hyperspace behavior outside `xyzzy` mode, with active
-  player laser shells now being cleared on every hyperspace jump like the
-  cabinet `HYPER -> KILSHL` path, while `xyzzy` hyperspace deliberately
+  shell objects now being cleared on every hyperspace jump like the cabinet
+  `HYPER -> KILSHL` path, while `xyzzy` hyperspace deliberately
   relocates the ship away from enemy clusters, with
   automatic unlimited smart bombs in `xyzzy` mode, and empty smart-bomb button
   presses in normal play likewise only ending the transient `SBOMB` switch
