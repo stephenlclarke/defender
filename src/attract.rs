@@ -66,6 +66,7 @@ pub struct AttractFrame {
     pub revealed_score_entries: usize,
     pub bonus_text: Option<AttractBonusText>,
     pub player_facing: HorizontalDirection,
+    pub animation_tick: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +76,14 @@ pub struct AttractObject {
     pub y16: i32,
     pub state: EntityState,
     pub facing: HorizontalDirection,
+    pub visual: AttractVisual,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AttractVisual {
+    #[default]
+    Sprite,
+    Explosion,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -356,6 +365,7 @@ pub fn attract_frame_for_beat(beat: AttractBeat) -> AttractFrame {
                 revealed_score_entries: beat.revealed_score_entries,
                 bonus_text: None,
                 player_facing: HorizontalDirection::Right,
+                animation_tick: 0,
             }
         }
     }
@@ -453,6 +463,11 @@ fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
         // human accelerates every two ticks until the catch frame.
         let (ship_x, ship_y, human_y) = rescue_intercept_state(fall_tick);
         objects.push(attract_object(EntityKind::PlayerShip, ship_x, ship_y));
+        if fall_tick < 12 {
+            let explosion_y = ATTRACT_LANDER_Y16 + i32::from(RESCUE_DESCENT_TICKS) * 0x00A0
+                - i32::from(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS) * 0x00B0;
+            objects.push(attract_explosion_object(ATTRACT_LANDER_X16, explosion_y));
+        }
         objects.push(attract_object_with_state(
             EntityKind::Human,
             ATTRACT_HUMAN_X16,
@@ -526,6 +541,7 @@ fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
         revealed_score_entries,
         bonus_text,
         player_facing: facing,
+        animation_tick: u32::from(tick),
     }
 }
 
@@ -551,7 +567,16 @@ fn append_legend_entities(
         if table_tick >= entry_start {
             let local = table_tick - entry_start;
             let enemy_y = 0xA000 - i32::from(local.min(entry_show_tick - entry_start)) * 0x00C0;
-            objects.push(attract_object(legend_kind(index), 0x1F00, enemy_y));
+            if local < LEGEND_APPROACH_TICKS {
+                objects.push(attract_object(legend_kind(index), 0x1F00, enemy_y));
+            } else if local < LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS / 2 {
+                objects.push(attract_explosion_object(0x1F00, enemy_y));
+            } else if local < entry_show_tick - entry_start {
+                objects.push(attract_explosion_object(
+                    ATTRACT_TABLE_XS[index],
+                    ATTRACT_TABLE_YS[index],
+                ));
+            }
             if local >= LEGEND_APPROACH_TICKS && local < entry_show_tick - entry_start {
                 add_laser_column(objects, player_x16, player_y16, 0x1F00, enemy_y);
             }
@@ -659,6 +684,7 @@ fn attract_object_with_state(
         y16,
         state,
         facing: HorizontalDirection::Right,
+        visual: AttractVisual::Sprite,
     }
 }
 
@@ -674,6 +700,18 @@ fn attract_object_facing(
         y16,
         state: EntityState::Normal,
         facing,
+        visual: AttractVisual::Sprite,
+    }
+}
+
+fn attract_explosion_object(x16: i32, y16: i32) -> AttractObject {
+    AttractObject {
+        kind: EntityKind::Pod,
+        x16,
+        y16,
+        state: EntityState::Normal,
+        facing: HorizontalDirection::Right,
+        visual: AttractVisual::Explosion,
     }
 }
 

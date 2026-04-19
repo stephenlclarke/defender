@@ -1,7 +1,7 @@
 //! Renders Defender scenes into RGBA frames for Kitty graphics output and README media.
 
 use crate::{
-    attract::AttractFrame,
+    attract::{AttractFrame, AttractVisual},
     attract_rom::attract_rom,
     branding::arcade_branding,
     font::arcade_font,
@@ -407,7 +407,7 @@ impl Renderer {
         }
         self.draw_attract_demo_objects(frame, playfield);
         if let Some(bonus_text) = frame.bonus_text {
-            self.draw_attract_bonus_text(bonus_text, playfield, TEXT_WARNING);
+            self.draw_attract_bonus_text(bonus_text, playfield, frame.animation_tick);
         }
         self.draw_attract_legend_entries(playfield, frame.revealed_score_entries);
     }
@@ -481,10 +481,16 @@ impl Renderer {
     ) {
         let scanner = self.gameplay_scanner_rect();
         let playfield = self.gameplay_playfield_rect(scanner);
-        self.draw_space_backdrop(world.tick(), Some(playfield));
-        self.draw_hud(world);
+        self.draw_gameplay_hud(world, scanner);
         self.draw_arcade_play_scanner(world, scanner);
-        self.draw_world_panel(world, playfield, false);
+        self.draw_world_panel_with_style(
+            world,
+            playfield,
+            false,
+            None,
+            BACKGROUND,
+            TERRAIN_AMBER_LINE,
+        );
         self.draw_secret_status(
             xyzzy_active,
             invincible,
@@ -637,25 +643,70 @@ impl Renderer {
         );
     }
 
-    fn draw_hud(&mut self, world: &World) {
-        self.draw_text(
-            28,
-            16,
-            &format!("{:>6}", world.status().score),
-            TEXT_ARCADE_WHITE,
+    fn draw_gameplay_hud(&mut self, world: &World, scanner: Rect) {
+        let baseline_y = scanner.y + scanner.height + 10;
+        let pod_y = scanner.y + 8;
+        let pod_height = scanner.height - 16;
+        let pod_gap = 20;
+        let left_pod = Rect {
+            x: 44,
+            y: pod_y,
+            width: scanner.x - 44 - pod_gap,
+            height: pod_height,
+        };
+        let right_pod = Rect {
+            x: scanner.x + scanner.width + pod_gap,
+            y: pod_y,
+            width: self.image_width as i32 - (scanner.x + scanner.width + pod_gap) - 44,
+            height: pod_height,
+        };
+
+        self.draw_line(
+            24,
+            baseline_y,
+            self.image_width as i32 - 24,
+            baseline_y,
+            Color::from_rgba(SCANNER_BORDER),
             2,
         );
-        let right_status = format!(
-            "LIVES {}   WAVE {}   BOMBS {}",
-            world.status().lives,
-            world.status().wave,
-            world.smart_bombs()
-        );
-        let status_width = arcade_font().text_width(&right_status, 2);
+        self.stroke_rect(left_pod, Color::from_rgba(SCANNER_BORDER), 4);
+        self.fill_rect(left_pod.inset(4), Color::from_rgba(BACKGROUND));
+        self.stroke_rect(right_pod, Color::from_rgba(SCANNER_BORDER), 4);
+        self.fill_rect(right_pod.inset(4), Color::from_rgba(BACKGROUND));
+
+        let score_text = format!("{:>5}", world.status().score);
         self.draw_text(
-            self.image_width as i32 - status_width - 28,
-            16,
-            &right_status,
+            left_pod.x + 18,
+            left_pod.y + 26,
+            &score_text,
+            scanner_hud_color(world),
+            4,
+        );
+        for index in 0..world.status().lives {
+            let icon = arcade_sprites().sprite_for_entity(
+                &Entity::new(EntityKind::PlayerShip, 0, 0, 0, 0),
+                0,
+                HorizontalDirection::Right,
+            );
+            self.draw_scaled_image_centered(
+                icon.as_ref(),
+                left_pod.x + left_pod.width - 22 - i32::from(index) * 22,
+                left_pod.y + 18,
+                12,
+            );
+        }
+
+        self.draw_text(
+            right_pod.x + 16,
+            right_pod.y + 16,
+            &format!("{:>4}", world.status().wave),
+            scanner_hud_color(world),
+            3,
+        );
+        self.draw_text(
+            right_pod.x + 16,
+            right_pod.y + 50,
+            &format!("B{:>2}", world.smart_bombs()),
             TEXT_ARCADE_WHITE,
             2,
         );
@@ -663,7 +714,7 @@ impl Renderer {
         if world.planet_destroyed() {
             self.draw_centered_text(
                 self.image_width as i32 / 2,
-                18,
+                scanner.y - 18,
                 "DEEP SPACE",
                 TEXT_DANGER,
                 2,
@@ -934,6 +985,7 @@ impl Renderer {
                     cx,
                     cy,
                     scale.max(4),
+                    terrain_rect,
                 );
             }
         }
@@ -949,6 +1001,7 @@ impl Renderer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn draw_entity(
         &mut self,
         entity: &Entity,
@@ -957,50 +1010,49 @@ impl Renderer {
         cx: i32,
         cy: i32,
         scale: i32,
+        clip_rect: Rect,
     ) {
         if entity.kind == EntityKind::PlayerShot && entity.velocity.dx != 0 {
-            self.draw_player_shot_beam(entity, cx, cy, scale);
+            self.draw_player_shot_beam(entity, cx, cy, scale, clip_rect);
             return;
         }
 
         let sprites = arcade_sprites();
         let image = sprites.sprite_for_entity(entity, tick, facing);
-        self.draw_scaled_image_centered(
+        self.draw_scaled_image_centered_clipped(
             image.as_ref(),
             cx,
             cy,
             sprite_draw_height(entity.kind, scale),
+            clip_rect,
         );
     }
 
-    fn draw_player_shot_beam(&mut self, entity: &Entity, cx: i32, cy: i32, scale: i32) {
+    fn draw_attract_explosion(&mut self, cx: i32, cy: i32, animation_tick: u32, clip_rect: Rect) {
+        let image = if (animation_tick / 4).is_multiple_of(2) {
+            arcade_sprites().pod_explosion()
+        } else {
+            arcade_sprites().swarmer_explosion()
+        };
+        self.draw_scaled_image_centered_clipped(image.as_ref(), cx, cy, 26, clip_rect);
+    }
+
+    fn draw_player_shot_beam(
+        &mut self,
+        entity: &Entity,
+        cx: i32,
+        cy: i32,
+        scale: i32,
+        clip_rect: Rect,
+    ) {
         // Defender's live gameplay laser reads as a short horizontal beam on the
         // cabinet, not a chunky projectile sprite. The attract sequence still
         // uses the ROM-driven laser path separately, so this beam only applies
         // to moving in-game shots.
         let direction = entity.velocity.dx.signum();
         let half_length = scale.max(4);
-        let core_half_length = (half_length - 2).max(2);
         let tail_x = cx - direction * half_length;
-        let core_tail_x = cx - direction * core_half_length;
-
-        self.draw_line(
-            tail_x,
-            cy,
-            cx,
-            cy,
-            Color::from_rgba([255, 232, 104, 255]),
-            2,
-        );
-        self.draw_line(
-            core_tail_x,
-            cy,
-            cx,
-            cy,
-            Color::from_rgba(TEXT_ARCADE_WHITE),
-            1,
-        );
-        self.stamp(cx + direction, cy, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
+        self.draw_arcade_laser_beam(tail_x, cy, cx, cy, entity.position.x as u32, clip_rect);
     }
 
     fn draw_attract_demo_objects(&mut self, frame: &AttractFrame, rect: Rect) {
@@ -1018,12 +1070,27 @@ impl Renderer {
 
             if object.kind == EntityKind::PlayerShip {
                 player_ship = Some((cx, cy, object.facing));
-            } else if object.kind.is_enemy() {
+            } else if object.kind.is_enemy() && object.visual == AttractVisual::Sprite {
                 laser_target = Some((object.kind, cx, cy));
             }
 
-            let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
-            self.draw_entity(&entity, object.facing, 0, cx, cy, 24);
+            match object.visual {
+                AttractVisual::Sprite => {
+                    let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
+                    self.draw_entity(
+                        &entity,
+                        object.facing,
+                        frame.animation_tick,
+                        cx,
+                        cy,
+                        24,
+                        rect,
+                    );
+                }
+                AttractVisual::Explosion => {
+                    self.draw_attract_explosion(cx, cy, frame.animation_tick, rect);
+                }
+            }
         }
 
         if player_shot_active
@@ -1033,35 +1100,71 @@ impl Renderer {
             let (start_x, start_y) = attract_laser_ship_anchor(ship_x, ship_y, facing);
             let (end_x, end_y) = attract_laser_target_anchor(kind, target_x, target_y);
             // `LASRS` writes the attract beam directly into screen memory, so
-            // render it here as a continuous cabinet-style beam instead of
-            // reconstructing it from fake `PlayerShot` world objects.
-            self.draw_arcade_laser_beam(start_x, start_y, end_x, end_y);
+            // render it here as a ROM-inspired color-cycling segmented beam.
+            self.draw_arcade_laser_beam(start_x, start_y, end_x, end_y, frame.animation_tick, rect);
         }
     }
 
-    fn draw_arcade_laser_beam(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) {
-        self.draw_line(x0, y0, x1, y1, Color::from_rgba([255, 232, 104, 255]), 3);
-        let (tip_x0, tip_y0) = beam_tip_start(x0, y0, x1, y1, 18.0);
-        self.draw_line(
+    fn draw_arcade_laser_beam(
+        &mut self,
+        x0: i32,
+        y0: i32,
+        x1: i32,
+        y1: i32,
+        animation_tick: u32,
+        clip_rect: Rect,
+    ) {
+        let dx = x1 - x0;
+        let dy = y1 - y0;
+        let steps = dx.abs().max(dy.abs()).max(1);
+        let phase = ((animation_tick / 2) as usize) % LASER_COLOR_SEQUENCE.len();
+        for step in 0..=steps {
+            if step % 6 >= 4 {
+                continue;
+            }
+            let x = x0 + dx * step / steps;
+            let y = y0 + dy * step / steps;
+            let color = LASER_COLOR_SEQUENCE[(phase + step as usize) % LASER_COLOR_SEQUENCE.len()];
+            self.stamp_clipped(x, y, Color::from_rgba(color), 1, clip_rect);
+            if step % 9 == 0 {
+                self.stamp_clipped(x, y - 1, Color::from_rgba(color), 1, clip_rect);
+            }
+        }
+        let (tip_x0, tip_y0) = beam_tip_start(x0, y0, x1, y1, 12.0);
+        self.draw_line_clipped(
             tip_x0,
             tip_y0,
             x1,
             y1,
             Color::from_rgba(TEXT_ARCADE_WHITE),
-            2,
+            1,
+            clip_rect,
         );
-        self.draw_dot(x1, y1, Color::from_rgba(TEXT_ARCADE_WHITE), 2);
+        self.draw_dot(x1, y1, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
     }
 
     fn draw_attract_bonus_text(
         &mut self,
         bonus_text: crate::attract::AttractBonusText,
         rect: Rect,
-        color: [u8; 4],
+        animation_tick: u32,
     ) {
         let x = project_attract_x(rect, bonus_text.x16);
         let y = project_attract_y(rect, bonus_text.y16);
-        self.draw_centered_text(x, y, bonus_text.text, color, 2);
+        if bonus_text.text == "500" {
+            let colors = bonus_cycle_colors(animation_tick);
+            let scale = 3;
+            let digit_width = arcade_font().text_width("5", scale);
+            let spacing = scale * 2;
+            let total_width = digit_width * 3 + spacing * 2;
+            let start_x = x - total_width / 2;
+            for (index, digit) in ['5', '0', '0'].into_iter().enumerate() {
+                let glyph_x = start_x + index as i32 * (digit_width + spacing);
+                self.draw_text(glyph_x, y, &digit.to_string(), colors[index], scale);
+            }
+            return;
+        }
+        self.draw_centered_text(x, y, bonus_text.text, TEXT_WARNING, 2);
     }
 
     fn draw_score_tables(
@@ -1074,18 +1177,33 @@ impl Renderer {
         let left_center = rect.x + rect.width / 4;
         let right_center = rect.x + rect.width * 3 / 4;
         let table_top = rect.y + 6;
+        const HEADING_SCALE: i32 = 2;
+        const ROW_SCALE: i32 = 3;
+        const ROW_STEP_Y: i32 = 30;
         let left_rows = score_rows(todays);
         let right_rows = score_rows(all_time);
         let column_width = left_rows
             .iter()
             .chain(right_rows.iter())
-            .map(|row| arcade_font().text_width(row, 2))
+            .map(|row| arcade_font().text_width(row, ROW_SCALE))
             .max()
             .unwrap_or(0);
-        self.draw_centered_text(left_center, table_top, "TODAYS", color, 2);
-        self.draw_centered_text(left_center, table_top + 20, "GREATEST", color, 2);
-        self.draw_centered_text(right_center, table_top, "ALL TIME", color, 2);
-        self.draw_centered_text(right_center, table_top + 20, "GREATEST", color, 2);
+        self.draw_centered_text(left_center, table_top, "TODAYS", color, HEADING_SCALE);
+        self.draw_centered_text(
+            left_center,
+            table_top + 20,
+            "GREATEST",
+            color,
+            HEADING_SCALE,
+        );
+        self.draw_centered_text(right_center, table_top, "ALL TIME", color, HEADING_SCALE);
+        self.draw_centered_text(
+            right_center,
+            table_top + 20,
+            "GREATEST",
+            color,
+            HEADING_SCALE,
+        );
 
         let left_x = left_center - column_width / 2;
         let right_x = right_center - column_width / 2;
@@ -1093,17 +1211,17 @@ impl Renderer {
         for index in 0..row_count {
             self.draw_text(
                 left_x,
-                rect.y + 58 + index as i32 * 24,
+                rect.y + 58 + index as i32 * ROW_STEP_Y,
                 left_rows.get(index).map(String::as_str).unwrap_or(""),
                 color,
-                2,
+                ROW_SCALE,
             );
             self.draw_text(
                 right_x,
-                rect.y + 58 + index as i32 * 24,
+                rect.y + 58 + index as i32 * ROW_STEP_Y,
                 right_rows.get(index).map(String::as_str).unwrap_or(""),
                 color,
-                2,
+                ROW_SCALE,
             );
         }
     }
@@ -1120,12 +1238,17 @@ impl Renderer {
             self.fill_rect(rect, Color::from_rgba(BACKGROUND));
         }
 
-        for index in 0..180u32 {
+        for index in 0..96u32 {
             let hash = hash32(seed.wrapping_mul(97).wrapping_add(index * 7919));
             let x = rect.x + (hash % rect.width.max(1) as u32) as i32;
             let y = rect.y + ((hash.rotate_left(13)) % rect.height.max(1) as u32) as i32;
-            let brightness = 150 + ((hash >> 24) as u8 % 100);
-            self.draw_dot(x, y, Color(brightness, brightness, 255, 255), 1);
+            let color = star_color(index, hash);
+            if hash & 0x7 == 0 {
+                self.draw_line(x - 2, y, x + 2, y, Color::from_rgba(color), 1);
+                self.draw_line(x, y - 2, x, y + 2, Color::from_rgba(color), 1);
+            } else {
+                self.draw_dot(x, y, Color::from_rgba(color), 1);
+            }
         }
     }
 
@@ -1242,20 +1365,21 @@ impl Renderer {
     }
 
     fn gameplay_scanner_rect(&self) -> Rect {
+        let width = (self.image_width as i32 - 420).max(320);
         Rect {
-            x: 48,
-            y: 48,
-            width: self.image_width as i32 - 96,
-            height: 94,
+            x: self.image_width as i32 / 2 - width / 2,
+            y: 34,
+            width,
+            height: 92,
         }
     }
 
     fn gameplay_playfield_rect(&self, scanner_rect: Rect) -> Rect {
         Rect {
             x: 24,
-            y: scanner_rect.y + scanner_rect.height + 82,
+            y: scanner_rect.y + scanner_rect.height + 38,
             width: self.image_width as i32 - 48,
-            height: self.image_height as i32 - (scanner_rect.y + scanner_rect.height + 182),
+            height: self.image_height as i32 - (scanner_rect.y + scanner_rect.height + 98),
         }
     }
 
@@ -1395,6 +1519,51 @@ impl Renderer {
                 self.render_target.blend_pixel(
                     origin_x + dx,
                     origin_y + dy,
+                    Color(
+                        image.pixels[index],
+                        image.pixels[index + 1],
+                        image.pixels[index + 2],
+                        alpha,
+                    ),
+                );
+            }
+        }
+    }
+
+    fn draw_scaled_image_centered_clipped(
+        &mut self,
+        image: &RenderedImage,
+        center_x: i32,
+        center_y: i32,
+        target_height: i32,
+        clip_rect: Rect,
+    ) {
+        if image.width == 0 || image.height == 0 {
+            return;
+        }
+
+        let target_height = target_height.max(1);
+        let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
+        let origin_x = center_x - target_width / 2;
+        let origin_y = center_y - target_height / 2;
+
+        for dy in 0..target_height {
+            let src_y = ((dy as u32) * image.height / target_height as u32).min(image.height - 1);
+            for dx in 0..target_width {
+                let px = origin_x + dx;
+                let py = origin_y + dy;
+                if !clip_rect.contains(px, py) {
+                    continue;
+                }
+                let src_x = ((dx as u32) * image.width / target_width as u32).min(image.width - 1);
+                let index = ((src_y * image.width + src_x) * 4) as usize;
+                let alpha = image.pixels[index + 3];
+                if alpha == 0 {
+                    continue;
+                }
+                self.render_target.blend_pixel(
+                    px,
+                    py,
                     Color(
                         image.pixels[index],
                         image.pixels[index + 1],
@@ -1718,6 +1887,41 @@ impl Renderer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn draw_line_clipped(
+        &mut self,
+        x0: i32,
+        y0: i32,
+        x1: i32,
+        y1: i32,
+        color: Color,
+        thickness: i32,
+        clip_rect: Rect,
+    ) {
+        let dx = (x1 - x0).abs();
+        let dy = -(y1 - y0).abs();
+        let sx = if x0 < x1 { 1 } else { -1 };
+        let sy = if y0 < y1 { 1 } else { -1 };
+        let mut err = dx + dy;
+        let (mut x, mut y) = (x0, y0);
+
+        loop {
+            self.stamp_clipped(x, y, color, thickness, clip_rect);
+            if x == x1 && y == y1 {
+                break;
+            }
+            let doubled = err * 2;
+            if doubled >= dy {
+                err += dy;
+                x += sx;
+            }
+            if doubled <= dx {
+                err += dx;
+                y += sy;
+            }
+        }
+    }
+
     fn draw_dot(&mut self, cx: i32, cy: i32, color: Color, radius: i32) {
         for dy in -radius..=radius {
             for dx in -radius..=radius {
@@ -1733,6 +1937,19 @@ impl Renderer {
         for dy in -radius..=radius {
             for dx in -radius..=radius {
                 self.render_target.put_pixel(x + dx, y + dy, color);
+            }
+        }
+    }
+
+    fn stamp_clipped(&mut self, x: i32, y: i32, color: Color, thickness: i32, clip_rect: Rect) {
+        let radius = thickness.saturating_sub(1);
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                let px = x + dx;
+                let py = y + dy;
+                if clip_rect.contains(px, py) {
+                    self.render_target.put_pixel(px, py, color);
+                }
             }
         }
     }
@@ -1846,6 +2063,10 @@ impl Rect {
     fn center_y(self) -> i32 {
         self.y + self.height / 2
     }
+
+    fn contains(self, x: i32, y: i32) -> bool {
+        x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
+    }
 }
 
 fn raster_size(geometry: TerminalGeometry) -> (u32, u32) {
@@ -1907,8 +2128,8 @@ fn score_rows(table: &HighScoreTable) -> Vec<String> {
 fn score_table_block_height(row_count: usize) -> i32 {
     const HEADER_HEIGHT: i32 = 36;
     const ROW_START_Y: i32 = 58;
-    const ROW_STEP_Y: i32 = 24;
-    const ROW_HEIGHT: i32 = 16;
+    const ROW_STEP_Y: i32 = 30;
+    const ROW_HEIGHT: i32 = 24;
 
     let rows_bottom = if row_count == 0 {
         0
@@ -1923,18 +2144,18 @@ const ATTRACT_COLOR_CYCLE_MS: u64 = 120;
 const LOGO_COLOR_CYCLE_MS: u64 = 45;
 const HALL_COLOR_CYCLE_MS: u64 = 33;
 const LOGO_COLOR_SEQUENCE: [[u8; 4]; 12] = [
-    [255, 72, 96, 255],
-    [255, 108, 96, 255],
-    [255, 156, 88, 255],
     [255, 208, 92, 255],
+    [255, 156, 88, 255],
+    [255, 108, 96, 255],
+    [255, 72, 96, 255],
+    [255, 100, 156, 255],
+    [206, 108, 255, 255],
+    [170, 96, 255, 255],
+    [118, 132, 255, 255],
+    [96, 236, 255, 255],
+    [122, 255, 184, 255],
     [224, 255, 92, 255],
     [170, 255, 108, 255],
-    [122, 255, 184, 255],
-    [96, 236, 255, 255],
-    [118, 132, 255, 255],
-    [170, 96, 255, 255],
-    [206, 108, 255, 255],
-    [255, 100, 156, 255],
 ];
 const HALL_COLOR_SEQUENCE: [[u8; 4]; 12] = [
     [206, 108, 255, 255],
@@ -1949,6 +2170,20 @@ const HALL_COLOR_SEQUENCE: [[u8; 4]; 12] = [
     [255, 188, 84, 255],
     [255, 132, 84, 255],
     [255, 100, 156, 255],
+];
+const LASER_COLOR_SEQUENCE: [[u8; 4]; 12] = [
+    [255, 232, 96, 255],
+    [255, 188, 84, 255],
+    [255, 132, 84, 255],
+    [255, 100, 156, 255],
+    [206, 108, 255, 255],
+    [170, 96, 255, 255],
+    [118, 132, 255, 255],
+    [88, 188, 255, 255],
+    [96, 236, 255, 255],
+    [122, 255, 184, 255],
+    [170, 255, 108, 255],
+    [224, 255, 92, 255],
 ];
 
 fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
@@ -2017,6 +2252,28 @@ fn hall_of_fame_color(phase: usize, elapsed_ms: u64) -> [u8; 4] {
     // through a broader arcade-like sequence instead of holding on purple.
     let index = (phase + (elapsed_ms / HALL_COLOR_CYCLE_MS) as usize) % HALL_COLOR_SEQUENCE.len();
     HALL_COLOR_SEQUENCE[index]
+}
+
+fn bonus_cycle_colors(animation_tick: u32) -> [[u8; 4]; 3] {
+    match (animation_tick / 5) % 3 {
+        0 => [[255, 96, 88, 255], [96, 148, 255, 255], [255, 220, 96, 255]],
+        1 => [[255, 220, 96, 255], [255, 96, 88, 255], [96, 148, 255, 255]],
+        _ => [[96, 148, 255, 255], [255, 220, 96, 255], [255, 96, 88, 255]],
+    }
+}
+
+fn star_color(index: u32, hash: u32) -> [u8; 4] {
+    const STAR_PALETTE: [[u8; 4]; 8] = [
+        [246, 246, 246, 255],
+        [255, 232, 96, 255],
+        [255, 132, 84, 255],
+        [96, 236, 255, 255],
+        [170, 96, 255, 255],
+        [170, 255, 108, 255],
+        [200, 200, 255, 255],
+        [255, 255, 255, 255],
+    ];
+    STAR_PALETTE[((hash ^ index.rotate_left(7)) as usize) % STAR_PALETTE.len()]
 }
 
 fn remap_defender_logo_color(source: [u8; 4], palette: AttractPalette) -> [u8; 4] {
@@ -2102,6 +2359,14 @@ fn scanner_color(kind: EntityKind) -> [u8; 4] {
     }
 }
 
+fn scanner_hud_color(world: &World) -> [u8; 4] {
+    match world.status().wave % 3 {
+        1 => [235, 229, 156, 255],
+        2 => [182, 255, 76, 255],
+        _ => [84, 196, 255, 255],
+    }
+}
+
 fn attract_legend_color(kind: EntityKind) -> [u8; 4] {
     match kind {
         EntityKind::Lander => [248, 232, 132, 255],
@@ -2184,7 +2449,7 @@ mod tests {
     }
 
     #[test]
-    fn gameplay_player_shot_renders_as_a_horizontal_beam() {
+    fn gameplay_player_shot_renders_as_a_dashed_beam() {
         let mut renderer = Renderer::with_size(960, 720);
         let world = World::with_entities(
             64,
@@ -2217,6 +2482,39 @@ mod tests {
             sample_pixel(&image.pixels, image.width, 481, y - 8),
             super::VIEWPORT_BACKGROUND
         );
+    }
+
+    #[test]
+    fn gameplay_entities_do_not_draw_outside_the_playfield() {
+        let mut renderer = Renderer::with_size(960, 720);
+        let world = World::with_entities(
+            64,
+            18,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![Entity::new(EntityKind::Lander, 0, 10, 0, 0)],
+        );
+        let scanner = renderer.gameplay_scanner_rect();
+        let playfield = renderer.gameplay_playfield_rect(scanner);
+
+        let image = renderer.render(Screen::Playing {
+            world: &world,
+            xyzzy_active: false,
+            invincible: false,
+            auto_fire: false,
+        });
+
+        for y in playfield.y as u32..(playfield.y + playfield.height) as u32 {
+            for x in 0..playfield.x as u32 {
+                assert_eq!(
+                    sample_pixel(&image.pixels, image.width, x, y),
+                    super::BACKGROUND
+                );
+            }
+        }
     }
 
     #[test]

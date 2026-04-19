@@ -163,6 +163,12 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   elapsed-time colour cycle running during the first `16` seconds of the
   cabinet sequence, matching the flashing/cycling behaviour visible in the
   original attract-mode capture instead of holding a fixed palette per beat.
+- The live gameplay renderer now uses a cabinet-style open black playfield with
+  amber terrain, clipped sprite drawing, a centered scanner block with score
+  side pods, a sparser mixed-colour starfield, colour-cycling attract `500`
+  bonus text, a segmented cycling attract/gameplay laser beam, and larger
+  hall-of-fame score rows, so the README screenshot and attract GIF are closer
+  to the original cabinet framing and effects.
 - All current sounds are embedded in the app via bundled `assets/sounds/*.wav`
   cue files decoded by `rodio`, so the live runtime stays self-contained while
   matching the sibling repos' asset layout.

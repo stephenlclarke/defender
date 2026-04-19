@@ -31,6 +31,8 @@ pub struct ArcadeSprites {
     pods: [Arc<RenderedImage>; 2],
     swarmers: [Arc<RenderedImage>; 2],
     mine: Arc<RenderedImage>,
+    pod_explosion: Arc<RenderedImage>,
+    swarmer_explosion: Arc<RenderedImage>,
 }
 
 pub fn arcade_sprites() -> &'static ArcadeSprites {
@@ -98,6 +100,8 @@ impl ArcadeSprites {
                 load_embedded_png(include_bytes!("../assets/arcade/swarmer2.png")),
             ],
             mine: load_embedded_png(include_bytes!("../assets/arcade/mine1.png")),
+            pod_explosion: load_embedded_png(include_bytes!("../assets/arcade/podexpl.png")),
+            swarmer_explosion: load_embedded_png(include_bytes!("../assets/arcade/swarmexpl.png")),
         }
     }
 
@@ -123,6 +127,14 @@ impl ArcadeSprites {
             EntityKind::Swarmer => self.swarmers[phase_index(entity, tick, 6, 2)].clone(),
             EntityKind::Mine => self.mine.clone(),
         }
+    }
+
+    pub fn pod_explosion(&self) -> Arc<RenderedImage> {
+        self.pod_explosion.clone()
+    }
+
+    pub fn swarmer_explosion(&self) -> Arc<RenderedImage> {
+        self.swarmer_explosion.clone()
     }
 }
 
