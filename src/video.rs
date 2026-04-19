@@ -47,6 +47,9 @@ const SWARMER_COLOR: [u8; 4] = [255, 170, 92, 255];
 const ENEMY_SHOT_COLOR: [u8; 4] = [255, 94, 94, 255];
 const PLAYER_SHOT_COLOR: [u8; 4] = [255, 255, 140, 255];
 const MINE_COLOR: [u8; 4] = [255, 74, 34, 255];
+const LASER_SOURCE_WHITE: [u8; 4] = [255, 255, 255, 255];
+const LASER_SOURCE_HIGHLIGHT: [u8; 4] = [255, 255, 210, 255];
+const LASER_SOURCE_CORE: [u8; 4] = [255, 234, 128, 255];
 const LOGO_PAGE_X_OFFSET: i32 = -96;
 const ATTRACT_TABLE_XS: [i32; 6] = [0x0900, 0x1100, 0x1980, 0x0960, 0x1160, 0x19E0];
 const ATTRACT_TABLE_YS: [i32; 6] = [0x6000, 0x6000, 0x6200, 0x9800, 0x9800, 0x9A00];
@@ -1048,7 +1051,15 @@ impl Renderer {
         let direction = entity.velocity.dx.signum();
         let half_length = scale.max(4);
         let tail_x = cx - direction * half_length;
-        self.draw_arcade_laser_beam(tail_x, cy, cx, cy, entity.position.x as u32, clip_rect);
+        self.draw_arcade_laser_beam(
+            tail_x,
+            cy,
+            cx,
+            cy,
+            (scale / 2).max(4),
+            entity.position.x as u32,
+            clip_rect,
+        );
     }
 
     fn draw_attract_demo_objects(&mut self, frame: &AttractFrame, rect: Rect) {
@@ -1101,45 +1112,48 @@ impl Renderer {
                 start_y,
                 end_x,
                 start_y,
+                8,
                 frame.animation_tick,
                 rect,
             );
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn draw_arcade_laser_beam(
         &mut self,
         x0: i32,
         y0: i32,
         x1: i32,
         y1: i32,
+        target_height: i32,
         animation_tick: u32,
         clip_rect: Rect,
     ) {
-        let dx = x1 - x0;
-        let dy = y1 - y0;
-        let steps = dx.abs().max(dy.abs()).max(1);
-        let phase = ((animation_tick / 2) as usize) % LASER_COLOR_SEQUENCE.len();
-        for step in 0..=steps {
-            if step % 6 >= 4 {
-                continue;
-            }
-            let x = x0 + dx * step / steps;
-            let y = y0 + dy * step / steps;
-            let color = LASER_COLOR_SEQUENCE[(phase + step as usize) % LASER_COLOR_SEQUENCE.len()];
-            self.stamp_clipped(x, y, Color::from_rgba(color), 1, clip_rect);
+        let image = arcade_sprites().player_shot();
+        let target_height = target_height.max(2);
+        let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
+        let step = (target_width - 2).max(1);
+        let center_y = (y0 + y1) / 2;
+        let left = x0.min(x1);
+        let right = x0.max(x1);
+        let remap = laser_sprite_remap(animation_tick);
+        let mut segment_left = left;
+
+        while segment_left <= right {
+            let center_x = segment_left + target_width / 2;
+            self.draw_scaled_image_centered_clipped_remapped(
+                image.as_ref(),
+                center_x,
+                center_y,
+                target_height,
+                &remap,
+                clip_rect,
+            );
+            segment_left += step;
         }
-        let (tip_x0, tip_y0) = beam_tip_start(x0, y0, x1, y1, 12.0);
-        self.draw_line_clipped(
-            tip_x0,
-            tip_y0,
-            x1,
-            y1,
-            Color::from_rgba(TEXT_ARCADE_WHITE),
-            1,
-            clip_rect,
-        );
-        self.draw_dot(x1, y1, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
+
+        self.draw_dot(right, center_y, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
     }
 
     fn draw_attract_bonus_text(
@@ -1571,6 +1585,54 @@ impl Renderer {
         }
     }
 
+    fn draw_scaled_image_centered_clipped_remapped(
+        &mut self,
+        image: &RenderedImage,
+        center_x: i32,
+        center_y: i32,
+        target_height: i32,
+        remap: &[([u8; 4], [u8; 4])],
+        clip_rect: Rect,
+    ) {
+        if image.width == 0 || image.height == 0 {
+            return;
+        }
+
+        let target_height = target_height.max(1);
+        let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
+        let origin_x = center_x - target_width / 2;
+        let origin_y = center_y - target_height / 2;
+
+        for dy in 0..target_height {
+            let src_y = ((dy as u32) * image.height / target_height as u32).min(image.height - 1);
+            for dx in 0..target_width {
+                let px = origin_x + dx;
+                let py = origin_y + dy;
+                if !clip_rect.contains(px, py) {
+                    continue;
+                }
+                let src_x = ((dx as u32) * image.width / target_width as u32).min(image.width - 1);
+                let index = ((src_y * image.width + src_x) * 4) as usize;
+                let alpha = image.pixels[index + 3];
+                if alpha == 0 {
+                    continue;
+                }
+                let source = [
+                    image.pixels[index],
+                    image.pixels[index + 1],
+                    image.pixels[index + 2],
+                    alpha,
+                ];
+                let mapped = remap
+                    .iter()
+                    .find_map(|(from, to)| (*from == source).then_some(*to))
+                    .unwrap_or(source);
+                self.render_target
+                    .blend_pixel(px, py, Color::from_rgba(mapped));
+            }
+        }
+    }
+
     fn draw_scaled_image_centered_remapped(
         &mut self,
         image: &RenderedImage,
@@ -1883,41 +1945,6 @@ impl Renderer {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn draw_line_clipped(
-        &mut self,
-        x0: i32,
-        y0: i32,
-        x1: i32,
-        y1: i32,
-        color: Color,
-        thickness: i32,
-        clip_rect: Rect,
-    ) {
-        let dx = (x1 - x0).abs();
-        let dy = -(y1 - y0).abs();
-        let sx = if x0 < x1 { 1 } else { -1 };
-        let sy = if y0 < y1 { 1 } else { -1 };
-        let mut err = dx + dy;
-        let (mut x, mut y) = (x0, y0);
-
-        loop {
-            self.stamp_clipped(x, y, color, thickness, clip_rect);
-            if x == x1 && y == y1 {
-                break;
-            }
-            let doubled = err * 2;
-            if doubled >= dy {
-                err += dy;
-                x += sx;
-            }
-            if doubled <= dx {
-                err += dx;
-                y += sy;
-            }
-        }
-    }
-
     fn draw_dot(&mut self, cx: i32, cy: i32, color: Color, radius: i32) {
         for dy in -radius..=radius {
             for dx in -radius..=radius {
@@ -1933,19 +1960,6 @@ impl Renderer {
         for dy in -radius..=radius {
             for dx in -radius..=radius {
                 self.render_target.put_pixel(x + dx, y + dy, color);
-            }
-        }
-    }
-
-    fn stamp_clipped(&mut self, x: i32, y: i32, color: Color, thickness: i32, clip_rect: Rect) {
-        let radius = thickness.saturating_sub(1);
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
-                let px = x + dx;
-                let py = y + dy;
-                if clip_rect.contains(px, py) {
-                    self.render_target.put_pixel(px, py, color);
-                }
             }
         }
     }
@@ -2316,19 +2330,19 @@ fn attract_laser_target_anchor(kind: EntityKind, cx: i32, cy: i32) -> (i32, i32)
     }
 }
 
-fn beam_tip_start(x0: i32, y0: i32, x1: i32, y1: i32, tip_length: f32) -> (i32, i32) {
-    let dx = (x1 - x0) as f32;
-    let dy = (y1 - y0) as f32;
-    let distance = (dx * dx + dy * dy).sqrt();
-    if distance <= 1.0 {
-        return (x0, y0);
-    }
-
-    let tip_fraction = ((distance - tip_length).max(0.0)) / distance;
-    (
-        (x0 as f32 + dx * tip_fraction).round() as i32,
-        (y0 as f32 + dy * tip_fraction).round() as i32,
-    )
+fn laser_sprite_remap(animation_tick: u32) -> [([u8; 4], [u8; 4]); 3] {
+    let phase = ((animation_tick / 2) as usize) % LASER_COLOR_SEQUENCE.len();
+    [
+        (LASER_SOURCE_WHITE, TEXT_ARCADE_WHITE),
+        (
+            LASER_SOURCE_HIGHLIGHT,
+            LASER_COLOR_SEQUENCE[(phase + 2) % LASER_COLOR_SEQUENCE.len()],
+        ),
+        (
+            LASER_SOURCE_CORE,
+            LASER_COLOR_SEQUENCE[phase % LASER_COLOR_SEQUENCE.len()],
+        ),
+    ]
 }
 
 fn scanner_color(kind: EntityKind) -> [u8; 4] {
@@ -2437,7 +2451,7 @@ mod tests {
     }
 
     #[test]
-    fn gameplay_player_shot_renders_as_a_dashed_beam() {
+    fn gameplay_player_shot_renders_as_a_solid_tiled_beam() {
         let mut renderer = Renderer::with_size(960, 720);
         let world = World::with_entities(
             64,
@@ -2466,8 +2480,12 @@ mod tests {
             sample_pixel(&image.pixels, image.width, 486, y),
             super::BACKGROUND
         );
+        assert_ne!(
+            sample_pixel(&image.pixels, image.width, 481, y),
+            super::BACKGROUND
+        );
         assert_eq!(
-            sample_pixel(&image.pixels, image.width, 481, y - 8),
+            sample_pixel(&image.pixels, image.width, 481, y - 12),
             super::VIEWPORT_BACKGROUND
         );
     }

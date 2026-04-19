@@ -133,6 +133,10 @@ impl ArcadeSprites {
         self.little_ship.clone()
     }
 
+    pub fn player_shot(&self) -> Arc<RenderedImage> {
+        self.player_shot.clone()
+    }
+
     pub fn pod_explosion(&self) -> Arc<RenderedImage> {
         self.pod_explosion.clone()
     }
