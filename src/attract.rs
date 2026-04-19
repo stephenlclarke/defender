@@ -599,11 +599,14 @@ fn add_laser_column(
     target_x16: i32,
     target_y16: i32,
 ) {
-    let laser_x = ship_x16 + ((target_x16 - ship_x16) / 2);
-    let mut y16 = ship_y16 + 0x0704;
-    while y16 < target_y16 {
-        objects.push(attract_object(EntityKind::PlayerShot, laser_x, y16));
-        y16 += 0x0800;
+    let dx = target_x16 - ship_x16;
+    let dy = target_y16 - ship_y16;
+    let steps = ((dx.abs().max(dy.abs()) + 0x07FF) / 0x0800).max(1);
+
+    for step in 1..=steps {
+        let x16 = ship_x16 + (dx * step) / steps;
+        let y16 = ship_y16 + (dy * step) / steps;
+        objects.push(attract_object(EntityKind::PlayerShot, x16, y16));
     }
 }
 

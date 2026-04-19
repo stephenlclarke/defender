@@ -945,11 +945,27 @@ impl Renderer {
     }
 
     fn draw_attract_demo_objects(&mut self, frame: &AttractFrame, rect: Rect) {
+        let mut player_shot_points = Vec::new();
         for object in &frame.objects {
             let cx = project_attract_x(rect, object.x16);
             let cy = project_attract_y(rect, object.y16);
+            if object.kind == EntityKind::PlayerShot {
+                player_shot_points.push((cx, cy));
+                continue;
+            }
             let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
             self.draw_entity(&entity, object.facing, 0, cx, cy, 24);
+        }
+
+        if !player_shot_points.is_empty() {
+            for window in player_shot_points.windows(2) {
+                let (x0, y0) = window[0];
+                let (x1, y1) = window[1];
+                self.draw_line(x0, y0, x1, y1, Color::from_rgba([255, 232, 104, 255]), 2);
+                self.draw_line(x0, y0, x1, y1, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
+            }
+            let (head_x, head_y) = *player_shot_points.last().expect("shot head");
+            self.stamp(head_x, head_y, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
         }
     }
 
