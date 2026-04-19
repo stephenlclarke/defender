@@ -77,6 +77,7 @@ pub struct AttractObject {
     pub state: EntityState,
     pub facing: HorizontalDirection,
     pub visual: AttractVisual,
+    pub visual_tick: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -84,6 +85,7 @@ pub enum AttractVisual {
     #[default]
     Sprite,
     Explosion,
+    Materialize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -466,7 +468,13 @@ fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
         if fall_tick < 12 {
             let explosion_y = ATTRACT_LANDER_Y16 + i32::from(RESCUE_DESCENT_TICKS) * 0x00A0
                 - i32::from(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS) * 0x00B0;
-            objects.push(attract_explosion_object(ATTRACT_LANDER_X16, explosion_y));
+            objects.push(attract_visual_object(
+                EntityKind::Lander,
+                ATTRACT_LANDER_X16,
+                explosion_y,
+                AttractVisual::Explosion,
+                fall_tick,
+            ));
         }
         objects.push(attract_object_with_state(
             EntityKind::Human,
@@ -570,11 +578,20 @@ fn append_legend_entities(
             if local < LEGEND_APPROACH_TICKS {
                 objects.push(attract_object(legend_kind(index), 0x1F00, enemy_y));
             } else if local < LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS / 2 {
-                objects.push(attract_explosion_object(0x1F00, enemy_y));
+                objects.push(attract_visual_object(
+                    legend_kind(index),
+                    0x1F00,
+                    enemy_y,
+                    AttractVisual::Explosion,
+                    local - LEGEND_APPROACH_TICKS,
+                ));
             } else if local < entry_show_tick - entry_start {
-                objects.push(attract_explosion_object(
+                objects.push(attract_visual_object(
+                    legend_kind(index),
                     ATTRACT_TABLE_XS[index],
                     ATTRACT_TABLE_YS[index],
+                    AttractVisual::Materialize,
+                    local - (LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS / 2),
                 ));
             }
             if local >= LEGEND_APPROACH_TICKS && local < entry_show_tick - entry_start {
@@ -685,6 +702,7 @@ fn attract_object_with_state(
         state,
         facing: HorizontalDirection::Right,
         visual: AttractVisual::Sprite,
+        visual_tick: 0,
     }
 }
 
@@ -701,17 +719,25 @@ fn attract_object_facing(
         state: EntityState::Normal,
         facing,
         visual: AttractVisual::Sprite,
+        visual_tick: 0,
     }
 }
 
-fn attract_explosion_object(x16: i32, y16: i32) -> AttractObject {
+fn attract_visual_object(
+    kind: EntityKind,
+    x16: i32,
+    y16: i32,
+    visual: AttractVisual,
+    visual_tick: u16,
+) -> AttractObject {
     AttractObject {
-        kind: EntityKind::Pod,
+        kind,
         x16,
         y16,
         state: EntityState::Normal,
         facing: HorizontalDirection::Right,
-        visual: AttractVisual::Explosion,
+        visual,
+        visual_tick,
     }
 }
 
@@ -848,11 +874,11 @@ mod tests {
     };
 
     use super::{
-        ATTRACT_CAUGHT_HUMAN_X16, ATTRACT_HUMAN_X16, LEGEND_APPROACH_TICKS, LEGEND_LASER_TICKS,
-        LEGEND_TEXT_TICKS, RESCUE_ASCENT_TICKS, RESCUE_DESCENT_TICKS, RESCUE_FALL_TICKS,
-        RESCUE_LASER_TICKS, RESCUE_RETURN_TICKS, RESCUE_SCORE_TICKS, SceneKind, attract_cycle,
-        attract_scene, high_score_scene, logo_scene, revealed_score_entries_for_tick,
-        scene_for_elapsed_ms, scripted_attract_frame_for_tick,
+        ATTRACT_CAUGHT_HUMAN_X16, ATTRACT_HUMAN_X16, AttractVisual, LEGEND_APPROACH_TICKS,
+        LEGEND_LASER_TICKS, LEGEND_TEXT_TICKS, RESCUE_ASCENT_TICKS, RESCUE_DESCENT_TICKS,
+        RESCUE_FALL_TICKS, RESCUE_LASER_TICKS, RESCUE_RETURN_TICKS, RESCUE_SCORE_TICKS, SceneKind,
+        attract_cycle, attract_scene, high_score_scene, logo_scene,
+        revealed_score_entries_for_tick, scene_for_elapsed_ms, scripted_attract_frame_for_tick,
     };
 
     #[test]
@@ -1008,5 +1034,50 @@ mod tests {
 
         assert_eq!(revealed_score_entries_for_tick(just_before_text), 0);
         assert_eq!(revealed_score_entries_for_tick(first_text_tick), 1);
+    }
+
+    #[test]
+    fn rescue_explosion_keeps_the_lander_kind() {
+        let rescue_phase_end = RESCUE_DESCENT_TICKS + RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS;
+        let frame = scripted_attract_frame_for_tick(rescue_phase_end);
+
+        let explosion = frame
+            .objects
+            .iter()
+            .find(|object| object.visual == AttractVisual::Explosion)
+            .expect("rescue fall should begin with an explosion object");
+
+        assert_eq!(explosion.kind, EntityKind::Lander);
+        assert_eq!(explosion.visual_tick, 0);
+    }
+
+    #[test]
+    fn legend_entry_switches_from_explosion_to_materialize_for_the_same_enemy() {
+        let table_start = RESCUE_DESCENT_TICKS
+            + RESCUE_ASCENT_TICKS
+            + RESCUE_LASER_TICKS
+            + RESCUE_FALL_TICKS
+            + RESCUE_SCORE_TICKS
+            + RESCUE_RETURN_TICKS;
+        let explosion_frame = scripted_attract_frame_for_tick(table_start + LEGEND_APPROACH_TICKS);
+        let materialize_frame = scripted_attract_frame_for_tick(
+            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS / 2,
+        );
+
+        let explosion = explosion_frame
+            .objects
+            .iter()
+            .find(|object| object.visual == AttractVisual::Explosion)
+            .expect("legend entry should show an explosion phase");
+        let materialize = materialize_frame
+            .objects
+            .iter()
+            .find(|object| object.visual == AttractVisual::Materialize)
+            .expect("legend entry should switch to a materialize phase");
+
+        assert_eq!(explosion.kind, EntityKind::Lander);
+        assert_eq!(materialize.kind, EntityKind::Lander);
+        assert_eq!(explosion.visual_tick, 0);
+        assert_eq!(materialize.visual_tick, 0);
     }
 }

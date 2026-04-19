@@ -1030,13 +1030,32 @@ impl Renderer {
         );
     }
 
-    fn draw_attract_explosion(&mut self, cx: i32, cy: i32, animation_tick: u32, clip_rect: Rect) {
-        let image = if (animation_tick / 4).is_multiple_of(2) {
-            arcade_sprites().pod_explosion(animation_tick)
-        } else {
-            arcade_sprites().swarmer_explosion()
-        };
-        self.draw_scaled_image_centered_clipped(image.as_ref(), cx, cy, 26, clip_rect);
+    fn draw_attract_explosion(
+        &mut self,
+        object: &crate::attract::AttractObject,
+        animation_tick: u32,
+        cx: i32,
+        cy: i32,
+        clip_rect: Rect,
+    ) {
+        let height = attract_explosion_height(object.kind, object.visual_tick);
+        let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
+        let image = arcade_sprites().sprite_for_entity(&entity, animation_tick, object.facing);
+        self.draw_scaled_image_centered_clipped(image.as_ref(), cx, cy, height, clip_rect);
+    }
+
+    fn draw_attract_materialize(
+        &mut self,
+        object: &crate::attract::AttractObject,
+        animation_tick: u32,
+        cx: i32,
+        cy: i32,
+        clip_rect: Rect,
+    ) {
+        let height = attract_materialize_height(object.kind, object.visual_tick);
+        let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
+        let image = arcade_sprites().sprite_for_entity(&entity, animation_tick, object.facing);
+        self.draw_scaled_image_centered_clipped(image.as_ref(), cx, cy, height, clip_rect);
     }
 
     fn draw_player_shot_beam(
@@ -1098,7 +1117,10 @@ impl Renderer {
                     );
                 }
                 AttractVisual::Explosion => {
-                    self.draw_attract_explosion(cx, cy, frame.animation_tick, rect);
+                    self.draw_attract_explosion(object, frame.animation_tick, cx, cy, rect);
+                }
+                AttractVisual::Materialize => {
+                    self.draw_attract_materialize(object, frame.animation_tick, cx, cy, rect);
                 }
             }
         }
@@ -2376,6 +2398,26 @@ fn sprite_draw_height(kind: EntityKind, scale: i32) -> i32 {
         }
         EntityKind::Baiter | EntityKind::Swarmer | EntityKind::Mine => (scale * 3 / 2).max(8),
     }
+}
+
+fn attract_explosion_height(kind: EntityKind, visual_tick: u16) -> i32 {
+    // `EXST` seeds the expanded-object size at `$0100`, then `EXPU` grows it by
+    // `#$AA` every update until the explosion dies. Mirror that rising curve
+    // here instead of stamping one fixed-size placeholder sprite.
+    let base = sprite_draw_height(kind, 24);
+    let rom_size = 0x0100u32 + u32::from(visual_tick) * 0x00AA;
+    let growth = ((rom_size >> 8) as i32).clamp(1, 10);
+    (base + growth * 4).clamp(base, base * 3)
+}
+
+fn attract_materialize_height(kind: EntityKind, visual_tick: u16) -> i32 {
+    // `APST` / `EXPU4` start the appear path at a large negative size and step
+    // it back toward the settled object. The attract page only shows a short
+    // slice of that contraction, so keep the same shrinking shape over the
+    // local beat window rather than snapping straight to the final sprite.
+    let base = sprite_draw_height(kind, 24);
+    let shrink = (10 - i32::from(visual_tick).min(10)).max(0);
+    (base + shrink * 4).clamp(base, base * 3)
 }
 
 #[cfg(test)]

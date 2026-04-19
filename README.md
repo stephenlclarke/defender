@@ -161,6 +161,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The instruction/demo page now uses the ROM-timed `LEDRET` rescue/scoring
   sequence in native fixed-point attract coordinates rather than routing those
   poses through the normal gameplay world update loop.
+- The attract score-card kills now preserve the real enemy picture family
+  through the red-label explode/appear split instead of swapping every hit to a
+  generic blast, so the rescue/legend sequence grows and coalesces the
+  cabinet-backed object art rather than alternating placeholder explosion
+  stamps.
 - The first attract-page and hall-of-fame screens now keep a live
   elapsed-time colour cycle running during the first `16` seconds of the
   cabinet sequence, matching the flashing/cycling behaviour visible in the
