@@ -306,14 +306,6 @@ Default: `4`
 Meaning: quarter-screen lead factor used for the swarmer focal-point shot
 model.
 
-`max_baiters`
-Default: `4`
-Meaning: maximum number of baiters allowed on-screen at once.
-
-`baiter_repeat_delay`
-Default: `20`
-Meaning: delay between additional baiter spawns while the wave stalls.
-
 `default_human_world_xs`
 Default: `8,26,44,62,80,98,116,134,152,170`
 Meaning: default world X positions for the ten starting humanoids.

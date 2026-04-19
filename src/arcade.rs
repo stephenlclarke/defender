@@ -17,8 +17,6 @@ pub struct ArcadeTables {
     pub player_shot_limit: usize,
     pub player_shot_speed: i32,
     pub swarmer_fire_lead_divisor: u32,
-    pub max_baiters: usize,
-    pub baiter_repeat_delay: u32,
     pub default_human_world_xs: &'static [i32; 10],
 }
 
@@ -40,8 +38,6 @@ static ARCADE_TABLES: ArcadeTables = ArcadeTables {
     player_shot_limit: 4,
     player_shot_speed: 2,
     swarmer_fire_lead_divisor: 4,
-    max_baiters: 4,
-    baiter_repeat_delay: 20,
     default_human_world_xs: &DEFAULT_HUMAN_WORLD_XS,
 };
 

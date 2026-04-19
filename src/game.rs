@@ -183,8 +183,7 @@ pub struct World {
     tick: u32,
     next_stock_award: u32,
     smart_bombs: u8,
-    wave_started_at: u32,
-    last_baiter_tick: u32,
+    baiter_timer: u32,
     pending_wave_openers: u8,
     spawned_wave_opener_groups: u8,
     next_wave_reinforcement_tick: u32,
@@ -222,8 +221,7 @@ impl World {
             tick: 0,
             next_stock_award: next_stock_award_score(0),
             smart_bombs: DEFAULT_SMART_BOMBS,
-            wave_started_at: 0,
-            last_baiter_tick: 0,
+            baiter_timer: wave_profile.baiter_delay,
             pending_wave_openers: wave_profile.landers.saturating_sub(wave_profile.wave_size),
             spawned_wave_opener_groups: 1,
             next_wave_reinforcement_tick: wave_profile.wave_time,
@@ -253,8 +251,9 @@ impl World {
             tick: 0,
             next_stock_award: next_stock_award_score(status.score),
             smart_bombs: DEFAULT_SMART_BOMBS,
-            wave_started_at: 0,
-            last_baiter_tick: 0,
+            baiter_timer: red_label_wave_table()
+                .profile_for_wave(status.wave)
+                .baiter_delay,
             pending_wave_openers: 0,
             spawned_wave_opener_groups: 0,
             next_wave_reinforcement_tick: 0,
@@ -1955,11 +1954,8 @@ impl World {
     }
 
     fn spawn_baiter_if_needed(&mut self, min_y: i32, max_y: i32) {
-        let tables = arcade_tables();
         let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
-        if self.entity_count_by_kind(EntityKind::Baiter) >= tables.max_baiters
-            || self.entity_count_by_kind(EntityKind::Lander) == 0
-        {
+        if self.entity_count_by_kind(EntityKind::Lander) == 0 {
             return;
         }
 
@@ -1968,12 +1964,21 @@ impl World {
             return;
         }
 
-        // Doug Mahugh chapter 07 and the Arcade History notes both frame
-        // Baiters as pressure for taking too long, not as baseline wave members.
-        let elapsed = self.tick.saturating_sub(self.wave_started_at);
-        let since_last_baiter = self.tick.saturating_sub(self.last_baiter_tick);
-        let due_tick = wave_profile.baiter_delay;
-        if elapsed < due_tick || since_last_baiter < tables.baiter_repeat_delay {
+        // `GEXEC` drives Baiter/UFO pressure through the persistent `UFOTMR`
+        // countdown instead of a fixed repeat delay. Keep the live port on
+        // that timer/cap path.
+        self.baiter_timer =
+            rom_advance_baiter_timer(self.baiter_timer, wave_profile.baiter_delay, remaining);
+        if self.baiter_timer != 0 {
+            return;
+        }
+        self.baiter_timer = rom_reset_baiter_timer(
+            self.status.wave,
+            self.tick,
+            wave_profile.baiter_delay,
+            remaining,
+        );
+        if self.entity_count_by_kind(EntityKind::Baiter) >= rom_baiter_count_limit() {
             return;
         }
 
@@ -2009,7 +2014,6 @@ impl World {
             initial_velocity.dx,
             initial_velocity.dy,
         ));
-        self.last_baiter_tick = self.tick;
     }
 
     fn clear_wave_carryover_entities(&mut self) {
@@ -2086,8 +2090,7 @@ impl World {
         }
 
         self.entities.extend(enemies);
-        self.wave_started_at = self.tick;
-        self.last_baiter_tick = self.tick;
+        self.baiter_timer = wave_profile.baiter_delay;
         self.pending_wave_openers = wave_profile.landers.saturating_sub(group_size);
         self.spawned_wave_opener_groups = 1;
         self.next_wave_reinforcement_tick = self.tick + wave_profile.wave_time;
@@ -2413,6 +2416,39 @@ fn rom_probe_swarmer_burst_count(wave: u8, tick: u32, position: Position) -> usi
         ((position.x as u32) << 8) ^ (position.y as u32) ^ 0x5052_424b,
     );
     rom_rmax(6, seed)
+}
+
+fn rom_baiter_count_limit() -> usize {
+    12
+}
+
+fn rom_baiter_timer_floor(base_delay: u32, remaining: usize) -> u32 {
+    if remaining > 8 {
+        return base_delay;
+    }
+
+    let mut floor = base_delay / 2;
+    if remaining <= 3 {
+        floor /= 2;
+    }
+    floor + 1
+}
+
+fn rom_advance_baiter_timer(current: u32, base_delay: u32, remaining: usize) -> u32 {
+    let mut timer = current.max(1);
+    if remaining <= 8 {
+        timer = timer.min(rom_baiter_timer_floor(base_delay, remaining));
+    }
+    timer.saturating_sub(1)
+}
+
+fn rom_reset_baiter_timer(wave: u8, tick: u32, base_delay: u32, remaining: usize) -> u32 {
+    if remaining >= 4 {
+        return base_delay;
+    }
+
+    let (_, _, seed, _) = rom_probe_seed_bytes(wave, tick, 0x5546_4f54 ^ remaining as u32);
+    rom_rmax((base_delay / 4).min(u32::from(u8::MAX)) as u8, seed) as u32
 }
 
 fn rom_probe_seed_bytes(wave: u8, tick: u32, salt: u32) -> (u8, u8, u8, u8) {
@@ -2845,16 +2881,17 @@ mod tests {
         Entity, EntityKind, EntityState, HorizontalDirection, Position, RomBaiterSeekContext,
         Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
         initialize_tie_cruise_altitude, nearest_wrapped_target, rom_accumulate_vertical_velocity,
-        rom_baiter_horizontal_close_band, rom_baiter_seek_velocity, rom_baiter_should_seek,
-        rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band, rom_bomb_shell_limit,
+        rom_advance_baiter_timer, rom_baiter_count_limit, rom_baiter_horizontal_close_band,
+        rom_baiter_seek_velocity, rom_baiter_should_seek, rom_baiter_spawn_for_wave,
+        rom_baiter_timer_floor, rom_baiter_vertical_close_band, rom_bomb_shell_limit,
         rom_bomber_mine_lifetime, rom_bomber_should_drop_mine, rom_lander_horizontal_velocity,
         rom_lander_vertical_velocity, rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity,
         rom_probe_spawn_for_wave, rom_probe_swarmer_burst_count, rom_probe_vertical_velocity,
-        rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit, rom_shoot_axes_from_seeds,
-        rom_swarmer_count_limit, rom_swarmer_horizontal_velocity, rom_swarmer_vertical_speed_limit,
-        rom_tie_close_band, rom_tie_far_band, rom_tie_horizontal_velocity,
-        rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen, screen_x_for_world_x,
-        shortest_wrapped_delta, wrap_coordinate,
+        rom_reset_baiter_timer, rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit,
+        rom_shoot_axes_from_seeds, rom_swarmer_count_limit, rom_swarmer_horizontal_velocity,
+        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
+        rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
+        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -5022,6 +5059,7 @@ mod tests {
             ],
         );
         world.tick = red_label_wave_table().profile_for_wave(2).baiter_delay + 4;
+        world.baiter_timer = 1;
 
         world.step_live(UpdateInput::default());
 
@@ -5079,10 +5117,74 @@ mod tests {
             ],
         );
         world.tick = red_label_wave_table().profile_for_wave(2).baiter_delay;
+        world.baiter_timer = 1;
 
         world.step_live(UpdateInput::default());
 
         assert_eq!(world.entity_count_by_kind(EntityKind::Baiter), 0);
+    }
+
+    #[test]
+    fn rom_baiter_count_limit_matches_gexec_ufo_cap() {
+        assert_eq!(rom_baiter_count_limit(), 12);
+    }
+
+    #[test]
+    fn rom_baiter_timer_floor_matches_gexec_acceleration_bands() {
+        assert_eq!(rom_baiter_timer_floor(196, 9), 196);
+        assert_eq!(rom_baiter_timer_floor(196, 8), 99);
+        assert_eq!(rom_baiter_timer_floor(196, 3), 50);
+    }
+
+    #[test]
+    fn rom_baiter_timer_reset_randomizes_when_fewer_than_four_enemies_remain() {
+        let varied: Vec<u32> = (0..32)
+            .map(|tick| rom_reset_baiter_timer(2, tick, 196, 3))
+            .collect();
+
+        assert!(varied.iter().all(|value| (1..=50).contains(value)));
+        assert!(varied.windows(2).any(|pair| pair[0] != pair[1]));
+        assert_eq!(rom_reset_baiter_timer(2, 0, 196, 4), 196);
+    }
+
+    #[test]
+    fn rom_baiter_timer_advances_on_the_gexec_countdown() {
+        assert_eq!(rom_advance_baiter_timer(196, 196, 12), 195);
+        assert_eq!(rom_advance_baiter_timer(196, 196, 8), 98);
+        assert_eq!(rom_advance_baiter_timer(196, 196, 3), 49);
+    }
+
+    #[test]
+    fn live_step_baiters_use_the_rom_active_cap() {
+        let mut entities = vec![
+            Entity::new(EntityKind::PlayerShip, 3, 4, 0, 0),
+            Entity::new(EntityKind::Lander, 18, 4, 0, 0),
+            Entity::new(EntityKind::Pod, 18, 4, 0, 0),
+            Entity::new(EntityKind::Human, 1, 8, 0, 0),
+        ];
+        entities.extend(
+            (0..rom_baiter_count_limit())
+                .map(|index| Entity::new(EntityKind::Baiter, 6 + index as i32, 4, 0, 0)),
+        );
+        let mut world = World::with_entities(
+            32,
+            10,
+            Status {
+                score: 0,
+                lives: 99,
+                wave: 2,
+            },
+            entities,
+        );
+        world.tick = 200;
+        world.baiter_timer = 1;
+
+        world.step_live(UpdateInput::default());
+
+        assert_eq!(
+            world.entity_count_by_kind(EntityKind::Baiter),
+            rom_baiter_count_limit()
+        );
     }
 
     #[test]
