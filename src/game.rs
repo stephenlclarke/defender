@@ -1048,9 +1048,7 @@ impl World {
                         world_max_x,
                     )
                     .is_some();
-                    let (seed, _) =
-                        rom_bomber_seed_bytes(self.status.wave, self.tick, enemy.position);
-                    enemy.rom_aux = rom_tie_next_cruise_altitude(enemy.rom_aux, seed);
+                    enemy.rom_aux = rom_tie_next_cruise_altitude(enemy.rom_aux, rand_state.seed);
                     let cruise_altitude =
                         scale_rom_display_y_to_world(i32::from(enemy.rom_aux), min_y, max_y);
                     let close_band = rom_tie_close_band(min_y, max_y);
@@ -1176,7 +1174,7 @@ impl World {
             // `TIE31 -> BOMBST` drops bombs on the `LSEED & #$07 == 0` edge
             // rather than on a fixed timer, and `BMBCNT` caps the live bomb
             // list at ten. Keep the port on that cabinet gate.
-            if !rom_bomber_should_drop_mine(self.status.wave, self.tick, bomber.position) {
+            if !rom_bomber_should_drop_mine(self.rand_state.lseed) {
                 continue;
             }
 
@@ -1207,8 +1205,7 @@ impl World {
                     // `BOMBST` seeds `ODATA` from `SEED & #$1F + 1`, and the
                     // shell scan retires bombs once that countdown reaches
                     // zero. Keep live bombs on that source-backed lifetime.
-                    mine.rom_aux =
-                        rom_bomber_mine_lifetime(self.status.wave, self.tick, bomber.position);
+                    mine.rom_aux = rom_bomber_mine_lifetime(self.rand_state.seed);
                 }
             }
         }
@@ -2004,19 +2001,14 @@ impl World {
         if self.baiter_timer != 0 {
             return;
         }
-        self.baiter_timer = rom_reset_baiter_timer(
-            self.status.wave,
-            self.tick,
-            wave_profile.baiter_delay,
-            remaining,
-        );
+        self.baiter_timer =
+            rom_reset_baiter_timer(&mut self.rand_state, wave_profile.baiter_delay, remaining);
         if self.entity_count_by_kind(EntityKind::Baiter) >= rom_baiter_count_limit() {
             return;
         }
 
         let spawn = rom_baiter_spawn_for_wave(
-            self.status.wave,
-            self.tick,
+            &self.rand_state,
             self.left_edge(),
             self.width,
             self.world_max_x(),
@@ -2492,52 +2484,20 @@ fn rom_advance_baiter_timer(current: u32, base_delay: u32, remaining: usize) -> 
     timer.saturating_sub(1)
 }
 
-fn rom_reset_baiter_timer(wave: u8, tick: u32, base_delay: u32, remaining: usize) -> u32 {
+fn rom_reset_baiter_timer(rand_state: &mut RomRandState, base_delay: u32, remaining: usize) -> u32 {
     if remaining >= 4 {
         return base_delay;
     }
 
-    let (_, _, seed, _) = rom_probe_seed_bytes(wave, tick, 0x5546_4f54 ^ remaining as u32);
-    rom_rmax((base_delay / 4).min(u32::from(u8::MAX)) as u8, seed) as u32
+    rom_seeded_rmax(rand_state, (base_delay / 4).min(u32::from(u8::MAX)) as u8) as u32
 }
 
-fn rom_probe_seed_bytes(wave: u8, tick: u32, salt: u32) -> (u8, u8, u8, u8) {
-    let mut mixed = tick
-        .wrapping_mul(0x045d_9f3b)
-        .rotate_left(7)
-        .wrapping_add(u32::from(wave).wrapping_mul(0x9e37))
-        ^ salt.wrapping_mul(0x9e37_79b9);
-    mixed ^= mixed >> 16;
-    mixed = mixed.wrapping_mul(0x7feb_352d);
-    mixed ^= mixed >> 15;
-    mixed = mixed.wrapping_mul(0x846c_a68b);
-    mixed ^= mixed >> 16;
-
-    (
-        (mixed >> 24) as u8,
-        (mixed >> 16) as u8,
-        (mixed >> 8) as u8,
-        mixed as u8,
-    )
-}
-
-fn rom_bomber_seed_bytes(wave: u8, tick: u32, position: Position) -> (u8, u8) {
-    let (hseed, lseed, _, _) = rom_probe_seed_bytes(
-        wave,
-        tick,
-        ((position.x as u32) << 8) ^ (position.y as u32) ^ 0x5449_4500,
-    );
-    (hseed, lseed)
-}
-
-fn rom_bomber_should_drop_mine(wave: u8, tick: u32, position: Position) -> bool {
-    let (_, lseed) = rom_bomber_seed_bytes(wave, tick, position);
+fn rom_bomber_should_drop_mine(lseed: u8) -> bool {
     (lseed & 0x07) == 0
 }
 
-fn rom_bomber_mine_lifetime(wave: u8, tick: u32, position: Position) -> u16 {
-    let (hseed, _) = rom_bomber_seed_bytes(wave, tick, position);
-    u16::from((hseed & 0x1F) + 1)
+fn rom_bomber_mine_lifetime(seed: u8) -> u16 {
+    u16::from((seed & 0x1F) + 1)
 }
 
 fn rom_shell_lifetime() -> u16 {
@@ -2718,18 +2678,16 @@ fn scale_rom_probe_y_to_world(rom_y: i32, min_y: i32, max_y: i32) -> i32 {
 }
 
 fn rom_baiter_spawn_for_wave(
-    wave: u8,
-    tick: u32,
+    rand_state: &RomRandState,
     left_edge: i32,
     screen_width: usize,
     world_max_x: i32,
     min_y: i32,
     max_y: i32,
 ) -> Position {
-    let (hseed_hi, hseed_lo, _, _) = rom_probe_seed_bytes(wave, tick, 0x5546_4f00);
     let max_screen_x = screen_width.saturating_sub(1) as i32;
-    let screen_x = (i32::from(hseed_hi & 0x1F) * max_screen_x / 0x1F).clamp(0, max_screen_x);
-    let rom_y = i32::from(hseed_lo >> 1) + 42;
+    let screen_x = (i32::from(rand_state.seed & 0x1F) * max_screen_x / 0x1F).clamp(0, max_screen_x);
+    let rom_y = i32::from(rand_state.hseed >> 1) + 42;
 
     Position {
         x: wrap_coordinate(left_edge + screen_x, world_max_x),
@@ -4215,12 +4173,9 @@ mod tests {
             ],
         );
 
-        for _ in 0..64 {
-            world.step_live(UpdateInput::default());
-            if world.entity_count_by_kind(EntityKind::Mine) > 0 {
-                break;
-            }
-        }
+        world.rand_state.seed = 2;
+        world.rand_state.lseed = 0;
+        world.drop_bomber_mines(1, world.height() as i32 - 2);
         assert!(world.entity_count_by_kind(EntityKind::Mine) > 0);
 
         let events = world.step_live(UpdateInput {
@@ -4261,9 +4216,7 @@ mod tests {
             },
             entities,
         );
-        world.tick = (0..64)
-            .find(|tick| rom_bomber_should_drop_mine(2, *tick, bomber_position))
-            .expect("bomb gate");
+        world.rand_state.lseed = 0;
 
         world.drop_bomber_mines(1, world.height() as i32 - 2);
 
@@ -4272,21 +4225,15 @@ mod tests {
 
     #[test]
     fn rom_bomber_mine_gate_matches_bombst_seed_edge() {
-        let position = Position { x: 12, y: 6 };
-        let drops = (0..32)
-            .filter(|tick| rom_bomber_should_drop_mine(2, *tick, position))
-            .count();
-
-        assert!(drops > 0);
-        assert!(drops < 32);
+        assert!(rom_bomber_should_drop_mine(0x00));
+        assert!(rom_bomber_should_drop_mine(0x08));
+        assert!(!rom_bomber_should_drop_mine(0x01));
+        assert!(!rom_bomber_should_drop_mine(0x07));
     }
 
     #[test]
     fn rom_bomber_mine_lifetime_matches_bombst_seed_range() {
-        let position = Position { x: 12, y: 6 };
-        let lifetimes: Vec<u16> = (0..32)
-            .map(|tick| rom_bomber_mine_lifetime(2, tick, position))
-            .collect();
+        let lifetimes: Vec<u16> = (0..32).map(rom_bomber_mine_lifetime).collect();
 
         assert!(lifetimes.iter().all(|lifetime| (1..=32).contains(lifetime)));
         assert!(lifetimes.windows(2).any(|pair| pair[0] != pair[1]));
@@ -5545,7 +5492,8 @@ mod tests {
 
     #[test]
     fn rom_baiter_spawn_stays_within_the_visible_band() {
-        let spawn = rom_baiter_spawn_for_wave(2, 200, -12, 24, 191, 1, 8);
+        let rand_state = RomRandState::default();
+        let spawn = rom_baiter_spawn_for_wave(&rand_state, -12, 24, 191, 1, 8);
 
         assert!((0..=191).contains(&spawn.x));
         assert!(screen_x_for_world_x(spawn.x, -12, 24, 192, 191).is_some());
@@ -5608,13 +5556,14 @@ mod tests {
 
     #[test]
     fn rom_baiter_timer_reset_randomizes_when_fewer_than_four_enemies_remain() {
+        let mut rand_state = RomRandState::default();
         let varied: Vec<u32> = (0..32)
-            .map(|tick| rom_reset_baiter_timer(2, tick, 196, 3))
+            .map(|_| rom_reset_baiter_timer(&mut rand_state, 196, 3))
             .collect();
 
         assert!(varied.iter().all(|value| (1..=50).contains(value)));
         assert!(varied.windows(2).any(|pair| pair[0] != pair[1]));
-        assert_eq!(rom_reset_baiter_timer(2, 0, 196, 4), 196);
+        assert_eq!(rom_reset_baiter_timer(&mut rand_state, 196, 4), 196);
     }
 
     #[test]
