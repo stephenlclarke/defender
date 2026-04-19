@@ -899,6 +899,11 @@ impl Renderer {
         cy: i32,
         scale: i32,
     ) {
+        if entity.kind == EntityKind::PlayerShot && entity.velocity.dx != 0 {
+            self.draw_player_shot_beam(entity, cx, cy, scale);
+            return;
+        }
+
         let sprites = arcade_sprites();
         let image = sprites.sprite_for_entity(entity, tick, facing);
         self.draw_scaled_image_centered(
@@ -907,6 +912,36 @@ impl Renderer {
             cy,
             sprite_draw_height(entity.kind, scale),
         );
+    }
+
+    fn draw_player_shot_beam(&mut self, entity: &Entity, cx: i32, cy: i32, scale: i32) {
+        // Defender's live gameplay laser reads as a short horizontal beam on the
+        // cabinet, not a chunky projectile sprite. The attract sequence still
+        // uses the ROM-driven laser path separately, so this beam only applies
+        // to moving in-game shots.
+        let direction = entity.velocity.dx.signum();
+        let half_length = scale.max(4);
+        let core_half_length = (half_length - 2).max(2);
+        let tail_x = cx - direction * half_length;
+        let core_tail_x = cx - direction * core_half_length;
+
+        self.draw_line(
+            tail_x,
+            cy,
+            cx,
+            cy,
+            Color::from_rgba([255, 232, 104, 255]),
+            2,
+        );
+        self.draw_line(
+            core_tail_x,
+            cy,
+            cx,
+            cy,
+            Color::from_rgba(TEXT_ARCADE_WHITE),
+            1,
+        );
+        self.stamp(cx + direction, cy, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
     }
 
     fn draw_attract_demo_objects(&mut self, frame: &AttractFrame, rect: Rect) {
@@ -1813,7 +1848,10 @@ fn sprite_draw_height(kind: EntityKind, scale: i32) -> i32 {
 mod tests {
     use super::{Renderer, Screen, scale_to_fit};
     use crate::{
-        high_scores::HighScoreTable, render::InitialsEntryView, terminal::TerminalGeometry,
+        game::{Entity, EntityKind, Status, World},
+        high_scores::HighScoreTable,
+        render::InitialsEntryView,
+        terminal::TerminalGeometry,
     };
 
     fn sample_pixel(image: &[u8], width: u32, x: u32, y: u32) -> [u8; 4] {
@@ -1842,7 +1880,7 @@ mod tests {
     #[test]
     fn gameplay_frame_contains_non_background_pixels() {
         let mut renderer = Renderer::with_size(960, 720);
-        let world = crate::game::World::bootstrap();
+        let world = World::bootstrap();
 
         let image = renderer.render(Screen::Playing {
             world: &world,
@@ -1859,6 +1897,42 @@ mod tests {
                 image.height / 2
             ),
             super::BACKGROUND
+        );
+    }
+
+    #[test]
+    fn gameplay_player_shot_renders_as_a_horizontal_beam() {
+        let mut renderer = Renderer::with_size(960, 720);
+        let world = World::with_entities(
+            64,
+            18,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![Entity::new(EntityKind::PlayerShot, 32, 6, 2, 0)],
+        );
+
+        let image = renderer.render(Screen::Playing {
+            world: &world,
+            xyzzy_active: false,
+            invincible: false,
+            auto_fire: false,
+        });
+        let y = 303;
+
+        assert_ne!(
+            sample_pixel(&image.pixels, image.width, 477, y),
+            super::BACKGROUND
+        );
+        assert_ne!(
+            sample_pixel(&image.pixels, image.width, 486, y),
+            super::BACKGROUND
+        );
+        assert_eq!(
+            sample_pixel(&image.pixels, image.width, 481, y - 8),
+            super::VIEWPORT_BACKGROUND
         );
     }
 
