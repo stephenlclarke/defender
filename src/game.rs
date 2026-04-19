@@ -139,6 +139,7 @@ pub struct Entity {
     pub velocity: Velocity,
     pub state: EntityState,
     pub rescue_value: u16,
+    pub rom_aux: u16,
 }
 
 impl Entity {
@@ -160,6 +161,7 @@ impl Entity {
             velocity: Velocity { dx, dy },
             state,
             rescue_value: 0,
+            rom_aux: 0,
         }
     }
 }
@@ -965,6 +967,7 @@ impl World {
                         -1 | 1 => enemy.velocity.dx.signum(),
                         _ => 1,
                     };
+                    initialize_tie_cruise_altitude(enemy);
                     let on_main_screen = screen_x_for_world_x(
                         enemy.position.x,
                         left_edge,
@@ -973,17 +976,21 @@ impl World {
                         world_max_x,
                     )
                     .is_some();
+                    let (seed, _) =
+                        rom_bomber_seed_bytes(self.status.wave, self.tick, enemy.position);
+                    enemy.rom_aux = rom_tie_next_cruise_altitude(enemy.rom_aux, seed);
                     let cruise_altitude =
-                        rom_tie_cruise_altitude(enemy.position.x, self.status.wave, min_y, max_y);
+                        scale_rom_display_y_to_world(i32::from(enemy.rom_aux), min_y, max_y);
                     let close_band = rom_tie_close_band(min_y, max_y);
                     let far_band = rom_tie_far_band(min_y, max_y);
 
                     // `TIEST` seeds a constant horizontal velocity from `TIEXV`;
-                    // the live vertical steering comes from the later `TIE`
-                    // process and should not alter that base X speed.
+                    // the later `TIE` process and should not alter that base X
+                    // speed. The Y path updates `OYV` through banded accel
+                    // solves instead of hard-resetting the velocity every tick.
                     enemy.velocity.dx = direction * tie_speed;
 
-                    enemy.velocity.dy = if on_main_screen {
+                    let next_vertical_step = if on_main_screen {
                         let delta = enemy.position.y.saturating_sub(
                             player_position
                                 .map(|target| target.y)
@@ -1004,6 +1011,8 @@ impl World {
                             0
                         }
                     };
+                    enemy.velocity.dy =
+                        rom_accumulate_vertical_velocity(enemy.velocity.dy, next_vertical_step);
                 }
                 EntityKind::Pod => {
                     if enemy.velocity.dx == 0 || enemy.velocity.dy == 0 {
@@ -2397,6 +2406,25 @@ fn rom_bomber_should_drop_mine(wave: u8, tick: u32, position: Position) -> bool 
     (lseed & 0x07) == 0
 }
 
+fn initialize_tie_cruise_altitude(entity: &mut Entity) {
+    if entity.rom_aux == 0 {
+        entity.rom_aux = 0x50;
+    }
+}
+
+fn rom_tie_next_cruise_altitude(current: u16, seed: u8) -> u16 {
+    let mut next = current.max(0x40);
+    if seed <= 0x40 {
+        let delta = i32::from(seed & 0x03) - 2;
+        next = (i32::from(next) + delta).clamp(0x40, 0x68) as u16;
+    }
+    next
+}
+
+fn rom_accumulate_vertical_velocity(current: i32, step: i32) -> i32 {
+    (current + step).clamp(-2, 2)
+}
+
 fn scale_rom_probe_x_to_screen(rom_x: i32, screen_width: usize) -> usize {
     if screen_width <= 1 {
         return 0;
@@ -2445,12 +2473,6 @@ fn scale_rom_display_y_to_world(rom_y: i32, min_y: i32, max_y: i32) -> i32 {
 
     let span = max_y - min_y;
     min_y + ((rom_y - ROM_YMIN) * span / (ROM_YMAX - ROM_YMIN)).clamp(0, span)
-}
-
-fn rom_tie_cruise_altitude(world_x: i32, wave: u8, min_y: i32, max_y: i32) -> i32 {
-    let stable_offset = ((world_x.rem_euclid(5) + i32::from(wave % 3)) - 2) * 2;
-    let rom_y = (0x50 + stable_offset).clamp(0x40, 0x68);
-    scale_rom_display_y_to_world(rom_y, min_y, max_y)
 }
 
 fn rom_tie_horizontal_velocity(raw: u8) -> i32 {
@@ -2758,13 +2780,14 @@ mod tests {
     use super::{
         Entity, EntityKind, EntityState, HorizontalDirection, Position, RomBaiterSeekContext,
         Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
-        nearest_wrapped_target, rom_baiter_horizontal_close_band, rom_baiter_seek_velocity,
-        rom_baiter_should_seek, rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band,
-        rom_bomber_should_drop_mine, rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
+        initialize_tie_cruise_altitude, nearest_wrapped_target, rom_accumulate_vertical_velocity,
+        rom_baiter_horizontal_close_band, rom_baiter_seek_velocity, rom_baiter_should_seek,
+        rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band, rom_bomber_should_drop_mine,
+        rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
         rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
         rom_probe_vertical_velocity, rom_shoot_axes_from_seeds, rom_swarmer_horizontal_velocity,
-        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_cruise_altitude,
-        rom_tie_far_band, rom_tie_horizontal_velocity, scale_rom_probe_x_to_screen,
+        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
+        rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
         screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
@@ -2835,9 +2858,16 @@ mod tests {
     }
 
     #[test]
-    fn rom_tie_cruise_altitude_stays_in_the_source_band() {
-        let cruise = rom_tie_cruise_altitude(12, 2, 1, 9);
-        assert!((1..=9).contains(&cruise));
+    fn rom_tie_helpers_follow_the_source_band_and_acceleration() {
+        let mut bomber = Entity::new(EntityKind::Bomber, 12, 2, -1, 0);
+        initialize_tie_cruise_altitude(&mut bomber);
+        assert_eq!(bomber.rom_aux, 0x50);
+        assert_eq!(rom_tie_next_cruise_altitude(0x50, 0x41), 0x50);
+        assert_eq!(rom_tie_next_cruise_altitude(0x40, 0x00), 0x40);
+        assert_eq!(rom_tie_next_cruise_altitude(0x68, 0x03), 0x68);
+        assert_eq!(rom_accumulate_vertical_velocity(0, 1), 1);
+        assert_eq!(rom_accumulate_vertical_velocity(2, 1), 2);
+        assert_eq!(rom_accumulate_vertical_velocity(-2, -1), -2);
         assert!(rom_tie_close_band(1, 9) >= 1);
         assert!(rom_tie_far_band(1, 9) > rom_tie_close_band(1, 9));
     }

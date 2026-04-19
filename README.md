@@ -249,7 +249,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - Bomber / TIE motion now follows the cabinet `TIEST` / `TIE` shape more
   closely too: horizontal motion now comes from the red-label `TIEXV` record,
   and mine drops now follow the source `BOMBST` seed gate and 10-bomb cap
-  instead of the earlier fixed Rust timer,
+  instead of the earlier fixed Rust timer. Off-screen cruise altitude now stays
+  on the cabinet `PD+9` path and live vertical motion updates through
+  `OYV`-style banded acceleration instead of resetting `dy` each tick,
   off-screen units steer back toward a source-backed cruise-altitude band, and
   on-screen units use the ROM-style close/far vertical proximity bands around
   the player instead of the older every-third-tick drift rule.
