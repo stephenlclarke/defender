@@ -573,12 +573,23 @@ impl World {
         self.update_enemy_intents(min_y, max_y);
         self.begin_human_abductions();
 
+        let capped_fire_attempt = input.fire
+            && !input.secret_mode
+            && !hyperspaced_this_tick
+            && !self.can_fire_player_shot(false);
+        if capped_fire_attempt && let Some(player_position) = shot_origin {
+            // Red-label `LFIRE` jumps to `SUCIDE` on the fifth active shot
+            // instead of quietly ignoring the fire input.
+            self.lose_player_life(player_position, &mut events);
+        }
+
         let auto_fire = input.secret_mode
             && input.auto_fire
             && !hyperspaced_this_tick
             && self.can_fire_player_shot(input.secret_mode)
             && shot_origin.is_some_and(|origin| self.should_auto_fire(origin, max_x, min_y, max_y));
-        if (input.fire || auto_fire)
+        if !capped_fire_attempt
+            && (input.fire || auto_fire)
             && !hyperspaced_this_tick
             && self.can_fire_player_shot(input.secret_mode)
             && let Some(origin) = shot_origin
@@ -2287,7 +2298,7 @@ mod tests {
     }
 
     #[test]
-    fn live_step_caps_player_shots_at_four_in_normal_play() {
+    fn live_step_fifth_manual_shot_triggers_suicide_in_normal_play() {
         let mut world = World::with_entities(
             64,
             10,
@@ -2318,6 +2329,8 @@ mod tests {
             arcade_tables().player_shot_limit
         );
         assert!(!events.contains(&WorldEvent::ShotFired));
+        assert!(events.contains(&WorldEvent::PlayerHit));
+        assert_eq!(world.status().lives, 2);
     }
 
     #[test]
