@@ -881,6 +881,14 @@ impl World {
                     let vertical_delta = target.y - enemy.position.y;
                     let horizontal_close_band = rom_mutant_seek_band();
                     let vertical_close_band = rom_mutant_avoid_band(min_y, max_y);
+                    let on_main_screen = screen_x_for_world_x(
+                        enemy.position.x,
+                        left_edge,
+                        width,
+                        world_span,
+                        world_max_x,
+                    )
+                    .is_some();
 
                     // `SCZ0` uses `SZXV` to seek the player horizontally every
                     // cycle, then switches between the `SZYV` seek and avoid
@@ -899,6 +907,19 @@ impl World {
                     };
                     if enemy.velocity.dy == 0 && enemy.position.y <= min_y {
                         enemy.velocity.dy = mutant_speed_y;
+                    }
+                    if on_main_screen {
+                        // `SCZ10` applies a signed `SZRY` hop directly to
+                        // `OY16` once the Mutant is on screen, using the live
+                        // `SEED` sign bit to pick the direction. Preserve that
+                        // visible cabinet jitter here before the motion step.
+                        enemy.position.y = rom_mutant_random_y_hop(
+                            enemy.position,
+                            wave_profile.mutant_random_y,
+                            self.tick,
+                            min_y,
+                            max_y,
+                        );
                     }
                 }
                 EntityKind::Baiter => {
@@ -2502,6 +2523,38 @@ fn rom_mutant_avoid_band(min_y: i32, max_y: i32) -> i32 {
     close.max(1)
 }
 
+fn rom_mutant_random_y_hop(
+    position: Position,
+    random_y: u8,
+    tick: u32,
+    min_y: i32,
+    max_y: i32,
+) -> i32 {
+    if random_y == 0 {
+        return position.y;
+    }
+
+    let seed = (tick as u8)
+        .wrapping_mul(37)
+        .wrapping_add((position.x as u8).wrapping_mul(13))
+        .wrapping_add((position.y as u8).wrapping_mul(17));
+    let delta = if (seed & 0x80) == 0 {
+        i32::from(random_y)
+    } else {
+        -i32::from(random_y)
+    };
+    let hopped_y = position.y + delta;
+
+    // `SCZ10` applies the signed `SZRY` hop directly to `OY16` and only
+    // patches the low underflow case back to `YMAX`. Keep the live world
+    // in-bounds without introducing a top-wrap artifact on coarse rows.
+    if hopped_y < min_y {
+        max_y
+    } else {
+        hopped_y.clamp(min_y, max_y)
+    }
+}
+
 fn rom_swarmer_horizontal_velocity(raw: u8) -> i32 {
     // `MSWM` loads `SWXV` directly for Swarm X velocity. Map the red-label
     // fixed-point record into the coarse live grid so later waves keep the
@@ -3348,7 +3401,7 @@ mod tests {
             .iter()
             .find(|entity| entity.kind == EntityKind::Mutant)
             .expect("mutant");
-        assert_eq!(mutant.position, Position { x: 9, y: 5 });
+        assert_eq!(mutant.position, Position { x: 9, y: 6 });
     }
 
     #[test]
@@ -3386,7 +3439,33 @@ mod tests {
                 wave_profile.mutant_y_velocity_lsb,
             ),
         );
-        assert_eq!(mutant.position, Position { x: 10, y: 4 });
+        assert_eq!(mutant.position, Position { x: 10, y: 5 });
+    }
+
+    #[test]
+    fn live_step_mutants_apply_the_rom_random_y_hop_when_on_screen() {
+        let mut world = World::with_entities(
+            32,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 4,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 12, 6, 0, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let mutant = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Mutant)
+            .expect("mutant");
+        assert_eq!(mutant.position.y, 5);
     }
 
     #[test]
@@ -3653,7 +3732,7 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
-                Entity::new(EntityKind::Mutant, 5, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 5, 5, 0, 0),
                 Entity::new(EntityKind::Mutant, 9, 2, 0, 0),
             ],
         );
@@ -3681,7 +3760,7 @@ mod tests {
             vec![
                 Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
                 Entity::new(EntityKind::Mutant, 6, 5, 0, 0),
-                Entity::new(EntityKind::Human, 6, 5, 0, 0),
+                Entity::new(EntityKind::Human, 5, 3, 0, 0),
             ],
         );
 
@@ -3769,7 +3848,7 @@ mod tests {
                 Entity::new(EntityKind::Lander, 12, 3, 0, 0),
                 Entity::new(EntityKind::Lander, 16, 5, 0, 0),
                 Entity::new(EntityKind::Mutant, 6, 5, 0, 0),
-                Entity::new(EntityKind::Human, 6, 5, 0, 0),
+                Entity::new(EntityKind::Human, 5, 3, 0, 0),
             ],
         );
 
@@ -4305,7 +4384,7 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
-                Entity::new(EntityKind::Mutant, 5, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 5, 5, 0, 0),
             ],
         );
 

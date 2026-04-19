@@ -200,8 +200,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   and grab speed now come from `LNDYV`, and Landers no longer fall back to a
   Rust-only player-chase path when no free humanoid is available.
 - Mutant / Schitzo motion now follows the red-label `SCZ0` shape more closely
-  too: horizontal pursuit now comes from `SZXV`, and the seek/avoid vertical
-  movement now comes from `SZYV` instead of the older single-step Rust chase.
+  too: horizontal pursuit now comes from `SZXV`, the seek/avoid vertical
+  movement now comes from `SZYV`, and the on-screen random y-hop now comes
+  from `SZRY` instead of the older single-step Rust chase.
 - Swarmer horizontal motion now comes from the red-label `SWXV` record too,
   and the vertical update band now expands from the red-label `SWAC` mask on
   later waves, so later-wave Swarmers keep their faster cabinet pace instead

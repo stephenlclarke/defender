@@ -383,7 +383,7 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
-                Entity::new(EntityKind::Mutant, 5, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 5, 5, 0, 0),
                 Entity::new(EntityKind::Mutant, 9, 2, 0, 0),
             ],
         );
