@@ -176,6 +176,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The instruction-page `SCANNER` label and enemy legend text now follow the
   red-label `COLR` / `COLTAB` colour walk instead of using hand-authored
   per-enemy colours.
+- The instruction-page scanner blips now follow the cabinet `SCPROC` four-tick
+  refresh cadence instead of updating every rendered frame.
 - The attract score-card kills now preserve the real enemy picture family
   through the red-label `AMOD10` / `AMOD11` / `BMODE2` / `BMODE3` split
   instead of swapping every hit to a generic blast, so the rescue/legend

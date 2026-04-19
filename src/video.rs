@@ -915,7 +915,13 @@ impl Renderer {
             }
         }
 
-        for object in &frame.objects {
+        let scanner_objects = if frame.scanner_objects.is_empty() {
+            &frame.objects
+        } else {
+            &frame.scanner_objects
+        };
+
+        for object in scanner_objects {
             let x = project_attract_x(inner, object.x16);
             let y = project_attract_y(inner, object.y16);
             if object.kind == EntityKind::PlayerShip {
@@ -2701,6 +2707,7 @@ mod tests {
         let frame_a = AttractFrame {
             world: World::bootstrap(),
             objects: Vec::new(),
+            scanner_objects: Vec::new(),
             revealed_score_entries: 0,
             visible_legend_text_entries: 0,
             demo_tick: 0,
@@ -2715,6 +2722,7 @@ mod tests {
         let frame_b = AttractFrame {
             world: World::bootstrap(),
             objects: Vec::new(),
+            scanner_objects: Vec::new(),
             revealed_score_entries: 0,
             visible_legend_text_entries: 0,
             demo_tick: 5,

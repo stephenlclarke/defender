@@ -55,6 +55,7 @@ const ATTRACT_LEGEND_SOURCE_START_Y16: i32 = 0xA000;
 pub struct AttractFrame {
     pub world: World,
     pub objects: Vec<AttractObject>,
+    pub scanner_objects: Vec<AttractObject>,
     pub revealed_score_entries: usize,
     pub visible_legend_text_entries: usize,
     pub demo_tick: u16,
@@ -425,6 +426,7 @@ pub fn attract_frame_for_beat(beat: AttractBeat) -> AttractFrame {
             AttractFrame {
                 world,
                 objects: Vec::new(),
+                scanner_objects: Vec::new(),
                 revealed_score_entries: beat.revealed_score_entries,
                 visible_legend_text_entries: 0,
                 demo_tick: 0,
@@ -473,6 +475,14 @@ fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
 }
 
 fn scripted_attract_frame_for_stage(stage: AttractDemoStage, tick: u16) -> AttractFrame {
+    scripted_attract_frame_for_stage_core(stage, tick, true)
+}
+
+fn scripted_attract_frame_for_stage_core(
+    stage: AttractDemoStage,
+    tick: u16,
+    include_scanner_snapshot: bool,
+) -> AttractFrame {
     let mut facing = HorizontalDirection::Right;
     let mut objects = Vec::new();
     let mut bonus_text = None;
@@ -614,8 +624,15 @@ fn scripted_attract_frame_for_stage(stage: AttractDemoStage, tick: u16) -> Attra
         .iter()
         .map(|object| rom_entity_with_state(object.kind, object.x16, object.y16, object.state))
         .collect();
+    let demo_tick = demo_tick_for_stage(stage, tick);
+    let scanner_objects = if include_scanner_snapshot {
+        scanner_snapshot_objects_for_demo_tick(demo_tick)
+    } else {
+        Vec::new()
+    };
+
     AttractFrame {
-        demo_tick: demo_tick_for_stage(stage, tick),
+        demo_tick,
         world: scripted_world(
             0,
             rom_x_to_world(ATTRACT_PLAYER_START_X << 8),
@@ -624,6 +641,7 @@ fn scripted_attract_frame_for_stage(stage: AttractDemoStage, tick: u16) -> Attra
             entities,
         ),
         objects,
+        scanner_objects,
         revealed_score_entries,
         visible_legend_text_entries: legend_text_entries_for_stage(stage, tick),
         bonus_text,
@@ -708,7 +726,6 @@ fn append_legend_entities(
     }
 }
 
-#[cfg(test)]
 fn demo_stage_for_tick(mut tick: u16) -> (AttractDemoStage, u16) {
     for (stage, duration) in attract_demo_timeline() {
         if tick < duration {
@@ -789,6 +806,12 @@ fn demo_tick_for_stage(target_stage: AttractDemoStage, local_tick: u16) -> u16 {
     }
 
     elapsed
+}
+
+fn scanner_snapshot_objects_for_demo_tick(demo_tick: u16) -> Vec<AttractObject> {
+    let refresh_tick = demo_tick - (demo_tick % 4);
+    let (stage, local_tick) = demo_stage_for_tick(refresh_tick);
+    scripted_attract_frame_for_stage_core(stage, local_tick, false).objects
 }
 
 fn stage_animation_tick(stage: AttractDemoStage, local_tick: u16) -> u32 {
@@ -1042,12 +1065,12 @@ mod tests {
     };
 
     use super::{
-        ATTRACT_CAUGHT_HUMAN_X16, ATTRACT_HUMAN_X16, AttractDemoStage, AttractVisual,
-        LEGEND_APPROACH_TICKS, LEGEND_LASER_TICKS, LEGEND_TRANSFER_TICKS, RESCUE_ASCENT_TICKS,
-        RESCUE_DESCENT_TICKS, RESCUE_FALL_TICKS, RESCUE_LASER_TICKS, RESCUE_RETURN_TICKS,
-        RESCUE_SCORE_TICKS, SceneKind, attract_cycle, attract_scene, demo_stage_for_tick,
-        high_score_scene, legend_text_entries_for_stage, logo_scene, scene_for_elapsed_ms,
-        scripted_attract_frame_for_tick,
+        ATTRACT_CAUGHT_HUMAN_X16, ATTRACT_HUMAN_X16, ATTRACT_LANDER_Y16, AttractDemoStage,
+        AttractVisual, LEGEND_APPROACH_TICKS, LEGEND_LASER_TICKS, LEGEND_TRANSFER_TICKS,
+        RESCUE_ASCENT_TICKS, RESCUE_DESCENT_TICKS, RESCUE_FALL_TICKS, RESCUE_LASER_TICKS,
+        RESCUE_RETURN_TICKS, RESCUE_SCORE_TICKS, SceneKind, attract_cycle, attract_scene,
+        demo_stage_for_tick, high_score_scene, legend_text_entries_for_stage, logo_scene,
+        scene_for_elapsed_ms, scripted_attract_frame_for_tick,
     };
 
     #[test]
@@ -1216,6 +1239,37 @@ mod tests {
             legend_text_entries_for_stage(reveal_stage, reveal_tick_one),
             1
         );
+    }
+
+    #[test]
+    fn scanner_snapshot_updates_on_four_tick_cadence() {
+        let frame_three = scripted_attract_frame_for_tick(3);
+        let frame_four = scripted_attract_frame_for_tick(4);
+
+        let live_three = frame_three
+            .objects
+            .iter()
+            .find(|object| object.kind == EntityKind::Lander)
+            .expect("live frame should contain the descending lander");
+        let scanner_three = frame_three
+            .scanner_objects
+            .iter()
+            .find(|object| object.kind == EntityKind::Lander)
+            .expect("scanner snapshot should contain the descending lander");
+        let scanner_four = frame_four
+            .scanner_objects
+            .iter()
+            .find(|object| object.kind == EntityKind::Lander)
+            .expect("scanner snapshot should refresh on the fourth tick");
+        let live_four = frame_four
+            .objects
+            .iter()
+            .find(|object| object.kind == EntityKind::Lander)
+            .expect("live frame should still contain the descending lander");
+
+        assert_ne!(live_three.y16, scanner_three.y16);
+        assert_eq!(scanner_three.y16, ATTRACT_LANDER_Y16);
+        assert_eq!(scanner_four.y16, live_four.y16);
     }
 
     #[test]
