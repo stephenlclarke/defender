@@ -742,9 +742,17 @@ impl World {
         player_velocity: Velocity,
     ) -> Option<Velocity> {
         let tables = arcade_tables();
+        let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         match enemy.kind {
             EntityKind::Lander | EntityKind::Mutant | EntityKind::Baiter => {
-                if !self.tick.is_multiple_of(tables.enemy_fire_base_delay) {
+                let shot_delay = match enemy.kind {
+                    EntityKind::Lander => wave_profile.lander_shot_time,
+                    EntityKind::Mutant => wave_profile.mutant_shot_time,
+                    EntityKind::Baiter => wave_profile.baiter_shot_time,
+                    _ => unreachable!(),
+                }
+                .max(1);
+                if !self.tick.is_multiple_of(shot_delay) {
                     return None;
                 }
 
@@ -754,16 +762,13 @@ impl World {
                 let horizontal_delta = player_screen_x - enemy_screen_x;
                 let mut dx = horizontal_delta.signum();
                 let aim_dy = (player_position.y - enemy.position.y).signum();
-                let spread_index = ((self.tick / tables.enemy_fire_base_delay) as i32
-                    + enemy.position.x
-                    + enemy.position.y)
-                    .rem_euclid(3);
+                let spread_index =
+                    ((self.tick / shot_delay) as i32 + enemy.position.x + enemy.position.y)
+                        .rem_euclid(3);
                 let spread = spread_index - 1;
                 let dy = (aim_dy + spread).clamp(-1, 1);
 
-                if (self.tick / tables.enemy_fire_base_delay)
-                    .is_multiple_of(tables.enemy_fire_chaser_cycle)
-                {
+                if (self.tick / shot_delay).is_multiple_of(tables.enemy_fire_chaser_cycle) {
                     dx = (dx + player_velocity.dx).clamp(-2, 2);
                 }
 
@@ -781,7 +786,8 @@ impl World {
                 Some(Velocity { dx, dy })
             }
             EntityKind::Swarmer => {
-                if !self.tick.is_multiple_of(tables.swarmer_fire_delay) {
+                let shot_delay = wave_profile.swarmer_shot_time.max(1);
+                if !self.tick.is_multiple_of(shot_delay) {
                     return None;
                 }
 
@@ -2660,10 +2666,9 @@ mod tests {
             ],
         );
 
-        let mut events = Vec::new();
-        for _ in 0..5 {
-            events = world.step_live(UpdateInput::default());
-        }
+        let shot_delay = red_label_wave_table().profile_for_wave(1).lander_shot_time;
+        world.tick = shot_delay - 1;
+        let events = world.step_live(UpdateInput::default());
 
         assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 1);
         assert!(events.contains(&WorldEvent::EnemyFired));
@@ -2687,7 +2692,8 @@ mod tests {
             Entity::new(EntityKind::Lander, offscreen_x, safe_y, 0, 0),
         ];
 
-        for _ in 0..arcade_tables().enemy_fire_base_delay {
+        let shot_delay = red_label_wave_table().profile_for_wave(1).lander_shot_time;
+        for _ in 0..shot_delay {
             world.step_live(UpdateInput::default());
         }
 
@@ -2717,10 +2723,9 @@ mod tests {
             ],
         );
 
-        let mut events = Vec::new();
-        for _ in 0..arcade_tables().swarmer_fire_delay {
-            events = world.step_live(UpdateInput::default());
-        }
+        let shot_delay = red_label_wave_table().profile_for_wave(3).swarmer_shot_time;
+        world.tick = shot_delay - 1;
+        let events = world.step_live(UpdateInput::default());
 
         let shot = world
             .entities()
@@ -2744,8 +2749,8 @@ mod tests {
             },
             vec![Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0)],
         );
-        world.tick =
-            arcade_tables().enemy_fire_base_delay * arcade_tables().enemy_fire_chaser_cycle;
+        let shot_delay = red_label_wave_table().profile_for_wave(1).lander_shot_time;
+        world.tick = shot_delay * arcade_tables().enemy_fire_chaser_cycle;
         let velocity = world
             .enemy_shot_velocity(
                 &Entity::new(EntityKind::Lander, 12, 5, 0, 0),

@@ -191,6 +191,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   seeds their visible start band and initial drift from the same `HSEED` /
   `SEED` / `LSEED`-style ranges the cabinet source uses before mapping those
   starts into the current wrapped world.
+- Enemy fire cadence now comes from the red-label `WVTAB` shot-timer records
+  (`LDSTIM`, `SZSTIM`, `SWSTIM`, and `UFSTIM`) instead of the older shared
+  Rust fallback delays, so Landers, Mutants, Swarmers, and Baiters follow the
+  cabinet wave table more closely.
 - Gameplay sprite phasing now follows ROM-informed display rules more closely:
   the player ship uses left/right cabinet art with horizontal display-phase
   selection instead of a made-up tick animation, shared enemy animation now
