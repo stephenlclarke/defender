@@ -1914,19 +1914,36 @@ impl World {
         let world_span = self.world_span;
         let left_edge = self.left_edge();
         for entity in &mut self.entities {
-            if entity.kind == EntityKind::Mine && entity.rom_aux > 0 {
-                entity.rom_aux -= 1;
+            match entity.kind {
+                EntityKind::PlayerShot | EntityKind::EnemyShot => {
+                    if entity.rom_aux == 0 {
+                        // `GETSHL` seeds the shared shell lifetime in `ODATA`
+                        // to 20. Keep raw shell fixtures and freshly spawned
+                        // live shells on that cabinet countdown.
+                        entity.rom_aux = rom_shell_lifetime();
+                    } else {
+                        entity.rom_aux -= 1;
+                    }
+                }
+                EntityKind::Mine => {
+                    if entity.rom_aux > 0 {
+                        entity.rom_aux -= 1;
+                    }
+                }
+                _ => {}
             }
         }
         self.entities.retain(|entity| match entity.kind {
             EntityKind::PlayerShot => {
                 screen_x_for_world_x(entity.position.x, left_edge, width, world_span, max_x)
                     .is_some()
+                    && entity.rom_aux > 0
                     && (min_y..=max_y).contains(&entity.position.y)
                     && entity.position.y < terrain_surface_y(terrain, entity.position.x) + 1
             }
             EntityKind::EnemyShot => {
                 (0..=max_x).contains(&entity.position.x)
+                    && entity.rom_aux > 0
                     && (min_y..=max_y).contains(&entity.position.y)
                     && entity.position.y < terrain_surface_y(terrain, entity.position.x) + 1
             }
@@ -2424,6 +2441,10 @@ fn rom_bomber_mine_lifetime(wave: u8, tick: u32, position: Position) -> u16 {
     u16::from((hseed & 0x1F) + 1)
 }
 
+fn rom_shell_lifetime() -> u16 {
+    20
+}
+
 fn initialize_tie_cruise_altitude(entity: &mut Entity) {
     if entity.rom_aux == 0 {
         entity.rom_aux = 0x50;
@@ -2803,10 +2824,10 @@ mod tests {
         rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band, rom_bomber_mine_lifetime,
         rom_bomber_should_drop_mine, rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
         rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
-        rom_probe_vertical_velocity, rom_shoot_axes_from_seeds, rom_swarmer_horizontal_velocity,
-        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
-        rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
-        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_probe_vertical_velocity, rom_shell_lifetime, rom_shoot_axes_from_seeds,
+        rom_swarmer_horizontal_velocity, rom_swarmer_vertical_speed_limit, rom_tie_close_band,
+        rom_tie_far_band, rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude,
+        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -3712,6 +3733,11 @@ mod tests {
     }
 
     #[test]
+    fn rom_shell_lifetime_matches_getshl_default() {
+        assert_eq!(rom_shell_lifetime(), 20);
+    }
+
+    #[test]
     fn live_step_bomber_mines_expire_after_their_rom_lifetime() {
         let mut world = World::with_entities(
             24,
@@ -4471,6 +4497,38 @@ mod tests {
 
         world.step_live(UpdateInput::default());
 
+        assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
+    }
+
+    #[test]
+    fn live_step_enemy_shots_seed_and_expire_on_the_shell_timer() {
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 4, 0, 0),
+                Entity::new(EntityKind::Lander, 20, 2, 0, 0),
+            ],
+        );
+        let shot_y = world.safe_altitude_at_world_x(12).saturating_sub(3).max(1);
+        world.spawn_entity(Entity::new(EntityKind::EnemyShot, 12, shot_y, 0, 0));
+
+        world.step_live(UpdateInput::default());
+        let shot = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::EnemyShot)
+            .expect("enemy shot");
+        assert_eq!(shot.rom_aux, rom_shell_lifetime());
+
+        for _ in 0..rom_shell_lifetime() {
+            world.step_live(UpdateInput::default());
+        }
         assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
     }
 
