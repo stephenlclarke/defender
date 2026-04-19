@@ -1089,22 +1089,16 @@ impl World {
                 EntityKind::Pod => {
                     if enemy.velocity.dx == 0 || enemy.velocity.dy == 0 {
                         // `PRBST` seeds PROBE start velocities from the live
-                        // random registers instead of inventing a special AI
-                        // roam task. Preserve that shape here by deriving a
-                        // deterministic replacement velocity from the current
-                        // world position/tick whenever a test or gameplay edge
-                        // case creates a zeroed Pod velocity.
-                        let fallback = rom_probe_velocity_seed(
-                            self.status.wave,
-                            ((enemy.position.x as u32) << 8)
-                                ^ (enemy.position.y as u32)
-                                ^ self.tick,
-                        );
+                        // shared random-byte state. If a fixture or gameplay
+                        // edge case leaves a Pod with zeroed velocity, advance
+                        // that same RNG state and reuse the cabinet seed bytes
+                        // instead of falling back to a synthetic hash.
+                        rand_state.advance();
                         if enemy.velocity.dx == 0 {
-                            enemy.velocity.dx = fallback.dx;
+                            enemy.velocity.dx = rom_probe_horizontal_velocity(rand_state.seed);
                         }
                         if enemy.velocity.dy == 0 {
-                            enemy.velocity.dy = fallback.dy;
+                            enemy.velocity.dy = rom_probe_vertical_velocity(rand_state.lseed);
                         }
                     }
                 }
@@ -2445,14 +2439,6 @@ fn rom_probe_spawn_for_wave(
     )
 }
 
-fn rom_probe_velocity_seed(wave: u8, salt: u32) -> Velocity {
-    let (_, _, seed, lseed) = rom_probe_seed_bytes(wave, salt, 0);
-    Velocity {
-        dx: rom_probe_horizontal_velocity(seed),
-        dy: rom_probe_vertical_velocity(lseed),
-    }
-}
-
 fn rom_rmax(max: u8, mut seed: u8) -> usize {
     while seed > max {
         seed >>= 1;
@@ -3278,6 +3264,33 @@ mod tests {
         assert_eq!(rom_probe_vertical_velocity(0x00), -1);
         assert_eq!(rom_probe_vertical_velocity(0x40), 1);
         assert_eq!(rom_probe_vertical_velocity(0x7f), 1);
+    }
+
+    #[test]
+    fn live_step_pods_recover_zero_velocity_from_the_shared_rand_state() {
+        let mut world = World::with_entities(
+            32,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Pod, 12, 5, 0, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let pod = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Pod)
+            .expect("pod");
+        assert_eq!(pod.velocity, Velocity { dx: -2, dy: -1 });
+        assert_eq!(pod.position, Position { x: 10, y: 4 });
     }
 
     #[test]
