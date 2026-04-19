@@ -16,14 +16,12 @@ pub struct ArcadeTables {
     pub player_max_speed: i32,
     pub player_shot_limit: usize,
     pub player_shot_speed: i32,
-    pub enemy_shot_limit: usize,
     pub swarmer_fire_lead_divisor: u32,
     pub max_baiters: usize,
     pub baiter_repeat_delay: u32,
     pub pod_swarmer_burst_min: usize,
     pub pod_swarmer_burst_range: usize,
     pub max_swarmers: usize,
-    pub max_mines: usize,
     pub default_human_world_xs: &'static [i32; 10],
 }
 
@@ -44,14 +42,12 @@ static ARCADE_TABLES: ArcadeTables = ArcadeTables {
     player_max_speed: 1,
     player_shot_limit: 4,
     player_shot_speed: 2,
-    enemy_shot_limit: 6,
     swarmer_fire_lead_divisor: 4,
     max_baiters: 4,
     baiter_repeat_delay: 20,
     pod_swarmer_burst_min: 5,
     pod_swarmer_burst_range: 3,
     max_swarmers: 20,
-    max_mines: 10,
     default_human_world_xs: &DEFAULT_HUMAN_WORLD_XS,
 };
 
@@ -66,7 +62,6 @@ mod tests {
         assert_eq!(tables.safe_fall_height, 2);
         assert_eq!(tables.player_shot_limit, 4);
         assert_eq!(tables.player_shot_speed, 2);
-        assert_eq!(tables.enemy_shot_limit, 6);
         assert_eq!(tables.default_human_world_xs.len(), 10);
         assert_eq!(tables.default_human_world_xs[0], 8);
         assert_eq!(tables.default_human_world_xs[9], 170);

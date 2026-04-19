@@ -393,6 +393,13 @@ impl World {
             .count()
     }
 
+    fn live_shell_count(&self) -> usize {
+        self.entities
+            .iter()
+            .filter(|entity| matches!(entity.kind, EntityKind::EnemyShot | EntityKind::Mine))
+            .count()
+    }
+
     pub fn enemy_count(&self) -> usize {
         self.entities
             .iter()
@@ -679,10 +686,10 @@ impl World {
         max_y: i32,
         events: &mut Vec<WorldEvent>,
     ) {
-        let tables = arcade_tables();
-        let available = tables
-            .enemy_shot_limit
-            .saturating_sub(self.entity_count_by_kind(EntityKind::EnemyShot));
+        // `GETSHL` gates the shared hostile shell list through `BMBCNT < 20`.
+        // Keep enemy bullets on that cabinet counter instead of the old Rust
+        // per-kind cap.
+        let available = rom_shell_spawn_limit().saturating_sub(self.live_shell_count());
         if available == 0 {
             return;
         }
@@ -1096,8 +1103,9 @@ impl World {
     }
 
     fn drop_bomber_mines(&mut self, min_y: i32, max_y: i32) {
-        let tables = arcade_tables();
-        if self.entity_count_by_kind(EntityKind::Mine) >= tables.max_mines {
+        // `BOMBST` uses the same `BMBCNT` counter as hostile shells but clamps
+        // it at ten before allowing a new mine to start.
+        if self.live_shell_count() >= rom_bomb_shell_limit() {
             return;
         }
 
@@ -1149,9 +1157,7 @@ impl World {
             }
         }
 
-        let available = tables
-            .max_mines
-            .saturating_sub(self.entity_count_by_kind(EntityKind::Mine));
+        let available = rom_bomb_shell_limit().saturating_sub(self.live_shell_count());
         self.entities.extend(new_mines.into_iter().take(available));
     }
 
@@ -2445,6 +2451,14 @@ fn rom_shell_lifetime() -> u16 {
     20
 }
 
+fn rom_shell_spawn_limit() -> usize {
+    20
+}
+
+fn rom_bomb_shell_limit() -> usize {
+    10
+}
+
 fn initialize_tie_cruise_altitude(entity: &mut Entity) {
     if entity.rom_aux == 0 {
         entity.rom_aux = 0x50;
@@ -2821,13 +2835,14 @@ mod tests {
         Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
         initialize_tie_cruise_altitude, nearest_wrapped_target, rom_accumulate_vertical_velocity,
         rom_baiter_horizontal_close_band, rom_baiter_seek_velocity, rom_baiter_should_seek,
-        rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band, rom_bomber_mine_lifetime,
-        rom_bomber_should_drop_mine, rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
-        rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
-        rom_probe_vertical_velocity, rom_shell_lifetime, rom_shoot_axes_from_seeds,
-        rom_swarmer_horizontal_velocity, rom_swarmer_vertical_speed_limit, rom_tie_close_band,
-        rom_tie_far_band, rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude,
-        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band, rom_bomb_shell_limit,
+        rom_bomber_mine_lifetime, rom_bomber_should_drop_mine, rom_lander_horizontal_velocity,
+        rom_lander_vertical_velocity, rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity,
+        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_shell_lifetime,
+        rom_shell_spawn_limit, rom_shoot_axes_from_seeds, rom_swarmer_horizontal_velocity,
+        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
+        rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
+        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -3277,6 +3292,51 @@ mod tests {
     }
 
     #[test]
+    fn enemy_fire_uses_the_rom_shared_shell_limit() {
+        let mut entities = vec![
+            Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+            Entity::new(EntityKind::Lander, 20, 3, 0, 0),
+        ];
+        entities.extend((0..rom_shell_spawn_limit()).map(|index| {
+            let mut shot = Entity::new(
+                EntityKind::EnemyShot,
+                8 + index as i32,
+                3 + (index as i32 % 2),
+                0,
+                0,
+            );
+            shot.rom_aux = 100;
+            shot
+        }));
+        let mut world = World::with_entities(
+            64,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            entities,
+        );
+
+        let shot_delay = red_label_wave_table().profile_for_wave(1).lander_shot_time;
+        world.tick = shot_delay;
+        let mut events = Vec::new();
+        world.spawn_enemy_fire(
+            world.world_max_x(),
+            1,
+            world.height() as i32 - 2,
+            &mut events,
+        );
+
+        assert_eq!(
+            world.entity_count_by_kind(EntityKind::EnemyShot),
+            rom_shell_spawn_limit()
+        );
+        assert!(!events.contains(&WorldEvent::EnemyFired));
+    }
+
+    #[test]
     fn live_step_does_not_allow_offscreen_enemies_to_fire() {
         let mut world = World::bootstrap();
         let player_x = world
@@ -3711,6 +3771,43 @@ mod tests {
     }
 
     #[test]
+    fn bomber_mines_use_the_rom_shared_shell_limit() {
+        let bomber_position = Position { x: 12, y: 6 };
+        let mut entities = vec![
+            Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0),
+            Entity::new(
+                EntityKind::Bomber,
+                bomber_position.x,
+                bomber_position.y,
+                -1,
+                0,
+            ),
+        ];
+        entities.extend((0..rom_bomb_shell_limit()).map(|index| {
+            let mut shot = Entity::new(EntityKind::EnemyShot, 2 + index as i32, 3, 0, 0);
+            shot.rom_aux = 100;
+            shot
+        }));
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            entities,
+        );
+        world.tick = (0..64)
+            .find(|tick| rom_bomber_should_drop_mine(2, *tick, bomber_position))
+            .expect("bomb gate");
+
+        world.drop_bomber_mines(1, world.height() as i32 - 2);
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mine), 0);
+    }
+
+    #[test]
     fn rom_bomber_mine_gate_matches_bombst_seed_edge() {
         let position = Position { x: 12, y: 6 };
         let drops = (0..32)
@@ -3735,6 +3832,16 @@ mod tests {
     #[test]
     fn rom_shell_lifetime_matches_getshl_default() {
         assert_eq!(rom_shell_lifetime(), 20);
+    }
+
+    #[test]
+    fn rom_shell_spawn_limit_matches_getshl_bmbcnt_gate() {
+        assert_eq!(rom_shell_spawn_limit(), 20);
+    }
+
+    #[test]
+    fn rom_bomb_shell_limit_matches_bombst_bmbcnt_gate() {
+        assert_eq!(rom_bomb_shell_limit(), 10);
     }
 
     #[test]

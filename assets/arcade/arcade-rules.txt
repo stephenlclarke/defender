@@ -9,14 +9,12 @@ max_wave_humanoid_bonus=500
 player_max_speed=1
 player_shot_limit=4
 player_shot_speed=2
-enemy_shot_limit=6
 swarmer_fire_lead_divisor=4
 max_baiters=4
 baiter_repeat_delay=20
 pod_swarmer_burst_min=5
 pod_swarmer_burst_range=3
 max_swarmers=20
-max_mines=10
 default_human_world_xs=8,26,44,62,80,98,116,134,152,170
 # BEGIN RED_LABEL_WAVE_TABLE
 # Extracted from blk71.src WVTAB in the Williams red-label source release.
