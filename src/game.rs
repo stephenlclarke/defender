@@ -1139,6 +1139,13 @@ impl World {
                     0,
                     0,
                 ));
+                if let Some(mine) = new_mines.last_mut() {
+                    // `BOMBST` seeds `ODATA` from `SEED & #$1F + 1`, and the
+                    // shell scan retires bombs once that countdown reaches
+                    // zero. Keep live bombs on that source-backed lifetime.
+                    mine.rom_aux =
+                        rom_bomber_mine_lifetime(self.status.wave, self.tick, bomber.position);
+                }
             }
         }
 
@@ -1906,6 +1913,11 @@ impl World {
         let width = self.width;
         let world_span = self.world_span;
         let left_edge = self.left_edge();
+        for entity in &mut self.entities {
+            if entity.kind == EntityKind::Mine && entity.rom_aux > 0 {
+                entity.rom_aux -= 1;
+            }
+        }
         self.entities.retain(|entity| match entity.kind {
             EntityKind::PlayerShot => {
                 screen_x_for_world_x(entity.position.x, left_edge, width, world_span, max_x)
@@ -1918,6 +1930,7 @@ impl World {
                     && (min_y..=max_y).contains(&entity.position.y)
                     && entity.position.y < terrain_surface_y(terrain, entity.position.x) + 1
             }
+            EntityKind::Mine => entity.rom_aux > 0,
             _ => true,
         });
     }
@@ -2406,6 +2419,11 @@ fn rom_bomber_should_drop_mine(wave: u8, tick: u32, position: Position) -> bool 
     (lseed & 0x07) == 0
 }
 
+fn rom_bomber_mine_lifetime(wave: u8, tick: u32, position: Position) -> u16 {
+    let (hseed, _) = rom_bomber_seed_bytes(wave, tick, position);
+    u16::from((hseed & 0x1F) + 1)
+}
+
 fn initialize_tie_cruise_altitude(entity: &mut Entity) {
     if entity.rom_aux == 0 {
         entity.rom_aux = 0x50;
@@ -2782,8 +2800,8 @@ mod tests {
         Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
         initialize_tie_cruise_altitude, nearest_wrapped_target, rom_accumulate_vertical_velocity,
         rom_baiter_horizontal_close_band, rom_baiter_seek_velocity, rom_baiter_should_seek,
-        rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band, rom_bomber_should_drop_mine,
-        rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
+        rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band, rom_bomber_mine_lifetime,
+        rom_bomber_should_drop_mine, rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
         rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
         rom_probe_vertical_velocity, rom_shoot_axes_from_seeds, rom_swarmer_horizontal_velocity,
         rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
@@ -3683,6 +3701,44 @@ mod tests {
     }
 
     #[test]
+    fn rom_bomber_mine_lifetime_matches_bombst_seed_range() {
+        let position = Position { x: 12, y: 6 };
+        let lifetimes: Vec<u16> = (0..32)
+            .map(|tick| rom_bomber_mine_lifetime(2, tick, position))
+            .collect();
+
+        assert!(lifetimes.iter().all(|lifetime| (1..=32).contains(lifetime)));
+        assert!(lifetimes.windows(2).any(|pair| pair[0] != pair[1]));
+    }
+
+    #[test]
+    fn live_step_bomber_mines_expire_after_their_rom_lifetime() {
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![Entity::new(EntityKind::Mine, 12, 6, 0, 0)],
+        );
+        if let Some(mine) = world
+            .entities
+            .iter_mut()
+            .find(|entity| entity.kind == EntityKind::Mine)
+        {
+            mine.rom_aux = 2;
+        }
+
+        world.step_live(UpdateInput::default());
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mine), 1);
+
+        world.step_live(UpdateInput::default());
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mine), 0);
+    }
+
+    #[test]
     fn smart_bomb_only_destroys_enemies_on_the_main_screen() {
         let mut world = World::bootstrap();
         let player_x = world
@@ -4263,6 +4319,13 @@ mod tests {
                 Entity::new(EntityKind::Mine, 3, 3, 0, 0),
             ],
         );
+        if let Some(mine) = world
+            .entities
+            .iter_mut()
+            .find(|entity| entity.kind == EntityKind::Mine)
+        {
+            mine.rom_aux = 2;
+        }
 
         let events = world.step_live(UpdateInput::default());
 
