@@ -524,14 +524,7 @@ impl World {
                     explodes: false,
                 }
             } else {
-                hyperspace_result(
-                    self.tick,
-                    self.status.score,
-                    self.player_facing,
-                    max_x,
-                    min_y,
-                    max_y,
-                )
+                hyperspace_result(self.rand_state, max_x, min_y, max_y)
             }
         });
 
@@ -546,7 +539,7 @@ impl World {
 
         let mut shot_origin = None;
         let mut hyperspaced_this_tick = false;
-        let mut hyperspace_failure_check = None;
+        let mut hyperspace_explodes = false;
         {
             let terrain = &self.terrain;
             if let Some(player) = self
@@ -567,7 +560,7 @@ impl World {
                     events.push(WorldEvent::HyperspaceUsed);
                     shot_origin = Some(player.position);
                     if !input.secret_mode {
-                        hyperspace_failure_check = Some((player.position, result.explodes));
+                        hyperspace_explodes = result.explodes;
                     }
                 } else {
                     if input.thrust {
@@ -587,9 +580,7 @@ impl World {
             }
         }
 
-        if let Some((player_position, explodes)) = hyperspace_failure_check
-            && (explodes || self.hyperspace_destination_is_unsafe(player_position))
-        {
+        if hyperspace_explodes && let Some(player_position) = self.player_position() {
             self.lose_player_life(player_position, &mut events);
         }
 
@@ -1530,20 +1521,6 @@ impl World {
         Position { x, y }
     }
 
-    fn hyperspace_destination_is_unsafe(&self, player_position: Position) -> bool {
-        self.entities.iter().any(|entity| match entity.kind {
-            EntityKind::Lander
-            | EntityKind::Mutant
-            | EntityKind::Baiter
-            | EntityKind::Bomber
-            | EntityKind::Pod
-            | EntityKind::Swarmer => positions_overlap(player_position, entity.position, 1, 1),
-            EntityKind::Mine => positions_overlap(player_position, entity.position, 0, 0),
-            EntityKind::EnemyShot => positions_overlap(player_position, entity.position, 0, 0),
-            _ => false,
-        })
-    }
-
     fn lose_player_life(&mut self, player_position: Position, events: &mut Vec<WorldEvent>) {
         self.release_player_carried_human_at(player_position);
         if self.status.lives > 0 {
@@ -1559,7 +1536,7 @@ impl World {
     }
 
     fn safest_hyperspace_destination(&self, max_x: i32, min_y: i32, max_y: i32) -> Position {
-        let fallback = hyperspace_destination(self.tick, self.status.score, max_x, min_y, max_y);
+        let fallback = rom_hyperspace_position(self.rand_state, max_x, min_y, max_y);
         let hazards: Vec<Position> = self
             .entities
             .iter()
@@ -2320,17 +2297,38 @@ fn nearest_wrapped_target(
     })
 }
 
-fn hyperspace_destination(tick: u32, score: u32, max_x: i32, min_y: i32, max_y: i32) -> Position {
-    let width = (max_x + 1).max(1) as u32;
-    let height = (max_y - min_y + 1).max(1) as u32;
-    let seed = tick
-        .wrapping_mul(17)
-        .wrapping_add(score.wrapping_mul(3))
-        .wrapping_add(11);
+fn rom_hyperspace_position(
+    rand_state: RomRandState,
+    max_x: i32,
+    min_y: i32,
+    max_y: i32,
+) -> Position {
+    // `HYPER` reloads `PLAX16` from either `#$2000` or `#$7000` based on the
+    // low `LSEED` bit, and reloads `PLAY16` from `HSEED >> 1 + YMIN`.
+    let rom_x = if (rand_state.lseed & 0x01) == 0 {
+        0x7000
+    } else {
+        0x2000
+    };
+    let rom_y = i32::from(rand_state.hseed >> 1) + 42;
     Position {
-        x: (seed % width) as i32,
-        y: min_y + ((seed / width) % height) as i32,
+        x: scale_rom_fixed_x_to_world(rom_x, max_x + 1),
+        y: scale_rom_display_y_to_world(rom_y, min_y, max_y),
     }
+}
+
+fn rom_hyperspace_facing(rand_state: RomRandState) -> HorizontalDirection {
+    if (rand_state.lseed & 0x01) == 0 {
+        HorizontalDirection::Left
+    } else {
+        HorizontalDirection::Right
+    }
+}
+
+fn rom_hyperspace_explodes(rand_state: RomRandState) -> bool {
+    // `HYPER` survives only when `LSEED > #192`; otherwise it jumps to
+    // `SUCIDE` after rematerialization.
+    rand_state.lseed <= 192
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2341,28 +2339,15 @@ struct HyperspaceResult {
 }
 
 fn hyperspace_result(
-    tick: u32,
-    score: u32,
-    current_facing: HorizontalDirection,
+    rand_state: RomRandState,
     max_x: i32,
     min_y: i32,
     max_y: i32,
 ) -> HyperspaceResult {
-    let position = hyperspace_destination(tick, score, max_x, min_y, max_y);
-    let seed = tick
-        .wrapping_mul(13)
-        .wrapping_add(score.wrapping_mul(7))
-        .wrapping_add(5);
-    let facing = if seed.is_multiple_of(2) {
-        current_facing
-    } else {
-        current_facing.reversed()
-    };
-
     HyperspaceResult {
-        position,
-        facing,
-        explodes: seed % 4 == 3,
+        position: rom_hyperspace_position(rand_state, max_x, min_y, max_y),
+        facing: rom_hyperspace_facing(rand_state),
+        explodes: rom_hyperspace_explodes(rand_state),
     }
 }
 
@@ -5765,7 +5750,12 @@ mod tests {
             ],
         );
 
-        let expected = hyperspace_result(1, 0, HorizontalDirection::Right, 19, 1, 7);
+        world.rand_state = RomRandState {
+            seed: 0x12,
+            hseed: 0x80,
+            lseed: 0xD1,
+        };
+        let expected = hyperspace_result(world.rand_state, 19, 1, 7);
         let events = world.step_live(UpdateInput {
             hyperspace: true,
             ..UpdateInput::default()
@@ -5823,6 +5813,11 @@ mod tests {
             },
             vec![Entity::new(EntityKind::PlayerShip, 2, 3, 1, 0)],
         );
+        world.rand_state = RomRandState {
+            seed: 0x00,
+            hseed: 0xA5,
+            lseed: 0x80,
+        };
 
         let events = world.step_live(UpdateInput {
             hyperspace: true,
@@ -5840,6 +5835,36 @@ mod tests {
         assert_eq!(world.player_facing(), HorizontalDirection::Right);
         assert!(events.contains(&WorldEvent::HyperspaceUsed));
         assert!(events.contains(&WorldEvent::PlayerHit));
+    }
+
+    #[test]
+    fn rom_hyperspace_result_uses_the_live_seed_bytes() {
+        let safe = hyperspace_result(
+            RomRandState {
+                seed: 0x12,
+                hseed: 0x80,
+                lseed: 0xD1,
+            },
+            19,
+            1,
+            7,
+        );
+        assert_eq!(safe.facing, HorizontalDirection::Right);
+        assert!(!safe.explodes);
+
+        let fatal = hyperspace_result(
+            RomRandState {
+                seed: 0x12,
+                hseed: 0x40,
+                lseed: 0x80,
+            },
+            19,
+            1,
+            7,
+        );
+        assert_eq!(fatal.facing, HorizontalDirection::Left);
+        assert!(fatal.explodes);
+        assert_ne!(safe.position, fatal.position);
     }
 
     #[test]

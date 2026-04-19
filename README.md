@@ -212,7 +212,8 @@ the final runtime self-contained:
   rematerialization, the four-shot laser cap, the rule that shots only remain
   active until they outrun the main screen, and the rules that smart bombs only
   destroy enemies on the main screen while leaving bullets and bomber
-  minefields alone.
+  minefields alone. The live game now follows the red-label `HYPER` seed-byte
+  path for rematerialization direction, position band, and failure chance.
 - <https://www.dougmahugh.com/defender-chapter03/>: lander-fire reference used
   to cross-check the shared `SHOOT` path, the random broad-arc jitter applied
   through `SEED` / `LSEED`, and the requirement that enemies only fire while
