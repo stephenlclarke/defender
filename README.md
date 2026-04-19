@@ -176,6 +176,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   the HUD uses the little-ship stock icon, and the attract rescue/scoring page
   now draws its `250` / `500` bonuses from embedded score art in
   `assets/arcade/`.
+- The runtime sprite path now selects from the distinct `defb6.src` picture
+  families instead of mirroring the player ship in software or cycling through
+  duplicated PNG buckets, so the shipped left-facing ship and the visible
+  Bomber/UFO/Lander frame groups follow the original cabinet art splits more
+  closely.
 - Live audio now comes from `src/audio_rom.rs`, which translates the Williams
   `VSNDRM1.SRC` radio, filtered-noise, scream, organ, and GWAVE routines into
   Rust sample generation instead of decoding pre-rendered WAV cue files, and
