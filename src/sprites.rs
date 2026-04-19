@@ -2,10 +2,9 @@
 //!
 //! The object art in `assets/arcade/*.png` is cropped from the red-label
 //! Defender sprite rip published by Sean Riddle's Williams graphics ripper
-//! work, then bundled into the app with `include_bytes!`. The runtime maps
-//! those assets onto the original `defb6.src` picture families (`PLAPIC`,
-//! `PLBPIC`, `TIEP*`, `UFOP*`, `LNDP*`, and so on) rather than inventing extra
-//! mirrored frames at draw time.
+//! work, then bundled into the app with `include_bytes!`. The runtime keeps
+//! the known-good cropped cabinet sprites for the live ship family while using
+//! ROM-backed picture decoding for the rescue score art.
 
 use std::{
     io::Cursor,
@@ -17,8 +16,8 @@ use png::{ColorType, Decoder, Transformations};
 
 use crate::{
     game::{Entity, EntityKind, HorizontalDirection},
-    object_rom::{render_picture, score_250_palette, score_500_palette, ship_palette},
-    object_rom_data::{C5P1, C25P1, PLAMIN, PLAPIC, PLBPIC},
+    object_rom::{render_picture, score_250_palette, score_500_palette},
+    object_rom_data::{C5P1, C25P1},
     video::RenderedImage,
 };
 
@@ -51,12 +50,11 @@ pub fn arcade_sprites() -> &'static ArcadeSprites {
 impl ArcadeSprites {
     fn new() -> Self {
         Self {
-            // `PLAPIC`, `PLBPIC`, and `PLAMIN` are decoded directly from the
-            // red-label `defb6.src` picture tables so the active runtime path
-            // uses the cabinet ship art rather than the older cropped PNGs.
-            ship_right: load_rom_picture(&PLAPIC, ship_palette()),
-            ship_left: load_rom_picture(&PLBPIC, ship_palette()),
-            little_ship: load_rom_picture(&PLAMIN, ship_palette()),
+            // The bundled `ship*.png` / `littleship.png` assets remain the
+            // known-good live ship family for the Kitty renderer.
+            ship_right: load_embedded_png(include_bytes!("../assets/arcade/ship1.png")),
+            ship_left: load_embedded_png(include_bytes!("../assets/arcade/ship3.png")),
+            little_ship: load_embedded_png(include_bytes!("../assets/arcade/littleship.png")),
             player_shot: load_embedded_png(include_bytes!("../assets/arcade/player-shot.png")),
             enemy_shots: [
                 load_embedded_png(include_bytes!("../assets/arcade/bomb1.png")),
