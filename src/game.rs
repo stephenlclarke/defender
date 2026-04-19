@@ -1611,8 +1611,6 @@ impl World {
     }
 
     fn spawn_swarmer_burst_at(&mut self, pod_position: Position) {
-        let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
-        let swarmer_speed = rom_swarmer_horizontal_velocity(wave_profile.swarmer_x_velocity);
         let available = rom_swarmer_count_limit()
             .saturating_sub(self.entity_count_by_kind(EntityKind::Swarmer));
         if available == 0 {
@@ -1620,39 +1618,17 @@ impl World {
         }
 
         let count = rom_probe_swarmer_burst_count(self.rand_state.seed).min(available);
-        let player_position = self.player_position();
-        let direction = player_position
-            .map(|player| shortest_wrapped_delta(pod_position.x, player.x, self.world_span))
-            .map(|delta| if delta == 0 { 1 } else { delta.signum() })
-            .unwrap_or(1);
-        // Doug Mahugh chapter 05 notes that Pod bursts should fan out enough to
-        // create a real pack rather than a stacked single-lane release.
-        let spawn_offsets = [
-            (0, -1),
-            (direction, 0),
-            (0, 1),
-            (-direction, 0),
-            (direction, -1),
-            (direction, 1),
-            (-2 * direction, 0),
-        ];
-        let max_x = self.world_max_x();
         let min_y = 1;
+        let max_y = self.safe_altitude_at_world_x(pod_position.x);
 
-        for &(horizontal_offset, vertical_offset) in spawn_offsets.iter().take(count) {
-            let x = wrap_coordinate(pod_position.x + horizontal_offset, max_x);
-            let safe_y = self.safe_altitude_at_world_x(x);
-            let y = (pod_position.y + vertical_offset).clamp(min_y, safe_y);
-            let dy = player_position
-                .map(|player| (player.y - y).signum())
-                .filter(|delta| *delta != 0)
-                .unwrap_or(vertical_offset.signum());
+        for _ in 0..count {
+            let velocity = rom_randv_velocity(&mut self.rand_state);
             self.entities.push(Entity::new(
                 EntityKind::Swarmer,
-                x,
-                y,
-                direction * swarmer_speed,
-                dy,
+                pod_position.x,
+                pod_position.y.clamp(min_y, max_y),
+                velocity.dx,
+                velocity.dy,
             ));
         }
     }
@@ -2424,6 +2400,24 @@ fn rom_probe_swarmer_burst_count(seed: u8) -> usize {
     rom_rmax(6, seed)
 }
 
+fn rom_randv_velocity(rand_state: &mut RomRandState) -> Velocity {
+    rand_state.advance();
+    Velocity {
+        dx: rom_probe_horizontal_velocity(rand_state.lseed),
+        dy: rom_randv_vertical_velocity(rand_state.seed),
+    }
+}
+
+fn rom_randv_vertical_velocity(seed: u8) -> i32 {
+    let raw = i16::from(seed as i8) * 2;
+    match raw {
+        ..=-128 => -2,
+        -127..=-1 => -1,
+        0..=127 => 1,
+        _ => 2,
+    }
+}
+
 fn rom_baiter_count_limit() -> usize {
     12
 }
@@ -2976,12 +2970,12 @@ mod tests {
         rom_bomber_mine_lifetime, rom_bomber_should_drop_mine, rom_default_human_world_xs,
         rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
         rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
-        rom_probe_swarmer_burst_count, rom_probe_vertical_velocity, rom_reset_baiter_timer,
-        rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit, rom_shoot_axes_from_seeds,
-        rom_swarmer_count_limit, rom_swarmer_horizontal_velocity, rom_swarmer_vertical_speed_limit,
-        rom_tie_close_band, rom_tie_far_band, rom_tie_horizontal_velocity,
-        rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen, screen_x_for_world_x,
-        shortest_wrapped_delta, wrap_coordinate,
+        rom_probe_swarmer_burst_count, rom_probe_vertical_velocity, rom_randv_velocity,
+        rom_reset_baiter_timer, rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit,
+        rom_shoot_axes_from_seeds, rom_swarmer_count_limit, rom_swarmer_horizontal_velocity,
+        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
+        rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
+        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -4712,14 +4706,13 @@ mod tests {
         assert_eq!(swarmer_count, rom_probe_swarmer_burst_count(0));
         assert_eq!(world.status().score, 1_000);
         assert!(events.contains(&WorldEvent::EnemyDestroyed));
-        let swarmer_speed = rom_swarmer_horizontal_velocity(
-            red_label_wave_table()
-                .profile_for_wave(3)
-                .swarmer_x_velocity,
+        assert!(
+            world
+                .entities()
+                .iter()
+                .any(|entity| entity.kind == EntityKind::Swarmer),
+            "destroyed pod should spawn at least one swarmer"
         );
-        assert!(world.entities().iter().all(|entity| {
-            entity.kind != EntityKind::Swarmer || entity.velocity.dx == -swarmer_speed
-        }));
     }
 
     #[test]
@@ -4736,6 +4729,24 @@ mod tests {
 
         assert!(counts.iter().all(|count| (1..=7).contains(count)));
         assert!(counts.windows(2).any(|pair| pair[0] != pair[1]));
+    }
+
+    #[test]
+    fn rom_randv_velocity_follows_the_source_seed_walk() {
+        let mut rand_state = RomRandState::default();
+
+        assert_eq!(
+            rom_randv_velocity(&mut rand_state),
+            Velocity { dx: 1, dy: -2 }
+        );
+        assert_eq!(
+            rom_randv_velocity(&mut rand_state),
+            Velocity { dx: -1, dy: -2 }
+        );
+        assert_eq!(
+            rom_randv_velocity(&mut rand_state),
+            Velocity { dx: 1, dy: 2 }
+        );
     }
 
     #[test]
