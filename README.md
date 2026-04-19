@@ -199,12 +199,12 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   ship, Bomber/UFO, Lander, Baiter, Pod/Probe, Swarmer, bomb, and score
   families follow the original cabinet picture tables more closely.
 - Live audio now comes from `src/audio_rom.rs`, which translates the Williams
-  `VSNDRM1.SRC` radio, filtered-noise, scream, organ, and GWAVE routines into
-  Rust sample generation instead of decoding pre-rendered WAV cue files, and
-  the live loop now queues overlapping cue playback instead of blocking the
-  frame loop on one sound at a time, with title/attract playback now triggering
-  cue changes from the attract beat stream rather than staying almost entirely
-  silent outside live gameplay.
+  `VSNDRM1.SRC` radio, filtered-noise, hyperspace, scream, organ, and GWAVE
+  routines into Rust sample generation instead of decoding pre-rendered WAV cue
+  files, and the live loop now queues overlapping cue playback instead of
+  blocking the frame loop on one sound at a time, with title/attract playback
+  now triggering cue changes from the attract beat stream rather than staying
+  almost entirely silent outside live gameplay.
 - `cargo run` / `defender` now launch the real Kitty-graphics play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, falling-human

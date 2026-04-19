@@ -35,6 +35,7 @@ pub(crate) enum SpecialRoutine {
     Thrust,
     Cannon,
     Radio,
+    Hyper,
     Scream,
 }
 
@@ -110,6 +111,7 @@ impl RomSoundBoard {
             }
             SpecialRoutine::Cannon => self.render_filtered_noise(true, true, 0xFF, 1_000, out),
             SpecialRoutine::Radio => self.render_radio(out),
+            SpecialRoutine::Hyper => self.render_hyper(out),
             SpecialRoutine::Scream => self.render_scream(out),
         }
     }
@@ -262,6 +264,25 @@ impl RomSoundBoard {
         }
     }
 
+    fn render_hyper(&mut self, out: &mut Vec<f32>) {
+        // `HYPER` in `VSNDRM1.SRC` starts with `SOUND` and `TEMPA` cleared, then
+        // runs 128 phase slices. Each slice advances a local counter from
+        // `0x00..0x7F`, toggles the output when the counter hits the current
+        // phase threshold, delays by `#18`, then toggles again at the cycle
+        // edge. That produces the cabinet's shifting square-wave hyperspace
+        // sweep instead of the old reused radio cue.
+        let mut sound = 0u8;
+        for phase in 0u8..=0x7F {
+            for counter in 0u8..=0x7F {
+                if counter == phase {
+                    sound = !sound;
+                }
+                append_level(out, sound, 18);
+            }
+            sound = !sound;
+        }
+    }
+
     fn render_scream(&mut self, out: &mut Vec<f32>) {
         let mut table = [(0u8, 0u8); 4];
         table[0].0 = 0x40;
@@ -399,6 +420,7 @@ mod tests {
         let mut board = RomSoundBoard::default();
         let rendered = board.render_actions(&[
             RomAction::Special(SpecialRoutine::Radio),
+            RomAction::Special(SpecialRoutine::Hyper),
             RomAction::Special(SpecialRoutine::Cannon),
             RomAction::GWave(GWaveSound::Bonus),
         ]);
@@ -435,5 +457,19 @@ mod tests {
             .fold(0.0, f32::max);
 
         assert!(first_half_peak >= second_half_peak);
+    }
+
+    #[test]
+    fn hyper_generates_a_toggling_square_wave() {
+        let mut board = RomSoundBoard::default();
+        let rendered = board.render_actions(&[RomAction::Special(SpecialRoutine::Hyper)]);
+
+        assert!(rendered.samples.len() > SAMPLE_RATE as usize / 2);
+        let transitions = rendered
+            .samples
+            .windows(2)
+            .filter(|pair| (pair[0] - pair[1]).abs() > 0.5)
+            .count();
+        assert!(transitions > 32);
     }
 }

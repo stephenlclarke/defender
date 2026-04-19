@@ -259,12 +259,13 @@ fn cues_for_events(events: &[SessionEvent]) -> Vec<SoundCue> {
     {
         push_unique_cue(&mut cues, SoundCue::Explosion);
     }
-    if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired))
-        || events.contains(&SessionEvent::World(
-            crate::game::WorldEvent::HyperspaceUsed,
-        ))
-    {
+    if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired)) {
         push_unique_cue(&mut cues, SoundCue::EnemySweep);
+    }
+    if events.contains(&SessionEvent::World(
+        crate::game::WorldEvent::HyperspaceUsed,
+    )) {
+        push_unique_cue(&mut cues, SoundCue::Hyperspace);
     }
     if events.contains(&SessionEvent::World(crate::game::WorldEvent::HumanRescued)) {
         push_unique_cue(&mut cues, SoundCue::HumanSaved);
@@ -397,7 +398,7 @@ mod tests {
                 SessionEvent::World(WorldEvent::HyperspaceUsed),
                 SessionEvent::World(WorldEvent::GameOver),
             ]),
-            vec![SoundCue::Explosion, SoundCue::EnemySweep]
+            vec![SoundCue::Explosion, SoundCue::Hyperspace]
         );
         assert_eq!(
             cues_for_events(&[SessionEvent::World(WorldEvent::WaveAdvanced)]),

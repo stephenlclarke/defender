@@ -11,6 +11,7 @@ pub enum SoundCue {
     LogoFanfare,
     AttractHum,
     EnemySweep,
+    Hyperspace,
     PlayerShot,
     HumanSaved,
     Explosion,
@@ -18,10 +19,11 @@ pub enum SoundCue {
 }
 
 impl SoundCue {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::LogoFanfare,
         Self::AttractHum,
         Self::EnemySweep,
+        Self::Hyperspace,
         Self::PlayerShot,
         Self::HumanSaved,
         Self::Explosion,
@@ -33,6 +35,7 @@ impl SoundCue {
             Self::LogoFanfare => "organ-phantom",
             Self::AttractHum => "thrust-noise",
             Self::EnemySweep => "radio-sweep",
+            Self::Hyperspace => "hyper-square",
             Self::PlayerShot => "cannon-burst",
             Self::HumanSaved => "bonus-gwave",
             Self::Explosion => "scream-burst",
@@ -45,6 +48,7 @@ impl SoundCue {
             Self::LogoFanfare => 1_150,
             Self::AttractHum => 220,
             Self::EnemySweep => 320,
+            Self::Hyperspace => 280,
             Self::PlayerShot => 190,
             Self::HumanSaved => 260,
             Self::Explosion => 420,
@@ -57,6 +61,7 @@ impl SoundCue {
             Self::LogoFanfare => &[RomAction::OrganTune(OrganTune::Phantom)],
             Self::AttractHum => &[RomAction::Special(SpecialRoutine::Thrust)],
             Self::EnemySweep => &[RomAction::Special(SpecialRoutine::Radio)],
+            Self::Hyperspace => &[RomAction::Special(SpecialRoutine::Hyper)],
             Self::PlayerShot => &[RomAction::Special(SpecialRoutine::Cannon)],
             Self::HumanSaved => &[RomAction::GWave(GWaveSound::Bonus)],
             Self::Explosion => &[RomAction::Special(SpecialRoutine::Scream)],
