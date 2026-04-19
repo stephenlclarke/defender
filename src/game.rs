@@ -566,49 +566,27 @@ impl World {
             self.lose_player_life(player_position, &mut events);
         }
 
-        let invalid_smart_bomb_attempt =
-            input.smart_bomb && !input.secret_mode && !self.can_use_smart_bomb(false);
-        if invalid_smart_bomb_attempt && let Some(player_position) = shot_origin {
-            // Red-label `SBOMB` falls through `SBMBX2 -> SUCIDE` if the player
-            // presses smart bomb with none remaining.
-            self.lose_player_life(player_position, &mut events);
-        }
-
-        if !invalid_smart_bomb_attempt
-            && input.smart_bomb
-            && self.can_use_smart_bomb(input.secret_mode)
-        {
+        if input.smart_bomb && self.can_use_smart_bomb(input.secret_mode) {
             self.detonate_smart_bomb(input.secret_mode, &mut events);
         }
 
         self.update_enemy_intents(min_y, max_y);
         self.begin_human_abductions();
 
-        let capped_fire_attempt = input.fire
-            && !input.secret_mode
-            && !hyperspaced_this_tick
-            && !self.can_fire_player_shot(false);
-        if capped_fire_attempt && let Some(player_position) = shot_origin {
-            // Red-label `LFIRE` jumps to `SUCIDE` on the fifth active shot
-            // instead of quietly ignoring the fire input.
-            self.lose_player_life(player_position, &mut events);
-        }
-
         let auto_fire = input.secret_mode
             && input.auto_fire
             && !hyperspaced_this_tick
             && self.can_fire_player_shot(input.secret_mode)
             && shot_origin.is_some_and(|origin| self.should_auto_fire(origin, max_x, min_y, max_y));
-        if !capped_fire_attempt
-            && (input.fire || auto_fire)
+        if (input.fire || auto_fire)
             && !hyperspaced_this_tick
             && self.can_fire_player_shot(input.secret_mode)
             && let Some(origin) = shot_origin
         {
             let shot_dx = self.player_facing.step() * arcade_tables().player_shot_speed;
-            // Doug Mahugh chapter 02 describes Defender's laser as a four-shot
-            // weapon whose bursts remain active only until they outrun the main
-            // screen. XYZZY deliberately lifts the cap.
+            // Red-label `LFIRE`/`LFIREX` is a transient switch process. Hitting
+            // the four-shot cap only kills that process; it does not destroy
+            // the ship. XYZZY deliberately lifts the cap.
             self.entities.push(Entity::new(
                 EntityKind::PlayerShot,
                 wrap_coordinate(origin.x + self.player_facing.step(), max_x),
@@ -2309,7 +2287,7 @@ mod tests {
     }
 
     #[test]
-    fn live_step_fifth_manual_shot_triggers_suicide_in_normal_play() {
+    fn live_step_fifth_manual_shot_is_ignored_in_normal_play() {
         let mut world = World::with_entities(
             64,
             10,
@@ -2340,8 +2318,7 @@ mod tests {
             arcade_tables().player_shot_limit
         );
         assert!(!events.contains(&WorldEvent::ShotFired));
-        assert!(events.contains(&WorldEvent::PlayerHit));
-        assert_eq!(world.status().lives, 2);
+        assert_eq!(world.status().lives, 3);
     }
 
     #[test]
@@ -4247,7 +4224,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_smart_bomb_press_triggers_suicide_in_normal_play() {
+    fn empty_smart_bomb_press_is_ignored_in_normal_play() {
         let mut world = World::with_entities(
             16,
             8,
@@ -4271,8 +4248,7 @@ mod tests {
         assert_eq!(world.smart_bombs(), 0);
         assert_eq!(world.status().score, 0);
         assert!(!events.contains(&WorldEvent::SmartBombDetonated));
-        assert!(events.contains(&WorldEvent::PlayerHit));
-        assert_eq!(world.status().lives, 2);
+        assert_eq!(world.status().lives, 3);
     }
 
     #[test]
