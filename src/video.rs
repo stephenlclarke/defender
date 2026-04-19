@@ -1004,28 +1004,53 @@ impl Renderer {
     }
 
     fn draw_attract_demo_objects(&mut self, frame: &AttractFrame, rect: Rect) {
-        let mut player_shot_points = Vec::new();
+        let mut player_ship = None;
+        let mut laser_target = None;
+        let mut player_shot_active = false;
+
         for object in &frame.objects {
             let cx = project_attract_x(rect, object.x16);
             let cy = project_attract_y(rect, object.y16);
             if object.kind == EntityKind::PlayerShot {
-                player_shot_points.push((cx, cy));
+                player_shot_active = true;
                 continue;
             }
+
+            if object.kind == EntityKind::PlayerShip {
+                player_ship = Some((cx, cy, object.facing));
+            } else if object.kind.is_enemy() {
+                laser_target = Some((object.kind, cx, cy));
+            }
+
             let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
             self.draw_entity(&entity, object.facing, 0, cx, cy, 24);
         }
 
-        if !player_shot_points.is_empty() {
-            for window in player_shot_points.windows(2) {
-                let (x0, y0) = window[0];
-                let (x1, y1) = window[1];
-                self.draw_line(x0, y0, x1, y1, Color::from_rgba([255, 232, 104, 255]), 2);
-                self.draw_line(x0, y0, x1, y1, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
-            }
-            let (head_x, head_y) = *player_shot_points.last().expect("shot head");
-            self.stamp(head_x, head_y, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
+        if player_shot_active
+            && let (Some((ship_x, ship_y, facing)), Some((kind, target_x, target_y))) =
+                (player_ship, laser_target)
+        {
+            let (start_x, start_y) = attract_laser_ship_anchor(ship_x, ship_y, facing);
+            let (end_x, end_y) = attract_laser_target_anchor(kind, target_x, target_y);
+            // `LASRS` writes the attract beam directly into screen memory, so
+            // render it here as a continuous cabinet-style beam instead of
+            // reconstructing it from fake `PlayerShot` world objects.
+            self.draw_arcade_laser_beam(start_x, start_y, end_x, end_y);
         }
+    }
+
+    fn draw_arcade_laser_beam(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) {
+        self.draw_line(x0, y0, x1, y1, Color::from_rgba([255, 232, 104, 255]), 3);
+        let (tip_x0, tip_y0) = beam_tip_start(x0, y0, x1, y1, 18.0);
+        self.draw_line(
+            tip_x0,
+            tip_y0,
+            x1,
+            y1,
+            Color::from_rgba(TEXT_ARCADE_WHITE),
+            2,
+        );
+        self.draw_dot(x1, y1, Color::from_rgba(TEXT_ARCADE_WHITE), 2);
     }
 
     fn draw_attract_bonus_text(
@@ -1971,6 +1996,43 @@ fn project_attract_x(rect: Rect, x16: i32) -> i32 {
 
 fn project_attract_y(rect: Rect, y16: i32) -> i32 {
     rect.y + native_attract_y(y16) * rect.height / 256
+}
+
+fn attract_laser_ship_anchor(cx: i32, cy: i32, facing: HorizontalDirection) -> (i32, i32) {
+    let direction = match facing {
+        HorizontalDirection::Left => -1,
+        HorizontalDirection::Right => 1,
+    };
+    let nose_x = cx + direction * 18;
+    let nose_y = cy + 4;
+    (nose_x, nose_y)
+}
+
+fn attract_laser_target_anchor(kind: EntityKind, cx: i32, cy: i32) -> (i32, i32) {
+    match kind {
+        EntityKind::Lander => (cx - 4, cy - 14),
+        EntityKind::Mutant => (cx - 3, cy - 12),
+        EntityKind::Baiter => (cx - 2, cy - 10),
+        EntityKind::Bomber => (cx - 8, cy - 8),
+        EntityKind::Pod => (cx - 6, cy - 10),
+        EntityKind::Swarmer => (cx - 3, cy - 10),
+        _ => (cx, cy),
+    }
+}
+
+fn beam_tip_start(x0: i32, y0: i32, x1: i32, y1: i32, tip_length: f32) -> (i32, i32) {
+    let dx = (x1 - x0) as f32;
+    let dy = (y1 - y0) as f32;
+    let distance = (dx * dx + dy * dy).sqrt();
+    if distance <= 1.0 {
+        return (x0, y0);
+    }
+
+    let tip_fraction = ((distance - tip_length).max(0.0)) / distance;
+    (
+        (x0 as f32 + dx * tip_fraction).round() as i32,
+        (y0 as f32 + dy * tip_fraction).round() as i32,
+    )
 }
 
 fn scanner_color(kind: EntityKind) -> [u8; 4] {
