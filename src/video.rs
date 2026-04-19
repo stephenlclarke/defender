@@ -7,7 +7,7 @@ use crate::{
     font::arcade_font,
     game::{Entity, EntityKind, HorizontalDirection, World},
     high_scores::{HighScoreEntry, HighScoreTable},
-    object_rom::pseudo_color_rgba,
+    object_rom::{coltab_color, pseudo_color_rgba},
     render::InitialsEntryView,
     sprites::arcade_sprites,
     terminal::TerminalGeometry,
@@ -2184,21 +2184,6 @@ const HALL_COLOR_SEQUENCE: [[u8; 4]; 12] = [
     [255, 132, 84, 255],
     [255, 100, 156, 255],
 ];
-const LASER_COLOR_SEQUENCE: [[u8; 4]; 12] = [
-    [255, 232, 96, 255],
-    [255, 188, 84, 255],
-    [255, 132, 84, 255],
-    [255, 100, 156, 255],
-    [206, 108, 255, 255],
-    [170, 96, 255, 255],
-    [118, 132, 255, 255],
-    [88, 188, 255, 255],
-    [96, 236, 255, 255],
-    [122, 255, 184, 255],
-    [170, 255, 108, 255],
-    [224, 255, 92, 255],
-];
-
 fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
     // The red-label attract path keeps the `COLR` and `TIECOL` color tasks
     // alive while the Williams page and hall-of-fame page are on screen. The
@@ -2334,17 +2319,11 @@ fn attract_laser_target_anchor(kind: EntityKind, cx: i32, cy: i32) -> (i32, i32)
 }
 
 fn laser_sprite_remap(animation_tick: u32) -> [([u8; 4], [u8; 4]); 3] {
-    let phase = ((animation_tick / 2) as usize) % LASER_COLOR_SEQUENCE.len();
+    let phase = (animation_tick / 2) as usize;
     [
         (LASER_SOURCE_WHITE, TEXT_ARCADE_WHITE),
-        (
-            LASER_SOURCE_HIGHLIGHT,
-            LASER_COLOR_SEQUENCE[(phase + 2) % LASER_COLOR_SEQUENCE.len()],
-        ),
-        (
-            LASER_SOURCE_CORE,
-            LASER_COLOR_SEQUENCE[phase % LASER_COLOR_SEQUENCE.len()],
-        ),
+        (LASER_SOURCE_HIGHLIGHT, coltab_color(phase + 2)),
+        (LASER_SOURCE_CORE, coltab_color(phase)),
     ]
 }
 

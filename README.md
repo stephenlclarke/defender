@@ -178,6 +178,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   red-label `WCTAB` colour table instead of the earlier three-colour heuristic,
   so the HUD border/score colour progression follows the cabinet source more
   closely.
+- The live laser beam and the colour-cycling bomb / attract-cycler sprite
+  families now take their palette walk from the red-label `COLTAB` bytes in
+  `defa7.src` / `defb6.src` rather than the earlier invented RGB sequence.
 - Gameplay sprite phasing now follows ROM-informed display rules more closely:
   the player ship uses left/right cabinet art with horizontal display-phase
   selection instead of a made-up tick animation, shared enemy animation now

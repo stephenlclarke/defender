@@ -12,6 +12,11 @@ const GRAY: [u8; 4] = [170, 170, 186, 255];
 const PURPLE: [u8; 4] = [182, 48, 255, 255];
 const WHITE: [u8; 4] = [255, 255, 255, 255];
 const TRANSPARENT: [u8; 4] = [0, 0, 0, 0];
+const ROM_COLTAB: [u8; 37] = [
+    0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x47, 0x47, 0x87,
+    0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
+    0xBF, 0x3F, 0x3E, 0x3C, 0x00,
+];
 
 #[derive(Clone, Copy, Debug)]
 pub struct PaletteOverrides {
@@ -75,8 +80,7 @@ pub fn player_shot_palette() -> PaletteOverrides {
 }
 
 pub fn bomb_palette(phase: usize) -> PaletteOverrides {
-    const CYCLE: [[u8; 4]; 4] = [PURPLE, YELLOW, RED, WHITE];
-    let color = CYCLE[phase % CYCLE.len()];
+    let color = coltab_color(phase);
     PaletteOverrides::new(WHITE, color, WHITE, WHITE, WHITE, WHITE)
 }
 
@@ -105,14 +109,13 @@ pub fn tie_palette(phase: usize) -> PaletteOverrides {
 }
 
 pub fn cycler_palette(phase: usize) -> PaletteOverrides {
-    const CYCLE: [[u8; 4]; 4] = [PURPLE, RED, YELLOW, WHITE];
     PaletteOverrides::new(
         WHITE,
         WHITE,
-        CYCLE[phase % CYCLE.len()],
-        CYCLE[(phase + 1) % CYCLE.len()],
-        CYCLE[(phase + 2) % CYCLE.len()],
-        CYCLE[(phase + 3) % CYCLE.len()],
+        coltab_color(phase),
+        coltab_color(phase + 1),
+        coltab_color(phase + 2),
+        coltab_color(phase + 3),
     )
 }
 
@@ -177,13 +180,21 @@ fn crtab_color(value: u8) -> [u8; 4] {
     pseudo_color_rgba(value)
 }
 
+pub fn coltab_color(phase: usize) -> [u8; 4] {
+    let color = ROM_COLTAB[phase % (ROM_COLTAB.len() - 1)];
+    pseudo_color_rgba(color)
+}
+
 fn scale_channel(value: u8, max: u8) -> u8 {
     ((u16::from(value) * 255) / u16::from(max.max(1))) as u8
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{pseudo_color_rgba, render_picture, score_500_palette, ship_palette, tie_palette};
+    use super::{
+        coltab_color, pseudo_color_rgba, render_picture, score_500_palette, ship_palette,
+        tie_palette,
+    };
     use crate::object_rom_data::{C5P1, PLAPIC, TIEP1};
 
     #[test]
@@ -220,5 +231,15 @@ mod tests {
         assert!(red[0] > red[1] && red[0] > red[2]);
         assert!(green[1] > green[0] && green[1] > green[2]);
         assert!(blue[2] > blue[0] && blue[2] > blue[1]);
+    }
+
+    #[test]
+    fn coltab_cycle_uses_rom_color_bytes() {
+        let first = coltab_color(0);
+        let later = coltab_color(8);
+
+        assert_ne!(first, later);
+        assert!(first[1] > 0 || first[2] > 0);
+        assert!(later[0] > 0 || later[1] > 0 || later[2] > 0);
     }
 }
