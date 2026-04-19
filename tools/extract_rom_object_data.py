@@ -19,6 +19,7 @@ PICTURE_LABELS = [
     "PLAPIC",
     "PLBPIC",
     "PLAMIN",
+    "SBPIC",
     "LASP1",
     "BMBP1",
     "BMBP2",

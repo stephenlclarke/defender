@@ -50,6 +50,14 @@ pub const PLAMIN: RomPictureData = RomPictureData {
     bytes: &PLAMIN_BYTES,
 };
 
+pub const SBPIC_BYTES: [u8; 9] = [0x90, 0x09, 0x90, 0x99, 0x99, 0x99, 0x90, 0xCC, 0x90];
+
+pub const SBPIC: RomPictureData = RomPictureData {
+    rows: 3,
+    bytes_per_row: 3,
+    bytes: &SBPIC_BYTES,
+};
+
 pub const LASP1_BYTES: [u8; 8] = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
 
 pub const LASP1: RomPictureData = RomPictureData {

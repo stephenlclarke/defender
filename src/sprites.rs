@@ -4,7 +4,8 @@
 //! Defender sprite rip published by Sean Riddle's Williams graphics ripper
 //! work, then bundled into the app with `include_bytes!`. The runtime keeps
 //! the bundled `500` rescue-bonus art, while using ROM-backed picture decoding
-//! for the live player ship phases and the `250` rescue score art.
+//! for the live player ship phases, the cabinet smart-bomb icon, and the
+//! `250` rescue score art.
 
 use std::{
     io::Cursor,
@@ -16,8 +17,8 @@ use png::{ColorType, Decoder, Transformations};
 
 use crate::{
     game::{Entity, EntityKind, HorizontalDirection},
-    object_rom::{render_picture, score_250_palette, ship_palette},
-    object_rom_data::{C25P1, PLAPIC, PLAPIC_ODD, PLBPIC, PLBPIC_ODD},
+    object_rom::{render_picture, score_250_palette, ship_palette, smart_bomb_palette},
+    object_rom_data::{C25P1, PLAPIC, PLAPIC_ODD, PLBPIC, PLBPIC_ODD, SBPIC},
     video::RenderedImage,
 };
 
@@ -28,6 +29,7 @@ pub struct ArcadeSprites {
     ship_left_even: Arc<RenderedImage>,
     ship_left_odd: Arc<RenderedImage>,
     little_ship: Arc<RenderedImage>,
+    smart_bomb: Arc<RenderedImage>,
     player_shot: Arc<RenderedImage>,
     enemy_shots: [Arc<RenderedImage>; 2],
     human: Arc<RenderedImage>,
@@ -62,6 +64,7 @@ impl ArcadeSprites {
             ship_left_even: load_rom_picture(&PLBPIC, ship_palette()),
             ship_left_odd: load_rom_picture(&PLBPIC_ODD, ship_palette()),
             little_ship: load_embedded_png(include_bytes!("../assets/arcade/littleship.png")),
+            smart_bomb: load_rom_picture(&SBPIC, smart_bomb_palette()),
             player_shot: load_embedded_png(include_bytes!("../assets/arcade/player-shot.png")),
             enemy_shots: [
                 load_embedded_png(include_bytes!("../assets/arcade/bomb1.png")),
@@ -149,6 +152,10 @@ impl ArcadeSprites {
 
     pub fn player_stock_icon(&self) -> Arc<RenderedImage> {
         self.little_ship.clone()
+    }
+
+    pub fn smart_bomb_icon(&self) -> Arc<RenderedImage> {
+        self.smart_bomb.clone()
     }
 
     pub fn player_shot(&self) -> Arc<RenderedImage> {
@@ -292,6 +299,15 @@ mod tests {
     #[test]
     fn player_stock_icon_decodes_with_pixels() {
         let icon = arcade_sprites().player_stock_icon();
+
+        assert!(icon.width > 0);
+        assert!(icon.height > 0);
+        assert!(icon.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
+    }
+
+    #[test]
+    fn smart_bomb_icon_decodes_with_pixels() {
+        let icon = arcade_sprites().smart_bomb_icon();
 
         assert!(icon.width > 0);
         assert!(icon.height > 0);

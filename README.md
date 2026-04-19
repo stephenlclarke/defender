@@ -187,6 +187,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   red-label `WCTAB` colour table instead of the earlier three-colour heuristic,
   so the HUD border/score colour progression follows the cabinet source more
   closely.
+- The live gameplay HUD now follows the cabinet `TDISP` / `LDISP` / `SBDISP` /
+  `BORDER` layout directly: the score, mini-ship stock row, smart-bomb column,
+  long top-screen line, and centered scanner geometry now come from the
+  original `P1LAT`, `P1DISP`, `P1SBD`, `SCANER`, and border constants instead
+  of the earlier hand-laid pod boxes and wave/bomb text readout.
 - The live laser beam and the colour-cycling bomb / attract-cycler sprite
   families now take their palette walk from the red-label `COLTAB` bytes in
   `defa7.src` / `defb6.src` rather than the earlier invented RGB sequence.

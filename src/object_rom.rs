@@ -81,6 +81,10 @@ pub fn player_shot_palette() -> PaletteOverrides {
     PaletteOverrides::new(WHITE, WHITE, WHITE, WHITE, WHITE, [255, 234, 128, 255])
 }
 
+pub fn smart_bomb_palette() -> PaletteOverrides {
+    PaletteOverrides::new(WHITE, WHITE, WHITE, WHITE, WHITE, WHITE)
+}
+
 pub fn bomb_palette(phase: usize) -> PaletteOverrides {
     let color = coltab_color(phase);
     PaletteOverrides::new(WHITE, color, WHITE, WHITE, WHITE, WHITE)

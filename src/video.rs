@@ -17,6 +17,8 @@ const LOGICAL_WIDTH: u32 = 960;
 const LOGICAL_HEIGHT: u32 = 720;
 const MAX_RENDER_WIDTH: u32 = 1_280;
 const MAX_RENDER_HEIGHT: u32 = 960;
+const CABINET_NATIVE_WIDTH: i32 = 320;
+const CABINET_NATIVE_HEIGHT: i32 = 256;
 const BACKGROUND: [u8; 4] = [2, 5, 11, 255];
 const PANEL_BACKGROUND: [u8; 4] = [10, 14, 26, 255];
 const PANEL_BORDER: [u8; 4] = [86, 123, 255, 255];
@@ -53,6 +55,18 @@ const ATTRACT_TABLE_XS: [i32; 6] = [0x0900, 0x1100, 0x1980, 0x0960, 0x1160, 0x19
 const ATTRACT_TABLE_YS: [i32; 6] = [0x6000, 0x6000, 0x6200, 0x9800, 0x9800, 0x9A00];
 const ATTRACT_LEGEND_LABEL_OFFSET_Y: i32 = 44;
 const ATTRACT_LEGEND_SCORE_OFFSET_Y: i32 = 70;
+const HUD_LINE_START_BYTE: i32 = 0x20;
+const HUD_LINE_END_BYTE: i32 = 0x9B;
+const SCANNER_LEFT_BYTE: i32 = 0x2F;
+const SCANNER_RIGHT_BYTE: i32 = 0x70;
+const SCANNER_TOP_Y: i32 = 0x07;
+const SCANNER_BOTTOM_Y: i32 = 0x28;
+const P1_LAT: u16 = 0x0F14;
+const P1_DISP: u16 = 0x0F1C;
+const P1_SBD: u16 = 0x291B;
+const P2_LAT: u16 = 0x7104 + 0x10;
+const P2_DISP: u16 = 0x711C;
+const P2_SBD: u16 = 0x8B1B;
 // These entries follow the ROM `TEXTAB` / `ENMYTB` order for the attract
 // instruction page. Their actual screen anchors are derived at render time from
 // the ROM object coordinates so the label/score text stays aligned under the
@@ -122,7 +136,7 @@ pub struct Renderer {
 #[derive(Clone, Copy)]
 struct Color(u8, u8, u8, u8);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Rect {
     x: i32,
     y: i32,
@@ -135,6 +149,18 @@ struct AttractLegendEntry {
     kind: EntityKind,
     label: &'static str,
     score: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct GameplayHudLayout {
+    scanner: Rect,
+    baseline_y: i32,
+    player_one_lives: (i32, i32),
+    player_one_score: (i32, i32),
+    player_one_smart_bombs: (i32, i32),
+    player_two_lives: (i32, i32),
+    player_two_score: (i32, i32),
+    player_two_smart_bombs: (i32, i32),
 }
 
 #[derive(Clone, Copy)]
@@ -487,10 +513,10 @@ impl Renderer {
         invincible: bool,
         auto_fire: bool,
     ) {
-        let scanner = self.gameplay_scanner_rect();
-        let playfield = self.gameplay_playfield_rect(scanner);
-        self.draw_gameplay_hud(world, scanner);
-        self.draw_arcade_play_scanner(world, scanner);
+        let hud = self.gameplay_hud_layout();
+        let playfield = self.gameplay_playfield_rect(hud);
+        self.draw_gameplay_hud(world, hud);
+        self.draw_arcade_play_scanner(world, hud.scanner);
         self.draw_world_panel_with_style(
             world,
             playfield,
@@ -651,69 +677,52 @@ impl Renderer {
         );
     }
 
-    fn draw_gameplay_hud(&mut self, world: &World, scanner: Rect) {
+    fn draw_gameplay_hud(&mut self, world: &World, hud: GameplayHudLayout) {
         let hud_color = scanner_hud_color(world);
-        let baseline_y = scanner.y + scanner.height + 10;
-        let pod_y = scanner.y + 8;
-        let pod_height = scanner.height - 16;
-        let pod_gap = 20;
-        let left_pod = Rect {
-            x: 44,
-            y: pod_y,
-            width: scanner.x - 44 - pod_gap,
-            height: pod_height,
-        };
-        let right_pod = Rect {
-            x: scanner.x + scanner.width + pod_gap,
-            y: pod_y,
-            width: self.image_width as i32 - (scanner.x + scanner.width + pod_gap) - 44,
-            height: pod_height,
-        };
-
         self.draw_line(
-            24,
-            baseline_y,
-            self.image_width as i32 - 24,
-            baseline_y,
+            self.project_native_game_x(rom_byte_to_native_x(HUD_LINE_START_BYTE)),
+            hud.baseline_y,
+            self.project_native_game_x(rom_byte_to_native_x(HUD_LINE_END_BYTE + 1)),
+            hud.baseline_y,
             Color::from_rgba(hud_color),
-            2,
+            3,
         );
-        self.stroke_rect(left_pod, Color::from_rgba(hud_color), 4);
-        self.fill_rect(left_pod.inset(4), Color::from_rgba(BACKGROUND));
-        self.stroke_rect(right_pod, Color::from_rgba(hud_color), 4);
-        self.fill_rect(right_pod.inset(4), Color::from_rgba(BACKGROUND));
 
         let score_text = format!("{:>5}", world.status().score);
-        self.draw_text(left_pod.x + 18, left_pod.y + 26, &score_text, hud_color, 4);
-        for index in 0..world.status().lives {
-            let icon = arcade_sprites().player_stock_icon();
-            self.draw_scaled_image_centered(
-                icon.as_ref(),
-                left_pod.x + left_pod.width - 22 - i32::from(index) * 22,
-                left_pod.y + 18,
-                12,
+        self.draw_text(
+            hud.player_one_score.0,
+            hud.player_one_score.1,
+            &score_text,
+            hud_color,
+            self.gameplay_digit_scale(),
+        );
+
+        let stock_icon = arcade_sprites().player_stock_icon();
+        let stock_height = self.scale_native_game_y(i32::try_from(stock_icon.height).unwrap_or(5));
+        for index in 0..world.status().lives.min(5) {
+            let native_x = hud.player_one_lives.0 + i32::from(index) * rom_byte_to_native_x(0x06);
+            let native_y = hud.player_one_lives.1;
+            self.draw_scaled_image_top_left(stock_icon.as_ref(), native_x, native_y, stock_height);
+        }
+
+        let smart_bomb_icon = arcade_sprites().smart_bomb_icon();
+        let smart_bomb_height =
+            self.scale_native_game_y(i32::try_from(smart_bomb_icon.height).unwrap_or(3));
+        for index in 0..world.smart_bombs().min(3) {
+            let native_x = hud.player_one_smart_bombs.0;
+            let native_y = hud.player_one_smart_bombs.1 + i32::from(index) * 4;
+            self.draw_scaled_image_top_left(
+                smart_bomb_icon.as_ref(),
+                native_x,
+                native_y,
+                smart_bomb_height,
             );
         }
 
-        self.draw_text(
-            right_pod.x + 16,
-            right_pod.y + 16,
-            &format!("{:>4}", world.status().wave),
-            hud_color,
-            3,
-        );
-        self.draw_text(
-            right_pod.x + 16,
-            right_pod.y + 50,
-            &format!("B{:>2}", world.smart_bombs()),
-            TEXT_ARCADE_WHITE,
-            2,
-        );
-
         if world.planet_destroyed() {
             self.draw_centered_text(
-                self.image_width as i32 / 2,
-                scanner.y - 18,
+                hud.scanner.center_x(),
+                hud.scanner.y - self.scale_native_game_y(12),
                 "DEEP SPACE",
                 TEXT_DANGER,
                 2,
@@ -1443,22 +1452,58 @@ impl Renderer {
         }
     }
 
-    fn gameplay_scanner_rect(&self) -> Rect {
-        let width = (self.image_width as i32 - 420).max(320);
-        Rect {
-            x: self.image_width as i32 / 2 - width / 2,
-            y: 34,
-            width,
-            height: 92,
+    fn gameplay_hud_layout(&self) -> GameplayHudLayout {
+        GameplayHudLayout {
+            scanner: Rect {
+                x: self.project_native_game_x(rom_byte_to_native_x(SCANNER_LEFT_BYTE)),
+                y: self.project_native_game_y(SCANNER_TOP_Y),
+                width: self.project_native_game_x(rom_byte_to_native_x(SCANNER_RIGHT_BYTE + 1))
+                    - self.project_native_game_x(rom_byte_to_native_x(SCANNER_LEFT_BYTE)),
+                height: self.project_native_game_y(SCANNER_BOTTOM_Y + 1)
+                    - self.project_native_game_y(SCANNER_TOP_Y),
+            },
+            baseline_y: self.project_native_game_y(SCANNER_BOTTOM_Y + 1),
+            player_one_lives: self.project_native_game_addr(P1_LAT),
+            player_one_score: self.project_native_game_addr(P1_DISP),
+            player_one_smart_bombs: self.project_native_game_addr(P1_SBD),
+            player_two_lives: self.project_native_game_addr(P2_LAT),
+            player_two_score: self.project_native_game_addr(P2_DISP),
+            player_two_smart_bombs: self.project_native_game_addr(P2_SBD),
         }
     }
 
-    fn gameplay_playfield_rect(&self, scanner_rect: Rect) -> Rect {
+    fn gameplay_digit_scale(&self) -> i32 {
+        (self.image_width as i32 / CABINET_NATIVE_WIDTH).max(1)
+    }
+
+    fn project_native_game_addr(&self, address: u16) -> (i32, i32) {
+        (
+            self.project_native_game_x(rom_addr_to_native_x(address)),
+            self.project_native_game_y(rom_addr_to_native_y(address)),
+        )
+    }
+
+    fn project_native_game_x(&self, native_x: i32) -> i32 {
+        ((i64::from(native_x) * i64::from(self.image_width) + i64::from(CABINET_NATIVE_WIDTH / 2))
+            / i64::from(CABINET_NATIVE_WIDTH)) as i32
+    }
+
+    fn project_native_game_y(&self, native_y: i32) -> i32 {
+        ((i64::from(native_y) * i64::from(self.image_height)
+            + i64::from(CABINET_NATIVE_HEIGHT / 2))
+            / i64::from(CABINET_NATIVE_HEIGHT)) as i32
+    }
+
+    fn scale_native_game_y(&self, native_height: i32) -> i32 {
+        (self.project_native_game_y(native_height) - self.project_native_game_y(0)).max(1)
+    }
+
+    fn gameplay_playfield_rect(&self, hud: GameplayHudLayout) -> Rect {
         Rect {
-            x: 24,
-            y: scanner_rect.y + scanner_rect.height + 38,
-            width: self.image_width as i32 - 48,
-            height: self.image_height as i32 - (scanner_rect.y + scanner_rect.height + 98),
+            x: 0,
+            y: hud.baseline_y + self.scale_native_game_y(4),
+            width: self.image_width as i32,
+            height: self.image_height as i32 - (hud.baseline_y + self.scale_native_game_y(4)),
         }
     }
 
@@ -1585,6 +1630,43 @@ impl Renderer {
         let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
         let origin_x = center_x - target_width / 2;
         let origin_y = center_y - target_height / 2;
+
+        for dy in 0..target_height {
+            let src_y = ((dy as u32) * image.height / target_height as u32).min(image.height - 1);
+            for dx in 0..target_width {
+                let src_x = ((dx as u32) * image.width / target_width as u32).min(image.width - 1);
+                let index = ((src_y * image.width + src_x) * 4) as usize;
+                let alpha = image.pixels[index + 3];
+                if alpha == 0 {
+                    continue;
+                }
+                self.render_target.blend_pixel(
+                    origin_x + dx,
+                    origin_y + dy,
+                    Color(
+                        image.pixels[index],
+                        image.pixels[index + 1],
+                        image.pixels[index + 2],
+                        alpha,
+                    ),
+                );
+            }
+        }
+    }
+
+    fn draw_scaled_image_top_left(
+        &mut self,
+        image: &RenderedImage,
+        origin_x: i32,
+        origin_y: i32,
+        target_height: i32,
+    ) {
+        if image.width == 0 || image.height == 0 {
+            return;
+        }
+
+        let target_height = target_height.max(1);
+        let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
 
         for dy in 0..target_height {
             let src_y = ((dy as u32) * image.height / target_height as u32).min(image.height - 1);
@@ -2386,6 +2468,18 @@ fn scanner_hud_color(world: &World) -> [u8; 4] {
     pseudo_color_rgba(WCTAB[wave_index])
 }
 
+fn rom_byte_to_native_x(byte_x: i32) -> i32 {
+    byte_x * 2
+}
+
+fn rom_addr_to_native_x(address: u16) -> i32 {
+    rom_byte_to_native_x(i32::from(address >> 8))
+}
+
+fn rom_addr_to_native_y(address: u16) -> i32 {
+    i32::from(address & 0x00FF)
+}
+
 fn attract_legend_color(kind: EntityKind) -> [u8; 4] {
     match kind {
         EntityKind::Lander => [248, 232, 132, 255],
@@ -2529,6 +2623,29 @@ mod tests {
     }
 
     #[test]
+    fn gameplay_hud_layout_matches_rom_addresses_at_native_scale() {
+        let renderer = Renderer::with_size(320, 256);
+        let hud = renderer.gameplay_hud_layout();
+
+        assert_eq!(
+            hud.scanner,
+            super::Rect {
+                x: 94,
+                y: 7,
+                width: 132,
+                height: 34,
+            }
+        );
+        assert_eq!(hud.baseline_y, 41);
+        assert_eq!(hud.player_one_lives, (30, 20));
+        assert_eq!(hud.player_one_score, (30, 28));
+        assert_eq!(hud.player_one_smart_bombs, (82, 27));
+        assert_eq!(hud.player_two_lives, (226, 20));
+        assert_eq!(hud.player_two_score, (226, 28));
+        assert_eq!(hud.player_two_smart_bombs, (278, 27));
+    }
+
+    #[test]
     fn attract_500_bonus_cycles_colors_across_animation_ticks() {
         let frame_a = AttractFrame {
             world: World::bootstrap(),
@@ -2594,8 +2711,7 @@ mod tests {
             },
             vec![Entity::new(EntityKind::Lander, 0, 10, 0, 0)],
         );
-        let scanner = renderer.gameplay_scanner_rect();
-        let playfield = renderer.gameplay_playfield_rect(scanner);
+        let playfield = renderer.gameplay_playfield_rect(renderer.gameplay_hud_layout());
 
         let image = renderer.render(Screen::Playing {
             world: &world,
@@ -2604,13 +2720,11 @@ mod tests {
             auto_fire: false,
         });
 
-        for y in playfield.y as u32..(playfield.y + playfield.height) as u32 {
-            for x in 0..playfield.x as u32 {
-                assert_eq!(
-                    sample_pixel(&image.pixels, image.width, x, y),
-                    super::BACKGROUND
-                );
-            }
+        for y in 0..playfield.y as u32 {
+            assert_eq!(
+                sample_pixel(&image.pixels, image.width, 0, y),
+                super::BACKGROUND
+            );
         }
     }
 
