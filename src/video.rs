@@ -48,9 +48,6 @@ const SWARMER_COLOR: [u8; 4] = [255, 170, 92, 255];
 const ENEMY_SHOT_COLOR: [u8; 4] = [255, 94, 94, 255];
 const PLAYER_SHOT_COLOR: [u8; 4] = [255, 255, 140, 255];
 const MINE_COLOR: [u8; 4] = [255, 74, 34, 255];
-const LASER_SOURCE_WHITE: [u8; 4] = [255, 255, 255, 255];
-const LASER_SOURCE_HIGHLIGHT: [u8; 4] = [255, 255, 210, 255];
-const LASER_SOURCE_CORE: [u8; 4] = [255, 234, 128, 255];
 const LOGO_PAGE_X_OFFSET: i32 = -96;
 const ATTRACT_TABLE_XS: [i32; 6] = [0x0900, 0x1100, 0x1980, 0x0960, 0x1160, 0x19E0];
 const ATTRACT_TABLE_YS: [i32; 6] = [0x6000, 0x6000, 0x6200, 0x9800, 0x9800, 0x9A00];
@@ -1155,30 +1152,62 @@ impl Renderer {
         animation_tick: u32,
         clip_rect: Rect,
     ) {
-        let image = arcade_sprites().player_shot();
-        let target_height = target_height.max(2);
-        let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
-        let step = (target_width - 2).max(1);
-        let center_y = (y0 + y1) / 2;
         let left = x0.min(x1);
         let right = x0.max(x1);
-        let remap = laser_sprite_remap(animation_tick);
-        let mut segment_left = left;
-
-        while segment_left <= right {
-            let center_x = segment_left + target_width / 2;
-            self.draw_scaled_image_centered_clipped_remapped(
-                image.as_ref(),
-                center_x,
-                center_y,
-                target_height,
-                &remap,
-                clip_rect,
-            );
-            segment_left += step;
+        if right <= left {
+            return;
         }
 
-        self.draw_dot(right, center_y, Color::from_rgba(TEXT_ARCADE_WHITE), 1);
+        let center_y = (y0 + y1) / 2;
+        let target_height = target_height.max(4);
+        let row_spacing = (target_height / 4).max(1);
+        let top_row = center_y - (row_spacing * 3) / 2;
+        let phase = (animation_tick / 2) as usize;
+        let body_end = (right - 6).max(left);
+        let segment_length = (target_height / 2).max(4);
+        let gap = 2;
+
+        for row in 0..4 {
+            let y = top_row + row * row_spacing;
+            let color = Color::from_rgba(coltab_color(phase + row as usize));
+            let mut segment_left = left + (row % 2) * 2;
+            while segment_left <= body_end {
+                let segment_right = (segment_left + segment_length - 1).min(body_end);
+                for x in segment_left..=segment_right {
+                    if clip_rect.contains(x, y) {
+                        self.render_target.blend_pixel(x, y, color);
+                    }
+                }
+                segment_left += segment_length + gap;
+            }
+        }
+
+        // `LASR` / `LASL` finish with the bright `$99` tip bytes, and `FISS`
+        // fills the trailing nibble table with a short noisy fringe instead of
+        // leaving the beam body as one solid bar.
+        let tip_left = (right - 4).max(left);
+        for row in 0..4 {
+            let y = top_row + row * row_spacing;
+            let tip_color = if row % 2 == 0 {
+                Color::from_rgba(TEXT_ARCADE_WHITE)
+            } else {
+                Color::from_rgba(coltab_color(phase + 6 + row as usize))
+            };
+            for x in tip_left..=right {
+                if clip_rect.contains(x, y) {
+                    self.render_target.blend_pixel(x, y, tip_color);
+                }
+            }
+        }
+
+        for offset in 0..4 {
+            let x = (tip_left - 2 - offset * 2).max(left);
+            let y = top_row + (((phase + offset as usize) % 4) as i32) * row_spacing;
+            let color = Color::from_rgba(coltab_color(phase + 9 + offset as usize));
+            if clip_rect.contains(x, y) {
+                self.render_target.blend_pixel(x, y, color);
+            }
+        }
     }
 
     fn draw_attract_bonus_text(
@@ -1191,7 +1220,13 @@ impl Renderer {
         let y = project_attract_y(rect, bonus_text.y16);
         if bonus_text.text == "500" {
             let image = arcade_sprites().score_500(animation_tick);
-            self.draw_scaled_image_centered(image.as_ref(), x, y + 8, 28);
+            self.draw_scaled_image_centered_remapped(
+                image.as_ref(),
+                x,
+                y + 8,
+                28,
+                &score_500_bonus_remap(animation_tick),
+            );
             return;
         }
         if bonus_text.text == "250" {
@@ -1606,54 +1641,6 @@ impl Renderer {
                         alpha,
                     ),
                 );
-            }
-        }
-    }
-
-    fn draw_scaled_image_centered_clipped_remapped(
-        &mut self,
-        image: &RenderedImage,
-        center_x: i32,
-        center_y: i32,
-        target_height: i32,
-        remap: &[([u8; 4], [u8; 4])],
-        clip_rect: Rect,
-    ) {
-        if image.width == 0 || image.height == 0 {
-            return;
-        }
-
-        let target_height = target_height.max(1);
-        let target_width = (((image.width as i32) * target_height) / image.height as i32).max(1);
-        let origin_x = center_x - target_width / 2;
-        let origin_y = center_y - target_height / 2;
-
-        for dy in 0..target_height {
-            let src_y = ((dy as u32) * image.height / target_height as u32).min(image.height - 1);
-            for dx in 0..target_width {
-                let px = origin_x + dx;
-                let py = origin_y + dy;
-                if !clip_rect.contains(px, py) {
-                    continue;
-                }
-                let src_x = ((dx as u32) * image.width / target_width as u32).min(image.width - 1);
-                let index = ((src_y * image.width + src_x) * 4) as usize;
-                let alpha = image.pixels[index + 3];
-                if alpha == 0 {
-                    continue;
-                }
-                let source = [
-                    image.pixels[index],
-                    image.pixels[index + 1],
-                    image.pixels[index + 2],
-                    alpha,
-                ];
-                let mapped = remap
-                    .iter()
-                    .find_map(|(from, to)| (*from == source).then_some(*to))
-                    .unwrap_or(source);
-                self.render_target
-                    .blend_pixel(px, py, Color::from_rgba(mapped));
             }
         }
     }
@@ -2340,12 +2327,27 @@ fn attract_laser_target_anchor(kind: EntityKind, cx: i32, cy: i32) -> (i32, i32)
     }
 }
 
-fn laser_sprite_remap(animation_tick: u32) -> [([u8; 4], [u8; 4]); 3] {
-    let phase = (animation_tick / 2) as usize;
+fn score_500_bonus_remap(animation_tick: u32) -> [([u8; 4], [u8; 4]); 14] {
+    let phase = ((animation_tick / 5) as usize) % 3;
+    let cycle = [[255, 80, 80, 255], [40, 56, 220, 255], [255, 188, 0, 255]];
+    let primary = cycle[phase];
+    let secondary = cycle[(phase + 1) % cycle.len()];
+    let tertiary = cycle[(phase + 2) % cycle.len()];
     [
-        (LASER_SOURCE_WHITE, TEXT_ARCADE_WHITE),
-        (LASER_SOURCE_HIGHLIGHT, coltab_color(phase + 2)),
-        (LASER_SOURCE_CORE, coltab_color(phase)),
+        ([29, 0, 180, 255], primary),
+        ([33, 4, 174, 255], primary),
+        ([31, 1, 175, 255], primary),
+        ([32, 0, 176, 255], primary),
+        ([34, 3, 167, 255], primary),
+        ([33, 0, 177, 255], primary),
+        ([242, 184, 0, 255], secondary),
+        ([249, 186, 0, 255], secondary),
+        ([249, 191, 0, 255], secondary),
+        ([252, 192, 0, 255], secondary),
+        ([254, 180, 0, 255], secondary),
+        ([255, 172, 23, 255], tertiary),
+        ([255, 189, 12, 255], tertiary),
+        ([255, 184, 4, 255], tertiary),
     ]
 }
 
@@ -2424,7 +2426,8 @@ fn attract_materialize_height(kind: EntityKind, visual_tick: u16) -> i32 {
 mod tests {
     use super::{Renderer, Screen, scale_to_fit};
     use crate::{
-        game::{Entity, EntityKind, Status, World},
+        attract::{AttractBonusText, AttractFrame},
+        game::{Entity, EntityKind, HorizontalDirection, Status, World},
         high_scores::HighScoreTable,
         render::InitialsEntryView,
         terminal::TerminalGeometry,
@@ -2477,7 +2480,7 @@ mod tests {
     }
 
     #[test]
-    fn gameplay_player_shot_renders_as_a_solid_tiled_beam() {
+    fn gameplay_player_shot_renders_as_a_horizontal_cabinet_beam() {
         let mut renderer = Renderer::with_size(960, 720);
         let world = World::with_entities(
             64,
@@ -2507,13 +2510,66 @@ mod tests {
             super::BACKGROUND
         );
         assert_ne!(
-            sample_pixel(&image.pixels, image.width, 481, y),
+            sample_pixel(&image.pixels, image.width, 486, y + 1),
             super::BACKGROUND
         );
         assert_eq!(
             sample_pixel(&image.pixels, image.width, 481, y - 12),
             super::VIEWPORT_BACKGROUND
         );
+    }
+
+    #[test]
+    fn attract_500_bonus_cycles_colors_across_animation_ticks() {
+        let frame_a = AttractFrame {
+            world: World::bootstrap(),
+            objects: Vec::new(),
+            revealed_score_entries: 0,
+            bonus_text: Some(AttractBonusText {
+                text: "500",
+                x16: 0x1DFF,
+                y16: 0x9000,
+            }),
+            player_facing: HorizontalDirection::Right,
+            animation_tick: 0,
+        };
+        let frame_b = AttractFrame {
+            world: World::bootstrap(),
+            objects: Vec::new(),
+            revealed_score_entries: 0,
+            bonus_text: Some(AttractBonusText {
+                text: "500",
+                x16: 0x1DFF,
+                y16: 0x9000,
+            }),
+            player_facing: HorizontalDirection::Right,
+            animation_tick: 5,
+        };
+
+        let image_a_pixels = {
+            let mut renderer = Renderer::with_size(960, 720);
+            renderer
+                .render(Screen::Attract {
+                    frame: &frame_a,
+                    palette_phase: 0,
+                    elapsed_ms: 0,
+                })
+                .pixels
+                .clone()
+        };
+        let image_b_pixels = {
+            let mut renderer = Renderer::with_size(960, 720);
+            renderer
+                .render(Screen::Attract {
+                    frame: &frame_b,
+                    palette_phase: 0,
+                    elapsed_ms: 0,
+                })
+                .pixels
+                .clone()
+        };
+
+        assert_ne!(image_a_pixels, image_b_pixels);
     }
 
     #[test]

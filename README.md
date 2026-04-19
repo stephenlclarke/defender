@@ -162,10 +162,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   sequence in native fixed-point attract coordinates rather than routing those
   poses through the normal gameplay world update loop.
 - The attract score-card kills now preserve the real enemy picture family
-  through the red-label explode/appear split instead of swapping every hit to a
-  generic blast, so the rescue/legend sequence grows and coalesces the
-  cabinet-backed object art rather than alternating placeholder explosion
-  stamps.
+  through the red-label `AMOD10` / `AMOD11` / `BMODE2` / `BMODE3` split
+  instead of swapping every hit to a generic blast, so the rescue/legend
+  sequence now keeps the source enemy alive for the full `LASRS` dwell, then
+  explodes the source object and materializes the table-side icon on the same
+  transfer tick before the score text appears.
 - The first attract-page and hall-of-fame screens now keep a live
   elapsed-time colour cycle running during the first `16` seconds of the
   cabinet sequence, matching the flashing/cycling behaviour visible in the
@@ -175,10 +176,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   section starts.
 - The live gameplay renderer now uses a cabinet-style open black playfield with
   amber terrain, clipped sprite drawing, a centered scanner block with score
-  side pods, a sparser mixed-colour starfield, colour-cycling attract `500`
-  bonus text, a segmented cycling attract/gameplay laser beam, and larger
-  hall-of-fame score rows, so the README screenshot and attract GIF are closer
-  to the original cabinet framing and effects.
+  side pods, a sparser mixed-colour starfield, a red/blue/yellow cycling
+  attract `500` bonus text, a ROM-shaped multi-row `LASR` / `LASL` beam with
+  the bright tip and `FISS`-style fringe, and larger hall-of-fame score rows,
+  so the README screenshot and attract GIF are closer to the original cabinet
+  framing and effects.
 - The gameplay scanner block and score pods now derive their wave tint from the
   red-label `WCTAB` colour table instead of the earlier three-colour heuristic,
   so the HUD border/score colour progression follows the cabinet source more

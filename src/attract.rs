@@ -559,11 +559,12 @@ fn append_legend_entities(
     player_x16: i32,
     player_y16: i32,
 ) {
-    let hold_start = LEGEND_ENTRY_TICKS * ATTRACT_SCORE_CARD.len() as u16;
+    let source_y = 0xA000 - i32::from(LEGEND_APPROACH_TICKS) * 0x00C0;
     for index in 0..ATTRACT_SCORE_CARD.len() {
         let entry_start = index as u16 * LEGEND_ENTRY_TICKS;
-        let entry_show_tick = entry_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
-        if table_tick >= entry_show_tick {
+        let transfer_tick = entry_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
+        let entry_end = entry_start + LEGEND_ENTRY_TICKS;
+        if table_tick >= entry_end {
             objects.push(attract_object(
                 legend_kind(index),
                 ATTRACT_TABLE_XS[index],
@@ -574,40 +575,44 @@ fn append_legend_entities(
 
         if table_tick >= entry_start {
             let local = table_tick - entry_start;
-            let enemy_y = 0xA000 - i32::from(local.min(entry_show_tick - entry_start)) * 0x00C0;
+            let enemy_y = if local < LEGEND_APPROACH_TICKS {
+                0xA000 - i32::from(local) * 0x00C0
+            } else {
+                source_y
+            };
             if local < LEGEND_APPROACH_TICKS {
                 objects.push(attract_object(legend_kind(index), 0x1F00, enemy_y));
-            } else if local < LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS / 2 {
+            } else if local < LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS {
+                // `AMOD10` leaves the active enemy intact for the whole
+                // `LASRS` dwell. `AMOD11` then explodes that source object and
+                // starts the table-side `APVCT` on the same transfer tick.
+                objects.push(attract_object(legend_kind(index), 0x1F00, enemy_y));
+            } else if local < LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TEXT_TICKS {
                 objects.push(attract_visual_object(
                     legend_kind(index),
                     0x1F00,
                     enemy_y,
                     AttractVisual::Explosion,
-                    local - LEGEND_APPROACH_TICKS,
+                    local - (LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS),
                 ));
-            } else if local < entry_show_tick - entry_start {
                 objects.push(attract_visual_object(
                     legend_kind(index),
                     ATTRACT_TABLE_XS[index],
                     ATTRACT_TABLE_YS[index],
                     AttractVisual::Materialize,
-                    local - (LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS / 2),
+                    local - (LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS),
+                ));
+            } else {
+                objects.push(attract_object(
+                    legend_kind(index),
+                    ATTRACT_TABLE_XS[index],
+                    ATTRACT_TABLE_YS[index],
                 ));
             }
-            if local >= LEGEND_APPROACH_TICKS && local < entry_show_tick - entry_start {
+            if local >= LEGEND_APPROACH_TICKS && local < transfer_tick - entry_start {
                 add_laser_column(objects, player_x16, player_y16, 0x1F00, enemy_y);
             }
             break;
-        }
-    }
-
-    if table_tick >= hold_start {
-        for index in 0..ATTRACT_SCORE_CARD.len() {
-            objects.push(attract_object(
-                legend_kind(index),
-                ATTRACT_TABLE_XS[index],
-                ATTRACT_TABLE_YS[index],
-            ));
         }
     }
 }
@@ -623,10 +628,8 @@ fn revealed_score_entries_for_tick(tick: u16) -> usize {
     );
     let mut visible = 0;
     for index in 0..ATTRACT_SCORE_CARD.len() {
-        let show_tick = index as u16 * LEGEND_ENTRY_TICKS
-            + LEGEND_APPROACH_TICKS
-            + LEGEND_LASER_TICKS
-            + LEGEND_TEXT_TICKS;
+        let show_tick =
+            index as u16 * LEGEND_ENTRY_TICKS + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
         if table_tick >= show_tick {
             visible += 1;
         }
@@ -875,10 +878,10 @@ mod tests {
 
     use super::{
         ATTRACT_CAUGHT_HUMAN_X16, ATTRACT_HUMAN_X16, AttractVisual, LEGEND_APPROACH_TICKS,
-        LEGEND_LASER_TICKS, LEGEND_TEXT_TICKS, RESCUE_ASCENT_TICKS, RESCUE_DESCENT_TICKS,
-        RESCUE_FALL_TICKS, RESCUE_LASER_TICKS, RESCUE_RETURN_TICKS, RESCUE_SCORE_TICKS, SceneKind,
-        attract_cycle, attract_scene, high_score_scene, logo_scene,
-        revealed_score_entries_for_tick, scene_for_elapsed_ms, scripted_attract_frame_for_tick,
+        LEGEND_LASER_TICKS, RESCUE_ASCENT_TICKS, RESCUE_DESCENT_TICKS, RESCUE_FALL_TICKS,
+        RESCUE_LASER_TICKS, RESCUE_RETURN_TICKS, RESCUE_SCORE_TICKS, SceneKind, attract_cycle,
+        attract_scene, high_score_scene, logo_scene, revealed_score_entries_for_tick,
+        scene_for_elapsed_ms, scripted_attract_frame_for_tick,
     };
 
     #[test]
@@ -1020,17 +1023,15 @@ mod tests {
     }
 
     #[test]
-    fn legend_text_waits_for_post_spawn_rom_delay() {
+    fn legend_text_appears_when_bmode2_starts() {
         let table_start = RESCUE_DESCENT_TICKS
             + RESCUE_ASCENT_TICKS
             + RESCUE_LASER_TICKS
             + RESCUE_FALL_TICKS
             + RESCUE_SCORE_TICKS
             + RESCUE_RETURN_TICKS;
-        let just_before_text =
-            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TEXT_TICKS - 1;
-        let first_text_tick =
-            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TEXT_TICKS;
+        let just_before_text = table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS - 1;
+        let first_text_tick = table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
 
         assert_eq!(revealed_score_entries_for_tick(just_before_text), 0);
         assert_eq!(revealed_score_entries_for_tick(first_text_tick), 1);
@@ -1052,28 +1053,52 @@ mod tests {
     }
 
     #[test]
-    fn legend_entry_switches_from_explosion_to_materialize_for_the_same_enemy() {
+    fn legend_entry_keeps_the_source_enemy_alive_for_the_full_laser_window() {
         let table_start = RESCUE_DESCENT_TICKS
             + RESCUE_ASCENT_TICKS
             + RESCUE_LASER_TICKS
             + RESCUE_FALL_TICKS
             + RESCUE_SCORE_TICKS
             + RESCUE_RETURN_TICKS;
-        let explosion_frame = scripted_attract_frame_for_tick(table_start + LEGEND_APPROACH_TICKS);
-        let materialize_frame = scripted_attract_frame_for_tick(
-            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS / 2,
+        let laser_frame = scripted_attract_frame_for_tick(table_start + LEGEND_APPROACH_TICKS + 1);
+
+        let source_enemy = laser_frame
+            .objects
+            .iter()
+            .find(|object| {
+                object.kind == EntityKind::Lander && object.visual == AttractVisual::Sprite
+            })
+            .expect("legend laser dwell should keep the source enemy visible");
+
+        assert_eq!(source_enemy.x16, 0x1F00);
+    }
+
+    #[test]
+    fn legend_entry_switches_to_explosion_and_materialize_on_the_same_transfer_tick() {
+        let table_start = RESCUE_DESCENT_TICKS
+            + RESCUE_ASCENT_TICKS
+            + RESCUE_LASER_TICKS
+            + RESCUE_FALL_TICKS
+            + RESCUE_SCORE_TICKS
+            + RESCUE_RETURN_TICKS;
+        let transfer_frame = scripted_attract_frame_for_tick(
+            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS,
         );
 
-        let explosion = explosion_frame
+        let explosion = transfer_frame
             .objects
             .iter()
-            .find(|object| object.visual == AttractVisual::Explosion)
-            .expect("legend entry should show an explosion phase");
-        let materialize = materialize_frame
+            .find(|object| {
+                object.kind == EntityKind::Lander && object.visual == AttractVisual::Explosion
+            })
+            .expect("legend transfer should show an explosion phase");
+        let materialize = transfer_frame
             .objects
             .iter()
-            .find(|object| object.visual == AttractVisual::Materialize)
-            .expect("legend entry should switch to a materialize phase");
+            .find(|object| {
+                object.kind == EntityKind::Lander && object.visual == AttractVisual::Materialize
+            })
+            .expect("legend transfer should show a materialize phase");
 
         assert_eq!(explosion.kind, EntityKind::Lander);
         assert_eq!(materialize.kind, EntityKind::Lander);
