@@ -1029,7 +1029,7 @@ impl Renderer {
 
     fn draw_attract_explosion(&mut self, cx: i32, cy: i32, animation_tick: u32, clip_rect: Rect) {
         let image = if (animation_tick / 4).is_multiple_of(2) {
-            arcade_sprites().pod_explosion()
+            arcade_sprites().pod_explosion(animation_tick)
         } else {
             arcade_sprites().swarmer_explosion()
         };
