@@ -5,6 +5,7 @@ pub mod arcade;
 pub mod attract;
 pub mod attract_rom;
 pub mod audio;
+mod audio_rom;
 pub mod branding;
 pub mod constants;
 mod customization;

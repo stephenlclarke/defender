@@ -18,7 +18,7 @@ pub fn run_live(play_audio: bool) -> Result<()> {
     ensure_interactive_terminal()?;
     KittyGraphics::ensure_supported()?;
 
-    let audio = AudioManager::new();
+    let mut audio = AudioManager::new();
     let mut stdout = io::stdout();
     let _terminal = TerminalSession::enter(&mut stdout)?;
     let mut input_tracker = InputTracker::default();

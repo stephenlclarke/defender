@@ -19,14 +19,14 @@ This repository is a native Rust reimplementation of Williams' `Defender`,
 rendered through the Kitty graphics protocol.
 
 The game logic is native Rust; ROMs are treated as reference material only, and
-the app now embeds its gameplay object art as PNGs from `assets/arcade/` and
-its cue audio as WAVs from `assets/sounds/`, with the red-label text font
-bundled as `assets/arcade/font-sheet.png`, plus ROM-derived branding art in
-`assets/arcade/logo-page.png` and `assets/arcade/defender-logo.png`, so
-compile and runtime do not depend on a local ROM or sound directory. The
-target is a faithful recreation of the original red-label arcade game, with
-hidden `xyzzy` extras as the deliberate behavior outside the original cabinet
-rules.
+the app now embeds its gameplay object art as PNGs from `assets/arcade/`, with
+the red-label text font bundled as `assets/arcade/font-sheet.png`, plus
+ROM-derived branding art in `assets/arcade/logo-page.png` and
+`assets/arcade/defender-logo.png`. Live audio is now synthesized in Rust from
+Williams sound-ROM routines translated out of `VSNDRM1.SRC`, so compile and
+runtime do not depend on a local ROM or sound directory. The target is a
+faithful recreation of the original red-label arcade game, with hidden `xyzzy`
+extras as the deliberate behavior outside the original cabinet rules.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -176,9 +176,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   the HUD uses the little-ship stock icon, and the attract rescue/scoring page
   now draws its `250` / `500` bonuses from embedded score art in
   `assets/arcade/`.
-- All current sounds are embedded in the app via bundled `assets/sounds/*.wav`
-  cue files decoded by `rodio`, so the live runtime stays self-contained while
-  matching the sibling repos' asset layout.
+- Live audio now comes from `src/audio_rom.rs`, which translates the Williams
+  `VSNDRM1.SRC` radio, filtered-noise, scream, organ, and GWAVE routines into
+  Rust sample generation instead of decoding pre-rendered WAV cue files.
 - `cargo run` / `defender` now launch the real Kitty-graphics play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, falling-human
@@ -293,7 +293,7 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   rewrites.
 - `../pacman`: secondary local reference for README/media conventions and
   workflow shape across the sibling Rust arcade repos, including the direct
-  `assets/arcade/*.png` and `assets/sounds/*` embedding pattern.
+  `assets/arcade/*.png` asset layout and bundled-media documentation pattern.
 - <https://github.com/mwenge/defender>: external Defender rewrite used to
   compare canonical ROM naming and overall project direction.
 
@@ -312,6 +312,10 @@ the final runtime self-contained:
   page and `DEFENDER` wordmark assets, plus the `blk71.src` `WVTAB` records
   used to reconstruct the ROM-derived wave/fire block in
   `assets/arcade/arcade-rules.txt`.
+- <https://github.com/historicalsource/williams-soundroms>: original Williams
+  sound-ROM source reference used to translate `VSNDRM1.SRC` routines and
+  tables into `src/audio_rom.rs`, including the `IRQ` dispatch path, `RADSND`,
+  `SVTAB`, `GFRTAB`, `GWVTAB`, `SCREAM`, and organ-note/tune logic.
 - <https://seanriddle.com/ripper.html>: Williams graphics-ripper reference used
   to confirm Defender's screen-format sprite layout and the red-label object
   sprite list/rip used to build the embedded `assets/arcade/*.png` object art.
