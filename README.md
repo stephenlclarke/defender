@@ -195,6 +195,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   (`LDSTIM`, `SZSTIM`, `SWSTIM`, and `UFSTIM`) instead of the older shared
   Rust fallback delays, so Landers, Mutants, Swarmers, and Baiters follow the
   cabinet wave table more closely.
+- Bomber / TIE motion now follows the cabinet `TIE` shape more closely too:
+  off-screen units steer back toward a source-backed cruise-altitude band, and
+  on-screen units use the ROM-style close/far vertical proximity bands around
+  the player instead of the older every-third-tick drift rule.
 - Gameplay sprite phasing now follows ROM-informed display rules more closely:
   the player ship uses left/right cabinet art with horizontal display-phase
   selection instead of a made-up tick animation, shared enemy animation now

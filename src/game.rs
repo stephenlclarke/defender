@@ -816,6 +816,8 @@ impl World {
         let free_humans = self.free_human_positions();
         let world_span = self.world_span;
         let world_max_x = self.world_max_x();
+        let left_edge = self.left_edge();
+        let width = self.width;
         let swarmer_follow_distance = (self.width as i32 / 2).max(8);
 
         for enemy in self
@@ -877,26 +879,51 @@ impl World {
                 }
                 EntityKind::Bomber => {
                     let tables = arcade_tables();
-                    // Doug Mahugh chapter 06 notes that Bombers become more
-                    // dangerous when they line up on the player's altitude.
-                    let target_y = player_position
-                        .map(|target| target.y)
-                        .unwrap_or(enemy.position.y);
                     let direction = match enemy.velocity.dx.signum() {
                         -1 | 1 => enemy.velocity.dx.signum(),
                         _ => 1,
                     };
+                    let on_main_screen = screen_x_for_world_x(
+                        enemy.position.x,
+                        left_edge,
+                        width,
+                        world_span,
+                        world_max_x,
+                    )
+                    .is_some();
+                    let cruise_altitude =
+                        rom_tie_cruise_altitude(enemy.position.x, self.status.wave, min_y, max_y);
+                    let close_band = rom_tie_close_band(min_y, max_y);
+                    let far_band = rom_tie_far_band(min_y, max_y);
+
                     enemy.velocity.dx = direction
-                        * if target_y == enemy.position.y {
+                        * if player_position.is_some_and(|target| target.y == enemy.position.y) {
                             tables.bomber_evasive_speed
                         } else {
                             tables.bomber_base_speed
                         };
-                    if target_y == enemy.position.y {
-                        enemy.velocity.dy = 0;
-                    } else if (self.tick + enemy.position.x as u32).is_multiple_of(3) {
-                        enemy.velocity.dy = (target_y - enemy.position.y).signum();
-                    }
+
+                    enemy.velocity.dy = if on_main_screen {
+                        let delta = enemy.position.y.saturating_sub(
+                            player_position
+                                .map(|target| target.y)
+                                .unwrap_or(enemy.position.y),
+                        );
+                        if delta >= far_band || (delta < 0 && delta >= -close_band) {
+                            -1
+                        } else if (delta > 0 && delta <= close_band) || delta <= -far_band {
+                            1
+                        } else {
+                            0
+                        }
+                    } else {
+                        let delta = cruise_altitude - enemy.position.y;
+                        if delta.abs() > close_band {
+                            delta.signum()
+                        } else {
+                            0
+                        }
+                    };
                 }
                 EntityKind::Pod => {
                     if enemy.velocity.dx == 0 || enemy.velocity.dy == 0 {
@@ -2181,6 +2208,36 @@ fn scale_rom_probe_y_to_world(rom_y: i32, min_y: i32, max_y: i32) -> i32 {
     min_y + ((rom_y - 42) * span / 0x7F).clamp(0, span)
 }
 
+fn scale_rom_display_y_to_world(rom_y: i32, min_y: i32, max_y: i32) -> i32 {
+    const ROM_YMIN: i32 = 42;
+    const ROM_YMAX: i32 = 0xA8;
+
+    if max_y <= min_y {
+        return min_y;
+    }
+
+    let span = max_y - min_y;
+    min_y + ((rom_y - ROM_YMIN) * span / (ROM_YMAX - ROM_YMIN)).clamp(0, span)
+}
+
+fn rom_tie_cruise_altitude(world_x: i32, wave: u8, min_y: i32, max_y: i32) -> i32 {
+    let stable_offset = ((world_x.rem_euclid(5) + i32::from(wave % 3)) - 2) * 2;
+    let rom_y = (0x50 + stable_offset).clamp(0x40, 0x68);
+    scale_rom_display_y_to_world(rom_y, min_y, max_y)
+}
+
+fn rom_tie_close_band(min_y: i32, max_y: i32) -> i32 {
+    let close = scale_rom_display_y_to_world(42 + 0x10, min_y, max_y)
+        - scale_rom_display_y_to_world(42, min_y, max_y);
+    close.max(1)
+}
+
+fn rom_tie_far_band(min_y: i32, max_y: i32) -> i32 {
+    let far = scale_rom_display_y_to_world(42 + 0x20, min_y, max_y)
+        - scale_rom_display_y_to_world(42, min_y, max_y);
+    far.max(rom_tie_close_band(min_y, max_y) + 1)
+}
+
 fn rom_probe_horizontal_velocity(seed: u8) -> i32 {
     let raw = i16::from(seed & 0x3F) - 0x20;
     match raw {
@@ -2247,7 +2304,8 @@ mod tests {
     use super::{
         Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput,
         Velocity, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
-        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, scale_rom_probe_x_to_screen,
+        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_tie_close_band,
+        rom_tie_cruise_altitude, rom_tie_far_band, scale_rom_probe_x_to_screen,
         shortest_wrapped_delta, wrap_coordinate,
     };
 
@@ -2315,6 +2373,14 @@ mod tests {
         assert_eq!(rom_probe_vertical_velocity(0x00), -1);
         assert_eq!(rom_probe_vertical_velocity(0x40), 1);
         assert_eq!(rom_probe_vertical_velocity(0x7f), 1);
+    }
+
+    #[test]
+    fn rom_tie_cruise_altitude_stays_in_the_source_band() {
+        let cruise = rom_tie_cruise_altitude(12, 2, 1, 9);
+        assert!((1..=9).contains(&cruise));
+        assert!(rom_tie_close_band(1, 9) >= 1);
+        assert!(rom_tie_far_band(1, 9) > rom_tie_close_band(1, 9));
     }
 
     #[test]
@@ -2900,6 +2966,33 @@ mod tests {
             .expect("bomber");
         assert_eq!(bomber.velocity.dx, -arcade_tables().bomber_evasive_speed);
         assert_eq!(bomber.position, Position { x: 10, y: 4 });
+    }
+
+    #[test]
+    fn live_step_offscreen_bombers_seek_their_cruise_altitude() {
+        let mut world = World::with_entities(
+            24,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 2,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0),
+                Entity::new(EntityKind::Bomber, 18, 2, -1, 0),
+            ],
+        );
+        world.camera_x = 4;
+
+        world.step_live(UpdateInput::default());
+
+        let bomber = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Bomber)
+            .expect("bomber");
+        assert_eq!(bomber.velocity.dy, 1);
     }
 
     #[test]
