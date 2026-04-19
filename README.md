@@ -314,18 +314,6 @@ Meaning: maximum number of baiters allowed on-screen at once.
 Default: `20`
 Meaning: delay between additional baiter spawns while the wave stalls.
 
-`pod_swarmer_burst_min`
-Default: `5`
-Meaning: minimum number of swarmers released when a pod is destroyed.
-
-`pod_swarmer_burst_range`
-Default: `3`
-Meaning: additional swarmer burst range above the minimum.
-
-`max_swarmers`
-Default: `20`
-Meaning: maximum number of live swarmers allowed at one time.
-
 `default_human_world_xs`
 Default: `8,26,44,62,80,98,116,134,152,170`
 Meaning: default world X positions for the ten starting humanoids.

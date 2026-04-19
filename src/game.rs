@@ -1609,17 +1609,16 @@ impl World {
     }
 
     fn spawn_swarmer_burst_at(&mut self, pod_position: Position) {
-        let tables = arcade_tables();
         let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         let swarmer_speed = rom_swarmer_horizontal_velocity(wave_profile.swarmer_x_velocity);
-        let available = tables
-            .max_swarmers
+        let available = rom_swarmer_count_limit()
             .saturating_sub(self.entity_count_by_kind(EntityKind::Swarmer));
         if available == 0 {
             return;
         }
 
-        let count = self.pod_swarmer_burst_count(pod_position).min(available);
+        let count =
+            rom_probe_swarmer_burst_count(self.status.wave, self.tick, pod_position).min(available);
         let player_position = self.player_position();
         let direction = player_position
             .map(|player| shortest_wrapped_delta(pod_position.x, player.x, self.world_span))
@@ -1655,14 +1654,6 @@ impl World {
                 dy,
             ));
         }
-    }
-
-    fn pod_swarmer_burst_count(&self, pod_position: Position) -> usize {
-        let tables = arcade_tables();
-        let variance =
-            ((self.tick as usize) + (pod_position.x as usize) + (pod_position.y as usize))
-                % tables.pod_swarmer_burst_range;
-        tables.pod_swarmer_burst_min + variance
     }
 
     fn can_use_smart_bomb(&self, secret_mode: bool) -> bool {
@@ -2408,6 +2399,22 @@ fn rom_probe_velocity_seed(wave: u8, salt: u32) -> Velocity {
     }
 }
 
+fn rom_rmax(max: u8, mut seed: u8) -> usize {
+    while seed > max {
+        seed >>= 1;
+    }
+    usize::from(seed) + 1
+}
+
+fn rom_probe_swarmer_burst_count(wave: u8, tick: u32, position: Position) -> usize {
+    let (_, _, seed, _) = rom_probe_seed_bytes(
+        wave,
+        tick,
+        ((position.x as u32) << 8) ^ (position.y as u32) ^ 0x5052_424b,
+    );
+    rom_rmax(6, seed)
+}
+
 fn rom_probe_seed_bytes(wave: u8, tick: u32, salt: u32) -> (u8, u8, u8, u8) {
     let mut mixed = tick
         .wrapping_mul(0x045d_9f3b)
@@ -2448,6 +2455,10 @@ fn rom_bomber_mine_lifetime(wave: u8, tick: u32, position: Position) -> u16 {
 }
 
 fn rom_shell_lifetime() -> u16 {
+    20
+}
+
+fn rom_swarmer_count_limit() -> usize {
     20
 }
 
@@ -2838,11 +2849,12 @@ mod tests {
         rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band, rom_bomb_shell_limit,
         rom_bomber_mine_lifetime, rom_bomber_should_drop_mine, rom_lander_horizontal_velocity,
         rom_lander_vertical_velocity, rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity,
-        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_shell_lifetime,
-        rom_shell_spawn_limit, rom_shoot_axes_from_seeds, rom_swarmer_horizontal_velocity,
-        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
-        rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
-        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_probe_spawn_for_wave, rom_probe_swarmer_burst_count, rom_probe_vertical_velocity,
+        rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit, rom_shoot_axes_from_seeds,
+        rom_swarmer_count_limit, rom_swarmer_horizontal_velocity, rom_swarmer_vertical_speed_limit,
+        rom_tie_close_band, rom_tie_far_band, rom_tie_horizontal_velocity,
+        rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen, screen_x_for_world_x,
+        shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -4518,10 +4530,9 @@ mod tests {
         let swarmer_count = world.entity_count_by_kind(EntityKind::Swarmer);
 
         assert_eq!(world.entity_count_by_kind(EntityKind::Pod), 0);
-        assert!(swarmer_count >= arcade_tables().pod_swarmer_burst_min);
-        assert!(
-            swarmer_count
-                < arcade_tables().pod_swarmer_burst_min + arcade_tables().pod_swarmer_burst_range
+        assert_eq!(
+            swarmer_count,
+            rom_probe_swarmer_burst_count(3, 1, Position { x: 10, y: 5 })
         );
         assert_eq!(world.status().score, 1_000);
         assert!(events.contains(&WorldEvent::EnemyDestroyed));
@@ -4533,6 +4544,30 @@ mod tests {
         assert!(world.entities().iter().all(|entity| {
             entity.kind != EntityKind::Swarmer || entity.velocity.dx == -swarmer_speed
         }));
+    }
+
+    #[test]
+    fn rom_rmax_matches_the_cabinet_halving_rule() {
+        assert_eq!(rom_rmax(6, 0), 1);
+        assert_eq!(rom_rmax(6, 6), 7);
+        assert_eq!(rom_rmax(6, 7), 4);
+        assert_eq!(rom_rmax(6, 255), 4);
+    }
+
+    #[test]
+    fn rom_probe_swarmer_burst_count_matches_prbkil_range() {
+        let position = Position { x: 10, y: 5 };
+        let counts: Vec<usize> = (0..32)
+            .map(|tick| rom_probe_swarmer_burst_count(3, tick, position))
+            .collect();
+
+        assert!(counts.iter().all(|count| (1..=7).contains(count)));
+        assert!(counts.windows(2).any(|pair| pair[0] != pair[1]));
+    }
+
+    #[test]
+    fn rom_swarmer_count_limit_matches_mmsw_swcnt_cap() {
+        assert_eq!(rom_swarmer_count_limit(), 20);
     }
 
     #[test]

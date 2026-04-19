@@ -19,9 +19,6 @@ pub struct ArcadeTables {
     pub swarmer_fire_lead_divisor: u32,
     pub max_baiters: usize,
     pub baiter_repeat_delay: u32,
-    pub pod_swarmer_burst_min: usize,
-    pub pod_swarmer_burst_range: usize,
-    pub max_swarmers: usize,
     pub default_human_world_xs: &'static [i32; 10],
 }
 
@@ -45,9 +42,6 @@ static ARCADE_TABLES: ArcadeTables = ArcadeTables {
     swarmer_fire_lead_divisor: 4,
     max_baiters: 4,
     baiter_repeat_delay: 20,
-    pod_swarmer_burst_min: 5,
-    pod_swarmer_burst_range: 3,
-    max_swarmers: 20,
     default_human_world_xs: &DEFAULT_HUMAN_WORLD_XS,
 };
 
