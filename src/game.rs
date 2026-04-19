@@ -517,6 +517,14 @@ impl World {
             }
         });
 
+        if hyperspace_result.is_some() {
+            // Red-label `HYPER` walks the shell list through `KILSHL` before the
+            // player reappears, so active player lasers do not survive
+            // hyperspace.
+            self.entities
+                .retain(|entity| entity.kind != EntityKind::PlayerShot);
+        }
+
         let mut shot_origin = None;
         let mut hyperspaced_this_tick = false;
         let mut hyperspace_failure_check = None;
@@ -4062,6 +4070,32 @@ mod tests {
         assert_eq!(world.player_facing(), expected.facing);
         assert!(events.contains(&WorldEvent::HyperspaceUsed));
         assert!(!events.contains(&WorldEvent::PlayerHit));
+    }
+
+    #[test]
+    fn live_step_hyperspace_clears_active_player_shots() {
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 2, 3, 1, 0),
+                Entity::new(EntityKind::PlayerShot, 6, 3, 2, 0),
+                Entity::new(EntityKind::PlayerShot, 7, 4, 2, 0),
+            ],
+        );
+
+        let events = world.step_live(UpdateInput {
+            hyperspace: true,
+            ..UpdateInput::default()
+        });
+
+        assert_eq!(world.entity_count_by_kind(EntityKind::PlayerShot), 0);
+        assert!(events.contains(&WorldEvent::HyperspaceUsed));
     }
 
     #[test]
