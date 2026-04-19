@@ -203,7 +203,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   the seed-derived `UFOST` visible-band placement instead of the earlier
   player-relative phase offsets, with fresh Baiters now also taking the
   immediate `UFONV0` velocity solve on spawn instead of idling for a full tick.
-- Bomber / TIE motion now follows the cabinet `TIE` shape more closely too:
+- Bomber / TIE motion now follows the cabinet `TIEST` / `TIE` shape more
+  closely too: horizontal motion now comes from the red-label `TIEXV` record,
   off-screen units steer back toward a source-backed cruise-altitude band, and
   on-screen units use the ROM-style close/far vertical proximity bands around
   the player instead of the older every-third-tick drift rule.
@@ -411,8 +412,8 @@ the final runtime self-contained:
   used to model pod bursts, delayed swarmer turnback, the follow-from-behind
   movement pattern, and the quarter-screen-ahead swarmer firing focal point.
 - <https://www.dougmahugh.com/defender-chapter06/>: bomber-behavior reference
-  used to model wave-two bomber introduction, altitude-triggered speed boosts,
-  and the persistent mine trails they leave behind.
+  used to model wave-two bomber introduction, the `TIEXV`-backed horizontal
+  cruise path, and the persistent mine trails they leave behind.
 - <https://www.dougmahugh.com/defender-chapter07/>: baiter-behavior reference
   used to model wave-delay baiter pressure, the `UFOST` visible-band spawn
   shape, and relative pursuit behavior.
@@ -513,14 +514,6 @@ Meaning: horizontal speed used by swarmer enemies.
 `baiter_speed`
 Default: `2`
 Meaning: horizontal speed used by baiter enemies.
-
-`bomber_base_speed`
-Default: `1`
-Meaning: normal horizontal speed used by bomber enemies.
-
-`bomber_evasive_speed`
-Default: `2`
-Meaning: faster bomber speed used when they cross the player altitude.
 
 `max_baiters`
 Default: `4`

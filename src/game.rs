@@ -883,6 +883,7 @@ impl World {
                     }
                 }
                 EntityKind::Bomber => {
+                    let tie_speed = rom_tie_horizontal_velocity(wave_profile.bomber_x_velocity);
                     let direction = match enemy.velocity.dx.signum() {
                         -1 | 1 => enemy.velocity.dx.signum(),
                         _ => 1,
@@ -900,12 +901,10 @@ impl World {
                     let close_band = rom_tie_close_band(min_y, max_y);
                     let far_band = rom_tie_far_band(min_y, max_y);
 
-                    enemy.velocity.dx = direction
-                        * if player_position.is_some_and(|target| target.y == enemy.position.y) {
-                            tables.bomber_evasive_speed
-                        } else {
-                            tables.bomber_base_speed
-                        };
+                    // `TIEST` seeds a constant horizontal velocity from `TIEXV`;
+                    // the live vertical steering comes from the later `TIE`
+                    // process and should not alter that base X speed.
+                    enemy.velocity.dx = direction * tie_speed;
 
                     enemy.velocity.dy = if on_main_screen {
                         let delta = enemy.position.y.saturating_sub(
@@ -1883,11 +1882,11 @@ impl World {
     }
 
     fn spawn_wave(&mut self) {
-        let tables = arcade_tables();
         let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         let width = self.world_span;
         let min_y = 1;
         let max_y = self.height as i32 - 3;
+        let tie_speed = rom_tie_horizontal_velocity(wave_profile.bomber_x_velocity);
         let bomber_origin = self
             .player_position()
             .map(|player| wrap_coordinate(player.x + width / 2, width - 1))
@@ -1916,23 +1915,11 @@ impl World {
         );
 
         let bomber_slots = [
-            (bomber_origin, -tables.bomber_base_speed),
-            (
-                wrap_coordinate(bomber_origin + 10, width - 1),
-                tables.bomber_base_speed,
-            ),
-            (
-                wrap_coordinate(bomber_origin - 10, width - 1),
-                -tables.bomber_base_speed,
-            ),
-            (
-                wrap_coordinate(bomber_origin + 20, width - 1),
-                tables.bomber_base_speed,
-            ),
-            (
-                wrap_coordinate(bomber_origin - 20, width - 1),
-                -tables.bomber_base_speed,
-            ),
+            (bomber_origin, -tie_speed),
+            (wrap_coordinate(bomber_origin + 10, width - 1), tie_speed),
+            (wrap_coordinate(bomber_origin - 10, width - 1), -tie_speed),
+            (wrap_coordinate(bomber_origin + 20, width - 1), tie_speed),
+            (wrap_coordinate(bomber_origin - 20, width - 1), -tie_speed),
         ];
         for (x, dx) in bomber_slots.into_iter().take(wave_profile.bombers as usize) {
             enemies.push(Entity::new(
@@ -2348,6 +2335,13 @@ fn rom_tie_cruise_altitude(world_x: i32, wave: u8, min_y: i32, max_y: i32) -> i3
     scale_rom_display_y_to_world(rom_y, min_y, max_y)
 }
 
+fn rom_tie_horizontal_velocity(raw: u8) -> i32 {
+    // `TIEXV` is stored in the cabinet fixed-point scale; map the red-label
+    // record back into the coarse live grid without reintroducing the old
+    // hand-authored Bomber fast/slow fallback.
+    if raw <= 0x28 { 1 } else { 2 }
+}
+
 fn rom_baiter_velocity_refresh_due(tick: u32, position: Position) -> bool {
     (tick + position.x as u32 + position.y as u32).is_multiple_of(18)
 }
@@ -2493,8 +2487,8 @@ mod tests {
         nearest_wrapped_target, rom_baiter_horizontal_close_band, rom_baiter_seek_velocity,
         rom_baiter_should_seek, rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band,
         rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_shoot_axes_from_seeds,
-        rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band, scale_rom_probe_x_to_screen,
-        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band, rom_tie_horizontal_velocity,
+        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -3160,7 +3154,7 @@ mod tests {
     }
 
     #[test]
-    fn live_step_bombers_accelerate_when_crossing_the_players_altitude() {
+    fn live_step_bombers_keep_their_rom_horizontal_speed_when_crossing_the_players_altitude() {
         let mut world = World::with_entities(
             24,
             10,
@@ -3182,8 +3176,13 @@ mod tests {
             .iter()
             .find(|entity| entity.kind == EntityKind::Bomber)
             .expect("bomber");
-        assert_eq!(bomber.velocity.dx, -arcade_tables().bomber_evasive_speed);
-        assert_eq!(bomber.position, Position { x: 10, y: 4 });
+        assert_eq!(
+            bomber.velocity.dx,
+            -rom_tie_horizontal_velocity(
+                red_label_wave_table().profile_for_wave(2).bomber_x_velocity
+            )
+        );
+        assert_eq!(bomber.position, Position { x: 11, y: 4 });
     }
 
     #[test]

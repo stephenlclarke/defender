@@ -22,6 +22,7 @@ pub struct RedLabelWaveTable {
     wave_time: WaveRecord,
     wave_size: WaveRecord,
     lander_shot_time: WaveRecord,
+    bomber_x_velocity: WaveRecord,
     mutant_shot_time: WaveRecord,
     swarmer_shot_time: WaveRecord,
     baiter_time: WaveRecord,
@@ -39,6 +40,7 @@ pub struct WaveProfile {
     pub wave_time: u32,
     pub wave_size: u8,
     pub lander_shot_time: u32,
+    pub bomber_x_velocity: u8,
     pub mutant_shot_time: u32,
     pub swarmer_shot_time: u32,
     pub baiter_delay: u32,
@@ -61,6 +63,7 @@ impl RedLabelWaveTable {
             wave_time: self.wave_time.value_for_wave(wave) as u32,
             wave_size: self.wave_size.value_for_wave(wave) as u8,
             lander_shot_time: self.lander_shot_time.value_for_wave(wave) as u32,
+            bomber_x_velocity: self.bomber_x_velocity.value_for_wave(wave) as u8,
             mutant_shot_time: self.mutant_shot_time.value_for_wave(wave) as u32,
             swarmer_shot_time: self.swarmer_shot_time.value_for_wave(wave) as u32,
             baiter_delay: self.baiter_time.value_for_wave(wave) as u32,
@@ -120,6 +123,7 @@ static RED_LABEL_WAVE_TABLE: RedLabelWaveTable = RedLabelWaveTable {
     wave_time: wave_record(30, 0, 0, 0, [30, 25, 20, 16]),
     wave_size: wave_record(5, 0, 0, 0, [5, 5, 5, 5]),
     lander_shot_time: wave_record(128, 16, -4, -2, [74, 58, 42, 42]),
+    bomber_x_velocity: wave_record(48, 0, 0, 0, [32, 40, 44, 48]),
     mutant_shot_time: wave_record(255, 8, -2, -2, [42, 34, 30, 28]),
     swarmer_shot_time: wave_record(40, 10, -2, -1, [25, 25, 25, 25]),
     baiter_time: wave_record(192, 24, -12, -4, [212, 196, 164, 148]),
@@ -143,6 +147,7 @@ mod tests {
         assert_eq!(wave_one.wave_time, 30);
         assert_eq!(wave_one.wave_size, 5);
         assert_eq!(wave_one.lander_shot_time, 74);
+        assert_eq!(wave_one.bomber_x_velocity, 32);
         assert_eq!(wave_one.mutant_shot_time, 42);
         assert_eq!(wave_one.swarmer_shot_time, 25);
         assert_eq!(wave_one.baiter_shot_time, 15);
@@ -152,6 +157,7 @@ mod tests {
         assert_eq!(wave_two.pods, 1);
         assert_eq!(wave_two.baiter_delay, 196);
         assert_eq!(wave_two.lander_shot_time, 58);
+        assert_eq!(wave_two.bomber_x_velocity, 40);
         assert_eq!(wave_two.mutant_shot_time, 34);
         assert_eq!(wave_two.baiter_shot_time, 13);
         assert_eq!(wave_two.baiter_seek_probability, 220);
