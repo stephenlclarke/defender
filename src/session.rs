@@ -383,7 +383,7 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
-                Entity::new(EntityKind::Lander, 5, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 5, 3, 0, 0),
                 Entity::new(EntityKind::Mutant, 9, 2, 0, 0),
             ],
         );
@@ -398,7 +398,7 @@ mod tests {
 
         assert!(events.contains(&SessionEvent::World(WorldEvent::EnemyDestroyed)));
         assert!(events.contains(&SessionEvent::HighScoreUpdated));
-        assert_eq!(session.high_score(), 250_050);
+        assert_eq!(session.high_score(), 250_150);
     }
 
     #[test]

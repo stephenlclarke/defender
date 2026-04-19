@@ -797,15 +797,20 @@ impl World {
     }
 
     fn update_enemy_intents(&mut self, min_y: i32, max_y: i32) {
-        let tables = arcade_tables();
         let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         let player_position = self.player_position();
         let player_velocity = self.player_velocity();
         let free_humans = self.free_human_positions();
+        let terrain = &self.terrain;
         let world_span = self.world_span;
         let world_max_x = self.world_max_x();
         let left_edge = self.left_edge();
         let width = self.width;
+        let lander_speed_x = rom_lander_horizontal_velocity(wave_profile.lander_x_velocity);
+        let lander_speed_y = rom_lander_vertical_velocity(
+            wave_profile.lander_y_velocity_msb,
+            wave_profile.lander_y_velocity_lsb,
+        );
         let swarmer_follow_distance = (self.width as i32 / 2).max(8);
 
         for enemy in self
@@ -821,16 +826,47 @@ impl World {
                     enemy.velocity.dy = -1;
                 }
                 EntityKind::Lander => {
-                    // StrategyWiki documents the classic Lander priority: hunt a
-                    // free humanoid first, then pressure the player if none remain.
-                    let target = nearest_wrapped_target(enemy.position, &free_humans, world_span)
-                        .or(player_position)
-                        .unwrap_or(enemy.position);
-                    enemy.velocity.dx =
-                        wrapped_horizontal_step(enemy.position.x, target.x, world_max_x);
-                    enemy.velocity.dy = (target.y - enemy.position.y).signum();
-                    if enemy.velocity.dy == 0 && enemy.position.y <= min_y {
-                        enemy.velocity.dy = 1;
+                    let cruise_y = rom_lander_cruise_altitude(
+                        terrain_surface_y(terrain, enemy.position.x) - 1,
+                        min_y,
+                        max_y,
+                    );
+                    let target = nearest_wrapped_target(enemy.position, &free_humans, world_span);
+                    // `LANDS0` does not chase the player horizontally. Landers
+                    // keep their seeded `LNDXV` drift until they line up with a
+                    // target, then switch into the short `LANDG` grab vector.
+                    if let Some(target) = target {
+                        if rom_lander_target_is_aligned(enemy.position, target, world_span) {
+                            enemy.velocity.dx =
+                                wrapped_horizontal_step(enemy.position.x, target.x, world_max_x)
+                                    * lander_speed_x.max(1);
+                            enemy.velocity.dy = rom_lander_grab_velocity(
+                                enemy.position.y,
+                                target.y,
+                                lander_speed_y,
+                            );
+                        } else {
+                            enemy.velocity.dx = normalize_or_seed_horizontal_velocity(
+                                enemy.velocity.dx,
+                                lander_speed_x,
+                                enemy.position.x,
+                                self.tick,
+                            );
+                            enemy.velocity.dy = rom_lander_cruise_velocity(
+                                enemy.position.y,
+                                cruise_y,
+                                lander_speed_y,
+                            );
+                        }
+                    } else {
+                        enemy.velocity.dx = normalize_or_seed_horizontal_velocity(
+                            enemy.velocity.dx,
+                            lander_speed_x,
+                            enemy.position.x,
+                            self.tick,
+                        );
+                        enemy.velocity.dy =
+                            rom_lander_cruise_velocity(enemy.position.y, cruise_y, lander_speed_y);
                     }
                 }
                 EntityKind::Mutant => {
@@ -891,15 +927,14 @@ impl World {
                                 screen_width: self.width,
                                 min_y,
                                 max_y,
-                                baiter_speed: tables.baiter_speed,
                             },
                         );
                     }
                     if enemy.velocity.dx == 0 {
                         enemy.velocity.dx = if self.tick.is_multiple_of(2) {
-                            tables.baiter_speed
+                            rom_baiter_base_speed()
                         } else {
-                            -tables.baiter_speed
+                            -rom_baiter_base_speed()
                         };
                     }
                 }
@@ -974,6 +1009,8 @@ impl World {
                 EntityKind::Swarmer => {
                     let swarmer_speed =
                         rom_swarmer_horizontal_velocity(wave_profile.swarmer_x_velocity);
+                    let swarmer_vertical_limit =
+                        rom_swarmer_vertical_speed_limit(wave_profile.swarmer_acceleration_mask);
                     let target = player_position.unwrap_or(enemy.position);
                     // Doug Mahugh chapter 05 calls out the "follow from behind"
                     // counterplay, so Swarmers should not instantly reverse on
@@ -994,12 +1031,22 @@ impl World {
 
                     let vertical_delta = target.y - enemy.position.y;
                     if vertical_delta != 0
-                        && (self.tick + enemy.position.x as u32).is_multiple_of(2)
+                        && rom_swarmer_vertical_refresh_due(
+                            self.tick,
+                            enemy.position,
+                            wave_profile.swarmer_acceleration_mask,
+                        )
                     {
-                        enemy.velocity.dy = vertical_delta.signum();
+                        enemy.velocity.dy = (enemy.velocity.dy
+                            + vertical_delta.signum() * swarmer_vertical_limit)
+                            .clamp(-swarmer_vertical_limit, swarmer_vertical_limit);
                     }
                     if enemy.velocity.dy == 0 {
-                        enemy.velocity.dy = if self.tick.is_multiple_of(2) { 1 } else { -1 };
+                        enemy.velocity.dy = if self.tick.is_multiple_of(2) {
+                            swarmer_vertical_limit
+                        } else {
+                            -swarmer_vertical_limit
+                        };
                     }
                 }
                 _ => {}
@@ -1890,7 +1937,6 @@ impl World {
                 screen_width: self.width,
                 min_y,
                 max_y,
-                baiter_speed: tables.baiter_speed,
             },
         );
 
@@ -2374,6 +2420,61 @@ fn rom_tie_horizontal_velocity(raw: u8) -> i32 {
     if raw <= 0x28 { 1 } else { 2 }
 }
 
+fn rom_lander_horizontal_velocity(raw: u8) -> i32 {
+    // `LANDST` seeds `OXV` from `LNDXV`. Waves 1-2 remain in the slower
+    // single-cell band, while later waves step into the faster 2-cell band.
+    if raw < 0x20 { 1 } else { 2 }
+}
+
+fn rom_lander_vertical_velocity(msb: u8, _lsb: u8) -> i32 {
+    // `LNDYV` is a 16-bit fixed-point velocity. Later waves step into the
+    // faster `+$0100` band, which maps to a 2-cell coarse step.
+    if msb == 0 { 1 } else { 2 }
+}
+
+fn rom_lander_altitude_offset(min_y: i32, max_y: i32) -> i32 {
+    let offset = scale_rom_display_y_to_world(42 + 50, min_y, max_y)
+        - scale_rom_display_y_to_world(42, min_y, max_y);
+    offset.max(1)
+}
+
+fn rom_lander_cruise_altitude(surface_y: i32, min_y: i32, max_y: i32) -> i32 {
+    (surface_y - rom_lander_altitude_offset(min_y, max_y)).clamp(min_y, max_y)
+}
+
+fn rom_lander_cruise_velocity(current_y: i32, cruise_y: i32, speed: i32) -> i32 {
+    let delta = cruise_y - current_y;
+    let tolerance = 1;
+    if delta > 0 {
+        speed
+    } else if delta < -tolerance {
+        -speed
+    } else {
+        0
+    }
+}
+
+fn rom_lander_target_is_aligned(position: Position, target: Position, world_span: i32) -> bool {
+    shortest_wrapped_delta(position.x, target.x, world_span).abs() <= 1
+}
+
+fn rom_lander_grab_velocity(current_y: i32, target_y: i32, speed: i32) -> i32 {
+    let desired_y = target_y.saturating_sub(1);
+    (desired_y - current_y).signum() * speed
+}
+
+fn normalize_or_seed_horizontal_velocity(current_dx: i32, speed: i32, x: i32, tick: u32) -> i32 {
+    if current_dx == 0 {
+        if (((tick as i32) + x).rem_euclid(2)) == 0 {
+            speed
+        } else {
+            -speed
+        }
+    } else {
+        current_dx.signum() * speed
+    }
+}
+
 fn rom_mutant_horizontal_velocity(raw: u8) -> i32 {
     // `SCZ0` reloads `SZXV` every cycle for the Schitzo/Mutant X seek. Map the
     // red-label fixed-point record into the coarse live grid so later waves
@@ -2408,6 +2509,15 @@ fn rom_swarmer_horizontal_velocity(raw: u8) -> i32 {
     if raw < 0x20 { 1 } else { 2 }
 }
 
+fn rom_swarmer_vertical_speed_limit(mask: u8) -> i32 {
+    if mask > 0x1F { 2 } else { 1 }
+}
+
+fn rom_swarmer_vertical_refresh_due(tick: u32, position: Position, mask: u8) -> bool {
+    let cadence = (((mask >> 4) & 0x3).max(1) + 1) as u32;
+    (tick + position.x as u32 + position.y as u32).is_multiple_of(cadence)
+}
+
 fn rom_baiter_velocity_refresh_due(tick: u32, position: Position) -> bool {
     (tick + position.x as u32 + position.y as u32).is_multiple_of(18)
 }
@@ -2427,6 +2537,11 @@ fn rom_baiter_vertical_close_band(min_y: i32, max_y: i32) -> i32 {
     close.max(1)
 }
 
+fn rom_baiter_base_speed() -> i32 {
+    // `UFONV0` seeds `XTEMP` from `#$4001`; the X seek uses the low byte.
+    1
+}
+
 #[derive(Clone, Copy)]
 struct RomBaiterSeekContext {
     target: Position,
@@ -2435,7 +2550,6 @@ struct RomBaiterSeekContext {
     screen_width: usize,
     min_y: i32,
     max_y: i32,
-    baiter_speed: i32,
 }
 
 fn rom_baiter_seek_velocity(
@@ -2450,9 +2564,8 @@ fn rom_baiter_seek_velocity(
 
     let horizontal_close_band = rom_baiter_horizontal_close_band(context.screen_width);
     if horizontal_delta.abs() > horizontal_close_band {
-        let seek_dx = horizontal_delta.signum() * context.baiter_speed;
-        next.dx = (context.player_velocity.dx + seek_dx)
-            .clamp(-(context.baiter_speed + 1), context.baiter_speed + 1);
+        let seek_dx = horizontal_delta.signum() * rom_baiter_base_speed();
+        next.dx = (context.player_velocity.dx + seek_dx).clamp(-2, 2);
         if next.dx == 0 {
             next.dx = seek_dx;
         }
@@ -2518,16 +2631,39 @@ fn default_attack_wave_openers(
     let max_x = world_span - 1;
     let wave_offset = i32::from(wave % 6);
     let group_offset = i32::from(group_index) * 14;
+    let wave_profile = red_label_wave_table().profile_for_wave(wave);
+    let lander_speed_x = rom_lander_horizontal_velocity(wave_profile.lander_x_velocity);
+    let lander_speed_y = rom_lander_vertical_velocity(
+        wave_profile.lander_y_velocity_msb,
+        wave_profile.lander_y_velocity_lsb,
+    );
+    let mutant_speed_x = rom_mutant_horizontal_velocity(wave_profile.mutant_x_velocity);
+    let mutant_speed_y = rom_mutant_vertical_velocity(
+        wave_profile.mutant_y_velocity_msb,
+        wave_profile.mutant_y_velocity_lsb,
+    );
     [
-        (world_span - 12 - group_offset, 3 + wave_offset % 3, -1, 1),
-        (world_span - 6 - group_offset, 6, -1, 1),
-        (18 + wave_offset + group_offset, 8, 1, -1),
-        (world_span / 2 + 8 + group_offset, 4, -1, 1),
-        (world_span / 2 - 10 - group_offset, 7, 1, -1),
+        (
+            world_span - 12 - group_offset,
+            3 + wave_offset % 3,
+            -1_i32,
+            1_i32,
+        ),
+        (world_span - 6 - group_offset, 6, -1_i32, 1_i32),
+        (18 + wave_offset + group_offset, 8, 1_i32, -1_i32),
+        (world_span / 2 + 8 + group_offset, 4, -1_i32, 1_i32),
+        (world_span / 2 - 10 - group_offset, 7, 1_i32, -1_i32),
     ]
     .into_iter()
     .take(count)
-    .map(|(x, y, dx, dy)| Entity::new(kind, wrap_coordinate(x, max_x), y, dx, dy))
+    .map(|(x, y, dx, dy)| {
+        let (dx, dy) = match kind {
+            EntityKind::Lander => (dx.signum() * lander_speed_x, lander_speed_y),
+            EntityKind::Mutant => (dx.signum() * mutant_speed_x, dy.signum() * mutant_speed_y),
+            _ => (dx, dy),
+        };
+        Entity::new(kind, wrap_coordinate(x, max_x), y, dx, dy)
+    })
     .collect()
 }
 
@@ -2552,10 +2688,12 @@ mod tests {
         Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
         nearest_wrapped_target, rom_baiter_horizontal_close_band, rom_baiter_seek_velocity,
         rom_baiter_should_seek, rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band,
+        rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
         rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
         rom_probe_vertical_velocity, rom_shoot_axes_from_seeds, rom_swarmer_horizontal_velocity,
-        rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band, rom_tie_horizontal_velocity,
-        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_cruise_altitude,
+        rom_tie_far_band, rom_tie_horizontal_velocity, scale_rom_probe_x_to_screen,
+        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -3084,7 +3222,7 @@ mod tests {
     }
 
     #[test]
-    fn live_step_landers_seek_the_nearest_free_human() {
+    fn live_step_landers_keep_seeded_horizontal_drift_until_target_alignment() {
         let mut world = World::with_entities(
             20,
             10,
@@ -3095,9 +3233,8 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
-                Entity::new(EntityKind::Lander, 10, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 10, 3, 1, 0),
                 Entity::new(EntityKind::Human, 14, 5, 0, 0),
-                Entity::new(EntityKind::Human, 3, 7, 0, 0),
             ],
         );
 
@@ -3109,10 +3246,11 @@ mod tests {
             .find(|entity| entity.kind == EntityKind::Lander)
             .expect("lander");
         assert_eq!(lander.position, Position { x: 11, y: 4 });
+        assert_eq!(lander.velocity.dx, 1);
     }
 
     #[test]
-    fn live_step_landers_chase_the_player_when_no_free_humans_remain() {
+    fn live_step_landers_do_not_chase_the_player_when_no_free_humans_remain() {
         let mut world = World::with_entities(
             20,
             10,
@@ -3123,8 +3261,9 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 4, 5, 0, 0),
-                Entity::new(EntityKind::Lander, 10, 3, 0, 0),
+                Entity::new(EntityKind::Lander, 10, 3, 1, 0),
                 Entity::with_state(EntityKind::Human, 12, 4, 0, 0, EntityState::Falling),
+                Entity::with_state(EntityKind::Human, 2, 2, 0, 0, EntityState::PlayerCarried),
             ],
         );
 
@@ -3135,7 +3274,55 @@ mod tests {
             .iter()
             .find(|entity| entity.kind == EntityKind::Lander)
             .expect("lander");
-        assert_eq!(lander.position, Position { x: 9, y: 4 });
+        assert_eq!(lander.position, Position { x: 11, y: 4 });
+        assert_eq!(lander.velocity.dx, 1);
+    }
+
+    #[test]
+    fn wave_one_landers_spawn_with_the_rom_velocity_records() {
+        let mut world = World::with_entities(
+            64,
+            12,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 1,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0)],
+        );
+
+        world.spawn_wave();
+
+        let wave_profile = red_label_wave_table().profile_for_wave(1);
+        let lander_speed_x = rom_lander_horizontal_velocity(wave_profile.lander_x_velocity);
+        let lander_speed_y = rom_lander_vertical_velocity(
+            wave_profile.lander_y_velocity_msb,
+            wave_profile.lander_y_velocity_lsb,
+        );
+
+        for lander in world
+            .entities()
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Lander)
+        {
+            assert_eq!(lander.velocity.dx.abs(), lander_speed_x);
+            assert_eq!(lander.velocity.dy, lander_speed_y);
+        }
+    }
+
+    #[test]
+    fn swarmer_acceleration_mask_expands_the_vertical_band_on_later_waves() {
+        let wave_one = red_label_wave_table().profile_for_wave(1);
+        let wave_four = red_label_wave_table().profile_for_wave(4);
+
+        assert_eq!(
+            rom_swarmer_vertical_speed_limit(wave_one.swarmer_acceleration_mask),
+            1
+        );
+        assert_eq!(
+            rom_swarmer_vertical_speed_limit(wave_four.swarmer_acceleration_mask),
+            2
+        );
     }
 
     #[test]
@@ -3466,7 +3653,7 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
-                Entity::new(EntityKind::Lander, 5, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 5, 3, 0, 0),
                 Entity::new(EntityKind::Mutant, 9, 2, 0, 0),
             ],
         );
@@ -3476,7 +3663,7 @@ mod tests {
             ..UpdateInput::default()
         });
 
-        assert_eq!(world.status().score, 150);
+        assert_eq!(world.status().score, 250);
         assert_eq!(world.enemy_count(), 1);
         assert!(events.contains(&WorldEvent::EnemyDestroyed));
     }
@@ -4118,7 +4305,7 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 1, 3, 0, 0),
-                Entity::new(EntityKind::Lander, 5, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 5, 3, 0, 0),
             ],
         );
 
@@ -4464,7 +4651,6 @@ mod tests {
                 screen_width: 64,
                 min_y: 1,
                 max_y: 9,
-                baiter_speed: arcade_tables().baiter_speed,
             },
         );
 
@@ -4807,8 +4993,8 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 3, 3, 0, 0),
-                Entity::new(EntityKind::Lander, 2, 3, 0, 0),
-                Entity::with_state(EntityKind::Human, 1, 1, 0, 0, EntityState::Abducted),
+                Entity::new(EntityKind::Mutant, 2, 3, 0, 0),
+                Entity::new(EntityKind::Pod, 10, 4, 1, 0),
             ],
         );
 
@@ -4819,8 +5005,8 @@ mod tests {
 
         assert_eq!(world.status().lives, 2);
         assert!(!world.is_game_over());
-        assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 0);
-        assert_eq!(world.status().score, 150);
+        assert_eq!(world.entity_count_by_kind(EntityKind::Mutant), 0);
+        assert_eq!(world.status().score, 250);
         assert!(events.contains(&WorldEvent::EnemyDestroyed));
         assert!(!events.contains(&WorldEvent::PlayerHit));
     }

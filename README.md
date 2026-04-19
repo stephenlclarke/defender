@@ -195,12 +195,17 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   (`LDSTIM`, `SZSTIM`, `SWSTIM`, and `UFSTIM`) instead of the older shared
   Rust fallback delays, so Landers, Mutants, Swarmers, and Baiters follow the
   cabinet wave table more closely.
+- Lander motion now follows the red-label `LANDST` / `LANDS0` records more
+  closely too: seeded horizontal drift now comes from `LNDXV`, vertical cruise
+  and grab speed now come from `LNDYV`, and Landers no longer fall back to a
+  Rust-only player-chase path when no free humanoid is available.
 - Mutant / Schitzo motion now follows the red-label `SCZ0` shape more closely
   too: horizontal pursuit now comes from `SZXV`, and the seek/avoid vertical
   movement now comes from `SZYV` instead of the older single-step Rust chase.
 - Swarmer horizontal motion now comes from the red-label `SWXV` record too,
-  so later-wave Swarmers keep their faster cabinet pace instead of following a
-  single fallback Rust speed across every wave.
+  and the vertical update band now expands from the red-label `SWAC` mask on
+  later waves, so later-wave Swarmers keep their faster cabinet pace instead
+  of following a single fallback Rust speed across every wave.
 - Baiter / UFO steering now follows the cabinet `UFOLP` / `UFONV` shape more
   closely too: retargets only happen on the source-style refresh cadence, the
   `UFOSK` record now gates when a retarget is allowed, and the ship stops
@@ -208,7 +213,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   continuously homing every frame, and delayed wave-pressure spawns now use
   the seed-derived `UFOST` visible-band placement instead of the earlier
   player-relative phase offsets, with fresh Baiters now also taking the
-  immediate `UFONV0` velocity solve on spawn instead of idling for a full tick.
+  immediate `UFONV0` velocity solve on spawn instead of idling for a full tick,
+  with the live base seek speed now coming from that same fixed ROM solve
+  instead of a separate Rust-only speed knob.
 - Bomber / TIE motion now follows the cabinet `TIEST` / `TIE` shape more
   closely too: horizontal motion now comes from the red-label `TIEXV` record,
   off-screen units steer back toward a source-backed cruise-altitude band, and
@@ -504,18 +511,10 @@ Meaning: horizontal speed of the player's laser burst tip.
 Default: `6`
 Meaning: maximum number of enemy shots allowed to remain active at once.
 
-`swarmer_fire_delay`
-Default: `3`
-Meaning: faster firing cadence used by swarmers.
-
 `swarmer_fire_lead_divisor`
 Default: `4`
 Meaning: quarter-screen lead factor used for the swarmer focal-point shot
 model.
-
-`baiter_speed`
-Default: `2`
-Meaning: horizontal speed used by baiter enemies.
 
 `max_baiters`
 Default: `4`
