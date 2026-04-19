@@ -169,6 +169,13 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   bonus text, a segmented cycling attract/gameplay laser beam, and larger
   hall-of-fame score rows, so the README screenshot and attract GIF are closer
   to the original cabinet framing and effects.
+- Gameplay sprite phasing now follows ROM-informed display rules more closely:
+  the player ship uses left/right cabinet art with horizontal display-phase
+  selection instead of a made-up tick animation, shared enemy animation now
+  follows a single cabinet-style cadence instead of per-entity position seeds,
+  the HUD uses the little-ship stock icon, and the attract rescue/scoring page
+  now draws its `250` / `500` bonuses from embedded score art in
+  `assets/arcade/`.
 - All current sounds are embedded in the app via bundled `assets/sounds/*.wav`
   cue files decoded by `rodio`, so the live runtime stays self-contained while
   matching the sibling repos' asset layout.

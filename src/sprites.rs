@@ -21,6 +21,7 @@ use crate::{
 pub struct ArcadeSprites {
     ships_right: [Arc<RenderedImage>; 4],
     ships_left: [Arc<RenderedImage>; 4],
+    little_ship: Arc<RenderedImage>,
     player_shot: Arc<RenderedImage>,
     enemy_shots: [Arc<RenderedImage>; 4],
     human: Arc<RenderedImage>,
@@ -33,6 +34,8 @@ pub struct ArcadeSprites {
     mine: Arc<RenderedImage>,
     pod_explosion: Arc<RenderedImage>,
     swarmer_explosion: Arc<RenderedImage>,
+    score_250: [Arc<RenderedImage>; 2],
+    score_500: [Arc<RenderedImage>; 2],
 }
 
 pub fn arcade_sprites() -> &'static ArcadeSprites {
@@ -53,6 +56,7 @@ impl ArcadeSprites {
         Self {
             ships_right,
             ships_left,
+            little_ship: load_embedded_png(include_bytes!("../assets/arcade/littleship.png")),
             player_shot: load_embedded_png(include_bytes!("../assets/arcade/player-shot.png")),
             enemy_shots: [
                 load_embedded_png(include_bytes!("../assets/arcade/bomb1.png")),
@@ -102,6 +106,14 @@ impl ArcadeSprites {
             mine: load_embedded_png(include_bytes!("../assets/arcade/mine1.png")),
             pod_explosion: load_embedded_png(include_bytes!("../assets/arcade/podexpl.png")),
             swarmer_explosion: load_embedded_png(include_bytes!("../assets/arcade/swarmexpl.png")),
+            score_250: [
+                load_embedded_png(include_bytes!("../assets/arcade/score250_1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/score250_2.png")),
+            ],
+            score_500: [
+                load_embedded_png(include_bytes!("../assets/arcade/score500_1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/score500_2.png")),
+            ],
         }
     }
 
@@ -112,21 +124,39 @@ impl ArcadeSprites {
         player_facing: HorizontalDirection,
     ) -> Arc<RenderedImage> {
         match entity.kind {
+            // The cabinet only switches between `PLAPIC` and `PLBPIC`
+            // (`defa7.src` `POUT` / `POUT1`). Our embedded ship frames are the
+            // pre-expanded display phases of those pictures, so the visible
+            // frame follows the ship's horizontal sub-cell placement rather
+            // than an invented animation timer.
             EntityKind::PlayerShip => match player_facing {
-                HorizontalDirection::Right => self.ships_right[player_phase(tick)].clone(),
-                HorizontalDirection::Left => self.ships_left[player_phase(tick)].clone(),
+                HorizontalDirection::Right => {
+                    self.ships_right[player_phase(entity.position.x)].clone()
+                }
+                HorizontalDirection::Left => {
+                    self.ships_left[player_phase(entity.position.x)].clone()
+                }
             },
             EntityKind::PlayerShot => self.player_shot.clone(),
-            EntityKind::EnemyShot => self.enemy_shots[phase_index(entity, tick, 2, 4)].clone(),
+            EntityKind::EnemyShot => self.enemy_shots[rom_cycle_index(tick, 2, 4)].clone(),
             EntityKind::Human => self.human.clone(),
-            EntityKind::Lander => self.landers[phase_index(entity, tick, 5, 6)].clone(),
-            EntityKind::Mutant => self.mutants[phase_index(entity, tick, 8, 2)].clone(),
-            EntityKind::Baiter => self.baiters[phase_index(entity, tick, 4, 6)].clone(),
-            EntityKind::Bomber => self.bombers[phase_index(entity, tick, 4, 8)].clone(),
-            EntityKind::Pod => self.pods[phase_index(entity, tick, 10, 2)].clone(),
-            EntityKind::Swarmer => self.swarmers[phase_index(entity, tick, 6, 2)].clone(),
+            // These visible phases are keyed off the cabinet object-picture
+            // cycles in `defb6.src` (`LNDP*`, `TIEP*`, `UFOP*`, etc.). The
+            // gameplay model does not yet preserve raw `OPICT`, so use a
+            // shared cabinet-like cadence instead of seeding frames from world
+            // position.
+            EntityKind::Lander => self.landers[rom_cycle_index(tick, 5, 6)].clone(),
+            EntityKind::Mutant => self.mutants[rom_cycle_index(tick, 8, 2)].clone(),
+            EntityKind::Baiter => self.baiters[rom_cycle_index(tick, 4, 6)].clone(),
+            EntityKind::Bomber => self.bombers[rom_cycle_index(tick, 4, 8)].clone(),
+            EntityKind::Pod => self.pods[rom_cycle_index(tick, 10, 2)].clone(),
+            EntityKind::Swarmer => self.swarmers[rom_cycle_index(tick, 6, 2)].clone(),
             EntityKind::Mine => self.mine.clone(),
         }
+    }
+
+    pub fn player_stock_icon(&self) -> Arc<RenderedImage> {
+        self.little_ship.clone()
     }
 
     pub fn pod_explosion(&self) -> Arc<RenderedImage> {
@@ -136,15 +166,22 @@ impl ArcadeSprites {
     pub fn swarmer_explosion(&self) -> Arc<RenderedImage> {
         self.swarmer_explosion.clone()
     }
+
+    pub fn score_250(&self, tick: u32) -> Arc<RenderedImage> {
+        self.score_250[rom_cycle_index(tick, 5, 2)].clone()
+    }
+
+    pub fn score_500(&self, tick: u32) -> Arc<RenderedImage> {
+        self.score_500[rom_cycle_index(tick, 5, 2)].clone()
+    }
 }
 
-fn player_phase(tick: u32) -> usize {
-    ((tick / 5) as usize) % 4
+fn player_phase(world_x: i32) -> usize {
+    world_x.rem_euclid(4) as usize
 }
 
-fn phase_index(entity: &Entity, tick: u32, speed: u32, len: usize) -> usize {
-    let phase_seed = i64::from(entity.position.x) * 31 + i64::from(entity.position.y) * 17;
-    (((tick / speed.max(1)) as i64) + phase_seed).rem_euclid(len as i64) as usize
+fn rom_cycle_index(tick: u32, speed: u32, len: usize) -> usize {
+    ((tick / speed.max(1)) as usize) % len.max(1)
 }
 
 fn load_embedded_png(bytes: &'static [u8]) -> Arc<RenderedImage> {
@@ -247,5 +284,42 @@ mod tests {
         let after = sprites.sprite_for_entity(&shot, 6, HorizontalDirection::Right);
 
         assert_ne!(before.pixels, after.pixels);
+    }
+
+    #[test]
+    fn player_ship_phase_follows_horizontal_position() {
+        let sprites = arcade_sprites();
+        let player_a = Entity::new(EntityKind::PlayerShip, 12, 8, 0, 0);
+        let player_b = Entity::new(EntityKind::PlayerShip, 13, 8, 0, 0);
+
+        let frame_a = sprites.sprite_for_entity(&player_a, 0, HorizontalDirection::Right);
+        let frame_b = sprites.sprite_for_entity(&player_b, 0, HorizontalDirection::Right);
+
+        assert_ne!(frame_a.pixels, frame_b.pixels);
+    }
+
+    #[test]
+    fn player_stock_icon_decodes_with_pixels() {
+        let icon = arcade_sprites().player_stock_icon();
+
+        assert!(icon.width > 0);
+        assert!(icon.height > 0);
+        assert!(icon.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
+    }
+
+    #[test]
+    fn bonus_score_art_decodes_with_pixels() {
+        let sprites = arcade_sprites();
+
+        for image in [
+            sprites.score_500(0),
+            sprites.score_500(6),
+            sprites.score_250(0),
+            sprites.score_250(6),
+        ] {
+            assert!(image.width > 0);
+            assert!(image.height > 0);
+            assert!(image.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
+        }
     }
 }

@@ -683,11 +683,7 @@ impl Renderer {
             4,
         );
         for index in 0..world.status().lives {
-            let icon = arcade_sprites().sprite_for_entity(
-                &Entity::new(EntityKind::PlayerShip, 0, 0, 0, 0),
-                0,
-                HorizontalDirection::Right,
-            );
+            let icon = arcade_sprites().player_stock_icon();
             self.draw_scaled_image_centered(
                 icon.as_ref(),
                 left_pod.x + left_pod.width - 22 - i32::from(index) * 22,
@@ -1152,16 +1148,13 @@ impl Renderer {
         let x = project_attract_x(rect, bonus_text.x16);
         let y = project_attract_y(rect, bonus_text.y16);
         if bonus_text.text == "500" {
-            let colors = bonus_cycle_colors(animation_tick);
-            let scale = 3;
-            let digit_width = arcade_font().text_width("5", scale);
-            let spacing = scale * 2;
-            let total_width = digit_width * 3 + spacing * 2;
-            let start_x = x - total_width / 2;
-            for (index, digit) in ['5', '0', '0'].into_iter().enumerate() {
-                let glyph_x = start_x + index as i32 * (digit_width + spacing);
-                self.draw_text(glyph_x, y, &digit.to_string(), colors[index], scale);
-            }
+            let image = arcade_sprites().score_500(animation_tick);
+            self.draw_scaled_image_centered(image.as_ref(), x, y + 8, 28);
+            return;
+        }
+        if bonus_text.text == "250" {
+            let image = arcade_sprites().score_250(animation_tick);
+            self.draw_scaled_image_centered(image.as_ref(), x, y + 8, 28);
             return;
         }
         self.draw_centered_text(x, y, bonus_text.text, TEXT_WARNING, 2);
@@ -2252,14 +2245,6 @@ fn hall_of_fame_color(phase: usize, elapsed_ms: u64) -> [u8; 4] {
     // through a broader arcade-like sequence instead of holding on purple.
     let index = (phase + (elapsed_ms / HALL_COLOR_CYCLE_MS) as usize) % HALL_COLOR_SEQUENCE.len();
     HALL_COLOR_SEQUENCE[index]
-}
-
-fn bonus_cycle_colors(animation_tick: u32) -> [[u8; 4]; 3] {
-    match (animation_tick / 5) % 3 {
-        0 => [[255, 96, 88, 255], [96, 148, 255, 255], [255, 220, 96, 255]],
-        1 => [[255, 220, 96, 255], [255, 96, 88, 255], [96, 148, 255, 255]],
-        _ => [[96, 148, 255, 255], [255, 220, 96, 255], [255, 96, 88, 255]],
-    }
 }
 
 fn star_color(index: u32, hash: u32) -> [u8; 4] {
