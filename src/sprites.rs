@@ -3,8 +3,9 @@
 //! The object art in `assets/arcade/*.png` is cropped from the red-label
 //! Defender sprite rip published by Sean Riddle's Williams graphics ripper
 //! work, then bundled into the app with `include_bytes!`. The runtime keeps
-//! the known-good cropped cabinet sprites for the live ship family while using
-//! ROM-backed picture decoding for the rescue score art.
+//! the known-good cropped cabinet sprites for the live ship family and the
+//! bundled `500` rescue-bonus art, while using ROM-backed picture decoding for
+//! the `250` rescue score art.
 
 use std::{
     io::Cursor,
@@ -16,8 +17,8 @@ use png::{ColorType, Decoder, Transformations};
 
 use crate::{
     game::{Entity, EntityKind, HorizontalDirection},
-    object_rom::{render_picture, score_250_palette, score_500_palette},
-    object_rom_data::{C5P1, C25P1},
+    object_rom::{render_picture, score_250_palette},
+    object_rom_data::C25P1,
     video::RenderedImage,
 };
 
@@ -39,7 +40,7 @@ pub struct ArcadeSprites {
     pod_explosion: Arc<RenderedImage>,
     swarmer_explosion: Arc<RenderedImage>,
     score_250: [Arc<RenderedImage>; 3],
-    score_500: [Arc<RenderedImage>; 3],
+    score_500: [Arc<RenderedImage>; 2],
 }
 
 pub fn arcade_sprites() -> &'static ArcadeSprites {
@@ -96,9 +97,8 @@ impl ArcadeSprites {
                 load_rom_picture(&C25P1, score_250_palette(2)),
             ],
             score_500: [
-                load_rom_picture(&C5P1, score_500_palette(0)),
-                load_rom_picture(&C5P1, score_500_palette(1)),
-                load_rom_picture(&C5P1, score_500_palette(2)),
+                load_embedded_png(include_bytes!("../assets/arcade/score500_1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/score500_2.png")),
             ],
         }
     }
@@ -154,7 +154,7 @@ impl ArcadeSprites {
     }
 
     pub fn score_500(&self, tick: u32) -> Arc<RenderedImage> {
-        self.score_500[rom_cycle_index(tick, 5, 3)].clone()
+        self.score_500[rom_cycle_index(tick, 5, 2)].clone()
     }
 }
 
@@ -300,15 +300,14 @@ mod tests {
     }
 
     #[test]
-    fn saved_humanoid_bonus_cycles_across_the_rom_palette_states() {
+    fn saved_humanoid_bonus_uses_stable_runtime_art() {
         let sprites = arcade_sprites();
 
         let phase_a = sprites.score_500(0);
         let phase_b = sprites.score_500(5);
         let phase_c = sprites.score_500(10);
 
-        assert_ne!(phase_a.pixels, phase_b.pixels);
-        assert_ne!(phase_b.pixels, phase_c.pixels);
-        assert_ne!(phase_a.pixels, phase_c.pixels);
+        assert_eq!(phase_a.pixels, phase_b.pixels);
+        assert_eq!(phase_a.pixels, phase_c.pixels);
     }
 }

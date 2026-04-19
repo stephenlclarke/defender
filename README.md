@@ -224,10 +224,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   the player instead of the older every-third-tick drift rule.
 - Gameplay sprite phasing now follows ROM-informed display rules more closely:
   the live player ship and HUD little-ship icon use the bundled cabinet sprite
-  family, the saved-humanoid `500` and `250` bonuses now come from the decoded
-  `C5P1` / `C25P1` score pictures with the ROM palette cycle, and shared enemy
-  animation still follows a single cabinet-style cadence instead of per-entity
-  position seeds.
+  family, the saved-humanoid `500` uses the bundled cabinet bonus art, the
+  `250` bonus still comes from the decoded `C25P1` score picture with the ROM
+  palette cycle, and shared enemy animation still follows a single
+  cabinet-style cadence instead of per-entity position seeds.
 - The runtime sprite path still uses the embedded arcade PNG family for the
   shipped Bomber/UFO, Lander, Baiter, Pod/Probe, Swarmer, bomb, and mine art,
   while the ROM-extracted picture-table work is now active for the player ship,
