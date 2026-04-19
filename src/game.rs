@@ -825,7 +825,7 @@ impl World {
                 // shell velocity from the current screen delta plus `SEED` /
                 // `LSEED` jitter rather than alternating between invented
                 // chaser and lob shot modes.
-                let (seed, lseed) = self.rom_enemy_shot_seed_bytes(enemy);
+                let (seed, lseed) = self.rom_enemy_shot_seed_bytes();
                 Some(rom_shoot_velocity(
                     enemy_screen_x,
                     enemy.position.y,
@@ -1501,24 +1501,9 @@ impl World {
             .map(|entity| entity.velocity)
     }
 
-    fn rom_enemy_shot_seed_bytes(&self, enemy: &Entity) -> (u8, u8) {
-        // The cabinet `SHOOT` routine consumes `SEED` and `LSEED` directly.
-        // The live Rust port still lacks the original RNG process, so it feeds
-        // the shared solver deterministic pseudo-seed bytes derived from the
-        // live tick and source object position instead of switching back to a
-        // separate handcrafted fire heuristic.
-        let base = (self.tick as u8).wrapping_add(self.status.wave.wrapping_mul(29));
-        let x = enemy.position.x as u8;
-        let y = enemy.position.y as u8;
-
-        let seed = base
-            .wrapping_add(x.rotate_left(1))
-            .wrapping_add(y.wrapping_mul(7));
-        let lseed = base
-            .wrapping_add(y.rotate_left(1))
-            .wrapping_add(x.wrapping_mul(11));
-
-        (seed, lseed)
+    fn rom_enemy_shot_seed_bytes(&self) -> (u8, u8) {
+        // `SHOOT` reads the live shared random-byte state directly.
+        (self.rand_state.seed, self.rand_state.lseed)
     }
 
     fn should_auto_fire(&self, origin: Position, max_x: i32, min_y: i32, max_y: i32) -> bool {
@@ -3873,6 +3858,18 @@ mod tests {
 
         assert_eq!(lower.0, higher.0);
         assert_eq!(higher.1, lower.1 + 64);
+    }
+
+    #[test]
+    fn rom_enemy_shot_seed_bytes_use_the_shared_rand_state() {
+        let mut world = World::bootstrap();
+        world.rand_state = RomRandState {
+            seed: 0x8A,
+            hseed: 0x12,
+            lseed: 0x34,
+        };
+
+        assert_eq!(world.rom_enemy_shot_seed_bytes(), (0x8A, 0x34));
     }
 
     #[test]
