@@ -27,7 +27,7 @@ const HALL_OF_FAME_HOLD_TICKS: u64 = 600;
 const RESCUE_DESCENT_TICKS: u16 = 0xE6;
 const RESCUE_ASCENT_TICKS: u16 = 0xA0;
 const RESCUE_LASER_TICKS: u16 = 0x15;
-const RESCUE_FALL_TICKS: u16 = 44 * 2;
+const RESCUE_FALL_TICKS: u16 = 0x2D * 2;
 const RESCUE_SCORE_TICKS: u16 = 0x50;
 const RESCUE_RETURN_TICKS: u16 = 0x60;
 const LEGEND_APPROACH_TICKS: u16 = 0x5F;
@@ -49,6 +49,15 @@ const ATTRACT_SCORE_BONUS_X16: i32 = 0x1DFF;
 const ATTRACT_SCORE_BONUS_Y16: i32 = 0x9000;
 const ATTRACT_SCORE_BONUS_DROP_X16: i32 = 0x1C00;
 const ATTRACT_SCORE_BONUS_DROP_Y16: i32 = 0xE000;
+const ATTRACT_CAUGHT_HUMAN_X16: i32 = 0x1E80;
+const ATTRACT_CAUGHT_HUMAN_Y16: i32 = 0xA2E0;
+const ATTRACT_GROUNDED_HUMAN_Y16: i32 = 0xDEE0;
+const ATTRACT_RESCUE_SHIP_XV16: i32 = 0x0040;
+const ATTRACT_RESCUE_SHIP_YV16: i32 = 0x00D4;
+const ATTRACT_RESCUE_HUMAN_ACCEL16: i32 = 0x0008;
+const ATTRACT_RESCUE_DROP_YV16: i32 = 0x00C0;
+const ATTRACT_RESCUE_RETURN_XV16: i32 = -0x0040;
+const ATTRACT_RESCUE_RETURN_YV16: i32 = -0x0180;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttractFrame {
@@ -384,7 +393,8 @@ fn scripted_world(
 
 fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
     let rescue_phase_end = RESCUE_DESCENT_TICKS + RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS;
-    let rescue_score_end = rescue_phase_end + RESCUE_FALL_TICKS + RESCUE_SCORE_TICKS;
+    let rescue_fall_end = rescue_phase_end + RESCUE_FALL_TICKS;
+    let rescue_score_end = rescue_fall_end + RESCUE_SCORE_TICKS;
     let rescue_return_end = rescue_score_end + RESCUE_RETURN_TICKS;
     let mut facing = HorizontalDirection::Right;
     let mut objects = Vec::new();
@@ -437,11 +447,11 @@ fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
                 enemy_y,
             );
         }
-    } else if tick < rescue_score_end {
+    } else if tick < rescue_fall_end {
         let fall_tick = tick - rescue_phase_end;
-        let human_y = rescue_fall_human_y16(fall_tick);
-        let ship_x = ATTRACT_PLAYER_X16 + i32::from(fall_tick) * 0x0040;
-        let ship_y = ATTRACT_PLAYER_Y16 + i32::from(fall_tick) * 0x00D4;
+        // `AMODE3` / `AMODE4` move the ship toward Eugene while the falling
+        // human accelerates every two ticks until the catch frame.
+        let (ship_x, ship_y, human_y) = rescue_intercept_state(fall_tick);
         objects.push(attract_object(EntityKind::PlayerShip, ship_x, ship_y));
         objects.push(attract_object_with_state(
             EntityKind::Human,
@@ -449,30 +459,37 @@ fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
             human_y,
             EntityState::Falling,
         ));
-        if fall_tick >= RESCUE_FALL_TICKS {
-            bonus_text = Some(AttractBonusText {
-                text: "500",
-                x16: ATTRACT_SCORE_BONUS_X16,
-                y16: ATTRACT_SCORE_BONUS_Y16,
-            });
-        }
+    } else if tick < rescue_score_end {
+        // `AMODE5` teleports the caught human onto the ship's path, spawns the
+        // `500`, and drops both ship and human straight toward the terrain.
+        let score_tick = tick - rescue_fall_end;
+        let (ship_x, ship_y, human_y) = rescue_drop_state(score_tick);
+        objects.push(attract_object(EntityKind::PlayerShip, ship_x, ship_y));
+        objects.push(attract_object(
+            EntityKind::Human,
+            ATTRACT_CAUGHT_HUMAN_X16,
+            human_y,
+        ));
+        bonus_text = Some(AttractBonusText {
+            text: "500",
+            x16: ATTRACT_SCORE_BONUS_X16,
+            y16: ATTRACT_SCORE_BONUS_Y16,
+        });
     } else if tick < rescue_return_end {
         let return_tick = tick - rescue_score_end;
         facing = HorizontalDirection::Left;
-        let ship_start_x = ATTRACT_PLAYER_X16 + i32::from(RESCUE_FALL_TICKS) * 0x0040;
-        let ship_start_y = ATTRACT_PLAYER_Y16
-            + i32::from(RESCUE_FALL_TICKS) * 0x00D4
-            + i32::from(RESCUE_SCORE_TICKS) * 0x00C0;
-        let human_start_y = ATTRACT_HUMAN_Y16
-            - i32::from(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS) * 0x00B0
-            + i32::from(RESCUE_SCORE_TICKS) * 0x00C0;
+        let (ship_start_x, ship_start_y, _) = rescue_drop_state(RESCUE_SCORE_TICKS);
         objects.push(attract_object_facing(
             EntityKind::PlayerShip,
-            ship_start_x - i32::from(return_tick) * 0x0040,
-            ship_start_y - i32::from(return_tick) * 0x0180,
+            ship_start_x + i32::from(return_tick) * ATTRACT_RESCUE_RETURN_XV16,
+            ship_start_y + i32::from(return_tick) * ATTRACT_RESCUE_RETURN_YV16,
             HorizontalDirection::Left,
         ));
-        objects.push(attract_object(EntityKind::Human, 0x1E80, human_start_y));
+        objects.push(attract_object(
+            EntityKind::Human,
+            ATTRACT_CAUGHT_HUMAN_X16,
+            ATTRACT_GROUNDED_HUMAN_Y16,
+        ));
         bonus_text = Some(AttractBonusText {
             text: "500",
             x16: ATTRACT_SCORE_BONUS_DROP_X16,
@@ -480,14 +497,15 @@ fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
         });
     } else {
         let table_tick = tick - rescue_return_end;
-        let player_x = ATTRACT_PLAYER_X16 + i32::from(RESCUE_FALL_TICKS) * 0x0040
-            - i32::from(RESCUE_RETURN_TICKS) * 0x0040;
-        let player_y = ATTRACT_PLAYER_Y16
-            + i32::from(RESCUE_FALL_TICKS) * 0x00D4
-            + i32::from(RESCUE_SCORE_TICKS) * 0x00C0
-            - i32::from(RESCUE_RETURN_TICKS) * 0x0180;
+        let (drop_ship_x, drop_ship_y, _) = rescue_drop_state(RESCUE_SCORE_TICKS);
+        let player_x = drop_ship_x + i32::from(RESCUE_RETURN_TICKS) * ATTRACT_RESCUE_RETURN_XV16;
+        let player_y = drop_ship_y + i32::from(RESCUE_RETURN_TICKS) * ATTRACT_RESCUE_RETURN_YV16;
         objects.push(attract_object(EntityKind::PlayerShip, player_x, player_y));
-        objects.push(attract_object(EntityKind::Human, 0x1E80, 0xDEE0));
+        objects.push(attract_object(
+            EntityKind::Human,
+            ATTRACT_CAUGHT_HUMAN_X16,
+            ATTRACT_GROUNDED_HUMAN_Y16,
+        ));
         append_legend_entities(&mut objects, table_tick, player_x, player_y);
     }
 
@@ -563,8 +581,10 @@ fn revealed_score_entries_for_tick(tick: u16) -> usize {
     );
     let mut visible = 0;
     for index in 0..ATTRACT_SCORE_CARD.len() {
-        let show_tick =
-            index as u16 * LEGEND_ENTRY_TICKS + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
+        let show_tick = index as u16 * LEGEND_ENTRY_TICKS
+            + LEGEND_APPROACH_TICKS
+            + LEGEND_LASER_TICKS
+            + LEGEND_TEXT_TICKS;
         if table_tick >= show_tick {
             visible += 1;
         }
@@ -587,23 +607,37 @@ fn add_laser_column(
     }
 }
 
-fn rescue_fall_human_y16(fall_tick: u16) -> i32 {
-    let mut y = ATTRACT_HUMAN_Y16 - i32::from(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS) * 0x00B0;
+fn rescue_intercept_state(fall_tick: u16) -> (i32, i32, i32) {
+    let mut ship_x = ATTRACT_PLAYER_X16;
+    let mut ship_y = ATTRACT_PLAYER_Y16;
+    let mut human_y =
+        ATTRACT_HUMAN_Y16 - i32::from(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS) * 0x00B0;
     let mut tick_cursor = 0;
-    let mut velocity = 0;
+    let mut human_velocity = 0;
 
-    for _ in 0..44 {
-        velocity += 0x0008;
+    for _ in 0..(RESCUE_FALL_TICKS / 2) {
+        human_velocity += ATTRACT_RESCUE_HUMAN_ACCEL16;
         for _ in 0..2 {
             if tick_cursor >= fall_tick {
-                return y;
+                return (ship_x, ship_y, human_y);
             }
-            y += velocity;
+            ship_x += ATTRACT_RESCUE_SHIP_XV16;
+            ship_y += ATTRACT_RESCUE_SHIP_YV16;
+            human_y += human_velocity;
             tick_cursor += 1;
         }
     }
 
-    y
+    (ship_x, ship_y, human_y)
+}
+
+fn rescue_drop_state(score_tick: u16) -> (i32, i32, i32) {
+    let (ship_x, ship_y, _) = rescue_intercept_state(RESCUE_FALL_TICKS);
+    (
+        ship_x,
+        ship_y + i32::from(score_tick) * ATTRACT_RESCUE_DROP_YV16,
+        ATTRACT_CAUGHT_HUMAN_Y16 + i32::from(score_tick) * ATTRACT_RESCUE_DROP_YV16,
+    )
 }
 
 fn attract_object(kind: EntityKind, x16: i32, y16: i32) -> AttractObject {
@@ -766,10 +800,18 @@ fn compact_score_row(rank: usize, entry: Option<&HighScoreEntry>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::{audio::SoundCue, game::World, high_scores::HighScoreTable};
+    use crate::{
+        audio::SoundCue,
+        game::{EntityKind, World},
+        high_scores::HighScoreTable,
+    };
 
     use super::{
-        SceneKind, attract_cycle, attract_scene, high_score_scene, logo_scene, scene_for_elapsed_ms,
+        ATTRACT_CAUGHT_HUMAN_X16, ATTRACT_HUMAN_X16, LEGEND_APPROACH_TICKS, LEGEND_LASER_TICKS,
+        LEGEND_TEXT_TICKS, RESCUE_ASCENT_TICKS, RESCUE_DESCENT_TICKS, RESCUE_FALL_TICKS,
+        RESCUE_LASER_TICKS, RESCUE_RETURN_TICKS, RESCUE_SCORE_TICKS, SceneKind, attract_cycle,
+        attract_scene, high_score_scene, logo_scene, revealed_score_entries_for_tick,
+        scene_for_elapsed_ms, scripted_attract_frame_for_tick,
     };
 
     #[test]
@@ -874,5 +916,49 @@ mod tests {
         assert!(
             text.contains("SCANNER") || text.contains("HALL OF FAME") || text.contains("WILLIAMS")
         );
+    }
+
+    #[test]
+    fn rescue_sequence_switches_to_catch_and_bonus_on_rom_tick_boundary() {
+        let rescue_phase_end = RESCUE_DESCENT_TICKS + RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS;
+
+        let intercept_frame =
+            scripted_attract_frame_for_tick(rescue_phase_end + RESCUE_FALL_TICKS - 1);
+        let caught_frame = scripted_attract_frame_for_tick(rescue_phase_end + RESCUE_FALL_TICKS);
+
+        assert_eq!(intercept_frame.bonus_text, None);
+        assert!(
+            intercept_frame
+                .objects
+                .iter()
+                .any(|object| object.kind == EntityKind::Human && object.x16 == ATTRACT_HUMAN_X16)
+        );
+        assert_eq!(
+            caught_frame
+                .bonus_text
+                .expect("catch frame should show the 500 bonus")
+                .text,
+            "500"
+        );
+        assert!(caught_frame.objects.iter().any(
+            |object| object.kind == EntityKind::Human && object.x16 == ATTRACT_CAUGHT_HUMAN_X16
+        ));
+    }
+
+    #[test]
+    fn legend_text_waits_for_post_spawn_rom_delay() {
+        let table_start = RESCUE_DESCENT_TICKS
+            + RESCUE_ASCENT_TICKS
+            + RESCUE_LASER_TICKS
+            + RESCUE_FALL_TICKS
+            + RESCUE_SCORE_TICKS
+            + RESCUE_RETURN_TICKS;
+        let just_before_text =
+            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TEXT_TICKS - 1;
+        let first_text_tick =
+            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TEXT_TICKS;
+
+        assert_eq!(revealed_score_entries_for_tick(just_before_text), 0);
+        assert_eq!(revealed_score_entries_for_tick(first_text_tick), 1);
     }
 }

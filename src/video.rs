@@ -1063,15 +1063,6 @@ impl Renderer {
 
     fn draw_attract_legend_entries(&mut self, revealed_score_entries: usize) {
         for entry in ATTRACT_SCORE_CARD.into_iter().take(revealed_score_entries) {
-            let sprite = Entity::new(entry.kind, 0, 0, 0, 0);
-            self.draw_entity(
-                &sprite,
-                HorizontalDirection::Right,
-                0,
-                entry.x,
-                entry.y - 30,
-                26,
-            );
             let color = attract_legend_color(entry.kind);
             self.draw_centered_text(entry.x, entry.y, entry.label, color, 2);
             self.draw_centered_text(entry.x, entry.y + 22, &entry.score.to_string(), color, 2);
