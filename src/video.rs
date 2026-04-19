@@ -256,7 +256,7 @@ impl Renderer {
         );
         let branding = arcade_branding();
         let rom = attract_rom();
-        let palette = attract_palette(state.palette_phase, state.elapsed_ms);
+        let palette = logo_page_palette(state.palette_phase, state.elapsed_ms);
         let max_width = (self.image_width as i32 - 64).max(1);
         let max_height = (self.image_height as i32 - 24).max(1);
         let scale = (max_width as f32 / 320.0).min(max_height as f32 / 256.0);
@@ -1920,7 +1920,22 @@ fn score_table_block_height(row_count: usize) -> i32 {
 }
 
 const ATTRACT_COLOR_CYCLE_MS: u64 = 120;
+const LOGO_COLOR_CYCLE_MS: u64 = 45;
 const HALL_COLOR_CYCLE_MS: u64 = 33;
+const LOGO_COLOR_SEQUENCE: [[u8; 4]; 12] = [
+    [255, 72, 96, 255],
+    [255, 108, 96, 255],
+    [255, 156, 88, 255],
+    [255, 208, 92, 255],
+    [224, 255, 92, 255],
+    [170, 255, 108, 255],
+    [122, 255, 184, 255],
+    [96, 236, 255, 255],
+    [118, 132, 255, 255],
+    [170, 96, 255, 255],
+    [206, 108, 255, 255],
+    [255, 100, 156, 255],
+];
 const HALL_COLOR_SEQUENCE: [[u8; 4]; 12] = [
     [206, 108, 255, 255],
     [170, 96, 255, 255],
@@ -1976,6 +1991,22 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
             scanner_text: [206, 108, 255, 255],
             scanner_border: [94, 146, 230, 255],
         },
+    }
+}
+
+fn logo_page_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
+    // `AMODES` launches the same cabinet color walkers before the Williams
+    // title page begins. The captured attract footage shows the first page
+    // walking a broader rainbow-like sequence than the old four-step
+    // approximation, so keep a dedicated faster cycle here.
+    let index = (phase + (elapsed_ms / LOGO_COLOR_CYCLE_MS) as usize) % LOGO_COLOR_SEQUENCE.len();
+    AttractPalette {
+        williams: LOGO_COLOR_SEQUENCE[index],
+        title_text: LOGO_COLOR_SEQUENCE[(index + 3) % LOGO_COLOR_SEQUENCE.len()],
+        defender_face: LOGO_COLOR_SEQUENCE[(index + 5) % LOGO_COLOR_SEQUENCE.len()],
+        defender_shadow: LOGO_COLOR_SEQUENCE[(index + 10) % LOGO_COLOR_SEQUENCE.len()],
+        scanner_text: TEXT_ATTRACT_PURPLE,
+        scanner_border: [67, 114, 198, 255],
     }
 }
 
