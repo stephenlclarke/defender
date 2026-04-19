@@ -140,6 +140,7 @@ pub struct Entity {
     pub state: EntityState,
     pub rescue_value: u16,
     pub rom_aux: u16,
+    pub rom_aux2: i16,
 }
 
 impl Entity {
@@ -162,6 +163,7 @@ impl Entity {
             state,
             rescue_value: 0,
             rom_aux: 0,
+            rom_aux2: 0,
         }
     }
 }
@@ -1111,25 +1113,18 @@ impl World {
                             .saturating_sub(1);
                     enemy.rom_aux = rom_pack_swarmer_state(swarmer_accel, shot_timer);
 
-                    let vertical_delta = target.y - enemy.position.y;
-                    if vertical_delta != 0
-                        && rom_swarmer_vertical_refresh_due(
-                            self.tick,
-                            enemy.position,
-                            swarmer_accel,
-                        )
-                    {
-                        enemy.velocity.dy = (enemy.velocity.dy
-                            + vertical_delta.signum() * swarmer_vertical_limit)
-                            .clamp(-swarmer_vertical_limit, swarmer_vertical_limit);
-                    }
-                    if enemy.velocity.dy == 0 {
-                        enemy.velocity.dy = if self.tick.is_multiple_of(2) {
-                            swarmer_vertical_limit
-                        } else {
-                            -swarmer_vertical_limit
-                        };
-                    }
+                    enemy.rom_aux2 = rom_swarmer_next_vertical_oyv(
+                        enemy.rom_aux2,
+                        enemy.velocity.dy,
+                        enemy.position.y,
+                        target.y,
+                        swarmer_accel,
+                        rand_state.seed,
+                    );
+                    enemy.velocity.dy = rom_swarmer_vertical_velocity_from_oyv(
+                        enemy.rom_aux2,
+                        swarmer_vertical_limit,
+                    );
                 }
                 _ => {}
             }
@@ -2820,9 +2815,47 @@ fn rom_swarmer_vertical_speed_limit(mask: u8) -> i32 {
     if mask > 0x1F { 2 } else { 1 }
 }
 
-fn rom_swarmer_vertical_refresh_due(tick: u32, position: Position, mask: u8) -> bool {
-    let cadence = (((mask >> 4) & 0x3).max(1) + 1) as u32;
-    (tick + position.x as u32 + position.y as u32).is_multiple_of(cadence)
+fn rom_swarmer_fixed_oyv(current_oyv: i16, current_dy: i32) -> i32 {
+    if current_oyv == 0 {
+        current_dy.clamp(-2, 2) * 0x100
+    } else {
+        i32::from(current_oyv)
+    }
+}
+
+fn rom_swarmer_damping(oyv: i32) -> i32 {
+    let shifted = (!(oyv as u16)).wrapping_shl(2);
+    i32::from((shifted >> 8) as i8)
+}
+
+fn rom_swarmer_next_vertical_oyv(
+    current_oyv: i16,
+    current_dy: i32,
+    current_y: i32,
+    target_y: i32,
+    acceleration: u8,
+    seed: u8,
+) -> i16 {
+    let accel = if target_y > current_y {
+        i32::from(acceleration)
+    } else {
+        -i32::from(acceleration)
+    };
+    let mut oyv = (rom_swarmer_fixed_oyv(current_oyv, current_dy) + accel).clamp(-0x0200, 0x0200);
+    oyv += rom_swarmer_damping(oyv);
+    oyv += i32::from((seed & 0x1F) as i8) - 0x10;
+    oyv.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16
+}
+
+fn rom_swarmer_vertical_velocity_from_oyv(oyv: i16, limit: i32) -> i32 {
+    let oyv = i32::from(oyv);
+    if oyv > 0 {
+        ((oyv + 0xFF) / 0x100).clamp(1, limit)
+    } else if oyv < 0 {
+        -(((-oyv + 0xFF) / 0x100).clamp(1, limit))
+    } else {
+        0
+    }
 }
 
 fn rom_baiter_should_seek(seed: u8, seek_probability: u8) -> bool {
@@ -3085,8 +3118,9 @@ mod tests {
         rom_probe_swarmer_burst_count, rom_probe_vertical_velocity, rom_randv_velocity,
         rom_reset_baiter_timer, rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit,
         rom_shoot_axes_from_seeds, rom_swarmer_acceleration, rom_swarmer_count_limit,
-        rom_swarmer_horizontal_velocity, rom_swarmer_shot_timer_for_entity,
-        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
+        rom_swarmer_damping, rom_swarmer_horizontal_velocity, rom_swarmer_next_vertical_oyv,
+        rom_swarmer_shot_timer_for_entity, rom_swarmer_vertical_speed_limit,
+        rom_swarmer_vertical_velocity_from_oyv, rom_tie_close_band, rom_tie_far_band,
         rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
         screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
@@ -3930,6 +3964,20 @@ mod tests {
             rom_swarmer_vertical_speed_limit(wave_four.swarmer_acceleration_mask),
             2
         );
+    }
+
+    #[test]
+    fn rom_swarmer_vertical_helpers_follow_mswm_damping_and_clamp() {
+        assert_eq!(rom_swarmer_damping(0x0200), -9);
+        assert_eq!(rom_swarmer_damping(-0x0200), 7);
+
+        let positive = rom_swarmer_next_vertical_oyv(0x0200, 2, 4, 6, 0x1F, 0x10);
+        assert_eq!(positive, 0x01F7);
+        assert_eq!(rom_swarmer_vertical_velocity_from_oyv(positive, 2), 2);
+
+        let negative = rom_swarmer_next_vertical_oyv(-0x0200, -2, 6, 4, 0x1F, 0x10);
+        assert_eq!(negative, -0x01F9);
+        assert_eq!(rom_swarmer_vertical_velocity_from_oyv(negative, 2), -2);
     }
 
     #[test]

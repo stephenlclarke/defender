@@ -223,7 +223,8 @@ the final runtime self-contained:
   cabinet `SHOOT` routine instead of a separate Rust-only firing heuristic.
 - <https://www.dougmahugh.com/defender-chapter05/>: swarmer-behavior reference
   used to model pod bursts, delayed swarmer turnback, the follow-from-behind
-  movement pattern, and the quarter-screen-ahead swarmer firing focal point.
+  movement pattern, the `MSWM` vertical acceleration/damping path, and the
+  quarter-screen-ahead swarmer firing focal point.
 - <https://www.dougmahugh.com/defender-chapter06/>: bomber-behavior reference
   used to model wave-two bomber introduction, the `TIEXV`-backed horizontal
   cruise path, and the persistent mine trails they leave behind.
