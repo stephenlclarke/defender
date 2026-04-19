@@ -226,6 +226,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   world, and risky hyperspace behavior outside `xyzzy` mode, while `xyzzy`
   hyperspace deliberately relocates the ship away from enemy clusters, with
   automatic unlimited smart bombs in `xyzzy` mode,
+  and empty smart-bomb button presses in normal play now following the cabinet
+  `SBMBX2 -> SUCIDE` path instead of being ignored,
   the normal shot cap removed in `xyzzy`, a separate `G` invincibility toggle,
   an `F` auto-fire toggle that only shoots when the current firing lane has a
   direct alien kill, and secret-mode full-height humanoid fall survival, plus

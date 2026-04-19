@@ -566,7 +566,18 @@ impl World {
             self.lose_player_life(player_position, &mut events);
         }
 
-        if input.smart_bomb && self.can_use_smart_bomb(input.secret_mode) {
+        let invalid_smart_bomb_attempt =
+            input.smart_bomb && !input.secret_mode && !self.can_use_smart_bomb(false);
+        if invalid_smart_bomb_attempt && let Some(player_position) = shot_origin {
+            // Red-label `SBOMB` falls through `SBMBX2 -> SUCIDE` if the player
+            // presses smart bomb with none remaining.
+            self.lose_player_life(player_position, &mut events);
+        }
+
+        if !invalid_smart_bomb_attempt
+            && input.smart_bomb
+            && self.can_use_smart_bomb(input.secret_mode)
+        {
             self.detonate_smart_bomb(input.secret_mode, &mut events);
         }
 
@@ -4236,7 +4247,7 @@ mod tests {
     }
 
     #[test]
-    fn invincible_mode_does_not_grant_unlimited_smart_bombs() {
+    fn empty_smart_bomb_press_triggers_suicide_in_normal_play() {
         let mut world = World::with_entities(
             16,
             8,
@@ -4254,13 +4265,14 @@ mod tests {
 
         let events = world.step_live(UpdateInput {
             smart_bomb: true,
-            invincible: true,
             ..UpdateInput::default()
         });
 
         assert_eq!(world.smart_bombs(), 0);
         assert_eq!(world.status().score, 0);
         assert!(!events.contains(&WorldEvent::SmartBombDetonated));
+        assert!(events.contains(&WorldEvent::PlayerHit));
+        assert_eq!(world.status().lives, 2);
     }
 
     #[test]
