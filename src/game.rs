@@ -688,14 +688,11 @@ impl World {
         max_y: i32,
         events: &mut Vec<WorldEvent>,
     ) {
+        let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         // `GETSHL` gates the shared hostile shell list through `BMBCNT < 20`.
         // Keep enemy bullets on that cabinet counter instead of the old Rust
         // per-kind cap.
         let available = rom_shell_spawn_limit().saturating_sub(self.live_shell_count());
-        if available == 0 {
-            return;
-        }
-
         let Some((player_position, player_screen_x)) =
             self.player_position().and_then(|position| {
                 self.screen_x_for_world_x(position.x)
@@ -706,26 +703,57 @@ impl World {
         };
 
         let player_velocity = self.player_velocity().unwrap_or(Velocity { dx: 0, dy: 0 });
+        let mut firing_enemies = Vec::new();
+        let mut swarmer_resets = Vec::new();
+
         // StrategyWiki's attack-wave advice calls out that opponents must be on
         // the main screen before they can shoot, so off-screen enemies are
         // filtered out here before any firing solution is attempted.
-        let firing_enemies: Vec<(Position, Velocity)> = self
-            .entities
-            .iter()
-            .filter(|entity| entity.kind.can_fire())
-            .filter_map(|entity| {
-                let enemy_screen_x = self.screen_x_for_world_x(entity.position.x)? as i32;
-                self.enemy_shot_velocity(
-                    entity,
-                    enemy_screen_x,
-                    player_position,
-                    player_screen_x,
-                    player_velocity,
-                )
-                .map(|velocity| (entity.position, velocity))
-            })
-            .take(available)
-            .collect();
+        for index in 0..self.entities.len() {
+            let entity = &self.entities[index];
+            if !entity.kind.can_fire() {
+                continue;
+            }
+
+            let Some(enemy_screen_x) = self.screen_x_for_world_x(entity.position.x) else {
+                continue;
+            };
+            let enemy_screen_x = enemy_screen_x as i32;
+
+            if entity.kind == EntityKind::Swarmer
+                && rom_swarmer_shot_timer_for_entity(entity, wave_profile.swarmer_shot_time) == 0
+            {
+                swarmer_resets.push(index);
+            }
+
+            if firing_enemies.len() >= available {
+                continue;
+            }
+
+            if let Some(velocity) = self.enemy_shot_velocity(
+                entity,
+                enemy_screen_x,
+                player_position,
+                player_screen_x,
+                player_velocity,
+            ) {
+                firing_enemies.push((entity.position, velocity));
+            }
+        }
+
+        for index in swarmer_resets {
+            let Some(entity) = self.entities.get_mut(index) else {
+                continue;
+            };
+            let acceleration =
+                rom_swarmer_acceleration_for_entity(entity, wave_profile.swarmer_acceleration_mask);
+            let shot_timer = rom_seeded_rmax(
+                &mut self.rand_state,
+                wave_profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8,
+            );
+            entity.rom_aux = rom_pack_swarmer_state(acceleration, shot_timer);
+        }
+
         if firing_enemies.is_empty() {
             return;
         }
@@ -783,24 +811,27 @@ impl World {
                 ))
             }
             EntityKind::Swarmer => {
-                let shot_delay = wave_profile.swarmer_shot_time.max(1);
-                if !self.tick.is_multiple_of(shot_delay) {
+                if rom_swarmer_shot_timer_for_entity(enemy, wave_profile.swarmer_shot_time) != 0 {
                     return None;
                 }
 
-                // Doug Mahugh chapter 05 explains that Swarmers fire through a
-                // focal point about a quarter-screen ahead at the player's
-                // altitude, rather than solving for exact distance.
-                let mut dx = enemy.velocity.dx.signum();
-                if dx == 0 {
-                    dx = (player_screen_x - enemy_screen_x).signum().max(1);
+                let heading = enemy.velocity.dx.signum();
+                let player_delta = player_screen_x - enemy_screen_x;
+                if player_delta != 0 && heading != 0 && player_delta.signum() != heading {
+                    return None;
                 }
+
                 let lead = (self.width as i32 / tables.swarmer_fire_lead_divisor as i32).max(1);
                 let vertical_delta = player_position.y - enemy.position.y;
                 let mut dy = (vertical_delta / lead.max(1)).clamp(-1, 1);
                 if dy == 0 && vertical_delta.abs() >= (lead / 2).max(1) {
                     dy = vertical_delta.signum();
                 }
+                let dx = if heading == 0 {
+                    player_delta.signum().max(1)
+                } else {
+                    heading
+                };
                 Some(Velocity { dx, dy })
             }
             _ => None,
@@ -1058,6 +1089,10 @@ impl World {
                     } else {
                         delta_x.signum() * swarmer_speed
                     };
+                    let shot_timer =
+                        rom_swarmer_shot_timer_for_entity(enemy, wave_profile.swarmer_shot_time)
+                            .saturating_sub(1);
+                    enemy.rom_aux = rom_pack_swarmer_state(swarmer_accel, shot_timer);
 
                     let vertical_delta = target.y - enemy.position.y;
                     if vertical_delta != 0
@@ -1615,6 +1650,14 @@ impl World {
 
         for _ in 0..count {
             let velocity = rom_randv_velocity(&mut self.rand_state);
+            let acceleration = rom_swarmer_acceleration(
+                self.rand_state.lseed,
+                wave_profile.swarmer_acceleration_mask,
+            );
+            let shot_timer = rom_seeded_rmax(
+                &mut self.rand_state,
+                wave_profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8,
+            );
             let mut swarmer = Entity::new(
                 EntityKind::Swarmer,
                 pod_position.x,
@@ -1622,10 +1665,7 @@ impl World {
                 velocity.dx,
                 velocity.dy,
             );
-            swarmer.rom_aux = u16::from(rom_swarmer_acceleration(
-                self.rand_state.lseed,
-                wave_profile.swarmer_acceleration_mask,
-            ));
+            swarmer.rom_aux = rom_pack_swarmer_state(acceleration, shot_timer);
             self.entities.push(swarmer);
         }
     }
@@ -2499,9 +2539,27 @@ fn rom_swarmer_acceleration(lseed: u8, mask: u8) -> u8 {
     lseed & mask
 }
 
+fn rom_pack_swarmer_state(acceleration: u8, shot_timer: u8) -> u16 {
+    u16::from_be_bytes([acceleration, shot_timer])
+}
+
 fn rom_swarmer_acceleration_for_entity(enemy: &Entity, wave_mask: u8) -> u8 {
-    let seeded = enemy.rom_aux as u8;
+    let [seeded, _] = enemy.rom_aux.to_be_bytes();
     if seeded == 0 { wave_mask } else { seeded }
+}
+
+fn rom_swarmer_shot_timer_for_entity(enemy: &Entity, wave_shot_time: u32) -> u8 {
+    let [acceleration, shot_timer] = enemy.rom_aux.to_be_bytes();
+    if acceleration == 0 && shot_timer == 0 {
+        wave_shot_time.min(u32::from(u8::MAX)) as u8
+    } else {
+        shot_timer
+    }
+}
+
+fn rom_seeded_rmax(rand_state: &mut RomRandState, max: u8) -> u8 {
+    rand_state.advance();
+    rom_rmax(max, rand_state.seed) as u8
 }
 
 fn rom_shell_spawn_limit() -> usize {
@@ -2975,11 +3033,12 @@ mod tests {
         rom_baiter_timer_floor, rom_baiter_vertical_close_band, rom_bomb_shell_limit,
         rom_bomber_mine_lifetime, rom_bomber_should_drop_mine, rom_default_human_world_xs,
         rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
-        rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
-        rom_probe_swarmer_burst_count, rom_probe_vertical_velocity, rom_randv_velocity,
-        rom_reset_baiter_timer, rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit,
-        rom_shoot_axes_from_seeds, rom_swarmer_acceleration, rom_swarmer_count_limit,
-        rom_swarmer_horizontal_velocity, rom_swarmer_vertical_speed_limit, rom_tie_close_band,
+        rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_pack_swarmer_state,
+        rom_probe_spawn_for_wave, rom_probe_swarmer_burst_count, rom_probe_vertical_velocity,
+        rom_randv_velocity, rom_reset_baiter_timer, rom_rmax, rom_shell_lifetime,
+        rom_shell_spawn_limit, rom_shoot_axes_from_seeds, rom_swarmer_acceleration,
+        rom_swarmer_count_limit, rom_swarmer_horizontal_velocity,
+        rom_swarmer_shot_timer_for_entity, rom_swarmer_vertical_speed_limit, rom_tie_close_band,
         rom_tie_far_band, rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude,
         scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
@@ -3556,6 +3615,18 @@ mod tests {
 
     #[test]
     fn swarmer_fire_uses_the_faster_enemy_cycle() {
+        let wave_profile = red_label_wave_table().profile_for_wave(3);
+        let mut swarmer = Entity::new(
+            EntityKind::Swarmer,
+            18,
+            4,
+            -rom_swarmer_horizontal_velocity(wave_profile.swarmer_x_velocity),
+            0,
+        );
+        swarmer.rom_aux = rom_pack_swarmer_state(
+            rom_swarmer_acceleration(0xAD, wave_profile.swarmer_acceleration_mask),
+            1,
+        );
         let mut world = World::with_entities(
             32,
             10,
@@ -3564,24 +3635,9 @@ mod tests {
                 lives: 3,
                 wave: 3,
             },
-            vec![
-                Entity::new(EntityKind::PlayerShip, 6, 4, 0, 0),
-                Entity::new(
-                    EntityKind::Swarmer,
-                    18,
-                    4,
-                    -rom_swarmer_horizontal_velocity(
-                        red_label_wave_table()
-                            .profile_for_wave(3)
-                            .swarmer_x_velocity,
-                    ),
-                    0,
-                ),
-            ],
+            vec![Entity::new(EntityKind::PlayerShip, 6, 4, 0, 0), swarmer],
         );
 
-        let shot_delay = red_label_wave_table().profile_for_wave(3).swarmer_shot_time;
-        world.tick = shot_delay - 1;
         let events = world.step_live(UpdateInput::default());
 
         let shot = world
@@ -3592,6 +3648,61 @@ mod tests {
         assert_eq!(shot.velocity.dx, -1);
         assert_eq!(shot.velocity.dy, 0);
         assert!(events.contains(&WorldEvent::EnemyFired));
+    }
+
+    #[test]
+    fn swarmer_fire_resets_the_rom_timer_when_the_shell_list_is_full() {
+        let wave_profile = red_label_wave_table().profile_for_wave(3);
+        let mut swarmer = Entity::new(
+            EntityKind::Swarmer,
+            18,
+            4,
+            -rom_swarmer_horizontal_velocity(wave_profile.swarmer_x_velocity),
+            0,
+        );
+        swarmer.rom_aux = rom_pack_swarmer_state(
+            rom_swarmer_acceleration(0xAD, wave_profile.swarmer_acceleration_mask),
+            1,
+        );
+        let mut entities = vec![Entity::new(EntityKind::PlayerShip, 6, 4, 0, 0), swarmer];
+        entities.extend((0..rom_shell_spawn_limit()).map(|index| {
+            let mut shot = Entity::new(
+                EntityKind::EnemyShot,
+                8 + index as i32,
+                3 + (index as i32 % 2),
+                0,
+                0,
+            );
+            shot.rom_aux = 100;
+            shot
+        }));
+        let mut world = World::with_entities(
+            32,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 3,
+            },
+            entities,
+        );
+
+        let events = world.step_live(UpdateInput::default());
+
+        assert_eq!(
+            world.entity_count_by_kind(EntityKind::EnemyShot),
+            rom_shell_spawn_limit()
+        );
+        assert!(!events.contains(&WorldEvent::EnemyFired));
+        let swarmer = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Swarmer)
+            .expect("swarmer");
+        assert!(
+            rom_swarmer_shot_timer_for_entity(swarmer, wave_profile.swarmer_shot_time) > 0,
+            "SWBMB should reseed PD4 after the attempt"
+        );
     }
 
     #[test]
