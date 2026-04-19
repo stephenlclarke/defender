@@ -124,18 +124,15 @@ impl ArcadeSprites {
         player_facing: HorizontalDirection,
     ) -> Arc<RenderedImage> {
         match entity.kind {
-            // The cabinet only switches between `PLAPIC` and `PLBPIC`
-            // (`defa7.src` `POUT` / `POUT1`). Our embedded ship frames are the
-            // pre-expanded display phases of those pictures, so the visible
-            // frame follows the ship's horizontal sub-cell placement rather
-            // than an invented animation timer.
+            // `POUT` / `POUT1` only swap the player between the right-facing
+            // `PLAPIC` and left-facing `PLBPIC` pictures. The four extracted
+            // ship PNGs are the low-level display phases of that same art; on
+            // this coarse world grid, cycling those phases per cell makes the
+            // ship appear to flicker and flip. Keep the cabinet-facing image
+            // stable instead of inventing a visible animation.
             EntityKind::PlayerShip => match player_facing {
-                HorizontalDirection::Right => {
-                    self.ships_right[player_phase(entity.position.x)].clone()
-                }
-                HorizontalDirection::Left => {
-                    self.ships_left[player_phase(entity.position.x)].clone()
-                }
+                HorizontalDirection::Right => self.ships_right[1].clone(),
+                HorizontalDirection::Left => self.ships_left[1].clone(),
             },
             EntityKind::PlayerShot => self.player_shot.clone(),
             EntityKind::EnemyShot => self.enemy_shots[rom_cycle_index(tick, 2, 4)].clone(),
@@ -174,10 +171,6 @@ impl ArcadeSprites {
     pub fn score_500(&self, tick: u32) -> Arc<RenderedImage> {
         self.score_500[rom_cycle_index(tick, 5, 2)].clone()
     }
-}
-
-fn player_phase(world_x: i32) -> usize {
-    world_x.rem_euclid(4) as usize
 }
 
 fn rom_cycle_index(tick: u32, speed: u32, len: usize) -> usize {
@@ -287,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    fn player_ship_phase_follows_horizontal_position() {
+    fn player_ship_frame_is_stable_across_horizontal_positions() {
         let sprites = arcade_sprites();
         let player_a = Entity::new(EntityKind::PlayerShip, 12, 8, 0, 0);
         let player_b = Entity::new(EntityKind::PlayerShip, 13, 8, 0, 0);
@@ -295,7 +288,7 @@ mod tests {
         let frame_a = sprites.sprite_for_entity(&player_a, 0, HorizontalDirection::Right);
         let frame_b = sprites.sprite_for_entity(&player_b, 0, HorizontalDirection::Right);
 
-        assert_ne!(frame_a.pixels, frame_b.pixels);
+        assert_eq!(frame_a.pixels, frame_b.pixels);
     }
 
     #[test]

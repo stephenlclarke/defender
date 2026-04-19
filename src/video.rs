@@ -1094,10 +1094,16 @@ impl Renderer {
                 (player_ship, laser_target)
         {
             let (start_x, start_y) = attract_laser_ship_anchor(ship_x, ship_y, facing);
-            let (end_x, end_y) = attract_laser_target_anchor(kind, target_x, target_y);
-            // `LASRS` writes the attract beam directly into screen memory, so
-            // render it here as a ROM-inspired color-cycling segmented beam.
-            self.draw_arcade_laser_beam(start_x, start_y, end_x, end_y, frame.animation_tick, rect);
+            let (end_x, _) = attract_laser_target_anchor(kind, target_x, target_y);
+            // `LASRS` writes a horizontal beam in the attract scoring sequence.
+            self.draw_arcade_laser_beam(
+                start_x,
+                start_y,
+                end_x,
+                start_y,
+                frame.animation_tick,
+                rect,
+            );
         }
     }
 
@@ -1122,9 +1128,6 @@ impl Renderer {
             let y = y0 + dy * step / steps;
             let color = LASER_COLOR_SEQUENCE[(phase + step as usize) % LASER_COLOR_SEQUENCE.len()];
             self.stamp_clipped(x, y, Color::from_rgba(color), 1, clip_rect);
-            if step % 9 == 0 {
-                self.stamp_clipped(x, y - 1, Color::from_rgba(color), 1, clip_rect);
-            }
         }
         let (tip_x0, tip_y0) = beam_tip_start(x0, y0, x1, y1, 12.0);
         self.draw_line_clipped(
