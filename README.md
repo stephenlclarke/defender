@@ -241,10 +241,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   projectiles are clipped by terrain. When the last humanoid is lost, the live
   renderer now drops the terrain line and marks the HUD as `DEEP SPACE` until a
   fifth-wave restoration brings the planet and all ten humanoids back.
-- Defender’s gameplay-fidelity, AI tuning, and the ROM-derived red-label
-  wave/fire records now all live in `assets/arcade/arcade-rules.txt`, so the
-  live game no longer depends on hand-authored attack-wave counts or
-  reinforcement timing constants in `src/game.rs`.
+- The live game no longer parses `assets/arcade/arcade-rules.txt` or merges
+  local `~/.xyzzy/defender/arcade-rules.txt` overrides into gameplay. The
+  default runtime now uses compiled Rust constants plus immutable red-label
+  `WVTAB` records, so the shipped cabinet path is no longer editable through
+  data files.
 - Gameplay work is being prioritized toward faithful Williams-arcade behavior in
   Rust first; hidden `xyzzy` options remain the only intentional rules
   extension outside that baseline.
@@ -267,8 +268,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   source tables.
 - `tools/extract_rom_attract_data.py` regenerates the Rust tables used by the
   live attract-page Williams trace and `DEFENDER` materialization code.
-- `tools/extract_rom_wave_table.py` regenerates the red-label `WVTAB` block
-  inside `assets/arcade/arcade-rules.txt` from the source `blk71.src` records.
+- `tools/extract_rom_wave_table.py` regenerates the extracted red-label
+  `WVTAB` reference block inside `assets/arcade/arcade-rules.txt` from the
+  source `blk71.src` records.
 - The title, attract legend, and hall-of-fame seed data now use the red-label
   ROM message/default tables instead of the earlier placeholder prototype
   strings.
@@ -310,8 +312,9 @@ the final runtime self-contained:
   embedded `assets/arcade/font-sheet.png`, and the `amode1.src` `LGOTAB`,
   `DEFDAT`, and `CPRTAB` tables used to reconstruct the embedded attract-logo
   page and `DEFENDER` wordmark assets, plus the `blk71.src` `WVTAB` records
-  used to reconstruct the ROM-derived wave/fire block in
-  `assets/arcade/arcade-rules.txt`.
+  used to reconstruct the compiled red-label wave/fire tables now embedded in
+  `src/red_label_wave.rs`, with the extracted text block kept in
+  `assets/arcade/arcade-rules.txt` as a checked-in reference copy.
 - <https://github.com/historicalsource/williams-soundroms>: original Williams
   sound-ROM source reference used to translate `VSNDRM1.SRC` routines and
   tables into `src/audio_rom.rs`, including the `IRQ` dispatch path, `RADSND`,
@@ -382,13 +385,13 @@ the final runtime self-contained:
   capture used to verify the full attract-sequence order, Williams logo-page
   composition, and the scoring legend reveal shown around `0:26`.
 
-## Customisation
+## ROM Table Reference
 
-Arcade tuning defaults and the ROM-derived red-label wave/fire records ship in
-`assets/arcade/arcade-rules.txt`. To override them locally, copy that file to
-`~/.xyzzy/defender/` and only include the keys you want to change. Omitted keys
-keep their embedded defaults. If `DEFENDER_DATA_DIR` is set, the game reads
-that file from the override directory instead.
+The extracted gameplay defaults and red-label `WVTAB` records remain documented
+in `assets/arcade/arcade-rules.txt`, but the live game no longer reads that
+file or accepts local override copies. The shipped runtime now uses compiled
+Rust constants and ROM-derived tables so cabinet behavior is not altered by
+filesystem state.
 
 ### `arcade-rules.txt`
 

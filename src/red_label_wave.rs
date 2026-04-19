@@ -1,10 +1,7 @@
 //! Holds the red-label Defender wave data extracted from `blk71.src` `WVTAB`.
-
-use std::sync::OnceLock;
-
-use crate::customization;
-
-const ARCADE_RULES: &str = include_str!("../assets/arcade/arcade-rules.txt");
+//!
+//! These records stay compiled into the runtime so the default game path uses immutable
+//! red-label data instead of parsing `arcade-rules.txt` or accepting local gameplay overrides.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct WaveRecord {
@@ -40,11 +37,7 @@ pub struct WaveProfile {
 }
 
 pub fn red_label_wave_table() -> &'static RedLabelWaveTable {
-    static TABLE: OnceLock<RedLabelWaveTable> = OnceLock::new();
-    TABLE.get_or_init(|| {
-        let text = customization::load_arcade_text("arcade-rules.txt", ARCADE_RULES);
-        parse_wave_table(&text)
-    })
+    &RED_LABEL_WAVE_TABLE
 }
 
 impl RedLabelWaveTable {
@@ -87,72 +80,32 @@ fn apply_delta(value: i32, delta: i32, floor: i32, ceiling: i32) -> i32 {
     }
 }
 
-fn parse_wave_table(text: &str) -> RedLabelWaveTable {
-    let mut landers = None;
-    let mut bombers = None;
-    let mut pods = None;
-    let mut mutants = None;
-    let mut swarmers = None;
-    let mut wave_time = None;
-    let mut wave_size = None;
-    let mut baiter_time = None;
-
-    for line in text.lines() {
-        let line = line.split('#').next().unwrap_or_default().trim();
-        if line.is_empty() {
-            continue;
-        }
-
-        let (key, value) = line
-            .split_once('=')
-            .expect("red-label wave table should use key=value lines");
-        match key {
-            "landers" => landers = Some(parse_record(value)),
-            "bombers" => bombers = Some(parse_record(value)),
-            "pods" => pods = Some(parse_record(value)),
-            "mutants" => mutants = Some(parse_record(value)),
-            "swarmers" => swarmers = Some(parse_record(value)),
-            "wave_time" => wave_time = Some(parse_record(value)),
-            "wave_size" => wave_size = Some(parse_record(value)),
-            "baiter_time" => baiter_time = Some(parse_record(value)),
-            _ => {}
-        }
-    }
-
-    RedLabelWaveTable {
-        landers: landers.expect("landers record should exist"),
-        bombers: bombers.expect("bombers record should exist"),
-        pods: pods.expect("pods record should exist"),
-        mutants: mutants.expect("mutants record should exist"),
-        swarmers: swarmers.expect("swarmers record should exist"),
-        wave_time: wave_time.expect("wave_time record should exist"),
-        wave_size: wave_size.expect("wave_size record should exist"),
-        baiter_time: baiter_time.expect("baiter_time record should exist"),
-    }
-}
-
-fn parse_record(value: &str) -> WaveRecord {
-    let (limits, waves) = value
-        .split_once('|')
-        .expect("wave records should use limits|waves format");
-    let limits = parse_i32_list(limits);
-    let waves = parse_i32_list(waves);
+const fn wave_record(
+    ceiling: i32,
+    floor: i32,
+    intra_delta: i32,
+    inter_delta: i32,
+    waves: [i32; 4],
+) -> WaveRecord {
     WaveRecord {
-        ceiling: limits[0],
-        floor: limits[1],
-        _intra_delta: limits[2],
-        inter_delta: limits[3],
-        waves: [waves[0], waves[1], waves[2], waves[3]],
+        ceiling,
+        floor,
+        _intra_delta: intra_delta,
+        inter_delta,
+        waves,
     }
 }
 
-fn parse_i32_list(value: &str) -> Vec<i32> {
-    value.split(',').map(parse_i32).collect()
-}
-
-fn parse_i32(value: &str) -> i32 {
-    value.trim().parse().expect("expected signed decimal value")
-}
+static RED_LABEL_WAVE_TABLE: RedLabelWaveTable = RedLabelWaveTable {
+    landers: wave_record(20, 0, 0, 0, [15, 20, 20, 20]),
+    bombers: wave_record(3, 0, 0, 0, [0, 3, 4, 5]),
+    pods: wave_record(6, 0, 0, 0, [0, 1, 3, 4]),
+    mutants: wave_record(10, 0, 0, 0, [0, 0, 0, 0]),
+    swarmers: wave_record(10, 0, 0, 0, [0, 0, 0, 0]),
+    wave_time: wave_record(30, 0, 0, 0, [30, 25, 20, 16]),
+    wave_size: wave_record(5, 0, 0, 0, [5, 5, 5, 5]),
+    baiter_time: wave_record(192, 24, -12, -4, [212, 196, 164, 148]),
+};
 
 #[cfg(test)]
 mod tests {

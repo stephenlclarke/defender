@@ -8,7 +8,6 @@ pub mod audio;
 mod audio_rom;
 pub mod branding;
 pub mod constants;
-mod customization;
 pub mod demo;
 pub mod font;
 pub mod game;

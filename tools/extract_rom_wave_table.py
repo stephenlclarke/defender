@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Extract the red-label Defender wave table from blk71.src.
 
-The generated records are written into `assets/arcade/arcade-rules.txt`, which
-is embedded by the Rust runtime so gameplay does not depend on a local
-ROM/source checkout at compile time or runtime.
+The generated records are written into `assets/arcade/arcade-rules.txt` as a
+checked-in reference copy of the Williams `WVTAB` source data. The live Rust
+runtime now embeds the equivalent values directly in source so cabinet behavior
+does not depend on text parsing or local override files.
 """
 
 from __future__ import annotations
