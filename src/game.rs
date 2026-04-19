@@ -822,8 +822,6 @@ impl World {
             wave_profile.lander_y_velocity_msb,
             wave_profile.lander_y_velocity_lsb,
         );
-        let swarmer_follow_distance = (self.width as i32 / 2).max(8);
-
         for enemy in self
             .entities
             .iter_mut()
@@ -1048,32 +1046,25 @@ impl World {
                 EntityKind::Swarmer => {
                     let swarmer_speed =
                         rom_swarmer_horizontal_velocity(wave_profile.swarmer_x_velocity);
-                    let swarmer_vertical_limit =
-                        rom_swarmer_vertical_speed_limit(wave_profile.swarmer_acceleration_mask);
+                    let swarmer_accel = rom_swarmer_acceleration_for_entity(
+                        enemy,
+                        wave_profile.swarmer_acceleration_mask,
+                    );
+                    let swarmer_vertical_limit = rom_swarmer_vertical_speed_limit(swarmer_accel);
                     let target = player_position.unwrap_or(enemy.position);
-                    // Doug Mahugh chapter 05 calls out the "follow from behind"
-                    // counterplay, so Swarmers should not instantly reverse on
-                    // every shorter wrapped path change.
                     let delta_x = shortest_wrapped_delta(enemy.position.x, target.x, world_span);
-                    let desired_dx = if delta_x == 0 {
+                    enemy.velocity.dx = if delta_x == 0 {
                         enemy.velocity.dx.signum().max(1) * swarmer_speed
                     } else {
                         delta_x.signum() * swarmer_speed
                     };
-                    let current_direction = enemy.velocity.dx.signum();
-                    let should_reverse = current_direction == 0
-                        || (desired_dx.signum() != current_direction
-                            && delta_x.abs() > swarmer_follow_distance);
-                    if should_reverse {
-                        enemy.velocity.dx = desired_dx;
-                    }
 
                     let vertical_delta = target.y - enemy.position.y;
                     if vertical_delta != 0
                         && rom_swarmer_vertical_refresh_due(
                             self.tick,
                             enemy.position,
-                            wave_profile.swarmer_acceleration_mask,
+                            swarmer_accel,
                         )
                     {
                         enemy.velocity.dy = (enemy.velocity.dy
@@ -1611,6 +1602,7 @@ impl World {
     }
 
     fn spawn_swarmer_burst_at(&mut self, pod_position: Position) {
+        let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         let available = rom_swarmer_count_limit()
             .saturating_sub(self.entity_count_by_kind(EntityKind::Swarmer));
         if available == 0 {
@@ -1623,13 +1615,18 @@ impl World {
 
         for _ in 0..count {
             let velocity = rom_randv_velocity(&mut self.rand_state);
-            self.entities.push(Entity::new(
+            let mut swarmer = Entity::new(
                 EntityKind::Swarmer,
                 pod_position.x,
                 pod_position.y.clamp(min_y, max_y),
                 velocity.dx,
                 velocity.dy,
+            );
+            swarmer.rom_aux = u16::from(rom_swarmer_acceleration(
+                self.rand_state.lseed,
+                wave_profile.swarmer_acceleration_mask,
             ));
+            self.entities.push(swarmer);
         }
     }
 
@@ -2498,6 +2495,15 @@ fn rom_swarmer_count_limit() -> usize {
     20
 }
 
+fn rom_swarmer_acceleration(lseed: u8, mask: u8) -> u8 {
+    lseed & mask
+}
+
+fn rom_swarmer_acceleration_for_entity(enemy: &Entity, wave_mask: u8) -> u8 {
+    let seeded = enemy.rom_aux as u8;
+    if seeded == 0 { wave_mask } else { seeded }
+}
+
 fn rom_shell_spawn_limit() -> usize {
     20
 }
@@ -2972,10 +2978,10 @@ mod tests {
         rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
         rom_probe_swarmer_burst_count, rom_probe_vertical_velocity, rom_randv_velocity,
         rom_reset_baiter_timer, rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit,
-        rom_shoot_axes_from_seeds, rom_swarmer_count_limit, rom_swarmer_horizontal_velocity,
-        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
-        rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
-        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_shoot_axes_from_seeds, rom_swarmer_acceleration, rom_swarmer_count_limit,
+        rom_swarmer_horizontal_velocity, rom_swarmer_vertical_speed_limit, rom_tie_close_band,
+        rom_tie_far_band, rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude,
+        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -4752,6 +4758,44 @@ mod tests {
     #[test]
     fn rom_swarmer_count_limit_matches_mmsw_swcnt_cap() {
         assert_eq!(rom_swarmer_count_limit(), 20);
+    }
+
+    #[test]
+    fn rom_swarmer_acceleration_matches_mmsw_pd2_mask() {
+        assert_eq!(rom_swarmer_acceleration(0xAD, 0x1F), 0x0D);
+        assert_eq!(rom_swarmer_acceleration(0x56, 0x3F), 0x16);
+    }
+
+    #[test]
+    fn live_step_swarmers_reverse_immediately_toward_the_player() {
+        let mut swarmer = Entity::new(EntityKind::Swarmer, 12, 6, 2, 0);
+        swarmer.rom_aux = u16::from(rom_swarmer_acceleration(0xAD, 0x1F));
+        let mut world = World::with_entities(
+            20,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 3,
+            },
+            vec![Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0), swarmer],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let swarmer = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Swarmer)
+            .expect("swarmer");
+        assert_eq!(
+            swarmer.velocity.dx,
+            -rom_swarmer_horizontal_velocity(
+                red_label_wave_table()
+                    .profile_for_wave(3)
+                    .swarmer_x_velocity
+            )
+        );
     }
 
     #[test]

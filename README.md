@@ -177,8 +177,8 @@ the final runtime self-contained:
   wave/fire tables now embedded in `src/red_label_wave.rs`, and the
   `defa7.src` `RAND` / `ASTST` / `PLRES` flow used to reconstruct the default
   astronaut restore layout plus the `defb6.src` `PRBST` / `PRBKIL` /
-  `MMSW` / `RANDV` probe-start and pod-burst paths now embedded in
-  `src/game.rs`, with the extracted text block kept in
+  `MMSW` / `RANDV` / `MSWM` probe-start, pod-burst, and Swarmer-motion
+  paths now embedded in `src/game.rs`, with the extracted text block kept in
   `assets/arcade/arcade-rules.txt` as a checked-in reference copy.
 - <https://github.com/historicalsource/williams-soundroms>: original Williams
   sound-ROM source reference used to translate `VSNDRM1.SRC` routines and
