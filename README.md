@@ -19,8 +19,8 @@ This repository is a native Rust reimplementation of Williams' `Defender`,
 rendered through the Kitty graphics protocol.
 
 The game logic is native Rust; ROMs are treated as reference material only, and
-the app now decodes its live gameplay object art directly from the red-label
-`defb6.src` picture tables, with the red-label text font bundled as
+the live game now uses embedded arcade sprite assets from `assets/arcade/`
+again for runtime object art, with the red-label text font bundled as
 `assets/arcade/font-sheet.png`, plus ROM-derived branding art in
 `assets/arcade/logo-page.png` and `assets/arcade/defender-logo.png`. Live
 audio is now synthesized in Rust from Williams sound-ROM routines translated
@@ -141,9 +141,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `--rom-report` now prints the embedded canonical red-label filename list when
   no directory is supplied, and only touches the filesystem when you pass an
   explicit ROM path.
-- Gameplay object art now decodes directly from the red-label `defb6.src`
-  picture descriptors and data tables in Rust instead of loading cropped
-  runtime PNGs for live play.
+- Gameplay object art now uses the embedded `assets/arcade/*.png` sprite set
+  again for live play after the direct `defb6.src` runtime picture decode
+  regressed into corrupted object art.
 - UI and attract text now render through the embedded
   `assets/arcade/font-sheet.png` sheet built from the red-label `mess0.src`
   character tables instead of the old generic bitmap font.
@@ -193,11 +193,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   the HUD uses the little-ship stock icon, and the attract rescue/scoring page
   now draws its `250` / `500` bonuses from embedded score art in
   `assets/arcade/`.
-- The runtime sprite path now builds its live object families from generated
-  `defb6.src` picture data instead of mirroring the player ship in software or
-  selecting from hand-curated gameplay PNG buckets, so the shipped left-facing
-  ship, Bomber/UFO, Lander, Baiter, Pod/Probe, Swarmer, bomb, and score
-  families follow the original cabinet picture tables more closely.
+- The runtime sprite path now again uses the embedded arcade PNG family for the
+  shipped left-facing ship, Bomber/UFO, Lander, Baiter, Pod/Probe, Swarmer,
+  bomb, and score art, while the ROM-extracted picture-table work remains in
+  the repo as reference material for future cabinet-exact rendering passes.
 - Live audio now comes from `src/audio_rom.rs`, which translates the Williams
   `VSNDRM1.SRC` radio, filtered-noise, hyperspace, scream, organ, and GWAVE
   routines into Rust sample generation instead of decoding pre-rendered WAV cue

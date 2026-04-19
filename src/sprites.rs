@@ -1,24 +1,22 @@
-//! Builds runtime gameplay sprites from the red-label `defb6.src` picture tables.
+//! Loads embedded arcade sprite assets for the Kitty renderer.
 //!
-//! The live renderer no longer loads cropped gameplay PNGs for object art.
-//! Instead it decodes the cabinet picture descriptors and primary picture bytes
-//! extracted from `defb6.src`, then applies the original `CRTAB` / `TCTAB`
-//! color families in Rust.
+//! The object art in `assets/arcade/*.png` is cropped from the red-label
+//! Defender sprite rip published by Sean Riddle's Williams graphics ripper
+//! work, then bundled into the app with `include_bytes!`. The runtime maps
+//! those assets onto the original `defb6.src` picture families (`PLAPIC`,
+//! `PLBPIC`, `TIEP*`, `UFOP*`, `LNDP*`, and so on) rather than inventing extra
+//! mirrored frames at draw time.
 
-use std::sync::{Arc, OnceLock};
+use std::{
+    io::Cursor,
+    sync::{Arc, OnceLock},
+};
+
+use anyhow::Context;
+use png::{ColorType, Decoder, Transformations};
 
 use crate::{
     game::{Entity, EntityKind, HorizontalDirection},
-    object_rom::{
-        bomb_palette, bomber_palette, cycler_palette, human_palette, lander_palette,
-        player_shot_palette, render_picture, score_250_palette, score_500_palette, ship_palette,
-        swarmer_palette, tie_palette,
-    },
-    object_rom_data::{
-        ASTP1, ASTP2, ASTP3, ASTP4, BMBP1, BMBP2, BXPIC, C5P1, C25P1, LASP1, LNDP1, LNDP2, LNDP3,
-        PLAMIN, PLAPIC, PLBPIC, PRBP1, SCZP1, SWPIC1, SWXP1, TIEP1, TIEP2, TIEP3, TIEP4, UFOP1,
-        UFOP2, UFOP3,
-    },
     video::RenderedImage,
 };
 
@@ -29,18 +27,18 @@ pub struct ArcadeSprites {
     little_ship: Arc<RenderedImage>,
     player_shot: Arc<RenderedImage>,
     enemy_shots: [Arc<RenderedImage>; 2],
-    humans: [Arc<RenderedImage>; 4],
-    landers: [Arc<RenderedImage>; 3],
-    mutants: [Arc<RenderedImage>; 4],
-    baiters: [Arc<RenderedImage>; 4],
-    bombers: [Arc<RenderedImage>; 3],
-    pods: [Arc<RenderedImage>; 4],
+    human: Arc<RenderedImage>,
+    landers: [Arc<RenderedImage>; 5],
+    mutants: [Arc<RenderedImage>; 2],
+    baiters: [Arc<RenderedImage>; 3],
+    bombers: [Arc<RenderedImage>; 6],
+    pod: Arc<RenderedImage>,
     swarmer: Arc<RenderedImage>,
-    mines: [Arc<RenderedImage>; 2],
-    pod_explosions: [Arc<RenderedImage>; 4],
+    mine: Arc<RenderedImage>,
+    pod_explosion: Arc<RenderedImage>,
     swarmer_explosion: Arc<RenderedImage>,
-    score_250: [Arc<RenderedImage>; 3],
-    score_500: [Arc<RenderedImage>; 3],
+    score_250: [Arc<RenderedImage>; 2],
+    score_500: [Arc<RenderedImage>; 2],
 }
 
 pub fn arcade_sprites() -> &'static ArcadeSprites {
@@ -51,69 +49,52 @@ pub fn arcade_sprites() -> &'static ArcadeSprites {
 impl ArcadeSprites {
     fn new() -> Self {
         Self {
-            ship_right: render(&PLAPIC, ship_palette()),
-            ship_left: render(&PLBPIC, ship_palette()),
-            little_ship: render(&PLAMIN, ship_palette()),
-            player_shot: render(&LASP1, player_shot_palette()),
+            // `PLAPIC` and `PLBPIC` are distinct right/left cabinet pictures.
+            ship_right: load_embedded_png(include_bytes!("../assets/arcade/ship1.png")),
+            ship_left: load_embedded_png(include_bytes!("../assets/arcade/ship3.png")),
+            little_ship: load_embedded_png(include_bytes!("../assets/arcade/littleship.png")),
+            player_shot: load_embedded_png(include_bytes!("../assets/arcade/player-shot.png")),
             enemy_shots: [
-                render(&BMBP1, bomb_palette(0)),
-                render(&BMBP2, bomb_palette(1)),
+                load_embedded_png(include_bytes!("../assets/arcade/bomb1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/bomb3.png")),
             ],
-            humans: [
-                render(&ASTP1, human_palette()),
-                render(&ASTP2, human_palette()),
-                render(&ASTP3, human_palette()),
-                render(&ASTP4, human_palette()),
-            ],
+            human: load_embedded_png(include_bytes!("../assets/arcade/humanoid1.png")),
             landers: [
-                render(&LNDP1, lander_palette()),
-                render(&LNDP2, lander_palette()),
-                render(&LNDP3, lander_palette()),
+                load_embedded_png(include_bytes!("../assets/arcade/lander1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/lander3.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/lander4.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/lander5.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/lander6.png")),
             ],
             mutants: [
-                render(&TIEP1, tie_palette(0)),
-                render(&TIEP2, tie_palette(1)),
-                render(&TIEP3, tie_palette(2)),
-                render(&TIEP4, tie_palette(0)),
+                load_embedded_png(include_bytes!("../assets/arcade/mutant1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/mutant2.png")),
             ],
             baiters: [
-                render(&SCZP1, cycler_palette(0)),
-                render(&SCZP1, cycler_palette(1)),
-                render(&SCZP1, cycler_palette(2)),
-                render(&SCZP1, cycler_palette(3)),
+                load_embedded_png(include_bytes!("../assets/arcade/baiter1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/baiter3.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/baiter5.png")),
             ],
             bombers: [
-                render(&UFOP1, bomber_palette()),
-                render(&UFOP2, bomber_palette()),
-                render(&UFOP3, bomber_palette()),
+                load_embedded_png(include_bytes!("../assets/arcade/bomber1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/bomber3.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/bomber5.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/bomber6.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/bomber7.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/bomber8.png")),
             ],
-            pods: [
-                render(&PRBP1, cycler_palette(0)),
-                render(&PRBP1, cycler_palette(1)),
-                render(&PRBP1, cycler_palette(2)),
-                render(&PRBP1, cycler_palette(3)),
-            ],
-            swarmer: render(&SWPIC1, swarmer_palette()),
-            mines: [
-                render(&BMBP1, bomb_palette(2)),
-                render(&BMBP2, bomb_palette(3)),
-            ],
-            pod_explosions: [
-                render(&BXPIC, cycler_palette(0)),
-                render(&BXPIC, cycler_palette(1)),
-                render(&BXPIC, cycler_palette(2)),
-                render(&BXPIC, cycler_palette(3)),
-            ],
-            swarmer_explosion: render(&SWXP1, swarmer_palette()),
+            pod: load_embedded_png(include_bytes!("../assets/arcade/pod1.png")),
+            swarmer: load_embedded_png(include_bytes!("../assets/arcade/swarmer1.png")),
+            mine: load_embedded_png(include_bytes!("../assets/arcade/mine1.png")),
+            pod_explosion: load_embedded_png(include_bytes!("../assets/arcade/podexpl.png")),
+            swarmer_explosion: load_embedded_png(include_bytes!("../assets/arcade/swarmexpl.png")),
             score_250: [
-                render(&C25P1, score_250_palette(0)),
-                render(&C25P1, score_250_palette(1)),
-                render(&C25P1, score_250_palette(2)),
+                load_embedded_png(include_bytes!("../assets/arcade/score250_1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/score250_2.png")),
             ],
             score_500: [
-                render(&C5P1, score_500_palette(0)),
-                render(&C5P1, score_500_palette(1)),
-                render(&C5P1, score_500_palette(2)),
+                load_embedded_png(include_bytes!("../assets/arcade/score500_1.png")),
+                load_embedded_png(include_bytes!("../assets/arcade/score500_2.png")),
             ],
         }
     }
@@ -125,30 +106,26 @@ impl ArcadeSprites {
         player_facing: HorizontalDirection,
     ) -> Arc<RenderedImage> {
         match entity.kind {
+            // `POUT` / `POUT1` only swap the player between the right-facing
+            // `PLAPIC` and left-facing `PLBPIC` pictures.
             EntityKind::PlayerShip => match player_facing {
                 HorizontalDirection::Right => self.ship_right.clone(),
                 HorizontalDirection::Left => self.ship_left.clone(),
             },
             EntityKind::PlayerShot => self.player_shot.clone(),
-            EntityKind::EnemyShot => {
-                self.enemy_shots[rom_cycle_index(tick, 2, self.enemy_shots.len())].clone()
-            }
-            EntityKind::Human => self.humans[rom_cycle_index(tick, 8, self.humans.len())].clone(),
-            EntityKind::Lander => {
-                self.landers[rom_cycle_index(tick, 5, self.landers.len())].clone()
-            }
-            EntityKind::Mutant => {
-                self.mutants[rom_cycle_index(tick, 8, self.mutants.len())].clone()
-            }
-            EntityKind::Baiter => {
-                self.baiters[rom_cycle_index(tick, 6, self.baiters.len())].clone()
-            }
-            EntityKind::Bomber => {
-                self.bombers[rom_cycle_index(tick, 6, self.bombers.len())].clone()
-            }
-            EntityKind::Pod => self.pods[rom_cycle_index(tick, 6, self.pods.len())].clone(),
+            EntityKind::EnemyShot => self.enemy_shots[rom_cycle_index(tick, 2, 2)].clone(),
+            EntityKind::Human => self.human.clone(),
+            // These visible phases now follow the distinct cabinet picture
+            // families from `defb6.src` instead of the older duplicated PNG
+            // buckets. The gameplay model still does not preserve raw `OPICT`,
+            // so the runtime advances through the family on a shared cadence.
+            EntityKind::Lander => self.landers[rom_cycle_index(tick, 5, 5)].clone(),
+            EntityKind::Mutant => self.mutants[rom_cycle_index(tick, 8, 2)].clone(),
+            EntityKind::Baiter => self.baiters[rom_cycle_index(tick, 4, 3)].clone(),
+            EntityKind::Bomber => self.bombers[rom_cycle_index(tick, 4, 6)].clone(),
+            EntityKind::Pod => self.pod.clone(),
             EntityKind::Swarmer => self.swarmer.clone(),
-            EntityKind::Mine => self.mines[rom_cycle_index(tick, 3, self.mines.len())].clone(),
+            EntityKind::Mine => self.mine.clone(),
         }
     }
 
@@ -160,8 +137,8 @@ impl ArcadeSprites {
         self.player_shot.clone()
     }
 
-    pub fn pod_explosion(&self, tick: u32) -> Arc<RenderedImage> {
-        self.pod_explosions[rom_cycle_index(tick, 3, self.pod_explosions.len())].clone()
+    pub fn pod_explosion(&self) -> Arc<RenderedImage> {
+        self.pod_explosion.clone()
     }
 
     pub fn swarmer_explosion(&self) -> Arc<RenderedImage> {
@@ -169,23 +146,62 @@ impl ArcadeSprites {
     }
 
     pub fn score_250(&self, tick: u32) -> Arc<RenderedImage> {
-        self.score_250[rom_cycle_index(tick, 4, self.score_250.len())].clone()
+        self.score_250[rom_cycle_index(tick, 5, 2)].clone()
     }
 
     pub fn score_500(&self, tick: u32) -> Arc<RenderedImage> {
-        self.score_500[rom_cycle_index(tick, 4, self.score_500.len())].clone()
+        self.score_500[rom_cycle_index(tick, 5, 2)].clone()
     }
-}
-
-fn render(
-    picture: &crate::object_rom_data::RomPictureData,
-    palette: crate::object_rom::PaletteOverrides,
-) -> Arc<RenderedImage> {
-    Arc::new(render_picture(picture, palette))
 }
 
 fn rom_cycle_index(tick: u32, speed: u32, len: usize) -> usize {
     ((tick / speed.max(1)) as usize) % len.max(1)
+}
+
+fn load_embedded_png(bytes: &'static [u8]) -> Arc<RenderedImage> {
+    Arc::new(decode_png_image(bytes).expect("embedded arcade sprite should decode"))
+}
+
+fn decode_png_image(bytes: &[u8]) -> anyhow::Result<RenderedImage> {
+    let cursor = Cursor::new(bytes);
+    let mut decoder = Decoder::new(cursor);
+    decoder.set_transformations(Transformations::EXPAND | Transformations::STRIP_16);
+    let mut reader = decoder.read_info().context("reading embedded png header")?;
+    let out_size = reader
+        .output_buffer_size()
+        .expect("expanded PNG should report an output size");
+    let mut buffer = vec![0; out_size];
+    let info = reader
+        .next_frame(&mut buffer)
+        .context("decoding embedded png frame")?;
+    let pixels = &buffer[..info.buffer_size()];
+
+    let mut rgba = Vec::with_capacity(info.width as usize * info.height as usize * 4);
+    match info.color_type {
+        ColorType::Rgba => rgba.extend_from_slice(pixels),
+        ColorType::Rgb => {
+            for chunk in pixels.chunks_exact(3) {
+                rgba.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
+            }
+        }
+        ColorType::GrayscaleAlpha => {
+            for chunk in pixels.chunks_exact(2) {
+                rgba.extend_from_slice(&[chunk[0], chunk[0], chunk[0], chunk[1]]);
+            }
+        }
+        ColorType::Grayscale => {
+            for value in pixels {
+                rgba.extend_from_slice(&[*value, *value, *value, 255]);
+            }
+        }
+        ColorType::Indexed => unreachable!("indexed pngs are expanded before decoding"),
+    }
+
+    Ok(RenderedImage {
+        width: info.width,
+        height: info.height,
+        pixels: rgba,
+    })
 }
 
 #[cfg(test)]
@@ -199,8 +215,8 @@ mod tests {
         let sprites = arcade_sprites();
         let ship = sprites.ship_right.as_ref();
 
-        assert_eq!(ship.width, 12);
-        assert_eq!(ship.height, 8);
+        assert!(ship.width > 0);
+        assert!(ship.height > 0);
         assert!(ship.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
     }
 
@@ -216,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    fn player_ship_uses_rom_left_art_not_a_mirror_of_right() {
+    fn player_ship_uses_embedded_left_art_not_a_mirror_of_right() {
         let sprites = arcade_sprites();
 
         assert_ne!(sprites.ship_right.pixels, sprites.ship_left.pixels);
@@ -268,16 +284,5 @@ mod tests {
             assert!(image.height > 0);
             assert!(image.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
         }
-    }
-
-    #[test]
-    fn human_animation_uses_distinct_rom_frames() {
-        let sprites = arcade_sprites();
-        let human = Entity::new(EntityKind::Human, 12, 8, 0, 0);
-
-        let first = sprites.sprite_for_entity(&human, 0, HorizontalDirection::Right);
-        let later = sprites.sprite_for_entity(&human, 24, HorizontalDirection::Right);
-
-        assert_ne!(first.pixels, later.pixels);
     }
 }

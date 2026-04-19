@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Decodes gameplay object pictures from the red-label `defb6.src` tables.
 
 use crate::{
