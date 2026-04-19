@@ -197,6 +197,7 @@ pub struct World {
 impl World {
     pub fn bootstrap() -> Self {
         let terrain = build_scrolling_terrain(WORLD_SPAN, WORLD_HEIGHT);
+        let mut rand_state = RomRandState::default();
         let mut entities = vec![Entity::new(
             EntityKind::PlayerShip,
             PLAYER_START_X,
@@ -211,6 +212,7 @@ impl World {
             EntityKind::Lander,
             0,
             wave_profile.wave_size as usize,
+            &mut rand_state,
         ));
         entities.extend(default_humans(&terrain, WORLD_SPAN as i32));
         Self {
@@ -232,7 +234,7 @@ impl World {
                 lives: DEFAULT_LIVES,
                 wave: DEFAULT_WAVE,
             },
-            rand_state: RomRandState::default(),
+            rand_state,
             terrain,
             entities,
         }
@@ -242,8 +244,12 @@ impl World {
         width: usize,
         height: usize,
         status: Status,
-        entities: Vec<Entity>,
+        mut entities: Vec<Entity>,
     ) -> Self {
+        let mut init_rand_state = RomRandState::default();
+        for entity in &mut entities {
+            initialize_rom_enemy_state(entity, status.wave, &mut init_rand_state);
+        }
         Self {
             width,
             height,
@@ -480,7 +486,8 @@ impl World {
         self.smart_bombs = smart_bombs;
     }
 
-    pub fn spawn_entity(&mut self, entity: Entity) {
+    pub fn spawn_entity(&mut self, mut entity: Entity) {
+        initialize_rom_enemy_state(&mut entity, self.status.wave, &mut self.rand_state);
         self.entities.push(entity);
     }
 
@@ -720,10 +727,21 @@ impl World {
             };
             let enemy_screen_x = enemy_screen_x as i32;
 
-            if entity.kind == EntityKind::Swarmer
-                && rom_swarmer_shot_timer_for_entity(entity, wave_profile.swarmer_shot_time) == 0
-            {
-                swarmer_resets.push(index);
+            match entity.kind {
+                EntityKind::Lander | EntityKind::Mutant | EntityKind::Baiter => {
+                    if rom_enemy_shot_timer_for_entity(entity, self.status.wave) == 0 {
+                        swarmer_resets.push(index);
+                    }
+                }
+                EntityKind::Swarmer
+                    if rom_swarmer_shot_timer_for_entity(
+                        entity,
+                        wave_profile.swarmer_shot_time,
+                    ) == 0 =>
+                {
+                    swarmer_resets.push(index);
+                }
+                _ => {}
             }
 
             if firing_enemies.len() >= available {
@@ -745,13 +763,27 @@ impl World {
             let Some(entity) = self.entities.get_mut(index) else {
                 continue;
             };
-            let acceleration =
-                rom_swarmer_acceleration_for_entity(entity, wave_profile.swarmer_acceleration_mask);
-            let shot_timer = rom_seeded_rmax(
-                &mut self.rand_state,
-                wave_profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8,
-            );
-            entity.rom_aux = rom_pack_swarmer_state(acceleration, shot_timer);
+            match entity.kind {
+                EntityKind::Lander | EntityKind::Mutant | EntityKind::Baiter => {
+                    entity.rom_aux = rom_pack_enemy_shot_timer(rom_reset_enemy_shot_timer(
+                        entity.kind,
+                        self.status.wave,
+                        &mut self.rand_state,
+                    ));
+                }
+                EntityKind::Swarmer => {
+                    let acceleration = rom_swarmer_acceleration_for_entity(
+                        entity,
+                        wave_profile.swarmer_acceleration_mask,
+                    );
+                    let shot_timer = rom_seeded_rmax(
+                        &mut self.rand_state,
+                        wave_profile.swarmer_shot_time.min(u32::from(u8::MAX)) as u8,
+                    );
+                    entity.rom_aux = rom_pack_swarmer_state(acceleration, shot_timer);
+                }
+                _ => {}
+            }
         }
 
         if firing_enemies.is_empty() {
@@ -784,21 +816,15 @@ impl World {
         let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         match enemy.kind {
             EntityKind::Lander | EntityKind::Mutant | EntityKind::Baiter => {
-                let shot_delay = match enemy.kind {
-                    EntityKind::Lander => wave_profile.lander_shot_time,
-                    EntityKind::Mutant => wave_profile.mutant_shot_time,
-                    EntityKind::Baiter => wave_profile.baiter_shot_time,
-                    _ => unreachable!(),
-                }
-                .max(1);
-                if !self.tick.is_multiple_of(shot_delay) {
+                if rom_enemy_shot_timer_for_entity(enemy, self.status.wave) != 0 {
                     return None;
                 }
 
                 // `defb6.src` routes Landers, Mutants, and Baiters through the
-                // shared `SHOOT` routine, which solves shell velocity from the
-                // current screen delta plus `SEED` / `LSEED` jitter rather than
-                // alternating between invented chaser and lob shot modes.
+                // shared per-process timer plus `SHOOT` routine, which solves
+                // shell velocity from the current screen delta plus `SEED` /
+                // `LSEED` jitter rather than alternating between invented
+                // chaser and lob shot modes.
                 let (seed, lseed) = self.rom_enemy_shot_seed_bytes(enemy);
                 Some(rom_shoot_velocity(
                     enemy_screen_x,
@@ -858,6 +884,14 @@ impl World {
             .iter_mut()
             .filter(|entity| entity.kind.is_enemy())
         {
+            if matches!(
+                enemy.kind,
+                EntityKind::Lander | EntityKind::Mutant | EntityKind::Baiter
+            ) {
+                let shot_timer = rom_enemy_shot_timer_for_entity(enemy, self.status.wave);
+                enemy.rom_aux = rom_pack_enemy_shot_timer(shot_timer.saturating_sub(1));
+            }
+
             match enemy.kind {
                 EntityKind::Lander if enemy.state == EntityState::CarryingHuman => {
                     // StrategyWiki gameplay notes and the red-label disassembly
@@ -1266,6 +1300,8 @@ impl World {
                 lander.kind = EntityKind::Mutant;
                 lander.state = EntityState::Normal;
                 lander.velocity.dy = 1;
+                lander.rom_aux =
+                    rom_pack_enemy_shot_timer(rom_mutant_transformed_shot_timer(self.status.wave));
             }
             lost_humans.push(human_index);
             events.push(WorldEvent::HumanLost);
@@ -1907,6 +1943,8 @@ impl World {
             if lander.velocity.dy == 0 {
                 lander.velocity.dy = 1;
             }
+            lander.rom_aux =
+                rom_pack_enemy_shot_timer(rom_mutant_transformed_shot_timer(self.status.wave));
         }
     }
 
@@ -2022,13 +2060,15 @@ impl World {
             },
         );
 
-        self.entities.push(Entity::new(
+        let mut baiter = Entity::new(
             EntityKind::Baiter,
             spawn.x,
             y,
             initial_velocity.dx,
             initial_velocity.dy,
-        ));
+        );
+        initialize_rom_enemy_state(&mut baiter, self.status.wave, &mut self.rand_state);
+        self.entities.push(baiter);
     }
 
     fn clear_wave_carryover_entities(&mut self) {
@@ -2071,6 +2111,7 @@ impl World {
             opening_enemy,
             0,
             group_size as usize,
+            &mut self.rand_state,
         );
 
         let bomber_slots = [
@@ -2137,6 +2178,7 @@ impl World {
             opening_enemy,
             group_index,
             group_size as usize,
+            &mut self.rand_state,
         );
         self.entities.extend(reinforcements);
 
@@ -2529,6 +2571,82 @@ fn rom_bomber_mine_lifetime(wave: u8, tick: u32, position: Position) -> u16 {
 
 fn rom_shell_lifetime() -> u16 {
     20
+}
+
+const ROM_ENEMY_SHOT_TIMER_TAG: u8 = 0xA5;
+
+fn rom_pack_enemy_shot_timer(timer: u8) -> u16 {
+    u16::from_be_bytes([ROM_ENEMY_SHOT_TIMER_TAG, timer])
+}
+
+fn rom_enemy_shot_timer_is_initialized(entity: &Entity) -> bool {
+    let [tag, _] = entity.rom_aux.to_be_bytes();
+    tag == ROM_ENEMY_SHOT_TIMER_TAG
+}
+
+fn rom_enemy_shot_timer_for_entity(enemy: &Entity, wave: u8) -> u8 {
+    let [tag, timer] = enemy.rom_aux.to_be_bytes();
+    if tag == ROM_ENEMY_SHOT_TIMER_TAG {
+        timer
+    } else {
+        rom_initial_enemy_shot_timer(enemy.kind, wave, &mut RomRandState::default())
+    }
+}
+
+fn rom_enemy_shot_time_limit(kind: EntityKind, wave: u8) -> u8 {
+    let wave_profile = red_label_wave_table().profile_for_wave(wave);
+    match kind {
+        EntityKind::Lander => wave_profile.lander_shot_time,
+        EntityKind::Mutant => wave_profile.mutant_shot_time,
+        EntityKind::Baiter => wave_profile.baiter_shot_time,
+        _ => 0,
+    }
+    .max(1)
+    .min(u32::from(u8::MAX)) as u8
+}
+
+fn rom_baiter_initial_shot_timer() -> u8 {
+    8
+}
+
+fn rom_mutant_transformed_shot_timer(wave: u8) -> u8 {
+    rom_enemy_shot_time_limit(EntityKind::Mutant, wave)
+}
+
+fn rom_initial_enemy_shot_timer(kind: EntityKind, wave: u8, rand_state: &mut RomRandState) -> u8 {
+    match kind {
+        EntityKind::Lander | EntityKind::Mutant => {
+            rom_seeded_rmax(rand_state, rom_enemy_shot_time_limit(kind, wave))
+        }
+        EntityKind::Baiter => rom_baiter_initial_shot_timer(),
+        _ => 0,
+    }
+}
+
+fn rom_reset_enemy_shot_timer(kind: EntityKind, wave: u8, rand_state: &mut RomRandState) -> u8 {
+    match kind {
+        EntityKind::Lander | EntityKind::Mutant | EntityKind::Baiter => {
+            rom_seeded_rmax(rand_state, rom_enemy_shot_time_limit(kind, wave))
+        }
+        _ => 0,
+    }
+}
+
+fn initialize_rom_enemy_state(entity: &mut Entity, wave: u8, rand_state: &mut RomRandState) {
+    if rom_enemy_shot_timer_is_initialized(entity) {
+        return;
+    }
+
+    match entity.kind {
+        EntityKind::Lander | EntityKind::Mutant | EntityKind::Baiter => {
+            entity.rom_aux = rom_pack_enemy_shot_timer(rom_initial_enemy_shot_timer(
+                entity.kind,
+                wave,
+                rand_state,
+            ));
+        }
+        _ => {}
+    }
 }
 
 fn rom_swarmer_count_limit() -> usize {
@@ -2968,6 +3086,7 @@ fn default_attack_wave_openers(
     kind: EntityKind,
     group_index: u8,
     count: usize,
+    rand_state: &mut RomRandState,
 ) -> Vec<Entity> {
     let max_x = world_span - 1;
     let wave_offset = i32::from(wave % 6);
@@ -3003,7 +3122,9 @@ fn default_attack_wave_openers(
             EntityKind::Mutant => (dx.signum() * mutant_speed_x, dy.signum() * mutant_speed_y),
             _ => (dx, dy),
         };
-        Entity::new(kind, wrap_coordinate(x, max_x), y, dx, dy)
+        let mut entity = Entity::new(kind, wrap_coordinate(x, max_x), y, dx, dy);
+        initialize_rom_enemy_state(&mut entity, wave, rand_state);
+        entity
     })
     .collect()
 }
@@ -3029,15 +3150,16 @@ mod tests {
         RomRandState, Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
         initialize_tie_cruise_altitude, nearest_wrapped_target, rom_accumulate_vertical_velocity,
         rom_advance_baiter_timer, rom_baiter_count_limit, rom_baiter_horizontal_close_band,
-        rom_baiter_seek_velocity, rom_baiter_should_seek, rom_baiter_spawn_for_wave,
-        rom_baiter_timer_floor, rom_baiter_vertical_close_band, rom_bomb_shell_limit,
-        rom_bomber_mine_lifetime, rom_bomber_should_drop_mine, rom_default_human_world_xs,
+        rom_baiter_initial_shot_timer, rom_baiter_seek_velocity, rom_baiter_should_seek,
+        rom_baiter_spawn_for_wave, rom_baiter_timer_floor, rom_baiter_vertical_close_band,
+        rom_bomb_shell_limit, rom_bomber_mine_lifetime, rom_bomber_should_drop_mine,
+        rom_default_human_world_xs, rom_enemy_shot_timer_for_entity,
         rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
-        rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_pack_swarmer_state,
-        rom_probe_spawn_for_wave, rom_probe_swarmer_burst_count, rom_probe_vertical_velocity,
-        rom_randv_velocity, rom_reset_baiter_timer, rom_rmax, rom_shell_lifetime,
-        rom_shell_spawn_limit, rom_shoot_axes_from_seeds, rom_swarmer_acceleration,
-        rom_swarmer_count_limit, rom_swarmer_horizontal_velocity,
+        rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_pack_enemy_shot_timer,
+        rom_pack_swarmer_state, rom_probe_spawn_for_wave, rom_probe_swarmer_burst_count,
+        rom_probe_vertical_velocity, rom_randv_velocity, rom_reset_baiter_timer, rom_rmax,
+        rom_shell_lifetime, rom_shell_spawn_limit, rom_shoot_axes_from_seeds,
+        rom_swarmer_acceleration, rom_swarmer_count_limit, rom_swarmer_horizontal_velocity,
         rom_swarmer_shot_timer_for_entity, rom_swarmer_vertical_speed_limit, rom_tie_close_band,
         rom_tie_far_band, rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude,
         scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
@@ -3519,6 +3641,9 @@ mod tests {
 
     #[test]
     fn live_step_spawns_enemy_shots_on_the_fire_tick() {
+        let shot_timer = red_label_wave_table().profile_for_wave(1).lander_shot_time as u8;
+        let mut lander = Entity::new(EntityKind::Lander, 12, 3, 0, 0);
+        lander.rom_aux = rom_pack_enemy_shot_timer(1);
         let mut world = World::with_entities(
             20,
             8,
@@ -3529,16 +3654,22 @@ mod tests {
             },
             vec![
                 Entity::new(EntityKind::PlayerShip, 2, 3, 0, 0),
-                Entity::new(EntityKind::Lander, 12, 3, 0, 0),
+                lander,
+                Entity::new(EntityKind::Human, 18, 6, 0, 0),
             ],
         );
 
-        let shot_delay = red_label_wave_table().profile_for_wave(1).lander_shot_time;
-        world.tick = shot_delay - 1;
         let events = world.step_live(UpdateInput::default());
 
         assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 1);
         assert!(events.contains(&WorldEvent::EnemyFired));
+        let lander = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Lander)
+            .expect("lander");
+        let reset_timer = rom_enemy_shot_timer_for_entity(lander, 1);
+        assert!((1..=shot_timer).contains(&reset_timer));
     }
 
     #[test]
@@ -3599,15 +3730,21 @@ mod tests {
         let offscreen_x = wrap_coordinate(player_x + world.width() as i32, world.world_max_x());
         let safe_y = world.safe_altitude_at_world_x(player_x).min(4);
         world.camera_x = player_x;
+        let mut lander = Entity::new(EntityKind::Lander, offscreen_x, safe_y, 0, 0);
+        lander.rom_aux = rom_pack_enemy_shot_timer(1);
         world.entities = vec![
             Entity::new(EntityKind::PlayerShip, player_x, safe_y, 0, 0),
-            Entity::new(EntityKind::Lander, offscreen_x, safe_y, 0, 0),
+            lander,
+            Entity::new(
+                EntityKind::Human,
+                wrap_coordinate(player_x + 8, world.world_max_x()),
+                8,
+                0,
+                0,
+            ),
         ];
 
-        let shot_delay = red_label_wave_table().profile_for_wave(1).lander_shot_time;
-        for _ in 0..shot_delay {
-            world.step_live(UpdateInput::default());
-        }
+        world.step_live(UpdateInput::default());
 
         assert!(world.screen_x_for_world_x(offscreen_x).is_none());
         assert_eq!(world.entity_count_by_kind(EntityKind::EnemyShot), 0);
@@ -5375,6 +5512,10 @@ mod tests {
             .expect("baiter");
         assert!(world.screen_x_for_world_x(baiter.position.x).is_some());
         assert_ne!(baiter.velocity, Velocity { dx: 0, dy: 0 });
+        assert_eq!(
+            rom_enemy_shot_timer_for_entity(baiter, 2),
+            rom_baiter_initial_shot_timer()
+        );
     }
 
     #[test]
