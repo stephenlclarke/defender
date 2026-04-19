@@ -1088,9 +1088,7 @@ impl World {
 
     fn drop_bomber_mines(&mut self, min_y: i32, max_y: i32) {
         let tables = arcade_tables();
-        if !self.tick.is_multiple_of(tables.bomber_mine_drop_delay)
-            || self.entity_count_by_kind(EntityKind::Mine) >= tables.max_mines
-        {
+        if self.entity_count_by_kind(EntityKind::Mine) >= tables.max_mines {
             return;
         }
 
@@ -1102,6 +1100,13 @@ impl World {
             .iter()
             .filter(|entity| entity.kind == EntityKind::Bomber)
         {
+            // `TIE31 -> BOMBST` drops bombs on the `LSEED & #$07 == 0` edge
+            // rather than on a fixed timer, and `BMBCNT` caps the live bomb
+            // list at ten. Keep the port on that cabinet gate.
+            if !rom_bomber_should_drop_mine(self.status.wave, self.tick, bomber.position) {
+                continue;
+            }
+
             let mine_x = wrap_coordinate(bomber.position.x - bomber.velocity.dx.signum(), max_x);
             let mine_position = Position {
                 x: mine_x,
@@ -2378,6 +2383,20 @@ fn rom_probe_seed_bytes(wave: u8, tick: u32, salt: u32) -> (u8, u8, u8, u8) {
     )
 }
 
+fn rom_bomber_seed_bytes(wave: u8, tick: u32, position: Position) -> (u8, u8) {
+    let (hseed, lseed, _, _) = rom_probe_seed_bytes(
+        wave,
+        tick,
+        ((position.x as u32) << 8) ^ (position.y as u32) ^ 0x5449_4500,
+    );
+    (hseed, lseed)
+}
+
+fn rom_bomber_should_drop_mine(wave: u8, tick: u32, position: Position) -> bool {
+    let (_, lseed) = rom_bomber_seed_bytes(wave, tick, position);
+    (lseed & 0x07) == 0
+}
+
 fn scale_rom_probe_x_to_screen(rom_x: i32, screen_width: usize) -> usize {
     if screen_width <= 1 {
         return 0;
@@ -2741,7 +2760,7 @@ mod tests {
         Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
         nearest_wrapped_target, rom_baiter_horizontal_close_band, rom_baiter_seek_velocity,
         rom_baiter_should_seek, rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band,
-        rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
+        rom_bomber_should_drop_mine, rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
         rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
         rom_probe_vertical_velocity, rom_shoot_axes_from_seeds, rom_swarmer_horizontal_velocity,
         rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_cruise_altitude,
@@ -3604,8 +3623,11 @@ mod tests {
             ],
         );
 
-        for _ in 0..3 {
+        for _ in 0..64 {
             world.step_live(UpdateInput::default());
+            if world.entity_count_by_kind(EntityKind::Mine) > 0 {
+                break;
+            }
         }
         assert!(world.entity_count_by_kind(EntityKind::Mine) > 0);
 
@@ -3617,6 +3639,17 @@ mod tests {
         assert_eq!(world.entity_count_by_kind(EntityKind::Bomber), 0);
         assert!(world.entity_count_by_kind(EntityKind::Mine) > 0);
         assert!(events.contains(&WorldEvent::SmartBombDetonated));
+    }
+
+    #[test]
+    fn rom_bomber_mine_gate_matches_bombst_seed_edge() {
+        let position = Position { x: 12, y: 6 };
+        let drops = (0..32)
+            .filter(|tick| rom_bomber_should_drop_mine(2, *tick, position))
+            .count();
+
+        assert!(drops > 0);
+        assert!(drops < 32);
     }
 
     #[test]

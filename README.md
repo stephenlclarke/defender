@@ -248,6 +248,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   instead of a separate Rust-only speed knob.
 - Bomber / TIE motion now follows the cabinet `TIEST` / `TIE` shape more
   closely too: horizontal motion now comes from the red-label `TIEXV` record,
+  and mine drops now follow the source `BOMBST` seed gate and 10-bomb cap
+  instead of the earlier fixed Rust timer,
   off-screen units steer back toward a source-backed cruise-altitude band, and
   on-screen units use the ROM-style close/far vertical proximity bands around
   the player instead of the older every-third-tick drift rule.
@@ -568,12 +570,8 @@ Meaning: additional swarmer burst range above the minimum.
 Default: `20`
 Meaning: maximum number of live swarmers allowed at one time.
 
-`bomber_mine_drop_delay`
-Default: `3`
-Meaning: tick delay between mine drops from a bomber.
-
 `max_mines`
-Default: `24`
+Default: `10`
 Meaning: maximum number of live bomber mines allowed at once.
 
 `default_human_world_xs`

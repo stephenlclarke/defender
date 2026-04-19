@@ -23,7 +23,6 @@ pub struct ArcadeTables {
     pub pod_swarmer_burst_min: usize,
     pub pod_swarmer_burst_range: usize,
     pub max_swarmers: usize,
-    pub bomber_mine_drop_delay: u32,
     pub max_mines: usize,
     pub default_human_world_xs: &'static [i32; 10],
 }
@@ -52,8 +51,7 @@ static ARCADE_TABLES: ArcadeTables = ArcadeTables {
     pod_swarmer_burst_min: 5,
     pod_swarmer_burst_range: 3,
     max_swarmers: 20,
-    bomber_mine_drop_delay: 3,
-    max_mines: 24,
+    max_mines: 10,
     default_human_world_xs: &DEFAULT_HUMAN_WORLD_XS,
 };
 
