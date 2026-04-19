@@ -893,13 +893,25 @@ impl World {
                     }
                 }
                 EntityKind::Pod => {
-                    // Pods are intentionally simpler here: the arcade sources use
-                    // them mainly as carriers that matter once they burst.
-                    if enemy.velocity.dx == 0 {
-                        enemy.velocity.dx = if self.tick.is_multiple_of(2) { 1 } else { -1 };
-                    }
-                    if enemy.velocity.dy == 0 {
-                        enemy.velocity.dy = if self.tick.is_multiple_of(3) { 1 } else { -1 };
+                    if enemy.velocity.dx == 0 || enemy.velocity.dy == 0 {
+                        // `PRBST` seeds PROBE start velocities from the live
+                        // random registers instead of inventing a special AI
+                        // roam task. Preserve that shape here by deriving a
+                        // deterministic replacement velocity from the current
+                        // world position/tick whenever a test or gameplay edge
+                        // case creates a zeroed Pod velocity.
+                        let fallback = rom_probe_velocity_seed(
+                            self.status.wave,
+                            ((enemy.position.x as u32) << 8)
+                                ^ (enemy.position.y as u32)
+                                ^ self.tick,
+                        );
+                        if enemy.velocity.dx == 0 {
+                            enemy.velocity.dx = fallback.dx;
+                        }
+                        if enemy.velocity.dy == 0 {
+                            enemy.velocity.dy = fallback.dy;
+                        }
                     }
                 }
                 EntityKind::Swarmer => {
@@ -1801,6 +1813,8 @@ impl World {
         let tables = arcade_tables();
         let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
         let width = self.world_span;
+        let min_y = 1;
+        let max_y = self.height as i32 - 3;
         let bomber_origin = self
             .player_position()
             .map(|player| wrap_coordinate(player.x + width / 2, width - 1))
@@ -1857,15 +1871,18 @@ impl World {
             ));
         }
 
-        let pod_slots = [
-            (width / 2, 5, -1, 1),
-            (wrap_coordinate(width - 20, width - 1), 4, 1, -1),
-            (wrap_coordinate(bomber_origin + 18, width - 1), 6, -1, -1),
-            (wrap_coordinate(bomber_origin - 18, width - 1), 4, 1, 1),
-        ];
-        for (x, desired_y, dx, dy) in pod_slots.into_iter().take(wave_profile.pods as usize) {
-            let y = desired_y.min(self.safe_altitude_at_world_x(x)).max(1);
-            enemies.push(Entity::new(EntityKind::Pod, x, y, dx, dy));
+        for slot in 0..wave_profile.pods {
+            let (screen_x, y, velocity) = rom_probe_spawn_for_wave(
+                self.status.wave,
+                self.tick,
+                slot,
+                self.width,
+                min_y,
+                max_y,
+            );
+            let x = self.world_x_for_screen_x(screen_x);
+            let y = y.min(self.safe_altitude_at_world_x(x)).max(min_y);
+            enemies.push(Entity::new(EntityKind::Pod, x, y, velocity.dx, velocity.dy));
         }
 
         self.entities.extend(enemies);
@@ -2088,6 +2105,91 @@ fn next_stock_award_score(score: u32) -> u32 {
         .saturating_mul(bonus_stock_score)
 }
 
+fn rom_probe_spawn_for_wave(
+    wave: u8,
+    tick: u32,
+    slot: u8,
+    screen_width: usize,
+    min_y: i32,
+    max_y: i32,
+) -> (usize, i32, Velocity) {
+    let (hseed_hi, hseed_lo, seed, lseed) = rom_probe_seed_bytes(wave, tick, u32::from(slot));
+    let rom_x = i32::from(hseed_hi & 0x3F) + 0x10;
+    let rom_y = i32::from(hseed_lo >> 1) + 42;
+    let screen_x = scale_rom_probe_x_to_screen(rom_x, screen_width);
+    let y = scale_rom_probe_y_to_world(rom_y, min_y, max_y);
+
+    (
+        screen_x,
+        y,
+        Velocity {
+            dx: rom_probe_horizontal_velocity(seed),
+            dy: rom_probe_vertical_velocity(lseed),
+        },
+    )
+}
+
+fn rom_probe_velocity_seed(wave: u8, salt: u32) -> Velocity {
+    let (_, _, seed, lseed) = rom_probe_seed_bytes(wave, salt, 0);
+    Velocity {
+        dx: rom_probe_horizontal_velocity(seed),
+        dy: rom_probe_vertical_velocity(lseed),
+    }
+}
+
+fn rom_probe_seed_bytes(wave: u8, tick: u32, salt: u32) -> (u8, u8, u8, u8) {
+    let mut mixed = tick
+        .wrapping_mul(0x045d_9f3b)
+        .rotate_left(7)
+        .wrapping_add(u32::from(wave).wrapping_mul(0x9e37))
+        ^ salt.wrapping_mul(0x9e37_79b9);
+    mixed ^= mixed >> 16;
+    mixed = mixed.wrapping_mul(0x7feb_352d);
+    mixed ^= mixed >> 15;
+    mixed = mixed.wrapping_mul(0x846c_a68b);
+    mixed ^= mixed >> 16;
+
+    (
+        (mixed >> 24) as u8,
+        (mixed >> 16) as u8,
+        (mixed >> 8) as u8,
+        mixed as u8,
+    )
+}
+
+fn scale_rom_probe_x_to_screen(rom_x: i32, screen_width: usize) -> usize {
+    if screen_width <= 1 {
+        return 0;
+    }
+
+    let max_screen_x = screen_width as i32 - 1;
+    ((rom_x - 0x10) * max_screen_x / 0x3F).clamp(0, max_screen_x) as usize
+}
+
+fn scale_rom_probe_y_to_world(rom_y: i32, min_y: i32, max_y: i32) -> i32 {
+    if max_y <= min_y {
+        return min_y;
+    }
+
+    let span = max_y - min_y;
+    min_y + ((rom_y - 42) * span / 0x7F).clamp(0, span)
+}
+
+fn rom_probe_horizontal_velocity(seed: u8) -> i32 {
+    let raw = i16::from(seed & 0x3F) - 0x20;
+    match raw {
+        ..=-16 => -2,
+        -15..=-1 => -1,
+        0..=15 => 1,
+        _ => 2,
+    }
+}
+
+fn rom_probe_vertical_velocity(seed: u8) -> i32 {
+    let raw = i16::from(seed & 0x7F) - 0x40;
+    if raw < 0 { -1 } else { 1 }
+}
+
 fn default_humans(terrain: &[usize]) -> Vec<Entity> {
     arcade_tables()
         .default_human_world_xs
@@ -2139,6 +2241,7 @@ mod tests {
     use super::{
         Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput,
         Velocity, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
+        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, scale_rom_probe_x_to_screen,
         shortest_wrapped_delta, wrap_coordinate,
     };
 
@@ -2182,6 +2285,30 @@ mod tests {
         );
 
         assert_eq!(target, Some(Position { x: 12, y: 6 }));
+    }
+
+    #[test]
+    fn rom_probe_spawn_stays_within_the_visible_band() {
+        for slot in 0..4 {
+            let (screen_x, y, velocity) = rom_probe_spawn_for_wave(4, 0, slot, 64, 1, 9);
+            assert!(screen_x < 64);
+            assert!((1..=9).contains(&y));
+            assert_ne!(velocity.dx, 0);
+            assert!(matches!(velocity.dy, -1 | 1));
+        }
+    }
+
+    #[test]
+    fn rom_probe_screen_mapping_preserves_the_rom_seed_range() {
+        assert_eq!(scale_rom_probe_x_to_screen(0x10, 64), 0);
+        assert_eq!(scale_rom_probe_x_to_screen(0x4f, 64), 63);
+    }
+
+    #[test]
+    fn rom_probe_vertical_velocity_enforces_the_rom_minimum_magnitude_sign() {
+        assert_eq!(rom_probe_vertical_velocity(0x00), -1);
+        assert_eq!(rom_probe_vertical_velocity(0x40), 1);
+        assert_eq!(rom_probe_vertical_velocity(0x7f), 1);
     }
 
     #[test]
@@ -3427,7 +3554,7 @@ mod tests {
             vec![
                 Entity::new(EntityKind::PlayerShip, 2, 4, 0, 0),
                 Entity::new(EntityKind::PlayerShot, 8, 4, 1, 0),
-                Entity::new(EntityKind::Pod, 9, 5, 0, 0),
+                Entity::new(EntityKind::Pod, 10, 5, -1, -1),
             ],
         );
 

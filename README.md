@@ -186,6 +186,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The live laser beam and the colour-cycling bomb / attract-cycler sprite
   families now take their palette walk from the red-label `COLTAB` bytes in
   `defa7.src` / `defb6.src` rather than the earlier invented RGB sequence.
+- Pod / PROBE starts now follow the red-label `PRBST` shape more closely: the
+  shipped game no longer drops Pods into fixed hand-authored slots, and instead
+  seeds their visible start band and initial drift from the same `HSEED` /
+  `SEED` / `LSEED`-style ranges the cabinet source uses before mapping those
+  starts into the current wrapped world.
 - Gameplay sprite phasing now follows ROM-informed display rules more closely:
   the player ship uses left/right cabinet art with horizontal display-phase
   selection instead of a made-up tick animation, shared enemy animation now
