@@ -1747,7 +1747,11 @@ fn remap_defender_logo_color(source: [u8; 4], palette: AttractPalette) -> [u8; 4
 }
 
 fn native_attract_x(x16: i32) -> i32 {
-    ((x16 + 0x20) >> 6) - 0x18 * 4
+    // The attract/instruction page object X coordinates in `amode1.src`
+    // (`XSHIP`, `XMAN`, and the `XS` legend table) line up with the cabinet
+    // capture when decoded on a 320-wide attract canvas as 11.5-style fixed
+    // point rather than the coarser playfield projection used elsewhere.
+    ((x16 + 0x10) >> 5).clamp(0, 319)
 }
 
 fn native_attract_y(y16: i32) -> i32 {
