@@ -195,6 +195,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   (`LDSTIM`, `SZSTIM`, `SWSTIM`, and `UFSTIM`) instead of the older shared
   Rust fallback delays, so Landers, Mutants, Swarmers, and Baiters follow the
   cabinet wave table more closely.
+- Mutant / Schitzo motion now follows the red-label `SCZ0` shape more closely
+  too: horizontal pursuit now comes from `SZXV`, and the seek/avoid vertical
+  movement now comes from `SZYV` instead of the older single-step Rust chase.
 - Swarmer horizontal motion now comes from the red-label `SWXV` record too,
   so later-wave Swarmers keep their faster cabinet pace instead of following a
   single fallback Rust speed across every wave.

@@ -834,14 +834,35 @@ impl World {
                     }
                 }
                 EntityKind::Mutant => {
-                    // Once a humanoid is lost, StrategyWiki and Arcade History
-                    // describe Mutants as relentless player hunters.
+                    let mutant_speed_x =
+                        rom_mutant_horizontal_velocity(wave_profile.mutant_x_velocity);
+                    let mutant_speed_y = rom_mutant_vertical_velocity(
+                        wave_profile.mutant_y_velocity_msb,
+                        wave_profile.mutant_y_velocity_lsb,
+                    );
                     let target = player_position.unwrap_or(enemy.position);
-                    enemy.velocity.dx =
-                        wrapped_horizontal_step(enemy.position.x, target.x, world_max_x);
-                    enemy.velocity.dy = (target.y - enemy.position.y).signum();
-                    if enemy.velocity.dy == 0 {
-                        enemy.velocity.dy = if self.tick.is_multiple_of(2) { -1 } else { 1 };
+                    let delta_x = shortest_wrapped_delta(enemy.position.x, target.x, world_span);
+                    let vertical_delta = target.y - enemy.position.y;
+                    let horizontal_close_band = rom_mutant_seek_band();
+                    let vertical_close_band = rom_mutant_avoid_band(min_y, max_y);
+
+                    // `SCZ0` uses `SZXV` to seek the player horizontally every
+                    // cycle, then switches between the `SZYV` seek and avoid
+                    // branches depending on the horizontal close band.
+                    enemy.velocity.dx = if delta_x == 0 {
+                        enemy.velocity.dx.signum().max(1) * mutant_speed_x
+                    } else {
+                        delta_x.signum() * mutant_speed_x
+                    };
+                    enemy.velocity.dy = if delta_x.abs() <= horizontal_close_band {
+                        vertical_delta.signum() * mutant_speed_y
+                    } else if vertical_delta.abs() <= vertical_close_band {
+                        -vertical_delta.signum() * mutant_speed_y
+                    } else {
+                        0
+                    };
+                    if enemy.velocity.dy == 0 && enemy.position.y <= min_y {
+                        enemy.velocity.dy = mutant_speed_y;
                     }
                 }
                 EntityKind::Baiter => {
@@ -984,7 +1005,15 @@ impl World {
                 _ => {}
             }
 
-            enemy.velocity.dy = enemy.velocity.dy.clamp(-1, 1);
+            let vertical_limit = if enemy.kind == EntityKind::Mutant {
+                rom_mutant_vertical_velocity(
+                    wave_profile.mutant_y_velocity_msb,
+                    wave_profile.mutant_y_velocity_lsb,
+                )
+            } else {
+                1
+            };
+            enemy.velocity.dy = enemy.velocity.dy.clamp(-vertical_limit, vertical_limit);
             enemy.position.y = enemy.position.y.clamp(min_y, max_y);
         }
     }
@@ -2345,6 +2374,33 @@ fn rom_tie_horizontal_velocity(raw: u8) -> i32 {
     if raw <= 0x28 { 1 } else { 2 }
 }
 
+fn rom_mutant_horizontal_velocity(raw: u8) -> i32 {
+    // `SCZ0` reloads `SZXV` every cycle for the Schitzo/Mutant X seek. Map the
+    // red-label fixed-point record into the coarse live grid so later waves
+    // keep the faster cabinet pursuit speed.
+    if raw < 0x20 { 1 } else { 2 }
+}
+
+fn rom_mutant_vertical_velocity(msb: u8, _lsb: u8) -> i32 {
+    // `SZYV` is stored as a 16-bit fixed-point velocity. Waves 1-2 remain in
+    // the sub-`$0100` range, while later waves step into the faster 2-cell
+    // band.
+    if msb == 0 { 1 } else { 2 }
+}
+
+fn rom_mutant_seek_band() -> i32 {
+    // `SCZ0` treats the player as X-close once the `PLABX - OX16` delta lands
+    // in the `#380 .. #700` range, which maps to about ten coarse cells in the
+    // live grid.
+    10
+}
+
+fn rom_mutant_avoid_band(min_y: i32, max_y: i32) -> i32 {
+    let close = scale_rom_display_y_to_world(42 + 8, min_y, max_y)
+        - scale_rom_display_y_to_world(42, min_y, max_y);
+    close.max(1)
+}
+
 fn rom_swarmer_horizontal_velocity(raw: u8) -> i32 {
     // `MSWM` loads `SWXV` directly for Swarm X velocity. Map the red-label
     // fixed-point record into the coarse live grid so later waves keep the
@@ -2496,10 +2552,10 @@ mod tests {
         Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
         nearest_wrapped_target, rom_baiter_horizontal_close_band, rom_baiter_seek_velocity,
         rom_baiter_should_seek, rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band,
-        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_shoot_axes_from_seeds,
-        rom_swarmer_horizontal_velocity, rom_tie_close_band, rom_tie_cruise_altitude,
-        rom_tie_far_band, rom_tie_horizontal_velocity, scale_rom_probe_x_to_screen,
-        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
+        rom_probe_vertical_velocity, rom_shoot_axes_from_seeds, rom_swarmer_horizontal_velocity,
+        rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band, rom_tie_horizontal_velocity,
+        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -3106,6 +3162,44 @@ mod tests {
             .find(|entity| entity.kind == EntityKind::Mutant)
             .expect("mutant");
         assert_eq!(mutant.position, Position { x: 9, y: 5 });
+    }
+
+    #[test]
+    fn live_step_later_wave_mutants_use_the_rom_speed_records() {
+        let mut world = World::with_entities(
+            32,
+            10,
+            Status {
+                score: 0,
+                lives: 3,
+                wave: 4,
+            },
+            vec![
+                Entity::new(EntityKind::PlayerShip, 4, 3, 0, 0),
+                Entity::new(EntityKind::Mutant, 12, 6, 0, 0),
+            ],
+        );
+
+        world.step_live(UpdateInput::default());
+
+        let mutant = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Mutant)
+            .expect("mutant");
+        let wave_profile = red_label_wave_table().profile_for_wave(4);
+        assert_eq!(
+            mutant.velocity.dx,
+            -rom_mutant_horizontal_velocity(wave_profile.mutant_x_velocity),
+        );
+        assert_eq!(
+            mutant.velocity.dy,
+            -rom_mutant_vertical_velocity(
+                wave_profile.mutant_y_velocity_msb,
+                wave_profile.mutant_y_velocity_lsb,
+            ),
+        );
+        assert_eq!(mutant.position, Position { x: 10, y: 4 });
     }
 
     #[test]

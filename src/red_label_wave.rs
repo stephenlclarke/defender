@@ -19,6 +19,10 @@ pub struct RedLabelWaveTable {
     pods: WaveRecord,
     mutants: WaveRecord,
     swarmers: WaveRecord,
+    mutant_random_y: WaveRecord,
+    mutant_y_velocity_msb: WaveRecord,
+    mutant_y_velocity_lsb: WaveRecord,
+    mutant_x_velocity: WaveRecord,
     swarmer_x_velocity: WaveRecord,
     wave_time: WaveRecord,
     wave_size: WaveRecord,
@@ -38,6 +42,10 @@ pub struct WaveProfile {
     pub pods: u8,
     pub mutants: u8,
     pub swarmers: u8,
+    pub mutant_random_y: u8,
+    pub mutant_y_velocity_msb: u8,
+    pub mutant_y_velocity_lsb: u8,
+    pub mutant_x_velocity: u8,
     pub swarmer_x_velocity: u8,
     pub wave_time: u32,
     pub wave_size: u8,
@@ -62,6 +70,10 @@ impl RedLabelWaveTable {
             pods: self.pods.value_for_wave(wave) as u8,
             mutants: self.mutants.value_for_wave(wave) as u8,
             swarmers: self.swarmers.value_for_wave(wave) as u8,
+            mutant_random_y: self.mutant_random_y.value_for_wave(wave) as u8,
+            mutant_y_velocity_msb: self.mutant_y_velocity_msb.value_for_wave(wave) as u8,
+            mutant_y_velocity_lsb: self.mutant_y_velocity_lsb.value_for_wave(wave) as u8,
+            mutant_x_velocity: self.mutant_x_velocity.value_for_wave(wave) as u8,
             swarmer_x_velocity: self.swarmer_x_velocity.value_for_wave(wave) as u8,
             wave_time: self.wave_time.value_for_wave(wave) as u32,
             wave_size: self.wave_size.value_for_wave(wave) as u8,
@@ -123,6 +135,10 @@ static RED_LABEL_WAVE_TABLE: RedLabelWaveTable = RedLabelWaveTable {
     pods: wave_record(6, 0, 0, 0, [0, 1, 3, 4]),
     mutants: wave_record(10, 0, 0, 0, [0, 0, 0, 0]),
     swarmers: wave_record(10, 0, 0, 0, [0, 0, 0, 0]),
+    mutant_random_y: wave_record(2, 0, 0, 0, [1, 1, 2, 2]),
+    mutant_y_velocity_msb: wave_record(1, 0, 0, 0, [0, 0, 1, 1]),
+    mutant_y_velocity_lsb: wave_record(255, 0, 8, 6, [98, 224, 2, 18]),
+    mutant_x_velocity: wave_record(96, 0, 8, 4, [12, 28, 36, 40]),
     swarmer_x_velocity: wave_record(96, 0, 8, 2, [22, 30, 32, 34]),
     wave_time: wave_record(30, 0, 0, 0, [30, 25, 20, 16]),
     wave_size: wave_record(5, 0, 0, 0, [5, 5, 5, 5]),
@@ -148,6 +164,10 @@ mod tests {
         assert_eq!(wave_one.landers, 15);
         assert_eq!(wave_one.bombers, 0);
         assert_eq!(wave_one.pods, 0);
+        assert_eq!(wave_one.mutant_random_y, 1);
+        assert_eq!(wave_one.mutant_y_velocity_msb, 0);
+        assert_eq!(wave_one.mutant_y_velocity_lsb, 98);
+        assert_eq!(wave_one.mutant_x_velocity, 12);
         assert_eq!(wave_one.swarmer_x_velocity, 22);
         assert_eq!(wave_one.wave_time, 30);
         assert_eq!(wave_one.wave_size, 5);
@@ -160,6 +180,10 @@ mod tests {
         assert_eq!(wave_two.landers, 20);
         assert_eq!(wave_two.bombers, 3);
         assert_eq!(wave_two.pods, 1);
+        assert_eq!(wave_two.mutant_random_y, 1);
+        assert_eq!(wave_two.mutant_y_velocity_msb, 0);
+        assert_eq!(wave_two.mutant_y_velocity_lsb, 224);
+        assert_eq!(wave_two.mutant_x_velocity, 28);
         assert_eq!(wave_two.swarmer_x_velocity, 30);
         assert_eq!(wave_two.baiter_delay, 196);
         assert_eq!(wave_two.lander_shot_time, 58);
