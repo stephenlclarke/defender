@@ -874,6 +874,7 @@ impl World {
         let world_max_x = self.world_max_x();
         let left_edge = self.left_edge();
         let width = self.width;
+        let rand_state = &mut self.rand_state;
         let lander_speed_x = rom_lander_horizontal_velocity(wave_profile.lander_x_velocity);
         let lander_speed_y = rom_lander_vertical_velocity(
             wave_profile.lander_y_velocity_msb,
@@ -987,10 +988,11 @@ impl World {
                         // `OY16` once the Mutant is on screen, using the live
                         // `SEED` sign bit to pick the direction. Preserve that
                         // visible cabinet jitter here before the motion step.
+                        rand_state.advance();
                         enemy.position.y = rom_mutant_random_y_hop(
                             enemy.position,
                             wave_profile.mutant_random_y,
-                            self.tick,
+                            rand_state.seed,
                             min_y,
                             max_y,
                         );
@@ -1012,7 +1014,7 @@ impl World {
                     if stationary
                         || (refresh_due
                             && rom_baiter_should_seek(
-                                self.rand_state.seed,
+                                rand_state.seed,
                                 wave_profile.baiter_seek_probability,
                             ))
                     {
@@ -1029,13 +1031,6 @@ impl World {
                                 max_y,
                             },
                         );
-                    }
-                    if enemy.velocity.dx == 0 {
-                        enemy.velocity.dx = if self.tick.is_multiple_of(2) {
-                            rom_baiter_base_speed()
-                        } else {
-                            -rom_baiter_base_speed()
-                        };
                     }
                 }
                 EntityKind::Bomber => {
@@ -2875,7 +2870,7 @@ fn rom_mutant_avoid_band(min_y: i32, max_y: i32) -> i32 {
 fn rom_mutant_random_y_hop(
     position: Position,
     random_y: u8,
-    tick: u32,
+    seed: u8,
     min_y: i32,
     max_y: i32,
 ) -> i32 {
@@ -2883,10 +2878,6 @@ fn rom_mutant_random_y_hop(
         return position.y;
     }
 
-    let seed = (tick as u8)
-        .wrapping_mul(37)
-        .wrapping_add((position.x as u8).wrapping_mul(13))
-        .wrapping_add((position.y as u8).wrapping_mul(17));
     let delta = if (seed & 0x80) == 0 {
         i32::from(random_y)
     } else {
@@ -4011,7 +4002,7 @@ mod tests {
             .iter()
             .find(|entity| entity.kind == EntityKind::Mutant)
             .expect("mutant");
-        assert_eq!(mutant.position, Position { x: 9, y: 6 });
+        assert_eq!(mutant.position, Position { x: 9, y: 4 });
     }
 
     #[test]
@@ -4049,7 +4040,7 @@ mod tests {
                 wave_profile.mutant_y_velocity_lsb,
             ),
         );
-        assert_eq!(mutant.position, Position { x: 10, y: 5 });
+        assert_eq!(mutant.position, Position { x: 10, y: 2 });
     }
 
     #[test]
@@ -4075,7 +4066,7 @@ mod tests {
             .iter()
             .find(|entity| entity.kind == EntityKind::Mutant)
             .expect("mutant");
-        assert_eq!(mutant.position.y, 5);
+        assert_eq!(mutant.position.y, 2);
     }
 
     #[test]
