@@ -177,7 +177,7 @@ the final runtime self-contained:
   wave/fire tables now embedded in `src/red_label_wave.rs`, and the
   `defa7.src` `RAND` / `ASTST` / `PLRES` flow used to reconstruct the default
   astronaut restore layout plus the `defb6.src` `PRBST` / `PRBKIL` /
-  `MMSW` / `RANDV` / `MSWM` / `SWBMB` / `LSHOT` / `SCZ0` / `UFOLP`
+  `MMSW` / `RANDV` / `MSWM` / `SWBMB` / `LSHOT` / `SCZ0` / `UFOLP` / `UFONV`
   probe-start, pod-burst, Swarmer-motion, and per-enemy shot-timer paths now
   embedded in `src/game.rs`, with the extracted text block kept in
   `assets/arcade/arcade-rules.txt` as a checked-in reference copy.

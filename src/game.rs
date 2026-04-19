@@ -999,15 +999,20 @@ impl World {
                 EntityKind::Baiter => {
                     let target = player_position.unwrap_or(enemy.position);
                     let stationary = enemy.velocity.dx == 0 && enemy.velocity.dy == 0;
-                    let refresh_due = rom_baiter_velocity_refresh_due(self.tick, enemy.position);
+                    let (cycle_counter, refresh_due) =
+                        rom_baiter_cycle_step(rom_baiter_cycle_counter_for_entity(enemy));
+                    enemy.rom_aux = rom_pack_enemy_state(
+                        rom_enemy_shot_timer_for_entity(enemy, self.status.wave),
+                        cycle_counter,
+                    );
                     // `UFOLP` only refreshes Baiter/UFO velocity when the image
-                    // cycle wraps, and `UFONV` gates the retarget through
-                    // `UFOSK` before applying the cabinet close-band checks.
+                    // cycle wraps, and `UFONV` gates that retarget through the
+                    // live `SEED > UFOSK` check before applying the cabinet
+                    // close-band exits.
                     if stationary
                         || (refresh_due
                             && rom_baiter_should_seek(
-                                self.tick,
-                                enemy.position,
+                                self.rand_state.seed,
                                 wave_profile.baiter_seek_probability,
                             ))
                     {
@@ -2573,20 +2578,30 @@ fn rom_shell_lifetime() -> u16 {
     20
 }
 
-const ROM_ENEMY_SHOT_TIMER_TAG: u8 = 0xA5;
+const ROM_ENEMY_STATE_TAG_MASK: u8 = 0x80;
+const ROM_BAITER_CYCLE_LENGTH: u8 = 18;
+
+fn rom_pack_enemy_state(timer: u8, aux: u8) -> u16 {
+    u16::from_be_bytes([ROM_ENEMY_STATE_TAG_MASK | aux, timer])
+}
 
 fn rom_pack_enemy_shot_timer(timer: u8) -> u16 {
-    u16::from_be_bytes([ROM_ENEMY_SHOT_TIMER_TAG, timer])
+    rom_pack_enemy_state(timer, 0)
 }
 
 fn rom_enemy_shot_timer_is_initialized(entity: &Entity) -> bool {
     let [tag, _] = entity.rom_aux.to_be_bytes();
-    tag == ROM_ENEMY_SHOT_TIMER_TAG
+    (tag & ROM_ENEMY_STATE_TAG_MASK) != 0
+}
+
+fn rom_enemy_aux_for_entity(entity: &Entity) -> u8 {
+    let [tag, _] = entity.rom_aux.to_be_bytes();
+    tag & !ROM_ENEMY_STATE_TAG_MASK
 }
 
 fn rom_enemy_shot_timer_for_entity(enemy: &Entity, wave: u8) -> u8 {
     let [tag, timer] = enemy.rom_aux.to_be_bytes();
-    if tag == ROM_ENEMY_SHOT_TIMER_TAG {
+    if (tag & ROM_ENEMY_STATE_TAG_MASK) != 0 {
         timer
     } else {
         rom_initial_enemy_shot_timer(enemy.kind, wave, &mut RomRandState::default())
@@ -2607,6 +2622,15 @@ fn rom_enemy_shot_time_limit(kind: EntityKind, wave: u8) -> u8 {
 
 fn rom_baiter_initial_shot_timer() -> u8 {
     8
+}
+
+fn rom_baiter_cycle_counter_for_entity(enemy: &Entity) -> u8 {
+    rom_enemy_aux_for_entity(enemy)
+}
+
+fn rom_baiter_cycle_step(counter: u8) -> (u8, bool) {
+    let next = (counter + 1) % ROM_BAITER_CYCLE_LENGTH;
+    (next, next == 0)
 }
 
 fn rom_mutant_transformed_shot_timer(wave: u8) -> u8 {
@@ -2639,11 +2663,12 @@ fn initialize_rom_enemy_state(entity: &mut Entity, wave: u8, rand_state: &mut Ro
 
     match entity.kind {
         EntityKind::Lander | EntityKind::Mutant | EntityKind::Baiter => {
-            entity.rom_aux = rom_pack_enemy_shot_timer(rom_initial_enemy_shot_timer(
-                entity.kind,
-                wave,
-                rand_state,
-            ));
+            let timer = rom_initial_enemy_shot_timer(entity.kind, wave, rand_state);
+            entity.rom_aux = if entity.kind == EntityKind::Baiter {
+                rom_pack_enemy_state(timer, 0)
+            } else {
+                rom_pack_enemy_shot_timer(timer)
+            };
         }
         _ => {}
     }
@@ -2895,12 +2920,7 @@ fn rom_swarmer_vertical_refresh_due(tick: u32, position: Position, mask: u8) -> 
     (tick + position.x as u32 + position.y as u32).is_multiple_of(cadence)
 }
 
-fn rom_baiter_velocity_refresh_due(tick: u32, position: Position) -> bool {
-    (tick + position.x as u32 + position.y as u32).is_multiple_of(18)
-}
-
-fn rom_baiter_should_seek(tick: u32, position: Position, seek_probability: u8) -> bool {
-    let seed = (((tick as i32) * 17) + position.x * 13 + position.y * 7).rem_euclid(256) as u8;
+fn rom_baiter_should_seek(seed: u8, seek_probability: u8) -> bool {
     seed > seek_probability
 }
 
@@ -3149,20 +3169,21 @@ mod tests {
         Entity, EntityKind, EntityState, HorizontalDirection, Position, RomBaiterSeekContext,
         RomRandState, Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
         initialize_tie_cruise_altitude, nearest_wrapped_target, rom_accumulate_vertical_velocity,
-        rom_advance_baiter_timer, rom_baiter_count_limit, rom_baiter_horizontal_close_band,
-        rom_baiter_initial_shot_timer, rom_baiter_seek_velocity, rom_baiter_should_seek,
-        rom_baiter_spawn_for_wave, rom_baiter_timer_floor, rom_baiter_vertical_close_band,
-        rom_bomb_shell_limit, rom_bomber_mine_lifetime, rom_bomber_should_drop_mine,
-        rom_default_human_world_xs, rom_enemy_shot_timer_for_entity,
-        rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
-        rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_pack_enemy_shot_timer,
-        rom_pack_swarmer_state, rom_probe_spawn_for_wave, rom_probe_swarmer_burst_count,
-        rom_probe_vertical_velocity, rom_randv_velocity, rom_reset_baiter_timer, rom_rmax,
-        rom_shell_lifetime, rom_shell_spawn_limit, rom_shoot_axes_from_seeds,
-        rom_swarmer_acceleration, rom_swarmer_count_limit, rom_swarmer_horizontal_velocity,
-        rom_swarmer_shot_timer_for_entity, rom_swarmer_vertical_speed_limit, rom_tie_close_band,
-        rom_tie_far_band, rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude,
-        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_advance_baiter_timer, rom_baiter_count_limit, rom_baiter_cycle_counter_for_entity,
+        rom_baiter_cycle_step, rom_baiter_horizontal_close_band, rom_baiter_initial_shot_timer,
+        rom_baiter_seek_velocity, rom_baiter_should_seek, rom_baiter_spawn_for_wave,
+        rom_baiter_timer_floor, rom_baiter_vertical_close_band, rom_bomb_shell_limit,
+        rom_bomber_mine_lifetime, rom_bomber_should_drop_mine, rom_default_human_world_xs,
+        rom_enemy_shot_timer_for_entity, rom_lander_horizontal_velocity,
+        rom_lander_vertical_velocity, rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity,
+        rom_pack_enemy_shot_timer, rom_pack_swarmer_state, rom_probe_spawn_for_wave,
+        rom_probe_swarmer_burst_count, rom_probe_vertical_velocity, rom_randv_velocity,
+        rom_reset_baiter_timer, rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit,
+        rom_shoot_axes_from_seeds, rom_swarmer_acceleration, rom_swarmer_count_limit,
+        rom_swarmer_horizontal_velocity, rom_swarmer_shot_timer_for_entity,
+        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
+        rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
+        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -3302,8 +3323,10 @@ mod tests {
     fn rom_baiter_seek_helpers_follow_the_source_thresholds() {
         assert_eq!(rom_baiter_horizontal_close_band(64), 20);
         assert!(rom_baiter_vertical_close_band(1, 9) >= 1);
-        assert!(!rom_baiter_should_seek(0, Position { x: 0, y: 0 }, 240));
-        assert!(rom_baiter_should_seek(14, Position { x: 17, y: 7 }, 200));
+        assert!(!rom_baiter_should_seek(0x08, 0xF0));
+        assert!(rom_baiter_should_seek(0xF1, 0xC8));
+        assert_eq!(rom_baiter_cycle_step(16), (17, false));
+        assert_eq!(rom_baiter_cycle_step(17), (0, true));
     }
 
     #[test]
@@ -5516,6 +5539,7 @@ mod tests {
             rom_enemy_shot_timer_for_entity(baiter, 2),
             rom_baiter_initial_shot_timer()
         );
+        assert_eq!(rom_baiter_cycle_counter_for_entity(baiter), 0);
     }
 
     #[test]
