@@ -141,9 +141,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `--rom-report` now prints the embedded canonical red-label filename list when
   no directory is supplied, and only touches the filesystem when you pass an
   explicit ROM path.
-- Gameplay object art now uses the embedded `assets/arcade/*.png` sprite set
-  again for live play after the direct `defb6.src` runtime picture decode
-  regressed into corrupted object art.
+- Gameplay object art mostly uses the embedded `assets/arcade/*.png` sprite
+  set again for live play after the earlier broad `defb6.src` runtime picture
+  decode regressed into corrupted object art, but the player ship now follows
+  the red-label `POUT` / `POUT1` / `ON86` path directly with ROM-decoded
+  `PLAPIC` / `PLBPIC` even/odd screen phases.
 - UI and attract text now render through the embedded
   `assets/arcade/font-sheet.png` sheet built from the red-label `mess0.src`
   character tables instead of the old generic bitmap font.

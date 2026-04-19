@@ -3,9 +3,8 @@
 //! The object art in `assets/arcade/*.png` is cropped from the red-label
 //! Defender sprite rip published by Sean Riddle's Williams graphics ripper
 //! work, then bundled into the app with `include_bytes!`. The runtime keeps
-//! the known-good cropped cabinet sprites for the live ship family and the
-//! bundled `500` rescue-bonus art, while using ROM-backed picture decoding for
-//! the `250` rescue score art.
+//! the bundled `500` rescue-bonus art, while using ROM-backed picture decoding
+//! for the live player ship phases and the `250` rescue score art.
 
 use std::{
     io::Cursor,
@@ -17,15 +16,17 @@ use png::{ColorType, Decoder, Transformations};
 
 use crate::{
     game::{Entity, EntityKind, HorizontalDirection},
-    object_rom::{render_picture, score_250_palette},
-    object_rom_data::C25P1,
+    object_rom::{render_picture, score_250_palette, ship_palette},
+    object_rom_data::{C25P1, PLAPIC, PLAPIC_ODD, PLBPIC, PLBPIC_ODD},
     video::RenderedImage,
 };
 
 #[derive(Clone, Debug)]
 pub struct ArcadeSprites {
-    ship_right: Arc<RenderedImage>,
-    ship_left: Arc<RenderedImage>,
+    ship_right_even: Arc<RenderedImage>,
+    ship_right_odd: Arc<RenderedImage>,
+    ship_left_even: Arc<RenderedImage>,
+    ship_left_odd: Arc<RenderedImage>,
     little_ship: Arc<RenderedImage>,
     player_shot: Arc<RenderedImage>,
     enemy_shots: [Arc<RenderedImage>; 2],
@@ -51,10 +52,15 @@ pub fn arcade_sprites() -> &'static ArcadeSprites {
 impl ArcadeSprites {
     fn new() -> Self {
         Self {
-            // The bundled `ship*.png` / `littleship.png` assets remain the
-            // known-good live ship family for the Kitty renderer.
-            ship_right: load_embedded_png(include_bytes!("../assets/arcade/ship1.png")),
-            ship_left: load_embedded_png(include_bytes!("../assets/arcade/ship3.png")),
+            // `POUT` / `POUT1` select the player picture family and then let
+            // `ON86` choose the even/odd data pointer from the current screen
+            // write phase. Mirror that cabinet path directly from the red-label
+            // `PLAPIC` / `PLBPIC` tables instead of pinning live play to one
+            // static bundled frame per facing.
+            ship_right_even: load_rom_picture(&PLAPIC, ship_palette()),
+            ship_right_odd: load_rom_picture(&PLAPIC_ODD, ship_palette()),
+            ship_left_even: load_rom_picture(&PLBPIC, ship_palette()),
+            ship_left_odd: load_rom_picture(&PLBPIC_ODD, ship_palette()),
             little_ship: load_embedded_png(include_bytes!("../assets/arcade/littleship.png")),
             player_shot: load_embedded_png(include_bytes!("../assets/arcade/player-shot.png")),
             enemy_shots: [
@@ -110,12 +116,7 @@ impl ArcadeSprites {
         player_facing: HorizontalDirection,
     ) -> Arc<RenderedImage> {
         match entity.kind {
-            // `POUT` / `POUT1` only swap the player between the right-facing
-            // `PLAPIC` and left-facing `PLBPIC` pictures.
-            EntityKind::PlayerShip => match player_facing {
-                HorizontalDirection::Right => self.ship_right.clone(),
-                HorizontalDirection::Left => self.ship_left.clone(),
-            },
+            EntityKind::PlayerShip => self.player_ship_for_screen_phase(player_facing, false),
             EntityKind::PlayerShot => self.player_shot.clone(),
             EntityKind::EnemyShot => self.enemy_shots[rom_cycle_index(tick, 2, 2)].clone(),
             EntityKind::Human => self.human.clone(),
@@ -130,6 +131,19 @@ impl ArcadeSprites {
             EntityKind::Pod => self.pod.clone(),
             EntityKind::Swarmer => self.swarmer.clone(),
             EntityKind::Mine => self.mine.clone(),
+        }
+    }
+
+    pub fn player_ship_for_screen_phase(
+        &self,
+        facing: HorizontalDirection,
+        odd_phase: bool,
+    ) -> Arc<RenderedImage> {
+        match (facing, odd_phase) {
+            (HorizontalDirection::Right, false) => self.ship_right_even.clone(),
+            (HorizontalDirection::Right, true) => self.ship_right_odd.clone(),
+            (HorizontalDirection::Left, false) => self.ship_left_even.clone(),
+            (HorizontalDirection::Left, true) => self.ship_left_odd.clone(),
         }
     }
 
@@ -224,7 +238,7 @@ mod tests {
     #[test]
     fn ship_assets_decode_with_pixels() {
         let sprites = arcade_sprites();
-        let ship = sprites.ship_right.as_ref();
+        let ship = sprites.ship_right_even.as_ref();
 
         assert!(ship.width > 0);
         assert!(ship.height > 0);
@@ -243,10 +257,13 @@ mod tests {
     }
 
     #[test]
-    fn player_ship_uses_embedded_left_art_not_a_mirror_of_right() {
+    fn player_ship_uses_rom_left_art_not_a_mirror_of_right() {
         let sprites = arcade_sprites();
 
-        assert_ne!(sprites.ship_right.pixels, sprites.ship_left.pixels);
+        assert_ne!(
+            sprites.ship_right_even.pixels,
+            sprites.ship_left_even.pixels
+        );
     }
 
     #[test]
@@ -261,15 +278,15 @@ mod tests {
     }
 
     #[test]
-    fn player_ship_frame_is_stable_across_horizontal_positions() {
+    fn player_ship_uses_distinct_rom_screen_phases_per_facing() {
         let sprites = arcade_sprites();
-        let player_a = Entity::new(EntityKind::PlayerShip, 12, 8, 0, 0);
-        let player_b = Entity::new(EntityKind::PlayerShip, 13, 8, 0, 0);
+        let right_even = sprites.player_ship_for_screen_phase(HorizontalDirection::Right, false);
+        let right_odd = sprites.player_ship_for_screen_phase(HorizontalDirection::Right, true);
+        let left_even = sprites.player_ship_for_screen_phase(HorizontalDirection::Left, false);
+        let left_odd = sprites.player_ship_for_screen_phase(HorizontalDirection::Left, true);
 
-        let frame_a = sprites.sprite_for_entity(&player_a, 0, HorizontalDirection::Right);
-        let frame_b = sprites.sprite_for_entity(&player_b, 0, HorizontalDirection::Right);
-
-        assert_eq!(frame_a.pixels, frame_b.pixels);
+        assert_ne!(right_even.pixels, right_odd.pixels);
+        assert_ne!(left_even.pixels, left_odd.pixels);
     }
 
     #[test]

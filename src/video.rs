@@ -1017,7 +1017,16 @@ impl Renderer {
         }
 
         let sprites = arcade_sprites();
-        let image = sprites.sprite_for_entity(entity, tick, facing);
+        let image = if entity.kind == EntityKind::PlayerShip {
+            // `POUT` / `POUT1` feed the player through `ON86`, which selects
+            // the even/odd picture pointer from the current screen write phase.
+            // Use the projected screen-x parity as the Kitty renderer analogue
+            // of that half-cell phase bit instead of pinning the ship to one
+            // static image per facing.
+            sprites.player_ship_for_screen_phase(facing, cx & 1 != 0)
+        } else {
+            sprites.sprite_for_entity(entity, tick, facing)
+        };
         self.draw_scaled_image_centered_clipped(
             image.as_ref(),
             cx,
