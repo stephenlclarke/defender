@@ -141,7 +141,6 @@ struct AttractPalette {
     title_text: [u8; 4],
     defender_face: [u8; 4],
     defender_shadow: [u8; 4],
-    hall_text: [u8; 4],
     scanner_text: [u8; 4],
     scanner_border: [u8; 4],
 }
@@ -420,7 +419,8 @@ impl Renderer {
         palette_phase: usize,
         elapsed_ms: u64,
     ) {
-        let palette = attract_palette(palette_phase, elapsed_ms);
+        let _palette = attract_palette(palette_phase, elapsed_ms);
+        let hall_text_color = hall_of_fame_color(palette_phase, elapsed_ms);
         self.fill_rect(
             Rect {
                 x: 0,
@@ -456,7 +456,7 @@ impl Renderer {
             self.image_width as i32 / 2,
             hall_title_y,
             "HALL OF FAME",
-            palette.hall_text,
+            hall_text_color,
             hall_title_scale,
         );
         self.draw_score_tables(
@@ -468,7 +468,7 @@ impl Renderer {
             },
             todays,
             all_time,
-            palette.hall_text,
+            hall_text_color,
         );
     }
 
@@ -1920,6 +1920,21 @@ fn score_table_block_height(row_count: usize) -> i32 {
 }
 
 const ATTRACT_COLOR_CYCLE_MS: u64 = 120;
+const HALL_COLOR_CYCLE_MS: u64 = 33;
+const HALL_COLOR_SEQUENCE: [[u8; 4]; 12] = [
+    [206, 108, 255, 255],
+    [170, 96, 255, 255],
+    [118, 132, 255, 255],
+    [88, 188, 255, 255],
+    [96, 236, 255, 255],
+    [122, 255, 184, 255],
+    [170, 255, 108, 255],
+    [224, 255, 92, 255],
+    [255, 232, 96, 255],
+    [255, 188, 84, 255],
+    [255, 132, 84, 255],
+    [255, 100, 156, 255],
+];
 
 fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
     // The red-label attract path keeps the `COLR` and `TIECOL` color tasks
@@ -1934,7 +1949,6 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
             title_text: [248, 192, 64, 255],
             defender_face: [112, 255, 52, 255],
             defender_shadow: [255, 48, 48, 255],
-            hall_text: TEXT_ATTRACT_PURPLE,
             scanner_text: TEXT_ATTRACT_PURPLE,
             scanner_border: [67, 114, 198, 255],
         },
@@ -1943,7 +1957,6 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
             title_text: [248, 208, 96, 255],
             defender_face: [144, 255, 80, 255],
             defender_shadow: [255, 72, 56, 255],
-            hall_text: TEXT_ATTRACT_MAGENTA,
             scanner_text: TEXT_ATTRACT_MAGENTA,
             scanner_border: [82, 132, 220, 255],
         },
@@ -1952,7 +1965,6 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
             title_text: [236, 184, 56, 255],
             defender_face: [96, 240, 48, 255],
             defender_shadow: [236, 40, 72, 255],
-            hall_text: [164, 88, 244, 255],
             scanner_text: [164, 88, 244, 255],
             scanner_border: [60, 106, 188, 255],
         },
@@ -1961,11 +1973,19 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
             title_text: [255, 216, 120, 255],
             defender_face: [176, 255, 96, 255],
             defender_shadow: [255, 108, 64, 255],
-            hall_text: [206, 108, 255, 255],
             scanner_text: [206, 108, 255, 255],
             scanner_border: [94, 146, 230, 255],
         },
     }
+}
+
+fn hall_of_fame_color(phase: usize, elapsed_ms: u64) -> [u8; 4] {
+    // `HALDIS` leaves the hall page under the `COLR` color task rather than a
+    // static heading color. The source task advances every 2 ticks, so use a
+    // shorter cadence than the simplified Williams-logo palette and walk
+    // through a broader arcade-like sequence instead of holding on purple.
+    let index = (phase + (elapsed_ms / HALL_COLOR_CYCLE_MS) as usize) % HALL_COLOR_SEQUENCE.len();
+    HALL_COLOR_SEQUENCE[index]
 }
 
 fn remap_defender_logo_color(source: [u8; 4], palette: AttractPalette) -> [u8; 4] {
