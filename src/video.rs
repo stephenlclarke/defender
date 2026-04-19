@@ -46,16 +46,22 @@ const SWARMER_COLOR: [u8; 4] = [255, 170, 92, 255];
 const ENEMY_SHOT_COLOR: [u8; 4] = [255, 94, 94, 255];
 const PLAYER_SHOT_COLOR: [u8; 4] = [255, 255, 140, 255];
 const MINE_COLOR: [u8; 4] = [255, 74, 34, 255];
-// These screen positions mirror the `TEXTAB` legend placement from the attract
-// instruction page in `amode1.src`, adapted to the Kitty renderer's logical
-// 960x720 canvas.
+const LOGO_PAGE_X_OFFSET: i32 = -8;
+const ATTRACT_TABLE_XS: [i32; 6] = [0x0900, 0x1100, 0x1980, 0x0960, 0x1160, 0x19E0];
+const ATTRACT_TABLE_YS: [i32; 6] = [0x6000, 0x6000, 0x6200, 0x9800, 0x9800, 0x9A00];
+const ATTRACT_LEGEND_LABEL_OFFSET_Y: i32 = 44;
+const ATTRACT_LEGEND_SCORE_OFFSET_Y: i32 = 70;
+// These entries follow the ROM `TEXTAB` / `ENMYTB` order for the attract
+// instruction page. Their actual screen anchors are derived at render time from
+// the ROM object coordinates so the label/score text stays aligned under the
+// cabinet positions instead of hand-placed screen columns.
 const ATTRACT_SCORE_CARD: [AttractLegendEntry; 6] = [
-    AttractLegendEntry::new(EntityKind::Lander, "LANDER", 150, 176, 284),
-    AttractLegendEntry::new(EntityKind::Mutant, "MUTANT", 150, 478, 284),
-    AttractLegendEntry::new(EntityKind::Baiter, "BAITER", 200, 776, 284),
-    AttractLegendEntry::new(EntityKind::Bomber, "BOMBER", 250, 176, 554),
-    AttractLegendEntry::new(EntityKind::Pod, "POD", 1000, 478, 554),
-    AttractLegendEntry::new(EntityKind::Swarmer, "SWARMER", 150, 776, 554),
+    AttractLegendEntry::new(EntityKind::Lander, "LANDER", 150),
+    AttractLegendEntry::new(EntityKind::Mutant, "MUTANT", 150),
+    AttractLegendEntry::new(EntityKind::Baiter, "BAITER", 200),
+    AttractLegendEntry::new(EntityKind::Bomber, "BOMBER", 250),
+    AttractLegendEntry::new(EntityKind::Pod, "POD", 1000),
+    AttractLegendEntry::new(EntityKind::Swarmer, "SWARMER", 150),
 ];
 
 pub enum Screen<'a> {
@@ -126,8 +132,6 @@ struct AttractLegendEntry {
     kind: EntityKind,
     label: &'static str,
     score: u32,
-    x: i32,
-    y: i32,
 }
 
 #[derive(Clone, Copy)]
@@ -153,14 +157,8 @@ struct LogoScreenState {
 }
 
 impl AttractLegendEntry {
-    const fn new(kind: EntityKind, label: &'static str, score: u32, x: i32, y: i32) -> Self {
-        Self {
-            kind,
-            label,
-            score,
-            x,
-            y,
-        }
+    const fn new(kind: EntityKind, label: &'static str, score: u32) -> Self {
+        Self { kind, label, score }
     }
 }
 
@@ -264,7 +262,7 @@ impl Renderer {
         let scale = (max_width as f32 / 320.0).min(max_height as f32 / 256.0);
         let page_width = (320.0 * scale).round() as i32;
         let page_height = (256.0 * scale).round() as i32;
-        let page_x = self.image_width as i32 / 2 - page_width / 2;
+        let page_x = self.image_width as i32 / 2 - page_width / 2 + LOGO_PAGE_X_OFFSET;
         let page_y = self.image_height as i32 / 2 - page_height / 2;
         let page_scale = page_height as f32 / 256.0;
         let page_x_at = |x: f32| page_x + (x * page_width as f32 / 320.0).round() as i32;
@@ -411,7 +409,7 @@ impl Renderer {
         if let Some(bonus_text) = frame.bonus_text {
             self.draw_attract_bonus_text(bonus_text, playfield, TEXT_WARNING);
         }
-        self.draw_attract_legend_entries(frame.revealed_score_entries);
+        self.draw_attract_legend_entries(playfield, frame.revealed_score_entries);
     }
 
     fn render_high_scores_screen(
@@ -1061,11 +1059,24 @@ impl Renderer {
         self.draw_text(x, y + 22, "SMART BOMBS INF", TEXT_PRIMARY, 1);
     }
 
-    fn draw_attract_legend_entries(&mut self, revealed_score_entries: usize) {
-        for entry in ATTRACT_SCORE_CARD.into_iter().take(revealed_score_entries) {
+    fn draw_attract_legend_entries(&mut self, rect: Rect, revealed_score_entries: usize) {
+        for (index, entry) in ATTRACT_SCORE_CARD
+            .into_iter()
+            .take(revealed_score_entries)
+            .enumerate()
+        {
             let color = attract_legend_color(entry.kind);
-            self.draw_centered_text(entry.x, entry.y, entry.label, color, 2);
-            self.draw_centered_text(entry.x, entry.y + 22, &entry.score.to_string(), color, 2);
+            let x = project_attract_x(rect, ATTRACT_TABLE_XS[index]);
+            let label_y =
+                project_attract_y(rect, ATTRACT_TABLE_YS[index]) + ATTRACT_LEGEND_LABEL_OFFSET_Y;
+            self.draw_centered_text(x, label_y, entry.label, color, 2);
+            self.draw_centered_text(
+                x,
+                label_y + (ATTRACT_LEGEND_SCORE_OFFSET_Y - ATTRACT_LEGEND_LABEL_OFFSET_Y),
+                &entry.score.to_string(),
+                color,
+                2,
+            );
         }
     }
 
