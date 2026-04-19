@@ -137,6 +137,32 @@ impl ArcadeSprites {
         }
     }
 
+    pub fn attract_sprite_for_kind(
+        &self,
+        kind: EntityKind,
+        facing: HorizontalDirection,
+        odd_phase: bool,
+    ) -> Arc<RenderedImage> {
+        match kind {
+            // `amode1.src` uses fixed `PICTS` entries (`...P1`) for the
+            // instruction-page enemies instead of stepping through the live
+            // gameplay animator. Keep the player on the cabinet `ON86`
+            // even/odd path, but pin the attract objects to their source
+            // picture family.
+            EntityKind::PlayerShip => self.player_ship_for_screen_phase(facing, odd_phase),
+            EntityKind::PlayerShot => self.player_shot.clone(),
+            EntityKind::EnemyShot => self.enemy_shots[0].clone(),
+            EntityKind::Human => self.human.clone(),
+            EntityKind::Lander => self.landers[0].clone(),
+            EntityKind::Mutant => self.mutants[0].clone(),
+            EntityKind::Baiter => self.baiters[0].clone(),
+            EntityKind::Bomber => self.bombers[0].clone(),
+            EntityKind::Pod => self.pod.clone(),
+            EntityKind::Swarmer => self.swarmer.clone(),
+            EntityKind::Mine => self.mine.clone(),
+        }
+    }
+
     pub fn player_ship_for_screen_phase(
         &self,
         facing: HorizontalDirection,
@@ -342,5 +368,26 @@ mod tests {
 
         assert_eq!(phase_a.pixels, phase_b.pixels);
         assert_eq!(phase_a.pixels, phase_c.pixels);
+    }
+
+    #[test]
+    fn attract_enemy_sprites_stay_on_their_rom_p1_family() {
+        let sprites = arcade_sprites();
+
+        let attract =
+            sprites.attract_sprite_for_kind(EntityKind::Bomber, HorizontalDirection::Right, false);
+        let live = sprites.sprite_for_entity(
+            &Entity::new(EntityKind::Bomber, 0, 0, 0, 0),
+            20,
+            HorizontalDirection::Right,
+        );
+
+        assert_ne!(attract.pixels, live.pixels);
+        assert_eq!(
+            attract.pixels,
+            sprites
+                .attract_sprite_for_kind(EntityKind::Bomber, HorizontalDirection::Right, true)
+                .pixels
+        );
     }
 }

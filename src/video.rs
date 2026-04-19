@@ -1099,28 +1099,26 @@ impl Renderer {
     fn draw_attract_explosion(
         &mut self,
         object: &crate::attract::AttractObject,
-        animation_tick: u32,
         cx: i32,
         cy: i32,
         clip_rect: Rect,
     ) {
         let height = attract_explosion_height(object.kind, object.visual_tick);
-        let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
-        let image = arcade_sprites().sprite_for_entity(&entity, animation_tick, object.facing);
+        let image =
+            arcade_sprites().attract_sprite_for_kind(object.kind, object.facing, cx & 1 != 0);
         self.draw_scaled_image_centered_clipped(image.as_ref(), cx, cy, height, clip_rect);
     }
 
     fn draw_attract_materialize(
         &mut self,
         object: &crate::attract::AttractObject,
-        animation_tick: u32,
         cx: i32,
         cy: i32,
         clip_rect: Rect,
     ) {
         let height = attract_materialize_height(object.kind, object.visual_tick);
-        let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
-        let image = arcade_sprites().sprite_for_entity(&entity, animation_tick, object.facing);
+        let image =
+            arcade_sprites().attract_sprite_for_kind(object.kind, object.facing, cx & 1 != 0);
         self.draw_scaled_image_centered_clipped(image.as_ref(), cx, cy, height, clip_rect);
     }
 
@@ -1171,22 +1169,24 @@ impl Renderer {
 
             match object.visual {
                 AttractVisual::Sprite => {
-                    let entity = Entity::with_state(object.kind, 0, 0, 0, 0, object.state);
-                    self.draw_entity(
-                        &entity,
+                    let image = arcade_sprites().attract_sprite_for_kind(
+                        object.kind,
                         object.facing,
-                        frame.animation_tick,
+                        cx & 1 != 0,
+                    );
+                    self.draw_scaled_image_centered_clipped(
+                        image.as_ref(),
                         cx,
                         cy,
-                        24,
+                        sprite_draw_height(object.kind, 24),
                         rect,
                     );
                 }
                 AttractVisual::Explosion => {
-                    self.draw_attract_explosion(object, frame.animation_tick, cx, cy, rect);
+                    self.draw_attract_explosion(object, cx, cy, rect);
                 }
                 AttractVisual::Materialize => {
-                    self.draw_attract_materialize(object, frame.animation_tick, cx, cy, rect);
+                    self.draw_attract_materialize(object, cx, cy, rect);
                 }
             }
         }
