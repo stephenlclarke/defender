@@ -51,10 +51,7 @@ const ENEMY_SHOT_COLOR: [u8; 4] = [255, 94, 94, 255];
 const PLAYER_SHOT_COLOR: [u8; 4] = [255, 255, 140, 255];
 const MINE_COLOR: [u8; 4] = [255, 74, 34, 255];
 const LOGO_PAGE_X_OFFSET: i32 = -96;
-const ATTRACT_TABLE_XS: [i32; 6] = [0x0900, 0x1100, 0x1980, 0x0960, 0x1160, 0x19E0];
-const ATTRACT_TABLE_YS: [i32; 6] = [0x6000, 0x6000, 0x6200, 0x9800, 0x9800, 0x9A00];
-const ATTRACT_LEGEND_LABEL_OFFSET_Y: i32 = 44;
-const ATTRACT_LEGEND_SCORE_OFFSET_Y: i32 = 70;
+const ATTRACT_SCANNER_TEXT_ADDR: u16 = 0x4330;
 const HUD_LINE_START_BYTE: i32 = 0x20;
 const HUD_LINE_END_BYTE: i32 = 0x9B;
 const SCANNER_LEFT_BYTE: i32 = 0x2F;
@@ -72,12 +69,12 @@ const P2_SBD: u16 = 0x8B1B;
 // the ROM object coordinates so the label/score text stays aligned under the
 // cabinet positions instead of hand-placed screen columns.
 const ATTRACT_SCORE_CARD: [AttractLegendEntry; 6] = [
-    AttractLegendEntry::new(EntityKind::Lander, "LANDER", 150),
-    AttractLegendEntry::new(EntityKind::Mutant, "MUTANT", 150),
-    AttractLegendEntry::new(EntityKind::Baiter, "BAITER", 200),
-    AttractLegendEntry::new(EntityKind::Bomber, "BOMBER", 250),
-    AttractLegendEntry::new(EntityKind::Pod, "POD", 1000),
-    AttractLegendEntry::new(EntityKind::Swarmer, "SWARMER", 150),
+    AttractLegendEntry::new(EntityKind::Lander, "LANDER", 150, 0x1C70, 6, 0x4433),
+    AttractLegendEntry::new(EntityKind::Mutant, "MUTANT", 150, 0x3C70, 6, 0xCC33),
+    AttractLegendEntry::new(EntityKind::Baiter, "BAITER", 200, 0x5F70, 6, 0x3333),
+    AttractLegendEntry::new(EntityKind::Bomber, "BOMBER", 250, 0x1CA8, 6, 0x8888),
+    AttractLegendEntry::new(EntityKind::Pod, "POD", 1000, 0x40A8, 0, 0xCCCC),
+    AttractLegendEntry::new(EntityKind::Swarmer, "SWARMER", 150, 0x5CA8, 8, 0x2424),
 ];
 
 pub enum Screen<'a> {
@@ -149,6 +146,9 @@ struct AttractLegendEntry {
     kind: EntityKind,
     label: &'static str,
     score: u32,
+    text_addr: u16,
+    score_indent_chars: i32,
+    scanner_blip: u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -185,8 +185,22 @@ struct LogoScreenState {
 }
 
 impl AttractLegendEntry {
-    const fn new(kind: EntityKind, label: &'static str, score: u32) -> Self {
-        Self { kind, label, score }
+    const fn new(
+        kind: EntityKind,
+        label: &'static str,
+        score: u32,
+        text_addr: u16,
+        score_indent_chars: i32,
+        scanner_blip: u16,
+    ) -> Self {
+        Self {
+            kind,
+            label,
+            score,
+            text_addr,
+            score_indent_chars,
+            scanner_blip,
+        }
     }
 }
 
@@ -392,9 +406,11 @@ impl Renderer {
             Color::from_rgba(palette.scanner_border),
             2,
         );
-        self.draw_centered_text(
-            self.image_width as i32 / 2,
-            128,
+        let (scanner_text_x, scanner_text_y) =
+            self.project_attract_screen_address(ATTRACT_SCANNER_TEXT_ADDR);
+        self.draw_text(
+            scanner_text_x,
+            scanner_text_y,
             "SCANNER",
             palette.scanner_text,
             3,
@@ -443,7 +459,7 @@ impl Renderer {
         if let Some(bonus_text) = frame.bonus_text {
             self.draw_attract_bonus_text(bonus_text, playfield, frame.animation_tick);
         }
-        self.draw_attract_legend_entries(playfield, frame.revealed_score_entries);
+        self.draw_attract_legend_entries(frame.revealed_score_entries);
     }
 
     fn render_high_scores_screen(
@@ -904,12 +920,43 @@ impl Renderer {
         for object in &frame.objects {
             let x = project_attract_x(inner, object.x16);
             let y = project_attract_y(inner, object.y16);
-            let radius = if object.kind == EntityKind::PlayerShip {
-                3
+            if object.kind == EntityKind::PlayerShip {
+                self.draw_dot(x, y, Color::from_rgba(scanner_color(object.kind)), 3);
+                continue;
+            }
+
+            if let Some(blip) = attract_scanner_blip(object.kind) {
+                self.draw_rom_scanner_blip(x, y, blip);
             } else {
-                2
-            };
-            self.draw_dot(x, y, Color::from_rgba(scanner_color(object.kind)), radius);
+                self.draw_dot(x, y, Color::from_rgba(scanner_color(object.kind)), 2);
+            }
+        }
+    }
+
+    fn draw_rom_scanner_blip(&mut self, center_x: i32, center_y: i32, blip: u16) {
+        let nibble_width = 3;
+        let nibble_height = 3;
+        let start_x = center_x - nibble_width * 2;
+        let nibbles = [
+            ((blip >> 12) & 0x0F) as u8,
+            ((blip >> 8) & 0x0F) as u8,
+            ((blip >> 4) & 0x0F) as u8,
+            (blip & 0x0F) as u8,
+        ];
+
+        for (index, nibble) in nibbles.into_iter().enumerate() {
+            if nibble == 0 {
+                continue;
+            }
+            self.fill_rect(
+                Rect {
+                    x: start_x + index as i32 * nibble_width,
+                    y: center_y - nibble_height / 2,
+                    width: nibble_width,
+                    height: nibble_height,
+                },
+                Color::from_rgba(pseudo_color_rgba(nibble)),
+            );
         }
     }
 
@@ -1340,6 +1387,13 @@ impl Renderer {
         }
     }
 
+    fn project_attract_screen_address(&self, address: u16) -> (i32, i32) {
+        (
+            rom_addr_to_native_x(address) * self.image_width as i32 / 320,
+            rom_addr_to_native_y(address) * self.image_height as i32 / 256,
+        )
+    }
+
     fn draw_defender_logo(
         &mut self,
         center_x: i32,
@@ -1413,23 +1467,24 @@ impl Renderer {
         self.draw_text(x, y + 22, "SMART BOMBS INF", TEXT_PRIMARY, 1);
     }
 
-    fn draw_attract_legend_entries(&mut self, rect: Rect, revealed_score_entries: usize) {
-        for (index, entry) in ATTRACT_SCORE_CARD
-            .into_iter()
-            .take(revealed_score_entries)
-            .enumerate()
-        {
+    fn draw_attract_legend_entries(&mut self, revealed_score_entries: usize) {
+        const LABEL_SCALE: i32 = 2;
+        const SCORE_SCALE: i32 = 2;
+        const ROM_LINE_STEP: i32 = 18;
+        for entry in ATTRACT_SCORE_CARD.into_iter().take(revealed_score_entries) {
             let color = attract_legend_color(entry.kind);
-            let x = project_attract_x(rect, ATTRACT_TABLE_XS[index]);
-            let label_y =
-                project_attract_y(rect, ATTRACT_TABLE_YS[index]) + ATTRACT_LEGEND_LABEL_OFFSET_Y;
-            self.draw_centered_text(x, label_y, entry.label, color, 2);
-            self.draw_centered_text(
-                x,
-                label_y + (ATTRACT_LEGEND_SCORE_OFFSET_Y - ATTRACT_LEGEND_LABEL_OFFSET_Y),
+            let (label_x, label_y) = self.project_attract_screen_address(entry.text_addr);
+            self.draw_text(label_x, label_y, entry.label, color, LABEL_SCALE);
+
+            let score_x =
+                label_x + entry.score_indent_chars * arcade_font().text_width("0", SCORE_SCALE);
+            let score_y = label_y + ROM_LINE_STEP * SCORE_SCALE / 2;
+            self.draw_text(
+                score_x,
+                score_y,
                 &entry.score.to_string(),
                 color,
-                2,
+                SCORE_SCALE,
             );
         }
     }
@@ -2455,6 +2510,16 @@ fn scanner_color(kind: EntityKind) -> [u8; 4] {
         EntityKind::Swarmer => SWARMER_COLOR,
         EntityKind::Mine => MINE_COLOR,
         EntityKind::Human => HUMAN_COLOR,
+    }
+}
+
+fn attract_scanner_blip(kind: EntityKind) -> Option<u16> {
+    match kind {
+        EntityKind::Human => Some(0x6666),
+        _ => ATTRACT_SCORE_CARD
+            .iter()
+            .find(|entry| entry.kind == kind)
+            .map(|entry| entry.scanner_blip),
     }
 }
 

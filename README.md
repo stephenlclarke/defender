@@ -163,6 +163,13 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The instruction/demo page now uses the ROM-timed `LEDRET` rescue/scoring
   sequence in native fixed-point attract coordinates rather than routing those
   poses through the normal gameplay world update loop.
+- The instruction-page `SCANNER` / enemy legend text now follows the red-label
+  `TEXTAB` screen addresses and `mess0.src` message layout instead of the older
+  hand-authored x/y offsets, so the cabinet labels and score rows line up with
+  the original attract page more closely.
+- The instruction-page scanner markers now use the red-label `BLIPS` /
+  `OBJCOL` packed colour words for enemies and Eugene instead of generic
+  projected dots, so the attract scanner reads closer to the cabinet page.
 - The attract score-card kills now preserve the real enemy picture family
   through the red-label `AMOD10` / `AMOD11` / `BMODE2` / `BMODE3` split
   instead of swapping every hit to a generic blast, so the rescue/legend
