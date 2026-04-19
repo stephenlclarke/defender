@@ -201,7 +201,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   seeking once it enters the ROM close bands around the player instead of
   continuously homing every frame, and delayed wave-pressure spawns now use
   the seed-derived `UFOST` visible-band placement instead of the earlier
-  player-relative phase offsets.
+  player-relative phase offsets, with fresh Baiters now also taking the
+  immediate `UFONV0` velocity solve on spawn instead of idling for a full tick.
 - Bomber / TIE motion now follows the cabinet `TIE` shape more closely too:
   off-screen units steer back toward a source-backed cruise-altitude band, and
   on-screen units use the ROM-style close/far vertical proximity bands around

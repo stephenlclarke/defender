@@ -846,9 +846,6 @@ impl World {
                 }
                 EntityKind::Baiter => {
                     let target = player_position.unwrap_or(enemy.position);
-                    let horizontal_delta =
-                        shortest_wrapped_delta(enemy.position.x, target.x, world_span);
-                    let vertical_delta = target.y - enemy.position.y;
                     let stationary = enemy.velocity.dx == 0 && enemy.velocity.dy == 0;
                     let refresh_due = rom_baiter_velocity_refresh_due(self.tick, enemy.position);
                     // `UFOLP` only refreshes Baiter/UFO velocity when the image
@@ -862,30 +859,20 @@ impl World {
                                 wave_profile.baiter_seek_probability,
                             ))
                     {
-                        let horizontal_close_band = rom_baiter_horizontal_close_band(self.width);
-                        if horizontal_delta.abs() > horizontal_close_band {
-                            let inherited_dx =
-                                player_velocity.map(|velocity| velocity.dx).unwrap_or(0);
-                            let seek_dx = horizontal_delta.signum() * tables.baiter_speed;
-                            enemy.velocity.dx = (inherited_dx + seek_dx)
-                                .clamp(-(tables.baiter_speed + 1), tables.baiter_speed + 1);
-                            if enemy.velocity.dx == 0 {
-                                enemy.velocity.dx = seek_dx;
-                            }
-                        }
-
-                        let vertical_close_band = rom_baiter_vertical_close_band(min_y, max_y);
-                        if vertical_delta.abs() > vertical_close_band {
-                            let inherited_dy =
-                                player_velocity.map(|velocity| velocity.dy).unwrap_or(0);
-                            let seek_dy = vertical_delta.signum();
-                            let averaged_dy = seek_dy + inherited_dy;
-                            enemy.velocity.dy = if averaged_dy == 0 {
-                                seek_dy
-                            } else {
-                                averaged_dy.signum()
-                            };
-                        }
+                        enemy.velocity = rom_baiter_seek_velocity(
+                            enemy.position,
+                            enemy.velocity,
+                            RomBaiterSeekContext {
+                                target,
+                                player_velocity: player_velocity
+                                    .unwrap_or(Velocity { dx: 0, dy: 0 }),
+                                world_span,
+                                screen_width: self.width,
+                                min_y,
+                                max_y,
+                                baiter_speed: tables.baiter_speed,
+                            },
+                        );
                     }
                     if enemy.velocity.dx == 0 {
                         enemy.velocity.dx = if self.tick.is_multiple_of(2) {
@@ -1861,9 +1848,28 @@ impl World {
         );
         let safe_y = self.safe_altitude_at_world_x(spawn.x).min(max_y);
         let y = spawn.y.clamp(min_y, safe_y);
+        let player_position = self.player_position().unwrap_or(spawn);
+        let initial_velocity = rom_baiter_seek_velocity(
+            Position { x: spawn.x, y },
+            Velocity { dx: 0, dy: 0 },
+            RomBaiterSeekContext {
+                target: player_position,
+                player_velocity: self.player_velocity().unwrap_or(Velocity { dx: 0, dy: 0 }),
+                world_span: self.world_span,
+                screen_width: self.width,
+                min_y,
+                max_y,
+                baiter_speed: tables.baiter_speed,
+            },
+        );
 
-        self.entities
-            .push(Entity::new(EntityKind::Baiter, spawn.x, y, 0, 0));
+        self.entities.push(Entity::new(
+            EntityKind::Baiter,
+            spawn.x,
+            y,
+            initial_velocity.dx,
+            initial_velocity.dy,
+        ));
         self.last_baiter_tick = self.tick;
     }
 
@@ -2361,6 +2367,51 @@ fn rom_baiter_vertical_close_band(min_y: i32, max_y: i32) -> i32 {
     close.max(1)
 }
 
+#[derive(Clone, Copy)]
+struct RomBaiterSeekContext {
+    target: Position,
+    player_velocity: Velocity,
+    world_span: i32,
+    screen_width: usize,
+    min_y: i32,
+    max_y: i32,
+    baiter_speed: i32,
+}
+
+fn rom_baiter_seek_velocity(
+    baiter_position: Position,
+    current_velocity: Velocity,
+    context: RomBaiterSeekContext,
+) -> Velocity {
+    let horizontal_delta =
+        shortest_wrapped_delta(baiter_position.x, context.target.x, context.world_span);
+    let vertical_delta = context.target.y - baiter_position.y;
+    let mut next = current_velocity;
+
+    let horizontal_close_band = rom_baiter_horizontal_close_band(context.screen_width);
+    if horizontal_delta.abs() > horizontal_close_band {
+        let seek_dx = horizontal_delta.signum() * context.baiter_speed;
+        next.dx = (context.player_velocity.dx + seek_dx)
+            .clamp(-(context.baiter_speed + 1), context.baiter_speed + 1);
+        if next.dx == 0 {
+            next.dx = seek_dx;
+        }
+    }
+
+    let vertical_close_band = rom_baiter_vertical_close_band(context.min_y, context.max_y);
+    if vertical_delta.abs() > vertical_close_band {
+        let seek_dy = vertical_delta.signum();
+        let averaged_dy = seek_dy + context.player_velocity.dy;
+        next.dy = if averaged_dy == 0 {
+            seek_dy
+        } else {
+            averaged_dy.signum()
+        };
+    }
+
+    next
+}
+
 fn rom_tie_close_band(min_y: i32, max_y: i32) -> i32 {
     let close = scale_rom_display_y_to_world(42 + 0x10, min_y, max_y)
         - scale_rom_display_y_to_world(42, min_y, max_y);
@@ -2437,12 +2488,13 @@ mod tests {
     use crate::red_label_wave::red_label_wave_table;
 
     use super::{
-        Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput,
-        Velocity, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
-        rom_baiter_horizontal_close_band, rom_baiter_should_seek, rom_baiter_spawn_for_wave,
-        rom_baiter_vertical_close_band, rom_probe_spawn_for_wave, rom_probe_vertical_velocity,
-        rom_shoot_axes_from_seeds, rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band,
-        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        Entity, EntityKind, EntityState, HorizontalDirection, Position, RomBaiterSeekContext,
+        Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
+        nearest_wrapped_target, rom_baiter_horizontal_close_band, rom_baiter_seek_velocity,
+        rom_baiter_should_seek, rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band,
+        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_shoot_axes_from_seeds,
+        rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band, scale_rom_probe_x_to_screen,
+        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -4269,6 +4321,7 @@ mod tests {
             .find(|entity| entity.kind == EntityKind::Baiter)
             .expect("baiter");
         assert!(world.screen_x_for_world_x(baiter.position.x).is_some());
+        assert_ne!(baiter.velocity, Velocity { dx: 0, dy: 0 });
     }
 
     #[test]
@@ -4278,6 +4331,26 @@ mod tests {
         assert!((0..=191).contains(&spawn.x));
         assert!(screen_x_for_world_x(spawn.x, -12, 24, 192, 191).is_some());
         assert!((1..=8).contains(&spawn.y));
+    }
+
+    #[test]
+    fn rom_baiter_seek_velocity_matches_the_spawn_side_of_ufonv0() {
+        let velocity = rom_baiter_seek_velocity(
+            Position { x: 18, y: 3 },
+            Velocity { dx: 0, dy: 0 },
+            RomBaiterSeekContext {
+                target: Position { x: 4, y: 6 },
+                player_velocity: Velocity { dx: 1, dy: 0 },
+                world_span: 192,
+                screen_width: 64,
+                min_y: 1,
+                max_y: 9,
+                baiter_speed: arcade_tables().baiter_speed,
+            },
+        );
+
+        assert_eq!(velocity.dx, 0);
+        assert!(velocity.dy > 0);
     }
 
     #[test]
