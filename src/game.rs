@@ -1850,23 +1850,20 @@ impl World {
             return;
         }
 
-        let Some(player_position) = self.player_position() else {
-            return;
-        };
-
-        let phase = (self.tick / tables.baiter_repeat_delay) as i32;
-        let horizontal_offset = self.width as i32 / 2 + (phase % 9);
-        let x = if phase % 2 == 0 {
-            wrap_coordinate(player_position.x + horizontal_offset, self.world_max_x())
-        } else {
-            wrap_coordinate(player_position.x - horizontal_offset, self.world_max_x())
-        };
-        let safe_y = self.safe_altitude_at_world_x(x).min(max_y);
-        let vertical_offset = if phase % 3 == 0 { -2 } else { 2 };
-        let y = (player_position.y + vertical_offset).clamp(min_y, safe_y);
+        let spawn = rom_baiter_spawn_for_wave(
+            self.status.wave,
+            self.tick,
+            self.left_edge(),
+            self.width,
+            self.world_max_x(),
+            min_y,
+            max_y,
+        );
+        let safe_y = self.safe_altitude_at_world_x(spawn.x).min(max_y);
+        let y = spawn.y.clamp(min_y, safe_y);
 
         self.entities
-            .push(Entity::new(EntityKind::Baiter, x, y, 0, 0));
+            .push(Entity::new(EntityKind::Baiter, spawn.x, y, 0, 0));
         self.last_baiter_tick = self.tick;
     }
 
@@ -2307,6 +2304,26 @@ fn scale_rom_probe_y_to_world(rom_y: i32, min_y: i32, max_y: i32) -> i32 {
     min_y + ((rom_y - 42) * span / 0x7F).clamp(0, span)
 }
 
+fn rom_baiter_spawn_for_wave(
+    wave: u8,
+    tick: u32,
+    left_edge: i32,
+    screen_width: usize,
+    world_max_x: i32,
+    min_y: i32,
+    max_y: i32,
+) -> Position {
+    let (hseed_hi, hseed_lo, _, _) = rom_probe_seed_bytes(wave, tick, 0x5546_4f00);
+    let max_screen_x = screen_width.saturating_sub(1) as i32;
+    let screen_x = (i32::from(hseed_hi & 0x1F) * max_screen_x / 0x1F).clamp(0, max_screen_x);
+    let rom_y = i32::from(hseed_lo >> 1) + 42;
+
+    Position {
+        x: wrap_coordinate(left_edge + screen_x, world_max_x),
+        y: scale_rom_probe_y_to_world(rom_y, min_y, max_y),
+    }
+}
+
 fn scale_rom_display_y_to_world(rom_y: i32, min_y: i32, max_y: i32) -> i32 {
     const ROM_YMIN: i32 = 42;
     const ROM_YMAX: i32 = 0xA8;
@@ -2422,10 +2439,10 @@ mod tests {
     use super::{
         Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput,
         Velocity, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
-        rom_baiter_horizontal_close_band, rom_baiter_should_seek, rom_baiter_vertical_close_band,
-        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_shoot_axes_from_seeds,
-        rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band, scale_rom_probe_x_to_screen,
-        shortest_wrapped_delta, wrap_coordinate,
+        rom_baiter_horizontal_close_band, rom_baiter_should_seek, rom_baiter_spawn_for_wave,
+        rom_baiter_vertical_close_band, rom_probe_spawn_for_wave, rom_probe_vertical_velocity,
+        rom_shoot_axes_from_seeds, rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band,
+        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -4246,6 +4263,21 @@ mod tests {
         world.step_live(UpdateInput::default());
 
         assert_eq!(world.entity_count_by_kind(EntityKind::Baiter), 1);
+        let baiter = world
+            .entities()
+            .iter()
+            .find(|entity| entity.kind == EntityKind::Baiter)
+            .expect("baiter");
+        assert!(world.screen_x_for_world_x(baiter.position.x).is_some());
+    }
+
+    #[test]
+    fn rom_baiter_spawn_stays_within_the_visible_band() {
+        let spawn = rom_baiter_spawn_for_wave(2, 200, -12, 24, 191, 1, 8);
+
+        assert!((0..=191).contains(&spawn.x));
+        assert!(screen_x_for_world_x(spawn.x, -12, 24, 192, 191).is_some());
+        assert!((1..=8).contains(&spawn.y));
     }
 
     #[test]

@@ -199,7 +199,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   closely too: retargets only happen on the source-style refresh cadence, the
   `UFOSK` record now gates when a retarget is allowed, and the ship stops
   seeking once it enters the ROM close bands around the player instead of
-  continuously homing every frame.
+  continuously homing every frame, and delayed wave-pressure spawns now use
+  the seed-derived `UFOST` visible-band placement instead of the earlier
+  player-relative phase offsets.
 - Bomber / TIE motion now follows the cabinet `TIE` shape more closely too:
   off-screen units steer back toward a source-backed cruise-altitude band, and
   on-screen units use the ROM-style close/far vertical proximity bands around
@@ -411,7 +413,8 @@ the final runtime self-contained:
   used to model wave-two bomber introduction, altitude-triggered speed boosts,
   and the persistent mine trails they leave behind.
 - <https://www.dougmahugh.com/defender-chapter07/>: baiter-behavior reference
-  used to model wave-delay baiter pressure and relative pursuit behavior.
+  used to model wave-delay baiter pressure, the `UFOST` visible-band spawn
+  shape, and relative pursuit behavior.
 - <https://www.arcade-history.com/?id=614&n=defender&page=detail>: scoring and
   gameplay reference used for humanoid rescue values, safe-fall saves, and wave
   bonus behavior.
