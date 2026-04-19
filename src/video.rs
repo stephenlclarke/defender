@@ -433,20 +433,38 @@ impl Renderer {
         // `HALDIS` writes the whole `DEFENDER` logo through `CWRIT` with
         // yellow face / red shadow on this page. The cabinet video keeps that
         // ROM logo stable while the headings and tables cycle in purple.
-        self.draw_defender_logo(self.image_width as i32 / 2, 72, 78, None);
+        let row_count = todays.entries().len().max(all_time.entries().len());
+        let logo_height = 78;
+        let hall_title_scale = 2;
+        let hall_title_height = 8 * hall_title_scale;
+        let logo_gap = 22;
+        let title_gap = 28;
+        let table_height = score_table_block_height(row_count);
+        let block_height = logo_height + logo_gap + hall_title_height + title_gap + table_height;
+        let block_top = (self.image_height as i32 - block_height) / 2;
+        let logo_center_y = block_top + logo_height / 2;
+        let hall_title_y = block_top + logo_height + logo_gap;
+        let table_y = hall_title_y + hall_title_height + title_gap;
+
+        self.draw_defender_logo(
+            self.image_width as i32 / 2,
+            logo_center_y,
+            logo_height,
+            None,
+        );
         self.draw_centered_text(
             self.image_width as i32 / 2,
-            142,
+            hall_title_y,
             "HALL OF FAME",
             palette.hall_text,
-            2,
+            hall_title_scale,
         );
         self.draw_score_tables(
             Rect {
                 x: 96,
-                y: 186,
+                y: table_y,
                 width: self.image_width as i32 - 192,
-                height: self.image_height as i32 - 236,
+                height: table_height,
             },
             todays,
             all_time,
@@ -1031,26 +1049,34 @@ impl Renderer {
         let left_center = rect.x + rect.width / 4;
         let right_center = rect.x + rect.width * 3 / 4;
         let table_top = rect.y + 6;
+        let left_rows = score_rows(todays);
+        let right_rows = score_rows(all_time);
+        let column_width = left_rows
+            .iter()
+            .chain(right_rows.iter())
+            .map(|row| arcade_font().text_width(row, 2))
+            .max()
+            .unwrap_or(0);
         self.draw_centered_text(left_center, table_top, "TODAYS", color, 2);
         self.draw_centered_text(left_center, table_top + 20, "GREATEST", color, 2);
         self.draw_centered_text(right_center, table_top, "ALL TIME", color, 2);
         self.draw_centered_text(right_center, table_top + 20, "GREATEST", color, 2);
 
-        let left_x = rect.x + 40;
-        let right_x = rect.center_x() + 24;
-        let row_count = todays.entries().len().max(all_time.entries().len());
+        let left_x = left_center - column_width / 2;
+        let right_x = right_center - column_width / 2;
+        let row_count = left_rows.len().max(right_rows.len());
         for index in 0..row_count {
             self.draw_text(
                 left_x,
                 rect.y + 58 + index as i32 * 24,
-                &arcade_score_row(index + 1, todays.entries().get(index)),
+                left_rows.get(index).map(String::as_str).unwrap_or(""),
                 color,
                 2,
             );
             self.draw_text(
                 right_x,
                 rect.y + 58 + index as i32 * 24,
-                &arcade_score_row(index + 1, all_time.entries().get(index)),
+                right_rows.get(index).map(String::as_str).unwrap_or(""),
                 color,
                 2,
             );
@@ -1844,6 +1870,28 @@ fn arcade_score_row(rank: usize, entry: Option<&HighScoreEntry>) -> String {
         Some(entry) => format!("{rank} {:<3} {:>5}", entry.initials, entry.score),
         None => format!("{rank} --- -----"),
     }
+}
+
+fn score_rows(table: &HighScoreTable) -> Vec<String> {
+    let row_count = table.entries().len().max(8);
+    (0..row_count)
+        .map(|index| arcade_score_row(index + 1, table.entries().get(index)))
+        .collect()
+}
+
+fn score_table_block_height(row_count: usize) -> i32 {
+    const HEADER_HEIGHT: i32 = 36;
+    const ROW_START_Y: i32 = 58;
+    const ROW_STEP_Y: i32 = 24;
+    const ROW_HEIGHT: i32 = 16;
+
+    let rows_bottom = if row_count == 0 {
+        0
+    } else {
+        ROW_START_Y + (row_count as i32 - 1) * ROW_STEP_Y + ROW_HEIGHT
+    };
+
+    HEADER_HEIGHT.max(rows_bottom)
 }
 
 const ATTRACT_COLOR_CYCLE_MS: u64 = 120;
