@@ -3,15 +3,6 @@ use crate::audio::SoundCue;
 use crate::game::{Entity, EntityKind, EntityState, HorizontalDirection, Status, World};
 use crate::high_scores::{HighScoreEntry, HighScoreTable};
 
-const ATTRACT_SCORE_CARD: [(&str, u32); 6] = [
-    ("LANDER", 150),
-    ("MUTANT", 150),
-    ("BAITER", 200),
-    ("BOMBER", 250),
-    ("POD", 1000),
-    ("SWARMER", 150),
-];
-
 const ATTRACT_WORLD_WIDTH: usize = 64;
 const ATTRACT_WORLD_HEIGHT: usize = 18;
 const ATTRACT_PLAYER_Y: i32 = 7;
@@ -32,13 +23,11 @@ const RESCUE_SCORE_TICKS: u16 = 0x50;
 const RESCUE_RETURN_TICKS: u16 = 0x60;
 const LEGEND_APPROACH_TICKS: u16 = 0x5F;
 const LEGEND_LASER_TICKS: u16 = 0x17;
-const LEGEND_TEXT_TICKS: u16 = 0x20;
-const LEGEND_SETTLE_TICKS: u16 = 0x20;
+const LEGEND_TRANSFER_TICKS: u16 = 0x20;
+const LEGEND_REVEAL_TICKS: u16 = 0x20;
 const LEGEND_ENTRY_TICKS: u16 =
-    LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TEXT_TICKS + LEGEND_SETTLE_TICKS;
+    LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TRANSFER_TICKS + LEGEND_REVEAL_TICKS;
 const LEGEND_HOLD_TICKS: u16 = 0xFF + 0xFF;
-const ATTRACT_TABLE_XS: [i32; 6] = [0x0900, 0x1100, 0x1980, 0x0960, 0x1160, 0x19E0];
-const ATTRACT_TABLE_YS: [i32; 6] = [0x6000, 0x6000, 0x6200, 0x9800, 0x9800, 0x9A00];
 const ATTRACT_PLAYER_X16: i32 = 0x0800;
 const ATTRACT_PLAYER_Y16: i32 = 0x5000;
 const ATTRACT_HUMAN_X16: i32 = 0x1E00;
@@ -58,6 +47,8 @@ const ATTRACT_RESCUE_HUMAN_ACCEL16: i32 = 0x0008;
 const ATTRACT_RESCUE_DROP_YV16: i32 = 0x00C0;
 const ATTRACT_RESCUE_RETURN_XV16: i32 = -0x0040;
 const ATTRACT_RESCUE_RETURN_YV16: i32 = -0x0180;
+const ATTRACT_LEGEND_SOURCE_X16: i32 = 0x1F00;
+const ATTRACT_LEGEND_SOURCE_START_Y16: i32 = 0xA000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttractFrame {
@@ -96,6 +87,76 @@ pub struct AttractBonusText {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttractDemoStage {
+    RescueDescend,
+    RescueAscend,
+    RescueLaser,
+    RescueFall,
+    RescueScore,
+    RescueReturn,
+    LegendApproach(usize),
+    LegendLaser(usize),
+    LegendTransfer(usize),
+    LegendReveal(usize),
+    LegendHold,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AttractLegendEntry {
+    kind: EntityKind,
+    label: &'static str,
+    score: u32,
+    table_x16: i32,
+    table_y16: i32,
+}
+
+const ATTRACT_ROM_LEGEND: [AttractLegendEntry; 6] = [
+    // These are the red-label `PICTS` / `XS` / `ENMYTB` score-card entries.
+    AttractLegendEntry {
+        kind: EntityKind::Lander,
+        label: "LANDER",
+        score: 150,
+        table_x16: 0x0900,
+        table_y16: 0x6000,
+    },
+    AttractLegendEntry {
+        kind: EntityKind::Mutant,
+        label: "MUTANT",
+        score: 150,
+        table_x16: 0x1100,
+        table_y16: 0x6000,
+    },
+    AttractLegendEntry {
+        kind: EntityKind::Baiter,
+        label: "BAITER",
+        score: 200,
+        table_x16: 0x1980,
+        table_y16: 0x6200,
+    },
+    AttractLegendEntry {
+        kind: EntityKind::Bomber,
+        label: "BOMBER",
+        score: 250,
+        table_x16: 0x0960,
+        table_y16: 0x9800,
+    },
+    AttractLegendEntry {
+        kind: EntityKind::Pod,
+        label: "POD",
+        score: 1000,
+        table_x16: 0x1160,
+        table_y16: 0x9800,
+    },
+    AttractLegendEntry {
+        kind: EntityKind::Swarmer,
+        label: "SWARMER",
+        score: 150,
+        table_x16: 0x19E0,
+        table_y16: 0x9A00,
+    },
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SceneKind {
     Logo,
     Attract,
@@ -132,7 +193,8 @@ pub struct AttractBeat {
     pub hold_ms: u64,
     pub world_steps: usize,
     pub revealed_score_entries: usize,
-    pub demo_tick: Option<u16>,
+    pub demo_stage: Option<AttractDemoStage>,
+    pub demo_stage_tick: u16,
     pub palette_phase: usize,
     pub logo_trace_points: usize,
     pub logo_show_title_text: bool,
@@ -217,7 +279,8 @@ fn logo_beat(
         hold_ms,
         world_steps: 0,
         revealed_score_entries: 0,
-        demo_tick: None,
+        demo_stage: None,
+        demo_stage_tick: 0,
         palette_phase: 0,
         logo_trace_points,
         logo_show_title_text,
@@ -235,7 +298,8 @@ fn logo_appear_beats() -> Vec<AttractBeat> {
             hold_ms: ticks_to_ms(1),
             world_steps: 0,
             revealed_score_entries: 0,
-            demo_tick: None,
+            demo_stage: None,
+            demo_stage_tick: 0,
             palette_phase: 0,
             logo_trace_points: WILLIAMS_TRACE_POINT_COUNT,
             logo_show_title_text: true,
@@ -259,7 +323,8 @@ fn logo_trace_beats() -> Vec<AttractBeat> {
             hold_ms: ticks_to_ms(TITLE_TRACE_SLEEP_TICKS),
             world_steps: 0,
             revealed_score_entries: 0,
-            demo_tick: None,
+            demo_stage: None,
+            demo_stage_tick: 0,
             palette_phase: 0,
             logo_trace_points: prefixes[end],
             logo_show_title_text: false,
@@ -280,7 +345,8 @@ fn high_score_beat(hold_ms: u64) -> AttractBeat {
         hold_ms,
         world_steps: 0,
         revealed_score_entries: 0,
-        demo_tick: None,
+        demo_stage: None,
+        demo_stage_tick: 0,
         palette_phase: 0,
         logo_trace_points: 0,
         logo_show_title_text: false,
@@ -291,22 +357,11 @@ fn high_score_beat(hold_ms: u64) -> AttractBeat {
 }
 
 fn demo_beats() -> Vec<AttractBeat> {
-    (0..demo_total_ticks())
-        .map(|tick| AttractBeat {
-            kind: SceneKind::Attract,
-            cue: Some(demo_cue_for_tick(tick)),
-            hold_ms: ticks_to_ms(1),
-            world_steps: 0,
-            revealed_score_entries: 0,
-            demo_tick: Some(tick),
-            palette_phase: 0,
-            logo_trace_points: 0,
-            logo_show_title_text: false,
-            logo_show_full_defender: false,
-            logo_defender_appear_tick: None,
-            logo_show_copyright: false,
-        })
-        .collect()
+    let mut beats = Vec::with_capacity(demo_total_ticks() as usize);
+    for (stage, duration) in attract_demo_timeline() {
+        append_demo_stage_beats(&mut beats, stage, duration);
+    }
+    beats
 }
 
 fn demo_total_ticks() -> u16 {
@@ -316,46 +371,49 @@ fn demo_total_ticks() -> u16 {
         + RESCUE_FALL_TICKS
         + RESCUE_SCORE_TICKS
         + RESCUE_RETURN_TICKS
-        + LEGEND_ENTRY_TICKS * ATTRACT_SCORE_CARD.len() as u16
+        + LEGEND_ENTRY_TICKS * ATTRACT_ROM_LEGEND.len() as u16
         + LEGEND_HOLD_TICKS
 }
 
-fn demo_cue_for_tick(tick: u16) -> SoundCue {
-    let rescue_tick_1 = RESCUE_DESCENT_TICKS;
-    let rescue_tick_2 = rescue_tick_1 + RESCUE_ASCENT_TICKS;
-    let rescue_tick_3 = rescue_tick_2 + RESCUE_LASER_TICKS;
-    let rescue_tick_4 = rescue_tick_3 + RESCUE_FALL_TICKS;
-    let rescue_tick_5 = rescue_tick_4 + RESCUE_SCORE_TICKS;
-    let rescue_tick_6 = rescue_tick_5 + RESCUE_RETURN_TICKS;
+fn append_demo_stage_beats(
+    beats: &mut Vec<AttractBeat>,
+    stage: AttractDemoStage,
+    duration_ticks: u16,
+) {
+    for tick in 0..duration_ticks {
+        beats.push(AttractBeat {
+            kind: SceneKind::Attract,
+            cue: Some(demo_cue_for_stage(stage, tick)),
+            hold_ms: ticks_to_ms(1),
+            world_steps: 0,
+            revealed_score_entries: revealed_score_entries_for_stage(stage),
+            demo_stage: Some(stage),
+            demo_stage_tick: tick,
+            palette_phase: 0,
+            logo_trace_points: 0,
+            logo_show_title_text: false,
+            logo_show_full_defender: false,
+            logo_defender_appear_tick: None,
+            logo_show_copyright: false,
+        });
+    }
+}
 
-    if tick == rescue_tick_1 {
-        SoundCue::AttractHum
-    } else if tick == rescue_tick_2 {
-        SoundCue::PlayerShot
-    } else if tick == rescue_tick_3 {
-        SoundCue::Explosion
-    } else if tick == rescue_tick_4 {
-        SoundCue::HumanSaved
-    } else if tick >= rescue_tick_6 {
-        let local = tick - rescue_tick_6;
-        let stage = local % LEGEND_ENTRY_TICKS;
-        if stage == 0 {
-            SoundCue::EnemySweep
-        } else if stage == LEGEND_APPROACH_TICKS {
-            SoundCue::PlayerShot
-        } else if stage == LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS {
-            SoundCue::Explosion
-        } else {
-            SoundCue::AttractHum
-        }
-    } else {
-        SoundCue::AttractHum
+fn demo_cue_for_stage(stage: AttractDemoStage, local_tick: u16) -> SoundCue {
+    match stage {
+        AttractDemoStage::RescueLaser if local_tick == 0 => SoundCue::PlayerShot,
+        AttractDemoStage::RescueFall if local_tick == 0 => SoundCue::Explosion,
+        AttractDemoStage::RescueScore if local_tick == 0 => SoundCue::HumanSaved,
+        AttractDemoStage::LegendApproach(_) if local_tick == 0 => SoundCue::EnemySweep,
+        AttractDemoStage::LegendLaser(_) if local_tick == 0 => SoundCue::PlayerShot,
+        AttractDemoStage::LegendTransfer(_) if local_tick == 0 => SoundCue::Explosion,
+        _ => SoundCue::AttractHum,
     }
 }
 
 pub fn attract_frame_for_beat(beat: AttractBeat) -> AttractFrame {
-    match beat.demo_tick {
-        Some(tick) => scripted_attract_frame_for_tick(tick),
+    match beat.demo_stage {
+        Some(stage) => scripted_attract_frame_for_stage(stage, beat.demo_stage_tick),
         None => {
             let mut world = World::bootstrap();
             for _ in 0..beat.world_steps {
@@ -403,136 +461,150 @@ fn scripted_world(
     world
 }
 
+#[cfg(test)]
 fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
-    let rescue_phase_end = RESCUE_DESCENT_TICKS + RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS;
-    let rescue_fall_end = rescue_phase_end + RESCUE_FALL_TICKS;
-    let rescue_score_end = rescue_fall_end + RESCUE_SCORE_TICKS;
-    let rescue_return_end = rescue_score_end + RESCUE_RETURN_TICKS;
+    let (stage, local_tick) = demo_stage_for_tick(tick);
+    scripted_attract_frame_for_stage(stage, local_tick)
+}
+
+fn scripted_attract_frame_for_stage(stage: AttractDemoStage, tick: u16) -> AttractFrame {
     let mut facing = HorizontalDirection::Right;
     let mut objects = Vec::new();
     let mut bonus_text = None;
+    let animation_tick = stage_animation_tick(stage, tick);
 
-    if tick < RESCUE_DESCENT_TICKS {
-        objects.push(attract_object(
-            EntityKind::Lander,
-            ATTRACT_LANDER_X16,
-            ATTRACT_LANDER_Y16 + i32::from(tick) * 0x00A0,
-        ));
-        objects.push(attract_object(
-            EntityKind::Human,
-            ATTRACT_HUMAN_X16,
-            ATTRACT_HUMAN_Y16,
-        ));
-        objects.push(attract_object(
-            EntityKind::PlayerShip,
-            ATTRACT_PLAYER_X16,
-            ATTRACT_PLAYER_Y16,
-        ));
-    } else if tick < rescue_phase_end {
-        let rise_tick = tick - RESCUE_DESCENT_TICKS;
-        let total_rise_tick = rise_tick.min(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS);
-        let enemy_y = ATTRACT_LANDER_Y16 + i32::from(RESCUE_DESCENT_TICKS) * 0x00A0
-            - i32::from(total_rise_tick) * 0x00B0;
-        let human_y = ATTRACT_HUMAN_Y16 - i32::from(total_rise_tick) * 0x00B0;
-        objects.push(attract_object(
-            EntityKind::Lander,
-            ATTRACT_LANDER_X16,
-            enemy_y,
-        ));
-        objects.push(attract_object_with_state(
-            EntityKind::Human,
-            ATTRACT_HUMAN_X16,
-            human_y,
-            EntityState::Abducted,
-        ));
-        objects.push(attract_object(
-            EntityKind::PlayerShip,
-            ATTRACT_PLAYER_X16,
-            ATTRACT_PLAYER_Y16,
-        ));
-        if rise_tick >= RESCUE_ASCENT_TICKS {
-            add_laser_column(
-                &mut objects,
-                ATTRACT_PLAYER_X16,
-                ATTRACT_PLAYER_Y16,
-                ATTRACT_LANDER_X16,
-                enemy_y,
-            );
-        }
-    } else if tick < rescue_fall_end {
-        let fall_tick = tick - rescue_phase_end;
-        // `AMODE3` / `AMODE4` move the ship toward Eugene while the falling
-        // human accelerates every two ticks until the catch frame.
-        let (ship_x, ship_y, human_y) = rescue_intercept_state(fall_tick);
-        objects.push(attract_object(EntityKind::PlayerShip, ship_x, ship_y));
-        if fall_tick < 12 {
-            let explosion_y = ATTRACT_LANDER_Y16 + i32::from(RESCUE_DESCENT_TICKS) * 0x00A0
-                - i32::from(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS) * 0x00B0;
-            objects.push(attract_visual_object(
+    match stage {
+        AttractDemoStage::RescueDescend => {
+            objects.push(attract_object(
                 EntityKind::Lander,
                 ATTRACT_LANDER_X16,
-                explosion_y,
-                AttractVisual::Explosion,
-                fall_tick,
+                ATTRACT_LANDER_Y16 + i32::from(tick) * 0x00A0,
+            ));
+            objects.push(attract_object(
+                EntityKind::Human,
+                ATTRACT_HUMAN_X16,
+                ATTRACT_HUMAN_Y16,
+            ));
+            objects.push(attract_object(
+                EntityKind::PlayerShip,
+                ATTRACT_PLAYER_X16,
+                ATTRACT_PLAYER_Y16,
             ));
         }
-        objects.push(attract_object_with_state(
-            EntityKind::Human,
-            ATTRACT_HUMAN_X16,
-            human_y,
-            EntityState::Falling,
-        ));
-    } else if tick < rescue_score_end {
-        // `AMODE5` teleports the caught human onto the ship's path, spawns the
-        // `500`, and drops both ship and human straight toward the terrain.
-        let score_tick = tick - rescue_fall_end;
-        let (ship_x, ship_y, human_y) = rescue_drop_state(score_tick);
-        objects.push(attract_object(EntityKind::PlayerShip, ship_x, ship_y));
-        objects.push(attract_object(
-            EntityKind::Human,
-            ATTRACT_CAUGHT_HUMAN_X16,
-            human_y,
-        ));
-        bonus_text = Some(AttractBonusText {
-            text: "500",
-            x16: ATTRACT_SCORE_BONUS_X16,
-            y16: ATTRACT_SCORE_BONUS_Y16,
-        });
-    } else if tick < rescue_return_end {
-        let return_tick = tick - rescue_score_end;
-        facing = HorizontalDirection::Left;
-        let (ship_start_x, ship_start_y, _) = rescue_drop_state(RESCUE_SCORE_TICKS);
-        objects.push(attract_object_facing(
-            EntityKind::PlayerShip,
-            ship_start_x + i32::from(return_tick) * ATTRACT_RESCUE_RETURN_XV16,
-            ship_start_y + i32::from(return_tick) * ATTRACT_RESCUE_RETURN_YV16,
-            HorizontalDirection::Left,
-        ));
-        objects.push(attract_object(
-            EntityKind::Human,
-            ATTRACT_CAUGHT_HUMAN_X16,
-            ATTRACT_GROUNDED_HUMAN_Y16,
-        ));
-        bonus_text = Some(AttractBonusText {
-            text: "500",
-            x16: ATTRACT_SCORE_BONUS_DROP_X16,
-            y16: ATTRACT_SCORE_BONUS_DROP_Y16,
-        });
-    } else {
-        let table_tick = tick - rescue_return_end;
-        let (drop_ship_x, drop_ship_y, _) = rescue_drop_state(RESCUE_SCORE_TICKS);
-        let player_x = drop_ship_x + i32::from(RESCUE_RETURN_TICKS) * ATTRACT_RESCUE_RETURN_XV16;
-        let player_y = drop_ship_y + i32::from(RESCUE_RETURN_TICKS) * ATTRACT_RESCUE_RETURN_YV16;
-        objects.push(attract_object(EntityKind::PlayerShip, player_x, player_y));
-        objects.push(attract_object(
-            EntityKind::Human,
-            ATTRACT_CAUGHT_HUMAN_X16,
-            ATTRACT_GROUNDED_HUMAN_Y16,
-        ));
-        append_legend_entities(&mut objects, table_tick, player_x, player_y);
+        AttractDemoStage::RescueAscend | AttractDemoStage::RescueLaser => {
+            let total_rise_tick = match stage {
+                AttractDemoStage::RescueAscend => tick,
+                AttractDemoStage::RescueLaser => RESCUE_ASCENT_TICKS + tick,
+                _ => 0,
+            };
+            let enemy_y = ATTRACT_LANDER_Y16 + i32::from(RESCUE_DESCENT_TICKS) * 0x00A0
+                - i32::from(total_rise_tick) * 0x00B0;
+            let human_y = ATTRACT_HUMAN_Y16 - i32::from(total_rise_tick) * 0x00B0;
+            objects.push(attract_object(
+                EntityKind::Lander,
+                ATTRACT_LANDER_X16,
+                enemy_y,
+            ));
+            objects.push(attract_object_with_state(
+                EntityKind::Human,
+                ATTRACT_HUMAN_X16,
+                human_y,
+                EntityState::Abducted,
+            ));
+            objects.push(attract_object(
+                EntityKind::PlayerShip,
+                ATTRACT_PLAYER_X16,
+                ATTRACT_PLAYER_Y16,
+            ));
+            if matches!(stage, AttractDemoStage::RescueLaser) {
+                add_laser_column(
+                    &mut objects,
+                    ATTRACT_PLAYER_X16,
+                    ATTRACT_PLAYER_Y16,
+                    ATTRACT_LANDER_X16,
+                    enemy_y,
+                );
+            }
+        }
+        AttractDemoStage::RescueFall => {
+            // `AMODE3` / `AMODE4` move the ship toward Eugene while the falling
+            // human accelerates every two ticks until the catch frame.
+            let (ship_x, ship_y, human_y) = rescue_intercept_state(tick);
+            objects.push(attract_object(EntityKind::PlayerShip, ship_x, ship_y));
+            if tick < 12 {
+                let explosion_y = ATTRACT_LANDER_Y16 + i32::from(RESCUE_DESCENT_TICKS) * 0x00A0
+                    - i32::from(RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS) * 0x00B0;
+                objects.push(attract_visual_object(
+                    EntityKind::Lander,
+                    ATTRACT_LANDER_X16,
+                    explosion_y,
+                    AttractVisual::Explosion,
+                    tick,
+                ));
+            }
+            objects.push(attract_object_with_state(
+                EntityKind::Human,
+                ATTRACT_HUMAN_X16,
+                human_y,
+                EntityState::Falling,
+            ));
+        }
+        AttractDemoStage::RescueScore => {
+            // `AMODE5` teleports the caught human onto the ship's path, spawns the
+            // `500`, and drops both ship and human straight toward the terrain.
+            let (ship_x, ship_y, human_y) = rescue_drop_state(tick);
+            objects.push(attract_object(EntityKind::PlayerShip, ship_x, ship_y));
+            objects.push(attract_object(
+                EntityKind::Human,
+                ATTRACT_CAUGHT_HUMAN_X16,
+                human_y,
+            ));
+            bonus_text = Some(AttractBonusText {
+                text: "500",
+                x16: ATTRACT_SCORE_BONUS_X16,
+                y16: ATTRACT_SCORE_BONUS_Y16,
+            });
+        }
+        AttractDemoStage::RescueReturn => {
+            facing = HorizontalDirection::Left;
+            let (ship_start_x, ship_start_y, _) = rescue_drop_state(RESCUE_SCORE_TICKS);
+            objects.push(attract_object_facing(
+                EntityKind::PlayerShip,
+                ship_start_x + i32::from(tick) * ATTRACT_RESCUE_RETURN_XV16,
+                ship_start_y + i32::from(tick) * ATTRACT_RESCUE_RETURN_YV16,
+                HorizontalDirection::Left,
+            ));
+            objects.push(attract_object(
+                EntityKind::Human,
+                ATTRACT_CAUGHT_HUMAN_X16,
+                ATTRACT_GROUNDED_HUMAN_Y16,
+            ));
+            bonus_text = Some(AttractBonusText {
+                text: "500",
+                x16: ATTRACT_SCORE_BONUS_DROP_X16,
+                y16: ATTRACT_SCORE_BONUS_DROP_Y16,
+            });
+        }
+        AttractDemoStage::LegendApproach(_)
+        | AttractDemoStage::LegendLaser(_)
+        | AttractDemoStage::LegendTransfer(_)
+        | AttractDemoStage::LegendReveal(_)
+        | AttractDemoStage::LegendHold => {
+            let (drop_ship_x, drop_ship_y, _) = rescue_drop_state(RESCUE_SCORE_TICKS);
+            let player_x =
+                drop_ship_x + i32::from(RESCUE_RETURN_TICKS) * ATTRACT_RESCUE_RETURN_XV16;
+            let player_y =
+                drop_ship_y + i32::from(RESCUE_RETURN_TICKS) * ATTRACT_RESCUE_RETURN_YV16;
+            objects.push(attract_object(EntityKind::PlayerShip, player_x, player_y));
+            objects.push(attract_object(
+                EntityKind::Human,
+                ATTRACT_CAUGHT_HUMAN_X16,
+                ATTRACT_GROUNDED_HUMAN_Y16,
+            ));
+            append_legend_entities(&mut objects, stage, tick, player_x, player_y);
+        }
     }
-
-    let revealed_score_entries = revealed_score_entries_for_tick(tick);
+    let revealed_score_entries = revealed_score_entries_for_stage(stage);
     let entities: Vec<Entity> = objects
         .iter()
         .map(|object| rom_entity_with_state(object.kind, object.x16, object.y16, object.state))
@@ -549,92 +621,155 @@ fn scripted_attract_frame_for_tick(tick: u16) -> AttractFrame {
         revealed_score_entries,
         bonus_text,
         player_facing: facing,
-        animation_tick: u32::from(tick),
+        animation_tick,
     }
 }
 
 fn append_legend_entities(
     objects: &mut Vec<AttractObject>,
-    table_tick: u16,
+    stage: AttractDemoStage,
+    local_tick: u16,
     player_x16: i32,
     player_y16: i32,
 ) {
-    let source_y = 0xA000 - i32::from(LEGEND_APPROACH_TICKS) * 0x00C0;
-    for index in 0..ATTRACT_SCORE_CARD.len() {
-        let entry_start = index as u16 * LEGEND_ENTRY_TICKS;
-        let transfer_tick = entry_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
-        let entry_end = entry_start + LEGEND_ENTRY_TICKS;
-        if table_tick >= entry_end {
-            objects.push(attract_object(
-                legend_kind(index),
-                ATTRACT_TABLE_XS[index],
-                ATTRACT_TABLE_YS[index],
-            ));
-            continue;
-        }
+    let source_y = ATTRACT_LEGEND_SOURCE_START_Y16 - i32::from(LEGEND_APPROACH_TICKS) * 0x00C0;
+    let current_index = match stage {
+        AttractDemoStage::LegendApproach(index)
+        | AttractDemoStage::LegendLaser(index)
+        | AttractDemoStage::LegendTransfer(index)
+        | AttractDemoStage::LegendReveal(index) => Some(index),
+        AttractDemoStage::LegendHold => None,
+        _ => return,
+    };
 
-        if table_tick >= entry_start {
-            let local = table_tick - entry_start;
-            let enemy_y = if local < LEGEND_APPROACH_TICKS {
-                0xA000 - i32::from(local) * 0x00C0
-            } else {
-                source_y
-            };
-            if local < LEGEND_APPROACH_TICKS {
-                objects.push(attract_object(legend_kind(index), 0x1F00, enemy_y));
-            } else if local < LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS {
-                // `AMOD10` leaves the active enemy intact for the whole
-                // `LASRS` dwell. `AMOD11` then explodes that source object and
-                // starts the table-side `APVCT` on the same transfer tick.
-                objects.push(attract_object(legend_kind(index), 0x1F00, enemy_y));
-            } else if local < LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TEXT_TICKS {
-                objects.push(attract_visual_object(
-                    legend_kind(index),
-                    0x1F00,
-                    enemy_y,
-                    AttractVisual::Explosion,
-                    local - (LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS),
-                ));
-                objects.push(attract_visual_object(
-                    legend_kind(index),
-                    ATTRACT_TABLE_XS[index],
-                    ATTRACT_TABLE_YS[index],
-                    AttractVisual::Materialize,
-                    local - (LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS),
-                ));
-            } else {
-                objects.push(attract_object(
-                    legend_kind(index),
-                    ATTRACT_TABLE_XS[index],
-                    ATTRACT_TABLE_YS[index],
-                ));
-            }
-            if local >= LEGEND_APPROACH_TICKS && local < transfer_tick - entry_start {
-                add_laser_column(objects, player_x16, player_y16, 0x1F00, enemy_y);
-            }
-            break;
+    let visible_entries = match stage {
+        AttractDemoStage::LegendHold => ATTRACT_ROM_LEGEND.len(),
+        _ => revealed_score_entries_for_stage(stage),
+    };
+    for entry in ATTRACT_ROM_LEGEND.iter().take(visible_entries) {
+        objects.push(attract_object(entry.kind, entry.table_x16, entry.table_y16));
+    }
+
+    let Some(index) = current_index else {
+        return;
+    };
+    let entry = ATTRACT_ROM_LEGEND[index];
+    match stage {
+        AttractDemoStage::LegendApproach(_) => {
+            let enemy_y = ATTRACT_LEGEND_SOURCE_START_Y16 - i32::from(local_tick) * 0x00C0;
+            objects.push(attract_object(
+                entry.kind,
+                ATTRACT_LEGEND_SOURCE_X16,
+                enemy_y,
+            ));
         }
+        AttractDemoStage::LegendLaser(_) => {
+            objects.push(attract_object(
+                entry.kind,
+                ATTRACT_LEGEND_SOURCE_X16,
+                source_y,
+            ));
+            add_laser_column(
+                objects,
+                player_x16,
+                player_y16,
+                ATTRACT_LEGEND_SOURCE_X16,
+                source_y,
+            );
+        }
+        AttractDemoStage::LegendTransfer(_) => {
+            objects.push(attract_visual_object(
+                entry.kind,
+                ATTRACT_LEGEND_SOURCE_X16,
+                source_y,
+                AttractVisual::Explosion,
+                local_tick,
+            ));
+            objects.push(attract_visual_object(
+                entry.kind,
+                entry.table_x16,
+                entry.table_y16,
+                AttractVisual::Materialize,
+                local_tick,
+            ));
+        }
+        AttractDemoStage::LegendReveal(_) => {
+            objects.push(attract_object(entry.kind, entry.table_x16, entry.table_y16));
+        }
+        AttractDemoStage::LegendHold => {}
+        _ => unreachable!("non-legend stage routed into legend object renderer"),
     }
 }
 
-fn revealed_score_entries_for_tick(tick: u16) -> usize {
-    let table_tick = tick.saturating_sub(
-        RESCUE_DESCENT_TICKS
-            + RESCUE_ASCENT_TICKS
-            + RESCUE_LASER_TICKS
-            + RESCUE_FALL_TICKS
-            + RESCUE_SCORE_TICKS
-            + RESCUE_RETURN_TICKS,
-    );
-    let mut visible = 0;
-    for index in 0..ATTRACT_SCORE_CARD.len() {
-        let show_tick =
-            index as u16 * LEGEND_ENTRY_TICKS + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
-        if table_tick >= show_tick {
-            visible += 1;
+#[cfg(test)]
+fn demo_stage_for_tick(mut tick: u16) -> (AttractDemoStage, u16) {
+    for (stage, duration) in attract_demo_timeline() {
+        if tick < duration {
+            return (stage, tick);
         }
+        tick -= duration;
     }
-    visible
+    (
+        AttractDemoStage::LegendHold,
+        LEGEND_HOLD_TICKS.saturating_sub(1),
+    )
+}
+
+fn attract_demo_timeline() -> impl Iterator<Item = (AttractDemoStage, u16)> {
+    let mut stages = Vec::with_capacity(6 + ATTRACT_ROM_LEGEND.len() * 4 + 1);
+    stages.push((AttractDemoStage::RescueDescend, RESCUE_DESCENT_TICKS));
+    stages.push((AttractDemoStage::RescueAscend, RESCUE_ASCENT_TICKS));
+    stages.push((AttractDemoStage::RescueLaser, RESCUE_LASER_TICKS));
+    stages.push((AttractDemoStage::RescueFall, RESCUE_FALL_TICKS));
+    stages.push((AttractDemoStage::RescueScore, RESCUE_SCORE_TICKS));
+    stages.push((AttractDemoStage::RescueReturn, RESCUE_RETURN_TICKS));
+    for index in 0..ATTRACT_ROM_LEGEND.len() {
+        stages.push((
+            AttractDemoStage::LegendApproach(index),
+            LEGEND_APPROACH_TICKS,
+        ));
+        stages.push((AttractDemoStage::LegendLaser(index), LEGEND_LASER_TICKS));
+        stages.push((
+            AttractDemoStage::LegendTransfer(index),
+            LEGEND_TRANSFER_TICKS,
+        ));
+        stages.push((AttractDemoStage::LegendReveal(index), LEGEND_REVEAL_TICKS));
+    }
+    stages.push((AttractDemoStage::LegendHold, LEGEND_HOLD_TICKS));
+    stages.into_iter()
+}
+
+fn revealed_score_entries_for_stage(stage: AttractDemoStage) -> usize {
+    match stage {
+        AttractDemoStage::LegendReveal(index) => index + 1,
+        AttractDemoStage::LegendHold => ATTRACT_ROM_LEGEND.len(),
+        AttractDemoStage::LegendApproach(index)
+        | AttractDemoStage::LegendLaser(index)
+        | AttractDemoStage::LegendTransfer(index) => index,
+        _ => 0,
+    }
+}
+
+fn stage_animation_tick(stage: AttractDemoStage, local_tick: u16) -> u32 {
+    match stage {
+        AttractDemoStage::RescueDescend => u32::from(local_tick),
+        AttractDemoStage::RescueAscend => u32::from(RESCUE_DESCENT_TICKS + local_tick),
+        AttractDemoStage::RescueLaser => {
+            u32::from(RESCUE_DESCENT_TICKS + RESCUE_ASCENT_TICKS + local_tick)
+        }
+        AttractDemoStage::RescueFall => {
+            u32::from(RESCUE_DESCENT_TICKS + RESCUE_ASCENT_TICKS + RESCUE_LASER_TICKS + local_tick)
+        }
+        AttractDemoStage::RescueScore => u32::from(local_tick),
+        AttractDemoStage::RescueReturn => u32::from(local_tick),
+        AttractDemoStage::LegendApproach(index)
+        | AttractDemoStage::LegendLaser(index)
+        | AttractDemoStage::LegendTransfer(index)
+        | AttractDemoStage::LegendReveal(index) => {
+            u32::from(index as u16 * LEGEND_ENTRY_TICKS + local_tick)
+        }
+        AttractDemoStage::LegendHold => u32::from(local_tick),
+    }
 }
 
 fn add_laser_column(
@@ -756,17 +891,6 @@ fn rom_y_to_world(y16: i32) -> i32 {
     ((y16 + 0x0800) >> 12).clamp(1, ATTRACT_WORLD_HEIGHT as i32 - 2)
 }
 
-fn legend_kind(index: usize) -> EntityKind {
-    match index {
-        0 => EntityKind::Lander,
-        1 => EntityKind::Mutant,
-        2 => EntityKind::Baiter,
-        3 => EntityKind::Bomber,
-        4 => EntityKind::Pod,
-        _ => EntityKind::Swarmer,
-    }
-}
-
 pub fn scene_for_elapsed_ms(
     elapsed_ms: u64,
     todays: &HighScoreTable,
@@ -821,10 +945,10 @@ pub fn attract_scene(world: &World, revealed_score_entries: usize) -> Scene {
     // order: SCANNER, LANDER, MUTANT, BAITER, BOMBER, POD, SWARMER.
     lines.push(String::from("SCANNER"));
     lines.extend(
-        ATTRACT_SCORE_CARD
+        ATTRACT_ROM_LEGEND
             .into_iter()
             .take(revealed_score_entries)
-            .map(|(name, score)| format!("{name:<8}{score:>8}")),
+            .map(|entry| format!("{:<8}{:>8}", entry.label, entry.score)),
     );
 
     Scene {
@@ -877,11 +1001,12 @@ mod tests {
     };
 
     use super::{
-        ATTRACT_CAUGHT_HUMAN_X16, ATTRACT_HUMAN_X16, AttractVisual, LEGEND_APPROACH_TICKS,
-        LEGEND_LASER_TICKS, RESCUE_ASCENT_TICKS, RESCUE_DESCENT_TICKS, RESCUE_FALL_TICKS,
-        RESCUE_LASER_TICKS, RESCUE_RETURN_TICKS, RESCUE_SCORE_TICKS, SceneKind, attract_cycle,
-        attract_scene, high_score_scene, logo_scene, revealed_score_entries_for_tick,
-        scene_for_elapsed_ms, scripted_attract_frame_for_tick,
+        ATTRACT_CAUGHT_HUMAN_X16, ATTRACT_HUMAN_X16, AttractDemoStage, AttractVisual,
+        LEGEND_APPROACH_TICKS, LEGEND_LASER_TICKS, LEGEND_TRANSFER_TICKS, RESCUE_ASCENT_TICKS,
+        RESCUE_DESCENT_TICKS, RESCUE_FALL_TICKS, RESCUE_LASER_TICKS, RESCUE_RETURN_TICKS,
+        RESCUE_SCORE_TICKS, SceneKind, attract_cycle, attract_scene, demo_stage_for_tick,
+        high_score_scene, logo_scene, revealed_score_entries_for_stage, scene_for_elapsed_ms,
+        scripted_attract_frame_for_tick,
     };
 
     #[test]
@@ -1018,8 +1143,13 @@ mod tests {
     #[test]
     fn rescue_sequence_uses_player_shot_cue_on_the_laser_tick() {
         let laser_tick = RESCUE_DESCENT_TICKS + RESCUE_ASCENT_TICKS;
+        let (stage, local_tick) = demo_stage_for_tick(laser_tick);
 
-        assert_eq!(super::demo_cue_for_tick(laser_tick), SoundCue::PlayerShot);
+        assert_eq!(stage, AttractDemoStage::RescueLaser);
+        assert_eq!(
+            super::demo_cue_for_stage(stage, local_tick),
+            SoundCue::PlayerShot
+        );
     }
 
     #[test]
@@ -1030,11 +1160,15 @@ mod tests {
             + RESCUE_FALL_TICKS
             + RESCUE_SCORE_TICKS
             + RESCUE_RETURN_TICKS;
-        let just_before_text = table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS - 1;
-        let first_text_tick = table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS;
+        let just_before_text =
+            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TRANSFER_TICKS - 1;
+        let first_text_tick =
+            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TRANSFER_TICKS;
 
-        assert_eq!(revealed_score_entries_for_tick(just_before_text), 0);
-        assert_eq!(revealed_score_entries_for_tick(first_text_tick), 1);
+        let (before_stage, _) = demo_stage_for_tick(just_before_text);
+        let (text_stage, _) = demo_stage_for_tick(first_text_tick);
+        assert_eq!(revealed_score_entries_for_stage(before_stage), 0);
+        assert_eq!(revealed_score_entries_for_stage(text_stage), 1);
     }
 
     #[test]

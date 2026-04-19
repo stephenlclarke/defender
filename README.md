@@ -168,7 +168,8 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   instead of swapping every hit to a generic blast, so the rescue/legend
   sequence now keeps the source enemy alive for the full `LASRS` dwell, then
   explodes the source object and materializes the table-side icon on the same
-  transfer tick before the score text appears.
+  transfer tick, with the legend text now appearing on the later `BMODE2`
+  phase instead of on the laser boundary.
 - The first attract-page and hall-of-fame screens now keep a live
   elapsed-time colour cycle running during the first `16` seconds of the
   cabinet sequence, matching the flashing/cycling behaviour visible in the
@@ -388,11 +389,13 @@ the final runtime self-contained:
   layout comparison point, especially for the red-label `defend.*` program ROM
   names, the `mess0.src` `CHRTBL` / `CHARACTERS` font tables used to build the
   embedded `assets/arcade/font-sheet.png`, and the `amode1.src` `LGOTAB`,
-  `DEFDAT`, and `CPRTAB` tables used to reconstruct the embedded attract-logo
-  page and `DEFENDER` wordmark assets, plus the `blk71.src` `WVTAB` records
-  used to reconstruct the compiled red-label wave/fire tables now embedded in
-  `src/red_label_wave.rs`, with the extracted text block kept in
-  `assets/arcade/arcade-rules.txt` as a checked-in reference copy.
+  `DEFDAT`, `CPRTAB`, `TEXTAB`, `TENT`, `ENMYTB`, `PICTS`, `XS`, and `BLIPS`
+  tables used to reconstruct the embedded attract-logo page, `DEFENDER`
+  wordmark assets, and the instruction-page rescue/legend sequence, plus the
+  `blk71.src` `WVTAB` records used to reconstruct the compiled red-label
+  wave/fire tables now embedded in `src/red_label_wave.rs`, with the extracted
+  text block kept in `assets/arcade/arcade-rules.txt` as a checked-in
+  reference copy.
 - <https://github.com/historicalsource/williams-soundroms>: original Williams
   sound-ROM source reference used to translate `VSNDRM1.SRC` routines and
   tables into `src/audio_rom.rs`, including the `IRQ` dispatch path, `RADSND`,
