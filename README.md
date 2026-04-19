@@ -195,6 +195,11 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   (`LDSTIM`, `SZSTIM`, `SWSTIM`, and `UFSTIM`) instead of the older shared
   Rust fallback delays, so Landers, Mutants, Swarmers, and Baiters follow the
   cabinet wave table more closely.
+- Baiter / UFO steering now follows the cabinet `UFOLP` / `UFONV` shape more
+  closely too: retargets only happen on the source-style refresh cadence, the
+  `UFOSK` record now gates when a retarget is allowed, and the ship stops
+  seeking once it enters the ROM close bands around the player instead of
+  continuously homing every frame.
 - Bomber / TIE motion now follows the cabinet `TIE` shape more closely too:
   off-screen units steer back toward a source-backed cruise-altitude band, and
   on-screen units use the ROM-style close/far vertical proximity bands around

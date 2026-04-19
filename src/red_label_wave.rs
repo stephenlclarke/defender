@@ -26,6 +26,7 @@ pub struct RedLabelWaveTable {
     swarmer_shot_time: WaveRecord,
     baiter_time: WaveRecord,
     baiter_shot_time: WaveRecord,
+    baiter_seek_probability: WaveRecord,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,6 +43,7 @@ pub struct WaveProfile {
     pub swarmer_shot_time: u32,
     pub baiter_delay: u32,
     pub baiter_shot_time: u32,
+    pub baiter_seek_probability: u8,
 }
 
 pub fn red_label_wave_table() -> &'static RedLabelWaveTable {
@@ -63,6 +65,7 @@ impl RedLabelWaveTable {
             swarmer_shot_time: self.swarmer_shot_time.value_for_wave(wave) as u32,
             baiter_delay: self.baiter_time.value_for_wave(wave) as u32,
             baiter_shot_time: self.baiter_shot_time.value_for_wave(wave) as u32,
+            baiter_seek_probability: self.baiter_seek_probability.value_for_wave(wave) as u8,
         }
     }
 }
@@ -121,6 +124,7 @@ static RED_LABEL_WAVE_TABLE: RedLabelWaveTable = RedLabelWaveTable {
     swarmer_shot_time: wave_record(40, 10, -2, -1, [25, 25, 25, 25]),
     baiter_time: wave_record(192, 24, -12, -4, [212, 196, 164, 148]),
     baiter_shot_time: wave_record(10, 3, -1, -1, [15, 13, 12, 10]),
+    baiter_seek_probability: wave_record(200, 40, -12, -8, [240, 220, 200, 200]),
 };
 
 #[cfg(test)]
@@ -142,6 +146,7 @@ mod tests {
         assert_eq!(wave_one.mutant_shot_time, 42);
         assert_eq!(wave_one.swarmer_shot_time, 25);
         assert_eq!(wave_one.baiter_shot_time, 15);
+        assert_eq!(wave_one.baiter_seek_probability, 240);
         assert_eq!(wave_two.landers, 20);
         assert_eq!(wave_two.bombers, 3);
         assert_eq!(wave_two.pods, 1);
@@ -149,6 +154,7 @@ mod tests {
         assert_eq!(wave_two.lander_shot_time, 58);
         assert_eq!(wave_two.mutant_shot_time, 34);
         assert_eq!(wave_two.baiter_shot_time, 13);
+        assert_eq!(wave_two.baiter_seek_probability, 220);
     }
 
     #[test]
@@ -165,5 +171,7 @@ mod tests {
         assert_eq!(wave_five.lander_shot_time, 40);
         assert_eq!(wave_four.baiter_shot_time, 10);
         assert_eq!(wave_five.baiter_shot_time, 9);
+        assert_eq!(wave_four.baiter_seek_probability, 200);
+        assert_eq!(wave_five.baiter_seek_probability, 192);
     }
 }
