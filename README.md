@@ -174,7 +174,9 @@ the final runtime self-contained:
   tables used to reconstruct the embedded attract-logo page, `DEFENDER`
   wordmark assets, and the instruction-page rescue/legend sequence, plus the
   `blk71.src` `WVTAB` records used to reconstruct the compiled red-label
-  wave/fire tables now embedded in `src/red_label_wave.rs`, with the extracted
+  wave/fire tables now embedded in `src/red_label_wave.rs`, and the
+  `defa7.src` `RAND` / `ASTST` / `PLRES` flow used to reconstruct the default
+  astronaut restore layout now embedded in `src/game.rs`, with the extracted
   text block kept in `assets/arcade/arcade-rules.txt` as a checked-in
   reference copy.
 - <https://github.com/historicalsource/williams-soundroms>: original Williams
@@ -305,10 +307,6 @@ Meaning: horizontal speed of the player's laser burst tip.
 Default: `4`
 Meaning: quarter-screen lead factor used for the swarmer focal-point shot
 model.
-
-`default_human_world_xs`
-Default: `8,26,44,62,80,98,116,134,152,170`
-Meaning: default world X positions for the ten starting humanoids.
 
 Record format for the ROM-derived wave/fire keys:
 `max,min,intra_delta,inter_delta|wave1,wave2,wave3,wave4`

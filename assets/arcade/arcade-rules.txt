@@ -10,7 +10,6 @@ player_max_speed=1
 player_shot_limit=4
 player_shot_speed=2
 swarmer_fire_lead_divisor=4
-default_human_world_xs=8,26,44,62,80,98,116,134,152,170
 # BEGIN RED_LABEL_WAVE_TABLE
 # Extracted from blk71.src WVTAB in the Williams red-label source release.
 # Format: name=max,min,intra_delta,inter_delta|wave1,wave2,wave3,wave4

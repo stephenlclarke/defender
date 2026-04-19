@@ -17,14 +17,11 @@ pub struct ArcadeTables {
     pub player_shot_limit: usize,
     pub player_shot_speed: i32,
     pub swarmer_fire_lead_divisor: u32,
-    pub default_human_world_xs: &'static [i32; 10],
 }
 
 pub fn arcade_tables() -> &'static ArcadeTables {
     &ARCADE_TABLES
 }
-
-const DEFAULT_HUMAN_WORLD_XS: [i32; 10] = [8, 26, 44, 62, 80, 98, 116, 134, 152, 170];
 
 static ARCADE_TABLES: ArcadeTables = ArcadeTables {
     safe_fall_height: 2,
@@ -38,7 +35,6 @@ static ARCADE_TABLES: ArcadeTables = ArcadeTables {
     player_shot_limit: 4,
     player_shot_speed: 2,
     swarmer_fire_lead_divisor: 4,
-    default_human_world_xs: &DEFAULT_HUMAN_WORLD_XS,
 };
 
 #[cfg(test)]
@@ -52,8 +48,5 @@ mod tests {
         assert_eq!(tables.safe_fall_height, 2);
         assert_eq!(tables.player_shot_limit, 4);
         assert_eq!(tables.player_shot_speed, 2);
-        assert_eq!(tables.default_human_world_xs.len(), 10);
-        assert_eq!(tables.default_human_world_xs[0], 8);
-        assert_eq!(tables.default_human_world_xs[9], 170);
     }
 }

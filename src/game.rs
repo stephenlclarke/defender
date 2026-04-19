@@ -211,7 +211,7 @@ impl World {
             0,
             wave_profile.wave_size as usize,
         ));
-        entities.extend(default_humans(&terrain));
+        entities.extend(default_humans(&terrain, WORLD_SPAN as i32));
         Self {
             width: WORLD_WIDTH,
             height: WORLD_HEIGHT,
@@ -2105,7 +2105,8 @@ impl World {
     fn restore_default_humans(&mut self) {
         self.entities
             .retain(|entity| entity.kind != EntityKind::Human);
-        self.entities.extend(default_humans(&self.terrain));
+        self.entities
+            .extend(default_humans(&self.terrain, self.world_span));
     }
 
     fn spawn_attack_wave_reinforcements_if_due(&mut self) {
@@ -2791,6 +2792,46 @@ fn rom_tie_far_band(min_y: i32, max_y: i32) -> i32 {
     far.max(rom_tie_close_band(min_y, max_y) + 1)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RomRandState {
+    seed: u8,
+    hseed: u8,
+    lseed: u8,
+}
+
+impl Default for RomRandState {
+    fn default() -> Self {
+        Self {
+            seed: 0,
+            hseed: 0xA5,
+            lseed: 0x5A,
+        }
+    }
+}
+
+impl RomRandState {
+    fn advance(&mut self) {
+        // `RAND` in `defa7.src` updates `SEED`, `HSEED`, and `LSEED` together.
+        let mut product_low = self.seed.wrapping_mul(3).wrapping_add(17);
+        let mut a = self.lseed >> 3;
+        a ^= self.lseed;
+        let carry_into_hseed = (a & 0x01) != 0;
+        let old_hseed = self.hseed;
+        self.hseed = (u8::from(carry_into_hseed) << 7) | (self.hseed >> 1);
+        let carry_into_lseed = (old_hseed & 0x01) != 0;
+        self.lseed = (u8::from(carry_into_lseed) << 7) | (self.lseed >> 1);
+        let (with_lseed, carry) = adc8(product_low, self.lseed, false);
+        let (new_seed, _) = adc8(with_lseed, self.hseed, carry);
+        product_low = new_seed;
+        self.seed = product_low;
+    }
+}
+
+fn adc8(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
+    let sum = u16::from(lhs) + u16::from(rhs) + u16::from(u8::from(carry));
+    ((sum & 0xFF) as u8, sum > 0xFF)
+}
+
 fn rom_probe_horizontal_velocity(seed: u8) -> i32 {
     let raw = i16::from(seed & 0x3F) - 0x20;
     match raw {
@@ -2806,11 +2847,53 @@ fn rom_probe_vertical_velocity(seed: u8) -> i32 {
     if raw < 0 { -1 } else { 1 }
 }
 
-fn default_humans(terrain: &[usize]) -> Vec<Entity> {
-    arcade_tables()
-        .default_human_world_xs
-        .iter()
-        .copied()
+fn scale_rom_fixed_x_to_world(rom_x: u16, world_span: i32) -> i32 {
+    if world_span <= 1 {
+        return 0;
+    }
+
+    (((u32::from(rom_x) * world_span as u32) >> 16) as i32).min(world_span - 1)
+}
+
+fn rom_astst_spawn_x(addend: u8, world_span: i32, rand_state: &mut RomRandState) -> i32 {
+    rand_state.advance();
+    let rom_x_hi = (rand_state.hseed & 0x1F).wrapping_add(addend);
+    let rom_x = u16::from_be_bytes([rom_x_hi, rand_state.lseed]);
+    scale_rom_fixed_x_to_world(rom_x, world_span)
+}
+
+fn rom_default_human_world_xs(world_span: i32) -> Vec<i32> {
+    const DEFAULT_HUMAN_COUNT: u8 = 10;
+
+    let mut rand_state = RomRandState::default();
+    let mut xs = Vec::with_capacity(DEFAULT_HUMAN_COUNT as usize);
+    let per_quadrant = DEFAULT_HUMAN_COUNT >> 2;
+
+    if DEFAULT_HUMAN_COUNT > 7 {
+        let mut quadrant = 0_u8;
+        loop {
+            for _ in 0..per_quadrant {
+                xs.push(rom_astst_spawn_x(quadrant, world_span, &mut rand_state));
+            }
+            quadrant = quadrant.wrapping_add(0x40);
+            if quadrant == 0 {
+                break;
+            }
+        }
+    }
+
+    let remainder = DEFAULT_HUMAN_COUNT - (per_quadrant << 2);
+    for _ in 0..remainder {
+        let addend = rand_state.hseed;
+        xs.push(rom_astst_spawn_x(addend, world_span, &mut rand_state));
+    }
+
+    xs
+}
+
+fn default_humans(terrain: &[usize], world_span: i32) -> Vec<Entity> {
+    rom_default_human_world_xs(world_span)
+        .into_iter()
         .map(|x| Entity::new(EntityKind::Human, x, terrain_surface_y(terrain, x), 0, 0))
         .collect()
 }
@@ -2879,19 +2962,20 @@ mod tests {
 
     use super::{
         Entity, EntityKind, EntityState, HorizontalDirection, Position, RomBaiterSeekContext,
-        Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
+        RomRandState, Status, UpdateInput, Velocity, World, WorldEvent, hyperspace_result,
         initialize_tie_cruise_altitude, nearest_wrapped_target, rom_accumulate_vertical_velocity,
         rom_advance_baiter_timer, rom_baiter_count_limit, rom_baiter_horizontal_close_band,
         rom_baiter_seek_velocity, rom_baiter_should_seek, rom_baiter_spawn_for_wave,
         rom_baiter_timer_floor, rom_baiter_vertical_close_band, rom_bomb_shell_limit,
-        rom_bomber_mine_lifetime, rom_bomber_should_drop_mine, rom_lander_horizontal_velocity,
-        rom_lander_vertical_velocity, rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity,
-        rom_probe_spawn_for_wave, rom_probe_swarmer_burst_count, rom_probe_vertical_velocity,
-        rom_reset_baiter_timer, rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit,
-        rom_shoot_axes_from_seeds, rom_swarmer_count_limit, rom_swarmer_horizontal_velocity,
-        rom_swarmer_vertical_speed_limit, rom_tie_close_band, rom_tie_far_band,
-        rom_tie_horizontal_velocity, rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen,
-        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_bomber_mine_lifetime, rom_bomber_should_drop_mine, rom_default_human_world_xs,
+        rom_lander_horizontal_velocity, rom_lander_vertical_velocity,
+        rom_mutant_horizontal_velocity, rom_mutant_vertical_velocity, rom_probe_spawn_for_wave,
+        rom_probe_swarmer_burst_count, rom_probe_vertical_velocity, rom_reset_baiter_timer,
+        rom_rmax, rom_shell_lifetime, rom_shell_spawn_limit, rom_shoot_axes_from_seeds,
+        rom_swarmer_count_limit, rom_swarmer_horizontal_velocity, rom_swarmer_vertical_speed_limit,
+        rom_tie_close_band, rom_tie_far_band, rom_tie_horizontal_velocity,
+        rom_tie_next_cruise_altitude, scale_rom_probe_x_to_screen, screen_x_for_world_x,
+        shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -2909,6 +2993,15 @@ mod tests {
             world.screen_x_for_world_x(world.entities()[0].position.x),
             Some(world.width() / 2)
         );
+        assert_eq!(
+            world
+                .entities()
+                .iter()
+                .filter(|entity| entity.kind == EntityKind::Human)
+                .map(|entity| entity.position.x)
+                .collect::<Vec<_>>(),
+            vec![14, 7, 63, 67, 105, 100, 146, 157, 7, 15]
+        );
     }
 
     #[test]
@@ -2922,6 +3015,38 @@ mod tests {
     fn shortest_wrapped_delta_prefers_the_shorter_arc() {
         assert_eq!(shortest_wrapped_delta(1, 14, 16), -3);
         assert_eq!(shortest_wrapped_delta(14, 1, 16), 3);
+    }
+
+    #[test]
+    fn rom_rand_matches_the_red_label_seed_walk() {
+        let mut rand_state = RomRandState::default();
+
+        rand_state.advance();
+        assert_eq!(rand_state.seed, 0x90);
+        assert_eq!(rand_state.hseed, 0xD2);
+        assert_eq!(rand_state.lseed, 0xAD);
+
+        rand_state.advance();
+        assert_eq!(rand_state.seed, 0x81);
+        assert_eq!(rand_state.hseed, 0x69);
+        assert_eq!(rand_state.lseed, 0x56);
+
+        rand_state.advance();
+        assert_eq!(rand_state.seed, 0x74);
+        assert_eq!(rand_state.hseed, 0x34);
+        assert_eq!(rand_state.lseed, 0xAB);
+    }
+
+    #[test]
+    fn rom_default_human_world_xs_follow_plres_astst_layout() {
+        assert_eq!(
+            rom_default_human_world_xs(64),
+            vec![4, 2, 21, 22, 35, 33, 48, 52, 2, 5]
+        );
+        assert_eq!(
+            rom_default_human_world_xs(192),
+            vec![14, 7, 63, 67, 105, 100, 146, 157, 7, 15]
+        );
     }
 
     #[test]
@@ -5032,10 +5157,12 @@ mod tests {
 
         assert_eq!(world.human_count(), 10);
         assert!(
-            !world
+            world
                 .entities()
                 .iter()
-                .any(|entity| entity.kind == EntityKind::Human && entity.position.x == 3)
+                .filter(|entity| entity.kind == EntityKind::Human)
+                .map(|entity| entity.position.x)
+                .eq([4, 2, 21, 22, 35, 33, 48, 52, 2, 5].into_iter())
         );
         assert_eq!(world.entity_count_by_kind(EntityKind::Lander), 5);
         assert!(!world.planet_destroyed());
