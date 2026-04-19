@@ -178,7 +178,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `assets/arcade/`.
 - Live audio now comes from `src/audio_rom.rs`, which translates the Williams
   `VSNDRM1.SRC` radio, filtered-noise, scream, organ, and GWAVE routines into
-  Rust sample generation instead of decoding pre-rendered WAV cue files.
+  Rust sample generation instead of decoding pre-rendered WAV cue files, and
+  the live loop now queues overlapping cue playback instead of blocking the
+  frame loop on one sound at a time.
 - `cargo run` / `defender` now launch the real Kitty-graphics play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, falling-human

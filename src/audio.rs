@@ -100,6 +100,25 @@ impl AudioManager {
         }
     }
 
+    pub fn play_cue(&mut self, cue: SoundCue) {
+        let rendered = self.board.render_actions(cue.program());
+        if rendered.samples.is_empty() {
+            return;
+        }
+
+        let Some(output) = self.output.as_ref() else {
+            return;
+        };
+
+        let sink = output.new_sink();
+        sink.append(SamplesBuffer::new(
+            1,
+            rendered.sample_rate,
+            rendered.samples,
+        ));
+        sink.detach();
+    }
+
     pub fn play_cue_blocking(&mut self, cue: SoundCue) {
         let rendered = self.board.render_actions(cue.program());
         if rendered.samples.is_empty() {
@@ -169,6 +188,7 @@ mod tests {
         };
 
         for cue in SoundCue::ALL {
+            audio.play_cue(cue);
             audio.play_cue_blocking(cue);
         }
     }

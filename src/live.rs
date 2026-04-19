@@ -61,8 +61,10 @@ pub fn run_live(play_audio: bool) -> Result<()> {
             title_started_at.elapsed().as_millis() as u64,
         )?;
 
-        if play_audio && let Some(cue) = cue_for_events(&events) {
-            audio.play_cue_blocking(cue);
+        if play_audio {
+            for cue in cues_for_events(&events) {
+                audio.play_cue(cue);
+            }
         }
 
         let elapsed = frame_started.elapsed();
@@ -199,41 +201,53 @@ fn title_beat_for_elapsed_ms(elapsed_ms: u64) -> AttractBeat {
     beat_for_elapsed_ms(elapsed_ms)
 }
 
-fn cue_for_events(events: &[SessionEvent]) -> Option<SoundCue> {
+fn cues_for_events(events: &[SessionEvent]) -> Vec<SoundCue> {
+    let mut cues = Vec::new();
+
     if events.contains(&SessionEvent::GameStarted) || events.contains(&SessionEvent::GameRestarted)
     {
-        Some(SoundCue::LogoFanfare)
-    } else if events.contains(&SessionEvent::HighScoreUpdated)
+        cues.push(SoundCue::LogoFanfare);
+    }
+    if events.contains(&SessionEvent::HighScoreUpdated)
         || events.contains(&SessionEvent::HighScoreSaved)
+        || events.contains(&SessionEvent::World(crate::game::WorldEvent::WaveAdvanced))
     {
-        Some(SoundCue::HighScoreChime)
-    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::GameOver))
+        push_unique_cue(&mut cues, SoundCue::HighScoreChime);
+    }
+    if events.contains(&SessionEvent::World(crate::game::WorldEvent::GameOver))
         || events.contains(&SessionEvent::World(crate::game::WorldEvent::PlayerHit))
         || events.contains(&SessionEvent::World(
             crate::game::WorldEvent::SmartBombDetonated,
         ))
+        || events.contains(&SessionEvent::World(
+            crate::game::WorldEvent::EnemyDestroyed,
+        ))
     {
-        Some(SoundCue::Explosion)
-    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired))
+        push_unique_cue(&mut cues, SoundCue::Explosion);
+    }
+    if events.contains(&SessionEvent::World(crate::game::WorldEvent::EnemyFired))
         || events.contains(&SessionEvent::World(
             crate::game::WorldEvent::HyperspaceUsed,
         ))
     {
-        Some(SoundCue::EnemySweep)
-    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::WaveAdvanced)) {
-        Some(SoundCue::HighScoreChime)
-    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::HumanRescued)) {
-        Some(SoundCue::HumanSaved)
-    } else if events.contains(&SessionEvent::World(
-        crate::game::WorldEvent::EnemyDestroyed,
-    )) {
-        Some(SoundCue::Explosion)
-    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::HumanLost)) {
-        Some(SoundCue::AttractHum)
-    } else if events.contains(&SessionEvent::World(crate::game::WorldEvent::ShotFired)) {
-        Some(SoundCue::PlayerShot)
-    } else {
-        None
+        push_unique_cue(&mut cues, SoundCue::EnemySweep);
+    }
+    if events.contains(&SessionEvent::World(crate::game::WorldEvent::HumanRescued)) {
+        push_unique_cue(&mut cues, SoundCue::HumanSaved);
+    }
+    if events.contains(&SessionEvent::World(crate::game::WorldEvent::HumanLost)) {
+        push_unique_cue(&mut cues, SoundCue::AttractHum);
+    }
+    if events.contains(&SessionEvent::World(crate::game::WorldEvent::ShotFired)) {
+        push_unique_cue(&mut cues, SoundCue::PlayerShot);
+    }
+
+    cues
+}
+
+fn push_unique_cue(cues: &mut Vec<SoundCue>, cue: SoundCue) {
+    if !cues.contains(&cue) {
+        cues.push(cue);
     }
 }
 
@@ -333,7 +347,7 @@ mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode};
 
     use super::{
-        InputTracker, PolledInput, cue_for_events, render_title_frame, title_beat_for_elapsed_ms,
+        InputTracker, PolledInput, cues_for_events, render_title_frame, title_beat_for_elapsed_ms,
         validate_interactive_terminal,
     };
     use crate::audio::SoundCue;
@@ -343,33 +357,39 @@ mod tests {
     use crate::video::Renderer;
 
     #[test]
-    fn event_priorities_prefer_game_over_and_hits() {
+    fn event_audio_groups_allow_overlap_without_duplicate_cues() {
         assert_eq!(
-            cue_for_events(&[
+            cues_for_events(&[
                 SessionEvent::World(WorldEvent::HyperspaceUsed),
                 SessionEvent::World(WorldEvent::GameOver),
             ]),
-            Some(SoundCue::Explosion)
+            vec![SoundCue::Explosion, SoundCue::EnemySweep]
         );
         assert_eq!(
-            cue_for_events(&[SessionEvent::World(WorldEvent::WaveAdvanced)]),
-            Some(SoundCue::HighScoreChime)
+            cues_for_events(&[SessionEvent::World(WorldEvent::WaveAdvanced)]),
+            vec![SoundCue::HighScoreChime]
         );
         assert_eq!(
-            cue_for_events(&[SessionEvent::World(WorldEvent::EnemyFired)]),
-            Some(SoundCue::EnemySweep)
+            cues_for_events(&[SessionEvent::World(WorldEvent::EnemyFired)]),
+            vec![SoundCue::EnemySweep]
         );
         assert_eq!(
-            cue_for_events(&[SessionEvent::World(WorldEvent::SmartBombDetonated)]),
-            Some(SoundCue::Explosion)
+            cues_for_events(&[
+                SessionEvent::World(WorldEvent::SmartBombDetonated),
+                SessionEvent::World(WorldEvent::EnemyDestroyed),
+            ]),
+            vec![SoundCue::Explosion]
         );
         assert_eq!(
-            cue_for_events(&[SessionEvent::World(WorldEvent::HumanRescued)]),
-            Some(SoundCue::HumanSaved)
+            cues_for_events(&[SessionEvent::World(WorldEvent::HumanRescued)]),
+            vec![SoundCue::HumanSaved]
         );
         assert_eq!(
-            cue_for_events(&[SessionEvent::HighScoreSaved]),
-            Some(SoundCue::HighScoreChime)
+            cues_for_events(&[
+                SessionEvent::HighScoreSaved,
+                SessionEvent::World(WorldEvent::ShotFired),
+            ]),
+            vec![SoundCue::HighScoreChime, SoundCue::PlayerShot]
         );
     }
 
