@@ -756,34 +756,20 @@ impl World {
                     return None;
                 }
 
-                // Doug Mahugh chapter 03 notes that Landers, Mutants, and
-                // Baiters all fire in the general direction of the player, with
-                // every other volley becoming a horizontal chaser.
-                let horizontal_delta = player_screen_x - enemy_screen_x;
-                let mut dx = horizontal_delta.signum();
-                let aim_dy = (player_position.y - enemy.position.y).signum();
-                let spread_index =
-                    ((self.tick / shot_delay) as i32 + enemy.position.x + enemy.position.y)
-                        .rem_euclid(3);
-                let spread = spread_index - 1;
-                let dy = (aim_dy + spread).clamp(-1, 1);
-
-                if (self.tick / shot_delay).is_multiple_of(tables.enemy_fire_chaser_cycle) {
-                    dx = (dx + player_velocity.dx).clamp(-2, 2);
-                }
-
-                if dx == 0 && dy == 0 {
-                    dx = if horizontal_delta == 0 {
-                        match enemy.velocity.dx.signum() {
-                            -1 | 1 => enemy.velocity.dx.signum(),
-                            _ => 1,
-                        }
-                    } else {
-                        horizontal_delta.signum()
-                    };
-                }
-
-                Some(Velocity { dx, dy })
+                // `defb6.src` routes Landers, Mutants, and Baiters through the
+                // shared `SHOOT` routine, which solves shell velocity from the
+                // current screen delta plus `SEED` / `LSEED` jitter rather than
+                // alternating between invented chaser and lob shot modes.
+                let (seed, lseed) = self.rom_enemy_shot_seed_bytes(enemy);
+                Some(rom_shoot_velocity(
+                    enemy_screen_x,
+                    enemy.position.y,
+                    player_screen_x,
+                    player_position.y,
+                    player_velocity,
+                    seed,
+                    lseed,
+                ))
             }
             EntityKind::Swarmer => {
                 let shot_delay = wave_profile.swarmer_shot_time.max(1);
@@ -1338,6 +1324,26 @@ impl World {
             .iter()
             .find(|entity| entity.kind == EntityKind::PlayerShip)
             .map(|entity| entity.velocity)
+    }
+
+    fn rom_enemy_shot_seed_bytes(&self, enemy: &Entity) -> (u8, u8) {
+        // The cabinet `SHOOT` routine consumes `SEED` and `LSEED` directly.
+        // The live Rust port still lacks the original RNG process, so it feeds
+        // the shared solver deterministic pseudo-seed bytes derived from the
+        // live tick and source object position instead of switching back to a
+        // separate handcrafted fire heuristic.
+        let base = (self.tick as u8).wrapping_add(self.status.wave.wrapping_mul(29));
+        let x = enemy.position.x as u8;
+        let y = enemy.position.y as u8;
+
+        let seed = base
+            .wrapping_add(x.rotate_left(1))
+            .wrapping_add(y.wrapping_mul(7));
+        let lseed = base
+            .wrapping_add(y.rotate_left(1))
+            .wrapping_add(x.wrapping_mul(11));
+
+        (seed, lseed)
     }
 
     fn should_auto_fire(&self, origin: Position, max_x: i32, min_y: i32, max_y: i32) -> bool {
@@ -2074,6 +2080,68 @@ fn wrapped_horizontal_step(from: i32, to: i32, max_x: i32) -> i32 {
     shortest_wrapped_delta(from, to, max_x + 1).signum()
 }
 
+fn rom_shoot_axes_from_seeds(
+    enemy_screen_x: i32,
+    enemy_y: i32,
+    player_screen_x: i32,
+    player_y: i32,
+    player_velocity: Velocity,
+    seed: u8,
+    lseed: u8,
+) -> (i32, i32) {
+    let mut horizontal = i32::from(seed & 0x1F) - 0x10 + player_screen_x - enemy_screen_x;
+    horizontal *= 4;
+    if seed > 120 {
+        horizontal += player_velocity.dx * 4;
+    }
+
+    let mut vertical = i32::from(lseed & 0x1F) - 0x10 + player_y - enemy_y;
+    vertical *= 4;
+
+    (horizontal, vertical)
+}
+
+fn quantize_rom_shot_component(raw: i32) -> i32 {
+    match raw {
+        i32::MIN..=-48 => -2,
+        -47..=-12 => -1,
+        -11..=11 => 0,
+        12..=47 => 1,
+        _ => 2,
+    }
+}
+
+fn rom_shoot_velocity(
+    enemy_screen_x: i32,
+    enemy_y: i32,
+    player_screen_x: i32,
+    player_y: i32,
+    player_velocity: Velocity,
+    seed: u8,
+    lseed: u8,
+) -> Velocity {
+    let (horizontal, vertical) = rom_shoot_axes_from_seeds(
+        enemy_screen_x,
+        enemy_y,
+        player_screen_x,
+        player_y,
+        player_velocity,
+        seed,
+        lseed,
+    );
+    let mut dx = quantize_rom_shot_component(horizontal);
+    let dy = quantize_rom_shot_component(vertical);
+
+    if dx == 0 && dy == 0 {
+        dx = match (player_screen_x - enemy_screen_x).signum() {
+            -1 | 1 => (player_screen_x - enemy_screen_x).signum(),
+            _ => 1,
+        };
+    }
+
+    Velocity { dx, dy }
+}
+
 fn shortest_wrapped_delta(from: i32, to: i32, span: i32) -> i32 {
     let forward = (to - from).rem_euclid(span);
     let backward = forward - span;
@@ -2355,8 +2423,8 @@ mod tests {
         Entity, EntityKind, EntityState, HorizontalDirection, Position, Status, UpdateInput,
         Velocity, World, WorldEvent, hyperspace_result, nearest_wrapped_target,
         rom_baiter_horizontal_close_band, rom_baiter_should_seek, rom_baiter_vertical_close_band,
-        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_tie_close_band,
-        rom_tie_cruise_altitude, rom_tie_far_band, scale_rom_probe_x_to_screen,
+        rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_shoot_axes_from_seeds,
+        rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band, scale_rom_probe_x_to_screen,
         shortest_wrapped_delta, wrap_coordinate,
     };
 
@@ -2863,30 +2931,22 @@ mod tests {
     }
 
     #[test]
-    fn lander_chaser_shots_add_player_velocity_to_horizontal_fire() {
-        let mut world = World::with_entities(
-            24,
-            10,
-            Status {
-                score: 0,
-                lives: 3,
-                wave: 1,
-            },
-            vec![Entity::new(EntityKind::PlayerShip, 4, 4, 0, 0)],
-        );
-        let shot_delay = red_label_wave_table().profile_for_wave(1).lander_shot_time;
-        world.tick = shot_delay * arcade_tables().enemy_fire_chaser_cycle;
-        let velocity = world
-            .enemy_shot_velocity(
-                &Entity::new(EntityKind::Lander, 12, 5, 0, 0),
-                12,
-                Position { x: 4, y: 5 },
-                4,
-                Velocity { dx: -1, dy: 0 },
-            )
-            .expect("chaser shot");
+    fn rom_shoot_axes_add_player_velocity_when_seed_exceeds_threshold() {
+        let without_lead =
+            rom_shoot_axes_from_seeds(10, 5, 8, 5, Velocity { dx: 2, dy: 0 }, 24, 32);
+        let with_lead = rom_shoot_axes_from_seeds(10, 5, 8, 5, Velocity { dx: 2, dy: 0 }, 152, 32);
 
-        assert_eq!(velocity.dx, -2);
+        assert_eq!(without_lead.1, with_lead.1);
+        assert_eq!(with_lead.0, without_lead.0 + 8);
+    }
+
+    #[test]
+    fn rom_shoot_axes_use_lseed_for_vertical_solution() {
+        let lower = rom_shoot_axes_from_seeds(8, 6, 10, 5, Velocity { dx: 0, dy: 0 }, 64, 1);
+        let higher = rom_shoot_axes_from_seeds(8, 6, 10, 5, Velocity { dx: 0, dy: 0 }, 64, 17);
+
+        assert_eq!(lower.0, higher.0);
+        assert_eq!(higher.1, lower.1 + 64);
     }
 
     #[test]

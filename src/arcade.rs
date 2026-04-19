@@ -17,8 +17,6 @@ pub struct ArcadeTables {
     pub player_shot_limit: usize,
     pub player_shot_speed: i32,
     pub enemy_shot_limit: usize,
-    pub enemy_fire_base_delay: u32,
-    pub enemy_fire_chaser_cycle: u32,
     pub swarmer_fire_delay: u32,
     pub swarmer_fire_lead_divisor: u32,
     pub swarmer_speed: i32,
@@ -53,8 +51,6 @@ static ARCADE_TABLES: ArcadeTables = ArcadeTables {
     player_shot_limit: 4,
     player_shot_speed: 2,
     enemy_shot_limit: 6,
-    enemy_fire_base_delay: 5,
-    enemy_fire_chaser_cycle: 2,
     swarmer_fire_delay: 3,
     swarmer_fire_lead_divisor: 4,
     swarmer_speed: 2,
@@ -83,7 +79,6 @@ mod tests {
         assert_eq!(tables.player_shot_limit, 4);
         assert_eq!(tables.player_shot_speed, 2);
         assert_eq!(tables.enemy_shot_limit, 6);
-        assert_eq!(tables.enemy_fire_base_delay, 5);
         assert_eq!(tables.swarmer_fire_delay, 3);
         assert_eq!(tables.default_human_world_xs.len(), 10);
         assert_eq!(tables.default_human_world_xs[0], 8);
