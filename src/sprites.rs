@@ -17,6 +17,8 @@ use png::{ColorType, Decoder, Transformations};
 
 use crate::{
     game::{Entity, EntityKind, HorizontalDirection},
+    object_rom::{render_picture, score_250_palette, score_500_palette, ship_palette},
+    object_rom_data::{C5P1, C25P1, PLAMIN, PLAPIC, PLBPIC},
     video::RenderedImage,
 };
 
@@ -37,8 +39,8 @@ pub struct ArcadeSprites {
     mine: Arc<RenderedImage>,
     pod_explosion: Arc<RenderedImage>,
     swarmer_explosion: Arc<RenderedImage>,
-    score_250: [Arc<RenderedImage>; 2],
-    score_500: [Arc<RenderedImage>; 2],
+    score_250: [Arc<RenderedImage>; 3],
+    score_500: [Arc<RenderedImage>; 3],
 }
 
 pub fn arcade_sprites() -> &'static ArcadeSprites {
@@ -49,10 +51,12 @@ pub fn arcade_sprites() -> &'static ArcadeSprites {
 impl ArcadeSprites {
     fn new() -> Self {
         Self {
-            // `PLAPIC` and `PLBPIC` are distinct right/left cabinet pictures.
-            ship_right: load_embedded_png(include_bytes!("../assets/arcade/ship1.png")),
-            ship_left: load_embedded_png(include_bytes!("../assets/arcade/ship3.png")),
-            little_ship: load_embedded_png(include_bytes!("../assets/arcade/littleship.png")),
+            // `PLAPIC`, `PLBPIC`, and `PLAMIN` are decoded directly from the
+            // red-label `defb6.src` picture tables so the active runtime path
+            // uses the cabinet ship art rather than the older cropped PNGs.
+            ship_right: load_rom_picture(&PLAPIC, ship_palette()),
+            ship_left: load_rom_picture(&PLBPIC, ship_palette()),
+            little_ship: load_rom_picture(&PLAMIN, ship_palette()),
             player_shot: load_embedded_png(include_bytes!("../assets/arcade/player-shot.png")),
             enemy_shots: [
                 load_embedded_png(include_bytes!("../assets/arcade/bomb1.png")),
@@ -89,12 +93,14 @@ impl ArcadeSprites {
             pod_explosion: load_embedded_png(include_bytes!("../assets/arcade/podexpl.png")),
             swarmer_explosion: load_embedded_png(include_bytes!("../assets/arcade/swarmexpl.png")),
             score_250: [
-                load_embedded_png(include_bytes!("../assets/arcade/score250_1.png")),
-                load_embedded_png(include_bytes!("../assets/arcade/score250_2.png")),
+                load_rom_picture(&C25P1, score_250_palette(0)),
+                load_rom_picture(&C25P1, score_250_palette(1)),
+                load_rom_picture(&C25P1, score_250_palette(2)),
             ],
             score_500: [
-                load_embedded_png(include_bytes!("../assets/arcade/score500_1.png")),
-                load_embedded_png(include_bytes!("../assets/arcade/score500_2.png")),
+                load_rom_picture(&C5P1, score_500_palette(0)),
+                load_rom_picture(&C5P1, score_500_palette(1)),
+                load_rom_picture(&C5P1, score_500_palette(2)),
             ],
         }
     }
@@ -146,11 +152,11 @@ impl ArcadeSprites {
     }
 
     pub fn score_250(&self, tick: u32) -> Arc<RenderedImage> {
-        self.score_250[rom_cycle_index(tick, 5, 2)].clone()
+        self.score_250[rom_cycle_index(tick, 5, 3)].clone()
     }
 
     pub fn score_500(&self, tick: u32) -> Arc<RenderedImage> {
-        self.score_500[rom_cycle_index(tick, 5, 2)].clone()
+        self.score_500[rom_cycle_index(tick, 5, 3)].clone()
     }
 }
 
@@ -160,6 +166,13 @@ fn rom_cycle_index(tick: u32, speed: u32, len: usize) -> usize {
 
 fn load_embedded_png(bytes: &'static [u8]) -> Arc<RenderedImage> {
     Arc::new(decode_png_image(bytes).expect("embedded arcade sprite should decode"))
+}
+
+fn load_rom_picture(
+    picture: &crate::object_rom_data::RomPictureData,
+    palette: crate::object_rom::PaletteOverrides,
+) -> Arc<RenderedImage> {
+    Arc::new(render_picture(picture, palette))
 }
 
 fn decode_png_image(bytes: &[u8]) -> anyhow::Result<RenderedImage> {
@@ -277,12 +290,27 @@ mod tests {
         for image in [
             sprites.score_500(0),
             sprites.score_500(6),
+            sprites.score_500(12),
             sprites.score_250(0),
             sprites.score_250(6),
+            sprites.score_250(12),
         ] {
             assert!(image.width > 0);
             assert!(image.height > 0);
             assert!(image.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
         }
+    }
+
+    #[test]
+    fn saved_humanoid_bonus_cycles_across_the_rom_palette_states() {
+        let sprites = arcade_sprites();
+
+        let phase_a = sprites.score_500(0);
+        let phase_b = sprites.score_500(5);
+        let phase_c = sprites.score_500(10);
+
+        assert_ne!(phase_a.pixels, phase_b.pixels);
+        assert_ne!(phase_b.pixels, phase_c.pixels);
+        assert_ne!(phase_a.pixels, phase_c.pixels);
     }
 }

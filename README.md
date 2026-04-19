@@ -205,16 +205,16 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   on-screen units use the ROM-style close/far vertical proximity bands around
   the player instead of the older every-third-tick drift rule.
 - Gameplay sprite phasing now follows ROM-informed display rules more closely:
-  the player ship uses left/right cabinet art with horizontal display-phase
-  selection instead of a made-up tick animation, shared enemy animation now
-  follows a single cabinet-style cadence instead of per-entity position seeds,
-  the HUD uses the little-ship stock icon, and the attract rescue/scoring page
-  now draws its `250` / `500` bonuses from embedded score art in
-  `assets/arcade/`.
-- The runtime sprite path now again uses the embedded arcade PNG family for the
-  shipped left-facing ship, Bomber/UFO, Lander, Baiter, Pod/Probe, Swarmer,
-  bomb, and score art, while the ROM-extracted picture-table work remains in
-  the repo as reference material for future cabinet-exact rendering passes.
+  the player ship now uses the decoded red-label `PLAPIC` / `PLBPIC` pictures,
+  the HUD little-ship icon uses `PLAMIN`, the saved-humanoid `500` and `250`
+  bonuses now come from the decoded `C5P1` / `C25P1` score pictures with the
+  ROM palette cycle, and shared enemy animation still follows a single
+  cabinet-style cadence instead of per-entity position seeds.
+- The runtime sprite path still uses the embedded arcade PNG family for the
+  shipped Bomber/UFO, Lander, Baiter, Pod/Probe, Swarmer, bomb, and mine art,
+  while the ROM-extracted picture-table work is now active for the player ship,
+  player stock icon, and rescue bonus scores and remains in the repo for future
+  cabinet-exact rendering passes.
 - Live audio now comes from `src/audio_rom.rs`, which translates the Williams
   `VSNDRM1.SRC` radio, filtered-noise, hyperspace, scream, organ, and GWAVE
   routines into Rust sample generation instead of decoding pre-rendered WAV cue
