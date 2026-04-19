@@ -195,6 +195,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   (`LDSTIM`, `SZSTIM`, `SWSTIM`, and `UFSTIM`) instead of the older shared
   Rust fallback delays, so Landers, Mutants, Swarmers, and Baiters follow the
   cabinet wave table more closely.
+- Swarmer horizontal motion now comes from the red-label `SWXV` record too,
+  so later-wave Swarmers keep their faster cabinet pace instead of following a
+  single fallback Rust speed across every wave.
 - Baiter / UFO steering now follows the cabinet `UFOLP` / `UFONV` shape more
   closely too: retargets only happen on the source-style refresh cadence, the
   `UFOSK` record now gates when a retarget is allowed, and the ship stops
@@ -506,10 +509,6 @@ Meaning: faster firing cadence used by swarmers.
 Default: `4`
 Meaning: quarter-screen lead factor used for the swarmer focal-point shot
 model.
-
-`swarmer_speed`
-Default: `2`
-Meaning: horizontal speed used by swarmer enemies.
 
 `baiter_speed`
 Default: `2`

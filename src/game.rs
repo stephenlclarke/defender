@@ -951,16 +951,17 @@ impl World {
                     }
                 }
                 EntityKind::Swarmer => {
-                    let tables = arcade_tables();
+                    let swarmer_speed =
+                        rom_swarmer_horizontal_velocity(wave_profile.swarmer_x_velocity);
                     let target = player_position.unwrap_or(enemy.position);
                     // Doug Mahugh chapter 05 calls out the "follow from behind"
                     // counterplay, so Swarmers should not instantly reverse on
                     // every shorter wrapped path change.
                     let delta_x = shortest_wrapped_delta(enemy.position.x, target.x, world_span);
                     let desired_dx = if delta_x == 0 {
-                        enemy.velocity.dx.signum().max(1) * tables.swarmer_speed
+                        enemy.velocity.dx.signum().max(1) * swarmer_speed
                     } else {
-                        delta_x.signum() * tables.swarmer_speed
+                        delta_x.signum() * swarmer_speed
                     };
                     let current_direction = enemy.velocity.dx.signum();
                     let should_reverse = current_direction == 0
@@ -1485,6 +1486,8 @@ impl World {
 
     fn spawn_swarmer_burst_at(&mut self, pod_position: Position) {
         let tables = arcade_tables();
+        let wave_profile = red_label_wave_table().profile_for_wave(self.status.wave);
+        let swarmer_speed = rom_swarmer_horizontal_velocity(wave_profile.swarmer_x_velocity);
         let available = tables
             .max_swarmers
             .saturating_sub(self.entity_count_by_kind(EntityKind::Swarmer));
@@ -1524,7 +1527,7 @@ impl World {
                 EntityKind::Swarmer,
                 x,
                 y,
-                direction * tables.swarmer_speed,
+                direction * swarmer_speed,
                 dy,
             ));
         }
@@ -2342,6 +2345,13 @@ fn rom_tie_horizontal_velocity(raw: u8) -> i32 {
     if raw <= 0x28 { 1 } else { 2 }
 }
 
+fn rom_swarmer_horizontal_velocity(raw: u8) -> i32 {
+    // `MSWM` loads `SWXV` directly for Swarm X velocity. Map the red-label
+    // fixed-point record into the coarse live grid so later waves keep the
+    // faster cabinet Swarmer pace without relying on a global fallback speed.
+    if raw < 0x20 { 1 } else { 2 }
+}
+
 fn rom_baiter_velocity_refresh_due(tick: u32, position: Position) -> bool {
     (tick + position.x as u32 + position.y as u32).is_multiple_of(18)
 }
@@ -2487,8 +2497,9 @@ mod tests {
         nearest_wrapped_target, rom_baiter_horizontal_close_band, rom_baiter_seek_velocity,
         rom_baiter_should_seek, rom_baiter_spawn_for_wave, rom_baiter_vertical_close_band,
         rom_probe_spawn_for_wave, rom_probe_vertical_velocity, rom_shoot_axes_from_seeds,
-        rom_tie_close_band, rom_tie_cruise_altitude, rom_tie_far_band, rom_tie_horizontal_velocity,
-        scale_rom_probe_x_to_screen, screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
+        rom_swarmer_horizontal_velocity, rom_tie_close_band, rom_tie_cruise_altitude,
+        rom_tie_far_band, rom_tie_horizontal_velocity, scale_rom_probe_x_to_screen,
+        screen_x_for_world_x, shortest_wrapped_delta, wrap_coordinate,
     };
 
     #[test]
@@ -2973,7 +2984,11 @@ mod tests {
                     EntityKind::Swarmer,
                     18,
                     4,
-                    -arcade_tables().swarmer_speed,
+                    -rom_swarmer_horizontal_velocity(
+                        red_label_wave_table()
+                            .profile_for_wave(3)
+                            .swarmer_x_velocity,
+                    ),
                     0,
                 ),
             ],
@@ -3301,7 +3316,14 @@ mod tests {
             .iter()
             .find(|entity| entity.kind == EntityKind::Swarmer)
             .expect("swarmer");
-        assert_eq!(swarmer.velocity.dx, -arcade_tables().swarmer_speed);
+        assert_eq!(
+            swarmer.velocity.dx,
+            -rom_swarmer_horizontal_velocity(
+                red_label_wave_table()
+                    .profile_for_wave(3)
+                    .swarmer_x_velocity
+            )
+        );
         assert_eq!(swarmer.position, Position { x: 10, y: 5 });
     }
 
@@ -3884,9 +3906,13 @@ mod tests {
         );
         assert_eq!(world.status().score, 1_000);
         assert!(events.contains(&WorldEvent::EnemyDestroyed));
+        let swarmer_speed = rom_swarmer_horizontal_velocity(
+            red_label_wave_table()
+                .profile_for_wave(3)
+                .swarmer_x_velocity,
+        );
         assert!(world.entities().iter().all(|entity| {
-            entity.kind != EntityKind::Swarmer
-                || entity.velocity.dx == -arcade_tables().swarmer_speed
+            entity.kind != EntityKind::Swarmer || entity.velocity.dx == -swarmer_speed
         }));
     }
 

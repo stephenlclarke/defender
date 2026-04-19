@@ -12,7 +12,6 @@ player_shot_speed=2
 enemy_shot_limit=6
 swarmer_fire_delay=3
 swarmer_fire_lead_divisor=4
-swarmer_speed=2
 baiter_speed=2
 max_baiters=4
 baiter_repeat_delay=20

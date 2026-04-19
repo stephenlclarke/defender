@@ -19,6 +19,7 @@ pub struct RedLabelWaveTable {
     pods: WaveRecord,
     mutants: WaveRecord,
     swarmers: WaveRecord,
+    swarmer_x_velocity: WaveRecord,
     wave_time: WaveRecord,
     wave_size: WaveRecord,
     lander_shot_time: WaveRecord,
@@ -37,6 +38,7 @@ pub struct WaveProfile {
     pub pods: u8,
     pub mutants: u8,
     pub swarmers: u8,
+    pub swarmer_x_velocity: u8,
     pub wave_time: u32,
     pub wave_size: u8,
     pub lander_shot_time: u32,
@@ -60,6 +62,7 @@ impl RedLabelWaveTable {
             pods: self.pods.value_for_wave(wave) as u8,
             mutants: self.mutants.value_for_wave(wave) as u8,
             swarmers: self.swarmers.value_for_wave(wave) as u8,
+            swarmer_x_velocity: self.swarmer_x_velocity.value_for_wave(wave) as u8,
             wave_time: self.wave_time.value_for_wave(wave) as u32,
             wave_size: self.wave_size.value_for_wave(wave) as u8,
             lander_shot_time: self.lander_shot_time.value_for_wave(wave) as u32,
@@ -120,6 +123,7 @@ static RED_LABEL_WAVE_TABLE: RedLabelWaveTable = RedLabelWaveTable {
     pods: wave_record(6, 0, 0, 0, [0, 1, 3, 4]),
     mutants: wave_record(10, 0, 0, 0, [0, 0, 0, 0]),
     swarmers: wave_record(10, 0, 0, 0, [0, 0, 0, 0]),
+    swarmer_x_velocity: wave_record(96, 0, 8, 2, [22, 30, 32, 34]),
     wave_time: wave_record(30, 0, 0, 0, [30, 25, 20, 16]),
     wave_size: wave_record(5, 0, 0, 0, [5, 5, 5, 5]),
     lander_shot_time: wave_record(128, 16, -4, -2, [74, 58, 42, 42]),
@@ -144,6 +148,7 @@ mod tests {
         assert_eq!(wave_one.landers, 15);
         assert_eq!(wave_one.bombers, 0);
         assert_eq!(wave_one.pods, 0);
+        assert_eq!(wave_one.swarmer_x_velocity, 22);
         assert_eq!(wave_one.wave_time, 30);
         assert_eq!(wave_one.wave_size, 5);
         assert_eq!(wave_one.lander_shot_time, 74);
@@ -155,6 +160,7 @@ mod tests {
         assert_eq!(wave_two.landers, 20);
         assert_eq!(wave_two.bombers, 3);
         assert_eq!(wave_two.pods, 1);
+        assert_eq!(wave_two.swarmer_x_velocity, 30);
         assert_eq!(wave_two.baiter_delay, 196);
         assert_eq!(wave_two.lander_shot_time, 58);
         assert_eq!(wave_two.bomber_x_velocity, 40);
