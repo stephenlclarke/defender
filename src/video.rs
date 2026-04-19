@@ -1104,8 +1104,12 @@ impl Renderer {
         clip_rect: Rect,
     ) {
         let height = attract_explosion_height(object.kind, object.visual_tick);
-        let image =
-            arcade_sprites().attract_sprite_for_kind(object.kind, object.facing, cx & 1 != 0);
+        let image = arcade_sprites().attract_sprite_for_kind(
+            object.kind,
+            object.facing,
+            cx & 1 != 0,
+            object.visual_tick,
+        );
         self.draw_scaled_image_centered_clipped(image.as_ref(), cx, cy, height, clip_rect);
     }
 
@@ -1117,8 +1121,12 @@ impl Renderer {
         clip_rect: Rect,
     ) {
         let height = attract_materialize_height(object.kind, object.visual_tick);
-        let image =
-            arcade_sprites().attract_sprite_for_kind(object.kind, object.facing, cx & 1 != 0);
+        let image = arcade_sprites().attract_sprite_for_kind(
+            object.kind,
+            object.facing,
+            cx & 1 != 0,
+            object.visual_tick,
+        );
         self.draw_scaled_image_centered_clipped(image.as_ref(), cx, cy, height, clip_rect);
     }
 
@@ -1173,6 +1181,7 @@ impl Renderer {
                         object.kind,
                         object.facing,
                         cx & 1 != 0,
+                        frame.demo_tick,
                     );
                     self.draw_scaled_image_centered_clipped(
                         image.as_ref(),

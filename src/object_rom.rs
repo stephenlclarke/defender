@@ -98,7 +98,19 @@ pub fn lander_palette() -> PaletteOverrides {
     PaletteOverrides::new(WHITE, WHITE, WHITE, WHITE, WHITE, WHITE)
 }
 
+pub fn mutant_palette() -> PaletteOverrides {
+    PaletteOverrides::new(WHITE, WHITE, WHITE, WHITE, WHITE, WHITE)
+}
+
+pub fn baiter_palette() -> PaletteOverrides {
+    PaletteOverrides::new(WHITE, WHITE, WHITE, WHITE, WHITE, WHITE)
+}
+
 pub fn bomber_palette() -> PaletteOverrides {
+    PaletteOverrides::new(WHITE, WHITE, WHITE, WHITE, WHITE, WHITE)
+}
+
+pub fn pod_palette() -> PaletteOverrides {
     PaletteOverrides::new(WHITE, WHITE, WHITE, WHITE, WHITE, WHITE)
 }
 

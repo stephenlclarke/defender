@@ -17,8 +17,14 @@ use png::{ColorType, Decoder, Transformations};
 
 use crate::{
     game::{Entity, EntityKind, HorizontalDirection},
-    object_rom::{render_picture, score_250_palette, ship_palette, smart_bomb_palette},
-    object_rom_data::{C25P1, PLAPIC, PLAPIC_ODD, PLBPIC, PLBPIC_ODD, SBPIC},
+    object_rom::{
+        baiter_palette, lander_palette, mutant_palette, pod_palette, render_picture,
+        score_250_palette, ship_palette, smart_bomb_palette, swarmer_palette, tie_palette,
+    },
+    object_rom_data::{
+        ASTP1, C25P1, LNDP1, PLAPIC, PLAPIC_ODD, PLBPIC, PLBPIC_ODD, PRBP1, SBPIC, SCZP1, SWPIC1,
+        TIEP1, UFOP1,
+    },
     video::RenderedImage,
 };
 
@@ -44,6 +50,13 @@ pub struct ArcadeSprites {
     swarmer_explosion: Arc<RenderedImage>,
     score_250: [Arc<RenderedImage>; 3],
     score_500: [Arc<RenderedImage>; 2],
+    attract_human: Arc<RenderedImage>,
+    attract_lander: Arc<RenderedImage>,
+    attract_mutant: Arc<RenderedImage>,
+    attract_baiter: Arc<RenderedImage>,
+    attract_bombers: [Arc<RenderedImage>; 3],
+    attract_pod: Arc<RenderedImage>,
+    attract_swarmer: Arc<RenderedImage>,
 }
 
 pub fn arcade_sprites() -> &'static ArcadeSprites {
@@ -109,6 +122,17 @@ impl ArcadeSprites {
                 load_embedded_png(include_bytes!("../assets/arcade/score500_1.png")),
                 load_embedded_png(include_bytes!("../assets/arcade/score500_2.png")),
             ],
+            attract_human: load_rom_picture(&ASTP1, crate::object_rom::human_palette()),
+            attract_lander: load_rom_picture(&LNDP1, lander_palette()),
+            attract_mutant: load_rom_picture(&SCZP1, mutant_palette()),
+            attract_baiter: load_rom_picture(&UFOP1, baiter_palette()),
+            attract_bombers: [
+                load_rom_picture(&TIEP1, tie_palette(0)),
+                load_rom_picture(&TIEP1, tie_palette(1)),
+                load_rom_picture(&TIEP1, tie_palette(2)),
+            ],
+            attract_pod: load_rom_picture(&PRBP1, pod_palette()),
+            attract_swarmer: load_rom_picture(&SWPIC1, swarmer_palette()),
         }
     }
 
@@ -142,6 +166,7 @@ impl ArcadeSprites {
         kind: EntityKind,
         facing: HorizontalDirection,
         odd_phase: bool,
+        demo_tick: u16,
     ) -> Arc<RenderedImage> {
         match kind {
             // `amode1.src` uses fixed `PICTS` entries (`...P1`) for the
@@ -152,13 +177,15 @@ impl ArcadeSprites {
             EntityKind::PlayerShip => self.player_ship_for_screen_phase(facing, odd_phase),
             EntityKind::PlayerShot => self.player_shot.clone(),
             EntityKind::EnemyShot => self.enemy_shots[0].clone(),
-            EntityKind::Human => self.human.clone(),
-            EntityKind::Lander => self.landers[0].clone(),
-            EntityKind::Mutant => self.mutants[0].clone(),
-            EntityKind::Baiter => self.baiters[0].clone(),
-            EntityKind::Bomber => self.bombers[0].clone(),
-            EntityKind::Pod => self.pod.clone(),
-            EntityKind::Swarmer => self.swarmer.clone(),
+            EntityKind::Human => self.attract_human.clone(),
+            EntityKind::Lander => self.attract_lander.clone(),
+            EntityKind::Mutant => self.attract_mutant.clone(),
+            EntityKind::Baiter => self.attract_baiter.clone(),
+            EntityKind::Bomber => self.attract_bombers
+                [((demo_tick / 6) as usize) % self.attract_bombers.len()]
+            .clone(),
+            EntityKind::Pod => self.attract_pod.clone(),
+            EntityKind::Swarmer => self.attract_swarmer.clone(),
             EntityKind::Mine => self.mine.clone(),
         }
     }
@@ -374,8 +401,12 @@ mod tests {
     fn attract_enemy_sprites_stay_on_their_rom_p1_family() {
         let sprites = arcade_sprites();
 
-        let attract =
-            sprites.attract_sprite_for_kind(EntityKind::Bomber, HorizontalDirection::Right, false);
+        let attract = sprites.attract_sprite_for_kind(
+            EntityKind::Bomber,
+            HorizontalDirection::Right,
+            false,
+            0,
+        );
         let live = sprites.sprite_for_entity(
             &Entity::new(EntityKind::Bomber, 0, 0, 0, 0),
             20,
@@ -383,11 +414,32 @@ mod tests {
         );
 
         assert_ne!(attract.pixels, live.pixels);
-        assert_eq!(
-            attract.pixels,
-            sprites
-                .attract_sprite_for_kind(EntityKind::Bomber, HorizontalDirection::Right, true)
-                .pixels
+    }
+
+    #[test]
+    fn attract_bomber_follows_rom_tiecol_cycle() {
+        let sprites = arcade_sprites();
+
+        let phase_a = sprites.attract_sprite_for_kind(
+            EntityKind::Bomber,
+            HorizontalDirection::Right,
+            false,
+            0,
         );
+        let phase_b = sprites.attract_sprite_for_kind(
+            EntityKind::Bomber,
+            HorizontalDirection::Right,
+            false,
+            6,
+        );
+        let phase_c = sprites.attract_sprite_for_kind(
+            EntityKind::Bomber,
+            HorizontalDirection::Right,
+            false,
+            12,
+        );
+
+        assert_ne!(phase_a.pixels, phase_b.pixels);
+        assert_ne!(phase_b.pixels, phase_c.pixels);
     }
 }

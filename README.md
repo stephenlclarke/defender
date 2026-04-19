@@ -185,10 +185,10 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   explodes the source object and materializes the table-side icon on the same
   transfer tick, with the legend text now appearing on the later `BMODE2`
   phase instead of on the laser boundary.
-- The instruction-page enemies now stay on the red-label `PICTS` `...P1`
-  families during the attract sequence instead of stepping through the live
-  gameplay sprite animator, so the score-card icons match the cabinet's fixed
-  legend pictures.
+- The instruction-page enemies now decode directly from the red-label `PICTS`
+  `...P1` tables (`LNDP1`, `SCZP1`, `UFOP1`, `TIEP1`, `PRBP1`, `SWPIC1`)
+  instead of stepping through bundled gameplay art, and the attract Bomber/TIE
+  now follows the `TIECOL` colour-task cadence from `defb6.src`.
 - The first attract-page and hall-of-fame screens now keep a live
   elapsed-time colour cycle running during the first `16` seconds of the
   cabinet sequence, matching the flashing/cycling behaviour visible in the
