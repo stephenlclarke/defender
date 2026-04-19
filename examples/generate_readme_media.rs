@@ -162,6 +162,7 @@ fn render_attract_sample(
                 .render(Screen::Attract {
                     frame: &frame,
                     palette_phase: beat.palette_phase,
+                    elapsed_ms,
                 })
                 .clone()
         }

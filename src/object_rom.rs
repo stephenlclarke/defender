@@ -6,11 +6,9 @@ use crate::{
 };
 
 const RED: [u8; 4] = [255, 80, 80, 255];
-const GREEN: [u8; 4] = [0, 190, 0, 255];
 const YELLOW: [u8; 4] = [255, 188, 0, 255];
 const BLUE: [u8; 4] = [40, 56, 220, 255];
 const GRAY: [u8; 4] = [170, 170, 186, 255];
-const BROWN: [u8; 4] = [176, 112, 48, 255];
 const PURPLE: [u8; 4] = [182, 48, 255, 255];
 const WHITE: [u8; 4] = [255, 255, 255, 255];
 const TRANSPARENT: [u8; 4] = [0, 0, 0, 0];
@@ -158,26 +156,34 @@ fn palette_color(index: u8, overrides: PaletteOverrides) -> [u8; 4] {
 }
 
 fn crtab_color_index(index: u8) -> [u8; 4] {
-    crtab_color(CRTAB[index as usize])
+    pseudo_color_rgba(CRTAB[index as usize])
+}
+
+pub fn pseudo_color_rgba(value: u8) -> [u8; 4] {
+    if value == 0 {
+        return TRANSPARENT;
+    }
+
+    // Williams packs pseudo-color RAM as 3 red bits, 3 green bits, and 2 blue
+    // bits. Decode those channels directly instead of keeping a hand-written
+    // lookup for only the subset we happened to use first.
+    let red = scale_channel(value & 0x07, 7);
+    let green = scale_channel((value >> 3) & 0x07, 7);
+    let blue = scale_channel((value >> 6) & 0x03, 3);
+    [red, green, blue, 255]
 }
 
 fn crtab_color(value: u8) -> [u8; 4] {
-    match value {
-        0x07 => RED,
-        0x28 => GREEN,
-        0x2F => YELLOW,
-        0x81 => BLUE,
-        0xA4 => GRAY,
-        0x15 => BROWN,
-        0xC7 => PURPLE,
-        0xFF => WHITE,
-        _ => TRANSPARENT,
-    }
+    pseudo_color_rgba(value)
+}
+
+fn scale_channel(value: u8, max: u8) -> u8 {
+    ((u16::from(value) * 255) / u16::from(max.max(1))) as u8
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{render_picture, score_500_palette, ship_palette, tie_palette};
+    use super::{pseudo_color_rgba, render_picture, score_500_palette, ship_palette, tie_palette};
     use crate::object_rom_data::{C5P1, PLAPIC, TIEP1};
 
     #[test]
@@ -203,5 +209,16 @@ mod tests {
         let next = render_picture(&C5P1, score_500_palette(1));
 
         assert_ne!(first.pixels, next.pixels);
+    }
+
+    #[test]
+    fn pseudo_color_decoder_matches_known_primary_examples() {
+        let red = pseudo_color_rgba(0x07);
+        let green = pseudo_color_rgba(0x28);
+        let blue = pseudo_color_rgba(0x81);
+
+        assert!(red[0] > red[1] && red[0] > red[2]);
+        assert!(green[1] > green[0] && green[1] > green[2]);
+        assert!(blue[2] > blue[0] && blue[2] > blue[1]);
     }
 }

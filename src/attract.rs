@@ -326,7 +326,7 @@ fn demo_cue_for_tick(tick: u16) -> SoundCue {
     let rescue_tick_5 = rescue_tick_4 + RESCUE_SCORE_TICKS;
     let rescue_tick_6 = rescue_tick_5 + RESCUE_RETURN_TICKS;
 
-    if tick == rescue_tick_1 || tick == rescue_tick_2 {
+    if tick == rescue_tick_1 {
         SoundCue::AttractHum
     } else if tick == rescue_tick_2 {
         SoundCue::PlayerShot
@@ -984,6 +984,13 @@ mod tests {
         assert!(caught_frame.objects.iter().any(
             |object| object.kind == EntityKind::Human && object.x16 == ATTRACT_CAUGHT_HUMAN_X16
         ));
+    }
+
+    #[test]
+    fn rescue_sequence_uses_player_shot_cue_on_the_laser_tick() {
+        let laser_tick = RESCUE_DESCENT_TICKS + RESCUE_ASCENT_TICKS;
+
+        assert_eq!(super::demo_cue_for_tick(laser_tick), SoundCue::PlayerShot);
     }
 
     #[test]

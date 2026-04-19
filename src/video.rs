@@ -7,6 +7,7 @@ use crate::{
     font::arcade_font,
     game::{Entity, EntityKind, HorizontalDirection, World},
     high_scores::{HighScoreEntry, HighScoreTable},
+    object_rom::pseudo_color_rgba,
     render::InitialsEntryView,
     sprites::arcade_sprites,
     terminal::TerminalGeometry,
@@ -81,6 +82,7 @@ pub enum Screen<'a> {
     Attract {
         frame: &'a AttractFrame,
         palette_phase: usize,
+        elapsed_ms: u64,
     },
     HighScores {
         todays: &'a HighScoreTable,
@@ -219,7 +221,8 @@ impl Renderer {
             Screen::Attract {
                 frame,
                 palette_phase,
-            } => self.render_attract_screen(frame, palette_phase),
+                elapsed_ms,
+            } => self.render_attract_screen(frame, palette_phase, elapsed_ms),
             Screen::HighScores {
                 todays,
                 all_time,
@@ -336,9 +339,14 @@ impl Renderer {
         }
     }
 
-    fn render_attract_screen(&mut self, frame: &AttractFrame, palette_phase: usize) {
+    fn render_attract_screen(
+        &mut self,
+        frame: &AttractFrame,
+        palette_phase: usize,
+        elapsed_ms: u64,
+    ) {
         let world = &frame.world;
-        let palette = attract_palette(palette_phase, 0);
+        let palette = attract_palette(palette_phase, elapsed_ms);
         // `LEDRET` rebuilds the cabinet playfield via `SCINIT`, `BORDER`,
         // `SCPROC`, and `TEXTP`, so the attract demo uses the same broad
         // scanner/playfield composition as the cabinet instead of the normal
@@ -647,6 +655,7 @@ impl Renderer {
     }
 
     fn draw_gameplay_hud(&mut self, world: &World, scanner: Rect) {
+        let hud_color = scanner_hud_color(world);
         let baseline_y = scanner.y + scanner.height + 10;
         let pod_y = scanner.y + 8;
         let pod_height = scanner.height - 16;
@@ -669,22 +678,16 @@ impl Renderer {
             baseline_y,
             self.image_width as i32 - 24,
             baseline_y,
-            Color::from_rgba(SCANNER_BORDER),
+            Color::from_rgba(hud_color),
             2,
         );
-        self.stroke_rect(left_pod, Color::from_rgba(SCANNER_BORDER), 4);
+        self.stroke_rect(left_pod, Color::from_rgba(hud_color), 4);
         self.fill_rect(left_pod.inset(4), Color::from_rgba(BACKGROUND));
-        self.stroke_rect(right_pod, Color::from_rgba(SCANNER_BORDER), 4);
+        self.stroke_rect(right_pod, Color::from_rgba(hud_color), 4);
         self.fill_rect(right_pod.inset(4), Color::from_rgba(BACKGROUND));
 
         let score_text = format!("{:>5}", world.status().score);
-        self.draw_text(
-            left_pod.x + 18,
-            left_pod.y + 26,
-            &score_text,
-            scanner_hud_color(world),
-            4,
-        );
+        self.draw_text(left_pod.x + 18, left_pod.y + 26, &score_text, hud_color, 4);
         for index in 0..world.status().lives {
             let icon = arcade_sprites().player_stock_icon();
             self.draw_scaled_image_centered(
@@ -699,7 +702,7 @@ impl Renderer {
             right_pod.x + 16,
             right_pod.y + 16,
             &format!("{:>4}", world.status().wave),
-            scanner_hud_color(world),
+            hud_color,
             3,
         );
         self.draw_text(
@@ -722,7 +725,7 @@ impl Renderer {
     }
 
     fn draw_arcade_play_scanner(&mut self, world: &World, rect: Rect) {
-        self.stroke_rect(rect, Color::from_rgba(SCANNER_BORDER), 4);
+        self.stroke_rect(rect, Color::from_rgba(scanner_hud_color(world)), 4);
         let inner = rect.inset(4);
         self.fill_rect(inner, Color::from_rgba(BACKGROUND));
 
@@ -2362,11 +2365,13 @@ fn scanner_color(kind: EntityKind) -> [u8; 4] {
 }
 
 fn scanner_hud_color(world: &World) -> [u8; 4] {
-    match world.status().wave % 3 {
-        1 => [235, 229, 156, 255],
-        2 => [182, 255, 76, 255],
-        _ => [84, 196, 255, 255],
-    }
+    // `PLSTR5` selects `PCRAM+5` from the red-label `WCTAB` wave-color table
+    // instead of using a fixed HUD tint. Decode that same pseudo-color byte for
+    // the gameplay scanner block so the score pods and scanner border follow
+    // the cabinet's per-wave colour walk.
+    const WCTAB: [u8; 7] = [0x81, 0x28, 0x07, 0x16, 0x2F, 0x84, 0x15];
+    let wave_index = world.status().wave.saturating_sub(1) as usize % WCTAB.len();
+    pseudo_color_rgba(WCTAB[wave_index])
 }
 
 fn attract_legend_color(kind: EntityKind) -> [u8; 4] {
@@ -2638,6 +2643,33 @@ mod tests {
                 todays: &todays,
                 all_time: &all_time,
                 palette_phase: 0,
+                elapsed_ms: 240,
+            })
+            .clone();
+
+        assert_ne!(frame_a.pixels, frame_b.pixels);
+    }
+
+    #[test]
+    fn attract_screen_palette_cycles_over_elapsed_time() {
+        let mut renderer = Renderer::with_size(960, 720);
+        let beat = crate::attract::attract_cycle()
+            .into_iter()
+            .find(|beat| beat.kind == crate::attract::SceneKind::Attract)
+            .expect("attract cycle should include an attract frame");
+        let frame = crate::attract::attract_frame_for_beat(beat);
+
+        let frame_a = renderer
+            .render(Screen::Attract {
+                frame: &frame,
+                palette_phase: beat.palette_phase,
+                elapsed_ms: 0,
+            })
+            .clone();
+        let frame_b = renderer
+            .render(Screen::Attract {
+                frame: &frame,
+                palette_phase: beat.palette_phase,
                 elapsed_ms: 240,
             })
             .clone();

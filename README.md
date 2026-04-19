@@ -164,13 +164,20 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The first attract-page and hall-of-fame screens now keep a live
   elapsed-time colour cycle running during the first `16` seconds of the
   cabinet sequence, matching the flashing/cycling behaviour visible in the
-  original attract-mode capture instead of holding a fixed palette per beat.
+  original attract-mode capture instead of holding a fixed palette per beat;
+  the instruction/demo page now advances that same palette task from elapsed
+  attract time too, rather than freezing the colours once the rescue/scoring
+  section starts.
 - The live gameplay renderer now uses a cabinet-style open black playfield with
   amber terrain, clipped sprite drawing, a centered scanner block with score
   side pods, a sparser mixed-colour starfield, colour-cycling attract `500`
   bonus text, a segmented cycling attract/gameplay laser beam, and larger
   hall-of-fame score rows, so the README screenshot and attract GIF are closer
   to the original cabinet framing and effects.
+- The gameplay scanner block and score pods now derive their wave tint from the
+  red-label `WCTAB` colour table instead of the earlier three-colour heuristic,
+  so the HUD border/score colour progression follows the cabinet source more
+  closely.
 - Gameplay sprite phasing now follows ROM-informed display rules more closely:
   the player ship uses left/right cabinet art with horizontal display-phase
   selection instead of a made-up tick animation, shared enemy animation now
@@ -187,7 +194,9 @@ Extra keys and game behaviour while `xyzzy` mode is active:
   `VSNDRM1.SRC` radio, filtered-noise, scream, organ, and GWAVE routines into
   Rust sample generation instead of decoding pre-rendered WAV cue files, and
   the live loop now queues overlapping cue playback instead of blocking the
-  frame loop on one sound at a time.
+  frame loop on one sound at a time, with title/attract playback now triggering
+  cue changes from the attract beat stream rather than staying almost entirely
+  silent outside live gameplay.
 - `cargo run` / `defender` now launch the real Kitty-graphics play loop with keyboard
   input, title/start flow, player shots, incoming enemy fire, smart bombs,
   hyperspace, enemy hits, wave progression, human abductions, falling-human

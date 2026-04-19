@@ -27,6 +27,7 @@ pub fn run_live(play_audio: bool) -> Result<()> {
     let mut renderer = Renderer::new(terminal_geometry);
     let mut graphics = KittyGraphics::new(terminal_geometry.cols, terminal_geometry.rows);
     let mut title_started_at = Instant::now();
+    let mut previous_title_cue = None;
     let mut previous_mode = session.mode();
 
     draw_frame(
@@ -36,6 +37,13 @@ pub fn run_live(play_audio: bool) -> Result<()> {
         &mut graphics,
         title_started_at.elapsed().as_millis() as u64,
     )?;
+    if play_audio && session.mode() == SessionMode::Title {
+        previous_title_cue = play_title_cue(
+            &mut audio,
+            title_started_at.elapsed().as_millis() as u64,
+            None,
+        );
+    }
 
     loop {
         let frame_started = Instant::now();
@@ -50,6 +58,10 @@ pub fn run_live(play_audio: bool) -> Result<()> {
         if session.mode() != previous_mode {
             if session.mode() == SessionMode::Title {
                 title_started_at = Instant::now();
+                previous_title_cue = None;
+            }
+            if previous_mode == SessionMode::Title && session.mode() != SessionMode::Title {
+                previous_title_cue = None;
             }
             previous_mode = session.mode();
         }
@@ -62,6 +74,13 @@ pub fn run_live(play_audio: bool) -> Result<()> {
         )?;
 
         if play_audio {
+            if session.mode() == SessionMode::Title {
+                previous_title_cue = play_title_cue(
+                    &mut audio,
+                    title_started_at.elapsed().as_millis() as u64,
+                    previous_title_cue,
+                );
+            }
             for cue in cues_for_events(&events) {
                 audio.play_cue(cue);
             }
@@ -186,6 +205,7 @@ fn render_title_frame<'a>(
             renderer.render(Screen::Attract {
                 frame: &frame,
                 palette_phase: beat.palette_phase,
+                elapsed_ms: attract_elapsed_ms,
             })
         }
         SceneKind::HighScore => renderer.render(Screen::HighScores {
@@ -199,6 +219,20 @@ fn render_title_frame<'a>(
 
 fn title_beat_for_elapsed_ms(elapsed_ms: u64) -> AttractBeat {
     beat_for_elapsed_ms(elapsed_ms)
+}
+
+fn play_title_cue(
+    audio: &mut AudioManager,
+    attract_elapsed_ms: u64,
+    previous_cue: Option<SoundCue>,
+) -> Option<SoundCue> {
+    let cue = title_beat_for_elapsed_ms(attract_elapsed_ms).cue;
+    if cue != previous_cue
+        && let Some(cue) = cue
+    {
+        audio.play_cue(cue);
+    }
+    cue
 }
 
 fn cues_for_events(events: &[SessionEvent]) -> Vec<SoundCue> {
