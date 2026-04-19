@@ -189,6 +189,7 @@ pub struct World {
     next_wave_reinforcement_tick: u32,
     game_over: bool,
     status: Status,
+    rand_state: RomRandState,
     terrain: Vec<usize>,
     entities: Vec<Entity>,
 }
@@ -231,6 +232,7 @@ impl World {
                 lives: DEFAULT_LIVES,
                 wave: DEFAULT_WAVE,
             },
+            rand_state: RomRandState::default(),
             terrain,
             entities,
         }
@@ -259,6 +261,7 @@ impl World {
             next_wave_reinforcement_tick: 0,
             game_over: false,
             status,
+            rand_state: RomRandState::default(),
             terrain: build_flat_terrain(width, height),
             entities,
         }
@@ -1616,8 +1619,7 @@ impl World {
             return;
         }
 
-        let count =
-            rom_probe_swarmer_burst_count(self.status.wave, self.tick, pod_position).min(available);
+        let count = rom_probe_swarmer_burst_count(self.rand_state.seed).min(available);
         let player_position = self.player_position();
         let direction = player_position
             .map(|player| shortest_wrapped_delta(pod_position.x, player.x, self.world_span))
@@ -2075,15 +2077,9 @@ impl World {
             ));
         }
 
-        for slot in 0..wave_profile.pods {
-            let (screen_x, y, velocity) = rom_probe_spawn_for_wave(
-                self.status.wave,
-                self.tick,
-                slot,
-                self.width,
-                min_y,
-                max_y,
-            );
+        for _ in 0..wave_profile.pods {
+            let (screen_x, y, velocity) =
+                rom_probe_spawn_for_wave(&mut self.rand_state, self.width, min_y, max_y);
             let x = self.world_x_for_screen_x(screen_x);
             let y = y.min(self.safe_altitude_at_world_x(x)).max(min_y);
             enemies.push(Entity::new(EntityKind::Pod, x, y, velocity.dx, velocity.dy));
@@ -2371,26 +2367,40 @@ fn next_stock_award_score(score: u32) -> u32 {
         .saturating_mul(bonus_stock_score)
 }
 
+fn scale_rom_probe_x_fixed_to_screen(rom_x: u16, screen_width: usize) -> usize {
+    const ROM_XMIN: u16 = 0x1000;
+    const ROM_XMAX: u16 = 0x4FFF;
+
+    if screen_width <= 1 {
+        return 0;
+    }
+
+    let max_screen_x = screen_width as u32 - 1;
+    let span = u32::from(ROM_XMAX - ROM_XMIN);
+    let offset = u32::from(rom_x.saturating_sub(ROM_XMIN)).min(span);
+
+    (offset * max_screen_x / span) as usize
+}
+
 fn rom_probe_spawn_for_wave(
-    wave: u8,
-    tick: u32,
-    slot: u8,
+    rand_state: &mut RomRandState,
     screen_width: usize,
     min_y: i32,
     max_y: i32,
 ) -> (usize, i32, Velocity) {
-    let (hseed_hi, hseed_lo, seed, lseed) = rom_probe_seed_bytes(wave, tick, u32::from(slot));
-    let rom_x = i32::from(hseed_hi & 0x3F) + 0x10;
-    let rom_y = i32::from(hseed_lo >> 1) + 42;
-    let screen_x = scale_rom_probe_x_to_screen(rom_x, screen_width);
+    rand_state.advance();
+    let rom_x_hi = (rand_state.hseed & 0x3F).wrapping_add(0x10);
+    let rom_x = u16::from_be_bytes([rom_x_hi, rand_state.lseed]);
+    let rom_y = i32::from(rand_state.lseed >> 1) + 42;
+    let screen_x = scale_rom_probe_x_fixed_to_screen(rom_x, screen_width);
     let y = scale_rom_probe_y_to_world(rom_y, min_y, max_y);
 
     (
         screen_x,
         y,
         Velocity {
-            dx: rom_probe_horizontal_velocity(seed),
-            dy: rom_probe_vertical_velocity(lseed),
+            dx: rom_probe_horizontal_velocity(rand_state.seed),
+            dy: rom_probe_vertical_velocity(rand_state.lseed),
         },
     )
 }
@@ -2410,12 +2420,7 @@ fn rom_rmax(max: u8, mut seed: u8) -> usize {
     usize::from(seed) + 1
 }
 
-fn rom_probe_swarmer_burst_count(wave: u8, tick: u32, position: Position) -> usize {
-    let (_, _, seed, _) = rom_probe_seed_bytes(
-        wave,
-        tick,
-        ((position.x as u32) << 8) ^ (position.y as u32) ^ 0x5052_424b,
-    );
+fn rom_probe_swarmer_burst_count(seed: u8) -> usize {
     rom_rmax(6, seed)
 }
 
@@ -2526,6 +2531,7 @@ fn rom_accumulate_vertical_velocity(current: i32, step: i32) -> i32 {
     (current + step).clamp(-2, 2)
 }
 
+#[cfg(test)]
 fn scale_rom_probe_x_to_screen(rom_x: i32, screen_width: usize) -> usize {
     if screen_width <= 1 {
         return 0;
@@ -3062,14 +3068,25 @@ mod tests {
     }
 
     #[test]
-    fn rom_probe_spawn_stays_within_the_visible_band() {
-        for slot in 0..4 {
-            let (screen_x, y, velocity) = rom_probe_spawn_for_wave(4, 0, slot, 64, 1, 9);
-            assert!(screen_x < 64);
-            assert!((1..=9).contains(&y));
-            assert_ne!(velocity.dx, 0);
-            assert!(matches!(velocity.dy, -1 | 1));
-        }
+    fn rom_probe_spawn_follows_prbst_seed_walk() {
+        let mut rand_state = RomRandState::default();
+
+        assert_eq!(
+            rom_probe_spawn_for_wave(&mut rand_state, 64, 1, 9),
+            (18, 6, Velocity { dx: -2, dy: -1 })
+        );
+        assert_eq!(
+            rom_probe_spawn_for_wave(&mut rand_state, 64, 1, 9),
+            (40, 3, Velocity { dx: -2, dy: 1 })
+        );
+        assert_eq!(
+            rom_probe_spawn_for_wave(&mut rand_state, 64, 1, 9),
+            (51, 6, Velocity { dx: 2, dy: -1 })
+        );
+        assert_eq!(
+            rom_probe_spawn_for_wave(&mut rand_state, 64, 1, 9),
+            (25, 3, Velocity { dx: -1, dy: 1 })
+        );
     }
 
     #[test]
@@ -4692,10 +4709,7 @@ mod tests {
         let swarmer_count = world.entity_count_by_kind(EntityKind::Swarmer);
 
         assert_eq!(world.entity_count_by_kind(EntityKind::Pod), 0);
-        assert_eq!(
-            swarmer_count,
-            rom_probe_swarmer_burst_count(3, 1, Position { x: 10, y: 5 })
-        );
+        assert_eq!(swarmer_count, rom_probe_swarmer_burst_count(0));
         assert_eq!(world.status().score, 1_000);
         assert!(events.contains(&WorldEvent::EnemyDestroyed));
         let swarmer_speed = rom_swarmer_horizontal_velocity(
@@ -4718,10 +4732,7 @@ mod tests {
 
     #[test]
     fn rom_probe_swarmer_burst_count_matches_prbkil_range() {
-        let position = Position { x: 10, y: 5 };
-        let counts: Vec<usize> = (0..32)
-            .map(|tick| rom_probe_swarmer_burst_count(3, tick, position))
-            .collect();
+        let counts: Vec<usize> = (0..32).map(rom_probe_swarmer_burst_count).collect();
 
         assert!(counts.iter().all(|count| (1..=7).contains(count)));
         assert!(counts.windows(2).any(|pair| pair[0] != pair[1]));
