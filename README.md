@@ -170,6 +170,12 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 - The instruction-page scanner markers now use the red-label `BLIPS` /
   `OBJCOL` packed colour words for enemies and Eugene instead of generic
   projected dots, so the attract scanner reads closer to the cabinet page.
+- The instruction-page enemy labels and score rows now wait for the cabinet
+  `TEXTP` six-tick refresh cadence after each `BMODE2` advance, instead of
+  appearing immediately on the reveal-stage boundary.
+- The instruction-page `SCANNER` label and enemy legend text now follow the
+  red-label `COLR` / `COLTAB` colour walk instead of using hand-authored
+  per-enemy colours.
 - The attract score-card kills now preserve the real enemy picture family
   through the red-label `AMOD10` / `AMOD11` / `BMODE2` / `BMODE3` split
   instead of swapping every hit to a generic blast, so the rescue/legend

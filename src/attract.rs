@@ -28,6 +28,7 @@ const LEGEND_REVEAL_TICKS: u16 = 0x20;
 const LEGEND_ENTRY_TICKS: u16 =
     LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TRANSFER_TICKS + LEGEND_REVEAL_TICKS;
 const LEGEND_HOLD_TICKS: u16 = 0xFF + 0xFF;
+const TEXTP_TICKS: u16 = 6;
 const ATTRACT_PLAYER_X16: i32 = 0x0800;
 const ATTRACT_PLAYER_Y16: i32 = 0x5000;
 const ATTRACT_HUMAN_X16: i32 = 0x1E00;
@@ -55,6 +56,8 @@ pub struct AttractFrame {
     pub world: World,
     pub objects: Vec<AttractObject>,
     pub revealed_score_entries: usize,
+    pub visible_legend_text_entries: usize,
+    pub demo_tick: u16,
     pub bonus_text: Option<AttractBonusText>,
     pub player_facing: HorizontalDirection,
     pub animation_tick: u32,
@@ -423,6 +426,8 @@ pub fn attract_frame_for_beat(beat: AttractBeat) -> AttractFrame {
                 world,
                 objects: Vec::new(),
                 revealed_score_entries: beat.revealed_score_entries,
+                visible_legend_text_entries: 0,
+                demo_tick: 0,
                 bonus_text: None,
                 player_facing: HorizontalDirection::Right,
                 animation_tick: 0,
@@ -610,6 +615,7 @@ fn scripted_attract_frame_for_stage(stage: AttractDemoStage, tick: u16) -> Attra
         .map(|object| rom_entity_with_state(object.kind, object.x16, object.y16, object.state))
         .collect();
     AttractFrame {
+        demo_tick: demo_tick_for_stage(stage, tick),
         world: scripted_world(
             0,
             rom_x_to_world(ATTRACT_PLAYER_START_X << 8),
@@ -619,6 +625,7 @@ fn scripted_attract_frame_for_stage(stage: AttractDemoStage, tick: u16) -> Attra
         ),
         objects,
         revealed_score_entries,
+        visible_legend_text_entries: legend_text_entries_for_stage(stage, tick),
         bonus_text,
         player_facing: facing,
         animation_tick,
@@ -748,6 +755,40 @@ fn revealed_score_entries_for_stage(stage: AttractDemoStage) -> usize {
         | AttractDemoStage::LegendTransfer(index) => index,
         _ => 0,
     }
+}
+
+fn legend_text_entries_for_stage(stage: AttractDemoStage, local_tick: u16) -> usize {
+    let demo_tick = demo_tick_for_stage(stage, local_tick);
+
+    ATTRACT_ROM_LEGEND
+        .iter()
+        .enumerate()
+        .take_while(|(index, _)| {
+            let bmode2_tick = demo_tick_for_stage(AttractDemoStage::LegendReveal(*index), 0);
+            demo_tick >= next_text_process_tick(bmode2_tick)
+        })
+        .count()
+}
+
+fn next_text_process_tick(tick: u16) -> u16 {
+    let remainder = tick % TEXTP_TICKS;
+    if remainder == 0 {
+        tick
+    } else {
+        tick + (TEXTP_TICKS - remainder)
+    }
+}
+
+fn demo_tick_for_stage(target_stage: AttractDemoStage, local_tick: u16) -> u16 {
+    let mut elapsed = 0;
+    for (stage, duration) in attract_demo_timeline() {
+        if stage == target_stage {
+            return elapsed + local_tick.min(duration.saturating_sub(1));
+        }
+        elapsed += duration;
+    }
+
+    elapsed
 }
 
 fn stage_animation_tick(stage: AttractDemoStage, local_tick: u16) -> u32 {
@@ -1005,7 +1046,7 @@ mod tests {
         LEGEND_APPROACH_TICKS, LEGEND_LASER_TICKS, LEGEND_TRANSFER_TICKS, RESCUE_ASCENT_TICKS,
         RESCUE_DESCENT_TICKS, RESCUE_FALL_TICKS, RESCUE_LASER_TICKS, RESCUE_RETURN_TICKS,
         RESCUE_SCORE_TICKS, SceneKind, attract_cycle, attract_scene, demo_stage_for_tick,
-        high_score_scene, logo_scene, revealed_score_entries_for_stage, scene_for_elapsed_ms,
+        high_score_scene, legend_text_entries_for_stage, logo_scene, scene_for_elapsed_ms,
         scripted_attract_frame_for_tick,
     };
 
@@ -1153,22 +1194,28 @@ mod tests {
     }
 
     #[test]
-    fn legend_text_appears_when_bmode2_starts() {
+    fn legend_text_waits_for_text_process_refresh() {
         let table_start = RESCUE_DESCENT_TICKS
             + RESCUE_ASCENT_TICKS
             + RESCUE_LASER_TICKS
             + RESCUE_FALL_TICKS
             + RESCUE_SCORE_TICKS
             + RESCUE_RETURN_TICKS;
-        let just_before_text =
-            table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TRANSFER_TICKS - 1;
-        let first_text_tick =
+        let reveal_start =
             table_start + LEGEND_APPROACH_TICKS + LEGEND_LASER_TICKS + LEGEND_TRANSFER_TICKS;
 
-        let (before_stage, _) = demo_stage_for_tick(just_before_text);
-        let (text_stage, _) = demo_stage_for_tick(first_text_tick);
-        assert_eq!(revealed_score_entries_for_stage(before_stage), 0);
-        assert_eq!(revealed_score_entries_for_stage(text_stage), 1);
+        let (reveal_stage, reveal_tick_zero) = demo_stage_for_tick(reveal_start);
+        let (_, reveal_tick_one) = demo_stage_for_tick(reveal_start + 1);
+
+        assert_eq!(reveal_stage, AttractDemoStage::LegendReveal(0));
+        assert_eq!(
+            legend_text_entries_for_stage(reveal_stage, reveal_tick_zero),
+            0
+        );
+        assert_eq!(
+            legend_text_entries_for_stage(reveal_stage, reveal_tick_one),
+            1
+        );
     }
 
     #[test]

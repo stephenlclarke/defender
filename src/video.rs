@@ -28,8 +28,6 @@ const TEXT_WARNING: [u8; 4] = [255, 200, 88, 255];
 const TEXT_DANGER: [u8; 4] = [255, 96, 88, 255];
 const TEXT_SCORE_BLUE: [u8; 4] = [84, 196, 255, 255];
 const TEXT_ARCADE_WHITE: [u8; 4] = [246, 246, 246, 255];
-const TEXT_ATTRACT_PURPLE: [u8; 4] = [182, 96, 255, 255];
-const TEXT_ATTRACT_MAGENTA: [u8; 4] = [220, 116, 255, 255];
 const TEXT_SCANNER_GREEN: [u8; 4] = [182, 255, 76, 255];
 const TERRAIN_LINE: [u8; 4] = [72, 224, 96, 255];
 const TERRAIN_FILL: [u8; 4] = [11, 50, 22, 255];
@@ -169,7 +167,6 @@ struct AttractPalette {
     title_text: [u8; 4],
     defender_face: [u8; 4],
     defender_shadow: [u8; 4],
-    scanner_text: [u8; 4],
     scanner_border: [u8; 4],
 }
 
@@ -408,11 +405,12 @@ impl Renderer {
         );
         let (scanner_text_x, scanner_text_y) =
             self.project_attract_screen_address(ATTRACT_SCANNER_TEXT_ADDR);
+        let legend_text_color = attract_legend_text_color(frame.demo_tick);
         self.draw_text(
             scanner_text_x,
             scanner_text_y,
             "SCANNER",
-            palette.scanner_text,
+            legend_text_color,
             3,
         );
         let playfield = Rect {
@@ -459,7 +457,7 @@ impl Renderer {
         if let Some(bonus_text) = frame.bonus_text {
             self.draw_attract_bonus_text(bonus_text, playfield, frame.animation_tick);
         }
-        self.draw_attract_legend_entries(frame.revealed_score_entries);
+        self.draw_attract_legend_entries(frame.visible_legend_text_entries, legend_text_color);
     }
 
     fn render_high_scores_screen(
@@ -1467,12 +1465,11 @@ impl Renderer {
         self.draw_text(x, y + 22, "SMART BOMBS INF", TEXT_PRIMARY, 1);
     }
 
-    fn draw_attract_legend_entries(&mut self, revealed_score_entries: usize) {
+    fn draw_attract_legend_entries(&mut self, revealed_score_entries: usize, color: [u8; 4]) {
         const LABEL_SCALE: i32 = 2;
         const SCORE_SCALE: i32 = 2;
         const ROM_LINE_STEP: i32 = 18;
         for entry in ATTRACT_SCORE_CARD.into_iter().take(revealed_score_entries) {
-            let color = attract_legend_color(entry.kind);
             let (label_x, label_y) = self.project_attract_screen_address(entry.text_addr);
             self.draw_text(label_x, label_y, entry.label, color, LABEL_SCALE);
 
@@ -2352,7 +2349,6 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
             title_text: [248, 192, 64, 255],
             defender_face: [112, 255, 52, 255],
             defender_shadow: [255, 48, 48, 255],
-            scanner_text: TEXT_ATTRACT_PURPLE,
             scanner_border: [67, 114, 198, 255],
         },
         1 => AttractPalette {
@@ -2360,7 +2356,6 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
             title_text: [248, 208, 96, 255],
             defender_face: [144, 255, 80, 255],
             defender_shadow: [255, 72, 56, 255],
-            scanner_text: TEXT_ATTRACT_MAGENTA,
             scanner_border: [82, 132, 220, 255],
         },
         2 => AttractPalette {
@@ -2368,7 +2363,6 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
             title_text: [236, 184, 56, 255],
             defender_face: [96, 240, 48, 255],
             defender_shadow: [236, 40, 72, 255],
-            scanner_text: [164, 88, 244, 255],
             scanner_border: [60, 106, 188, 255],
         },
         _ => AttractPalette {
@@ -2376,7 +2370,6 @@ fn attract_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
             title_text: [255, 216, 120, 255],
             defender_face: [176, 255, 96, 255],
             defender_shadow: [255, 108, 64, 255],
-            scanner_text: [206, 108, 255, 255],
             scanner_border: [94, 146, 230, 255],
         },
     }
@@ -2393,7 +2386,6 @@ fn logo_page_palette(phase: usize, elapsed_ms: u64) -> AttractPalette {
         title_text: LOGO_COLOR_SEQUENCE[(index + 3) % LOGO_COLOR_SEQUENCE.len()],
         defender_face: LOGO_COLOR_SEQUENCE[(index + 5) % LOGO_COLOR_SEQUENCE.len()],
         defender_shadow: LOGO_COLOR_SEQUENCE[(index + 10) % LOGO_COLOR_SEQUENCE.len()],
-        scanner_text: TEXT_ATTRACT_PURPLE,
         scanner_border: [67, 114, 198, 255],
     }
 }
@@ -2545,16 +2537,10 @@ fn rom_addr_to_native_y(address: u16) -> i32 {
     i32::from(address & 0x00FF)
 }
 
-fn attract_legend_color(kind: EntityKind) -> [u8; 4] {
-    match kind {
-        EntityKind::Lander => [248, 232, 132, 255],
-        EntityKind::Mutant => [102, 232, 255, 255],
-        EntityKind::Baiter => [182, 120, 255, 255],
-        EntityKind::Bomber => [108, 255, 120, 255],
-        EntityKind::Pod => [255, 176, 96, 255],
-        EntityKind::Swarmer => [232, 96, 255, 255],
-        _ => TEXT_ATTRACT_PURPLE,
-    }
+fn attract_legend_text_color(demo_tick: u16) -> [u8; 4] {
+    // `COLR` advances through `COLTAB` every 2 ticks and drives the shared
+    // instruction-page letter color via `PCRAM+1`.
+    coltab_color((demo_tick / 2) as usize)
 }
 
 fn sprite_draw_height(kind: EntityKind, scale: i32) -> i32 {
@@ -2716,6 +2702,8 @@ mod tests {
             world: World::bootstrap(),
             objects: Vec::new(),
             revealed_score_entries: 0,
+            visible_legend_text_entries: 0,
+            demo_tick: 0,
             bonus_text: Some(AttractBonusText {
                 text: "500",
                 x16: 0x1DFF,
@@ -2728,6 +2716,8 @@ mod tests {
             world: World::bootstrap(),
             objects: Vec::new(),
             revealed_score_entries: 0,
+            visible_legend_text_entries: 0,
+            demo_tick: 5,
             bonus_text: Some(AttractBonusText {
                 text: "500",
                 x16: 0x1DFF,
