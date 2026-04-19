@@ -27,6 +27,7 @@ const TEXT_SCORE_BLUE: [u8; 4] = [84, 196, 255, 255];
 const TEXT_ARCADE_WHITE: [u8; 4] = [246, 246, 246, 255];
 const TEXT_ATTRACT_PURPLE: [u8; 4] = [182, 96, 255, 255];
 const TEXT_ATTRACT_MAGENTA: [u8; 4] = [220, 116, 255, 255];
+const TEXT_SCANNER_GREEN: [u8; 4] = [182, 255, 76, 255];
 const TERRAIN_LINE: [u8; 4] = [72, 224, 96, 255];
 const TERRAIN_FILL: [u8; 4] = [11, 50, 22, 255];
 const TERRAIN_AMBER_LINE: [u8; 4] = [255, 164, 40, 255];
@@ -460,11 +461,12 @@ impl Renderer {
         invincible: bool,
         auto_fire: bool,
     ) {
-        let playfield = self.default_playfield_rect();
+        let scanner = self.gameplay_scanner_rect();
+        let playfield = self.gameplay_playfield_rect(scanner);
         self.draw_space_backdrop(world.tick(), Some(playfield));
         self.draw_hud(world);
-        self.draw_scanner(world, self.default_scanner_rect());
-        self.draw_world_panel(world, playfield, true);
+        self.draw_arcade_play_scanner(world, scanner);
+        self.draw_world_panel(world, playfield, false);
         self.draw_secret_status(
             xyzzy_active,
             invincible,
@@ -618,61 +620,100 @@ impl Renderer {
     }
 
     fn draw_hud(&mut self, world: &World) {
-        self.draw_text(24, 18, "DEFENDER", TEXT_WARNING, 3);
         self.draw_text(
-            262,
-            20,
-            &format!("SCORE {:06}", world.status().score),
-            TEXT_PRIMARY,
+            28,
+            16,
+            &format!("{:>6}", world.status().score),
+            TEXT_ARCADE_WHITE,
             2,
         );
+        let right_status = format!(
+            "LIVES {}   WAVE {}   BOMBS {}",
+            world.status().lives,
+            world.status().wave,
+            world.smart_bombs()
+        );
+        let status_width = arcade_font().text_width(&right_status, 2);
         self.draw_text(
-            500,
-            20,
-            &format!("LIVES {}", world.status().lives),
-            TEXT_PRIMARY,
+            self.image_width as i32 - status_width - 28,
+            16,
+            &right_status,
+            TEXT_ARCADE_WHITE,
             2,
         );
-        self.draw_text(
-            642,
-            20,
-            &format!("WAVE {}", world.status().wave),
-            TEXT_PRIMARY,
-            2,
-        );
-        self.draw_text(
-            760,
-            20,
-            &format!("BOMBS {}", world.smart_bombs()),
-            TEXT_PRIMARY,
-            2,
-        );
-        self.draw_text(
-            24,
-            52,
-            &format!(
-                "ENEMIES {}   HUMANS {}   THREAT {}",
-                world.enemy_count(),
-                world.human_count(),
-                world.threat_score()
-            ),
-            TEXT_SECONDARY,
-            2,
-        );
-        self.draw_text(
-            642,
-            52,
-            if world.planet_destroyed() {
-                "DEEP SPACE"
+
+        if world.planet_destroyed() {
+            self.draw_centered_text(
+                self.image_width as i32 / 2,
+                18,
+                "DEEP SPACE",
+                TEXT_DANGER,
+                2,
+            );
+        }
+    }
+
+    fn draw_arcade_play_scanner(&mut self, world: &World, rect: Rect) {
+        self.stroke_rect(rect, Color::from_rgba(SCANNER_BORDER), 4);
+        let inner = rect.inset(4);
+        self.fill_rect(inner, Color::from_rgba(BACKGROUND));
+
+        if !world.planet_destroyed() {
+            let terrain_y = inner.y + inner.height - 12;
+            let mut previous = None;
+            for screen_x in 0..world.width() {
+                let x = inner.x
+                    + ((screen_x as f32 + 0.5) * inner.width as f32 / world.width() as f32).round()
+                        as i32;
+                let terrain_row = world.terrain_row_at_screen_x(screen_x) as f32;
+                let terrain_offset =
+                    ((terrain_row / world.height() as f32) * 18.0).round() as i32 - 9;
+                let y = terrain_y + terrain_offset;
+                if let Some((prev_x, prev_y)) = previous {
+                    self.draw_line(
+                        prev_x,
+                        prev_y,
+                        x,
+                        y,
+                        Color::from_rgba(TERRAIN_AMBER_LINE),
+                        2,
+                    );
+                }
+                previous = Some((x, y));
+            }
+        }
+
+        for entity in world.entities() {
+            let x = inner.x
+                + ((entity.position.x.rem_euclid(world.world_span()) as f32) * inner.width as f32
+                    / world.world_span() as f32)
+                    .round() as i32;
+            let vertical_range = (inner.height - 24).max(1) as f32;
+            let y = inner.y
+                + ((entity.position.y as f32 / (world.height().saturating_sub(1).max(1) as f32))
+                    * vertical_range)
+                    .round() as i32
+                + 6;
+            let color = Color::from_rgba(scanner_color(entity.kind));
+            if entity.kind == EntityKind::PlayerShip {
+                self.draw_player_scanner_icon(x, y, color);
             } else {
-                "PLANET ACTIVE"
-            },
-            if world.planet_destroyed() {
-                TEXT_DANGER
-            } else {
-                TEXT_SECONDARY
-            },
-            2,
+                let radius = if entity.kind == EntityKind::Human {
+                    2
+                } else {
+                    3
+                };
+                self.draw_dot(x, y, color, radius);
+            }
+        }
+
+        self.draw_scanner_center_markers(rect);
+        self.draw_centered_text(
+            rect.center_x(),
+            rect.y + rect.height + 18,
+            "SCANNER",
+            TEXT_SCANNER_GREEN,
+            4,
         );
     }
 
@@ -1149,9 +1190,74 @@ impl Renderer {
         }
     }
 
+    fn gameplay_scanner_rect(&self) -> Rect {
+        Rect {
+            x: 48,
+            y: 48,
+            width: self.image_width as i32 - 96,
+            height: 94,
+        }
+    }
+
+    fn gameplay_playfield_rect(&self, scanner_rect: Rect) -> Rect {
+        Rect {
+            x: 24,
+            y: scanner_rect.y + scanner_rect.height + 82,
+            width: self.image_width as i32 - 48,
+            height: self.image_height as i32 - (scanner_rect.y + scanner_rect.height + 182),
+        }
+    }
+
     fn draw_panel(&mut self, rect: Rect) {
         self.fill_rect(rect, Color::from_rgba(PANEL_BACKGROUND));
         self.stroke_rect(rect, Color::from_rgba(PANEL_BORDER), 2);
+    }
+
+    fn draw_scanner_center_markers(&mut self, rect: Rect) {
+        let color = Color::from_rgba(TEXT_ARCADE_WHITE);
+        let marker_width = 112;
+        let marker_height = 20;
+        let notch_width = 68;
+        let notch_height = 12;
+        let top_box = Rect {
+            x: rect.center_x() - marker_width / 2,
+            y: rect.y - 8,
+            width: marker_width,
+            height: marker_height,
+        };
+        self.fill_rect(top_box, color);
+        self.fill_rect(
+            Rect {
+                x: rect.center_x() - notch_width / 2,
+                y: rect.y + 2,
+                width: notch_width,
+                height: notch_height,
+            },
+            Color::from_rgba(BACKGROUND),
+        );
+
+        let bottom_box = Rect {
+            x: rect.center_x() - marker_width / 2,
+            y: rect.y + rect.height - 12,
+            width: marker_width,
+            height: marker_height,
+        };
+        self.fill_rect(bottom_box, color);
+        self.fill_rect(
+            Rect {
+                x: rect.center_x() - notch_width / 2,
+                y: rect.y + rect.height - 12,
+                width: notch_width,
+                height: notch_height,
+            },
+            Color::from_rgba(BACKGROUND),
+        );
+    }
+
+    fn draw_player_scanner_icon(&mut self, cx: i32, cy: i32, color: Color) {
+        self.draw_line(cx - 6, cy, cx + 6, cy, color, 2);
+        self.draw_line(cx, cy - 6, cx, cy + 6, color, 2);
+        self.draw_dot(cx, cy, color, 2);
     }
 
     fn draw_text(&mut self, x: i32, y: i32, text: &str, color: [u8; 4], scale: i32) {
