@@ -56,6 +56,9 @@ pub const RED_LABEL_HIGH_SCORE_CELLS: usize = RED_LABEL_HIGH_SCORE_DEFAULT_BYTES
 pub const RED_LABEL_THSTAB_START: u16 = 0xB260;
 pub const RED_LABEL_CLRAUD_PACKED_BYTE_WRITES: usize = 0x0E;
 pub const RED_LABEL_CLRALL_PACKED_BYTE_WRITES: usize = CMOS_RAM_SIZE / 2;
+pub const RED_LABEL_RESET_PALETTE_BYTES: [u8; PALETTE_RAM_SIZE] = [
+    0xC0, 0x87, 0x5F, 0x43, 0x2F, 0x21, 0x17, 0x10, 0x0B, 0x07, 0x04, 0x02, 0x01, 0x00, 0x00, 0x00,
+];
 pub const WATCHDOG_RESET_BYTE: u8 = 0x39;
 pub const VIDEO_COUNTER_CLAMPED_VALUE: u8 = 0xFC;
 pub const VIDEO_COUNTER_CLAMP_VPOS: u16 = 0x100;
@@ -376,6 +379,34 @@ impl<'a> DefenderMainBoard<'a> {
             }
             other => Some(RedLabelPowerUpAction::UnknownSpecialFunction(other)),
         }
+    }
+
+    /// Source-shaped visible `RESET` setup before the power-up RAM test.
+    ///
+    /// This covers the `MAPC` bank select clear, PIA register setup, and the
+    /// `RESET1` 16-byte palette write loop. It intentionally stops before
+    /// condition-code changes and the RAM/ROM diagnostics.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defb6.src#L1463-L1489>.
+    pub fn red_label_reset_setup(&mut self) -> Result<(), MainCpuWriteError> {
+        self.write_byte(MAIN_CPU_BANK_SELECT_WRITE, 0)?;
+        self.write_byte(0xCC01, 0)?;
+        self.write_byte(0xCC03, 0)?;
+        self.write_byte(0xCC05, 0)?;
+        self.write_byte(0xCC07, 0)?;
+        self.write_byte(0xCC00, 0xC0)?;
+        self.write_byte(0xCC02, 0xFF)?;
+        self.write_byte(0xCC04, 0)?;
+        self.write_byte(0xCC06, 0)?;
+        self.write_byte(0xCC03, 0x04)?;
+        self.write_byte(0xCC05, 0x04)?;
+        self.write_byte(0xCC07, 0x04)?;
+        self.write_byte(0xCC01, 0x14)?;
+
+        for (offset, byte) in RED_LABEL_RESET_PALETTE_BYTES.iter().copied().enumerate() {
+            self.write_byte(0xC000 + offset as u16, byte)?;
+        }
+
+        Ok(())
     }
 
     pub fn apply_cmos_default(&mut self, default: &RedLabelCmosDefault) -> Option<()> {
@@ -787,12 +818,12 @@ mod tests {
             MainCpuWriteTarget, PALETTE_RAM_SIZE, RED_LABEL_CLRALL_PACKED_BYTE_WRITES,
             RED_LABEL_CLRAUD_PACKED_BYTE_WRITES, RED_LABEL_CMOSCK_CELL_OFFSET,
             RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_DIPFLG_CELL_OFFSET,
-            RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_THSTAB_START,
-            RedLabelPowerUpAction, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
-            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
-            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
-            main_cpu_read_target, main_cpu_write_target, video_control_cocktail,
-            video_counter_read_value,
+            RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
+            RED_LABEL_THSTAB_START, RedLabelPowerUpAction, WATCHDOG_RESET_BYTE,
+            cmos_4bit_write_value, cmos_sram_clear_packed_bytes, cmos_sram_read_byte,
+            cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word, defender_io_window,
+            is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -1274,6 +1305,34 @@ mod tests {
             Ok(DEFENDER_IN0_FIRE | DEFENDER_IN0_THRUST)
         );
         assert_eq!(board.read_byte(0xCC06), Ok(DEFENDER_IN1_ALTITUDE_UP));
+    }
+
+    #[test]
+    fn main_board_red_label_reset_setup_matches_source_pia_and_palette_writes() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        board
+            .write_byte(MAIN_CPU_BANK_SELECT_WRITE, 7)
+            .expect("dirty bank select");
+        board
+            .write_byte(MAIN_CPU_BANK_SELECT_WRITE, MAIN_CPU_IO_BANK)
+            .expect("select I/O bank");
+        board.write_byte(0xC000, 0xAA).expect("dirty palette");
+
+        board
+            .red_label_reset_setup()
+            .expect("source RESET setup writes are mapped");
+
+        assert_eq!(board.bank_select(), MAIN_CPU_IO_BANK);
+        assert_eq!(board.pia1().ddr_a(), 0xC0);
+        assert_eq!(board.pia1().ddr_b(), 0xFF);
+        assert_eq!(board.pia1().control_a(), 0x14);
+        assert_eq!(board.pia1().control_b(), 0x04);
+        assert_eq!(board.pia2().ddr_a(), 0x00);
+        assert_eq!(board.pia2().ddr_b(), 0x00);
+        assert_eq!(board.pia2().control_a(), 0x04);
+        assert_eq!(board.pia2().control_b(), 0x04);
+        assert_eq!(board.palette_ram(), &RED_LABEL_RESET_PALETTE_BYTES);
     }
 
     #[test]
