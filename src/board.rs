@@ -16,9 +16,9 @@
 //! VA11/COUNT240 inputs to PIA1 CB1/CA1. It can also expose native visible
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, and can route the CMOS-visible
-//! `romc0.src` power-up branch. CMOS persistence, `AUDITG` diagnostic
-//! text/debounce timing, full `CROM0` diagnostics, LED segment side effects,
-//! and full video timing remain explicit fidelity gaps.
+//! `romc0.src` power-up branch. CMOS persistence, `AUDITG` debounce timing and
+//! live diagnostic text rendering, full `CROM0` diagnostics, LED segment side
+//! effects, and full video timing remain explicit fidelity gaps.
 
 use crate::{
     input::{
@@ -57,6 +57,7 @@ pub const RED_LABEL_CMOSCK_CELL_OFFSET: u8 = 0x7F;
 pub const RED_LABEL_REPLAY_CELL_OFFSET: u8 = 0x81;
 pub const RED_LABEL_COINSL_CELL_OFFSET: u8 = 0x87;
 pub const RED_LABEL_AUDIT_ADJUSTMENT_COUNT: u8 = 28;
+pub const RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS: usize = 31;
 pub const RED_LABEL_HIGH_SCORE_DEFAULT_BYTES: usize = 48;
 pub const RED_LABEL_HIGH_SCORE_CELLS: usize = RED_LABEL_HIGH_SCORE_DEFAULT_BYTES * 2;
 pub const RED_LABEL_THSTAB_START: u16 = 0xB260;
@@ -161,6 +162,27 @@ pub enum RedLabelAuditAdjustmentChange {
     ReadOnly,
     CoinageLocked,
     Changed(RedLabelAuditAdjustmentValue),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAuditDisplayLine {
+    row_number: u8,
+    value: RedLabelAuditAdjustmentValue,
+    visible_text: String,
+}
+
+impl RedLabelAuditDisplayLine {
+    pub fn row_number(&self) -> u8 {
+        self.row_number
+    }
+
+    pub fn value(&self) -> RedLabelAuditAdjustmentValue {
+        self.value
+    }
+
+    pub fn visible_text(&self) -> &str {
+        &self.visible_text
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -414,6 +436,27 @@ impl<'a> DefenderMainBoard<'a> {
                 .map(RedLabelAuditAdjustmentValue::PackedWord),
             _ => None,
         }
+    }
+
+    /// Source-shaped `DISAUD` stack-buffer text for one audit row.
+    ///
+    /// This models the 31 visible characters that precede the slash terminator:
+    /// row number at columns 0-1, row value at source-selected columns, and the
+    /// `MSGAUD` text at column 12. It intentionally leaves `VDISST` bitmap text
+    /// transfer and live screen erasure outside this deterministic board helper.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L117-L173>.
+    pub fn red_label_audit_display_line(
+        &self,
+        adjustment: &RedLabelAuditAdjustment,
+    ) -> Option<RedLabelAuditDisplayLine> {
+        let value = self.red_label_audit_adjustment_value(adjustment)?;
+        let visible_text = red_label_audit_display_text(adjustment, value)?;
+
+        Some(RedLabelAuditDisplayLine {
+            row_number: adjustment.number,
+            value,
+            visible_text,
+        })
     }
 
     /// Source-shaped visible `ALTER` / `HYSCRE` CMOS mutation for one row.
@@ -915,6 +958,55 @@ fn red_label_adjust_replay_bcd(value: u16, direction: RedLabelAuditAdjustmentDir
     u16::from_be_bytes([adjusted_ms_byte, adjusted_ls_byte])
 }
 
+fn red_label_audit_display_text(
+    adjustment: &RedLabelAuditAdjustment,
+    value: RedLabelAuditAdjustmentValue,
+) -> Option<String> {
+    let mut buffer = [b' '; RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS];
+    let row_number = red_label_decimal_to_bcd_byte(adjustment.number);
+    red_label_write_bcd_byte_ascii(&mut buffer, 0, row_number)?;
+
+    match value {
+        RedLabelAuditAdjustmentValue::PackedWord(value) if adjustment.number <= 7 => {
+            red_label_write_bcd_word_ascii(&mut buffer, 7, value)?;
+        }
+        RedLabelAuditAdjustmentValue::PackedWord(value) if adjustment.number == 8 => {
+            red_label_write_bcd_word_ascii(&mut buffer, 5, value)?;
+            red_label_write_bcd_byte_ascii(&mut buffer, 9, 0)?;
+        }
+        RedLabelAuditAdjustmentValue::PackedByte(value) if adjustment.number > 8 => {
+            red_label_write_bcd_byte_ascii(&mut buffer, 9, value)?;
+        }
+        _ => return None,
+    }
+
+    let message_start = 12;
+    let message = adjustment.message.as_bytes();
+    let message_end = message_start + message.len();
+    if message_end > buffer.len() || !message.is_ascii() {
+        return None;
+    }
+    buffer[message_start..message_end].copy_from_slice(message);
+
+    String::from_utf8(buffer.to_vec()).ok()
+}
+
+fn red_label_write_bcd_word_ascii(buffer: &mut [u8], start: usize, value: u16) -> Option<()> {
+    let [ms_byte, ls_byte] = value.to_be_bytes();
+    red_label_write_bcd_byte_ascii(buffer, start, ms_byte)?;
+    red_label_write_bcd_byte_ascii(buffer, start + 2, ls_byte)
+}
+
+fn red_label_write_bcd_byte_ascii(buffer: &mut [u8], start: usize, value: u8) -> Option<()> {
+    let end = start.checked_add(2)?;
+    if end > buffer.len() {
+        return None;
+    }
+    buffer[start] = b'0' + ((value >> 4) & 0x0F);
+    buffer[start + 1] = b'0' + (value & 0x0F);
+    Some(())
+}
+
 fn red_label_bcd_add_byte(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
     let decimal_sum =
         red_label_bcd_byte_to_u16(lhs) + red_label_bcd_byte_to_u16(rhs) + u16::from(carry);
@@ -1093,11 +1185,11 @@ mod tests {
             CMOS_RAM_SIZE, DefenderIoWindow, DefenderMainBoard, DefenderMainCpuRomBus,
             MAIN_CPU_BANK_SELECT_WRITE, MAIN_CPU_IO_BANK, MAIN_CPU_RAM_SIZE, MainCpuReadError,
             MainCpuReadTarget, MainCpuReadWindow, MainCpuRomRead, MainCpuWriteError,
-            MainCpuWriteTarget, PALETTE_RAM_SIZE, RED_LABEL_CLRALL_PACKED_BYTE_WRITES,
-            RED_LABEL_CLRAUD_PACKED_BYTE_WRITES, RED_LABEL_CMOSCK_CELL_OFFSET,
-            RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_DIPFLG_CELL_OFFSET,
-            RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
-            RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
+            MainCpuWriteTarget, PALETTE_RAM_SIZE, RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS,
+            RED_LABEL_CLRALL_PACKED_BYTE_WRITES, RED_LABEL_CLRAUD_PACKED_BYTE_WRITES,
+            RED_LABEL_CMOSCK_CELL_OFFSET, RED_LABEL_CRHSTD_CELL_OFFSET,
+            RED_LABEL_DIPFLG_CELL_OFFSET, RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS,
+            RED_LABEL_RESET_PALETTE_BYTES, RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
             RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
             RedLabelAuditOperatorState, RedLabelAuditOperatorStep, RedLabelPowerUpAction,
             RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
@@ -2172,6 +2264,77 @@ mod tests {
             board.red_label_audit_adjustment_value(special_function),
             Some(RedLabelAuditAdjustmentValue::PackedByte(0x00))
         );
+    }
+
+    #[test]
+    fn main_board_formats_auditg_display_line_like_disaud_buffer() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+
+        let left_coins = adjustments
+            .iter()
+            .find(|adjustment| adjustment.number == 1)
+            .expect("left coin audit row");
+        board
+            .cmos_sram_write_word(left_coins.offset as u8, 0x1234)
+            .expect("set left coin counter");
+        let left_coins_line = board
+            .red_label_audit_display_line(left_coins)
+            .expect("left coin display line");
+        assert_eq!(left_coins_line.row_number(), 1);
+        assert_eq!(
+            left_coins_line.value(),
+            RedLabelAuditAdjustmentValue::PackedWord(0x1234)
+        );
+        let left_coins_text = left_coins_line.visible_text().as_bytes();
+        assert_eq!(left_coins_text.len(), RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS);
+        assert_eq!(&left_coins_text[0..2], b"01");
+        assert_eq!(&left_coins_text[7..11], b"1234");
+        assert_eq!(&left_coins_text[12..22], b"COINS LEFT");
+
+        let replay = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "REPLAY")
+            .expect("replay adjustment");
+        let replay_line = board
+            .red_label_audit_display_line(replay)
+            .expect("replay display line");
+        let replay_text = replay_line.visible_text().as_bytes();
+        assert_eq!(replay_line.row_number(), 8);
+        assert_eq!(&replay_text[0..2], b"08");
+        assert_eq!(&replay_text[5..11], b"010000");
+        assert_eq!(&replay_text[12..28], b"BONUS SHIP LEVEL");
+
+        let ships = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "NSHIP")
+            .expect("ship-count adjustment");
+        let ships_line = board
+            .red_label_audit_display_line(ships)
+            .expect("ship-count display line");
+        let ships_text = ships_line.visible_text().as_bytes();
+        assert_eq!(&ships_text[0..2], b"09");
+        assert_eq!(&ships_text[9..11], b"03");
+        assert_eq!(&ships_text[12..27], b"NUMBER OF SHIPS");
+
+        let special_function = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "DIPSW")
+            .expect("special-function adjustment");
+        board
+            .cmos_sram_write_byte(RED_LABEL_DIPSW_CELL_OFFSET, 0x45)
+            .expect("set special function");
+        let special_function_line = board
+            .red_label_audit_display_line(special_function)
+            .expect("special-function display line");
+        let special_function_text = special_function_line.visible_text().as_bytes();
+        assert_eq!(&special_function_text[0..2], b"28");
+        assert_eq!(&special_function_text[9..11], b"45");
+        assert_eq!(&special_function_text[12..28], b"SPECIAL FUNCTION");
     }
 
     #[test]
