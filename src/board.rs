@@ -16,12 +16,15 @@
 //! VA11/COUNT240 inputs to PIA1 CB1/CA1. It can also expose native visible
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, and can route the CMOS-visible
-//! `romc0.src` power-up branch. CMOS persistence, full `AUDITG`/`CROM0`
-//! post-power-up loops, LED segment side effects, and full video timing remain
-//! explicit fidelity gaps.
+//! `romc0.src` power-up branch. CMOS persistence, `AUDITG` diagnostic
+//! text/debounce timing, full `CROM0` diagnostics, LED segment side effects,
+//! and full video timing remain explicit fidelity gaps.
 
 use crate::{
-    input::{CabinetInput, DefenderInputPorts},
+    input::{
+        CabinetInput, DEFENDER_IN2_ADVANCE, DEFENDER_IN2_AUTO_UP_MANUAL_DOWN,
+        DEFENDER_IN2_HIGH_SCORE_RESET, DefenderInputPorts,
+    },
     pia::{Pia6821, PiaOutputEvent},
     red_label_memory::{
         RedLabelAuditAdjustment, RedLabelCmosDefault, RedLabelCmosLayoutEntry,
@@ -53,6 +56,7 @@ pub const RED_LABEL_DIPSW_CELL_OFFSET: u8 = 0x7D;
 pub const RED_LABEL_CMOSCK_CELL_OFFSET: u8 = 0x7F;
 pub const RED_LABEL_REPLAY_CELL_OFFSET: u8 = 0x81;
 pub const RED_LABEL_COINSL_CELL_OFFSET: u8 = 0x87;
+pub const RED_LABEL_AUDIT_ADJUSTMENT_COUNT: u8 = 28;
 pub const RED_LABEL_HIGH_SCORE_DEFAULT_BYTES: usize = 48;
 pub const RED_LABEL_HIGH_SCORE_CELLS: usize = RED_LABEL_HIGH_SCORE_DEFAULT_BYTES * 2;
 pub const RED_LABEL_THSTAB_START: u16 = 0xB260;
@@ -157,6 +161,69 @@ pub enum RedLabelAuditAdjustmentChange {
     ReadOnly,
     CoinageLocked,
     Changed(RedLabelAuditAdjustmentValue),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAuditOperatorState {
+    row_index: u8,
+    display_pending: bool,
+}
+
+impl Default for RedLabelAuditOperatorState {
+    fn default() -> Self {
+        Self {
+            row_index: 0,
+            display_pending: true,
+        }
+    }
+}
+
+impl RedLabelAuditOperatorState {
+    pub fn for_displayed_row_number(row_number: u8) -> Option<Self> {
+        if !(1..=RED_LABEL_AUDIT_ADJUSTMENT_COUNT).contains(&row_number) {
+            return None;
+        }
+
+        Some(Self {
+            row_index: row_number - 1,
+            display_pending: false,
+        })
+    }
+
+    pub fn row_index(self) -> u8 {
+        self.row_index
+    }
+
+    pub fn row_number(self) -> u8 {
+        self.row_index + 1
+    }
+
+    pub fn display_pending(self) -> bool {
+        self.display_pending
+    }
+
+    pub fn adjustment(
+        self,
+        adjustments: &[RedLabelAuditAdjustment],
+    ) -> Option<&RedLabelAuditAdjustment> {
+        let row_number = self.row_number();
+        adjustments
+            .iter()
+            .find(|adjustment| adjustment.number == row_number)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAuditOperatorStep {
+    Idle {
+        row_number: u8,
+        change: Option<RedLabelAuditAdjustmentChange>,
+    },
+    Display {
+        row_number: u8,
+        change: Option<RedLabelAuditAdjustmentChange>,
+    },
+    ReturnToGame,
 }
 
 impl MainCpuRomRead {
@@ -395,6 +462,58 @@ impl<'a> DefenderMainBoard<'a> {
         Some(RedLabelAuditAdjustmentChange::Changed(
             RedLabelAuditAdjustmentValue::PackedByte(adjusted),
         ))
+    }
+
+    /// Source-shaped `AUDITG` operator row navigation and change decision.
+    ///
+    /// This covers the `AUDIT0` service-advance up/down row movement,
+    /// auto-advance return after the last row, and the high-score-reset switch
+    /// handoff to `ALTER`/`HYSCRE`. It intentionally does not model the
+    /// diagnostic text rendering, 10 ms delay cadence, or switch debounce loop.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L41-L113>.
+    pub fn red_label_audit_operator_step(
+        &mut self,
+        state: &mut RedLabelAuditOperatorState,
+        adjustments: &[RedLabelAuditAdjustment],
+    ) -> Option<RedLabelAuditOperatorStep> {
+        let input = self.input_ports.pia1_port_a();
+        if input & DEFENDER_IN2_ADVANCE != 0 {
+            state.display_pending = true;
+            if input & DEFENDER_IN2_AUTO_UP_MANUAL_DOWN != 0 {
+                state.row_index = state.row_index.wrapping_add(1);
+                if state.row_index == RED_LABEL_AUDIT_ADJUSTMENT_COUNT {
+                    return Some(RedLabelAuditOperatorStep::ReturnToGame);
+                }
+            } else if state.row_index == 0 {
+                state.row_index = RED_LABEL_AUDIT_ADJUSTMENT_COUNT - 1;
+            } else {
+                state.row_index -= 1;
+            }
+        }
+
+        let adjustment = state.adjustment(adjustments)?;
+        let change = if input & DEFENDER_IN2_HIGH_SCORE_RESET != 0 {
+            let direction = if input & DEFENDER_IN2_AUTO_UP_MANUAL_DOWN != 0 {
+                RedLabelAuditAdjustmentDirection::Up
+            } else {
+                RedLabelAuditAdjustmentDirection::Down
+            };
+            let change = self.red_label_alter_audit_adjustment(adjustment, direction)?;
+            if matches!(change, RedLabelAuditAdjustmentChange::Changed(_)) {
+                state.display_pending = true;
+            }
+            Some(change)
+        } else {
+            None
+        };
+
+        let row_number = state.row_number();
+        if state.display_pending {
+            state.display_pending = false;
+            Some(RedLabelAuditOperatorStep::Display { row_number, change })
+        } else {
+            Some(RedLabelAuditOperatorStep::Idle { row_number, change })
+        }
     }
 
     pub fn cmos_sram_read_byte(&self, nibble_offset: u8) -> Option<u8> {
@@ -979,7 +1098,8 @@ mod tests {
             RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_DIPFLG_CELL_OFFSET,
             RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
             RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
-            RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue, RedLabelPowerUpAction,
+            RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
+            RedLabelAuditOperatorState, RedLabelAuditOperatorStep, RedLabelPowerUpAction,
             RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
             cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
             cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
@@ -2167,6 +2287,116 @@ mod tests {
             board.cmos_ram()[usize::from(RED_LABEL_DIPFLG_CELL_OFFSET)],
             0xF1
         );
+    }
+
+    #[test]
+    fn main_board_auditg_operator_step_follows_service_switch_navigation() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+        let mut state = RedLabelAuditOperatorState::default();
+
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+
+        assert_eq!(state.row_index(), 0);
+        assert_eq!(state.row_number(), 1);
+        assert!(state.display_pending());
+
+        board.set_cabinet_input(CabinetInput::NONE);
+        assert_eq!(
+            board.red_label_audit_operator_step(&mut state, &adjustments),
+            Some(RedLabelAuditOperatorStep::Display {
+                row_number: 1,
+                change: None,
+            })
+        );
+        assert!(!state.display_pending());
+
+        assert_eq!(
+            board.red_label_audit_operator_step(&mut state, &adjustments),
+            Some(RedLabelAuditOperatorStep::Idle {
+                row_number: 1,
+                change: None,
+            })
+        );
+
+        board.set_cabinet_input(CabinetInput {
+            service_advance: true,
+            ..CabinetInput::NONE
+        });
+        assert_eq!(
+            board.red_label_audit_operator_step(&mut state, &adjustments),
+            Some(RedLabelAuditOperatorStep::Display {
+                row_number: 28,
+                change: None,
+            })
+        );
+        assert_eq!(state.row_number(), 28);
+
+        board.set_cabinet_input(CabinetInput {
+            service_advance: true,
+            auto_up_manual_down: true,
+            ..CabinetInput::NONE
+        });
+        assert_eq!(
+            board.red_label_audit_operator_step(&mut state, &adjustments),
+            Some(RedLabelAuditOperatorStep::ReturnToGame)
+        );
+    }
+
+    #[test]
+    fn main_board_auditg_operator_step_applies_high_score_reset_adjustments() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+
+        let mut read_only_state =
+            RedLabelAuditOperatorState::for_displayed_row_number(1).expect("row 1 state");
+        board.set_cabinet_input(CabinetInput {
+            high_score_reset: true,
+            auto_up_manual_down: true,
+            ..CabinetInput::NONE
+        });
+        assert_eq!(
+            board.red_label_audit_operator_step(&mut read_only_state, &adjustments),
+            Some(RedLabelAuditOperatorStep::Idle {
+                row_number: 1,
+                change: Some(RedLabelAuditAdjustmentChange::ReadOnly),
+            })
+        );
+
+        let mut ship_state =
+            RedLabelAuditOperatorState::for_displayed_row_number(9).expect("row 9 state");
+        assert_eq!(
+            board.red_label_audit_operator_step(&mut ship_state, &adjustments),
+            Some(RedLabelAuditOperatorStep::Display {
+                row_number: 9,
+                change: Some(RedLabelAuditAdjustmentChange::Changed(
+                    RedLabelAuditAdjustmentValue::PackedByte(0x04)
+                )),
+            })
+        );
+        assert!(!ship_state.display_pending());
+
+        board.set_cabinet_input(CabinetInput {
+            service_advance: true,
+            high_score_reset: true,
+            ..CabinetInput::NONE
+        });
+        assert_eq!(
+            board.red_label_audit_operator_step(&mut ship_state, &adjustments),
+            Some(RedLabelAuditOperatorStep::Display {
+                row_number: 8,
+                change: Some(RedLabelAuditAdjustmentChange::Changed(
+                    RedLabelAuditAdjustmentValue::PackedWord(0x0090)
+                )),
+            })
+        );
+        assert_eq!(ship_state.row_number(), 8);
     }
 
     #[test]

@@ -245,6 +245,9 @@ This section records drift found during the repository review on
   adjustment mutation rules: audit rows stay read-only, coin multiplier rows
   respect `COINSL`, `DIPSW` changes set `DIPFLG`, and byte/replay-level values
   use the `BMPNUP` / `BMPNDN` packed-BCD update paths.
+- `src/board.rs` now models the source-visible `AUDITG` operator row step:
+  service advance moves through `MSGAUD` rows, auto/up exits after row 28, and
+  high-score reset applies the current row's adjustment direction.
 - `src/board.rs` now models the visible CMOS cell effects of `CLRAUD` and
   `CMINIT`: `CLRAUD` performs 14 packed zero writes from `CMOS`, while `CMINIT`
   clears the visible CMOS image and applies the embedded `DEFALT` bytes.
@@ -546,11 +549,12 @@ This section records drift found during the repository review on
   report the `romc0.src` target reached by each `PWRUP` action decision, can
   read `AUDITG` / `MSGAUD` audit and operator-adjustment rows from their
   source CMOS offsets, can apply the source-visible `ALTER` / `HYSCRE`
-  mutation rules for those rows, and can snapshot source-labeled CMOS and RAM
-  fields. A main-board address classifier exists for RAM, banked I/O, selected
-  banked program ROM, bank-select writes, and fixed ROM reads. Main RAM bytes
-  can now be read and written through a deterministic harness surface. Raw
-  write-only palette register bytes, CMOS 4-bit write/read bytes,
+  mutation rules for those rows, can step the source-visible `AUDITG` row
+  navigation from IN2 service inputs, and can snapshot source-labeled CMOS and
+  RAM fields. A main-board address classifier exists for RAM, banked I/O,
+  selected banked program ROM, bank-select writes, and fixed ROM reads. Main
+  RAM bytes can now be read and written through a deterministic harness
+  surface. Raw write-only palette register bytes, CMOS 4-bit write/read bytes,
   video-control cocktail state, and watchdog reset
   recognition are stored. Video-counter reads expose the MAME `vpos & 0xfc`
   behavior with the `vpos >= 0x100` clamp. The main-board PIA data/control
@@ -563,11 +567,11 @@ This section records drift found during the repository review on
   sample generation also remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
-  no exact power-on RAM state, translated `AUDITG` operator loop or `CROM0`
-  diagnostics after the now-identified `PWRUP` action decision, CMOS
-  persistence, screen scanline scheduler, watchdog timing/reset side effects,
-  rendering timing side effects, decoder PROM behavior, DAC sample output, CPU
-  IRQ scheduling, or translated `VSNDRM1.SRC` routines.
+  no exact power-on RAM state, translated `AUDITG` diagnostic text/debounce
+  timing or `CROM0` diagnostics after the now-identified `PWRUP` action
+  decision, CMOS persistence, screen scanline scheduler, watchdog timing/reset
+  side effects, rendering timing side effects, decoder PROM behavior, DAC
+  sample output, CPU IRQ scheduling, or translated `VSNDRM1.SRC` routines.
 
 ### Player And Controls
 

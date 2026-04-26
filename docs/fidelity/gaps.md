@@ -100,7 +100,8 @@ This file records behavior that must not be guessed in arcade-core code.
   visible `RHSTD` / `RHSTDS` all-time and today's high-score reset copy, can
   read `AUDITG` / `MSGAUD` audit and operator-adjustment rows from their
   source CMOS offsets, can apply the source-visible `ALTER` / `HYSCRE`
-  mutation rules for those rows, and can snapshot source-labeled CMOS and
+  mutation rules for those rows, can step the source-visible `AUDITG` row
+  navigation from IN2 service inputs, and can snapshot source-labeled CMOS and
   main-RAM fields. A main-board address classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
@@ -130,9 +131,9 @@ This file records behavior that must not be guessed in arcade-core code.
   data register, PIA IC4 port A writes are captured as the DAC callback
   boundary, and command CB1 drives the sound PIA IRQ state. The board layer can
   report the `romc0.src` target reached by each `PWRUP` action decision and
-  read/mutate the source `AUDITG` / `MSGAUD` table rows, but CPU IRQ
+  step/read/mutate the source `AUDITG` / `MSGAUD` table rows, but CPU IRQ
   scheduling, LED segment side effects, exact Williams power-on RAM contents,
-  the translated `AUDITG` operator loop or `CROM0` diagnostics after that
+  `AUDITG` diagnostic text/debounce timing or `CROM0` diagnostics after that
   decision, CMOS persistence, screen scanline scheduling, watchdog timing/reset
   side effects, palette/rendering timing side effects, decoder PROM behavior,
   and DAC sample generation are not modeled.
@@ -345,10 +346,10 @@ This file records behavior that must not be guessed in arcade-core code.
 - CMOS layout, ROM default bytes, 4-bit cell writes, `CLRAUD`/`CMINIT` visible
   cell effects, the CMOS-visible `PWRUP` branch and source dispatch target,
   `RHSTD`/`RHSTDS` reset copies, `AUDITG` / `MSGAUD` message-offset rows and
-  source-visible adjustment mutations, and red-label packed byte/word helper
-  behavior are modeled, but CMOS persistence, full operator behavior,
-  high-score comparison/initials routines, and the post-`PWRUP` `AUDITG` /
-  `CROM0` routines are not translated.
+  source-visible row navigation and adjustment mutations, and red-label packed
+  byte/word helper behavior are modeled, but CMOS persistence, `AUDITG`
+  diagnostic text/debounce timing, high-score comparison/initials routines, and
+  the post-`PWRUP` `CROM0` diagnostics are not translated.
 
 ## Player
 
