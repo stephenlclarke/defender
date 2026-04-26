@@ -18367,6 +18367,107 @@ mod tests {
     }
 
     #[test]
+    fn credited_two_player_start_runs_translated_st2_path() {
+        let mut machine = ArcadeMachine::new();
+        machine.step(CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        });
+
+        let output = machine.step(CabinetInput {
+            coin: true,
+            start_two: true,
+            ..CabinetInput::NONE
+        });
+        let events = output.events().collect::<Vec<_>>();
+
+        assert_eq!(output.snapshot.phase, GamePhase::Playing);
+        assert_eq!(output.snapshot.credits, 0);
+        assert!(events.contains(&MachineEvent::CreditAdded));
+        assert!(events.contains(&MachineEvent::GameStarted));
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF0, 0xF0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA08C..0xA08D),
+            Some(&[0x02][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA07B..0xA07D),
+            Some(&[0x10, 0x00][..])
+        );
+    }
+
+    #[test]
+    fn free_play_one_player_start_runs_translated_st1_path() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .write_cmos_byte_by_symbol("FREEPL", 1)
+            .expect("enable free play");
+
+        let output = machine.step(CabinetInput {
+            start_one: true,
+            ..CabinetInput::NONE
+        });
+        let events = output.events().collect::<Vec<_>>();
+
+        assert_eq!(output.snapshot.phase, GamePhase::Playing);
+        assert_eq!(output.snapshot.credits, 1);
+        assert!(!events.contains(&MachineEvent::CreditAdded));
+        assert!(events.contains(&MachineEvent::GameStarted));
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x01][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF0, 0xF1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA08C..0xA08D),
+            Some(&[0x01][..])
+        );
+    }
+
+    #[test]
+    fn free_play_two_player_start_runs_translated_st2_path() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .write_cmos_byte_by_symbol("FREEPL", 1)
+            .expect("enable free play");
+
+        let output = machine.step(CabinetInput {
+            start_two: true,
+            ..CabinetInput::NONE
+        });
+        let events = output.events().collect::<Vec<_>>();
+
+        assert_eq!(output.snapshot.phase, GamePhase::Playing);
+        assert_eq!(output.snapshot.credits, 0);
+        assert!(!events.contains(&MachineEvent::CreditAdded));
+        assert!(events.contains(&MachineEvent::GameStarted));
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF0, 0xF0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA08C..0xA08D),
+            Some(&[0x02][..])
+        );
+    }
+
+    #[test]
     fn start_button_initializes_red_label_player_runtime_state() {
         let mut machine = ArcadeMachine::new();
         machine.step(CabinetInput {
