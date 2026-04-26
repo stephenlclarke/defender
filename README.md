@@ -385,9 +385,10 @@ yet; current implementation status is tracked in `SPEC.md` and
   tables, plus the `amode1.src` `MTERR` mini-terrain bytes used by `SCNRV`, are
   now embedded from `assets/red-label/terrain-data.tsv`. The
   `romc0.src` `PWRUP` and `romc8.src` `DEFALT`, `CMOSMV`, `CMINIT`, `RHSTD`,
-  and `RHSTDS` routines provide the ROM-derived CMOS defaults, power-up CMOS
-  branch/source dispatch target, and high-score reset copy now embedded in
-  `assets/red-label/cmos-defaults.tsv`. The `defb6.src` `CRTAB` bytes now feed
+  `RHSTDS`, and `AUDITG` table routines provide the ROM-derived CMOS defaults,
+  power-up CMOS branch/source dispatch target, high-score reset copy, and
+  operator audit/adjustment table now embedded under `assets/red-label/`. The
+  `defb6.src` `CRTAB` bytes now feed
   the `CRINIT` pseudo-color RAM reset embedded in
   `assets/red-label/color-ram.tsv`. The `defa7.src` `SCORE`, `SNDLD`, `SHELL`,
   `BMBOUT`, `FBOUT`, `BKIL`, `LFIRE`, `LCOL`, `LASR` / `LASR0`, `LASL` /

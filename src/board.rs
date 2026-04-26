@@ -16,16 +16,16 @@
 //! VA11/COUNT240 inputs to PIA1 CB1/CA1. It can also expose native visible
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, and can route the CMOS-visible
-//! `romc0.src` power-up branch. CMOS persistence, post-power-up routine
-//! dispatch, LED segment side effects, and full video timing remain explicit
-//! fidelity gaps.
+//! `romc0.src` power-up branch. CMOS persistence, full `AUDITG`/`CROM0`
+//! post-power-up loops, LED segment side effects, and full video timing remain
+//! explicit fidelity gaps.
 
 use crate::{
     input::{CabinetInput, DefenderInputPorts},
     pia::{Pia6821, PiaOutputEvent},
     red_label_memory::{
-        RedLabelCmosDefault, RedLabelCmosLayoutEntry, RedLabelRamLayoutEntry, pack_sram_byte,
-        pack_sram_word, unpack_sram_byte, unpack_sram_word,
+        RedLabelAuditAdjustment, RedLabelCmosDefault, RedLabelCmosLayoutEntry,
+        RedLabelRamLayoutEntry, pack_sram_byte, pack_sram_word, unpack_sram_byte, unpack_sram_word,
     },
     rom::RedLabelRomImages,
     sound::SoundCommandLatch,
@@ -136,6 +136,12 @@ pub enum RedLabelPowerUpDispatchTarget {
     ComprehensiveRomTest,
     ResetHighScoreTables,
     ClearAudits,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAuditAdjustmentValue {
+    PackedByte(u8),
+    PackedWord(u16),
 }
 
 impl MainCpuRomRead {
@@ -310,6 +316,22 @@ impl<'a> DefenderMainBoard<'a> {
 
     pub fn red_label_cmos_field(&self, field: &RedLabelCmosLayoutEntry) -> Option<&[u8]> {
         self.cmos_range(field.offset_range()?)
+    }
+
+    pub fn red_label_audit_adjustment_value(
+        &self,
+        adjustment: &RedLabelAuditAdjustment,
+    ) -> Option<RedLabelAuditAdjustmentValue> {
+        let offset = u8::try_from(adjustment.offset).ok()?;
+        match adjustment.cells {
+            2 => self
+                .cmos_sram_read_byte(offset)
+                .map(RedLabelAuditAdjustmentValue::PackedByte),
+            4 => self
+                .cmos_sram_read_word(offset)
+                .map(RedLabelAuditAdjustmentValue::PackedWord),
+            _ => None,
+        }
     }
 
     pub fn cmos_sram_read_byte(&self, nibble_offset: u8) -> Option<u8> {
@@ -845,11 +867,12 @@ mod tests {
             RED_LABEL_CLRAUD_PACKED_BYTE_WRITES, RED_LABEL_CMOSCK_CELL_OFFSET,
             RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_DIPFLG_CELL_OFFSET,
             RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
-            RED_LABEL_THSTAB_START, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
-            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
-            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
-            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
-            video_control_cocktail, video_counter_read_value,
+            RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentValue, RedLabelPowerUpAction,
+            RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
+            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
+            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
+            main_cpu_read_target, main_cpu_write_target, video_control_cocktail,
+            video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -857,8 +880,9 @@ mod tests {
         },
         pia::PIA_IRQ1,
         red_label_memory::{
-            MemoryMapCpu, RedLabelMemoryMapEntry, red_label_cmos_defaults, red_label_cmos_layout,
-            red_label_memory_map, red_label_ram_layout,
+            MemoryMapCpu, RedLabelMemoryMapEntry, red_label_audit_adjustments,
+            red_label_cmos_defaults, red_label_cmos_layout, red_label_memory_map,
+            red_label_ram_layout,
         },
         rom::{
             RedLabelRomImages, RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile,
@@ -1862,6 +1886,60 @@ mod tests {
         );
         assert_eq!(board.cmos_ram()[0xFF], 0xF0);
         assert_eq!(board.cmos_sram_read_word(0x81), Some(0x0100));
+    }
+
+    #[test]
+    fn main_board_reads_auditg_adjustment_values_from_cmos_cells() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+
+        let left_coins = adjustments
+            .iter()
+            .find(|adjustment| adjustment.number == 1)
+            .expect("left coin audit row");
+        assert_eq!(
+            board.red_label_audit_adjustment_value(left_coins),
+            Some(RedLabelAuditAdjustmentValue::PackedWord(0x0000))
+        );
+
+        board
+            .cmos_sram_write_word(left_coins.offset as u8, 0x1234)
+            .expect("set left coin counter");
+        assert_eq!(
+            board.red_label_audit_adjustment_value(left_coins),
+            Some(RedLabelAuditAdjustmentValue::PackedWord(0x1234))
+        );
+
+        let replay = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "REPLAY")
+            .expect("replay adjustment");
+        assert_eq!(
+            board.red_label_audit_adjustment_value(replay),
+            Some(RedLabelAuditAdjustmentValue::PackedWord(0x0100))
+        );
+
+        let ships = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "NSHIP")
+            .expect("ship-count adjustment");
+        assert_eq!(
+            board.red_label_audit_adjustment_value(ships),
+            Some(RedLabelAuditAdjustmentValue::PackedByte(0x03))
+        );
+
+        let special_function = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "DIPSW")
+            .expect("special-function adjustment");
+        assert_eq!(
+            board.red_label_audit_adjustment_value(special_function),
+            Some(RedLabelAuditAdjustmentValue::PackedByte(0x00))
+        );
     }
 
     #[test]

@@ -16,6 +16,9 @@ Rules:
 
 Current files:
 
+- `audit-adjustments.tsv`: red-label `romc8.src` `AUDITG` / `MSGAUD`
+  operator audit and adjustment message table, including the source CMOS cell
+  offsets and display widths used by `DISAUD`.
 - `cmos-defaults.tsv`: red-label `romc8.src` `DEFALT` bytes expanded as
   source-owned CMOS default records. Each byte is written through `CMOSMV` /
   `WCAV` as two 4-bit CMOS cells, most-significant nibble first. The first
@@ -151,6 +154,11 @@ row is cross-checked against `GETSHL` and `SHSCAN` in `defa7.src`:
 `cmos-defaults.tsv` is derived from `romc8.src` `DEFALT`, `CMOSMV`, `CMINIT`,
 `RHSTD`, and `RHSTDS`:
 <https://github.com/mwenge/defender/blob/master/src/romc8.src>.
+`audit-adjustments.tsv` is derived from `romc8.src` `AUDITG`, `DISAUD`, and
+`MSGAUD`:
+<https://github.com/mwenge/defender/blob/master/src/romc8.src#L5-L173>
+and
+<https://github.com/mwenge/defender/blob/master/src/romc8.src#L716-L774>.
 `color-ram.tsv` is derived from the `defb6.src` `CRTAB` records copied by
 `defa7.src` `CRINIT` into `PCRAM`:
 <https://github.com/mwenge/defender/blob/master/src/defb6.src#L1874-L1890>.

@@ -3,14 +3,16 @@
 //! The source asset records the MAME-documented Defender main-board and
 //! sound-board address ranges used by the Rust address classifiers. It also
 //! records source-owned `phr6.src` RAM table labels and `romc8.src` CMOS
-//! default bytes so runtime code can address player, object, process,
-//! shell-list, and operator/default cells without inventing Rust-only layouts.
+//! default bytes plus `AUDITG`/`MSGAUD` rows so runtime code can address
+//! player, object, process, shell-list, and operator/default cells without
+//! inventing Rust-only layouts.
 
 use std::ops::Range;
 
 use crate::assets::{
-    RED_LABEL_CMOS_DEFAULTS_TSV, RED_LABEL_CMOS_LAYOUT_TSV, RED_LABEL_LINKED_LISTS_TSV,
-    RED_LABEL_MEMORY_MAP_TSV, RED_LABEL_RAM_LAYOUT_TSV, RED_LABEL_SRAM_ROUTINES_TSV,
+    RED_LABEL_AUDIT_ADJUSTMENTS_TSV, RED_LABEL_CMOS_DEFAULTS_TSV, RED_LABEL_CMOS_LAYOUT_TSV,
+    RED_LABEL_LINKED_LISTS_TSV, RED_LABEL_MEMORY_MAP_TSV, RED_LABEL_RAM_LAYOUT_TSV,
+    RED_LABEL_SRAM_ROUTINES_TSV,
 };
 
 pub const RED_LABEL_CMOS_BASE: u16 = 0xC400;
@@ -75,6 +77,26 @@ pub struct RedLabelSramRoutine {
 
 pub fn red_label_sram_routines() -> Result<Vec<RedLabelSramRoutine>, String> {
     parse_red_label_sram_routines_tsv(RED_LABEL_SRAM_ROUTINES_TSV)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAuditAdjustment {
+    pub number: u8,
+    pub symbol: String,
+    pub offset: u16,
+    pub cells: u16,
+    pub message: String,
+    pub source: String,
+}
+
+impl RedLabelAuditAdjustment {
+    pub fn cell_range(&self) -> Option<Range<u16>> {
+        checked_range(self.offset, u32::from(self.cells))
+    }
+}
+
+pub fn red_label_audit_adjustments() -> Result<Vec<RedLabelAuditAdjustment>, String> {
+    parse_red_label_audit_adjustments_tsv(RED_LABEL_AUDIT_ADJUSTMENTS_TSV)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -299,6 +321,31 @@ pub fn parse_red_label_sram_routines_tsv(text: &str) -> Result<Vec<RedLabelSramR
     }
 
     Ok(routines)
+}
+
+pub fn parse_red_label_audit_adjustments_tsv(
+    text: &str,
+) -> Result<Vec<RedLabelAuditAdjustment>, String> {
+    let mut lines = text.lines();
+    let Some(header) = lines.next() else {
+        return Err(String::from("audit adjustments TSV is empty"));
+    };
+    if header != "number\tsymbol\toffset\tcells\tmessage\tsource" {
+        return Err(format!("unexpected audit adjustments header '{header}'"));
+    }
+
+    let mut adjustments = Vec::new();
+    for (index, line) in lines.enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        adjustments.push(parse_audit_adjustment_line(index + 2, line)?);
+    }
+    if adjustments.is_empty() {
+        return Err(String::from("audit adjustments TSV has no entries"));
+    }
+
+    Ok(adjustments)
 }
 
 pub fn parse_red_label_ram_layout_tsv(text: &str) -> Result<Vec<RedLabelRamLayoutEntry>, String> {
@@ -538,6 +585,47 @@ fn parse_sram_routine_line(line_number: usize, line: &str) -> Result<RedLabelSra
     })
 }
 
+fn parse_audit_adjustment_line(
+    line_number: usize,
+    line: &str,
+) -> Result<RedLabelAuditAdjustment, String> {
+    let fields = line.split('\t').collect::<Vec<_>>();
+    if fields.len() != 6 {
+        return Err(format!(
+            "audit adjustments line {line_number} has {} fields, expected 6",
+            fields.len()
+        ));
+    }
+
+    let number = parse_u8(line_number, "number", fields[0])?;
+    let offset = parse_context_hex_u16("audit adjustments", line_number, "offset", fields[2])?;
+    let cells = parse_u16(line_number, "cells", fields[3])?;
+    if number == 0 {
+        return Err(format!(
+            "audit adjustments line {line_number} number is zero"
+        ));
+    }
+    if !matches!(cells, 2 | 4) {
+        return Err(format!(
+            "audit adjustments line {line_number} cells {cells} is not 2 or 4"
+        ));
+    }
+    if u32::from(offset) + u32::from(cells) > u32::from(RED_LABEL_CMOS_CELLS) {
+        return Err(format!(
+            "audit adjustments line {line_number} range exceeds CMOS cell space"
+        ));
+    }
+
+    Ok(RedLabelAuditAdjustment {
+        number,
+        symbol: String::from(fields[1]),
+        offset,
+        cells,
+        message: String::from(fields[4]),
+        source: String::from(fields[5]),
+    })
+}
+
 fn parse_optional_hex_u16(
     line_number: usize,
     field_name: &str,
@@ -624,10 +712,11 @@ fn checked_range_from_u32(start: u32, len: u32) -> Option<Range<u16>> {
 mod tests {
     use super::{
         MemoryMapCpu, RED_LABEL_CMOS_BASE, RED_LABEL_CMOS_CELLS, cmos_4bit_cell_value,
-        pack_sram_byte, pack_sram_word, parse_red_label_cmos_defaults_tsv,
-        parse_red_label_cmos_layout_tsv, parse_red_label_linked_lists_tsv,
-        parse_red_label_memory_map_tsv, parse_red_label_ram_layout_tsv,
-        parse_red_label_sram_routines_tsv, red_label_cmos_defaults, red_label_cmos_layout,
+        pack_sram_byte, pack_sram_word, parse_red_label_audit_adjustments_tsv,
+        parse_red_label_cmos_defaults_tsv, parse_red_label_cmos_layout_tsv,
+        parse_red_label_linked_lists_tsv, parse_red_label_memory_map_tsv,
+        parse_red_label_ram_layout_tsv, parse_red_label_sram_routines_tsv,
+        red_label_audit_adjustments, red_label_cmos_defaults, red_label_cmos_layout,
         red_label_linked_lists, red_label_memory_map, red_label_ram_layout,
         red_label_sram_routines, unpack_sram_byte, unpack_sram_word,
     };
@@ -736,6 +825,58 @@ mod tests {
         let text = "routine\taddress\tregister\twidth_nibbles\tx_advance\toperation\tsource\nSRAMRead\t0xF813\tA\twat\t2\tread_byte\tComputer Archeology\n";
         let error = parse_red_label_sram_routines_tsv(text).expect_err("bad width");
         assert!(error.contains("width_nibbles"));
+    }
+
+    #[test]
+    fn embedded_audit_adjustments_capture_auditg_message_table() {
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+
+        assert_eq!(adjustments.len(), 28);
+
+        let left_coins = adjustments
+            .iter()
+            .find(|adjustment| adjustment.number == 1)
+            .expect("left coin audit row");
+        assert_eq!(left_coins.symbol, "SLOT1");
+        assert_eq!(left_coins.offset, 0x01);
+        assert_eq!(left_coins.cells, 4);
+        assert_eq!(left_coins.message, "COINS LEFT");
+        assert_eq!(left_coins.cell_range(), Some(0x0001..0x0005));
+
+        let replay = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "REPLAY")
+            .expect("replay adjustment");
+        assert_eq!(replay.number, 8);
+        assert_eq!(replay.cells, 4);
+        assert_eq!(replay.message, "BONUS SHIP LEVEL");
+
+        let special_function = adjustments.last().expect("last audit row");
+        assert_eq!(special_function.number, 28);
+        assert_eq!(special_function.symbol, "DIPSW");
+        assert_eq!(special_function.offset, 0x7D);
+        assert_eq!(special_function.cells, 2);
+        assert_eq!(special_function.message, "SPECIAL FUNCTION");
+    }
+
+    #[test]
+    fn audit_adjustments_parser_rejects_bad_header_and_cell_drift() {
+        let error = parse_red_label_audit_adjustments_tsv("wat\n").expect_err("bad header");
+        assert!(error.contains("unexpected audit adjustments header"));
+
+        let text =
+            "number\tsymbol\toffset\tcells\tmessage\tsource\n1\tSLOT1\t01\t4\tCOINS LEFT\tromc8\n";
+        let error = parse_red_label_audit_adjustments_tsv(text).expect_err("bad offset");
+        assert!(error.contains("is not hex"));
+
+        let text = "number\tsymbol\toffset\tcells\tmessage\tsource\n1\tSLOT1\t0x01\t3\tCOINS LEFT\tromc8\n";
+        let error = parse_red_label_audit_adjustments_tsv(text).expect_err("bad cells");
+        assert!(error.contains("is not 2 or 4"));
+
+        let text =
+            "number\tsymbol\toffset\tcells\tmessage\tsource\n1\tOVER\t0xFE\t4\tOVER\tromc8\n";
+        let error = parse_red_label_audit_adjustments_tsv(text).expect_err("overflow");
+        assert!(error.contains("range exceeds CMOS cell space"));
     }
 
     #[test]

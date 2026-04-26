@@ -1,0 +1,29 @@
+number	symbol	offset	cells	message	source
+1	SLOT1	0x01	4	COINS LEFT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L716-L747
+2	SLOT2	0x05	4	COINS CENTER	https://github.com/mwenge/defender/blob/master/src/romc8.src#L717-L748
+3	SLOT3	0x09	4	COINS RIGHT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L718-L749
+4	TOTPDC	0x0D	4	TOTAL PAID	https://github.com/mwenge/defender/blob/master/src/romc8.src#L719-L750
+5	TOTRPL	0x11	4	SHIPS WON	https://github.com/mwenge/defender/blob/master/src/romc8.src#L720-L751
+6	BLLTIM	0x15	4	TOTAL TIME	https://github.com/mwenge/defender/blob/master/src/romc8.src#L721-L752
+7	BLLCNT	0x19	4	TOTAL SHIPS	https://github.com/mwenge/defender/blob/master/src/romc8.src#L722-L753
+8	REPLAY	0x81	4	BONUS SHIP LEVEL	https://github.com/mwenge/defender/blob/master/src/romc8.src#L723-L754
+9	NSHIP	0x85	2	NUMBER OF SHIPS	https://github.com/mwenge/defender/blob/master/src/romc8.src#L724-L755
+10	COINSL	0x87	2	COINAGE SELECT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L725-L756
+11	SLOT1M	0x89	2	LEFT COIN MULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L726-L757
+12	SLOT2M	0x8B	2	CENTER COIN MULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L727-L758
+13	SLOT3M	0x8D	2	RIGHT COIN MULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L728-L759
+14	CUNITC	0x8F	2	COINS FOR CREDIT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L729-L760
+15	CUNITB	0x91	2	COINS FOR BONUS	https://github.com/mwenge/defender/blob/master/src/romc8.src#L730-L761
+16	MINUNT	0x93	2	MINIMUM COINS	https://github.com/mwenge/defender/blob/master/src/romc8.src#L731-L762
+17	FREEPL	0x95	2	FREE PLAY	https://github.com/mwenge/defender/blob/master/src/romc8.src#L732-L763
+18	GA1	0x97	2	GAME ADJUST 1	https://github.com/mwenge/defender/blob/master/src/romc8.src#L733-L764
+19	GA1+2	0x99	2	GAME ADJUST 2	https://github.com/mwenge/defender/blob/master/src/romc8.src#L734-L765
+20	GA1+4	0x9B	2	GAME ADJUST 3	https://github.com/mwenge/defender/blob/master/src/romc8.src#L735-L766
+21	GA1+6	0x9D	2	GAME ADJUST 4	https://github.com/mwenge/defender/blob/master/src/romc8.src#L736-L767
+22	GA1+8	0x9F	2	GAME ADJUST 5	https://github.com/mwenge/defender/blob/master/src/romc8.src#L737-L768
+23	GA1+10	0xA1	2	GAME ADJUST 6	https://github.com/mwenge/defender/blob/master/src/romc8.src#L738-L769
+24	GA1+12	0xA3	2	GAME ADJUST 7	https://github.com/mwenge/defender/blob/master/src/romc8.src#L739-L770
+25	GA1+14	0xA5	2	GAME ADJUST 8	https://github.com/mwenge/defender/blob/master/src/romc8.src#L740-L771
+26	GA1+16	0xA7	2	GAME ADJUST 9	https://github.com/mwenge/defender/blob/master/src/romc8.src#L741-L772
+27	GA1+18	0xA9	2	GAME ADJUST 10	https://github.com/mwenge/defender/blob/master/src/romc8.src#L742-L773
+28	DIPSW	0x7D	2	SPECIAL FUNCTION	https://github.com/mwenge/defender/blob/master/src/romc8.src#L743-L774
