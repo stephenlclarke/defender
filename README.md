@@ -172,9 +172,9 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   layout/default metadata, input port metadata, RAM table metadata, ROM
   metadata, ROM-region/load maps with derived `CROM0` `ROMMAP` descriptors and
   checksum/stage reports, shell image bytes, object-picture descriptors, object
-  image bytes, diagnostic LED output behavior, sound-table bytes, the complete
-  `SWTAB` switch table, the trace schema, and `WVTAB` wave records from
-  `assets/red-label/`.
+  image bytes, diagnostic LED output behavior, CROM0 diagnostic screen and
+  advance-gate intent, sound-table bytes, the complete `SWTAB` switch table,
+  the trace schema, and `WVTAB` wave records from `assets/red-label/`.
 - The core now initializes source-owned process, super-process, object, player,
   player-start, switch-history, switch-queue, and shell-list RAM bytes from
   embedded red-label metadata and emits object-table/SPTR-head CRCs in fidelity
@@ -387,11 +387,12 @@ yet; current implementation status is tracked in `SPEC.md` and
   tables, plus the `amode1.src` `MTERR` mini-terrain bytes used by `SCNRV`, are
   now embedded from `assets/red-label/terrain-data.tsv`. The
   `romc0.src` `PWRUP`, `romf8.src` `ROMMAP`/`ROM0`/`ROM9`, and `romc8.src`
-  `DEFALT`, `CMOSMV`, `CMINIT`, `RHSTD`, `RHSTDS`, `AUDITG`, `LEDS`, and
-  `FLASHL` routines provide the ROM-derived CMOS defaults, power-up CMOS
-  branch/source dispatch target, source-shaped `CROM0` ROM descriptor bytes and
-  checksum failure reports plus the ROM-stage manual/auto outcome, diagnostic
-  LED output bytes, high-score reset copy, and operator audit/adjustment table,
+  `DEFALT`, `CMOSMV`, `CMINIT`, `RHSTD`, `RHSTDS`, `AUDITG`, `LEDS`, `FLASHL`,
+  `ADVSW`, and `NEXTST` routines provide the ROM-derived CMOS defaults,
+  power-up CMOS branch/source dispatch target, source-shaped `CROM0` ROM
+  descriptor bytes and checksum failure reports plus the ROM-stage manual/auto
+  outcome, diagnostic LED output bytes, CROM0 diagnostic text/palette intent and
+  advance gates, high-score reset copy, and operator audit/adjustment table,
   `DISAUD` display-line formatting, row
   navigation, post-display debounce cadence, deterministic audit cycle, and
   CMOS mutation rules now embedded under `assets/red-label/`. The

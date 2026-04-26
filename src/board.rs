@@ -17,9 +17,10 @@
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, and can route the CMOS-visible
 //! `romc0.src` power-up branch. CMOS persistence, `AUDITG` live diagnostic text
-//! transfer/full-loop integration, live `CROM0` diagnostic video/later-test
-//! execution and physical lamp timing beyond the modeled ROM-stage LED output,
-//! and full video timing remain explicit fidelity gaps.
+//! transfer/full-loop integration, live `CROM0` diagnostic bitmap text
+//! transfer/later-test execution and physical advance/lamp timing beyond the
+//! modeled ROM-stage screen/LED output, and full video timing remain explicit
+//! fidelity gaps.
 
 use crate::{
     input::{
@@ -31,7 +32,10 @@ use crate::{
         RedLabelAuditAdjustment, RedLabelCmosDefault, RedLabelCmosLayoutEntry,
         RedLabelRamLayoutEntry, pack_sram_byte, pack_sram_word, unpack_sram_byte, unpack_sram_word,
     },
-    rom::{RedLabelCrom0RomStage, RedLabelRomImages},
+    rom::{
+        RedLabelCrom0AdvanceGate, RedLabelCrom0RomStage, RedLabelCrom0RomStageStatus,
+        RedLabelCrom0RomStageTarget, RedLabelRomImages,
+    },
     sound::SoundCommandLatch,
     video::{
         RenderedImage, defender_visible_palette_index, render_defender_visible_palette_indices,
@@ -74,6 +78,12 @@ pub const RED_LABEL_RESET_PALETTE_BYTES: [u8; PALETTE_RAM_SIZE] = [
 ];
 pub const RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS: u8 = 2;
 pub const RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS: u16 = 500;
+pub const RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS: u16 = 0xC001;
+pub const RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX: u8 = 1;
+pub const RED_LABEL_CROM0_ROM_FAILURE_TEXT: &str = "ROM FAILURE";
+pub const RED_LABEL_CROM0_ALL_ROMS_OK_TEXT: &str = "ALL ROMS OK";
+pub const RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT: &str = "ROM";
+pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS: &[&str] = &["AUTO FOR RAM TEST"];
 pub const WATCHDOG_RESET_BYTE: u8 = 0x39;
 pub const VIDEO_COUNTER_CLAMPED_VALUE: u8 = 0xFC;
 pub const VIDEO_COUNTER_CLAMP_VPOS: u16 = 0x100;
@@ -165,6 +175,43 @@ pub struct RedLabelDiagnosticLedFlash {
     pub source_value: u8,
     pub repetitions: u8,
     pub delay_ms: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelDiagnosticPaletteWrite {
+    pub address: u16,
+    pub index: u8,
+    pub value: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelDiagnosticTextWrite {
+    pub address: u16,
+    pub vector_label: &'static str,
+    pub text: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelDiagnosticInstructionWrite {
+    pub table_label: &'static str,
+    pub lines: &'static [&'static str],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0BadRomScreenWrite {
+    pub row_address: u16,
+    pub text_vector_label: &'static str,
+    pub text: &'static str,
+    pub rom_number: u8,
+    pub rom_number_bcd: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RedLabelCrom0DiagnosticScreen {
+    pub letter_color: Option<RedLabelDiagnosticPaletteWrite>,
+    pub headline: Option<RedLabelDiagnosticTextWrite>,
+    pub instructions: Vec<RedLabelDiagnosticInstructionWrite>,
+    pub bad_roms: Vec<RedLabelCrom0BadRomScreenWrite>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -467,6 +514,8 @@ pub struct DefenderMainBoard<'a> {
     last_sound_command_latch: Option<SoundCommandLatch>,
     diagnostic_led_output: RedLabelDiagnosticLedOutput,
     diagnostic_led_flashes: Vec<RedLabelDiagnosticLedFlash>,
+    crom0_diagnostic_screen: RedLabelCrom0DiagnosticScreen,
+    crom0_advance_gates: Vec<RedLabelCrom0AdvanceGate>,
 }
 
 impl<'a> DefenderMainBoard<'a> {
@@ -485,6 +534,8 @@ impl<'a> DefenderMainBoard<'a> {
             last_sound_command_latch: None,
             diagnostic_led_output: red_label_diagnostic_led_output(0),
             diagnostic_led_flashes: Vec::new(),
+            crom0_diagnostic_screen: RedLabelCrom0DiagnosticScreen::default(),
+            crom0_advance_gates: Vec::new(),
         }
     }
 
@@ -543,6 +594,14 @@ impl<'a> DefenderMainBoard<'a> {
         &self.diagnostic_led_flashes
     }
 
+    pub fn crom0_diagnostic_screen(&self) -> &RedLabelCrom0DiagnosticScreen {
+        &self.crom0_diagnostic_screen
+    }
+
+    pub fn crom0_advance_gates(&self) -> &[RedLabelCrom0AdvanceGate] {
+        &self.crom0_advance_gates
+    }
+
     pub fn red_label_set_diagnostic_leds(
         &mut self,
         source_value: u8,
@@ -563,6 +622,13 @@ impl<'a> DefenderMainBoard<'a> {
     }
 
     pub fn red_label_apply_crom0_rom_stage(&mut self, stage: &RedLabelCrom0RomStage) {
+        let screen = red_label_crom0_diagnostic_screen(stage);
+        if let Some(letter_color) = screen.letter_color {
+            self.palette_ram[usize::from(letter_color.index)] = letter_color.value;
+        }
+        self.crom0_diagnostic_screen = screen;
+        self.crom0_advance_gates.clone_from(&stage.advance_gates);
+
         if let Some(led) = stage.initial_led {
             self.red_label_set_diagnostic_leds(led);
         }
@@ -1409,6 +1475,86 @@ fn banked_write_target(address: u16, bank_select: u8) -> MainCpuWriteTarget {
     }
 }
 
+/// Source-shaped `CROM0` text/palette intent.
+///
+/// This records the message vectors and values around `SETCOL`, `VWTEXT`,
+/// `VOPERI`, and `VWNUMB`; bitmap text transfer into video RAM remains a
+/// separate translation step.
+/// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L193-L250>.
+/// Source: <https://github.com/mwenge/defender/blob/master/src/mess0.src#L73-L96>.
+pub fn red_label_crom0_diagnostic_screen(
+    stage: &RedLabelCrom0RomStage,
+) -> RedLabelCrom0DiagnosticScreen {
+    let mut screen = RedLabelCrom0DiagnosticScreen {
+        letter_color: stage
+            .text_color
+            .map(|value| RedLabelDiagnosticPaletteWrite {
+                address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+                index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+                value,
+            }),
+        ..RedLabelCrom0DiagnosticScreen::default()
+    };
+
+    match stage.status {
+        RedLabelCrom0RomStageStatus::RomFailure => {
+            if let Some(address) = stage.headline_address {
+                screen.headline = Some(RedLabelDiagnosticTextWrite {
+                    address,
+                    vector_label: "VROMFL",
+                    text: RED_LABEL_CROM0_ROM_FAILURE_TEXT,
+                });
+                screen
+                    .instructions
+                    .push(RedLabelDiagnosticInstructionWrite {
+                        table_label: "IROMFL",
+                        lines: RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS,
+                    });
+            }
+
+            screen
+                .bad_roms
+                .extend(stage.bad_rom_displays.iter().map(|display| {
+                    RedLabelCrom0BadRomScreenWrite {
+                        row_address: display.cursor_address,
+                        text_vector_label: "VWROM",
+                        text: RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT,
+                        rom_number: display.rom_number,
+                        rom_number_bcd: red_label_decimal_to_bcd_byte(display.rom_number),
+                    }
+                }));
+
+            if matches!(stage.target, RedLabelCrom0RomStageTarget::WaitForNextSwitch)
+                && stage.final_led.is_some()
+            {
+                screen
+                    .instructions
+                    .push(RedLabelDiagnosticInstructionWrite {
+                        table_label: "IROMDO",
+                        lines: RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS,
+                    });
+            }
+        }
+        RedLabelCrom0RomStageStatus::AllRomsOk => {
+            if let Some(address) = stage.headline_address {
+                screen.headline = Some(RedLabelDiagnosticTextWrite {
+                    address,
+                    vector_label: "VALROM",
+                    text: RED_LABEL_CROM0_ALL_ROMS_OK_TEXT,
+                });
+                screen
+                    .instructions
+                    .push(RedLabelDiagnosticInstructionWrite {
+                        table_label: "IROMDO",
+                        lines: RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS,
+                    });
+            }
+        }
+    }
+
+    screen
+}
+
 pub fn red_label_diagnostic_led_output(source_value: u8) -> RedLabelDiagnosticLedOutput {
     let (mut pia1_port_a, mut carry) = lsr(source_value);
     for _ in 0..3 {
@@ -1456,18 +1602,23 @@ mod tests {
             RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS, RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS,
             RED_LABEL_CLRALL_PACKED_BYTE_WRITES, RED_LABEL_CLRAUD_PACKED_BYTE_WRITES,
             RED_LABEL_CMOSCK_CELL_OFFSET, RED_LABEL_CRHSTD_CELL_OFFSET,
+            RED_LABEL_CROM0_ALL_ROMS_OK_TEXT, RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS,
+            RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT, RED_LABEL_CROM0_ROM_FAILURE_TEXT,
             RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS, RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
+            RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS, RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
             RED_LABEL_DIPFLG_CELL_OFFSET, RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS,
             RED_LABEL_RESET_PALETTE_BYTES, RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
             RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
             RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
             RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
-            RedLabelDiagnosticLedFlash, RedLabelDiagnosticLedOutput, RedLabelPowerUpAction,
+            RedLabelCrom0BadRomScreenWrite, RedLabelDiagnosticInstructionWrite,
+            RedLabelDiagnosticLedFlash, RedLabelDiagnosticLedOutput,
+            RedLabelDiagnosticPaletteWrite, RedLabelDiagnosticTextWrite, RedLabelPowerUpAction,
             RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
             cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
             cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
-            main_cpu_read_target, main_cpu_write_target, red_label_diagnostic_led_output,
-            video_control_cocktail, video_counter_read_value,
+            main_cpu_read_target, main_cpu_write_target, red_label_crom0_diagnostic_screen,
+            red_label_diagnostic_led_output, video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -1480,9 +1631,11 @@ mod tests {
             red_label_ram_layout,
         },
         rom::{
-            RedLabelCrom0RomStage, RedLabelCrom0RomStageStatus, RedLabelCrom0RomStageTarget,
-            RedLabelRomImages, RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile,
-            VerifiedRomSet,
+            RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS, RED_LABEL_CROM0_FAILURE_COLOR,
+            RED_LABEL_CROM0_OK_COLOR, RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS,
+            RedLabelCrom0AdvanceGate, RedLabelCrom0BadRomDisplay, RedLabelCrom0RomStage,
+            RedLabelCrom0RomStageStatus, RedLabelCrom0RomStageTarget, RedLabelRomImages,
+            RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile, VerifiedRomSet,
         },
     };
 
@@ -2037,6 +2190,7 @@ mod tests {
             final_led: Some(0x02),
             flash_led: None,
             bad_rom_displays: Vec::new(),
+            advance_gates: Vec::new(),
             target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
         };
 
@@ -2061,6 +2215,7 @@ mod tests {
             final_led: None,
             flash_led: Some(0x08),
             bad_rom_displays: Vec::new(),
+            advance_gates: Vec::new(),
             target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
         };
 
@@ -2077,6 +2232,136 @@ mod tests {
         assert_eq!(
             board.diagnostic_led_output(),
             red_label_diagnostic_led_output(0)
+        );
+    }
+
+    #[test]
+    fn main_board_records_crom0_failure_screen_and_advance_gates() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let stage = RedLabelCrom0RomStage {
+            status: RedLabelCrom0RomStageStatus::RomFailure,
+            text_color: Some(RED_LABEL_CROM0_FAILURE_COLOR),
+            headline_address: Some(RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS),
+            initial_led: Some(0x08),
+            final_led: Some(12),
+            flash_led: None,
+            bad_rom_displays: vec![
+                RedLabelCrom0BadRomDisplay {
+                    rom_number: 2,
+                    cursor_address: 0x4270,
+                },
+                RedLabelCrom0BadRomDisplay {
+                    rom_number: 12,
+                    cursor_address: 0x427A,
+                },
+            ],
+            advance_gates: vec![
+                RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+                RedLabelCrom0AdvanceGate::NextTestAutoCounter,
+            ],
+            target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
+        };
+        let expected_screen = red_label_crom0_diagnostic_screen(&stage);
+
+        board.red_label_apply_crom0_rom_stage(&stage);
+
+        assert_eq!(
+            expected_screen.letter_color,
+            Some(RedLabelDiagnosticPaletteWrite {
+                address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+                index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+                value: RED_LABEL_CROM0_FAILURE_COLOR,
+            })
+        );
+        assert_eq!(
+            expected_screen.headline,
+            Some(RedLabelDiagnosticTextWrite {
+                address: RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS,
+                vector_label: "VROMFL",
+                text: RED_LABEL_CROM0_ROM_FAILURE_TEXT,
+            })
+        );
+        assert_eq!(
+            expected_screen.instructions.as_slice(),
+            &[
+                RedLabelDiagnosticInstructionWrite {
+                    table_label: "IROMFL",
+                    lines: RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS,
+                },
+                RedLabelDiagnosticInstructionWrite {
+                    table_label: "IROMDO",
+                    lines: RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS,
+                },
+            ]
+        );
+        assert_eq!(
+            expected_screen.bad_roms.as_slice(),
+            &[
+                RedLabelCrom0BadRomScreenWrite {
+                    row_address: 0x4270,
+                    text_vector_label: "VWROM",
+                    text: RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT,
+                    rom_number: 2,
+                    rom_number_bcd: 0x02,
+                },
+                RedLabelCrom0BadRomScreenWrite {
+                    row_address: 0x427A,
+                    text_vector_label: "VWROM",
+                    text: RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT,
+                    rom_number: 12,
+                    rom_number_bcd: 0x12,
+                },
+            ]
+        );
+        assert_eq!(board.palette_ram()[1], RED_LABEL_CROM0_FAILURE_COLOR);
+        assert_eq!(board.crom0_diagnostic_screen(), &expected_screen);
+        assert_eq!(
+            board.crom0_advance_gates(),
+            &[
+                RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+                RedLabelCrom0AdvanceGate::NextTestAutoCounter,
+            ]
+        );
+    }
+
+    #[test]
+    fn main_board_records_crom0_success_screen() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let stage = RedLabelCrom0RomStage {
+            status: RedLabelCrom0RomStageStatus::AllRomsOk,
+            text_color: Some(RED_LABEL_CROM0_OK_COLOR),
+            headline_address: Some(RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS),
+            initial_led: None,
+            final_led: None,
+            flash_led: Some(0x08),
+            bad_rom_displays: Vec::new(),
+            advance_gates: vec![RedLabelCrom0AdvanceGate::NextTestAutoCounter],
+            target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
+        };
+
+        board.red_label_apply_crom0_rom_stage(&stage);
+
+        assert_eq!(board.palette_ram()[1], RED_LABEL_CROM0_OK_COLOR);
+        assert_eq!(
+            board.crom0_diagnostic_screen().headline,
+            Some(RedLabelDiagnosticTextWrite {
+                address: RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS,
+                vector_label: "VALROM",
+                text: RED_LABEL_CROM0_ALL_ROMS_OK_TEXT,
+            })
+        );
+        assert_eq!(
+            board.crom0_diagnostic_screen().instructions.as_slice(),
+            &[RedLabelDiagnosticInstructionWrite {
+                table_label: "IROMDO",
+                lines: RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS,
+            }]
+        );
+        assert_eq!(
+            board.crom0_advance_gates(),
+            &[RedLabelCrom0AdvanceGate::NextTestAutoCounter]
         );
     }
 

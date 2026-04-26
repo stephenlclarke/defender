@@ -143,6 +143,8 @@ pub const RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS: u16 = 0x3860;
 pub const RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS: u16 = 0x3880;
 pub const RED_LABEL_CROM0_BAD_ROM_CURSOR_START: u16 = 0x4266;
 pub const RED_LABEL_CROM0_BAD_ROM_CURSOR_STEP: u16 = 10;
+pub const RED_LABEL_CROM0_ADVSW_DELAY_MS: u16 = 100;
+pub const RED_LABEL_CROM0_NEXTST_MIN_DELAY_MS: u16 = 1;
 const RED_LABEL_CROM0_ROMMAP_ADDRESS_MASK: u8 = 0x70;
 const RED_LABEL_CROM0_ROMMAP_BLOCK_MASK: u8 = 0x0F;
 const RED_LABEL_CROM0_ROMMAP_UNUSED_MASK: u8 = 0x80;
@@ -220,6 +222,43 @@ pub enum RedLabelCrom0RomStageTarget {
     RamTestActiveLoop,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0AdvanceGate {
+    /// `romc8.src` `ADVSW`: wait through 100 ms release/press polling.
+    AdvanceSwitchReleaseThenPress,
+    /// `romc8.src` `NEXTST`: wait at least 1 ms for the auto/advance counter.
+    NextTestAutoCounter,
+}
+
+impl RedLabelCrom0AdvanceGate {
+    pub fn delay_ms(self) -> u16 {
+        match self {
+            RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress => {
+                RED_LABEL_CROM0_ADVSW_DELAY_MS
+            }
+            RedLabelCrom0AdvanceGate::NextTestAutoCounter => RED_LABEL_CROM0_NEXTST_MIN_DELAY_MS,
+        }
+    }
+
+    pub fn waits_for_advance_release(self) -> bool {
+        matches!(
+            self,
+            RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress
+        )
+    }
+
+    pub fn waits_for_advance_press(self) -> bool {
+        matches!(
+            self,
+            RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress
+        )
+    }
+
+    pub fn waits_for_auto_counter(self) -> bool {
+        matches!(self, RedLabelCrom0AdvanceGate::NextTestAutoCounter)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RedLabelCrom0BadRomDisplay {
     pub rom_number: u8,
@@ -235,6 +274,7 @@ pub struct RedLabelCrom0RomStage {
     pub final_led: Option<u8>,
     pub flash_led: Option<u8>,
     pub bad_rom_displays: Vec<RedLabelCrom0BadRomDisplay>,
+    pub advance_gates: Vec<RedLabelCrom0AdvanceGate>,
     pub target: RedLabelCrom0RomStageTarget,
 }
 
@@ -805,6 +845,15 @@ fn red_label_crom0_rom_stage_outcome(
         },
         flash_led: None,
         bad_rom_displays,
+        advance_gates: match operator_mode {
+            RedLabelCrom0OperatorMode::Manual => vec![
+                RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+                RedLabelCrom0AdvanceGate::NextTestAutoCounter,
+            ],
+            RedLabelCrom0OperatorMode::Auto => {
+                vec![RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress]
+            }
+        },
         target: match operator_mode {
             RedLabelCrom0OperatorMode::Manual => RedLabelCrom0RomStageTarget::WaitForNextSwitch,
             RedLabelCrom0OperatorMode::Auto => RedLabelCrom0RomStageTarget::RamTestStart,
@@ -822,6 +871,7 @@ fn red_label_crom0_all_ok_stage(operator_mode: RedLabelCrom0OperatorMode) -> Red
             final_led: None,
             flash_led: Some(RED_LABEL_CROM0_ROM_TEST_LED),
             bad_rom_displays: Vec::new(),
+            advance_gates: vec![RedLabelCrom0AdvanceGate::NextTestAutoCounter],
             target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
         },
         RedLabelCrom0OperatorMode::Auto => RedLabelCrom0RomStage {
@@ -832,6 +882,7 @@ fn red_label_crom0_all_ok_stage(operator_mode: RedLabelCrom0OperatorMode) -> Red
             final_led: None,
             flash_led: None,
             bad_rom_displays: Vec::new(),
+            advance_gates: Vec::new(),
             target: RedLabelCrom0RomStageTarget::RamTestActiveLoop,
         },
     }
@@ -1110,13 +1161,15 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::{
-        RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS, RED_LABEL_CROM0_BAD_ROM_CURSOR_STEP,
-        RED_LABEL_CROM0_FAILURE_COLOR, RED_LABEL_CROM0_FIXED_ROM_BLOCK, RED_LABEL_CROM0_OK_COLOR,
-        RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS, RED_LABEL_CROM0_ROM_TEST_LED,
-        RED_LABEL_CROM0_ROMMAP_BYTES, RedLabelCrom0OperatorMode, RedLabelCrom0RomStageStatus,
-        RedLabelCrom0RomStageTarget, RedLabelRomImages, RomDescriptor, RomLoad, RomRegion, RomView,
-        VerifiedRomFile, VerifiedRomSet, crc32, load_verified_dir_against, parse_rom_descriptors,
-        parse_rom_map, parse_rom_regions, red_label_crom0_rom_diagnostics,
+        RED_LABEL_CROM0_ADVSW_DELAY_MS, RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS,
+        RED_LABEL_CROM0_BAD_ROM_CURSOR_STEP, RED_LABEL_CROM0_FAILURE_COLOR,
+        RED_LABEL_CROM0_FIXED_ROM_BLOCK, RED_LABEL_CROM0_NEXTST_MIN_DELAY_MS,
+        RED_LABEL_CROM0_OK_COLOR, RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS,
+        RED_LABEL_CROM0_ROM_TEST_LED, RED_LABEL_CROM0_ROMMAP_BYTES, RedLabelCrom0AdvanceGate,
+        RedLabelCrom0OperatorMode, RedLabelCrom0RomStageStatus, RedLabelCrom0RomStageTarget,
+        RedLabelRomImages, RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile,
+        VerifiedRomSet, crc32, load_verified_dir_against, parse_rom_descriptors, parse_rom_map,
+        parse_rom_regions, red_label_crom0_rom_diagnostics,
         red_label_crom0_rom_diagnostics_from_descriptors, red_label_crom0_rom_map_descriptors,
         red_label_crom0_rom_map_descriptors_from_loads, red_label_main_cpu_region,
         red_label_rom_map, red_label_rom_regions, red_label_roms, scan_dir_against,
@@ -1457,6 +1510,15 @@ mod tests {
         assert_eq!(stage.initial_led, None);
         assert_eq!(stage.final_led, None);
         assert!(stage.bad_rom_displays.is_empty());
+        assert_eq!(
+            stage.advance_gates.as_slice(),
+            &[RedLabelCrom0AdvanceGate::NextTestAutoCounter]
+        );
+        assert_eq!(
+            stage.advance_gates[0].delay_ms(),
+            RED_LABEL_CROM0_NEXTST_MIN_DELAY_MS
+        );
+        assert!(stage.advance_gates[0].waits_for_auto_counter());
         assert_eq!(stage.target, RedLabelCrom0RomStageTarget::WaitForNextSwitch);
     }
 
@@ -1471,6 +1533,7 @@ mod tests {
         assert_eq!(stage.text_color, None);
         assert_eq!(stage.headline_address, None);
         assert_eq!(stage.flash_led, None);
+        assert!(stage.advance_gates.is_empty());
         assert_eq!(stage.target, RedLabelCrom0RomStageTarget::RamTestActiveLoop);
     }
 
@@ -1499,6 +1562,19 @@ mod tests {
             stage.bad_rom_displays[0].cursor_address,
             0x4266 + RED_LABEL_CROM0_BAD_ROM_CURSOR_STEP
         );
+        assert_eq!(
+            stage.advance_gates.as_slice(),
+            &[
+                RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+                RedLabelCrom0AdvanceGate::NextTestAutoCounter,
+            ]
+        );
+        assert_eq!(
+            stage.advance_gates[0].delay_ms(),
+            RED_LABEL_CROM0_ADVSW_DELAY_MS
+        );
+        assert!(stage.advance_gates[0].waits_for_advance_release());
+        assert!(stage.advance_gates[0].waits_for_advance_press());
         assert_eq!(stage.target, RedLabelCrom0RomStageTarget::WaitForNextSwitch);
     }
 
@@ -1517,6 +1593,10 @@ mod tests {
         assert_eq!(stage.initial_led, Some(RED_LABEL_CROM0_ROM_TEST_LED));
         assert_eq!(stage.final_led, None);
         assert_eq!(stage.bad_rom_displays[0].rom_number, 2);
+        assert_eq!(
+            stage.advance_gates.as_slice(),
+            &[RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress]
+        );
         assert_eq!(stage.target, RedLabelCrom0RomStageTarget::RamTestStart);
     }
 
