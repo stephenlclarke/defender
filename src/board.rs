@@ -16,8 +16,8 @@
 //! VA11/COUNT240 inputs to PIA1 CB1/CA1. It can also expose native visible
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, and can route the CMOS-visible
-//! `romc0.src` power-up branch. CMOS persistence, `AUDITG` debounce timing and
-//! live diagnostic text rendering, full `CROM0` diagnostics, LED segment side
+//! `romc0.src` power-up branch. CMOS persistence, `AUDITG` live diagnostic text
+//! transfer/full-loop integration, full `CROM0` diagnostics, LED segment side
 //! effects, and full video timing remain explicit fidelity gaps.
 
 use crate::{
@@ -58,6 +58,11 @@ pub const RED_LABEL_REPLAY_CELL_OFFSET: u8 = 0x81;
 pub const RED_LABEL_COINSL_CELL_OFFSET: u8 = 0x87;
 pub const RED_LABEL_AUDIT_ADJUSTMENT_COUNT: u8 = 28;
 pub const RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS: usize = 31;
+pub const RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS: u8 = 100;
+pub const RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS: u8 = 6;
+pub const RED_LABEL_AUDIT_DEBOUNCE_SHIFT_REGISTER: u8 = 0xFF;
+pub const RED_LABEL_AUDIT_DEBOUNCE_INPUT_MASK: u8 =
+    DEFENDER_IN2_ADVANCE | DEFENDER_IN2_HIGH_SCORE_RESET;
 pub const RED_LABEL_HIGH_SCORE_DEFAULT_BYTES: usize = 48;
 pub const RED_LABEL_HIGH_SCORE_CELLS: usize = RED_LABEL_HIGH_SCORE_DEFAULT_BYTES * 2;
 pub const RED_LABEL_THSTAB_START: u16 = 0xB260;
@@ -183,6 +188,73 @@ impl RedLabelAuditDisplayLine {
     pub fn visible_text(&self) -> &str {
         &self.visible_text
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAuditDebounceState {
+    scan_delay: u8,
+    remaining_ticks: u8,
+    shift_register: u8,
+}
+
+impl Default for RedLabelAuditDebounceState {
+    fn default() -> Self {
+        Self {
+            scan_delay: 0,
+            remaining_ticks: 0,
+            shift_register: RED_LABEL_AUDIT_DEBOUNCE_SHIFT_REGISTER,
+        }
+    }
+}
+
+impl RedLabelAuditDebounceState {
+    pub fn scan_delay(self) -> u8 {
+        self.scan_delay
+    }
+
+    pub fn remaining_ticks(self) -> u8 {
+        self.remaining_ticks
+    }
+
+    pub fn shift_register(self) -> u8 {
+        self.shift_register
+    }
+
+    /// Enter the post-`DISAUD` delay/debounce block at `AUDT3A`.
+    ///
+    /// `scan_delay` is the source `TEMP1A` value: zero selects the first
+    /// 100-tick delay, any other non-six value selects the six-tick scan rate,
+    /// and six resumes the already-scanning branch without reinitializing the
+    /// shift register.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L85-L97>.
+    pub fn begin_after_display(&mut self) {
+        if self.scan_delay == RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS {
+            self.remaining_ticks = RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS;
+            return;
+        }
+
+        self.scan_delay = if self.scan_delay == 0 {
+            RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS
+        } else {
+            RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS
+        };
+        self.remaining_ticks = self.scan_delay.wrapping_add(1);
+        self.shift_register = RED_LABEL_AUDIT_DEBOUNCE_SHIFT_REGISTER;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAuditDebounceStep {
+    Waiting {
+        remaining_ticks: u8,
+        shift_register: u8,
+    },
+    Released {
+        shift_register: u8,
+    },
+    TimedOut {
+        scan_delay: u8,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -457,6 +529,43 @@ impl<'a> DefenderMainBoard<'a> {
             value,
             visible_text,
         })
+    }
+
+    /// Run one source `DELY10` tick from the `AUDT3D` post-display debounce.
+    ///
+    /// This models the `DECA`, `BITB #$0A`, and `RORB` behavior after each
+    /// displayed row. A release requires the advance and high-score-reset bits
+    /// to shift the register down to zero; timeout leaves `TEMP1A` at the
+    /// current scan delay for the next display.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L97-L112>.
+    pub fn red_label_audit_debounce_tick(
+        &self,
+        state: &mut RedLabelAuditDebounceState,
+    ) -> Option<RedLabelAuditDebounceStep> {
+        if state.remaining_ticks == 0 {
+            return None;
+        }
+
+        state.remaining_ticks = state.remaining_ticks.wrapping_sub(1);
+        if state.remaining_ticks == 0 {
+            return Some(RedLabelAuditDebounceStep::TimedOut {
+                scan_delay: state.scan_delay,
+            });
+        }
+
+        let input = self.input_ports.pia1_port_a();
+        let carry_in = input & RED_LABEL_AUDIT_DEBOUNCE_INPUT_MASK != 0;
+        state.shift_register = (state.shift_register >> 1) | if carry_in { 0x80 } else { 0 };
+        if state.shift_register == 0 {
+            state.scan_delay = 0;
+            state.remaining_ticks = 0;
+            Some(RedLabelAuditDebounceStep::Released { shift_register: 0 })
+        } else {
+            Some(RedLabelAuditDebounceStep::Waiting {
+                remaining_ticks: state.remaining_ticks,
+                shift_register: state.shift_register,
+            })
+        }
     }
 
     /// Source-shaped visible `ALTER` / `HYSCRE` CMOS mutation for one row.
@@ -1186,17 +1295,18 @@ mod tests {
             MAIN_CPU_BANK_SELECT_WRITE, MAIN_CPU_IO_BANK, MAIN_CPU_RAM_SIZE, MainCpuReadError,
             MainCpuReadTarget, MainCpuReadWindow, MainCpuRomRead, MainCpuWriteError,
             MainCpuWriteTarget, PALETTE_RAM_SIZE, RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS,
+            RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS, RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS,
             RED_LABEL_CLRALL_PACKED_BYTE_WRITES, RED_LABEL_CLRAUD_PACKED_BYTE_WRITES,
             RED_LABEL_CMOSCK_CELL_OFFSET, RED_LABEL_CRHSTD_CELL_OFFSET,
             RED_LABEL_DIPFLG_CELL_OFFSET, RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS,
             RED_LABEL_RESET_PALETTE_BYTES, RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
             RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
-            RedLabelAuditOperatorState, RedLabelAuditOperatorStep, RedLabelPowerUpAction,
-            RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
-            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
-            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
-            main_cpu_read_target, main_cpu_write_target, video_control_cocktail,
-            video_counter_read_value,
+            RedLabelAuditDebounceState, RedLabelAuditDebounceStep, RedLabelAuditOperatorState,
+            RedLabelAuditOperatorStep, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
+            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
+            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
+            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -2335,6 +2445,124 @@ mod tests {
         assert_eq!(&special_function_text[0..2], b"28");
         assert_eq!(&special_function_text[9..11], b"45");
         assert_eq!(&special_function_text[12..28], b"SPECIAL FUNCTION");
+    }
+
+    #[test]
+    fn main_board_auditg_debounce_uses_source_scan_delay_cadence() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let mut debounce = RedLabelAuditDebounceState::default();
+
+        assert_eq!(debounce.scan_delay(), 0);
+        assert_eq!(debounce.remaining_ticks(), 0);
+
+        debounce.begin_after_display();
+        assert_eq!(
+            debounce.scan_delay(),
+            RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS
+        );
+        assert_eq!(
+            debounce.remaining_ticks(),
+            RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS + 1
+        );
+
+        board.set_cabinet_input(CabinetInput {
+            service_advance: true,
+            ..CabinetInput::NONE
+        });
+        for remaining_ticks in (1..=RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS).rev() {
+            assert_eq!(
+                board.red_label_audit_debounce_tick(&mut debounce),
+                Some(RedLabelAuditDebounceStep::Waiting {
+                    remaining_ticks,
+                    shift_register: 0xFF,
+                })
+            );
+        }
+        assert_eq!(
+            board.red_label_audit_debounce_tick(&mut debounce),
+            Some(RedLabelAuditDebounceStep::TimedOut {
+                scan_delay: RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS,
+            })
+        );
+
+        debounce.begin_after_display();
+        assert_eq!(
+            debounce.scan_delay(),
+            RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS
+        );
+        assert_eq!(
+            debounce.remaining_ticks(),
+            RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS + 1
+        );
+        for remaining_ticks in (1..=RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS).rev() {
+            assert_eq!(
+                board.red_label_audit_debounce_tick(&mut debounce),
+                Some(RedLabelAuditDebounceStep::Waiting {
+                    remaining_ticks,
+                    shift_register: 0xFF,
+                })
+            );
+        }
+        assert_eq!(
+            board.red_label_audit_debounce_tick(&mut debounce),
+            Some(RedLabelAuditDebounceStep::TimedOut {
+                scan_delay: RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS,
+            })
+        );
+
+        debounce.begin_after_display();
+        assert_eq!(
+            debounce.remaining_ticks(),
+            RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS
+        );
+    }
+
+    #[test]
+    fn main_board_auditg_debounce_requires_shifted_release_samples() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let mut debounce = RedLabelAuditDebounceState::default();
+
+        debounce.begin_after_display();
+        board.set_cabinet_input(CabinetInput {
+            high_score_reset: true,
+            ..CabinetInput::NONE
+        });
+        assert_eq!(
+            board.red_label_audit_debounce_tick(&mut debounce),
+            Some(RedLabelAuditDebounceStep::Waiting {
+                remaining_ticks: RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS,
+                shift_register: 0xFF,
+            })
+        );
+
+        board.set_cabinet_input(CabinetInput::NONE);
+        for (remaining_ticks, shift_register) in [
+            (99, 0x7F),
+            (98, 0x3F),
+            (97, 0x1F),
+            (96, 0x0F),
+            (95, 0x07),
+            (94, 0x03),
+            (93, 0x01),
+        ] {
+            assert_eq!(
+                board.red_label_audit_debounce_tick(&mut debounce),
+                Some(RedLabelAuditDebounceStep::Waiting {
+                    remaining_ticks,
+                    shift_register,
+                })
+            );
+        }
+        assert_eq!(
+            board.red_label_audit_debounce_tick(&mut debounce),
+            Some(RedLabelAuditDebounceStep::Released { shift_register: 0 })
+        );
+        assert_eq!(debounce.scan_delay(), 0);
+        assert_eq!(debounce.remaining_ticks(), 0);
+        assert_eq!(debounce.shift_register(), 0);
+        assert_eq!(board.red_label_audit_debounce_tick(&mut debounce), None);
     }
 
     #[test]

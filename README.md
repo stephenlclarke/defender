@@ -388,8 +388,8 @@ yet; current implementation status is tracked in `SPEC.md` and
   `RHSTDS`, and `AUDITG` table routines provide the ROM-derived CMOS defaults,
   power-up CMOS branch/source dispatch target, high-score reset copy, and
   operator audit/adjustment table, `DISAUD` display-line formatting, row
-  navigation, and CMOS mutation rules now embedded under `assets/red-label/`.
-  The
+  navigation, post-display debounce cadence, and CMOS mutation rules now
+  embedded under `assets/red-label/`. The
   `defb6.src` `CRTAB` bytes now feed
   the `CRINIT` pseudo-color RAM reset embedded in
   `assets/red-label/color-ram.tsv`. The `defa7.src` `SCORE`, `SNDLD`, `SHELL`,
