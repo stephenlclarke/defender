@@ -17201,7 +17201,8 @@ impl ArcadeMachine {
         events: &mut Vec<MachineEvent>,
     ) {
         if input.coin {
-            self.credits = self.credits.saturating_add(1);
+            self.apply_live_coin_credit()
+                .expect("embedded red-label credit layout is valid");
             events.push(MachineEvent::CreditAdded);
         }
 
@@ -17214,6 +17215,20 @@ impl ArcadeMachine {
             let switch_outcome = self.step_red_label_live_player_switches(input);
             self.step_player_controls(input, events, switch_outcome);
         }
+    }
+
+    fn apply_live_coin_credit(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let credit_before = self
+            .memory
+            .read_field_byte(&layout, "base_page", "CREDIT")?;
+        let (credit_after, _) = bcd_add_byte(credit_before, 0x01, false);
+        self.memory
+            .write_field_byte(&layout, "base_page", "CREDIT", credit_after)?;
+        self.memory
+            .write_cmos_byte_by_symbol("CREDST", credit_after)?;
+        self.credits = bcd_byte_to_u16(credit_after).min(u16::from(u8::MAX)) as u8;
+        Ok(())
     }
 
     fn begin_current_player_high_score_entry(
@@ -32625,6 +32640,35 @@ mod tests {
             output
                 .events()
                 .any(|event| event == MachineEvent::CreditAdded)
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x01][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF0, 0xF1][..])
+        );
+    }
+
+    #[test]
+    fn coin_input_increments_red_label_credit_as_bcd() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA037, 0x09).expect("set CREDIT");
+
+        let output = machine.step(CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(output.snapshot.credits, 10);
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x10][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF1, 0xF0][..])
         );
     }
 

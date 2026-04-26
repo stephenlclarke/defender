@@ -356,7 +356,10 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   red-label `SWTAB`, `SSCAN` switch history, `SWPROC` queue, `SWP` status gate,
   and translated `LFIRE` / `SBOMB` / `HYPER` / `REV` / `ST1` / `ST2`
   scheduler paths. The scanner records all eight IN0 switch bits and queues
-  every translated source switch process. `REV` sets
+  every translated source switch process. Live coin input now increments the
+  red-label `CREDIT` byte as BCD and mirrors the packed backup through
+  `CREDST`, giving the translated `ST1`/`ST2` credit gates source-visible
+  state to consume. `REV` sets
   `REVFLG`, negates `PLADIR` into `NPLAD`, debounces `PIA21`, clears the flag,
   and returns the process to the free list.
 - ROM files are optional verification inputs only. The deployed runtime remains
