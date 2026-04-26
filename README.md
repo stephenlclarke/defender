@@ -300,10 +300,13 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   refresh. `BGERAS` now erases terrain screen words through the source `STBL`
   screen-address table. `COLR` / `COLRLP`, `FLPUP` / `FLP2`, `CBOMB` /
   `CBMB1`, and `TIECOL` / `TIECL` now run as translated support-process bodies
-  using embedded `COLTAB` / `TCTAB` assets. The remaining `PLRES`
-  swarmer respawn path, whose `PLRES` phony-object X low byte needs
-  register-aware scheduler tracing for the entry B register, live terrain
-  scheduling, and full live respawn integration remain documented gaps.
+  using embedded `COLTAB` / `TCTAB` assets. Translated `PLSTRT` runtime
+  dispatch now syncs the live snapshot's current player, wave, lives, smart
+  bombs, and player motion from red-label RAM. The remaining `PLRES` swarmer
+  respawn path, whose `PLRES` phony-object X low byte needs register-aware
+  scheduler tracing for the entry B register, live terrain scheduling, and full
+  live respawn orchestration beyond that snapshot handoff remain documented
+  gaps.
   The IRQ `PLAYER` motion slice now applies source-shaped 24-bit horizontal
   damping, thrust acceleration, X/scroll correction, absolute-X calculation,
   and altitude up/down velocity from `PIA21` / `PIA31`. The `PRDISP` player

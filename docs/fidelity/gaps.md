@@ -237,7 +237,9 @@ This file records behavior that must not be guessed in arcade-core code.
   stack pointer, and `BGERAS` erases terrain screen words through the source
   `STBL` table. `COLR` / `COLRLP`, `FLPUP` / `FLP2`, `CBOMB` / `CBMB1`, and
   `TIECOL` / `TIECL` now run as translated support-process bodies using
-  embedded `COLTAB` / `TCTAB` assets. The zero-enemy `BONUS` death-tail path now
+  embedded `COLTAB` / `TCTAB` assets. Translated `PLSTRT` runtime dispatch now
+  syncs the live snapshot's current player, wave, lives, smart bombs, and
+  player motion from red-label RAM. The zero-enemy `BONUS` death-tail path now
   clears through `SCLR1`, writes the source `MESS` / `WNBV` wave-complete text
   and numbers from embedded `mess0.src` assets, scores survivor icons through
   `BC1`, refreshes wave parameters through `GETWV`, and returns through `BC3`
@@ -282,8 +284,8 @@ This file records behavior that must not be guessed in arcade-core code.
   on the CPU B register carried into `PLRES`, enemy kill/collision vectors
   beyond `BKIL` / `NOKILL` / `ASTKIL` / `AKIL1` / `MSWKIL` / `PRBKIL` /
   `SCZKIL` / `UFOKIL` / `LKILL` / `LKIL1` / `TIEKIL`, live terrain scheduling,
-  full live respawn integration, and golden-trace proof for the translated
-  death tail remain open. The
+  full live respawn orchestration beyond the runtime snapshot handoff, and
+  golden-trace proof for the translated death tail remain open. The
   assembled/ROM-confirmed addresses for `BONUS`, `BC1`, `BC2`, `BC3`, `GETWV`,
   `PDTH5SCLR`, `SCLR1`, `PLRES`, `ASTST`, `ASTRO`, `ASTKIL`, `PRBST`, `PRBKIL`,
   `MMSW`, `MSWM`, `MSWLP`, `SWBMB`, `MSWKIL`, `SHOOT`, `SCZST`, `SCZ0`,
@@ -419,10 +421,10 @@ This file records behavior that must not be guessed in arcade-core code.
   source-order `WVTAB`, applies CMOS difficulty/ceiling inter-wall `WDELT`
   updates, and restores `PTARG` on the `GA1+6` restore-wave cadence. `BGI`
   now selects bank/map 7 and runs the translated `BGINIT` terrain-table
-  generator. `PLSTRT` live respawn, golden-trace proof for the translated
-  `BONUS`/`SCLR1`
-  wave-clear death tail, respawn, human-carry routines, full IRQ scanline/live
-  rendering integration, and full reverse movement integration remain open.
+  generator. `PLSTRT` live respawn orchestration beyond runtime snapshot sync,
+  golden-trace proof for the translated `BONUS` / `SCLR1` wave-clear death
+  tail, respawn, human-carry routines, full IRQ scanline/live rendering
+  integration, and full reverse movement integration remain open.
 
 ## World And Enemies
 

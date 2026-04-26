@@ -16172,7 +16172,7 @@ impl ArcadeMachine {
         routine_address: u16,
     ) -> Result<RedLabelProcessDispatch, String> {
         let dispatch = self.dispatch_red_label_process_routine(routine_address)?;
-        self.apply_process_dispatch_state(&dispatch);
+        self.apply_process_dispatch_state(&dispatch)?;
         self.sync_scores_from_red_label_memory()?;
         Ok(dispatch)
     }
@@ -16184,7 +16184,7 @@ impl ArcadeMachine {
             return Ok(None);
         };
         let dispatch = self.dispatch_red_label_process_routine(scheduled.routine_address)?;
-        self.apply_process_dispatch_state(&dispatch);
+        self.apply_process_dispatch_state(&dispatch)?;
         self.sync_scores_from_red_label_memory()?;
         Ok(Some(dispatch))
     }
@@ -16203,8 +16203,21 @@ impl ArcadeMachine {
             .dispatch_translated_process_routine(routine_address)
     }
 
-    fn apply_process_dispatch_state(&mut self, dispatch: &RedLabelProcessDispatch) {
+    fn apply_process_dispatch_state(
+        &mut self,
+        dispatch: &RedLabelProcessDispatch,
+    ) -> Result<(), String> {
         match dispatch {
+            RedLabelProcessDispatch::PlayerStart(
+                RedLabelPlayerStart::RuntimeSleeping { .. }
+                | RedLabelPlayerStart::ScreenClearedSleeping { .. }
+                | RedLabelPlayerStart::GameExecReady { .. },
+            ) => {
+                self.phase = GamePhase::Playing;
+                self.high_score_entry = None;
+                self.high_score_submission = None;
+                self.sync_live_player_from_red_label_memory()?;
+            }
             RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::GameOverSleeping {
                 ..
             }) => {
@@ -16226,6 +16239,31 @@ impl ArcadeMachine {
             }
             _ => {}
         }
+        Ok(())
+    }
+
+    fn sync_live_player_from_red_label_memory(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let player_table = table_descriptor(&layout, "player")?;
+        let current_player = self
+            .memory
+            .read_field_byte(&layout, "base_page", "CURPLR")?;
+        if current_player == 0 || u16::from(current_player) > player_table.entries {
+            return Err(format!(
+                "red-label live current player {current_player} is outside player table"
+            ));
+        }
+
+        let player_index = u16::from(current_player - 1);
+        let wave_range = player_field_range_for_entry(&layout, player_index, "PWAV")?;
+        let lives_range = player_field_range_for_entry(&layout, player_index, "PLAS")?;
+        let smart_bombs_range = player_field_range_for_entry(&layout, player_index, "PSBC")?;
+
+        self.current_player = current_player;
+        self.wave = self.memory.read_byte(wave_range.start)?;
+        self.player.lives = self.memory.read_byte(lives_range.start)?;
+        self.player.smart_bombs = self.memory.read_byte(smart_bombs_range.start)?;
+        self.sync_player_motion_from_red_label_memory()
     }
 
     pub fn red_label_make_process(
@@ -17441,7 +17479,7 @@ mod tests {
             RedLabelTieProcessStep, RedLabelUfoProcessStep, RedLabelUfoStart,
             RedLabelUfoVelocityUpdate, RedLabelWaveDelta, RedLabelWaveParameters,
         },
-        red_label::{RandState, rmax},
+        red_label::{Facing, Fixed16, RandState, rmax},
         sound::SoundCommand,
     };
 
@@ -23379,6 +23417,67 @@ mod tests {
             machine.red_label_ram_range(process + 0x02..process + 0x05),
             Some(&[0xDA, 0x32, 0x60][..])
         );
+    }
+
+    #[test]
+    fn player_runtime_dispatch_syncs_live_snapshot_from_red_label_ram() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.current_player = 2;
+        snapshot.wave = 7;
+        snapshot.player.x = Fixed16::ZERO;
+        snapshot.player.y = Fixed16::ZERO;
+        snapshot.player.facing = Facing::Left;
+        snapshot.player.lives = 9;
+        snapshot.player.smart_bombs = 9;
+        machine.restore(snapshot);
+
+        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        machine.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        machine.memory.write_byte(0xA1C9, 3).expect("set PLAS");
+        machine.memory.write_byte(0xA1CA, 4).expect("set PWAV");
+        machine.memory.write_byte(0xA1CB, 2).expect("set PSBC");
+        machine.memory.write_byte(0xA1CC, 0).expect("set PTARG");
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("PLSTR3").expect("PLSTR3 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PLSTR3 process")
+            .process_address;
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule PLSTR3");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("PLSTR3").expect("PLSTR3 address"),
+            )
+            .expect("dispatch PLSTR3");
+        let RedLabelProcessDispatch::PlayerStart(RedLabelPlayerStart::RuntimeSleeping {
+            process_address,
+            runtime,
+            ..
+        }) = dispatch
+        else {
+            panic!("expected PLSTR3 runtime dispatch");
+        };
+
+        assert_eq!(process_address, process);
+        assert_eq!(runtime.current_player, 1);
+        assert_eq!(runtime.wave, 4);
+        let snapshot = machine.snapshot();
+        assert_eq!(snapshot.phase, GamePhase::Playing);
+        assert_eq!(snapshot.current_player, 1);
+        assert_eq!(snapshot.wave, 4);
+        assert_eq!(snapshot.player.lives, 2);
+        assert_eq!(snapshot.player.smart_bombs, 2);
+        assert_eq!(snapshot.player.x.raw(), 0x0020_0000);
+        assert_eq!(snapshot.player.y.raw(), 0x0080_0000);
+        assert_eq!(snapshot.player.xv, Fixed16::ZERO);
+        assert_eq!(snapshot.player.yv, Fixed16::ZERO);
+        assert_eq!(snapshot.player.facing, Facing::Right);
     }
 
     #[test]

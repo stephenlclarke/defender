@@ -579,7 +579,8 @@ This section records drift found during the repository review on
   gates, start sounds, one/two `START` calls, and the final `DIE` process
   cleanup.
   Generic/untranslated process body dispatch,
-  remaining object callbacks, live respawn integration after `PLSTRT`,
+  remaining object callbacks, live respawn orchestration beyond the `PLSTRT`
+  runtime snapshot handoff,
   full trace proof for the translated `BONUS` wave-clear death-tail path,
   `SWTAB`
   cabinet-session integration beyond the translated start-switch process
@@ -673,8 +674,9 @@ This section records drift found during the repository review on
   BGL-relative X, width, and alternate-flavor checks. `VELO` active-object
   velocity addition is translated for direct dispatch. `BGI` now selects
   bank/map 7 and runs the translated `BGINIT` terrain-table generator.
-  `PLSTRT` live respawn integration, human-carry behavior, and full IRQ
-  scanline/live rendering integration remain open.
+  `PLSTRT` live respawn orchestration beyond runtime snapshot sync,
+  human-carry behavior, and full IRQ scanline/live rendering integration
+  remain open.
 - Input profiles and MAME IN0/IN1/IN2 port projection exist, and the main-board
   CPU can now read those bytes through the PIA data/control register path once
   the ROM selects data registers. Cabinet control behavior and initials entry
@@ -1147,11 +1149,14 @@ tables to `BGL` and draws the selected flavor through `STBL` when the caller
 supplies the live 6809 stack pointer, and `BGERAS` erases terrain screen words
 through the source `STBL` table. `COLR` / `COLRLP`, `FLPUP` / `FLP2`,
 `CBOMB` / `CBMB1`, and `TIECOL` / `TIECL` now run as translated
-support-process bodies using embedded `COLTAB` / `TCTAB` assets. The `BONUS`
+support-process bodies using embedded `COLTAB` / `TCTAB` assets. Translated
+`PLSTRT` runtime dispatch now syncs the live snapshot's current player, wave,
+lives, smart bombs, and player motion from red-label RAM. The `BONUS`
 wave-clear death tail reached through `PDTH5` now writes the `MESS` / `WNBV`
-bonus text and numbers, scores survivor icons through `BC1`, refreshes the next
-wave through `GETWV`, and returns through `BC3` to `PDTH5SCLR`. Full reverse
-movement/rendering integration, remaining enemy kill/collision vectors beyond
+bonus text and numbers, scores survivor icons through `BC1`, refreshes the
+next wave through `GETWV`, and returns through `BC3` to `PDTH5SCLR`. Full
+reverse movement/rendering integration, remaining enemy kill/collision vectors
+beyond
 `BKIL` / `NOKILL` / `ASTKIL` / `MSWKIL` / `PRBKIL` / `SCZKIL` / `UFOKIL` /
 `LKILL` / `LKIL1` / `TIEKIL`, the remaining `PLRES` swarmer respawn path,
 full IRQ scanline/live video integration, full frame/cycle integration, and
