@@ -129,10 +129,36 @@ pub enum RedLabelPowerUpAction {
     UnknownSpecialFunction(u8),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelPowerUpDispatchTarget {
+    ReturnToCaller,
+    AuditGate,
+    ComprehensiveRomTest,
+    ResetHighScoreTables,
+    ClearAudits,
+}
+
 impl MainCpuRomRead {
     pub fn byte(self) -> u8 {
         match self {
             Self::Fixed(byte) | Self::Banked { byte, .. } => byte,
+        }
+    }
+}
+
+impl RedLabelPowerUpAction {
+    /// Source target reached after `PWRUP` handles CMOS/DIP visible effects.
+    ///
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L142-L177>.
+    pub fn dispatch_target(self) -> RedLabelPowerUpDispatchTarget {
+        match self {
+            Self::NoSpecialFunction | Self::UnknownSpecialFunction(_) => {
+                RedLabelPowerUpDispatchTarget::ReturnToCaller
+            }
+            Self::InitializeCmosAndAudit => RedLabelPowerUpDispatchTarget::AuditGate,
+            Self::AutoCycleRomTest => RedLabelPowerUpDispatchTarget::ComprehensiveRomTest,
+            Self::ResetHighScoreTables => RedLabelPowerUpDispatchTarget::ResetHighScoreTables,
+            Self::ClearAudits => RedLabelPowerUpDispatchTarget::ClearAudits,
         }
     }
 }
@@ -819,10 +845,10 @@ mod tests {
             RED_LABEL_CLRAUD_PACKED_BYTE_WRITES, RED_LABEL_CMOSCK_CELL_OFFSET,
             RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_DIPFLG_CELL_OFFSET,
             RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
-            RED_LABEL_THSTAB_START, RedLabelPowerUpAction, WATCHDOG_RESET_BYTE,
-            cmos_4bit_write_value, cmos_sram_clear_packed_bytes, cmos_sram_read_byte,
-            cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word, defender_io_window,
-            is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            RED_LABEL_THSTAB_START, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
+            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
+            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
+            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
             video_control_cocktail, video_counter_read_value,
         },
         input::{
@@ -1692,6 +1718,10 @@ mod tests {
             Some(RedLabelPowerUpAction::NoSpecialFunction)
         );
         assert_eq!(
+            RedLabelPowerUpAction::NoSpecialFunction.dispatch_target(),
+            RedLabelPowerUpDispatchTarget::ReturnToCaller
+        );
+        assert_eq!(
             board.cmos_sram_read_byte(RED_LABEL_CMOSCK_CELL_OFFSET),
             Some(0x5A)
         );
@@ -1713,6 +1743,10 @@ mod tests {
         assert_eq!(
             board.red_label_power_up(&defaults),
             Some(RedLabelPowerUpAction::InitializeCmosAndAudit)
+        );
+        assert_eq!(
+            RedLabelPowerUpAction::InitializeCmosAndAudit.dispatch_target(),
+            RedLabelPowerUpDispatchTarget::AuditGate
         );
         assert_eq!(
             board.cmos_sram_read_byte(RED_LABEL_CMOSCK_CELL_OFFSET),
@@ -1738,6 +1772,10 @@ mod tests {
             Some(RedLabelPowerUpAction::AutoCycleRomTest)
         );
         assert_eq!(
+            RedLabelPowerUpAction::AutoCycleRomTest.dispatch_target(),
+            RedLabelPowerUpDispatchTarget::ComprehensiveRomTest
+        );
+        assert_eq!(
             board.cmos_ram()[usize::from(RED_LABEL_DIPFLG_CELL_OFFSET)],
             0xF0
         );
@@ -1756,6 +1794,10 @@ mod tests {
         assert_eq!(
             board.red_label_power_up(&defaults),
             Some(RedLabelPowerUpAction::ResetHighScoreTables)
+        );
+        assert_eq!(
+            RedLabelPowerUpAction::ResetHighScoreTables.dispatch_target(),
+            RedLabelPowerUpDispatchTarget::ResetHighScoreTables
         );
         assert_eq!(
             board.cmos_sram_read_byte(RED_LABEL_CRHSTD_CELL_OFFSET),
@@ -1777,6 +1819,10 @@ mod tests {
             board.red_label_power_up(&defaults),
             Some(RedLabelPowerUpAction::ClearAudits)
         );
+        assert_eq!(
+            RedLabelPowerUpAction::ClearAudits.dispatch_target(),
+            RedLabelPowerUpDispatchTarget::ClearAudits
+        );
         assert!(board.cmos_ram()[0..0x1C].iter().all(|cell| *cell == 0xF0));
 
         board.write_byte(0xC400, 0x01).expect("set DIPFLG");
@@ -1786,6 +1832,10 @@ mod tests {
         assert_eq!(
             board.red_label_power_up(&defaults),
             Some(RedLabelPowerUpAction::UnknownSpecialFunction(0x55))
+        );
+        assert_eq!(
+            RedLabelPowerUpAction::UnknownSpecialFunction(0x55).dispatch_target(),
+            RedLabelPowerUpDispatchTarget::ReturnToCaller
         );
     }
 
@@ -1805,6 +1855,10 @@ mod tests {
         assert_eq!(
             board.red_label_power_up(&defaults),
             Some(RedLabelPowerUpAction::InitializeCmosAndAudit)
+        );
+        assert_eq!(
+            RedLabelPowerUpAction::InitializeCmosAndAudit.dispatch_target(),
+            RedLabelPowerUpDispatchTarget::AuditGate
         );
         assert_eq!(board.cmos_ram()[0xFF], 0xF0);
         assert_eq!(board.cmos_sram_read_word(0x81), Some(0x0100));

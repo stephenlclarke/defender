@@ -125,9 +125,10 @@ This file records behavior that must not be guessed in arcade-core code.
   main-board sound-command latch handoff onto sound PIA port B/CB1. The sound
   CPU can read that latched command through PIA IC4 port B after selecting the
   data register, PIA IC4 port A writes are captured as the DAC callback
-  boundary, and command CB1 drives the sound PIA IRQ state. CPU IRQ scheduling,
-  LED segment side effects, exact Williams power-on RAM contents, translated
-  `AUDITG` or `CROM0` dispatch after the `PWRUP` action decision, CMOS
+  boundary, and command CB1 drives the sound PIA IRQ state. The board layer can
+  report the `romc0.src` target reached by each `PWRUP` action decision, but
+  CPU IRQ scheduling, LED segment side effects, exact Williams power-on RAM
+  contents, translated `AUDITG` or `CROM0` dispatch after that decision, CMOS
   persistence, screen scanline scheduling, watchdog timing/reset side effects,
   palette/rendering timing side effects, decoder PROM behavior, and DAC sample
   generation are not modeled.
@@ -338,10 +339,11 @@ This file records behavior that must not be guessed in arcade-core code.
   remaining `SWTAB` routine bodies and no-process input effects, exact
   frame/cycle integration, and golden-trace equivalence are not translated.
 - CMOS layout, ROM default bytes, 4-bit cell writes, `CLRAUD`/`CMINIT` visible
-  cell effects, the CMOS-visible `PWRUP` branch, `RHSTD`/`RHSTDS` reset copies,
-  and red-label packed byte/word helper behavior are modeled, but CMOS
-  persistence, operator behavior, high-score comparison/initials routines, and
-  the post-`PWRUP` `AUDITG` / `CROM0` targets are not translated.
+  cell effects, the CMOS-visible `PWRUP` branch and source dispatch target,
+  `RHSTD`/`RHSTDS` reset copies, and red-label packed byte/word helper
+  behavior are modeled, but CMOS persistence, operator behavior, high-score
+  comparison/initials routines, and the post-`PWRUP` `AUDITG` / `CROM0`
+  routines are not translated.
 
 ## Player
 

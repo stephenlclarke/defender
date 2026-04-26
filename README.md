@@ -386,7 +386,7 @@ yet; current implementation status is tracked in `SPEC.md` and
   now embedded from `assets/red-label/terrain-data.tsv`. The
   `romc0.src` `PWRUP` and `romc8.src` `DEFALT`, `CMOSMV`, `CMINIT`, `RHSTD`,
   and `RHSTDS` routines provide the ROM-derived CMOS defaults, power-up CMOS
-  branch, and high-score reset copy now embedded in
+  branch/source dispatch target, and high-score reset copy now embedded in
   `assets/red-label/cmos-defaults.tsv`. The `defb6.src` `CRTAB` bytes now feed
   the `CRINIT` pseudo-color RAM reset embedded in
   `assets/red-label/color-ram.tsv`. The `defa7.src` `SCORE`, `SNDLD`, `SHELL`,

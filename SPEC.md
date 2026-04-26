@@ -535,7 +535,8 @@ This section records drift found during the repository review on
   CMOS defaults to its CMOS cell array through the visible `CMINIT` clear/copy
   sequence, can model the visible `CLRAUD` packed zero writes, can route the
   CMOS-visible `PWRUP` branch around `CMOSCK`/`DIPFLG`/`DIPSW`, can run the
-  visible `RHSTD` / `RHSTDS` all-time and today's high-score reset copy, and
+  visible `RHSTD` / `RHSTDS` all-time and today's high-score reset copy, can
+  report the `romc0.src` target reached by each `PWRUP` action decision, and
   can snapshot source-labeled CMOS and RAM fields. A main-board address
   classifier exists for RAM, banked I/O, selected banked program ROM,
   bank-select writes, and fixed ROM reads. Main RAM bytes can now be read and
@@ -554,10 +555,10 @@ This section records drift found during the repository review on
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated `AUDITG` or `CROM0` dispatch after
-  the `PWRUP` action decision, CMOS persistence, screen scanline scheduler,
-  watchdog timing/reset side effects, rendering timing side effects, decoder
-  PROM behavior, DAC sample output, CPU IRQ scheduling, or translated
-  `VSNDRM1.SRC` routines.
+  the now-identified `PWRUP` action decision, CMOS persistence, screen
+  scanline scheduler, watchdog timing/reset side effects, rendering timing side
+  effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or
+  translated `VSNDRM1.SRC` routines.
 
 ### Player And Controls
 
