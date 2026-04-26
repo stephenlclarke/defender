@@ -146,11 +146,12 @@ This file records behavior that must not be guessed in arcade-core code.
   CPU can read that latched command through PIA IC4 port B after selecting the
   data register, PIA IC4 port A writes are captured as the DAC callback
   boundary, and command CB1 drives the sound PIA IRQ state. The board layer can
-  report the `romc0.src` target reached by each `PWRUP` action decision and
+  report the `romc0.src` target reached by each `PWRUP` action decision,
+  dispatch `AuditGate` into the source-visible `AUDITG` entry screen, and
   step/read/format/mutate and video-transfer the source `AUDITG` / `MSGAUD`
   table rows and its post-display debounce countdown as one deterministic
-  cycle, but CPU IRQ scheduling, exact Williams power-on RAM contents,
-  post-`PWRUP` `AUDITG` scheduling/wiring, physical advance-switch timing,
+  cycle, but CPU IRQ scheduling, exact Williams power-on RAM contents, live
+  post-`PWRUP` `AUDITG` frame scheduling, physical advance-switch timing,
   physical lamp timing, sub-pass/page-boundary RAM-test operator polling,
   CMOS persistence,
   screen scanline scheduling, watchdog timing/reset side effects,
@@ -376,10 +377,11 @@ This file records behavior that must not be guessed in arcade-core code.
   write/verify loop plus visible outcomes and the CROM0 color-RAM diagnostic
   heading/bars/palette loop plus audio-test sound-pulse/skip-table behavior,
   switch-test display-table/PIA-scan behavior, monitor-test
-  crosshatch/RGB-field/color-bar pattern behavior, and monitor-to-`AUDITG`
-  entry transfer. CMOS persistence, post-`PWRUP` `AUDITG` scheduling/wiring,
-  high-score comparison/initials routines, and sub-pass/page-boundary RAM-test
-  operator polling are not translated.
+  crosshatch/RGB-field/color-bar pattern behavior, monitor-to-`AUDITG` entry
+  transfer, and post-`PWRUP` `AuditGate` entry transfer. CMOS persistence, live
+  post-`PWRUP` `AUDITG` frame scheduling, high-score comparison/initials
+  routines, and sub-pass/page-boundary RAM-test operator polling are not
+  translated.
 
 ## Player
 

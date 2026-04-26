@@ -280,7 +280,8 @@ This section records drift found during the repository review on
 - `src/board.rs` now models the CMOS-visible `PWRUP` branch around `CMOSCK`,
   `DIPFLG`, and `DIPSW`: bad check bytes and the `0x45` default function run
   `CMINIT`, `0x35` runs `CLRAUD`, `0x15` returns the auto-cycle ROM-test
-  action, and `0x25` runs the translated high-score reset copy.
+  action, `0x25` runs the translated high-score reset copy, and `AuditGate`
+  dispatch transfers the `AUDITG` entry screen.
 - `src/board.rs` now models the visible `RHSTD` / `RHSTDS` reset copy:
   the first 48 `DEFALT` bytes are copied back into the all-time `CRHSTD` CMOS
   range and into the `THSTAB` "today's greatest" RAM table using the same
@@ -572,10 +573,11 @@ This section records drift found during the repository review on
   sequence, can model the visible `CLRAUD` packed zero writes, can route the
   CMOS-visible `PWRUP` branch around `CMOSCK`/`DIPFLG`/`DIPSW`, can run the
   visible `RHSTD` / `RHSTDS` all-time and today's high-score reset copy, can
-  report the `romc0.src` target reached by each `PWRUP` action decision, can
-  read `AUDITG` / `MSGAUD` audit and operator-adjustment rows from their
-  source CMOS offsets, can transfer the source-visible `AUDITG` entry screens
-  and `DISAUD` row text/erasure, can apply the source-visible `ALTER` /
+  report the `romc0.src` target reached by each `PWRUP` action decision and
+  dispatch `AuditGate` into the source-visible `AUDITG` entry screen, can read
+  `AUDITG` / `MSGAUD` audit and operator-adjustment rows from their source CMOS
+  offsets, can transfer the source-visible `AUDITG` entry screens and `DISAUD`
+  row text/erasure, can apply the source-visible `ALTER` /
   `HYSCRE` mutation rules, can step the source-visible `AUDITG` row navigation
   from IN2 service inputs, can model the post-display `AUDITG` debounce
   countdown, can run those pieces as one deterministic audit cycle with
@@ -610,8 +612,8 @@ This section records drift found during the repository review on
   scheduling, physical lamp timing, and sample generation remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
-  no exact power-on RAM state, translated post-`PWRUP` `AUDITG` scheduling and
-  wiring, physical advance-switch timing, physical lamp timing,
+  no exact power-on RAM state, live post-`PWRUP` `AUDITG` frame scheduling,
+  physical advance-switch timing, physical lamp timing,
   sub-pass/page-boundary RAM-test operator polling, CMOS persistence, screen
   scanline scheduler, watchdog timing/reset side effects, rendering timing side
   effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or

@@ -397,8 +397,9 @@ yet; current implementation status is tracked in `SPEC.md` and
   `romc0.src` `PWRUP`, `romf8.src` `ROMMAP`/`ROM0`/`ROM9`, and `romc8.src`
   `DEFALT`, `CMOSMV`, `CMINIT`, `RHSTD`, `RHSTDS`, `AUDITG`, `LEDS`, `FLASHL`,
   `ADVSW`, and `NEXTST` routines provide the ROM-derived CMOS defaults,
-  power-up CMOS branch/source dispatch target, source-shaped `CROM0` ROM
-  descriptor bytes and checksum failure reports plus the ROM-stage manual/auto
+  power-up CMOS branch/source dispatch target including `AUDITG` entry
+  dispatch, source-shaped `CROM0` ROM descriptor bytes and checksum failure
+  reports plus the ROM-stage manual/auto
   outcome, diagnostic LED output bytes, CROM0 diagnostic text/palette intent and
   bitmap headline/bad-ROM-row/operator-instruction transfer plus advance gates,
   RAM-test start/failure/no-error visible setup, RAM2 pattern fill/verify pass,

@@ -18,9 +18,9 @@
 //! ROM-derived CMOS defaults from `romc8.src`, can route the CMOS-visible
 //! `romc0.src` power-up branch, and can run the `CROM0` CMOS RAM-test
 //! write/verify loop, visible outcomes, and color-RAM diagnostic cycle. CMOS
-//! persistence, `AUDITG` post-`PWRUP` scheduling/full-loop integration,
-//! physical advance/lamp timing beyond the modeled ROM-stage screen/LED output,
-//! and full video timing remain explicit fidelity gaps.
+//! persistence, `AUDITG` live frame scheduling/full-loop integration, physical
+//! advance/lamp timing beyond the modeled ROM-stage screen/LED output, and full
+//! video timing remain explicit fidelity gaps.
 
 use crate::{
     input::{
@@ -295,6 +295,13 @@ pub enum RedLabelPowerUpDispatchTarget {
     ComprehensiveRomTest,
     ResetHighScoreTables,
     ClearAudits,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelPowerUpDispatch {
+    pub action: RedLabelPowerUpAction,
+    pub target: RedLabelPowerUpDispatchTarget,
+    pub audit_start: Option<RedLabelAuditGameAdjustStartTransfer>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3665,6 +3672,35 @@ impl<'a> DefenderMainBoard<'a> {
             }
             other => Some(RedLabelPowerUpAction::UnknownSpecialFunction(other)),
         }
+    }
+
+    /// Run the source-visible `PWRUP` branch and dispatch to its modeled target.
+    ///
+    /// The lower-level `red_label_power_up` helper reports the source action and
+    /// applies CMOS-visible side effects. This helper also follows `PWRUP0` into
+    /// `AUDITG`, transferring the game-adjust entry screen when the source branch
+    /// jumps there.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L142-L177>.
+    pub fn red_label_dispatch_power_up(
+        &mut self,
+        defaults: &[RedLabelCmosDefault],
+    ) -> Result<Option<RedLabelPowerUpDispatch>, String> {
+        let action = match self.red_label_power_up(defaults) {
+            Some(action) => action,
+            None => return Ok(None),
+        };
+        let target = action.dispatch_target();
+        let audit_start = if target == RedLabelPowerUpDispatchTarget::AuditGate {
+            Some(self.red_label_write_audit_game_adjust_start()?)
+        } else {
+            None
+        };
+
+        Ok(Some(RedLabelPowerUpDispatch {
+            action,
+            target,
+            audit_start,
+        }))
     }
 
     /// Source-shaped visible `RESET` setup before the power-up RAM test.
@@ -8145,6 +8181,56 @@ mod tests {
         );
         assert_eq!(board.cmos_ram()[0xFF], 0xF0);
         assert_eq!(board.cmos_sram_read_word(0x81), Some(0x0100));
+    }
+
+    #[test]
+    fn main_board_power_up_dispatch_enters_auditg_entry_screen() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+
+        board.write_byte(0xC47F, 0x00).expect("bad CMOSCK high");
+        board
+            .write_byte(0x2820, 0xAA)
+            .expect("dirty audit title cell");
+
+        let dispatch = board
+            .red_label_dispatch_power_up(&defaults)
+            .expect("power-up dispatch")
+            .expect("power-up action");
+
+        assert_eq!(
+            dispatch.action,
+            RedLabelPowerUpAction::InitializeCmosAndAudit
+        );
+        assert_eq!(dispatch.target, RedLabelPowerUpDispatchTarget::AuditGate);
+        let audit_start = dispatch.audit_start.expect("audit start transfer");
+        assert_eq!(
+            audit_start.initial_delay_ms,
+            RED_LABEL_AUDIT_INITIAL_DELAY_MS
+        );
+        assert_eq!(audit_start.active_instructions.table_label, "IAUD2");
+        assert_eq!(
+            board.cmos_sram_read_byte(RED_LABEL_CMOSCK_CELL_OFFSET),
+            Some(0x5A)
+        );
+        assert_message_glyph_at(&board, RED_LABEL_AUDIT_TITLE_ADDRESS, 'W');
+
+        board
+            .write_byte(0x2820, 0xAA)
+            .expect("dirty audit title cell");
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+        let no_special = board
+            .red_label_dispatch_power_up(&defaults)
+            .expect("power-up dispatch")
+            .expect("no-special action");
+        assert_eq!(no_special.action, RedLabelPowerUpAction::NoSpecialFunction);
+        assert_eq!(
+            no_special.target,
+            RedLabelPowerUpDispatchTarget::ReturnToCaller
+        );
+        assert_eq!(no_special.audit_start, None);
+        assert_eq!(board.ram()[0x2820], 0xAA);
     }
 
     #[test]
