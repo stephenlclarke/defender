@@ -20,8 +20,8 @@
 //! write/verify loop, visible outcomes, and color-RAM diagnostic cycle. CMOS
 //! persistence, `AUDITG` live diagnostic text transfer/full-loop integration,
 //! physical advance/lamp timing beyond the modeled ROM-stage screen/LED output,
-//! later switch/monitor test execution, and full video timing remain explicit
-//! fidelity gaps.
+//! monitor-test handoff wiring, and full video timing remain explicit fidelity
+//! gaps.
 
 use crate::{
     input::{
@@ -106,12 +106,15 @@ pub const RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT: &str =
     "COLOR RAM TEST VERTICAL COLOR BARS INDICATE COLOR RAM FAILURE";
 pub const RED_LABEL_CROM0_AUDIO_TEST_TEXT: &str = "AUDIO TEST SOUND";
 pub const RED_LABEL_CROM0_SWITCH_TEST_TEXT: &str = "SWITCH TEST";
+pub const RED_LABEL_CROM0_MONITOR_TEST_TEXT: &str = "MONITOR TEST PATTERNS";
 pub const RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT: &str = "AUTO FOR COLOR RAM TEST";
 pub const RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT: &str = "AUTO FOR SWITCH TEST";
 pub const RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT: &str =
     "AUTO FOR MONITOR TEST PATTERNS";
+pub const RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT: &str = "AUTO FOR AUDIT, GAME ADJUST";
 pub const RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT: &str =
     "MANUAL TO TEST INDIVIDUAL SOUNDS";
+pub const RED_LABEL_CROM0_MANUAL_TO_STEP_THRU_PATTERNS_TEXT: &str = "MANUAL TO STEP THRU PATTERNS";
 pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT];
 pub const RED_LABEL_CROM0_RAM_TEST_START_INSTRUCTIONS: &[&str] =
@@ -128,6 +131,10 @@ pub const RED_LABEL_CROM0_AUDIO_TEST_INSTRUCTIONS: &[&str] = &[
 ];
 pub const RED_LABEL_CROM0_SWITCH_TEST_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT];
+pub const RED_LABEL_CROM0_MONITOR_TEST_INSTRUCTIONS: &[&str] = &[
+    RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT,
+    RED_LABEL_CROM0_MANUAL_TO_STEP_THRU_PATTERNS_TEXT,
+];
 pub const RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS: u16 = 0x18CE;
 pub const RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES: [u16; 2] = [0x10DA, 0x10E4];
 pub const RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS: u16 = 0x4080;
@@ -145,6 +152,7 @@ pub const RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS: u16 = 0x3830;
 pub const RED_LABEL_CROM0_SWITCH_DISPLAY_ROW_STEP: u16 = 0x000A;
 pub const RED_LABEL_CROM0_SWITCH_ERASE_WIDTH: u8 = 0x38;
 pub const RED_LABEL_CROM0_SWITCH_ERASE_HEIGHT: u8 = 0x08;
+pub const RED_LABEL_CROM0_MONITOR_TEST_TEXT_ADDRESS: u16 = 0x2880;
 pub const RED_LABEL_CROM0_RAM_TEST_COLOR: u8 = 0xA5;
 pub const RED_LABEL_CROM0_RAM_TEST_LED: u8 = 0x04;
 pub const RED_LABEL_CROM0_CMOS_RAM_TEST_LED: u8 = 0x02;
@@ -175,6 +183,19 @@ pub const RED_LABEL_CROM0_SWITCH_CLOSURE_SOUND_NUMBER: u8 = 0x08;
 pub const RED_LABEL_CROM0_SWITCH_DISPLAY_TABLE_SIZE: usize = 38;
 pub const RED_LABEL_CROM0_SWITCH_DISPLAY_EMPTY: u8 = 0xFF;
 pub const RED_LABEL_CROM0_SWITCH_LAST_READ_SLOTS: usize = 5;
+pub const RED_LABEL_CROM0_MONITOR_PATTERN_DELAY_MS: u16 = 5000;
+pub const RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES: [u8; 16] = [
+    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+];
+pub const RED_LABEL_CROM0_MONITOR_COLOR_BAR_PALETTE_BYTES: [u8; 16] = [
+    0x05, 0x05, 0x28, 0x28, 0x80, 0x80, 0x00, 0x00, 0xAD, 0xAD, 0x2D, 0x2D, 0xA8, 0xA8, 0x85, 0x85,
+];
+pub const RED_LABEL_CROM0_MONITOR_CROSSHATCH_PALETTE_BYTES: [(u8, u8); 4] =
+    [(1, 0xFF), (2, 0xC0), (3, 0x38), (4, 0x07)];
+pub const RED_LABEL_CROM0_MONITOR_RED_FIELD_COLOR: u8 = 0x05;
+pub const RED_LABEL_CROM0_MONITOR_GREEN_FIELD_COLOR: u8 = 0x28;
+pub const RED_LABEL_CROM0_MONITOR_BLUE_FIELD_COLOR: u8 = 0x80;
+pub const RED_LABEL_CROM0_MONITOR_FIELD_WATCHDOG_HIDE_PALETTE_INDEX: u8 = 0x0C;
 pub const RED_LABEL_CROM0_RAM_TEST_DELAY_MS: u16 = 5000;
 pub const RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS: u16 = 10;
 pub const RED_LABEL_CROM0_RAM_TEST_START_SEED: u16 = 0x0000;
@@ -759,6 +780,110 @@ pub struct RedLabelCrom0SwitchTestStep {
     pub cocktail_detected: bool,
     pub change: RedLabelCrom0SwitchTestChange,
     pub target: RedLabelCrom0SwitchTestTarget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0MonitorPatternKind {
+    Crosshatch,
+    RedField,
+    GreenField,
+    BlueField,
+    ColorBars,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0MonitorTestTarget {
+    MonitorTestLoop,
+    AuditGameAdjust,
+    RomTest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0MonitorTestTransfer {
+    pub screen_clear_end: u16,
+    pub palette_zeroed: bool,
+    pub letter_color: RedLabelDiagnosticPaletteWrite,
+    pub headline: RedLabelDiagnosticBitmapTextWrite,
+    pub instructions: RedLabelDiagnosticInstructionBitmapTextWrite,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0MonitorLineWrite {
+    pub start_address: u16,
+    pub end_address: u16,
+    pub value: u8,
+    pub bytes_written: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0MonitorMaskedRangeWrite {
+    pub start_address: u16,
+    pub end_address: u16,
+    pub low_nibble: u8,
+    pub bytes_written: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0MonitorPointWrite {
+    pub address: u16,
+    pub value: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0MonitorBarWrite {
+    pub bar_index: usize,
+    pub value: u8,
+    pub start_address: u16,
+    pub end_address: u16,
+    pub bytes_written: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0MonitorCrosshatchPattern {
+    pub screen_clear_end: u16,
+    pub palette_zeroed: bool,
+    pub palette_writes: Vec<RedLabelDiagnosticPaletteWrite>,
+    pub white_verticals: Vec<RedLabelCrom0MonitorLineWrite>,
+    pub white_horizontals: Vec<RedLabelCrom0MonitorLineWrite>,
+    pub color_horizontals: Vec<RedLabelCrom0MonitorLineWrite>,
+    pub color_verticals: Vec<RedLabelCrom0MonitorLineWrite>,
+    pub blue_touch_points: Vec<RedLabelCrom0MonitorPointWrite>,
+    pub blue_touch_ranges: Vec<RedLabelCrom0MonitorMaskedRangeWrite>,
+    pub dot_writes: Vec<RedLabelCrom0MonitorPointWrite>,
+    pub watchdog_reset_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0MonitorFieldPattern {
+    pub source_label: &'static str,
+    pub screen_clear_end: u16,
+    pub color: u8,
+    pub palette_writes: Vec<RedLabelDiagnosticPaletteWrite>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0MonitorColorBarsPattern {
+    pub source_label: &'static str,
+    pub palette_writes: Vec<RedLabelDiagnosticPaletteWrite>,
+    pub bars: Vec<RedLabelCrom0MonitorBarWrite>,
+    pub watchdog_reset_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelCrom0MonitorPatternDisplay {
+    Crosshatch(RedLabelCrom0MonitorCrosshatchPattern),
+    Field(RedLabelCrom0MonitorFieldPattern),
+    ColorBars(RedLabelCrom0MonitorColorBarsPattern),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0MonitorTestStep {
+    pub pattern_index: usize,
+    pub pattern: Option<RedLabelCrom0MonitorPatternKind>,
+    pub display: Option<RedLabelCrom0MonitorPatternDisplay>,
+    pub next_pattern_index: Option<usize>,
+    pub delay_ms: Option<u16>,
+    pub target: RedLabelCrom0MonitorTestTarget,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2376,6 +2501,417 @@ impl<'a> DefenderMainBoard<'a> {
         ))
     }
 
+    /// Transfer the visible `MONTRT` monitor-test heading and instructions.
+    ///
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L670-L677>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/mess0.src#L110-L147>.
+    pub fn red_label_write_crom0_monitor_test_start(
+        &mut self,
+    ) -> Result<RedLabelCrom0MonitorTestTransfer, String> {
+        self.red_label_clear_screen();
+        self.palette_ram = [0; PALETTE_RAM_SIZE];
+        self.crom0_diagnostic_screen = RedLabelCrom0DiagnosticScreen::default();
+        self.crom0_advance_gates.clear();
+
+        let letter_color = RedLabelDiagnosticPaletteWrite {
+            address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+            index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+            value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+        };
+        self.palette_ram[usize::from(letter_color.index)] = letter_color.value;
+
+        let headline = self.red_label_write_message_text(
+            RED_LABEL_CROM0_MONITOR_TEST_TEXT_ADDRESS,
+            "VMONTS",
+            red_label_message("VMONTS")?,
+        )?;
+        if headline.text != RED_LABEL_CROM0_MONITOR_TEST_TEXT {
+            return Err(format!(
+                "red-label monitor-test vector `VMONTS` text `{}` does not match source text `{}`",
+                headline.text, RED_LABEL_CROM0_MONITOR_TEST_TEXT
+            ));
+        }
+
+        let instruction = RedLabelDiagnosticInstructionWrite {
+            table_label: "IMONTS",
+            lines: RED_LABEL_CROM0_MONITOR_TEST_INSTRUCTIONS,
+        };
+        let instructions = self.red_label_write_crom0_operator_instruction_text(&instruction)?;
+
+        Ok(RedLabelCrom0MonitorTestTransfer {
+            screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            palette_zeroed: true,
+            letter_color,
+            headline,
+            instructions,
+        })
+    }
+
+    /// Step one source `MONTRT` pattern-vector dispatch.
+    ///
+    /// The caller supplies the two operator branch decisions that the ROM takes
+    /// around the pattern display: advance-with-auto routes to `AUDITG` before
+    /// drawing, while the temporary condition-code branch after the last pattern
+    /// can return to `CROM0`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L678-L703>.
+    pub fn red_label_step_crom0_monitor_test_pattern(
+        &mut self,
+        pattern_index: usize,
+        advance_to_audit: bool,
+        rom_test_after_last_pattern: bool,
+    ) -> Result<RedLabelCrom0MonitorTestStep, String> {
+        red_label_validate_monitor_pattern_index(pattern_index)?;
+
+        if advance_to_audit {
+            return Ok(RedLabelCrom0MonitorTestStep {
+                pattern_index,
+                pattern: None,
+                display: None,
+                next_pattern_index: None,
+                delay_ms: None,
+                target: RedLabelCrom0MonitorTestTarget::AuditGameAdjust,
+            });
+        }
+
+        let pattern = red_label_crom0_monitor_pattern_kind(pattern_index)?;
+        let display = self.red_label_draw_crom0_monitor_pattern(pattern)?;
+        let next_pattern_index = if pattern_index + 1 == RED_LABEL_CROM0_MONITOR_PATTERN_COUNT {
+            0
+        } else {
+            pattern_index + 1
+        };
+        let target = if pattern_index + 1 == RED_LABEL_CROM0_MONITOR_PATTERN_COUNT
+            && rom_test_after_last_pattern
+        {
+            RedLabelCrom0MonitorTestTarget::RomTest
+        } else {
+            RedLabelCrom0MonitorTestTarget::MonitorTestLoop
+        };
+
+        Ok(RedLabelCrom0MonitorTestStep {
+            pattern_index,
+            pattern: Some(pattern),
+            display: Some(display),
+            next_pattern_index: Some(next_pattern_index),
+            delay_ms: Some(RED_LABEL_CROM0_MONITOR_PATTERN_DELAY_MS),
+            target,
+        })
+    }
+
+    fn red_label_draw_crom0_monitor_pattern(
+        &mut self,
+        pattern: RedLabelCrom0MonitorPatternKind,
+    ) -> Result<RedLabelCrom0MonitorPatternDisplay, String> {
+        match pattern {
+            RedLabelCrom0MonitorPatternKind::Crosshatch => {
+                Ok(RedLabelCrom0MonitorPatternDisplay::Crosshatch(
+                    self.red_label_draw_crom0_monitor_crosshatch()?,
+                ))
+            }
+            RedLabelCrom0MonitorPatternKind::RedField => Ok(
+                RedLabelCrom0MonitorPatternDisplay::Field(self.red_label_draw_crom0_monitor_field(
+                    "RFIELD",
+                    RED_LABEL_CROM0_MONITOR_RED_FIELD_COLOR,
+                )),
+            ),
+            RedLabelCrom0MonitorPatternKind::GreenField => Ok(
+                RedLabelCrom0MonitorPatternDisplay::Field(self.red_label_draw_crom0_monitor_field(
+                    "GFIELD",
+                    RED_LABEL_CROM0_MONITOR_GREEN_FIELD_COLOR,
+                )),
+            ),
+            RedLabelCrom0MonitorPatternKind::BlueField => Ok(
+                RedLabelCrom0MonitorPatternDisplay::Field(self.red_label_draw_crom0_monitor_field(
+                    "BFIELD",
+                    RED_LABEL_CROM0_MONITOR_BLUE_FIELD_COLOR,
+                )),
+            ),
+            RedLabelCrom0MonitorPatternKind::ColorBars => {
+                Ok(RedLabelCrom0MonitorPatternDisplay::ColorBars(
+                    self.red_label_draw_crom0_monitor_color_bars()?,
+                ))
+            }
+        }
+    }
+
+    fn red_label_draw_crom0_monitor_crosshatch(
+        &mut self,
+    ) -> Result<RedLabelCrom0MonitorCrosshatchPattern, String> {
+        self.red_label_clear_screen();
+        self.palette_ram.fill(0);
+        let palette_writes = RED_LABEL_CROM0_MONITOR_CROSSHATCH_PALETTE_BYTES
+            .iter()
+            .copied()
+            .map(|(index, value)| {
+                self.palette_ram[usize::from(index)] = value;
+                RedLabelDiagnosticPaletteWrite {
+                    address: MAIN_CPU_BANKED_ROM_START + u16::from(index),
+                    index,
+                    value,
+                }
+            })
+            .collect();
+
+        let mut white_verticals = Vec::with_capacity(RED_LABEL_CROM0_MONITOR_WHITE_VERTICALS.len());
+        for (start, end) in RED_LABEL_CROM0_MONITOR_WHITE_VERTICALS {
+            white_verticals.push(self.red_label_write_crom0_monitor_linear_line(start, end, 0x01)?);
+        }
+
+        let mut white_horizontals =
+            Vec::with_capacity(RED_LABEL_CROM0_MONITOR_WHITE_HORIZONTALS.len());
+        for (start, end) in RED_LABEL_CROM0_MONITOR_WHITE_HORIZONTALS {
+            white_horizontals
+                .push(self.red_label_write_crom0_monitor_horizontal_line(start, end, 0x11)?);
+        }
+
+        let mut color_horizontals =
+            Vec::with_capacity(RED_LABEL_CROM0_MONITOR_COLOR_HORIZONTALS.len());
+        for (start, end, value) in RED_LABEL_CROM0_MONITOR_COLOR_HORIZONTALS {
+            color_horizontals
+                .push(self.red_label_write_crom0_monitor_horizontal_line(start, end, value)?);
+        }
+
+        let mut color_verticals = Vec::with_capacity(RED_LABEL_CROM0_MONITOR_COLOR_VERTICALS.len());
+        for (start, end, value) in RED_LABEL_CROM0_MONITOR_COLOR_VERTICALS {
+            color_verticals
+                .push(self.red_label_write_crom0_monitor_linear_line(start, end, value)?);
+        }
+
+        self.ram[0x467E] = 0x21;
+        self.ram[0x967E] = 0x20;
+        let blue_touch_points = vec![
+            RedLabelCrom0MonitorPointWrite {
+                address: 0x467E,
+                value: 0x21,
+            },
+            RedLabelCrom0MonitorPointWrite {
+                address: 0x967E,
+                value: 0x20,
+            },
+        ];
+
+        let blue_touch_ranges = RED_LABEL_CROM0_MONITOR_BLUE_TOUCH_RANGES
+            .iter()
+            .copied()
+            .map(|(start, end)| self.red_label_or_crom0_monitor_low_nibble_range(start, end, 0x02))
+            .collect::<Result<Vec<_>, _>>()?;
+        let dot_writes = self.red_label_draw_crom0_monitor_crosshatch_dots();
+
+        Ok(RedLabelCrom0MonitorCrosshatchPattern {
+            screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            palette_zeroed: true,
+            palette_writes,
+            white_verticals,
+            white_horizontals,
+            color_horizontals,
+            color_verticals,
+            blue_touch_points,
+            blue_touch_ranges,
+            dot_writes,
+            watchdog_reset_count: RED_LABEL_CROM0_MONITOR_CROSSHATCH_WATCHDOG_RESETS,
+        })
+    }
+
+    fn red_label_draw_crom0_monitor_field(
+        &mut self,
+        source_label: &'static str,
+        color: u8,
+    ) -> RedLabelCrom0MonitorFieldPattern {
+        self.red_label_clear_screen();
+        let palette_writes = [0, RED_LABEL_CROM0_MONITOR_FIELD_WATCHDOG_HIDE_PALETTE_INDEX]
+            .into_iter()
+            .map(|index| {
+                self.palette_ram[usize::from(index)] = color;
+                RedLabelDiagnosticPaletteWrite {
+                    address: MAIN_CPU_BANKED_ROM_START + u16::from(index),
+                    index,
+                    value: color,
+                }
+            })
+            .collect();
+
+        RedLabelCrom0MonitorFieldPattern {
+            source_label,
+            screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            color,
+            palette_writes,
+        }
+    }
+
+    fn red_label_draw_crom0_monitor_color_bars(
+        &mut self,
+    ) -> Result<RedLabelCrom0MonitorColorBarsPattern, String> {
+        let palette_writes = RED_LABEL_CROM0_MONITOR_COLOR_BAR_PALETTE_BYTES
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, value)| {
+                self.palette_ram[index] = value;
+                RedLabelDiagnosticPaletteWrite {
+                    address: MAIN_CPU_BANKED_ROM_START
+                        + u16::try_from(index).expect("palette index fits u16"),
+                    index: index as u8,
+                    value,
+                }
+            })
+            .collect();
+
+        let mut bars = Vec::with_capacity(RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES.len());
+        let mut start = 0usize;
+        for (bar_index, value) in RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            let end = start
+                .checked_add(RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES)
+                .ok_or_else(|| format!("red-label monitor color bar {bar_index} overflows"))?;
+            if end > usize::from(RED_LABEL_SCREEN_CLEAR_END) {
+                return Err(format!(
+                    "red-label monitor color bar {bar_index} range 0x{start:04X}..0x{end:04X} exceeds video RAM"
+                ));
+            }
+
+            self.ram[start..end].fill(value);
+            bars.push(RedLabelCrom0MonitorBarWrite {
+                bar_index,
+                value,
+                start_address: u16::try_from(start)
+                    .expect("monitor color-bar start is inside main RAM"),
+                end_address: u16::try_from(end).expect("monitor color-bar end is inside main RAM"),
+                bytes_written: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+            });
+
+            start = start
+                .checked_add(RED_LABEL_CROM0_COLOR_RAM_BAR_STEP_BYTES)
+                .ok_or_else(|| {
+                    format!("red-label monitor color bar {bar_index} next address overflows")
+                })?;
+            if value == 0 {
+                start = RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES;
+            }
+        }
+
+        Ok(RedLabelCrom0MonitorColorBarsPattern {
+            source_label: "CBARCL/COLORB",
+            palette_writes,
+            bars,
+            watchdog_reset_count: RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES.len(),
+        })
+    }
+
+    fn red_label_write_crom0_monitor_linear_line(
+        &mut self,
+        start_address: u16,
+        end_address: u16,
+        value: u8,
+    ) -> Result<RedLabelCrom0MonitorLineWrite, String> {
+        if start_address > end_address || usize::from(end_address) > self.ram.len() {
+            return Err(format!(
+                "red-label monitor linear line 0x{start_address:04X}..0x{end_address:04X} is outside RAM"
+            ));
+        }
+
+        self.ram[usize::from(start_address)..usize::from(end_address)].fill(value);
+        Ok(RedLabelCrom0MonitorLineWrite {
+            start_address,
+            end_address,
+            value,
+            bytes_written: usize::from(end_address - start_address),
+        })
+    }
+
+    fn red_label_write_crom0_monitor_horizontal_line(
+        &mut self,
+        start_address: u16,
+        end_address: u16,
+        value: u8,
+    ) -> Result<RedLabelCrom0MonitorLineWrite, String> {
+        let [mut x, y] = start_address.to_be_bytes();
+        let [end_x, end_y] = end_address.to_be_bytes();
+        if y != end_y {
+            return Err(format!(
+                "red-label monitor horizontal line 0x{start_address:04X}..0x{end_address:04X} changes rows"
+            ));
+        }
+
+        let mut bytes_written = 0usize;
+        while x != end_x {
+            let address = u16::from_be_bytes([x, y]);
+            if usize::from(address) >= self.ram.len() {
+                return Err(format!(
+                    "red-label monitor horizontal line address 0x{address:04X} is outside RAM"
+                ));
+            }
+            self.ram[usize::from(address)] = value;
+            bytes_written += 1;
+            x = x.wrapping_add(1);
+        }
+
+        Ok(RedLabelCrom0MonitorLineWrite {
+            start_address,
+            end_address,
+            value,
+            bytes_written,
+        })
+    }
+
+    fn red_label_or_crom0_monitor_low_nibble_range(
+        &mut self,
+        start_address: u16,
+        end_address: u16,
+        low_nibble: u8,
+    ) -> Result<RedLabelCrom0MonitorMaskedRangeWrite, String> {
+        if start_address > end_address || usize::from(end_address) > self.ram.len() {
+            return Err(format!(
+                "red-label monitor masked range 0x{start_address:04X}..0x{end_address:04X} is outside RAM"
+            ));
+        }
+
+        for address in start_address..end_address {
+            let byte = &mut self.ram[usize::from(address)];
+            *byte = (*byte & 0xF0) | (low_nibble & 0x0F);
+        }
+
+        Ok(RedLabelCrom0MonitorMaskedRangeWrite {
+            start_address,
+            end_address,
+            low_nibble: low_nibble & 0x0F,
+            bytes_written: usize::from(end_address - start_address),
+        })
+    }
+
+    fn red_label_draw_crom0_monitor_crosshatch_dots(
+        &mut self,
+    ) -> Vec<RedLabelCrom0MonitorPointWrite> {
+        let mut dot_writes = Vec::new();
+        let mut x = 0x0E_u8;
+        let mut y = 0x18_u8;
+
+        loop {
+            let address = u16::from_be_bytes([x, y]);
+            let byte = &mut self.ram[usize::from(address)];
+            *byte = (*byte & 0xF0) | 0x01;
+            dot_writes.push(RedLabelCrom0MonitorPointWrite {
+                address,
+                value: *byte,
+            });
+
+            let (next_y, carry) = y.overflowing_add(0x22);
+            if carry {
+                y = 0x18;
+                x = x.wrapping_add(0x10);
+                if x == 0x9E {
+                    break;
+                }
+            } else {
+                y = next_y;
+            }
+        }
+
+        dot_writes
+    }
+
     fn red_label_clear_screen(&mut self) {
         self.ram[..usize::from(RED_LABEL_SCREEN_CLEAR_END)].fill(0);
     }
@@ -3499,8 +4035,56 @@ fn red_label_bcd_number_visible_digits(bcd_number: u8) -> Vec<u8> {
     }
 }
 
+const RED_LABEL_CROM0_MONITOR_PATTERN_COUNT: usize = 5;
+const RED_LABEL_CROM0_MONITOR_CROSSHATCH_WATCHDOG_RESETS: usize = 8;
+const RED_LABEL_CROM0_MONITOR_WHITE_HORIZONTALS: [(u16, u16); 8] = [
+    (0x0707, 0x9707),
+    (0x0729, 0x9729),
+    (0x074B, 0x974B),
+    (0x076D, 0x976D),
+    (0x078F, 0x978F),
+    (0x07B1, 0x97B1),
+    (0x07D3, 0x97D3),
+    (0x07F5, 0x97F5),
+];
+const RED_LABEL_CROM0_MONITOR_WHITE_VERTICALS: [(u16, u16); 10] = [
+    (0x0607, 0x06F5),
+    (0x1607, 0x16F5),
+    (0x2607, 0x26F5),
+    (0x3607, 0x36F5),
+    (0x4607, 0x46F5),
+    (0x5607, 0x56F5),
+    (0x6607, 0x66F5),
+    (0x7607, 0x76F5),
+    (0x8607, 0x86F5),
+    (0x9607, 0x96F5),
+];
+const RED_LABEL_CROM0_MONITOR_COLOR_HORIZONTALS: [(u16, u16, u8); 12] = [
+    (0x4805, 0x5505, 0x44),
+    (0x4806, 0x5506, 0x44),
+    (0x4807, 0x5507, 0x00),
+    (0x4808, 0x5508, 0x33),
+    (0x4809, 0x5509, 0x33),
+    (0x48F3, 0x55F3, 0x33),
+    (0x48F4, 0x55F4, 0x33),
+    (0x48F5, 0x55F5, 0x00),
+    (0x48F6, 0x55F6, 0x44),
+    (0x48F7, 0x55F7, 0x44),
+    (0x077E, 0x467E, 0x22),
+    (0x577E, 0x967E, 0x22),
+];
+const RED_LABEL_CROM0_MONITOR_COLOR_VERTICALS: [(u16, u16, u8); 4] = [
+    (0x056F, 0x058E, 0x04),
+    (0x066F, 0x068E, 0x30),
+    (0x966F, 0x968E, 0x00),
+    (0x976F, 0x978E, 0x34),
+];
+const RED_LABEL_CROM0_MONITOR_BLUE_TOUCH_RANGES: [(u16, u16); 2] =
+    [(0x4E0A, 0x4E6D), (0x4E90, 0x4EF3)];
+
 fn red_label_crom0_operator_instruction_vector(line: &str) -> Result<&'static str, String> {
     match line {
+        RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT => Ok("VINS2"),
         RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT => Ok("VINS4"),
         RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT => Ok("VINS5"),
         RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT => Ok("VINS6"),
@@ -3508,9 +4092,36 @@ fn red_label_crom0_operator_instruction_vector(line: &str) -> Result<&'static st
         RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT => Ok("VINS9"),
         RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT => Ok("VINS10"),
         RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT => Ok("VINS11"),
+        RED_LABEL_CROM0_MANUAL_TO_STEP_THRU_PATTERNS_TEXT => Ok("VINS12"),
         _ => Err(format!(
             "red-label CROM0 operator instruction `{line}` has no message vector"
         )),
+    }
+}
+
+fn red_label_validate_monitor_pattern_index(pattern_index: usize) -> Result<(), String> {
+    if pattern_index >= RED_LABEL_CROM0_MONITOR_PATTERN_COUNT {
+        return Err(format!(
+            "red-label CROM0 monitor pattern index {pattern_index} is outside 0..{}",
+            RED_LABEL_CROM0_MONITOR_PATTERN_COUNT - 1
+        ));
+    }
+    Ok(())
+}
+
+fn red_label_crom0_monitor_pattern_kind(
+    pattern_index: usize,
+) -> Result<RedLabelCrom0MonitorPatternKind, String> {
+    match pattern_index {
+        0 => Ok(RedLabelCrom0MonitorPatternKind::Crosshatch),
+        1 => Ok(RedLabelCrom0MonitorPatternKind::RedField),
+        2 => Ok(RedLabelCrom0MonitorPatternKind::GreenField),
+        3 => Ok(RedLabelCrom0MonitorPatternKind::BlueField),
+        4 => Ok(RedLabelCrom0MonitorPatternKind::ColorBars),
+        _ => {
+            red_label_validate_monitor_pattern_index(pattern_index)?;
+            unreachable!("validated monitor pattern index should map to a pattern")
+        }
     }
 }
 
@@ -4004,6 +4615,7 @@ mod tests {
             RED_LABEL_CROM0_AUDIO_TEST_SOUND_DELAY_MS, RED_LABEL_CROM0_AUDIO_TEST_TEXT,
             RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT,
+            RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS, RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT, RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT,
@@ -4020,10 +4632,17 @@ mod tests {
             RED_LABEL_CROM0_COLOR_RAM_TEST_INITIAL_DELAY_MS, RED_LABEL_CROM0_COLOR_RAM_TEST_LED,
             RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT, RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS,
             RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT,
-            RED_LABEL_CROM0_MULTIPLE_RAM_FAILURE_TEXT, RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT,
-            RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES,
-            RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT,
-            RED_LABEL_CROM0_RAM_FAILURE_TEXT, RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS,
+            RED_LABEL_CROM0_MANUAL_TO_STEP_THRU_PATTERNS_TEXT,
+            RED_LABEL_CROM0_MONITOR_BLUE_FIELD_COLOR, RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES,
+            RED_LABEL_CROM0_MONITOR_COLOR_BAR_PALETTE_BYTES,
+            RED_LABEL_CROM0_MONITOR_FIELD_WATCHDOG_HIDE_PALETTE_INDEX,
+            RED_LABEL_CROM0_MONITOR_GREEN_FIELD_COLOR, RED_LABEL_CROM0_MONITOR_PATTERN_DELAY_MS,
+            RED_LABEL_CROM0_MONITOR_RED_FIELD_COLOR, RED_LABEL_CROM0_MONITOR_TEST_TEXT,
+            RED_LABEL_CROM0_MONITOR_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_MULTIPLE_RAM_FAILURE_TEXT,
+            RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT, RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS,
+            RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES, RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+            RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT, RED_LABEL_CROM0_RAM_FAILURE_TEXT,
+            RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS,
             RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_COLOR,
             RED_LABEL_CROM0_RAM_TEST_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
             RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER, RED_LABEL_CROM0_RAM_TEST_LED,
@@ -4053,6 +4672,10 @@ mod tests {
             RedLabelCrom0ColorRamBarWrite, RedLabelCrom0ColorRamBars,
             RedLabelCrom0ColorRamPaletteCycle, RedLabelCrom0ColorRamPaletteFill,
             RedLabelCrom0ColorRamTestTarget, RedLabelCrom0ColorRamTestTransfer,
+            RedLabelCrom0MonitorBarWrite, RedLabelCrom0MonitorLineWrite,
+            RedLabelCrom0MonitorMaskedRangeWrite, RedLabelCrom0MonitorPatternDisplay,
+            RedLabelCrom0MonitorPatternKind, RedLabelCrom0MonitorPointWrite,
+            RedLabelCrom0MonitorTestTarget, RedLabelCrom0MonitorTestTransfer,
             RedLabelCrom0RamFailure, RedLabelCrom0RamFailureTransfer,
             RedLabelCrom0RamTestAbortStatus, RedLabelCrom0RamTestAbortTransfer,
             RedLabelCrom0RamTestLoopStatus, RedLabelCrom0RamTestLoopTarget,
@@ -6423,6 +7046,317 @@ mod tests {
         assert_eq!(monitor.change, RedLabelCrom0SwitchTestChange::NoChange);
         assert_eq!(monitor.target, RedLabelCrom0SwitchTestTarget::MonitorTest);
         assert_eq!(monitor.scans.len(), 5);
+    }
+
+    #[test]
+    fn main_board_writes_crom0_monitor_test_start() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let transfer = board
+            .red_label_write_crom0_monitor_test_start()
+            .expect("monitor test start transfer");
+
+        assert_eq!(
+            transfer,
+            RedLabelCrom0MonitorTestTransfer {
+                screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+                palette_zeroed: true,
+                letter_color: RedLabelDiagnosticPaletteWrite {
+                    address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+                    index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+                    value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+                },
+                headline: RedLabelDiagnosticBitmapTextWrite {
+                    address: RED_LABEL_CROM0_MONITOR_TEST_TEXT_ADDRESS,
+                    vector_label: "VMONTS",
+                    text: String::from(RED_LABEL_CROM0_MONITOR_TEST_TEXT),
+                    cursor_after: 0x7A80,
+                },
+                instructions: RedLabelDiagnosticInstructionBitmapTextWrite {
+                    table_label: "IMONTS",
+                    prompt: RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                        vector_label: "VINS1",
+                        text: String::from(RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT),
+                        cursor_after: 0x96CE,
+                    },
+                    lines: vec![
+                        RedLabelDiagnosticBitmapTextWrite {
+                            address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                            vector_label: "VINS2",
+                            text: String::from(RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT),
+                            cursor_after: 0x74DA,
+                        },
+                        RedLabelDiagnosticBitmapTextWrite {
+                            address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[1],
+                            vector_label: "VINS12",
+                            text: String::from(RED_LABEL_CROM0_MANUAL_TO_STEP_THRU_PATTERNS_TEXT),
+                            cursor_after: 0x7BE4,
+                        },
+                    ],
+                },
+            }
+        );
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_MONITOR_TEST_TEXT_ADDRESS, 'M');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0], 'A');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[1], 'M');
+    }
+
+    #[test]
+    fn main_board_draws_crom0_monitor_crosshatch_pattern() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let step = board
+            .red_label_step_crom0_monitor_test_pattern(0, false, false)
+            .expect("monitor crosshatch pattern");
+
+        assert_eq!(step.pattern_index, 0);
+        assert_eq!(
+            step.pattern,
+            Some(RedLabelCrom0MonitorPatternKind::Crosshatch)
+        );
+        assert_eq!(step.next_pattern_index, Some(1));
+        assert_eq!(
+            step.delay_ms,
+            Some(RED_LABEL_CROM0_MONITOR_PATTERN_DELAY_MS)
+        );
+        assert_eq!(step.target, RedLabelCrom0MonitorTestTarget::MonitorTestLoop);
+        let RedLabelCrom0MonitorPatternDisplay::Crosshatch(crosshatch) =
+            step.display.expect("crosshatch display")
+        else {
+            panic!("expected crosshatch display");
+        };
+
+        assert_eq!(crosshatch.screen_clear_end, RED_LABEL_SCREEN_CLEAR_END);
+        assert!(crosshatch.palette_zeroed);
+        assert_eq!(crosshatch.palette_writes.len(), 4);
+        assert_eq!(board.palette_ram()[1], 0xFF);
+        assert_eq!(board.palette_ram()[2], 0xC0);
+        assert_eq!(board.palette_ram()[3], 0x38);
+        assert_eq!(board.palette_ram()[4], 0x07);
+        assert_eq!(crosshatch.white_verticals.len(), 10);
+        assert_eq!(
+            crosshatch.white_verticals[0],
+            RedLabelCrom0MonitorLineWrite {
+                start_address: 0x0607,
+                end_address: 0x06F5,
+                value: 0x01,
+                bytes_written: 0x00EE,
+            }
+        );
+        assert_eq!(crosshatch.white_horizontals.len(), 8);
+        assert_eq!(
+            crosshatch.white_horizontals[0],
+            RedLabelCrom0MonitorLineWrite {
+                start_address: 0x0707,
+                end_address: 0x9707,
+                value: 0x11,
+                bytes_written: 0x90,
+            }
+        );
+        assert_eq!(crosshatch.color_horizontals.len(), 12);
+        assert_eq!(crosshatch.color_verticals.len(), 4);
+        assert_eq!(
+            crosshatch.blue_touch_points,
+            vec![
+                RedLabelCrom0MonitorPointWrite {
+                    address: 0x467E,
+                    value: 0x21,
+                },
+                RedLabelCrom0MonitorPointWrite {
+                    address: 0x967E,
+                    value: 0x20,
+                },
+            ]
+        );
+        assert_eq!(
+            crosshatch.blue_touch_ranges[0],
+            RedLabelCrom0MonitorMaskedRangeWrite {
+                start_address: 0x4E0A,
+                end_address: 0x4E6D,
+                low_nibble: 0x02,
+                bytes_written: 0x63,
+            }
+        );
+        assert_eq!(crosshatch.dot_writes.len(), 63);
+        assert_eq!(
+            crosshatch.dot_writes[0],
+            RedLabelCrom0MonitorPointWrite {
+                address: 0x0E18,
+                value: 0x01,
+            }
+        );
+        assert_eq!(
+            crosshatch.dot_writes[62],
+            RedLabelCrom0MonitorPointWrite {
+                address: 0x8EE4,
+                value: 0x01,
+            }
+        );
+
+        assert_eq!(crosshatch.watchdog_reset_count, 8);
+        assert_eq!(board.ram()[0x0607], 0x01);
+        assert_eq!(board.ram()[0x06F4], 0x01);
+        assert_eq!(board.ram()[0x0707], 0x11);
+        assert_eq!(board.ram()[0x9607], 0x11);
+        assert_eq!(board.ram()[0x4805], 0x44);
+        assert_eq!(board.ram()[0x5405], 0x44);
+        assert_eq!(board.ram()[0x056F], 0x04);
+        assert_eq!(board.ram()[0x058D], 0x04);
+        assert_eq!(board.ram()[0x467E], 0x21);
+        assert_eq!(board.ram()[0x967E], 0x20);
+        assert_eq!(board.ram()[0x4E0A] & 0x0F, 0x02);
+        assert_eq!(board.ram()[0x4E6C] & 0x0F, 0x02);
+        assert_eq!(board.ram()[0x0E18], 0x01);
+    }
+
+    #[test]
+    fn main_board_draws_crom0_monitor_fields_and_routes_to_audit() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        board.write_byte(0x1234, 0xAA).expect("dirty video RAM");
+        board.write_byte(0xC001, 0xEE).expect("dirty palette index");
+
+        let red = board
+            .red_label_step_crom0_monitor_test_pattern(1, false, false)
+            .expect("monitor red field");
+        let RedLabelCrom0MonitorPatternDisplay::Field(field) = red.display.expect("field display")
+        else {
+            panic!("expected field display");
+        };
+        assert_eq!(red.pattern, Some(RedLabelCrom0MonitorPatternKind::RedField));
+        assert_eq!(field.source_label, "RFIELD");
+        assert_eq!(field.color, RED_LABEL_CROM0_MONITOR_RED_FIELD_COLOR);
+        assert_eq!(
+            field.palette_writes,
+            vec![
+                RedLabelDiagnosticPaletteWrite {
+                    address: 0xC000,
+                    index: 0,
+                    value: RED_LABEL_CROM0_MONITOR_RED_FIELD_COLOR,
+                },
+                RedLabelDiagnosticPaletteWrite {
+                    address: 0xC00C,
+                    index: RED_LABEL_CROM0_MONITOR_FIELD_WATCHDOG_HIDE_PALETTE_INDEX,
+                    value: RED_LABEL_CROM0_MONITOR_RED_FIELD_COLOR,
+                },
+            ]
+        );
+        assert_eq!(board.ram()[0x1234], 0);
+        assert_eq!(
+            board.palette_ram()
+                [usize::from(RED_LABEL_CROM0_MONITOR_FIELD_WATCHDOG_HIDE_PALETTE_INDEX)],
+            RED_LABEL_CROM0_MONITOR_RED_FIELD_COLOR
+        );
+        assert_eq!(board.palette_ram()[1], 0xEE);
+
+        let green = board
+            .red_label_step_crom0_monitor_test_pattern(2, false, false)
+            .expect("monitor green field");
+        let RedLabelCrom0MonitorPatternDisplay::Field(green_field) =
+            green.display.expect("green display")
+        else {
+            panic!("expected green field display");
+        };
+        assert_eq!(green_field.source_label, "GFIELD");
+        assert_eq!(green_field.color, RED_LABEL_CROM0_MONITOR_GREEN_FIELD_COLOR);
+
+        let blue = board
+            .red_label_step_crom0_monitor_test_pattern(3, false, false)
+            .expect("monitor blue field");
+        let RedLabelCrom0MonitorPatternDisplay::Field(blue_field) =
+            blue.display.expect("blue display")
+        else {
+            panic!("expected blue field display");
+        };
+        assert_eq!(blue_field.source_label, "BFIELD");
+        assert_eq!(blue_field.color, RED_LABEL_CROM0_MONITOR_BLUE_FIELD_COLOR);
+
+        let audit = board
+            .red_label_step_crom0_monitor_test_pattern(2, true, false)
+            .expect("monitor audit target");
+        assert_eq!(audit.pattern, None);
+        assert_eq!(audit.display, None);
+        assert_eq!(audit.next_pattern_index, None);
+        assert_eq!(audit.delay_ms, None);
+        assert_eq!(
+            audit.target,
+            RedLabelCrom0MonitorTestTarget::AuditGameAdjust
+        );
+    }
+
+    #[test]
+    fn main_board_draws_crom0_monitor_color_bars_and_final_targets() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let restart = board
+            .red_label_step_crom0_monitor_test_pattern(4, false, false)
+            .expect("monitor color bars");
+        assert_eq!(
+            restart.pattern,
+            Some(RedLabelCrom0MonitorPatternKind::ColorBars)
+        );
+        assert_eq!(restart.next_pattern_index, Some(0));
+        assert_eq!(
+            restart.target,
+            RedLabelCrom0MonitorTestTarget::MonitorTestLoop
+        );
+        let RedLabelCrom0MonitorPatternDisplay::ColorBars(color_bars) =
+            restart.display.expect("color-bar display")
+        else {
+            panic!("expected color bars display");
+        };
+        assert_eq!(color_bars.source_label, "CBARCL/COLORB");
+        assert_eq!(color_bars.palette_writes.len(), PALETTE_RAM_SIZE);
+        assert_eq!(
+            board.palette_ram().as_slice(),
+            RED_LABEL_CROM0_MONITOR_COLOR_BAR_PALETTE_BYTES.as_slice()
+        );
+        assert_eq!(
+            color_bars.bars.len(),
+            RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES.len()
+        );
+        assert_eq!(
+            color_bars.bars[0],
+            RedLabelCrom0MonitorBarWrite {
+                bar_index: 0,
+                value: RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES[0],
+                start_address: 0x0000,
+                end_address: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES as u16,
+                bytes_written: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+            }
+        );
+        assert_eq!(
+            color_bars.bars[15],
+            RedLabelCrom0MonitorBarWrite {
+                bar_index: 15,
+                value: RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES[15],
+                start_address: 0x8D00,
+                end_address: RED_LABEL_SCREEN_CLEAR_END,
+                bytes_written: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+            }
+        );
+        assert_eq!(
+            color_bars.watchdog_reset_count,
+            RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES.len()
+        );
+        assert_eq!(board.ram()[0x0000], 0x00);
+        assert_eq!(board.ram()[0x0F00], 0x11);
+        assert_eq!(board.ram()[0x1800], 0x22);
+        assert_eq!(board.ram()[0x9BFF], 0xFF);
+
+        let rom = board
+            .red_label_step_crom0_monitor_test_pattern(4, false, true)
+            .expect("monitor final ROM target");
+        assert_eq!(rom.target, RedLabelCrom0MonitorTestTarget::RomTest);
+
+        let error = board
+            .red_label_step_crom0_monitor_test_pattern(5, false, false)
+            .expect_err("invalid monitor pattern index");
+        assert!(error.contains("outside 0..4"));
     }
 
     #[test]

@@ -348,6 +348,8 @@ mod tests {
             parse_messages(crate::assets::RED_LABEL_MESSAGES_TSV).expect("messages parse");
 
         assert!(glyphs.iter().any(|glyph| glyph.character == 'F'));
+        assert!(glyphs.iter().any(|glyph| glyph.character == 'G'));
+        assert!(glyphs.iter().any(|glyph| glyph.character == 'J'));
         assert!(glyphs.iter().any(|glyph| glyph.character == ','));
         assert!(glyphs.iter().any(|glyph| glyph.character == ':'));
         assert_eq!(
@@ -590,6 +592,12 @@ mod tests {
             ("VSW16", &["INVALID", "SWITCH"]),
             ("VSW17", &["INVALID", "SWITCH"]),
             ("VINS11", &["AUTO", "FOR", "MONITOR", "TEST", "PATTERNS"]),
+            ("VMONTS", &["MONITOR", "TEST", "PATTERNS"]),
+            (
+                "VINS2",
+                &["AUTO", "FOR", "AUDIT", "[HMC:0xFE]", ",", "GAME", "ADJUST"],
+            ),
+            ("VINS12", &["MANUAL", "TO", "STEP", "THRU", "PATTERNS"]),
         ];
         for (label, expected_words) in switch_messages {
             assert_eq!(

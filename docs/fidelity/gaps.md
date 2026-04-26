@@ -75,8 +75,9 @@ This file records behavior that must not be guessed in arcade-core code.
   RAM-test start/failure/no-error visible setup, the RAM2 pattern fill/verify
   pass, pass-boundary loop dispatch, and CMOS RAM-test write/verify loop plus
   visible outcomes, plus the CROM0 color-RAM diagnostic heading/bars/palette
-  loop, audio-test sound-pulse/skip-table behavior, and switch-test
-  display-table/PIA-scan behavior.
+  loop, audio-test sound-pulse/skip-table behavior, switch-test
+  display-table/PIA-scan behavior, and monitor-test
+  crosshatch/RGB-field/color-bar pattern behavior.
   The MAME-documented main-board and sound-board memory maps are
   embedded under
   `assets/red-label/memory-map.tsv` and checked against the Rust address
@@ -149,9 +150,9 @@ This file records behavior that must not be guessed in arcade-core code.
   post-display debounce countdown as one deterministic cycle, but CPU IRQ
   scheduling, exact Williams power-on RAM contents, `AUDITG` live text
   transfer/screen erasure/post-`PWRUP` wiring, physical advance-switch timing,
-  physical lamp timing, sub-pass/page-boundary RAM-test operator polling, and
-  later monitor test execution after the modeled RAM-test, CMOS RAM-test,
-  color-RAM diagnostic, audio-test, and switch-test loops, CMOS persistence,
+  physical lamp timing, sub-pass/page-boundary RAM-test operator polling,
+  monitor-test handoff/live-audit integration beyond the modeled monitor
+  pattern loop, CMOS persistence,
   screen scanline scheduling, watchdog timing/reset side effects,
   palette/rendering timing side effects, decoder PROM behavior, and DAC sample
   generation are not modeled.
@@ -372,12 +373,13 @@ This file records behavior that must not be guessed in arcade-core code.
   gate metadata plus the RAM-test start/failure/no-error visible setup, RAM2
   pattern fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test
   write/verify loop plus visible outcomes and the CROM0 color-RAM diagnostic
-  heading/bars/palette loop plus audio-test sound-pulse/skip-table behavior and
-  switch-test display-table/PIA-scan behavior. CMOS persistence, `AUDITG` live text
-  transfer/screen erasure/post-`PWRUP` wiring, high-score comparison/initials
-  routines, sub-pass/page-boundary RAM-test operator polling, and later
-  monitor test execution beyond the modeled RAM-test, CMOS RAM-test, color-RAM
-  diagnostic, audio-test, and switch-test loops are not translated.
+  heading/bars/palette loop plus audio-test sound-pulse/skip-table behavior,
+  switch-test display-table/PIA-scan behavior, and monitor-test
+  crosshatch/RGB-field/color-bar pattern behavior. CMOS persistence, `AUDITG`
+  live text transfer/screen erasure/post-`PWRUP` wiring, high-score
+  comparison/initials routines, sub-pass/page-boundary RAM-test operator
+  polling, and monitor-test handoff/live-audit integration beyond the modeled
+  monitor pattern loop are not translated.
 
 ## Player
 
