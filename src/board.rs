@@ -90,6 +90,12 @@ pub const RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS: u8 = 6;
 pub const RED_LABEL_AUDIT_DEBOUNCE_SHIFT_REGISTER: u8 = 0xFF;
 pub const RED_LABEL_AUDIT_DEBOUNCE_INPUT_MASK: u8 =
     DEFENDER_IN2_ADVANCE | DEFENDER_IN2_HIGH_SCORE_RESET;
+pub const RED_LABEL_HIGH_SCORE_ENTRIES: usize = 8;
+pub const RED_LABEL_HIGH_SCORE_ENTRY_BYTES: usize = 6;
+pub const RED_LABEL_HIGH_SCORE_ENTRY_CELLS: usize = RED_LABEL_HIGH_SCORE_ENTRY_BYTES * 2;
+pub const RED_LABEL_HIGH_SCORE_SCORE_BYTES: usize = 3;
+pub const RED_LABEL_HIGH_SCORE_INITIALS_BYTES: usize = 3;
+pub const RED_LABEL_HIGH_SCORE_MAX_SCORE: u32 = 999_999;
 pub const RED_LABEL_HIGH_SCORE_DEFAULT_BYTES: usize = 48;
 pub const RED_LABEL_HIGH_SCORE_CELLS: usize = RED_LABEL_HIGH_SCORE_DEFAULT_BYTES * 2;
 pub const RED_LABEL_THSTAB_START: u16 = 0xB260;
@@ -330,6 +336,34 @@ pub struct RedLabelPowerUpAuditFrameStep {
     pub dispatch: Option<RedLabelPowerUpDispatch>,
     pub audit_cycle: Option<RedLabelAuditCycleStep>,
     pub target: RedLabelPowerUpAuditFrameTarget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelHighScoreTable {
+    AllTime,
+    TodaysGreatest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelHighScoreEntry {
+    pub rank: usize,
+    pub score: u32,
+    pub initials: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelHighScoreComparison {
+    pub table: RedLabelHighScoreTable,
+    pub score: u32,
+    pub qualifying_rank: Option<usize>,
+    pub displaced_entry: Option<RedLabelHighScoreEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelHighScoreInsertion {
+    pub table: RedLabelHighScoreTable,
+    pub inserted_entry: RedLabelHighScoreEntry,
+    pub dropped_entry: RedLabelHighScoreEntry,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3703,6 +3737,108 @@ impl<'a> DefenderMainBoard<'a> {
         self.red_label_reset_todays_high_scores(defaults)
     }
 
+    pub fn red_label_high_score_table(
+        &self,
+        table: RedLabelHighScoreTable,
+    ) -> Option<Vec<RedLabelHighScoreEntry>> {
+        (0..RED_LABEL_HIGH_SCORE_ENTRIES)
+            .map(|index| {
+                let cells = self.red_label_high_score_entry_cells(table, index)?;
+                red_label_decode_high_score_entry(index + 1, cells)
+            })
+            .collect()
+    }
+
+    pub fn red_label_compare_high_score(
+        &self,
+        table: RedLabelHighScoreTable,
+        score: u32,
+    ) -> Option<RedLabelHighScoreComparison> {
+        if score > RED_LABEL_HIGH_SCORE_MAX_SCORE {
+            return None;
+        }
+        let entries = self.red_label_high_score_table(table)?;
+        let qualifying_index = red_label_high_score_qualifying_index(&entries, score);
+        Some(RedLabelHighScoreComparison {
+            table,
+            score,
+            qualifying_rank: qualifying_index.map(|index| index + 1),
+            displaced_entry: qualifying_index.and_then(|index| entries.get(index).cloned()),
+        })
+    }
+
+    pub fn red_label_insert_high_score(
+        &mut self,
+        table: RedLabelHighScoreTable,
+        score: u32,
+        initials: &str,
+    ) -> Option<RedLabelHighScoreInsertion> {
+        if score > RED_LABEL_HIGH_SCORE_MAX_SCORE {
+            return None;
+        }
+        let mut entries = self.red_label_high_score_table(table)?;
+        let qualifying_index = red_label_high_score_qualifying_index(&entries, score)?;
+        let dropped_entry = entries.last()?.clone();
+        let inserted_entry = RedLabelHighScoreEntry {
+            rank: qualifying_index + 1,
+            score,
+            initials: String::from(initials),
+        };
+        red_label_encode_high_score_entry(&inserted_entry)?;
+
+        entries.insert(qualifying_index, inserted_entry.clone());
+        entries.truncate(RED_LABEL_HIGH_SCORE_ENTRIES);
+        for (index, entry) in entries.iter().enumerate() {
+            let mut ranked_entry = entry.clone();
+            ranked_entry.rank = index + 1;
+            let cells = red_label_encode_high_score_entry(&ranked_entry)?;
+            self.red_label_write_high_score_entry_cells(table, index, &cells)?;
+        }
+
+        Some(RedLabelHighScoreInsertion {
+            table,
+            inserted_entry,
+            dropped_entry,
+        })
+    }
+
+    fn red_label_high_score_entry_cells(
+        &self,
+        table: RedLabelHighScoreTable,
+        index: usize,
+    ) -> Option<&[u8]> {
+        if index >= RED_LABEL_HIGH_SCORE_ENTRIES {
+            return None;
+        }
+        let start = red_label_high_score_table_start(table)
+            .checked_add(index.checked_mul(RED_LABEL_HIGH_SCORE_ENTRY_CELLS)?)?;
+        let end = start.checked_add(RED_LABEL_HIGH_SCORE_ENTRY_CELLS)?;
+        match table {
+            RedLabelHighScoreTable::AllTime => self.cmos_ram.get(start..end),
+            RedLabelHighScoreTable::TodaysGreatest => self.ram.get(start..end),
+        }
+    }
+
+    fn red_label_write_high_score_entry_cells(
+        &mut self,
+        table: RedLabelHighScoreTable,
+        index: usize,
+        cells: &[u8; RED_LABEL_HIGH_SCORE_ENTRY_CELLS],
+    ) -> Option<()> {
+        if index >= RED_LABEL_HIGH_SCORE_ENTRIES {
+            return None;
+        }
+        let start = red_label_high_score_table_start(table)
+            .checked_add(index.checked_mul(RED_LABEL_HIGH_SCORE_ENTRY_CELLS)?)?;
+        let end = start.checked_add(RED_LABEL_HIGH_SCORE_ENTRY_CELLS)?;
+        match table {
+            RedLabelHighScoreTable::AllTime => self.cmos_ram.get_mut(start..end)?,
+            RedLabelHighScoreTable::TodaysGreatest => self.ram.get_mut(start..end)?,
+        }
+        .copy_from_slice(cells);
+        Some(())
+    }
+
     pub fn red_label_power_up(
         &mut self,
         defaults: &[RedLabelCmosDefault],
@@ -4215,6 +4351,123 @@ fn red_label_high_score_default_cells(defaults: &[RedLabelCmosDefault]) -> Optio
     }
 
     (cells.len() == RED_LABEL_HIGH_SCORE_CELLS).then_some(cells)
+}
+
+fn red_label_high_score_table_start(table: RedLabelHighScoreTable) -> usize {
+    match table {
+        RedLabelHighScoreTable::AllTime => usize::from(RED_LABEL_CRHSTD_CELL_OFFSET),
+        RedLabelHighScoreTable::TodaysGreatest => usize::from(RED_LABEL_THSTAB_START),
+    }
+}
+
+fn red_label_decode_high_score_entry(rank: usize, cells: &[u8]) -> Option<RedLabelHighScoreEntry> {
+    if cells.len() != RED_LABEL_HIGH_SCORE_ENTRY_CELLS {
+        return None;
+    }
+
+    let score = red_label_high_score_from_bcd_bytes([
+        red_label_packed_cell_byte(cells, 0)?,
+        red_label_packed_cell_byte(cells, 2)?,
+        red_label_packed_cell_byte(cells, 4)?,
+    ])?;
+    let initials = String::from_utf8(vec![
+        red_label_packed_cell_byte(cells, 6)?,
+        red_label_packed_cell_byte(cells, 8)?,
+        red_label_packed_cell_byte(cells, 10)?,
+    ])
+    .ok()?;
+    red_label_validate_high_score_initials(&initials)?;
+
+    Some(RedLabelHighScoreEntry {
+        rank,
+        score,
+        initials,
+    })
+}
+
+fn red_label_encode_high_score_entry(
+    entry: &RedLabelHighScoreEntry,
+) -> Option<[u8; RED_LABEL_HIGH_SCORE_ENTRY_CELLS]> {
+    if !(1..=RED_LABEL_HIGH_SCORE_ENTRIES).contains(&entry.rank) {
+        return None;
+    }
+    red_label_validate_high_score_initials(&entry.initials)?;
+    let score_bytes = red_label_high_score_bcd_bytes(entry.score)?;
+    let initials = entry.initials.as_bytes();
+
+    let mut cells = [0; RED_LABEL_HIGH_SCORE_ENTRY_CELLS];
+    red_label_write_packed_cell_byte(&mut cells, 0, score_bytes[0])?;
+    red_label_write_packed_cell_byte(&mut cells, 2, score_bytes[1])?;
+    red_label_write_packed_cell_byte(&mut cells, 4, score_bytes[2])?;
+    red_label_write_packed_cell_byte(&mut cells, 6, initials[0])?;
+    red_label_write_packed_cell_byte(&mut cells, 8, initials[1])?;
+    red_label_write_packed_cell_byte(&mut cells, 10, initials[2])?;
+    Some(cells)
+}
+
+fn red_label_high_score_qualifying_index(
+    entries: &[RedLabelHighScoreEntry],
+    score: u32,
+) -> Option<usize> {
+    if score > RED_LABEL_HIGH_SCORE_MAX_SCORE {
+        return None;
+    }
+    entries.iter().position(|entry| score > entry.score)
+}
+
+fn red_label_high_score_from_bcd_bytes(
+    bytes: [u8; RED_LABEL_HIGH_SCORE_SCORE_BYTES],
+) -> Option<u32> {
+    if bytes.iter().any(|byte| !red_label_is_bcd_byte(*byte)) {
+        return None;
+    }
+    Some(
+        u32::from(red_label_bcd_byte_to_u16(bytes[0])) * 10_000
+            + u32::from(red_label_bcd_byte_to_u16(bytes[1])) * 100
+            + u32::from(red_label_bcd_byte_to_u16(bytes[2])),
+    )
+}
+
+fn red_label_high_score_bcd_bytes(score: u32) -> Option<[u8; RED_LABEL_HIGH_SCORE_SCORE_BYTES]> {
+    if score > RED_LABEL_HIGH_SCORE_MAX_SCORE {
+        return None;
+    }
+    Some([
+        red_label_decimal_to_bcd_byte(u8::try_from(score / 10_000).ok()?),
+        red_label_decimal_to_bcd_byte(u8::try_from((score / 100) % 100).ok()?),
+        red_label_decimal_to_bcd_byte(u8::try_from(score % 100).ok()?),
+    ])
+}
+
+fn red_label_validate_high_score_initials(initials: &str) -> Option<()> {
+    (initials.len() == RED_LABEL_HIGH_SCORE_INITIALS_BYTES
+        && initials.bytes().all(|byte| byte.is_ascii_uppercase()))
+    .then_some(())
+}
+
+fn red_label_is_bcd_byte(value: u8) -> bool {
+    value >> 4 <= 9 && value & 0x0F <= 9
+}
+
+fn red_label_packed_cell_byte(cells: &[u8], nibble_offset: usize) -> Option<u8> {
+    Some(pack_sram_byte(
+        *cells.get(nibble_offset)?,
+        *cells.get(nibble_offset + 1)?,
+    ))
+}
+
+fn red_label_write_packed_cell_byte(
+    cells: &mut [u8],
+    nibble_offset: usize,
+    value: u8,
+) -> Option<()> {
+    if nibble_offset + 1 >= cells.len() {
+        return None;
+    }
+    let (ms_nibble, ls_nibble) = unpack_sram_byte(value);
+    cells[nibble_offset] = cmos_4bit_write_value(ms_nibble);
+    cells[nibble_offset + 1] = cmos_4bit_write_value(ls_nibble);
+    Some(())
 }
 
 pub fn video_control_cocktail(value: u8) -> bool {
@@ -5105,14 +5358,16 @@ mod tests {
             RED_LABEL_CROM0_SWITCH_TEST_TEXT_ADDRESS, RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
             RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS, RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
             RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX, RED_LABEL_DIPFLG_CELL_OFFSET,
-            RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
-            RED_LABEL_SCREEN_CLEAR_END, RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
-            RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
-            RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
-            RedLabelAuditDebounceStep, RedLabelAuditDisplayLineTransfer,
-            RedLabelAuditGameAdjustStartTransfer, RedLabelAuditOperatorState,
-            RedLabelAuditOperatorStep, RedLabelCrom0AudioSoundNumberTransfer,
-            RedLabelCrom0AudioSoundPulse, RedLabelCrom0AudioTestStep, RedLabelCrom0AudioTestTarget,
+            RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS,
+            RED_LABEL_HIGH_SCORE_ENTRY_CELLS, RED_LABEL_HIGH_SCORE_MAX_SCORE,
+            RED_LABEL_RESET_PALETTE_BYTES, RED_LABEL_SCREEN_CLEAR_END, RED_LABEL_THSTAB_START,
+            RedLabelAuditAdjustmentChange, RedLabelAuditAdjustmentDirection,
+            RedLabelAuditAdjustmentValue, RedLabelAuditCycleState, RedLabelAuditCycleStep,
+            RedLabelAuditDebounceState, RedLabelAuditDebounceStep,
+            RedLabelAuditDisplayLineTransfer, RedLabelAuditGameAdjustStartTransfer,
+            RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
+            RedLabelCrom0AudioSoundNumberTransfer, RedLabelCrom0AudioSoundPulse,
+            RedLabelCrom0AudioTestStep, RedLabelCrom0AudioTestTarget,
             RedLabelCrom0AudioTestTransfer, RedLabelCrom0BadRamBitmapTextWrite,
             RedLabelCrom0BadRomBitmapTextWrite, RedLabelCrom0BadRomScreenWrite,
             RedLabelCrom0CmosRamFailure, RedLabelCrom0CmosRamTestFault,
@@ -5140,13 +5395,15 @@ mod tests {
             RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
             RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
             RedLabelDiagnosticLedOutput, RedLabelDiagnosticPaletteWrite,
-            RedLabelDiagnosticTextWrite, RedLabelPowerUpAction, RedLabelPowerUpAuditFrameState,
-            RedLabelPowerUpAuditFrameTarget, RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE,
-            cmos_4bit_write_value, cmos_sram_clear_packed_bytes, cmos_sram_read_byte,
-            cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word, defender_io_window,
-            is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
-            red_label_crom0_diagnostic_screen, red_label_crom0_ram_test_next_word,
-            red_label_diagnostic_led_output, video_control_cocktail, video_counter_read_value,
+            RedLabelDiagnosticTextWrite, RedLabelHighScoreComparison, RedLabelHighScoreEntry,
+            RedLabelHighScoreInsertion, RedLabelHighScoreTable, RedLabelPowerUpAction,
+            RedLabelPowerUpAuditFrameState, RedLabelPowerUpAuditFrameTarget,
+            RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
+            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
+            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
+            main_cpu_read_target, main_cpu_write_target, red_label_crom0_diagnostic_screen,
+            red_label_crom0_ram_test_next_word, red_label_diagnostic_led_output,
+            video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -8173,6 +8430,156 @@ mod tests {
         assert_eq!(
             board.cmos_sram_read_byte(RED_LABEL_CRHSTD_CELL_OFFSET),
             Some(0x99)
+        );
+    }
+
+    #[test]
+    fn main_board_compares_all_time_and_todays_high_score_tables() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+
+        board
+            .red_label_reset_high_scores(&defaults)
+            .expect("reset high-score tables");
+
+        let all_time = board
+            .red_label_high_score_table(RedLabelHighScoreTable::AllTime)
+            .expect("all-time high-score table");
+        assert_eq!(all_time.len(), 8);
+        assert_eq!(
+            all_time[0],
+            RedLabelHighScoreEntry {
+                rank: 1,
+                score: 21_270,
+                initials: String::from("DRJ"),
+            }
+        );
+        assert_eq!(
+            all_time[7],
+            RedLabelHighScoreEntry {
+                rank: 8,
+                score: 6_010,
+                initials: String::from("TMH"),
+            }
+        );
+
+        assert_eq!(
+            board.red_label_compare_high_score(RedLabelHighScoreTable::AllTime, 20_000),
+            Some(RedLabelHighScoreComparison {
+                table: RedLabelHighScoreTable::AllTime,
+                score: 20_000,
+                qualifying_rank: Some(2),
+                displaced_entry: Some(RedLabelHighScoreEntry {
+                    rank: 2,
+                    score: 18_315,
+                    initials: String::from("SAM"),
+                }),
+            })
+        );
+        assert_eq!(
+            board.red_label_compare_high_score(RedLabelHighScoreTable::AllTime, 6_010),
+            Some(RedLabelHighScoreComparison {
+                table: RedLabelHighScoreTable::AllTime,
+                score: 6_010,
+                qualifying_rank: None,
+                displaced_entry: None,
+            })
+        );
+        assert_eq!(
+            board.red_label_compare_high_score(
+                RedLabelHighScoreTable::AllTime,
+                RED_LABEL_HIGH_SCORE_MAX_SCORE + 1,
+            ),
+            None
+        );
+
+        let todays = board
+            .red_label_high_score_table(RedLabelHighScoreTable::TodaysGreatest)
+            .expect("today's high-score table");
+        assert_eq!(todays[0].initials, "DRJ");
+        assert_eq!(todays[0].score, 21_270);
+    }
+
+    #[test]
+    fn main_board_inserts_high_score_entries_and_shifts_tables() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+
+        board
+            .red_label_reset_high_scores(&defaults)
+            .expect("reset high-score tables");
+
+        assert_eq!(
+            board.red_label_insert_high_score(RedLabelHighScoreTable::AllTime, 20_000, "ACE"),
+            Some(RedLabelHighScoreInsertion {
+                table: RedLabelHighScoreTable::AllTime,
+                inserted_entry: RedLabelHighScoreEntry {
+                    rank: 2,
+                    score: 20_000,
+                    initials: String::from("ACE"),
+                },
+                dropped_entry: RedLabelHighScoreEntry {
+                    rank: 8,
+                    score: 6_010,
+                    initials: String::from("TMH"),
+                },
+            })
+        );
+        let all_time = board
+            .red_label_high_score_table(RedLabelHighScoreTable::AllTime)
+            .expect("all-time table after insert");
+        assert_eq!(all_time[1].initials, "ACE");
+        assert_eq!(all_time[1].score, 20_000);
+        assert_eq!(all_time[2].initials, "SAM");
+        assert_eq!(
+            board.cmos_range(0x29..0x29 + RED_LABEL_HIGH_SCORE_ENTRY_CELLS as u16),
+            Some(
+                &[
+                    0xF0, 0xF2, 0xF0, 0xF0, 0xF0, 0xF0, 0xF4, 0xF1, 0xF4, 0xF3, 0xF4, 0xF5,
+                ][..]
+            )
+        );
+
+        assert_eq!(
+            board.red_label_insert_high_score(
+                RedLabelHighScoreTable::TodaysGreatest,
+                99_999,
+                "ZED",
+            ),
+            Some(RedLabelHighScoreInsertion {
+                table: RedLabelHighScoreTable::TodaysGreatest,
+                inserted_entry: RedLabelHighScoreEntry {
+                    rank: 1,
+                    score: 99_999,
+                    initials: String::from("ZED"),
+                },
+                dropped_entry: RedLabelHighScoreEntry {
+                    rank: 8,
+                    score: 6_010,
+                    initials: String::from("TMH"),
+                },
+            })
+        );
+        let todays = board
+            .red_label_high_score_table(RedLabelHighScoreTable::TodaysGreatest)
+            .expect("today's table after insert");
+        assert_eq!(todays[0].initials, "ZED");
+        assert_eq!(todays[0].score, 99_999);
+        assert_eq!(all_time[0].initials, "DRJ");
+
+        assert_eq!(
+            board.red_label_insert_high_score(RedLabelHighScoreTable::AllTime, 22_000, "xyZ"),
+            None
+        );
+        assert_eq!(
+            board.red_label_insert_high_score(
+                RedLabelHighScoreTable::AllTime,
+                RED_LABEL_HIGH_SCORE_MAX_SCORE + 1,
+                "MAX",
+            ),
+            None
         );
     }
 

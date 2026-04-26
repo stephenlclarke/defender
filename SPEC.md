@@ -291,6 +291,11 @@ This section records drift found during the repository review on
   the first 48 `DEFALT` bytes are copied back into the all-time `CRHSTD` CMOS
   range and into the `THSTAB` "today's greatest" RAM table using the same
   two-cell packed format.
+- `src/board.rs` now models packed high-score table comparison/insertion for
+  the all-time `CRHSTD` CMOS table and the `THSTAB` "today's greatest" RAM
+  table: six-digit BCD scores plus three ASCII initials decode from the same
+  two-cell format, qualifying scores shift lower entries, and the dropped entry
+  is reported.
 - `assets/red-label/ram-layout.tsv`, `assets/red-label/linked-lists.tsv`,
   `src/red_label_memory.rs`, and the board harness now agree on the source-owned
   `phr6.src` player table, object cell, process cell, super-process cell, and
@@ -377,11 +382,11 @@ This section records drift found during the repository review on
   runtime, and it is explicitly temporary until video RAM output is proven.
   Remaining work: regenerate any needed visual/audio asset from red-label
   source/ROM data or remove it from the shipped runtime path.
-- `assets/red-label/high-scores.tsv` is parsed as a seed table and
+- `assets/red-label/high-scores.tsv` is parsed as a seed table,
   `assets/red-label/cmos-defaults.tsv` records the matching ROM default CMOS
-  bytes, but there is no persistence model, initials entry, or today's-greatest
-  flow yet. Remaining work: trace the red-label high-score and CMOS routines
-  before implementing persistence.
+  bytes, and the board can compare/insert entries in both all-time and today's
+  packed high-score tables. There is still no persistence model, initials-entry
+  UI, or high-score screen flow.
 - The current deterministic trace compares Rust output to local expected TSV,
   `docs/fidelity/fixtures/` defines the ignored local fixture layout, and
   Phase 1 now has a local MAME/source trace runner plus a complete scenario
@@ -587,7 +592,8 @@ This section records drift found during the repository review on
   from IN2 service inputs, can model the post-display `AUDITG` debounce
   countdown, can run those pieces as one deterministic audit cycle with
   previous-row erasure, can step the post-`PWRUP` `AUDITG` outer frame path to
-  return-to-caller, and can snapshot source-labeled CMOS and RAM fields. A
+  return-to-caller, can compare/insert packed high-score entries, and can
+  snapshot source-labeled CMOS and RAM fields. A
   main-board address classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
@@ -756,9 +762,9 @@ This section records drift found during the repository review on
 
 - Credits and one-player start are only a scaffold.
 - CMOS-backed high-score reset copies all-time and today's tables from
-  `DEFALT`, but high-score comparison, initials entry, persistence,
-  two-player state, service switches, diagnostics, audits, and adjustments are
-  absent.
+  `DEFALT`, and packed table comparison/insertion is modeled. Initials entry,
+  persistence, two-player state, service switches, diagnostics, audits, and
+  adjustments are absent from the live cabinet flow.
 - The CLI now has `--input-profile`, ROM metadata reporting with CRC-32
   validation, local ROM-set mapping verification, and deterministic Rust trace
   emission, exact local TSV fixture comparison, and an ignored local trace
@@ -1185,7 +1191,7 @@ their behavior from labels.
    turns.
 4. Implement exact scoring for enemies, bullets, mines, humans, rescued humans,
    Pods, Swarmers, wave-end humanoid bonuses, extra ships, and smart bombs.
-5. Implement red-label high-score and today's-greatest behavior.
+5. Implement red-label initials-entry screens and live high-score flow.
 6. Add a CMOS-like storage trait with file-backed local persistence.
 7. Add operator/default settings needed for red-label exactness.
 8. Add negative tests for every corrected score so old prototype mistakes, such

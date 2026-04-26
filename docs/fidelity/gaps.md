@@ -119,8 +119,9 @@ This file records behavior that must not be guessed in arcade-core code.
   from IN2 service inputs, can model the post-display `AUDITG` debounce
   countdown, can run those pieces as one deterministic audit cycle with
   previous-row erasure, can step the post-`PWRUP` `AUDITG` outer frame path to
-  return-to-caller, and can snapshot source-labeled CMOS and main-RAM fields. A
-  main-board address classifier exists for RAM, banked I/O,
+  return-to-caller, can compare/insert packed high-score entries in the all-time
+  and today's tables, and can snapshot source-labeled CMOS and main-RAM fields.
+  A main-board address classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
   surface, and raw write-only palette register bytes are stored. CMOS 4-bit
@@ -380,9 +381,9 @@ This file records behavior that must not be guessed in arcade-core code.
   audio-test sound-pulse/skip-table behavior,
   switch-test display-table/PIA-scan behavior, monitor-test
   crosshatch/RGB-field/color-bar pattern behavior, monitor-to-`AUDITG` entry
-  transfer, post-`PWRUP` `AuditGate` entry transfer, and `AUDITG` outer
-  frame-step dispatch. CMOS persistence and high-score comparison/initials
-  routines are not translated.
+  transfer, post-`PWRUP` `AuditGate` entry transfer, `AUDITG` outer frame-step
+  dispatch, and packed high-score table comparison/insertion. CMOS persistence,
+  initials entry, and high-score screen flow are not translated.
 
 ## Player
 
