@@ -192,7 +192,7 @@ against fixtures:
   the physical ROM numbers that `CROM0` would display for failures, plus the
   manual/auto ROM-stage outcome for success/failure display intent, `ADVSW` /
   `NEXTST` gate sequence, message-ROM bitmap text transfer, and RAM-test
-  start/failure/no-error visible setup.
+  start/failure/no-error visible setup plus the RAM2 pattern fill/verify pass.
 - `src/app.rs` exposes non-interactive verification commands:
   `--verify-roms PATH` checks a local red-label ROM directory and maps it into
   the embedded MAME ROM regions, while `--fidelity-trace [FRAMES]` emits the
@@ -585,14 +585,16 @@ This section records drift found during the repository review on
   events, CROM0 diagnostic text/palette intent, bitmap
   headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
   gate metadata. It can also render the source-visible RAM-test start,
-  failure, and no-error screens reached from the CROM0 handoff. CPU interrupt
-  scheduling, physical lamp timing, and sample generation remain gaps.
+  failure, and no-error screens reached from the CROM0 handoff and execute the
+  source RAM2 pattern fill/verify pass. CPU interrupt scheduling, physical lamp
+  timing, and sample generation remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated `AUDITG` live text transfer/screen
   erasure/post-`PWRUP` wiring, physical advance-switch timing, physical lamp
-  timing, the full RAM sweep and later CMOS/color/sound test execution after
-  the modeled RAM-test visible outcomes, CMOS persistence, screen
+  timing, live comprehensive RAM-test loop/operator polling and later
+  CMOS/color/sound test execution after the modeled RAM-test pass/outcomes,
+  CMOS persistence, screen
   scanline scheduler, watchdog timing/reset side effects, rendering timing side
   effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or
   translated `VSNDRM1.SRC` routines.

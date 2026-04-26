@@ -17,9 +17,9 @@
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, and can route the CMOS-visible
 //! `romc0.src` power-up branch. CMOS persistence, `AUDITG` live diagnostic text
-//! transfer/full-loop integration, `CROM0` later-test execution, physical
-//! advance/lamp timing beyond the modeled ROM-stage screen/LED output, and full
-//! video timing remain explicit fidelity gaps.
+//! transfer/full-loop integration, `CROM0` CMOS/color/sound later-test
+//! execution, physical advance/lamp timing beyond the modeled ROM-stage
+//! screen/LED output, and full video timing remain explicit fidelity gaps.
 
 use crate::{
     input::{
@@ -111,7 +111,10 @@ pub const RED_LABEL_CROM0_RAM_TEST_COLOR: u8 = 0xA5;
 pub const RED_LABEL_CROM0_RAM_TEST_LED: u8 = 0x04;
 pub const RED_LABEL_CROM0_RAM_TEST_DELAY_MS: u16 = 5000;
 pub const RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS: u16 = 10;
+pub const RED_LABEL_CROM0_RAM_TEST_START_SEED: u16 = 0x0000;
 pub const RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER: u16 = 0x000A;
+pub const RED_LABEL_CROM0_RAM_TEST_END_ADDRESS: u16 = MAIN_CPU_RAM_SIZE as u16;
+pub const RED_LABEL_CROM0_RAM_TEST_WORDS: usize = MAIN_CPU_RAM_SIZE / 2;
 pub const RED_LABEL_SCREEN_CLEAR_END: u16 = 0x9C00;
 pub const WATCHDOG_RESET_BYTE: u8 = 0x39;
 pub const VIDEO_COUNTER_CLAMPED_VALUE: u8 = 0xFC;
@@ -346,6 +349,35 @@ pub struct RedLabelCrom0RamTestAbortTransfer {
     pub instructions: Option<RedLabelDiagnosticInstructionBitmapTextWrite>,
     pub flash_led: Option<RedLabelDiagnosticLedFlash>,
     pub advance_gates: Vec<RedLabelCrom0AdvanceGate>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0RamTestPatternFill {
+    pub seed: u16,
+    pub next_seed: u16,
+    pub start_address: u16,
+    pub end_address: u16,
+    pub words_written: usize,
+    pub watchdog_reset_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0RamTestPatternVerification {
+    pub seed: u16,
+    pub next_seed: Option<u16>,
+    pub start_address: u16,
+    pub end_address: u16,
+    pub words_verified: usize,
+    pub watchdog_reset_count: usize,
+    pub failure: Option<RedLabelCrom0RamFailure>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0RamTestPass {
+    pub test_counter: u16,
+    pub next_test_counter: Option<u16>,
+    pub fill: RedLabelCrom0RamTestPatternFill,
+    pub verification: RedLabelCrom0RamTestPatternVerification,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -863,7 +895,6 @@ impl<'a> DefenderMainBoard<'a> {
     /// This models the source-visible start of the comprehensive RAM test after
     /// the CROM0 stage: `NEWTST`, LEDs off, white diagnostic text, `VRAMTS`,
     /// `IRAMTS`, the 5-second delay intent, and the initial active-loop counter.
-    /// The translated `RAM2` memory-test loop remains a later-test gap.
     pub fn red_label_write_crom0_ram_test_start(
         &mut self,
     ) -> Result<RedLabelCrom0RamTestStartTransfer, String> {
@@ -910,6 +941,118 @@ impl<'a> DefenderMainBoard<'a> {
             active_loop_delay_ms: RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS,
             test_counter: RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER,
         })
+    }
+
+    /// Run one source-shaped `RAM2` comprehensive RAM-test fill/verify pass.
+    ///
+    /// In comprehensive mode the ROM repeats this pass until the operator aborts
+    /// through the advance/auto input or a mismatch jumps to `CRAM10`; this
+    /// method exposes the pass boundary and the counter value that would feed
+    /// `CRAM20` if the caller models an operator abort.
+    pub fn red_label_run_crom0_ram_test_pass(
+        &mut self,
+        seed: u16,
+        test_counter: u16,
+    ) -> RedLabelCrom0RamTestPass {
+        let fill = self.red_label_fill_crom0_ram_test_pattern(seed);
+        let verification = self.red_label_verify_crom0_ram_test_pattern(seed);
+        let next_test_counter = if verification.failure.is_some() {
+            None
+        } else {
+            Some(test_counter.wrapping_sub(1))
+        };
+
+        RedLabelCrom0RamTestPass {
+            test_counter,
+            next_test_counter,
+            fill,
+            verification,
+        }
+    }
+
+    /// Execute the source `RAM3`-`RAM6` pattern write over `0x0000..0xC000`.
+    ///
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romf8.src#L99-L133>.
+    pub fn red_label_fill_crom0_ram_test_pattern(
+        &mut self,
+        seed: u16,
+    ) -> RedLabelCrom0RamTestPatternFill {
+        let mut next_seed = seed;
+        let mut words_written = 0;
+        let mut watchdog_reset_count = 0;
+
+        for address in (0..MAIN_CPU_RAM_SIZE).step_by(2) {
+            next_seed = red_label_crom0_ram_test_next_word(next_seed);
+            let [high, low] = next_seed.to_be_bytes();
+            self.ram[address] = high;
+            self.ram[address + 1] = low;
+            words_written += 1;
+
+            if (address + 2) & 0x00FF == 0 {
+                watchdog_reset_count += 1;
+            }
+        }
+
+        RedLabelCrom0RamTestPatternFill {
+            seed,
+            next_seed,
+            start_address: 0,
+            end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
+            words_written,
+            watchdog_reset_count,
+        }
+    }
+
+    /// Execute the source `RAM7`-`RAM17` verification pass.
+    ///
+    /// On mismatch, `failure` carries the values that the ROM leaves for
+    /// `CRAM10`: the expected random word in `Y`, the actual RAM word, and `X`
+    /// rewound to the failing word address.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romf8.src#L136-L206>.
+    pub fn red_label_verify_crom0_ram_test_pattern(
+        &self,
+        seed: u16,
+    ) -> RedLabelCrom0RamTestPatternVerification {
+        let mut next_seed = seed;
+        let mut words_verified = 0;
+        let mut watchdog_reset_count = 0;
+
+        for address in (0..MAIN_CPU_RAM_SIZE).step_by(2) {
+            next_seed = red_label_crom0_ram_test_next_word(next_seed);
+            let actual_word = u16::from_be_bytes([self.ram[address], self.ram[address + 1]]);
+            words_verified += 1;
+            if actual_word != next_seed {
+                let failing_address =
+                    u16::try_from(address).expect("RAM-test address is inside main RAM");
+                return RedLabelCrom0RamTestPatternVerification {
+                    seed,
+                    next_seed: None,
+                    start_address: 0,
+                    end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
+                    words_verified,
+                    watchdog_reset_count,
+                    failure: Some(RedLabelCrom0RamFailure {
+                        failing_address,
+                        expected_word: next_seed,
+                        actual_word,
+                    }),
+                };
+            }
+
+            if (address + 2) & 0x00FF == 0 {
+                watchdog_reset_count += 1;
+            }
+        }
+
+        RedLabelCrom0RamTestPatternVerification {
+            seed,
+            next_seed: Some(next_seed),
+            start_address: 0,
+            end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
+            words_verified,
+            watchdog_reset_count,
+            failure: None,
+        }
     }
 
     /// Transfer the visible `CRAM10` RAM-failure screen into video RAM.
@@ -2165,6 +2308,32 @@ fn red_label_ram_block_led_source(block_number: u8) -> Result<u8, String> {
     Ok(0x10 >> block_number)
 }
 
+/// Source `RAM3` / `RAM4` / `RAM5` pseudo-random word step used by `RAM2`.
+///
+/// Source: <https://github.com/mwenge/defender/blob/master/src/romf8.src#L99-L116>.
+pub fn red_label_crom0_ram_test_next_word(seed: u16) -> u16 {
+    let [mut a, mut b] = seed.to_be_bytes();
+    b = !b;
+    if b & 0x09 != 0 {
+        b = !b;
+        if b & 0x09 != 0 {
+            let carry = a & 0x01 != 0;
+            a >>= 1;
+            (b, _) = ror(b, carry);
+        } else {
+            let carry;
+            (a, carry) = ror(a, true);
+            (b, _) = ror(b, carry);
+        }
+    } else {
+        b = !b;
+        let carry;
+        (a, carry) = ror(a, true);
+        (b, _) = ror(b, carry);
+    }
+    u16::from_be_bytes([a, b])
+}
+
 fn red_label_text_cursor_advance(cursor: u16, width: u8) -> u16 {
     let [x, y] = cursor.to_be_bytes();
     u16::from_be_bytes([x.wrapping_add(width).wrapping_add(1), y])
@@ -2219,20 +2388,23 @@ mod tests {
             RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT, RED_LABEL_CROM0_RAM_FAILURE_TEXT,
             RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS,
             RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_COLOR,
-            RED_LABEL_CROM0_RAM_TEST_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER,
-            RED_LABEL_CROM0_RAM_TEST_LED, RED_LABEL_CROM0_RAM_TEST_TEXT,
-            RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_ROM_FAILURE_TEXT,
-            RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS, RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
-            RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS, RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
-            RED_LABEL_DIPFLG_CELL_OFFSET, RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS,
-            RED_LABEL_RESET_PALETTE_BYTES, RED_LABEL_SCREEN_CLEAR_END, RED_LABEL_THSTAB_START,
-            RedLabelAuditAdjustmentChange, RedLabelAuditAdjustmentDirection,
-            RedLabelAuditAdjustmentValue, RedLabelAuditCycleState, RedLabelAuditCycleStep,
-            RedLabelAuditDebounceState, RedLabelAuditDebounceStep, RedLabelAuditOperatorState,
-            RedLabelAuditOperatorStep, RedLabelCrom0BadRamBitmapTextWrite,
-            RedLabelCrom0BadRomBitmapTextWrite, RedLabelCrom0BadRomScreenWrite,
-            RedLabelCrom0RamFailure, RedLabelCrom0RamFailureTransfer,
-            RedLabelCrom0RamTestAbortStatus, RedLabelCrom0RamTestAbortTransfer,
+            RED_LABEL_CROM0_RAM_TEST_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
+            RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER, RED_LABEL_CROM0_RAM_TEST_LED,
+            RED_LABEL_CROM0_RAM_TEST_START_SEED, RED_LABEL_CROM0_RAM_TEST_TEXT,
+            RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_RAM_TEST_WORDS,
+            RED_LABEL_CROM0_ROM_FAILURE_TEXT, RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
+            RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS, RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+            RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX, RED_LABEL_DIPFLG_CELL_OFFSET,
+            RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
+            RED_LABEL_SCREEN_CLEAR_END, RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
+            RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
+            RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
+            RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
+            RedLabelCrom0BadRamBitmapTextWrite, RedLabelCrom0BadRomBitmapTextWrite,
+            RedLabelCrom0BadRomScreenWrite, RedLabelCrom0RamFailure,
+            RedLabelCrom0RamFailureTransfer, RedLabelCrom0RamTestAbortStatus,
+            RedLabelCrom0RamTestAbortTransfer, RedLabelCrom0RamTestPass,
+            RedLabelCrom0RamTestPatternFill, RedLabelCrom0RamTestPatternVerification,
             RedLabelCrom0RamTestStartTransfer, RedLabelCrom0RamTestTarget,
             RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
             RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
@@ -2241,8 +2413,8 @@ mod tests {
             WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
             cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
             defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
-            red_label_crom0_diagnostic_screen, red_label_diagnostic_led_output,
-            video_control_cocktail, video_counter_read_value,
+            red_label_crom0_diagnostic_screen, red_label_crom0_ram_test_next_word,
+            red_label_diagnostic_led_output, video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -3267,6 +3439,102 @@ mod tests {
         assert_message_glyph_at(&board, 0x4F80, 'T');
         assert_message_glyph_at(&board, 0x30DA, 'X');
         assert_message_glyph_at(&board, 0x34DA, 'I');
+    }
+
+    #[test]
+    fn main_board_runs_crom0_ram_test_pattern_pass() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        assert_eq!(
+            red_label_crom0_ram_test_next_word(RED_LABEL_CROM0_RAM_TEST_START_SEED),
+            0x8000
+        );
+        assert_eq!(red_label_crom0_ram_test_next_word(0x8000), 0xC000);
+
+        let pass = board.red_label_run_crom0_ram_test_pass(
+            RED_LABEL_CROM0_RAM_TEST_START_SEED,
+            RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER,
+        );
+
+        assert_eq!(
+            pass,
+            RedLabelCrom0RamTestPass {
+                test_counter: RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER,
+                next_test_counter: Some(RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER - 1),
+                fill: RedLabelCrom0RamTestPatternFill {
+                    seed: RED_LABEL_CROM0_RAM_TEST_START_SEED,
+                    next_seed: 0xCE5C,
+                    start_address: 0,
+                    end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
+                    words_written: RED_LABEL_CROM0_RAM_TEST_WORDS,
+                    watchdog_reset_count: 0xC0,
+                },
+                verification: RedLabelCrom0RamTestPatternVerification {
+                    seed: RED_LABEL_CROM0_RAM_TEST_START_SEED,
+                    next_seed: Some(0xCE5C),
+                    start_address: 0,
+                    end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
+                    words_verified: RED_LABEL_CROM0_RAM_TEST_WORDS,
+                    watchdog_reset_count: 0xC0,
+                    failure: None,
+                },
+            }
+        );
+        assert_eq!(
+            &board.ram()[0x0000..0x0010],
+            &[
+                0x80, 0x00, 0xC0, 0x00, 0xE0, 0x00, 0xF0, 0x00, 0xF8, 0x00, 0xFC, 0x00, 0xFE, 0x00,
+                0xFF, 0x00,
+            ]
+        );
+        assert_eq!(&board.ram()[0xBFFE..0xC000], &[0xCE, 0x5C]);
+    }
+
+    #[test]
+    fn main_board_detects_crom0_ram_test_pattern_failure() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        board.red_label_fill_crom0_ram_test_pattern(RED_LABEL_CROM0_RAM_TEST_START_SEED);
+
+        let failing_address = 0x079E;
+        let expected_word = u16::from_be_bytes([
+            board.ram()[usize::from(failing_address)],
+            board.ram()[usize::from(failing_address + 1)],
+        ]);
+        let actual_word = expected_word ^ 0x0004;
+        board
+            .write_byte(failing_address + 1, actual_word.to_be_bytes()[1])
+            .expect("corrupt RAM-test word");
+
+        let verification =
+            board.red_label_verify_crom0_ram_test_pattern(RED_LABEL_CROM0_RAM_TEST_START_SEED);
+        let failure = RedLabelCrom0RamFailure {
+            failing_address,
+            expected_word,
+            actual_word,
+        };
+
+        assert_eq!(
+            verification,
+            RedLabelCrom0RamTestPatternVerification {
+                seed: RED_LABEL_CROM0_RAM_TEST_START_SEED,
+                next_seed: None,
+                start_address: 0,
+                end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
+                words_verified: 0x03D0,
+                watchdog_reset_count: 0x07,
+                failure: Some(failure),
+            }
+        );
+
+        let transfer = board
+            .red_label_write_crom0_ram_failure(failure)
+            .expect("RAM failure screen");
+        assert_eq!(transfer.error_mask, 0x0004);
+        assert_eq!(transfer.ram_row.block_number, 2);
+        assert_eq!(transfer.ram_row.bit_number, 3);
+        assert_eq!(transfer.ram_row.ram_number_bcd, 0x23);
     }
 
     #[test]

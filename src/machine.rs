@@ -11,6 +11,7 @@ use crate::{
     board::{
         CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, cleared_main_cpu_ram,
         cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte,
+        red_label_crom0_ram_test_next_word,
     },
     input::{CabinetInput, DefenderInputPorts},
     red_label::{
@@ -2136,34 +2137,6 @@ impl RedLabelPowerUpRamFill {
     }
 }
 
-fn red_label_power_up_ram_random_word(mut a: u8, mut b: u8) -> (u8, u8) {
-    b = !b;
-    if b & 0x09 != 0 {
-        b = !b;
-        if b & 0x09 != 0 {
-            let carry = a & 0x01 != 0;
-            a >>= 1;
-            (b, _) = ror_u8(b, carry);
-        } else {
-            let carry;
-            (a, carry) = ror_u8(a, true);
-            (b, _) = ror_u8(b, carry);
-        }
-    } else {
-        b = !b;
-        let carry;
-        (a, carry) = ror_u8(a, true);
-        (b, _) = ror_u8(b, carry);
-    }
-    (a, b)
-}
-
-fn ror_u8(value: u8, carry: bool) -> (u8, bool) {
-    let next_carry = value & 0x01 != 0;
-    let rotated = (value >> 1) | if carry { 0x80 } else { 0 };
-    (rotated, next_carry)
-}
-
 fn red_label_trace_power_up_ram_fill_target(frame: u64) -> u16 {
     match frame {
         0..=67 => 0x0000,
@@ -2316,7 +2289,8 @@ impl RedLabelRuntimeMemory {
         }
 
         while fill.next_address < target_address {
-            let (a, b) = red_label_power_up_ram_random_word(fill.a, fill.b);
+            let [a, b] = red_label_crom0_ram_test_next_word(u16::from_be_bytes([fill.a, fill.b]))
+                .to_be_bytes();
             fill.a = a;
             fill.b = b;
             self.write_byte(fill.next_address, a)?;
