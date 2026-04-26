@@ -582,12 +582,14 @@ This section records drift found during the repository review on
   remaining object callbacks, live respawn orchestration beyond the `PLSTRT`
   runtime snapshot handoff,
   full trace proof for the translated `BONUS` wave-clear death-tail path,
-  source-exact live coinage/debounce and `SWTAB` cabinet-session integration
-  beyond the translated start-switch process bodies, scanline scheduling, live
-  video presentation, and full frame/cycle integration remain gaps. The live
-  coin bridge now keeps the red-label `CREDIT` byte and `CREDST` backup in
-  BCD sync so the translated start-switch credit gates can observe inserted
-  credits.
+  source-exact live coinage/debounce, source-exact boot/start-ready state,
+  no-credit quick-start removal, broader `SWTAB` cabinet-session integration,
+  scanline scheduling, live video presentation, and full frame/cycle integration
+  remain gaps. The live coin bridge now keeps the red-label `CREDIT` byte and
+  `CREDST` backup in BCD sync so the translated start-switch credit gates can
+  observe inserted credits, and credited/free-play live start buttons now scan
+  `SWTAB`, dispatch `ST1`/`ST2`, and consume credits through the translated
+  `START2` tail.
   The board harness can now read/write packed CMOS/SRAM bytes and words using
   the documented most-significant-nibble-first order, can apply the ROM-derived
   CMOS defaults to its CMOS cell array through the visible `CMINIT` clear/copy

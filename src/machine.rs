@@ -16237,8 +16237,28 @@ impl ArcadeMachine {
                 self.high_score_entry = None;
                 self.high_score_submission = None;
             }
+            RedLabelProcessDispatch::StartSwitch(start) => {
+                self.sync_live_credit_from_red_label_memory()?;
+                if matches!(
+                    start,
+                    RedLabelStartSwitch::StartedOne { .. } | RedLabelStartSwitch::StartedTwo { .. }
+                ) {
+                    self.phase = GamePhase::Playing;
+                    self.high_score_entry = None;
+                    self.high_score_submission = None;
+                }
+            }
             _ => {}
         }
+        Ok(())
+    }
+
+    fn sync_live_credit_from_red_label_memory(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let credit = self
+            .memory
+            .read_field_byte(&layout, "base_page", "CREDIT")?;
+        self.credits = bcd_byte_to_u16(credit).min(u16::from(u8::MAX)) as u8;
         Ok(())
     }
 
@@ -17200,21 +17220,86 @@ impl ArcadeMachine {
         input: CabinetInput,
         events: &mut Vec<MachineEvent>,
     ) {
+        let mut started_this_frame = false;
         if input.coin {
             self.apply_live_coin_credit()
                 .expect("embedded red-label credit layout is valid");
             events.push(MachineEvent::CreditAdded);
         }
 
-        if input.start_one && matches!(self.phase, GamePhase::Attract | GamePhase::GameOver) {
+        if (input.start_one || input.start_two)
+            && matches!(self.phase, GamePhase::Attract | GamePhase::GameOver)
+            && self
+                .should_use_translated_live_start_switch(input)
+                .expect("embedded red-label start credit layout is valid")
+        {
+            if self
+                .step_red_label_live_start_switch(input)
+                .expect("live start switch creates only translated red-label processes")
+            {
+                events.push(MachineEvent::GameStarted);
+                started_this_frame = true;
+            }
+        } else if input.start_one
+            && !input.start_two
+            && matches!(self.phase, GamePhase::Attract | GamePhase::GameOver)
+        {
             self.start_one_player_game();
             events.push(MachineEvent::GameStarted);
+            started_this_frame = true;
         }
 
-        if self.phase == GamePhase::Playing {
+        if self.phase == GamePhase::Playing && !started_this_frame {
             let switch_outcome = self.step_red_label_live_player_switches(input);
             self.step_player_controls(input, events, switch_outcome);
         }
+    }
+
+    fn should_use_translated_live_start_switch(&self, input: CabinetInput) -> Result<bool, String> {
+        if input.start_two {
+            return Ok(true);
+        }
+
+        let layout = red_label_ram_layout()?;
+        let credit = self
+            .memory
+            .read_field_byte(&layout, "base_page", "CREDIT")?;
+        let free_play = self.memory.read_cmos_byte_by_symbol("FREEPL")?;
+        Ok(credit != 0 || free_play == 1)
+    }
+
+    fn step_red_label_live_start_switch(&mut self, input: CabinetInput) -> Result<bool, String> {
+        self.prepare_red_label_live_start_state()?;
+        let mut start_input = CabinetInput::NONE;
+        start_input.start_one = input.start_one;
+        start_input.start_two = input.start_two;
+        self.memory
+            .scan_translated_player_switches(start_input.defender_input_ports())?;
+        self.memory.dispatch_switch_processes()?;
+
+        let Some(dispatch) = self.step_red_label_translated_process()? else {
+            return Ok(false);
+        };
+        Ok(matches!(
+            dispatch,
+            RedLabelProcessDispatch::StartSwitch(
+                RedLabelStartSwitch::StartedOne { .. } | RedLabelStartSwitch::StartedTwo { .. }
+            )
+        ))
+    }
+
+    fn prepare_red_label_live_start_state(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        self.memory
+            .write_field_byte(&layout, "base_page", "PWRFLG", 1)?;
+        let status = self
+            .memory
+            .read_field_byte(&layout, "base_page", "STATUS")?;
+        if status & 0x80 == 0 {
+            self.memory
+                .write_field_byte(&layout, "base_page", "STATUS", 0xFF)?;
+        }
+        Ok(())
     }
 
     fn apply_live_coin_credit(&mut self) -> Result<(), String> {
@@ -18211,6 +18296,73 @@ mod tests {
             output
                 .events()
                 .any(|event| event == MachineEvent::GameStarted)
+        );
+    }
+
+    #[test]
+    fn credited_start_button_runs_translated_st1_path() {
+        let mut machine = ArcadeMachine::new();
+        let output = machine.step(CabinetInput {
+            coin: true,
+            start_one: true,
+            ..CabinetInput::NONE
+        });
+        let events = output.events().collect::<Vec<_>>();
+
+        assert_eq!(output.snapshot.phase, GamePhase::Playing);
+        assert_eq!(output.snapshot.credits, 0);
+        assert!(events.contains(&MachineEvent::CreditAdded));
+        assert!(events.contains(&MachineEvent::GameStarted));
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF0, 0xF0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0B7..0xA0B8),
+            Some(&[0x01][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[0x7F][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA08C..0xA08D),
+            Some(&[0x01][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA07B..0xA07D),
+            Some(&[0x20, 0x00][..])
+        );
+        let player_start_address = red_label_routine_address("PLSTRT")
+            .expect("PLSTRT address")
+            .to_be_bytes();
+        assert_eq!(
+            machine.red_label_ram_range(0xAAD6..0xAAD8),
+            Some(&player_start_address[..])
+        );
+    }
+
+    #[test]
+    fn translated_two_player_start_waits_for_second_credit() {
+        let mut machine = ArcadeMachine::new();
+        let output = machine.step(CabinetInput {
+            coin: true,
+            start_two: true,
+            ..CabinetInput::NONE
+        });
+        let events = output.events().collect::<Vec<_>>();
+
+        assert_eq!(output.snapshot.phase, GamePhase::Attract);
+        assert_eq!(output.snapshot.credits, 1);
+        assert!(events.contains(&MachineEvent::CreditAdded));
+        assert!(!events.contains(&MachineEvent::GameStarted));
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x01][..])
         );
     }
 

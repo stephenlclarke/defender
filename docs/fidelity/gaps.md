@@ -366,7 +366,10 @@ This file records behavior that must not be guessed in arcade-core code.
   `COLR` / `FLPUP` / `CBOMB` / `TIECOL` support-process resumes from `PADDR`,
   including guarded `SBMBX2`/`SUCIDE`.
   Live coin input now increments the red-label `CREDIT` byte as BCD and mirrors
-  `CREDST`, but source-exact coinage/debounce is still not translated.
+  `CREDST`, and credited/free-play live start buttons now enter through
+  `SWTAB`/`ST1`/`ST2`. Source-exact coinage/debounce, source-exact
+  boot/start-ready state, and the no-credit one-player quick-start shortcut are
+  still not translated.
   Generic/untranslated process bodies, broader suicide resume semantics, the
   remaining `SWTAB` routine bodies and no-process input effects, exact
   frame/cycle integration, and golden-trace equivalence are not translated.

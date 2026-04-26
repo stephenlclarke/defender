@@ -351,15 +351,16 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   including status/credit gates, start sounds, one/two `START` calls, and the
   final `DIE` process cleanup. Scanline scheduling, remaining `PLRES` swarmer
   object spawning, and live video presentation remain gaps.
-  Live fire, smart bomb,
-  hyperspace, and reverse now enter through an asset-backed
-  red-label `SWTAB`, `SSCAN` switch history, `SWPROC` queue, `SWP` status gate,
-  and translated `LFIRE` / `SBOMB` / `HYPER` / `REV` / `ST1` / `ST2`
-  scheduler paths. The scanner records all eight IN0 switch bits and queues
-  every translated source switch process. Live coin input now increments the
-  red-label `CREDIT` byte as BCD and mirrors the packed backup through
-  `CREDST`, giving the translated `ST1`/`ST2` credit gates source-visible
-  state to consume. `REV` sets
+  Live fire, smart bomb, hyperspace, reverse, and credited/free-play start
+  buttons now enter through an asset-backed red-label `SWTAB`, `SSCAN` switch
+  history, `SWPROC` queue, `SWP` status gate, and translated `LFIRE` / `SBOMB`
+  / `HYPER` / `REV` / `ST1` / `ST2` scheduler paths. The scanner records all
+  eight IN0 switch bits and queues every translated source switch process. Live
+  coin input now increments the red-label `CREDIT` byte as BCD and mirrors the
+  packed backup through `CREDST`, giving the translated `ST1`/`ST2` credit
+  gates source-visible state to consume. The no-credit one-player quick-start
+  remains a compatibility shortcut until source-exact boot and coinage own the
+  live session. `REV` sets
   `REVFLG`, negates `PLADIR` into `NPLAD`, debounces `PIA21`, clears the flag,
   and returns the process to the free list.
 - ROM files are optional verification inputs only. The deployed runtime remains
