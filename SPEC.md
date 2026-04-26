@@ -580,13 +580,14 @@ This section records drift found during the repository review on
   Williams VA11/COUNT240 lines can drive PIA1 CB1/CA1, and the resulting PIA
   IRQ line state is visible to the deterministic harness. The board can expose
   native visible palette-index and RGBA frames from its video RAM and palette
-  RAM, but CPU interrupt scheduling remains a gap. LED segment side effects and
-  sample generation also remain gaps.
+  RAM, and can record source-shaped diagnostic LED output bytes and `FLASHL`
+  events. CPU interrupt scheduling, physical lamp timing, and sample generation
+  remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated `AUDITG` live text transfer/screen
   erasure/post-`PWRUP` wiring or live `CROM0` diagnostic video writes,
-  advance-switch loop, LED hardware side effects, and RAM/CMOS/color/sound test
+  advance-switch loop, physical lamp timing, and RAM/CMOS/color/sound test
   execution after the now-identified `PWRUP` action decision beyond the modeled
   ROM-stage outcome, CMOS persistence, screen scanline scheduler, watchdog
   timing/reset side effects, rendering timing side effects, decoder PROM

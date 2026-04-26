@@ -140,13 +140,13 @@ This file records behavior that must not be guessed in arcade-core code.
   report the `romc0.src` target reached by each `PWRUP` action decision and
   step/read/format/mutate the source `AUDITG` / `MSGAUD` table rows and its
   post-display debounce countdown as one deterministic cycle, but CPU IRQ
-  scheduling, LED segment side effects, exact Williams power-on RAM contents,
-  `AUDITG` live text transfer/screen erasure/post-`PWRUP` wiring or live
-  `CROM0` diagnostic video writes, advance-switch loop, LED hardware side
-  effects, and RAM/CMOS/color/sound test execution after that decision beyond
-  the modeled ROM-stage outcome, CMOS persistence, screen scanline scheduling,
-  watchdog timing/reset side effects, palette/rendering timing side effects,
-  decoder PROM behavior, and DAC sample generation are not modeled.
+  scheduling, exact Williams power-on RAM contents, `AUDITG` live text
+  transfer/screen erasure/post-`PWRUP` wiring or live `CROM0` diagnostic video
+  writes, advance-switch loop, physical lamp timing, and RAM/CMOS/color/sound
+  test execution after that decision beyond the modeled ROM-stage outcome, CMOS
+  persistence, screen scanline scheduling, watchdog timing/reset side effects,
+  palette/rendering timing side effects, decoder PROM behavior, and DAC sample
+  generation are not modeled.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core
   scaffold. It initializes `PINIT`/`OINIT`-style process, super-process, and
   object free lists, sets `CRPROC` to the active-process head, clears active

@@ -17,9 +17,9 @@
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, and can route the CMOS-visible
 //! `romc0.src` power-up branch. CMOS persistence, `AUDITG` live diagnostic text
-//! transfer/full-loop integration, live `CROM0` diagnostic video/LED/later-test
-//! execution beyond the modeled ROM-stage outcome, and full video timing remain
-//! explicit fidelity gaps.
+//! transfer/full-loop integration, live `CROM0` diagnostic video/later-test
+//! execution and physical lamp timing beyond the modeled ROM-stage LED output,
+//! and full video timing remain explicit fidelity gaps.
 
 use crate::{
     input::{
@@ -31,7 +31,7 @@ use crate::{
         RedLabelAuditAdjustment, RedLabelCmosDefault, RedLabelCmosLayoutEntry,
         RedLabelRamLayoutEntry, pack_sram_byte, pack_sram_word, unpack_sram_byte, unpack_sram_word,
     },
-    rom::RedLabelRomImages,
+    rom::{RedLabelCrom0RomStage, RedLabelRomImages},
     sound::SoundCommandLatch,
     video::{
         RenderedImage, defender_visible_palette_index, render_defender_visible_palette_indices,
@@ -72,6 +72,8 @@ pub const RED_LABEL_CLRALL_PACKED_BYTE_WRITES: usize = CMOS_RAM_SIZE / 2;
 pub const RED_LABEL_RESET_PALETTE_BYTES: [u8; PALETTE_RAM_SIZE] = [
     0xC0, 0x87, 0x5F, 0x43, 0x2F, 0x21, 0x17, 0x10, 0x0B, 0x07, 0x04, 0x02, 0x01, 0x00, 0x00, 0x00,
 ];
+pub const RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS: u8 = 2;
+pub const RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS: u16 = 500;
 pub const WATCHDOG_RESET_BYTE: u8 = 0x39;
 pub const VIDEO_COUNTER_CLAMPED_VALUE: u8 = 0xFC;
 pub const VIDEO_COUNTER_CLAMP_VPOS: u16 = 0x100;
@@ -149,6 +151,20 @@ pub enum RedLabelPowerUpDispatchTarget {
     ComprehensiveRomTest,
     ResetHighScoreTables,
     ClearAudits,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelDiagnosticLedOutput {
+    pub source_value: u8,
+    pub pia1_port_a: u8,
+    pub pia1_port_b: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelDiagnosticLedFlash {
+    pub source_value: u8,
+    pub repetitions: u8,
+    pub delay_ms: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -449,6 +465,8 @@ pub struct DefenderMainBoard<'a> {
     watchdog_reset_count: u64,
     video_counter_vpos: u16,
     last_sound_command_latch: Option<SoundCommandLatch>,
+    diagnostic_led_output: RedLabelDiagnosticLedOutput,
+    diagnostic_led_flashes: Vec<RedLabelDiagnosticLedFlash>,
 }
 
 impl<'a> DefenderMainBoard<'a> {
@@ -465,6 +483,8 @@ impl<'a> DefenderMainBoard<'a> {
             watchdog_reset_count: 0,
             video_counter_vpos: 0,
             last_sound_command_latch: None,
+            diagnostic_led_output: red_label_diagnostic_led_output(0),
+            diagnostic_led_flashes: Vec::new(),
         }
     }
 
@@ -513,6 +533,45 @@ impl<'a> DefenderMainBoard<'a> {
 
     pub fn visible_rgba_image(&self) -> Option<RenderedImage> {
         render_defender_visible_rgba(self.ram.as_slice(), &self.palette_ram)
+    }
+
+    pub fn diagnostic_led_output(&self) -> RedLabelDiagnosticLedOutput {
+        self.diagnostic_led_output
+    }
+
+    pub fn diagnostic_led_flashes(&self) -> &[RedLabelDiagnosticLedFlash] {
+        &self.diagnostic_led_flashes
+    }
+
+    pub fn red_label_set_diagnostic_leds(
+        &mut self,
+        source_value: u8,
+    ) -> RedLabelDiagnosticLedOutput {
+        let output = red_label_diagnostic_led_output(source_value);
+        self.diagnostic_led_output = output;
+        output
+    }
+
+    pub fn red_label_flash_diagnostic_leds(&mut self, source_value: u8) {
+        self.diagnostic_led_flashes
+            .push(RedLabelDiagnosticLedFlash {
+                source_value,
+                repetitions: RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
+                delay_ms: RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
+            });
+        self.red_label_set_diagnostic_leds(0);
+    }
+
+    pub fn red_label_apply_crom0_rom_stage(&mut self, stage: &RedLabelCrom0RomStage) {
+        if let Some(led) = stage.initial_led {
+            self.red_label_set_diagnostic_leds(led);
+        }
+        if let Some(led) = stage.flash_led {
+            self.red_label_flash_diagnostic_leds(led);
+        }
+        if let Some(led) = stage.final_led {
+            self.red_label_set_diagnostic_leds(led);
+        }
     }
 
     pub fn cmos_ram(&self) -> &CmosRam {
@@ -1350,6 +1409,33 @@ fn banked_write_target(address: u16, bank_select: u8) -> MainCpuWriteTarget {
     }
 }
 
+pub fn red_label_diagnostic_led_output(source_value: u8) -> RedLabelDiagnosticLedOutput {
+    let (mut pia1_port_a, mut carry) = lsr(source_value);
+    for _ in 0..3 {
+        (pia1_port_a, carry) = ror(pia1_port_a, carry);
+    }
+    if pia1_port_a & 0x80 == 0 {
+        pia1_port_a = pia1_port_a.wrapping_add(1);
+    }
+    for _ in 0..2 {
+        (pia1_port_a, carry) = ror(pia1_port_a, carry);
+    }
+
+    RedLabelDiagnosticLedOutput {
+        source_value,
+        pia1_port_a,
+        pia1_port_b: pia1_port_a.wrapping_shl(3) | 0x3F,
+    }
+}
+
+fn lsr(value: u8) -> (u8, bool) {
+    (value >> 1, value & 1 != 0)
+}
+
+fn ror(value: u8, carry: bool) -> (u8, bool) {
+    ((value >> 1) | if carry { 0x80 } else { 0 }, value & 1 != 0)
+}
+
 fn mirrored_offset(address: u16, start: u16, end: u16, mirror_mask: u16) -> Option<u16> {
     let canonical = address & !mirror_mask;
     if (start..=end).contains(&canonical) {
@@ -1370,15 +1456,17 @@ mod tests {
             RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS, RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS,
             RED_LABEL_CLRALL_PACKED_BYTE_WRITES, RED_LABEL_CLRAUD_PACKED_BYTE_WRITES,
             RED_LABEL_CMOSCK_CELL_OFFSET, RED_LABEL_CRHSTD_CELL_OFFSET,
+            RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS, RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
             RED_LABEL_DIPFLG_CELL_OFFSET, RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS,
             RED_LABEL_RESET_PALETTE_BYTES, RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
             RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
             RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
             RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
-            RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE,
-            cmos_4bit_write_value, cmos_sram_clear_packed_bytes, cmos_sram_read_byte,
-            cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word, defender_io_window,
-            is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            RedLabelDiagnosticLedFlash, RedLabelDiagnosticLedOutput, RedLabelPowerUpAction,
+            RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
+            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
+            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
+            main_cpu_read_target, main_cpu_write_target, red_label_diagnostic_led_output,
             video_control_cocktail, video_counter_read_value,
         },
         input::{
@@ -1392,6 +1480,7 @@ mod tests {
             red_label_ram_layout,
         },
         rom::{
+            RedLabelCrom0RomStage, RedLabelCrom0RomStageStatus, RedLabelCrom0RomStageTarget,
             RedLabelRomImages, RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile,
             VerifiedRomSet,
         },
@@ -1890,6 +1979,105 @@ mod tests {
         assert_eq!(board.pia2().control_a(), 0x04);
         assert_eq!(board.pia2().control_b(), 0x04);
         assert_eq!(board.palette_ram(), &RED_LABEL_RESET_PALETTE_BYTES);
+    }
+
+    #[test]
+    fn main_board_diagnostic_led_output_matches_source_leds_rotation() {
+        assert_eq!(
+            red_label_diagnostic_led_output(0x08),
+            RedLabelDiagnosticLedOutput {
+                source_value: 0x08,
+                pia1_port_a: 0xC0,
+                pia1_port_b: 0x3F,
+            }
+        );
+        assert_eq!(
+            red_label_diagnostic_led_output(0x04),
+            RedLabelDiagnosticLedOutput {
+                source_value: 0x04,
+                pia1_port_a: 0x20,
+                pia1_port_b: 0x3F,
+            }
+        );
+        assert_eq!(
+            red_label_diagnostic_led_output(0x02),
+            RedLabelDiagnosticLedOutput {
+                source_value: 0x02,
+                pia1_port_a: 0x90,
+                pia1_port_b: 0xBF,
+            }
+        );
+        assert_eq!(
+            red_label_diagnostic_led_output(0x01),
+            RedLabelDiagnosticLedOutput {
+                source_value: 0x01,
+                pia1_port_a: 0x88,
+                pia1_port_b: 0x7F,
+            }
+        );
+        assert_eq!(
+            red_label_diagnostic_led_output(0x00),
+            RedLabelDiagnosticLedOutput {
+                source_value: 0x00,
+                pia1_port_a: 0x80,
+                pia1_port_b: 0x3F,
+            }
+        );
+    }
+
+    #[test]
+    fn main_board_applies_crom0_rom_stage_steady_leds() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let stage = RedLabelCrom0RomStage {
+            status: RedLabelCrom0RomStageStatus::RomFailure,
+            text_color: None,
+            headline_address: None,
+            initial_led: Some(0x08),
+            final_led: Some(0x02),
+            flash_led: None,
+            bad_rom_displays: Vec::new(),
+            target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
+        };
+
+        board.red_label_apply_crom0_rom_stage(&stage);
+
+        assert_eq!(
+            board.diagnostic_led_output(),
+            red_label_diagnostic_led_output(0x02)
+        );
+        assert!(board.diagnostic_led_flashes().is_empty());
+    }
+
+    #[test]
+    fn main_board_records_crom0_rom_stage_flash_leds() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let stage = RedLabelCrom0RomStage {
+            status: RedLabelCrom0RomStageStatus::AllRomsOk,
+            text_color: None,
+            headline_address: None,
+            initial_led: None,
+            final_led: None,
+            flash_led: Some(0x08),
+            bad_rom_displays: Vec::new(),
+            target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
+        };
+
+        board.red_label_apply_crom0_rom_stage(&stage);
+
+        assert_eq!(
+            board.diagnostic_led_flashes(),
+            &[RedLabelDiagnosticLedFlash {
+                source_value: 0x08,
+                repetitions: RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
+                delay_ms: RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
+            }]
+        );
+        assert_eq!(
+            board.diagnostic_led_output(),
+            red_label_diagnostic_led_output(0)
+        );
     }
 
     #[test]
