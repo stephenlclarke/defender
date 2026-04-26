@@ -174,8 +174,9 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   checksum/stage reports, shell image bytes, object-picture descriptors, object
   image bytes, diagnostic LED output behavior, CROM0 diagnostic screen text
   transfer including operator instructions, RAM-test start/failure/no-error
-  visible outcomes, the RAM2 pattern fill/verify pass, pass-boundary loop
-  dispatch, CMOS RAM-test write/verify loop and visible outcomes, the CROM0
+  visible outcomes, the RAM2 pattern fill/verify pass with page-boundary
+  operator-poll metadata, pass-boundary loop dispatch, CMOS RAM-test
+  write/verify loop and visible outcomes, the CROM0
   color-RAM diagnostic heading/bars/palette loop, CROM0 audio-test
   heading/sound-pulse/skip-table behavior, CROM0 switch-test
   heading/display-table/PIA-scan behavior, CROM0 monitor-test
@@ -402,8 +403,9 @@ yet; current implementation status is tracked in `SPEC.md` and
   reports plus the ROM-stage manual/auto
   outcome, diagnostic LED output bytes, CROM0 diagnostic text/palette intent and
   bitmap headline/bad-ROM-row/operator-instruction transfer plus advance gates,
-  RAM-test start/failure/no-error visible setup, RAM2 pattern fill/verify pass,
-  pass-boundary loop dispatch, CMOS RAM-test write/verify loop and visible
+  RAM-test start/failure/no-error visible setup, RAM2 pattern fill/verify pass
+  with page-boundary operator-poll metadata, pass-boundary loop dispatch, CMOS
+  RAM-test write/verify loop and visible
   outcomes, CROM0 color-RAM diagnostic heading/bars/palette-loop behavior,
   CROM0 audio-test heading/sound-pulse/skip-table behavior, CROM0 switch-test
   heading/display-table/PIA-scan behavior, CROM0 monitor-test

@@ -217,6 +217,9 @@ pub const RED_LABEL_CROM0_RAM_TEST_START_SEED: u16 = 0x0000;
 pub const RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER: u16 = 0x000A;
 pub const RED_LABEL_CROM0_RAM_TEST_END_ADDRESS: u16 = MAIN_CPU_RAM_SIZE as u16;
 pub const RED_LABEL_CROM0_RAM_TEST_WORDS: usize = MAIN_CPU_RAM_SIZE / 2;
+pub const RED_LABEL_CROM0_RAM_TEST_OPERATOR_POLL_ADDRESS: u16 = 0xCC00;
+pub const RED_LABEL_CROM0_RAM_TEST_OPERATOR_ABORT_INPUT_MASK: u8 =
+    DEFENDER_IN2_ADVANCE | DEFENDER_IN2_AUTO_UP_MANUAL_DOWN;
 pub const RED_LABEL_SCREEN_CLEAR_END: u16 = 0x9C00;
 pub const WATCHDOG_RESET_BYTE: u8 = 0x39;
 pub const VIDEO_COUNTER_CLAMPED_VALUE: u8 = 0xFC;
@@ -468,6 +471,13 @@ pub struct RedLabelCrom0RamTestAbortTransfer {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0RamTestOperatorPolling {
+    pub port_address: u16,
+    pub abort_input_mask: u8,
+    pub page_boundaries_checked: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RedLabelCrom0RamTestPatternFill {
     pub seed: u16,
     pub next_seed: u16,
@@ -475,6 +485,7 @@ pub struct RedLabelCrom0RamTestPatternFill {
     pub end_address: u16,
     pub words_written: usize,
     pub watchdog_reset_count: usize,
+    pub operator_polling: RedLabelCrom0RamTestOperatorPolling,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -485,6 +496,7 @@ pub struct RedLabelCrom0RamTestPatternVerification {
     pub end_address: u16,
     pub words_verified: usize,
     pub watchdog_reset_count: usize,
+    pub operator_polling: RedLabelCrom0RamTestOperatorPolling,
     pub failure: Option<RedLabelCrom0RamFailure>,
 }
 
@@ -1538,8 +1550,8 @@ impl<'a> DefenderMainBoard<'a> {
     /// Run one pass and route the CROM0 RAM-test loop at the pass boundary.
     ///
     /// The ROM polls the advance/auto switch at watchdog page boundaries inside
-    /// `RAM2`; this pass-level helper preserves the same dispatch targets while
-    /// leaving sub-pass polling cadence as a physical timing concern.
+    /// `RAM2`; the fill/verification transfers report those page-boundary poll
+    /// counts while this helper preserves the same dispatch targets.
     pub fn red_label_step_crom0_ram_test_loop(
         &mut self,
         seed: u16,
@@ -1580,6 +1592,7 @@ impl<'a> DefenderMainBoard<'a> {
             end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
             words_written,
             watchdog_reset_count,
+            operator_polling: red_label_crom0_ram_test_operator_polling(watchdog_reset_count),
         }
     }
 
@@ -1611,6 +1624,9 @@ impl<'a> DefenderMainBoard<'a> {
                     end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
                     words_verified,
                     watchdog_reset_count,
+                    operator_polling: red_label_crom0_ram_test_operator_polling(
+                        watchdog_reset_count,
+                    ),
                     failure: Some(RedLabelCrom0RamFailure {
                         failing_address,
                         expected_word: next_seed,
@@ -1631,6 +1647,7 @@ impl<'a> DefenderMainBoard<'a> {
             end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
             words_verified,
             watchdog_reset_count,
+            operator_polling: red_label_crom0_ram_test_operator_polling(watchdog_reset_count),
             failure: None,
         }
     }
@@ -4728,6 +4745,16 @@ fn red_label_crom0_ram_test_loop_step(
     }
 }
 
+fn red_label_crom0_ram_test_operator_polling(
+    page_boundaries_checked: usize,
+) -> RedLabelCrom0RamTestOperatorPolling {
+    RedLabelCrom0RamTestOperatorPolling {
+        port_address: RED_LABEL_CROM0_RAM_TEST_OPERATOR_POLL_ADDRESS,
+        abort_input_mask: RED_LABEL_CROM0_RAM_TEST_OPERATOR_ABORT_INPUT_MASK,
+        page_boundaries_checked,
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RedLabelMessageTextLayout {
     top_left: u16,
@@ -4960,10 +4987,12 @@ mod tests {
             RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_COLOR,
             RED_LABEL_CROM0_RAM_TEST_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
             RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER, RED_LABEL_CROM0_RAM_TEST_LED,
-            RED_LABEL_CROM0_RAM_TEST_START_SEED, RED_LABEL_CROM0_RAM_TEST_TEXT,
-            RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_RAM_TEST_WORDS,
-            RED_LABEL_CROM0_ROM_FAILURE_TEXT, RED_LABEL_CROM0_SWITCH_CLOSURE_SOUND_NUMBER,
-            RED_LABEL_CROM0_SWITCH_DISPLAY_EMPTY, RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS,
+            RED_LABEL_CROM0_RAM_TEST_OPERATOR_ABORT_INPUT_MASK,
+            RED_LABEL_CROM0_RAM_TEST_OPERATOR_POLL_ADDRESS, RED_LABEL_CROM0_RAM_TEST_START_SEED,
+            RED_LABEL_CROM0_RAM_TEST_TEXT, RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS,
+            RED_LABEL_CROM0_RAM_TEST_WORDS, RED_LABEL_CROM0_ROM_FAILURE_TEXT,
+            RED_LABEL_CROM0_SWITCH_CLOSURE_SOUND_NUMBER, RED_LABEL_CROM0_SWITCH_DISPLAY_EMPTY,
+            RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS,
             RED_LABEL_CROM0_SWITCH_DISPLAY_TABLE_SIZE, RED_LABEL_CROM0_SWITCH_ERASE_HEIGHT,
             RED_LABEL_CROM0_SWITCH_ERASE_WIDTH, RED_LABEL_CROM0_SWITCH_TEST_TEXT,
             RED_LABEL_CROM0_SWITCH_TEST_TEXT_ADDRESS, RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
@@ -4994,22 +5023,22 @@ mod tests {
             RedLabelCrom0RamFailure, RedLabelCrom0RamFailureTransfer,
             RedLabelCrom0RamTestAbortStatus, RedLabelCrom0RamTestAbortTransfer,
             RedLabelCrom0RamTestLoopStatus, RedLabelCrom0RamTestLoopTarget,
-            RedLabelCrom0RamTestPass, RedLabelCrom0RamTestPatternFill,
-            RedLabelCrom0RamTestPatternVerification, RedLabelCrom0RamTestStartTransfer,
-            RedLabelCrom0RamTestTarget, RedLabelCrom0SwitchDisplayBlockErase,
-            RedLabelCrom0SwitchOpened, RedLabelCrom0SwitchPanel, RedLabelCrom0SwitchPortScan,
-            RedLabelCrom0SwitchTestChange, RedLabelCrom0SwitchTestState,
-            RedLabelCrom0SwitchTestTarget, RedLabelDiagnosticAsciiTextWrite,
-            RedLabelDiagnosticBcdNumberWrite, RedLabelDiagnosticBitmapTextWrite,
-            RedLabelDiagnosticInstructionBitmapTextWrite, RedLabelDiagnosticInstructionWrite,
-            RedLabelDiagnosticLedFlash, RedLabelDiagnosticLedOutput,
-            RedLabelDiagnosticPaletteWrite, RedLabelDiagnosticTextWrite, RedLabelPowerUpAction,
-            RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
-            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
-            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
-            main_cpu_read_target, main_cpu_write_target, red_label_crom0_diagnostic_screen,
-            red_label_crom0_ram_test_next_word, red_label_diagnostic_led_output,
-            video_control_cocktail, video_counter_read_value,
+            RedLabelCrom0RamTestOperatorPolling, RedLabelCrom0RamTestPass,
+            RedLabelCrom0RamTestPatternFill, RedLabelCrom0RamTestPatternVerification,
+            RedLabelCrom0RamTestStartTransfer, RedLabelCrom0RamTestTarget,
+            RedLabelCrom0SwitchDisplayBlockErase, RedLabelCrom0SwitchOpened,
+            RedLabelCrom0SwitchPanel, RedLabelCrom0SwitchPortScan, RedLabelCrom0SwitchTestChange,
+            RedLabelCrom0SwitchTestState, RedLabelCrom0SwitchTestTarget,
+            RedLabelDiagnosticAsciiTextWrite, RedLabelDiagnosticBcdNumberWrite,
+            RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
+            RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
+            RedLabelDiagnosticLedOutput, RedLabelDiagnosticPaletteWrite,
+            RedLabelDiagnosticTextWrite, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
+            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
+            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
+            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            red_label_crom0_diagnostic_screen, red_label_crom0_ram_test_next_word,
+            red_label_diagnostic_led_output, video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -5130,6 +5159,16 @@ mod tests {
             glyph.height,
             &glyph.bytes,
         );
+    }
+
+    fn ram_test_operator_polling(
+        page_boundaries_checked: usize,
+    ) -> RedLabelCrom0RamTestOperatorPolling {
+        RedLabelCrom0RamTestOperatorPolling {
+            port_address: RED_LABEL_CROM0_RAM_TEST_OPERATOR_POLL_ADDRESS,
+            abort_input_mask: RED_LABEL_CROM0_RAM_TEST_OPERATOR_ABORT_INPUT_MASK,
+            page_boundaries_checked,
+        }
     }
 
     fn assert_score_digit_at(board: &DefenderMainBoard<'_>, screen_address: u16, digit: u8) {
@@ -6066,6 +6105,7 @@ mod tests {
                     end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
                     words_written: RED_LABEL_CROM0_RAM_TEST_WORDS,
                     watchdog_reset_count: 0xC0,
+                    operator_polling: ram_test_operator_polling(0xC0),
                 },
                 verification: RedLabelCrom0RamTestPatternVerification {
                     seed: RED_LABEL_CROM0_RAM_TEST_START_SEED,
@@ -6074,6 +6114,7 @@ mod tests {
                     end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
                     words_verified: RED_LABEL_CROM0_RAM_TEST_WORDS,
                     watchdog_reset_count: 0xC0,
+                    operator_polling: ram_test_operator_polling(0xC0),
                     failure: None,
                 },
             }
@@ -6157,6 +6198,7 @@ mod tests {
                 end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
                 words_written: RED_LABEL_CROM0_RAM_TEST_WORDS,
                 watchdog_reset_count: 0xC0,
+                operator_polling: ram_test_operator_polling(0xC0),
             },
             verification: RedLabelCrom0RamTestPatternVerification {
                 seed: RED_LABEL_CROM0_RAM_TEST_START_SEED,
@@ -6165,6 +6207,7 @@ mod tests {
                 end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
                 words_verified: 0x03D0,
                 watchdog_reset_count: 0x07,
+                operator_polling: ram_test_operator_polling(0x07),
                 failure: Some(failure),
             },
         };
@@ -6216,6 +6259,7 @@ mod tests {
                 end_address: RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
                 words_verified: 0x03D0,
                 watchdog_reset_count: 0x07,
+                operator_polling: ram_test_operator_polling(0x07),
                 failure: Some(failure),
             }
         );

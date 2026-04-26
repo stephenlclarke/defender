@@ -193,8 +193,9 @@ against fixtures:
   manual/auto ROM-stage outcome for success/failure display intent, `ADVSW` /
   `NEXTST` gate sequence, message-ROM bitmap text transfer including CMOS text
   controls, RAM-test start/failure/no-error visible setup, the RAM2 pattern
-  fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test write/verify
-  loop plus visible outcomes, and the CROM0 color-RAM diagnostic
+  fill/verify pass with page-boundary operator-poll metadata, pass-boundary loop
+  dispatch, and CMOS RAM-test write/verify loop plus visible outcomes, and the
+  CROM0 color-RAM diagnostic
   heading/bars/palette loop plus audio-test sound-pulse/skip-table behavior,
   switch-test display-table/PIA-scan behavior, monitor-test
   crosshatch/RGB-field/color-bar pattern behavior, and the monitor-test
@@ -599,10 +600,11 @@ This section records drift found during the repository review on
   headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
   gate metadata. It can also render the source-visible RAM-test start,
   failure, and no-error screens reached from the CROM0 handoff, execute the
-  source RAM2 pattern fill/verify pass, route pass-boundary
-  continue/failure/operator-abort loop targets, and run the CMOS RAM-test
-  backup/write/verify/restore loop with OK/failure/operator-abort routing and
-  source text-control visible outcomes. It can also transfer the CROM0
+  source RAM2 pattern fill/verify pass with page-boundary operator-poll
+  metadata, route pass-boundary continue/failure/operator-abort loop targets,
+  and run the CMOS RAM-test backup/write/verify/restore loop with
+  OK/failure/operator-abort routing and source text-control visible outcomes. It
+  can also transfer the CROM0
   color-RAM test heading/instructions, draw the source `RAMBAR` vertical bars,
   step the `COLRMT` palette loop, model the CROM0 audio-test heading,
   `PLAYB` pulse, skip-sound table, BCD sound-number display, CROM0
@@ -613,11 +615,10 @@ This section records drift found during the repository review on
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, live post-`PWRUP` `AUDITG` frame scheduling,
-  physical advance-switch timing, physical lamp timing,
-  sub-pass/page-boundary RAM-test operator polling, CMOS persistence, screen
-  scanline scheduler, watchdog timing/reset side effects, rendering timing side
-  effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or
-  translated `VSNDRM1.SRC` routines.
+  physical advance-switch timing, physical lamp timing, CMOS persistence,
+  screen scanline scheduler, watchdog timing/reset side effects, rendering
+  timing side effects, decoder PROM behavior, DAC sample output, CPU IRQ
+  scheduling, or translated `VSNDRM1.SRC` routines.
 
 ### Player And Controls
 

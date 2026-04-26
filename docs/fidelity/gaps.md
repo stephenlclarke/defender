@@ -73,9 +73,10 @@ This file records behavior that must not be guessed in arcade-core code.
   the manual/auto success/failure display intent, `ADVSW` / `NEXTST` gate
   sequence, message-ROM bitmap text transfer including CMOS text controls,
   RAM-test start/failure/no-error visible setup, the RAM2 pattern fill/verify
-  pass, pass-boundary loop dispatch, and CMOS RAM-test write/verify loop plus
-  visible outcomes, plus the CROM0 color-RAM diagnostic heading/bars/palette
-  loop, audio-test sound-pulse/skip-table behavior, switch-test
+  pass with page-boundary operator-poll metadata, pass-boundary loop dispatch,
+  and CMOS RAM-test write/verify loop plus visible outcomes, plus the CROM0
+  color-RAM diagnostic heading/bars/palette loop, audio-test
+  sound-pulse/skip-table behavior, switch-test
   display-table/PIA-scan behavior, and monitor-test
   crosshatch/RGB-field/color-bar pattern behavior.
   The MAME-documented main-board and sound-board memory maps are
@@ -152,8 +153,7 @@ This file records behavior that must not be guessed in arcade-core code.
   table rows and its post-display debounce countdown as one deterministic
   cycle, but CPU IRQ scheduling, exact Williams power-on RAM contents, live
   post-`PWRUP` `AUDITG` frame scheduling, physical advance-switch timing,
-  physical lamp timing, sub-pass/page-boundary RAM-test operator polling,
-  CMOS persistence,
+  physical lamp timing, CMOS persistence,
   screen scanline scheduling, watchdog timing/reset side effects,
   palette/rendering timing side effects, decoder PROM behavior, and DAC sample
   generation are not modeled.
@@ -373,15 +373,15 @@ This file records behavior that must not be guessed in arcade-core code.
   diagnostic text/palette intent, bitmap
   headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
   gate metadata plus the RAM-test start/failure/no-error visible setup, RAM2
-  pattern fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test
-  write/verify loop plus visible outcomes and the CROM0 color-RAM diagnostic
-  heading/bars/palette loop plus audio-test sound-pulse/skip-table behavior,
+  pattern fill/verify pass with page-boundary operator-poll metadata,
+  pass-boundary loop dispatch, and CMOS RAM-test write/verify loop plus visible
+  outcomes and the CROM0 color-RAM diagnostic heading/bars/palette loop plus
+  audio-test sound-pulse/skip-table behavior,
   switch-test display-table/PIA-scan behavior, monitor-test
   crosshatch/RGB-field/color-bar pattern behavior, monitor-to-`AUDITG` entry
   transfer, and post-`PWRUP` `AuditGate` entry transfer. CMOS persistence, live
-  post-`PWRUP` `AUDITG` frame scheduling, high-score comparison/initials
-  routines, and sub-pass/page-boundary RAM-test operator polling are not
-  translated.
+  post-`PWRUP` `AUDITG` frame scheduling, and high-score comparison/initials
+  routines are not translated.
 
 ## Player
 
