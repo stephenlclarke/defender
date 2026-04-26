@@ -11,16 +11,18 @@ use crate::{
     board::{
         CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, RED_LABEL_CRHSTD_CELL_OFFSET,
         RED_LABEL_HIGH_SCORE_ENTRIES, RED_LABEL_HIGH_SCORE_ENTRY_CELLS,
-        RED_LABEL_HIGH_SCORE_MAX_SCORE, cleared_main_cpu_ram, cmos_sram_read_byte,
-        cmos_sram_read_word, cmos_sram_write_byte, red_label_crom0_ram_test_next_word,
+        RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START, cleared_main_cpu_ram,
+        cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte,
+        red_label_crom0_ram_test_next_word,
     },
     input::{CabinetInput, DefenderInputPorts},
     red_label::{
         Facing, Fixed16, RandState, bonus_stock_score, default_high_scores, defaults, rmax,
     },
     red_label_memory::{
-        RedLabelCmosDefault, RedLabelLinkedList, RedLabelRamLayoutEntry, red_label_cmos_defaults,
-        red_label_cmos_layout, red_label_linked_lists, red_label_ram_layout,
+        RedLabelCmosDefault, RedLabelLinkedList, RedLabelRamLayoutEntry, cmos_4bit_cell_value,
+        pack_sram_byte, red_label_cmos_defaults, red_label_cmos_layout, red_label_linked_lists,
+        red_label_ram_layout, unpack_sram_byte,
     },
     red_label_wave::{RED_LABEL_WDELT_RECORD_COUNT, WaveProfile, red_label_wave_table},
     rom::crc32,
@@ -2116,6 +2118,21 @@ impl RuntimeHighScoreEntry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuntimeHighScoreTable {
+    AllTime,
+    TodaysGreatest,
+}
+
+impl RuntimeHighScoreTable {
+    fn label(self) -> &'static str {
+        match self {
+            Self::AllTime => "all-time",
+            Self::TodaysGreatest => "today's greatest",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RedLabelPowerUpRamFill {
     next_address: u16,
     a: u8,
@@ -2227,7 +2244,9 @@ impl RedLabelRuntimeMemory {
             object_table_range,
             shell_head_range: usize::from(shell_head)..usize::from(shell_head) + 2,
         };
-        memory.apply_cmos_defaults(&red_label_cmos_defaults()?)?;
+        let cmos_defaults = red_label_cmos_defaults()?;
+        memory.apply_cmos_defaults(&cmos_defaults)?;
+        memory.apply_todays_high_score_defaults(&cmos_defaults)?;
         Ok(memory)
     }
 
@@ -2290,6 +2309,24 @@ impl RedLabelRuntimeMemory {
         Ok(())
     }
 
+    fn apply_todays_high_score_defaults(
+        &mut self,
+        defaults: &[RedLabelCmosDefault],
+    ) -> Result<(), String> {
+        let cells = red_label_high_score_default_cells(defaults)?;
+        let start = usize::from(RED_LABEL_THSTAB_START);
+        let end = start
+            .checked_add(cells.len())
+            .ok_or_else(|| String::from("red-label today's high-score default range overflows"))?;
+        if end > self.ram.len() {
+            return Err(format!(
+                "red-label today's high-score default range 0x{start:04X}..0x{end:04X} overflows RAM"
+            ));
+        }
+        self.ram[start..end].copy_from_slice(&cells);
+        Ok(())
+    }
+
     fn read_cmos_byte_by_symbol(&self, symbol: &'static str) -> Result<u8, String> {
         let offset = cmos_symbol_offset(symbol)?;
         cmos_sram_read_byte(&self.cmos, usize::from(offset))
@@ -2322,15 +2359,32 @@ impl RedLabelRuntimeMemory {
     }
 
     fn all_time_high_score_value(&self) -> Result<u32, String> {
-        Ok(self.all_time_high_score_entry(0)?.score)
+        Ok(self
+            .high_score_entry(RuntimeHighScoreTable::AllTime, 0)?
+            .score)
     }
 
-    fn all_time_high_score_qualifying_rank(&self, score: u32) -> Result<Option<u8>, String> {
+    fn live_high_score_qualifying_rank(&self, score: u32) -> Result<Option<u8>, String> {
+        let all_time = self.high_score_qualifying_rank(RuntimeHighScoreTable::AllTime, score)?;
+        let todays =
+            self.high_score_qualifying_rank(RuntimeHighScoreTable::TodaysGreatest, score)?;
+        Ok(match (all_time, todays) {
+            (Some(all_time), Some(todays)) => Some(all_time.min(todays)),
+            (Some(rank), None) | (None, Some(rank)) => Some(rank),
+            (None, None) => None,
+        })
+    }
+
+    fn high_score_qualifying_rank(
+        &self,
+        table: RuntimeHighScoreTable,
+        score: u32,
+    ) -> Result<Option<u8>, String> {
         if score > RED_LABEL_HIGH_SCORE_MAX_SCORE {
             return Ok(None);
         }
         for index in 0..RED_LABEL_HIGH_SCORE_ENTRIES {
-            if score > self.all_time_high_score_entry(index)?.score {
+            if score > self.high_score_entry(table, index)?.score {
                 return Ok(Some(
                     u8::try_from(index + 1).expect("red-label high-score rank should fit in u8"),
                 ));
@@ -2339,8 +2393,9 @@ impl RedLabelRuntimeMemory {
         Ok(None)
     }
 
-    fn insert_all_time_high_score(
+    fn insert_high_score(
         &mut self,
+        table: RuntimeHighScoreTable,
         score: u32,
         initials: [u8; RED_LABEL_INITIALS_ENTRY_CHARS],
     ) -> Result<Option<u8>, String> {
@@ -2349,73 +2404,86 @@ impl RedLabelRuntimeMemory {
                 "red-label high-score initials must be three uppercase ASCII letters",
             ));
         }
-        let Some(rank) = self.all_time_high_score_qualifying_rank(score)? else {
+        let Some(rank) = self.high_score_qualifying_rank(table, score)? else {
             return Ok(None);
         };
         let insert_index = usize::from(rank - 1);
         let mut entries = [RuntimeHighScoreEntry::EMPTY; RED_LABEL_HIGH_SCORE_ENTRIES];
         for (index, entry) in entries.iter_mut().enumerate() {
-            *entry = self.all_time_high_score_entry(index)?;
+            *entry = self.high_score_entry(table, index)?;
         }
         for index in (insert_index + 1..RED_LABEL_HIGH_SCORE_ENTRIES).rev() {
             entries[index] = entries[index - 1];
         }
         entries[insert_index] = RuntimeHighScoreEntry { score, initials };
         for (index, entry) in entries.iter().copied().enumerate() {
-            self.write_all_time_high_score_entry(index, entry)?;
+            self.write_high_score_entry(table, index, entry)?;
         }
         Ok(Some(rank))
     }
 
-    fn all_time_high_score_entry(&self, index: usize) -> Result<RuntimeHighScoreEntry, String> {
-        let start = all_time_high_score_entry_offset(index)?;
+    fn high_score_entry(
+        &self,
+        table: RuntimeHighScoreTable,
+        index: usize,
+    ) -> Result<RuntimeHighScoreEntry, String> {
+        let start = high_score_entry_offset(table, index)?;
+        let source = self.high_score_table_cells(table);
         let bytes = [
-            cmos_sram_read_byte(&self.cmos, start)
-                .ok_or_else(|| String::from("red-label all-time high-score byte 0 overflows"))?,
-            cmos_sram_read_byte(&self.cmos, start + 2)
-                .ok_or_else(|| String::from("red-label all-time high-score byte 1 overflows"))?,
-            cmos_sram_read_byte(&self.cmos, start + 4)
-                .ok_or_else(|| String::from("red-label all-time high-score byte 2 overflows"))?,
+            sram_cell_read_byte(source, start).ok_or_else(|| {
+                format!("red-label {} high-score byte 0 overflows", table.label())
+            })?,
+            sram_cell_read_byte(source, start + 2).ok_or_else(|| {
+                format!("red-label {} high-score byte 1 overflows", table.label())
+            })?,
+            sram_cell_read_byte(source, start + 4).ok_or_else(|| {
+                format!("red-label {} high-score byte 2 overflows", table.label())
+            })?,
         ];
         if bytes.iter().any(|byte| !is_bcd_byte(*byte)) {
-            return Err(String::from(
-                "red-label all-time high-score bytes are not valid BCD",
+            return Err(format!(
+                "red-label {} high-score bytes are not valid BCD",
+                table.label()
             ));
         }
         let score = bcd_digits_to_u32(&bytes);
         if score > RED_LABEL_HIGH_SCORE_MAX_SCORE {
             return Err(format!(
-                "red-label all-time high score {score} exceeds {RED_LABEL_HIGH_SCORE_MAX_SCORE}"
+                "red-label {} high score {score} exceeds {RED_LABEL_HIGH_SCORE_MAX_SCORE}",
+                table.label()
             ));
         }
         let initials = [
-            cmos_sram_read_byte(&self.cmos, start + 6)
-                .ok_or_else(|| String::from("red-label all-time initial 0 overflows"))?,
-            cmos_sram_read_byte(&self.cmos, start + 8)
-                .ok_or_else(|| String::from("red-label all-time initial 1 overflows"))?,
-            cmos_sram_read_byte(&self.cmos, start + 10)
-                .ok_or_else(|| String::from("red-label all-time initial 2 overflows"))?,
+            sram_cell_read_byte(source, start + 6)
+                .ok_or_else(|| format!("red-label {} initial 0 overflows", table.label()))?,
+            sram_cell_read_byte(source, start + 8)
+                .ok_or_else(|| format!("red-label {} initial 1 overflows", table.label()))?,
+            sram_cell_read_byte(source, start + 10)
+                .ok_or_else(|| format!("red-label {} initial 2 overflows", table.label()))?,
         ];
         if !red_label_high_score_initials_are_valid(&initials) {
-            return Err(String::from(
-                "red-label all-time high-score initials are not valid uppercase ASCII",
+            return Err(format!(
+                "red-label {} high-score initials are not valid uppercase ASCII",
+                table.label()
             ));
         }
         Ok(RuntimeHighScoreEntry { score, initials })
     }
 
-    fn write_all_time_high_score_entry(
+    fn write_high_score_entry(
         &mut self,
+        table: RuntimeHighScoreTable,
         index: usize,
         entry: RuntimeHighScoreEntry,
     ) -> Result<(), String> {
-        let start = all_time_high_score_entry_offset(index)?;
+        let start = high_score_entry_offset(table, index)?;
         let score_bytes = high_score_bcd_bytes(entry.score)?;
         if !red_label_high_score_initials_are_valid(&entry.initials) {
             return Err(String::from(
                 "red-label high-score initials must be three uppercase ASCII letters",
             ));
         }
+        let target = self.high_score_table_cells_mut(table);
         for (offset, value) in [
             (0, score_bytes[0]),
             (2, score_bytes[1]),
@@ -2424,11 +2492,28 @@ impl RedLabelRuntimeMemory {
             (8, entry.initials[1]),
             (10, entry.initials[2]),
         ] {
-            cmos_sram_write_byte(&mut self.cmos, start + offset, value).ok_or_else(|| {
-                format!("red-label all-time high-score entry {index} write overflows")
+            sram_cell_write_byte(target, start + offset, value).ok_or_else(|| {
+                format!(
+                    "red-label {} high-score entry {index} write overflows",
+                    table.label()
+                )
             })?;
         }
         Ok(())
+    }
+
+    fn high_score_table_cells(&self, table: RuntimeHighScoreTable) -> &[u8] {
+        match table {
+            RuntimeHighScoreTable::AllTime => self.cmos.as_slice(),
+            RuntimeHighScoreTable::TodaysGreatest => self.ram.as_slice(),
+        }
+    }
+
+    fn high_score_table_cells_mut(&mut self, table: RuntimeHighScoreTable) -> &mut [u8] {
+        match table {
+            RuntimeHighScoreTable::AllTime => self.cmos.as_mut_slice(),
+            RuntimeHighScoreTable::TodaysGreatest => self.ram.as_mut_slice(),
+        }
     }
 
     pub fn object_table_crc32(&self) -> u32 {
@@ -15481,21 +15566,89 @@ fn is_bcd_byte(value: u8) -> bool {
     value >> 4 <= 9 && value & 0x0F <= 9
 }
 
-fn all_time_high_score_entry_offset(index: usize) -> Result<usize, String> {
-    if index >= RED_LABEL_HIGH_SCORE_ENTRIES {
-        return Err(format!(
-            "red-label high-score index {index} is out of range"
+fn sram_cell_read_byte(cells: &[u8], nibble_offset: usize) -> Option<u8> {
+    let ms_nibble = cells.get(nibble_offset)?;
+    let ls_nibble = cells.get(nibble_offset + 1)?;
+    Some(pack_sram_byte(*ms_nibble, *ls_nibble))
+}
+
+fn sram_cell_write_byte(cells: &mut [u8], nibble_offset: usize, value: u8) -> Option<()> {
+    if nibble_offset + 1 >= cells.len() {
+        return None;
+    }
+    let (ms_nibble, ls_nibble) = unpack_sram_byte(value);
+    cells[nibble_offset] = cmos_4bit_cell_value(ms_nibble);
+    cells[nibble_offset + 1] = cmos_4bit_cell_value(ls_nibble);
+    Some(())
+}
+
+fn red_label_high_score_default_cells(defaults: &[RedLabelCmosDefault]) -> Result<Vec<u8>, String> {
+    let start = u16::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+    let end = start
+        .checked_add(
+            u16::try_from(RED_LABEL_HIGH_SCORE_ENTRIES * RED_LABEL_HIGH_SCORE_ENTRY_CELLS)
+                .expect("red-label high-score cells should fit in u16"),
+        )
+        .expect("red-label high-score default range should fit in u16");
+    let mut high_score_defaults = defaults
+        .iter()
+        .filter(|default| default.offset >= start && default.offset < end)
+        .collect::<Vec<_>>();
+    high_score_defaults.sort_by_key(|default| default.offset);
+    let mut cells =
+        Vec::with_capacity(RED_LABEL_HIGH_SCORE_ENTRIES * RED_LABEL_HIGH_SCORE_ENTRY_CELLS);
+    let mut expected_offset = start;
+    for default in high_score_defaults {
+        if default.offset != expected_offset {
+            return Err(format!(
+                "red-label high-score default `{}` starts at 0x{:02X}, expected 0x{expected_offset:02X}",
+                default.symbol, default.offset
+            ));
+        }
+        let encoded_cells = default.encoded_cells();
+        cells.extend_from_slice(&encoded_cells);
+        expected_offset = expected_offset
+            .checked_add(default.cells)
+            .ok_or_else(|| String::from("red-label high-score default offset overflowed"))?;
+    }
+    if expected_offset != end
+        || cells.len() != RED_LABEL_HIGH_SCORE_ENTRIES * RED_LABEL_HIGH_SCORE_ENTRY_CELLS
+    {
+        return Err(String::from(
+            "red-label high-score defaults do not cover the full table",
         ));
     }
-    usize::from(RED_LABEL_CRHSTD_CELL_OFFSET)
+    Ok(cells)
+}
+
+fn high_score_entry_offset(table: RuntimeHighScoreTable, index: usize) -> Result<usize, String> {
+    if index >= RED_LABEL_HIGH_SCORE_ENTRIES {
+        return Err(format!(
+            "red-label {} high-score index {index} is out of range",
+            table.label()
+        ));
+    }
+    let start = match table {
+        RuntimeHighScoreTable::AllTime => usize::from(RED_LABEL_CRHSTD_CELL_OFFSET),
+        RuntimeHighScoreTable::TodaysGreatest => usize::from(RED_LABEL_THSTAB_START),
+    };
+    start
         .checked_add(
             index
                 .checked_mul(RED_LABEL_HIGH_SCORE_ENTRY_CELLS)
                 .ok_or_else(|| {
-                    format!("red-label high-score index {index} offset multiplication overflowed")
+                    format!(
+                        "red-label {} high-score index {index} offset multiplication overflowed",
+                        table.label()
+                    )
                 })?,
         )
-        .ok_or_else(|| format!("red-label high-score index {index} offset overflowed"))
+        .ok_or_else(|| {
+            format!(
+                "red-label {} high-score index {index} offset overflowed",
+                table.label()
+            )
+        })
 }
 
 fn high_score_bcd_bytes(score: u32) -> Result<[u8; 3], String> {
@@ -16987,7 +17140,7 @@ impl ArcadeMachine {
         &mut self,
         score: u32,
     ) -> Result<Option<HighScoreEntryState>, String> {
-        let Some(rank) = self.memory.all_time_high_score_qualifying_rank(score)? else {
+        let Some(rank) = self.memory.live_high_score_qualifying_rank(score)? else {
             return Ok(None);
         };
         let state = HighScoreEntryState::new(score, rank);
@@ -17089,8 +17242,16 @@ impl ArcadeMachine {
         let Some(state) = self.high_score_entry.take() else {
             return Ok(());
         };
-        self.memory
-            .insert_all_time_high_score(state.score, state.initials)?;
+        self.memory.insert_high_score(
+            RuntimeHighScoreTable::AllTime,
+            state.score,
+            state.initials,
+        )?;
+        self.memory.insert_high_score(
+            RuntimeHighScoreTable::TodaysGreatest,
+            state.score,
+            state.initials,
+        )?;
         self.high_score_submission = Some(HighScoreSubmissionState {
             player: self.current_high_score_player(),
             score: state.score,
@@ -17230,7 +17391,8 @@ impl ArcadeMachine {
 mod tests {
     use crate::{
         board::{
-            CMOS_RAM_SIZE, RED_LABEL_CRHSTD_CELL_OFFSET, cmos_sram_read_byte, cmos_sram_write_byte,
+            CMOS_RAM_SIZE, RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_HIGH_SCORE_ENTRIES,
+            RED_LABEL_THSTAB_START, cmos_sram_read_byte, cmos_sram_write_byte,
         },
         input::{CabinetInput, DefenderInputPorts},
         machine::{
@@ -17725,7 +17887,7 @@ mod tests {
     }
 
     #[test]
-    fn game_over_high_score_entry_accepts_initials_and_updates_cmos_table() {
+    fn game_over_high_score_entry_accepts_initials_and_updates_high_score_tables() {
         let mut machine = ArcadeMachine::new();
         let mut snapshot = machine.snapshot();
         snapshot.phase = GamePhase::GameOver;
@@ -17777,6 +17939,24 @@ mod tests {
             ],
             [0x05, 0x00, 0x00, b'A', b'C', b'E']
         );
+        let todays_high_score_offset = usize::from(RED_LABEL_THSTAB_START);
+        assert_eq!(
+            [
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_high_score_offset)
+                    .expect("today score high byte"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_high_score_offset + 2)
+                    .expect("today score middle byte"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_high_score_offset + 4)
+                    .expect("today score low byte"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_high_score_offset + 6)
+                    .expect("today first initial"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_high_score_offset + 8)
+                    .expect("today second initial"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_high_score_offset + 10)
+                    .expect("today third initial"),
+            ],
+            [0x05, 0x00, 0x00, b'A', b'C', b'E']
+        );
         let submitted_events = submitted.events().collect::<Vec<_>>();
         assert_eq!(
             submitted_events,
@@ -17786,6 +17966,69 @@ mod tests {
                 MachineEvent::HighScoreInitialAccepted,
                 MachineEvent::HighScoreSubmitted,
             ]
+        );
+    }
+
+    #[test]
+    fn todays_only_high_score_still_collects_initials() {
+        let mut machine = ArcadeMachine::new();
+        for index in 0..RED_LABEL_HIGH_SCORE_ENTRIES {
+            machine
+                .memory
+                .write_high_score_entry(
+                    super::RuntimeHighScoreTable::AllTime,
+                    index,
+                    super::RuntimeHighScoreEntry {
+                        score: 99_999 - u32::try_from(index).expect("test rank fits in u32"),
+                        initials: [b'A', b'L', b'L'],
+                    },
+                )
+                .expect("seed all-time table");
+        }
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = 21_500;
+        machine.restore(snapshot);
+
+        let output = machine.step_with_typed_chars(CabinetInput::NONE, &['z', 'e', 'd']);
+
+        assert_eq!(output.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(output.snapshot.high_score_entry, None);
+        assert_eq!(output.snapshot.scores.high_score, 99_999);
+        assert!(
+            output
+                .events()
+                .any(|event| event == MachineEvent::HighScoreEntryStarted)
+        );
+        let all_time_offset = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+        assert_eq!(
+            [
+                cmos_sram_read_byte(machine.red_label_cmos_ram(), all_time_offset)
+                    .expect("all-time score high byte"),
+                cmos_sram_read_byte(machine.red_label_cmos_ram(), all_time_offset + 2)
+                    .expect("all-time score middle byte"),
+                cmos_sram_read_byte(machine.red_label_cmos_ram(), all_time_offset + 4)
+                    .expect("all-time score low byte"),
+            ],
+            [0x09, 0x99, 0x99]
+        );
+        let todays_offset = usize::from(RED_LABEL_THSTAB_START);
+        assert_eq!(
+            [
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_offset)
+                    .expect("today score high byte"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_offset + 2)
+                    .expect("today score middle byte"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_offset + 4)
+                    .expect("today score low byte"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_offset + 6)
+                    .expect("today first initial"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_offset + 8)
+                    .expect("today second initial"),
+                super::sram_cell_read_byte(machine.red_label_ram(), todays_offset + 10)
+                    .expect("today third initial"),
+            ],
+            [0x02, 0x15, 0x00, b'Z', b'E', b'D']
         );
     }
 

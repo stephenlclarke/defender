@@ -388,9 +388,10 @@ This section records drift found during the repository review on
   packed high-score tables. Live mode can load/save the 256-cell CMOS image
   through a file-backed storage trait when `--cmos-path` is provided, and the
   core can collect three initials for a qualifying game-over score before
-  submitting it to the all-time CMOS table. Translated player-death game-over
-  sleeps now hand the clean core to `GameOver`, allowing the deterministic
-  initials path to start from the scheduler. There is still no exact
+  submitting it to the all-time CMOS table and `THSTAB` today's-greatest RAM
+  table. Translated player-death game-over sleeps now hand the clean core to
+  `GameOver`, allowing the deterministic initials path to start from the
+  scheduler. There is still no exact
   initials-entry UI, full game-over-to-attract timing, or high-score screen
   rendering.
 - The current deterministic trace compares Rust output to local expected TSV,
@@ -770,8 +771,9 @@ This section records drift found during the repository review on
 - Credits and one-player start are only a scaffold.
 - CMOS-backed high-score reset copies all-time and today's tables from
   `DEFALT`, packed table comparison/insertion is modeled, and qualifying
-  game-over scores can collect initials and write the all-time CMOS table.
-  Translated player-death game-over dispatches hand live mode into that flow.
+  game-over scores can collect initials and write both the all-time CMOS table
+  and `THSTAB` today's-greatest RAM table. Translated player-death game-over
+  dispatches hand live mode into that flow.
   Exact initials screen rendering, full game-over-to-attract timing, two-player
   state, service switches, diagnostics, audits, adjustments, and a default live
   CMOS path policy are absent from the live cabinet flow.
@@ -876,7 +878,8 @@ Build compatibility features around the arcade core:
 - `xyzzy` modifies input and selected arcade events through explicit overlay
   hooks.
 - Local CMOS persistence uses a file-backed storage trait; deterministic
-  initials-entry submissions write through that same CMOS image.
+  initials-entry submissions update the all-time CMOS image and the live
+  today's-greatest RAM table.
 - Terminal rendering consumes arcade video output but does not alter gameplay.
 
 ### Renderer

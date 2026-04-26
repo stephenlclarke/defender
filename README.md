@@ -190,7 +190,8 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   heading/crosshatch/RGB-field/color-bar pattern behavior and audit-branch
   handoff, `AUDITG` entry screens and `DISAUD` row video transfer/erasure, the
   post-`PWRUP` `AUDITG` frame-step loop, packed high-score table
-  comparison/insertion helpers, deterministic initials-entry submission,
+  comparison/insertion helpers, deterministic initials-entry submission to both
+  live high-score tables,
   optional file-backed CMOS persistence, and advance-gate intent,
   sound-table bytes, the
   complete `SWTAB` switch table, the trace schema, and `WVTAB` wave records from
@@ -426,8 +427,9 @@ yet; current implementation status is tracked in `SPEC.md` and
   transfer/erasure, row navigation, post-display debounce cadence,
   deterministic audit cycle with previous-row erasure, post-`PWRUP` outer
   frame-step dispatch, packed high-score table comparison/insertion,
-  deterministic initials-entry submission, optional file-backed CMOS
-  persistence, and CMOS mutation rules now embedded under `assets/red-label/`.
+  deterministic initials-entry submission to both live high-score tables,
+  optional file-backed CMOS persistence, and CMOS mutation rules now embedded
+  under `assets/red-label/`.
   The
   `defb6.src` `CRTAB` bytes now feed
   the `CRINIT` pseudo-color RAM reset embedded in
