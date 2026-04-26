@@ -8,6 +8,7 @@
 pub mod app;
 pub mod assets;
 pub mod board;
+pub mod cmos_storage;
 pub mod fidelity;
 pub mod input;
 pub mod kitty;

@@ -104,6 +104,7 @@ After installation, run the clean-slate runtime and tooling with:
 
 - `defender`
 - `defender --mute`
+- `defender --cmos-path ~/.local/state/defender/red-label-cmos.bin`
 - `defender --rom-report`
 - `defender --rom-report /path/to/roms`
 - `defender --verify-roms /path/to/roms`
@@ -122,9 +123,10 @@ Notes:
   supports the Kitty graphics protocol.
 - Download Ghostty: <https://ghostty.org/download>
 - Download Warp: <https://www.warp.dev/download>
-- Initials entry and persistence are not implemented in the clean-slate core
-  yet. The ROM-derived high-score reset copy and packed high-score table
-  comparison/insertion helpers are modeled.
+- Initials entry and the live high-score screen flow are not implemented in the
+  clean-slate core yet. The ROM-derived high-score reset copy, packed
+  high-score table comparison/insertion helpers, and optional file-backed CMOS
+  persistence through `--cmos-path` are modeled.
 
 ## Controls
 
@@ -184,7 +186,8 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   heading/crosshatch/RGB-field/color-bar pattern behavior and audit-branch
   handoff, `AUDITG` entry screens and `DISAUD` row video transfer/erasure, the
   post-`PWRUP` `AUDITG` frame-step loop, packed high-score table
-  comparison/insertion helpers, and advance-gate intent, sound-table bytes, the
+  comparison/insertion helpers, optional file-backed CMOS persistence, and
+  advance-gate intent, sound-table bytes, the
   complete `SWTAB` switch table, the trace schema, and `WVTAB` wave records from
   `assets/red-label/`.
 - The core now initializes source-owned process, super-process, object, player,
@@ -349,7 +352,7 @@ must be added as explicit overlay hooks with paired arcade-off tests.
 - MAME/source reference-trace tooling is in place for local Phase 1 fixtures,
   but checked-in golden traces are intentionally absent because they are local
   emulator outputs.
-- Initials entry, high-score persistence, two-player sessions, operator
+- Initials entry, live high-score screen flow, two-player sessions, operator
   settings, untranslated object/shell/process bodies, generic body
   dispatch/frame scheduling, and sound-routine execution are still fidelity gaps
   tracked in `SPEC.md` and `docs/fidelity/gaps.md`.
@@ -417,8 +420,9 @@ yet; current implementation status is tracked in `SPEC.md` and
   game-adjust entry screens, and `DISAUD` display-line formatting/video
   transfer/erasure, row navigation, post-display debounce cadence,
   deterministic audit cycle with previous-row erasure, post-`PWRUP` outer
-  frame-step dispatch, packed high-score table comparison/insertion, and CMOS
-  mutation rules now embedded under `assets/red-label/`. The
+  frame-step dispatch, packed high-score table comparison/insertion, optional
+  file-backed CMOS persistence, and CMOS mutation rules now embedded under
+  `assets/red-label/`. The
   `defb6.src` `CRTAB` bytes now feed
   the `CRINIT` pseudo-color RAM reset embedded in
   `assets/red-label/color-ram.tsv`. The `defa7.src` `SCORE`, `SNDLD`, `SHELL`,

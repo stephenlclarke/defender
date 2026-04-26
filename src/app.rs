@@ -21,6 +21,7 @@ enum Command {
     PlayLive {
         play_audio: bool,
         input_profile: InputProfile,
+        cmos_path: Option<PathBuf>,
     },
     RomReport {
         path: Option<PathBuf>,
@@ -59,7 +60,8 @@ pub fn run() -> Result<()> {
         Command::PlayLive {
             play_audio,
             input_profile,
-        } => run_live(play_audio, input_profile),
+            cmos_path,
+        } => run_live(play_audio, input_profile, cmos_path.as_deref()),
         Command::RomReport { path } => run_rom_report(path.as_deref()),
         Command::VerifyRoms { path } => run_verify_roms(&path),
         Command::FidelityTrace { frame_count } => {
@@ -463,6 +465,7 @@ where
 {
     let mut play_audio = true;
     let mut input_profile = InputProfile::default();
+    let mut cmos_path = None;
     let mut args = args.into_iter().peekable();
 
     while let Some(arg) = args.next() {
@@ -475,6 +478,12 @@ where
                 };
                 input_profile = InputProfile::parse(&value)
                     .with_context(|| format!("unknown input profile: {value}"))?;
+            }
+            "--cmos-path" => {
+                let Some(value) = args.next() else {
+                    bail!("--cmos-path requires a file path");
+                };
+                cmos_path = Some(PathBuf::from(value));
             }
             "--rom-report" => {
                 let path = args.next().map(PathBuf::from);
@@ -597,6 +606,7 @@ where
     Ok(Command::PlayLive {
         play_audio,
         input_profile,
+        cmos_path,
     })
 }
 
@@ -616,7 +626,7 @@ fn print_help() {
 }
 
 fn help_text() -> &'static str {
-    "defender\n  cargo run\n  cargo run -- --mute\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play requires an interactive terminal with Kitty graphics support.\n"
+    "defender\n  cargo run\n  cargo run -- --mute\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play requires an interactive terminal with Kitty graphics support.\n"
 }
 
 #[cfg(test)]
@@ -642,6 +652,7 @@ mod tests {
             Command::PlayLive {
                 play_audio: true,
                 input_profile: InputProfile::Planetoid,
+                cmos_path: None,
             }
         );
     }
@@ -660,6 +671,25 @@ mod tests {
             Command::PlayLive {
                 play_audio: false,
                 input_profile: InputProfile::Cabinet,
+                cmos_path: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_args_accepts_live_cmos_path() {
+        let command = parse_args(vec![
+            String::from("--cmos-path"),
+            String::from("/tmp/defender-cmos.bin"),
+        ])
+        .expect("parse args");
+
+        assert_eq!(
+            command,
+            Command::PlayLive {
+                play_audio: true,
+                input_profile: InputProfile::Planetoid,
+                cmos_path: Some(PathBuf::from("/tmp/defender-cmos.bin")),
             }
         );
     }

@@ -9,9 +9,9 @@ use std::sync::OnceLock;
 
 use crate::{
     board::{
-        CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, cleared_main_cpu_ram,
-        cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte,
-        red_label_crom0_ram_test_next_word,
+        CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, RED_LABEL_CRHSTD_CELL_OFFSET,
+        RED_LABEL_HIGH_SCORE_MAX_SCORE, cleared_main_cpu_ram, cmos_sram_read_byte,
+        cmos_sram_read_word, cmos_sram_write_byte, red_label_crom0_ram_test_next_word,
     },
     input::{CabinetInput, DefenderInputPorts},
     red_label::{
@@ -2264,6 +2264,34 @@ impl RedLabelRuntimeMemory {
             offset,
             value,
         })
+    }
+
+    fn replace_cmos(&mut self, cmos: CmosRam) {
+        self.cmos = cmos;
+    }
+
+    fn all_time_high_score_value(&self) -> Result<u32, String> {
+        let start = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+        let bytes = [
+            cmos_sram_read_byte(&self.cmos, start)
+                .ok_or_else(|| String::from("red-label all-time high-score byte 0 overflows"))?,
+            cmos_sram_read_byte(&self.cmos, start + 2)
+                .ok_or_else(|| String::from("red-label all-time high-score byte 1 overflows"))?,
+            cmos_sram_read_byte(&self.cmos, start + 4)
+                .ok_or_else(|| String::from("red-label all-time high-score byte 2 overflows"))?,
+        ];
+        if bytes.iter().any(|byte| !is_bcd_byte(*byte)) {
+            return Err(String::from(
+                "red-label all-time high-score bytes are not valid BCD",
+            ));
+        }
+        let score = bcd_digits_to_u32(&bytes);
+        if score > RED_LABEL_HIGH_SCORE_MAX_SCORE {
+            return Err(format!(
+                "red-label all-time high score {score} exceeds {RED_LABEL_HIGH_SCORE_MAX_SCORE}"
+            ));
+        }
+        Ok(score)
     }
 
     pub fn object_table_crc32(&self) -> u32 {
@@ -15312,6 +15340,10 @@ fn bcd_byte_to_u16(value: u8) -> u16 {
     u16::from(value >> 4) * 10 + u16::from(value & 0x0F)
 }
 
+fn is_bcd_byte(value: u8) -> bool {
+    value >> 4 <= 9 && value & 0x0F <= 9
+}
+
 fn getwv_restore_wave_hits(wave: u8, restore_wave: u8) -> bool {
     if restore_wave == 0 {
         return false;
@@ -15639,6 +15671,16 @@ impl ArcadeMachine {
             .red_label_initialize_thrust_table()
             .expect("embedded red-label THTAB layout is valid");
         machine
+            .sync_high_score_from_red_label_cmos()
+            .expect("embedded red-label high-score layout is valid");
+        machine
+    }
+
+    pub fn try_new_with_cmos(cmos: CmosRam) -> Result<Self, String> {
+        let mut machine = Self::new();
+        machine.memory.replace_cmos(cmos);
+        machine.sync_high_score_from_red_label_cmos()?;
+        Ok(machine)
     }
 
     pub fn new_cold_boot_trace() -> Self {
@@ -15723,6 +15765,10 @@ impl ArcadeMachine {
 
     pub fn red_label_cmos_range(&self, range: std::ops::Range<u16>) -> Option<&[u8]> {
         self.memory.cmos_range(range)
+    }
+
+    pub fn red_label_cmos_ram(&self) -> &CmosRam {
+        &self.memory.cmos
     }
 
     pub fn red_label_object_table_crc32(&self) -> u32 {
@@ -16763,7 +16809,13 @@ impl ArcadeMachine {
     fn sync_scores_from_red_label_memory(&mut self) -> Result<(), String> {
         self.scores.player_one = self.memory.player_score_value(1)?;
         self.scores.player_two = self.memory.player_score_value(2)?;
+        self.sync_high_score_from_red_label_cmos()?;
         self.player.smart_bombs = self.memory.player_smart_bombs_value(self.current_player)?;
+        Ok(())
+    }
+
+    fn sync_high_score_from_red_label_cmos(&mut self) -> Result<(), String> {
+        self.scores.high_score = self.memory.all_time_high_score_value()?;
         Ok(())
     }
 
@@ -16826,6 +16878,7 @@ impl ArcadeMachine {
 #[cfg(test)]
 mod tests {
     use crate::{
+        board::{CMOS_RAM_SIZE, RED_LABEL_CRHSTD_CELL_OFFSET, cmos_sram_write_byte},
         input::{CabinetInput, DefenderInputPorts},
         machine::{
             ArcadeMachine, GamePhase, MachineEvent, RED_LABEL_ATTRACT_PROCESS_TYPE,
@@ -17296,6 +17349,23 @@ mod tests {
         assert_eq!(snapshot.player.lives, 3);
         assert_eq!(snapshot.player.smart_bombs, 3);
         assert_eq!(snapshot.wave_profile.landers, 15);
+    }
+
+    #[test]
+    fn loaded_cmos_updates_attract_high_score_without_resetting_player_defaults() {
+        let mut cmos = [0xF0; CMOS_RAM_SIZE];
+        let high_score_offset = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+        cmos_sram_write_byte(&mut cmos, high_score_offset, 0x98).expect("write score high byte");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 2, 0x76)
+            .expect("write score middle byte");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 4, 0x54).expect("write score low byte");
+
+        let machine = ArcadeMachine::try_new_with_cmos(cmos).expect("load CMOS");
+        let snapshot = machine.snapshot();
+
+        assert_eq!(snapshot.scores.high_score, 987_654);
+        assert_eq!(snapshot.player.lives, 3);
+        assert_eq!(snapshot.player.smart_bombs, 3);
     }
 
     #[test]

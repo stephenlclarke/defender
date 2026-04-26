@@ -155,7 +155,7 @@ This file records behavior that must not be guessed in arcade-core code.
   table rows and its post-display debounce countdown as one deterministic cycle
   plus the post-`PWRUP` outer frame path, but CPU IRQ scheduling, exact Williams
   power-on RAM contents, physical advance-switch timing, physical lamp timing,
-  CMOS persistence,
+  default live CMOS path policy,
   screen scanline scheduling, watchdog timing/reset side effects,
   palette/rendering timing side effects, decoder PROM behavior, and DAC sample
   generation are not modeled.
@@ -382,8 +382,9 @@ This file records behavior that must not be guessed in arcade-core code.
   switch-test display-table/PIA-scan behavior, monitor-test
   crosshatch/RGB-field/color-bar pattern behavior, monitor-to-`AUDITG` entry
   transfer, post-`PWRUP` `AuditGate` entry transfer, `AUDITG` outer frame-step
-  dispatch, and packed high-score table comparison/insertion. CMOS persistence,
-  initials entry, and high-score screen flow are not translated.
+  dispatch, packed high-score table comparison/insertion, and optional
+  file-backed CMOS persistence. Initials entry and high-score screen flow are
+  not translated.
 
 ## Player
 

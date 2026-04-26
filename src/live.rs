@@ -1,13 +1,15 @@
 //! Live terminal runner for the new core.
 
 use std::io::{self, IsTerminal, Write};
+use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use crossterm::event::{self, Event};
 
 use crate::{
+    cmos_storage::{CmosStorage, FileCmosStorage},
     input::{InputMapper, InputProfile, PolledInput, XyzzyOverlay},
     kitty::KittyGraphics,
     machine::{ArcadeMachine, CompatibilityState},
@@ -17,7 +19,11 @@ use crate::{
 
 const FRAME_DURATION: Duration = Duration::from_micros(16_639);
 
-pub fn run_live(_play_audio: bool, input_profile: InputProfile) -> Result<()> {
+pub fn run_live(
+    _play_audio: bool,
+    input_profile: InputProfile,
+    cmos_path: Option<&Path>,
+) -> Result<()> {
     ensure_interactive_terminal()?;
     KittyGraphics::ensure_supported()?;
 
@@ -28,7 +34,11 @@ pub fn run_live(_play_audio: bool, input_profile: InputProfile) -> Result<()> {
     let mut graphics = KittyGraphics::new(terminal_geometry.cols, terminal_geometry.rows);
     let mut input_mapper = InputMapper::new(input_profile);
     let mut xyzzy = XyzzyOverlay::default();
-    let mut machine = ArcadeMachine::new();
+    let cmos_storage = cmos_path.map(FileCmosStorage::new);
+    let storage = cmos_storage
+        .as_ref()
+        .map(|storage| storage as &dyn CmosStorage);
+    let mut machine = live_machine_from_cmos_storage(storage)?;
 
     loop {
         let frame_started = Instant::now();
@@ -60,6 +70,12 @@ pub fn run_live(_play_audio: bool, input_profile: InputProfile) -> Result<()> {
 
     graphics.clear(&mut stdout)?;
     stdout.flush().context("flushing kitty clear escape")?;
+    save_live_cmos(
+        cmos_storage
+            .as_ref()
+            .map(|storage| storage as &dyn CmosStorage),
+        &machine,
+    )?;
     Ok(())
 }
 
@@ -75,6 +91,29 @@ fn validate_interactive_terminal(stdin_is_terminal: bool, stdout_is_terminal: bo
             "live mode requires an interactive terminal; run `cargo run` in a real terminal window"
         )
     }
+}
+
+fn live_machine_from_cmos_storage(storage: Option<&dyn CmosStorage>) -> Result<ArcadeMachine> {
+    let Some(storage) = storage else {
+        return Ok(ArcadeMachine::new());
+    };
+
+    let Some(cmos) = storage.load_cmos().context("loading persisted CMOS RAM")? else {
+        return Ok(ArcadeMachine::new());
+    };
+
+    ArcadeMachine::try_new_with_cmos(cmos)
+        .map_err(|error| anyhow!("loading persisted CMOS RAM into arcade core: {error}"))
+}
+
+fn save_live_cmos(storage: Option<&dyn CmosStorage>, machine: &ArcadeMachine) -> Result<()> {
+    let Some(storage) = storage else {
+        return Ok(());
+    };
+
+    storage
+        .save_cmos(machine.red_label_cmos_ram())
+        .context("saving persisted CMOS RAM")
 }
 
 fn sync_terminal_geometry(
@@ -104,7 +143,33 @@ fn poll_input(input_mapper: &mut InputMapper) -> Result<PolledInput> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FRAME_DURATION, validate_interactive_terminal};
+    use std::cell::RefCell;
+    use std::io;
+
+    use crate::board::{CMOS_RAM_SIZE, CmosRam, cmos_sram_write_byte};
+    use crate::cmos_storage::CmosStorage;
+    use crate::machine::ArcadeMachine;
+
+    use super::{
+        FRAME_DURATION, live_machine_from_cmos_storage, save_live_cmos,
+        validate_interactive_terminal,
+    };
+
+    #[derive(Default)]
+    struct MemoryCmosStorage {
+        cmos: RefCell<Option<CmosRam>>,
+    }
+
+    impl CmosStorage for MemoryCmosStorage {
+        fn load_cmos(&self) -> io::Result<Option<CmosRam>> {
+            Ok(*self.cmos.borrow())
+        }
+
+        fn save_cmos(&self, cmos: &CmosRam) -> io::Result<()> {
+            *self.cmos.borrow_mut() = Some(*cmos);
+            Ok(())
+        }
+    }
 
     #[test]
     fn live_mode_rejects_non_interactive_terminal() {
@@ -115,5 +180,31 @@ mod tests {
     #[test]
     fn frame_duration_tracks_cabinet_refresh_not_old_ninety_ms_tick() {
         assert!(FRAME_DURATION.as_millis() < 20);
+    }
+
+    #[test]
+    fn live_cmos_storage_loads_and_saves_machine_cmos() {
+        let storage = MemoryCmosStorage::default();
+        let mut cmos = [0xF0; CMOS_RAM_SIZE];
+        cmos_sram_write_byte(&mut cmos, 0x7D, 0x04).expect("write persisted credits");
+        *storage.cmos.borrow_mut() = Some(cmos);
+
+        let machine =
+            live_machine_from_cmos_storage(Some(&storage)).expect("load machine from CMOS");
+        assert_eq!(
+            machine.red_label_cmos_range(0x7D..0x7F),
+            Some(&cmos[0x7D..0x7F])
+        );
+
+        let mut changed_machine = ArcadeMachine::try_new_with_cmos(cmos).expect("machine");
+        changed_machine.step(crate::input::CabinetInput {
+            coin: true,
+            ..crate::input::CabinetInput::NONE
+        });
+        save_live_cmos(Some(&storage), &changed_machine).expect("save machine CMOS");
+        assert_eq!(
+            storage.cmos.borrow().expect("saved CMOS"),
+            *changed_machine.red_label_cmos_ram()
+        );
     }
 }
