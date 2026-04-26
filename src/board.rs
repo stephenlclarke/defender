@@ -105,8 +105,11 @@ pub const RED_LABEL_CROM0_MULTIPLE_RAM_FAILURE_TEXT: &str =
 pub const RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT: &str =
     "COLOR RAM TEST VERTICAL COLOR BARS INDICATE COLOR RAM FAILURE";
 pub const RED_LABEL_CROM0_AUDIO_TEST_TEXT: &str = "AUDIO TEST SOUND";
+pub const RED_LABEL_CROM0_SWITCH_TEST_TEXT: &str = "SWITCH TEST";
 pub const RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT: &str = "AUTO FOR COLOR RAM TEST";
 pub const RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT: &str = "AUTO FOR SWITCH TEST";
+pub const RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT: &str =
+    "AUTO FOR MONITOR TEST PATTERNS";
 pub const RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT: &str =
     "MANUAL TO TEST INDIVIDUAL SOUNDS";
 pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS: &[&str] =
@@ -123,6 +126,8 @@ pub const RED_LABEL_CROM0_AUDIO_TEST_INSTRUCTIONS: &[&str] = &[
     RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT,
     RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT,
 ];
+pub const RED_LABEL_CROM0_SWITCH_TEST_INSTRUCTIONS: &[&str] =
+    &[RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT];
 pub const RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS: u16 = 0x18CE;
 pub const RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES: [u16; 2] = [0x10DA, 0x10E4];
 pub const RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS: u16 = 0x4080;
@@ -135,6 +140,11 @@ pub const RED_LABEL_CROM0_CMOS_RAM_OK_TEXT_ADDRESS: u16 = 0x3880;
 pub const RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS: u16 = 0x3880;
 pub const RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS: u16 = 0x4078;
 pub const RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS: u16 = 0x5A8C;
+pub const RED_LABEL_CROM0_SWITCH_TEST_TEXT_ADDRESS: u16 = 0x3820;
+pub const RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS: u16 = 0x3830;
+pub const RED_LABEL_CROM0_SWITCH_DISPLAY_ROW_STEP: u16 = 0x000A;
+pub const RED_LABEL_CROM0_SWITCH_ERASE_WIDTH: u8 = 0x38;
+pub const RED_LABEL_CROM0_SWITCH_ERASE_HEIGHT: u8 = 0x08;
 pub const RED_LABEL_CROM0_RAM_TEST_COLOR: u8 = 0xA5;
 pub const RED_LABEL_CROM0_RAM_TEST_LED: u8 = 0x04;
 pub const RED_LABEL_CROM0_CMOS_RAM_TEST_LED: u8 = 0x02;
@@ -161,6 +171,10 @@ pub const RED_LABEL_CROM0_AUDIO_KILL_SOUND_NUMBER: u8 = 0x13;
 pub const RED_LABEL_CROM0_AUDIO_LAST_SOUND_NUMBER: u8 = 0x1F;
 pub const RED_LABEL_CROM0_AUDIO_IDLE_PORT_B: u8 = 0x3F;
 pub const RED_LABEL_CROM0_AUDIO_SKIP_SOUND_NUMBERS: [u8; 3] = [0x13, 0x1B, 0x1C];
+pub const RED_LABEL_CROM0_SWITCH_CLOSURE_SOUND_NUMBER: u8 = 0x08;
+pub const RED_LABEL_CROM0_SWITCH_DISPLAY_TABLE_SIZE: usize = 38;
+pub const RED_LABEL_CROM0_SWITCH_DISPLAY_EMPTY: u8 = 0xFF;
+pub const RED_LABEL_CROM0_SWITCH_LAST_READ_SLOTS: usize = 5;
 pub const RED_LABEL_CROM0_RAM_TEST_DELAY_MS: u16 = 5000;
 pub const RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS: u16 = 10;
 pub const RED_LABEL_CROM0_RAM_TEST_START_SEED: u16 = 0x0000;
@@ -653,6 +667,98 @@ pub struct RedLabelCrom0AudioTestStep {
     pub next_sound_number: Option<u8>,
     pub next_delay_ms: Option<u16>,
     pub target: RedLabelCrom0AudioTestTarget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0SwitchTestTarget {
+    SwitchTestLoop,
+    MonitorTest,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0SwitchPanel {
+    CoinDoor,
+    ControlPanel1,
+    ControlPanel2,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0SwitchTestState {
+    pub display_table: [u8; RED_LABEL_CROM0_SWITCH_DISPLAY_TABLE_SIZE],
+    pub last_reads: [u8; RED_LABEL_CROM0_SWITCH_LAST_READ_SLOTS],
+}
+
+impl Default for RedLabelCrom0SwitchTestState {
+    fn default() -> Self {
+        Self {
+            display_table: [RED_LABEL_CROM0_SWITCH_DISPLAY_EMPTY;
+                RED_LABEL_CROM0_SWITCH_DISPLAY_TABLE_SIZE],
+            last_reads: [0; RED_LABEL_CROM0_SWITCH_LAST_READ_SLOTS],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0SwitchTestTransfer {
+    pub screen_clear_end: u16,
+    pub palette_zeroed: bool,
+    pub letter_color: RedLabelDiagnosticPaletteWrite,
+    pub headline: RedLabelDiagnosticBitmapTextWrite,
+    pub instructions: RedLabelDiagnosticInstructionBitmapTextWrite,
+    pub state: RedLabelCrom0SwitchTestState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0SwitchPortScan {
+    pub port_address: u16,
+    pub last_read_index: usize,
+    pub panel: RedLabelCrom0SwitchPanel,
+    pub panel_number: u8,
+    pub first_switch_number: u8,
+    pub raw_state: u8,
+    pub masked_state: u8,
+    pub previous_state: u8,
+    pub changed_bits: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0SwitchDisplayBlockErase {
+    pub address: u16,
+    pub width: u8,
+    pub height: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0SwitchClosed {
+    pub switch_number: u8,
+    pub changed_bit: u8,
+    pub display_slot: usize,
+    pub sound: RedLabelCrom0AudioSoundPulse,
+    pub name: RedLabelDiagnosticBitmapTextWrite,
+    pub panel_number: Option<RedLabelDiagnosticBcdNumberWrite>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0SwitchOpened {
+    pub switch_number: u8,
+    pub changed_bit: u8,
+    pub display_slot: usize,
+    pub erase: RedLabelCrom0SwitchDisplayBlockErase,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelCrom0SwitchTestChange {
+    NoChange,
+    Closed(RedLabelCrom0SwitchClosed),
+    Opened(RedLabelCrom0SwitchOpened),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0SwitchTestStep {
+    pub scans: Vec<RedLabelCrom0SwitchPortScan>,
+    pub cocktail_detected: bool,
+    pub change: RedLabelCrom0SwitchTestChange,
+    pub target: RedLabelCrom0SwitchTestTarget,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2074,6 +2180,202 @@ impl<'a> DefenderMainBoard<'a> {
         }
     }
 
+    /// Transfer the visible `SWITST` switch-test heading, instructions, and
+    /// initialized display bookkeeping.
+    ///
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L543-L563>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/mess0.src#L82-L146>.
+    pub fn red_label_write_crom0_switch_test_start(
+        &mut self,
+    ) -> Result<RedLabelCrom0SwitchTestTransfer, String> {
+        self.red_label_clear_screen();
+        self.palette_ram = [0; PALETTE_RAM_SIZE];
+        self.crom0_diagnostic_screen = RedLabelCrom0DiagnosticScreen::default();
+        self.crom0_advance_gates.clear();
+
+        let letter_color = RedLabelDiagnosticPaletteWrite {
+            address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+            index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+            value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+        };
+        self.palette_ram[usize::from(letter_color.index)] = letter_color.value;
+
+        let headline = self.red_label_write_message_text(
+            RED_LABEL_CROM0_SWITCH_TEST_TEXT_ADDRESS,
+            "VSWTTS",
+            red_label_message("VSWTTS")?,
+        )?;
+        if headline.text != RED_LABEL_CROM0_SWITCH_TEST_TEXT {
+            return Err(format!(
+                "red-label switch-test vector `VSWTTS` text `{}` does not match source text `{}`",
+                headline.text, RED_LABEL_CROM0_SWITCH_TEST_TEXT
+            ));
+        }
+
+        let instruction = RedLabelDiagnosticInstructionWrite {
+            table_label: "ISWTTS",
+            lines: RED_LABEL_CROM0_SWITCH_TEST_INSTRUCTIONS,
+        };
+        let instructions = self.red_label_write_crom0_operator_instruction_text(&instruction)?;
+
+        Ok(RedLabelCrom0SwitchTestTransfer {
+            screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            palette_zeroed: true,
+            letter_color,
+            headline,
+            instructions,
+            state: RedLabelCrom0SwitchTestState::default(),
+        })
+    }
+
+    /// Step the source `SWIT2` switch-test scan once.
+    ///
+    /// The scan handles one changed switch bit per call, matching the source
+    /// path that returns to `SWIT4A` immediately after opening or closing one
+    /// switch display row.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L564-L652>.
+    pub fn red_label_step_crom0_switch_test(
+        &mut self,
+        state: &mut RedLabelCrom0SwitchTestState,
+        advance_to_monitor: bool,
+    ) -> Result<RedLabelCrom0SwitchTestStep, String> {
+        let (mut scans, cocktail_detected) =
+            red_label_crom0_switch_port_scans(self.input_ports, state);
+        for scan_index in 0..scans.len() {
+            let scan = scans[scan_index];
+            if scan.changed_bits == 0 {
+                continue;
+            }
+
+            let changed_bit = scan.changed_bits & scan.changed_bits.wrapping_neg();
+            let switch_number = scan.first_switch_number + changed_bit.trailing_zeros() as u8;
+            state.last_reads[scan.last_read_index] ^= changed_bit;
+            let change = if scan.masked_state & changed_bit != 0 {
+                self.red_label_close_crom0_switch(
+                    state,
+                    switch_number,
+                    changed_bit,
+                    scan.panel_number,
+                    cocktail_detected,
+                )?
+            } else {
+                self.red_label_open_crom0_switch(state, switch_number, changed_bit)?
+            };
+            scans.truncate(scan_index + 1);
+
+            return Ok(RedLabelCrom0SwitchTestStep {
+                scans,
+                cocktail_detected,
+                change,
+                target: if advance_to_monitor {
+                    RedLabelCrom0SwitchTestTarget::MonitorTest
+                } else {
+                    RedLabelCrom0SwitchTestTarget::SwitchTestLoop
+                },
+            });
+        }
+
+        Ok(RedLabelCrom0SwitchTestStep {
+            scans,
+            cocktail_detected,
+            change: RedLabelCrom0SwitchTestChange::NoChange,
+            target: if advance_to_monitor {
+                RedLabelCrom0SwitchTestTarget::MonitorTest
+            } else {
+                RedLabelCrom0SwitchTestTarget::SwitchTestLoop
+            },
+        })
+    }
+
+    fn red_label_close_crom0_switch(
+        &mut self,
+        state: &mut RedLabelCrom0SwitchTestState,
+        switch_number: u8,
+        changed_bit: u8,
+        panel_number: u8,
+        cocktail_detected: bool,
+    ) -> Result<RedLabelCrom0SwitchTestChange, String> {
+        let display_slot = state
+            .display_table
+            .iter()
+            .position(|entry| red_label_crom0_switch_display_slot_is_available(*entry))
+            .ok_or_else(|| String::from("red-label CROM0 switch display table is full"))?;
+        state.display_table[display_slot] = switch_number;
+
+        let address = red_label_crom0_switch_display_address(display_slot)?;
+        let vector_label = red_label_crom0_switch_name_vector(switch_number)?;
+        let sound =
+            self.red_label_play_crom0_audio_sound(RED_LABEL_CROM0_SWITCH_CLOSURE_SOUND_NUMBER);
+        let name = self.red_label_write_message_text(
+            address,
+            vector_label,
+            red_label_message(vector_label)?,
+        )?;
+        let expected_name = red_label_crom0_switch_name_text(switch_number)?;
+        if name.text != expected_name {
+            return Err(format!(
+                "red-label switch-test vector `{vector_label}` text `{}` does not match source text `{expected_name}`",
+                name.text
+            ));
+        }
+
+        let panel_number =
+            if red_label_crom0_switch_writes_panel_number(switch_number, cocktail_detected) {
+                let bcd_number = red_label_decimal_to_bcd_byte(panel_number);
+                Some(RedLabelDiagnosticBcdNumberWrite {
+                    address: name.cursor_after,
+                    bcd_number,
+                    cursor_after: self
+                        .red_label_write_bcd_number_text(name.cursor_after, bcd_number)?,
+                })
+            } else {
+                None
+            };
+
+        Ok(RedLabelCrom0SwitchTestChange::Closed(
+            RedLabelCrom0SwitchClosed {
+                switch_number,
+                changed_bit,
+                display_slot,
+                sound,
+                name,
+                panel_number,
+            },
+        ))
+    }
+
+    fn red_label_open_crom0_switch(
+        &mut self,
+        state: &mut RedLabelCrom0SwitchTestState,
+        switch_number: u8,
+        changed_bit: u8,
+    ) -> Result<RedLabelCrom0SwitchTestChange, String> {
+        let display_slot = state
+            .display_table
+            .iter()
+            .position(|entry| *entry == switch_number)
+            .ok_or_else(|| {
+                format!("red-label CROM0 switch display table has no active switch {switch_number}")
+            })?;
+        state.display_table[display_slot] = !switch_number;
+        let address = red_label_crom0_switch_display_address(display_slot)?;
+        let erase = RedLabelCrom0SwitchDisplayBlockErase {
+            address,
+            width: RED_LABEL_CROM0_SWITCH_ERASE_WIDTH,
+            height: RED_LABEL_CROM0_SWITCH_ERASE_HEIGHT,
+        };
+        self.red_label_clear_block(erase.address, erase.width, erase.height)?;
+
+        Ok(RedLabelCrom0SwitchTestChange::Opened(
+            RedLabelCrom0SwitchOpened {
+                switch_number,
+                changed_bit,
+                display_slot,
+                erase,
+            },
+        ))
+    }
+
     fn red_label_clear_screen(&mut self) {
         self.ram[..usize::from(RED_LABEL_SCREEN_CLEAR_END)].fill(0);
     }
@@ -2230,6 +2532,22 @@ impl<'a> DefenderMainBoard<'a> {
         for column in 0..image.width {
             let column_address = red_label_screen_offset(screen_address, u16::from(column) << 8)?;
             for row in 0..image.height {
+                let address = red_label_screen_offset(column_address, u16::from(row))?;
+                self.ram[usize::from(address)] = 0;
+            }
+        }
+        Ok(())
+    }
+
+    fn red_label_clear_block(
+        &mut self,
+        screen_address: u16,
+        width: u8,
+        height: u8,
+    ) -> Result<(), String> {
+        for column in 0..width {
+            let column_address = red_label_screen_offset(screen_address, u16::from(column) << 8)?;
+            for row in 0..height {
                 let address = red_label_screen_offset(column_address, u16::from(row))?;
                 self.ram[usize::from(address)] = 0;
             }
@@ -3189,6 +3507,7 @@ fn red_label_crom0_operator_instruction_vector(line: &str) -> Result<&'static st
         RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT => Ok("VINS7"),
         RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT => Ok("VINS9"),
         RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT => Ok("VINS10"),
+        RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT => Ok("VINS11"),
         _ => Err(format!(
             "red-label CROM0 operator instruction `{line}` has no message vector"
         )),
@@ -3275,6 +3594,179 @@ fn red_label_crom0_next_audio_sound_number(
         }
         return Ok((sound_number, skipped));
     }
+}
+
+fn red_label_crom0_switch_port_scans(
+    input_ports: DefenderInputPorts,
+    state: &RedLabelCrom0SwitchTestState,
+) -> (Vec<RedLabelCrom0SwitchPortScan>, bool) {
+    let cocktail_detected = input_ports.in1 & 0x80 != 0;
+    let mut scans = vec![
+        red_label_crom0_switch_port_scan(
+            RedLabelCrom0SwitchPortScanInput {
+                port_address: 0xCC00,
+                last_read_index: 0,
+                panel: RedLabelCrom0SwitchPanel::CoinDoor,
+                panel_number: 0,
+                first_switch_number: 0,
+                raw_state: input_ports.in2,
+                masked_state: input_ports.in2,
+            },
+            state.last_reads[0],
+        ),
+        red_label_crom0_switch_port_scan(
+            RedLabelCrom0SwitchPortScanInput {
+                port_address: 0xCC04,
+                last_read_index: 1,
+                panel: RedLabelCrom0SwitchPanel::ControlPanel1,
+                panel_number: 1,
+                first_switch_number: 8,
+                raw_state: input_ports.in0,
+                masked_state: input_ports.in0,
+            },
+            state.last_reads[1],
+        ),
+        red_label_crom0_switch_port_scan(
+            RedLabelCrom0SwitchPortScanInput {
+                port_address: 0xCC06,
+                last_read_index: 2,
+                panel: RedLabelCrom0SwitchPanel::ControlPanel1,
+                panel_number: 1,
+                first_switch_number: 16,
+                raw_state: input_ports.in1,
+                masked_state: input_ports.in1 & 0x7F,
+            },
+            state.last_reads[2],
+        ),
+    ];
+
+    if cocktail_detected {
+        scans.push(red_label_crom0_switch_port_scan(
+            RedLabelCrom0SwitchPortScanInput {
+                port_address: 0xCC04,
+                last_read_index: 3,
+                panel: RedLabelCrom0SwitchPanel::ControlPanel2,
+                panel_number: 2,
+                first_switch_number: 24,
+                raw_state: input_ports.in0,
+                masked_state: input_ports.in0 & 0xCF,
+            },
+            state.last_reads[3],
+        ));
+        scans.push(red_label_crom0_switch_port_scan(
+            RedLabelCrom0SwitchPortScanInput {
+                port_address: 0xCC06,
+                last_read_index: 4,
+                panel: RedLabelCrom0SwitchPanel::ControlPanel2,
+                panel_number: 2,
+                first_switch_number: 32,
+                raw_state: input_ports.in1,
+                masked_state: input_ports.in1 & 0x7F,
+            },
+            state.last_reads[4],
+        ));
+    }
+
+    (scans, cocktail_detected)
+}
+
+struct RedLabelCrom0SwitchPortScanInput {
+    port_address: u16,
+    last_read_index: usize,
+    panel: RedLabelCrom0SwitchPanel,
+    panel_number: u8,
+    first_switch_number: u8,
+    raw_state: u8,
+    masked_state: u8,
+}
+
+fn red_label_crom0_switch_port_scan(
+    input: RedLabelCrom0SwitchPortScanInput,
+    previous_state: u8,
+) -> RedLabelCrom0SwitchPortScan {
+    RedLabelCrom0SwitchPortScan {
+        port_address: input.port_address,
+        last_read_index: input.last_read_index,
+        panel: input.panel,
+        panel_number: input.panel_number,
+        first_switch_number: input.first_switch_number,
+        raw_state: input.raw_state,
+        masked_state: input.masked_state,
+        previous_state,
+        changed_bits: input.masked_state ^ previous_state,
+    }
+}
+
+fn red_label_crom0_switch_display_slot_is_available(entry: u8) -> bool {
+    entry & 0x80 != 0
+}
+
+fn red_label_crom0_switch_display_address(display_slot: usize) -> Result<u16, String> {
+    if display_slot >= RED_LABEL_CROM0_SWITCH_DISPLAY_TABLE_SIZE {
+        return Err(format!(
+            "red-label CROM0 switch display slot {display_slot} is outside 0..{}",
+            RED_LABEL_CROM0_SWITCH_DISPLAY_TABLE_SIZE - 1
+        ));
+    }
+    Ok(RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS
+        + (display_slot as u16 * RED_LABEL_CROM0_SWITCH_DISPLAY_ROW_STEP))
+}
+
+fn red_label_crom0_switch_name_index(switch_number: u8) -> Result<usize, String> {
+    let name_number = if switch_number >= 24 {
+        switch_number - 16
+    } else {
+        switch_number
+    };
+    if name_number > 23 {
+        return Err(format!(
+            "red-label CROM0 switch number {switch_number} has no switch-test name vector"
+        ));
+    }
+    Ok(usize::from(name_number))
+}
+
+fn red_label_crom0_switch_name_vector(switch_number: u8) -> Result<&'static str, String> {
+    const VECTORS: [&str; 24] = [
+        "VSW0", "VSW1", "VSW2", "VSW3", "VSW4", "VSW5", "VSW6", "VSW7", "VSW8", "VSW9", "VSWA",
+        "VSWB", "VSWC", "VSWD", "VSWE", "VSWF", "VSW10", "VSW11", "VSW12", "VSW13", "VSW14",
+        "VSW15", "VSW16", "VSW17",
+    ];
+    Ok(VECTORS[red_label_crom0_switch_name_index(switch_number)?])
+}
+
+fn red_label_crom0_switch_name_text(switch_number: u8) -> Result<&'static str, String> {
+    const TEXT: [&str; 24] = [
+        "AUTO UP",
+        "ADVANCE",
+        "RIGHT COIN",
+        "HIGHSCORE RESET",
+        "LEFT COIN",
+        "CENTER COIN",
+        "INVALID SWITCH",
+        "INVALID SWITCH",
+        "FIRE",
+        "THRUST",
+        "SMART BOMB",
+        "HYPERSPACE",
+        "TWO PLAYERS",
+        "ONE PLAYER",
+        "REVERSE",
+        "DOWN",
+        "UP",
+        "INVALID SWITCH",
+        "INVALID SWITCH",
+        "INVALID SWITCH",
+        "INVALID SWITCH",
+        "INVALID SWITCH",
+        "INVALID SWITCH",
+        "INVALID SWITCH",
+    ];
+    Ok(TEXT[red_label_crom0_switch_name_index(switch_number)?])
+}
+
+fn red_label_crom0_switch_writes_panel_number(switch_number: u8, cocktail_detected: bool) -> bool {
+    cocktail_detected && switch_number >= 8 && switch_number >> 1 != 6
 }
 
 fn red_label_crom0_ram_test_loop_step(
@@ -3512,6 +4004,7 @@ mod tests {
             RED_LABEL_CROM0_AUDIO_TEST_SOUND_DELAY_MS, RED_LABEL_CROM0_AUDIO_TEST_TEXT,
             RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT,
+            RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS, RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT, RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT,
             RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT, RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS,
@@ -3536,7 +4029,11 @@ mod tests {
             RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER, RED_LABEL_CROM0_RAM_TEST_LED,
             RED_LABEL_CROM0_RAM_TEST_START_SEED, RED_LABEL_CROM0_RAM_TEST_TEXT,
             RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_RAM_TEST_WORDS,
-            RED_LABEL_CROM0_ROM_FAILURE_TEXT, RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
+            RED_LABEL_CROM0_ROM_FAILURE_TEXT, RED_LABEL_CROM0_SWITCH_CLOSURE_SOUND_NUMBER,
+            RED_LABEL_CROM0_SWITCH_DISPLAY_EMPTY, RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS,
+            RED_LABEL_CROM0_SWITCH_DISPLAY_TABLE_SIZE, RED_LABEL_CROM0_SWITCH_ERASE_HEIGHT,
+            RED_LABEL_CROM0_SWITCH_ERASE_WIDTH, RED_LABEL_CROM0_SWITCH_TEST_TEXT,
+            RED_LABEL_CROM0_SWITCH_TEST_TEXT_ADDRESS, RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
             RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS, RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
             RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX, RED_LABEL_DIPFLG_CELL_OFFSET,
             RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
@@ -3561,7 +4058,10 @@ mod tests {
             RedLabelCrom0RamTestLoopStatus, RedLabelCrom0RamTestLoopTarget,
             RedLabelCrom0RamTestPass, RedLabelCrom0RamTestPatternFill,
             RedLabelCrom0RamTestPatternVerification, RedLabelCrom0RamTestStartTransfer,
-            RedLabelCrom0RamTestTarget, RedLabelDiagnosticBcdNumberWrite,
+            RedLabelCrom0RamTestTarget, RedLabelCrom0SwitchDisplayBlockErase,
+            RedLabelCrom0SwitchOpened, RedLabelCrom0SwitchPanel, RedLabelCrom0SwitchPortScan,
+            RedLabelCrom0SwitchTestChange, RedLabelCrom0SwitchTestState,
+            RedLabelCrom0SwitchTestTarget, RedLabelDiagnosticBcdNumberWrite,
             RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
             RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
             RedLabelDiagnosticLedOutput, RedLabelDiagnosticPaletteWrite,
@@ -5719,6 +6219,210 @@ mod tests {
         assert!(error.contains("has no next sound"));
 
         assert_eq!(RED_LABEL_CROM0_AUDIO_SKIP_SOUND_NUMBERS, [0x13, 0x1B, 0x1C]);
+    }
+
+    #[test]
+    fn main_board_writes_crom0_switch_test_start() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let transfer = board
+            .red_label_write_crom0_switch_test_start()
+            .expect("switch test start transfer");
+
+        assert_eq!(transfer.screen_clear_end, RED_LABEL_SCREEN_CLEAR_END);
+        assert!(transfer.palette_zeroed);
+        assert_eq!(
+            transfer.letter_color,
+            RedLabelDiagnosticPaletteWrite {
+                address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+                index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+                value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+            }
+        );
+        assert_eq!(
+            transfer.headline.address,
+            RED_LABEL_CROM0_SWITCH_TEST_TEXT_ADDRESS
+        );
+        assert_eq!(transfer.headline.vector_label, "VSWTTS");
+        assert_eq!(transfer.headline.text, RED_LABEL_CROM0_SWITCH_TEST_TEXT);
+        assert_eq!(transfer.instructions.table_label, "ISWTTS");
+        assert_eq!(
+            transfer.instructions.lines[0].text,
+            RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT
+        );
+        assert_eq!(
+            transfer.state.display_table,
+            [RED_LABEL_CROM0_SWITCH_DISPLAY_EMPTY; RED_LABEL_CROM0_SWITCH_DISPLAY_TABLE_SIZE]
+        );
+        assert_eq!(transfer.state.last_reads, [0; 5]);
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_SWITCH_TEST_TEXT_ADDRESS, 'S');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0], 'A');
+    }
+
+    #[test]
+    fn main_board_steps_crom0_switch_test_close_and_open() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let mut state = RedLabelCrom0SwitchTestState::default();
+        board.set_cabinet_input(CabinetInput {
+            fire: true,
+            ..CabinetInput::NONE
+        });
+
+        let close = board
+            .red_label_step_crom0_switch_test(&mut state, false)
+            .expect("fire switch close");
+
+        assert_eq!(close.target, RedLabelCrom0SwitchTestTarget::SwitchTestLoop);
+        assert!(!close.cocktail_detected);
+        assert_eq!(
+            close.scans,
+            vec![
+                RedLabelCrom0SwitchPortScan {
+                    port_address: 0xCC00,
+                    last_read_index: 0,
+                    panel: RedLabelCrom0SwitchPanel::CoinDoor,
+                    panel_number: 0,
+                    first_switch_number: 0,
+                    raw_state: 0,
+                    masked_state: 0,
+                    previous_state: 0,
+                    changed_bits: 0,
+                },
+                RedLabelCrom0SwitchPortScan {
+                    port_address: 0xCC04,
+                    last_read_index: 1,
+                    panel: RedLabelCrom0SwitchPanel::ControlPanel1,
+                    panel_number: 1,
+                    first_switch_number: 8,
+                    raw_state: DEFENDER_IN0_FIRE,
+                    masked_state: DEFENDER_IN0_FIRE,
+                    previous_state: 0,
+                    changed_bits: DEFENDER_IN0_FIRE,
+                },
+            ]
+        );
+        let RedLabelCrom0SwitchTestChange::Closed(closed) = close.change else {
+            panic!("expected switch close");
+        };
+        assert_eq!(closed.switch_number, 8);
+        assert_eq!(closed.changed_bit, DEFENDER_IN0_FIRE);
+        assert_eq!(closed.display_slot, 0);
+        assert_eq!(
+            closed.sound,
+            RedLabelCrom0AudioSoundPulse {
+                sound_number: RED_LABEL_CROM0_SWITCH_CLOSURE_SOUND_NUMBER,
+                port_b_value: 0x37,
+                latch: SoundCommandLatch::from_main_board_pia_port_b(0x37),
+                active_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+                idle_port_b_value: RED_LABEL_CROM0_AUDIO_IDLE_PORT_B,
+                idle_latch: SoundCommandLatch::from_main_board_pia_port_b(
+                    RED_LABEL_CROM0_AUDIO_IDLE_PORT_B
+                ),
+                idle_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+            }
+        );
+        assert_eq!(
+            closed.name.address,
+            RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS
+        );
+        assert_eq!(closed.name.vector_label, "VSW8");
+        assert_eq!(closed.name.text, "FIRE");
+        assert_eq!(closed.panel_number, None);
+        assert_eq!(state.display_table[0], 8);
+        assert_eq!(state.last_reads[1], DEFENDER_IN0_FIRE);
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS, 'F');
+        assert_eq!(
+            board.last_sound_command_latch(),
+            Some(SoundCommandLatch::from_main_board_pia_port_b(
+                RED_LABEL_CROM0_AUDIO_IDLE_PORT_B
+            ))
+        );
+
+        board.set_cabinet_input(CabinetInput::NONE);
+        let open = board
+            .red_label_step_crom0_switch_test(&mut state, false)
+            .expect("fire switch open");
+        let RedLabelCrom0SwitchTestChange::Opened(opened) = open.change else {
+            panic!("expected switch open");
+        };
+        assert_eq!(
+            opened,
+            RedLabelCrom0SwitchOpened {
+                switch_number: 8,
+                changed_bit: DEFENDER_IN0_FIRE,
+                display_slot: 0,
+                erase: RedLabelCrom0SwitchDisplayBlockErase {
+                    address: RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS,
+                    width: RED_LABEL_CROM0_SWITCH_ERASE_WIDTH,
+                    height: RED_LABEL_CROM0_SWITCH_ERASE_HEIGHT,
+                },
+            }
+        );
+        assert_eq!(state.display_table[0], !8);
+        assert_eq!(state.last_reads[1], 0);
+        assert_eq!(
+            board.ram()[usize::from(RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS)],
+            0
+        );
+        assert_eq!(
+            board.ram()[usize::from(RED_LABEL_CROM0_SWITCH_DISPLAY_FIRST_ADDRESS + 0x0700)],
+            0
+        );
+    }
+
+    #[test]
+    fn main_board_steps_crom0_switch_test_cocktail_panel_and_monitor_target() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let mut state = RedLabelCrom0SwitchTestState::default();
+        state.last_reads[1] = DEFENDER_IN0_FIRE;
+        board.set_input_ports(DefenderInputPorts {
+            in0: DEFENDER_IN0_FIRE,
+            in1: 0x80,
+            in2: 0,
+        });
+
+        let panel_two = board
+            .red_label_step_crom0_switch_test(&mut state, false)
+            .expect("panel two fire switch close");
+
+        assert!(panel_two.cocktail_detected);
+        assert_eq!(panel_two.scans.len(), 4);
+        assert_eq!(
+            panel_two.scans[3],
+            RedLabelCrom0SwitchPortScan {
+                port_address: 0xCC04,
+                last_read_index: 3,
+                panel: RedLabelCrom0SwitchPanel::ControlPanel2,
+                panel_number: 2,
+                first_switch_number: 24,
+                raw_state: DEFENDER_IN0_FIRE,
+                masked_state: DEFENDER_IN0_FIRE,
+                previous_state: 0,
+                changed_bits: DEFENDER_IN0_FIRE,
+            }
+        );
+        let RedLabelCrom0SwitchTestChange::Closed(closed) = panel_two.change else {
+            panic!("expected panel two switch close");
+        };
+        assert_eq!(closed.switch_number, 24);
+        assert_eq!(closed.name.vector_label, "VSW8");
+        assert_eq!(closed.name.text, "FIRE");
+        let panel_number = closed.panel_number.expect("cocktail panel number");
+        assert_eq!(panel_number.bcd_number, 0x02);
+        assert_eq!(panel_number.address, closed.name.cursor_after);
+        assert_score_digit_at(&board, panel_number.address, 2);
+        assert_eq!(state.display_table[0], 24);
+        assert_eq!(state.last_reads[3], DEFENDER_IN0_FIRE);
+
+        let monitor = board
+            .red_label_step_crom0_switch_test(&mut state, true)
+            .expect("switch test monitor target");
+        assert_eq!(monitor.change, RedLabelCrom0SwitchTestChange::NoChange);
+        assert_eq!(monitor.target, RedLabelCrom0SwitchTestTarget::MonitorTest);
+        assert_eq!(monitor.scans.len(), 5);
     }
 
     #[test]

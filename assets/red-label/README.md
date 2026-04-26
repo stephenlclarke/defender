@@ -44,12 +44,12 @@ Current files:
 - `message-glyphs.tsv`: source `mess0.src` character image bytes consumed by
   the translated `BONUS` `MESS` text calls and CROM0 diagnostic headline,
   bad-ROM-row, operator-instruction, RAM-test start/failure/no-error, and
-  CMOS/color/audio-test text transfer.
+  CMOS/color/audio/switch-test text transfer.
 - `messages.tsv`: source `mess0.src` message vectors, word lists, and
   text-control tokens consumed by
   the translated `BONUS` screen text and CROM0 ROM-test diagnostic headline,
   bad-ROM-row, operator-instruction, RAM-test start/failure/no-error, and
-  CMOS/color/audio-test messages.
+  CMOS/color/audio/switch-test messages.
 - `object-images.tsv`: red-label object image bytes currently needed by
   `COLIDE` / `COL0` picture-mask intersection, `PRDISP` / `ON86` player
   picture writes, and translated `CWRIT` / `COFF` plus descriptor ON/OFF
@@ -208,9 +208,9 @@ support processes:
 <https://github.com/mwenge/defender/blob/master/src/defa7.src#L3035-L3042>.
 <https://github.com/mwenge/defender/blob/master/src/defb6.src#L1206-L1209>.
 `message-glyphs.tsv` and `messages.tsv` are derived from `mess0.src`
-`BONSX`, `ATWV`, `COMPV`, the CROM0 diagnostic/RAM-test/CMOS/color/audio-test
-vectors, word records, text-control bytes, `CHRTBL`, and the character image
-records consumed by the `BONUS` routine's `MESS` / `WNBV` calls:
+`BONSX`, `ATWV`, `COMPV`, the CROM0 diagnostic/RAM-test/CMOS/color/audio/switch
+test vectors, word records, text-control bytes, `CHRTBL`, and the character
+image records consumed by the `BONUS` routine's `MESS` / `WNBV` calls:
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L91-L99>.
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L142>.
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L188-L196>.

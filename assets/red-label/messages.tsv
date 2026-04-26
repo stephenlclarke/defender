@@ -11,6 +11,31 @@ VCMSOK	0xC07F	CMOS RAM OK	https://github.com/mwenge/defender/blob/master/src/mes
 VCMSAB	0xC081	MULTIPLE RAM FAILURE [HMC:0xFE] , [VMT:0x10] [HMT:0xF8] CMOS RAM CAN NOT BE TESTED	https://github.com/mwenge/defender/blob/master/src/mess0.src#L103-L104;https://github.com/mwenge/defender/blob/master/src/mess0.src#L202-L206
 VCOLTS	0xC083	COLOR RAM TEST [VMT:0x30] [HMT:0xE8] VERTICAL COLOR BARS INDICATE [RLF] [HMC:0xFC] COLOR RAM FAILURE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L105-L107;https://github.com/mwenge/defender/blob/master/src/mess0.src#L207-L211
 VAUDTS	0xC085	AUDIO TEST [RLF] [RLF] [HMC:0x04] SOUND	https://github.com/mwenge/defender/blob/master/src/mess0.src#L108-L109;https://github.com/mwenge/defender/blob/master/src/mess0.src#L212-L214
+VSWTTS	0xC087	SWITCH TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L110-L110;https://github.com/mwenge/defender/blob/master/src/mess0.src#L215-L215
+VSW0	0xC08B	AUTO UP	https://github.com/mwenge/defender/blob/master/src/mess0.src#L112-L113;https://github.com/mwenge/defender/blob/master/src/mess0.src#L217-L218
+VSW1	0xC08D	ADVANCE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L113-L114;https://github.com/mwenge/defender/blob/master/src/mess0.src#L218-L219
+VSW2	0xC08F	RIGHT COIN	https://github.com/mwenge/defender/blob/master/src/mess0.src#L114-L115;https://github.com/mwenge/defender/blob/master/src/mess0.src#L219-L220
+VSW3	0xC091	HIGHSCORE RESET	https://github.com/mwenge/defender/blob/master/src/mess0.src#L115-L116;https://github.com/mwenge/defender/blob/master/src/mess0.src#L220-L221
+VSW4	0xC093	LEFT COIN	https://github.com/mwenge/defender/blob/master/src/mess0.src#L116-L117;https://github.com/mwenge/defender/blob/master/src/mess0.src#L221-L222
+VSW5	0xC095	CENTER COIN	https://github.com/mwenge/defender/blob/master/src/mess0.src#L117-L118;https://github.com/mwenge/defender/blob/master/src/mess0.src#L222-L223
+VSW6	0xC097	INVALID SWITCH	https://github.com/mwenge/defender/blob/master/src/mess0.src#L118-L119;https://github.com/mwenge/defender/blob/master/src/mess0.src#L223-L224
+VSW7	0xC099	INVALID SWITCH	https://github.com/mwenge/defender/blob/master/src/mess0.src#L119-L120;https://github.com/mwenge/defender/blob/master/src/mess0.src#L224-L225
+VSW8	0xC09B	FIRE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L120-L121;https://github.com/mwenge/defender/blob/master/src/mess0.src#L225-L226
+VSW9	0xC09D	THRUST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L121-L122;https://github.com/mwenge/defender/blob/master/src/mess0.src#L226-L227
+VSWA	0xC09F	SMART BOMB	https://github.com/mwenge/defender/blob/master/src/mess0.src#L122-L123;https://github.com/mwenge/defender/blob/master/src/mess0.src#L227-L228
+VSWB	0xC0A1	HYPERSPACE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L123-L124;https://github.com/mwenge/defender/blob/master/src/mess0.src#L228-L229
+VSWC	0xC0A3	TWO PLAYERS	https://github.com/mwenge/defender/blob/master/src/mess0.src#L124-L125;https://github.com/mwenge/defender/blob/master/src/mess0.src#L229-L230
+VSWD	0xC0A5	ONE PLAYER	https://github.com/mwenge/defender/blob/master/src/mess0.src#L125-L126;https://github.com/mwenge/defender/blob/master/src/mess0.src#L230-L231
+VSWE	0xC0A7	REVERSE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L126-L127;https://github.com/mwenge/defender/blob/master/src/mess0.src#L231-L232
+VSWF	0xC0A9	DOWN	https://github.com/mwenge/defender/blob/master/src/mess0.src#L127-L128;https://github.com/mwenge/defender/blob/master/src/mess0.src#L232-L233
+VSW10	0xC0AB	UP	https://github.com/mwenge/defender/blob/master/src/mess0.src#L128-L129;https://github.com/mwenge/defender/blob/master/src/mess0.src#L233-L234
+VSW11	0xC0AD	INVALID SWITCH	https://github.com/mwenge/defender/blob/master/src/mess0.src#L129-L130;https://github.com/mwenge/defender/blob/master/src/mess0.src#L234-L235
+VSW12	0xC0AF	INVALID SWITCH	https://github.com/mwenge/defender/blob/master/src/mess0.src#L130-L131;https://github.com/mwenge/defender/blob/master/src/mess0.src#L235-L236
+VSW13	0xC0B1	INVALID SWITCH	https://github.com/mwenge/defender/blob/master/src/mess0.src#L131-L132;https://github.com/mwenge/defender/blob/master/src/mess0.src#L236-L237
+VSW14	0xC0B3	INVALID SWITCH	https://github.com/mwenge/defender/blob/master/src/mess0.src#L132-L133;https://github.com/mwenge/defender/blob/master/src/mess0.src#L237-L238
+VSW15	0xC0B5	INVALID SWITCH	https://github.com/mwenge/defender/blob/master/src/mess0.src#L133-L134;https://github.com/mwenge/defender/blob/master/src/mess0.src#L238-L239
+VSW16	0xC0B7	INVALID SWITCH	https://github.com/mwenge/defender/blob/master/src/mess0.src#L134-L135;https://github.com/mwenge/defender/blob/master/src/mess0.src#L239-L240
+VSW17	0xC0B9	INVALID SWITCH	https://github.com/mwenge/defender/blob/master/src/mess0.src#L135-L136;https://github.com/mwenge/defender/blob/master/src/mess0.src#L240-L240
 VINS1	0xC0BB	PRESS ADVANCE WITH SWITCH SET FOR:	https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L139;https://github.com/mwenge/defender/blob/master/src/mess0.src#L241-L243
 VINS4	0xC0C1	AUTO FOR RAM TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L139;https://github.com/mwenge/defender/blob/master/src/mess0.src#L247-L248
 VINS5	0xC0C3	AUTO TO EXIT TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L140-L141;https://github.com/mwenge/defender/blob/master/src/mess0.src#L249-L250
@@ -18,6 +43,7 @@ VINS6	0xC0C5	AUTO FOR CMOS RAM TEST	https://github.com/mwenge/defender/blob/mast
 VINS7	0xC0C7	AUTO FOR COLOR RAM TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L142-L143;https://github.com/mwenge/defender/blob/master/src/mess0.src#L251-L252
 VINS9	0xC0CB	AUTO FOR SWITCH TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L144-L145;https://github.com/mwenge/defender/blob/master/src/mess0.src#L253-L254
 VINS10	0xC0CD	MANUAL TO TEST INDIVIDUAL SOUNDS	https://github.com/mwenge/defender/blob/master/src/mess0.src#L145-L146;https://github.com/mwenge/defender/blob/master/src/mess0.src#L254-L255
+VINS11	0xC0CF	AUTO FOR MONITOR TEST PATTERNS	https://github.com/mwenge/defender/blob/master/src/mess0.src#L146-L147;https://github.com/mwenge/defender/blob/master/src/mess0.src#L255-L256
 BONSX	0xC0F3	BONUS X	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
 ATWV	0xC0F9	ATTACK WAVE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
 COMPV	0xC0FB	COMPLETED	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296

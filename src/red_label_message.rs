@@ -563,5 +563,44 @@ mod tests {
                 String::from("SOUNDS")
             ]
         );
+        let switch_messages: &[(&str, &[&str])] = &[
+            ("VSWTTS", &["SWITCH", "TEST"]),
+            ("VSW0", &["AUTO", "UP"]),
+            ("VSW1", &["ADVANCE"]),
+            ("VSW2", &["RIGHT", "COIN"]),
+            ("VSW3", &["HIGHSCORE", "RESET"]),
+            ("VSW4", &["LEFT", "COIN"]),
+            ("VSW5", &["CENTER", "COIN"]),
+            ("VSW6", &["INVALID", "SWITCH"]),
+            ("VSW7", &["INVALID", "SWITCH"]),
+            ("VSW8", &["FIRE"]),
+            ("VSW9", &["THRUST"]),
+            ("VSWA", &["SMART", "BOMB"]),
+            ("VSWB", &["HYPERSPACE"]),
+            ("VSWC", &["TWO", "PLAYERS"]),
+            ("VSWD", &["ONE", "PLAYER"]),
+            ("VSWE", &["REVERSE"]),
+            ("VSWF", &["DOWN"]),
+            ("VSW10", &["UP"]),
+            ("VSW11", &["INVALID", "SWITCH"]),
+            ("VSW12", &["INVALID", "SWITCH"]),
+            ("VSW13", &["INVALID", "SWITCH"]),
+            ("VSW14", &["INVALID", "SWITCH"]),
+            ("VSW15", &["INVALID", "SWITCH"]),
+            ("VSW16", &["INVALID", "SWITCH"]),
+            ("VSW17", &["INVALID", "SWITCH"]),
+            ("VINS11", &["AUTO", "FOR", "MONITOR", "TEST", "PATTERNS"]),
+        ];
+        for (label, expected_words) in switch_messages {
+            assert_eq!(
+                red_label_message(label)
+                    .unwrap_or_else(|_| panic!("{label} message"))
+                    .words
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>(),
+                *expected_words
+            );
+        }
     }
 }
