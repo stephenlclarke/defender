@@ -589,7 +589,8 @@ This section records drift found during the repository review on
   `CREDST` backup in BCD sync so the translated start-switch credit gates can
   observe inserted credits, and credited/free-play live one- and two-player
   start buttons now scan `SWTAB`, dispatch `ST1`/`ST2`, and consume credits
-  through the translated `START2` tail.
+  through the translated `START2` tail. Live player controls stay gated while
+  the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1` start handoff advances.
   The board harness can now read/write packed CMOS/SRAM bytes and words using
   the documented most-significant-nibble-first order, can apply the ROM-derived
   CMOS defaults to its CMOS cell array through the visible `CMINIT` clear/copy

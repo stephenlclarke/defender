@@ -367,7 +367,8 @@ This file records behavior that must not be guessed in arcade-core code.
   including guarded `SBMBX2`/`SUCIDE`.
   Live coin input now increments the red-label `CREDIT` byte as BCD and mirrors
   `CREDST`, and credited/free-play live one- and two-player start buttons now
-  enter through `SWTAB`/`ST1`/`ST2`. Source-exact coinage/debounce,
+  enter through `SWTAB`/`ST1`/`ST2`; live controls are gated while the active
+  translated player-start handoff advances. Source-exact coinage/debounce,
   source-exact boot/start-ready state, and the no-credit one-player quick-start
   shortcut are still not translated.
   Generic/untranslated process bodies, broader suicide resume semantics, the

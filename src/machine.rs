@@ -212,6 +212,7 @@ pub struct CompatibilityState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct LiveTranslatedSwitchOutcome {
     smart_bomb_started: bool,
+    player_start_active: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8362,6 +8363,34 @@ impl RedLabelRuntimeMemory {
 
         Err(String::from(
             "red-label active process list did not terminate within process table size",
+        ))
+    }
+
+    fn active_process_has_routine(&self, routine_addresses: &[u16]) -> Result<bool, String> {
+        let layout = red_label_ram_layout()?;
+        let lists = red_label_linked_lists()?;
+        let process = table_descriptor(&layout, "process")?;
+        let super_process = table_descriptor(&layout, "super_process")?;
+        let active_head = linked_list(&lists, "active_process")?.head_address;
+        let mut process_address = self.read_word(active_head)?;
+
+        for _ in 0..(process.entries + super_process.entries) {
+            if process_address == 0 {
+                return Ok(false);
+            }
+            let table = process_table_for_address(&layout, process_address)?;
+            let routine_address = self.read_process_word(&layout, process_address, "PADDR")?;
+            if routine_addresses.contains(&routine_address) {
+                return Ok(true);
+            }
+
+            let plink =
+                process_field_range_for_address(&layout, table, process_address, "PLINK")?.start;
+            process_address = self.read_word(plink)?;
+        }
+
+        Err(String::from(
+            "red-label active process list did not terminate while searching routine addresses",
         ))
     }
 
@@ -17251,7 +17280,9 @@ impl ArcadeMachine {
 
         if self.phase == GamePhase::Playing && !started_this_frame {
             let switch_outcome = self.step_red_label_live_player_switches(input);
-            self.step_player_controls(input, events, switch_outcome);
+            if !switch_outcome.player_start_active {
+                self.step_player_controls(input, events, switch_outcome);
+            }
         }
     }
 
@@ -17434,24 +17465,31 @@ impl ArcadeMachine {
             .compatibility
             .xyzzy_active
             .then_some(self.player.smart_bombs);
-        let mut translated_input = CabinetInput::NONE;
-        translated_input.fire =
-            input.fire || (self.compatibility.xyzzy_active && self.compatibility.xyzzy_auto_fire);
-        translated_input.smart_bomb = input.smart_bomb && !self.compatibility.xyzzy_active;
-        translated_input.reverse = input.reverse;
-        translated_input.thrust = input.thrust;
-        translated_input.altitude_down = input.altitude_down;
-        translated_input.altitude_up = input.altitude_up;
-        translated_input.hyperspace = input.hyperspace;
-        self.memory
-            .scan_translated_player_switches(translated_input.defender_input_ports())
-            .expect("embedded red-label switch-scan layout is valid");
-        self.memory
-            .dispatch_switch_processes()
-            .expect("embedded red-label switch-process queue layout is valid");
-        let process_dispatch = self
-            .step_red_label_translated_process()
-            .expect("live switch scan creates only translated red-label processes");
+        let player_start_active = self
+            .red_label_live_player_start_process_active()
+            .expect("embedded red-label player-start process labels are valid");
+        let process_dispatch = if player_start_active {
+            self.step_red_label_translated_process()
+                .expect("live player start creates only translated red-label processes")
+        } else {
+            let mut translated_input = CabinetInput::NONE;
+            translated_input.fire = input.fire
+                || (self.compatibility.xyzzy_active && self.compatibility.xyzzy_auto_fire);
+            translated_input.smart_bomb = input.smart_bomb && !self.compatibility.xyzzy_active;
+            translated_input.reverse = input.reverse;
+            translated_input.thrust = input.thrust;
+            translated_input.altitude_down = input.altitude_down;
+            translated_input.altitude_up = input.altitude_up;
+            translated_input.hyperspace = input.hyperspace;
+            self.memory
+                .scan_translated_player_switches(translated_input.defender_input_ports())
+                .expect("embedded red-label switch-scan layout is valid");
+            self.memory
+                .dispatch_switch_processes()
+                .expect("embedded red-label switch-process queue layout is valid");
+            self.step_red_label_translated_process()
+                .expect("live switch scan creates only translated red-label processes")
+        };
         if let Some(smart_bombs) = overlay_smart_bombs {
             self.player.smart_bombs = smart_bombs;
         }
@@ -17460,7 +17498,23 @@ impl ArcadeMachine {
                 process_dispatch,
                 Some(RedLabelProcessDispatch::SmartBombStarted(Some(_)))
             ),
+            player_start_active: player_start_active
+                || matches!(
+                    process_dispatch,
+                    Some(RedLabelProcessDispatch::PlayerStart(_))
+                ),
         }
+    }
+
+    fn red_label_live_player_start_process_active(&self) -> Result<bool, String> {
+        let routines = [
+            red_label_routine_address("PLSTRT")?,
+            red_label_routine_address("PLST1A")?,
+            red_label_routine_address("PLSTR3")?,
+            red_label_routine_address("PLS01")?,
+            red_label_routine_address("PLS1")?,
+        ];
+        self.memory.active_process_has_routine(&routines)
     }
 
     fn sync_scores_from_red_label_memory(&mut self) -> Result<(), String> {
@@ -18343,6 +18397,38 @@ mod tests {
         assert_eq!(
             machine.red_label_ram_range(0xAAD6..0xAAD8),
             Some(&player_start_address[..])
+        );
+    }
+
+    #[test]
+    fn translated_start_defers_live_controls_while_player_start_advances() {
+        let mut machine = ArcadeMachine::new();
+        machine.step(CabinetInput {
+            coin: true,
+            start_one: true,
+            ..CabinetInput::NONE
+        });
+
+        let output = machine.step(CabinetInput {
+            reverse: true,
+            thrust: true,
+            fire: true,
+            hyperspace: true,
+            ..CabinetInput::NONE
+        });
+        let events = output.events().collect::<Vec<_>>();
+
+        assert_eq!(output.snapshot.phase, GamePhase::Playing);
+        assert!(!events.contains(&MachineEvent::ReversePressed));
+        assert!(!events.contains(&MachineEvent::FirePressed));
+        assert!(!events.contains(&MachineEvent::HyperspacePressed));
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[0x7F][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA07B..0xA07D),
+            Some(&[0x20, 0x00][..])
         );
     }
 

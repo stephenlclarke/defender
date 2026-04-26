@@ -360,7 +360,9 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   BCD and mirrors the packed backup through `CREDST`, giving the translated
   `ST1`/`ST2` credit gates source-visible state to consume. The no-credit
   one-player quick-start remains a compatibility shortcut until source-exact
-  boot and coinage own the live session. `REV` sets
+  boot and coinage own the live session. After a translated start, live player
+  controls stay gated while the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1`
+  player-start handoff advances. `REV` sets
   `REVFLG`, negates `PLADIR` into `NPLAD`, debounces `PIA21`, clears the flag,
   and returns the process to the free list.
 - ROM files are optional verification inputs only. The deployed runtime remains
