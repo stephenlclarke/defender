@@ -168,6 +168,7 @@ impl Renderer {
             GamePhase::Attract => BLUE,
             GamePhase::Playing => GREEN,
             GamePhase::GameOver => RED,
+            GamePhase::HighScoreEntry => AMBER,
         };
         self.draw_horizontal_line(48, self.image_width as i32 - 48, baseline - 22, phase_color);
 

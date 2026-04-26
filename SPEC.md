@@ -386,8 +386,11 @@ This section records drift found during the repository review on
   `assets/red-label/cmos-defaults.tsv` records the matching ROM default CMOS
   bytes, and the board can compare/insert entries in both all-time and today's
   packed high-score tables. Live mode can load/save the 256-cell CMOS image
-  through a file-backed storage trait when `--cmos-path` is provided. There is
-  still no initials-entry UI or high-score screen flow.
+  through a file-backed storage trait when `--cmos-path` is provided, and the
+  core can collect three initials for a qualifying game-over score before
+  submitting it to the all-time CMOS table. There is still no exact
+  initials-entry UI, automatic death/game-over handoff, or high-score screen
+  rendering.
 - The current deterministic trace compares Rust output to local expected TSV,
   `docs/fidelity/fixtures/` defines the ignored local fixture layout, and
   Phase 1 now has a local MAME/source trace runner plus a complete scenario
@@ -764,7 +767,9 @@ This section records drift found during the repository review on
 
 - Credits and one-player start are only a scaffold.
 - CMOS-backed high-score reset copies all-time and today's tables from
-  `DEFALT`, and packed table comparison/insertion is modeled. Initials entry,
+  `DEFALT`, packed table comparison/insertion is modeled, and qualifying
+  game-over scores can collect initials and write the all-time CMOS table.
+  Exact initials screen rendering, automatic death/game-over handoff,
   two-player state, service switches, diagnostics, audits, adjustments, and a
   default live CMOS path policy are absent from the live cabinet flow.
 - The CLI now has `--input-profile`, ROM metadata reporting with CRC-32
@@ -867,8 +872,8 @@ Build compatibility features around the arcade core:
 - Input profiles map terminal keys into cabinet action bits.
 - `xyzzy` modifies input and selected arcade events through explicit overlay
   hooks.
-- Local CMOS persistence uses a file-backed storage trait; live high-score
-  writes will use that path when the initials flow is translated.
+- Local CMOS persistence uses a file-backed storage trait; deterministic
+  initials-entry submissions write through that same CMOS image.
 - Terminal rendering consumes arcade video output but does not alter gameplay.
 
 ### Renderer
@@ -1194,7 +1199,7 @@ their behavior from labels.
    turns.
 4. Implement exact scoring for enemies, bullets, mines, humans, rescued humans,
    Pods, Swarmers, wave-end humanoid bonuses, extra ships, and smart bombs.
-5. Implement red-label initials-entry screens and live high-score flow.
+5. Translate red-label initials-entry screens and automatic game-over handoff.
 6. Decide whether live CMOS persistence should remain explicit via
    `--cmos-path` or gain a platform default path.
 7. Add operator/default settings needed for red-label exactness.

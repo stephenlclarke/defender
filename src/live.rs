@@ -55,7 +55,7 @@ pub fn run_live(
             xyzzy_invincible: xyzzy.invincible(),
             xyzzy_auto_fire: xyzzy.auto_fire(),
         });
-        let output = machine.step(input.cabinet);
+        let output = machine.step_with_typed_chars(input.cabinet, &input.typed_chars);
         let image = renderer.render_scaffold(output.snapshot);
         graphics
             .draw_frame(&mut stdout, image)
@@ -146,7 +146,9 @@ mod tests {
     use std::cell::RefCell;
     use std::io;
 
-    use crate::board::{CMOS_RAM_SIZE, CmosRam, cmos_sram_write_byte};
+    use crate::board::{
+        CMOS_RAM_SIZE, CmosRam, RED_LABEL_CRHSTD_CELL_OFFSET, cmos_sram_write_byte,
+    };
     use crate::cmos_storage::CmosStorage;
     use crate::machine::ArcadeMachine;
 
@@ -186,6 +188,14 @@ mod tests {
     fn live_cmos_storage_loads_and_saves_machine_cmos() {
         let storage = MemoryCmosStorage::default();
         let mut cmos = [0xF0; CMOS_RAM_SIZE];
+        let high_score_offset = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+        cmos_sram_write_byte(&mut cmos, high_score_offset, 0x21).expect("write score high byte");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 2, 0x27)
+            .expect("write score middle byte");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 4, 0x00).expect("write score low byte");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 6, b'D').expect("write first initial");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 8, b'R').expect("write second initial");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 10, b'J').expect("write third initial");
         cmos_sram_write_byte(&mut cmos, 0x7D, 0x04).expect("write persisted credits");
         *storage.cmos.borrow_mut() = Some(cmos);
 

@@ -252,6 +252,9 @@ impl InputMapper {
         {
             input.typed_chars.push(character.to_ascii_lowercase());
         }
+        if matches!(key_event.kind, KeyEventKind::Press) && key_event.code == KeyCode::Backspace {
+            input.typed_chars.push('\u{8}');
+        }
 
         match key_event.code {
             KeyCode::Esc if pressed => input.quit_requested = true,
@@ -630,9 +633,13 @@ mod tests {
             KeyEvent::new(KeyCode::Char('X'), KeyModifiers::SHIFT),
             &mut input,
         );
+        mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+            &mut input,
+        );
         mapper.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE), &mut input);
 
-        assert_eq!(input.typed_chars, vec!['x']);
+        assert_eq!(input.typed_chars, vec!['x', '\u{8}']);
         assert!(input.quit_requested);
     }
 

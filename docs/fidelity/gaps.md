@@ -383,8 +383,9 @@ This file records behavior that must not be guessed in arcade-core code.
   crosshatch/RGB-field/color-bar pattern behavior, monitor-to-`AUDITG` entry
   transfer, post-`PWRUP` `AuditGate` entry transfer, `AUDITG` outer frame-step
   dispatch, packed high-score table comparison/insertion, and optional
-  file-backed CMOS persistence. Initials entry and high-score screen flow are
-  not translated.
+  file-backed CMOS persistence. Deterministic initials-entry submission to the
+  all-time CMOS table is modeled; exact high-score screen rendering and
+  automatic game-over handoff are not translated.
 
 ## Player
 

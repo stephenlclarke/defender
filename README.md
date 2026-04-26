@@ -123,10 +123,11 @@ Notes:
   supports the Kitty graphics protocol.
 - Download Ghostty: <https://ghostty.org/download>
 - Download Warp: <https://www.warp.dev/download>
-- Initials entry and the live high-score screen flow are not implemented in the
-  clean-slate core yet. The ROM-derived high-score reset copy, packed
-  high-score table comparison/insertion helpers, and optional file-backed CMOS
-  persistence through `--cmos-path` are modeled.
+- Exact high-score screen rendering and automatic game-over handoff are not
+  implemented in the clean-slate core yet. The ROM-derived high-score reset
+  copy, packed high-score table comparison/insertion helpers, deterministic
+  initials-entry submission, and optional file-backed CMOS persistence through
+  `--cmos-path` are modeled.
 
 ## Controls
 
@@ -140,6 +141,8 @@ Current live scaffold controls:
 - `ENTER`: fire while playing
 - `TAB`: emit a smart-bomb event while playing
 - `H`: emit a hyperspace event while playing
+- `A`-`Z`: enter initials while high-score entry is active
+- `BACKSPACE`: delete the previous initial while high-score entry is active
 - `Q` or `ESC`: quit
 
 Letter-key controls accept either upper- or lower-case input.
@@ -186,8 +189,9 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   heading/crosshatch/RGB-field/color-bar pattern behavior and audit-branch
   handoff, `AUDITG` entry screens and `DISAUD` row video transfer/erasure, the
   post-`PWRUP` `AUDITG` frame-step loop, packed high-score table
-  comparison/insertion helpers, optional file-backed CMOS persistence, and
-  advance-gate intent, sound-table bytes, the
+  comparison/insertion helpers, deterministic initials-entry submission,
+  optional file-backed CMOS persistence, and advance-gate intent,
+  sound-table bytes, the
   complete `SWTAB` switch table, the trace schema, and `WVTAB` wave records from
   `assets/red-label/`.
 - The core now initializes source-owned process, super-process, object, player,
@@ -352,10 +356,10 @@ must be added as explicit overlay hooks with paired arcade-off tests.
 - MAME/source reference-trace tooling is in place for local Phase 1 fixtures,
   but checked-in golden traces are intentionally absent because they are local
   emulator outputs.
-- Initials entry, live high-score screen flow, two-player sessions, operator
-  settings, untranslated object/shell/process bodies, generic body
-  dispatch/frame scheduling, and sound-routine execution are still fidelity gaps
-  tracked in `SPEC.md` and `docs/fidelity/gaps.md`.
+- Exact high-score screen rendering, automatic game-over handoff, two-player
+  sessions, operator settings, untranslated object/shell/process bodies, generic
+  body dispatch/frame scheduling, and sound-routine execution are still fidelity
+  gaps tracked in `SPEC.md` and `docs/fidelity/gaps.md`.
 
 ## SonarQube
 
@@ -420,9 +424,10 @@ yet; current implementation status is tracked in `SPEC.md` and
   game-adjust entry screens, and `DISAUD` display-line formatting/video
   transfer/erasure, row navigation, post-display debounce cadence,
   deterministic audit cycle with previous-row erasure, post-`PWRUP` outer
-  frame-step dispatch, packed high-score table comparison/insertion, optional
-  file-backed CMOS persistence, and CMOS mutation rules now embedded under
-  `assets/red-label/`. The
+  frame-step dispatch, packed high-score table comparison/insertion,
+  deterministic initials-entry submission, optional file-backed CMOS
+  persistence, and CMOS mutation rules now embedded under `assets/red-label/`.
+  The
   `defb6.src` `CRTAB` bytes now feed
   the `CRINIT` pseudo-color RAM reset embedded in
   `assets/red-label/color-ram.tsv`. The `defa7.src` `SCORE`, `SNDLD`, `SHELL`,

@@ -10,6 +10,7 @@ use std::sync::OnceLock;
 use crate::{
     board::{
         CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, RED_LABEL_CRHSTD_CELL_OFFSET,
+        RED_LABEL_HIGH_SCORE_ENTRIES, RED_LABEL_HIGH_SCORE_ENTRY_CELLS,
         RED_LABEL_HIGH_SCORE_MAX_SCORE, cleared_main_cpu_ram, cmos_sram_read_byte,
         cmos_sram_read_word, cmos_sram_write_byte, red_label_crom0_ram_test_next_word,
     },
@@ -90,6 +91,7 @@ pub enum GamePhase {
     Attract,
     Playing,
     GameOver,
+    HighScoreEntry,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -151,6 +153,39 @@ pub struct MachineSnapshot {
     pub xyzzy_active: bool,
     pub xyzzy_invincible: bool,
     pub xyzzy_auto_fire: bool,
+    pub high_score_entry: Option<HighScoreEntryState>,
+    pub high_score_submission: Option<HighScoreSubmissionState>,
+}
+
+pub const RED_LABEL_INITIALS_ENTRY_CHARS: usize = 3;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreEntryState {
+    pub score: u32,
+    pub rank: u8,
+    pub initials: [u8; RED_LABEL_INITIALS_ENTRY_CHARS],
+    pub cursor: u8,
+}
+
+impl HighScoreEntryState {
+    fn new(score: u32, rank: u8) -> Self {
+        Self {
+            score,
+            rank,
+            initials: [b' '; RED_LABEL_INITIALS_ENTRY_CHARS],
+            cursor: 0,
+        }
+    }
+
+    pub fn initials_text(self) -> String {
+        self.initials.iter().map(|byte| char::from(*byte)).collect()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreSubmissionState {
+    pub player: u8,
+    pub score: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -186,6 +221,9 @@ pub enum MachineEvent {
     SmartBombPressed,
     HyperspacePressed,
     BonusAwarded,
+    HighScoreEntryStarted,
+    HighScoreInitialAccepted,
+    HighScoreSubmitted,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2065,6 +2103,19 @@ pub struct RedLabelRuntimeMemory {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RuntimeHighScoreEntry {
+    score: u32,
+    initials: [u8; RED_LABEL_INITIALS_ENTRY_CHARS],
+}
+
+impl RuntimeHighScoreEntry {
+    const EMPTY: Self = Self {
+        score: 0,
+        initials: [b' '; RED_LABEL_INITIALS_ENTRY_CHARS],
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RedLabelPowerUpRamFill {
     next_address: u16,
     a: u8,
@@ -2271,7 +2322,53 @@ impl RedLabelRuntimeMemory {
     }
 
     fn all_time_high_score_value(&self) -> Result<u32, String> {
-        let start = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+        Ok(self.all_time_high_score_entry(0)?.score)
+    }
+
+    fn all_time_high_score_qualifying_rank(&self, score: u32) -> Result<Option<u8>, String> {
+        if score > RED_LABEL_HIGH_SCORE_MAX_SCORE {
+            return Ok(None);
+        }
+        for index in 0..RED_LABEL_HIGH_SCORE_ENTRIES {
+            if score > self.all_time_high_score_entry(index)?.score {
+                return Ok(Some(
+                    u8::try_from(index + 1).expect("red-label high-score rank should fit in u8"),
+                ));
+            }
+        }
+        Ok(None)
+    }
+
+    fn insert_all_time_high_score(
+        &mut self,
+        score: u32,
+        initials: [u8; RED_LABEL_INITIALS_ENTRY_CHARS],
+    ) -> Result<Option<u8>, String> {
+        if !red_label_high_score_initials_are_valid(&initials) {
+            return Err(String::from(
+                "red-label high-score initials must be three uppercase ASCII letters",
+            ));
+        }
+        let Some(rank) = self.all_time_high_score_qualifying_rank(score)? else {
+            return Ok(None);
+        };
+        let insert_index = usize::from(rank - 1);
+        let mut entries = [RuntimeHighScoreEntry::EMPTY; RED_LABEL_HIGH_SCORE_ENTRIES];
+        for (index, entry) in entries.iter_mut().enumerate() {
+            *entry = self.all_time_high_score_entry(index)?;
+        }
+        for index in (insert_index + 1..RED_LABEL_HIGH_SCORE_ENTRIES).rev() {
+            entries[index] = entries[index - 1];
+        }
+        entries[insert_index] = RuntimeHighScoreEntry { score, initials };
+        for (index, entry) in entries.iter().copied().enumerate() {
+            self.write_all_time_high_score_entry(index, entry)?;
+        }
+        Ok(Some(rank))
+    }
+
+    fn all_time_high_score_entry(&self, index: usize) -> Result<RuntimeHighScoreEntry, String> {
+        let start = all_time_high_score_entry_offset(index)?;
         let bytes = [
             cmos_sram_read_byte(&self.cmos, start)
                 .ok_or_else(|| String::from("red-label all-time high-score byte 0 overflows"))?,
@@ -2291,7 +2388,47 @@ impl RedLabelRuntimeMemory {
                 "red-label all-time high score {score} exceeds {RED_LABEL_HIGH_SCORE_MAX_SCORE}"
             ));
         }
-        Ok(score)
+        let initials = [
+            cmos_sram_read_byte(&self.cmos, start + 6)
+                .ok_or_else(|| String::from("red-label all-time initial 0 overflows"))?,
+            cmos_sram_read_byte(&self.cmos, start + 8)
+                .ok_or_else(|| String::from("red-label all-time initial 1 overflows"))?,
+            cmos_sram_read_byte(&self.cmos, start + 10)
+                .ok_or_else(|| String::from("red-label all-time initial 2 overflows"))?,
+        ];
+        if !red_label_high_score_initials_are_valid(&initials) {
+            return Err(String::from(
+                "red-label all-time high-score initials are not valid uppercase ASCII",
+            ));
+        }
+        Ok(RuntimeHighScoreEntry { score, initials })
+    }
+
+    fn write_all_time_high_score_entry(
+        &mut self,
+        index: usize,
+        entry: RuntimeHighScoreEntry,
+    ) -> Result<(), String> {
+        let start = all_time_high_score_entry_offset(index)?;
+        let score_bytes = high_score_bcd_bytes(entry.score)?;
+        if !red_label_high_score_initials_are_valid(&entry.initials) {
+            return Err(String::from(
+                "red-label high-score initials must be three uppercase ASCII letters",
+            ));
+        }
+        for (offset, value) in [
+            (0, score_bytes[0]),
+            (2, score_bytes[1]),
+            (4, score_bytes[2]),
+            (6, entry.initials[0]),
+            (8, entry.initials[1]),
+            (10, entry.initials[2]),
+        ] {
+            cmos_sram_write_byte(&mut self.cmos, start + offset, value).ok_or_else(|| {
+                format!("red-label all-time high-score entry {index} write overflows")
+            })?;
+        }
+        Ok(())
     }
 
     pub fn object_table_crc32(&self) -> u32 {
@@ -15344,6 +15481,58 @@ fn is_bcd_byte(value: u8) -> bool {
     value >> 4 <= 9 && value & 0x0F <= 9
 }
 
+fn all_time_high_score_entry_offset(index: usize) -> Result<usize, String> {
+    if index >= RED_LABEL_HIGH_SCORE_ENTRIES {
+        return Err(format!(
+            "red-label high-score index {index} is out of range"
+        ));
+    }
+    usize::from(RED_LABEL_CRHSTD_CELL_OFFSET)
+        .checked_add(
+            index
+                .checked_mul(RED_LABEL_HIGH_SCORE_ENTRY_CELLS)
+                .ok_or_else(|| {
+                    format!("red-label high-score index {index} offset multiplication overflowed")
+                })?,
+        )
+        .ok_or_else(|| format!("red-label high-score index {index} offset overflowed"))
+}
+
+fn high_score_bcd_bytes(score: u32) -> Result<[u8; 3], String> {
+    if score > RED_LABEL_HIGH_SCORE_MAX_SCORE {
+        return Err(format!(
+            "red-label high score {score} exceeds {RED_LABEL_HIGH_SCORE_MAX_SCORE}"
+        ));
+    }
+    Ok([
+        decimal_to_bcd_byte(
+            u8::try_from(score / 10_000)
+                .expect("red-label high-score ten-thousands byte should fit in u8"),
+        ),
+        decimal_to_bcd_byte(
+            u8::try_from((score / 100) % 100)
+                .expect("red-label high-score hundreds byte should fit in u8"),
+        ),
+        decimal_to_bcd_byte(
+            u8::try_from(score % 100).expect("red-label high-score ones byte should fit in u8"),
+        ),
+    ])
+}
+
+fn red_label_high_score_initials_are_valid(
+    initials: &[u8; RED_LABEL_INITIALS_ENTRY_CHARS],
+) -> bool {
+    initials.iter().all(u8::is_ascii_uppercase)
+}
+
+fn red_label_initials_entry_byte(character: char) -> Option<u8> {
+    if character.is_ascii_alphabetic() {
+        Some(character.to_ascii_uppercase() as u8)
+    } else {
+        None
+    }
+}
+
 fn getwv_restore_wave_hits(wave: u8, restore_wave: u8) -> bool {
     if restore_wave == 0 {
         return false;
@@ -15637,6 +15826,8 @@ pub struct ArcadeMachine {
     compatibility: CompatibilityState,
     memory: RedLabelRuntimeMemory,
     trace_power_up_ram_fill: Option<RedLabelPowerUpRamFill>,
+    high_score_entry: Option<HighScoreEntryState>,
+    high_score_submission: Option<HighScoreSubmissionState>,
 }
 
 impl Default for ArcadeMachine {
@@ -15713,6 +15904,8 @@ impl ArcadeMachine {
             compatibility: CompatibilityState::default(),
             memory,
             trace_power_up_ram_fill: None,
+            high_score_entry: None,
+            high_score_submission: None,
         }
     }
 
@@ -15735,6 +15928,8 @@ impl ArcadeMachine {
             xyzzy_active: self.compatibility.xyzzy_active,
             xyzzy_invincible: self.compatibility.xyzzy_invincible,
             xyzzy_auto_fire: self.compatibility.xyzzy_auto_fire,
+            high_score_entry: self.high_score_entry,
+            high_score_submission: self.high_score_submission,
         }
     }
 
@@ -15753,6 +15948,8 @@ impl ArcadeMachine {
             xyzzy_invincible: snapshot.xyzzy_invincible,
             xyzzy_auto_fire: snapshot.xyzzy_auto_fire,
         };
+        self.high_score_entry = snapshot.high_score_entry;
+        self.high_score_submission = snapshot.high_score_submission;
     }
 
     pub fn red_label_ram(&self) -> &[u8] {
@@ -16719,25 +16916,29 @@ impl ArcadeMachine {
     }
 
     pub fn step(&mut self, input: CabinetInput) -> FrameOutput {
+        self.step_with_typed_chars(input, &[])
+    }
+
+    pub fn step_with_typed_chars(
+        &mut self,
+        input: CabinetInput,
+        typed_chars: &[char],
+    ) -> FrameOutput {
         self.frame = self.frame.saturating_add(1);
         self.last_input_bits = input.bits();
         self.rng.advance();
 
         let mut events = Vec::new();
         if self.trace_power_up_ram_fill.is_none() {
-            if input.coin {
-                self.credits = self.credits.saturating_add(1);
-                events.push(MachineEvent::CreditAdded);
-            }
-
-            if input.start_one && matches!(self.phase, GamePhase::Attract | GamePhase::GameOver) {
-                self.start_one_player_game();
-                events.push(MachineEvent::GameStarted);
-            }
-
-            if self.phase == GamePhase::Playing {
-                let switch_outcome = self.step_red_label_live_player_switches(input);
-                self.step_player_controls(input, &mut events, switch_outcome);
+            let feed_high_score_entry = self.phase == GamePhase::HighScoreEntry
+                || (self.phase == GamePhase::GameOver
+                    && self
+                        .begin_current_player_high_score_entry(&mut events)
+                        .expect("red-label high-score table should be valid"));
+            if feed_high_score_entry {
+                self.step_live_high_score_entry(typed_chars, &mut events);
+            } else {
+                self.step_live_non_high_score_input(input, &mut events);
             }
         }
 
@@ -16755,6 +16956,127 @@ impl ArcadeMachine {
         )
     }
 
+    pub fn red_label_begin_live_high_score_entry(
+        &mut self,
+        score: u32,
+    ) -> Result<Option<HighScoreEntryState>, String> {
+        let Some(rank) = self.memory.all_time_high_score_qualifying_rank(score)? else {
+            return Ok(None);
+        };
+        let state = HighScoreEntryState::new(score, rank);
+        self.phase = GamePhase::HighScoreEntry;
+        self.high_score_entry = Some(state);
+        self.high_score_submission = None;
+        Ok(Some(state))
+    }
+
+    fn step_live_non_high_score_input(
+        &mut self,
+        input: CabinetInput,
+        events: &mut Vec<MachineEvent>,
+    ) {
+        if input.coin {
+            self.credits = self.credits.saturating_add(1);
+            events.push(MachineEvent::CreditAdded);
+        }
+
+        if input.start_one && matches!(self.phase, GamePhase::Attract | GamePhase::GameOver) {
+            self.start_one_player_game();
+            events.push(MachineEvent::GameStarted);
+        }
+
+        if self.phase == GamePhase::Playing {
+            let switch_outcome = self.step_red_label_live_player_switches(input);
+            self.step_player_controls(input, events, switch_outcome);
+        }
+    }
+
+    fn begin_current_player_high_score_entry(
+        &mut self,
+        events: &mut Vec<MachineEvent>,
+    ) -> Result<bool, String> {
+        if self.high_score_entry.is_some() {
+            return Ok(true);
+        }
+        let player = self.current_high_score_player();
+        let score = match self.current_player {
+            2 => self.scores.player_two,
+            _ => self.scores.player_one,
+        };
+        if self.high_score_submission == Some(HighScoreSubmissionState { player, score }) {
+            return Ok(false);
+        }
+        if self.red_label_begin_live_high_score_entry(score)?.is_some() {
+            events.push(MachineEvent::HighScoreEntryStarted);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn step_live_high_score_entry(&mut self, typed_chars: &[char], events: &mut Vec<MachineEvent>) {
+        for &character in typed_chars {
+            if character == '\u{8}' || character == '\u{7F}' {
+                self.backspace_live_high_score_initial();
+                continue;
+            }
+
+            let Some(initial) = red_label_initials_entry_byte(character) else {
+                continue;
+            };
+            let ready_to_submit = {
+                let Some(state) = self.high_score_entry.as_mut() else {
+                    break;
+                };
+                let cursor = usize::from(state.cursor);
+                if cursor >= RED_LABEL_INITIALS_ENTRY_CHARS {
+                    false
+                } else {
+                    state.initials[cursor] = initial;
+                    state.cursor += 1;
+                    events.push(MachineEvent::HighScoreInitialAccepted);
+                    usize::from(state.cursor) == RED_LABEL_INITIALS_ENTRY_CHARS
+                }
+            };
+            if ready_to_submit {
+                self.submit_live_high_score_entry()
+                    .expect("red-label high-score entry state should remain valid");
+                events.push(MachineEvent::HighScoreSubmitted);
+                break;
+            }
+        }
+    }
+
+    fn backspace_live_high_score_initial(&mut self) {
+        let Some(state) = self.high_score_entry.as_mut() else {
+            return;
+        };
+        if state.cursor == 0 {
+            return;
+        }
+        state.cursor -= 1;
+        state.initials[usize::from(state.cursor)] = b' ';
+    }
+
+    fn submit_live_high_score_entry(&mut self) -> Result<(), String> {
+        let Some(state) = self.high_score_entry.take() else {
+            return Ok(());
+        };
+        self.memory
+            .insert_all_time_high_score(state.score, state.initials)?;
+        self.high_score_submission = Some(HighScoreSubmissionState {
+            player: self.current_high_score_player(),
+            score: state.score,
+        });
+        self.sync_high_score_from_red_label_cmos()?;
+        self.phase = GamePhase::GameOver;
+        Ok(())
+    }
+
+    fn current_high_score_player(&self) -> u8 {
+        if self.current_player == 2 { 2 } else { 1 }
+    }
+
     fn start_one_player_game(&mut self) {
         self.phase = GamePhase::Playing;
         self.current_player = 1;
@@ -16762,6 +17084,8 @@ impl ArcadeMachine {
         self.player = PlayerState::default();
         self.scores.player_one = 0;
         self.scores.next_bonus = bonus_stock_score();
+        self.high_score_entry = None;
+        self.high_score_submission = None;
         self.memory
             .start_one_player_tables()
             .expect("embedded red-label START player table assets are valid");
@@ -16878,7 +17202,9 @@ impl ArcadeMachine {
 #[cfg(test)]
 mod tests {
     use crate::{
-        board::{CMOS_RAM_SIZE, RED_LABEL_CRHSTD_CELL_OFFSET, cmos_sram_write_byte},
+        board::{
+            CMOS_RAM_SIZE, RED_LABEL_CRHSTD_CELL_OFFSET, cmos_sram_read_byte, cmos_sram_write_byte,
+        },
         input::{CabinetInput, DefenderInputPorts},
         machine::{
             ArcadeMachine, GamePhase, MachineEvent, RED_LABEL_ATTRACT_PROCESS_TYPE,
@@ -17359,6 +17685,9 @@ mod tests {
         cmos_sram_write_byte(&mut cmos, high_score_offset + 2, 0x76)
             .expect("write score middle byte");
         cmos_sram_write_byte(&mut cmos, high_score_offset + 4, 0x54).expect("write score low byte");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 6, b'A').expect("write first initial");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 8, b'C').expect("write second initial");
+        cmos_sram_write_byte(&mut cmos, high_score_offset + 10, b'E').expect("write third initial");
 
         let machine = ArcadeMachine::try_new_with_cmos(cmos).expect("load CMOS");
         let snapshot = machine.snapshot();
@@ -17366,6 +17695,127 @@ mod tests {
         assert_eq!(snapshot.scores.high_score, 987_654);
         assert_eq!(snapshot.player.lives, 3);
         assert_eq!(snapshot.player.smart_bombs, 3);
+    }
+
+    #[test]
+    fn game_over_high_score_entry_accepts_initials_and_updates_cmos_table() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = 50_000;
+        machine.restore(snapshot);
+
+        let first = machine.step_with_typed_chars(CabinetInput::NONE, &['a']);
+
+        assert_eq!(first.snapshot.phase, GamePhase::HighScoreEntry);
+        assert_eq!(
+            first.snapshot.high_score_entry.expect("entry started"),
+            super::HighScoreEntryState {
+                score: 50_000,
+                rank: 1,
+                initials: [b'A', b' ', b' '],
+                cursor: 1,
+            }
+        );
+        let first_events = first.events().collect::<Vec<_>>();
+        assert_eq!(
+            first_events,
+            vec![
+                MachineEvent::HighScoreEntryStarted,
+                MachineEvent::HighScoreInitialAccepted,
+            ]
+        );
+
+        let submitted =
+            machine.step_with_typed_chars(CabinetInput::NONE, &['b', '\u{8}', 'c', 'e']);
+
+        assert_eq!(submitted.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(submitted.snapshot.high_score_entry, None);
+        assert_eq!(submitted.snapshot.scores.high_score, 50_000);
+        let high_score_offset = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+        assert_eq!(
+            [
+                cmos_sram_read_byte(machine.red_label_cmos_ram(), high_score_offset)
+                    .expect("score high byte"),
+                cmos_sram_read_byte(machine.red_label_cmos_ram(), high_score_offset + 2)
+                    .expect("score middle byte"),
+                cmos_sram_read_byte(machine.red_label_cmos_ram(), high_score_offset + 4)
+                    .expect("score low byte"),
+                cmos_sram_read_byte(machine.red_label_cmos_ram(), high_score_offset + 6)
+                    .expect("first initial"),
+                cmos_sram_read_byte(machine.red_label_cmos_ram(), high_score_offset + 8)
+                    .expect("second initial"),
+                cmos_sram_read_byte(machine.red_label_cmos_ram(), high_score_offset + 10)
+                    .expect("third initial"),
+            ],
+            [0x05, 0x00, 0x00, b'A', b'C', b'E']
+        );
+        let submitted_events = submitted.events().collect::<Vec<_>>();
+        assert_eq!(
+            submitted_events,
+            vec![
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreSubmitted,
+            ]
+        );
+    }
+
+    #[test]
+    fn submitted_lower_rank_high_score_does_not_reenter_entry() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = 20_000;
+        machine.restore(snapshot);
+
+        let submitted = machine.step_with_typed_chars(CabinetInput::NONE, &['a', 'c', 'e']);
+
+        assert_eq!(submitted.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(submitted.snapshot.high_score_entry, None);
+        assert_eq!(
+            submitted.snapshot.high_score_submission,
+            Some(super::HighScoreSubmissionState {
+                player: 1,
+                score: 20_000,
+            })
+        );
+
+        let next = machine.step_with_typed_chars(CabinetInput::NONE, &['b', 'a', 'd']);
+
+        assert_eq!(next.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(next.snapshot.high_score_entry, None);
+        assert!(
+            !next
+                .events()
+                .any(|event| event == MachineEvent::HighScoreEntryStarted)
+        );
+    }
+
+    #[test]
+    fn non_qualifying_game_over_score_does_not_block_start() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = 10;
+        machine.restore(snapshot);
+
+        let output = machine.step_with_typed_chars(
+            CabinetInput {
+                start_one: true,
+                ..CabinetInput::NONE
+            },
+            &['a', 'b', 'c'],
+        );
+
+        assert_eq!(output.snapshot.phase, GamePhase::Playing);
+        assert_eq!(output.snapshot.high_score_entry, None);
+        assert!(
+            output
+                .events()
+                .any(|event| event == MachineEvent::GameStarted)
+        );
     }
 
     #[test]

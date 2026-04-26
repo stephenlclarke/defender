@@ -381,6 +381,7 @@ fn phase_label(phase: GamePhase) -> &'static str {
         GamePhase::Attract => "attract",
         GamePhase::Playing => "playing",
         GamePhase::GameOver => "game_over",
+        GamePhase::HighScoreEntry => "high_score_entry",
     }
 }
 
@@ -393,6 +394,9 @@ fn event_label(event: MachineEvent) -> &'static str {
         MachineEvent::SmartBombPressed => "smart_bomb_pressed",
         MachineEvent::HyperspacePressed => "hyperspace_pressed",
         MachineEvent::BonusAwarded => "bonus_awarded",
+        MachineEvent::HighScoreEntryStarted => "high_score_entry_started",
+        MachineEvent::HighScoreInitialAccepted => "high_score_initial_accepted",
+        MachineEvent::HighScoreSubmitted => "high_score_submitted",
     }
 }
 
