@@ -171,9 +171,9 @@ must be added as explicit overlay hooks with paired arcade-off tests.
 - The runtime embeds red-label defaults, score values, high-score seeds, CMOS
   layout/default metadata, input port metadata, RAM table metadata, ROM
   metadata, ROM-region/load maps with derived `CROM0` `ROMMAP` descriptors and
-  checksum reports, shell image bytes, object-picture descriptors, object image
-  bytes, sound-table bytes, the complete `SWTAB` switch table, the trace schema,
-  and `WVTAB` wave records from `assets/red-label/`.
+  checksum/stage reports, shell image bytes, object-picture descriptors, object
+  image bytes, sound-table bytes, the complete `SWTAB` switch table, the trace
+  schema, and `WVTAB` wave records from `assets/red-label/`.
 - The core now initializes source-owned process, super-process, object, player,
   player-start, switch-history, switch-queue, and shell-list RAM bytes from
   embedded red-label metadata and emits object-table/SPTR-head CRCs in fidelity
@@ -389,8 +389,8 @@ yet; current implementation status is tracked in `SPEC.md` and
   `DEFALT`, `CMOSMV`, `CMINIT`, `RHSTD`, `RHSTDS`, and `AUDITG` table routines
   provide the ROM-derived CMOS defaults, power-up CMOS branch/source dispatch
   target, source-shaped `CROM0` ROM descriptor bytes and checksum failure
-  reports, high-score reset copy, and operator audit/adjustment table, `DISAUD`
-  display-line formatting, row
+  reports plus the ROM-stage manual/auto outcome, high-score reset copy, and
+  operator audit/adjustment table, `DISAUD` display-line formatting, row
   navigation, post-display debounce cadence, deterministic audit cycle, and
   CMOS mutation rules now embedded under `assets/red-label/`. The
   `defb6.src` `CRTAB` bytes now feed
@@ -561,7 +561,7 @@ into Rust. The active embedded assets currently include:
 - `rom-regions.tsv`: MAME ROM region sizes.
 - `rom-map.tsv`: MAME `ROM_LOAD` mapping for fixed, banked, sound, and PROM
   views; the `defend.*` rows also derive the source-shaped `CROM0` `ROMMAP`
-  descriptor bytes and checksum reports.
+  descriptor bytes and checksum/stage reports.
 - `routine-addresses.tsv`: assembled red-label `defa7.src` routine entry
   points currently used for `SCORE`, `SNDLD`, `SHELL`, `BKIL`, `LFIRE`,
   `LCOL`, `LASR` / `LASR0`, `LASL` / `LASL0`, `LASD`, `COLIDE`, `COL0`,

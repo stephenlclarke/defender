@@ -136,6 +136,13 @@ pub const RED_LABEL_CROM0_ROMMAP_BYTES: usize = 24;
 pub const RED_LABEL_CROM0_ROMMAP_SLOT_BYTES: usize = 2;
 pub const RED_LABEL_CROM0_ROM_CHUNK_SIZE: usize = 0x0800;
 pub const RED_LABEL_CROM0_FIXED_ROM_BLOCK: u8 = 0x0F;
+pub const RED_LABEL_CROM0_ROM_TEST_LED: u8 = 0x08;
+pub const RED_LABEL_CROM0_OK_COLOR: u8 = 0x7A;
+pub const RED_LABEL_CROM0_FAILURE_COLOR: u8 = 0x57;
+pub const RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS: u16 = 0x3860;
+pub const RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS: u16 = 0x3880;
+pub const RED_LABEL_CROM0_BAD_ROM_CURSOR_START: u16 = 0x4266;
+pub const RED_LABEL_CROM0_BAD_ROM_CURSOR_STEP: u16 = 10;
 const RED_LABEL_CROM0_ROMMAP_ADDRESS_MASK: u8 = 0x70;
 const RED_LABEL_CROM0_ROMMAP_BLOCK_MASK: u8 = 0x0F;
 const RED_LABEL_CROM0_ROMMAP_UNUSED_MASK: u8 = 0x80;
@@ -188,6 +195,47 @@ impl RedLabelCrom0RomDiagnosticReport {
     pub fn all_roms_ok(&self) -> bool {
         self.failures.is_empty()
     }
+
+    pub fn stage_outcome(&self, operator_mode: RedLabelCrom0OperatorMode) -> RedLabelCrom0RomStage {
+        red_label_crom0_rom_stage_outcome(self, operator_mode)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0OperatorMode {
+    Manual,
+    Auto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0RomStageStatus {
+    AllRomsOk,
+    RomFailure,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0RomStageTarget {
+    WaitForNextSwitch,
+    RamTestStart,
+    RamTestActiveLoop,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0BadRomDisplay {
+    pub rom_number: u8,
+    pub cursor_address: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0RomStage {
+    pub status: RedLabelCrom0RomStageStatus,
+    pub text_color: Option<u8>,
+    pub headline_address: Option<u16>,
+    pub initial_led: Option<u8>,
+    pub final_led: Option<u8>,
+    pub flash_led: Option<u8>,
+    pub bad_rom_displays: Vec<RedLabelCrom0BadRomDisplay>,
+    pub target: RedLabelCrom0RomStageTarget,
 }
 
 pub fn red_label_crom0_rom_diagnostics(
@@ -727,6 +775,72 @@ fn red_label_crom0_rom_diagnostics_from_descriptors(
     })
 }
 
+fn red_label_crom0_rom_stage_outcome(
+    diagnostics: &RedLabelCrom0RomDiagnosticReport,
+    operator_mode: RedLabelCrom0OperatorMode,
+) -> RedLabelCrom0RomStage {
+    if diagnostics.all_roms_ok() {
+        return red_label_crom0_all_ok_stage(operator_mode);
+    }
+
+    let bad_rom_displays = diagnostics
+        .reported_bad_roms()
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, rom_number)| RedLabelCrom0BadRomDisplay {
+            rom_number,
+            cursor_address: red_label_crom0_bad_rom_cursor_address(index),
+        })
+        .collect::<Vec<_>>();
+
+    RedLabelCrom0RomStage {
+        status: RedLabelCrom0RomStageStatus::RomFailure,
+        text_color: Some(RED_LABEL_CROM0_FAILURE_COLOR),
+        headline_address: Some(RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS),
+        initial_led: Some(RED_LABEL_CROM0_ROM_TEST_LED),
+        final_led: match operator_mode {
+            RedLabelCrom0OperatorMode::Manual => diagnostics.last_reported_bad_rom(),
+            RedLabelCrom0OperatorMode::Auto => None,
+        },
+        flash_led: None,
+        bad_rom_displays,
+        target: match operator_mode {
+            RedLabelCrom0OperatorMode::Manual => RedLabelCrom0RomStageTarget::WaitForNextSwitch,
+            RedLabelCrom0OperatorMode::Auto => RedLabelCrom0RomStageTarget::RamTestStart,
+        },
+    }
+}
+
+fn red_label_crom0_all_ok_stage(operator_mode: RedLabelCrom0OperatorMode) -> RedLabelCrom0RomStage {
+    match operator_mode {
+        RedLabelCrom0OperatorMode::Manual => RedLabelCrom0RomStage {
+            status: RedLabelCrom0RomStageStatus::AllRomsOk,
+            text_color: Some(RED_LABEL_CROM0_OK_COLOR),
+            headline_address: Some(RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS),
+            initial_led: None,
+            final_led: None,
+            flash_led: Some(RED_LABEL_CROM0_ROM_TEST_LED),
+            bad_rom_displays: Vec::new(),
+            target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
+        },
+        RedLabelCrom0OperatorMode::Auto => RedLabelCrom0RomStage {
+            status: RedLabelCrom0RomStageStatus::AllRomsOk,
+            text_color: None,
+            headline_address: None,
+            initial_led: None,
+            final_led: None,
+            flash_led: None,
+            bad_rom_displays: Vec::new(),
+            target: RedLabelCrom0RomStageTarget::RamTestActiveLoop,
+        },
+    }
+}
+
+fn red_label_crom0_bad_rom_cursor_address(index: usize) -> u16 {
+    RED_LABEL_CROM0_BAD_ROM_CURSOR_START + (index as u16 + 1) * RED_LABEL_CROM0_BAD_ROM_CURSOR_STEP
+}
+
 fn red_label_crom0_rom_check(
     images: &RedLabelRomImages,
     descriptor_index: usize,
@@ -996,13 +1110,16 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::{
-        RED_LABEL_CROM0_FIXED_ROM_BLOCK, RED_LABEL_CROM0_ROMMAP_BYTES, RedLabelRomImages,
-        RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile, VerifiedRomSet, crc32,
-        load_verified_dir_against, parse_rom_descriptors, parse_rom_map, parse_rom_regions,
-        red_label_crom0_rom_diagnostics, red_label_crom0_rom_diagnostics_from_descriptors,
-        red_label_crom0_rom_map_descriptors, red_label_crom0_rom_map_descriptors_from_loads,
-        red_label_main_cpu_region, red_label_rom_map, red_label_rom_regions, red_label_roms,
-        scan_dir_against,
+        RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS, RED_LABEL_CROM0_BAD_ROM_CURSOR_STEP,
+        RED_LABEL_CROM0_FAILURE_COLOR, RED_LABEL_CROM0_FIXED_ROM_BLOCK, RED_LABEL_CROM0_OK_COLOR,
+        RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS, RED_LABEL_CROM0_ROM_TEST_LED,
+        RED_LABEL_CROM0_ROMMAP_BYTES, RedLabelCrom0OperatorMode, RedLabelCrom0RomStageStatus,
+        RedLabelCrom0RomStageTarget, RedLabelRomImages, RomDescriptor, RomLoad, RomRegion, RomView,
+        VerifiedRomFile, VerifiedRomSet, crc32, load_verified_dir_against, parse_rom_descriptors,
+        parse_rom_map, parse_rom_regions, red_label_crom0_rom_diagnostics,
+        red_label_crom0_rom_diagnostics_from_descriptors, red_label_crom0_rom_map_descriptors,
+        red_label_crom0_rom_map_descriptors_from_loads, red_label_main_cpu_region,
+        red_label_rom_map, red_label_rom_regions, red_label_roms, scan_dir_against,
     };
 
     const FAKE_ROMS: [RomDescriptor; 2] = [
@@ -1321,6 +1438,86 @@ mod tests {
         assert_eq!(diagnostics.failures()[0].start_address, 0xC000);
         assert_eq!(diagnostics.failures()[0].checksum, 0x0200);
         assert_eq!(diagnostics.reported_bad_roms(), &[6]);
+    }
+
+    #[test]
+    fn red_label_crom0_rom_stage_reports_manual_success_like_source() {
+        let images = red_label_zero_checksum_rom_images(&[]);
+        let diagnostics = red_label_crom0_rom_diagnostics(&images).expect("CROM0 diagnostics");
+
+        let stage = diagnostics.stage_outcome(RedLabelCrom0OperatorMode::Manual);
+
+        assert_eq!(stage.status, RedLabelCrom0RomStageStatus::AllRomsOk);
+        assert_eq!(stage.text_color, Some(RED_LABEL_CROM0_OK_COLOR));
+        assert_eq!(
+            stage.headline_address,
+            Some(RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS)
+        );
+        assert_eq!(stage.flash_led, Some(RED_LABEL_CROM0_ROM_TEST_LED));
+        assert_eq!(stage.initial_led, None);
+        assert_eq!(stage.final_led, None);
+        assert!(stage.bad_rom_displays.is_empty());
+        assert_eq!(stage.target, RedLabelCrom0RomStageTarget::WaitForNextSwitch);
+    }
+
+    #[test]
+    fn red_label_crom0_rom_stage_skips_success_display_in_auto_mode() {
+        let images = red_label_zero_checksum_rom_images(&[]);
+        let diagnostics = red_label_crom0_rom_diagnostics(&images).expect("CROM0 diagnostics");
+
+        let stage = diagnostics.stage_outcome(RedLabelCrom0OperatorMode::Auto);
+
+        assert_eq!(stage.status, RedLabelCrom0RomStageStatus::AllRomsOk);
+        assert_eq!(stage.text_color, None);
+        assert_eq!(stage.headline_address, None);
+        assert_eq!(stage.flash_led, None);
+        assert_eq!(stage.target, RedLabelCrom0RomStageTarget::RamTestActiveLoop);
+    }
+
+    #[test]
+    fn red_label_crom0_rom_stage_reports_manual_failure_and_waits() {
+        let images = red_label_zero_checksum_rom_images(&[("defend.2", 0, 0x01)]);
+        let mut descriptors = [0; RED_LABEL_CROM0_ROMMAP_BYTES];
+        descriptors[2] = 0x4F;
+        let diagnostics = red_label_crom0_rom_diagnostics_from_descriptors(&images, &descriptors)
+            .expect("CROM0 diagnostics");
+
+        let stage = diagnostics.stage_outcome(RedLabelCrom0OperatorMode::Manual);
+
+        assert_eq!(stage.status, RedLabelCrom0RomStageStatus::RomFailure);
+        assert_eq!(stage.text_color, Some(RED_LABEL_CROM0_FAILURE_COLOR));
+        assert_eq!(
+            stage.headline_address,
+            Some(RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS)
+        );
+        assert_eq!(stage.initial_led, Some(RED_LABEL_CROM0_ROM_TEST_LED));
+        assert_eq!(stage.final_led, Some(2));
+        assert_eq!(stage.flash_led, None);
+        assert_eq!(stage.bad_rom_displays.len(), 1);
+        assert_eq!(stage.bad_rom_displays[0].rom_number, 2);
+        assert_eq!(
+            stage.bad_rom_displays[0].cursor_address,
+            0x4266 + RED_LABEL_CROM0_BAD_ROM_CURSOR_STEP
+        );
+        assert_eq!(stage.target, RedLabelCrom0RomStageTarget::WaitForNextSwitch);
+    }
+
+    #[test]
+    fn red_label_crom0_rom_stage_auto_failure_continues_to_ram_test_start() {
+        let images = red_label_zero_checksum_rom_images(&[("defend.2", 0, 0x01)]);
+        let mut descriptors = [0; RED_LABEL_CROM0_ROMMAP_BYTES];
+        descriptors[2] = 0x4F;
+        let diagnostics = red_label_crom0_rom_diagnostics_from_descriptors(&images, &descriptors)
+            .expect("CROM0 diagnostics");
+
+        let stage = diagnostics.stage_outcome(RedLabelCrom0OperatorMode::Auto);
+
+        assert_eq!(stage.status, RedLabelCrom0RomStageStatus::RomFailure);
+        assert_eq!(stage.text_color, Some(RED_LABEL_CROM0_FAILURE_COLOR));
+        assert_eq!(stage.initial_led, Some(RED_LABEL_CROM0_ROM_TEST_LED));
+        assert_eq!(stage.final_led, None);
+        assert_eq!(stage.bad_rom_displays[0].rom_number, 2);
+        assert_eq!(stage.target, RedLabelCrom0RomStageTarget::RamTestStart);
     }
 
     #[test]

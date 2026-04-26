@@ -86,7 +86,7 @@ Current files:
 - `rom-map.tsv`: MAME `ROM_LOAD` offsets for red-label main CPU, banked
   program ROM, sound CPU, and decoder PROM images; the `defend.*` rows also
   derive the source-shaped `CROM0` `ROMMAP` descriptor bytes used by
-  `ROM0`/`ROM9` checksum reports.
+  `ROM0`/`ROM9` checksum and stage reports.
 - `routine-addresses.tsv`: assembled red-label routine entry points for the
   translated `SCORE`, `SNDLD`, `SHELL`, `BKIL`, `LFIRE`, `LCOL`, `LASR` /
   `LASR0`, `LASL` / `LASL0`, `LASD`, `COLIDE`, `COL0`, `COLCHK`, `REV`,
@@ -144,8 +144,8 @@ mirror the red-label ROM, input, and CPU map declarations from the MAME
 Williams driver:
 <https://github.com/mamedev/mame/blob/master/src/mame/midway/williams.cpp>.
 The `rom-map.tsv` main-program rows also derive the 24-byte `romf8.src`
-`ROMMAP` descriptor table and checksum reports consumed through `ROM0`/`ROM9`
-by `romc0.src` `CROM0`:
+`ROMMAP` descriptor table, checksum reports, and manual/auto ROM-stage outcomes
+consumed through `ROM0`/`ROM9` by `romc0.src` `CROM0`:
 <https://github.com/mwenge/defender/blob/master/src/romf8.src#L233-L282> and
 <https://github.com/mwenge/defender/blob/master/src/romf8.src#L615-L641>.
 The CPU address view is cross-checked against the Computer Archeology Defender

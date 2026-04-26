@@ -17,9 +17,9 @@
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, and can route the CMOS-visible
 //! `romc0.src` power-up branch. CMOS persistence, `AUDITG` live diagnostic text
-//! transfer/full-loop integration, `CROM0` diagnostic display and later-test
-//! handoff, LED segment side effects, and full video timing remain explicit
-//! fidelity gaps.
+//! transfer/full-loop integration, live `CROM0` diagnostic video/LED/later-test
+//! execution beyond the modeled ROM-stage outcome, and full video timing remain
+//! explicit fidelity gaps.
 
 use crate::{
     input::{
