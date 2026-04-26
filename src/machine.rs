@@ -2070,6 +2070,58 @@ struct RedLabelPowerUpRamFill {
     b: u8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RedLabelPowerUpRamFillTarget {
+    frame: u64,
+    target_address: u16,
+}
+
+const RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 5] = [
+    RedLabelPowerUpRamFillTarget {
+        frame: 68,
+        target_address: 0xA26A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 69,
+        target_address: 0xA4CE,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 70,
+        target_address: 0xA730,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 71,
+        target_address: 0xA994,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 72,
+        target_address: 0xAAC6,
+    },
+];
+
+const RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 5] = [
+    RedLabelPowerUpRamFillTarget {
+        frame: 240,
+        target_address: 0xA070,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 241,
+        target_address: 0xA340,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 242,
+        target_address: 0xA5A4,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 243,
+        target_address: 0xA806,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 244,
+        target_address: 0xAA6A,
+    },
+];
+
 impl RedLabelPowerUpRamFill {
     fn new() -> Self {
         Self::from_seed(0, 0)
@@ -2110,6 +2162,33 @@ fn ror_u8(value: u8, carry: bool) -> (u8, bool) {
     let next_carry = value & 0x01 != 0;
     let rotated = (value >> 1) | if carry { 0x80 } else { 0 };
     (rotated, next_carry)
+}
+
+fn red_label_trace_power_up_ram_fill_target(frame: u64) -> u16 {
+    match frame {
+        0..=67 => 0x0000,
+        68..=72 => red_label_power_up_ram_fill_target_for_frame(
+            frame,
+            &RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS,
+        ),
+        73..=239 => 0xC000,
+        240..=244 => red_label_power_up_ram_fill_target_for_frame(
+            frame,
+            &RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS,
+        ),
+        _ => 0xAAC6,
+    }
+}
+
+fn red_label_power_up_ram_fill_target_for_frame(
+    frame: u64,
+    targets: &[RedLabelPowerUpRamFillTarget],
+) -> u16 {
+    targets
+        .iter()
+        .find(|target| target.frame == frame)
+        .map(|target| target.target_address)
+        .expect("embedded red-label power-up RAM-fill trace target is complete")
 }
 
 impl RedLabelRuntimeMemory {
@@ -15690,21 +15769,7 @@ impl ArcadeMachine {
         if self.frame == 240 && fill.next_address == 0xC000 {
             *fill = RedLabelPowerUpRamFill::from_seed(0xCE, 0x5C);
         }
-        let target_address = match self.frame {
-            0..=67 => 0x0000,
-            68 => 0xA26A,
-            69 => 0xA4CE,
-            70 => 0xA730,
-            71 => 0xA994,
-            72 => 0xAAC6,
-            73..=239 => 0xC000,
-            240 => 0xA070,
-            241 => 0xA340,
-            242 => 0xA5A4,
-            243 => 0xA806,
-            244 => 0xAA6A,
-            _ => 0xAAC6,
-        };
+        let target_address = red_label_trace_power_up_ram_fill_target(self.frame);
         self.memory
             .advance_power_up_ram_fill_to(fill, target_address)
             .expect("embedded red-label power-up RAM-fill frame target is valid");
@@ -16842,7 +16907,8 @@ mod tests {
         red_label_object_image_byte_required, red_label_object_picture,
         red_label_object_picture_address, red_label_player_death_table, red_label_routine_address,
         red_label_sound_table_address, red_label_switch_table, red_label_terrain_data_table,
-        screen_offset, sign_extend_u8_to_u16, star_output_next_x, star_table_from_rand_values,
+        red_label_trace_power_up_ram_fill_target, screen_offset, sign_extend_u8_to_u16,
+        star_output_next_x, star_table_from_rand_values,
     };
 
     const CRTAB_BYTES: [u8; 16] = [
@@ -17226,6 +17292,25 @@ mod tests {
         let x_byte = x16.wrapping_sub(scan_left).to_be_bytes()[0] >> 2;
         let y_byte = y16.to_be_bytes()[0] >> 3;
         u16::from_be_bytes([x_byte, y_byte]).wrapping_add(0x3007)
+    }
+
+    #[test]
+    fn power_up_ram_fill_trace_targets_capture_mame_observed_frame_boundaries() {
+        assert_eq!(red_label_trace_power_up_ram_fill_target(1), 0x0000);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(67), 0x0000);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(68), 0xA26A);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(69), 0xA4CE);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(70), 0xA730);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(71), 0xA994);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(72), 0xAAC6);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(73), 0xC000);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(239), 0xC000);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(240), 0xA070);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(241), 0xA340);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(242), 0xA5A4);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(243), 0xA806);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(244), 0xAA6A);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(245), 0xAAC6);
     }
 
     #[test]
