@@ -17,10 +17,11 @@
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, can route the CMOS-visible
 //! `romc0.src` power-up branch, and can run the `CROM0` CMOS RAM-test
-//! write/verify loop and visible outcomes. CMOS persistence, `AUDITG` live
-//! diagnostic text transfer/full-loop integration, physical advance/lamp timing
-//! beyond the modeled ROM-stage screen/LED output, later color/sound test
-//! execution, and full video timing remain explicit fidelity gaps.
+//! write/verify loop, visible outcomes, and color-RAM diagnostic cycle. CMOS
+//! persistence, `AUDITG` live diagnostic text transfer/full-loop integration,
+//! physical advance/lamp timing beyond the modeled ROM-stage screen/LED output,
+//! later audio/switch/monitor test execution, and full video timing remain
+//! explicit fidelity gaps.
 
 use crate::{
     input::{
@@ -101,6 +102,8 @@ pub const RED_LABEL_CROM0_CMOS_RAM_FAILURE_TEXT: &str =
 pub const RED_LABEL_CROM0_CMOS_RAM_OK_TEXT: &str = "CMOS RAM OK";
 pub const RED_LABEL_CROM0_MULTIPLE_RAM_FAILURE_TEXT: &str =
     "MULTIPLE RAM FAILURE, CMOS RAM CAN NOT BE TESTED";
+pub const RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT: &str =
+    "COLOR RAM TEST VERTICAL COLOR BARS INDICATE COLOR RAM FAILURE";
 pub const RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT: &str = "AUTO FOR COLOR RAM TEST";
 pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT];
@@ -110,6 +113,8 @@ pub const RED_LABEL_CROM0_RAM_TEST_DONE_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT];
 pub const RED_LABEL_CROM0_CMOS_RAM_TEST_DONE_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT];
+pub const RED_LABEL_CROM0_COLOR_RAM_TEST_INSTRUCTIONS: &[&str] =
+    &[RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT];
 pub const RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS: u16 = 0x18CE;
 pub const RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES: [u16; 2] = [0x10DA, 0x10E4];
 pub const RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS: u16 = 0x4080;
@@ -119,14 +124,25 @@ pub const RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS: u16 = 0x2880;
 pub const RED_LABEL_CROM0_CMOS_MULTIPLE_RAM_FAILURE_TEXT_ADDRESS: u16 = 0x2880;
 pub const RED_LABEL_CROM0_CMOS_RAM_FAILURE_TEXT_ADDRESS: u16 = 0x3080;
 pub const RED_LABEL_CROM0_CMOS_RAM_OK_TEXT_ADDRESS: u16 = 0x3880;
+pub const RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS: u16 = 0x3880;
 pub const RED_LABEL_CROM0_RAM_TEST_COLOR: u8 = 0xA5;
 pub const RED_LABEL_CROM0_RAM_TEST_LED: u8 = 0x04;
 pub const RED_LABEL_CROM0_CMOS_RAM_TEST_LED: u8 = 0x02;
+pub const RED_LABEL_CROM0_COLOR_RAM_TEST_LED: u8 = 0x01;
 pub const RED_LABEL_CROM0_CMOS_NO_GOOD_BLOCK_DIRECT_PAGE: u8 = 0xA2;
 pub const RED_LABEL_CROM0_CMOS_BACKUP_PAGE_OFFSET: u8 = 0x03;
 pub const RED_LABEL_CROM0_CMOS_PATTERN_START: u8 = 0x10;
 pub const RED_LABEL_CROM0_CMOS_PATTERN_PASSES: usize = 0x10;
 pub const RED_LABEL_CROM0_CMOS_PATTERN_COMPARISONS: usize = CMOS_RAM_SIZE - 1;
+pub const RED_LABEL_CROM0_COLOR_RAM_TEST_INITIAL_DELAY_MS: u16 = 5000;
+pub const RED_LABEL_CROM0_COLOR_RAM_TEST_COLOR_DELAY_MS: u16 = 2000;
+pub const RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES: usize = 0x0F00;
+pub const RED_LABEL_CROM0_COLOR_RAM_BAR_STEP_BYTES: usize = 0x0900;
+pub const RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES: [u8; 16] = [
+    0x00, 0xFF, 0x11, 0xEE, 0x22, 0xDD, 0x33, 0xCC, 0x44, 0xBB, 0x55, 0xAA, 0x66, 0x99, 0x77, 0x88,
+];
+pub const RED_LABEL_CROM0_COLOR_RAM_PALETTE_BYTES: [u8; 8] =
+    [0x02, 0x03, 0x04, 0x10, 0x18, 0x20, 0x40, 0x80];
 pub const RED_LABEL_CROM0_RAM_TEST_DELAY_MS: u16 = 5000;
 pub const RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS: u16 = 10;
 pub const RED_LABEL_CROM0_RAM_TEST_START_SEED: u16 = 0x0000;
@@ -512,6 +528,58 @@ pub struct RedLabelCrom0CmosRamTestLoopStep {
     pub abort_pattern_counter: Option<u8>,
     pub failure: Option<RedLabelCrom0CmosRamFailure>,
     pub cmos_restored: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0ColorRamTestTarget {
+    ColorRamLoop,
+    AudioTest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0ColorRamTestTransfer {
+    pub screen_clear_end: u16,
+    pub palette_zeroed: bool,
+    pub led_output: RedLabelDiagnosticLedOutput,
+    pub letter_color: RedLabelDiagnosticPaletteWrite,
+    pub headline: RedLabelDiagnosticBitmapTextWrite,
+    pub instructions: RedLabelDiagnosticInstructionBitmapTextWrite,
+    pub initial_delay_ms: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0ColorRamBarWrite {
+    pub bar_index: usize,
+    pub value: u8,
+    pub start_address: u16,
+    pub end_address: u16,
+    pub bytes_written: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0ColorRamBars {
+    pub source_label: &'static str,
+    pub palette_zeroed: bool,
+    pub bars: Vec<RedLabelCrom0ColorRamBarWrite>,
+    pub watchdog_reset_count: usize,
+    pub operator_abort_after_bar: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0ColorRamPaletteFill {
+    pub color_index: usize,
+    pub value: u8,
+    pub start_address: u16,
+    pub end_address: u16,
+    pub registers_written: usize,
+    pub delay_ms: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0ColorRamPaletteCycle {
+    pub source_label: &'static str,
+    pub fills: Vec<RedLabelCrom0ColorRamPaletteFill>,
+    pub target: RedLabelCrom0ColorRamTestTarget,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1636,6 +1704,158 @@ impl<'a> DefenderMainBoard<'a> {
         for offset in 0..CMOS_RAM_SIZE {
             let saved = self.ram[usize::from(backup_address) + offset];
             self.cmos_ram[offset] = cmos_4bit_write_value(saved);
+        }
+    }
+
+    /// Transfer the visible `COLRAM` diagnostic heading and instructions.
+    ///
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L457-L467>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/mess0.src#L79-L108>.
+    pub fn red_label_write_crom0_color_ram_test_start(
+        &mut self,
+    ) -> Result<RedLabelCrom0ColorRamTestTransfer, String> {
+        self.red_label_clear_screen();
+        self.palette_ram = [0; PALETTE_RAM_SIZE];
+        self.crom0_diagnostic_screen = RedLabelCrom0DiagnosticScreen::default();
+        self.crom0_advance_gates.clear();
+
+        let led_output = self.red_label_set_diagnostic_leds(RED_LABEL_CROM0_COLOR_RAM_TEST_LED);
+        let letter_color = RedLabelDiagnosticPaletteWrite {
+            address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+            index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+            value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+        };
+        self.palette_ram[usize::from(letter_color.index)] = letter_color.value;
+
+        let headline = self.red_label_write_message_text(
+            RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS,
+            "VCOLTS",
+            red_label_message("VCOLTS")?,
+        )?;
+        if headline.text != RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT {
+            return Err(format!(
+                "red-label color-RAM-test vector `VCOLTS` text `{}` does not match source text `{}`",
+                headline.text, RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT
+            ));
+        }
+
+        let instruction = RedLabelDiagnosticInstructionWrite {
+            table_label: "ICOLTS",
+            lines: RED_LABEL_CROM0_COLOR_RAM_TEST_INSTRUCTIONS,
+        };
+        let instructions = self.red_label_write_crom0_operator_instruction_text(&instruction)?;
+
+        Ok(RedLabelCrom0ColorRamTestTransfer {
+            screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            palette_zeroed: true,
+            led_output,
+            letter_color,
+            headline,
+            instructions,
+            initial_delay_ms: RED_LABEL_CROM0_COLOR_RAM_TEST_INITIAL_DELAY_MS,
+        })
+    }
+
+    /// Execute the source `RAMBAR` vertical bar write into video RAM.
+    ///
+    /// The first black bar is widened by the source `TSTA` branch; later bars
+    /// advance by `0x0900` after writing `0x0F00` bytes, producing the same
+    /// overlapped video-RAM pattern as `romc8.src`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L504-L524>.
+    pub fn red_label_draw_crom0_color_ram_bars(
+        &mut self,
+        operator_abort_after_bar: Option<usize>,
+    ) -> Result<RedLabelCrom0ColorRamBars, String> {
+        red_label_validate_color_ram_bar_abort(operator_abort_after_bar)?;
+
+        self.palette_ram.fill(0);
+        let mut bars = Vec::with_capacity(RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES.len());
+        let mut start = 0usize;
+        let mut watchdog_reset_count = 0;
+
+        for (bar_index, value) in RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            let end = start
+                .checked_add(RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES)
+                .ok_or_else(|| format!("red-label color-RAM bar {bar_index} address overflows"))?;
+            if end > usize::from(RED_LABEL_SCREEN_CLEAR_END) {
+                return Err(format!(
+                    "red-label color-RAM bar {bar_index} range 0x{start:04X}..0x{end:04X} exceeds video RAM"
+                ));
+            }
+
+            self.ram[start..end].fill(value);
+            watchdog_reset_count += 1;
+            bars.push(RedLabelCrom0ColorRamBarWrite {
+                bar_index,
+                value,
+                start_address: u16::try_from(start)
+                    .expect("color-RAM bar start is inside main RAM"),
+                end_address: u16::try_from(end).expect("color-RAM bar end is inside main RAM"),
+                bytes_written: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+            });
+
+            if operator_abort_after_bar == Some(bar_index + 1) {
+                break;
+            }
+
+            start = start
+                .checked_add(RED_LABEL_CROM0_COLOR_RAM_BAR_STEP_BYTES)
+                .ok_or_else(|| {
+                    format!("red-label color-RAM bar {bar_index} next address overflows")
+                })?;
+            if value == 0 {
+                start = RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES;
+            }
+        }
+
+        Ok(RedLabelCrom0ColorRamBars {
+            source_label: "COLRMD",
+            palette_zeroed: true,
+            bars,
+            watchdog_reset_count,
+            operator_abort_after_bar,
+        })
+    }
+
+    /// Execute one source `COLRM0`/`COLRM1` color-RAM palette cycle.
+    ///
+    /// Each step writes one `COLRMT` byte across hardware color RAM
+    /// `0xC000..0xC010`; the caller supplies the final `ASCNTR` branch result.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L469-L484>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L312-L313>.
+    pub fn red_label_step_crom0_color_ram_palette_cycle(
+        &mut self,
+        advance_to_audio: bool,
+    ) -> RedLabelCrom0ColorRamPaletteCycle {
+        let mut fills = Vec::with_capacity(RED_LABEL_CROM0_COLOR_RAM_PALETTE_BYTES.len());
+        for (color_index, value) in RED_LABEL_CROM0_COLOR_RAM_PALETTE_BYTES
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            self.palette_ram.fill(value);
+            fills.push(RedLabelCrom0ColorRamPaletteFill {
+                color_index,
+                value,
+                start_address: MAIN_CPU_BANKED_ROM_START,
+                end_address: MAIN_CPU_BANKED_ROM_START + PALETTE_RAM_SIZE as u16,
+                registers_written: PALETTE_RAM_SIZE,
+                delay_ms: RED_LABEL_CROM0_COLOR_RAM_TEST_COLOR_DELAY_MS,
+            });
+        }
+
+        RedLabelCrom0ColorRamPaletteCycle {
+            source_label: "COLRMT",
+            fills,
+            target: if advance_to_audio {
+                RedLabelCrom0ColorRamTestTarget::AudioTest
+            } else {
+                RedLabelCrom0ColorRamTestTarget::ColorRamLoop
+            },
         }
     }
 
@@ -2765,6 +2985,20 @@ fn red_label_crom0_cmos_backup_address(direct_page: u8) -> Result<u16, String> {
     Ok(backup_address)
 }
 
+fn red_label_validate_color_ram_bar_abort(
+    operator_abort_after_bar: Option<usize>,
+) -> Result<(), String> {
+    if let Some(bar_index) = operator_abort_after_bar
+        && !(1..=RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES.len()).contains(&bar_index)
+    {
+        return Err(format!(
+            "red-label CROM0 color-RAM abort bar {bar_index} is outside 1..={}",
+            RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES.len()
+        ));
+    }
+    Ok(())
+}
+
 fn red_label_crom0_ram_test_loop_step(
     pass: RedLabelCrom0RamTestPass,
     operator_abort: bool,
@@ -2986,13 +3220,14 @@ mod tests {
     use crate::{
         board::{
             CMOS_RAM_SIZE, DefenderIoWindow, DefenderMainBoard, DefenderMainCpuRomBus,
-            MAIN_CPU_BANK_SELECT_WRITE, MAIN_CPU_IO_BANK, MAIN_CPU_RAM_SIZE, MainCpuReadError,
-            MainCpuReadTarget, MainCpuReadWindow, MainCpuRomRead, MainCpuWriteError,
-            MainCpuWriteTarget, PALETTE_RAM_SIZE, RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS,
-            RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS, RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS,
-            RED_LABEL_CLRALL_PACKED_BYTE_WRITES, RED_LABEL_CLRAUD_PACKED_BYTE_WRITES,
-            RED_LABEL_CMOSCK_CELL_OFFSET, RED_LABEL_CRHSTD_CELL_OFFSET,
-            RED_LABEL_CROM0_ALL_ROMS_OK_TEXT, RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT,
+            MAIN_CPU_BANK_SELECT_WRITE, MAIN_CPU_BANKED_ROM_START, MAIN_CPU_IO_BANK,
+            MAIN_CPU_RAM_SIZE, MainCpuReadError, MainCpuReadTarget, MainCpuReadWindow,
+            MainCpuRomRead, MainCpuWriteError, MainCpuWriteTarget, PALETTE_RAM_SIZE,
+            RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS, RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS,
+            RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS, RED_LABEL_CLRALL_PACKED_BYTE_WRITES,
+            RED_LABEL_CLRAUD_PACKED_BYTE_WRITES, RED_LABEL_CMOSCK_CELL_OFFSET,
+            RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_CROM0_ALL_ROMS_OK_TEXT,
+            RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS, RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT, RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT,
@@ -3004,6 +3239,10 @@ mod tests {
             RED_LABEL_CROM0_CMOS_PATTERN_START, RED_LABEL_CROM0_CMOS_RAM_FAILURE_TEXT,
             RED_LABEL_CROM0_CMOS_RAM_FAILURE_TEXT_ADDRESS, RED_LABEL_CROM0_CMOS_RAM_OK_TEXT,
             RED_LABEL_CROM0_CMOS_RAM_OK_TEXT_ADDRESS, RED_LABEL_CROM0_CMOS_RAM_TEST_LED,
+            RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES, RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+            RED_LABEL_CROM0_COLOR_RAM_PALETTE_BYTES, RED_LABEL_CROM0_COLOR_RAM_TEST_COLOR_DELAY_MS,
+            RED_LABEL_CROM0_COLOR_RAM_TEST_INITIAL_DELAY_MS, RED_LABEL_CROM0_COLOR_RAM_TEST_LED,
+            RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT, RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS,
             RED_LABEL_CROM0_MULTIPLE_RAM_FAILURE_TEXT, RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT,
             RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES,
             RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT,
@@ -3027,7 +3266,10 @@ mod tests {
             RedLabelCrom0CmosRamTestLoopStep, RedLabelCrom0CmosRamTestLoopTarget,
             RedLabelCrom0CmosRamTestPatternFill, RedLabelCrom0CmosRamTestPatternVerification,
             RedLabelCrom0CmosRamTestStatus, RedLabelCrom0CmosRamTestTarget,
-            RedLabelCrom0CmosRamTestTransfer, RedLabelCrom0RamFailure,
+            RedLabelCrom0CmosRamTestTransfer, RedLabelCrom0ColorRamBarWrite,
+            RedLabelCrom0ColorRamBars, RedLabelCrom0ColorRamPaletteCycle,
+            RedLabelCrom0ColorRamPaletteFill, RedLabelCrom0ColorRamTestTarget,
+            RedLabelCrom0ColorRamTestTransfer, RedLabelCrom0RamFailure,
             RedLabelCrom0RamFailureTransfer, RedLabelCrom0RamTestAbortStatus,
             RedLabelCrom0RamTestAbortTransfer, RedLabelCrom0RamTestLoopStatus,
             RedLabelCrom0RamTestLoopTarget, RedLabelCrom0RamTestPass,
@@ -4819,6 +5061,197 @@ mod tests {
                 }),
             }
         );
+    }
+
+    #[test]
+    fn main_board_writes_crom0_color_ram_test_start() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let transfer = board
+            .red_label_write_crom0_color_ram_test_start()
+            .expect("color RAM test start transfer");
+
+        assert_eq!(
+            transfer,
+            RedLabelCrom0ColorRamTestTransfer {
+                screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+                palette_zeroed: true,
+                led_output: red_label_diagnostic_led_output(RED_LABEL_CROM0_COLOR_RAM_TEST_LED),
+                letter_color: RedLabelDiagnosticPaletteWrite {
+                    address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+                    index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+                    value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+                },
+                headline: RedLabelDiagnosticBitmapTextWrite {
+                    address: RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS,
+                    vector_label: "VCOLTS",
+                    text: String::from(RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT),
+                    cursor_after: 0x76BA,
+                },
+                instructions: RedLabelDiagnosticInstructionBitmapTextWrite {
+                    table_label: "ICOLTS",
+                    prompt: RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                        vector_label: "VINS1",
+                        text: String::from(RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT),
+                        cursor_after: 0x96CE,
+                    },
+                    lines: vec![RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                        vector_label: "VINS5",
+                        text: String::from(RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT),
+                        cursor_after: 0x4FDA,
+                    }],
+                },
+                initial_delay_ms: RED_LABEL_CROM0_COLOR_RAM_TEST_INITIAL_DELAY_MS,
+            }
+        );
+        assert_eq!(
+            board.palette_ram()[usize::from(RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX)],
+            RED_LABEL_CROM0_RAM_TEST_COLOR
+        );
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS, 'C');
+        assert_message_glyph_at(&board, 0x20B0, 'V');
+        assert_message_glyph_at(&board, 0x34BA, 'C');
+    }
+
+    #[test]
+    fn main_board_draws_crom0_color_ram_bars_with_source_overlap() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        board.write_byte(0xC001, 0xA5).expect("dirty color RAM");
+
+        let bars = board
+            .red_label_draw_crom0_color_ram_bars(None)
+            .expect("color RAM bars");
+
+        assert_eq!(bars.source_label, "COLRMD");
+        assert!(bars.palette_zeroed);
+        assert_eq!(bars.bars.len(), RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES.len());
+        assert_eq!(
+            bars.watchdog_reset_count,
+            RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES.len()
+        );
+        assert_eq!(bars.operator_abort_after_bar, None);
+        assert_eq!(
+            bars.bars[0],
+            RedLabelCrom0ColorRamBarWrite {
+                bar_index: 0,
+                value: RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES[0],
+                start_address: 0x0000,
+                end_address: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES as u16,
+                bytes_written: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+            }
+        );
+        assert_eq!(
+            bars.bars[1],
+            RedLabelCrom0ColorRamBarWrite {
+                bar_index: 1,
+                value: RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES[1],
+                start_address: 0x0F00,
+                end_address: 0x1E00,
+                bytes_written: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+            }
+        );
+        assert_eq!(
+            bars.bars[15],
+            RedLabelCrom0ColorRamBarWrite {
+                bar_index: 15,
+                value: RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES[15],
+                start_address: 0x8D00,
+                end_address: RED_LABEL_SCREEN_CLEAR_END,
+                bytes_written: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+            }
+        );
+        assert_eq!(board.ram()[0x0000], 0x00);
+        assert_eq!(board.ram()[0x0EFF], 0x00);
+        assert_eq!(board.ram()[0x0F00], 0xFF);
+        assert_eq!(board.ram()[0x1800], 0x11);
+        assert_eq!(board.ram()[0x9BFF], 0x88);
+        assert!(board.palette_ram().iter().all(|value| *value == 0));
+    }
+
+    #[test]
+    fn main_board_draws_crom0_color_ram_bars_until_operator_abort() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        board.write_byte(0x1800, 0xEE).expect("dirty unwritten RAM");
+
+        let bars = board
+            .red_label_draw_crom0_color_ram_bars(Some(2))
+            .expect("color RAM bars abort");
+
+        assert_eq!(
+            bars,
+            RedLabelCrom0ColorRamBars {
+                source_label: "COLRMD",
+                palette_zeroed: true,
+                bars: vec![
+                    RedLabelCrom0ColorRamBarWrite {
+                        bar_index: 0,
+                        value: RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES[0],
+                        start_address: 0x0000,
+                        end_address: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES as u16,
+                        bytes_written: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+                    },
+                    RedLabelCrom0ColorRamBarWrite {
+                        bar_index: 1,
+                        value: RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES[1],
+                        start_address: 0x0F00,
+                        end_address: 0x1E00,
+                        bytes_written: RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
+                    },
+                ],
+                watchdog_reset_count: 2,
+                operator_abort_after_bar: Some(2),
+            }
+        );
+        assert_eq!(board.ram()[0x1800], 0xFF);
+
+        let error = board
+            .red_label_draw_crom0_color_ram_bars(Some(17))
+            .expect_err("invalid abort bar");
+        assert!(error.contains("outside 1..=16"));
+    }
+
+    #[test]
+    fn main_board_steps_crom0_color_ram_palette_cycle() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let cycle = board.red_label_step_crom0_color_ram_palette_cycle(false);
+        let expected_fills: Vec<_> = RED_LABEL_CROM0_COLOR_RAM_PALETTE_BYTES
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(color_index, value)| RedLabelCrom0ColorRamPaletteFill {
+                color_index,
+                value,
+                start_address: MAIN_CPU_BANKED_ROM_START,
+                end_address: MAIN_CPU_BANKED_ROM_START + PALETTE_RAM_SIZE as u16,
+                registers_written: PALETTE_RAM_SIZE,
+                delay_ms: RED_LABEL_CROM0_COLOR_RAM_TEST_COLOR_DELAY_MS,
+            })
+            .collect();
+
+        assert_eq!(
+            cycle,
+            RedLabelCrom0ColorRamPaletteCycle {
+                source_label: "COLRMT",
+                fills: expected_fills,
+                target: RedLabelCrom0ColorRamTestTarget::ColorRamLoop,
+            }
+        );
+        assert!(
+            board
+                .palette_ram()
+                .iter()
+                .all(|value| *value == *RED_LABEL_CROM0_COLOR_RAM_PALETTE_BYTES.last().unwrap())
+        );
+
+        let next = board.red_label_step_crom0_color_ram_palette_cycle(true);
+        assert_eq!(next.target, RedLabelCrom0ColorRamTestTarget::AudioTest);
     }
 
     #[test]

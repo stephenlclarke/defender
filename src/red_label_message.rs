@@ -502,5 +502,27 @@ mod tests {
                 String::from("TEST")
             ]
         );
+        assert_eq!(
+            red_label_message("VCOLTS")
+                .expect("VCOLTS message")
+                .words
+                .as_slice(),
+            &[
+                String::from("COLOR"),
+                String::from("RAM"),
+                String::from("TEST"),
+                String::from("[VMT:0x30]"),
+                String::from("[HMT:0xE8]"),
+                String::from("VERTICAL"),
+                String::from("COLOR"),
+                String::from("BARS"),
+                String::from("INDICATE"),
+                String::from("[RLF]"),
+                String::from("[HMC:0xFC]"),
+                String::from("COLOR"),
+                String::from("RAM"),
+                String::from("FAILURE")
+            ]
+        );
     }
 }

@@ -74,7 +74,8 @@ This file records behavior that must not be guessed in arcade-core code.
   sequence, message-ROM bitmap text transfer including CMOS text controls,
   RAM-test start/failure/no-error visible setup, the RAM2 pattern fill/verify
   pass, pass-boundary loop dispatch, and CMOS RAM-test write/verify loop plus
-  visible outcomes.
+  visible outcomes, plus the CROM0 color-RAM diagnostic heading/bars/palette
+  loop.
   The MAME-documented main-board and sound-board memory maps are
   embedded under
   `assets/red-label/memory-map.tsv` and checked against the Rust address
@@ -148,10 +149,10 @@ This file records behavior that must not be guessed in arcade-core code.
   scheduling, exact Williams power-on RAM contents, `AUDITG` live text
   transfer/screen erasure/post-`PWRUP` wiring, physical advance-switch timing,
   physical lamp timing, sub-pass/page-boundary RAM-test operator polling, and
-  later color/sound test execution after the modeled RAM-test and CMOS RAM-test
-  loop, CMOS persistence, screen scanline scheduling, watchdog
-  timing/reset side effects, palette/rendering timing side effects, decoder PROM
-  behavior, and DAC sample generation are not modeled.
+  later audio/switch/monitor test execution after the modeled RAM-test, CMOS
+  RAM-test, and color-RAM diagnostic loops, CMOS persistence, screen scanline
+  scheduling, watchdog timing/reset side effects, palette/rendering timing side
+  effects, decoder PROM behavior, and DAC sample generation are not modeled.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core
   scaffold. It initializes `PINIT`/`OINIT`-style process, super-process, and
   object free lists, sets `CRPROC` to the active-process head, clears active
@@ -368,11 +369,12 @@ This file records behavior that must not be guessed in arcade-core code.
   headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
   gate metadata plus the RAM-test start/failure/no-error visible setup, RAM2
   pattern fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test
-  write/verify loop plus visible outcomes. CMOS persistence, `AUDITG` live text
+  write/verify loop plus visible outcomes and the CROM0 color-RAM diagnostic
+  heading/bars/palette loop. CMOS persistence, `AUDITG` live text
   transfer/screen erasure/post-`PWRUP` wiring, high-score comparison/initials
   routines, sub-pass/page-boundary RAM-test operator polling, and later
-  color/sound test execution beyond the modeled RAM-test and CMOS RAM-test loop
-  are not translated.
+  audio/switch/monitor test execution beyond the modeled RAM-test, CMOS
+  RAM-test, and color-RAM diagnostic loops are not translated.
 
 ## Player
 

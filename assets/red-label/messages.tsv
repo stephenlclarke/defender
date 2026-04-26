@@ -9,6 +9,7 @@ VNORAM	0xC07B	NO RAM ERRORS DETECTED	https://github.com/mwenge/defender/blob/mas
 VCMSFL	0xC07D	CMOS RAM FAILURE [RTC:0x28,0xA0] TEST MUST BE ENTERED [RLF] WITH COIN DOOR OPEN	https://github.com/mwenge/defender/blob/master/src/mess0.src#L99-L101;https://github.com/mwenge/defender/blob/master/src/mess0.src#L196-L200
 VCMSOK	0xC07F	CMOS RAM OK	https://github.com/mwenge/defender/blob/master/src/mess0.src#L102-L102;https://github.com/mwenge/defender/blob/master/src/mess0.src#L201-L201
 VCMSAB	0xC081	MULTIPLE RAM FAILURE [HMC:0xFE] , [VMT:0x10] [HMT:0xF8] CMOS RAM CAN NOT BE TESTED	https://github.com/mwenge/defender/blob/master/src/mess0.src#L103-L104;https://github.com/mwenge/defender/blob/master/src/mess0.src#L202-L206
+VCOLTS	0xC083	COLOR RAM TEST [VMT:0x30] [HMT:0xE8] VERTICAL COLOR BARS INDICATE [RLF] [HMC:0xFC] COLOR RAM FAILURE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L105-L107;https://github.com/mwenge/defender/blob/master/src/mess0.src#L207-L211
 VINS1	0xC0BB	PRESS ADVANCE WITH SWITCH SET FOR:	https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L139;https://github.com/mwenge/defender/blob/master/src/mess0.src#L241-L243
 VINS4	0xC0C1	AUTO FOR RAM TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L139;https://github.com/mwenge/defender/blob/master/src/mess0.src#L247-L248
 VINS5	0xC0C3	AUTO TO EXIT TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L140-L141;https://github.com/mwenge/defender/blob/master/src/mess0.src#L249-L250
