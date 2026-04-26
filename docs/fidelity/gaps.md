@@ -384,8 +384,9 @@ This file records behavior that must not be guessed in arcade-core code.
   transfer, post-`PWRUP` `AuditGate` entry transfer, `AUDITG` outer frame-step
   dispatch, packed high-score table comparison/insertion, and optional
   file-backed CMOS persistence. Deterministic initials-entry submission to the
-  all-time CMOS table is modeled; exact high-score screen rendering and
-  automatic game-over handoff are not translated.
+  all-time CMOS table is modeled, and translated player-death game-over sleeps
+  can enter live `GameOver` for that path. Exact high-score screen rendering
+  and full game-over-to-attract timing are not translated.
 
 ## Player
 

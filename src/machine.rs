@@ -16012,6 +16012,7 @@ impl ArcadeMachine {
         routine_address: u16,
     ) -> Result<RedLabelProcessDispatch, String> {
         let dispatch = self.dispatch_red_label_process_routine(routine_address)?;
+        self.apply_process_dispatch_state(&dispatch);
         self.sync_scores_from_red_label_memory()?;
         Ok(dispatch)
     }
@@ -16022,9 +16023,10 @@ impl ArcadeMachine {
         let Some(scheduled) = self.memory.step_process_scheduler()? else {
             return Ok(None);
         };
-        let dispatch = Some(self.dispatch_red_label_process_routine(scheduled.routine_address)?);
+        let dispatch = self.dispatch_red_label_process_routine(scheduled.routine_address)?;
+        self.apply_process_dispatch_state(&dispatch);
         self.sync_scores_from_red_label_memory()?;
-        Ok(dispatch)
+        Ok(Some(dispatch))
     }
 
     fn dispatch_red_label_process_routine(
@@ -16039,6 +16041,31 @@ impl ArcadeMachine {
 
         self.memory
             .dispatch_translated_process_routine(routine_address)
+    }
+
+    fn apply_process_dispatch_state(&mut self, dispatch: &RedLabelProcessDispatch) {
+        match dispatch {
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::GameOverSleeping {
+                ..
+            }) => {
+                self.phase = GamePhase::GameOver;
+                self.high_score_entry = None;
+            }
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::AttractJump { .. }) => {
+                self.phase = GamePhase::Attract;
+                self.high_score_entry = None;
+                self.high_score_submission = None;
+            }
+            RedLabelProcessDispatch::PlayerDeath(
+                RedLabelPlayerDeath::PostExplosionRespawnJump { next_player, .. },
+            ) => {
+                self.phase = GamePhase::Playing;
+                self.current_player = *next_player;
+                self.high_score_entry = None;
+                self.high_score_submission = None;
+            }
+            _ => {}
+        }
     }
 
     pub fn red_label_make_process(
@@ -17788,6 +17815,56 @@ mod tests {
         assert_eq!(next.snapshot.high_score_entry, None);
         assert!(
             !next
+                .events()
+                .any(|event| event == MachineEvent::HighScoreEntryStarted)
+        );
+    }
+
+    #[test]
+    fn translated_death_game_over_handoff_starts_live_high_score_entry() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::Playing;
+        machine.restore(snapshot);
+        write_ram_bytes(&mut machine, 0xA1C2, &[0x00, 0x05, 0x00, 0x00]);
+        machine.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        machine.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1C9, 0).expect("clear PLAS");
+        machine
+            .red_label_make_process(
+                red_label_routine_address("PDTH5R").expect("PDTH5R address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PDTH5R process");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch PDTH5R")
+            .expect("scheduled PDTH5R");
+
+        assert!(matches!(
+            dispatch,
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::GameOverSleeping { .. })
+        ));
+        assert_eq!(machine.snapshot().phase, GamePhase::GameOver);
+        assert_eq!(machine.snapshot().scores.player_one, 50_000);
+
+        let entry = machine.step_with_typed_chars(CabinetInput::NONE, &['d']);
+
+        assert_eq!(entry.snapshot.phase, GamePhase::HighScoreEntry);
+        assert_eq!(
+            entry.snapshot.high_score_entry.expect("entry started"),
+            super::HighScoreEntryState {
+                score: 50_000,
+                rank: 1,
+                initials: [b'D', b' ', b' '],
+                cursor: 1,
+            }
+        );
+        assert!(
+            entry
                 .events()
                 .any(|event| event == MachineEvent::HighScoreEntryStarted)
         );

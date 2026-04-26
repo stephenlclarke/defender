@@ -388,8 +388,10 @@ This section records drift found during the repository review on
   packed high-score tables. Live mode can load/save the 256-cell CMOS image
   through a file-backed storage trait when `--cmos-path` is provided, and the
   core can collect three initials for a qualifying game-over score before
-  submitting it to the all-time CMOS table. There is still no exact
-  initials-entry UI, automatic death/game-over handoff, or high-score screen
+  submitting it to the all-time CMOS table. Translated player-death game-over
+  sleeps now hand the clean core to `GameOver`, allowing the deterministic
+  initials path to start from the scheduler. There is still no exact
+  initials-entry UI, full game-over-to-attract timing, or high-score screen
   rendering.
 - The current deterministic trace compares Rust output to local expected TSV,
   `docs/fidelity/fixtures/` defines the ignored local fixture layout, and
@@ -769,9 +771,10 @@ This section records drift found during the repository review on
 - CMOS-backed high-score reset copies all-time and today's tables from
   `DEFALT`, packed table comparison/insertion is modeled, and qualifying
   game-over scores can collect initials and write the all-time CMOS table.
-  Exact initials screen rendering, automatic death/game-over handoff,
-  two-player state, service switches, diagnostics, audits, adjustments, and a
-  default live CMOS path policy are absent from the live cabinet flow.
+  Translated player-death game-over dispatches hand live mode into that flow.
+  Exact initials screen rendering, full game-over-to-attract timing, two-player
+  state, service switches, diagnostics, audits, adjustments, and a default live
+  CMOS path policy are absent from the live cabinet flow.
 - The CLI now has `--input-profile`, ROM metadata reporting with CRC-32
   validation, local ROM-set mapping verification, and deterministic Rust trace
   emission, exact local TSV fixture comparison, and an ignored local trace
@@ -1199,7 +1202,8 @@ their behavior from labels.
    turns.
 4. Implement exact scoring for enemies, bullets, mines, humans, rescued humans,
    Pods, Swarmers, wave-end humanoid bonuses, extra ships, and smart bombs.
-5. Translate red-label initials-entry screens and automatic game-over handoff.
+5. Translate red-label initials-entry/high-score screens and full
+   game-over-to-attract timing.
 6. Decide whether live CMOS persistence should remain explicit via
    `--cmos-path` or gain a platform default path.
 7. Add operator/default settings needed for red-label exactness.

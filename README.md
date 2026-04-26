@@ -123,11 +123,12 @@ Notes:
   supports the Kitty graphics protocol.
 - Download Ghostty: <https://ghostty.org/download>
 - Download Warp: <https://www.warp.dev/download>
-- Exact high-score screen rendering and automatic game-over handoff are not
-  implemented in the clean-slate core yet. The ROM-derived high-score reset
-  copy, packed high-score table comparison/insertion helpers, deterministic
-  initials-entry submission, and optional file-backed CMOS persistence through
-  `--cmos-path` are modeled.
+- Exact high-score screen rendering and the full game-over-to-attract screen
+  flow are not implemented in the clean-slate core yet. The ROM-derived
+  high-score reset copy, packed high-score table comparison/insertion helpers,
+  translated death-tail game-over handoff into deterministic initials-entry
+  submission, and optional file-backed CMOS persistence through `--cmos-path`
+  are modeled.
 
 ## Controls
 
@@ -356,10 +357,10 @@ must be added as explicit overlay hooks with paired arcade-off tests.
 - MAME/source reference-trace tooling is in place for local Phase 1 fixtures,
   but checked-in golden traces are intentionally absent because they are local
   emulator outputs.
-- Exact high-score screen rendering, automatic game-over handoff, two-player
-  sessions, operator settings, untranslated object/shell/process bodies, generic
-  body dispatch/frame scheduling, and sound-routine execution are still fidelity
-  gaps tracked in `SPEC.md` and `docs/fidelity/gaps.md`.
+- Exact high-score screen rendering, full game-over-to-attract timing,
+  two-player sessions, operator settings, untranslated object/shell/process
+  bodies, generic body dispatch/frame scheduling, and sound-routine execution
+  are still fidelity gaps tracked in `SPEC.md` and `docs/fidelity/gaps.md`.
 
 ## SonarQube
 
