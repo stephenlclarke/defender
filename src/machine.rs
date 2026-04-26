@@ -57,8 +57,10 @@ const RED_LABEL_ACTIVE_SCREEN_CLEAR_START: u16 = RED_LABEL_Y_MIN as u16;
 const RED_LABEL_ACTIVE_SCREEN_CLEAR_BYTES: u16 =
     (RED_LABEL_SCREEN_CLEAR_END >> 8) * (0x100 - RED_LABEL_Y_MIN as u16);
 const RED_LABEL_Y_MAX: u8 = 240;
+const RED_LABEL_THRUST_SWITCH_BIT: u8 = 0x02;
 const RED_LABEL_SMART_BOMB_SWITCH_BIT: u8 = 0x04;
 const RED_LABEL_REVERSE_SWITCH_BIT: u8 = 0x40;
+const RED_LABEL_SOUND_PLAYER_ALIVE_BLOCK_MASK: u8 = 0x98;
 const RED_LABEL_WALL_COLOR_TABLE: [u8; 8] = [0x81, 0x28, 0x07, 0x16, 0x2F, 0x84, 0x15, 0x00];
 const RED_LABEL_PLAYER_EXPLOSION_PIECES: u16 = 0x80;
 const RED_LABEL_ASTRO_RESTORE_Y: u8 = 0xE0;
@@ -514,7 +516,7 @@ pub struct RedLabelIrqObjectBandPass {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RedLabelIrqPreTailStep {
-    SoundSequencerDue,
+    SoundSequence(RedLabelSoundSequenceStep),
     PlayerMotion(RedLabelPlayerMotion),
     StarOutput(RedLabelStarOutput),
     CoinScanDue,
@@ -912,6 +914,32 @@ pub enum RedLabelShellOutputRoutine {
 pub struct RedLabelLoadedSoundTable {
     pub address: u16,
     pub priority: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelSoundSequenceSource {
+    Timer,
+    Table,
+    SequenceEnded,
+    ThrustStarted,
+    ThrustStopped,
+    Idle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelSoundSequenceStep {
+    pub source: RedLabelSoundSequenceSource,
+    pub timer_before: u8,
+    pub timer_after: u8,
+    pub repeat_before: u8,
+    pub repeat_after: u8,
+    pub table_pointer_before: u16,
+    pub table_pointer_after: u16,
+    pub priority_after: u8,
+    pub thrust_flag_before: u8,
+    pub thrust_flag_after: u8,
+    pub sound_number: Option<u8>,
+    pub command: Option<SoundCommand>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -7456,9 +7484,9 @@ impl RedLabelRuntimeMemory {
     /// already translated object-band tail reached by the source branch. When
     /// the caller supplies the live 6809 stack pointer in
     /// `RedLabelIrqSchedulerContext`, the terrain branch can run translated
-    /// `BGOUT`; otherwise it reports that `BGOUT` is due. `SNDSEQ`, `CSCAN`,
-    /// palette copy, and hardware map restoration are still reported as
-    /// obligations rather than guessed.
+    /// `BGOUT`; otherwise it reports that `BGOUT` is due. `CSCAN`, palette
+    /// copy, and hardware map restoration are still reported as obligations
+    /// rather than guessed.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1931-L2069>.
     pub fn run_irq_scanline_object_phase(
         &mut self,
@@ -7673,7 +7701,7 @@ impl RedLabelRuntimeMemory {
         &mut self,
     ) -> Result<Vec<RedLabelIrqPreTailStep>, String> {
         Ok(vec![
-            RedLabelIrqPreTailStep::SoundSequencerDue,
+            RedLabelIrqPreTailStep::SoundSequence(self.step_sound_sequence()?),
             RedLabelIrqPreTailStep::PlayerMotion(self.update_player_motion_from_pia()?),
             RedLabelIrqPreTailStep::StarOutput(self.output_stars()?),
         ])
@@ -13438,6 +13466,124 @@ impl RedLabelRuntimeMemory {
         }))
     }
 
+    /// Source-shaped `SNDSEQ`: advance the currently loaded sound table,
+    /// output at most one raw sound-board command, and maintain the thrust
+    /// sound gate from `PIA21` / `THFLG`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L725-L755>.
+    fn step_sound_sequence(&mut self) -> Result<RedLabelSoundSequenceStep, String> {
+        let layout = red_label_ram_layout()?;
+        let timer_before = self.read_field_byte(&layout, "base_page", "SNDTMR")?;
+        let repeat_before = self.read_field_byte(&layout, "base_page", "SNDREP")?;
+        let table_pointer_before = self.read_field_word(&layout, "base_page", "SNDX")?;
+        let thrust_flag_before = self.read_field_byte(&layout, "base_page", "THFLG")?;
+
+        let mut source = RedLabelSoundSequenceSource::Idle;
+        let mut timer_after = timer_before;
+        let mut sound_number = None;
+        let mut command = None;
+
+        if timer_before != 0 {
+            timer_after = timer_before.wrapping_sub(1);
+            self.write_field_byte(&layout, "base_page", "SNDTMR", timer_after)?;
+            if timer_after != 0 {
+                source = RedLabelSoundSequenceSource::Timer;
+            } else {
+                let mut table_pointer = table_pointer_before;
+                let mut repeat = repeat_before.wrapping_sub(1);
+                self.write_field_byte(&layout, "base_page", "SNDREP", repeat)?;
+
+                if repeat == 0 {
+                    table_pointer = table_pointer_before.wrapping_add(3);
+                    self.write_field_word(&layout, "base_page", "SNDX", table_pointer)?;
+                    repeat = red_label_sound_table_byte_required(table_pointer)?;
+                    if repeat == 0 {
+                        self.write_field_byte(&layout, "base_page", "SNDPRI", 0)?;
+                        source = RedLabelSoundSequenceSource::SequenceEnded;
+                    } else {
+                        self.write_field_byte(&layout, "base_page", "SNDREP", repeat)?;
+                    }
+                }
+
+                if repeat != 0 {
+                    timer_after =
+                        red_label_sound_table_byte_required(table_pointer.wrapping_add(1))?;
+                    let table_sound =
+                        red_label_sound_table_byte_required(table_pointer.wrapping_add(2))?;
+                    self.write_field_byte(&layout, "base_page", "SNDTMR", timer_after)?;
+                    sound_number = Some(table_sound);
+                    command = Some(red_label_sound_output_command(table_sound));
+                    source = RedLabelSoundSequenceSource::Table;
+                }
+            }
+        }
+
+        if command.is_none()
+            && timer_after == 0
+            && let Some((thrust_source, thrust_sound_number, thrust_command)) =
+                self.step_thrust_sound_gate(&layout)?
+        {
+            source = thrust_source;
+            sound_number = Some(thrust_sound_number);
+            command = Some(thrust_command);
+        }
+
+        Ok(RedLabelSoundSequenceStep {
+            source,
+            timer_before,
+            timer_after: self.read_field_byte(&layout, "base_page", "SNDTMR")?,
+            repeat_before,
+            repeat_after: self.read_field_byte(&layout, "base_page", "SNDREP")?,
+            table_pointer_before,
+            table_pointer_after: self.read_field_word(&layout, "base_page", "SNDX")?,
+            priority_after: self.read_field_byte(&layout, "base_page", "SNDPRI")?,
+            thrust_flag_before,
+            thrust_flag_after: self.read_field_byte(&layout, "base_page", "THFLG")?,
+            sound_number,
+            command,
+        })
+    }
+
+    fn step_thrust_sound_gate(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<Option<(RedLabelSoundSequenceSource, u8, SoundCommand)>, String> {
+        let thrust_active =
+            self.read_field_byte(layout, "base_page", "PIA21")? & RED_LABEL_THRUST_SWITCH_BIT != 0;
+        let thrust_flag = self.read_field_byte(layout, "base_page", "THFLG")?;
+
+        if !thrust_active {
+            if thrust_flag == 0 {
+                return Ok(None);
+            }
+            self.write_field_byte(layout, "base_page", "THFLG", 0)?;
+            let sound_number = 0x0F;
+            return Ok(Some((
+                RedLabelSoundSequenceSource::ThrustStopped,
+                sound_number,
+                red_label_sound_output_command(sound_number),
+            )));
+        }
+
+        if thrust_flag != 0 {
+            return Ok(None);
+        }
+
+        if self.read_field_byte(layout, "base_page", "STATUS")?
+            & RED_LABEL_SOUND_PLAYER_ALIVE_BLOCK_MASK
+            != 0
+        {
+            return Ok(None);
+        }
+
+        let sound_number = 0x16;
+        self.write_field_byte(layout, "base_page", "THFLG", sound_number)?;
+        Ok(Some((
+            RedLabelSoundSequenceSource::ThrustStarted,
+            sound_number,
+            red_label_sound_output_command(sound_number),
+        )))
+    }
+
     fn current_process_address(&self, layout: &[RedLabelRamLayoutEntry]) -> Result<u16, String> {
         let crproc = ram_field(layout, "runtime_pointers", "CRPROC")?
             .field_range_for_entry(0)
@@ -15128,6 +15274,16 @@ fn red_label_sound_table(address: u16) -> Result<&'static RedLabelSoundTable, St
         .ok_or_else(|| format!("red-label sound table asset has no 0x{address:04X} entry"))
 }
 
+fn red_label_sound_table_byte_required(address: u16) -> Result<u8, String> {
+    red_label_sound_tables()?
+        .iter()
+        .find_map(|entry| {
+            let offset = address.checked_sub(entry.address)?;
+            entry.bytes.get(usize::from(offset)).copied()
+        })
+        .ok_or_else(|| format!("red-label sound table asset has no byte at 0x{address:04X}"))
+}
+
 fn red_label_sound_tables() -> Result<&'static [RedLabelSoundTable], String> {
     static SOUND_TABLES: OnceLock<Result<Vec<RedLabelSoundTable>, String>> = OnceLock::new();
     match SOUND_TABLES.get_or_init(|| parse_sound_tables(crate::assets::RED_LABEL_SOUND_TABLES_TSV))
@@ -16740,6 +16896,10 @@ impl ArcadeMachine {
         self.memory.advance_active_object_velocities()
     }
 
+    pub fn red_label_step_sound_sequence(&mut self) -> Result<RedLabelSoundSequenceStep, String> {
+        self.memory.step_sound_sequence()
+    }
+
     pub fn red_label_run_normal_irq_upper_object_band_pass(
         &mut self,
     ) -> Result<RedLabelIrqObjectBandPass, String> {
@@ -17623,9 +17783,10 @@ mod tests {
             RedLabelScoreOutcome, RedLabelScoreSpriteKind, RedLabelScoreSpriteStart,
             RedLabelScoreSpriteStep, RedLabelScoreTransfer, RedLabelScreenClear,
             RedLabelShellDescriptor, RedLabelShellOutputRoutine, RedLabelShellStep,
-            RedLabelSmartBomb, RedLabelSmartBombTail, RedLabelStarBlink, RedLabelStarHyper,
-            RedLabelStarOutput, RedLabelStarRamBlast, RedLabelStarTableInit, RedLabelStartCredit,
-            RedLabelStartGame, RedLabelStartGameInit, RedLabelStartSwitch, RedLabelStockDisplay,
+            RedLabelSmartBomb, RedLabelSmartBombTail, RedLabelSoundSequenceSource,
+            RedLabelSoundSequenceStep, RedLabelStarBlink, RedLabelStarHyper, RedLabelStarOutput,
+            RedLabelStarRamBlast, RedLabelStarTableInit, RedLabelStartCredit, RedLabelStartGame,
+            RedLabelStartGameInit, RedLabelStartSwitch, RedLabelStockDisplay,
             RedLabelSupportProcessStep, RedLabelSwitchProcess, RedLabelSwitchScan,
             RedLabelTerrainBlowProcessStep, RedLabelTerrainErase, RedLabelTerrainExplosion,
             RedLabelTerrainExplosionPass, RedLabelTerrainOutput, RedLabelTerrainTablesInit,
@@ -21018,7 +21179,11 @@ mod tests {
         assert_eq!(upper.pre_tail_steps.len(), 3);
         assert!(matches!(
             upper.pre_tail_steps[0],
-            RedLabelIrqPreTailStep::SoundSequencerDue
+            RedLabelIrqPreTailStep::SoundSequence(RedLabelSoundSequenceStep {
+                source: RedLabelSoundSequenceSource::Idle,
+                command: None,
+                ..
+            })
         ));
         assert!(matches!(
             upper.pre_tail_steps[1],
@@ -21148,7 +21313,11 @@ mod tests {
         assert_eq!(lower.pre_tail_steps.len(), 3);
         assert!(matches!(
             lower.pre_tail_steps[0],
-            RedLabelIrqPreTailStep::SoundSequencerDue
+            RedLabelIrqPreTailStep::SoundSequence(RedLabelSoundSequenceStep {
+                source: RedLabelSoundSequenceSource::Idle,
+                command: None,
+                ..
+            })
         ));
         assert!(matches!(
             lower.pre_tail_steps[1],
@@ -29118,6 +29287,174 @@ mod tests {
         assert_eq!(
             sound("SWSSND").bytes.as_slice(),
             &[0xC0, 0x01, 0x18, 0x0C, 0x00]
+        );
+    }
+
+    #[test]
+    fn sound_sequence_outputs_first_loaded_table_command() {
+        let mut machine = ArcadeMachine::new();
+        let address = red_label_sound_table_address("ST1SND").expect("ST1SND address");
+        assert_eq!(
+            machine
+                .memory
+                .load_sound_table_by_label("ST1SND")
+                .expect("load ST1SND"),
+            Some(RedLabelLoadedSoundTable {
+                address,
+                priority: 0xF0,
+            })
+        );
+
+        let step = machine
+            .red_label_step_sound_sequence()
+            .expect("step SNDSEQ");
+
+        assert_eq!(
+            step,
+            RedLabelSoundSequenceStep {
+                source: RedLabelSoundSequenceSource::Table,
+                timer_before: 1,
+                timer_after: 0x40,
+                repeat_before: 1,
+                repeat_after: 1,
+                table_pointer_before: address - 2,
+                table_pointer_after: address + 1,
+                priority_after: 0xF0,
+                thrust_flag_before: 0,
+                thrust_flag_after: 0,
+                sound_number: Some(0x0A),
+                command: Some(SoundCommand::from_main_board_pia_port_b(0x35)),
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0B0..0xA0B5),
+            Some(&[0xD4, 0xBE, 0xF0, 0x40, 0x01][..])
+        );
+    }
+
+    #[test]
+    fn sound_sequence_decrements_active_timer_without_output() {
+        let mut machine = ArcadeMachine::new();
+        let address = red_label_sound_table_address("ST1SND").expect("ST1SND address");
+        machine
+            .memory
+            .load_sound_table_by_label("ST1SND")
+            .expect("load ST1SND");
+        machine
+            .red_label_step_sound_sequence()
+            .expect("prime ST1SND");
+
+        let step = machine
+            .red_label_step_sound_sequence()
+            .expect("tick SNDSEQ timer");
+
+        assert_eq!(
+            step,
+            RedLabelSoundSequenceStep {
+                source: RedLabelSoundSequenceSource::Timer,
+                timer_before: 0x40,
+                timer_after: 0x3F,
+                repeat_before: 1,
+                repeat_after: 1,
+                table_pointer_before: address + 1,
+                table_pointer_after: address + 1,
+                priority_after: 0xF0,
+                thrust_flag_before: 0,
+                thrust_flag_after: 0,
+                sound_number: None,
+                command: None,
+            }
+        );
+    }
+
+    #[test]
+    fn sound_sequence_clears_priority_at_table_terminator() {
+        let mut machine = ArcadeMachine::new();
+        let address = red_label_sound_table_address("ST1SND").expect("ST1SND address");
+        machine
+            .memory
+            .load_sound_table_by_label("ST1SND")
+            .expect("load ST1SND");
+        machine
+            .red_label_step_sound_sequence()
+            .expect("prime ST1SND");
+        machine
+            .memory
+            .write_byte(0xA0B3, 1)
+            .expect("force timer expiry");
+
+        let step = machine
+            .red_label_step_sound_sequence()
+            .expect("finish ST1SND");
+
+        assert_eq!(
+            step,
+            RedLabelSoundSequenceStep {
+                source: RedLabelSoundSequenceSource::SequenceEnded,
+                timer_before: 1,
+                timer_after: 0,
+                repeat_before: 1,
+                repeat_after: 0,
+                table_pointer_before: address + 1,
+                table_pointer_after: address + 4,
+                priority_after: 0,
+                thrust_flag_before: 0,
+                thrust_flag_after: 0,
+                sound_number: None,
+                command: None,
+            }
+        );
+    }
+
+    #[test]
+    fn sound_sequence_runs_thrust_start_and_stop_gate() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA07B, 0x02).expect("set PIA21");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+
+        let started = machine
+            .red_label_step_sound_sequence()
+            .expect("start thrust sound");
+
+        assert_eq!(
+            started,
+            RedLabelSoundSequenceStep {
+                source: RedLabelSoundSequenceSource::ThrustStarted,
+                timer_before: 0,
+                timer_after: 0,
+                repeat_before: 0,
+                repeat_after: 0,
+                table_pointer_before: 0,
+                table_pointer_after: 0,
+                priority_after: 0,
+                thrust_flag_before: 0,
+                thrust_flag_after: 0x16,
+                sound_number: Some(0x16),
+                command: Some(SoundCommand::from_main_board_pia_port_b(0x29)),
+            }
+        );
+
+        machine.memory.write_byte(0xA07B, 0).expect("clear PIA21");
+        let stopped = machine
+            .red_label_step_sound_sequence()
+            .expect("stop thrust sound");
+
+        assert_eq!(
+            stopped,
+            RedLabelSoundSequenceStep {
+                source: RedLabelSoundSequenceSource::ThrustStopped,
+                timer_before: 0,
+                timer_after: 0,
+                repeat_before: 0,
+                repeat_after: 0,
+                table_pointer_before: 0,
+                table_pointer_after: 0,
+                priority_after: 0,
+                thrust_flag_before: 0x16,
+                thrust_flag_after: 0,
+                sound_number: Some(0x0F),
+                command: Some(SoundCommand::from_main_board_pia_port_b(0x30)),
+            }
         );
     }
 

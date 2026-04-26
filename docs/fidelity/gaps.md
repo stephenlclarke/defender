@@ -326,9 +326,12 @@ This file records behavior that must not be guessed in arcade-core code.
   entering those tails, and it runs translated `PLAYER` / `STOUT` pre-tail work
   on the source branches that call them. When the caller supplies the live 6809
   stack pointer, the terrain branch also runs translated `BGOUT`; otherwise it
-  records that `BGOUT` is due. The remaining `SNDSEQ`, `CSCAN`, palette copy
-  side effects, live stack-context wiring, and hardware-map restoration still
-  need full scheduler integration.
+  records that `BGOUT` is due. The pre-tail `SNDSEQ` sound-table sequencer now
+  advances `SNDX` / `SNDPRI` / `SNDTMR` / `SNDREP`, emits source-shaped
+  main-board sound commands, and handles the thrust sound gate. The remaining
+  `CSCAN`, palette copy side effects, live stack-context wiring, sound trace
+  plumbing from the full frame step, and hardware-map restoration still need
+  full scheduler integration.
   The start-flow foundation now covers source-shaped `FPLAY` credit
   seeding from the core CMOS image, the RAM-visible `START` power-page
   gate/player table reset/`PLSTRT` process creation, source `SCRCLR` video-RAM
@@ -473,10 +476,11 @@ This file records behavior that must not be guessed in arcade-core code.
 
 ## Audio
 
-- Gameplay routines that write main-board sound command values are not
-  translated.
-- The core has a raw sound-command output path, but no gameplay routine emits
-  commands until exact command values are source-cited or fixture-verified.
+- The source `SNDLD` table loads and `SNDSEQ` main-board sound-table sequencer
+  are translated over `SNDX`, `SNDPRI`, `SNDTMR`, `SNDREP`, and `THFLG`.
+  `SNDSEQ` can now emit source-shaped command bytes for table playback and the
+  thrust start/stop gate. Full-frame trace plumbing, command-sequence
+  fixtures, and waveform fixtures are still missing.
 - Sound-board RAM/PIA/ROM address classification exists, and the MAME-documented
   main-board command latch byte/CB1 handoff is modeled from the PIA1 port-B
   output callback boundary. Sound CPU PIA IC4 register reads can consume the

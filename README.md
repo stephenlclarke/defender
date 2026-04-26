@@ -328,8 +328,11 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   translated `PLAYER` / `STOUT` pre-tail work on the source branches that call
   them. When the caller supplies the live 6809 stack pointer, the terrain branch
   also runs translated `BGOUT`; otherwise it records that `BGOUT` is due. The
-  remaining `SNDSEQ`, `CSCAN`, palette copy side effects, live stack-context
-  wiring, and hardware-map restoration still need full scheduler integration.
+  pre-tail `SNDSEQ` sound-table sequencer now advances `SNDX` / `SNDPRI` /
+  `SNDTMR` / `SNDREP`, emits source-shaped main-board sound commands, and
+  handles the thrust sound gate. The remaining `CSCAN`, palette copy side
+  effects, live stack-context wiring, sound trace plumbing from the full frame
+  step, and hardware-map restoration still need full scheduler integration.
   The `GEXEC` tail slice now
   restores `STRCNT` after star
   overflow, advances `GTIME` through the source

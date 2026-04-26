@@ -555,8 +555,11 @@ This section records drift found during the repository review on
   calculations before entering those tails, and it runs translated `PLAYER` /
   `STOUT` pre-tail work on the source branches that call them. When the caller
   supplies the live 6809 stack pointer, the terrain branch also runs translated
-  `BGOUT`; otherwise it records that `BGOUT` is due. The remaining `SNDSEQ`,
-  `CSCAN`, palette copy side effects, live stack-context wiring, and hardware-map
+  `BGOUT`; otherwise it records that `BGOUT` is due. The pre-tail `SNDSEQ`
+  sound-table sequencer now advances `SNDX` / `SNDPRI` / `SNDTMR` / `SNDREP`,
+  emits source-shaped main-board sound commands, and handles the thrust sound
+  gate. The remaining `CSCAN`, palette copy side effects, live stack-context
+  wiring, sound trace plumbing from the full frame step, and hardware-map
   restoration still need full scheduler integration.
   The `GEXEC` tail slice
   now restores `STRCNT` toward 16, advances `GTIME` through the source
@@ -770,9 +773,11 @@ This section records drift found during the repository review on
 - The clean-slate tree has raw sound-command trace plumbing and a
   MAME-documented sound-board RAM/PIA/ROM memory surface plus the
   main-board-to-sound-board command latch handoff and sound PIA port-A DAC
-  callback boundary. Command CB1 now sets the sound PIA IRQ state, but the tree
-  does not yet include sound-routine execution, CPU IRQ scheduling, or sample
-  generation.
+  callback boundary. The main-board `SNDSEQ` table sequencer is translated for
+  source-shaped command writes and the thrust sound gate. Command CB1 now sets
+  the sound PIA IRQ state, but the tree does not yet include sound-routine
+  execution, CPU IRQ scheduling, sample generation, or full-frame sound trace
+  emission from the live scheduler.
 - Sound must be rebuilt as command writes into a translated sound-board state
   machine from `VSNDRM1.SRC`, not as high-level gameplay cues.
 
@@ -1021,8 +1026,8 @@ respawn/game-over branch decisions. The dispatcher can now run translated
 addresses, and the translated player-death resume addresses from `PADDR`,
 including guarded `SBMBX2`/`SUCIDE`. Remaining work is to move scaffold state
 onto those bytes, integrate the translated IRQ object-phase gate with the
-remaining sound, coin-scan, terrain, palette-copy, hardware-map, and video
-scheduler side effects, and translate the remaining process bodies.
+remaining sound trace, coin-scan, terrain, palette-copy, hardware-map, and
+video scheduler side effects, and translate the remaining process bodies.
 
 1. Continue expanding `src/machine.rs` or split it into `arcade_core` modules
    once table/process size justifies it.
@@ -1117,8 +1122,8 @@ watchdog data-byte reporting, palette-copy due tests, and the normal/flipped
 `XXX2` calculations, and runs translated `PLAYER` / `STOUT` pre-tail work on
 the branches that call them. It can also run translated `BGOUT` when the caller
 supplies the live 6809 stack pointer. Full hardware IRQ integration still needs
-`SNDSEQ`, `CSCAN`, palette copy side effects, live stack-context wiring, and
-hardware map restoration. The
+`CSCAN`, palette copy side effects, live stack-context wiring, full-frame sound
+trace plumbing, and hardware map restoration. The
 `SCPROC` scanner maintenance
 process is translated through `ISCAN`, `OSCAN`, `SHSCAN`, and `SCNRV` with exact
 `SCP1`/`SCP2` sleep cadence, including `SETAB` / `SETEND` object/player blip
@@ -1250,13 +1255,15 @@ their behavior from labels.
 
 ### Phase 8: Audio
 
-1. Replace high-level gameplay cue dispatch with sound command writes.
-2. Model the sound board state, command latch, and routine dispatch.
-3. Port remaining `VSNDRM1.SRC` routines needed by Defender.
-4. Verify command sequences against red-label traces.
-5. Add waveform tests with tolerance for deterministic generated buffers.
-6. Keep `--mute` as an output-layer switch only.
-7. Do not trigger sound from semantic Rust events unless that event is proven to
+1. Continue replacing high-level gameplay cue dispatch with source-shaped sound
+   command writes.
+2. Integrate `SNDSEQ` command output into the full frame/trace scheduler.
+3. Model the sound board state, command latch, and routine dispatch.
+4. Port remaining `VSNDRM1.SRC` routines needed by Defender.
+5. Verify command sequences against red-label traces.
+6. Add waveform tests with tolerance for deterministic generated buffers.
+7. Keep `--mute` as an output-layer switch only.
+8. Do not trigger sound from semantic Rust events unless that event is proven to
    correspond to a red-label sound command write.
 
 ### Phase 9: CLI, Tooling, And Developer Workflow

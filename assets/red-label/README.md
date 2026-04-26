@@ -120,12 +120,12 @@ Current files:
 - `shell-images.tsv`: red-label bomb shell image bytes used by `BMBOUT` when
   `BAX` points at the ROM-resident `BMBD10` / `BMBD11` / `BMBD20` / `BMBD21`
   records.
-- `sound-tables.tsv`: red-label sound table bytes currently used by `SNDLD` for
-  replay, player-death, one-player start, two-player start, terrain-blow,
-  smart-bomb, bomb-hit, laser, appearance, probe-hit, schizoid-hit, swarmer-hit,
-  swarmer-shot, UFO-hit, lander-hit, lander-pickup, lander-suck, lander-grab,
-  lander-shot, astronaut-catch, astronaut-scream, astronaut-land, UFO-shot,
-  tie-hit, and schizoid-shot sound loads.
+- `sound-tables.tsv`: red-label sound table bytes currently used by `SNDLD` and
+  `SNDSEQ` for replay, player-death, one-player start, two-player start,
+  terrain-blow, smart-bomb, bomb-hit, laser, appearance, probe-hit,
+  schizoid-hit, swarmer-hit, swarmer-shot, UFO-hit, lander-hit, lander-pickup,
+  lander-suck, lander-grab, lander-shot, astronaut-catch, astronaut-scream,
+  astronaut-land, UFO-shot, tie-hit, and schizoid-shot sound loads.
 - `sram-routines.tsv`: red-label SRAM routine metadata for the 4-bit cell
   packing used by CMOS/high-score reads and writes.
 - `switch-table.tsv`: red-label `defb6.src` `SWTAB` switch bit table for
