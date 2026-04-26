@@ -12,12 +12,18 @@ use crate::{
     cmos_storage::{CmosStorage, FileCmosStorage},
     input::{InputMapper, InputProfile, PolledInput, XyzzyOverlay},
     kitty::KittyGraphics,
-    machine::{ArcadeMachine, CompatibilityState},
+    machine::{ArcadeMachine, CompatibilityState, FRAME_RATE_MILLIHZ},
     terminal::{TerminalSession, geometry},
     video::Renderer,
 };
 
-const FRAME_DURATION: Duration = Duration::from_micros(16_639);
+const FRAME_DURATION: Duration =
+    Duration::from_micros(cabinet_frame_duration_micros(FRAME_RATE_MILLIHZ));
+
+const fn cabinet_frame_duration_micros(frame_rate_millihz: u32) -> u64 {
+    let rate = frame_rate_millihz as u64;
+    (1_000_000_000 + (rate / 2)) / rate
+}
 
 pub fn run_live(
     _play_audio: bool,
@@ -150,11 +156,11 @@ mod tests {
         CMOS_RAM_SIZE, CmosRam, RED_LABEL_CRHSTD_CELL_OFFSET, cmos_sram_write_byte,
     };
     use crate::cmos_storage::CmosStorage;
-    use crate::machine::ArcadeMachine;
+    use crate::machine::{ArcadeMachine, FRAME_RATE_MILLIHZ};
 
     use super::{
-        FRAME_DURATION, live_machine_from_cmos_storage, save_live_cmos,
-        validate_interactive_terminal,
+        FRAME_DURATION, cabinet_frame_duration_micros, live_machine_from_cmos_storage,
+        save_live_cmos, validate_interactive_terminal,
     };
 
     #[derive(Default)]
@@ -181,7 +187,11 @@ mod tests {
 
     #[test]
     fn frame_duration_tracks_cabinet_refresh_not_old_ninety_ms_tick() {
-        assert!(FRAME_DURATION.as_millis() < 20);
+        assert_eq!(
+            FRAME_DURATION.as_micros(),
+            u128::from(cabinet_frame_duration_micros(FRAME_RATE_MILLIHZ))
+        );
+        assert_eq!(FRAME_DURATION.as_micros(), 16_639);
     }
 
     #[test]

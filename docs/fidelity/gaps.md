@@ -457,7 +457,9 @@ This file records behavior that must not be guessed in arcade-core code.
   integration, color presentation, general text, attract, game-over, and
   high-score screens are not translated.
 - Current live renderer remains explicitly named scaffolding until translated
-  video RAM can feed the native cabinet-frame presenter.
+  video RAM can feed the native cabinet-frame presenter. Live pacing is derived
+  from the core red-label `FRAME_RATE_MILLIHZ` constant rather than the
+  archived prototype's coarse gameplay tick.
 
 ## Audio
 

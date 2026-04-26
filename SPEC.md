@@ -1070,7 +1070,9 @@ register carried into `PLRES`; implement it only after register-aware scheduler
 tracing proves that entry state. Broader body dispatch, suicide resume semantics,
 cycle/frame scheduling, and golden-trace verification are still open.
 
-1. Replace the 90ms gameplay tick with cabinet frame stepping.
+1. Continue deriving live frame pacing from the core red-label
+   `FRAME_RATE_MILLIHZ` constant while keeping terminal presentation outside the
+   verified cabinet frame.
 2. Decouple terminal draw cadence from core stepping.
 3. Port or model red-label process scheduling and delay semantics.
 4. Verify object process order against golden traces.

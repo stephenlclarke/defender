@@ -174,7 +174,9 @@ must be added as explicit overlay hooks with paired arcade-off tests.
 ## Current Status
 
 - Live mode renders an explicitly named scaffold frame, not yet the red-label
-  video RAM output.
+  video RAM output. Its pacing is derived from the core red-label
+  `FRAME_RATE_MILLIHZ` constant rather than the archived prototype's coarse
+  tick.
 - The runtime embeds red-label defaults, score values, high-score seeds, CMOS
   layout/default metadata, input port metadata, RAM table metadata, ROM
   metadata, ROM-region/load maps with derived `CROM0` `ROMMAP` descriptors and
