@@ -17,10 +17,11 @@
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, can route the CMOS-visible
 //! `romc0.src` power-up branch, and can run the `CROM0` CMOS RAM-test
-//! write/verify loop, visible outcomes, and color-RAM diagnostic cycle. CMOS
-//! persistence, `AUDITG` live frame scheduling/full-loop integration, physical
-//! advance/lamp timing beyond the modeled ROM-stage screen/LED output, and full
-//! video timing remain explicit fidelity gaps.
+//! write/verify loop, visible outcomes, color-RAM diagnostic cycle, and
+//! post-`PWRUP` `AUDITG` frame-step dispatch. CMOS persistence, full live
+//! CPU/frame integration, physical advance/lamp timing beyond the modeled
+//! ROM-stage screen/LED output, and full video timing remain explicit fidelity
+//! gaps.
 
 use crate::{
     input::{
@@ -305,6 +306,30 @@ pub struct RedLabelPowerUpDispatch {
     pub action: RedLabelPowerUpAction,
     pub target: RedLabelPowerUpDispatchTarget,
     pub audit_start: Option<RedLabelAuditGameAdjustStartTransfer>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelPowerUpAuditFrameTarget {
+    NoPowerUpAction,
+    AuditGameAdjust,
+    ReturnToCaller,
+    ComprehensiveRomTest,
+    ResetHighScoreTables,
+    ClearAudits,
+    Complete,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RedLabelPowerUpAuditFrameState {
+    dispatch: Option<RedLabelPowerUpDispatch>,
+    audit_cycle: Option<RedLabelAuditCycleState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelPowerUpAuditFrameStep {
+    pub dispatch: Option<RedLabelPowerUpDispatch>,
+    pub audit_cycle: Option<RedLabelAuditCycleStep>,
+    pub target: RedLabelPowerUpAuditFrameTarget,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1186,6 +1211,28 @@ impl RedLabelPowerUpAction {
             Self::ResetHighScoreTables => RedLabelPowerUpDispatchTarget::ResetHighScoreTables,
             Self::ClearAudits => RedLabelPowerUpDispatchTarget::ClearAudits,
         }
+    }
+}
+
+impl RedLabelPowerUpAuditFrameTarget {
+    fn from_dispatch_target(target: RedLabelPowerUpDispatchTarget) -> Self {
+        match target {
+            RedLabelPowerUpDispatchTarget::ReturnToCaller => Self::ReturnToCaller,
+            RedLabelPowerUpDispatchTarget::AuditGate => Self::AuditGameAdjust,
+            RedLabelPowerUpDispatchTarget::ComprehensiveRomTest => Self::ComprehensiveRomTest,
+            RedLabelPowerUpDispatchTarget::ResetHighScoreTables => Self::ResetHighScoreTables,
+            RedLabelPowerUpDispatchTarget::ClearAudits => Self::ClearAudits,
+        }
+    }
+}
+
+impl RedLabelPowerUpAuditFrameState {
+    pub fn dispatch(&self) -> Option<&RedLabelPowerUpDispatch> {
+        self.dispatch.as_ref()
+    }
+
+    pub fn audit_cycle(&self) -> Option<&RedLabelAuditCycleState> {
+        self.audit_cycle.as_ref()
     }
 }
 
@@ -3720,6 +3767,66 @@ impl<'a> DefenderMainBoard<'a> {
         }))
     }
 
+    /// Step the deterministic `PWRUP`-to-`AUDITG` outer frame path.
+    ///
+    /// The first call runs `PWRUP` and records the dispatch target. When that
+    /// target is `AUDITG`, later calls advance the already translated audit
+    /// display/debounce cycle until it returns to the caller.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L142-L177>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L5-L113>.
+    pub fn red_label_step_power_up_audit_frame(
+        &mut self,
+        state: &mut RedLabelPowerUpAuditFrameState,
+        defaults: &[RedLabelCmosDefault],
+        adjustments: &[RedLabelAuditAdjustment],
+    ) -> Result<RedLabelPowerUpAuditFrameStep, String> {
+        if let Some(audit_cycle) = &mut state.audit_cycle {
+            let audit_step = self
+                .red_label_audit_cycle_step(audit_cycle, adjustments)
+                .ok_or_else(|| {
+                    String::from("red-label power-up AUDITG frame step could not advance")
+                })?;
+            let target = if audit_step == RedLabelAuditCycleStep::ReturnToGame {
+                state.audit_cycle = None;
+                RedLabelPowerUpAuditFrameTarget::ReturnToCaller
+            } else {
+                RedLabelPowerUpAuditFrameTarget::AuditGameAdjust
+            };
+            return Ok(RedLabelPowerUpAuditFrameStep {
+                dispatch: None,
+                audit_cycle: Some(audit_step),
+                target,
+            });
+        }
+
+        if state.dispatch.is_some() {
+            return Ok(RedLabelPowerUpAuditFrameStep {
+                dispatch: None,
+                audit_cycle: None,
+                target: RedLabelPowerUpAuditFrameTarget::Complete,
+            });
+        }
+
+        let Some(dispatch) = self.red_label_dispatch_power_up(defaults)? else {
+            return Ok(RedLabelPowerUpAuditFrameStep {
+                dispatch: None,
+                audit_cycle: None,
+                target: RedLabelPowerUpAuditFrameTarget::NoPowerUpAction,
+            });
+        };
+        let target = RedLabelPowerUpAuditFrameTarget::from_dispatch_target(dispatch.target);
+        if let Some(audit_start) = &dispatch.audit_start {
+            state.audit_cycle = Some(audit_start.state.clone());
+        }
+        state.dispatch = Some(dispatch.clone());
+
+        Ok(RedLabelPowerUpAuditFrameStep {
+            dispatch: Some(dispatch),
+            audit_cycle: None,
+            target,
+        })
+    }
+
     /// Source-shaped visible `RESET` setup before the power-up RAM test.
     ///
     /// This covers the `MAPC` bank select clear, PIA register setup, and the
@@ -5033,10 +5140,11 @@ mod tests {
             RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
             RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
             RedLabelDiagnosticLedOutput, RedLabelDiagnosticPaletteWrite,
-            RedLabelDiagnosticTextWrite, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
-            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
-            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
-            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            RedLabelDiagnosticTextWrite, RedLabelPowerUpAction, RedLabelPowerUpAuditFrameState,
+            RedLabelPowerUpAuditFrameTarget, RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE,
+            cmos_4bit_write_value, cmos_sram_clear_packed_bytes, cmos_sram_read_byte,
+            cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word, defender_io_window,
+            is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
             red_label_crom0_diagnostic_screen, red_label_crom0_ram_test_next_word,
             red_label_diagnostic_led_output, video_control_cocktail, video_counter_read_value,
         },
@@ -8275,6 +8383,143 @@ mod tests {
         );
         assert_eq!(no_special.audit_start, None);
         assert_eq!(board.ram()[0x2820], 0xAA);
+    }
+
+    #[test]
+    fn main_board_power_up_audit_frame_steps_dispatch_and_audit_cycle() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+        let mut state = RedLabelPowerUpAuditFrameState::default();
+
+        board.write_byte(0xC47F, 0x00).expect("bad CMOSCK high");
+
+        let dispatch_frame = board
+            .red_label_step_power_up_audit_frame(&mut state, &defaults, &adjustments)
+            .expect("power-up audit dispatch frame");
+        assert_eq!(
+            dispatch_frame.target,
+            RedLabelPowerUpAuditFrameTarget::AuditGameAdjust
+        );
+        assert_eq!(dispatch_frame.audit_cycle, None);
+        let dispatch = dispatch_frame.dispatch.expect("dispatch frame action");
+        assert_eq!(
+            dispatch.action,
+            RedLabelPowerUpAction::InitializeCmosAndAudit
+        );
+        assert_eq!(dispatch.target, RedLabelPowerUpDispatchTarget::AuditGate);
+        assert!(dispatch.audit_start.is_some());
+        assert!(state.dispatch().is_some());
+        assert_eq!(
+            state.audit_cycle().expect("audit cycle state").operator(),
+            RedLabelAuditOperatorState::default()
+        );
+        assert_message_glyph_at(&board, RED_LABEL_AUDIT_TITLE_ADDRESS, 'W');
+
+        board.set_cabinet_input(CabinetInput::NONE);
+        let display_frame = board
+            .red_label_step_power_up_audit_frame(&mut state, &defaults, &adjustments)
+            .expect("power-up audit display frame");
+        assert_eq!(
+            display_frame.target,
+            RedLabelPowerUpAuditFrameTarget::AuditGameAdjust
+        );
+        assert_eq!(display_frame.dispatch, None);
+        match display_frame.audit_cycle.expect("audit display cycle") {
+            RedLabelAuditCycleStep::Display {
+                line,
+                transfer,
+                change,
+            } => {
+                assert_eq!(line.row_number(), 1);
+                assert_eq!(transfer.erased, None);
+                assert_eq!(transfer.write.text, line.visible_text());
+                assert_eq!(change, None);
+            }
+            other => panic!("unexpected power-up audit display frame {other:?}"),
+        }
+        assert_eq!(
+            state
+                .audit_cycle()
+                .expect("audit cycle after display")
+                .debounce()
+                .remaining_ticks(),
+            RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS + 1
+        );
+        assert!(
+            state
+                .audit_cycle()
+                .expect("audit cycle after display")
+                .previous_visible_text()
+                .is_some_and(|text| text.starts_with("01"))
+        );
+
+        board.set_cabinet_input(CabinetInput {
+            service_advance: true,
+            ..CabinetInput::NONE
+        });
+        let debounce_frame = board
+            .red_label_step_power_up_audit_frame(&mut state, &defaults, &adjustments)
+            .expect("power-up audit debounce frame");
+        assert_eq!(
+            debounce_frame.target,
+            RedLabelPowerUpAuditFrameTarget::AuditGameAdjust
+        );
+        assert_eq!(
+            debounce_frame.audit_cycle,
+            Some(RedLabelAuditCycleStep::Debounce(
+                RedLabelAuditDebounceStep::Waiting {
+                    remaining_ticks: RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS,
+                    shift_register: 0xFF,
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn main_board_power_up_audit_frame_exits_to_caller_after_last_row() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+        let mut state = RedLabelPowerUpAuditFrameState::default();
+
+        board.write_byte(0xC47F, 0x00).expect("bad CMOSCK high");
+        board
+            .red_label_step_power_up_audit_frame(&mut state, &defaults, &adjustments)
+            .expect("power-up audit dispatch frame");
+        state.audit_cycle =
+            Some(RedLabelAuditCycleState::for_displayed_row_number(28).expect("row 28 cycle"));
+
+        board.set_cabinet_input(CabinetInput {
+            service_advance: true,
+            auto_up_manual_down: true,
+            ..CabinetInput::NONE
+        });
+        let return_frame = board
+            .red_label_step_power_up_audit_frame(&mut state, &defaults, &adjustments)
+            .expect("power-up audit return frame");
+
+        assert_eq!(
+            return_frame.target,
+            RedLabelPowerUpAuditFrameTarget::ReturnToCaller
+        );
+        assert_eq!(
+            return_frame.audit_cycle,
+            Some(RedLabelAuditCycleStep::ReturnToGame)
+        );
+        assert!(state.audit_cycle().is_none());
+
+        let complete_frame = board
+            .red_label_step_power_up_audit_frame(&mut state, &defaults, &adjustments)
+            .expect("complete power-up audit frame");
+        assert_eq!(
+            complete_frame.target,
+            RedLabelPowerUpAuditFrameTarget::Complete
+        );
+        assert_eq!(complete_frame.dispatch, None);
+        assert_eq!(complete_frame.audit_cycle, None);
     }
 
     #[test]

@@ -268,6 +268,10 @@ This section records drift found during the repository review on
 - `src/board.rs` now ties the source-visible `AUDITG` row step, `DISAUD`
   display-line formatting/video transfer/previous-row erasure, and
   post-display debounce gate into one deterministic audit cycle helper.
+- `src/board.rs` now models the post-`PWRUP` `AUDITG` outer frame step: the
+  first frame records the source dispatch target and transfers the entry
+  screen, then later frames advance the audit display/debounce cycle until
+  auto/up after row 28 returns to the caller.
 - `src/board.rs` now models the source-visible `ALTER` / `HYSCRE` operator
   adjustment mutation rules: audit rows stay read-only, coin multiplier rows
   respect `COINSL`, `DIPSW` changes set `DIPFLG`, and byte/replay-level values
@@ -582,7 +586,8 @@ This section records drift found during the repository review on
   `HYSCRE` mutation rules, can step the source-visible `AUDITG` row navigation
   from IN2 service inputs, can model the post-display `AUDITG` debounce
   countdown, can run those pieces as one deterministic audit cycle with
-  previous-row erasure, and can snapshot source-labeled CMOS and RAM fields. A
+  previous-row erasure, can step the post-`PWRUP` `AUDITG` outer frame path to
+  return-to-caller, and can snapshot source-labeled CMOS and RAM fields. A
   main-board address classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
@@ -614,11 +619,10 @@ This section records drift found during the repository review on
   scheduling, physical lamp timing, and sample generation remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
-  no exact power-on RAM state, live post-`PWRUP` `AUDITG` frame scheduling,
-  physical advance-switch timing, physical lamp timing, CMOS persistence,
-  screen scanline scheduler, watchdog timing/reset side effects, rendering
-  timing side effects, decoder PROM behavior, DAC sample output, CPU IRQ
-  scheduling, or translated `VSNDRM1.SRC` routines.
+  no exact power-on RAM state, physical advance-switch timing, physical lamp
+  timing, CMOS persistence, screen scanline scheduler, watchdog timing/reset
+  side effects, rendering timing side effects, decoder PROM behavior, DAC
+  sample output, CPU IRQ scheduling, or translated `VSNDRM1.SRC` routines.
 
 ### Player And Controls
 

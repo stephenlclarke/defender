@@ -118,8 +118,9 @@ This file records behavior that must not be guessed in arcade-core code.
   `HYSCRE` mutation rules, can step the source-visible `AUDITG` row navigation
   from IN2 service inputs, can model the post-display `AUDITG` debounce
   countdown, can run those pieces as one deterministic audit cycle with
-  previous-row erasure, and can snapshot source-labeled CMOS and main-RAM
-  fields. A main-board address classifier exists for RAM, banked I/O,
+  previous-row erasure, can step the post-`PWRUP` `AUDITG` outer frame path to
+  return-to-caller, and can snapshot source-labeled CMOS and main-RAM fields. A
+  main-board address classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
   surface, and raw write-only palette register bytes are stored. CMOS 4-bit
@@ -150,10 +151,10 @@ This file records behavior that must not be guessed in arcade-core code.
   report the `romc0.src` target reached by each `PWRUP` action decision,
   dispatch `AuditGate` into the source-visible `AUDITG` entry screen, and
   step/read/format/mutate and video-transfer the source `AUDITG` / `MSGAUD`
-  table rows and its post-display debounce countdown as one deterministic
-  cycle, but CPU IRQ scheduling, exact Williams power-on RAM contents, live
-  post-`PWRUP` `AUDITG` frame scheduling, physical advance-switch timing,
-  physical lamp timing, CMOS persistence,
+  table rows and its post-display debounce countdown as one deterministic cycle
+  plus the post-`PWRUP` outer frame path, but CPU IRQ scheduling, exact Williams
+  power-on RAM contents, physical advance-switch timing, physical lamp timing,
+  CMOS persistence,
   screen scanline scheduling, watchdog timing/reset side effects,
   palette/rendering timing side effects, decoder PROM behavior, and DAC sample
   generation are not modeled.
@@ -379,8 +380,8 @@ This file records behavior that must not be guessed in arcade-core code.
   audio-test sound-pulse/skip-table behavior,
   switch-test display-table/PIA-scan behavior, monitor-test
   crosshatch/RGB-field/color-bar pattern behavior, monitor-to-`AUDITG` entry
-  transfer, and post-`PWRUP` `AuditGate` entry transfer. CMOS persistence, live
-  post-`PWRUP` `AUDITG` frame scheduling, and high-score comparison/initials
+  transfer, post-`PWRUP` `AuditGate` entry transfer, and `AUDITG` outer
+  frame-step dispatch. CMOS persistence and high-score comparison/initials
   routines are not translated.
 
 ## Player
