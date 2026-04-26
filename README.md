@@ -279,8 +279,8 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   `TBL4` sleeps, `OVCNT`, `COLTAB`, `AHSND`, and final `TBSND` / `SUCIDE`,
   schizoid-reserve `SCZST` restore from copied `SCZRES`,
   the `SCZ0` movement/shot-timer process slice through shared `SHOOT`,
-  UFO `UFOST` / `UFOLP` process/object start, shot timer, `UFOP1`-`UFOP3`
-  image cycle, `UFONV` velocity update, and `USHSND` shot sound,
+  UFO `UFOST` dispatcher process/object start plus `UFOLP` shot timer,
+  `UFOP1`-`UFOP3` image cycle, `UFONV` velocity update, and `USHSND` shot sound,
   the `SCZKIL`, `UFOKIL`, normal `LKILL`, `LANDST` lander start/`GTARG`
   target selection, `LANDS0` orbit/`LSHOT`, `LANDG` capture, `LANDF` flee,
   `LNDFXA` pull-in, `SCZ00` mutant conversion, and kidnapping `LKIL1` /

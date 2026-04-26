@@ -2086,6 +2086,7 @@ pub enum RedLabelProcessDispatch {
     LaserStep(RedLabelLaserStep),
     LaserFinished(RedLabelKilledProcess),
     Schizoid(RedLabelSchizoidProcessStep),
+    UfoStarted(RedLabelUfoStart),
     Ufo(RedLabelUfoProcessStep),
     Tie(RedLabelTieProcessStep),
     Lander(RedLabelLanderProcessStep),
@@ -8729,6 +8730,12 @@ impl RedLabelRuntimeMemory {
             return self
                 .step_schizoid_current_process()
                 .map(RedLabelProcessDispatch::Schizoid);
+        }
+
+        if routine_address == red_label_routine_address("UFOST")? {
+            return self
+                .start_ufo_process()
+                .map(RedLabelProcessDispatch::UfoStarted);
         }
 
         if routine_address == red_label_routine_address("UFOLP")? {
@@ -25682,6 +25689,72 @@ mod tests {
             Some(&[0xA2, 0x3C, 0x08, 0x00][..])
         );
         assert_eq!(machine.red_label_ram_range(0xA119..0xA11A), Some(&[0][..]));
+    }
+
+    #[test]
+    fn translated_process_dispatch_runs_ufost_start() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA0DF, 0x12).expect("set SEED");
+        machine.memory.write_byte(0xA0E0, 0x34).expect("set HSEED");
+        machine.memory.write_word(0xA020, 0x2000).expect("set BGL");
+        machine
+            .memory
+            .write_word(0xA0CC, 0x0000)
+            .expect("set PLABX");
+        machine
+            .memory
+            .write_word(0xA0C7, 0x0000)
+            .expect("set PLAXV");
+        machine.memory.write_byte(0xA0C0, 0x30).expect("set PLAYC");
+        machine
+            .memory
+            .write_word(0xA0CA, 0x0000)
+            .expect("set PLAYV");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("UFOST").expect("UFOST address"),
+            )
+            .expect("dispatch UFOST");
+        let RedLabelProcessDispatch::UfoStarted(start) = dispatch else {
+            panic!("expected UFO start dispatch");
+        };
+
+        assert_eq!(
+            start.process,
+            RedLabelCreatedProcess {
+                process_address: 0xAAC5,
+                routine_address: red_label_routine_address("UFOLP").expect("UFOLP address"),
+                process_type: RED_LABEL_SYSTEM_PROCESS_TYPE,
+                class: super::RedLabelProcessClass::Regular,
+            }
+        );
+        assert_eq!(start.object.object_address, 0xA23C);
+        assert_eq!(start.object.process_address, 0xAAC5);
+        assert_eq!(
+            start.object.descriptor,
+            RedLabelObjectDescriptor {
+                picture_address: red_label_object_picture_address("UFOP1").expect("UFOP1 address"),
+                collision_vector_address: red_label_routine_address("UFOKIL")
+                    .expect("UFOKIL address"),
+                scanner_color: 0x3333,
+            }
+        );
+        assert_eq!(start.x16, 0x3234);
+        assert_eq!(start.y16, 0x4400);
+        assert_eq!(start.shot_timer, 8);
+        assert_eq!(
+            start.velocity,
+            RedLabelUfoVelocityUpdate {
+                x_velocity: Some(0xFFC0),
+                y_velocity: Some(0xFF80),
+            }
+        );
+        assert_eq!(start.appearance.slot_address, Some(0x9C00));
+        assert_eq!(
+            machine.red_label_ram_range(0xAACC..0xAAD0),
+            Some(&[0xA2, 0x3C, 0x08, 0x00][..])
+        );
     }
 
     #[test]

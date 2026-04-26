@@ -1052,7 +1052,8 @@ and source `TERBLO` terrain-blow process on the final astronaut, including
 `TBL4` sleeps, `OVCNT`, `COLTAB`, `AHSND`, and final `TBSND` / `SUCIDE`,
 schizoid-reserve `SCZST` restore from copied `SCZRES`, the `SCZ0`
 movement/shot-timer process slice through shared `SHOOT`, the `SCZKIL`
-`KILP` score/explosion/sound path, `UFOST` / `UFOLP` UFO start/process loop,
+`KILP` score/explosion/sound path, `UFOST` dispatcher UFO start / `UFOLP`
+process loop,
 `UFOKIL`, normal `LKILL`, `LANDST` lander start/`GTARG` target selection,
 `LANDS0` orbit/`LSHOT`, `LANDG` capture, `LANDF` flee, `LNDFXA` pull-in,
 `SCZ00` mutant conversion, and kidnapping `LKIL1` / `AKIL1` / `AFALL` /
@@ -1123,7 +1124,8 @@ the scheduled `ASTRO` target-list walker against `ALTTBL`, the `ASTKIL`
 terrain-blow process when the final astronaut is removed, schizoid-reserve `SCZST`
 restore from copied `SCZRES`, the `SCZ0`
 movement/shot-timer process slice through shared `SHOOT`, the `SCZKIL`
-`KILP` score/explosion/sound path, `UFOST` / `UFOLP` UFO start/process loop,
+`KILP` score/explosion/sound path, `UFOST` dispatcher UFO start / `UFOLP`
+process loop,
 `UFOKIL`, normal `LKILL`, `LANDST` lander start/`GTARG` target selection,
 `LANDS0` orbit/`LSHOT`, `LANDG` capture, `LANDF` flee, `LNDFXA` pull-in,
 `SCZ00` mutant conversion, and kidnapping `LKIL1` / `AKIL1` / `AFALL` /

@@ -252,10 +252,11 @@ This file records behavior that must not be guessed in arcade-core code.
   `SCZRES` through source-shaped `SCZST` / `SCZ0` process/object setup,
   including the second `RMAX` RNG advance and `APVCT` appearance entry; the
   scheduled `SCZ0` body now runs its source-shaped X seek, Y seek/avoid, random
-  Y hop, shot timer, shared `SHOOT` shell setup, and `SSHSND` load. `UFOST` /
-  `UFOLP` now run the source UFO process/object start, shot timer, shared
-  `SHOOT` shell setup, `UFOP1`-`UFOP3` image cycle, `UFONV` velocity update,
-  and `USHSND` shot sound. `SCZKIL`
+  Y hop, shot timer, shared `SHOOT` shell setup, and `SSHSND` load. `UFOST`
+  now enters through translated process dispatch and runs the source UFO
+  process/object start; `UFOLP` runs the shot timer, shared `SHOOT` shell
+  setup, `UFOP1`-`UFOP3` image cycle, `UFONV` velocity update, and `USHSND`
+  shot sound. `SCZKIL`
   now runs the source `KILP` score/explosion/sound path with `SCHSND`,
   `UFOKIL` decrements `UFOCNT` and runs the source `KILP` path with
   `UFHSND`, normal `LKILL` decrements `LNDCNT` and runs the source `KILP`
