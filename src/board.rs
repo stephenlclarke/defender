@@ -69,6 +69,22 @@ pub const RED_LABEL_REPLAY_CELL_OFFSET: u8 = 0x81;
 pub const RED_LABEL_COINSL_CELL_OFFSET: u8 = 0x87;
 pub const RED_LABEL_AUDIT_ADJUSTMENT_COUNT: u8 = 28;
 pub const RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS: usize = 31;
+pub const RED_LABEL_AUDIT_DISPLAY_ADDRESS: u16 = 0x1080;
+pub const RED_LABEL_AUDIT_TITLE_TEXT: &str = "WILLIAMS DEFENDER";
+pub const RED_LABEL_AUDIT_TITLE_ADDRESS: u16 = 0x2820;
+pub const RED_LABEL_AUDIT_INITIAL_DELAY_MS: u16 = 1500;
+pub const RED_LABEL_AUDIT_AUTO_FOR_GAME_OVER_TEXT: &str = "AUTO FOR GAME OVER";
+pub const RED_LABEL_AUDIT_MANUAL_TO_STEP_THRU_ADJUST_TEXT: &str = "MANUAL TO STEP THRU ADJUST";
+pub const RED_LABEL_AUDIT_PRESS_ADVANCE_TO_STEP_THRU_TEST_TEXT: &str =
+    "PRESS ADVANCE TO STEP THRU TEST";
+pub const RED_LABEL_AUDIT_PRESS_HIGH_SCORE_RESET_TO_MAKE_CHANGE_TEXT: &str =
+    "PRESS HIGHSCORE RESET TO MAKE CHANGE";
+pub const RED_LABEL_AUDIT_INITIAL_INSTRUCTIONS: &[&str] = &[
+    RED_LABEL_AUDIT_AUTO_FOR_GAME_OVER_TEXT,
+    RED_LABEL_AUDIT_MANUAL_TO_STEP_THRU_ADJUST_TEXT,
+];
+pub const RED_LABEL_AUDIT_ACTIVE_INSTRUCTIONS: &[&str] =
+    &[RED_LABEL_AUDIT_PRESS_HIGH_SCORE_RESET_TO_MAKE_CHANGE_TEXT];
 pub const RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS: u8 = 100;
 pub const RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS: u8 = 6;
 pub const RED_LABEL_AUDIT_DEBOUNCE_SHIFT_REGISTER: u8 = 0xFF;
@@ -903,6 +919,35 @@ pub enum RedLabelAuditAdjustmentChange {
     ReadOnly,
     CoinageLocked,
     Changed(RedLabelAuditAdjustmentValue),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAuditGameAdjustStartTransfer {
+    pub screen_clear_end: u16,
+    pub palette_zeroed: bool,
+    pub letter_color: RedLabelDiagnosticPaletteWrite,
+    pub title: RedLabelDiagnosticBitmapTextWrite,
+    pub initial_instructions: RedLabelDiagnosticInstructionBitmapTextWrite,
+    pub initial_delay_ms: u16,
+    pub active_screen_clear_end: u16,
+    pub active_title: RedLabelDiagnosticBitmapTextWrite,
+    pub active_instructions: RedLabelDiagnosticInstructionBitmapTextWrite,
+    pub state: RedLabelAuditCycleState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelDiagnosticAsciiTextWrite {
+    pub address: u16,
+    pub text: String,
+    pub cursor_after: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAuditDisplayLineTransfer {
+    pub address: u16,
+    pub erased: Option<RedLabelDiagnosticAsciiTextWrite>,
+    pub write: RedLabelDiagnosticAsciiTextWrite,
+    pub line: RedLabelAuditDisplayLine,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2920,16 +2965,40 @@ impl<'a> DefenderMainBoard<'a> {
         &mut self,
         instruction: &RedLabelDiagnosticInstructionWrite,
     ) -> Result<RedLabelDiagnosticInstructionBitmapTextWrite, String> {
-        let prompt_message = red_label_message("VINS1")?;
+        self.red_label_write_operator_instruction_text(
+            "VINS1",
+            RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT,
+            instruction,
+        )
+    }
+
+    fn red_label_write_audit_operator_instruction_text(
+        &mut self,
+        instruction: &RedLabelDiagnosticInstructionWrite,
+    ) -> Result<RedLabelDiagnosticInstructionBitmapTextWrite, String> {
+        self.red_label_write_operator_instruction_text(
+            "VINS16",
+            RED_LABEL_AUDIT_PRESS_ADVANCE_TO_STEP_THRU_TEST_TEXT,
+            instruction,
+        )
+    }
+
+    fn red_label_write_operator_instruction_text(
+        &mut self,
+        prompt_vector_label: &'static str,
+        prompt_text: &'static str,
+        instruction: &RedLabelDiagnosticInstructionWrite,
+    ) -> Result<RedLabelDiagnosticInstructionBitmapTextWrite, String> {
+        let prompt_message = red_label_message(prompt_vector_label)?;
         let prompt = self.red_label_write_message_text(
             RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
-            "VINS1",
+            prompt_vector_label,
             prompt_message,
         )?;
-        if prompt.text != RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT {
+        if prompt.text != prompt_text {
             return Err(format!(
-                "red-label operator prompt asset text `{}` does not match source text `{}`",
-                prompt.text, RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT
+                "red-label operator prompt vector `{prompt_vector_label}` text `{}` does not match source text `{prompt_text}`",
+                prompt.text
             ));
         }
 
@@ -2961,6 +3030,74 @@ impl<'a> DefenderMainBoard<'a> {
             prompt,
             lines,
         })
+    }
+
+    fn red_label_write_ascii_text(
+        &mut self,
+        screen_address: u16,
+        text: &str,
+    ) -> Result<RedLabelDiagnosticAsciiTextWrite, String> {
+        let mut cursor = screen_address;
+        for character in text.chars() {
+            cursor = self.red_label_write_ascii_character(cursor, character)?;
+        }
+
+        Ok(RedLabelDiagnosticAsciiTextWrite {
+            address: screen_address,
+            text: String::from(text),
+            cursor_after: cursor,
+        })
+    }
+
+    fn red_label_clear_ascii_text(
+        &mut self,
+        screen_address: u16,
+        text: &str,
+    ) -> Result<RedLabelDiagnosticAsciiTextWrite, String> {
+        let mut cursor = screen_address;
+        for character in text.chars() {
+            cursor = self.red_label_clear_ascii_character(cursor, character)?;
+        }
+
+        Ok(RedLabelDiagnosticAsciiTextWrite {
+            address: screen_address,
+            text: String::from(text),
+            cursor_after: cursor,
+        })
+    }
+
+    fn red_label_write_ascii_character(
+        &mut self,
+        screen_address: u16,
+        character: char,
+    ) -> Result<u16, String> {
+        if let Some(digit) = character.to_digit(10) {
+            let digit = u8::try_from(digit).expect("ASCII digit fits in u8");
+            let image = red_label_score_digit_image(digit)?;
+            self.red_label_write_score_digit_image(screen_address, image)?;
+            return Ok(red_label_text_cursor_advance(screen_address, image.width));
+        }
+
+        let glyph = red_label_message_glyph(character)?;
+        self.red_label_write_message_glyph(screen_address, glyph)?;
+        Ok(red_label_text_cursor_advance(screen_address, glyph.width))
+    }
+
+    fn red_label_clear_ascii_character(
+        &mut self,
+        screen_address: u16,
+        character: char,
+    ) -> Result<u16, String> {
+        if let Some(digit) = character.to_digit(10) {
+            let digit = u8::try_from(digit).expect("ASCII digit fits in u8");
+            let image = red_label_score_digit_image(digit)?;
+            self.red_label_clear_block(screen_address, image.width, image.height)?;
+            return Ok(red_label_text_cursor_advance(screen_address, image.width));
+        }
+
+        let glyph = red_label_message_glyph(character)?;
+        self.red_label_clear_block(screen_address, glyph.width, glyph.height)?;
+        Ok(red_label_text_cursor_advance(screen_address, glyph.width))
     }
 
     fn red_label_write_message_text(
@@ -3128,8 +3265,7 @@ impl<'a> DefenderMainBoard<'a> {
     ///
     /// This models the 31 visible characters that precede the slash terminator:
     /// row number at columns 0-1, row value at source-selected columns, and the
-    /// `MSGAUD` text at column 12. It intentionally leaves `VDISST` bitmap text
-    /// transfer and live screen erasure outside this deterministic board helper.
+    /// `MSGAUD` text at column 12.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L117-L173>.
     pub fn red_label_audit_display_line(
         &self,
@@ -3142,6 +3278,105 @@ impl<'a> DefenderMainBoard<'a> {
             row_number: adjustment.number,
             value,
             visible_text,
+        })
+    }
+
+    /// Transfer the source-visible `AUDITG` entry screens into video RAM.
+    ///
+    /// This covers the initial title plus `IAUD1` prompt, the 1.5 second delay
+    /// intent, and the active audit screen with `IAUD2` before the first
+    /// `AUDIT0` display-row pass.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L5-L31>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/mess0.src#L84-L150>.
+    pub fn red_label_write_audit_game_adjust_start(
+        &mut self,
+    ) -> Result<RedLabelAuditGameAdjustStartTransfer, String> {
+        self.red_label_clear_screen();
+        self.palette_ram = [0; PALETTE_RAM_SIZE];
+        self.crom0_diagnostic_screen = RedLabelCrom0DiagnosticScreen::default();
+        self.crom0_advance_gates.clear();
+
+        let letter_color = RedLabelDiagnosticPaletteWrite {
+            address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+            index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+            value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+        };
+        self.palette_ram[usize::from(letter_color.index)] = letter_color.value;
+
+        let title = self.red_label_write_audit_title_text()?;
+        let initial_instructions = self.red_label_write_crom0_operator_instruction_text(
+            &RedLabelDiagnosticInstructionWrite {
+                table_label: "IAUD1",
+                lines: RED_LABEL_AUDIT_INITIAL_INSTRUCTIONS,
+            },
+        )?;
+
+        self.red_label_clear_screen();
+        let active_title = self.red_label_write_audit_title_text()?;
+        let active_instructions = self.red_label_write_audit_operator_instruction_text(
+            &RedLabelDiagnosticInstructionWrite {
+                table_label: "IAUD2",
+                lines: RED_LABEL_AUDIT_ACTIVE_INSTRUCTIONS,
+            },
+        )?;
+
+        Ok(RedLabelAuditGameAdjustStartTransfer {
+            screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            palette_zeroed: true,
+            letter_color,
+            title,
+            initial_instructions,
+            initial_delay_ms: RED_LABEL_AUDIT_INITIAL_DELAY_MS,
+            active_screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            active_title,
+            active_instructions,
+            state: RedLabelAuditCycleState::default(),
+        })
+    }
+
+    fn red_label_write_audit_title_text(
+        &mut self,
+    ) -> Result<RedLabelDiagnosticBitmapTextWrite, String> {
+        let title = self.red_label_write_message_text(
+            RED_LABEL_AUDIT_TITLE_ADDRESS,
+            "VINS15",
+            red_label_message("VINS15")?,
+        )?;
+        if title.text != RED_LABEL_AUDIT_TITLE_TEXT {
+            return Err(format!(
+                "red-label audit title vector `VINS15` text `{}` does not match source text `{}`",
+                title.text, RED_LABEL_AUDIT_TITLE_TEXT
+            ));
+        }
+        Ok(title)
+    }
+
+    /// Transfer one source-shaped `DISAUD` row through the `VDISST` screen path.
+    ///
+    /// `previous_visible_text` models the stack buffer erased by `VERAST`
+    /// before `CLRBUF` and the new 31-character row are written.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L117-L173>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/mess0.src#L692-L817>.
+    pub fn red_label_write_audit_display_line(
+        &mut self,
+        line: &RedLabelAuditDisplayLine,
+        previous_visible_text: Option<&str>,
+    ) -> Result<RedLabelAuditDisplayLineTransfer, String> {
+        let erased = previous_visible_text
+            .map(|text| {
+                red_label_validate_audit_visible_text(text)?;
+                self.red_label_clear_ascii_text(RED_LABEL_AUDIT_DISPLAY_ADDRESS, text)
+            })
+            .transpose()?;
+        red_label_validate_audit_visible_text(line.visible_text())?;
+        let write =
+            self.red_label_write_ascii_text(RED_LABEL_AUDIT_DISPLAY_ADDRESS, line.visible_text())?;
+
+        Ok(RedLabelAuditDisplayLineTransfer {
+            address: RED_LABEL_AUDIT_DISPLAY_ADDRESS,
+            erased,
+            write,
+            line: line.clone(),
         })
     }
 
@@ -4093,10 +4328,27 @@ fn red_label_crom0_operator_instruction_vector(line: &str) -> Result<&'static st
         RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT => Ok("VINS10"),
         RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT => Ok("VINS11"),
         RED_LABEL_CROM0_MANUAL_TO_STEP_THRU_PATTERNS_TEXT => Ok("VINS12"),
+        RED_LABEL_AUDIT_AUTO_FOR_GAME_OVER_TEXT => Ok("VINS13"),
+        RED_LABEL_AUDIT_MANUAL_TO_STEP_THRU_ADJUST_TEXT => Ok("VINS14"),
+        RED_LABEL_AUDIT_PRESS_HIGH_SCORE_RESET_TO_MAKE_CHANGE_TEXT => Ok("VINS17"),
         _ => Err(format!(
             "red-label CROM0 operator instruction `{line}` has no message vector"
         )),
     }
+}
+
+fn red_label_validate_audit_visible_text(text: &str) -> Result<(), String> {
+    if !text.is_ascii() {
+        return Err(String::from("red-label AUDITG display text must be ASCII"));
+    }
+    if text.len() != RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS {
+        return Err(format!(
+            "red-label AUDITG display text length {} does not match {} visible characters",
+            text.len(),
+            RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS
+        ));
+    }
+    Ok(())
 }
 
 fn red_label_validate_monitor_pattern_index(pattern_index: usize) -> Result<(), String> {
@@ -4604,8 +4856,13 @@ mod tests {
             MAIN_CPU_BANK_SELECT_WRITE, MAIN_CPU_BANKED_ROM_START, MAIN_CPU_IO_BANK,
             MAIN_CPU_RAM_SIZE, MainCpuReadError, MainCpuReadTarget, MainCpuReadWindow,
             MainCpuRomRead, MainCpuWriteError, MainCpuWriteTarget, PALETTE_RAM_SIZE,
+            RED_LABEL_AUDIT_AUTO_FOR_GAME_OVER_TEXT, RED_LABEL_AUDIT_DISPLAY_ADDRESS,
             RED_LABEL_AUDIT_DISPLAY_VISIBLE_CHARS, RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS,
-            RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS, RED_LABEL_CLRALL_PACKED_BYTE_WRITES,
+            RED_LABEL_AUDIT_INITIAL_DELAY_MS, RED_LABEL_AUDIT_MANUAL_TO_STEP_THRU_ADJUST_TEXT,
+            RED_LABEL_AUDIT_PRESS_ADVANCE_TO_STEP_THRU_TEST_TEXT,
+            RED_LABEL_AUDIT_PRESS_HIGH_SCORE_RESET_TO_MAKE_CHANGE_TEXT,
+            RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS, RED_LABEL_AUDIT_TITLE_ADDRESS,
+            RED_LABEL_AUDIT_TITLE_TEXT, RED_LABEL_CLRALL_PACKED_BYTE_WRITES,
             RED_LABEL_CLRAUD_PACKED_BYTE_WRITES, RED_LABEL_CMOSCK_CELL_OFFSET,
             RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_CROM0_ALL_ROMS_OK_TEXT,
             RED_LABEL_CROM0_AUDIO_IDLE_PORT_B, RED_LABEL_CROM0_AUDIO_KILL_SOUND_NUMBER,
@@ -4659,9 +4916,10 @@ mod tests {
             RED_LABEL_SCREEN_CLEAR_END, RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
             RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
             RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
-            RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
-            RedLabelCrom0AudioSoundNumberTransfer, RedLabelCrom0AudioSoundPulse,
-            RedLabelCrom0AudioTestStep, RedLabelCrom0AudioTestTarget,
+            RedLabelAuditDebounceStep, RedLabelAuditDisplayLineTransfer,
+            RedLabelAuditGameAdjustStartTransfer, RedLabelAuditOperatorState,
+            RedLabelAuditOperatorStep, RedLabelCrom0AudioSoundNumberTransfer,
+            RedLabelCrom0AudioSoundPulse, RedLabelCrom0AudioTestStep, RedLabelCrom0AudioTestTarget,
             RedLabelCrom0AudioTestTransfer, RedLabelCrom0BadRamBitmapTextWrite,
             RedLabelCrom0BadRomBitmapTextWrite, RedLabelCrom0BadRomScreenWrite,
             RedLabelCrom0CmosRamFailure, RedLabelCrom0CmosRamTestFault,
@@ -4684,16 +4942,17 @@ mod tests {
             RedLabelCrom0RamTestTarget, RedLabelCrom0SwitchDisplayBlockErase,
             RedLabelCrom0SwitchOpened, RedLabelCrom0SwitchPanel, RedLabelCrom0SwitchPortScan,
             RedLabelCrom0SwitchTestChange, RedLabelCrom0SwitchTestState,
-            RedLabelCrom0SwitchTestTarget, RedLabelDiagnosticBcdNumberWrite,
-            RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
-            RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
-            RedLabelDiagnosticLedOutput, RedLabelDiagnosticPaletteWrite,
-            RedLabelDiagnosticTextWrite, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
-            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
-            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
-            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
-            red_label_crom0_diagnostic_screen, red_label_crom0_ram_test_next_word,
-            red_label_diagnostic_led_output, video_control_cocktail, video_counter_read_value,
+            RedLabelCrom0SwitchTestTarget, RedLabelDiagnosticAsciiTextWrite,
+            RedLabelDiagnosticBcdNumberWrite, RedLabelDiagnosticBitmapTextWrite,
+            RedLabelDiagnosticInstructionBitmapTextWrite, RedLabelDiagnosticInstructionWrite,
+            RedLabelDiagnosticLedFlash, RedLabelDiagnosticLedOutput,
+            RedLabelDiagnosticPaletteWrite, RedLabelDiagnosticTextWrite, RedLabelPowerUpAction,
+            RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
+            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
+            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
+            main_cpu_read_target, main_cpu_write_target, red_label_crom0_diagnostic_screen,
+            red_label_crom0_ram_test_next_word, red_label_diagnostic_led_output,
+            video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -4841,7 +5100,8 @@ mod tests {
                     usize::from(screen_address + (u16::from(column) << 8) + u16::from(row));
                 assert_eq!(
                     board.ram()[address],
-                    bytes[source_column + usize::from(row)]
+                    bytes[source_column + usize::from(row)],
+                    "screen byte mismatch at 0x{address:04X}"
                 );
             }
         }
@@ -7985,6 +8245,162 @@ mod tests {
         assert_eq!(&special_function_text[0..2], b"28");
         assert_eq!(&special_function_text[9..11], b"45");
         assert_eq!(&special_function_text[12..28], b"SPECIAL FUNCTION");
+    }
+
+    #[test]
+    fn main_board_writes_auditg_entry_screens() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let transfer = board
+            .red_label_write_audit_game_adjust_start()
+            .expect("audit game-adjust start transfer");
+
+        assert_eq!(
+            transfer,
+            RedLabelAuditGameAdjustStartTransfer {
+                screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+                palette_zeroed: true,
+                letter_color: RedLabelDiagnosticPaletteWrite {
+                    address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+                    index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+                    value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+                },
+                title: RedLabelDiagnosticBitmapTextWrite {
+                    address: RED_LABEL_AUDIT_TITLE_ADDRESS,
+                    vector_label: "VINS15",
+                    text: String::from(RED_LABEL_AUDIT_TITLE_TEXT),
+                    cursor_after: 0x6C20,
+                },
+                initial_instructions: RedLabelDiagnosticInstructionBitmapTextWrite {
+                    table_label: "IAUD1",
+                    prompt: RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                        vector_label: "VINS1",
+                        text: String::from(RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT),
+                        cursor_after: 0x96CE,
+                    },
+                    lines: vec![
+                        RedLabelDiagnosticBitmapTextWrite {
+                            address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                            vector_label: "VINS13",
+                            text: String::from(RED_LABEL_AUDIT_AUTO_FOR_GAME_OVER_TEXT),
+                            cursor_after: 0x55DA,
+                        },
+                        RedLabelDiagnosticBitmapTextWrite {
+                            address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[1],
+                            vector_label: "VINS14",
+                            text: String::from(RED_LABEL_AUDIT_MANUAL_TO_STEP_THRU_ADJUST_TEXT),
+                            cursor_after: 0x73E4,
+                        },
+                    ],
+                },
+                initial_delay_ms: RED_LABEL_AUDIT_INITIAL_DELAY_MS,
+                active_screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+                active_title: RedLabelDiagnosticBitmapTextWrite {
+                    address: RED_LABEL_AUDIT_TITLE_ADDRESS,
+                    vector_label: "VINS15",
+                    text: String::from(RED_LABEL_AUDIT_TITLE_TEXT),
+                    cursor_after: 0x6C20,
+                },
+                active_instructions: RedLabelDiagnosticInstructionBitmapTextWrite {
+                    table_label: "IAUD2",
+                    prompt: RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                        vector_label: "VINS16",
+                        text: String::from(RED_LABEL_AUDIT_PRESS_ADVANCE_TO_STEP_THRU_TEST_TEXT),
+                        cursor_after: 0x8CCE,
+                    },
+                    lines: vec![RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                        vector_label: "VINS17",
+                        text: String::from(
+                            RED_LABEL_AUDIT_PRESS_HIGH_SCORE_RESET_TO_MAKE_CHANGE_TEXT,
+                        ),
+                        cursor_after: 0x98DA,
+                    }],
+                },
+                state: RedLabelAuditCycleState::default(),
+            }
+        );
+        assert_eq!(
+            board.palette_ram()[usize::from(RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX)],
+            RED_LABEL_CROM0_RAM_TEST_COLOR
+        );
+        assert_message_glyph_at(&board, RED_LABEL_AUDIT_TITLE_ADDRESS, 'W');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, 'P');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0], 'P');
+    }
+
+    #[test]
+    fn main_board_writes_auditg_display_line_to_video_ram_and_erases_previous_line() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+        let special_function = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "DIPSW")
+            .expect("special-function adjustment");
+        board
+            .cmos_sram_write_byte(RED_LABEL_DIPSW_CELL_OFFSET, 0x45)
+            .expect("set special function");
+        let previous_line = board
+            .red_label_audit_display_line(special_function)
+            .expect("previous audit display line");
+        board
+            .red_label_write_audit_display_line(&previous_line, None)
+            .expect("write previous audit display line");
+        assert_message_glyph_at(&board, 0x3080, 'S');
+        assert_message_glyph_at(&board, 0x5980, 'C');
+
+        let left_coins = adjustments
+            .iter()
+            .find(|adjustment| adjustment.number == 1)
+            .expect("left coin audit row");
+        board
+            .cmos_sram_write_word(left_coins.offset as u8, 0x1234)
+            .expect("set left coin counter");
+        let line = board
+            .red_label_audit_display_line(left_coins)
+            .expect("left coin display line");
+        let transfer = board
+            .red_label_write_audit_display_line(&line, Some(previous_line.visible_text()))
+            .expect("write audit display line");
+
+        assert_eq!(
+            transfer,
+            RedLabelAuditDisplayLineTransfer {
+                address: RED_LABEL_AUDIT_DISPLAY_ADDRESS,
+                erased: Some(RedLabelDiagnosticAsciiTextWrite {
+                    address: RED_LABEL_AUDIT_DISPLAY_ADDRESS,
+                    text: String::from(previous_line.visible_text()),
+                    cursor_after: 0x7280,
+                }),
+                write: RedLabelDiagnosticAsciiTextWrite {
+                    address: RED_LABEL_AUDIT_DISPLAY_ADDRESS,
+                    text: String::from(line.visible_text()),
+                    cursor_after: 0x6B80,
+                },
+                line: line.clone(),
+            }
+        );
+        assert_score_digit_at(&board, RED_LABEL_AUDIT_DISPLAY_ADDRESS, 0);
+        assert_score_digit_at(&board, 0x1480, 1);
+        assert_score_digit_at(&board, 0x2280, 1);
+        assert_score_digit_at(&board, 0x2680, 2);
+        assert_score_digit_at(&board, 0x2A80, 3);
+        assert_score_digit_at(&board, 0x2E80, 4);
+        assert_message_glyph_at(&board, 0x3480, 'C');
+        assert_message_glyph_at(&board, 0x3C80, 'I');
+        assert_eq!(board.ram()[0x5980], 0);
+
+        let error = board
+            .red_label_write_audit_display_line(&line, Some("too short"))
+            .expect_err("invalid previous display line");
+        assert!(error.contains("does not match 31 visible characters"));
     }
 
     #[test]

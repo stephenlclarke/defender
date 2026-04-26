@@ -179,7 +179,8 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   color-RAM diagnostic heading/bars/palette loop, CROM0 audio-test
   heading/sound-pulse/skip-table behavior, CROM0 switch-test
   heading/display-table/PIA-scan behavior, CROM0 monitor-test
-  heading/crosshatch/RGB-field/color-bar pattern behavior, and advance-gate intent,
+  heading/crosshatch/RGB-field/color-bar pattern behavior, `AUDITG` entry
+  screens and `DISAUD` row video transfer/erasure, and advance-gate intent,
   sound-table bytes, the complete `SWTAB` switch table, the trace schema, and
   `WVTAB` wave records from `assets/red-label/`.
 - The core now initializes source-owned process, super-process, object, player,
@@ -404,10 +405,10 @@ yet; current implementation status is tracked in `SPEC.md` and
   pass-boundary loop dispatch, CMOS RAM-test write/verify loop and visible
   outcomes, CROM0 color-RAM diagnostic heading/bars/palette-loop behavior,
   CROM0 audio-test heading/sound-pulse/skip-table behavior, CROM0 switch-test
-  heading/display-table/PIA-scan behavior, and CROM0 monitor-test
-  heading/crosshatch/RGB-field/color-bar pattern behavior,
-  high-score reset copy, and operator audit/adjustment table, `DISAUD`
-  display-line formatting, row
+  heading/display-table/PIA-scan behavior, CROM0 monitor-test
+  heading/crosshatch/RGB-field/color-bar pattern behavior, high-score reset
+  copy, operator audit/adjustment table, `AUDITG` game-adjust entry screens,
+  and `DISAUD` display-line formatting/video transfer/erasure, row
   navigation, post-display debounce cadence, deterministic audit cycle, and
   CMOS mutation rules now embedded under `assets/red-label/`. The
   `defb6.src` `CRTAB` bytes now feed
@@ -552,12 +553,13 @@ into Rust. The active embedded assets currently include:
 - `memory-map.tsv`: MAME main-board and sound-board address ranges used by the
   Rust address classifiers.
 - `message-glyphs.tsv`: source `mess0.src` text glyph bytes consumed by the
-  translated `BONUS` `MESS` calls and CROM0 diagnostic/RAM-test/CMOS/color/audio
-  test/switch-test/monitor-test text transfers.
+  translated `BONUS` `MESS` calls and CROM0
+  diagnostic/RAM-test/CMOS/color/audio/switch-test/monitor-test/audit text
+  transfers.
 - `messages.tsv`: source `mess0.src` message vectors, words, and text-control
   tokens consumed by the translated `BONUS` screen text and CROM0 diagnostic,
-  RAM-test, CMOS-test, color-test, audio-test, switch-test, and monitor-test
-  messages.
+  RAM-test, CMOS-test, color-test, audio-test, switch-test, monitor-test, and
+  audit/game-adjust messages.
 - `object-images.tsv`: red-label object image bytes currently used by
   `COLIDE` / `COL0` picture-mask intersection, `PRDISP` / `ON86` player
   picture writes, `CWRIT` / `COFF` generic object-picture writes/erases, and

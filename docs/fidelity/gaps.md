@@ -112,12 +112,13 @@ This file records behavior that must not be guessed in arcade-core code.
   CMOS-visible `PWRUP` branch around `CMOSCK`/`DIPFLG`/`DIPSW`, can run the
   visible `RHSTD` / `RHSTDS` all-time and today's high-score reset copy, can
   read `AUDITG` / `MSGAUD` audit and operator-adjustment rows from their
-  source CMOS offsets, can format the source-visible `DISAUD` line buffer for
-  those rows, can apply the source-visible `ALTER` / `HYSCRE` mutation rules,
-  can step the source-visible `AUDITG` row navigation from IN2 service inputs,
-  can model the post-display `AUDITG` debounce countdown, can run those pieces
-  as one deterministic audit cycle, and can snapshot source-labeled CMOS and
-  main-RAM fields. A main-board address classifier exists for RAM, banked I/O,
+  source CMOS offsets, can transfer the source-visible `AUDITG` entry screens
+  and `DISAUD` row text/erasure, can apply the source-visible `ALTER` /
+  `HYSCRE` mutation rules, can step the source-visible `AUDITG` row navigation
+  from IN2 service inputs, can model the post-display `AUDITG` debounce
+  countdown, can run those pieces as one deterministic audit cycle, and can
+  snapshot source-labeled CMOS and main-RAM fields. A main-board address
+  classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
   surface, and raw write-only palette register bytes are stored. CMOS 4-bit
@@ -146,10 +147,10 @@ This file records behavior that must not be guessed in arcade-core code.
   data register, PIA IC4 port A writes are captured as the DAC callback
   boundary, and command CB1 drives the sound PIA IRQ state. The board layer can
   report the `romc0.src` target reached by each `PWRUP` action decision and
-  step/read/format/mutate the source `AUDITG` / `MSGAUD` table rows and its
-  post-display debounce countdown as one deterministic cycle, but CPU IRQ
-  scheduling, exact Williams power-on RAM contents, `AUDITG` live text
-  transfer/screen erasure/post-`PWRUP` wiring, physical advance-switch timing,
+  step/read/format/mutate and video-transfer the source `AUDITG` / `MSGAUD`
+  table rows and its post-display debounce countdown as one deterministic
+  cycle, but CPU IRQ scheduling, exact Williams power-on RAM contents,
+  post-`PWRUP` `AUDITG` scheduling/wiring, physical advance-switch timing,
   physical lamp timing, sub-pass/page-boundary RAM-test operator polling,
   monitor-test handoff/live-audit integration beyond the modeled monitor
   pattern loop, CMOS persistence,
@@ -365,9 +366,10 @@ This file records behavior that must not be guessed in arcade-core code.
 - CMOS layout, ROM default bytes, 4-bit cell writes, `CLRAUD`/`CMINIT` visible
   cell effects, the CMOS-visible `PWRUP` branch and source dispatch target,
   `RHSTD`/`RHSTDS` reset copies, `AUDITG` / `MSGAUD` message-offset rows and
-  source-visible row navigation, display-line formatting, and adjustment
-  mutations, the post-display debounce countdown, and red-label packed
-  byte/word helper behavior are modeled, and the CROM0 ROM stage now carries
+  source-visible entry-screen transfer, row navigation, display-line formatting
+  and video transfer/erasure, adjustment mutations, the post-display debounce
+  countdown, and red-label packed byte/word helper behavior are modeled, and
+  the CROM0 ROM stage now carries
   diagnostic text/palette intent, bitmap
   headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
   gate metadata plus the RAM-test start/failure/no-error visible setup, RAM2
@@ -375,9 +377,9 @@ This file records behavior that must not be guessed in arcade-core code.
   write/verify loop plus visible outcomes and the CROM0 color-RAM diagnostic
   heading/bars/palette loop plus audio-test sound-pulse/skip-table behavior,
   switch-test display-table/PIA-scan behavior, and monitor-test
-  crosshatch/RGB-field/color-bar pattern behavior. CMOS persistence, `AUDITG`
-  live text transfer/screen erasure/post-`PWRUP` wiring, high-score
-  comparison/initials routines, sub-pass/page-boundary RAM-test operator
+  crosshatch/RGB-field/color-bar pattern behavior. CMOS persistence,
+  post-`PWRUP` `AUDITG` scheduling/wiring, high-score comparison/initials
+  routines, sub-pass/page-boundary RAM-test operator
   polling, and monitor-test handoff/live-audit integration beyond the modeled
   monitor pattern loop are not translated.
 

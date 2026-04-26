@@ -350,6 +350,7 @@ mod tests {
         assert!(glyphs.iter().any(|glyph| glyph.character == 'F'));
         assert!(glyphs.iter().any(|glyph| glyph.character == 'G'));
         assert!(glyphs.iter().any(|glyph| glyph.character == 'J'));
+        assert!(glyphs.iter().any(|glyph| glyph.character == 'Y'));
         assert!(glyphs.iter().any(|glyph| glyph.character == ','));
         assert!(glyphs.iter().any(|glyph| glyph.character == ':'));
         assert_eq!(
@@ -598,6 +599,17 @@ mod tests {
                 &["AUTO", "FOR", "AUDIT", "[HMC:0xFE]", ",", "GAME", "ADJUST"],
             ),
             ("VINS12", &["MANUAL", "TO", "STEP", "THRU", "PATTERNS"]),
+            ("VINS13", &["AUTO", "FOR", "GAME", "OVER"]),
+            ("VINS14", &["MANUAL", "TO", "STEP", "THRU", "ADJUST"]),
+            ("VINS15", &["WILLIAMS", "DEFENDER"]),
+            (
+                "VINS16",
+                &["PRESS", "ADVANCE", "TO", "STEP", "THRU", "TEST"],
+            ),
+            (
+                "VINS17",
+                &["PRESS", "HIGHSCORE", "RESET", "TO", "MAKE", "CHANGE"],
+            ),
         ];
         for (label, expected_words) in switch_messages {
             assert_eq!(

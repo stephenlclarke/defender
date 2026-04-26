@@ -253,9 +253,13 @@ This section records drift found during the repository review on
 - `assets/red-label/audit-adjustments.tsv`, `src/red_label_memory.rs`, and the
   board harness now agree on the `romc8.src` `AUDITG` / `MSGAUD` audit and
   operator-adjustment messages, CMOS offsets, and packed display widths.
+- `src/board.rs` now models the source-visible `AUDITG` game-adjust entry
+  screens: `VINS15` title transfer, `IAUD1` initial instructions, 1.5-second
+  delay intent, and active `IAUD2` prompt state.
 - `src/board.rs` now models the source-visible `DISAUD` audit row stack buffer:
   row numbers, packed CMOS values, the replay row's dummy trailing zeroes, and
-  `MSGAUD` messages land in the same 31 visible character columns.
+  `MSGAUD` messages land in the same 31 visible character columns; the row can
+  also transfer to video RAM at `0x1080` while erasing the previous visible row.
 - `src/board.rs` now models the source-visible `AUDITG` post-display
   delay/debounce registers: the first 100-tick scan delay, the six-tick repeat
   scan cadence, and the `BITB #$0A` release shift register.
@@ -569,12 +573,13 @@ This section records drift found during the repository review on
   visible `RHSTD` / `RHSTDS` all-time and today's high-score reset copy, can
   report the `romc0.src` target reached by each `PWRUP` action decision, can
   read `AUDITG` / `MSGAUD` audit and operator-adjustment rows from their
-  source CMOS offsets, can format the source-visible `DISAUD` line buffer for
-  those rows, can apply the source-visible `ALTER` / `HYSCRE` mutation rules,
-  can step the source-visible `AUDITG` row navigation from IN2 service inputs,
-  can model the post-display `AUDITG` debounce countdown, can run those pieces
-  as one deterministic audit cycle, and can snapshot source-labeled CMOS and
-  RAM fields. A main-board address classifier exists for RAM, banked I/O,
+  source CMOS offsets, can transfer the source-visible `AUDITG` entry screens
+  and `DISAUD` row text/erasure, can apply the source-visible `ALTER` /
+  `HYSCRE` mutation rules, can step the source-visible `AUDITG` row navigation
+  from IN2 service inputs, can model the post-display `AUDITG` debounce
+  countdown, can run those pieces as one deterministic audit cycle, and can
+  snapshot source-labeled CMOS and RAM fields. A main-board address classifier
+  exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
   surface. Raw write-only palette register bytes, CMOS 4-bit write/read bytes,
@@ -598,14 +603,15 @@ This section records drift found during the repository review on
   color-RAM test heading/instructions, draw the source `RAMBAR` vertical bars,
   step the `COLRMT` palette loop, model the CROM0 audio-test heading,
   `PLAYB` pulse, skip-sound table, BCD sound-number display, CROM0
-  switch-test heading/display table/PIA scan, and CROM0 monitor-test
-  heading/crosshatch/RGB-field/color-bar pattern displays. CPU interrupt
-  scheduling, physical lamp timing, and sample generation remain gaps.
+  switch-test heading/display table/PIA scan, CROM0 monitor-test
+  heading/crosshatch/RGB-field/color-bar pattern displays, and `AUDITG`
+  title/prompt/row text transfers. CPU interrupt scheduling, physical lamp
+  timing, and sample generation remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
-  no exact power-on RAM state, translated `AUDITG` live text transfer/screen
-  erasure/post-`PWRUP` wiring, physical advance-switch timing, physical lamp
-  timing, sub-pass/page-boundary RAM-test operator polling, monitor-test
+  no exact power-on RAM state, translated post-`PWRUP` `AUDITG` scheduling and
+  wiring, physical advance-switch timing, physical lamp timing,
+  sub-pass/page-boundary RAM-test operator polling, monitor-test
   handoff/live-audit integration beyond the modeled monitor pattern loop,
   CMOS persistence, screen
   scanline scheduler, watchdog timing/reset side effects, rendering timing side

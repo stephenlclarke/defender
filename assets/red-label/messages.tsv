@@ -47,6 +47,11 @@ VINS9	0xC0CB	AUTO FOR SWITCH TEST	https://github.com/mwenge/defender/blob/master
 VINS10	0xC0CD	MANUAL TO TEST INDIVIDUAL SOUNDS	https://github.com/mwenge/defender/blob/master/src/mess0.src#L145-L146;https://github.com/mwenge/defender/blob/master/src/mess0.src#L254-L255
 VINS11	0xC0CF	AUTO FOR MONITOR TEST PATTERNS	https://github.com/mwenge/defender/blob/master/src/mess0.src#L146-L147;https://github.com/mwenge/defender/blob/master/src/mess0.src#L255-L256
 VINS12	0xC0D1	MANUAL TO STEP THRU PATTERNS	https://github.com/mwenge/defender/blob/master/src/mess0.src#L147-L148;https://github.com/mwenge/defender/blob/master/src/mess0.src#L256-L257
+VINS13	0xC0D3	AUTO FOR GAME OVER	https://github.com/mwenge/defender/blob/master/src/mess0.src#L148-L149;https://github.com/mwenge/defender/blob/master/src/mess0.src#L257-L258
+VINS14	0xC0D5	MANUAL TO STEP THRU ADJUST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L149-L150;https://github.com/mwenge/defender/blob/master/src/mess0.src#L258-L259
+VINS15	0xC0D7	WILLIAMS DEFENDER	https://github.com/mwenge/defender/blob/master/src/mess0.src#L150-L151;https://github.com/mwenge/defender/blob/master/src/mess0.src#L259-L260
+VINS16	0xC0D9	PRESS ADVANCE TO STEP THRU TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L151-L152;https://github.com/mwenge/defender/blob/master/src/mess0.src#L260-L261
+VINS17	0xC0DB	PRESS HIGHSCORE RESET TO MAKE CHANGE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L152-L153;https://github.com/mwenge/defender/blob/master/src/mess0.src#L261-L262
 BONSX	0xC0F3	BONUS X	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
 ATWV	0xC0F9	ATTACK WAVE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
 COMPV	0xC0FB	COMPLETED	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
