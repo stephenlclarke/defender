@@ -1,0 +1,11 @@
+label	digit	address	width	height	bytes	source
+NUMBR0	0	0xC6C7	3	8	010101010101010011000000000011001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520
+NUMBR1	1	0xC6DF	3	8	000001000000000001111000000000001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520
+NUMBR2	2	0xC6F7	3	8	010100000001010011000001100011001111111000001100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520
+NUMBR3	3	0xC70F	3	8	010000000000010011000011000011001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520
+NUMBR4	4	0xC727	3	8	000001010000000001100011000000001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520
+NUMBR5	5	0xC73F	3	8	010101010000010011101011000011001100001101011100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520
+NUMBR6	6	0xC757	3	8	010101010101010011101011101011001100001101011100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520
+NUMBR7	7	0xC76F	3	8	010000000001010011000001111010001111111000000000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520
+NUMBR8	8	0xC787	3	8	010101000101010011101011101011001101011001011100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520
+NUMBR9	9	0xC79F	3	8	010101010000010011101011000011001101011101011100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L477-L520

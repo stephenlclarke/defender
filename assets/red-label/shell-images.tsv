@@ -1,0 +1,5 @@
+label	address	bytes	source
+BMBD10	0xCCB0	A00AA0A000A0	https://github.com/mwenge/defender/blob/master/src/defb6.src#L2072-L2077
+BMBD11	0xCCB6	0A000A0AA00A	https://github.com/mwenge/defender/blob/master/src/defb6.src#L2072-L2077
+BMBD20	0xCCBC	0AAA0A00A000	https://github.com/mwenge/defender/blob/master/src/defb6.src#L2072-L2077
+BMBD21	0xCCC2	000A00A0AAA0	https://github.com/mwenge/defender/blob/master/src/defb6.src#L2072-L2077

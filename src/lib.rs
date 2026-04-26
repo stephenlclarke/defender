@@ -1,25 +1,23 @@
-//! Exposes the modules that make up the Defender bootstrap application, world model, and ROM helpers.
+//! Clean-slate Defender red-label reimplementation.
+//!
+//! The old prototype implementation lives under `oldsrc/`. New code is
+//! organized around a deterministic arcade core that can be checked against
+//! the original red-label ROM behavior, with presentation and compatibility
+//! features layered around it.
 
 pub mod app;
-pub mod arcade;
-pub mod attract;
-pub mod attract_rom;
-pub mod audio;
-mod audio_rom;
-pub mod branding;
-pub mod constants;
-pub mod demo;
-pub mod font;
-pub mod game;
-pub mod high_scores;
+pub mod assets;
+pub mod board;
+pub mod fidelity;
+pub mod input;
 pub mod kitty;
 pub mod live;
-mod object_rom;
-mod object_rom_data;
+pub mod machine;
+pub mod pia;
+pub mod red_label;
+pub mod red_label_memory;
 pub mod red_label_wave;
-pub mod render;
 pub mod rom;
-pub mod session;
-pub mod sprites;
+pub mod sound;
 pub mod terminal;
 pub mod video;

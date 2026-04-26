@@ -1,0 +1,31 @@
+symbol	offset	cells	bytes	description	source
+CRHSTD	0x1D	12	0x02 0x12 0x70 0x44 0x52 0x4A	ALL TIME #1 DEFAULT 21270 DRJ	https://github.com/mwenge/defender/blob/master/src/romc8.src#L782-L783
+CRHSTD+12*1	0x29	12	0x01 0x83 0x15 0x53 0x41 0x4D	ALL TIME #2 DEFAULT 18315 SAM	https://github.com/mwenge/defender/blob/master/src/romc8.src#L784-L785
+CRHSTD+12*2	0x35	12	0x01 0x59 0x20 0x4C 0x45 0x44	ALL TIME #3 DEFAULT 15920 LED	https://github.com/mwenge/defender/blob/master/src/romc8.src#L786-L787
+CRHSTD+12*3	0x41	12	0x01 0x42 0x85 0x50 0x47 0x44	ALL TIME #4 DEFAULT 14285 PGD	https://github.com/mwenge/defender/blob/master/src/romc8.src#L788-L789
+CRHSTD+12*4	0x4D	12	0x01 0x25 0x20 0x43 0x52 0x42	ALL TIME #5 DEFAULT 12520 CRB	https://github.com/mwenge/defender/blob/master/src/romc8.src#L790-L791
+CRHSTD+12*5	0x59	12	0x01 0x10 0x35 0x4D 0x52 0x53	ALL TIME #6 DEFAULT 11035 MRS	https://github.com/mwenge/defender/blob/master/src/romc8.src#L792-L793
+CRHSTD+12*6	0x65	12	0x00 0x82 0x65 0x53 0x53 0x52	ALL TIME #7 DEFAULT 8265 SSR	https://github.com/mwenge/defender/blob/master/src/romc8.src#L794-L795
+CRHSTD+12*7	0x71	12	0x00 0x60 0x10 0x54 0x4D 0x48	ALL TIME #8 DEFAULT 6010 TMH	https://github.com/mwenge/defender/blob/master/src/romc8.src#L796-L797
+DIPSW	0x7D	2	0x00	DIPSW DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L799-L799
+CMOSCK	0x7F	2	0x5A	CMOS BOUNDARY CHECK BYTE DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L800-L800
+REPLAY	0x81	4	0x01 0x00	REPLAY LEVEL DEFAULT 10000	https://github.com/mwenge/defender/blob/master/src/romc8.src#L801-L801
+NSHIP	0x85	2	0x03	SHIPS PER GAME DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L802-L802
+COINSL	0x87	2	0x03	COINAGE SELECT DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L803-L803
+SLOT1M	0x89	2	0x01	LEFT COIN MULTIPLIER DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L804-L804
+SLOT2M	0x8B	2	0x04	CENTER COIN MULTIPLIER DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L805-L805
+SLOT3M	0x8D	2	0x01	RIGHT COIN MULTIPLIER DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L806-L806
+CUNITC	0x8F	2	0x01	COIN UNITS PER CREDIT DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L807-L807
+CUNITB	0x91	2	0x00	COIN UNITS FOR BONUS DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L808-L808
+MINUNT	0x93	2	0x00	MINIMUM COINS DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L809-L809
+FREEPL	0x95	2	0x00	FREE PLAY DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L810-L810
+GA1	0x97	2	0x05	INITIAL DIFFICULTY DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L811-L811
+GA1+2	0x99	2	0x15	DIFFICULTY CEILING DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L812-L812
+GA1+4	0x9B	2	0x01	BACKGROUND SOUND DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L813-L813
+GA1+6	0x9D	2	0x05	RESTORE WAVE DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L814-L814
+GA1+8	0x9F	2	0x00	GAME ADJUST 5 DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L815-L815
+GA1+10	0xA1	2	0x00	GAME ADJUST 6 DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L816-L816
+GA1+12	0xA3	2	0x00	GAME ADJUST 7 DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L817-L817
+GA1+14	0xA5	2	0x00	GAME ADJUST 8 DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L818-L818
+GA1+16	0xA7	2	0x00	GAME ADJUST 9 DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L819-L819
+GA1+18	0xA9	2	0x00	GAME ADJUST 10 DEFAULT	https://github.com/mwenge/defender/blob/master/src/romc8.src#L820-L820

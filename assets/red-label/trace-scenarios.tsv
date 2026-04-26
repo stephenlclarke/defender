@@ -1,0 +1,13 @@
+scenario	frames	input_program	description	source
+attract_boot	300	none*300	Idle boot/attract observation window for the first 300 frames	SPEC.md Phase 1 required golden trace
+start_game	120	coin,start_one;none*119	Coin and one-player start transition from attract into game state	SPEC.md Phase 1 required golden trace
+first_300_frames	300	coin,start_one;none*299	First 300 frames after one-player start with no further controls	SPEC.md Phase 1 required golden trace
+firing	120	coin,start_one;none*30;fire*12;none*77	One-player start followed by a held fire window	SPEC.md Phase 1 required golden trace
+thrust_reverse	120	coin,start_one;none*30;thrust*24;reverse,thrust*12;none*53	One-player start followed by thrust and reverse-thrust input windows	SPEC.md Phase 1 required golden trace
+smart_bomb	120	coin,start_one;none*60;smart_bomb;none*58	One-player start followed by one smart-bomb input edge	SPEC.md Phase 1 required golden trace
+hyperspace	120	coin,start_one;none*60;hyperspace;none*58	One-player start followed by one hyperspace input edge	SPEC.md Phase 1 required golden trace
+abduction	900	coin,start_one;none*899	Long one-player run intended to capture early lander/humanoid abduction state	SPEC.md Phase 1 required golden trace
+death	900	coin,start_one;none*899	Long one-player run intended to capture first unassisted death state	SPEC.md Phase 1 required golden trace
+wave_advance	1800	coin,start_one;none*1799	Long one-player run intended to capture wave progression state	SPEC.md Phase 1 required golden trace
+planet_destruction	2400	coin,start_one;none*2399	Long one-player run intended to capture destroyed-planet state when reached	SPEC.md Phase 1 required golden trace
+high_score_entry	2400	coin,start_one;none*2399	Long one-player run intended to capture game-over/high-score entry state when reached	SPEC.md Phase 1 required golden trace

@@ -1,0 +1,4 @@
+label	vector_address	words	source
+BONSX	0xC0F3	BONUS X	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
+ATWV	0xC0F9	ATTACK WAVE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
+COMPV	0xC0FB	COMPLETED	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296

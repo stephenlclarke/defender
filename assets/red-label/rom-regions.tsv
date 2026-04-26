@@ -1,0 +1,5 @@
+region	size	source
+maincpu	0x3000	MAME_ROM_REGION
+banked	0x7000	MAME_ROM_REGION
+soundcpu	0x10000	MAME_ROM_REGION
+proms	0x0400	MAME_ROM_REGION

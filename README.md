@@ -18,16 +18,18 @@
 This repository is a native Rust reimplementation of Williams' `Defender`,
 rendered through the Kitty graphics protocol.
 
-The game logic is native Rust; ROMs are treated as reference material only, and
-the live game now uses embedded arcade sprite assets from `assets/arcade/`
-again for runtime object art, with the red-label text font bundled as
-`assets/arcade/font-sheet.png`, plus ROM-derived branding art in
-`assets/arcade/logo-page.png` and `assets/arcade/defender-logo.png`. Live
-audio is now synthesized in Rust from Williams sound-ROM routines translated
-out of `VSNDRM1.SRC`, so compile and runtime do not depend on a local ROM or
-sound directory. The target is a faithful recreation of the original red-label
-arcade game, with hidden `xyzzy` extras as the deliberate behavior outside the
-original cabinet rules.
+The project is now being rewritten from a clean slate as an exact red-label
+arcade implementation. The previous prototype source has been moved to
+`oldsrc/` for reference. New code under `src/` is organized around translating
+the original red-label assembly and machine behavior into Rust, with a
+self-contained runtime so deployment is copying the built binary to a new
+machine.
+
+ROMs are treated as reference and verification material only. Runtime assets
+and ROM-derived tables live under `assets/` and are embedded with
+`include_str!` or `include_bytes!`; a deployed binary does not need a local ROM
+or asset directory. The deliberate compatibility features are hidden `xyzzy`
+behavior and the BBC Micro `Planetoid` key mapping.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -49,8 +51,21 @@ Run targets:
 - `cargo run -- --mute`
 - `cargo run -- --rom-report`
 - `cargo run -- --rom-report /path/to/roms`
+- `cargo run -- --verify-roms /path/to/roms`
+- `cargo run -- --fidelity-trace 300`
+- `cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'`
+- `cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt`
+- `cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv`
+- `cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local`
+- `cargo run -- --fidelity-list-scenarios`
+- `cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local`
+- `cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local`
 - `make run`
 - `make run-muted`
+- `make trace-fixtures`
+- `make reference-inputs`
+- `make reference-traces`
+- `make reference-fixtures-check`
 - `cargo test`
 - `cargo fmt --check`
 - `cargo clippy --all-targets -- -D warnings`
@@ -58,11 +73,26 @@ Run targets:
 - `make coverage`
 - `make sq-ci`
 - `make sq`
-- `make readme-media`
+- `make readme-media` (currently archived with the old prototype)
 
 Run the live game inside `kitty`, `ghostty`, `warp`, or another terminal that
-supports the Kitty graphics protocol. `--rom-report` remains non-interactive
-and does not require a compatible graphics terminal.
+supports the Kitty graphics protocol. `--rom-report` remains non-interactive,
+validates red-label file sizes and CRC-32 values, and does not require a
+compatible graphics terminal. `--verify-roms` performs the same validation and
+then checks that the ROM files map into the embedded MAME red-label regions.
+`--fidelity-trace` emits deterministic TSV frames from the current Rust core
+for local trace fixture work. `--fidelity-trace-inputs` does the same with a
+semicolon-separated per-frame cabinet input script. Use
+`--fidelity-trace-inputs-file` to read the same script format from a local
+fixture file. `--fidelity-check-trace` reads that input script, generates the
+current Rust trace, and compares it exactly with an expected TSV fixture.
+`--fidelity-check-trace-dir` checks all local `*.inputs.txt` /
+`*.expected.tsv` fixture pairs in a directory, skipping the directory when it is
+absent. `--fidelity-list-scenarios` and `--fidelity-write-scenario-inputs`
+expose the Phase 1 reference scenario manifest from
+`assets/red-label/trace-scenarios.tsv`. `--fidelity-check-reference-trace-dir`
+validates that a local reference fixture directory has every required Phase 1
+scenario input and expected trace with the checked-in schema header.
 
 ## Install
 
@@ -70,12 +100,21 @@ Install directly from git with Cargo:
 
 - `cargo install --git https://github.com/stephenlclarke/defender defender`
 
-After installation, run the prototype with:
+After installation, run the clean-slate runtime and tooling with:
 
 - `defender`
 - `defender --mute`
 - `defender --rom-report`
 - `defender --rom-report /path/to/roms`
+- `defender --verify-roms /path/to/roms`
+- `defender --fidelity-trace 300`
+- `defender --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'`
+- `defender --fidelity-trace-inputs-file /path/to/inputs.txt`
+- `defender --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv`
+- `defender --fidelity-check-trace-dir docs/fidelity/fixtures/local`
+- `defender --fidelity-list-scenarios`
+- `defender --fidelity-write-scenario-inputs docs/fidelity/fixtures/local`
+- `defender --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local`
 
 Notes:
 
@@ -83,22 +122,21 @@ Notes:
   supports the Kitty graphics protocol.
 - Download Ghostty: <https://ghostty.org/download>
 - Download Warp: <https://www.warp.dev/download>
-- High scores persist between live runs in `~/.xyzzy/defender/high_scores.txt`;
-  set `DEFENDER_DATA_DIR` to redirect that file for local experiments or tests.
+- High-score comparison, initials entry, and persistence are not implemented in
+  the clean-slate core yet. The ROM-derived high-score reset copy is modeled.
 
 ## Controls
 
-Live mode controls:
+Current live scaffold controls:
 
-- `ENTER` or `1`: start from the attract sequence, or restart after game over
+- `ENTER` or `1`: start the one-player scaffold from attract mode
 - `A`: move up
 - `Z`: move down
 - `SHIFT`: thrust forward
 - `SPACE`: flip the ship's facing direction
-- `ENTER`: fire the laser bolt
-- `TAB`: detonate a smart bomb
-- `H`: trigger hyperspace
-- `BACKSPACE`: delete the previous letter during high-score initials entry
+- `ENTER`: fire while playing
+- `TAB`: emit a smart-bomb event while playing
+- `H`: emit a hyperspace event while playing
 - `Q` or `ESC`: quit
 
 Letter-key controls accept either upper- or lower-case input.
@@ -106,7 +144,7 @@ Letter-key controls accept either upper- or lower-case input.
 The live key layout is currently modelled on the BBC Micro `Planetoid`
 control scheme from Acornsoft's 1982 release of its `Defender` variant.
 
-## XYZZY Mode
+## XYZZY Overlay
 
 During a live session, type `X`, `Y`, `Z`, `Z`, `Y` to toggle hidden `XYZZY`
 mode on or off.
@@ -114,30 +152,193 @@ mode on or off.
 Typing `XYZZY` a second time turns the mode off and resets the hidden
 invincibility and auto-fire toggles back to their default state.
 
-Extra keys and game behaviour while `xyzzy` mode is active:
+Implemented clean-slate scaffold behavior while `xyzzy` mode is active:
 
-- the normal four-shot arcade laser cap is removed while `xyzzy` mode is
-  active.
-- smart bombs become unlimited automatically while `xyzzy` mode is enabled,
-  and `xyzzy` smart bombs also clear bullets and mines on the main screen.
-- `F`: toggle fully automatic firing. While active, the ship fires
-  automatically when a current laser shot would destroy an alien directly ahead
-  in the active firing lane.
-- `G`: toggle god mode. While active, enemy fire and mines cannot kill the
-  player, and ramming an enemy destroys it and awards its normal score instead
-  of costing a ship.
-- `H`: hyperspace becomes safe and cannot destroy the player ship while
-  `xyzzy` mode is active, and the rematerialization point is chosen as far away
-  from enemies as possible.
-- falling humanoids always survive the landing while `xyzzy` mode is active,
-  even after a full-height drop.
+- `F`: toggles the auto-fire compatibility flag.
+- `G`: toggles the invincibility compatibility flag.
+- Auto-fire currently emits the scaffold fire event while playing.
+- Smart bombs can still emit a scaffold smart-bomb event after inventory reaches
+  zero.
 
-## Current Notes
+Future `xyzzy` effects such as the arcade laser cap override, bullet and mine
+clearing, safe hyperspace, collision overrides, and falling-humanoid survival
+must be added as explicit overlay hooks with paired arcade-off tests.
 
-- High scores persist between live runs in `~/.xyzzy/defender/high_scores.txt`;
-  set `DEFENDER_DATA_DIR` to redirect that file for local experiments or tests.
-  The attract-mode `TODAYS GREATEST` table is intentionally volatile and resets
-  from the red-label ROM defaults each new app launch.
+## Current Status
+
+- Live mode renders an explicitly named scaffold frame, not yet the red-label
+  video RAM output.
+- The runtime embeds red-label defaults, score values, high-score seeds, CMOS
+  layout/default metadata, input port metadata, RAM table metadata, ROM
+  metadata, ROM-region maps, shell image bytes, object-picture descriptors,
+  object image bytes, sound-table bytes, the complete `SWTAB` switch table,
+  the trace schema, and `WVTAB` wave records from `assets/red-label/`.
+- The core now initializes source-owned process, super-process, object, player,
+  player-start, switch-history, switch-queue, and shell-list RAM bytes from
+  embedded red-label metadata and emits object-table/SPTR-head CRCs in fidelity
+  traces. It also has source-shaped
+  process allocation, super-process allocation, sleep, kill, scheduler, object
+  allocation, object initialization, object kill, shell allocation, and
+  active/inactive object scanner, shell-list cleanup/movement, dead-shell erase,
+  active-object `OPROC` descriptor erase/write banding, active-object `VELO`
+  position updates, source-ordered `IRQ` / `IRQB` object-band tails over
+  `XXX1` / `XXX2` / `XXX3`, and bomb/fireball shell output primitives over
+  those bytes.
+  The translated
+  `SCPROC` process now runs the source `ISCAN`, `OSCAN`, and `SHSCAN`
+  maintenance stages, bank-1 `SCNRV` scanner raster writes, and sleeps through
+  the exact `SCP1`, `SCP2`, and `SCPROC` resume addresses. Shell output
+  dispatch now uses the assembled red-label `OBJCOL` entry-point addresses
+  embedded under `assets/red-label/routine-addresses.tsv`. The first
+  source-shaped scoring and collision slice translates `SCORE`, the visible
+  RAM effects of `SNDLD`, `BKIL`, `LFIRE` entry, `LASR0` / `LASL0`
+  drawing/fizzle/erase/sleep loops, `LASD` tail, the RAM-visible part of
+  `LCOL`, source-ordered `FISS` / `STINIT` / `FBINIT` / `THINIT` boot table
+  initialization, `STOUT` star output including its fall-through `SBLNK` color
+  blink/hyperspace RAM side effects, exact source `LFIRE` fall-through into the
+  first laser loop, and `COLIDE` / `COL0` picture-mask intersection for
+  extracted complete and short-form object-picture
+  descriptors; `COLCHK` now performs the visible player-collision
+  flag/status/death-process writes.
+  Collision dispatch reads `OCVECT` and routes only translated vectors. The
+  translated vectors currently include `BKIL`, source no-op `NOKILL`, `MSWKIL`,
+  `PRBKIL`, `ASTKIL`, captured-astronaut `AKIL1`, `SCZKIL`, `UFOKIL`, normal
+  `LKILL`, kidnapping `LKIL1`, and `TIEKIL`. The
+  `SBOMB` path now consumes
+  the current player's `PSBC`, loads `SBSND`, walks active objects through
+  `OCVECT`, toggles `PCRAM` through the source `NAP` resume points, debounces
+  `PIA21`, clears `SBFLG`, and suicides the smart-bomb process. The dispatcher
+  also preserves the source guard path that jumps to `SBMBX2`/`SUCIDE` without
+  clearing an already-active `SBFLG`. One-player start now applies the visible
+  `PLSTR5` player RAM initialization. The `HYPER` entry now translates the
+  exact `STATUS & $FD` guard, `STATUS=$77` write, source-shaped `SCLR1`
+  active-screen clear for rows `Y >= 42`, and `NAP 15,HYP02` process sleep.
+  The visible `HYP02` rematerialization slice
+  now kills `SPTR` shells, copies `SEED`/`HSEED` into `BGL`/`BGLX`, seeds the
+  phony player object, runs the source `APVCT`/`APST` appearance-start RAM
+  updates with the extracted `APSND` table, and sleeps to `HYP2`. The visible
+  `HYP2` tail now kills the
+  phony object, resets `STATUS` through `STCHK`, suicides on the safe path, and
+  exposes the `PLEND` branch when `LSEED > 192`. The RAM-visible `EXST` /
+  `EXPU` expansion path now initializes explosion slots, advances `RAMALS`
+  appearance/explosion slots, restores object pictures when appearances
+  finish/offscreen, clears old erase-list blocks, and runs the translated
+  `EWRITE` expanded-object writer from embedded picture assets. `KILOFF` now
+  unlinks objects and clears the current picture footprint through `OFSHIT`'s
+  map-2 erase path. The player-death entry and glow loop now translate
+  `PLEND` / `PDTHL` / `PDTH2` / `PDTH4`: `PLSAV`, `PDSND`, `MONO` into
+  `MONOTB`, `PXCTB` glow colors, pseudo-color RAM writes, and the sleep into
+  `PDTH5` are source-shaped. The `PDTH5` entry now clears `PCRAM`, runs exact
+  `GNCIDE`, enters the bank-7 `PXVCT`/`PX1A` player-explosion loop using the
+  extracted `PXCOL` color table, and resumes into the ROM-confirmed `PDTH5R`
+  continuation. The non-wave-end respawn, player-switch, and game-over branch
+  decisions are translated through `WVCHK`, `PLE02`, `PLE3`, `PLSTRT`, and
+  `ATTR` addresses. The wave-clear `BONUS` long-sleep path now writes the
+  source `MESS` / `WNBV` bonus text and numbers from embedded `mess0.src`
+  assets, scores each surviving astronaut, sleeps through `BC1`, refreshes the
+  next wave through `GETWV`, and returns through `BC3` to the ROM-confirmed
+  post-bonus `SCLR1` address. The `PLSTRT` respawn path now
+  translates the RAM-visible entry
+  handoff, source `PINIT` process-list reset, `PLSTR3` / `PLSTR5` current-player
+  runtime initialization, bank-7 `ALINIT` / `BGALT` altitude-table generation
+  from `TDATA`, bank-7 `BGINIT` `TERTF0` / `TERTF1` terrain-table generation
+  from `TDATA`, bank-7 `BGOUT` terrain-table rolling and `STBL` screen-word
+  output with an explicit 6809 stack pointer, support-process creation,
+  `PLS01` status/sleep,
+  `PLS1` `PLRES` astronaut-process/target-list/enemy-runtime restore,
+  the scheduled `ASTRO` target-list walker against `ALTTBL`, the `ASTKIL`
+  `ASTCLR` / `KILOFF` / `XSVCT` astronaut explosion path, and the source
+  `TERBLO` terrain-blow process when the final astronaut is removed, including
+  `BGERAS`, scanner-terrain `STETAB` erase, `TEREX` explosion passes, `TBL3` /
+  `TBL4` sleeps, `OVCNT`, `COLTAB`, `AHSND`, and final `TBSND` / `SUCIDE`,
+  schizoid-reserve `SCZST` restore from copied `SCZRES`,
+  the `SCZ0` movement/shot-timer process slice through shared `SHOOT`,
+  UFO `UFOST` / `UFOLP` process/object start, shot timer, `UFOP1`-`UFOP3`
+  image cycle, `UFONV` velocity update, and `USHSND` shot sound,
+  the `SCZKIL`, `UFOKIL`, normal `LKILL`, `LANDST` lander start/`GTARG`
+  target selection, `LANDS0` orbit/`LSHOT`, `LANDG` capture, `LANDF` flee,
+  `LNDFXA` pull-in, `SCZ00` mutant conversion, and kidnapping `LKIL1` /
+  `AKIL1` / `AFALL` / `AFALL2` passenger-release, catch, and
+  falling-astronaut paths, including `P250` / `P500` rescue score popups and
+  `P503` cleanup,
+  probe-reserve `PRBST` restore from copied `PRBRES`, the `PRBKIL` `KILO` /
+  `RMAX` / `MMSW` mini-swarmer spawn path, the `MSWKIL` `KILOFF` / `KILLOP` /
+  `XSVCT` score/sound path, the `MSWM` / `MSWLP` mini-swarmer
+  acceleration/damping/turnback process loop, `SWBMB` firing through `GETSHL`,
+  and the `SWSSND` swarmer-shot sound load, tie-fighter reserve `TIEST`
+  restore from copied `TIERES`, the `TIE` process image/vertical/cruise slice,
+  `BOMBST` bomb-shell allocation and lifetime path, the `TIEKIL` `KILO`
+  squad-slot and super-process cleanup path, `STCHK`/`PDFLG` tail, and
+  machine-level
+  `INIT20` `CRINIT` / `FISS` / `STINIT` / `OINIT` / `FBINIT` / `THINIT`
+  refresh. `BGERAS` now erases terrain screen words through the source `STBL`
+  screen-address table. `COLR` / `COLRLP`, `FLPUP` / `FLP2`, `CBOMB` /
+  `CBMB1`, and `TIECOL` / `TIECL` now run as translated support-process bodies
+  using embedded `COLTAB` / `TCTAB` assets. The remaining `PLRES`
+  swarmer respawn path, whose `PLRES` phony-object X low byte needs
+  register-aware scheduler tracing for the entry B register, live terrain
+  scheduling, and full live respawn integration remain documented gaps.
+  The IRQ `PLAYER` motion slice now applies source-shaped 24-bit horizontal
+  damping, thrust acceleration, X/scroll correction, absolute-X calculation,
+  and altitude up/down velocity from `PIA21` / `PIA31`. The `PRDISP` player
+  picture slice now stores the source scanline bound in `TEMP48`, gates on
+  `STATUS` / `PLAYC`, erases the old 8x6 `OFF86` footprint, copies `NPLAD` /
+  `NPLAXC`, and draws `PLAPIC` / `PLBPIC` through embedded `ON86` image bytes;
+  the same slice now performs the adjacent `THOUT` / `THOFF` thrust-flame byte
+  writes from the extracted `THTAB` data. `THPROC` now advances the
+  fireball/thrust table pointers from source-shaped RAM. `OPROC` now erases and
+  redraws active-object descriptor pictures in caller scanline bands with the
+  ROM BGL-relative X and alternate-flavor checks, and `VELO` now advances
+  active-object `OX16` / `OY16` by source velocities with Y wrap through
+  `YMIN` / `YMAX`. The normal and inverted IRQ object-band tails now load the
+  source scanline pairs from `XXX1` or `XXX2` and run already translated
+  `PRDISP`, `OPROC`, `SHELL`, and `VELO` slices in the ROM order. The
+  scanline object-phase gate now applies the source `VERTCT` thresholds, `IFLG`
+  latch, `TIMER` increment, normal/flipped watchdog data byte, palette-copy due
+  conditions, and `XXX2` calculations before entering those tails, and it runs
+  translated `PLAYER` / `STOUT` pre-tail work on the source branches that call
+  them. When the caller supplies the live 6809 stack pointer, the terrain branch
+  also runs translated `BGOUT`; otherwise it records that `BGOUT` is due. The
+  remaining `SNDSEQ`, `CSCAN`, palette copy side effects, live stack-context
+  wiring, and hardware-map restoration still need full scheduler integration.
+  The `GEXEC` tail slice now
+  restores `STRCNT` after star
+  overflow, advances `GTIME` through the source
+  audit-meter wrap, decrements the process `PD` counter, and applies source
+  `WDELT` intra-wall deltas to `ELIST` every 40 passes. The `GETWV` wave
+  parameter path now increments `PWAV`, refreshes `PENEMY` from source-order
+  `WVTAB`, applies CMOS difficulty/ceiling inter-wall `WDELT` updates, and
+  restores `PTARG` on the `GA1+6` restore-wave cadence. The start-flow
+  foundation now extracts `CREDIT`,
+  `CUNITS`, and `BUNITS`; implements exact `FPLAY` free-play credit seeding;
+  and translates the RAM-visible `START` power-page gate, first-game player
+  table reset/copy, `PLSTRT` process creation, source `SCRCLR` video-RAM clear,
+  and `START2` BCD credit/`PLRCNT` tail plus `WCMOSA CREDST` packed CMOS credit
+  backup. The source `TDISP` top-of-screen redraw now runs through extracted
+  score digit, mini-ship, and smart-bomb image assets, including `BLKCLR`,
+  `BORDER`, `LDISP`, `SBDISP`, and `SCRTR0` visible RAM writes. `ST1` and `ST2`
+  now
+  execute through the translated process dispatcher in the source order,
+  including status/credit gates, start sounds, one/two `START` calls, and the
+  final `DIE` process cleanup. Scanline scheduling, remaining `PLRES` swarmer
+  object spawning, and live video presentation remain gaps.
+  Live fire, smart bomb,
+  hyperspace, and reverse now enter through an asset-backed
+  red-label `SWTAB`, `SSCAN` switch history, `SWPROC` queue, `SWP` status gate,
+  and translated `LFIRE` / `SBOMB` / `HYPER` / `REV` / `ST1` / `ST2`
+  scheduler paths. The scanner records all eight IN0 switch bits and queues
+  every translated source switch process. `REV` sets
+  `REVFLG`, negates `PLADIR` into `NPLAD`, debounces `PIA21`, clears the flag,
+  and returns the process to the free list.
+- ROM files are optional verification inputs only. The deployed runtime remains
+  self-contained.
+- MAME/source reference-trace tooling is in place for local Phase 1 fixtures,
+  but checked-in golden traces are intentionally absent because they are local
+  emulator outputs.
+- High-score comparison, initials entry, high-score persistence, two-player
+  sessions, operator settings, untranslated object/shell/process bodies,
+  generic body dispatch/frame scheduling, and sound-routine execution are still
+  fidelity gaps tracked in `SPEC.md` and `docs/fidelity/gaps.md`.
 
 ## SonarQube
 
@@ -161,9 +362,12 @@ Extra keys and game behaviour while `xyzzy` mode is active:
 
 ## Source Materials
 
-These references were used for reverse engineering, rules verification, attract
-screen reconstruction, and extraction of historical arcade data while keeping
-the final runtime self-contained:
+These references are used for reverse engineering, rules verification, attract
+screen reconstruction, extraction of historical arcade data, and future
+translation work while keeping the final runtime self-contained. A reference
+listed here does not imply the clean-slate runtime has implemented that behavior
+yet; current implementation status is tracked in `SPEC.md` and
+`docs/fidelity/gaps.md`.
 
 - <https://github.com/mwenge/defender>: Motorola 6809 assembly language for the
   'Red Label' version of the game. Used for reference implementation and ROM
@@ -173,22 +377,74 @@ the final runtime self-contained:
   `DEFDAT`, `CPRTAB`, `TEXTAB`, `TENT`, `ENMYTB`, `PICTS`, `XS`, and `BLIPS`
   tables used to reconstruct the embedded attract-logo page, `DEFENDER`
   wordmark assets, and the instruction-page rescue/legend sequence, plus the
-  `blk71.src` `WVTAB` records used to reconstruct the compiled red-label
-  wave/fire tables now embedded in `src/red_label_wave.rs`, and the
-  `defa7.src` `RAND` / `ASTST` / `PLRES` flow used to reconstruct the default
-  astronaut restore layout plus the `defb6.src` `PRBST` / `PRBKIL` /
-  `MMSW` / `RANDV` / `MSWM` / `SWBMB` / `LSHOT` / `SCZ0` / `SCZ10` /
-  `UFOLP` / `UFONV` probe-start, pod-burst, Swarmer-motion, and per-enemy
-  shot-timer paths now embedded in `src/game.rs`, with the extracted text
-  block kept in
-  `assets/arcade/arcade-rules.txt` as a checked-in reference copy.
+  source-ordered `blk71.src` `WVTAB` records used to reconstruct the compiled
+  red-label wave/fire tables, `GETWV` base values, and `WDELT` updates now
+  embedded from `assets/red-label/wave-table.tsv`, and the `blk71.src`
+  `TDATA` bitstream used by `ALINIT` / `BGALT` to generate the bank-7
+  altitude table and by `BGINIT` to generate the mirrored terrain flavor
+  tables, plus the `amode1.src` `MTERR` mini-terrain bytes used by `SCNRV`, are
+  now embedded from `assets/red-label/terrain-data.tsv`. The
+  `romc0.src` `PWRUP` and `romc8.src` `DEFALT`, `CMOSMV`, `CMINIT`, `RHSTD`,
+  and `RHSTDS` routines provide the ROM-derived CMOS defaults, power-up CMOS
+  branch, and high-score reset copy now embedded in
+  `assets/red-label/cmos-defaults.tsv`. The `defb6.src` `CRTAB` bytes now feed
+  the `CRINIT` pseudo-color RAM reset embedded in
+  `assets/red-label/color-ram.tsv`. The `defa7.src` `SCORE`, `SNDLD`, `SHELL`,
+  `BMBOUT`, `FBOUT`, `BKIL`, `LFIRE`, `LCOL`, `LASR` / `LASR0`, `LASL` /
+  `LASL0`, `LASD`, `COLIDE`, `COL0`, `COLCHK`, `REV`, `PLEND` / `PDTHL` /
+  `PDTH2` / `PDTH4` / `PDTH5`, `PXVCT` / `PX1A`, `PDTH5R`, `PLE02`, `PLE3`,
+  `PLSTRT`, `PLST1A`, `PLSTR3`, `PLS01`, `PLS1`, `STCHK`, `ATTR`, `PLAYER`,
+  `THPROC`, `SCPROC` / `SCP1` / `SCP2`, `OSCAN`, `ISCAN`, `SHSCAN`, `SCNRV`,
+  `BGOUT`, `ALINIT`, `BGINIT`, `BGERAS`, `BGI`, `UFOST` / `UFOLP`, and `SBOMB`
+  assembled entry points and smart-bomb resume labels provide the first
+  routine-address asset. The
+  `defa7.src` `PLSTR5`, `SSCAN`, `SWP`,
+  `REV`, and `SBOMB` paths, with the complete `defb6.src` `SWTAB`, provide the
+  first live player-fire, smart-bomb, and reverse process wiring. The
+  `defa7.src` `BMBOUT` / `FBOUT` shell output callbacks, `SCORE` BCD/replay
+  path, `SNDLD` sound-table loader, `BKIL` bomb-collision routine, `LFIRE`
+  cap/process-data entry path, RAM-visible `LCOL` collision setup, source
+  `FISS` / `STINIT` / `FBINIT` / `THINIT` table initialization, bank-7
+  `ALINIT` altitude-table generation from `TDATA`, `BGINIT` terrain-table
+  generation from `TDATA`, `BGERAS` terrain erase via `STBL`, source `LFIRE`
+  fall-through into `LASR` / `LASL`, `LASD` process
+  tail, `COLIDE` / `COL0`
+  picture-intersection routine, visible `COLCHK` player-collision side effects,
+  `REV` reverse debounce path,
+  `SBOMB` smart-bomb entry/tail path, `COLR` laser-color cycle, `FLPUP`
+  score-flash process, `CBOMB` bomb-color/image cycle, `TIECOL` tie-fighter
+  color cycle, `PLEND` / `PDEATH` / `MONO` /
+  `PLSAV` player-death entry/glow-loop path, and the `PDTH5` / `PXVCT`
+  player-explosion and non-wave-end branch path, plus the `defb6.src`
+  object-picture descriptors and image bytes, source-shaped `CWRIT` / `COFF`
+  generic picture writes/erases, and descriptor ON/OFF picture dispatch helpers
+  plus `OPROC` active-object display banding and `VELO` active-object movement
+  provide the first source-shaped shell output, laser, scoring, switch,
+  collision, drawing, and death primitives. The
+  remaining `defa7.src` and `defb6.src` gameplay routines remain the next
+  translation targets; old prototype extractions are archived under `oldsrc/`.
+- <https://github.com/mamedev/mame/blob/master/src/mame/midway/williams.cpp>:
+  MAME Williams driver source used for the red-label `ROM_REGION` and
+  `ROM_LOAD` region mapping now embedded under `assets/red-label/`, the
+  main-board memory/PIA callback map, and the active-high Defender IN0/IN1/IN2
+  cabinet input bit layout.
+- <https://github.com/mamedev/mame/blob/master/src/mame/midway/williams_v.cpp>:
+  MAME Williams video source used for the 4-bit bitmap screen-memory layout,
+  Defender visible-area crop, palette-RAM-index frame extraction, and palette
+  resistor conversion. MAME's `src/emu/video/resnet.cpp` provides the resistor
+  weight algorithm used for the RGBA palette lookup.
+- <https://github.com/mamedev/mame/blob/master/src/devices/machine/6821pia.cpp>:
+  MAME Motorola 6821 PIA device source used for the main-board PIA data/control
+  register behavior, data-direction filtering, CA/CB IRQ flags, CA2/CB2 strobe
+  behavior, and output-callback timing.
 - <https://github.com/historicalsource/williams-soundroms>: original Williams
-  sound-ROM source reference used to translate `VSNDRM1.SRC` routines and
-  tables into `src/audio_rom.rs`, including the `IRQ` dispatch path, `RADSND`,
-  `SVTAB`, `GFRTAB`, `GWVTAB`, `SCREAM`, and organ-note/tune logic.
+  sound-ROM source reference for the future `VSNDRM1.SRC` translation,
+  including the `IRQ` dispatch path, `RADSND`, `SVTAB`, `GFRTAB`, `GWVTAB`,
+  `SCREAM`, and organ-note/tune logic. Legacy cue assets are kept only as
+  archived prototype references under `assets/sounds/`.
 - <https://seanriddle.com/ripper.html>: Williams graphics-ripper reference used
-  to confirm Defender's screen-format sprite layout while translating the
-  red-label `defb6.src` picture tables into the live Rust object decoder.
+  to confirm Defender's screen-format sprite layout for the future red-label
+  `defb6.src` picture-table translation.
 - <https://www.thedefenderproject.com/defender-rom-versions-the-history/>:
   revision history and ROM-set background for Williams Defender releases.
 - <https://www.mamechannel.it/files_free/arcade_manuals_unpacked/defenderw.pdf>:
@@ -212,42 +468,39 @@ the final runtime self-contained:
   rematerialization, the four-shot laser cap, the rule that shots only remain
   active until they outrun the main screen, and the rules that smart bombs only
   destroy enemies on the main screen while leaving bullets and bomber
-  minefields alone. The live game now follows the red-label `HYPER` seed-byte
-  path for rematerialization direction, position band, and failure chance.
-- <https://www.dougmahugh.com/defender-chapter03/>: lander-fire reference used
-  to cross-check the shared `SHOOT` path, the random broad-arc jitter applied
-  through `SEED` / `LSEED`, and the requirement that enemies only fire while
-  they are on the main screen.
+  minefields alone.
+- <https://www.dougmahugh.com/defender-chapter03/>: lander-fire reference for
+  the translated shared `SHOOT` path, random broad-arc jitter through `SEED` /
+  `LSEED`, and the rule that enemies only fire while on the main screen.
 - <https://www.dougmahugh.com/defender-chapter04/>: mutant-behaviour reference
-  used to keep the more aggressive mutant fire path aligned with the shared
-  cabinet `SHOOT` routine instead of a separate Rust-only firing heuristic.
+  for future translation of the more aggressive mutant fire path and its shared
+  cabinet `SHOOT` routine.
 - <https://www.dougmahugh.com/defender-chapter05/>: swarmer-behavior reference
-  used to model pod bursts, delayed swarmer turnback, the follow-from-behind
-  movement pattern, the `MSWM` vertical acceleration/damping path, and the
-  quarter-screen-ahead swarmer firing focal point.
+  for the translated `MSWM` vertical acceleration/damping/turnback path and
+  `SWBMB` swarmer-shot focal point, plus future checks of pod bursts and
+  surrounding wave behavior.
 - <https://www.dougmahugh.com/defender-chapter06/>: bomber-behavior reference
-  used to model wave-two bomber introduction, the `TIEXV`-backed horizontal
-  cruise path, and the persistent mine trails they leave behind.
+  for future translation of wave-two bomber introduction, the `TIEXV`-backed
+  horizontal cruise path, and persistent mine trails.
 - <https://www.dougmahugh.com/defender-chapter07/>: baiter-behavior reference
-  used to model wave-delay baiter pressure, the `UFOST` visible-band spawn
-  shape, and relative pursuit behavior.
+  for future translation of wave-delay baiter pressure, the `UFOST`
+  visible-band spawn shape, and relative pursuit behavior.
 - <https://www.arcade-history.com/?id=614&n=defender&page=detail>: scoring and
-  gameplay reference used for humanoid rescue values, safe-fall saves, and wave
-  bonus behavior.
-- <https://strategywiki.org/wiki/Defender/Gameplay>: gameplay reference used to
-  cross-check live enemy and humanoid behavior against the original arcade
+  gameplay reference for future checks of humanoid rescue values, safe-fall
+  saves, and wave bonus behavior.
+- <https://strategywiki.org/wiki/Defender/Gameplay>: gameplay reference for
+  future checks of enemy and humanoid behavior against the original arcade
   rules, including opening five-lander attack waves, later five-ship
-  reinforcement groups, later pod scheduling, and the destroyed-planet mutant-
-  wave cycle until the next fifth-round restore.
+  reinforcement groups, later pod scheduling, and the destroyed-planet
+  mutant-wave cycle until the next fifth-round restore.
 - <https://strategywiki.org/wiki/Defender/Walkthrough>: rescue-strategy and
-  scoring reference used for the current `500` catch / `500` return humanoid
-  rescue implementation.
+  scoring reference for future humanoid rescue implementation.
 - <https://en.wikipedia.org/wiki/Defender_%281981_video_game%29>: general rules
-  reference used to cross-check the default `10,000`-point extra ship and smart
-  bomb award behavior.
+  reference for future checks of the default `10,000`-point extra ship and
+  smart bomb award behavior.
 - <https://www.digitpress.com/reviews/defender.htm>: secondary gameplay
-  reference used to model Defender's reverse-with-inertia handling, where the
-  ship keeps its current momentum until thrust changes it.
+  reference for future checks of Defender's reverse-with-inertia handling, where
+  the ship keeps its current momentum until thrust changes it.
 - <https://bbcmicro.co.uk/game.php?id=11>: BBC Micro `Planetoid` archive entry
   used to anchor the current keyboard layout to the Acornsoft 1982 home-port
   control scheme.
@@ -255,160 +508,94 @@ the final runtime self-contained:
   capture used to verify the full attract-sequence order, Williams logo-page
   composition, and the scoring legend reveal shown around `0:26`.
 
-## ROM Table Reference
+## Red-Label Assets
 
-The extracted gameplay defaults and red-label `WVTAB` records remain documented
-in `assets/arcade/arcade-rules.txt`, but the live game no longer reads that
-file or accepts local override copies. The shipped runtime now uses compiled
-Rust constants and ROM-derived tables so cabinet behavior is not altered by
-filesystem state.
+Clean-slate runtime data lives under `assets/red-label/` before it is embedded
+into Rust. The active embedded assets currently include:
 
-### `arcade-rules.txt`
+- `defaults.tsv`: stock, smart bomb, starting wave, and human-count defaults.
+- `high-scores.tsv`: red-label high-score seed initials and scores.
+- `cmos-defaults.tsv`: `romc8.src` `DEFALT` bytes used by `CMOSMV`, `CMINIT`,
+  `RHSTD`, and `RHSTDS` for high-score reset, replay, coinage, and
+  game-adjust defaults.
+- `cmos-layout.tsv`: source-owned `phr6.src` CMOS cell layout for audits,
+  high-score slots, credit backup, coinage/operator settings, and game-adjust
+  cells.
+- `color-ram.tsv`: source-owned `defb6.src` `CRTAB` bytes copied by `CRINIT`
+  into `PCRAM`.
+- `input-ports.tsv`: MAME IN0, IN1, and IN2 cabinet input bit layout.
+- `linked-lists.tsv`: red-label RAM linked-list heads for active/free
+  processes, object lists, and the shell list.
+- `memory-map.tsv`: MAME main-board and sound-board address ranges used by the
+  Rust address classifiers.
+- `message-glyphs.tsv`: source `mess0.src` text glyph bytes consumed by the
+  translated `BONUS` `MESS` calls.
+- `messages.tsv`: source `mess0.src` message vectors and words consumed by the
+  translated `BONUS` screen text.
+- `object-images.tsv`: red-label object image bytes currently used by
+  `COLIDE` / `COL0` picture-mask intersection, `PRDISP` / `ON86` player
+  picture writes, `CWRIT` / `COFF` generic object-picture writes/erases, and
+  descriptor ON/OFF output helpers including `OPROC` active-object band
+  writes, plus short-form laser, mini-player, and smart-bomb image data.
+- `object-pictures.tsv`: red-label complete and short-form object-picture
+  metadata currently used by the generic picture-collision path, translated
+  generic picture output/erase helpers, translated `OPROC` object display
+  banding, and the translated player-picture output slice.
+- `ram-layout.tsv`: source-owned `phr6.src` RAM table bases, strides, counts,
+  and field offsets for base-page state, text cursor workspace, `TIMER`,
+  `IRQHK`, `IFLG`, RNG seed bytes, `ASTCNT`, runtime pointers, `ITEMP` /
+  `ITEMP2`, `XTEMP` / `XTEMP2`, `TEMP48`, and `XXX1`-`XXX3` scratch bytes,
+  star-map bytes,
+  laser fizzle bytes, thrust/fireball table bytes, player data, object cells,
+  process cells, super-process cells, bank-7 terrain runtime bytes, `ALTTBL`,
+  `TERTF0` / `TERTF1`, `STBL`, and the source-order `ELIST` enemy
+  reserve/runtime parameter fields through `UFOSK` plus `ECNTS` active counts
+  through `UFOCNT`.
+- `roms.tsv`: red-label ROM filenames, byte sizes, and CRC-32 values.
+- `rom-regions.tsv`: MAME ROM region sizes.
+- `rom-map.tsv`: MAME `ROM_LOAD` mapping for fixed, banked, sound, and PROM
+  views.
+- `routine-addresses.tsv`: assembled red-label `defa7.src` routine entry
+  points currently used for `SCORE`, `SNDLD`, `SHELL`, `BKIL`, `LFIRE`,
+  `LCOL`, `LASR` / `LASR0`, `LASL` / `LASL0`, `LASD`, `COLIDE`, `COL0`,
+  `COLCHK`, `REV`, `PLEND` / `PDTHL` / `PDTH2` / `PDTH4` / `PDTH5`,
+  `PXVCT` / `PX1A`, `PDTH5R`, `PDTH5SCLR`, `PLE02`, `PLE3`, `PLSTRT`, `ATTR`,
+  `SBOMB`, `BONUS`, `BC1`, `BC2`, `BC3`, `GETWV`, smart-bomb tail resume points,
+  `HYPER` entry/resume labels,
+  `SCLR1`, `PRDISP`, `PLAYER`, `THPROC`, `PRBKIL`, `MMSW`, `MSWM`, `MSWLP`,
+  `SWBMB`, `MSWKIL`, `SHOOT`, `SCZST` / `SCZ0` / `SCZKIL`, `UFOST` /
+  `UFOLP` / `UFOKIL`, `LKIL1`, `LKILL`, `AFALL` / `AFALL2`, `P250`, `P500`,
+  `P503`, `BGI`, `TERBLO`, `TBL3`, `TBL4`, `TIEST`, `TIE`, `TIEKIL`,
+  `OBJCOL`, and `OCVECT` dispatch.
+- `player-death.tsv`: ROM-derived `PXCTB` player-death glow table and `PXCOL`
+  player-explosion color table consumed by the translated death path.
+- `scores.tsv`: score-card values currently parsed by `src/red_label.rs`.
+- `shell-images.tsv`: `defb6.src` bomb shell image bytes consumed by the
+  translated `BMBOUT` callback.
+- `sound-tables.tsv`: red-label sound table bytes currently used by the
+  translated `SNDLD` loader for replay, player-death, start, smart-bomb,
+  bomb-hit, appearance, laser, probe-hit, schizoid-hit, UFO-hit, lander-hit,
+  lander-pickup, lander-suck, lander-grab, lander-shot, astronaut-catch,
+  astronaut-scream, astronaut-land, swarmer-hit, swarmer-shot, UFO-shot,
+  terrain-blow, tie-hit, and schizoid-shot sounds.
+- `sram-routines.tsv`: red-label SRAM byte/word packing routine metadata for
+  CMOS/high-score work.
+- `switch-table.tsv`: complete red-label `defb6.src` `SWTAB` switch bit table
+  used by the translated `SSCAN` / `SWP` scanner path.
+- `terrain-data.tsv`: `blk71.src` `TDATA` terrain bitstream consumed by the
+  translated `ALINIT` / `BGALT` altitude-table generator and `BGINIT`
+  terrain flavor-table generator, plus `amode1.src` `MTERR` mini-terrain bytes
+  consumed by `SCNRV`.
+- `trace-scenarios.tsv`: Phase 1 golden-trace scenario names, frame counts, and
+  compact cabinet input programs.
+- `trace-schema.tsv`: the single checked-in TSV trace schema source.
+- `wave-table.tsv`: extracted source-order `blk71.src` `WVTAB` wave records.
 
-`safe_fall_height`
-Default: `2`
-Meaning: maximum drop height that still counts as a safe humanoid landing.
-
-`safe_fall_score`
-Default: `250`
-Meaning: rescue score awarded when an uncaught humanoid survives a safe fall.
-
-`human_catch_score`
-Default: `500`
-Meaning: score awarded when the player catches a falling humanoid.
-
-`human_landing_score`
-Default: `500`
-Meaning: score awarded when a carried humanoid is returned safely to the
-ground.
-
-`hazard_collision_score`
-Default: `25`
-Meaning: score awarded when a bullet or mine kills the player, matching the
-arcade hazard rule.
-
-`bonus_stock_score`
-Default: `10000`
-Meaning: score interval that awards an extra ship and smart bomb.
-
-`max_wave_humanoid_bonus`
-Default: `500`
-Meaning: upper cap on the end-of-wave surviving-humanoid bonus.
-
-`player_max_speed`
-Default: `1`
-Meaning: maximum horizontal thrust increment applied to the player ship.
-
-`player_shot_limit`
-Default: `4`
-Meaning: maximum number of player laser shots that can be active at once
-outside `xyzzy` mode.
-
-`player_shot_speed`
-Default: `2`
-Meaning: horizontal speed of the player's laser burst tip.
-
-`swarmer_fire_lead_divisor`
-Default: `4`
-Meaning: quarter-screen lead factor used for the swarmer focal-point shot
-model.
-
-Record format for the ROM-derived wave/fire keys:
-`max,min,intra_delta,inter_delta|wave1,wave2,wave3,wave4`
-
-`landers`
-Default: `20,0,0,0|15,20,20,20`
-Meaning: red-label lander reserve count per wave, including the four-group
-twenty-lander opener used from wave two onward.
-
-`bombers`
-Default: `3,0,0,0|0,3,4,5`
-Meaning: red-label TIE/Bomber count per wave.
-
-`pods`
-Default: `6,0,0,0|0,1,3,4`
-Meaning: red-label PROBE/Pod count per wave.
-
-`mutants`
-Default: `10,0,0,0|0,0,0,0`
-Meaning: red-label SCHITZO/Mutant baseline count record.
-
-`swarmers`
-Default: `10,0,0,0|0,0,0,0`
-Meaning: red-label baseline swarmer reserve record.
-
-`wave_time`
-Default: `30,0,0,0|30,25,20,16`
-Meaning: red-label delay between successive lander squad launches.
-
-`wave_size`
-Default: `5,0,0,0|5,5,5,5`
-Meaning: red-label size of each launched lander squad.
-
-`lander_x_velocity`
-Default: `96,0,3,2|22,30,38,46`
-Meaning: red-label lander horizontal-speed record from `WVTAB`.
-
-`lander_y_velocity_msb`
-Default: `1,0,0,0|0,0,1,1`
-Meaning: red-label lander vertical-speed MSB record from `WVTAB`.
-
-`lander_y_velocity_lsb`
-Default: `255,0,16,0|112,176,0,0`
-Meaning: red-label lander vertical-speed LSB record from `WVTAB`.
-
-`lander_shot_time`
-Default: `128,16,-4,-2|74,58,42,42`
-Meaning: red-label lander shot-timer record from `WVTAB`.
-
-`bomber_x_velocity`
-Default: `48,0,0,0|32,40,44,48`
-Meaning: red-label bomber horizontal-speed record from `WVTAB`.
-
-`mutant_random_y`
-Default: `2,0,0,0|1,1,2,2`
-Meaning: red-label mutant vertical-randomness record from `WVTAB`.
-
-`mutant_y_velocity_msb`
-Default: `1,0,0,0|0,0,1,1`
-Meaning: red-label mutant vertical-speed MSB record from `WVTAB`.
-
-`mutant_y_velocity_lsb`
-Default: `255,0,8,6|98,224,2,18`
-Meaning: red-label mutant vertical-speed LSB record from `WVTAB`.
-
-`mutant_x_velocity`
-Default: `96,0,8,4|12,28,36,40`
-Meaning: red-label mutant horizontal-speed record from `WVTAB`.
-
-`mutant_shot_time`
-Default: `255,8,-2,-2|42,34,30,28`
-Meaning: red-label mutant shot-timer record from `WVTAB`.
-
-`swarmer_x_velocity`
-Default: `96,0,8,2|22,30,32,34`
-Meaning: red-label swarmer horizontal-speed record from `WVTAB`.
-
-`swarmer_shot_time`
-Default: `40,10,-2,-1|25,25,25,25`
-Meaning: red-label swarmer shot-timer record from `WVTAB`.
-
-`swarmer_acceleration_mask`
-Default: `63,0,0,0|31,31,31,63`
-Meaning: red-label swarmer acceleration-mask record from `WVTAB`.
-
-`baiter_time`
-Default: `192,24,-12,-4|212,196,164,148`
-Meaning: red-label UFO/Baiter spoiler timer used as the first-spawn delay for
-the live baiter-pressure path.
-
-`baiter_shot_time`
-Default: `10,3,-1,-1|15,13,12,10`
-Meaning: red-label baiter shot-timer record from `WVTAB`.
-
-`baiter_seek_probability`
-Default: `200,40,-12,-8|240,220,200,200`
-Meaning: red-label baiter seek-probability record from `WVTAB`.
+`assets/arcade/arcade-rules.txt`, the PNG files under `assets/arcade/`, and the
+WAV files under `assets/sounds/` are legacy prototype references unless a
+clean-slate module explicitly embeds them through `src/assets.rs`. At present,
+the clean-slate renderer embeds only `assets/arcade/logo-page.png` for the
+temporary scaffold frame.
 
 ## Platform Support
 
@@ -418,9 +605,10 @@ terminal session inside `kitty`, `ghostty`, `warp`, or a compatible emulator.
 If your terminal supports the protocol but is not recognised by name, set
 `DEFENDER_FORCE_KITTY=1` to bypass the terminal-name guard.
 
-Non-interactive tooling paths such as `--rom-report` and
-`cargo run --example generate_readme_media` remain usable anywhere a recent
-Rust toolchain is available.
+Non-interactive tooling paths such as `--rom-report`, `--verify-roms`,
+`--fidelity-trace`, `--fidelity-trace-inputs-file`, and
+`--fidelity-check-trace` / `--fidelity-check-trace-dir` remain usable anywhere
+a recent Rust toolchain is available.
 
 The live session now requests terminal keyboard-enhancement reporting so
 standalone `Shift` thrust input can be captured in terminals that support the

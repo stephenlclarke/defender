@@ -1,0 +1,32 @@
+label	address	width	height	primary_image	alternate_image	output_routine	erase_routine	source
+SCZP1	0xF8CE	5	8	0xF9FB	0xFA23	0xD193	0xD11F	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1895-L1897
+ASXP1	0xF8D8	4	8	0xFA4B	0xFA4B	0xD139	0xD16B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1899-L1900
+SWXP1	0xF8E2	4	8	0xFA6B	0xFA6B	0xD139	0xD16B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1902-L1903
+NULOB	0xF8EC	1	1	0xF8F6	0xF8F6	0xD8DB	0xD8DB	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1905-L1907
+PRBP1	0xF8F7	4	8	0xFA8B	0xFAAB	0xD139	0xD16B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1909-L1910
+ASTP1	0xF901	2	8	0xFACB	0xFADB	0xD0F9	0xD10B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1913-L1914
+ASTP2	0xF90B	2	8	0xFAEB	0xFAFB	0xD0F9	0xD10B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1915-L1916
+ASTP3	0xF915	2	8	0xFB0B	0xFB1B	0xD0F9	0xD10B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1918-L1919
+ASTP4	0xF91F	2	8	0xFB2B	0xFB3B	0xD0F9	0xD10B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1920-L1921
+TIEP1	0xF929	4	8	0xFB4B	0xFB6B	0xD139	0xD16B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1923-L1924
+TIEP2	0xF933	4	8	0xFB8B	0xFBAB	0xD139	0xD16B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1925-L1926
+TIEP3	0xF93D	4	8	0xFBCB	0xFBEB	0xD139	0xD16B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1927-L1928
+TIEP4	0xF947	4	8	0xFC0B	0xFC2B	0xD139	0xD16B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1929-L1930
+BXPIC	0xF951	4	8	0xCC90	0xCC90	0xD139	0xD16B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1931-L1933
+BMBP1	0xF95B	2	3	0xCCB0	0xCCB6	0xD1F1	0xD20D	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1935-L1936
+BMBP2	0xF965	2	3	0xCCBC	0xCCC2	0xD1F1	0xD20D	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1937-L1938
+LASP1	0xF96F	8	1	0xF973				https://github.com/mwenge/defender/blob/master/src/defb6.src#L1939-L1942
+SWPIC1	0xF97B	3	4	0xCCC8	0xCCD4	0xD1AD	0xD1D7	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1943-L1945
+LNDP1	0xF985	5	8	0xCCE0	0xCD08	0xD193	0xD11F	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1947-L1948
+LNDP2	0xF98F	5	8	0xCD30	0xCD58	0xD193	0xD11F	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1949-L1950
+LNDP3	0xF999	5	8	0xCD80	0xCDA8	0xD193	0xD11F	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1951-L1952
+UFOP1	0xF9A3	6	4	0xCDD0	0xCDE8	0xD21F	0xD260	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1953-L1955
+UFOP2	0xF9AD	6	4	0xCE00	0xCE18	0xD21F	0xD260	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1956-L1957
+UFOP3	0xF9B7	6	4	0xCE30	0xCE48	0xD21F	0xD260	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1958-L1959
+PLAPIC	0xF9C1	8	6	0xCE60	0xCE90	0xD28E	0xD2DF	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1961-L1962
+PLBPIC	0xF9CB	8	6	0xCEC0	0xCEF0	0xD28E	0xD2DF	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1963-L1964
+PLAMIN	0xF9D5	5	4	0xCF20				https://github.com/mwenge/defender/blob/master/src/defb6.src#L1965-L1967
+SBPIC	0xF9D9	3	3	0xCF34				https://github.com/mwenge/defender/blob/master/src/defb6.src#L1968-L1970
+C25P1	0xF9DD	6	6	0xCF3D	0xCF61	0xD33D	0xD350	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1972-L1973
+C5P1	0xF9E7	6	6	0xCF85	0xCFA9	0xD33D	0xD350	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1975-L1976
+TEREX	0xF9F1	8	6	0xCFCD	0xCFCD	0xF522	0xF57B	https://github.com/mwenge/defender/blob/master/src/defb6.src#L1978-L1979

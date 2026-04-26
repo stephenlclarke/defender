@@ -3,8 +3,8 @@ fn main() {
 }
 
 fn exit_code_for_result(result: anyhow::Result<()>) -> i32 {
-    if let Err(error) = result {
-        eprintln!("defender: {error:#}");
+    if let Err(err) = result {
+        eprintln!("defender: {err:#}");
         1
     } else {
         0

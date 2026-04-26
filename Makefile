@@ -1,7 +1,11 @@
-.PHONY: fmt test clippy ci coverage sq sq-ci sonar run run-muted live live-muted readme-media
+.PHONY: fmt test clippy fidelity ci trace-fixtures reference-inputs reference-traces reference-fixtures-check coverage sq sq-ci sonar run run-muted live live-muted readme-media
 
 SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
+FIDELITY_TRACE_FIXTURES ?= docs/fidelity/fixtures/local
+DEFENDER_MAME ?= mame
+DEFENDER_ROM_DIR ?= assets/roms
+DEFENDER_REFERENCE_TRACE_DIR ?= docs/fidelity/fixtures/local
 
 fmt:
 	cargo fmt --check
@@ -12,7 +16,21 @@ test:
 clippy:
 	cargo clippy --all-targets -- -D warnings
 
-ci: fmt test clippy
+fidelity: fmt test clippy trace-fixtures coverage
+
+ci: fidelity
+
+trace-fixtures:
+	cargo run --quiet -- --fidelity-check-trace-dir "$(FIDELITY_TRACE_FIXTURES)"
+
+reference-inputs:
+	cargo run --quiet -- --fidelity-write-scenario-inputs "$(DEFENDER_REFERENCE_TRACE_DIR)"
+
+reference-traces:
+	python3 tools/generate_reference_traces.py --mame "$(DEFENDER_MAME)" --rom-dir "$(DEFENDER_ROM_DIR)" --out-dir "$(DEFENDER_REFERENCE_TRACE_DIR)"
+
+reference-fixtures-check:
+	cargo run --quiet -- --fidelity-check-reference-trace-dir "$(DEFENDER_REFERENCE_TRACE_DIR)"
 
 coverage:
 	@cargo llvm-cov --version >/dev/null 2>&1 || { \
@@ -24,7 +42,7 @@ coverage:
 		exit 1; \
 	}
 	mkdir -p target/coverage
-	rustup run stable cargo llvm-cov --all-targets --workspace --cobertura --output-path target/coverage/coverage.xml
+	rustup run stable cargo llvm-cov --all-targets --workspace --fail-under-lines 80 --cobertura --output-path target/coverage/coverage.xml
 
 sq-ci: coverage
 
@@ -53,4 +71,4 @@ live: run
 live-muted: run-muted
 
 readme-media:
-	cargo run --example generate_readme_media
+	@echo "README media generation is archived under oldsrc/examples during the clean-slate rewrite."
