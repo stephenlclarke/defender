@@ -195,7 +195,7 @@ against fixtures:
   controls, RAM-test start/failure/no-error visible setup, the RAM2 pattern
   fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test write/verify
   loop plus visible outcomes, and the CROM0 color-RAM diagnostic
-  heading/bars/palette loop.
+  heading/bars/palette loop plus audio-test sound-pulse/skip-table behavior.
 - `src/app.rs` exposes non-interactive verification commands:
   `--verify-roms PATH` checks a local red-label ROM directory and maps it into
   the embedded MAME ROM regions, while `--fidelity-trace [FRAMES]` emits the
@@ -594,16 +594,17 @@ This section records drift found during the repository review on
   backup/write/verify/restore loop with OK/failure/operator-abort routing and
   source text-control visible outcomes. It can also transfer the CROM0
   color-RAM test heading/instructions, draw the source `RAMBAR` vertical bars,
-  and step the `COLRMT` palette loop. CPU interrupt scheduling, physical lamp
-  timing, and sample generation remain gaps.
+  step the `COLRMT` palette loop, and model the CROM0 audio-test heading,
+  `PLAYB` pulse, skip-sound table, and BCD sound-number display. CPU interrupt
+  scheduling, physical lamp timing, and sample generation remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated `AUDITG` live text transfer/screen
   erasure/post-`PWRUP` wiring, physical advance-switch timing, physical lamp
   timing, sub-pass/page-boundary RAM-test operator polling, and later
-  audio/switch/monitor test execution after the modeled RAM-test, CMOS RAM-test,
-  and color-RAM diagnostic loops, CMOS persistence, screen scanline scheduler,
-  watchdog timing/reset side effects, rendering timing side
+  switch/monitor test execution after the modeled RAM-test, CMOS RAM-test,
+  color-RAM diagnostic, and audio-test loops, CMOS persistence, screen scanline
+  scheduler, watchdog timing/reset side effects, rendering timing side
   effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or
   translated `VSNDRM1.SRC` routines.
 

@@ -10,11 +10,14 @@ VCMSFL	0xC07D	CMOS RAM FAILURE [RTC:0x28,0xA0] TEST MUST BE ENTERED [RLF] WITH C
 VCMSOK	0xC07F	CMOS RAM OK	https://github.com/mwenge/defender/blob/master/src/mess0.src#L102-L102;https://github.com/mwenge/defender/blob/master/src/mess0.src#L201-L201
 VCMSAB	0xC081	MULTIPLE RAM FAILURE [HMC:0xFE] , [VMT:0x10] [HMT:0xF8] CMOS RAM CAN NOT BE TESTED	https://github.com/mwenge/defender/blob/master/src/mess0.src#L103-L104;https://github.com/mwenge/defender/blob/master/src/mess0.src#L202-L206
 VCOLTS	0xC083	COLOR RAM TEST [VMT:0x30] [HMT:0xE8] VERTICAL COLOR BARS INDICATE [RLF] [HMC:0xFC] COLOR RAM FAILURE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L105-L107;https://github.com/mwenge/defender/blob/master/src/mess0.src#L207-L211
+VAUDTS	0xC085	AUDIO TEST [RLF] [RLF] [HMC:0x04] SOUND	https://github.com/mwenge/defender/blob/master/src/mess0.src#L108-L109;https://github.com/mwenge/defender/blob/master/src/mess0.src#L212-L214
 VINS1	0xC0BB	PRESS ADVANCE WITH SWITCH SET FOR:	https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L139;https://github.com/mwenge/defender/blob/master/src/mess0.src#L241-L243
 VINS4	0xC0C1	AUTO FOR RAM TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L139;https://github.com/mwenge/defender/blob/master/src/mess0.src#L247-L248
 VINS5	0xC0C3	AUTO TO EXIT TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L140-L141;https://github.com/mwenge/defender/blob/master/src/mess0.src#L249-L250
 VINS6	0xC0C5	AUTO FOR CMOS RAM TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L140-L142;https://github.com/mwenge/defender/blob/master/src/mess0.src#L250-L251
 VINS7	0xC0C7	AUTO FOR COLOR RAM TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L142-L143;https://github.com/mwenge/defender/blob/master/src/mess0.src#L251-L252
+VINS9	0xC0CB	AUTO FOR SWITCH TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L144-L145;https://github.com/mwenge/defender/blob/master/src/mess0.src#L253-L254
+VINS10	0xC0CD	MANUAL TO TEST INDIVIDUAL SOUNDS	https://github.com/mwenge/defender/blob/master/src/mess0.src#L145-L146;https://github.com/mwenge/defender/blob/master/src/mess0.src#L254-L255
 BONSX	0xC0F3	BONUS X	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
 ATWV	0xC0F9	ATTACK WAVE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
 COMPV	0xC0FB	COMPLETED	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296

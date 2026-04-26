@@ -20,8 +20,8 @@
 //! write/verify loop, visible outcomes, and color-RAM diagnostic cycle. CMOS
 //! persistence, `AUDITG` live diagnostic text transfer/full-loop integration,
 //! physical advance/lamp timing beyond the modeled ROM-stage screen/LED output,
-//! later audio/switch/monitor test execution, and full video timing remain
-//! explicit fidelity gaps.
+//! later switch/monitor test execution, and full video timing remain explicit
+//! fidelity gaps.
 
 use crate::{
     input::{
@@ -104,7 +104,11 @@ pub const RED_LABEL_CROM0_MULTIPLE_RAM_FAILURE_TEXT: &str =
     "MULTIPLE RAM FAILURE, CMOS RAM CAN NOT BE TESTED";
 pub const RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT: &str =
     "COLOR RAM TEST VERTICAL COLOR BARS INDICATE COLOR RAM FAILURE";
+pub const RED_LABEL_CROM0_AUDIO_TEST_TEXT: &str = "AUDIO TEST SOUND";
 pub const RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT: &str = "AUTO FOR COLOR RAM TEST";
+pub const RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT: &str = "AUTO FOR SWITCH TEST";
+pub const RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT: &str =
+    "MANUAL TO TEST INDIVIDUAL SOUNDS";
 pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT];
 pub const RED_LABEL_CROM0_RAM_TEST_START_INSTRUCTIONS: &[&str] =
@@ -115,6 +119,10 @@ pub const RED_LABEL_CROM0_CMOS_RAM_TEST_DONE_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT];
 pub const RED_LABEL_CROM0_COLOR_RAM_TEST_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT];
+pub const RED_LABEL_CROM0_AUDIO_TEST_INSTRUCTIONS: &[&str] = &[
+    RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT,
+    RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT,
+];
 pub const RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS: u16 = 0x18CE;
 pub const RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES: [u16; 2] = [0x10DA, 0x10E4];
 pub const RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS: u16 = 0x4080;
@@ -125,10 +133,13 @@ pub const RED_LABEL_CROM0_CMOS_MULTIPLE_RAM_FAILURE_TEXT_ADDRESS: u16 = 0x2880;
 pub const RED_LABEL_CROM0_CMOS_RAM_FAILURE_TEXT_ADDRESS: u16 = 0x3080;
 pub const RED_LABEL_CROM0_CMOS_RAM_OK_TEXT_ADDRESS: u16 = 0x3880;
 pub const RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS: u16 = 0x3880;
+pub const RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS: u16 = 0x4078;
+pub const RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS: u16 = 0x5A8C;
 pub const RED_LABEL_CROM0_RAM_TEST_COLOR: u8 = 0xA5;
 pub const RED_LABEL_CROM0_RAM_TEST_LED: u8 = 0x04;
 pub const RED_LABEL_CROM0_CMOS_RAM_TEST_LED: u8 = 0x02;
 pub const RED_LABEL_CROM0_COLOR_RAM_TEST_LED: u8 = 0x01;
+pub const RED_LABEL_CROM0_AUDIO_TEST_LED: u8 = 0x00;
 pub const RED_LABEL_CROM0_CMOS_NO_GOOD_BLOCK_DIRECT_PAGE: u8 = 0xA2;
 pub const RED_LABEL_CROM0_CMOS_BACKUP_PAGE_OFFSET: u8 = 0x03;
 pub const RED_LABEL_CROM0_CMOS_PATTERN_START: u8 = 0x10;
@@ -143,6 +154,13 @@ pub const RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES: [u8; 16] = [
 ];
 pub const RED_LABEL_CROM0_COLOR_RAM_PALETTE_BYTES: [u8; 8] =
     [0x02, 0x03, 0x04, 0x10, 0x18, 0x20, 0x40, 0x80];
+pub const RED_LABEL_CROM0_AUDIO_TEST_FIRST_DELAY_MS: u16 = 1;
+pub const RED_LABEL_CROM0_AUDIO_TEST_SOUND_DELAY_MS: u16 = 1000;
+pub const RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS: u16 = 10;
+pub const RED_LABEL_CROM0_AUDIO_KILL_SOUND_NUMBER: u8 = 0x13;
+pub const RED_LABEL_CROM0_AUDIO_LAST_SOUND_NUMBER: u8 = 0x1F;
+pub const RED_LABEL_CROM0_AUDIO_IDLE_PORT_B: u8 = 0x3F;
+pub const RED_LABEL_CROM0_AUDIO_SKIP_SOUND_NUMBERS: [u8; 3] = [0x13, 0x1B, 0x1C];
 pub const RED_LABEL_CROM0_RAM_TEST_DELAY_MS: u16 = 5000;
 pub const RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS: u16 = 10;
 pub const RED_LABEL_CROM0_RAM_TEST_START_SEED: u16 = 0x0000;
@@ -261,6 +279,13 @@ pub struct RedLabelDiagnosticTextWrite {
 pub struct RedLabelDiagnosticInstructionWrite {
     pub table_label: &'static str,
     pub lines: &'static [&'static str],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelDiagnosticBcdNumberWrite {
+    pub address: u16,
+    pub bcd_number: u8,
+    pub cursor_after: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -580,6 +605,54 @@ pub struct RedLabelCrom0ColorRamPaletteCycle {
     pub source_label: &'static str,
     pub fills: Vec<RedLabelCrom0ColorRamPaletteFill>,
     pub target: RedLabelCrom0ColorRamTestTarget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0AudioTestTarget {
+    AudioTestLoop,
+    SwitchTest,
+    MonitorTest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0AudioTestTransfer {
+    pub screen_clear_end: u16,
+    pub palette_zeroed: bool,
+    pub led_output: RedLabelDiagnosticLedOutput,
+    pub letter_color: RedLabelDiagnosticPaletteWrite,
+    pub headline: RedLabelDiagnosticBitmapTextWrite,
+    pub instructions: RedLabelDiagnosticInstructionBitmapTextWrite,
+    pub current_sound_bcd: u8,
+    pub first_sound_delay_ms: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0AudioSoundPulse {
+    pub sound_number: u8,
+    pub port_b_value: u8,
+    pub latch: SoundCommandLatch,
+    pub active_delay_ms: u16,
+    pub idle_port_b_value: u8,
+    pub idle_latch: SoundCommandLatch,
+    pub idle_delay_ms: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0AudioSoundNumberTransfer {
+    pub erase: RedLabelDiagnosticBcdNumberWrite,
+    pub write: RedLabelDiagnosticBcdNumberWrite,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0AudioTestStep {
+    pub current_sound_number: u8,
+    pub skipped_sound_numbers: Vec<u8>,
+    pub kill_sound: RedLabelCrom0AudioSoundPulse,
+    pub played_sound: Option<RedLabelCrom0AudioSoundPulse>,
+    pub sound_number: Option<RedLabelCrom0AudioSoundNumberTransfer>,
+    pub next_sound_number: Option<u8>,
+    pub next_delay_ms: Option<u16>,
+    pub target: RedLabelCrom0AudioTestTarget,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1859,6 +1932,148 @@ impl<'a> DefenderMainBoard<'a> {
         }
     }
 
+    /// Transfer the visible `SOUND0` audio-test heading and instructions.
+    ///
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L486-L497>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/mess0.src#L81-L108>.
+    pub fn red_label_write_crom0_audio_test_start(
+        &mut self,
+    ) -> Result<RedLabelCrom0AudioTestTransfer, String> {
+        self.red_label_clear_screen();
+        self.palette_ram = [0; PALETTE_RAM_SIZE];
+        self.crom0_diagnostic_screen = RedLabelCrom0DiagnosticScreen::default();
+        self.crom0_advance_gates.clear();
+
+        let led_output = self.red_label_set_diagnostic_leds(RED_LABEL_CROM0_AUDIO_TEST_LED);
+        let letter_color = RedLabelDiagnosticPaletteWrite {
+            address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+            index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+            value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+        };
+        self.palette_ram[usize::from(letter_color.index)] = letter_color.value;
+
+        let headline = self.red_label_write_message_text(
+            RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS,
+            "VAUDTS",
+            red_label_message("VAUDTS")?,
+        )?;
+        if headline.text != RED_LABEL_CROM0_AUDIO_TEST_TEXT {
+            return Err(format!(
+                "red-label audio-test vector `VAUDTS` text `{}` does not match source text `{}`",
+                headline.text, RED_LABEL_CROM0_AUDIO_TEST_TEXT
+            ));
+        }
+
+        let instruction = RedLabelDiagnosticInstructionWrite {
+            table_label: "IAUDTS",
+            lines: RED_LABEL_CROM0_AUDIO_TEST_INSTRUCTIONS,
+        };
+        let instructions = self.red_label_write_crom0_operator_instruction_text(&instruction)?;
+
+        Ok(RedLabelCrom0AudioTestTransfer {
+            screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            palette_zeroed: true,
+            led_output,
+            letter_color,
+            headline,
+            instructions,
+            current_sound_bcd: 0,
+            first_sound_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_FIRST_DELAY_MS,
+        })
+    }
+
+    /// Step the source `SOUND1`-`SOUND6` diagnostic sound loop once.
+    ///
+    /// The helper records the `PLAYB` kill pulse, the optional sound pulse,
+    /// source skip-table entries, the visible BCD sound-number update, and the
+    /// branch to either the sound loop, switch test, or monitor test boundary.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc0.src#L498-L536>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L317-L319>.
+    pub fn red_label_step_crom0_audio_test(
+        &mut self,
+        current_sound_number: u8,
+        advance_to_switch: bool,
+        monitor_after_last_sound: bool,
+    ) -> Result<RedLabelCrom0AudioTestStep, String> {
+        red_label_validate_audio_sound_counter(current_sound_number, advance_to_switch)?;
+
+        let kill_sound =
+            self.red_label_play_crom0_audio_sound(RED_LABEL_CROM0_AUDIO_KILL_SOUND_NUMBER);
+        if advance_to_switch {
+            return Ok(RedLabelCrom0AudioTestStep {
+                current_sound_number,
+                skipped_sound_numbers: Vec::new(),
+                kill_sound,
+                played_sound: None,
+                sound_number: None,
+                next_sound_number: None,
+                next_delay_ms: None,
+                target: RedLabelCrom0AudioTestTarget::SwitchTest,
+            });
+        }
+
+        let (next_sound_number, skipped_sound_numbers) =
+            red_label_crom0_next_audio_sound_number(current_sound_number)?;
+        let played_sound = self.red_label_play_crom0_audio_sound(next_sound_number);
+        let previous_bcd = red_label_decimal_to_bcd_byte(current_sound_number);
+        let next_bcd = red_label_decimal_to_bcd_byte(next_sound_number);
+        let erase_cursor_after = self.red_label_clear_bcd_number_text(
+            RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS,
+            previous_bcd,
+        )?;
+        let write_cursor_after = self.red_label_write_bcd_number_text(
+            RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS,
+            next_bcd,
+        )?;
+        let sound_number = RedLabelCrom0AudioSoundNumberTransfer {
+            erase: RedLabelDiagnosticBcdNumberWrite {
+                address: RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS,
+                bcd_number: previous_bcd,
+                cursor_after: erase_cursor_after,
+            },
+            write: RedLabelDiagnosticBcdNumberWrite {
+                address: RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS,
+                bcd_number: next_bcd,
+                cursor_after: write_cursor_after,
+            },
+        };
+
+        Ok(RedLabelCrom0AudioTestStep {
+            current_sound_number,
+            skipped_sound_numbers,
+            kill_sound,
+            played_sound: Some(played_sound),
+            sound_number: Some(sound_number),
+            next_sound_number: Some(next_sound_number),
+            next_delay_ms: Some(RED_LABEL_CROM0_AUDIO_TEST_SOUND_DELAY_MS),
+            target: if next_sound_number == RED_LABEL_CROM0_AUDIO_LAST_SOUND_NUMBER
+                && monitor_after_last_sound
+            {
+                RedLabelCrom0AudioTestTarget::MonitorTest
+            } else {
+                RedLabelCrom0AudioTestTarget::AudioTestLoop
+            },
+        })
+    }
+
+    fn red_label_play_crom0_audio_sound(
+        &mut self,
+        sound_number: u8,
+    ) -> RedLabelCrom0AudioSoundPulse {
+        let port_b_value = !sound_number & 0x3F;
+        let latch = self.write_pia1_port_b_output(port_b_value);
+        let idle_latch = self.write_pia1_port_b_output(RED_LABEL_CROM0_AUDIO_IDLE_PORT_B);
+        RedLabelCrom0AudioSoundPulse {
+            sound_number,
+            port_b_value,
+            latch,
+            active_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+            idle_port_b_value: RED_LABEL_CROM0_AUDIO_IDLE_PORT_B,
+            idle_latch,
+            idle_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+        }
+    }
+
     fn red_label_clear_screen(&mut self) {
         self.ram[..usize::from(RED_LABEL_SCREEN_CLEAR_END)].fill(0);
     }
@@ -1959,6 +2174,20 @@ impl<'a> DefenderMainBoard<'a> {
         Ok(cursor)
     }
 
+    fn red_label_clear_bcd_number_text(
+        &mut self,
+        screen_address: u16,
+        bcd_number: u8,
+    ) -> Result<u16, String> {
+        let mut cursor = screen_address;
+        for digit in red_label_bcd_number_visible_digits(bcd_number) {
+            let image = red_label_score_digit_image(digit)?;
+            self.red_label_clear_score_digit_image(cursor, image)?;
+            cursor = red_label_text_cursor_advance(cursor, image.width);
+        }
+        Ok(cursor)
+    }
+
     fn red_label_write_message_glyph(
         &mut self,
         screen_address: u16,
@@ -1988,6 +2217,21 @@ impl<'a> DefenderMainBoard<'a> {
                 let source_byte = image.bytes[source_column + usize::from(row)];
                 let address = red_label_screen_offset(column_address, u16::from(row))?;
                 self.ram[usize::from(address)] = source_byte;
+            }
+        }
+        Ok(())
+    }
+
+    fn red_label_clear_score_digit_image(
+        &mut self,
+        screen_address: u16,
+        image: &RedLabelScoreDigitImage,
+    ) -> Result<(), String> {
+        for column in 0..image.width {
+            let column_address = red_label_screen_offset(screen_address, u16::from(column) << 8)?;
+            for row in 0..image.height {
+                let address = red_label_screen_offset(column_address, u16::from(row))?;
+                self.ram[usize::from(address)] = 0;
             }
         }
         Ok(())
@@ -2943,6 +3187,8 @@ fn red_label_crom0_operator_instruction_vector(line: &str) -> Result<&'static st
         RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT => Ok("VINS5"),
         RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT => Ok("VINS6"),
         RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT => Ok("VINS7"),
+        RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT => Ok("VINS9"),
+        RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT => Ok("VINS10"),
         _ => Err(format!(
             "red-label CROM0 operator instruction `{line}` has no message vector"
         )),
@@ -2997,6 +3243,38 @@ fn red_label_validate_color_ram_bar_abort(
         ));
     }
     Ok(())
+}
+
+fn red_label_validate_audio_sound_counter(
+    current_sound_number: u8,
+    advance_to_switch: bool,
+) -> Result<(), String> {
+    if advance_to_switch {
+        return Ok(());
+    }
+    if current_sound_number >= RED_LABEL_CROM0_AUDIO_LAST_SOUND_NUMBER {
+        return Err(format!(
+            "red-label CROM0 audio current sound 0x{current_sound_number:02X} has no next sound before 0x{:02X}",
+            RED_LABEL_CROM0_AUDIO_LAST_SOUND_NUMBER
+        ));
+    }
+    Ok(())
+}
+
+fn red_label_crom0_next_audio_sound_number(
+    current_sound_number: u8,
+) -> Result<(u8, Vec<u8>), String> {
+    red_label_validate_audio_sound_counter(current_sound_number, false)?;
+    let mut sound_number = current_sound_number;
+    let mut skipped = Vec::new();
+    loop {
+        sound_number = sound_number.wrapping_add(1);
+        if RED_LABEL_CROM0_AUDIO_SKIP_SOUND_NUMBERS.contains(&sound_number) {
+            skipped.push(sound_number);
+            continue;
+        }
+        return Ok((sound_number, skipped));
+    }
 }
 
 fn red_label_crom0_ram_test_loop_step(
@@ -3227,12 +3505,17 @@ mod tests {
             RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS, RED_LABEL_CLRALL_PACKED_BYTE_WRITES,
             RED_LABEL_CLRAUD_PACKED_BYTE_WRITES, RED_LABEL_CMOSCK_CELL_OFFSET,
             RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_CROM0_ALL_ROMS_OK_TEXT,
-            RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT,
+            RED_LABEL_CROM0_AUDIO_IDLE_PORT_B, RED_LABEL_CROM0_AUDIO_KILL_SOUND_NUMBER,
+            RED_LABEL_CROM0_AUDIO_LAST_SOUND_NUMBER, RED_LABEL_CROM0_AUDIO_SKIP_SOUND_NUMBERS,
+            RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS, RED_LABEL_CROM0_AUDIO_TEST_FIRST_DELAY_MS,
+            RED_LABEL_CROM0_AUDIO_TEST_LED, RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+            RED_LABEL_CROM0_AUDIO_TEST_SOUND_DELAY_MS, RED_LABEL_CROM0_AUDIO_TEST_TEXT,
+            RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS, RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT,
-            RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT, RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT,
-            RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS, RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT,
-            RED_LABEL_CROM0_CMOS_BACKUP_PAGE_OFFSET,
+            RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT, RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT,
+            RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT, RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS,
+            RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT, RED_LABEL_CROM0_CMOS_BACKUP_PAGE_OFFSET,
             RED_LABEL_CROM0_CMOS_MULTIPLE_RAM_FAILURE_TEXT_ADDRESS,
             RED_LABEL_CROM0_CMOS_NO_GOOD_BLOCK_DIRECT_PAGE,
             RED_LABEL_CROM0_CMOS_PATTERN_COMPARISONS, RED_LABEL_CROM0_CMOS_PATTERN_PASSES,
@@ -3243,6 +3526,7 @@ mod tests {
             RED_LABEL_CROM0_COLOR_RAM_PALETTE_BYTES, RED_LABEL_CROM0_COLOR_RAM_TEST_COLOR_DELAY_MS,
             RED_LABEL_CROM0_COLOR_RAM_TEST_INITIAL_DELAY_MS, RED_LABEL_CROM0_COLOR_RAM_TEST_LED,
             RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT, RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS,
+            RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT,
             RED_LABEL_CROM0_MULTIPLE_RAM_FAILURE_TEXT, RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT,
             RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES,
             RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT,
@@ -3260,21 +3544,24 @@ mod tests {
             RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
             RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
             RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
-            RedLabelCrom0BadRamBitmapTextWrite, RedLabelCrom0BadRomBitmapTextWrite,
-            RedLabelCrom0BadRomScreenWrite, RedLabelCrom0CmosRamFailure,
-            RedLabelCrom0CmosRamTestFault, RedLabelCrom0CmosRamTestLoopStatus,
-            RedLabelCrom0CmosRamTestLoopStep, RedLabelCrom0CmosRamTestLoopTarget,
-            RedLabelCrom0CmosRamTestPatternFill, RedLabelCrom0CmosRamTestPatternVerification,
-            RedLabelCrom0CmosRamTestStatus, RedLabelCrom0CmosRamTestTarget,
-            RedLabelCrom0CmosRamTestTransfer, RedLabelCrom0ColorRamBarWrite,
-            RedLabelCrom0ColorRamBars, RedLabelCrom0ColorRamPaletteCycle,
-            RedLabelCrom0ColorRamPaletteFill, RedLabelCrom0ColorRamTestTarget,
-            RedLabelCrom0ColorRamTestTransfer, RedLabelCrom0RamFailure,
-            RedLabelCrom0RamFailureTransfer, RedLabelCrom0RamTestAbortStatus,
-            RedLabelCrom0RamTestAbortTransfer, RedLabelCrom0RamTestLoopStatus,
-            RedLabelCrom0RamTestLoopTarget, RedLabelCrom0RamTestPass,
-            RedLabelCrom0RamTestPatternFill, RedLabelCrom0RamTestPatternVerification,
-            RedLabelCrom0RamTestStartTransfer, RedLabelCrom0RamTestTarget,
+            RedLabelCrom0AudioSoundNumberTransfer, RedLabelCrom0AudioSoundPulse,
+            RedLabelCrom0AudioTestStep, RedLabelCrom0AudioTestTarget,
+            RedLabelCrom0AudioTestTransfer, RedLabelCrom0BadRamBitmapTextWrite,
+            RedLabelCrom0BadRomBitmapTextWrite, RedLabelCrom0BadRomScreenWrite,
+            RedLabelCrom0CmosRamFailure, RedLabelCrom0CmosRamTestFault,
+            RedLabelCrom0CmosRamTestLoopStatus, RedLabelCrom0CmosRamTestLoopStep,
+            RedLabelCrom0CmosRamTestLoopTarget, RedLabelCrom0CmosRamTestPatternFill,
+            RedLabelCrom0CmosRamTestPatternVerification, RedLabelCrom0CmosRamTestStatus,
+            RedLabelCrom0CmosRamTestTarget, RedLabelCrom0CmosRamTestTransfer,
+            RedLabelCrom0ColorRamBarWrite, RedLabelCrom0ColorRamBars,
+            RedLabelCrom0ColorRamPaletteCycle, RedLabelCrom0ColorRamPaletteFill,
+            RedLabelCrom0ColorRamTestTarget, RedLabelCrom0ColorRamTestTransfer,
+            RedLabelCrom0RamFailure, RedLabelCrom0RamFailureTransfer,
+            RedLabelCrom0RamTestAbortStatus, RedLabelCrom0RamTestAbortTransfer,
+            RedLabelCrom0RamTestLoopStatus, RedLabelCrom0RamTestLoopTarget,
+            RedLabelCrom0RamTestPass, RedLabelCrom0RamTestPatternFill,
+            RedLabelCrom0RamTestPatternVerification, RedLabelCrom0RamTestStartTransfer,
+            RedLabelCrom0RamTestTarget, RedLabelDiagnosticBcdNumberWrite,
             RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
             RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
             RedLabelDiagnosticLedOutput, RedLabelDiagnosticPaletteWrite,
@@ -3303,6 +3590,7 @@ mod tests {
             RedLabelCrom0RomStageStatus, RedLabelCrom0RomStageTarget, RedLabelRomImages,
             RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile, VerifiedRomSet,
         },
+        sound::SoundCommandLatch,
     };
 
     fn test_rom_images() -> RedLabelRomImages {
@@ -5252,6 +5540,185 @@ mod tests {
 
         let next = board.red_label_step_crom0_color_ram_palette_cycle(true);
         assert_eq!(next.target, RedLabelCrom0ColorRamTestTarget::AudioTest);
+    }
+
+    #[test]
+    fn main_board_writes_crom0_audio_test_start() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let transfer = board
+            .red_label_write_crom0_audio_test_start()
+            .expect("audio test start transfer");
+
+        assert_eq!(
+            transfer,
+            RedLabelCrom0AudioTestTransfer {
+                screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+                palette_zeroed: true,
+                led_output: red_label_diagnostic_led_output(RED_LABEL_CROM0_AUDIO_TEST_LED),
+                letter_color: RedLabelDiagnosticPaletteWrite {
+                    address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+                    index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+                    value: RED_LABEL_CROM0_RAM_TEST_COLOR,
+                },
+                headline: RedLabelDiagnosticBitmapTextWrite {
+                    address: RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS,
+                    vector_label: "VAUDTS",
+                    text: String::from(RED_LABEL_CROM0_AUDIO_TEST_TEXT),
+                    cursor_after: 0x5A8C,
+                },
+                instructions: RedLabelDiagnosticInstructionBitmapTextWrite {
+                    table_label: "IAUDTS",
+                    prompt: RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                        vector_label: "VINS1",
+                        text: String::from(RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT),
+                        cursor_after: 0x96CE,
+                    },
+                    lines: vec![
+                        RedLabelDiagnosticBitmapTextWrite {
+                            address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                            vector_label: "VINS9",
+                            text: String::from(RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT),
+                            cursor_after: 0x5CDA,
+                        },
+                        RedLabelDiagnosticBitmapTextWrite {
+                            address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[1],
+                            vector_label: "VINS10",
+                            text: String::from(RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT),
+                            cursor_after: 0x88E4,
+                        },
+                    ],
+                },
+                current_sound_bcd: 0,
+                first_sound_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_FIRST_DELAY_MS,
+            }
+        );
+        assert_eq!(
+            board.palette_ram()[usize::from(RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX)],
+            RED_LABEL_CROM0_RAM_TEST_COLOR
+        );
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS, 'A');
+        assert_message_glyph_at(&board, 0x5578, 'T');
+        assert_message_glyph_at(&board, 0x44_8C, 'S');
+    }
+
+    #[test]
+    fn main_board_steps_crom0_audio_test_sound_loop_and_skip_table() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        board
+            .red_label_write_bcd_number_text(RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS, 0x18)
+            .expect("dirty previous sound number");
+
+        let step = board
+            .red_label_step_crom0_audio_test(0x12, false, false)
+            .expect("audio test step");
+
+        assert_eq!(
+            step,
+            RedLabelCrom0AudioTestStep {
+                current_sound_number: 0x12,
+                skipped_sound_numbers: vec![RED_LABEL_CROM0_AUDIO_KILL_SOUND_NUMBER],
+                kill_sound: RedLabelCrom0AudioSoundPulse {
+                    sound_number: RED_LABEL_CROM0_AUDIO_KILL_SOUND_NUMBER,
+                    port_b_value: 0x2C,
+                    latch: SoundCommandLatch::from_main_board_pia_port_b(0x2C),
+                    active_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+                    idle_port_b_value: RED_LABEL_CROM0_AUDIO_IDLE_PORT_B,
+                    idle_latch: SoundCommandLatch::from_main_board_pia_port_b(
+                        RED_LABEL_CROM0_AUDIO_IDLE_PORT_B
+                    ),
+                    idle_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+                },
+                played_sound: Some(RedLabelCrom0AudioSoundPulse {
+                    sound_number: 0x14,
+                    port_b_value: 0x2B,
+                    latch: SoundCommandLatch::from_main_board_pia_port_b(0x2B),
+                    active_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+                    idle_port_b_value: RED_LABEL_CROM0_AUDIO_IDLE_PORT_B,
+                    idle_latch: SoundCommandLatch::from_main_board_pia_port_b(
+                        RED_LABEL_CROM0_AUDIO_IDLE_PORT_B
+                    ),
+                    idle_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+                }),
+                sound_number: Some(RedLabelCrom0AudioSoundNumberTransfer {
+                    erase: RedLabelDiagnosticBcdNumberWrite {
+                        address: RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS,
+                        bcd_number: 0x18,
+                        cursor_after: 0x628C,
+                    },
+                    write: RedLabelDiagnosticBcdNumberWrite {
+                        address: RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS,
+                        bcd_number: 0x20,
+                        cursor_after: 0x628C,
+                    },
+                }),
+                next_sound_number: Some(0x14),
+                next_delay_ms: Some(RED_LABEL_CROM0_AUDIO_TEST_SOUND_DELAY_MS),
+                target: RedLabelCrom0AudioTestTarget::AudioTestLoop,
+            }
+        );
+        assert_eq!(
+            board.last_sound_command_latch(),
+            Some(SoundCommandLatch::from_main_board_pia_port_b(
+                RED_LABEL_CROM0_AUDIO_IDLE_PORT_B
+            ))
+        );
+        assert_score_digit_at(&board, RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS, 2);
+        assert_score_digit_at(&board, 0x5E8C, 0);
+    }
+
+    #[test]
+    fn main_board_routes_crom0_audio_test_to_switch_and_monitor_boundaries() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let switch = board
+            .red_label_step_crom0_audio_test(0x14, true, false)
+            .expect("audio test switch target");
+        assert_eq!(switch.target, RedLabelCrom0AudioTestTarget::SwitchTest);
+        assert_eq!(switch.played_sound, None);
+        assert_eq!(switch.sound_number, None);
+        assert_eq!(
+            switch.kill_sound,
+            RedLabelCrom0AudioSoundPulse {
+                sound_number: RED_LABEL_CROM0_AUDIO_KILL_SOUND_NUMBER,
+                port_b_value: 0x2C,
+                latch: SoundCommandLatch::from_main_board_pia_port_b(0x2C),
+                active_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+                idle_port_b_value: RED_LABEL_CROM0_AUDIO_IDLE_PORT_B,
+                idle_latch: SoundCommandLatch::from_main_board_pia_port_b(
+                    RED_LABEL_CROM0_AUDIO_IDLE_PORT_B
+                ),
+                idle_delay_ms: RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
+            }
+        );
+
+        let monitor = board
+            .red_label_step_crom0_audio_test(0x1E, false, true)
+            .expect("audio test monitor target");
+        assert_eq!(monitor.target, RedLabelCrom0AudioTestTarget::MonitorTest);
+        assert_eq!(
+            monitor.next_sound_number,
+            Some(RED_LABEL_CROM0_AUDIO_LAST_SOUND_NUMBER)
+        );
+        assert_eq!(
+            monitor
+                .sound_number
+                .expect("last sound number write")
+                .write
+                .bcd_number,
+            0x31
+        );
+
+        let error = board
+            .red_label_step_crom0_audio_test(RED_LABEL_CROM0_AUDIO_LAST_SOUND_NUMBER, false, false)
+            .expect_err("last sound has no next sound");
+        assert!(error.contains("has no next sound"));
+
+        assert_eq!(RED_LABEL_CROM0_AUDIO_SKIP_SOUND_NUMBERS, [0x13, 0x1B, 0x1C]);
     }
 
     #[test]

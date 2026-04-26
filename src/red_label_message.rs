@@ -524,5 +524,44 @@ mod tests {
                 String::from("FAILURE")
             ]
         );
+        assert_eq!(
+            red_label_message("VAUDTS")
+                .expect("VAUDTS message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUDIO"),
+                String::from("TEST"),
+                String::from("[RLF]"),
+                String::from("[RLF]"),
+                String::from("[HMC:0x04]"),
+                String::from("SOUND")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS9")
+                .expect("VINS9 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUTO"),
+                String::from("FOR"),
+                String::from("SWITCH"),
+                String::from("TEST")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS10")
+                .expect("VINS10 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("MANUAL"),
+                String::from("TO"),
+                String::from("TEST"),
+                String::from("INDIVIDUAL"),
+                String::from("SOUNDS")
+            ]
+        );
     }
 }

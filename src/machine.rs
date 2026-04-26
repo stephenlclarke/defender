@@ -27466,7 +27466,7 @@ mod tests {
             red_label_message_glyph('W').expect("W glyph").bytes.len(),
             32
         );
-        assert_eq!(messages.len(), 19);
+        assert_eq!(messages.len(), 22);
         assert_eq!(
             red_label_message("VROMFL")
                 .expect("VROMFL message")
