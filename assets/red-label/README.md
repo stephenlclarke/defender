@@ -84,7 +84,9 @@ Current files:
 - `roms.tsv`: expected red-label ROM filenames, byte sizes, and CRC-32 values.
 - `rom-regions.tsv`: MAME ROM region sizes used by verification tooling.
 - `rom-map.tsv`: MAME `ROM_LOAD` offsets for red-label main CPU, banked
-  program ROM, sound CPU, and decoder PROM images.
+  program ROM, sound CPU, and decoder PROM images; the `defend.*` rows also
+  derive the source-shaped `CROM0` `ROMMAP` descriptor bytes used by
+  `ROM0`/`ROM9`.
 - `routine-addresses.tsv`: assembled red-label routine entry points for the
   translated `SCORE`, `SNDLD`, `SHELL`, `BKIL`, `LFIRE`, `LCOL`, `LASR` /
   `LASR0`, `LASL` / `LASL0`, `LASD`, `COLIDE`, `COL0`, `COLCHK`, `REV`,
@@ -141,6 +143,11 @@ Current files:
 mirror the red-label ROM, input, and CPU map declarations from the MAME
 Williams driver:
 <https://github.com/mamedev/mame/blob/master/src/mame/midway/williams.cpp>.
+The `rom-map.tsv` main-program rows also derive the 24-byte `romf8.src`
+`ROMMAP` descriptor table consumed through `ROM0`/`ROM9` by `romc0.src`
+`CROM0`:
+<https://github.com/mwenge/defender/blob/master/src/romf8.src#L233-L282> and
+<https://github.com/mwenge/defender/blob/master/src/romf8.src#L615-L641>.
 The CPU address view is cross-checked against the Computer Archeology Defender
 RAM-use notes: <https://computerarcheology.com/Arcade/Defender/RAMUse.html>.
 `sram-routines.tsv` is derived from the same RAM-use notes for the fixed-bank

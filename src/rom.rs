@@ -132,6 +132,15 @@ pub fn red_label_rom_map() -> &'static [RomLoad] {
         .as_slice()
 }
 
+pub const RED_LABEL_CROM0_ROMMAP_BYTES: usize = 24;
+pub const RED_LABEL_CROM0_ROMMAP_SLOT_BYTES: usize = 2;
+pub const RED_LABEL_CROM0_ROM_CHUNK_SIZE: usize = 0x0800;
+pub const RED_LABEL_CROM0_FIXED_ROM_BLOCK: u8 = 0x0F;
+
+pub fn red_label_crom0_rom_map_descriptors() -> Result<[u8; RED_LABEL_CROM0_ROMMAP_BYTES], String> {
+    red_label_crom0_rom_map_descriptors_from_loads(red_label_rom_map())
+}
+
 impl VerifiedRomSet {
     pub fn files(&self) -> &[VerifiedRomFile] {
         &self.files
@@ -585,6 +594,105 @@ fn parse_rom_map(text: &'static str) -> Result<Vec<RomLoad>, String> {
     Ok(loads)
 }
 
+fn red_label_crom0_rom_map_descriptors_from_loads(
+    loads: &[RomLoad],
+) -> Result<[u8; RED_LABEL_CROM0_ROMMAP_BYTES], String> {
+    let mut descriptors = [0; RED_LABEL_CROM0_ROMMAP_BYTES];
+    for load in loads.iter().copied() {
+        let Some(rom_number) = red_label_defender_rom_number(load.name)? else {
+            continue;
+        };
+        let slot_start = usize::from(rom_number - 1) * RED_LABEL_CROM0_ROMMAP_SLOT_BYTES;
+        if slot_start + RED_LABEL_CROM0_ROMMAP_SLOT_BYTES > descriptors.len() {
+            return Err(format!(
+                "CROM0 ROMMAP has no slot for physical ROM {}",
+                load.name
+            ));
+        }
+        if load.size % RED_LABEL_CROM0_ROM_CHUNK_SIZE != 0 {
+            return Err(format!(
+                "CROM0 ROMMAP load {} size 0x{:04X} is not 2K aligned",
+                load.name, load.size
+            ));
+        }
+
+        let chunks = load.size / RED_LABEL_CROM0_ROM_CHUNK_SIZE;
+        if chunks > RED_LABEL_CROM0_ROMMAP_SLOT_BYTES {
+            return Err(format!(
+                "CROM0 ROMMAP load {} spans {chunks} chunks, expected at most two",
+                load.name
+            ));
+        }
+
+        for chunk_index in 0..chunks {
+            let descriptor = red_label_crom0_descriptor_byte(load, chunk_index)?;
+            let descriptor_index = slot_start + chunk_index;
+            if descriptors[descriptor_index] != 0 {
+                return Err(format!(
+                    "CROM0 ROMMAP slot {} half {} is already occupied",
+                    rom_number,
+                    chunk_index + 1
+                ));
+            }
+            descriptors[descriptor_index] = descriptor;
+        }
+    }
+
+    Ok(descriptors)
+}
+
+fn red_label_defender_rom_number(name: &str) -> Result<Option<u8>, String> {
+    let Some(number) = name
+        .strip_prefix("defend.")
+        .and_then(|suffix| suffix.parse::<u8>().ok())
+    else {
+        return Ok(None);
+    };
+    if number == 0 || number > 12 {
+        return Err(format!(
+            "CROM0 ROMMAP physical ROM number {number} is out of range"
+        ));
+    }
+    Ok(Some(number))
+}
+
+fn red_label_crom0_descriptor_byte(load: RomLoad, chunk_index: usize) -> Result<u8, String> {
+    let cpu_start = load
+        .cpu_start
+        .ok_or_else(|| format!("CROM0 ROMMAP load {} has no CPU start", load.name))?;
+    let chunk_offset = u16::try_from(chunk_index * RED_LABEL_CROM0_ROM_CHUNK_SIZE)
+        .map_err(|_| format!("CROM0 ROMMAP load {} chunk offset overflows", load.name))?;
+    let address = cpu_start
+        .checked_add(chunk_offset)
+        .ok_or_else(|| format!("CROM0 ROMMAP load {} CPU address overflows", load.name))?;
+    if !(0xC000..=0xF800).contains(&address) || (address - 0xC000) % 0x0800 != 0 {
+        return Err(format!(
+            "CROM0 ROMMAP load {} CPU address {address:#06X} is not a 2K ROM boundary",
+            load.name
+        ));
+    }
+
+    let address_code = ((address - 0xC000) / 0x0800) as u8;
+    let block = match load.view {
+        RomView::Fixed => RED_LABEL_CROM0_FIXED_ROM_BLOCK,
+        RomView::Banked(bank) if bank <= 0x0F => bank,
+        RomView::Banked(bank) => {
+            return Err(format!(
+                "CROM0 ROMMAP load {} bank {bank} exceeds descriptor width",
+                load.name
+            ));
+        }
+        RomView::SoundCpu | RomView::Prom => {
+            return Err(format!(
+                "CROM0 ROMMAP load {} is not a main CPU ROM",
+                load.name
+            ));
+        }
+    };
+
+    Ok((address_code << 4) | block)
+}
+
 fn parse_rom_view(view: &str, bank: &str, line_number: usize) -> Result<RomView, String> {
     match view {
         "fixed" if bank == "-" => Ok(RomView::Fixed),
@@ -676,10 +784,12 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::{
-        RedLabelRomImages, RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile,
-        VerifiedRomSet, crc32, load_verified_dir_against, parse_rom_descriptors, parse_rom_map,
-        parse_rom_regions, red_label_main_cpu_region, red_label_rom_map, red_label_rom_regions,
-        red_label_roms, scan_dir_against,
+        RED_LABEL_CROM0_FIXED_ROM_BLOCK, RED_LABEL_CROM0_ROMMAP_BYTES, RedLabelRomImages,
+        RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile, VerifiedRomSet, crc32,
+        load_verified_dir_against, parse_rom_descriptors, parse_rom_map, parse_rom_regions,
+        red_label_crom0_rom_map_descriptors, red_label_crom0_rom_map_descriptors_from_loads,
+        red_label_main_cpu_region, red_label_rom_map, red_label_rom_regions, red_label_roms,
+        scan_dir_against,
     };
 
     const FAKE_ROMS: [RomDescriptor; 2] = [
@@ -810,6 +920,92 @@ mod tests {
                 view: RomView::Prom,
                 cpu_start: None,
             }
+        );
+    }
+
+    #[test]
+    fn red_label_crom0_rommap_descriptors_follow_romf8_format() {
+        let descriptors = red_label_crom0_rom_map_descriptors().expect("CROM0 ROMMAP");
+
+        assert_eq!(descriptors.len(), RED_LABEL_CROM0_ROMMAP_BYTES);
+        assert_eq!(
+            descriptors,
+            [
+                0x2F, 0x00, 0x4F, 0x5F, 0x6F, 0x7F, 0x3F, 0x00, 0x00, 0x00, 0x07, 0x00, 0x03, 0x00,
+                0x02, 0x00, 0x01, 0x00, 0x13, 0x00, 0x12, 0x00, 0x11, 0x00,
+            ]
+        );
+        assert_eq!(descriptors[0] & 0x0F, RED_LABEL_CROM0_FIXED_ROM_BLOCK);
+        assert_eq!(descriptors[0] >> 4, 2);
+        assert_eq!(descriptors[10], 0x07);
+        assert_eq!(descriptors[16], 0x01);
+        assert_eq!(descriptors[18], 0x13);
+    }
+
+    #[test]
+    fn red_label_crom0_rommap_descriptors_reject_drift() {
+        let bad_number = [RomLoad {
+            name: "defend.13",
+            region: "maincpu",
+            region_offset: 0,
+            size: 0x0800,
+            view: RomView::Fixed,
+            cpu_start: Some(0xD000),
+        }];
+        let oversize = [RomLoad {
+            name: "defend.1",
+            region: "maincpu",
+            region_offset: 0,
+            size: 0x1800,
+            view: RomView::Fixed,
+            cpu_start: Some(0xD000),
+        }];
+        let unaligned_address = [RomLoad {
+            name: "defend.1",
+            region: "maincpu",
+            region_offset: 0,
+            size: 0x0800,
+            view: RomView::Fixed,
+            cpu_start: Some(0xD400),
+        }];
+        let duplicate_slot = [
+            RomLoad {
+                name: "defend.1",
+                region: "maincpu",
+                region_offset: 0,
+                size: 0x0800,
+                view: RomView::Fixed,
+                cpu_start: Some(0xD000),
+            },
+            RomLoad {
+                name: "defend.1",
+                region: "maincpu",
+                region_offset: 0x0800,
+                size: 0x0800,
+                view: RomView::Fixed,
+                cpu_start: Some(0xD800),
+            },
+        ];
+
+        assert!(
+            red_label_crom0_rom_map_descriptors_from_loads(&bad_number)
+                .expect_err("bad ROM number should fail")
+                .contains("out of range")
+        );
+        assert!(
+            red_label_crom0_rom_map_descriptors_from_loads(&oversize)
+                .expect_err("oversize ROM should fail")
+                .contains("expected at most two")
+        );
+        assert!(
+            red_label_crom0_rom_map_descriptors_from_loads(&unaligned_address)
+                .expect_err("unaligned address should fail")
+                .contains("not a 2K ROM boundary")
+        );
+        assert!(
+            red_label_crom0_rom_map_descriptors_from_loads(&duplicate_slot)
+                .expect_err("duplicate ROM slot should fail")
+                .contains("already occupied")
         );
     }
 
