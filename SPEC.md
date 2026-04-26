@@ -241,6 +241,10 @@ This section records drift found during the repository review on
 - `assets/red-label/audit-adjustments.tsv`, `src/red_label_memory.rs`, and the
   board harness now agree on the `romc8.src` `AUDITG` / `MSGAUD` audit and
   operator-adjustment messages, CMOS offsets, and packed display widths.
+- `src/board.rs` now models the source-visible `ALTER` / `HYSCRE` operator
+  adjustment mutation rules: audit rows stay read-only, coin multiplier rows
+  respect `COINSL`, `DIPSW` changes set `DIPFLG`, and byte/replay-level values
+  use the `BMPNUP` / `BMPNDN` packed-BCD update paths.
 - `src/board.rs` now models the visible CMOS cell effects of `CLRAUD` and
   `CMINIT`: `CLRAUD` performs 14 packed zero writes from `CMOS`, while `CMINIT`
   clears the visible CMOS image and applies the embedded `DEFALT` bytes.
@@ -541,12 +545,13 @@ This section records drift found during the repository review on
   visible `RHSTD` / `RHSTDS` all-time and today's high-score reset copy, can
   report the `romc0.src` target reached by each `PWRUP` action decision, can
   read `AUDITG` / `MSGAUD` audit and operator-adjustment rows from their
-  source CMOS offsets, and can snapshot source-labeled CMOS and RAM fields. A
-  main-board address classifier exists for RAM, banked I/O, selected banked
-  program ROM, bank-select writes, and fixed ROM reads. Main RAM bytes can now
-  be read and written through a deterministic harness surface. Raw write-only
-  palette register bytes, CMOS 4-bit write/read bytes, video-control cocktail
-  state, and watchdog reset
+  source CMOS offsets, can apply the source-visible `ALTER` / `HYSCRE`
+  mutation rules for those rows, and can snapshot source-labeled CMOS and RAM
+  fields. A main-board address classifier exists for RAM, banked I/O, selected
+  banked program ROM, bank-select writes, and fixed ROM reads. Main RAM bytes
+  can now be read and written through a deterministic harness surface. Raw
+  write-only palette register bytes, CMOS 4-bit write/read bytes,
+  video-control cocktail state, and watchdog reset
   recognition are stored. Video-counter reads expose the MAME `vpos & 0xfc`
   behavior with the `vpos >= 0x100` clamp. The main-board PIA data/control
   register path is modeled for IN0/IN1/IN2 reads and sound-command output

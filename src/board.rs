@@ -51,6 +51,8 @@ pub const RED_LABEL_CRHSTD_CELL_OFFSET: u8 = 0x1D;
 pub const RED_LABEL_DIPFLG_CELL_OFFSET: u8 = 0x00;
 pub const RED_LABEL_DIPSW_CELL_OFFSET: u8 = 0x7D;
 pub const RED_LABEL_CMOSCK_CELL_OFFSET: u8 = 0x7F;
+pub const RED_LABEL_REPLAY_CELL_OFFSET: u8 = 0x81;
+pub const RED_LABEL_COINSL_CELL_OFFSET: u8 = 0x87;
 pub const RED_LABEL_HIGH_SCORE_DEFAULT_BYTES: usize = 48;
 pub const RED_LABEL_HIGH_SCORE_CELLS: usize = RED_LABEL_HIGH_SCORE_DEFAULT_BYTES * 2;
 pub const RED_LABEL_THSTAB_START: u16 = 0xB260;
@@ -142,6 +144,19 @@ pub enum RedLabelPowerUpDispatchTarget {
 pub enum RedLabelAuditAdjustmentValue {
     PackedByte(u8),
     PackedWord(u16),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAuditAdjustmentDirection {
+    Up,
+    Down,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAuditAdjustmentChange {
+    ReadOnly,
+    CoinageLocked,
+    Changed(RedLabelAuditAdjustmentValue),
 }
 
 impl MainCpuRomRead {
@@ -332,6 +347,54 @@ impl<'a> DefenderMainBoard<'a> {
                 .map(RedLabelAuditAdjustmentValue::PackedWord),
             _ => None,
         }
+    }
+
+    /// Source-shaped visible `ALTER` / `HYSCRE` CMOS mutation for one row.
+    ///
+    /// This models the alterability guards, `DIPSW` flag side effect, and
+    /// `BMPNUP` / `BMPNDN` packed-BCD changes. It intentionally leaves the
+    /// `AUDITG` screen loop, switch debounce, and display refresh outside this
+    /// deterministic board helper.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L216-L307>.
+    pub fn red_label_alter_audit_adjustment(
+        &mut self,
+        adjustment: &RedLabelAuditAdjustment,
+        direction: RedLabelAuditAdjustmentDirection,
+    ) -> Option<RedLabelAuditAdjustmentChange> {
+        if adjustment.number <= 7 {
+            return Some(RedLabelAuditAdjustmentChange::ReadOnly);
+        }
+
+        if (11..=16).contains(&adjustment.number)
+            && self.cmos_sram_read_byte(RED_LABEL_COINSL_CELL_OFFSET)? != 0
+        {
+            return Some(RedLabelAuditAdjustmentChange::CoinageLocked);
+        }
+
+        let offset = usize::from(u8::try_from(adjustment.offset).ok()?);
+        if offset == usize::from(RED_LABEL_DIPSW_CELL_OFFSET) {
+            self.cmos_ram[usize::from(RED_LABEL_DIPFLG_CELL_OFFSET)] = cmos_4bit_write_value(1);
+        }
+
+        if offset == usize::from(RED_LABEL_REPLAY_CELL_OFFSET) {
+            let value = cmos_sram_read_word(&self.cmos_ram, offset)?;
+            let adjusted = red_label_adjust_replay_bcd(value, direction);
+            cmos_sram_write_word(&mut self.cmos_ram, offset, adjusted)?;
+            return Some(RedLabelAuditAdjustmentChange::Changed(
+                RedLabelAuditAdjustmentValue::PackedWord(adjusted),
+            ));
+        }
+
+        if adjustment.cells != 2 {
+            return None;
+        }
+
+        let value = cmos_sram_read_byte(&self.cmos_ram, offset)?;
+        let adjusted = red_label_adjust_bcd_byte(value, direction);
+        cmos_sram_write_byte(&mut self.cmos_ram, offset, adjusted)?;
+        Some(RedLabelAuditAdjustmentChange::Changed(
+            RedLabelAuditAdjustmentValue::PackedByte(adjusted),
+        ))
     }
 
     pub fn cmos_sram_read_byte(&self, nibble_offset: u8) -> Option<u8> {
@@ -702,6 +765,54 @@ pub fn cmos_sram_clear_packed_bytes(
     Some(())
 }
 
+fn red_label_adjust_bcd_byte(value: u8, direction: RedLabelAuditAdjustmentDirection) -> u8 {
+    let addend = match direction {
+        RedLabelAuditAdjustmentDirection::Up => 0x01,
+        RedLabelAuditAdjustmentDirection::Down => 0x99,
+    };
+    red_label_bcd_add_byte(value, addend, false).0
+}
+
+fn red_label_adjust_replay_bcd(value: u16, direction: RedLabelAuditAdjustmentDirection) -> u16 {
+    let ms_byte = (value >> 8) as u8;
+    let ls_byte = value as u8;
+    let (adjusted_ms_byte, adjusted_ls_byte) = match direction {
+        RedLabelAuditAdjustmentDirection::Up => {
+            let (adjusted_ls_byte, carry) = red_label_bcd_add_byte(ls_byte, 0x10, false);
+            let adjusted_ms_byte = if carry {
+                red_label_bcd_add_byte(ms_byte, 0x01, false).0
+            } else {
+                ms_byte
+            };
+            (adjusted_ms_byte, adjusted_ls_byte)
+        }
+        RedLabelAuditAdjustmentDirection::Down => {
+            let (adjusted_ls_byte, carry) = red_label_bcd_add_byte(ls_byte, 0x90, false);
+            let adjusted_ms_byte = red_label_bcd_add_byte(ms_byte, 0x99, carry).0;
+            (adjusted_ms_byte, adjusted_ls_byte)
+        }
+    };
+
+    u16::from_be_bytes([adjusted_ms_byte, adjusted_ls_byte])
+}
+
+fn red_label_bcd_add_byte(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
+    let decimal_sum =
+        red_label_bcd_byte_to_u16(lhs) + red_label_bcd_byte_to_u16(rhs) + u16::from(carry);
+    (
+        red_label_decimal_to_bcd_byte((decimal_sum % 100) as u8),
+        decimal_sum >= 100,
+    )
+}
+
+fn red_label_bcd_byte_to_u16(value: u8) -> u16 {
+    u16::from(value >> 4) * 10 + u16::from(value & 0x0F)
+}
+
+fn red_label_decimal_to_bcd_byte(value: u8) -> u8 {
+    ((value / 10) << 4) | (value % 10)
+}
+
 fn red_label_high_score_default_cells(defaults: &[RedLabelCmosDefault]) -> Option<Vec<u8>> {
     let start = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
     let end = start.checked_add(RED_LABEL_HIGH_SCORE_CELLS)?;
@@ -867,7 +978,8 @@ mod tests {
             RED_LABEL_CLRAUD_PACKED_BYTE_WRITES, RED_LABEL_CMOSCK_CELL_OFFSET,
             RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_DIPFLG_CELL_OFFSET,
             RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
-            RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentValue, RedLabelPowerUpAction,
+            RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
+            RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue, RedLabelPowerUpAction,
             RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
             cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
             cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
@@ -1939,6 +2051,121 @@ mod tests {
         assert_eq!(
             board.red_label_audit_adjustment_value(special_function),
             Some(RedLabelAuditAdjustmentValue::PackedByte(0x00))
+        );
+    }
+
+    #[test]
+    fn main_board_alters_auditg_adjustments_like_source_buttons() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+
+        let left_coins = adjustments
+            .iter()
+            .find(|adjustment| adjustment.number == 1)
+            .expect("left coin audit row");
+        board
+            .cmos_sram_write_word(left_coins.offset as u8, 0x1234)
+            .expect("dirty audit counter");
+        assert_eq!(
+            board
+                .red_label_alter_audit_adjustment(left_coins, RedLabelAuditAdjustmentDirection::Up),
+            Some(RedLabelAuditAdjustmentChange::ReadOnly)
+        );
+        assert_eq!(
+            board.red_label_audit_adjustment_value(left_coins),
+            Some(RedLabelAuditAdjustmentValue::PackedWord(0x1234))
+        );
+
+        let ships = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "NSHIP")
+            .expect("ship-count adjustment");
+        assert_eq!(
+            board.red_label_alter_audit_adjustment(ships, RedLabelAuditAdjustmentDirection::Up),
+            Some(RedLabelAuditAdjustmentChange::Changed(
+                RedLabelAuditAdjustmentValue::PackedByte(0x04)
+            ))
+        );
+        assert_eq!(
+            board.red_label_alter_audit_adjustment(ships, RedLabelAuditAdjustmentDirection::Down),
+            Some(RedLabelAuditAdjustmentChange::Changed(
+                RedLabelAuditAdjustmentValue::PackedByte(0x03)
+            ))
+        );
+
+        let replay = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "REPLAY")
+            .expect("replay adjustment");
+        board
+            .cmos_sram_write_word(replay.offset as u8, 0x0190)
+            .expect("set replay level near low-byte carry");
+        assert_eq!(
+            board.red_label_alter_audit_adjustment(replay, RedLabelAuditAdjustmentDirection::Up),
+            Some(RedLabelAuditAdjustmentChange::Changed(
+                RedLabelAuditAdjustmentValue::PackedWord(0x0200)
+            ))
+        );
+        assert_eq!(
+            board.red_label_alter_audit_adjustment(replay, RedLabelAuditAdjustmentDirection::Down),
+            Some(RedLabelAuditAdjustmentChange::Changed(
+                RedLabelAuditAdjustmentValue::PackedWord(0x0190)
+            ))
+        );
+
+        let left_multiplier = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "SLOT1M")
+            .expect("left coin multiplier adjustment");
+        assert_eq!(
+            board.red_label_alter_audit_adjustment(
+                left_multiplier,
+                RedLabelAuditAdjustmentDirection::Up
+            ),
+            Some(RedLabelAuditAdjustmentChange::CoinageLocked)
+        );
+        assert_eq!(
+            board.red_label_audit_adjustment_value(left_multiplier),
+            Some(RedLabelAuditAdjustmentValue::PackedByte(0x01))
+        );
+
+        let coin_select = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "COINSL")
+            .expect("coin select adjustment");
+        board
+            .cmos_sram_write_byte(coin_select.offset as u8, 0x00)
+            .expect("unlock coin multiplier rows");
+        assert_eq!(
+            board.red_label_alter_audit_adjustment(
+                left_multiplier,
+                RedLabelAuditAdjustmentDirection::Up
+            ),
+            Some(RedLabelAuditAdjustmentChange::Changed(
+                RedLabelAuditAdjustmentValue::PackedByte(0x02)
+            ))
+        );
+
+        let special_function = adjustments
+            .iter()
+            .find(|adjustment| adjustment.symbol == "DIPSW")
+            .expect("special-function adjustment");
+        assert_eq!(
+            board.red_label_alter_audit_adjustment(
+                special_function,
+                RedLabelAuditAdjustmentDirection::Up
+            ),
+            Some(RedLabelAuditAdjustmentChange::Changed(
+                RedLabelAuditAdjustmentValue::PackedByte(0x01)
+            ))
+        );
+        assert_eq!(
+            board.cmos_ram()[usize::from(RED_LABEL_DIPFLG_CELL_OFFSET)],
+            0xF1
         );
     }
 

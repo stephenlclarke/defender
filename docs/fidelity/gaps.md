@@ -99,12 +99,13 @@ This file records behavior that must not be guessed in arcade-core code.
   CMOS-visible `PWRUP` branch around `CMOSCK`/`DIPFLG`/`DIPSW`, can run the
   visible `RHSTD` / `RHSTDS` all-time and today's high-score reset copy, can
   read `AUDITG` / `MSGAUD` audit and operator-adjustment rows from their
-  source CMOS offsets, and can snapshot source-labeled CMOS and main-RAM
-  fields. A main-board address classifier exists for RAM, banked I/O, selected
-  banked program ROM,
-  bank-select writes, and fixed ROM reads. Main RAM bytes can now be read and
-  written through a deterministic harness surface, and raw write-only palette
-  register bytes are stored. CMOS 4-bit writes store `data | 0xf0`,
+  source CMOS offsets, can apply the source-visible `ALTER` / `HYSCRE`
+  mutation rules for those rows, and can snapshot source-labeled CMOS and
+  main-RAM fields. A main-board address classifier exists for RAM, banked I/O,
+  selected banked program ROM, bank-select writes, and fixed ROM reads. Main
+  RAM bytes can now be read and written through a deterministic harness
+  surface, and raw write-only palette register bytes are stored. CMOS 4-bit
+  writes store `data | 0xf0`,
   video-control writes update
   the cocktail bit, and watchdog writes only count reset recognition for byte
   `0x39`. Video-counter reads expose the MAME `vpos & 0xfc` behavior with the
@@ -129,12 +130,12 @@ This file records behavior that must not be guessed in arcade-core code.
   data register, PIA IC4 port A writes are captured as the DAC callback
   boundary, and command CB1 drives the sound PIA IRQ state. The board layer can
   report the `romc0.src` target reached by each `PWRUP` action decision and
-  read the source `AUDITG` / `MSGAUD` table rows, but CPU IRQ scheduling, LED
-  segment side effects, exact Williams power-on RAM contents, the translated
-  `AUDITG` operator loop or `CROM0` diagnostics after that decision, CMOS
-  persistence, screen scanline scheduling, watchdog timing/reset side effects,
-  palette/rendering timing side effects, decoder PROM behavior, and DAC sample
-  generation are not modeled.
+  read/mutate the source `AUDITG` / `MSGAUD` table rows, but CPU IRQ
+  scheduling, LED segment side effects, exact Williams power-on RAM contents,
+  the translated `AUDITG` operator loop or `CROM0` diagnostics after that
+  decision, CMOS persistence, screen scanline scheduling, watchdog timing/reset
+  side effects, palette/rendering timing side effects, decoder PROM behavior,
+  and DAC sample generation are not modeled.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core
   scaffold. It initializes `PINIT`/`OINIT`-style process, super-process, and
   object free lists, sets `CRPROC` to the active-process head, clears active
@@ -343,10 +344,11 @@ This file records behavior that must not be guessed in arcade-core code.
   frame/cycle integration, and golden-trace equivalence are not translated.
 - CMOS layout, ROM default bytes, 4-bit cell writes, `CLRAUD`/`CMINIT` visible
   cell effects, the CMOS-visible `PWRUP` branch and source dispatch target,
-  `RHSTD`/`RHSTDS` reset copies, `AUDITG` / `MSGAUD` message-offset rows, and
-  red-label packed byte/word helper behavior are modeled, but CMOS persistence,
-  operator behavior, high-score comparison/initials routines, and the
-  post-`PWRUP` `AUDITG` / `CROM0` routines are not translated.
+  `RHSTD`/`RHSTDS` reset copies, `AUDITG` / `MSGAUD` message-offset rows and
+  source-visible adjustment mutations, and red-label packed byte/word helper
+  behavior are modeled, but CMOS persistence, full operator behavior,
+  high-score comparison/initials routines, and the post-`PWRUP` `AUDITG` /
+  `CROM0` routines are not translated.
 
 ## Player
 
