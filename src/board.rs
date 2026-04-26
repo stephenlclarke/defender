@@ -16,11 +16,11 @@
 //! VA11/COUNT240 inputs to PIA1 CB1/CA1. It can also expose native visible
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, can route the CMOS-visible
-//! `romc0.src` power-up branch, and can render `CROM0` CMOS RAM-test visible
-//! outcomes. CMOS persistence, `AUDITG` live diagnostic text transfer/full-loop
-//! integration, physical advance/lamp timing beyond the modeled ROM-stage
-//! screen/LED output, later color/sound test execution, and full video timing
-//! remain explicit fidelity gaps.
+//! `romc0.src` power-up branch, and can run the `CROM0` CMOS RAM-test
+//! write/verify loop and visible outcomes. CMOS persistence, `AUDITG` live
+//! diagnostic text transfer/full-loop integration, physical advance/lamp timing
+//! beyond the modeled ROM-stage screen/LED output, later color/sound test
+//! execution, and full video timing remain explicit fidelity gaps.
 
 use crate::{
     input::{
@@ -122,6 +122,11 @@ pub const RED_LABEL_CROM0_CMOS_RAM_OK_TEXT_ADDRESS: u16 = 0x3880;
 pub const RED_LABEL_CROM0_RAM_TEST_COLOR: u8 = 0xA5;
 pub const RED_LABEL_CROM0_RAM_TEST_LED: u8 = 0x04;
 pub const RED_LABEL_CROM0_CMOS_RAM_TEST_LED: u8 = 0x02;
+pub const RED_LABEL_CROM0_CMOS_NO_GOOD_BLOCK_DIRECT_PAGE: u8 = 0xA2;
+pub const RED_LABEL_CROM0_CMOS_BACKUP_PAGE_OFFSET: u8 = 0x03;
+pub const RED_LABEL_CROM0_CMOS_PATTERN_START: u8 = 0x10;
+pub const RED_LABEL_CROM0_CMOS_PATTERN_PASSES: usize = 0x10;
+pub const RED_LABEL_CROM0_CMOS_PATTERN_COMPARISONS: usize = CMOS_RAM_SIZE - 1;
 pub const RED_LABEL_CROM0_RAM_TEST_DELAY_MS: u16 = 5000;
 pub const RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS: u16 = 10;
 pub const RED_LABEL_CROM0_RAM_TEST_START_SEED: u16 = 0x0000;
@@ -442,6 +447,71 @@ pub struct RedLabelCrom0CmosRamTestTransfer {
     pub instructions: RedLabelDiagnosticInstructionBitmapTextWrite,
     pub flash_led: Option<RedLabelDiagnosticLedFlash>,
     pub advance_gates: Vec<RedLabelCrom0AdvanceGate>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0CmosRamTestLoopStatus {
+    MultipleRamFailure,
+    CmosRamFailure,
+    OperatorAbort,
+    CmosRamOk,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0CmosRamTestLoopTarget {
+    MultipleRamFailureScreen,
+    CmosRamFailureScreen,
+    CmosRamOkScreen,
+    ColorRamTest,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0CmosRamFailure {
+    pub pattern_counter: u8,
+    pub previous_offset: u8,
+    pub failing_offset: u8,
+    pub previous_value: u8,
+    pub actual_value: u8,
+    pub error_delta: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0CmosRamTestPatternFill {
+    pub pattern_counter: u8,
+    pub start_offset: u8,
+    pub end_offset: u16,
+    pub cells_written: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0CmosRamTestPatternVerification {
+    pub pattern_counter: u8,
+    pub start_offset: u8,
+    pub end_offset: u16,
+    pub comparisons: usize,
+    pub failure: Option<RedLabelCrom0CmosRamFailure>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0CmosRamTestFault {
+    pub pattern_counter: u8,
+    pub offset: u8,
+    pub value: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0CmosRamTestLoopStep {
+    pub direct_page: u8,
+    pub backup_address: Option<u16>,
+    pub status: RedLabelCrom0CmosRamTestLoopStatus,
+    pub target: RedLabelCrom0CmosRamTestLoopTarget,
+    pub patterns_written: usize,
+    pub successful_patterns: usize,
+    pub watchdog_reset_count: usize,
+    pub final_pattern_counter: u8,
+    pub abort_pattern_counter: Option<u8>,
+    pub failure: Option<RedLabelCrom0CmosRamFailure>,
+    pub cmos_restored: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1385,6 +1455,188 @@ impl<'a> DefenderMainBoard<'a> {
             flash_led,
             advance_gates: self.crom0_advance_gates.clone(),
         })
+    }
+
+    /// Run the source-shaped CROM0 CMOS RAM write/verify loop.
+    ///
+    /// The ROM backs up all 256 CMOS cells into a good RAM block, writes 16
+    /// descending nibble-pattern passes, verifies adjacent cell deltas after
+    /// each pass, restores the backup, and then routes to either the visible
+    /// CMOS result screen or directly to color RAM on an operator abort.
+    pub fn red_label_run_crom0_cmos_ram_test_loop(
+        &mut self,
+        direct_page: u8,
+        operator_abort_after_pattern: Option<u8>,
+    ) -> Result<RedLabelCrom0CmosRamTestLoopStep, String> {
+        self.red_label_run_crom0_cmos_ram_test_loop_with_fault(
+            direct_page,
+            operator_abort_after_pattern,
+            None,
+        )
+    }
+
+    /// Run the CMOS RAM-test loop with an injected bad CMOS cell.
+    ///
+    /// This keeps the normal helper free of artificial mutation while allowing
+    /// deterministic tests to exercise the source `CMOS15` failure route.
+    pub fn red_label_run_crom0_cmos_ram_test_loop_with_fault(
+        &mut self,
+        direct_page: u8,
+        operator_abort_after_pattern: Option<u8>,
+        fault: Option<RedLabelCrom0CmosRamTestFault>,
+    ) -> Result<RedLabelCrom0CmosRamTestLoopStep, String> {
+        red_label_validate_cmos_pattern_counter(operator_abort_after_pattern)?;
+        if let Some(fault) = fault {
+            red_label_validate_cmos_pattern_counter(Some(fault.pattern_counter))?;
+        }
+
+        if direct_page == RED_LABEL_CROM0_CMOS_NO_GOOD_BLOCK_DIRECT_PAGE {
+            return Ok(RedLabelCrom0CmosRamTestLoopStep {
+                direct_page,
+                backup_address: None,
+                status: RedLabelCrom0CmosRamTestLoopStatus::MultipleRamFailure,
+                target: RedLabelCrom0CmosRamTestLoopTarget::MultipleRamFailureScreen,
+                patterns_written: 0,
+                successful_patterns: 0,
+                watchdog_reset_count: 0,
+                final_pattern_counter: RED_LABEL_CROM0_CMOS_PATTERN_START,
+                abort_pattern_counter: None,
+                failure: None,
+                cmos_restored: false,
+            });
+        }
+
+        let backup_address = red_label_crom0_cmos_backup_address(direct_page)?;
+        for offset in 0..CMOS_RAM_SIZE {
+            self.ram[usize::from(backup_address) + offset] = self.cmos_ram[offset];
+        }
+
+        let mut patterns_written = 0;
+        let mut successful_patterns = 0;
+        let mut watchdog_reset_count = 0;
+
+        for pattern_counter in (1..=RED_LABEL_CROM0_CMOS_PATTERN_START).rev() {
+            self.red_label_fill_crom0_cmos_ram_test_pattern(pattern_counter);
+            patterns_written += 1;
+
+            if let Some(fault) = fault
+                && fault.pattern_counter == pattern_counter
+            {
+                self.cmos_ram[usize::from(fault.offset)] = cmos_4bit_write_value(fault.value);
+            }
+
+            let verification = self.red_label_verify_crom0_cmos_ram_test_pattern(pattern_counter);
+            if let Some(failure) = verification.failure {
+                self.red_label_restore_crom0_cmos_ram_test_backup(backup_address);
+                return Ok(RedLabelCrom0CmosRamTestLoopStep {
+                    direct_page,
+                    backup_address: Some(backup_address),
+                    status: RedLabelCrom0CmosRamTestLoopStatus::CmosRamFailure,
+                    target: RedLabelCrom0CmosRamTestLoopTarget::CmosRamFailureScreen,
+                    patterns_written,
+                    successful_patterns,
+                    watchdog_reset_count,
+                    final_pattern_counter: pattern_counter,
+                    abort_pattern_counter: None,
+                    failure: Some(failure),
+                    cmos_restored: true,
+                });
+            }
+
+            successful_patterns += 1;
+            watchdog_reset_count += 1;
+
+            if operator_abort_after_pattern == Some(pattern_counter) {
+                self.red_label_restore_crom0_cmos_ram_test_backup(backup_address);
+                return Ok(RedLabelCrom0CmosRamTestLoopStep {
+                    direct_page,
+                    backup_address: Some(backup_address),
+                    status: RedLabelCrom0CmosRamTestLoopStatus::OperatorAbort,
+                    target: RedLabelCrom0CmosRamTestLoopTarget::ColorRamTest,
+                    patterns_written,
+                    successful_patterns,
+                    watchdog_reset_count,
+                    final_pattern_counter: pattern_counter,
+                    abort_pattern_counter: Some(pattern_counter),
+                    failure: None,
+                    cmos_restored: true,
+                });
+            }
+        }
+
+        self.red_label_restore_crom0_cmos_ram_test_backup(backup_address);
+        Ok(RedLabelCrom0CmosRamTestLoopStep {
+            direct_page,
+            backup_address: Some(backup_address),
+            status: RedLabelCrom0CmosRamTestLoopStatus::CmosRamOk,
+            target: RedLabelCrom0CmosRamTestLoopTarget::CmosRamOkScreen,
+            patterns_written,
+            successful_patterns,
+            watchdog_reset_count,
+            final_pattern_counter: 0,
+            abort_pattern_counter: None,
+            failure: None,
+            cmos_restored: true,
+        })
+    }
+
+    pub fn red_label_fill_crom0_cmos_ram_test_pattern(
+        &mut self,
+        pattern_counter: u8,
+    ) -> RedLabelCrom0CmosRamTestPatternFill {
+        for offset in 0..CMOS_RAM_SIZE {
+            self.cmos_ram[offset] =
+                cmos_4bit_write_value(pattern_counter.wrapping_add(offset as u8));
+        }
+
+        RedLabelCrom0CmosRamTestPatternFill {
+            pattern_counter,
+            start_offset: 0,
+            end_offset: CMOS_RAM_SIZE as u16,
+            cells_written: CMOS_RAM_SIZE,
+        }
+    }
+
+    pub fn red_label_verify_crom0_cmos_ram_test_pattern(
+        &self,
+        pattern_counter: u8,
+    ) -> RedLabelCrom0CmosRamTestPatternVerification {
+        for offset in 1..CMOS_RAM_SIZE {
+            let previous_value = self.cmos_ram[offset - 1];
+            let actual_value = self.cmos_ram[offset];
+            let error_delta = actual_value.wrapping_sub(previous_value).wrapping_sub(1) & 0x0F;
+            if error_delta != 0 {
+                return RedLabelCrom0CmosRamTestPatternVerification {
+                    pattern_counter,
+                    start_offset: 0,
+                    end_offset: CMOS_RAM_SIZE as u16,
+                    comparisons: offset,
+                    failure: Some(RedLabelCrom0CmosRamFailure {
+                        pattern_counter,
+                        previous_offset: (offset - 1) as u8,
+                        failing_offset: offset as u8,
+                        previous_value,
+                        actual_value,
+                        error_delta,
+                    }),
+                };
+            }
+        }
+
+        RedLabelCrom0CmosRamTestPatternVerification {
+            pattern_counter,
+            start_offset: 0,
+            end_offset: CMOS_RAM_SIZE as u16,
+            comparisons: RED_LABEL_CROM0_CMOS_PATTERN_COMPARISONS,
+            failure: None,
+        }
+    }
+
+    fn red_label_restore_crom0_cmos_ram_test_backup(&mut self, backup_address: u16) {
+        for offset in 0..CMOS_RAM_SIZE {
+            let saved = self.ram[usize::from(backup_address) + offset];
+            self.cmos_ram[offset] = cmos_4bit_write_value(saved);
+        }
     }
 
     fn red_label_clear_screen(&mut self) {
@@ -2486,6 +2738,33 @@ fn red_label_ram_block_led_source(block_number: u8) -> Result<u8, String> {
     Ok(0x10 >> block_number)
 }
 
+fn red_label_validate_cmos_pattern_counter(pattern_counter: Option<u8>) -> Result<(), String> {
+    if let Some(pattern_counter) = pattern_counter
+        && !(1..=RED_LABEL_CROM0_CMOS_PATTERN_START).contains(&pattern_counter)
+    {
+        return Err(format!(
+            "red-label CROM0 CMOS pattern counter 0x{pattern_counter:02X} is outside 1..=0x10"
+        ));
+    }
+    Ok(())
+}
+
+fn red_label_crom0_cmos_backup_address(direct_page: u8) -> Result<u16, String> {
+    let backup_page = direct_page.wrapping_add(RED_LABEL_CROM0_CMOS_BACKUP_PAGE_OFFSET);
+    let backup_address = u16::from(backup_page) << 8;
+    let backup_end = usize::from(backup_address)
+        .checked_add(CMOS_RAM_SIZE)
+        .ok_or_else(|| {
+            format!("red-label CROM0 CMOS backup address 0x{backup_address:04X} overflows")
+        })?;
+    if backup_end > MAIN_CPU_RAM_SIZE {
+        return Err(format!(
+            "red-label CROM0 CMOS backup range 0x{backup_address:04X}..0x{backup_end:04X} is outside main RAM"
+        ));
+    }
+    Ok(backup_address)
+}
+
 fn red_label_crom0_ram_test_loop_step(
     pass: RedLabelCrom0RamTestPass,
     operator_abort: bool,
@@ -2718,14 +2997,17 @@ mod tests {
             RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS, RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT, RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT,
             RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS, RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT,
+            RED_LABEL_CROM0_CMOS_BACKUP_PAGE_OFFSET,
             RED_LABEL_CROM0_CMOS_MULTIPLE_RAM_FAILURE_TEXT_ADDRESS,
-            RED_LABEL_CROM0_CMOS_RAM_FAILURE_TEXT, RED_LABEL_CROM0_CMOS_RAM_FAILURE_TEXT_ADDRESS,
-            RED_LABEL_CROM0_CMOS_RAM_OK_TEXT, RED_LABEL_CROM0_CMOS_RAM_OK_TEXT_ADDRESS,
-            RED_LABEL_CROM0_CMOS_RAM_TEST_LED, RED_LABEL_CROM0_MULTIPLE_RAM_FAILURE_TEXT,
-            RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT, RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS,
-            RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES, RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
-            RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT, RED_LABEL_CROM0_RAM_FAILURE_TEXT,
-            RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS,
+            RED_LABEL_CROM0_CMOS_NO_GOOD_BLOCK_DIRECT_PAGE,
+            RED_LABEL_CROM0_CMOS_PATTERN_COMPARISONS, RED_LABEL_CROM0_CMOS_PATTERN_PASSES,
+            RED_LABEL_CROM0_CMOS_PATTERN_START, RED_LABEL_CROM0_CMOS_RAM_FAILURE_TEXT,
+            RED_LABEL_CROM0_CMOS_RAM_FAILURE_TEXT_ADDRESS, RED_LABEL_CROM0_CMOS_RAM_OK_TEXT,
+            RED_LABEL_CROM0_CMOS_RAM_OK_TEXT_ADDRESS, RED_LABEL_CROM0_CMOS_RAM_TEST_LED,
+            RED_LABEL_CROM0_MULTIPLE_RAM_FAILURE_TEXT, RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT,
+            RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES,
+            RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT,
+            RED_LABEL_CROM0_RAM_FAILURE_TEXT, RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS,
             RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_COLOR,
             RED_LABEL_CROM0_RAM_TEST_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_END_ADDRESS,
             RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER, RED_LABEL_CROM0_RAM_TEST_LED,
@@ -2740,23 +3022,26 @@ mod tests {
             RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
             RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
             RedLabelCrom0BadRamBitmapTextWrite, RedLabelCrom0BadRomBitmapTextWrite,
-            RedLabelCrom0BadRomScreenWrite, RedLabelCrom0CmosRamTestStatus,
-            RedLabelCrom0CmosRamTestTarget, RedLabelCrom0CmosRamTestTransfer,
-            RedLabelCrom0RamFailure, RedLabelCrom0RamFailureTransfer,
-            RedLabelCrom0RamTestAbortStatus, RedLabelCrom0RamTestAbortTransfer,
-            RedLabelCrom0RamTestLoopStatus, RedLabelCrom0RamTestLoopTarget,
-            RedLabelCrom0RamTestPass, RedLabelCrom0RamTestPatternFill,
-            RedLabelCrom0RamTestPatternVerification, RedLabelCrom0RamTestStartTransfer,
-            RedLabelCrom0RamTestTarget, RedLabelDiagnosticBitmapTextWrite,
-            RedLabelDiagnosticInstructionBitmapTextWrite, RedLabelDiagnosticInstructionWrite,
-            RedLabelDiagnosticLedFlash, RedLabelDiagnosticLedOutput,
-            RedLabelDiagnosticPaletteWrite, RedLabelDiagnosticTextWrite, RedLabelPowerUpAction,
-            RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
-            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
-            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
-            main_cpu_read_target, main_cpu_write_target, red_label_crom0_diagnostic_screen,
-            red_label_crom0_ram_test_next_word, red_label_diagnostic_led_output,
-            video_control_cocktail, video_counter_read_value,
+            RedLabelCrom0BadRomScreenWrite, RedLabelCrom0CmosRamFailure,
+            RedLabelCrom0CmosRamTestFault, RedLabelCrom0CmosRamTestLoopStatus,
+            RedLabelCrom0CmosRamTestLoopStep, RedLabelCrom0CmosRamTestLoopTarget,
+            RedLabelCrom0CmosRamTestPatternFill, RedLabelCrom0CmosRamTestPatternVerification,
+            RedLabelCrom0CmosRamTestStatus, RedLabelCrom0CmosRamTestTarget,
+            RedLabelCrom0CmosRamTestTransfer, RedLabelCrom0RamFailure,
+            RedLabelCrom0RamFailureTransfer, RedLabelCrom0RamTestAbortStatus,
+            RedLabelCrom0RamTestAbortTransfer, RedLabelCrom0RamTestLoopStatus,
+            RedLabelCrom0RamTestLoopTarget, RedLabelCrom0RamTestPass,
+            RedLabelCrom0RamTestPatternFill, RedLabelCrom0RamTestPatternVerification,
+            RedLabelCrom0RamTestStartTransfer, RedLabelCrom0RamTestTarget,
+            RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
+            RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
+            RedLabelDiagnosticLedOutput, RedLabelDiagnosticPaletteWrite,
+            RedLabelDiagnosticTextWrite, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
+            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
+            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
+            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            red_label_crom0_diagnostic_screen, red_label_crom0_ram_test_next_word,
+            red_label_diagnostic_led_output, video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -4343,6 +4628,197 @@ mod tests {
             &[RedLabelCrom0AdvanceGate::NextTestAutoCounter]
         );
         assert_message_glyph_at(&board, RED_LABEL_CROM0_CMOS_RAM_OK_TEXT_ADDRESS, 'C');
+    }
+
+    #[test]
+    fn main_board_runs_crom0_cmos_ram_test_loop_success_and_abort() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+        let cmos_before = *board.cmos_ram();
+        let direct_page = 0xA0;
+        let backup_address = u16::from(direct_page + RED_LABEL_CROM0_CMOS_BACKUP_PAGE_OFFSET) << 8;
+
+        let ok = board
+            .red_label_run_crom0_cmos_ram_test_loop(direct_page, None)
+            .expect("CMOS loop OK");
+
+        assert_eq!(
+            ok,
+            RedLabelCrom0CmosRamTestLoopStep {
+                direct_page,
+                backup_address: Some(backup_address),
+                status: RedLabelCrom0CmosRamTestLoopStatus::CmosRamOk,
+                target: RedLabelCrom0CmosRamTestLoopTarget::CmosRamOkScreen,
+                patterns_written: RED_LABEL_CROM0_CMOS_PATTERN_PASSES,
+                successful_patterns: RED_LABEL_CROM0_CMOS_PATTERN_PASSES,
+                watchdog_reset_count: RED_LABEL_CROM0_CMOS_PATTERN_PASSES,
+                final_pattern_counter: 0,
+                abort_pattern_counter: None,
+                failure: None,
+                cmos_restored: true,
+            }
+        );
+        assert_eq!(board.cmos_ram(), &cmos_before);
+        assert_eq!(
+            &board.ram()[usize::from(backup_address)..usize::from(backup_address) + CMOS_RAM_SIZE],
+            &cmos_before
+        );
+
+        let abort = board
+            .red_label_run_crom0_cmos_ram_test_loop(direct_page, Some(0x0F))
+            .expect("CMOS loop operator abort");
+
+        assert_eq!(
+            abort,
+            RedLabelCrom0CmosRamTestLoopStep {
+                direct_page,
+                backup_address: Some(backup_address),
+                status: RedLabelCrom0CmosRamTestLoopStatus::OperatorAbort,
+                target: RedLabelCrom0CmosRamTestLoopTarget::ColorRamTest,
+                patterns_written: 2,
+                successful_patterns: 2,
+                watchdog_reset_count: 2,
+                final_pattern_counter: 0x0F,
+                abort_pattern_counter: Some(0x0F),
+                failure: None,
+                cmos_restored: true,
+            }
+        );
+        assert_eq!(board.cmos_ram(), &cmos_before);
+    }
+
+    #[test]
+    fn main_board_routes_crom0_cmos_ram_test_loop_failure_and_no_good_block() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+        let cmos_before = *board.cmos_ram();
+        let direct_page = 0xA0;
+        let backup_address = u16::from(direct_page + RED_LABEL_CROM0_CMOS_BACKUP_PAGE_OFFSET) << 8;
+        let failure = RedLabelCrom0CmosRamFailure {
+            pattern_counter: 0x0F,
+            previous_offset: 0x21,
+            failing_offset: 0x22,
+            previous_value: 0xF0,
+            actual_value: 0xF5,
+            error_delta: 0x04,
+        };
+
+        let failed = board
+            .red_label_run_crom0_cmos_ram_test_loop_with_fault(
+                direct_page,
+                None,
+                Some(RedLabelCrom0CmosRamTestFault {
+                    pattern_counter: 0x0F,
+                    offset: 0x22,
+                    value: 0x05,
+                }),
+            )
+            .expect("CMOS loop failure");
+
+        assert_eq!(
+            failed,
+            RedLabelCrom0CmosRamTestLoopStep {
+                direct_page,
+                backup_address: Some(backup_address),
+                status: RedLabelCrom0CmosRamTestLoopStatus::CmosRamFailure,
+                target: RedLabelCrom0CmosRamTestLoopTarget::CmosRamFailureScreen,
+                patterns_written: 2,
+                successful_patterns: 1,
+                watchdog_reset_count: 1,
+                final_pattern_counter: 0x0F,
+                abort_pattern_counter: None,
+                failure: Some(failure),
+                cmos_restored: true,
+            }
+        );
+        assert_eq!(board.cmos_ram(), &cmos_before);
+
+        let unavailable = board
+            .red_label_run_crom0_cmos_ram_test_loop(
+                RED_LABEL_CROM0_CMOS_NO_GOOD_BLOCK_DIRECT_PAGE,
+                None,
+            )
+            .expect("CMOS loop no good block");
+
+        assert_eq!(
+            unavailable,
+            RedLabelCrom0CmosRamTestLoopStep {
+                direct_page: RED_LABEL_CROM0_CMOS_NO_GOOD_BLOCK_DIRECT_PAGE,
+                backup_address: None,
+                status: RedLabelCrom0CmosRamTestLoopStatus::MultipleRamFailure,
+                target: RedLabelCrom0CmosRamTestLoopTarget::MultipleRamFailureScreen,
+                patterns_written: 0,
+                successful_patterns: 0,
+                watchdog_reset_count: 0,
+                final_pattern_counter: RED_LABEL_CROM0_CMOS_PATTERN_START,
+                abort_pattern_counter: None,
+                failure: None,
+                cmos_restored: false,
+            }
+        );
+        assert_eq!(board.cmos_ram(), &cmos_before);
+    }
+
+    #[test]
+    fn main_board_fills_and_verifies_crom0_cmos_ram_test_pattern() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let fill =
+            board.red_label_fill_crom0_cmos_ram_test_pattern(RED_LABEL_CROM0_CMOS_PATTERN_START);
+
+        assert_eq!(
+            fill,
+            RedLabelCrom0CmosRamTestPatternFill {
+                pattern_counter: RED_LABEL_CROM0_CMOS_PATTERN_START,
+                start_offset: 0,
+                end_offset: CMOS_RAM_SIZE as u16,
+                cells_written: CMOS_RAM_SIZE,
+            }
+        );
+        assert_eq!(
+            &board.cmos_ram()[0x00..=0x0F],
+            &[
+                0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD,
+                0xFE, 0xFF,
+            ]
+        );
+        assert_eq!(board.cmos_ram()[0xFF], 0xFF);
+
+        assert_eq!(
+            board.red_label_verify_crom0_cmos_ram_test_pattern(RED_LABEL_CROM0_CMOS_PATTERN_START),
+            RedLabelCrom0CmosRamTestPatternVerification {
+                pattern_counter: RED_LABEL_CROM0_CMOS_PATTERN_START,
+                start_offset: 0,
+                end_offset: CMOS_RAM_SIZE as u16,
+                comparisons: RED_LABEL_CROM0_CMOS_PATTERN_COMPARISONS,
+                failure: None,
+            }
+        );
+
+        board.write_byte(0xC422, 0x05).expect("corrupt CMOS cell");
+
+        assert_eq!(
+            board.red_label_verify_crom0_cmos_ram_test_pattern(RED_LABEL_CROM0_CMOS_PATTERN_START),
+            RedLabelCrom0CmosRamTestPatternVerification {
+                pattern_counter: RED_LABEL_CROM0_CMOS_PATTERN_START,
+                start_offset: 0,
+                end_offset: CMOS_RAM_SIZE as u16,
+                comparisons: 0x22,
+                failure: Some(RedLabelCrom0CmosRamFailure {
+                    pattern_counter: RED_LABEL_CROM0_CMOS_PATTERN_START,
+                    previous_offset: 0x21,
+                    failing_offset: 0x22,
+                    previous_value: 0xF1,
+                    actual_value: 0xF5,
+                    error_delta: 0x03,
+                }),
+            }
+        );
     }
 
     #[test]

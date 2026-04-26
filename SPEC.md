@@ -193,8 +193,8 @@ against fixtures:
   manual/auto ROM-stage outcome for success/failure display intent, `ADVSW` /
   `NEXTST` gate sequence, message-ROM bitmap text transfer including CMOS text
   controls, RAM-test start/failure/no-error visible setup, the RAM2 pattern
-  fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test visible
-  outcomes.
+  fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test write/verify
+  loop plus visible outcomes.
 - `src/app.rs` exposes non-interactive verification commands:
   `--verify-roms PATH` checks a local red-label ROM directory and maps it into
   the embedded MAME ROM regions, while `--fidelity-trace [FRAMES]` emits the
@@ -589,17 +589,16 @@ This section records drift found during the repository review on
   gate metadata. It can also render the source-visible RAM-test start,
   failure, and no-error screens reached from the CROM0 handoff, execute the
   source RAM2 pattern fill/verify pass, route pass-boundary
-  continue/failure/operator-abort loop targets, and render CMOS RAM-test
-  OK/failure/multiple-RAM-failure visible outcomes with source text-control
-  tokens. CPU interrupt scheduling, physical lamp timing, and sample generation
-  remain gaps.
+  continue/failure/operator-abort loop targets, and run the CMOS RAM-test
+  backup/write/verify/restore loop with OK/failure/operator-abort routing and
+  source text-control visible outcomes. CPU interrupt scheduling, physical lamp
+  timing, and sample generation remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated `AUDITG` live text transfer/screen
   erasure/post-`PWRUP` wiring, physical advance-switch timing, physical lamp
-  timing, sub-pass/page-boundary RAM-test operator polling, the CMOS RAM
-  write/verify loop and operator-abort branch, and later color/sound test
-  execution after the modeled RAM-test and CMOS visible outcomes,
+  timing, sub-pass/page-boundary RAM-test operator polling, and later
+  color/sound test execution after the modeled RAM-test and CMOS RAM-test loop,
   CMOS persistence, screen
   scanline scheduler, watchdog timing/reset side effects, rendering timing side
   effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or

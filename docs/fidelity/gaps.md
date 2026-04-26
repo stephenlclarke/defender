@@ -73,7 +73,8 @@ This file records behavior that must not be guessed in arcade-core code.
   the manual/auto success/failure display intent, `ADVSW` / `NEXTST` gate
   sequence, message-ROM bitmap text transfer including CMOS text controls,
   RAM-test start/failure/no-error visible setup, the RAM2 pattern fill/verify
-  pass, pass-boundary loop dispatch, and CMOS RAM-test visible outcomes.
+  pass, pass-boundary loop dispatch, and CMOS RAM-test write/verify loop plus
+  visible outcomes.
   The MAME-documented main-board and sound-board memory maps are
   embedded under
   `assets/red-label/memory-map.tsv` and checked against the Rust address
@@ -146,10 +147,9 @@ This file records behavior that must not be guessed in arcade-core code.
   post-display debounce countdown as one deterministic cycle, but CPU IRQ
   scheduling, exact Williams power-on RAM contents, `AUDITG` live text
   transfer/screen erasure/post-`PWRUP` wiring, physical advance-switch timing,
-  physical lamp timing, sub-pass/page-boundary RAM-test operator polling, the
-  CMOS RAM write/verify loop and operator-abort branch, and later color/sound
-  test execution after the modeled RAM-test and CMOS visible outcomes, CMOS
-  persistence, screen scanline scheduling, watchdog
+  physical lamp timing, sub-pass/page-boundary RAM-test operator polling, and
+  later color/sound test execution after the modeled RAM-test and CMOS RAM-test
+  loop, CMOS persistence, screen scanline scheduling, watchdog
   timing/reset side effects, palette/rendering timing side effects, decoder PROM
   behavior, and DAC sample generation are not modeled.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core
@@ -368,12 +368,11 @@ This file records behavior that must not be guessed in arcade-core code.
   headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
   gate metadata plus the RAM-test start/failure/no-error visible setup, RAM2
   pattern fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test
-  visible outcomes. CMOS persistence, `AUDITG` live text
+  write/verify loop plus visible outcomes. CMOS persistence, `AUDITG` live text
   transfer/screen erasure/post-`PWRUP` wiring, high-score comparison/initials
-  routines, sub-pass/page-boundary RAM-test operator polling, the CMOS RAM
-  write/verify loop and operator-abort branch, and later color/sound test
-  execution beyond the modeled RAM-test and CMOS visible outcomes are not
-  translated.
+  routines, sub-pass/page-boundary RAM-test operator polling, and later
+  color/sound test execution beyond the modeled RAM-test and CMOS RAM-test loop
+  are not translated.
 
 ## Player
 
