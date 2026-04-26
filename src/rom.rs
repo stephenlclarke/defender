@@ -136,9 +136,67 @@ pub const RED_LABEL_CROM0_ROMMAP_BYTES: usize = 24;
 pub const RED_LABEL_CROM0_ROMMAP_SLOT_BYTES: usize = 2;
 pub const RED_LABEL_CROM0_ROM_CHUNK_SIZE: usize = 0x0800;
 pub const RED_LABEL_CROM0_FIXED_ROM_BLOCK: u8 = 0x0F;
+const RED_LABEL_CROM0_ROMMAP_ADDRESS_MASK: u8 = 0x70;
+const RED_LABEL_CROM0_ROMMAP_BLOCK_MASK: u8 = 0x0F;
+const RED_LABEL_CROM0_ROMMAP_UNUSED_MASK: u8 = 0x80;
 
 pub fn red_label_crom0_rom_map_descriptors() -> Result<[u8; RED_LABEL_CROM0_ROMMAP_BYTES], String> {
     red_label_crom0_rom_map_descriptors_from_loads(red_label_rom_map())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0RomCheck {
+    pub descriptor_index: usize,
+    pub rom_number: u8,
+    pub half: u8,
+    pub descriptor: u8,
+    pub view: RomView,
+    pub start_address: u16,
+    pub checksum: u16,
+}
+
+impl RedLabelCrom0RomCheck {
+    pub fn failed(self) -> bool {
+        self.checksum != 0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0RomDiagnosticReport {
+    checks: Vec<RedLabelCrom0RomCheck>,
+    failures: Vec<RedLabelCrom0RomCheck>,
+    reported_bad_roms: Vec<u8>,
+}
+
+impl RedLabelCrom0RomDiagnosticReport {
+    pub fn checks(&self) -> &[RedLabelCrom0RomCheck] {
+        &self.checks
+    }
+
+    pub fn failures(&self) -> &[RedLabelCrom0RomCheck] {
+        &self.failures
+    }
+
+    pub fn reported_bad_roms(&self) -> &[u8] {
+        &self.reported_bad_roms
+    }
+
+    pub fn last_reported_bad_rom(&self) -> Option<u8> {
+        self.reported_bad_roms.last().copied()
+    }
+
+    pub fn all_roms_ok(&self) -> bool {
+        self.failures.is_empty()
+    }
+}
+
+pub fn red_label_crom0_rom_diagnostics(
+    images: &RedLabelRomImages,
+) -> Result<RedLabelCrom0RomDiagnosticReport, String> {
+    red_label_crom0_rom_diagnostics_from_descriptors(
+        images,
+        &red_label_crom0_rom_map_descriptors()?,
+    )
 }
 
 impl VerifiedRomSet {
@@ -641,6 +699,160 @@ fn red_label_crom0_rom_map_descriptors_from_loads(
     Ok(descriptors)
 }
 
+fn red_label_crom0_rom_diagnostics_from_descriptors(
+    images: &RedLabelRomImages,
+    descriptors: &[u8; RED_LABEL_CROM0_ROMMAP_BYTES],
+) -> Result<RedLabelCrom0RomDiagnosticReport, String> {
+    let mut failed_by_index = [false; RED_LABEL_CROM0_ROMMAP_BYTES];
+    let mut checks = Vec::new();
+    let mut failures = Vec::new();
+
+    for (descriptor_index, descriptor) in descriptors.iter().copied().enumerate() {
+        if descriptor == 0 {
+            continue;
+        }
+
+        let check = red_label_crom0_rom_check(images, descriptor_index, descriptor)?;
+        if check.failed() {
+            failed_by_index[descriptor_index] = true;
+            failures.push(check);
+        }
+        checks.push(check);
+    }
+
+    Ok(RedLabelCrom0RomDiagnosticReport {
+        checks,
+        failures,
+        reported_bad_roms: red_label_crom0_reported_bad_roms(&failed_by_index),
+    })
+}
+
+fn red_label_crom0_rom_check(
+    images: &RedLabelRomImages,
+    descriptor_index: usize,
+    descriptor: u8,
+) -> Result<RedLabelCrom0RomCheck, String> {
+    let view = red_label_crom0_descriptor_view(descriptor);
+    let start_address = red_label_crom0_descriptor_start_address(descriptor)?;
+    let checksum = red_label_crom0_rom_checksum(images, view, start_address, descriptor)?;
+
+    Ok(RedLabelCrom0RomCheck {
+        descriptor_index,
+        rom_number: red_label_crom0_physical_rom_number(descriptor_index),
+        half: red_label_crom0_physical_rom_half(descriptor_index),
+        descriptor,
+        view,
+        start_address,
+        checksum,
+    })
+}
+
+fn red_label_crom0_reported_bad_roms(
+    failed_by_index: &[bool; RED_LABEL_CROM0_ROMMAP_BYTES],
+) -> Vec<u8> {
+    let mut reported = Vec::new();
+    let mut descriptor_index = 0;
+    while descriptor_index < failed_by_index.len() {
+        if failed_by_index[descriptor_index] {
+            reported.push(red_label_crom0_physical_rom_number(descriptor_index));
+            descriptor_index += if descriptor_index % RED_LABEL_CROM0_ROMMAP_SLOT_BYTES == 0 {
+                RED_LABEL_CROM0_ROMMAP_SLOT_BYTES
+            } else {
+                1
+            };
+        } else {
+            descriptor_index += 1;
+        }
+    }
+
+    reported
+}
+
+fn red_label_crom0_descriptor_view(descriptor: u8) -> RomView {
+    let block = descriptor & RED_LABEL_CROM0_ROMMAP_BLOCK_MASK;
+    if block == RED_LABEL_CROM0_FIXED_ROM_BLOCK {
+        RomView::Fixed
+    } else {
+        RomView::Banked(block)
+    }
+}
+
+fn red_label_crom0_descriptor_start_address(descriptor: u8) -> Result<u16, String> {
+    if descriptor & RED_LABEL_CROM0_ROMMAP_UNUSED_MASK != 0 {
+        return Err(format!(
+            "CROM0 ROMMAP descriptor 0x{descriptor:02X} sets unsupported bit 7"
+        ));
+    }
+
+    let address_code = u16::from((descriptor & RED_LABEL_CROM0_ROMMAP_ADDRESS_MASK) >> 4);
+    Ok(0xC000 + address_code * RED_LABEL_CROM0_ROM_CHUNK_SIZE as u16)
+}
+
+fn red_label_crom0_rom_checksum(
+    images: &RedLabelRomImages,
+    view: RomView,
+    start_address: u16,
+    descriptor: u8,
+) -> Result<u16, String> {
+    let mut checksum = 0u16;
+    let mut address = start_address;
+    loop {
+        let high = red_label_crom0_rom_checksum_byte(images, view, address, descriptor)?;
+        let low =
+            red_label_crom0_rom_checksum_byte(images, view, address.wrapping_add(1), descriptor)?;
+        checksum = add_end_around_carry(checksum, u16::from_be_bytes([high, low]));
+
+        if address == 0xFFFE {
+            break;
+        }
+        address = address
+            .checked_add(2)
+            .ok_or_else(|| format!("CROM0 ROM checksum address {address:#06X} overflows"))?;
+    }
+
+    Ok(checksum)
+}
+
+fn red_label_crom0_rom_checksum_byte(
+    images: &RedLabelRomImages,
+    view: RomView,
+    address: u16,
+    descriptor: u8,
+) -> Result<u8, String> {
+    let byte = if address < 0xD000 {
+        match view {
+            RomView::Banked(bank) => images.banked_byte(bank, address).or_else(|| {
+                if (0xC800..0xD000).contains(&address) {
+                    images.banked_byte(bank, address - RED_LABEL_CROM0_ROM_CHUNK_SIZE as u16)
+                } else {
+                    None
+                }
+            }),
+            RomView::Fixed => images.fixed_byte(address),
+            RomView::SoundCpu | RomView::Prom => None,
+        }
+    } else {
+        images.fixed_byte(address)
+    };
+
+    byte.ok_or_else(|| {
+        format!("CROM0 ROM checksum descriptor 0x{descriptor:02X} cannot read {address:#06X}")
+    })
+}
+
+fn add_end_around_carry(left: u16, right: u16) -> u16 {
+    let sum = u32::from(left) + u32::from(right);
+    (sum as u16).wrapping_add((sum >> 16) as u16)
+}
+
+fn red_label_crom0_physical_rom_number(descriptor_index: usize) -> u8 {
+    (descriptor_index / RED_LABEL_CROM0_ROMMAP_SLOT_BYTES + 1) as u8
+}
+
+fn red_label_crom0_physical_rom_half(descriptor_index: usize) -> u8 {
+    (descriptor_index % RED_LABEL_CROM0_ROMMAP_SLOT_BYTES + 1) as u8
+}
+
 fn red_label_defender_rom_number(name: &str) -> Result<Option<u8>, String> {
     let Some(number) = name
         .strip_prefix("defend.")
@@ -787,6 +999,7 @@ mod tests {
         RED_LABEL_CROM0_FIXED_ROM_BLOCK, RED_LABEL_CROM0_ROMMAP_BYTES, RedLabelRomImages,
         RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile, VerifiedRomSet, crc32,
         load_verified_dir_against, parse_rom_descriptors, parse_rom_map, parse_rom_regions,
+        red_label_crom0_rom_diagnostics, red_label_crom0_rom_diagnostics_from_descriptors,
         red_label_crom0_rom_map_descriptors, red_label_crom0_rom_map_descriptors_from_loads,
         red_label_main_cpu_region, red_label_rom_map, red_label_rom_regions, red_label_roms,
         scan_dir_against,
@@ -831,6 +1044,33 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.path);
         }
+    }
+
+    fn red_label_zero_checksum_rom_images(patches: &[(&str, usize, u8)]) -> RedLabelRomImages {
+        let files = red_label_rom_map()
+            .iter()
+            .map(|load| {
+                let mut bytes = vec![0; load.size];
+                for (name, offset, value) in patches.iter().copied() {
+                    if name == load.name {
+                        bytes[offset] = value;
+                    }
+                }
+
+                VerifiedRomFile {
+                    descriptor: RomDescriptor {
+                        name: load.name,
+                        size: load.size as u64,
+                        crc32: "00000000",
+                    },
+                    crc32: 0,
+                    bytes,
+                }
+            })
+            .collect::<Vec<_>>();
+        let rom_set = VerifiedRomSet::from_files_for_test(files);
+
+        RedLabelRomImages::from_verified_rom_set(&rom_set).expect("zero checksum ROM image")
     }
 
     #[test]
@@ -1007,6 +1247,80 @@ mod tests {
                 .expect_err("duplicate ROM slot should fail")
                 .contains("already occupied")
         );
+    }
+
+    #[test]
+    fn red_label_crom0_rom_diagnostics_pass_zero_checksum_image() {
+        let images = red_label_zero_checksum_rom_images(&[]);
+
+        let diagnostics = red_label_crom0_rom_diagnostics(&images).expect("CROM0 diagnostics");
+
+        assert_eq!(diagnostics.checks().len(), 13);
+        assert!(diagnostics.all_roms_ok());
+        assert!(diagnostics.failures().is_empty());
+        assert!(diagnostics.reported_bad_roms().is_empty());
+        assert_eq!(diagnostics.last_reported_bad_rom(), None);
+    }
+
+    #[test]
+    fn red_label_crom0_rom_diagnostics_use_source_checksum_span_and_report_one_rom_number() {
+        let images = red_label_zero_checksum_rom_images(&[
+            ("defend.2", 0, 0x01),
+            ("defend.2", 0x0800, 0x02),
+        ]);
+        let mut descriptors = [0; RED_LABEL_CROM0_ROMMAP_BYTES];
+        descriptors[2] = 0x4F;
+        descriptors[3] = 0x5F;
+
+        let diagnostics = red_label_crom0_rom_diagnostics_from_descriptors(&images, &descriptors)
+            .expect("CROM0 diagnostics");
+
+        assert_eq!(diagnostics.failures().len(), 2);
+        assert_eq!(diagnostics.failures()[0].descriptor_index, 2);
+        assert_eq!(diagnostics.failures()[0].rom_number, 2);
+        assert_eq!(diagnostics.failures()[0].half, 1);
+        assert_eq!(diagnostics.failures()[0].start_address, 0xE000);
+        assert_eq!(diagnostics.failures()[0].checksum, 0x0300);
+        assert_eq!(diagnostics.failures()[1].descriptor_index, 3);
+        assert_eq!(diagnostics.failures()[1].rom_number, 2);
+        assert_eq!(diagnostics.failures()[1].half, 2);
+        assert_eq!(diagnostics.failures()[1].start_address, 0xE800);
+        assert_eq!(diagnostics.failures()[1].checksum, 0x0200);
+        assert_eq!(diagnostics.reported_bad_roms(), &[2]);
+        assert_eq!(diagnostics.last_reported_bad_rom(), Some(2));
+    }
+
+    #[test]
+    fn red_label_crom0_rom_diagnostics_select_banked_descriptor_view() {
+        let images = red_label_zero_checksum_rom_images(&[("defend.9", 0, 0x01)]);
+
+        let diagnostics = red_label_crom0_rom_diagnostics(&images).expect("CROM0 diagnostics");
+
+        assert_eq!(diagnostics.failures().len(), 1);
+        assert_eq!(diagnostics.failures()[0].descriptor_index, 16);
+        assert_eq!(diagnostics.failures()[0].descriptor, 0x01);
+        assert_eq!(diagnostics.failures()[0].rom_number, 9);
+        assert_eq!(diagnostics.failures()[0].half, 1);
+        assert_eq!(diagnostics.failures()[0].view, RomView::Banked(1));
+        assert_eq!(diagnostics.failures()[0].start_address, 0xC000);
+        assert_eq!(diagnostics.failures()[0].checksum, 0x0100);
+        assert_eq!(diagnostics.reported_bad_roms(), &[9]);
+    }
+
+    #[test]
+    fn red_label_crom0_rom_diagnostics_mirror_sparse_banked_half() {
+        let images = red_label_zero_checksum_rom_images(&[("defend.6", 0, 0x01)]);
+
+        let diagnostics = red_label_crom0_rom_diagnostics(&images).expect("CROM0 diagnostics");
+
+        assert_eq!(diagnostics.failures().len(), 1);
+        assert_eq!(diagnostics.failures()[0].descriptor_index, 10);
+        assert_eq!(diagnostics.failures()[0].descriptor, 0x07);
+        assert_eq!(diagnostics.failures()[0].rom_number, 6);
+        assert_eq!(diagnostics.failures()[0].view, RomView::Banked(7));
+        assert_eq!(diagnostics.failures()[0].start_address, 0xC000);
+        assert_eq!(diagnostics.failures()[0].checksum, 0x0200);
+        assert_eq!(diagnostics.reported_bad_roms(), &[6]);
     }
 
     #[test]

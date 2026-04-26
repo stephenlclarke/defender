@@ -187,7 +187,9 @@ against fixtures:
   images for the main CPU, banked program ROMs, sound CPU ROM, and decoder
   PROMs for optional local verification and future extraction, and derives the
   24-byte source-shaped `romf8.src` `ROMMAP` descriptor table consumed by
-  `CROM0` through `ROM0`/`ROM9` from the embedded MAME load map.
+  `CROM0` through `ROM0`/`ROM9` from the embedded MAME load map. It can also
+  run the source-shaped `ROM0`/`ROM9` checksum scan over those images and report
+  the physical ROM numbers that `CROM0` would display for failures.
 - `src/app.rs` exposes non-interactive verification commands:
   `--verify-roms PATH` checks a local red-label ROM directory and maps it into
   the embedded MAME ROM regions, while `--fidelity-trace [FRAMES]` emits the
@@ -581,12 +583,12 @@ This section records drift found during the repository review on
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated `AUDITG` live text transfer/screen
-  erasure/post-`PWRUP` wiring or translated `CROM0` diagnostic loops after the
-  now-identified `PWRUP` action decision beyond the derived `ROMMAP`
-  descriptors, CMOS persistence, screen scanline scheduler, watchdog
-  timing/reset side effects, rendering timing side effects, decoder PROM
-  behavior, DAC sample output, CPU IRQ scheduling, or translated `VSNDRM1.SRC`
-  routines.
+  erasure/post-`PWRUP` wiring or translated `CROM0` diagnostic display,
+  advance-switch, LED, and RAM/CMOS/color/sound-test handoff after the
+  now-identified `PWRUP` action decision beyond the modeled ROM checksum scan,
+  CMOS persistence, screen scanline scheduler, watchdog timing/reset side
+  effects, rendering timing side effects, decoder PROM behavior, DAC sample
+  output, CPU IRQ scheduling, or translated `VSNDRM1.SRC` routines.
 
 ### Player And Controls
 

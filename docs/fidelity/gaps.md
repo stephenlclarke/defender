@@ -68,9 +68,11 @@ This file records behavior that must not be guessed in arcade-core code.
 - Verified ROM image views exist for fixed main-CPU ROM, banked program ROMs,
   sound CPU ROM, and decoder PROM bytes, and the source-shaped `CROM0` `ROMMAP`
   descriptor table is derived from the embedded MAME load map. The
-  MAME-documented main-board and sound-board memory maps are embedded under
-  `assets/red-label/memory-map.tsv` and checked against the Rust address
-  classifiers. Red-label fixed-bank SRAM routine metadata is embedded under
+  source-shaped `ROM0`/`ROM9` checksum scan can report the physical ROM numbers
+  that `CROM0` would display for failures. The MAME-documented main-board and
+  sound-board memory maps are embedded under `assets/red-label/memory-map.tsv`
+  and checked against the Rust address classifiers. Red-label fixed-bank SRAM
+  routine metadata is embedded under
   `assets/red-label/sram-routines.tsv`,
   source-owned CMOS cell metadata is embedded under
   `assets/red-label/cmos-layout.tsv`, `romc8.src` CMOS default bytes are
@@ -139,10 +141,11 @@ This file records behavior that must not be guessed in arcade-core code.
   post-display debounce countdown as one deterministic cycle, but CPU IRQ
   scheduling, LED segment side effects, exact Williams power-on RAM contents,
   `AUDITG` live text transfer/screen erasure/post-`PWRUP` wiring or translated
-  `CROM0` diagnostic loops after that decision beyond the derived `ROMMAP`
-  descriptors, CMOS persistence, screen scanline scheduling, watchdog
-  timing/reset side effects, palette/rendering timing side effects, decoder
-  PROM behavior, and DAC sample generation are not modeled.
+  `CROM0` diagnostic display, advance-switch, LED, and RAM/CMOS/color/sound
+  test handoff after that decision beyond the modeled ROM checksum scan, CMOS
+  persistence, screen scanline scheduling, watchdog timing/reset side effects,
+  palette/rendering timing side effects, decoder PROM behavior, and DAC sample
+  generation are not modeled.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core
   scaffold. It initializes `PINIT`/`OINIT`-style process, super-process, and
   object free lists, sets `CRPROC` to the active-process head, clears active
@@ -356,8 +359,8 @@ This file records behavior that must not be guessed in arcade-core code.
   mutations, the post-display debounce countdown, and red-label packed
   byte/word helper behavior are modeled, but CMOS persistence, `AUDITG` live
   text transfer/screen erasure/post-`PWRUP` wiring, high-score
-  comparison/initials routines, and the post-`PWRUP` `CROM0` diagnostic loops
-  beyond the derived `ROMMAP` descriptors are not translated.
+  comparison/initials routines, and the post-`PWRUP` `CROM0` diagnostic UI and
+  later-test handoff beyond the modeled ROM checksum scan are not translated.
 
 ## Player
 
