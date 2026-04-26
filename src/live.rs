@@ -10,7 +10,7 @@ use crossterm::event::{self, Event};
 
 use crate::{
     cmos_storage::{CmosStorage, FileCmosStorage},
-    input::{InputMapper, InputProfile, PolledInput, XyzzyOverlay},
+    input::{CabinetInput, InputMapper, InputProfile, PolledInput, XyzzyOverlay},
     kitty::KittyGraphics,
     machine::{ArcadeMachine, CompatibilityState, FRAME_RATE_MILLIHZ},
     terminal::{TerminalSession, geometry},
@@ -23,6 +23,29 @@ const FRAME_DURATION: Duration =
 const fn cabinet_frame_duration_micros(frame_rate_millihz: u32) -> u64 {
     let rate = frame_rate_millihz as u64;
     (1_000_000_000 + (rate / 2)) / rate
+}
+
+struct LiveCoreClock {
+    next_step: Instant,
+}
+
+impl LiveCoreClock {
+    fn new(now: Instant) -> Self {
+        Self { next_step: now }
+    }
+
+    fn steps_due(&mut self, now: Instant) -> u32 {
+        let mut steps = 0;
+        while now >= self.next_step {
+            steps += 1;
+            self.next_step += FRAME_DURATION;
+        }
+        steps
+    }
+
+    fn sleep_until_next_step(&self, now: Instant) -> Duration {
+        self.next_step.saturating_duration_since(now)
+    }
 }
 
 pub fn run_live(
@@ -45,9 +68,10 @@ pub fn run_live(
         .as_ref()
         .map(|storage| storage as &dyn CmosStorage);
     let mut machine = live_machine_from_cmos_storage(storage)?;
+    let mut core_clock = LiveCoreClock::new(Instant::now());
+    let mut pending_typed_chars = Vec::new();
 
     loop {
-        let frame_started = Instant::now();
         sync_terminal_geometry(&mut terminal_geometry, &mut renderer, &mut graphics)?;
 
         let input = poll_input(&mut input_mapper)?;
@@ -56,21 +80,32 @@ pub fn run_live(
         }
 
         xyzzy.handle_typed_chars(&input.typed_chars);
+        pending_typed_chars.extend(input.typed_chars.iter().copied());
         machine.set_compatibility(CompatibilityState {
             xyzzy_active: xyzzy.active(),
             xyzzy_invincible: xyzzy.invincible(),
             xyzzy_auto_fire: xyzzy.auto_fire(),
         });
-        let output = machine.step_with_typed_chars(input.cabinet, &input.typed_chars);
-        let image = renderer.render_scaffold(output.snapshot);
+        let core_steps = core_clock.steps_due(Instant::now());
+        step_live_core_frames(
+            &mut machine,
+            input.cabinet,
+            &pending_typed_chars,
+            core_steps,
+        );
+        if core_steps != 0 {
+            pending_typed_chars.clear();
+        }
+
+        let image = renderer.render_scaffold(machine.snapshot());
         graphics
             .draw_frame(&mut stdout, image)
             .context("drawing kitty graphics frame")?;
         stdout.flush().context("flushing kitty graphics frame")?;
 
-        let elapsed = frame_started.elapsed();
-        if elapsed < FRAME_DURATION {
-            thread::sleep(FRAME_DURATION - elapsed);
+        let sleep_duration = core_clock.sleep_until_next_step(Instant::now());
+        if !sleep_duration.is_zero() {
+            thread::sleep(sleep_duration);
         }
     }
 
@@ -83,6 +118,22 @@ pub fn run_live(
         &machine,
     )?;
     Ok(())
+}
+
+fn step_live_core_frames(
+    machine: &mut ArcadeMachine,
+    input: CabinetInput,
+    typed_chars: &[char],
+    frames: u32,
+) {
+    if frames == 0 {
+        return;
+    }
+
+    machine.step_with_typed_chars(input, typed_chars);
+    for _ in 1..frames {
+        machine.step(input);
+    }
 }
 
 fn ensure_interactive_terminal() -> Result<()> {
@@ -151,16 +202,19 @@ fn poll_input(input_mapper: &mut InputMapper) -> Result<PolledInput> {
 mod tests {
     use std::cell::RefCell;
     use std::io;
+    use std::time::Instant;
 
     use crate::board::{
         CMOS_RAM_SIZE, CmosRam, RED_LABEL_CRHSTD_CELL_OFFSET, cmos_sram_write_byte,
     };
     use crate::cmos_storage::CmosStorage;
-    use crate::machine::{ArcadeMachine, FRAME_RATE_MILLIHZ};
+    use crate::input::CabinetInput;
+    use crate::machine::{ArcadeMachine, FRAME_RATE_MILLIHZ, GamePhase};
 
     use super::{
-        FRAME_DURATION, cabinet_frame_duration_micros, live_machine_from_cmos_storage,
-        save_live_cmos, validate_interactive_terminal,
+        FRAME_DURATION, LiveCoreClock, cabinet_frame_duration_micros,
+        live_machine_from_cmos_storage, save_live_cmos, step_live_core_frames,
+        validate_interactive_terminal,
     };
 
     #[derive(Default)]
@@ -192,6 +246,47 @@ mod tests {
             u128::from(cabinet_frame_duration_micros(FRAME_RATE_MILLIHZ))
         );
         assert_eq!(FRAME_DURATION.as_micros(), 16_639);
+    }
+
+    #[test]
+    fn core_clock_reports_due_frames_independent_of_draw_calls() {
+        let start = Instant::now();
+        let mut clock = LiveCoreClock::new(start);
+
+        assert_eq!(clock.steps_due(start), 1);
+        assert_eq!(clock.sleep_until_next_step(start), FRAME_DURATION);
+        assert_eq!(clock.steps_due(start + (FRAME_DURATION / 2)), 0);
+        assert_eq!(
+            clock.sleep_until_next_step(start + (FRAME_DURATION / 2)),
+            FRAME_DURATION / 2
+        );
+
+        let stalled_until = start + FRAME_DURATION + FRAME_DURATION + FRAME_DURATION;
+        assert_eq!(clock.steps_due(stalled_until), 3);
+        assert_eq!(clock.sleep_until_next_step(stalled_until), FRAME_DURATION);
+    }
+
+    #[test]
+    fn live_core_steps_catch_up_without_replaying_typed_chars() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::HighScoreEntry;
+        machine.restore(snapshot);
+        machine
+            .red_label_begin_live_high_score_entry(50_000)
+            .expect("high score table should be valid");
+
+        step_live_core_frames(&mut machine, CabinetInput::NONE, &['a'], 3);
+
+        let snapshot = machine.snapshot();
+        assert_eq!(snapshot.frame, 3);
+        assert_eq!(
+            snapshot
+                .high_score_entry
+                .expect("entry still active")
+                .initials,
+            [b'A', b' ', b' ']
+        );
     }
 
     #[test]

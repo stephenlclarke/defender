@@ -451,8 +451,9 @@ This section records drift found during the repository review on
   collision setup, `OCVECT` dispatch to translated vectors, `REV` reverse
   debounce path, and source-shaped `SBOMB` entry/flash/debounce tail are
   translated.
-- The live loop now uses a cabinet-rate frame duration, but the core does not
-  yet execute red-label process timing or CPU-cycle-level behavior.
+- The live loop now uses a cabinet-rate frame duration and advances any due
+  core frames before each terminal draw, but the core does not yet execute
+  red-label process timing or CPU-cycle-level behavior.
 - `RAND` is translated, but the whole program does not yet run the same sequence
   of RNG reads as the red-label program. Exactness requires preserving call
   order, not just the formula.
@@ -746,7 +747,9 @@ This section records drift found during the repository review on
   palette-index extraction, RGB palette resistor conversion, and an
   aspect-preserving native RGBA cabinet-frame scaler are implemented.
 - The current live loop still renders an explicitly named scaffold frame until
-  the arcade core produces real video RAM frames. `STOUT` / `SBLNK`, `PRDISP` /
+  the arcade core produces real video RAM frames. It advances core frames from
+  the red-label frame clock before drawing the latest snapshot, so terminal
+  rendering no longer controls core frame count. `STOUT` / `SBLNK`, `PRDISP` /
   `POUT`, `OPROC`, shell output, `EWRITE`, and player-explosion routines can
   mutate video RAM directly, but full scanner/terrain/object scheduling, color
   walkers, text, attract mode, game-over, high-score screens, and scanline
@@ -1070,14 +1073,13 @@ register carried into `PLRES`; implement it only after register-aware scheduler
 tracing proves that entry state. Broader body dispatch, suicide resume semantics,
 cycle/frame scheduling, and golden-trace verification are still open.
 
-1. Continue deriving live frame pacing from the core red-label
-   `FRAME_RATE_MILLIHZ` constant while keeping terminal presentation outside the
-   verified cabinet frame.
-2. Decouple terminal draw cadence from core stepping.
-3. Port or model red-label process scheduling and delay semantics.
-4. Verify object process order against golden traces.
-5. Preserve compatibility frame pacing only in the renderer/application layer.
-6. Do not convert cycle/frame values by feel. Use source constants, MAME driver
+1. Continue keeping terminal presentation outside the verified cabinet frame
+   while the live loop advances due core frames from `FRAME_RATE_MILLIHZ`
+   independently of draw calls.
+2. Port or model red-label process scheduling and delay semantics.
+3. Verify object process order against golden traces.
+4. Preserve compatibility frame pacing only in the renderer/application layer.
+5. Do not convert cycle/frame values by feel. Use source constants, MAME driver
    metadata, or measured trace timing.
 
 ### Phase 4: Player, Inputs, And `xyzzy`
