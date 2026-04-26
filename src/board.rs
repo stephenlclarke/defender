@@ -18,7 +18,7 @@
 //! ROM-derived CMOS defaults from `romc8.src`, can route the CMOS-visible
 //! `romc0.src` power-up branch, and can run the `CROM0` CMOS RAM-test
 //! write/verify loop, visible outcomes, and color-RAM diagnostic cycle. CMOS
-//! persistence, `AUDITG` live diagnostic text transfer/full-loop integration,
+//! persistence, `AUDITG` post-`PWRUP` scheduling/full-loop integration,
 //! physical advance/lamp timing beyond the modeled ROM-stage screen/LED output,
 //! monitor-test handoff wiring, and full video timing remain explicit fidelity
 //! gaps.
@@ -1038,10 +1038,11 @@ pub enum RedLabelAuditDebounceStep {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct RedLabelAuditCycleState {
     operator: RedLabelAuditOperatorState,
     debounce: RedLabelAuditDebounceState,
+    previous_visible_text: Option<String>,
 }
 
 impl RedLabelAuditCycleState {
@@ -1049,15 +1050,20 @@ impl RedLabelAuditCycleState {
         Some(Self {
             operator: RedLabelAuditOperatorState::for_displayed_row_number(row_number)?,
             debounce: RedLabelAuditDebounceState::default(),
+            previous_visible_text: None,
         })
     }
 
-    pub fn operator(self) -> RedLabelAuditOperatorState {
+    pub fn operator(&self) -> RedLabelAuditOperatorState {
         self.operator
     }
 
-    pub fn debounce(self) -> RedLabelAuditDebounceState {
+    pub fn debounce(&self) -> RedLabelAuditDebounceState {
         self.debounce
+    }
+
+    pub fn previous_visible_text(&self) -> Option<&str> {
+        self.previous_visible_text.as_deref()
     }
 }
 
@@ -1069,6 +1075,7 @@ pub enum RedLabelAuditCycleStep {
     },
     Display {
         line: RedLabelAuditDisplayLine,
+        transfer: RedLabelAuditDisplayLineTransfer,
         change: Option<RedLabelAuditAdjustmentChange>,
     },
     Debounce(RedLabelAuditDebounceStep),
@@ -3420,9 +3427,9 @@ impl<'a> DefenderMainBoard<'a> {
     /// Source-shaped deterministic `AUDIT0` cycle.
     ///
     /// This ties the translated row navigation/change decision, `DISAUD` line
-    /// formatting, and post-display debounce gate into one step. It keeps live
-    /// video text transfer, screen erasure, watchdog refresh, and the outer
-    /// post-`PWRUP` entry/exit wiring outside the helper.
+    /// formatting/video transfer/screen erasure, and post-display debounce gate
+    /// into one step. It keeps watchdog refresh and the outer post-`PWRUP`
+    /// entry/exit wiring outside the helper.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L41-L113>.
     pub fn red_label_audit_cycle_step(
         &mut self,
@@ -3444,8 +3451,19 @@ impl<'a> DefenderMainBoard<'a> {
                     .iter()
                     .find(|adjustment| adjustment.number == row_number)?;
                 let line = self.red_label_audit_display_line(adjustment)?;
+                let transfer = self
+                    .red_label_write_audit_display_line(
+                        &line,
+                        state.previous_visible_text.as_deref(),
+                    )
+                    .ok()?;
+                state.previous_visible_text = Some(String::from(line.visible_text()));
                 state.debounce.begin_after_display();
-                Some(RedLabelAuditCycleStep::Display { line, change })
+                Some(RedLabelAuditCycleStep::Display {
+                    line,
+                    transfer,
+                    change,
+                })
             }
             RedLabelAuditOperatorStep::ReturnToGame => Some(RedLabelAuditCycleStep::ReturnToGame),
         }
@@ -8535,9 +8553,15 @@ mod tests {
             .red_label_audit_cycle_step(&mut cycle, &adjustments)
             .expect("initial cycle")
         {
-            RedLabelAuditCycleStep::Display { line, change } => {
+            RedLabelAuditCycleStep::Display {
+                line,
+                transfer,
+                change,
+            } => {
                 assert_eq!(line.row_number(), 1);
                 assert_eq!(&line.visible_text().as_bytes()[0..2], b"01");
+                assert_eq!(transfer.erased, None);
+                assert_eq!(transfer.write.text, line.visible_text());
                 assert_eq!(change, None);
             }
             other => panic!("unexpected initial audit cycle step {other:?}"),
@@ -8546,6 +8570,11 @@ mod tests {
         assert_eq!(
             cycle.debounce().remaining_ticks(),
             RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS + 1
+        );
+        assert!(
+            cycle
+                .previous_visible_text()
+                .is_some_and(|text| text.starts_with("01"))
         );
 
         board.set_cabinet_input(CabinetInput {
@@ -8587,9 +8616,20 @@ mod tests {
             .red_label_audit_cycle_step(&mut cycle, &adjustments)
             .expect("advance cycle")
         {
-            RedLabelAuditCycleStep::Display { line, change } => {
+            RedLabelAuditCycleStep::Display {
+                line,
+                transfer,
+                change,
+            } => {
                 assert_eq!(line.row_number(), 28);
                 assert_eq!(&line.visible_text().as_bytes()[0..2], b"28");
+                assert!(
+                    transfer
+                        .erased
+                        .as_ref()
+                        .is_some_and(|erased| erased.text.starts_with("01"))
+                );
+                assert_eq!(transfer.write.text, line.visible_text());
                 assert_eq!(change, None);
             }
             other => panic!("unexpected manual advance audit cycle step {other:?}"),
@@ -8616,7 +8656,11 @@ mod tests {
             .red_label_audit_cycle_step(&mut cycle, &adjustments)
             .expect("adjustment cycle")
         {
-            RedLabelAuditCycleStep::Display { line, change } => {
+            RedLabelAuditCycleStep::Display {
+                line,
+                transfer,
+                change,
+            } => {
                 assert_eq!(line.row_number(), 9);
                 assert_eq!(
                     change,
@@ -8626,6 +8670,8 @@ mod tests {
                 );
                 assert_eq!(line.value(), RedLabelAuditAdjustmentValue::PackedByte(0x04));
                 assert_eq!(&line.visible_text().as_bytes()[9..11], b"04");
+                assert_eq!(transfer.erased, None);
+                assert_eq!(transfer.write.text, line.visible_text());
             }
             other => panic!("unexpected adjustment audit cycle step {other:?}"),
         }

@@ -409,8 +409,9 @@ yet; current implementation status is tracked in `SPEC.md` and
   heading/crosshatch/RGB-field/color-bar pattern behavior, high-score reset
   copy, operator audit/adjustment table, `AUDITG` game-adjust entry screens,
   and `DISAUD` display-line formatting/video transfer/erasure, row
-  navigation, post-display debounce cadence, deterministic audit cycle, and
-  CMOS mutation rules now embedded under `assets/red-label/`. The
+  navigation, post-display debounce cadence, deterministic audit cycle with
+  previous-row erasure, and CMOS mutation rules now embedded under
+  `assets/red-label/`. The
   `defb6.src` `CRTAB` bytes now feed
   the `CRINIT` pseudo-color RAM reset embedded in
   `assets/red-label/color-ram.tsv`. The `defa7.src` `SCORE`, `SNDLD`, `SHELL`,

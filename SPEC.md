@@ -264,8 +264,8 @@ This section records drift found during the repository review on
   delay/debounce registers: the first 100-tick scan delay, the six-tick repeat
   scan cadence, and the `BITB #$0A` release shift register.
 - `src/board.rs` now ties the source-visible `AUDITG` row step, `DISAUD`
-  display-line formatting, and post-display debounce gate into one
-  deterministic audit cycle helper.
+  display-line formatting/video transfer/previous-row erasure, and
+  post-display debounce gate into one deterministic audit cycle helper.
 - `src/board.rs` now models the source-visible `ALTER` / `HYSCRE` operator
   adjustment mutation rules: audit rows stay read-only, coin multiplier rows
   respect `COINSL`, `DIPSW` changes set `DIPFLG`, and byte/replay-level values
@@ -577,9 +577,9 @@ This section records drift found during the repository review on
   and `DISAUD` row text/erasure, can apply the source-visible `ALTER` /
   `HYSCRE` mutation rules, can step the source-visible `AUDITG` row navigation
   from IN2 service inputs, can model the post-display `AUDITG` debounce
-  countdown, can run those pieces as one deterministic audit cycle, and can
-  snapshot source-labeled CMOS and RAM fields. A main-board address classifier
-  exists for RAM, banked I/O,
+  countdown, can run those pieces as one deterministic audit cycle with
+  previous-row erasure, and can snapshot source-labeled CMOS and RAM fields. A
+  main-board address classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
   surface. Raw write-only palette register bytes, CMOS 4-bit write/read bytes,

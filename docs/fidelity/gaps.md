@@ -116,9 +116,9 @@ This file records behavior that must not be guessed in arcade-core code.
   and `DISAUD` row text/erasure, can apply the source-visible `ALTER` /
   `HYSCRE` mutation rules, can step the source-visible `AUDITG` row navigation
   from IN2 service inputs, can model the post-display `AUDITG` debounce
-  countdown, can run those pieces as one deterministic audit cycle, and can
-  snapshot source-labeled CMOS and main-RAM fields. A main-board address
-  classifier exists for RAM, banked I/O,
+  countdown, can run those pieces as one deterministic audit cycle with
+  previous-row erasure, and can snapshot source-labeled CMOS and main-RAM
+  fields. A main-board address classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
   surface, and raw write-only palette register bytes are stored. CMOS 4-bit
