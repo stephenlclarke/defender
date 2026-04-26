@@ -1,5 +1,6 @@
 label	character	address	width	height	bytes	source
 SPACE	SPACE	0xC697	1	8	0000000000000000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L469-L476
+COMMA	,	0xC6B7	1	8	0000000000010110	https://github.com/mwenge/defender/blob/master/src/mess0.src#L481-L482
 COLON	:	0xC7B7	1	8	0000010000010000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L540-L541
 LETTRA	A	0xC7D7	3	8	010101010101010011000011000000001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L522-L525
 LETTRB	B	0xC7EF	3	8	010101010101010011000011000011001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L526-L529

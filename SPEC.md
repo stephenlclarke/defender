@@ -191,9 +191,10 @@ against fixtures:
   run the source-shaped `ROM0`/`ROM9` checksum scan over those images and report
   the physical ROM numbers that `CROM0` would display for failures, plus the
   manual/auto ROM-stage outcome for success/failure display intent, `ADVSW` /
-  `NEXTST` gate sequence, message-ROM bitmap text transfer, and RAM-test
-  start/failure/no-error visible setup plus the RAM2 pattern fill/verify pass
-  and pass-boundary loop dispatch.
+  `NEXTST` gate sequence, message-ROM bitmap text transfer including CMOS text
+  controls, RAM-test start/failure/no-error visible setup, the RAM2 pattern
+  fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test visible
+  outcomes.
 - `src/app.rs` exposes non-interactive verification commands:
   `--verify-roms PATH` checks a local red-label ROM directory and maps it into
   the embedded MAME ROM regions, while `--fidelity-trace [FRAMES]` emits the
@@ -587,15 +588,18 @@ This section records drift found during the repository review on
   headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
   gate metadata. It can also render the source-visible RAM-test start,
   failure, and no-error screens reached from the CROM0 handoff, execute the
-  source RAM2 pattern fill/verify pass, and route pass-boundary
-  continue/failure/operator-abort loop targets. CPU interrupt scheduling,
-  physical lamp timing, and sample generation remain gaps.
+  source RAM2 pattern fill/verify pass, route pass-boundary
+  continue/failure/operator-abort loop targets, and render CMOS RAM-test
+  OK/failure/multiple-RAM-failure visible outcomes with source text-control
+  tokens. CPU interrupt scheduling, physical lamp timing, and sample generation
+  remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated `AUDITG` live text transfer/screen
   erasure/post-`PWRUP` wiring, physical advance-switch timing, physical lamp
-  timing, sub-pass/page-boundary RAM-test operator polling, and later
-  CMOS/color/sound test execution after the modeled RAM-test pass/outcomes,
+  timing, sub-pass/page-boundary RAM-test operator polling, the CMOS RAM
+  write/verify loop and operator-abort branch, and later color/sound test
+  execution after the modeled RAM-test and CMOS visible outcomes,
   CMOS persistence, screen
   scanline scheduler, watchdog timing/reset side effects, rendering timing side
   effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or

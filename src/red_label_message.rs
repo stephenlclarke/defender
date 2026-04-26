@@ -348,7 +348,12 @@ mod tests {
             parse_messages(crate::assets::RED_LABEL_MESSAGES_TSV).expect("messages parse");
 
         assert!(glyphs.iter().any(|glyph| glyph.character == 'F'));
+        assert!(glyphs.iter().any(|glyph| glyph.character == ','));
         assert!(glyphs.iter().any(|glyph| glyph.character == ':'));
+        assert_eq!(
+            red_label_message_glyph(',').expect("comma glyph").address,
+            0xC6B7
+        );
         assert_eq!(
             red_label_message_glyph('H').expect("H glyph").address,
             0xC87F
@@ -438,6 +443,61 @@ mod tests {
                 String::from("AUTO"),
                 String::from("FOR"),
                 String::from("CMOS"),
+                String::from("RAM"),
+                String::from("TEST")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VCMSFL")
+                .expect("VCMSFL message")
+                .words
+                .as_slice(),
+            &[
+                String::from("CMOS"),
+                String::from("RAM"),
+                String::from("FAILURE"),
+                String::from("[RTC:0x28,0xA0]"),
+                String::from("TEST"),
+                String::from("MUST"),
+                String::from("BE"),
+                String::from("ENTERED"),
+                String::from("[RLF]"),
+                String::from("WITH"),
+                String::from("COIN"),
+                String::from("DOOR"),
+                String::from("OPEN")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VCMSAB")
+                .expect("VCMSAB message")
+                .words
+                .as_slice(),
+            &[
+                String::from("MULTIPLE"),
+                String::from("RAM"),
+                String::from("FAILURE"),
+                String::from("[HMC:0xFE]"),
+                String::from(","),
+                String::from("[VMT:0x10]"),
+                String::from("[HMT:0xF8]"),
+                String::from("CMOS"),
+                String::from("RAM"),
+                String::from("CAN"),
+                String::from("NOT"),
+                String::from("BE"),
+                String::from("TESTED")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS7")
+                .expect("VINS7 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUTO"),
+                String::from("FOR"),
+                String::from("COLOR"),
                 String::from("RAM"),
                 String::from("TEST")
             ]

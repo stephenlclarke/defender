@@ -27449,7 +27449,7 @@ mod tests {
                 0x11, 0x00, 0x11, 0x01, 0x01, 0x11, 0x01, 0x01, 0x11, 0x00
             ]
         );
-        assert_eq!(message_glyphs.len(), 23);
+        assert_eq!(message_glyphs.len(), 24);
         assert_eq!(
             red_label_message_glyph(' ').expect("space glyph").address,
             0xC697
@@ -27459,10 +27459,14 @@ mod tests {
             0xC7B7
         );
         assert_eq!(
+            red_label_message_glyph(',').expect("comma glyph").address,
+            0xC6B7
+        );
+        assert_eq!(
             red_label_message_glyph('W').expect("W glyph").bytes.len(),
             32
         );
-        assert_eq!(messages.len(), 14);
+        assert_eq!(messages.len(), 18);
         assert_eq!(
             red_label_message("VROMFL")
                 .expect("VROMFL message")
@@ -27504,6 +27508,19 @@ mod tests {
                 String::from("RAM"),
                 String::from("ERRORS"),
                 String::from("DETECTED")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS7")
+                .expect("VINS7 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUTO"),
+                String::from("FOR"),
+                String::from("COLOR"),
+                String::from("RAM"),
+                String::from("TEST")
             ]
         );
         assert_eq!(
