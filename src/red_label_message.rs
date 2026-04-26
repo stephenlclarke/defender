@@ -392,6 +392,32 @@ mod tests {
             &[String::from("RAM"), String::from("TEST")]
         );
         assert_eq!(
+            red_label_message("VWRAM")
+                .expect("VWRAM message")
+                .words
+                .as_slice(),
+            &[String::from("RAM")]
+        );
+        assert_eq!(
+            red_label_message("VRAMFL")
+                .expect("VRAMFL message")
+                .words
+                .as_slice(),
+            &[String::from("RAM"), String::from("FAILURE")]
+        );
+        assert_eq!(
+            red_label_message("VNORAM")
+                .expect("VNORAM message")
+                .words
+                .as_slice(),
+            &[
+                String::from("NO"),
+                String::from("RAM"),
+                String::from("ERRORS"),
+                String::from("DETECTED")
+            ]
+        );
+        assert_eq!(
             red_label_message("VINS5")
                 .expect("VINS5 message")
                 .words
@@ -400,6 +426,19 @@ mod tests {
                 String::from("AUTO"),
                 String::from("TO"),
                 String::from("EXIT"),
+                String::from("TEST")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS6")
+                .expect("VINS6 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUTO"),
+                String::from("FOR"),
+                String::from("CMOS"),
+                String::from("RAM"),
                 String::from("TEST")
             ]
         );

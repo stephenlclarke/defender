@@ -36,8 +36,9 @@ use crate::{
         red_label_message_glyph, red_label_score_digit_image,
     },
     rom::{
-        RedLabelCrom0AdvanceGate, RedLabelCrom0RomStage, RedLabelCrom0RomStageStatus,
-        RedLabelCrom0RomStageTarget, RedLabelRomImages,
+        RED_LABEL_CROM0_FAILURE_COLOR, RED_LABEL_CROM0_OK_COLOR, RedLabelCrom0AdvanceGate,
+        RedLabelCrom0RomStage, RedLabelCrom0RomStageStatus, RedLabelCrom0RomStageTarget,
+        RedLabelRomImages,
     },
     sound::SoundCommandLatch,
     video::{
@@ -89,15 +90,25 @@ pub const RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT: &str = "ROM";
 pub const RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT: &str = "PRESS ADVANCE WITH SWITCH SET FOR:";
 pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT: &str = "AUTO FOR RAM TEST";
 pub const RED_LABEL_CROM0_RAM_TEST_TEXT: &str = "RAM TEST";
+pub const RED_LABEL_CROM0_RAM_FAILURE_TEXT: &str = "RAM FAILURE";
+pub const RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT: &str = "RAM";
+pub const RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT: &str = "NO RAM ERRORS DETECTED";
 pub const RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT: &str = "AUTO TO EXIT TEST";
+pub const RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT: &str = "AUTO FOR CMOS RAM TEST";
 pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT];
 pub const RED_LABEL_CROM0_RAM_TEST_START_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT];
+pub const RED_LABEL_CROM0_RAM_TEST_DONE_INSTRUCTIONS: &[&str] =
+    &[RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT];
 pub const RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS: u16 = 0x18CE;
 pub const RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES: [u16; 2] = [0x10DA, 0x10E4];
 pub const RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS: u16 = 0x4080;
+pub const RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS: u16 = 0x3870;
+pub const RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS: u16 = 0x4290;
+pub const RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS: u16 = 0x2880;
 pub const RED_LABEL_CROM0_RAM_TEST_COLOR: u8 = 0xA5;
+pub const RED_LABEL_CROM0_RAM_TEST_LED: u8 = 0x04;
 pub const RED_LABEL_CROM0_RAM_TEST_DELAY_MS: u16 = 5000;
 pub const RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS: u16 = 10;
 pub const RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER: u16 = 0x000A;
@@ -274,6 +285,67 @@ pub struct RedLabelCrom0RamTestStartTransfer {
     pub delay_ms: u16,
     pub active_loop_delay_ms: u16,
     pub test_counter: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCrom0RamFailure {
+    pub failing_address: u16,
+    pub expected_word: u16,
+    pub actual_word: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0BadRamBitmapTextWrite {
+    pub row_address: u16,
+    pub text: String,
+    pub block_number: u8,
+    pub bit_number: u8,
+    pub ram_number_bcd: u8,
+    pub cursor_after: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0RamFailureTransfer {
+    pub screen_clear_end: u16,
+    pub palette_zeroed: bool,
+    pub failing_address: u16,
+    pub expected_word: u16,
+    pub actual_word: u16,
+    pub error_mask: u16,
+    pub led_output: RedLabelDiagnosticLedOutput,
+    pub letter_color: RedLabelDiagnosticPaletteWrite,
+    pub headline: RedLabelDiagnosticBitmapTextWrite,
+    pub instructions: RedLabelDiagnosticInstructionBitmapTextWrite,
+    pub ram_row: RedLabelCrom0BadRamBitmapTextWrite,
+    pub block_led_output: RedLabelDiagnosticLedOutput,
+    pub bit_led_output: RedLabelDiagnosticLedOutput,
+    pub advance_gates: Vec<RedLabelCrom0AdvanceGate>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0RamTestAbortStatus {
+    EarlyAbort,
+    NoErrorsDetected,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCrom0RamTestTarget {
+    CmosRamTest,
+    WaitForNextSwitch,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0RamTestAbortTransfer {
+    pub screen_clear_end: u16,
+    pub palette_zeroed: bool,
+    pub test_counter: u16,
+    pub status: RedLabelCrom0RamTestAbortStatus,
+    pub target: RedLabelCrom0RamTestTarget,
+    pub letter_color: Option<RedLabelDiagnosticPaletteWrite>,
+    pub headline: Option<RedLabelDiagnosticBitmapTextWrite>,
+    pub instructions: Option<RedLabelDiagnosticInstructionBitmapTextWrite>,
+    pub flash_led: Option<RedLabelDiagnosticLedFlash>,
+    pub advance_gates: Vec<RedLabelCrom0AdvanceGate>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -505,6 +577,33 @@ impl RedLabelPowerUpAction {
             Self::ResetHighScoreTables => RedLabelPowerUpDispatchTarget::ResetHighScoreTables,
             Self::ClearAudits => RedLabelPowerUpDispatchTarget::ClearAudits,
         }
+    }
+}
+
+impl RedLabelCrom0RamFailure {
+    pub fn error_mask(self) -> u16 {
+        self.expected_word ^ self.actual_word
+    }
+
+    pub fn bad_bit_number(self) -> Result<u8, String> {
+        let [high, low] = self.error_mask().to_be_bytes();
+        let value = if high == 0 { low } else { high };
+        if value == 0 {
+            return Err(format!(
+                "red-label RAM failure at 0x{:04X} has no differing bits",
+                self.failing_address
+            ));
+        }
+        Ok(value.trailing_zeros() as u8 + 1)
+    }
+
+    pub fn bad_block_number(self) -> u8 {
+        let [page, _] = self.failing_address.to_be_bytes();
+        page % 3 + 1
+    }
+
+    pub fn ram_number_bcd(self) -> Result<u8, String> {
+        Ok((self.bad_block_number() << 4) | self.bad_bit_number()?)
     }
 }
 
@@ -810,6 +909,170 @@ impl<'a> DefenderMainBoard<'a> {
             delay_ms: RED_LABEL_CROM0_RAM_TEST_DELAY_MS,
             active_loop_delay_ms: RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS,
             test_counter: RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER,
+        })
+    }
+
+    /// Transfer the visible `CRAM10` RAM-failure screen into video RAM.
+    ///
+    /// This derives the source `RAM NN` display from the failing address and
+    /// expected/actual word mismatch, then records the possible manual LED and
+    /// advance-switch sequence. The physical switch branch to CMOS is left to
+    /// the caller.
+    pub fn red_label_write_crom0_ram_failure(
+        &mut self,
+        failure: RedLabelCrom0RamFailure,
+    ) -> Result<RedLabelCrom0RamFailureTransfer, String> {
+        let error_mask = failure.error_mask();
+        let block_number = failure.bad_block_number();
+        let bit_number = failure.bad_bit_number()?;
+        let ram_number_bcd = (block_number << 4) | bit_number;
+
+        self.red_label_clear_screen();
+        self.palette_ram = [0; PALETTE_RAM_SIZE];
+        self.crom0_diagnostic_screen = RedLabelCrom0DiagnosticScreen::default();
+        self.crom0_advance_gates = vec![
+            RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+            RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+            RedLabelCrom0AdvanceGate::NextTestAutoCounter,
+        ];
+
+        let led_output = self.red_label_set_diagnostic_leds(RED_LABEL_CROM0_RAM_TEST_LED);
+        let letter_color = RedLabelDiagnosticPaletteWrite {
+            address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+            index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+            value: RED_LABEL_CROM0_FAILURE_COLOR,
+        };
+        self.palette_ram[usize::from(letter_color.index)] = letter_color.value;
+
+        let headline = self.red_label_write_message_text(
+            RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS,
+            "VRAMFL",
+            red_label_message("VRAMFL")?,
+        )?;
+        if headline.text != RED_LABEL_CROM0_RAM_FAILURE_TEXT {
+            return Err(format!(
+                "red-label RAM-failure vector `VRAMFL` text `{}` does not match source text `{}`",
+                headline.text, RED_LABEL_CROM0_RAM_FAILURE_TEXT
+            ));
+        }
+
+        let instruction = RedLabelDiagnosticInstructionWrite {
+            table_label: "IRAMFL",
+            lines: RED_LABEL_CROM0_RAM_TEST_DONE_INSTRUCTIONS,
+        };
+        let instructions = self.red_label_write_crom0_operator_instruction_text(&instruction)?;
+
+        let ram_label = self.red_label_write_message_text(
+            RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS,
+            "VWRAM",
+            red_label_message("VWRAM")?,
+        )?;
+        let cursor_after =
+            self.red_label_write_bcd_number_text(ram_label.cursor_after, ram_number_bcd)?;
+        let ram_row = RedLabelCrom0BadRamBitmapTextWrite {
+            row_address: RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS,
+            text: format!(
+                "{} {}{}",
+                RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT, block_number, bit_number
+            ),
+            block_number,
+            bit_number,
+            ram_number_bcd,
+            cursor_after,
+        };
+
+        Ok(RedLabelCrom0RamFailureTransfer {
+            screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            palette_zeroed: true,
+            failing_address: failure.failing_address,
+            expected_word: failure.expected_word,
+            actual_word: failure.actual_word,
+            error_mask,
+            led_output,
+            letter_color,
+            headline,
+            instructions,
+            ram_row,
+            block_led_output: red_label_diagnostic_led_output(red_label_ram_block_led_source(
+                block_number,
+            )?),
+            bit_led_output: red_label_diagnostic_led_output(bit_number),
+            advance_gates: self.crom0_advance_gates.clone(),
+        })
+    }
+
+    /// Transfer the visible `CRAM20` RAM-test abort/no-error screen.
+    ///
+    /// A counter equal to the initial source counter is the early-abort path
+    /// into the CMOS test. Later abort/completion displays `NO RAM ERRORS
+    /// DETECTED`, flashes LED 4 twice, and waits at `NEXTST`.
+    pub fn red_label_write_crom0_ram_test_abort(
+        &mut self,
+        test_counter: u16,
+    ) -> Result<RedLabelCrom0RamTestAbortTransfer, String> {
+        self.red_label_clear_screen();
+        self.palette_ram = [0; PALETTE_RAM_SIZE];
+        self.crom0_diagnostic_screen = RedLabelCrom0DiagnosticScreen::default();
+        self.crom0_advance_gates.clear();
+
+        if test_counter == RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER {
+            return Ok(RedLabelCrom0RamTestAbortTransfer {
+                screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+                palette_zeroed: true,
+                test_counter,
+                status: RedLabelCrom0RamTestAbortStatus::EarlyAbort,
+                target: RedLabelCrom0RamTestTarget::CmosRamTest,
+                letter_color: None,
+                headline: None,
+                instructions: None,
+                flash_led: None,
+                advance_gates: Vec::new(),
+            });
+        }
+
+        let letter_color = RedLabelDiagnosticPaletteWrite {
+            address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+            index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+            value: RED_LABEL_CROM0_OK_COLOR,
+        };
+        self.palette_ram[usize::from(letter_color.index)] = letter_color.value;
+
+        let headline = self.red_label_write_message_text(
+            RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS,
+            "VNORAM",
+            red_label_message("VNORAM")?,
+        )?;
+        if headline.text != RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT {
+            return Err(format!(
+                "red-label no-RAM-errors vector `VNORAM` text `{}` does not match source text `{}`",
+                headline.text, RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT
+            ));
+        }
+
+        let instruction = RedLabelDiagnosticInstructionWrite {
+            table_label: "IRAMDO",
+            lines: RED_LABEL_CROM0_RAM_TEST_DONE_INSTRUCTIONS,
+        };
+        let instructions = self.red_label_write_crom0_operator_instruction_text(&instruction)?;
+        let flash_led = RedLabelDiagnosticLedFlash {
+            source_value: RED_LABEL_CROM0_RAM_TEST_LED,
+            repetitions: RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
+            delay_ms: RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
+        };
+        self.red_label_flash_diagnostic_leds(RED_LABEL_CROM0_RAM_TEST_LED);
+        self.crom0_advance_gates = vec![RedLabelCrom0AdvanceGate::NextTestAutoCounter];
+
+        Ok(RedLabelCrom0RamTestAbortTransfer {
+            screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+            palette_zeroed: true,
+            test_counter,
+            status: RedLabelCrom0RamTestAbortStatus::NoErrorsDetected,
+            target: RedLabelCrom0RamTestTarget::WaitForNextSwitch,
+            letter_color: Some(letter_color),
+            headline: Some(headline),
+            instructions: Some(instructions),
+            flash_led: Some(flash_led),
+            advance_gates: self.crom0_advance_gates.clone(),
         })
     }
 
@@ -1886,10 +2149,20 @@ fn red_label_crom0_operator_instruction_vector(line: &str) -> Result<&'static st
     match line {
         RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT => Ok("VINS4"),
         RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT => Ok("VINS5"),
+        RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT => Ok("VINS6"),
         _ => Err(format!(
             "red-label CROM0 operator instruction `{line}` has no message vector"
         )),
     }
+}
+
+fn red_label_ram_block_led_source(block_number: u8) -> Result<u8, String> {
+    if !(1..=3).contains(&block_number) {
+        return Err(format!(
+            "red-label RAM failure block {block_number} is outside 1..=3"
+        ));
+    }
+    Ok(0x10 >> block_number)
 }
 
 fn red_label_text_cursor_advance(cursor: u16, width: u8) -> u16 {
@@ -1937,31 +2210,39 @@ mod tests {
             RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS, RED_LABEL_AUDIT_REPEAT_SCAN_DELAY_TICKS,
             RED_LABEL_CLRALL_PACKED_BYTE_WRITES, RED_LABEL_CLRAUD_PACKED_BYTE_WRITES,
             RED_LABEL_CMOSCK_CELL_OFFSET, RED_LABEL_CRHSTD_CELL_OFFSET,
-            RED_LABEL_CROM0_ALL_ROMS_OK_TEXT, RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS,
-            RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT, RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT,
-            RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES,
-            RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT,
+            RED_LABEL_CROM0_ALL_ROMS_OK_TEXT, RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT,
+            RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS, RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT,
+            RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT, RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT,
+            RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS, RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT,
+            RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT, RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS,
+            RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES, RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+            RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT, RED_LABEL_CROM0_RAM_FAILURE_TEXT,
+            RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS,
             RED_LABEL_CROM0_RAM_TEST_ACTIVE_LOOP_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_COLOR,
             RED_LABEL_CROM0_RAM_TEST_DELAY_MS, RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER,
-            RED_LABEL_CROM0_RAM_TEST_TEXT, RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS,
-            RED_LABEL_CROM0_ROM_FAILURE_TEXT, RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
-            RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS, RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
-            RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX, RED_LABEL_DIPFLG_CELL_OFFSET,
-            RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS, RED_LABEL_RESET_PALETTE_BYTES,
-            RED_LABEL_SCREEN_CLEAR_END, RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
-            RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
-            RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
-            RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
+            RED_LABEL_CROM0_RAM_TEST_LED, RED_LABEL_CROM0_RAM_TEST_TEXT,
+            RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_ROM_FAILURE_TEXT,
+            RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS, RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
+            RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS, RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+            RED_LABEL_DIPFLG_CELL_OFFSET, RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS,
+            RED_LABEL_RESET_PALETTE_BYTES, RED_LABEL_SCREEN_CLEAR_END, RED_LABEL_THSTAB_START,
+            RedLabelAuditAdjustmentChange, RedLabelAuditAdjustmentDirection,
+            RedLabelAuditAdjustmentValue, RedLabelAuditCycleState, RedLabelAuditCycleStep,
+            RedLabelAuditDebounceState, RedLabelAuditDebounceStep, RedLabelAuditOperatorState,
+            RedLabelAuditOperatorStep, RedLabelCrom0BadRamBitmapTextWrite,
             RedLabelCrom0BadRomBitmapTextWrite, RedLabelCrom0BadRomScreenWrite,
-            RedLabelCrom0RamTestStartTransfer, RedLabelDiagnosticBitmapTextWrite,
-            RedLabelDiagnosticInstructionBitmapTextWrite, RedLabelDiagnosticInstructionWrite,
-            RedLabelDiagnosticLedFlash, RedLabelDiagnosticLedOutput,
-            RedLabelDiagnosticPaletteWrite, RedLabelDiagnosticTextWrite, RedLabelPowerUpAction,
-            RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
-            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
-            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
-            main_cpu_read_target, main_cpu_write_target, red_label_crom0_diagnostic_screen,
-            red_label_diagnostic_led_output, video_control_cocktail, video_counter_read_value,
+            RedLabelCrom0RamFailure, RedLabelCrom0RamFailureTransfer,
+            RedLabelCrom0RamTestAbortStatus, RedLabelCrom0RamTestAbortTransfer,
+            RedLabelCrom0RamTestStartTransfer, RedLabelCrom0RamTestTarget,
+            RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
+            RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
+            RedLabelDiagnosticLedOutput, RedLabelDiagnosticPaletteWrite,
+            RedLabelDiagnosticTextWrite, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
+            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
+            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
+            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            red_label_crom0_diagnostic_screen, red_label_diagnostic_led_output,
+            video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -2986,6 +3267,202 @@ mod tests {
         assert_message_glyph_at(&board, 0x4F80, 'T');
         assert_message_glyph_at(&board, 0x30DA, 'X');
         assert_message_glyph_at(&board, 0x34DA, 'I');
+    }
+
+    #[test]
+    fn main_board_writes_crom0_ram_failure_outcome() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        board
+            .red_label_write_crom0_ram_test_start()
+            .expect("RAM test start transfer");
+
+        let failure = RedLabelCrom0RamFailure {
+            failing_address: 0x079E,
+            expected_word: 0xAAAA,
+            actual_word: 0xAAAE,
+        };
+        assert_eq!(failure.error_mask(), 0x0004);
+        assert_eq!(failure.bad_block_number(), 2);
+        assert_eq!(failure.bad_bit_number(), Ok(3));
+        assert_eq!(failure.ram_number_bcd(), Ok(0x23));
+
+        let transfer = board
+            .red_label_write_crom0_ram_failure(failure)
+            .expect("RAM failure transfer");
+
+        assert_eq!(
+            transfer,
+            RedLabelCrom0RamFailureTransfer {
+                screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+                palette_zeroed: true,
+                failing_address: 0x079E,
+                expected_word: 0xAAAA,
+                actual_word: 0xAAAE,
+                error_mask: 0x0004,
+                led_output: red_label_diagnostic_led_output(RED_LABEL_CROM0_RAM_TEST_LED),
+                letter_color: RedLabelDiagnosticPaletteWrite {
+                    address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+                    index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+                    value: RED_LABEL_CROM0_FAILURE_COLOR,
+                },
+                headline: RedLabelDiagnosticBitmapTextWrite {
+                    address: RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS,
+                    vector_label: "VRAMFL",
+                    text: String::from(RED_LABEL_CROM0_RAM_FAILURE_TEXT),
+                    cursor_after: 0x6470,
+                },
+                instructions: RedLabelDiagnosticInstructionBitmapTextWrite {
+                    table_label: "IRAMFL",
+                    prompt: RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                        vector_label: "VINS1",
+                        text: String::from(RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT),
+                        cursor_after: 0x96CE,
+                    },
+                    lines: vec![RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                        vector_label: "VINS6",
+                        text: String::from(RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT),
+                        cursor_after: 0x64DA,
+                    }],
+                },
+                ram_row: RedLabelCrom0BadRamBitmapTextWrite {
+                    row_address: RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS,
+                    text: format!("{RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT} 23"),
+                    block_number: 2,
+                    bit_number: 3,
+                    ram_number_bcd: 0x23,
+                    cursor_after: 0x5990,
+                },
+                block_led_output: red_label_diagnostic_led_output(0x04),
+                bit_led_output: red_label_diagnostic_led_output(0x03),
+                advance_gates: vec![
+                    RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+                    RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+                    RedLabelCrom0AdvanceGate::NextTestAutoCounter,
+                ],
+            }
+        );
+        assert_eq!(
+            board.palette_ram()[usize::from(RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX)],
+            RED_LABEL_CROM0_FAILURE_COLOR
+        );
+        assert_eq!(
+            board.crom0_advance_gates(),
+            &[
+                RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+                RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+                RedLabelCrom0AdvanceGate::NextTestAutoCounter,
+            ]
+        );
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_RAM_FAILURE_TEXT_ADDRESS, 'R');
+        assert_message_glyph_at(&board, 0x4770, 'F');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_BAD_RAM_TEXT_ADDRESS, 'R');
+        assert_score_digit_at(&board, 0x5190, 2);
+        assert_score_digit_at(&board, 0x5590, 3);
+        assert_message_glyph_at(&board, 0x30DA, 'C');
+    }
+
+    #[test]
+    fn main_board_writes_crom0_ram_abort_and_no_error_outcomes() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        board
+            .red_label_write_crom0_ram_test_start()
+            .expect("RAM test start transfer");
+
+        let early = board
+            .red_label_write_crom0_ram_test_abort(RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER)
+            .expect("early RAM-test abort transfer");
+
+        assert_eq!(
+            early,
+            RedLabelCrom0RamTestAbortTransfer {
+                screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+                palette_zeroed: true,
+                test_counter: RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER,
+                status: RedLabelCrom0RamTestAbortStatus::EarlyAbort,
+                target: RedLabelCrom0RamTestTarget::CmosRamTest,
+                letter_color: None,
+                headline: None,
+                instructions: None,
+                flash_led: None,
+                advance_gates: Vec::new(),
+            }
+        );
+        assert_eq!(
+            board.ram()[usize::from(RED_LABEL_CROM0_RAM_TEST_TEXT_ADDRESS)],
+            0
+        );
+        assert_eq!(board.palette_ram(), &[0; PALETTE_RAM_SIZE]);
+        assert!(board.crom0_advance_gates().is_empty());
+
+        let transfer = board
+            .red_label_write_crom0_ram_test_abort(RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER - 1)
+            .expect("no-error RAM-test abort transfer");
+
+        assert_eq!(
+            transfer,
+            RedLabelCrom0RamTestAbortTransfer {
+                screen_clear_end: RED_LABEL_SCREEN_CLEAR_END,
+                palette_zeroed: true,
+                test_counter: RED_LABEL_CROM0_RAM_TEST_INITIAL_COUNTER - 1,
+                status: RedLabelCrom0RamTestAbortStatus::NoErrorsDetected,
+                target: RedLabelCrom0RamTestTarget::WaitForNextSwitch,
+                letter_color: Some(RedLabelDiagnosticPaletteWrite {
+                    address: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS,
+                    index: RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
+                    value: RED_LABEL_CROM0_OK_COLOR,
+                }),
+                headline: Some(RedLabelDiagnosticBitmapTextWrite {
+                    address: RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS,
+                    vector_label: "VNORAM",
+                    text: String::from(RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT),
+                    cursor_after: 0x7D80,
+                }),
+                instructions: Some(RedLabelDiagnosticInstructionBitmapTextWrite {
+                    table_label: "IRAMDO",
+                    prompt: RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                        vector_label: "VINS1",
+                        text: String::from(RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT),
+                        cursor_after: 0x96CE,
+                    },
+                    lines: vec![RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                        vector_label: "VINS6",
+                        text: String::from(RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT),
+                        cursor_after: 0x64DA,
+                    }],
+                }),
+                flash_led: Some(RedLabelDiagnosticLedFlash {
+                    source_value: RED_LABEL_CROM0_RAM_TEST_LED,
+                    repetitions: RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
+                    delay_ms: RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
+                }),
+                advance_gates: vec![RedLabelCrom0AdvanceGate::NextTestAutoCounter],
+            }
+        );
+        assert_eq!(
+            board.palette_ram()[usize::from(RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX)],
+            RED_LABEL_CROM0_OK_COLOR
+        );
+        assert_eq!(
+            board.diagnostic_led_flashes(),
+            &[RedLabelDiagnosticLedFlash {
+                source_value: RED_LABEL_CROM0_RAM_TEST_LED,
+                repetitions: RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
+                delay_ms: RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS,
+            }]
+        );
+        assert_eq!(
+            board.crom0_advance_gates(),
+            &[RedLabelCrom0AdvanceGate::NextTestAutoCounter]
+        );
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_NO_RAM_ERRORS_TEXT_ADDRESS, 'N');
+        assert_message_glyph_at(&board, 0x7780, 'D');
+        assert_message_glyph_at(&board, 0x30DA, 'C');
     }
 
     #[test]
