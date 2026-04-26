@@ -27488,7 +27488,7 @@ mod tests {
             red_label_message_glyph('W').expect("W glyph").bytes.len(),
             32
         );
-        assert_eq!(messages.len(), 8);
+        assert_eq!(messages.len(), 10);
         assert_eq!(
             red_label_message("VROMFL")
                 .expect("VROMFL message")
@@ -27505,6 +27505,18 @@ mod tests {
                 String::from("AUTO"),
                 String::from("FOR"),
                 String::from("RAM"),
+                String::from("TEST")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS5")
+                .expect("VINS5 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUTO"),
+                String::from("TO"),
+                String::from("EXIT"),
                 String::from("TEST")
             ]
         );

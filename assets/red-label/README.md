@@ -43,10 +43,10 @@ Current files:
   bank behavior, mirrors, and handlers used by the Rust address classifiers.
 - `message-glyphs.tsv`: source `mess0.src` character image bytes consumed by
   the translated `BONUS` `MESS` text calls and CROM0 diagnostic headline,
-  bad-ROM-row, and operator-instruction text transfer.
+  bad-ROM-row, operator-instruction, and RAM-test start text transfer.
 - `messages.tsv`: source `mess0.src` message vectors and word lists consumed by
   the translated `BONUS` screen text and CROM0 ROM-test diagnostic headline,
-  bad-ROM-row, and operator-instruction messages.
+  bad-ROM-row, operator-instruction, and RAM-test start messages.
 - `object-images.tsv`: red-label object image bytes currently needed by
   `COLIDE` / `COL0` picture-mask intersection, `PRDISP` / `ON86` player
   picture writes, and translated `CWRIT` / `COFF` plus descriptor ON/OFF

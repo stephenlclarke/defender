@@ -71,8 +71,9 @@ This file records behavior that must not be guessed in arcade-core code.
   source-shaped `ROM0`/`ROM9` checksum scan can report the physical ROM numbers
   that `CROM0` would display for failures, and the ROM-stage outcome records
   the manual/auto success/failure display intent, `ADVSW` / `NEXTST` gate
-  sequence, message-ROM bitmap text transfer, and RAM-test handoff. The
-  MAME-documented main-board and sound-board memory maps are embedded under
+  sequence, message-ROM bitmap text transfer, and RAM-test start-screen
+  handoff. The MAME-documented main-board and sound-board memory maps are
+  embedded under
   `assets/red-label/memory-map.tsv` and checked against the Rust address
   classifiers. Red-label fixed-bank SRAM routine metadata is embedded under
   `assets/red-label/sram-routines.tsv`,
@@ -143,9 +144,9 @@ This file records behavior that must not be guessed in arcade-core code.
   post-display debounce countdown as one deterministic cycle, but CPU IRQ
   scheduling, exact Williams power-on RAM contents, `AUDITG` live text
   transfer/screen erasure/post-`PWRUP` wiring, physical advance-switch timing,
-  physical lamp timing, and RAM/CMOS/color/sound test execution after that
-  decision beyond the modeled
-  ROM-stage outcome, CMOS persistence, screen scanline scheduling, watchdog
+  physical lamp timing, and RAM/CMOS/color/sound test execution after the
+  modeled RAM-test start handoff, CMOS persistence, screen scanline scheduling,
+  watchdog
   timing/reset side effects, palette/rendering timing side effects, decoder PROM
   behavior, and DAC sample generation are not modeled.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core
@@ -362,10 +363,10 @@ This file records behavior that must not be guessed in arcade-core code.
   byte/word helper behavior are modeled, and the CROM0 ROM stage now carries
   diagnostic text/palette intent, bitmap
   headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
-  gate metadata. CMOS persistence, `AUDITG` live text transfer/screen
-  erasure/post-`PWRUP` wiring, high-score comparison/initials routines,
-  post-`PWRUP` live CROM0 ROM-test integration, and later-test execution beyond
-  the modeled ROM-stage outcome are not translated.
+  gate metadata plus the RAM-test start-screen visible setup. CMOS persistence,
+  `AUDITG` live text transfer/screen erasure/post-`PWRUP` wiring, high-score
+  comparison/initials routines, and later RAM/CMOS/color/sound test execution
+  beyond the modeled RAM-test start handoff are not translated.
 
 ## Player
 

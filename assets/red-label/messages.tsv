@@ -2,8 +2,10 @@ label	vector_address	words	source
 VWROM	0xC06D	ROM	https://github.com/mwenge/defender/blob/master/src/mess0.src#L91-L93;https://github.com/mwenge/defender/blob/master/src/mess0.src#L188-L190
 VROMFL	0xC071	ROM FAILURE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L91-L96;https://github.com/mwenge/defender/blob/master/src/mess0.src#L188-L190
 VALROM	0xC077	ALL ROMS OK	https://github.com/mwenge/defender/blob/master/src/mess0.src#L91-L96;https://github.com/mwenge/defender/blob/master/src/mess0.src#L188-L193
+VRAMTS	0xC079	RAM TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L97-L98;https://github.com/mwenge/defender/blob/master/src/mess0.src#L194-L195
 VINS1	0xC0BB	PRESS ADVANCE WITH SWITCH SET FOR:	https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L139;https://github.com/mwenge/defender/blob/master/src/mess0.src#L241-L243
 VINS4	0xC0C1	AUTO FOR RAM TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L139;https://github.com/mwenge/defender/blob/master/src/mess0.src#L247-L248
+VINS5	0xC0C3	AUTO TO EXIT TEST	https://github.com/mwenge/defender/blob/master/src/mess0.src#L140-L141;https://github.com/mwenge/defender/blob/master/src/mess0.src#L249-L250
 BONSX	0xC0F3	BONUS X	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
 ATWV	0xC0F9	ATTACK WAVE	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296
 COMPV	0xC0FB	COMPLETED	https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174;https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296

@@ -384,5 +384,24 @@ mod tests {
                 String::from("FOR:")
             ]
         );
+        assert_eq!(
+            red_label_message("VRAMTS")
+                .expect("VRAMTS message")
+                .words
+                .as_slice(),
+            &[String::from("RAM"), String::from("TEST")]
+        );
+        assert_eq!(
+            red_label_message("VINS5")
+                .expect("VINS5 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUTO"),
+                String::from("TO"),
+                String::from("EXIT"),
+                String::from("TEST")
+            ]
+        );
     }
 }
