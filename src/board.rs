@@ -32,6 +32,10 @@ use crate::{
         RedLabelAuditAdjustment, RedLabelCmosDefault, RedLabelCmosLayoutEntry,
         RedLabelRamLayoutEntry, pack_sram_byte, pack_sram_word, unpack_sram_byte, unpack_sram_word,
     },
+    red_label_message::{
+        RedLabelMessage, RedLabelMessageGlyphImage, RedLabelScoreDigitImage, red_label_message,
+        red_label_message_glyph, red_label_score_digit_image,
+    },
     rom::{
         RedLabelCrom0AdvanceGate, RedLabelCrom0RomStage, RedLabelCrom0RomStageStatus,
         RedLabelCrom0RomStageTarget, RedLabelRomImages,
@@ -212,6 +216,29 @@ pub struct RedLabelCrom0DiagnosticScreen {
     pub headline: Option<RedLabelDiagnosticTextWrite>,
     pub instructions: Vec<RedLabelDiagnosticInstructionWrite>,
     pub bad_roms: Vec<RedLabelCrom0BadRomScreenWrite>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelDiagnosticBitmapTextWrite {
+    pub address: u16,
+    pub vector_label: &'static str,
+    pub text: String,
+    pub cursor_after: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelCrom0BadRomBitmapTextWrite {
+    pub row_address: u16,
+    pub text: String,
+    pub rom_number: u8,
+    pub rom_number_bcd: u8,
+    pub cursor_after: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RedLabelCrom0DiagnosticTextTransfer {
+    pub headline: Option<RedLabelDiagnosticBitmapTextWrite>,
+    pub bad_roms: Vec<RedLabelCrom0BadRomBitmapTextWrite>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -638,6 +665,124 @@ impl<'a> DefenderMainBoard<'a> {
         if let Some(led) = stage.final_led {
             self.red_label_set_diagnostic_leds(led);
         }
+    }
+
+    /// Transfer the modeled `CROM0` diagnostic text into video RAM using
+    /// message-ROM glyph bytes.
+    ///
+    /// This covers the `VWTEXT`/`VWNUMB` writes for the ROM-test headline and
+    /// bad-ROM rows. Operator instruction text and physical timing remain
+    /// represented by `crom0_diagnostic_screen` / `crom0_advance_gates`.
+    pub fn red_label_write_crom0_diagnostic_text(
+        &mut self,
+        stage: &RedLabelCrom0RomStage,
+    ) -> Result<RedLabelCrom0DiagnosticTextTransfer, String> {
+        let screen = red_label_crom0_diagnostic_screen(stage);
+        let mut transfer = RedLabelCrom0DiagnosticTextTransfer::default();
+
+        if let Some(headline) = screen.headline {
+            let message = red_label_message(headline.vector_label)?;
+            transfer.headline = Some(self.red_label_write_message_text(
+                headline.address,
+                headline.vector_label,
+                message,
+            )?);
+        }
+
+        for bad_rom in &screen.bad_roms {
+            let message = red_label_message(bad_rom.text_vector_label)?;
+            let rom_label = self.red_label_write_message_text(
+                bad_rom.row_address,
+                bad_rom.text_vector_label,
+                message,
+            )?;
+            let cursor_after = self
+                .red_label_write_bcd_number_text(rom_label.cursor_after, bad_rom.rom_number_bcd)?;
+            transfer.bad_roms.push(RedLabelCrom0BadRomBitmapTextWrite {
+                row_address: bad_rom.row_address,
+                text: format!("{} {}", bad_rom.text, bad_rom.rom_number),
+                rom_number: bad_rom.rom_number,
+                rom_number_bcd: bad_rom.rom_number_bcd,
+                cursor_after,
+            });
+        }
+
+        self.crom0_diagnostic_screen = screen;
+        Ok(transfer)
+    }
+
+    fn red_label_write_message_text(
+        &mut self,
+        screen_address: u16,
+        vector_label: &'static str,
+        message: &RedLabelMessage,
+    ) -> Result<RedLabelDiagnosticBitmapTextWrite, String> {
+        let mut cursor = screen_address;
+        for word in &message.words {
+            for character in word.chars() {
+                let glyph = red_label_message_glyph(character)?;
+                self.red_label_write_message_glyph(cursor, glyph)?;
+                cursor = red_label_text_cursor_advance(cursor, glyph.width);
+            }
+            let space = red_label_message_glyph(' ')?;
+            self.red_label_write_message_glyph(cursor, space)?;
+            cursor = red_label_text_cursor_advance(cursor, space.width);
+        }
+
+        Ok(RedLabelDiagnosticBitmapTextWrite {
+            address: screen_address,
+            vector_label,
+            text: message.words.join(" "),
+            cursor_after: cursor,
+        })
+    }
+
+    fn red_label_write_bcd_number_text(
+        &mut self,
+        screen_address: u16,
+        bcd_number: u8,
+    ) -> Result<u16, String> {
+        let mut cursor = screen_address;
+        for digit in red_label_bcd_number_visible_digits(bcd_number) {
+            let image = red_label_score_digit_image(digit)?;
+            self.red_label_write_score_digit_image(cursor, image)?;
+            cursor = red_label_text_cursor_advance(cursor, image.width);
+        }
+        Ok(cursor)
+    }
+
+    fn red_label_write_message_glyph(
+        &mut self,
+        screen_address: u16,
+        glyph: &RedLabelMessageGlyphImage,
+    ) -> Result<(), String> {
+        for column in 0..glyph.width {
+            let column_address = red_label_screen_offset(screen_address, u16::from(column) << 8)?;
+            let source_column = usize::from(column) * usize::from(glyph.height);
+            for row in 0..glyph.height {
+                let source_byte = glyph.bytes[source_column + usize::from(row)];
+                let address = red_label_screen_offset(column_address, u16::from(row))?;
+                self.ram[usize::from(address)] = source_byte;
+            }
+        }
+        Ok(())
+    }
+
+    fn red_label_write_score_digit_image(
+        &mut self,
+        screen_address: u16,
+        image: &RedLabelScoreDigitImage,
+    ) -> Result<(), String> {
+        for column in 0..image.width {
+            let column_address = red_label_screen_offset(screen_address, u16::from(column) << 8)?;
+            let source_column = usize::from(column) * usize::from(image.height);
+            for row in 0..image.height {
+                let source_byte = image.bytes[source_column + usize::from(row)];
+                let address = red_label_screen_offset(column_address, u16::from(row))?;
+                self.ram[usize::from(address)] = source_byte;
+            }
+        }
+        Ok(())
     }
 
     pub fn cmos_ram(&self) -> &CmosRam {
@@ -1574,6 +1719,33 @@ pub fn red_label_diagnostic_led_output(source_value: u8) -> RedLabelDiagnosticLe
     }
 }
 
+fn red_label_bcd_number_visible_digits(bcd_number: u8) -> Vec<u8> {
+    let high = bcd_number >> 4;
+    let low = bcd_number & 0x0F;
+    if high == 0 {
+        vec![low]
+    } else {
+        vec![high, low]
+    }
+}
+
+fn red_label_text_cursor_advance(cursor: u16, width: u8) -> u16 {
+    let [x, y] = cursor.to_be_bytes();
+    u16::from_be_bytes([x.wrapping_add(width).wrapping_add(1), y])
+}
+
+fn red_label_screen_offset(address: u16, offset: u16) -> Result<u16, String> {
+    let target = address.checked_add(offset).ok_or_else(|| {
+        format!("red-label screen address 0x{address:04X}+0x{offset:04X} overflows")
+    })?;
+    if target > MAIN_CPU_RAM_END {
+        return Err(format!(
+            "red-label screen address 0x{target:04X} is outside main RAM"
+        ));
+    }
+    Ok(target)
+}
+
 fn lsr(value: u8) -> (u8, bool) {
     (value >> 1, value & 1 != 0)
 }
@@ -1611,7 +1783,8 @@ mod tests {
             RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
             RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
             RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
-            RedLabelCrom0BadRomScreenWrite, RedLabelDiagnosticInstructionWrite,
+            RedLabelCrom0BadRomBitmapTextWrite, RedLabelCrom0BadRomScreenWrite,
+            RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionWrite,
             RedLabelDiagnosticLedFlash, RedLabelDiagnosticLedOutput,
             RedLabelDiagnosticPaletteWrite, RedLabelDiagnosticTextWrite, RedLabelPowerUpAction,
             RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
@@ -1630,6 +1803,7 @@ mod tests {
             red_label_cmos_defaults, red_label_cmos_layout, red_label_memory_map,
             red_label_ram_layout,
         },
+        red_label_message::{red_label_message_glyph, red_label_score_digit_image},
         rom::{
             RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS, RED_LABEL_CROM0_FAILURE_COLOR,
             RED_LABEL_CROM0_OK_COLOR, RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS,
@@ -1722,6 +1896,52 @@ mod tests {
 
         RedLabelRomImages::from_parts_for_test(&rom_set, &regions, &loads)
             .expect("test ROM image should build")
+    }
+
+    fn assert_message_glyph_at(
+        board: &DefenderMainBoard<'_>,
+        screen_address: u16,
+        character: char,
+    ) {
+        let glyph = red_label_message_glyph(character).expect("message glyph");
+        assert_image_bytes_at(
+            board,
+            screen_address,
+            glyph.width,
+            glyph.height,
+            &glyph.bytes,
+        );
+    }
+
+    fn assert_score_digit_at(board: &DefenderMainBoard<'_>, screen_address: u16, digit: u8) {
+        let image = red_label_score_digit_image(digit).expect("score digit");
+        assert_image_bytes_at(
+            board,
+            screen_address,
+            image.width,
+            image.height,
+            &image.bytes,
+        );
+    }
+
+    fn assert_image_bytes_at(
+        board: &DefenderMainBoard<'_>,
+        screen_address: u16,
+        width: u8,
+        height: u8,
+        bytes: &[u8],
+    ) {
+        for column in 0..width {
+            let source_column = usize::from(column) * usize::from(height);
+            for row in 0..height {
+                let address =
+                    usize::from(screen_address + (u16::from(column) << 8) + u16::from(row));
+                assert_eq!(
+                    board.ram()[address],
+                    bytes[source_column + usize::from(row)]
+                );
+            }
+        }
     }
 
     fn main_memory_entry(handler: &str) -> RedLabelMemoryMapEntry {
@@ -2363,6 +2583,92 @@ mod tests {
             board.crom0_advance_gates(),
             &[RedLabelCrom0AdvanceGate::NextTestAutoCounter]
         );
+    }
+
+    #[test]
+    fn main_board_writes_crom0_failure_bitmap_text_to_video_ram() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let stage = RedLabelCrom0RomStage {
+            status: RedLabelCrom0RomStageStatus::RomFailure,
+            text_color: Some(RED_LABEL_CROM0_FAILURE_COLOR),
+            headline_address: Some(RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS),
+            initial_led: Some(0x08),
+            final_led: Some(12),
+            flash_led: None,
+            bad_rom_displays: vec![RedLabelCrom0BadRomDisplay {
+                rom_number: 12,
+                cursor_address: 0x427A,
+            }],
+            advance_gates: vec![
+                RedLabelCrom0AdvanceGate::AdvanceSwitchReleaseThenPress,
+                RedLabelCrom0AdvanceGate::NextTestAutoCounter,
+            ],
+            target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
+        };
+
+        let transfer = board
+            .red_label_write_crom0_diagnostic_text(&stage)
+            .expect("CROM0 text transfer");
+
+        assert_eq!(
+            transfer.headline,
+            Some(RedLabelDiagnosticBitmapTextWrite {
+                address: RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS,
+                vector_label: "VROMFL",
+                text: String::from(RED_LABEL_CROM0_ROM_FAILURE_TEXT),
+                cursor_after: 0x6460,
+            })
+        );
+        assert_eq!(
+            transfer.bad_roms,
+            vec![RedLabelCrom0BadRomBitmapTextWrite {
+                row_address: 0x427A,
+                text: String::from("ROM 12"),
+                rom_number: 12,
+                rom_number_bcd: 0x12,
+                cursor_after: 0x597A,
+            }]
+        );
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS, 'R');
+        assert_message_glyph_at(&board, 0x4760, 'F');
+        assert_score_digit_at(&board, 0x517A, 1);
+        assert_score_digit_at(&board, 0x557A, 2);
+    }
+
+    #[test]
+    fn main_board_writes_crom0_success_bitmap_text_to_video_ram() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let stage = RedLabelCrom0RomStage {
+            status: RedLabelCrom0RomStageStatus::AllRomsOk,
+            text_color: Some(RED_LABEL_CROM0_OK_COLOR),
+            headline_address: Some(RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS),
+            initial_led: None,
+            final_led: None,
+            flash_led: Some(0x08),
+            bad_rom_displays: Vec::new(),
+            advance_gates: vec![RedLabelCrom0AdvanceGate::NextTestAutoCounter],
+            target: RedLabelCrom0RomStageTarget::WaitForNextSwitch,
+        };
+
+        let transfer = board
+            .red_label_write_crom0_diagnostic_text(&stage)
+            .expect("CROM0 success text transfer");
+
+        assert_eq!(
+            transfer.headline,
+            Some(RedLabelDiagnosticBitmapTextWrite {
+                address: RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS,
+                vector_label: "VALROM",
+                text: String::from(RED_LABEL_CROM0_ALL_ROMS_OK_TEXT),
+                cursor_after: 0x6380,
+            })
+        );
+        assert!(transfer.bad_roms.is_empty());
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS, 'A');
+        assert_message_glyph_at(&board, 0x5980, 'O');
+        assert_message_glyph_at(&board, 0x5D80, 'K');
     }
 
     #[test]

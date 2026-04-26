@@ -191,7 +191,8 @@ against fixtures:
   run the source-shaped `ROM0`/`ROM9` checksum scan over those images and report
   the physical ROM numbers that `CROM0` would display for failures, plus the
   manual/auto ROM-stage outcome for success/failure display intent, `ADVSW` /
-  `NEXTST` gate sequence, and RAM-test handoff.
+  `NEXTST` gate sequence, message-ROM bitmap text transfer, and RAM-test
+  handoff.
 - `src/app.rs` exposes non-interactive verification commands:
   `--verify-roms PATH` checks a local red-label ROM directory and maps it into
   the embedded MAME ROM regions, while `--fidelity-trace [FRAMES]` emits the
@@ -581,19 +582,19 @@ This section records drift found during the repository review on
   IRQ line state is visible to the deterministic harness. The board can expose
   native visible palette-index and RGBA frames from its video RAM and palette
   RAM, and can record source-shaped diagnostic LED output bytes, `FLASHL`
-  events, CROM0 diagnostic text/palette intent, and `ADVSW` / `NEXTST` gate
-  metadata. CPU interrupt scheduling, physical lamp timing, and sample
-  generation remain gaps.
+  events, CROM0 diagnostic text/palette intent, bitmap headline/bad-ROM-row
+  transfer, and `ADVSW` / `NEXTST` gate metadata. CPU interrupt scheduling,
+  physical lamp timing, and sample generation remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated `AUDITG` live text transfer/screen
-  erasure/post-`PWRUP` wiring or live CROM0 diagnostic bitmap text writes,
-  physical advance-switch timing, physical lamp timing, and RAM/CMOS/color/sound
-  test execution after the now-identified `PWRUP` action decision beyond the
-  modeled ROM-stage outcome, CMOS persistence, screen scanline scheduler,
-  watchdog timing/reset side effects, rendering timing side effects, decoder
-  PROM behavior, DAC sample output, CPU IRQ scheduling, or translated `VSNDRM1.SRC`
-  routines.
+  erasure/post-`PWRUP` wiring or live CROM0 operator-instruction bitmap text
+  writes, physical advance-switch timing, physical lamp timing, and
+  RAM/CMOS/color/sound test execution after the now-identified `PWRUP` action
+  decision beyond the modeled ROM-stage outcome, CMOS persistence, screen
+  scanline scheduler, watchdog timing/reset side effects, rendering timing side
+  effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or
+  translated `VSNDRM1.SRC` routines.
 
 ### Player And Controls
 

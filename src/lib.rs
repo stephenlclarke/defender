@@ -16,6 +16,7 @@ pub mod machine;
 pub mod pia;
 pub mod red_label;
 pub mod red_label_memory;
+pub mod red_label_message;
 pub mod red_label_wave;
 pub mod rom;
 pub mod sound;

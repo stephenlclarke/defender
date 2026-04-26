@@ -42,9 +42,9 @@ Current files:
 - `memory-map.tsv`: MAME-documented main-board and sound-board address ranges,
   bank behavior, mirrors, and handlers used by the Rust address classifiers.
 - `message-glyphs.tsv`: source `mess0.src` character image bytes consumed by
-  the translated `BONUS` `MESS` text calls.
+  the translated `BONUS` `MESS` text calls and CROM0 diagnostic text transfer.
 - `messages.tsv`: source `mess0.src` message vectors and word lists consumed by
-  the translated `BONUS` screen text.
+  the translated `BONUS` screen text and CROM0 ROM-test diagnostic messages.
 - `object-images.tsv`: red-label object image bytes currently needed by
   `COLIDE` / `COL0` picture-mask intersection, `PRDISP` / `ON86` player
   picture writes, and translated `CWRIT` / `COFF` plus descriptor ON/OFF

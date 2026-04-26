@@ -27475,7 +27475,7 @@ mod tests {
                 0x11, 0x00, 0x11, 0x01, 0x01, 0x11, 0x01, 0x01, 0x11, 0x00
             ]
         );
-        assert_eq!(message_glyphs.len(), 18);
+        assert_eq!(message_glyphs.len(), 21);
         assert_eq!(
             red_label_message_glyph(' ').expect("space glyph").address,
             0xC697
@@ -27484,7 +27484,14 @@ mod tests {
             red_label_message_glyph('W').expect("W glyph").bytes.len(),
             32
         );
-        assert_eq!(messages.len(), 3);
+        assert_eq!(messages.len(), 6);
+        assert_eq!(
+            red_label_message("VROMFL")
+                .expect("VROMFL message")
+                .words
+                .as_slice(),
+            &[String::from("ROM"), String::from("FAILURE")]
+        );
         assert_eq!(
             red_label_message("ATWV")
                 .expect("ATWV message")
