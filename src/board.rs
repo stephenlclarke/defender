@@ -257,6 +257,43 @@ pub enum RedLabelAuditDebounceStep {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct RedLabelAuditCycleState {
+    operator: RedLabelAuditOperatorState,
+    debounce: RedLabelAuditDebounceState,
+}
+
+impl RedLabelAuditCycleState {
+    pub fn for_displayed_row_number(row_number: u8) -> Option<Self> {
+        Some(Self {
+            operator: RedLabelAuditOperatorState::for_displayed_row_number(row_number)?,
+            debounce: RedLabelAuditDebounceState::default(),
+        })
+    }
+
+    pub fn operator(self) -> RedLabelAuditOperatorState {
+        self.operator
+    }
+
+    pub fn debounce(self) -> RedLabelAuditDebounceState {
+        self.debounce
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelAuditCycleStep {
+    Idle {
+        row_number: u8,
+        change: Option<RedLabelAuditAdjustmentChange>,
+    },
+    Display {
+        line: RedLabelAuditDisplayLine,
+        change: Option<RedLabelAuditAdjustmentChange>,
+    },
+    Debounce(RedLabelAuditDebounceStep),
+    ReturnToGame,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RedLabelAuditOperatorState {
     row_index: u8,
@@ -565,6 +602,40 @@ impl<'a> DefenderMainBoard<'a> {
                 remaining_ticks: state.remaining_ticks,
                 shift_register: state.shift_register,
             })
+        }
+    }
+
+    /// Source-shaped deterministic `AUDIT0` cycle.
+    ///
+    /// This ties the translated row navigation/change decision, `DISAUD` line
+    /// formatting, and post-display debounce gate into one step. It keeps live
+    /// video text transfer, screen erasure, watchdog refresh, and the outer
+    /// post-`PWRUP` entry/exit wiring outside the helper.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/romc8.src#L41-L113>.
+    pub fn red_label_audit_cycle_step(
+        &mut self,
+        state: &mut RedLabelAuditCycleState,
+        adjustments: &[RedLabelAuditAdjustment],
+    ) -> Option<RedLabelAuditCycleStep> {
+        if state.debounce.remaining_ticks != 0 {
+            return self
+                .red_label_audit_debounce_tick(&mut state.debounce)
+                .map(RedLabelAuditCycleStep::Debounce);
+        }
+
+        match self.red_label_audit_operator_step(&mut state.operator, adjustments)? {
+            RedLabelAuditOperatorStep::Idle { row_number, change } => {
+                Some(RedLabelAuditCycleStep::Idle { row_number, change })
+            }
+            RedLabelAuditOperatorStep::Display { row_number, change } => {
+                let adjustment = adjustments
+                    .iter()
+                    .find(|adjustment| adjustment.number == row_number)?;
+                let line = self.red_label_audit_display_line(adjustment)?;
+                state.debounce.begin_after_display();
+                Some(RedLabelAuditCycleStep::Display { line, change })
+            }
+            RedLabelAuditOperatorStep::ReturnToGame => Some(RedLabelAuditCycleStep::ReturnToGame),
         }
     }
 
@@ -1301,11 +1372,12 @@ mod tests {
             RED_LABEL_DIPFLG_CELL_OFFSET, RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS,
             RED_LABEL_RESET_PALETTE_BYTES, RED_LABEL_THSTAB_START, RedLabelAuditAdjustmentChange,
             RedLabelAuditAdjustmentDirection, RedLabelAuditAdjustmentValue,
-            RedLabelAuditDebounceState, RedLabelAuditDebounceStep, RedLabelAuditOperatorState,
-            RedLabelAuditOperatorStep, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
-            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
-            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
-            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
+            RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
+            RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE,
+            cmos_4bit_write_value, cmos_sram_clear_packed_bytes, cmos_sram_read_byte,
+            cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word, defender_io_window,
+            is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
             video_control_cocktail, video_counter_read_value,
         },
         input::{
@@ -2563,6 +2635,142 @@ mod tests {
         assert_eq!(debounce.remaining_ticks(), 0);
         assert_eq!(debounce.shift_register(), 0);
         assert_eq!(board.red_label_audit_debounce_tick(&mut debounce), None);
+    }
+
+    #[test]
+    fn main_board_auditg_cycle_displays_line_and_gates_navigation_until_release() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+        let mut cycle = RedLabelAuditCycleState::default();
+
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+        board.set_cabinet_input(CabinetInput::NONE);
+        match board
+            .red_label_audit_cycle_step(&mut cycle, &adjustments)
+            .expect("initial cycle")
+        {
+            RedLabelAuditCycleStep::Display { line, change } => {
+                assert_eq!(line.row_number(), 1);
+                assert_eq!(&line.visible_text().as_bytes()[0..2], b"01");
+                assert_eq!(change, None);
+            }
+            other => panic!("unexpected initial audit cycle step {other:?}"),
+        }
+        assert_eq!(cycle.operator().row_number(), 1);
+        assert_eq!(
+            cycle.debounce().remaining_ticks(),
+            RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS + 1
+        );
+
+        board.set_cabinet_input(CabinetInput {
+            service_advance: true,
+            ..CabinetInput::NONE
+        });
+        assert_eq!(
+            board.red_label_audit_cycle_step(&mut cycle, &adjustments),
+            Some(RedLabelAuditCycleStep::Debounce(
+                RedLabelAuditDebounceStep::Waiting {
+                    remaining_ticks: RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS,
+                    shift_register: 0xFF,
+                }
+            ))
+        );
+        assert_eq!(cycle.operator().row_number(), 1);
+
+        board.set_cabinet_input(CabinetInput::NONE);
+        for _ in 0..7 {
+            assert!(matches!(
+                board.red_label_audit_cycle_step(&mut cycle, &adjustments),
+                Some(RedLabelAuditCycleStep::Debounce(
+                    RedLabelAuditDebounceStep::Waiting { .. }
+                ))
+            ));
+        }
+        assert_eq!(
+            board.red_label_audit_cycle_step(&mut cycle, &adjustments),
+            Some(RedLabelAuditCycleStep::Debounce(
+                RedLabelAuditDebounceStep::Released { shift_register: 0 }
+            ))
+        );
+
+        board.set_cabinet_input(CabinetInput {
+            service_advance: true,
+            ..CabinetInput::NONE
+        });
+        match board
+            .red_label_audit_cycle_step(&mut cycle, &adjustments)
+            .expect("advance cycle")
+        {
+            RedLabelAuditCycleStep::Display { line, change } => {
+                assert_eq!(line.row_number(), 28);
+                assert_eq!(&line.visible_text().as_bytes()[0..2], b"28");
+                assert_eq!(change, None);
+            }
+            other => panic!("unexpected manual advance audit cycle step {other:?}"),
+        }
+        assert_eq!(cycle.operator().row_number(), 28);
+    }
+
+    #[test]
+    fn main_board_auditg_cycle_applies_change_before_display_line() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+        let mut cycle = RedLabelAuditCycleState::for_displayed_row_number(9).expect("row 9 cycle");
+
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+        board.set_cabinet_input(CabinetInput {
+            high_score_reset: true,
+            auto_up_manual_down: true,
+            ..CabinetInput::NONE
+        });
+
+        match board
+            .red_label_audit_cycle_step(&mut cycle, &adjustments)
+            .expect("adjustment cycle")
+        {
+            RedLabelAuditCycleStep::Display { line, change } => {
+                assert_eq!(line.row_number(), 9);
+                assert_eq!(
+                    change,
+                    Some(RedLabelAuditAdjustmentChange::Changed(
+                        RedLabelAuditAdjustmentValue::PackedByte(0x04)
+                    ))
+                );
+                assert_eq!(line.value(), RedLabelAuditAdjustmentValue::PackedByte(0x04));
+                assert_eq!(&line.visible_text().as_bytes()[9..11], b"04");
+            }
+            other => panic!("unexpected adjustment audit cycle step {other:?}"),
+        }
+        assert_eq!(
+            cycle.debounce().remaining_ticks(),
+            RED_LABEL_AUDIT_FIRST_SCAN_DELAY_TICKS + 1
+        );
+    }
+
+    #[test]
+    fn main_board_auditg_cycle_exits_after_last_row_auto_advance() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let defaults = red_label_cmos_defaults().expect("CMOS defaults parse");
+        let adjustments = red_label_audit_adjustments().expect("audit adjustments parse");
+        let mut cycle =
+            RedLabelAuditCycleState::for_displayed_row_number(28).expect("row 28 cycle");
+
+        board.red_label_cmos_init(&defaults).expect("CMOS init");
+        board.set_cabinet_input(CabinetInput {
+            service_advance: true,
+            auto_up_manual_down: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(
+            board.red_label_audit_cycle_step(&mut cycle, &adjustments),
+            Some(RedLabelAuditCycleStep::ReturnToGame)
+        );
     }
 
     #[test]

@@ -247,6 +247,9 @@ This section records drift found during the repository review on
 - `src/board.rs` now models the source-visible `AUDITG` post-display
   delay/debounce registers: the first 100-tick scan delay, the six-tick repeat
   scan cadence, and the `BITB #$0A` release shift register.
+- `src/board.rs` now ties the source-visible `AUDITG` row step, `DISAUD`
+  display-line formatting, and post-display debounce gate into one
+  deterministic audit cycle helper.
 - `src/board.rs` now models the source-visible `ALTER` / `HYSCRE` operator
   adjustment mutation rules: audit rows stay read-only, coin multiplier rows
   respect `COINSL`, `DIPSW` changes set `DIPFLG`, and byte/replay-level values
@@ -557,9 +560,9 @@ This section records drift found during the repository review on
   source CMOS offsets, can format the source-visible `DISAUD` line buffer for
   those rows, can apply the source-visible `ALTER` / `HYSCRE` mutation rules,
   can step the source-visible `AUDITG` row navigation from IN2 service inputs,
-  can model the post-display `AUDITG` debounce countdown, and can snapshot
-  source-labeled CMOS and RAM fields. A main-board address classifier exists
-  for RAM, banked I/O,
+  can model the post-display `AUDITG` debounce countdown, can run those pieces
+  as one deterministic audit cycle, and can snapshot source-labeled CMOS and
+  RAM fields. A main-board address classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
   surface. Raw write-only palette register bytes, CMOS 4-bit write/read bytes,
@@ -575,11 +578,12 @@ This section records drift found during the repository review on
   sample generation also remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
-  no exact power-on RAM state, translated `AUDITG` live text transfer/full-loop
-  integration or `CROM0` diagnostics after the now-identified `PWRUP` action
-  decision, CMOS persistence, screen scanline scheduler, watchdog timing/reset
-  side effects, rendering timing side effects, decoder PROM behavior, DAC
-  sample output, CPU IRQ scheduling, or translated `VSNDRM1.SRC` routines.
+  no exact power-on RAM state, translated `AUDITG` live text transfer/screen
+  erasure/post-`PWRUP` wiring or `CROM0` diagnostics after the now-identified
+  `PWRUP` action decision, CMOS persistence, screen scanline scheduler,
+  watchdog timing/reset side effects, rendering timing side effects, decoder
+  PROM behavior, DAC sample output, CPU IRQ scheduling, or translated
+  `VSNDRM1.SRC` routines.
 
 ### Player And Controls
 

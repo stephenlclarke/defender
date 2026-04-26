@@ -102,9 +102,9 @@ This file records behavior that must not be guessed in arcade-core code.
   source CMOS offsets, can format the source-visible `DISAUD` line buffer for
   those rows, can apply the source-visible `ALTER` / `HYSCRE` mutation rules,
   can step the source-visible `AUDITG` row navigation from IN2 service inputs,
-  can model the post-display `AUDITG` debounce countdown, and can snapshot
-  source-labeled CMOS and main-RAM fields. A main-board address classifier
-  exists for RAM, banked I/O,
+  can model the post-display `AUDITG` debounce countdown, can run those pieces
+  as one deterministic audit cycle, and can snapshot source-labeled CMOS and
+  main-RAM fields. A main-board address classifier exists for RAM, banked I/O,
   selected banked program ROM, bank-select writes, and fixed ROM reads. Main
   RAM bytes can now be read and written through a deterministic harness
   surface, and raw write-only palette register bytes are stored. CMOS 4-bit
@@ -134,12 +134,12 @@ This file records behavior that must not be guessed in arcade-core code.
   boundary, and command CB1 drives the sound PIA IRQ state. The board layer can
   report the `romc0.src` target reached by each `PWRUP` action decision and
   step/read/format/mutate the source `AUDITG` / `MSGAUD` table rows and its
-  post-display debounce countdown, but CPU IRQ scheduling, LED segment side
-  effects, exact Williams power-on RAM contents, `AUDITG` live text
-  transfer/full-loop integration or `CROM0` diagnostics after that decision,
-  CMOS persistence, screen scanline scheduling, watchdog timing/reset side
-  effects, palette/rendering timing side effects, decoder PROM behavior, and
-  DAC sample generation are not modeled.
+  post-display debounce countdown as one deterministic cycle, but CPU IRQ
+  scheduling, LED segment side effects, exact Williams power-on RAM contents,
+  `AUDITG` live text transfer/screen erasure/post-`PWRUP` wiring or `CROM0`
+  diagnostics after that decision, CMOS persistence, screen scanline
+  scheduling, watchdog timing/reset side effects, palette/rendering timing side
+  effects, decoder PROM behavior, and DAC sample generation are not modeled.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core
   scaffold. It initializes `PINIT`/`OINIT`-style process, super-process, and
   object free lists, sets `CRPROC` to the active-process head, clears active
@@ -352,8 +352,9 @@ This file records behavior that must not be guessed in arcade-core code.
   source-visible row navigation, display-line formatting, and adjustment
   mutations, the post-display debounce countdown, and red-label packed
   byte/word helper behavior are modeled, but CMOS persistence, `AUDITG` live
-  text transfer/full-loop integration, high-score comparison/initials routines,
-  and the post-`PWRUP` `CROM0` diagnostics are not translated.
+  text transfer/screen erasure/post-`PWRUP` wiring, high-score
+  comparison/initials routines, and the post-`PWRUP` `CROM0` diagnostics are
+  not translated.
 
 ## Player
 
