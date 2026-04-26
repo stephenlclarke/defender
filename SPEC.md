@@ -196,8 +196,9 @@ against fixtures:
   fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test write/verify
   loop plus visible outcomes, and the CROM0 color-RAM diagnostic
   heading/bars/palette loop plus audio-test sound-pulse/skip-table behavior,
-  switch-test display-table/PIA-scan behavior, and monitor-test
-  crosshatch/RGB-field/color-bar pattern behavior.
+  switch-test display-table/PIA-scan behavior, monitor-test
+  crosshatch/RGB-field/color-bar pattern behavior, and the monitor-test
+  audit-branch transfer into the `AUDITG` entry screen.
 - `src/app.rs` exposes non-interactive verification commands:
   `--verify-roms PATH` checks a local red-label ROM directory and maps it into
   the embedded MAME ROM regions, while `--fidelity-trace [FRAMES]` emits the
@@ -604,16 +605,14 @@ This section records drift found during the repository review on
   step the `COLRMT` palette loop, model the CROM0 audio-test heading,
   `PLAYB` pulse, skip-sound table, BCD sound-number display, CROM0
   switch-test heading/display table/PIA scan, CROM0 monitor-test
-  heading/crosshatch/RGB-field/color-bar pattern displays, and `AUDITG`
-  title/prompt/row text transfers. CPU interrupt scheduling, physical lamp
-  timing, and sample generation remain gaps.
+  heading/crosshatch/RGB-field/color-bar pattern displays, monitor-to-`AUDITG`
+  entry transfer, and `AUDITG` title/prompt/row text transfers. CPU interrupt
+  scheduling, physical lamp timing, and sample generation remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated post-`PWRUP` `AUDITG` scheduling and
   wiring, physical advance-switch timing, physical lamp timing,
-  sub-pass/page-boundary RAM-test operator polling, monitor-test
-  handoff/live-audit integration beyond the modeled monitor pattern loop,
-  CMOS persistence, screen
+  sub-pass/page-boundary RAM-test operator polling, CMOS persistence, screen
   scanline scheduler, watchdog timing/reset side effects, rendering timing side
   effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or
   translated `VSNDRM1.SRC` routines.

@@ -152,8 +152,7 @@ This file records behavior that must not be guessed in arcade-core code.
   cycle, but CPU IRQ scheduling, exact Williams power-on RAM contents,
   post-`PWRUP` `AUDITG` scheduling/wiring, physical advance-switch timing,
   physical lamp timing, sub-pass/page-boundary RAM-test operator polling,
-  monitor-test handoff/live-audit integration beyond the modeled monitor
-  pattern loop, CMOS persistence,
+  CMOS persistence,
   screen scanline scheduling, watchdog timing/reset side effects,
   palette/rendering timing side effects, decoder PROM behavior, and DAC sample
   generation are not modeled.
@@ -376,12 +375,11 @@ This file records behavior that must not be guessed in arcade-core code.
   pattern fill/verify pass, pass-boundary loop dispatch, and CMOS RAM-test
   write/verify loop plus visible outcomes and the CROM0 color-RAM diagnostic
   heading/bars/palette loop plus audio-test sound-pulse/skip-table behavior,
-  switch-test display-table/PIA-scan behavior, and monitor-test
-  crosshatch/RGB-field/color-bar pattern behavior. CMOS persistence,
-  post-`PWRUP` `AUDITG` scheduling/wiring, high-score comparison/initials
-  routines, sub-pass/page-boundary RAM-test operator
-  polling, and monitor-test handoff/live-audit integration beyond the modeled
-  monitor pattern loop are not translated.
+  switch-test display-table/PIA-scan behavior, monitor-test
+  crosshatch/RGB-field/color-bar pattern behavior, and monitor-to-`AUDITG`
+  entry transfer. CMOS persistence, post-`PWRUP` `AUDITG` scheduling/wiring,
+  high-score comparison/initials routines, and sub-pass/page-boundary RAM-test
+  operator polling are not translated.
 
 ## Player
 

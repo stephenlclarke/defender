@@ -20,8 +20,7 @@
 //! write/verify loop, visible outcomes, and color-RAM diagnostic cycle. CMOS
 //! persistence, `AUDITG` post-`PWRUP` scheduling/full-loop integration,
 //! physical advance/lamp timing beyond the modeled ROM-stage screen/LED output,
-//! monitor-test handoff wiring, and full video timing remain explicit fidelity
-//! gaps.
+//! and full video timing remain explicit fidelity gaps.
 
 use crate::{
     input::{
@@ -897,6 +896,7 @@ pub struct RedLabelCrom0MonitorTestStep {
     pub pattern_index: usize,
     pub pattern: Option<RedLabelCrom0MonitorPatternKind>,
     pub display: Option<RedLabelCrom0MonitorPatternDisplay>,
+    pub audit_start: Option<RedLabelAuditGameAdjustStartTransfer>,
     pub next_pattern_index: Option<usize>,
     pub delay_ms: Option<u16>,
     pub target: RedLabelCrom0MonitorTestTarget,
@@ -2615,10 +2615,12 @@ impl<'a> DefenderMainBoard<'a> {
         red_label_validate_monitor_pattern_index(pattern_index)?;
 
         if advance_to_audit {
+            let audit_start = self.red_label_write_audit_game_adjust_start()?;
             return Ok(RedLabelCrom0MonitorTestStep {
                 pattern_index,
                 pattern: None,
                 display: None,
+                audit_start: Some(audit_start),
                 next_pattern_index: None,
                 delay_ms: None,
                 target: RedLabelCrom0MonitorTestTarget::AuditGameAdjust,
@@ -2644,6 +2646,7 @@ impl<'a> DefenderMainBoard<'a> {
             pattern_index,
             pattern: Some(pattern),
             display: Some(display),
+            audit_start: None,
             next_pattern_index: Some(next_pattern_index),
             delay_ms: Some(RED_LABEL_CROM0_MONITOR_PATTERN_DELAY_MS),
             target,
@@ -7507,6 +7510,7 @@ mod tests {
         assert_eq!(red.pattern, Some(RedLabelCrom0MonitorPatternKind::RedField));
         assert_eq!(field.source_label, "RFIELD");
         assert_eq!(field.color, RED_LABEL_CROM0_MONITOR_RED_FIELD_COLOR);
+        assert_eq!(red.audit_start, None);
         assert_eq!(
             field.palette_writes,
             vec![
@@ -7557,12 +7561,15 @@ mod tests {
             .expect("monitor audit target");
         assert_eq!(audit.pattern, None);
         assert_eq!(audit.display, None);
+        let audit_start = audit.audit_start.as_ref().expect("audit start transfer");
+        assert_eq!(audit_start.active_instructions.table_label, "IAUD2");
         assert_eq!(audit.next_pattern_index, None);
         assert_eq!(audit.delay_ms, None);
         assert_eq!(
             audit.target,
             RedLabelCrom0MonitorTestTarget::AuditGameAdjust
         );
+        assert_message_glyph_at(&board, RED_LABEL_AUDIT_TITLE_ADDRESS, 'W');
     }
 
     #[test]

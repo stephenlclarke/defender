@@ -179,10 +179,10 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   color-RAM diagnostic heading/bars/palette loop, CROM0 audio-test
   heading/sound-pulse/skip-table behavior, CROM0 switch-test
   heading/display-table/PIA-scan behavior, CROM0 monitor-test
-  heading/crosshatch/RGB-field/color-bar pattern behavior, `AUDITG` entry
-  screens and `DISAUD` row video transfer/erasure, and advance-gate intent,
-  sound-table bytes, the complete `SWTAB` switch table, the trace schema, and
-  `WVTAB` wave records from `assets/red-label/`.
+  heading/crosshatch/RGB-field/color-bar pattern behavior and audit-branch
+  handoff, `AUDITG` entry screens and `DISAUD` row video transfer/erasure, and
+  advance-gate intent, sound-table bytes, the complete `SWTAB` switch table,
+  the trace schema, and `WVTAB` wave records from `assets/red-label/`.
 - The core now initializes source-owned process, super-process, object, player,
   player-start, switch-history, switch-queue, and shell-list RAM bytes from
   embedded red-label metadata and emits object-table/SPTR-head CRCs in fidelity
@@ -406,12 +406,12 @@ yet; current implementation status is tracked in `SPEC.md` and
   outcomes, CROM0 color-RAM diagnostic heading/bars/palette-loop behavior,
   CROM0 audio-test heading/sound-pulse/skip-table behavior, CROM0 switch-test
   heading/display-table/PIA-scan behavior, CROM0 monitor-test
-  heading/crosshatch/RGB-field/color-bar pattern behavior, high-score reset
-  copy, operator audit/adjustment table, `AUDITG` game-adjust entry screens,
-  and `DISAUD` display-line formatting/video transfer/erasure, row
-  navigation, post-display debounce cadence, deterministic audit cycle with
-  previous-row erasure, and CMOS mutation rules now embedded under
-  `assets/red-label/`. The
+  heading/crosshatch/RGB-field/color-bar pattern behavior and audit-branch
+  handoff, high-score reset copy, operator audit/adjustment table, `AUDITG`
+  game-adjust entry screens, and `DISAUD` display-line formatting/video
+  transfer/erasure, row navigation, post-display debounce cadence,
+  deterministic audit cycle with previous-row erasure, and CMOS mutation rules
+  now embedded under `assets/red-label/`. The
   `defb6.src` `CRTAB` bytes now feed
   the `CRINIT` pseudo-color RAM reset embedded in
   `assets/red-label/color-ram.tsv`. The `defa7.src` `SCORE`, `SNDLD`, `SHELL`,
