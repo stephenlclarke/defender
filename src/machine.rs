@@ -27475,22 +27475,38 @@ mod tests {
                 0x11, 0x00, 0x11, 0x01, 0x01, 0x11, 0x01, 0x01, 0x11, 0x00
             ]
         );
-        assert_eq!(message_glyphs.len(), 21);
+        assert_eq!(message_glyphs.len(), 23);
         assert_eq!(
             red_label_message_glyph(' ').expect("space glyph").address,
             0xC697
         );
         assert_eq!(
+            red_label_message_glyph(':').expect("colon glyph").address,
+            0xC7B7
+        );
+        assert_eq!(
             red_label_message_glyph('W').expect("W glyph").bytes.len(),
             32
         );
-        assert_eq!(messages.len(), 6);
+        assert_eq!(messages.len(), 8);
         assert_eq!(
             red_label_message("VROMFL")
                 .expect("VROMFL message")
                 .words
                 .as_slice(),
             &[String::from("ROM"), String::from("FAILURE")]
+        );
+        assert_eq!(
+            red_label_message("VINS4")
+                .expect("VINS4 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUTO"),
+                String::from("FOR"),
+                String::from("RAM"),
+                String::from("TEST")
+            ]
         );
         assert_eq!(
             red_label_message("ATWV")

@@ -17,10 +17,9 @@
 //! palette-index and RGBA frames from video RAM and palette RAM, can apply the
 //! ROM-derived CMOS defaults from `romc8.src`, and can route the CMOS-visible
 //! `romc0.src` power-up branch. CMOS persistence, `AUDITG` live diagnostic text
-//! transfer/full-loop integration, live `CROM0` diagnostic bitmap text
-//! transfer/later-test execution and physical advance/lamp timing beyond the
-//! modeled ROM-stage screen/LED output, and full video timing remain explicit
-//! fidelity gaps.
+//! transfer/full-loop integration, `CROM0` later-test execution, physical
+//! advance/lamp timing beyond the modeled ROM-stage screen/LED output, and full
+//! video timing remain explicit fidelity gaps.
 
 use crate::{
     input::{
@@ -87,7 +86,12 @@ pub const RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX: u8 = 1;
 pub const RED_LABEL_CROM0_ROM_FAILURE_TEXT: &str = "ROM FAILURE";
 pub const RED_LABEL_CROM0_ALL_ROMS_OK_TEXT: &str = "ALL ROMS OK";
 pub const RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT: &str = "ROM";
-pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS: &[&str] = &["AUTO FOR RAM TEST"];
+pub const RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT: &str = "PRESS ADVANCE WITH SWITCH SET FOR:";
+pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT: &str = "AUTO FOR RAM TEST";
+pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS: &[&str] =
+    &[RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT];
+pub const RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS: u16 = 0x18CE;
+pub const RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES: [u16; 2] = [0x10DA, 0x10E4];
 pub const WATCHDOG_RESET_BYTE: u8 = 0x39;
 pub const VIDEO_COUNTER_CLAMPED_VALUE: u8 = 0xFC;
 pub const VIDEO_COUNTER_CLAMP_VPOS: u16 = 0x100;
@@ -235,9 +239,17 @@ pub struct RedLabelCrom0BadRomBitmapTextWrite {
     pub cursor_after: u16,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelDiagnosticInstructionBitmapTextWrite {
+    pub table_label: &'static str,
+    pub prompt: RedLabelDiagnosticBitmapTextWrite,
+    pub lines: Vec<RedLabelDiagnosticBitmapTextWrite>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct RedLabelCrom0DiagnosticTextTransfer {
     pub headline: Option<RedLabelDiagnosticBitmapTextWrite>,
+    pub instructions: Vec<RedLabelDiagnosticInstructionBitmapTextWrite>,
     pub bad_roms: Vec<RedLabelCrom0BadRomBitmapTextWrite>,
 }
 
@@ -670,9 +682,9 @@ impl<'a> DefenderMainBoard<'a> {
     /// Transfer the modeled `CROM0` diagnostic text into video RAM using
     /// message-ROM glyph bytes.
     ///
-    /// This covers the `VWTEXT`/`VWNUMB` writes for the ROM-test headline and
-    /// bad-ROM rows. Operator instruction text and physical timing remain
-    /// represented by `crom0_diagnostic_screen` / `crom0_advance_gates`.
+    /// This covers the `VWTEXT`/`VWNUMB` writes for the ROM-test headline,
+    /// operator instruction prompt/lines, and bad-ROM rows. Physical timing
+    /// remains represented by `crom0_advance_gates`.
     pub fn red_label_write_crom0_diagnostic_text(
         &mut self,
         stage: &RedLabelCrom0RomStage,
@@ -687,6 +699,13 @@ impl<'a> DefenderMainBoard<'a> {
                 headline.vector_label,
                 message,
             )?);
+        }
+
+        let mut instructions = screen.instructions.iter();
+        if let Some(instruction) = instructions.next() {
+            transfer
+                .instructions
+                .push(self.red_label_write_crom0_operator_instruction_text(instruction)?);
         }
 
         for bad_rom in &screen.bad_roms {
@@ -707,8 +726,61 @@ impl<'a> DefenderMainBoard<'a> {
             });
         }
 
+        for instruction in instructions {
+            transfer
+                .instructions
+                .push(self.red_label_write_crom0_operator_instruction_text(instruction)?);
+        }
+
         self.crom0_diagnostic_screen = screen;
         Ok(transfer)
+    }
+
+    fn red_label_write_crom0_operator_instruction_text(
+        &mut self,
+        instruction: &RedLabelDiagnosticInstructionWrite,
+    ) -> Result<RedLabelDiagnosticInstructionBitmapTextWrite, String> {
+        let prompt_message = red_label_message("VINS1")?;
+        let prompt = self.red_label_write_message_text(
+            RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+            "VINS1",
+            prompt_message,
+        )?;
+        if prompt.text != RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT {
+            return Err(format!(
+                "red-label operator prompt asset text `{}` does not match source text `{}`",
+                prompt.text, RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT
+            ));
+        }
+
+        let mut lines = Vec::with_capacity(instruction.lines.len());
+        for (line_index, line) in instruction.lines.iter().copied().enumerate() {
+            let address = *RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES
+                .get(line_index)
+                .ok_or_else(|| {
+                    format!(
+                        "red-label operator instruction table `{}` has no screen address for line {}",
+                        instruction.table_label,
+                        line_index + 1
+                    )
+                })?;
+            let vector_label = red_label_crom0_operator_instruction_vector(line)?;
+            let message = red_label_message(vector_label)?;
+            let text_write = self.red_label_write_message_text(address, vector_label, message)?;
+            if text_write.text != line {
+                return Err(format!(
+                    "red-label operator instruction vector `{vector_label}` text `{}` does not match source text `{line}`",
+                    text_write.text
+                ));
+            }
+            lines.push(text_write);
+        }
+
+        Ok(RedLabelDiagnosticInstructionBitmapTextWrite {
+            table_label: instruction.table_label,
+            prompt,
+            lines,
+        })
     }
 
     fn red_label_write_message_text(
@@ -1729,6 +1801,15 @@ fn red_label_bcd_number_visible_digits(bcd_number: u8) -> Vec<u8> {
     }
 }
 
+fn red_label_crom0_operator_instruction_vector(line: &str) -> Result<&'static str, String> {
+    match line {
+        RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT => Ok("VINS4"),
+        _ => Err(format!(
+            "red-label CROM0 operator instruction `{line}` has no message vector"
+        )),
+    }
+}
+
 fn red_label_text_cursor_advance(cursor: u16, width: u8) -> u16 {
     let [x, y] = cursor.to_be_bytes();
     u16::from_be_bytes([x.wrapping_add(width).wrapping_add(1), y])
@@ -1775,7 +1856,9 @@ mod tests {
             RED_LABEL_CLRALL_PACKED_BYTE_WRITES, RED_LABEL_CLRAUD_PACKED_BYTE_WRITES,
             RED_LABEL_CMOSCK_CELL_OFFSET, RED_LABEL_CRHSTD_CELL_OFFSET,
             RED_LABEL_CROM0_ALL_ROMS_OK_TEXT, RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS,
-            RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT, RED_LABEL_CROM0_ROM_FAILURE_TEXT,
+            RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT, RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT,
+            RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES, RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+            RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT, RED_LABEL_CROM0_ROM_FAILURE_TEXT,
             RED_LABEL_DIAGNOSTIC_LED_FLASH_DELAY_MS, RED_LABEL_DIAGNOSTIC_LED_FLASH_REPETITIONS,
             RED_LABEL_DIAGNOSTIC_LETTER_COLOR_ADDRESS, RED_LABEL_DIAGNOSTIC_LETTER_COLOR_INDEX,
             RED_LABEL_DIPFLG_CELL_OFFSET, RED_LABEL_DIPSW_CELL_OFFSET, RED_LABEL_HIGH_SCORE_CELLS,
@@ -1784,14 +1867,15 @@ mod tests {
             RedLabelAuditCycleState, RedLabelAuditCycleStep, RedLabelAuditDebounceState,
             RedLabelAuditDebounceStep, RedLabelAuditOperatorState, RedLabelAuditOperatorStep,
             RedLabelCrom0BadRomBitmapTextWrite, RedLabelCrom0BadRomScreenWrite,
-            RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionWrite,
-            RedLabelDiagnosticLedFlash, RedLabelDiagnosticLedOutput,
-            RedLabelDiagnosticPaletteWrite, RedLabelDiagnosticTextWrite, RedLabelPowerUpAction,
-            RedLabelPowerUpDispatchTarget, WATCHDOG_RESET_BYTE, cmos_4bit_write_value,
-            cmos_sram_clear_packed_bytes, cmos_sram_read_byte, cmos_sram_read_word,
-            cmos_sram_write_byte, cmos_sram_write_word, defender_io_window, is_main_cpu_rom_bank,
-            main_cpu_read_target, main_cpu_write_target, red_label_crom0_diagnostic_screen,
-            red_label_diagnostic_led_output, video_control_cocktail, video_counter_read_value,
+            RedLabelDiagnosticBitmapTextWrite, RedLabelDiagnosticInstructionBitmapTextWrite,
+            RedLabelDiagnosticInstructionWrite, RedLabelDiagnosticLedFlash,
+            RedLabelDiagnosticLedOutput, RedLabelDiagnosticPaletteWrite,
+            RedLabelDiagnosticTextWrite, RedLabelPowerUpAction, RedLabelPowerUpDispatchTarget,
+            WATCHDOG_RESET_BYTE, cmos_4bit_write_value, cmos_sram_clear_packed_bytes,
+            cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
+            defender_io_window, is_main_cpu_rom_bank, main_cpu_read_target, main_cpu_write_target,
+            red_label_crom0_diagnostic_screen, red_label_diagnostic_led_output,
+            video_control_cocktail, video_counter_read_value,
         },
         input::{
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
@@ -2630,10 +2714,49 @@ mod tests {
                 cursor_after: 0x597A,
             }]
         );
+        assert_eq!(
+            transfer.instructions,
+            vec![
+                RedLabelDiagnosticInstructionBitmapTextWrite {
+                    table_label: "IROMFL",
+                    prompt: RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                        vector_label: "VINS1",
+                        text: String::from(RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT),
+                        cursor_after: 0x96CE,
+                    },
+                    lines: vec![RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                        vector_label: "VINS4",
+                        text: String::from(RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT),
+                        cursor_after: 0x51DA,
+                    }],
+                },
+                RedLabelDiagnosticInstructionBitmapTextWrite {
+                    table_label: "IROMDO",
+                    prompt: RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                        vector_label: "VINS1",
+                        text: String::from(RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT),
+                        cursor_after: 0x96CE,
+                    },
+                    lines: vec![RedLabelDiagnosticBitmapTextWrite {
+                        address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                        vector_label: "VINS4",
+                        text: String::from(RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT),
+                        cursor_after: 0x51DA,
+                    }],
+                },
+            ]
+        );
         assert_message_glyph_at(&board, RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS, 'R');
         assert_message_glyph_at(&board, 0x4760, 'F');
         assert_score_digit_at(&board, 0x517A, 1);
         assert_score_digit_at(&board, 0x557A, 2);
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, 'P');
+        assert_message_glyph_at(&board, 0x58CE, 'H');
+        assert_message_glyph_at(&board, 0x92CE, ':');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0], 'A');
     }
 
     #[test]
@@ -2666,9 +2789,28 @@ mod tests {
             })
         );
         assert!(transfer.bad_roms.is_empty());
+        assert_eq!(
+            transfer.instructions,
+            vec![RedLabelDiagnosticInstructionBitmapTextWrite {
+                table_label: "IROMDO",
+                prompt: RedLabelDiagnosticBitmapTextWrite {
+                    address: RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS,
+                    vector_label: "VINS1",
+                    text: String::from(RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT),
+                    cursor_after: 0x96CE,
+                },
+                lines: vec![RedLabelDiagnosticBitmapTextWrite {
+                    address: RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0],
+                    vector_label: "VINS4",
+                    text: String::from(RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT),
+                    cursor_after: 0x51DA,
+                }],
+            }]
+        );
         assert_message_glyph_at(&board, RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS, 'A');
         assert_message_glyph_at(&board, 0x5980, 'O');
         assert_message_glyph_at(&board, 0x5D80, 'K');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0], 'A');
     }
 
     #[test]

@@ -582,15 +582,16 @@ This section records drift found during the repository review on
   IRQ line state is visible to the deterministic harness. The board can expose
   native visible palette-index and RGBA frames from its video RAM and palette
   RAM, and can record source-shaped diagnostic LED output bytes, `FLASHL`
-  events, CROM0 diagnostic text/palette intent, bitmap headline/bad-ROM-row
-  transfer, and `ADVSW` / `NEXTST` gate metadata. CPU interrupt scheduling,
-  physical lamp timing, and sample generation remain gaps.
+  events, CROM0 diagnostic text/palette intent, bitmap
+  headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
+  gate metadata. CPU interrupt scheduling, physical lamp timing, and sample
+  generation remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, translated `AUDITG` live text transfer/screen
-  erasure/post-`PWRUP` wiring or live CROM0 operator-instruction bitmap text
-  writes, physical advance-switch timing, physical lamp timing, and
-  RAM/CMOS/color/sound test execution after the now-identified `PWRUP` action
+  erasure/post-`PWRUP` wiring, physical advance-switch timing, physical lamp
+  timing, and RAM/CMOS/color/sound test execution after the now-identified
+  `PWRUP` action
   decision beyond the modeled ROM-stage outcome, CMOS persistence, screen
   scanline scheduler, watchdog timing/reset side effects, rendering timing side
   effects, decoder PROM behavior, DAC sample output, CPU IRQ scheduling, or

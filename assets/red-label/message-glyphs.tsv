@@ -1,11 +1,13 @@
 label	character	address	width	height	bytes	source
 SPACE	SPACE	0xC697	1	8	0000000000000000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L469-L476
+COLON	:	0xC7B7	1	8	0000010000010000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L540-L541
 LETTRA	A	0xC7D7	3	8	010101010101010011000011000000001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L522-L525
 LETTRB	B	0xC7EF	3	8	010101010101010011000011000011001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L526-L529
 LETTRC	C	0xC807	3	8	010101010101010011101010101011001100000000001100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L530-L533
 LETTRD	D	0xC81F	3	8	010101010101010011000000000011001011111111111000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L534-L537
 LETTRE	E	0xC837	3	8	010101010101010011101011101011001100001000001100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L538-L541
 LETTRF	F	0xC84F	3	8	010101010101010011101011101010001100001000000000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L542-L545
+LETTRH	H	0xC87F	3	8	010101010101010010101011101010000101011101010100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L574-L577
 LETTRI	I	0xC897	2	8	01010101010101001010101010101000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L554-L556
 LETTRK	K	0xC8BF	3	8	010101010101010000000111010000000110000000100100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L558-L561
 LETTRL	L	0xC8D7	3	8	010101010101010010101010101011000000000000001100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L562-L565

@@ -142,9 +142,9 @@ This file records behavior that must not be guessed in arcade-core code.
   step/read/format/mutate the source `AUDITG` / `MSGAUD` table rows and its
   post-display debounce countdown as one deterministic cycle, but CPU IRQ
   scheduling, exact Williams power-on RAM contents, `AUDITG` live text
-  transfer/screen erasure/post-`PWRUP` wiring or live CROM0 operator-instruction
-  bitmap text writes, physical advance-switch timing, physical lamp timing, and
-  RAM/CMOS/color/sound test execution after that decision beyond the modeled
+  transfer/screen erasure/post-`PWRUP` wiring, physical advance-switch timing,
+  physical lamp timing, and RAM/CMOS/color/sound test execution after that
+  decision beyond the modeled
   ROM-stage outcome, CMOS persistence, screen scanline scheduling, watchdog
   timing/reset side effects, palette/rendering timing side effects, decoder PROM
   behavior, and DAC sample generation are not modeled.
@@ -360,11 +360,12 @@ This file records behavior that must not be guessed in arcade-core code.
   source-visible row navigation, display-line formatting, and adjustment
   mutations, the post-display debounce countdown, and red-label packed
   byte/word helper behavior are modeled, and the CROM0 ROM stage now carries
-  diagnostic text/palette intent, bitmap headline/bad-ROM-row transfer, and
-  `ADVSW` / `NEXTST` gate metadata. CMOS persistence, `AUDITG` live text
-  transfer/screen erasure/post-`PWRUP` wiring, high-score comparison/initials
-  routines, and post-`PWRUP` live CROM0 operator-instruction bitmap transfer and
-  later-test execution beyond the modeled ROM-stage outcome are not translated.
+  diagnostic text/palette intent, bitmap
+  headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
+  gate metadata. CMOS persistence, `AUDITG` live text transfer/screen
+  erasure/post-`PWRUP` wiring, high-score comparison/initials routines,
+  post-`PWRUP` live CROM0 ROM-test integration, and later-test execution beyond
+  the modeled ROM-stage outcome are not translated.
 
 ## Player
 

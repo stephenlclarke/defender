@@ -348,6 +348,11 @@ mod tests {
             parse_messages(crate::assets::RED_LABEL_MESSAGES_TSV).expect("messages parse");
 
         assert!(glyphs.iter().any(|glyph| glyph.character == 'F'));
+        assert!(glyphs.iter().any(|glyph| glyph.character == ':'));
+        assert_eq!(
+            red_label_message_glyph('H').expect("H glyph").address,
+            0xC87F
+        );
         assert_eq!(red_label_message_glyph('I').expect("I glyph").width, 2);
         assert_eq!(
             red_label_message_glyph('R').expect("R glyph").address,
@@ -363,6 +368,20 @@ mod tests {
                 String::from("ALL"),
                 String::from("ROMS"),
                 String::from("OK")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS1")
+                .expect("VINS1 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("PRESS"),
+                String::from("ADVANCE"),
+                String::from("WITH"),
+                String::from("SWITCH"),
+                String::from("SET"),
+                String::from("FOR:")
             ]
         );
     }
