@@ -331,9 +331,12 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   pre-tail `SNDSEQ` sound-table sequencer now advances `SNDX` / `SNDPRI` /
   `SNDTMR` / `SNDREP`, emits source-shaped main-board sound commands, and
   handles the thrust sound gate. Full frame output and fidelity traces now
-  include the resulting raw command bytes. The remaining `CSCAN`, palette copy
-  side effects, live stack-context wiring, and hardware-map restoration still
-  need full scheduler integration.
+  include the resulting raw command bytes. The source `CSCAN` branch now keeps
+  the `PIA01` / `PIA02` coin-door history, masks IN2 through `ANDB #$3F`,
+  double-checks the sample, and queues the first surviving `SWTAB1`
+  coin/admin switch process. Palette copy side effects, live stack-context
+  wiring, coin process bodies/coinage, and hardware-map restoration still need
+  full scheduler integration.
   The `GEXEC` tail slice now
   restores `STRCNT` after star
   overflow, advances `GTIME` through the source
@@ -458,9 +461,10 @@ yet; current implementation status is tracked in `SPEC.md` and
   `BGOUT`, `ALINIT`, `BGINIT`, `BGERAS`, `BGI`, `UFOST` / `UFOLP`, and `SBOMB`
   assembled entry points and smart-bomb resume labels provide the first
   routine-address asset. The
-  `defa7.src` `PLSTR5`, `SSCAN`, `SWP`,
-  `REV`, and `SBOMB` paths, with the complete `defb6.src` `SWTAB`, provide the
-  first live player-fire, smart-bomb, and reverse process wiring. The
+  `defa7.src` `PLSTR5`, `SSCAN`, `CSCAN`, `SWP`,
+  `REV`, and `SBOMB` paths, with the complete `defb6.src` `SWTAB` and
+  `SWTAB1`, provide the first live player-fire, smart-bomb, reverse, and
+  coin-door switch process wiring. The
   `defa7.src` `BMBOUT` / `FBOUT` shell output callbacks, `SCORE` BCD/replay
   path, `SNDLD` sound-table loader, `BKIL` bomb-collision routine, `LFIRE`
   cap/process-data entry path, RAM-visible `LCOL` collision setup, source

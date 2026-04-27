@@ -2,6 +2,11 @@ label	address	source
 SLEEP	0xD001	https://github.com/mwenge/defender/blob/master/src/defa7.src#L8-L15
 SUCIDE	0xD00A	https://github.com/mwenge/defender/blob/master/src/defa7.src#L17-L22
 SCORE	0xD360	https://github.com/mwenge/defender/blob/master/src/defa7.src#L474-L535
+HSRES	0xD43D	https://github.com/mwenge/defender/blob/master/src/defa7.src#L602-L608
+ADVSW	0xD44B	https://github.com/mwenge/defender/blob/master/src/defa7.src#L611-L623
+LCOIN	0xD46E	https://github.com/mwenge/defender/blob/master/src/defa7.src#L628-L630
+RCOIN	0xD475	https://github.com/mwenge/defender/blob/master/src/defa7.src#L632-L634
+CCOIN	0xD47C	https://github.com/mwenge/defender/blob/master/src/defa7.src#L636-L637
 SNDLD	0xD54D	https://github.com/mwenge/defender/blob/master/src/defa7.src#L706-L721
 SHELL	0xE453	https://github.com/mwenge/defender/blob/master/src/defa7.src#L2609-L2643
 BMBOUT	0xE498	https://github.com/mwenge/defender/blob/master/src/defa7.src#L2645-L2662

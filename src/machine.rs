@@ -60,6 +60,7 @@ const RED_LABEL_Y_MAX: u8 = 240;
 const RED_LABEL_THRUST_SWITCH_BIT: u8 = 0x02;
 const RED_LABEL_SMART_BOMB_SWITCH_BIT: u8 = 0x04;
 const RED_LABEL_REVERSE_SWITCH_BIT: u8 = 0x40;
+const RED_LABEL_COIN_SCAN_MASK: u8 = 0x3F;
 const RED_LABEL_SOUND_PLAYER_ALIVE_BLOCK_MASK: u8 = 0x98;
 const RED_LABEL_WALL_COLOR_TABLE: [u8; 8] = [0x81, 0x28, 0x07, 0x16, 0x2F, 0x84, 0x15, 0x00];
 const RED_LABEL_PLAYER_EXPLOSION_PIECES: u16 = 0x80;
@@ -319,6 +320,16 @@ pub struct RedLabelSwitchScan {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCoinSwitchScan {
+    pub previous_pia01: u8,
+    pub previous_pia02: u8,
+    pub current_pia01: u8,
+    pub triggered_bits: u8,
+    pub confirmed_bits: u8,
+    pub queued: Option<RedLabelSwitchProcess>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RedLabelReverse {
     StartedSleeping {
         process_address: u16,
@@ -519,7 +530,7 @@ pub enum RedLabelIrqPreTailStep {
     SoundSequence(RedLabelSoundSequenceStep),
     PlayerMotion(RedLabelPlayerMotion),
     StarOutput(RedLabelStarOutput),
-    CoinScanDue,
+    CoinScan(RedLabelCoinSwitchScan),
     TerrainOutput(RedLabelTerrainOutput),
     TerrainOutputDue,
 }
@@ -527,6 +538,7 @@ pub enum RedLabelIrqPreTailStep {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct RedLabelIrqSchedulerContext {
     pub terrain_stack_pointer: Option<u16>,
+    pub input_ports: DefenderInputPorts,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -6681,6 +6693,47 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    /// Source-shaped red-label `CSCAN`: keep the two-frame `PIA01`/`PIA02`
+    /// coin-door history, mask the current IN2 coin/admin byte like `ANDB #$3F`,
+    /// perform the source double-check with the same input sample, and queue the
+    /// first source `SWTAB1` process whose bit survives both history checks.
+    pub fn scan_translated_coin_switches(
+        &mut self,
+        input_ports: DefenderInputPorts,
+    ) -> Result<RedLabelCoinSwitchScan, String> {
+        let layout = red_label_ram_layout()?;
+        let previous_pia01 = self.read_field_byte(&layout, "base_page", "PIA01")?;
+        let previous_pia02 = self.read_field_byte(&layout, "base_page", "PIA02")?;
+        let history_clear_mask = !(previous_pia01 | previous_pia02);
+        let current_pia01 = input_ports.in2 & RED_LABEL_COIN_SCAN_MASK;
+        let triggered_bits = current_pia01 & history_clear_mask;
+
+        self.write_field_byte(&layout, "base_page", "PIA02", previous_pia01)?;
+        self.write_field_byte(&layout, "base_page", "PIA01", current_pia01)?;
+
+        let confirmed_bits = if triggered_bits == 0 {
+            0
+        } else {
+            let confirmed_pia01 = input_ports.in2 & current_pia01;
+            self.write_field_byte(&layout, "base_page", "PIA01", confirmed_pia01)?;
+            confirmed_pia01 & history_clear_mask
+        };
+        let queued = translated_coin_switch_process(confirmed_bits)?;
+
+        if let Some(process) = queued {
+            self.queue_switch_process(&layout, process)?;
+        }
+
+        Ok(RedLabelCoinSwitchScan {
+            previous_pia01,
+            previous_pia02,
+            current_pia01,
+            triggered_bits,
+            confirmed_bits,
+            queued,
+        })
+    }
+
     /// Source-shaped `SWP` over the two `SWPROC` slots: create every queued
     /// process whose status mask is clear, and clear the routine word for each
     /// consumed slot just as the source does.
@@ -7482,11 +7535,12 @@ impl RedLabelRuntimeMemory {
     /// the source watchdog/palette obligations, runs translated `PLAYER` and
     /// `STOUT` where the source branches call them, and then runs only the
     /// already translated object-band tail reached by the source branch. When
-    /// the caller supplies the live 6809 stack pointer in
-    /// `RedLabelIrqSchedulerContext`, the terrain branch can run translated
-    /// `BGOUT`; otherwise it reports that `BGOUT` is due. `CSCAN`, palette
-    /// copy, and hardware map restoration are still reported as obligations
-    /// rather than guessed.
+    /// the caller supplies live cabinet input, the source `CSCAN` branch keeps
+    /// its two-frame coin-door history and queues source switch processes; when
+    /// the caller supplies the live 6809 stack pointer, the terrain branch can
+    /// run translated `BGOUT`; otherwise it reports that `BGOUT` is due.
+    /// Palette copy and hardware map restoration are still reported as
+    /// obligations rather than guessed.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1931-L2069>.
     pub fn run_irq_scanline_object_phase(
         &mut self,
@@ -7712,7 +7766,9 @@ impl RedLabelRuntimeMemory {
         layout: &[RedLabelRamLayoutEntry],
         context: RedLabelIrqSchedulerContext,
     ) -> Result<Vec<RedLabelIrqPreTailStep>, String> {
-        let mut steps = vec![RedLabelIrqPreTailStep::CoinScanDue];
+        let mut steps = vec![RedLabelIrqPreTailStep::CoinScan(
+            self.scan_translated_coin_switches(context.input_ports)?,
+        )];
         let status = self.read_field_byte(layout, "base_page", "STATUS")?;
         if status & 0x02 == 0 {
             if let Some(stack_pointer) = context.terrain_stack_pointer {
@@ -14360,6 +14416,31 @@ fn translated_player_switch_process(
     }))
 }
 
+fn translated_coin_switch_process(
+    confirmed_bits: u8,
+) -> Result<Option<RedLabelSwitchProcess>, String> {
+    if confirmed_bits == 0 {
+        return Ok(None);
+    }
+
+    let switch_bit = 1u8 << confirmed_bits.trailing_zeros();
+    let (routine_label, process_type) = match switch_bit {
+        0x02 => ("ADVSW", RED_LABEL_SYSTEM_PROCESS_TYPE),
+        0x04 => ("RCOIN", RED_LABEL_COIN_PROCESS_TYPE),
+        0x08 => ("HSRES", RED_LABEL_SYSTEM_PROCESS_TYPE),
+        0x10 => ("LCOIN", RED_LABEL_COIN_PROCESS_TYPE),
+        0x20 => ("CCOIN", RED_LABEL_COIN_PROCESS_TYPE),
+        _ => return Ok(None),
+    };
+
+    Ok(Some(RedLabelSwitchProcess {
+        switch_bit,
+        routine_address: red_label_routine_address(routine_label)?,
+        process_type,
+        status_mask: 0,
+    }))
+}
+
 fn red_label_switch_table() -> Result<&'static [RedLabelSwitchTableEntry], String> {
     static SWITCH_TABLE: OnceLock<Result<Vec<RedLabelSwitchTableEntry>, String>> = OnceLock::new();
     match SWITCH_TABLE.get_or_init(|| parse_switch_table(crate::assets::RED_LABEL_SWITCH_TABLE_TSV))
@@ -16502,6 +16583,13 @@ impl ArcadeMachine {
         self.memory.scan_translated_player_switches(input_ports)
     }
 
+    pub fn red_label_scan_translated_coin_switches(
+        &mut self,
+        input_ports: DefenderInputPorts,
+    ) -> Result<RedLabelCoinSwitchScan, String> {
+        self.memory.scan_translated_coin_switches(input_ports)
+    }
+
     pub fn red_label_dispatch_switch_processes(
         &mut self,
     ) -> Result<Vec<RedLabelCreatedProcess>, String> {
@@ -17770,13 +17858,13 @@ mod tests {
             RedLabelAppearanceStart, RedLabelAstronautDirection, RedLabelAstronautKill,
             RedLabelAstronautProcessStep, RedLabelAstronautWalk, RedLabelBackgroundInit,
             RedLabelBlockClear, RedLabelBonusTextCall, RedLabelBonusTextPlan, RedLabelBorder,
-            RedLabelCapturedAstronautCollision, RedLabelColorRamInit, RedLabelCreatedProcess,
-            RedLabelCreatedShell, RedLabelEnemyKill, RedLabelExpandedUpdate,
-            RedLabelExplosionStart, RedLabelFallingAstronautStep, RedLabelFireballTableInit,
-            RedLabelFreePlayCredit, RedLabelGameExecStarTime, RedLabelGenocide, RedLabelHyperspace,
-            RedLabelIrqMode, RedLabelIrqObjectBandPass, RedLabelIrqObjectBandPhase,
-            RedLabelIrqObjectBandStep, RedLabelIrqPreTailStep, RedLabelIrqSchedulerContext,
-            RedLabelIrqSchedulerPhase, RedLabelKidnappingLanderKill,
+            RedLabelCapturedAstronautCollision, RedLabelCoinSwitchScan, RedLabelColorRamInit,
+            RedLabelCreatedProcess, RedLabelCreatedShell, RedLabelEnemyKill,
+            RedLabelExpandedUpdate, RedLabelExplosionStart, RedLabelFallingAstronautStep,
+            RedLabelFireballTableInit, RedLabelFreePlayCredit, RedLabelGameExecStarTime,
+            RedLabelGenocide, RedLabelHyperspace, RedLabelIrqMode, RedLabelIrqObjectBandPass,
+            RedLabelIrqObjectBandPhase, RedLabelIrqObjectBandStep, RedLabelIrqPreTailStep,
+            RedLabelIrqSchedulerContext, RedLabelIrqSchedulerPhase, RedLabelKidnappingLanderKill,
             RedLabelKidnappingPassengerRelease, RedLabelKilledProcess, RedLabelLanderFleeOutcome,
             RedLabelLanderProcessStep, RedLabelLanderTarget, RedLabelLaserDirection,
             RedLabelLaserFire, RedLabelLaserFireDispatch, RedLabelLaserFizzleInit,
@@ -17878,6 +17966,17 @@ mod tests {
             screen_entries: 0x98,
             first_screen_address: 0x98DE,
             stack_pointer_saved: 0x1234,
+        }
+    }
+
+    fn expected_empty_coin_scan() -> RedLabelCoinSwitchScan {
+        RedLabelCoinSwitchScan {
+            previous_pia01: 0,
+            previous_pia02: 0,
+            current_pia01: 0,
+            triggered_bits: 0,
+            confirmed_bits: 0,
+            queued: None,
         }
     }
 
@@ -21250,7 +21349,7 @@ mod tests {
         assert_eq!(
             lower.pre_tail_steps,
             vec![
-                RedLabelIrqPreTailStep::CoinScanDue,
+                RedLabelIrqPreTailStep::CoinScan(expected_empty_coin_scan()),
                 RedLabelIrqPreTailStep::TerrainOutputDue,
             ]
         );
@@ -21288,7 +21387,7 @@ mod tests {
         assert_eq!(
             upper.pre_tail_steps,
             vec![
-                RedLabelIrqPreTailStep::CoinScanDue,
+                RedLabelIrqPreTailStep::CoinScan(expected_empty_coin_scan()),
                 RedLabelIrqPreTailStep::TerrainOutputDue,
             ]
         );
@@ -21373,6 +21472,7 @@ mod tests {
                 0x20,
                 RedLabelIrqSchedulerContext {
                     terrain_stack_pointer: Some(0x1234),
+                    input_ports: DefenderInputPorts::EMPTY,
                 },
             )
             .expect("normal IRQ lower object phase with BGOUT context");
@@ -21383,7 +21483,7 @@ mod tests {
         assert_eq!(
             step.pre_tail_steps,
             vec![
-                RedLabelIrqPreTailStep::CoinScanDue,
+                RedLabelIrqPreTailStep::CoinScan(expected_empty_coin_scan()),
                 RedLabelIrqPreTailStep::TerrainOutput(expected_bgout_default()),
             ]
         );
@@ -22035,6 +22135,206 @@ mod tests {
         assert_eq!(
             machine.red_label_ram_range(0xA082..0xA086),
             Some(&[0xE8, 0xC1, RED_LABEL_SYSTEM_PROCESS_TYPE, 0xF8][..])
+        );
+    }
+
+    #[test]
+    fn translated_coin_switch_scan_queues_left_coin_from_swtab1_bit() {
+        let mut machine = ArcadeMachine::new();
+
+        let scan = machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts {
+                in0: 0,
+                in1: 0,
+                in2: 0x10,
+            })
+            .expect("queue left coin");
+
+        assert_eq!(
+            scan,
+            RedLabelCoinSwitchScan {
+                previous_pia01: 0,
+                previous_pia02: 0,
+                current_pia01: 0x10,
+                triggered_bits: 0x10,
+                confirmed_bits: 0x10,
+                queued: Some(RedLabelSwitchProcess {
+                    switch_bit: 0x10,
+                    routine_address: red_label_routine_address("LCOIN").expect("LCOIN address"),
+                    process_type: RED_LABEL_COIN_PROCESS_TYPE,
+                    status_mask: 0,
+                }),
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA079..0xA07B),
+            Some(&[0x10, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA082..0xA086),
+            Some(&[0xD4, 0x6E, RED_LABEL_COIN_PROCESS_TYPE, 0][..])
+        );
+    }
+
+    #[test]
+    fn translated_coin_switch_scan_uses_two_frame_history() {
+        let mut machine = ArcadeMachine::new();
+        let left_coin = DefenderInputPorts {
+            in0: 0,
+            in1: 0,
+            in2: 0x10,
+        };
+
+        machine
+            .red_label_scan_translated_coin_switches(left_coin)
+            .expect("queue first left coin");
+        machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts::EMPTY)
+            .expect("release left coin once");
+        let blocked = machine
+            .red_label_scan_translated_coin_switches(left_coin)
+            .expect("one clear sample only");
+
+        assert_eq!(blocked.triggered_bits, 0);
+        assert_eq!(blocked.confirmed_bits, 0);
+        assert_eq!(blocked.queued, None);
+
+        machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts::EMPTY)
+            .expect("clear blocked coin sample");
+        machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts::EMPTY)
+            .expect("second clear sample");
+        let retriggered = machine
+            .red_label_scan_translated_coin_switches(left_coin)
+            .expect("two clear samples");
+
+        assert_eq!(retriggered.triggered_bits, 0x10);
+        assert!(retriggered.queued.is_some());
+        assert_eq!(
+            machine.red_label_ram_range(0xA086..0xA08A),
+            Some(&[0xD4, 0x6E, RED_LABEL_COIN_PROCESS_TYPE, 0][..])
+        );
+    }
+
+    #[test]
+    fn translated_coin_switch_scan_uses_source_bit_order() {
+        let mut machine = ArcadeMachine::new();
+
+        let scan = machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts {
+                in0: 0,
+                in1: 0,
+                in2: 0x14,
+            })
+            .expect("queue first source-order coin switch");
+
+        assert_eq!(
+            scan.queued,
+            Some(RedLabelSwitchProcess {
+                switch_bit: 0x04,
+                routine_address: red_label_routine_address("RCOIN").expect("RCOIN address"),
+                process_type: RED_LABEL_COIN_PROCESS_TYPE,
+                status_mask: 0,
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA082..0xA086),
+            Some(&[0xD4, 0x75, RED_LABEL_COIN_PROCESS_TYPE, 0][..])
+        );
+    }
+
+    #[test]
+    fn translated_coin_switch_scan_queues_admin_switch_processes() {
+        let mut machine = ArcadeMachine::new();
+
+        let advance = machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts {
+                in0: 0,
+                in1: 0,
+                in2: 0x02,
+            })
+            .expect("queue advance switch");
+
+        assert_eq!(
+            advance.queued,
+            Some(RedLabelSwitchProcess {
+                switch_bit: 0x02,
+                routine_address: red_label_routine_address("ADVSW").expect("ADVSW address"),
+                process_type: RED_LABEL_SYSTEM_PROCESS_TYPE,
+                status_mask: 0,
+            })
+        );
+
+        machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts::EMPTY)
+            .expect("release advance");
+        machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts::EMPTY)
+            .expect("clear advance history");
+        let reset = machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts {
+                in0: 0,
+                in1: 0,
+                in2: 0x08,
+            })
+            .expect("queue high-score reset");
+
+        assert_eq!(
+            reset.queued,
+            Some(RedLabelSwitchProcess {
+                switch_bit: 0x08,
+                routine_address: red_label_routine_address("HSRES").expect("HSRES address"),
+                process_type: RED_LABEL_SYSTEM_PROCESS_TYPE,
+                status_mask: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn irq_coin_branch_runs_translated_coin_scan_with_context_input() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA092, 1).expect("arm IFLG");
+        machine
+            .memory
+            .write_byte(0xA0C0, 0x80)
+            .expect("set PLAYC outside lower band");
+
+        let step = machine
+            .red_label_run_irq_scanline_object_phase_with_context(
+                RedLabelIrqMode::Normal,
+                0x20,
+                RedLabelIrqSchedulerContext {
+                    terrain_stack_pointer: None,
+                    input_ports: DefenderInputPorts {
+                        in0: 0,
+                        in1: 0,
+                        in2: 0x20,
+                    },
+                },
+            )
+            .expect("normal IRQ lower object phase scans center coin");
+
+        assert_eq!(step.phase, RedLabelIrqSchedulerPhase::NormalLower);
+        assert_eq!(
+            step.pre_tail_steps[0],
+            RedLabelIrqPreTailStep::CoinScan(RedLabelCoinSwitchScan {
+                previous_pia01: 0,
+                previous_pia02: 0,
+                current_pia01: 0x20,
+                triggered_bits: 0x20,
+                confirmed_bits: 0x20,
+                queued: Some(RedLabelSwitchProcess {
+                    switch_bit: 0x20,
+                    routine_address: red_label_routine_address("CCOIN").expect("CCOIN address"),
+                    process_type: RED_LABEL_COIN_PROCESS_TYPE,
+                    status_mask: 0,
+                }),
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA082..0xA086),
+            Some(&[0xD4, 0x7C, RED_LABEL_COIN_PROCESS_TYPE, 0][..])
         );
     }
 
@@ -28368,6 +28668,26 @@ mod tests {
         assert_eq!(
             red_label_routine_address("SCORE").expect("SCORE address"),
             0xD360
+        );
+        assert_eq!(
+            red_label_routine_address("HSRES").expect("HSRES address"),
+            0xD43D
+        );
+        assert_eq!(
+            red_label_routine_address("ADVSW").expect("ADVSW address"),
+            0xD44B
+        );
+        assert_eq!(
+            red_label_routine_address("LCOIN").expect("LCOIN address"),
+            0xD46E
+        );
+        assert_eq!(
+            red_label_routine_address("RCOIN").expect("RCOIN address"),
+            0xD475
+        );
+        assert_eq!(
+            red_label_routine_address("CCOIN").expect("CCOIN address"),
+            0xD47C
         );
         assert_eq!(
             red_label_routine_address("SNDLD").expect("SNDLD address"),

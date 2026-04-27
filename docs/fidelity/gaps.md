@@ -330,8 +330,11 @@ This file records behavior that must not be guessed in arcade-core code.
   advances `SNDX` / `SNDPRI` / `SNDTMR` / `SNDREP`, emits source-shaped
   main-board sound commands, and handles the thrust sound gate. Full frame
   output and fidelity traces now include the resulting raw command bytes. The
-  remaining `CSCAN`, palette copy side effects, live stack-context wiring, and
-  hardware-map restoration still need full scheduler integration.
+  source `CSCAN` branch now keeps the `PIA01` / `PIA02` coin-door history,
+  masks IN2 through `ANDB #$3F`, double-checks the sample, and queues the first
+  surviving `SWTAB1` coin/admin switch process. Palette copy side effects, live
+  stack-context wiring, coin process bodies/coinage, and hardware-map
+  restoration still need full scheduler integration.
   The start-flow foundation now covers source-shaped `FPLAY` credit
   seeding from the core CMOS image, the RAM-visible `START` power-page
   gate/player table reset/`PLSTRT` process creation, source `SCRCLR` video-RAM
@@ -371,9 +374,9 @@ This file records behavior that must not be guessed in arcade-core code.
   Live coin input now increments the red-label `CREDIT` byte as BCD and mirrors
   `CREDST`, and credited/free-play live one- and two-player start buttons now
   enter through `SWTAB`/`ST1`/`ST2`; live controls are gated while the active
-  translated player-start handoff advances. Source-exact coinage/debounce,
-  source-exact boot/start-ready state, and the no-credit one-player quick-start
-  shortcut are still not translated.
+  translated player-start handoff advances. Source-exact coin process
+  bodies/coinage, source-exact boot/start-ready state, and the no-credit
+  one-player quick-start shortcut are still not translated.
   Generic/untranslated process bodies, broader suicide resume semantics, the
   remaining `SWTAB` routine bodies and no-process input effects, exact
   frame/cycle integration, and golden-trace equivalence are not translated.

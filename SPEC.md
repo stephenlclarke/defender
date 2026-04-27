@@ -559,9 +559,11 @@ This section records drift found during the repository review on
   sound-table sequencer now advances `SNDX` / `SNDPRI` / `SNDTMR` / `SNDREP`,
   emits source-shaped main-board sound commands, and handles the thrust sound
   gate. Full frame output and fidelity traces now include the resulting raw
-  command bytes. The remaining `CSCAN`, palette copy side effects,
-  live stack-context wiring, and hardware-map restoration still need full
-  scheduler integration.
+  command bytes. The source `CSCAN` branch now keeps the `PIA01` / `PIA02`
+  coin-door history, masks IN2 through `ANDB #$3F`, double-checks the sample,
+  and queues the first surviving `SWTAB1` coin/admin switch process. Palette
+  copy side effects, live stack-context wiring, coin process bodies/coinage,
+  and hardware-map restoration still need full scheduler integration.
   The `GEXEC` tail slice
   now restores `STRCNT` toward 16, advances `GTIME` through the source
   audit-meter wrap, decrements the process `PD` counter, and applies the
@@ -586,8 +588,8 @@ This section records drift found during the repository review on
   remaining object callbacks, live respawn orchestration beyond the `PLSTRT`
   runtime snapshot handoff,
   full trace proof for the translated `BONUS` wave-clear death-tail path,
-  source-exact live coinage/debounce, source-exact boot/start-ready state,
-  no-credit quick-start removal, broader `SWTAB` cabinet-session integration,
+  source-exact live coin process bodies/coinage, source-exact boot/start-ready
+  state, no-credit quick-start removal, broader `SWTAB` cabinet-session integration,
   scanline scheduling, live video presentation, and full frame/cycle integration
   remain gaps. The live coin bridge now keeps the red-label `CREDIT` byte and
   `CREDST` backup in BCD sync so the translated start-switch credit gates can
@@ -1027,8 +1029,8 @@ respawn/game-over branch decisions. The dispatcher can now run translated
 addresses, and the translated player-death resume addresses from `PADDR`,
 including guarded `SBMBX2`/`SUCIDE`. Remaining work is to move scaffold state
 onto those bytes, integrate the translated IRQ object-phase gate with the
-remaining sound trace, coin-scan, terrain, palette-copy, hardware-map, and
-video scheduler side effects, and translate the remaining process bodies.
+remaining terrain stack-context, palette-copy, hardware-map, and video
+scheduler side effects, and translate the remaining process bodies.
 
 1. Continue expanding `src/machine.rs` or split it into `arcade_core` modules
    once table/process size justifies it.
@@ -1122,9 +1124,11 @@ IRQ object-phase gate now applies source `VERTCT` thresholds, `IFLG`, `TIMER`,
 watchdog data-byte reporting, palette-copy due tests, and the normal/flipped
 `XXX2` calculations, and runs translated `PLAYER` / `STOUT` pre-tail work on
 the branches that call them. It can also run translated `BGOUT` when the caller
-supplies the live 6809 stack pointer. Full hardware IRQ integration still needs
-`CSCAN`, palette copy side effects, live stack-context wiring, full-frame sound
-trace plumbing, and hardware map restoration. The
+supplies the live 6809 stack pointer. The source `CSCAN` branch now keeps the
+`PIA01` / `PIA02` history and queues source `SWTAB1` coin/admin switch
+processes from caller-supplied IN2. Full hardware IRQ integration still needs
+palette copy side effects, live stack-context wiring, coin process bodies,
+coinage, and hardware map restoration. The
 `SCPROC` scanner maintenance
 process is translated through `ISCAN`, `OSCAN`, `SHSCAN`, and `SCNRV` with exact
 `SCP1`/`SCP2` sleep cadence, including `SETAB` / `SETEND` object/player blip
