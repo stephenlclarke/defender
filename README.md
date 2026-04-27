@@ -337,9 +337,11 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   double-checks the sample, and queues the first surviving `SWTAB1`
   coin/admin switch process. The queued coin process path now translates
   `LCOIN` / `RCOIN` / `CCOIN` debounce/sleep handling, `CN1` coin sound
-  loading, and the fixed-bank BCD coinage/audit/credit updates. Palette copy
-  side effects, live stack-context wiring, admin switch bodies, and
-  hardware-map restoration still need full scheduler integration.
+  loading, and the fixed-bank BCD coinage/audit/credit updates. The queued
+  admin switch path now translates `HSRES` today's-high-score reset and `ADVSW`
+  manual diagnostics/audit target selection, with the diagnostic/audit mode
+  handoff still explicit. Palette copy side effects, live stack-context wiring,
+  and hardware-map restoration still need full scheduler integration.
   The `GEXEC` tail slice now
   restores `STRCNT` after star
   overflow, advances `GTIME` through the source

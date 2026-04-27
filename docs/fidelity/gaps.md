@@ -335,8 +335,11 @@ This file records behavior that must not be guessed in arcade-core code.
   surviving `SWTAB1` coin/admin switch process. The queued coin process path
   now translates `LCOIN` / `RCOIN` / `CCOIN` debounce/sleep handling, `CN1`
   coin sound loading, and the fixed-bank BCD coinage/audit/credit updates.
-  Palette copy side effects, live stack-context wiring, admin switch bodies,
-  and hardware-map restoration still need full scheduler integration.
+  The queued admin switch path now translates `HSRES` today's-high-score reset
+  and `ADVSW` manual diagnostics/audit target selection, with the
+  diagnostic/audit mode handoff still explicit. Palette copy side effects, live
+  stack-context wiring, and hardware-map restoration still need full scheduler
+  integration.
   The start-flow foundation now covers source-shaped `FPLAY` credit
   seeding from the core CMOS image, the RAM-visible `START` power-page
   gate/player table reset/`PLSTRT` process creation, source `SCRCLR` video-RAM

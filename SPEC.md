@@ -564,9 +564,11 @@ This section records drift found during the repository review on
   and queues the first surviving `SWTAB1` coin/admin switch process. The queued
   coin process path now translates `LCOIN` / `RCOIN` / `CCOIN` debounce/sleep
   handling, `CN1` coin sound loading, and the fixed-bank BCD
-  coinage/audit/credit updates. Palette copy side effects, live stack-context
-  wiring, admin switch bodies, and hardware-map restoration still need full
-  scheduler integration.
+  coinage/audit/credit updates. The queued admin switch path now translates
+  `HSRES` today's-high-score reset and `ADVSW` manual diagnostics/audit target
+  selection, with the diagnostic/audit mode handoff still explicit. Palette
+  copy side effects, live stack-context wiring, and hardware-map restoration
+  still need full scheduler integration.
   The `GEXEC` tail slice
   now restores `STRCNT` toward 16, advances `GTIME` through the source
   audit-meter wrap, decrements the process `PD` counter, and applies the
@@ -1135,9 +1137,12 @@ supplies the live 6809 stack pointer. The source `CSCAN` branch now keeps the
 `PIA01` / `PIA02` history and queues source `SWTAB1` coin/admin switch
 processes from caller-supplied IN2. The queued coin process path translates
 `LCOIN` / `RCOIN` / `CCOIN`, `CN1`, `CNSND`, fixed-bank coinage, slot audits,
-paid-credit audit, and `CUNITS`/`BUNITS`/`CREDIT` updates. Full hardware IRQ
-integration still needs palette copy side effects, live stack-context wiring,
-admin switch bodies, and hardware map restoration. The `SCPROC` scanner
+paid-credit audit, and `CUNITS`/`BUNITS`/`CREDIT` updates. The queued admin
+switch path translates `HSRES` today's-high-score reset and `ADVSW` manual
+diagnostics/audit target selection, with the diagnostic/audit mode handoff
+still explicit. Full hardware IRQ integration still needs palette copy side
+effects, live stack-context wiring, and hardware map restoration. The `SCPROC`
+scanner
 maintenance process is translated through `ISCAN`, `OSCAN`, `SHSCAN`, and
 `SCNRV` with exact
 `SCP1`/`SCP2` sleep cadence, including `SETAB` / `SETEND` object/player blip

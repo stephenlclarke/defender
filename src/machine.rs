@@ -1619,6 +1619,38 @@ pub enum RedLabelStartSwitch {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAdvanceSwitchTarget {
+    Diagnostics,
+    Audits,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAdminSwitch {
+    HighScoreResetStatusBlocked {
+        status: u8,
+        killed_process: RedLabelKilledProcess,
+    },
+    HighScoreReset {
+        status: u8,
+        map_after: u8,
+        hsrflg_before: u8,
+        hsrflg_after: u8,
+        killed_process: RedLabelKilledProcess,
+    },
+    AdvanceStatusBlocked {
+        status: u8,
+        killed_process: RedLabelKilledProcess,
+    },
+    AdvanceJump {
+        status: u8,
+        pia01: u8,
+        target: RedLabelAdvanceSwitchTarget,
+        map_after: u8,
+        killed_process: RedLabelKilledProcess,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RedLabelPlayerRuntimeInit {
     pub current_player: u8,
@@ -2242,6 +2274,7 @@ pub enum RedLabelProcessDispatch {
     PlayerDeath(RedLabelPlayerDeath),
     StartSwitch(RedLabelStartSwitch),
     CoinProcess(RedLabelCoinProcessStep),
+    AdminSwitch(RedLabelAdminSwitch),
     LaserFire(RedLabelLaserFireDispatch),
     LaserStep(RedLabelLaserStep),
     LaserFinished(RedLabelKilledProcess),
@@ -8226,6 +8259,73 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    /// Source-shaped `HSRES`: only run in attract/game-over, reset today's
+    /// high scores, increment the aliased `HSRFLG` byte, then `SUCIDE`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1081-L1087>.
+    pub fn dispatch_high_score_reset_current_process(
+        &mut self,
+    ) -> Result<RedLabelAdminSwitch, String> {
+        let layout = red_label_ram_layout()?;
+        let status = self.read_field_byte(&layout, "base_page", "STATUS")?;
+        if status & 0x80 == 0 {
+            return Ok(RedLabelAdminSwitch::HighScoreResetStatusBlocked {
+                status,
+                killed_process: self.kill_current_process(&layout)?,
+            });
+        }
+
+        let map_after = 3;
+        self.write_field_byte(&layout, "base_page", "MAPCR", map_after)?;
+        let defaults = red_label_cmos_defaults()?;
+        self.apply_todays_high_score_defaults(&defaults)?;
+        let hsrflg_address = RED_LABEL_THSTAB_START;
+        let hsrflg_before = self.read_byte(hsrflg_address)?;
+        let hsrflg_after = hsrflg_before.wrapping_add(1);
+        self.write_byte(hsrflg_address, hsrflg_after)?;
+        let killed_process = self.kill_current_process(&layout)?;
+        Ok(RedLabelAdminSwitch::HighScoreReset {
+            status,
+            map_after,
+            hsrflg_before,
+            hsrflg_after,
+            killed_process,
+        })
+    }
+
+    /// Source-shaped `ADVSW`: only run in attract/game-over, select the manual
+    /// diagnostic or automatic audit vector from `PIA01` bit 0, and retire the
+    /// cabinet switch process after recording the target.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1091-L1102>.
+    pub fn dispatch_advance_switch_current_process(
+        &mut self,
+    ) -> Result<RedLabelAdminSwitch, String> {
+        let layout = red_label_ram_layout()?;
+        let status = self.read_field_byte(&layout, "base_page", "STATUS")?;
+        if status & 0x80 == 0 {
+            return Ok(RedLabelAdminSwitch::AdvanceStatusBlocked {
+                status,
+                killed_process: self.kill_current_process(&layout)?,
+            });
+        }
+
+        let map_after = 3;
+        self.write_field_byte(&layout, "base_page", "MAPCR", map_after)?;
+        let pia01 = self.read_field_byte(&layout, "base_page", "PIA01")?;
+        let target = if pia01 & 0x01 == 0 {
+            RedLabelAdvanceSwitchTarget::Diagnostics
+        } else {
+            RedLabelAdvanceSwitchTarget::Audits
+        };
+        let killed_process = self.kill_current_process(&layout)?;
+        Ok(RedLabelAdminSwitch::AdvanceJump {
+            status,
+            pia01,
+            target,
+            map_after,
+            killed_process,
+        })
+    }
+
     fn apply_coin_slot_credit(
         &mut self,
         slot: RedLabelCoinSlot,
@@ -8981,6 +9081,18 @@ impl RedLabelRuntimeMemory {
             return self
                 .dispatch_start_two_current_process()
                 .map(RedLabelProcessDispatch::StartSwitch);
+        }
+
+        if routine_address == red_label_routine_address("HSRES")? {
+            return self
+                .dispatch_high_score_reset_current_process()
+                .map(RedLabelProcessDispatch::AdminSwitch);
+        }
+
+        if routine_address == red_label_routine_address("ADVSW")? {
+            return self
+                .dispatch_advance_switch_current_process()
+                .map(RedLabelProcessDispatch::AdminSwitch);
         }
 
         if routine_address == red_label_routine_address("LCOIN")? {
@@ -18232,10 +18344,11 @@ mod tests {
         input::{CabinetInput, DefenderInputPorts},
         machine::{
             ArcadeMachine, GamePhase, MachineEvent, RED_LABEL_ATTRACT_PROCESS_TYPE,
-            RED_LABEL_COIN_PROCESS_TYPE, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelAltitudeTableInit,
-            RedLabelAppearanceStart, RedLabelAstronautDirection, RedLabelAstronautKill,
-            RedLabelAstronautProcessStep, RedLabelAstronautWalk, RedLabelBackgroundInit,
-            RedLabelBlockClear, RedLabelBonusTextCall, RedLabelBonusTextPlan, RedLabelBorder,
+            RED_LABEL_COIN_PROCESS_TYPE, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelAdminSwitch,
+            RedLabelAdvanceSwitchTarget, RedLabelAltitudeTableInit, RedLabelAppearanceStart,
+            RedLabelAstronautDirection, RedLabelAstronautKill, RedLabelAstronautProcessStep,
+            RedLabelAstronautWalk, RedLabelBackgroundInit, RedLabelBlockClear,
+            RedLabelBonusTextCall, RedLabelBonusTextPlan, RedLabelBorder,
             RedLabelCapturedAstronautCollision, RedLabelCmosWordWrite, RedLabelCoinCredit,
             RedLabelCoinProcessStep, RedLabelCoinSlot, RedLabelCoinSwitchScan,
             RedLabelColorRamInit, RedLabelCreatedProcess, RedLabelCreatedShell, RedLabelEnemyKill,
@@ -22646,6 +22759,167 @@ mod tests {
                 status_mask: 0,
             })
         );
+    }
+
+    #[test]
+    fn high_score_reset_dispatch_resets_todays_scores_and_suicides() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_admin_switch_process(&mut machine, "HSRES");
+        machine.memory.write_byte(0xA036, 7).expect("seed MAPCR");
+        machine.memory.write_byte(0xA0BA, 0xFF).expect("set STATUS");
+        machine
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START, 0x7E)
+            .expect("dirty HSRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START + 1, 0x7D)
+            .expect("dirty today's high score table");
+
+        let defaults = super::red_label_cmos_defaults().expect("CMOS defaults");
+        let mut expected =
+            super::red_label_high_score_default_cells(&defaults).expect("high-score defaults");
+        let hsrflg_before = expected[0];
+        expected[0] = hsrflg_before.wrapping_add(1);
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("HSRES").expect("HSRES address"),
+            )
+            .expect("dispatch HSRES");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AdminSwitch(RedLabelAdminSwitch::HighScoreReset {
+                status: 0xFF,
+                map_after: 3,
+                hsrflg_before,
+                hsrflg_after: expected[0],
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: process,
+                    previous_link_address: 0xA05F,
+                },
+            })
+        );
+        let todays_end = RED_LABEL_THSTAB_START
+            + u16::try_from(expected.len()).expect("expected table length fits in u16");
+        assert_eq!(
+            machine.red_label_ram_range(RED_LABEL_THSTAB_START..todays_end),
+            Some(expected.as_slice())
+        );
+        assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[3][..]));
+        assert_eq!(
+            machine.red_label_ram_range(0xA05F..0xA061),
+            Some(&[0, 0][..])
+        );
+    }
+
+    #[test]
+    fn high_score_reset_status_block_suicides_without_table_mutation() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_admin_switch_process(&mut machine, "HSRES");
+        machine.memory.write_byte(0xA036, 7).expect("seed MAPCR");
+        machine.memory.write_byte(0xA0BA, 0x7F).expect("set STATUS");
+        machine
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START, 0x55)
+            .expect("dirty HSRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START + 1, 0x66)
+            .expect("dirty today's high score table");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("HSRES").expect("HSRES address"),
+            )
+            .expect("dispatch blocked HSRES");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AdminSwitch(
+                RedLabelAdminSwitch::HighScoreResetStatusBlocked {
+                    status: 0x7F,
+                    killed_process: RedLabelKilledProcess {
+                        killed_process_address: process,
+                        previous_link_address: 0xA05F,
+                    },
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(RED_LABEL_THSTAB_START..RED_LABEL_THSTAB_START + 2),
+            Some(&[0x55, 0x66][..])
+        );
+        assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[7][..]));
+    }
+
+    #[test]
+    fn advance_switch_dispatch_selects_diagnostics_or_audits_and_suicides() {
+        for (pia01, target) in [
+            (0x02, RedLabelAdvanceSwitchTarget::Diagnostics),
+            (0x03, RedLabelAdvanceSwitchTarget::Audits),
+        ] {
+            let mut machine = ArcadeMachine::new();
+            let process = schedule_admin_switch_process(&mut machine, "ADVSW");
+            machine.memory.write_byte(0xA036, 7).expect("seed MAPCR");
+            machine.memory.write_byte(0xA079, pia01).expect("set PIA01");
+            machine.memory.write_byte(0xA0BA, 0x80).expect("set STATUS");
+
+            let dispatch = machine
+                .red_label_dispatch_translated_process_routine(
+                    red_label_routine_address("ADVSW").expect("ADVSW address"),
+                )
+                .expect("dispatch ADVSW");
+
+            assert_eq!(
+                dispatch,
+                RedLabelProcessDispatch::AdminSwitch(RedLabelAdminSwitch::AdvanceJump {
+                    status: 0x80,
+                    pia01,
+                    target,
+                    map_after: 3,
+                    killed_process: RedLabelKilledProcess {
+                        killed_process_address: process,
+                        previous_link_address: 0xA05F,
+                    },
+                })
+            );
+            assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[3][..]));
+            assert_eq!(
+                machine.red_label_ram_range(0xA05F..0xA061),
+                Some(&[0, 0][..])
+            );
+        }
+    }
+
+    #[test]
+    fn advance_switch_status_block_suicides_without_vector_handoff() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_admin_switch_process(&mut machine, "ADVSW");
+        machine.memory.write_byte(0xA036, 7).expect("seed MAPCR");
+        machine.memory.write_byte(0xA079, 0x03).expect("set PIA01");
+        machine
+            .memory
+            .write_byte(0xA0BA, 0x00)
+            .expect("clear STATUS");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("ADVSW").expect("ADVSW address"),
+            )
+            .expect("dispatch blocked ADVSW");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AdminSwitch(RedLabelAdminSwitch::AdvanceStatusBlocked {
+                status: 0x00,
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: process,
+                    previous_link_address: 0xA05F,
+                },
+            })
+        );
+        assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[7][..]));
     }
 
     #[test]
@@ -32066,6 +32340,24 @@ mod tests {
             machine
                 .step_red_label_process_scheduler()
                 .expect("schedule coin process")
+                .expect("scheduled process")
+                .process_address,
+            process
+        );
+        process
+    }
+
+    fn schedule_admin_switch_process(machine: &mut ArcadeMachine, routine: &str) -> u16 {
+        let routine_address =
+            red_label_routine_address(routine).unwrap_or_else(|_| panic!("{routine} address"));
+        let process = machine
+            .red_label_make_process(routine_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make admin switch process")
+            .process_address;
+        assert_eq!(
+            machine
+                .step_red_label_process_scheduler()
+                .expect("schedule admin switch process")
                 .expect("scheduled process")
                 .process_address,
             process
