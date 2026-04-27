@@ -285,6 +285,7 @@ impl InputMapper {
                 input.cabinet.fire = true;
             }
             KeyCode::Char('1') if pressed => input.cabinet.start_one = true,
+            KeyCode::Char('5') if pressed => input.cabinet.coin = true,
             KeyCode::Char('a') | KeyCode::Char('A') => set_held_flag(
                 &mut self.held.altitude_up,
                 key_event.kind,
@@ -450,10 +451,15 @@ mod tests {
             &mut input,
         );
         mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Char('5'), KeyModifiers::NONE),
+            &mut input,
+        );
+        mapper.handle_key_event(
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
             &mut input,
         );
 
+        assert!(input.cabinet.coin);
         assert!(input.cabinet.altitude_up);
         assert!(input.cabinet.thrust);
         assert!(input.cabinet.reverse);

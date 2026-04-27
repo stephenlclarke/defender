@@ -132,9 +132,10 @@ Notes:
 
 ## Controls
 
-Current live scaffold controls:
+Current live controls with the default `planetoid` input profile:
 
-- `ENTER` or `1`: start the one-player scaffold from attract mode
+- `5`: insert a left-slot coin
+- `ENTER` or `1`: start a one-player game when credit or free play is available
 - `A`: move up
 - `Z`: move down
 - `SHIFT`: thrust forward

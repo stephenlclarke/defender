@@ -791,7 +791,9 @@ This section records drift found during the repository review on
 
 ### Session, Cabinet State, And Operator Behavior
 
-- Credits and one-player start are only a scaffold.
+- Live coin input and one-/two-player start buttons now enter through the
+  translated red-label coin and start switch paths. No-credit one-player starts
+  are blocked by the source `ST1` credit gate.
 - CMOS-backed high-score reset copies all-time and today's tables from
   `DEFALT`, packed table comparison/insertion is modeled, and qualifying
   game-over scores can collect initials and write both the all-time CMOS table
