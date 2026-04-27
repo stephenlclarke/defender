@@ -143,6 +143,9 @@ Current live controls with the default `planetoid` input profile:
 - `ENTER`: fire while playing
 - `TAB`: emit a smart-bomb event while playing
 - `H`: emit a hyperspace event while playing
+- `F2`: service advance / diagnostics target
+- `F3`: reset today's high-score table from ROM defaults
+- hold `F4` with `F2`: select the auto/audits target
 - `A`-`Z`: enter initials while high-score entry is active
 - `BACKSPACE`: delete the previous initial while high-score entry is active
 - `Q` or `ESC`: quit

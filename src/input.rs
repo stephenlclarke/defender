@@ -218,6 +218,7 @@ pub struct HeldInput {
     pub altitude_up: bool,
     pub altitude_down: bool,
     pub thrust: bool,
+    pub auto_up_manual_down: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -267,6 +268,7 @@ impl InputMapper {
         input.cabinet.altitude_up |= self.held.altitude_up;
         input.cabinet.altitude_down |= self.held.altitude_down;
         input.cabinet.thrust |= self.held.thrust;
+        input.cabinet.auto_up_manual_down |= self.held.auto_up_manual_down;
     }
 
     fn map_profile_key(&mut self, key_event: KeyEvent, input: &mut PolledInput) {
@@ -305,6 +307,13 @@ impl InputMapper {
             KeyCode::Char(' ') if pressed => input.cabinet.reverse = true,
             KeyCode::Tab if pressed => input.cabinet.smart_bomb = true,
             KeyCode::Char('h') | KeyCode::Char('H') if pressed => input.cabinet.hyperspace = true,
+            KeyCode::F(2) if pressed => input.cabinet.service_advance = true,
+            KeyCode::F(3) if pressed => input.cabinet.high_score_reset = true,
+            KeyCode::F(4) => set_held_flag(
+                &mut self.held.auto_up_manual_down,
+                key_event.kind,
+                &mut input.cabinet.auto_up_manual_down,
+            ),
             _ => {}
         }
     }
@@ -334,6 +343,13 @@ impl InputMapper {
             KeyCode::Char('f') | KeyCode::Char('F') if pressed => input.cabinet.fire = true,
             KeyCode::Char('b') | KeyCode::Char('B') if pressed => input.cabinet.smart_bomb = true,
             KeyCode::Char('h') | KeyCode::Char('H') if pressed => input.cabinet.hyperspace = true,
+            KeyCode::F(2) if pressed => input.cabinet.service_advance = true,
+            KeyCode::F(3) if pressed => input.cabinet.high_score_reset = true,
+            KeyCode::F(4) => set_held_flag(
+                &mut self.held.auto_up_manual_down,
+                key_event.kind,
+                &mut input.cabinet.auto_up_manual_down,
+            ),
             _ => {}
         }
     }
@@ -458,6 +474,12 @@ mod tests {
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
             &mut input,
         );
+        mapper.handle_key_event(KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE), &mut input);
+        mapper.handle_key_event(KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE), &mut input);
+        mapper.handle_key_event(
+            KeyEvent::new_with_kind(KeyCode::F(4), KeyModifiers::NONE, KeyEventKind::Press),
+            &mut input,
+        );
 
         assert!(input.cabinet.coin);
         assert!(input.cabinet.altitude_up);
@@ -467,10 +489,13 @@ mod tests {
         assert!(input.cabinet.hyperspace);
         assert!(input.cabinet.fire);
         assert!(input.cabinet.start_one);
+        assert!(input.cabinet.service_advance);
+        assert!(input.cabinet.high_score_reset);
+        assert!(input.cabinet.auto_up_manual_down);
     }
 
     #[test]
-    fn cabinet_profile_maps_coin_and_start_buttons() {
+    fn cabinet_profile_maps_coin_start_and_operator_buttons() {
         let mut mapper = InputMapper::new(InputProfile::Cabinet);
         let mut input = PolledInput::default();
 
@@ -482,9 +507,42 @@ mod tests {
             KeyEvent::new(KeyCode::Char('1'), KeyModifiers::NONE),
             &mut input,
         );
+        mapper.handle_key_event(KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE), &mut input);
+        mapper.handle_key_event(KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE), &mut input);
+        mapper.handle_key_event(
+            KeyEvent::new_with_kind(KeyCode::F(4), KeyModifiers::NONE, KeyEventKind::Press),
+            &mut input,
+        );
 
         assert!(input.cabinet.coin);
         assert!(input.cabinet.start_one);
+        assert!(input.cabinet.service_advance);
+        assert!(input.cabinet.high_score_reset);
+        assert!(input.cabinet.auto_up_manual_down);
+    }
+
+    #[test]
+    fn operator_auto_up_selector_is_held_until_release() {
+        let mut mapper = InputMapper::new(InputProfile::Planetoid);
+        let mut input = PolledInput::default();
+
+        mapper.handle_key_event(
+            KeyEvent::new_with_kind(KeyCode::F(4), KeyModifiers::NONE, KeyEventKind::Press),
+            &mut input,
+        );
+        assert!(input.cabinet.auto_up_manual_down);
+
+        let mut held = PolledInput::default();
+        mapper.apply_held(&mut held);
+        assert!(held.cabinet.auto_up_manual_down);
+
+        mapper.handle_key_event(
+            KeyEvent::new_with_kind(KeyCode::F(4), KeyModifiers::NONE, KeyEventKind::Release),
+            &mut PolledInput::default(),
+        );
+        let mut released = PolledInput::default();
+        mapper.apply_held(&mut released);
+        assert!(!released.cabinet.auto_up_manual_down);
     }
 
     #[test]

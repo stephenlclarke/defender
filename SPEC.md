@@ -698,6 +698,9 @@ This section records drift found during the repository review on
   `PLSTRT` live respawn orchestration beyond runtime snapshot sync,
   human-carry behavior, and full IRQ scanline/live rendering integration
   remain open.
+- The live keyboard profiles expose operator cabinet bits with `F2` for
+  service advance, `F3` for high-score reset, and held `F4` for the
+  auto/up selector used with service advance.
 - Input profiles and MAME IN0/IN1/IN2 port projection exist, and the main-board
   CPU can now read those bytes through the PIA data/control register path once
   the ROM selects data registers. Cabinet control behavior and initials entry
