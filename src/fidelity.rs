@@ -389,6 +389,9 @@ fn event_label(event: MachineEvent) -> &'static str {
     match event {
         MachineEvent::CreditAdded => "credit_added",
         MachineEvent::GameStarted => "game_started",
+        MachineEvent::DiagnosticsSelected => "diagnostics_selected",
+        MachineEvent::AuditsSelected => "audits_selected",
+        MachineEvent::HighScoreReset => "high_score_reset",
         MachineEvent::ReversePressed => "reverse_pressed",
         MachineEvent::FirePressed => "fire_pressed",
         MachineEvent::SmartBombPressed => "smart_bomb_pressed",

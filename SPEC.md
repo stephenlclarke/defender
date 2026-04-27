@@ -595,15 +595,18 @@ This section records drift found during the repository review on
   full trace proof for the translated `BONUS` wave-clear death-tail path,
   source-exact boot/start-ready state, broader `SWTAB` cabinet-session
   integration, scanline scheduling, live video presentation, and full
-  frame/cycle integration remain gaps. Live coin input now enters through
-  translated `CSCAN` / `SWTAB1` / `SWP`, ticks the source
+  frame/cycle integration remain gaps. Live coin/admin input now enters through
+  translated `CSCAN` / `SWTAB1` / `SWP`, ignores the source auto/manual
+  selector for queue priority while preserving it for `ADVSW`, ticks the source
   slam/coin debounce counters, sleeps through `LCOIN` / `RCOIN` / `CCOIN`, and
   awards credit from `CN1` with `CNSND`, slot audits, paid-credit audit,
-  `CUNITS`/`BUNITS`, and CMOS-backed `CREDIT` / `CREDST` updates.
-  Credited/free-play live one- and two-player start buttons now scan `SWTAB`,
-  dispatch `ST1`/`ST2`, and consume credits through the translated `START2`
-  tail. Live player controls stay gated while
-  the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1` start handoff advances.
+  `CUNITS`/`BUNITS`, and CMOS-backed `CREDIT` / `CREDST` updates. Live
+  high-score reset now runs through `HSRES`, live service advance reports the
+  translated diagnostics/audits target, and credited/free-play live one- and
+  two-player start buttons now scan `SWTAB`, dispatch `ST1`/`ST2`, and consume
+  credits through the translated `START2` tail. Live player controls stay gated
+  while the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1` start handoff
+  advances.
   The board harness can now read/write packed CMOS/SRAM bytes and words using
   the documented most-significant-nibble-first order, can apply the ROM-derived
   CMOS defaults to its CMOS cell array through the visible `CMINIT` clear/copy
@@ -793,9 +796,9 @@ This section records drift found during the repository review on
 
 ### Session, Cabinet State, And Operator Behavior
 
-- Live coin input and one-/two-player start buttons now enter through the
-  translated red-label coin and start switch paths. No-credit one-player starts
-  are blocked by the source `ST1` credit gate.
+- Live coin/admin input and one-/two-player start buttons now enter through the
+  translated red-label coin/admin and start switch paths. No-credit one-player
+  starts are blocked by the source `ST1` credit gate.
 - CMOS-backed high-score reset copies all-time and today's tables from
   `DEFALT`, packed table comparison/insertion is modeled, and qualifying
   game-over scores can collect initials and write both the all-time CMOS table

@@ -61,6 +61,7 @@ const RED_LABEL_THRUST_SWITCH_BIT: u8 = 0x02;
 const RED_LABEL_SMART_BOMB_SWITCH_BIT: u8 = 0x04;
 const RED_LABEL_REVERSE_SWITCH_BIT: u8 = 0x40;
 const RED_LABEL_COIN_SCAN_MASK: u8 = 0x3F;
+const RED_LABEL_COIN_QUEUEABLE_BITS: u8 = 0x3E;
 const RED_LABEL_COIN_DEBOUNCE_COUNT: u8 = 0x16;
 const RED_LABEL_COIN_SLEEP_TICKS: u8 = 10;
 const RED_LABEL_SLAM_SWITCH_BIT: u8 = 0x40;
@@ -225,10 +226,19 @@ struct LiveTranslatedSwitchOutcome {
     player_start_active: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct LiveCoinDoorSwitchOutcome {
+    credit_added: bool,
+    admin_event: Option<MachineEvent>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MachineEvent {
     CreditAdded,
     GameStarted,
+    DiagnosticsSelected,
+    AuditsSelected,
+    HighScoreReset,
     ReversePressed,
     FirePressed,
     SmartBombPressed,
@@ -14892,11 +14902,12 @@ fn translated_player_switch_process(
 fn translated_coin_switch_process(
     confirmed_bits: u8,
 ) -> Result<Option<RedLabelSwitchProcess>, String> {
-    if confirmed_bits == 0 {
+    let queueable_bits = confirmed_bits & RED_LABEL_COIN_QUEUEABLE_BITS;
+    if queueable_bits == 0 {
         return Ok(None);
     }
 
-    let switch_bit = 1u8 << confirmed_bits.trailing_zeros();
+    let switch_bit = 1u8 << queueable_bits.trailing_zeros();
     let (routine_label, process_type) = match switch_bit {
         0x02 => ("ADVSW", RED_LABEL_SYSTEM_PROCESS_TYPE),
         0x04 => ("RCOIN", RED_LABEL_COIN_PROCESS_TYPE),
@@ -17995,11 +18006,14 @@ impl ArcadeMachine {
         events: &mut Vec<MachineEvent>,
     ) {
         let mut started_this_frame = false;
-        if self
-            .step_red_label_live_coin_switches(input)
-            .expect("live coin switch creates only translated red-label processes")
-        {
+        let coin_door_outcome = self
+            .step_red_label_live_coin_door_switches(input)
+            .expect("live coin/admin switch creates only translated red-label processes");
+        if coin_door_outcome.credit_added {
             events.push(MachineEvent::CreditAdded);
+        }
+        if let Some(event) = coin_door_outcome.admin_event {
+            events.push(event);
         }
 
         if (input.start_one || input.start_two)
@@ -18054,42 +18068,64 @@ impl ArcadeMachine {
         Ok(())
     }
 
-    fn step_red_label_live_coin_switches(&mut self, input: CabinetInput) -> Result<bool, String> {
+    fn step_red_label_live_coin_door_switches(
+        &mut self,
+        input: CabinetInput,
+    ) -> Result<LiveCoinDoorSwitchOutcome, String> {
         let mut coin_input = CabinetInput::NONE;
         coin_input.coin = input.coin;
         coin_input.coin_two = input.coin_two;
         coin_input.coin_three = input.coin_three;
-        let coin_process_active_before = self.red_label_live_coin_process_active()?;
+        coin_input.auto_up_manual_down = input.auto_up_manual_down;
+        coin_input.service_advance = input.service_advance;
+        coin_input.high_score_reset = input.high_score_reset;
+        coin_input.tilt = input.tilt;
+        self.prepare_red_label_live_admin_switch_state(coin_input)?;
+        let coin_process_active_before = self.red_label_live_coin_door_process_active()?;
         self.memory
             .tick_coin_slam_debouncers(coin_input.defender_input_ports())?;
         self.memory
             .scan_translated_coin_switches(coin_input.defender_input_ports())?;
         self.memory.dispatch_switch_processes()?;
-        if !coin_process_active_before && !self.red_label_live_coin_process_active()? {
-            return Ok(false);
+        if !coin_process_active_before && !self.red_label_live_coin_door_process_active()? {
+            return Ok(LiveCoinDoorSwitchOutcome::default());
         }
 
         let Some(dispatch) = self.step_red_label_translated_process()? else {
-            return Ok(false);
+            return Ok(LiveCoinDoorSwitchOutcome::default());
         };
-        Ok(matches!(
-            dispatch,
-            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::Completed {
-                coin_credit: RedLabelCoinCredit {
-                    credits_awarded: 1..,
-                    ..
-                },
-                ..
-            })
-        ))
+        Ok(live_coin_door_switch_outcome(&dispatch))
     }
 
-    fn red_label_live_coin_process_active(&self) -> Result<bool, String> {
+    fn prepare_red_label_live_admin_switch_state(
+        &mut self,
+        input: CabinetInput,
+    ) -> Result<(), String> {
+        if !(input.service_advance || input.high_score_reset) {
+            return Ok(());
+        }
+        if !matches!(self.phase, GamePhase::Attract | GamePhase::GameOver) {
+            return Ok(());
+        }
+        let layout = red_label_ram_layout()?;
+        let status = self
+            .memory
+            .read_field_byte(&layout, "base_page", "STATUS")?;
+        if status & 0x80 == 0 {
+            self.memory
+                .write_field_byte(&layout, "base_page", "STATUS", 0xFF)?;
+        }
+        Ok(())
+    }
+
+    fn red_label_live_coin_door_process_active(&self) -> Result<bool, String> {
         let routines = [
             red_label_routine_address("LCOIN")?,
             red_label_routine_address("RCOIN")?,
             red_label_routine_address("CCOIN")?,
             red_label_routine_address("CN1")?,
+            red_label_routine_address("ADVSW")?,
+            red_label_routine_address("HSRES")?,
         ];
         self.memory.active_process_has_routine(&routines)
     }
@@ -18331,6 +18367,43 @@ impl ArcadeMachine {
         if input.hyperspace {
             events.push(MachineEvent::HyperspacePressed);
         }
+    }
+}
+
+fn live_coin_door_switch_outcome(dispatch: &RedLabelProcessDispatch) -> LiveCoinDoorSwitchOutcome {
+    match dispatch {
+        RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::Completed {
+            coin_credit:
+                RedLabelCoinCredit {
+                    credits_awarded: 1..,
+                    ..
+                },
+            ..
+        }) => LiveCoinDoorSwitchOutcome {
+            credit_added: true,
+            admin_event: None,
+        },
+        RedLabelProcessDispatch::AdminSwitch(RedLabelAdminSwitch::HighScoreReset { .. }) => {
+            LiveCoinDoorSwitchOutcome {
+                credit_added: false,
+                admin_event: Some(MachineEvent::HighScoreReset),
+            }
+        }
+        RedLabelProcessDispatch::AdminSwitch(RedLabelAdminSwitch::AdvanceJump {
+            target: RedLabelAdvanceSwitchTarget::Diagnostics,
+            ..
+        }) => LiveCoinDoorSwitchOutcome {
+            credit_added: false,
+            admin_event: Some(MachineEvent::DiagnosticsSelected),
+        },
+        RedLabelProcessDispatch::AdminSwitch(RedLabelAdminSwitch::AdvanceJump {
+            target: RedLabelAdvanceSwitchTarget::Audits,
+            ..
+        }) => LiveCoinDoorSwitchOutcome {
+            credit_added: false,
+            admin_event: Some(MachineEvent::AuditsSelected),
+        },
+        _ => LiveCoinDoorSwitchOutcome::default(),
     }
 }
 
@@ -19119,6 +19192,74 @@ mod tests {
             machine.red_label_ram_range(0xA037..0xA038),
             Some(&[0x00][..])
         );
+    }
+
+    #[test]
+    fn live_high_score_reset_runs_through_translated_coin_door_switch() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START, 0x7E)
+            .expect("dirty HSRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START + 1, 0x7D)
+            .expect("dirty today's high-score table");
+
+        let defaults = super::red_label_cmos_defaults().expect("CMOS defaults");
+        let mut expected =
+            super::red_label_high_score_default_cells(&defaults).expect("high-score defaults");
+        expected[0] = expected[0].wrapping_add(1);
+        let output = machine.step(CabinetInput {
+            high_score_reset: true,
+            ..CabinetInput::NONE
+        });
+
+        let events = output.events().collect::<Vec<_>>();
+        let todays_end = RED_LABEL_THSTAB_START
+            + u16::try_from(expected.len()).expect("expected table length fits in u16");
+        assert_eq!(output.snapshot.phase, GamePhase::Attract);
+        assert!(events.contains(&MachineEvent::HighScoreReset));
+        assert_eq!(
+            machine.red_label_ram_range(RED_LABEL_THSTAB_START..todays_end),
+            Some(expected.as_slice())
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA082..0xA086),
+            Some(&[0, 0, 0, 0][..])
+        );
+    }
+
+    #[test]
+    fn live_advance_switch_reports_manual_or_auto_admin_target() {
+        for (input, event) in [
+            (
+                CabinetInput {
+                    service_advance: true,
+                    ..CabinetInput::NONE
+                },
+                MachineEvent::DiagnosticsSelected,
+            ),
+            (
+                CabinetInput {
+                    auto_up_manual_down: true,
+                    service_advance: true,
+                    ..CabinetInput::NONE
+                },
+                MachineEvent::AuditsSelected,
+            ),
+        ] {
+            let mut machine = ArcadeMachine::new();
+            let output = machine.step(input);
+            let events = output.events().collect::<Vec<_>>();
+
+            assert_eq!(output.snapshot.phase, GamePhase::Attract);
+            assert!(events.contains(&event));
+            assert_eq!(
+                machine.red_label_ram_range(0xA082..0xA086),
+                Some(&[0, 0, 0, 0][..])
+            );
+        }
     }
 
     #[test]
@@ -22711,6 +22852,40 @@ mod tests {
         assert_eq!(
             machine.red_label_ram_range(0xA082..0xA086),
             Some(&[0xD4, 0x75, RED_LABEL_COIN_PROCESS_TYPE, 0][..])
+        );
+    }
+
+    #[test]
+    fn translated_coin_switch_scan_ignores_auto_manual_selector_for_queue_order() {
+        let mut machine = ArcadeMachine::new();
+
+        let scan = machine
+            .red_label_scan_translated_coin_switches(DefenderInputPorts {
+                in0: 0,
+                in1: 0,
+                in2: 0x03,
+            })
+            .expect("queue advance switch with auto/manual selector held");
+
+        assert_eq!(
+            scan,
+            RedLabelCoinSwitchScan {
+                previous_pia01: 0,
+                previous_pia02: 0,
+                current_pia01: 0x03,
+                triggered_bits: 0x03,
+                confirmed_bits: 0x03,
+                queued: Some(RedLabelSwitchProcess {
+                    switch_bit: 0x02,
+                    routine_address: red_label_routine_address("ADVSW").expect("ADVSW address"),
+                    process_type: RED_LABEL_SYSTEM_PROCESS_TYPE,
+                    status_mask: 0,
+                }),
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA082..0xA086),
+            Some(&[0xD4, 0x4B, RED_LABEL_SYSTEM_PROCESS_TYPE, 0][..])
         );
     }
 

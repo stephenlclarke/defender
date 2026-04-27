@@ -368,15 +368,18 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   `SSCAN` switch history, `SWPROC` queue, `SWP` status gate, and translated
   `LFIRE` / `SBOMB` / `HYPER` / `REV` / `ST1` / `ST2` scheduler paths. The
   scanner records all eight IN0 switch bits and queues every translated source
-  switch process. Live coin input now enters through the translated `CSCAN` /
-  `SWTAB1` / `SWP` scheduler path, ticks the source slam/coin debounce
-  counters, sleeps through `LCOIN` / `RCOIN` / `CCOIN`, and awards credit from
-  `CN1` with `CNSND`, slot audits, paid-credit audit, `CUNITS`/`BUNITS`, and
-  CMOS-backed `CREDIT` / `CREDST` updates. No-credit one-player starts now enter
-  translated `ST1` and die at the source credit gate instead of using the old
-  compatibility shortcut. After a translated start, live player controls stay
-  gated while the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1` player-start
-  handoff advances.
+  switch process. Live coin/admin input now enters through the translated
+  `CSCAN` / `SWTAB1` / `SWP` scheduler path, ignores the source auto/manual
+  selector for queue priority while preserving it for `ADVSW`, ticks the source
+  slam/coin debounce counters, sleeps through `LCOIN` / `RCOIN` / `CCOIN`, and
+  awards credit from `CN1` with `CNSND`, slot audits, paid-credit audit,
+  `CUNITS`/`BUNITS`, and CMOS-backed `CREDIT` / `CREDST` updates. Live
+  high-score reset now runs through `HSRES`, and live service advance reports
+  the translated diagnostics/audits target. No-credit one-player starts now
+  enter translated `ST1` and die at the source credit gate instead of using the
+  old compatibility shortcut. After a translated start, live player controls
+  stay gated while the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1`
+  player-start handoff advances.
   `REV` sets
   `REVFLG`, negates `PLADIR` into `NPLAD`, debounces `PIA21`, clears the flag,
   and returns the process to the free list.
