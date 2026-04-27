@@ -1,4 +1,5 @@
 label	address	bytes	source
+CNSND	0xD4AB	FF01181900	https://github.com/mwenge/defender/blob/master/src/defa7.src#L665-L665
 RPSND	0xD4B0	FF01201E00	https://github.com/mwenge/defender/blob/master/src/defa7.src#L665-L666
 PDSND	0xD4B5	F002081101201700	https://github.com/mwenge/defender/blob/master/src/defa7.src#L667-L667
 ST1SND	0xD4BD	F001400A00	https://github.com/mwenge/defender/blob/master/src/defa7.src#L668-L668

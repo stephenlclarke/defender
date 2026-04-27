@@ -93,8 +93,8 @@ Current files:
   derive the source-shaped `CROM0` `ROMMAP` descriptor bytes used by
   `ROM0`/`ROM9` checksum and stage reports.
 - `routine-addresses.tsv`: assembled red-label routine entry points for the
-  translated `SCORE`, `HSRES`, `ADVSW`, `LCOIN`, `RCOIN`, `CCOIN`, `SNDLD`,
-  `SHELL`, `BKIL`, `LFIRE`, `LCOL`, `LASR` / `LASR0`, `LASL` / `LASL0`,
+  translated `SCORE`, `HSRES`, `ADVSW`, `LCOIN`, `RCOIN`, `CCOIN`, `CN1`,
+  `SNDLD`, `SHELL`, `BKIL`, `LFIRE`, `LCOL`, `LASR` / `LASR0`, `LASL` / `LASL0`,
   `LASD`, `COLIDE`, `COL0`, `COLCHK`, `REV`, `PLEND` / `PDTHL` / `PDTH2` /
   `PDTH4` / `PDTH5`, `PXVCT` / `PX1A`, `PDTH5R`, `PLE02`, `PLE3`, `PLSTRT`,
   `PLST1A`, `PLSTR3`, `PLS01`, `PLS1`,
@@ -122,7 +122,7 @@ Current files:
   `BAX` points at the ROM-resident `BMBD10` / `BMBD11` / `BMBD20` / `BMBD21`
   records.
 - `sound-tables.tsv`: red-label sound table bytes currently used by `SNDLD` and
-  `SNDSEQ` for replay, player-death, one-player start, two-player start,
+  `SNDSEQ` for coin, replay, player-death, one-player start, two-player start,
   terrain-blow, smart-bomb, bomb-hit, laser, appearance, probe-hit,
   schizoid-hit, swarmer-hit, swarmer-shot, UFO-hit, lander-hit, lander-pickup,
   lander-suck, lander-grab, lander-shot, astronaut-catch, astronaut-scream,
@@ -224,7 +224,7 @@ consumed by the `BONUS` routine's `MESS` / `WNBV` calls:
 `defb6.src`, and `amode1.src` with the upstream red-label build recipe, then
 recording the `SCORE`, `SNDLD`, `SHELL`, `BMBOUT`, `FBOUT`, `BKIL`, `LFIRE`,
 `LCOL`, `LASR` / `LASR0`, `LASL` / `LASL0`, `LASD`, `COLIDE`, `COL0`,
-`COLCHK`, `HSRES`, `ADVSW`, `LCOIN`, `RCOIN`, `CCOIN`, `REV`, `PLEND` /
+`COLCHK`, `HSRES`, `ADVSW`, `LCOIN`, `RCOIN`, `CCOIN`, `CN1`, `REV`, `PLEND` /
 `PDTHL` / `PDTH2` / `PDTH4` / `PDTH5`, `PXVCT` / `PX1A`, `PDTH5R`, `PLE02`,
 `PLE3`, `PLSTRT`, `PLST1A`, `PLSTR3`, `PLS01`, `PLS1`, `STCHK`, `ASTST`,
 `ATTR`, `SBOMB`, smart-bomb tail, `HYPER` / `HYP02` / `HYP2`, `PRDISP`,
@@ -247,7 +247,7 @@ are cross-checked against the bank-7 player explosion source:
 <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1328-L1434>.
 <https://github.com/mwenge/defender/blob/master/src/blk71.src#L564-L672>.
 The source ranges for `SCORE`, `HSRES` / `ADVSW` / `LCOIN` / `RCOIN` /
-`CCOIN`, `SNDLD`, `LFIRE` / `LCOL` / `LASR` / `LASL` /
+`CCOIN` / `CN1`, `SNDLD`, `LFIRE` / `LCOL` / `LASR` / `LASL` /
 `LASD` / `CRINIT` / `FISS`, `STINIT`, `COLIDE` / `COLCHK`, `PLSTR5`, `SSCAN` /
 `SWP`, `SWTAB`, `REV`, `SBOMB`, `HYPER`, `HYP02`, `THINIT` / `THOUT` / `THOFF`,
 `FBINIT`, `THPROC`, `SCPROC` / `SCP1` / `SCP2`, `OSCAN`, `ISCAN`, `SHSCAN`,

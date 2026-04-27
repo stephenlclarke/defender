@@ -561,9 +561,12 @@ This section records drift found during the repository review on
   gate. Full frame output and fidelity traces now include the resulting raw
   command bytes. The source `CSCAN` branch now keeps the `PIA01` / `PIA02`
   coin-door history, masks IN2 through `ANDB #$3F`, double-checks the sample,
-  and queues the first surviving `SWTAB1` coin/admin switch process. Palette
-  copy side effects, live stack-context wiring, coin process bodies/coinage,
-  and hardware-map restoration still need full scheduler integration.
+  and queues the first surviving `SWTAB1` coin/admin switch process. The queued
+  coin process path now translates `LCOIN` / `RCOIN` / `CCOIN` debounce/sleep
+  handling, `CN1` coin sound loading, and the fixed-bank BCD
+  coinage/audit/credit updates. Palette copy side effects, live stack-context
+  wiring, admin switch bodies, and hardware-map restoration still need full
+  scheduler integration.
   The `GEXEC` tail slice
   now restores `STRCNT` toward 16, advances `GTIME` through the source
   audit-meter wrap, decrements the process `PD` counter, and applies the
@@ -588,14 +591,17 @@ This section records drift found during the repository review on
   remaining object callbacks, live respawn orchestration beyond the `PLSTRT`
   runtime snapshot handoff,
   full trace proof for the translated `BONUS` wave-clear death-tail path,
-  source-exact live coin process bodies/coinage, source-exact boot/start-ready
-  state, no-credit quick-start removal, broader `SWTAB` cabinet-session integration,
-  scanline scheduling, live video presentation, and full frame/cycle integration
-  remain gaps. The live coin bridge now keeps the red-label `CREDIT` byte and
-  `CREDST` backup in BCD sync so the translated start-switch credit gates can
-  observe inserted credits, and credited/free-play live one- and two-player
-  start buttons now scan `SWTAB`, dispatch `ST1`/`ST2`, and consume credits
-  through the translated `START2` tail. Live player controls stay gated while
+  source-exact boot/start-ready state, full live coin scheduler handoff,
+  no-credit quick-start removal, broader `SWTAB` cabinet-session integration,
+  scanline scheduling, live video presentation, and full frame/cycle
+  integration remain gaps. The live coin bridge now keeps the red-label
+  `CREDIT` byte and `CREDST` backup in BCD sync so the translated start-switch
+  credit gates can observe inserted credits, and the translated
+  `LCOIN` / `RCOIN` / `CCOIN` / `CN1` path models coin counters, `CNSND`, slot
+  audits, paid-credit audit, `CUNITS`/`BUNITS`, and CMOS-backed credit updates.
+  Credited/free-play live one- and two-player start buttons now scan `SWTAB`,
+  dispatch `ST1`/`ST2`, and consume credits through the translated `START2`
+  tail. Live player controls stay gated while
   the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1` start handoff advances.
   The board harness can now read/write packed CMOS/SRAM bytes and words using
   the documented most-significant-nibble-first order, can apply the ROM-derived
@@ -1126,11 +1132,13 @@ watchdog data-byte reporting, palette-copy due tests, and the normal/flipped
 the branches that call them. It can also run translated `BGOUT` when the caller
 supplies the live 6809 stack pointer. The source `CSCAN` branch now keeps the
 `PIA01` / `PIA02` history and queues source `SWTAB1` coin/admin switch
-processes from caller-supplied IN2. Full hardware IRQ integration still needs
-palette copy side effects, live stack-context wiring, coin process bodies,
-coinage, and hardware map restoration. The
-`SCPROC` scanner maintenance
-process is translated through `ISCAN`, `OSCAN`, `SHSCAN`, and `SCNRV` with exact
+processes from caller-supplied IN2. The queued coin process path translates
+`LCOIN` / `RCOIN` / `CCOIN`, `CN1`, `CNSND`, fixed-bank coinage, slot audits,
+paid-credit audit, and `CUNITS`/`BUNITS`/`CREDIT` updates. Full hardware IRQ
+integration still needs palette copy side effects, live stack-context wiring,
+admin switch bodies, and hardware map restoration. The `SCPROC` scanner
+maintenance process is translated through `ISCAN`, `OSCAN`, `SHSCAN`, and
+`SCNRV` with exact
 `SCP1`/`SCP2` sleep cadence, including `SETAB` / `SETEND` object/player blip
 erase state, `STETAB` terrain erase state, and embedded `MTERR` mini-terrain
 records. `PLSTRT` is translated through the RAM-visible process/list

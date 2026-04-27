@@ -12,7 +12,7 @@ use crate::{
         CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, RED_LABEL_CRHSTD_CELL_OFFSET,
         RED_LABEL_HIGH_SCORE_ENTRIES, RED_LABEL_HIGH_SCORE_ENTRY_CELLS,
         RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START, cleared_main_cpu_ram,
-        cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte,
+        cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
         red_label_crom0_ram_test_next_word,
     },
     input::{CabinetInput, DefenderInputPorts},
@@ -61,6 +61,11 @@ const RED_LABEL_THRUST_SWITCH_BIT: u8 = 0x02;
 const RED_LABEL_SMART_BOMB_SWITCH_BIT: u8 = 0x04;
 const RED_LABEL_REVERSE_SWITCH_BIT: u8 = 0x40;
 const RED_LABEL_COIN_SCAN_MASK: u8 = 0x3F;
+const RED_LABEL_COIN_DEBOUNCE_COUNT: u8 = 0x16;
+const RED_LABEL_COIN_SLEEP_TICKS: u8 = 10;
+const RED_LABEL_LEFT_COIN_VECTOR: u16 = 0xC012;
+const RED_LABEL_RIGHT_COIN_VECTOR: u16 = 0xC015;
+const RED_LABEL_CENTER_COIN_VECTOR: u16 = 0xC018;
 const RED_LABEL_SOUND_PLAYER_ALIVE_BLOCK_MASK: u8 = 0x98;
 const RED_LABEL_WALL_COLOR_TABLE: [u8; 8] = [0x81, 0x28, 0x07, 0x16, 0x2F, 0x84, 0x15, 0x00];
 const RED_LABEL_PLAYER_EXPLOSION_PIECES: u16 = 0x80;
@@ -307,6 +312,110 @@ pub struct RedLabelSwitchProcess {
     pub routine_address: u16,
     pub process_type: u8,
     pub status_mask: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelCoinSlot {
+    Left,
+    Center,
+    Right,
+}
+
+impl RedLabelCoinSlot {
+    const fn counter_field(self) -> &'static str {
+        match self {
+            Self::Left => "LCCNT",
+            Self::Center => "CCCNT",
+            Self::Right => "RCCNT",
+        }
+    }
+
+    const fn audit_symbol(self) -> &'static str {
+        match self {
+            Self::Left => "SLOT1",
+            Self::Center => "SLOT2",
+            Self::Right => "SLOT3",
+        }
+    }
+
+    const fn multiplier_symbol(self) -> &'static str {
+        match self {
+            Self::Left => "SLOT1M",
+            Self::Center => "SLOT2M",
+            Self::Right => "SLOT3M",
+        }
+    }
+
+    const fn vector_address(self) -> u16 {
+        match self {
+            Self::Left => RED_LABEL_LEFT_COIN_VECTOR,
+            Self::Center => RED_LABEL_CENTER_COIN_VECTOR,
+            Self::Right => RED_LABEL_RIGHT_COIN_VECTOR,
+        }
+    }
+
+    const fn from_vector_address(vector_address: u16) -> Option<Self> {
+        match vector_address {
+            RED_LABEL_LEFT_COIN_VECTOR => Some(Self::Left),
+            RED_LABEL_CENTER_COIN_VECTOR => Some(Self::Center),
+            RED_LABEL_RIGHT_COIN_VECTOR => Some(Self::Right),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCoinCredit {
+    pub slot: RedLabelCoinSlot,
+    pub slot_audit: RedLabelCmosWordWrite,
+    pub paid_credit_audit: Option<RedLabelCmosWordWrite>,
+    pub multiplier_units: u8,
+    pub minimum_units: u8,
+    pub units_per_credit: u8,
+    pub bonus_units_per_credit: u8,
+    pub cunits_before: u8,
+    pub cunits_after: u8,
+    pub bunits_before: u8,
+    pub bunits_after: u8,
+    pub paid_credits: u8,
+    pub bonus_credits: u8,
+    pub credits_awarded: u8,
+    pub credit_before: u8,
+    pub credit_after: u8,
+    pub credit_cmos_backup: Option<RedLabelCmosByteWrite>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelCoinProcessStep {
+    DebounceSleeping {
+        slot: RedLabelCoinSlot,
+        process_address: u16,
+        slam_counter: u8,
+        counter_before: u8,
+        counter_after: u8,
+        vector_address: u16,
+        wakeup_address: u16,
+    },
+    Slammed {
+        slot: Option<RedLabelCoinSlot>,
+        process_address: u16,
+        slam_counter: u8,
+        killed_process: RedLabelKilledProcess,
+    },
+    DebounceBlocked {
+        slot: RedLabelCoinSlot,
+        process_address: u16,
+        counter: u8,
+        killed_process: RedLabelKilledProcess,
+    },
+    Completed {
+        slot: RedLabelCoinSlot,
+        process_address: u16,
+        vector_address: u16,
+        sound_loaded: Option<RedLabelLoadedSoundTable>,
+        coin_credit: RedLabelCoinCredit,
+        killed_process: RedLabelKilledProcess,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1404,6 +1513,13 @@ pub struct RedLabelCmosByteWrite {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelCmosWordWrite {
+    pub symbol: &'static str,
+    pub offset: u16,
+    pub value: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RedLabelBlockClear {
     pub screen_address: u16,
     pub width: u8,
@@ -2123,6 +2239,7 @@ pub enum RedLabelProcessDispatch {
     Hyperspace(RedLabelHyperspace),
     PlayerDeath(RedLabelPlayerDeath),
     StartSwitch(RedLabelStartSwitch),
+    CoinProcess(RedLabelCoinProcessStep),
     LaserFire(RedLabelLaserFireDispatch),
     LaserStep(RedLabelLaserStep),
     LaserFinished(RedLabelKilledProcess),
@@ -2390,6 +2507,21 @@ impl RedLabelRuntimeMemory {
         cmos_sram_write_byte(&mut self.cmos, usize::from(offset), value)
             .ok_or_else(|| format!("red-label CMOS byte `{symbol}` overflows CMOS RAM"))?;
         Ok(RedLabelCmosByteWrite {
+            symbol,
+            offset,
+            value,
+        })
+    }
+
+    fn write_cmos_word_by_symbol(
+        &mut self,
+        symbol: &'static str,
+        value: u16,
+    ) -> Result<RedLabelCmosWordWrite, String> {
+        let offset = cmos_symbol_offset(symbol)?;
+        cmos_sram_write_word(&mut self.cmos, usize::from(offset), value)
+            .ok_or_else(|| format!("red-label CMOS word `{symbol}` overflows CMOS RAM"))?;
+        Ok(RedLabelCmosWordWrite {
             symbol,
             offset,
             value,
@@ -6734,6 +6866,94 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    /// Source-shaped `LCOIN` / `RCOIN` / `CCOIN` entry: reject slam/debounce
+    /// state, arm the selected coin counter, stash the fixed-bank vector in
+    /// `PD2`, then sleep to `CN1`.
+    pub fn start_coin_process_current_process(
+        &mut self,
+        slot: RedLabelCoinSlot,
+    ) -> Result<RedLabelCoinProcessStep, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let slam_counter = self.read_field_byte(&layout, "base_page", "SLMCNT")?;
+        if slam_counter != 0 {
+            let killed_process = self.kill_current_process(&layout)?;
+            return Ok(RedLabelCoinProcessStep::Slammed {
+                slot: Some(slot),
+                process_address,
+                slam_counter,
+                killed_process,
+            });
+        }
+
+        let counter_before = self.read_field_byte(&layout, "base_page", slot.counter_field())?;
+        if counter_before != 0 {
+            let killed_process = self.kill_current_process(&layout)?;
+            return Ok(RedLabelCoinProcessStep::DebounceBlocked {
+                slot,
+                process_address,
+                counter: counter_before,
+                killed_process,
+            });
+        }
+
+        self.write_field_byte(
+            &layout,
+            "base_page",
+            slot.counter_field(),
+            RED_LABEL_COIN_DEBOUNCE_COUNT,
+        )?;
+        let vector_address = slot.vector_address();
+        self.write_process_data_word(&layout, process_address, "PD2", vector_address)?;
+        let wakeup_address = red_label_routine_address("CN1")?;
+        self.sleep_current_process(RED_LABEL_COIN_SLEEP_TICKS, wakeup_address)?;
+
+        Ok(RedLabelCoinProcessStep::DebounceSleeping {
+            slot,
+            process_address,
+            slam_counter,
+            counter_before,
+            counter_after: RED_LABEL_COIN_DEBOUNCE_COUNT,
+            vector_address,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `CN1`: reject slam tilt, load `CNSND`, run the fixed-bank
+    /// coinage vector selected in `PD2`, then suicide.
+    pub fn continue_coin_process_current_process(
+        &mut self,
+    ) -> Result<RedLabelCoinProcessStep, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let vector_address = self.read_process_data_word(&layout, process_address, "PD2")?;
+        let slot = RedLabelCoinSlot::from_vector_address(vector_address).ok_or_else(|| {
+            format!("red-label coin process vector 0x{vector_address:04X} is not translated")
+        })?;
+        let slam_counter = self.read_field_byte(&layout, "base_page", "SLMCNT")?;
+        if slam_counter != 0 {
+            let killed_process = self.kill_current_process(&layout)?;
+            return Ok(RedLabelCoinProcessStep::Slammed {
+                slot: Some(slot),
+                process_address,
+                slam_counter,
+                killed_process,
+            });
+        }
+
+        let sound_loaded = self.load_sound_table_by_label("CNSND")?;
+        let coin_credit = self.apply_coin_slot_credit(slot)?;
+        let killed_process = self.kill_current_process(&layout)?;
+        Ok(RedLabelCoinProcessStep::Completed {
+            slot,
+            process_address,
+            vector_address,
+            sound_loaded,
+            coin_credit,
+            killed_process,
+        })
+    }
+
     /// Source-shaped `SWP` over the two `SWPROC` slots: create every queued
     /// process whose status mask is clear, and clear the routine word for each
     /// consumed slot just as the source does.
@@ -7978,6 +8198,90 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    fn apply_coin_slot_credit(
+        &mut self,
+        slot: RedLabelCoinSlot,
+    ) -> Result<RedLabelCoinCredit, String> {
+        let layout = red_label_ram_layout()?;
+        let slot_audit = self.add_bcd_cmos_word_by_symbol(slot.audit_symbol(), 0x01)?;
+        let multiplier_units =
+            bcd_byte_to_u16(self.read_cmos_byte_by_symbol(slot.multiplier_symbol())?) as u8;
+        let minimum_units = bcd_byte_to_u16(self.read_cmos_byte_by_symbol("MINUNT")?) as u8;
+        let units_per_credit = bcd_byte_to_u16(self.read_cmos_byte_by_symbol("CUNITC")?) as u8;
+        let bonus_units_per_credit =
+            bcd_byte_to_u16(self.read_cmos_byte_by_symbol("CUNITB")?) as u8;
+
+        let bunits_before = self.read_field_byte(&layout, "base_page", "BUNITS")?;
+        let cunits_before = self.read_field_byte(&layout, "base_page", "CUNITS")?;
+        let mut bunits_after = bunits_before.wrapping_add(multiplier_units);
+        let mut cunits_after = cunits_before.wrapping_add(multiplier_units);
+        self.write_field_byte(&layout, "base_page", "BUNITS", bunits_after)?;
+        self.write_field_byte(&layout, "base_page", "CUNITS", cunits_after)?;
+
+        let mut paid_credit_audit = None;
+        let mut paid_credits = 0;
+        let mut bonus_credits = 0;
+        let mut credits_awarded = 0;
+        let credit_before = self.read_field_byte(&layout, "base_page", "CREDIT")?;
+        let mut credit_after = credit_before;
+        let mut credit_cmos_backup = None;
+
+        if cunits_after >= minimum_units {
+            let (credits, remainder) = red_label_divide_coin_units(cunits_after, units_per_credit);
+            paid_credits = credits;
+            cunits_after = remainder;
+            self.write_field_byte(&layout, "base_page", "CUNITS", cunits_after)?;
+
+            let (bonus, _) = red_label_divide_coin_units(bunits_after, bonus_units_per_credit);
+            bonus_credits = bonus;
+            if bonus_credits != 0 {
+                cunits_after = 0;
+                bunits_after = 0;
+                self.write_field_byte(&layout, "base_page", "CUNITS", 0)?;
+                self.write_field_byte(&layout, "base_page", "BUNITS", 0)?;
+            }
+
+            credits_awarded = bcd_add_byte(bonus_credits, paid_credits, false).0;
+            paid_credit_audit = Some(self.add_bcd_cmos_word_by_symbol("TOTPDC", credits_awarded)?);
+            let (added_credit, carry) = bcd_add_byte(credit_before, credits_awarded, false);
+            credit_after = if carry { 0x99 } else { added_credit };
+            self.write_field_byte(&layout, "base_page", "CREDIT", credit_after)?;
+            credit_cmos_backup = Some(self.write_cmos_byte_by_symbol("CREDST", credit_after)?);
+        }
+
+        Ok(RedLabelCoinCredit {
+            slot,
+            slot_audit,
+            paid_credit_audit,
+            multiplier_units,
+            minimum_units,
+            units_per_credit,
+            bonus_units_per_credit,
+            cunits_before,
+            cunits_after,
+            bunits_before,
+            bunits_after,
+            paid_credits,
+            bonus_credits,
+            credits_awarded,
+            credit_before,
+            credit_after,
+            credit_cmos_backup,
+        })
+    }
+
+    fn add_bcd_cmos_word_by_symbol(
+        &mut self,
+        symbol: &'static str,
+        addend: u8,
+    ) -> Result<RedLabelCmosWordWrite, String> {
+        let current = self.read_cmos_word_by_symbol(symbol)?;
+        let [high, low] = current.to_be_bytes();
+        let (new_low, carry) = bcd_add_byte(low, addend, false);
+        let (new_high, _) = bcd_add_byte(high, 0, carry);
+        self.write_cmos_word_by_symbol(symbol, u16::from_be_bytes([new_high, new_low]))
+    }
+
     /// Source-shaped `BLKCLR`: clear a screen-format rectangular block at X
     /// with D carrying width in A and height in B.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/defb6.src#L1411-L1418>.
@@ -8649,6 +8953,30 @@ impl RedLabelRuntimeMemory {
             return self
                 .dispatch_start_two_current_process()
                 .map(RedLabelProcessDispatch::StartSwitch);
+        }
+
+        if routine_address == red_label_routine_address("LCOIN")? {
+            return self
+                .start_coin_process_current_process(RedLabelCoinSlot::Left)
+                .map(RedLabelProcessDispatch::CoinProcess);
+        }
+
+        if routine_address == red_label_routine_address("RCOIN")? {
+            return self
+                .start_coin_process_current_process(RedLabelCoinSlot::Right)
+                .map(RedLabelProcessDispatch::CoinProcess);
+        }
+
+        if routine_address == red_label_routine_address("CCOIN")? {
+            return self
+                .start_coin_process_current_process(RedLabelCoinSlot::Center)
+                .map(RedLabelProcessDispatch::CoinProcess);
+        }
+
+        if routine_address == red_label_routine_address("CN1")? {
+            return self
+                .continue_coin_process_current_process()
+                .map(RedLabelProcessDispatch::CoinProcess);
         }
 
         if routine_address == red_label_routine_address("HYPER")? {
@@ -15831,6 +16159,17 @@ fn bcd_add_byte(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
     )
 }
 
+fn red_label_divide_coin_units(dividend: u8, divisor: u8) -> (u8, u8) {
+    if divisor == 0 {
+        return (0, 0);
+    }
+
+    (
+        decimal_to_bcd_byte((dividend / divisor) % 100),
+        dividend % divisor,
+    )
+}
+
 fn bcd_byte_to_u16(value: u8) -> u16 {
     u16::from(value >> 4) * 10 + u16::from(value & 0x0F)
 }
@@ -16513,6 +16852,9 @@ impl ArcadeMachine {
                     self.high_score_entry = None;
                     self.high_score_submission = None;
                 }
+            }
+            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::Completed { .. }) => {
+                self.sync_live_credit_from_red_label_memory()?;
             }
             _ => {}
         }
@@ -17858,8 +18200,9 @@ mod tests {
             RedLabelAppearanceStart, RedLabelAstronautDirection, RedLabelAstronautKill,
             RedLabelAstronautProcessStep, RedLabelAstronautWalk, RedLabelBackgroundInit,
             RedLabelBlockClear, RedLabelBonusTextCall, RedLabelBonusTextPlan, RedLabelBorder,
-            RedLabelCapturedAstronautCollision, RedLabelCoinSwitchScan, RedLabelColorRamInit,
-            RedLabelCreatedProcess, RedLabelCreatedShell, RedLabelEnemyKill,
+            RedLabelCapturedAstronautCollision, RedLabelCmosWordWrite, RedLabelCoinCredit,
+            RedLabelCoinProcessStep, RedLabelCoinSlot, RedLabelCoinSwitchScan,
+            RedLabelColorRamInit, RedLabelCreatedProcess, RedLabelCreatedShell, RedLabelEnemyKill,
             RedLabelExpandedUpdate, RedLabelExplosionStart, RedLabelFallingAstronautStep,
             RedLabelFireballTableInit, RedLabelFreePlayCredit, RedLabelGameExecStarTime,
             RedLabelGenocide, RedLabelHyperspace, RedLabelIrqMode, RedLabelIrqObjectBandPass,
@@ -22335,6 +22678,319 @@ mod tests {
         assert_eq!(
             machine.red_label_ram_range(0xA082..0xA086),
             Some(&[0xD4, 0x7C, RED_LABEL_COIN_PROCESS_TYPE, 0][..])
+        );
+    }
+
+    #[test]
+    fn coin_process_entry_debounces_and_sleeps_to_cn1() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_coin_process(&mut machine, "LCOIN");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("LCOIN").expect("LCOIN address"),
+            )
+            .expect("dispatch LCOIN");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::DebounceSleeping {
+                slot: RedLabelCoinSlot::Left,
+                process_address: process,
+                slam_counter: 0,
+                counter_before: 0,
+                counter_after: 0x16,
+                vector_address: 0xC012,
+                wakeup_address: red_label_routine_address("CN1").expect("CN1 address"),
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA07F..0xA080),
+            Some(&[0x16][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 2..process + 5),
+            Some(&[0xD4, 0x99, 0x0A][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 9..process + 11),
+            Some(&[0xC0, 0x12][..])
+        );
+    }
+
+    #[test]
+    fn coin_process_entry_suicides_when_debounce_or_slam_active() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_coin_process(&mut machine, "LCOIN");
+        machine.memory.write_byte(0xA07F, 1).expect("set LCCNT");
+
+        assert_eq!(
+            machine
+                .red_label_dispatch_translated_process_routine(
+                    red_label_routine_address("LCOIN").expect("LCOIN address"),
+                )
+                .expect("blocked LCOIN"),
+            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::DebounceBlocked {
+                slot: RedLabelCoinSlot::Left,
+                process_address: process,
+                counter: 1,
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: process,
+                    previous_link_address: 0xA05F,
+                },
+            })
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_coin_process(&mut machine, "RCOIN");
+        machine.memory.write_byte(0xA07E, 2).expect("set SLMCNT");
+
+        assert_eq!(
+            machine
+                .red_label_dispatch_translated_process_routine(
+                    red_label_routine_address("RCOIN").expect("RCOIN address"),
+                )
+                .expect("slammed RCOIN"),
+            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::Slammed {
+                slot: Some(RedLabelCoinSlot::Right),
+                process_address: process,
+                slam_counter: 2,
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: process,
+                    previous_link_address: 0xA05F,
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn coin_process_cn1_applies_default_coinage_and_suicides() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_coin_process(&mut machine, "LCOIN");
+        machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("LCOIN").expect("LCOIN address"),
+            )
+            .expect("dispatch LCOIN");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("CN1").expect("CN1 address"),
+            )
+            .expect("dispatch CN1");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::Completed {
+                slot: RedLabelCoinSlot::Left,
+                process_address: process,
+                vector_address: 0xC012,
+                sound_loaded: Some(RedLabelLoadedSoundTable {
+                    address: red_label_sound_table_address("CNSND").expect("CNSND address"),
+                    priority: 0xFF,
+                }),
+                coin_credit: RedLabelCoinCredit {
+                    slot: RedLabelCoinSlot::Left,
+                    slot_audit: RedLabelCmosWordWrite {
+                        symbol: "SLOT1",
+                        offset: 0x01,
+                        value: 0x0001,
+                    },
+                    paid_credit_audit: Some(RedLabelCmosWordWrite {
+                        symbol: "TOTPDC",
+                        offset: 0x0D,
+                        value: 0x0001,
+                    }),
+                    multiplier_units: 1,
+                    minimum_units: 0,
+                    units_per_credit: 1,
+                    bonus_units_per_credit: 0,
+                    cunits_before: 0,
+                    cunits_after: 0,
+                    bunits_before: 0,
+                    bunits_after: 1,
+                    paid_credits: 0x01,
+                    bonus_credits: 0,
+                    credits_awarded: 0x01,
+                    credit_before: 0,
+                    credit_after: 0x01,
+                    credit_cmos_backup: Some(credit_backup(0x01)),
+                },
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: process,
+                    previous_link_address: 0xA05F,
+                },
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA03A),
+            Some(&[0x01, 0x00, 0x01][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0B0..0xA0B5),
+            Some(&[0xD4, 0xA9, 0xFF, 0x01, 0x01][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x01..0x05),
+            Some(&[0xF0, 0xF0, 0xF0, 0xF1][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x0D..0x11),
+            Some(&[0xF0, 0xF0, 0xF0, 0xF1][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF0, 0xF1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA05F..0xA061),
+            Some(&[0, 0][..])
+        );
+    }
+
+    #[test]
+    fn coin_process_cn1_accumulates_units_until_minimum() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .write_cmos_byte_by_symbol("MINUNT", 0x02)
+            .expect("set MINUNT");
+        let process = schedule_coin_process(&mut machine, "LCOIN");
+        machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("LCOIN").expect("LCOIN address"),
+            )
+            .expect("dispatch LCOIN");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("CN1").expect("CN1 address"),
+            )
+            .expect("dispatch CN1");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::Completed {
+                slot: RedLabelCoinSlot::Left,
+                process_address: process,
+                vector_address: 0xC012,
+                sound_loaded: Some(RedLabelLoadedSoundTable {
+                    address: red_label_sound_table_address("CNSND").expect("CNSND address"),
+                    priority: 0xFF,
+                }),
+                coin_credit: RedLabelCoinCredit {
+                    slot: RedLabelCoinSlot::Left,
+                    slot_audit: RedLabelCmosWordWrite {
+                        symbol: "SLOT1",
+                        offset: 0x01,
+                        value: 0x0001,
+                    },
+                    paid_credit_audit: None,
+                    multiplier_units: 1,
+                    minimum_units: 2,
+                    units_per_credit: 1,
+                    bonus_units_per_credit: 0,
+                    cunits_before: 0,
+                    cunits_after: 1,
+                    bunits_before: 0,
+                    bunits_after: 1,
+                    paid_credits: 0,
+                    bonus_credits: 0,
+                    credits_awarded: 0,
+                    credit_before: 0,
+                    credit_after: 0,
+                    credit_cmos_backup: None,
+                },
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: process,
+                    previous_link_address: 0xA05F,
+                },
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA03A),
+            Some(&[0x00, 0x01, 0x01][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x0D..0x11),
+            Some(&[0xF0, 0xF0, 0xF0, 0xF0][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF0, 0xF0][..])
+        );
+    }
+
+    #[test]
+    fn coin_process_cn1_uses_center_slot_multiplier() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_coin_process(&mut machine, "CCOIN");
+        machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("CCOIN").expect("CCOIN address"),
+            )
+            .expect("dispatch CCOIN");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("CN1").expect("CN1 address"),
+            )
+            .expect("dispatch CN1");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::Completed {
+                slot: RedLabelCoinSlot::Center,
+                process_address: process,
+                vector_address: 0xC018,
+                sound_loaded: Some(RedLabelLoadedSoundTable {
+                    address: red_label_sound_table_address("CNSND").expect("CNSND address"),
+                    priority: 0xFF,
+                }),
+                coin_credit: RedLabelCoinCredit {
+                    slot: RedLabelCoinSlot::Center,
+                    slot_audit: RedLabelCmosWordWrite {
+                        symbol: "SLOT2",
+                        offset: 0x05,
+                        value: 0x0001,
+                    },
+                    paid_credit_audit: Some(RedLabelCmosWordWrite {
+                        symbol: "TOTPDC",
+                        offset: 0x0D,
+                        value: 0x0004,
+                    }),
+                    multiplier_units: 4,
+                    minimum_units: 0,
+                    units_per_credit: 1,
+                    bonus_units_per_credit: 0,
+                    cunits_before: 0,
+                    cunits_after: 0,
+                    bunits_before: 0,
+                    bunits_after: 4,
+                    paid_credits: 0x04,
+                    bonus_credits: 0,
+                    credits_awarded: 0x04,
+                    credit_before: 0,
+                    credit_after: 0x04,
+                    credit_cmos_backup: Some(credit_backup(0x04)),
+                },
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: process,
+                    previous_link_address: 0xA05F,
+                },
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA03A),
+            Some(&[0x04, 0x00, 0x04][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x05..0x09),
+            Some(&[0xF0, 0xF0, 0xF0, 0xF1][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x0D..0x11),
+            Some(&[0xF0, 0xF0, 0xF0, 0xF4][..])
         );
     }
 
@@ -28690,6 +29346,10 @@ mod tests {
             0xD47C
         );
         assert_eq!(
+            red_label_routine_address("CN1").expect("CN1 address"),
+            0xD499
+        );
+        assert_eq!(
             red_label_routine_address("SNDLD").expect("SNDLD address"),
             0xD54D
         );
@@ -29419,7 +30079,11 @@ mod tests {
                 0x00
             ]
         );
-        assert_eq!(sounds.len(), 25);
+        assert_eq!(sounds.len(), 26);
+        assert_eq!(
+            red_label_sound_table_address("CNSND").expect("CNSND"),
+            0xD4AB
+        );
         assert_eq!(
             red_label_sound_table_address("RPSND").expect("RPSND"),
             0xD4B0
@@ -29519,6 +30183,10 @@ mod tests {
         assert_eq!(
             red_label_sound_table_address("SWSSND").expect("SWSSND"),
             0xD534
+        );
+        assert_eq!(
+            sound("CNSND").bytes.as_slice(),
+            &[0xFF, 0x01, 0x18, 0x19, 0x00]
         );
         assert_eq!(
             sound("PDSND").bytes.as_slice(),
@@ -31396,6 +32064,24 @@ mod tests {
             machine
                 .step_red_label_process_scheduler()
                 .expect("schedule support process")
+                .expect("scheduled process")
+                .process_address,
+            process
+        );
+        process
+    }
+
+    fn schedule_coin_process(machine: &mut ArcadeMachine, routine: &str) -> u16 {
+        let routine_address =
+            red_label_routine_address(routine).unwrap_or_else(|_| panic!("{routine} address"));
+        let process = machine
+            .red_label_make_process(routine_address, RED_LABEL_COIN_PROCESS_TYPE)
+            .expect("make coin process")
+            .process_address;
+        assert_eq!(
+            machine
+                .step_red_label_process_scheduler()
+                .expect("schedule coin process")
                 .expect("scheduled process")
                 .process_address,
             process

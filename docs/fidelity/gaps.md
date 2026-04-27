@@ -332,9 +332,11 @@ This file records behavior that must not be guessed in arcade-core code.
   output and fidelity traces now include the resulting raw command bytes. The
   source `CSCAN` branch now keeps the `PIA01` / `PIA02` coin-door history,
   masks IN2 through `ANDB #$3F`, double-checks the sample, and queues the first
-  surviving `SWTAB1` coin/admin switch process. Palette copy side effects, live
-  stack-context wiring, coin process bodies/coinage, and hardware-map
-  restoration still need full scheduler integration.
+  surviving `SWTAB1` coin/admin switch process. The queued coin process path
+  now translates `LCOIN` / `RCOIN` / `CCOIN` debounce/sleep handling, `CN1`
+  coin sound loading, and the fixed-bank BCD coinage/audit/credit updates.
+  Palette copy side effects, live stack-context wiring, admin switch bodies,
+  and hardware-map restoration still need full scheduler integration.
   The start-flow foundation now covers source-shaped `FPLAY` credit
   seeding from the core CMOS image, the RAM-visible `START` power-page
   gate/player table reset/`PLSTRT` process creation, source `SCRCLR` video-RAM
@@ -371,12 +373,15 @@ This file records behavior that must not be guessed in arcade-core code.
   addresses, `ASTRO` and `MSWM` / `MSWLP` enemy process resumes, and the
   `COLR` / `FLPUP` / `CBOMB` / `TIECOL` support-process resumes from `PADDR`,
   including guarded `SBMBX2`/`SUCIDE`.
-  Live coin input now increments the red-label `CREDIT` byte as BCD and mirrors
-  `CREDST`, and credited/free-play live one- and two-player start buttons now
-  enter through `SWTAB`/`ST1`/`ST2`; live controls are gated while the active
-  translated player-start handoff advances. Source-exact coin process
-  bodies/coinage, source-exact boot/start-ready state, and the no-credit
-  one-player quick-start shortcut are still not translated.
+  Live coin input still keeps the red-label `CREDIT` byte and `CREDST` backup
+  in BCD sync, and credited/free-play live one- and two-player start buttons
+  now enter through `SWTAB`/`ST1`/`ST2`; live controls are gated while the
+  active translated player-start handoff advances. The translated
+  `LCOIN` / `RCOIN` / `CCOIN` / `CN1` path now models coin counters, `CNSND`,
+  slot audits, paid-credit audit, `CUNITS`/`BUNITS`, and CMOS-backed credit
+  updates. Source-exact boot/start-ready state, the full live coin scheduler
+  handoff, and the no-credit one-player quick-start shortcut are still not
+  translated.
   Generic/untranslated process bodies, broader suicide resume semantics, the
   remaining `SWTAB` routine bodies and no-process input effects, exact
   frame/cycle integration, and golden-trace equivalence are not translated.
