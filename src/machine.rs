@@ -63,6 +63,8 @@ const RED_LABEL_REVERSE_SWITCH_BIT: u8 = 0x40;
 const RED_LABEL_COIN_SCAN_MASK: u8 = 0x3F;
 const RED_LABEL_COIN_DEBOUNCE_COUNT: u8 = 0x16;
 const RED_LABEL_COIN_SLEEP_TICKS: u8 = 10;
+const RED_LABEL_SLAM_SWITCH_BIT: u8 = 0x40;
+const RED_LABEL_SLAM_DEBOUNCE_COUNT: u8 = 60;
 const RED_LABEL_LEFT_COIN_VECTOR: u16 = 0xC012;
 const RED_LABEL_RIGHT_COIN_VECTOR: u16 = 0xC015;
 const RED_LABEL_CENTER_COIN_VECTOR: u16 = 0xC018;
@@ -6866,6 +6868,32 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    /// Source-shaped `SSCAN` coin/slam debounce maintenance before switch
+    /// scans: seed `SLMCNT` from tilt, then decrement every nonzero slam/coin
+    /// counter once.
+    pub fn tick_coin_slam_debouncers(
+        &mut self,
+        input_ports: DefenderInputPorts,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        if input_ports.in2 & RED_LABEL_SLAM_SWITCH_BIT != 0 {
+            self.write_field_byte(
+                &layout,
+                "base_page",
+                "SLMCNT",
+                RED_LABEL_SLAM_DEBOUNCE_COUNT,
+            )?;
+        }
+
+        for field in ["SLMCNT", "LCCNT", "CCCNT", "RCCNT"] {
+            let value = self.read_field_byte(&layout, "base_page", field)?;
+            if value != 0 {
+                self.write_field_byte(&layout, "base_page", field, value.wrapping_sub(1))?;
+            }
+        }
+        Ok(())
+    }
+
     /// Source-shaped `LCOIN` / `RCOIN` / `CCOIN` entry: reject slam/debounce
     /// state, arm the selected coin counter, stash the fixed-bank vector in
     /// `PD2`, then sleep to `CN1`.
@@ -13557,6 +13585,11 @@ impl RedLabelRuntimeMemory {
     ) -> Result<RedLabelKilledProcess, String> {
         let killed_process_address = self.current_process_address(layout)?;
         let previous_link_address = self.kill_process(killed_process_address)?;
+        let crproc = ram_field(layout, "runtime_pointers", "CRPROC")?
+            .field_range_for_entry(0)
+            .ok_or_else(|| String::from("red-label CRPROC range is invalid"))?
+            .start;
+        self.write_word(crproc, previous_link_address)?;
         Ok(RedLabelKilledProcess {
             killed_process_address,
             previous_link_address,
@@ -17850,9 +17883,10 @@ impl ArcadeMachine {
         events: &mut Vec<MachineEvent>,
     ) {
         let mut started_this_frame = false;
-        if input.coin {
-            self.apply_live_coin_credit()
-                .expect("embedded red-label credit layout is valid");
+        if self
+            .step_red_label_live_coin_switches(input)
+            .expect("live coin switch creates only translated red-label processes")
+        {
             events.push(MachineEvent::CreditAdded);
         }
 
@@ -17933,18 +17967,44 @@ impl ArcadeMachine {
         Ok(())
     }
 
-    fn apply_live_coin_credit(&mut self) -> Result<(), String> {
-        let layout = red_label_ram_layout()?;
-        let credit_before = self
-            .memory
-            .read_field_byte(&layout, "base_page", "CREDIT")?;
-        let (credit_after, _) = bcd_add_byte(credit_before, 0x01, false);
+    fn step_red_label_live_coin_switches(&mut self, input: CabinetInput) -> Result<bool, String> {
+        let mut coin_input = CabinetInput::NONE;
+        coin_input.coin = input.coin;
+        coin_input.coin_two = input.coin_two;
+        coin_input.coin_three = input.coin_three;
+        let coin_process_active_before = self.red_label_live_coin_process_active()?;
         self.memory
-            .write_field_byte(&layout, "base_page", "CREDIT", credit_after)?;
+            .tick_coin_slam_debouncers(coin_input.defender_input_ports())?;
         self.memory
-            .write_cmos_byte_by_symbol("CREDST", credit_after)?;
-        self.credits = bcd_byte_to_u16(credit_after).min(u16::from(u8::MAX)) as u8;
-        Ok(())
+            .scan_translated_coin_switches(coin_input.defender_input_ports())?;
+        self.memory.dispatch_switch_processes()?;
+        if !coin_process_active_before && !self.red_label_live_coin_process_active()? {
+            return Ok(false);
+        }
+
+        let Some(dispatch) = self.step_red_label_translated_process()? else {
+            return Ok(false);
+        };
+        Ok(matches!(
+            dispatch,
+            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::Completed {
+                coin_credit: RedLabelCoinCredit {
+                    credits_awarded: 1..,
+                    ..
+                },
+                ..
+            })
+        ))
+    }
+
+    fn red_label_live_coin_process_active(&self) -> Result<bool, String> {
+        let routines = [
+            red_label_routine_address("LCOIN")?,
+            red_label_routine_address("RCOIN")?,
+            red_label_routine_address("CCOIN")?,
+            red_label_routine_address("CN1")?,
+        ];
+        self.memory.active_process_has_routine(&routines)
     }
 
     fn begin_current_player_high_score_entry(
@@ -18969,8 +19029,9 @@ mod tests {
     #[test]
     fn credited_start_button_runs_translated_st1_path() {
         let mut machine = ArcadeMachine::new();
+        insert_live_coin(&mut machine);
+
         let output = machine.step(CabinetInput {
-            coin: true,
             start_one: true,
             ..CabinetInput::NONE
         });
@@ -18978,7 +19039,7 @@ mod tests {
 
         assert_eq!(output.snapshot.phase, GamePhase::Playing);
         assert_eq!(output.snapshot.credits, 0);
-        assert!(events.contains(&MachineEvent::CreditAdded));
+        assert!(!events.contains(&MachineEvent::CreditAdded));
         assert!(events.contains(&MachineEvent::GameStarted));
         assert_eq!(
             machine.red_label_ram_range(0xA037..0xA038),
@@ -19016,8 +19077,8 @@ mod tests {
     #[test]
     fn translated_start_defers_live_controls_while_player_start_advances() {
         let mut machine = ArcadeMachine::new();
+        insert_live_coin(&mut machine);
         machine.step(CabinetInput {
-            coin: true,
             start_one: true,
             ..CabinetInput::NONE
         });
@@ -19048,8 +19109,9 @@ mod tests {
     #[test]
     fn translated_two_player_start_waits_for_second_credit() {
         let mut machine = ArcadeMachine::new();
+        insert_live_coin(&mut machine);
+
         let output = machine.step(CabinetInput {
-            coin: true,
             start_two: true,
             ..CabinetInput::NONE
         });
@@ -19057,7 +19119,7 @@ mod tests {
 
         assert_eq!(output.snapshot.phase, GamePhase::Attract);
         assert_eq!(output.snapshot.credits, 1);
-        assert!(events.contains(&MachineEvent::CreditAdded));
+        assert!(!events.contains(&MachineEvent::CreditAdded));
         assert!(!events.contains(&MachineEvent::GameStarted));
         assert_eq!(
             machine.red_label_ram_range(0xA037..0xA038),
@@ -19068,13 +19130,10 @@ mod tests {
     #[test]
     fn credited_two_player_start_runs_translated_st2_path() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            coin: true,
-            ..CabinetInput::NONE
-        });
+        insert_live_coin(&mut machine);
+        insert_live_right_coin(&mut machine);
 
         let output = machine.step(CabinetInput {
-            coin: true,
             start_two: true,
             ..CabinetInput::NONE
         });
@@ -19082,7 +19141,7 @@ mod tests {
 
         assert_eq!(output.snapshot.phase, GamePhase::Playing);
         assert_eq!(output.snapshot.credits, 0);
-        assert!(events.contains(&MachineEvent::CreditAdded));
+        assert!(!events.contains(&MachineEvent::CreditAdded));
         assert!(events.contains(&MachineEvent::GameStarted));
         assert_eq!(
             machine.red_label_ram_range(0xA037..0xA038),
@@ -32089,6 +32148,45 @@ mod tests {
         process
     }
 
+    fn insert_live_coin(machine: &mut ArcadeMachine) -> super::FrameOutput {
+        machine.step(CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        });
+        step_until_credit_added(machine)
+    }
+
+    fn insert_live_right_coin(machine: &mut ArcadeMachine) -> super::FrameOutput {
+        machine.step(CabinetInput {
+            coin_three: true,
+            ..CabinetInput::NONE
+        });
+        step_until_credit_added(machine)
+    }
+
+    fn step_until_credit_added(machine: &mut ArcadeMachine) -> super::FrameOutput {
+        for _ in 0..super::RED_LABEL_COIN_DEBOUNCE_COUNT {
+            let output = machine.step(CabinetInput::NONE);
+            if output
+                .events()
+                .any(|event| event == MachineEvent::CreditAdded)
+            {
+                return output;
+            }
+        }
+        panic!("live coin process did not award credit");
+    }
+
+    fn step_until_sound_priority_clears(machine: &mut ArcadeMachine) {
+        for _ in 0..128 {
+            if machine.red_label_ram_range(0xA0B2..0xA0B3) == Some(&[0][..]) {
+                return;
+            }
+            machine.step(CabinetInput::NONE);
+        }
+        panic!("red-label sound priority did not clear");
+    }
+
     fn schedule_reverse_process(machine: &mut ArcadeMachine, routine: &str) -> u16 {
         let routine_address =
             red_label_routine_address(routine).unwrap_or_else(|_| panic!("{routine} address"));
@@ -34322,10 +34420,23 @@ mod tests {
     #[test]
     fn coin_input_increments_credit_counter() {
         let mut machine = ArcadeMachine::new();
-        let output = machine.step(CabinetInput {
+        let queued = machine.step(CabinetInput {
             coin: true,
             ..CabinetInput::NONE
         });
+
+        assert_eq!(queued.snapshot.credits, 0);
+        assert!(
+            !queued
+                .events()
+                .any(|event| event == MachineEvent::CreditAdded)
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA07F..0xA080),
+            Some(&[0x16][..])
+        );
+
+        let output = step_until_credit_added(&mut machine);
 
         assert_eq!(output.snapshot.credits, 1);
         assert!(
@@ -34348,10 +34459,14 @@ mod tests {
         let mut machine = ArcadeMachine::new();
         machine.memory.write_byte(0xA037, 0x09).expect("set CREDIT");
 
-        let output = machine.step(CabinetInput {
+        let queued = machine.step(CabinetInput {
             coin: true,
             ..CabinetInput::NONE
         });
+
+        assert_eq!(queued.snapshot.credits, 0);
+
+        let output = step_until_credit_added(&mut machine);
 
         assert_eq!(output.snapshot.credits, 10);
         assert_eq!(
@@ -34407,8 +34522,10 @@ mod tests {
     #[test]
     fn translated_start_sound_command_reaches_next_frame_output() {
         let mut machine = ArcadeMachine::new();
+        insert_live_coin(&mut machine);
+        step_until_sound_priority_clears(&mut machine);
+
         let start = machine.step(CabinetInput {
-            coin: true,
             start_one: true,
             ..CabinetInput::NONE
         });

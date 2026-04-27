@@ -591,14 +591,13 @@ This section records drift found during the repository review on
   remaining object callbacks, live respawn orchestration beyond the `PLSTRT`
   runtime snapshot handoff,
   full trace proof for the translated `BONUS` wave-clear death-tail path,
-  source-exact boot/start-ready state, full live coin scheduler handoff,
-  no-credit quick-start removal, broader `SWTAB` cabinet-session integration,
-  scanline scheduling, live video presentation, and full frame/cycle
-  integration remain gaps. The live coin bridge now keeps the red-label
-  `CREDIT` byte and `CREDST` backup in BCD sync so the translated start-switch
-  credit gates can observe inserted credits, and the translated
-  `LCOIN` / `RCOIN` / `CCOIN` / `CN1` path models coin counters, `CNSND`, slot
-  audits, paid-credit audit, `CUNITS`/`BUNITS`, and CMOS-backed credit updates.
+  source-exact boot/start-ready state, no-credit quick-start removal, broader
+  `SWTAB` cabinet-session integration, scanline scheduling, live video
+  presentation, and full frame/cycle integration remain gaps. Live coin input
+  now enters through translated `CSCAN` / `SWTAB1` / `SWP`, ticks the source
+  slam/coin debounce counters, sleeps through `LCOIN` / `RCOIN` / `CCOIN`, and
+  awards credit from `CN1` with `CNSND`, slot audits, paid-credit audit,
+  `CUNITS`/`BUNITS`, and CMOS-backed `CREDIT` / `CREDST` updates.
   Credited/free-play live one- and two-player start buttons now scan `SWTAB`,
   dispatch `ST1`/`ST2`, and consume credits through the translated `START2`
   tail. Live player controls stay gated while

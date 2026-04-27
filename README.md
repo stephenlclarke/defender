@@ -365,15 +365,15 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   `SSCAN` switch history, `SWPROC` queue, `SWP` status gate, and translated
   `LFIRE` / `SBOMB` / `HYPER` / `REV` / `ST1` / `ST2` scheduler paths. The
   scanner records all eight IN0 switch bits and queues every translated source
-  switch process. Live coin input still keeps the red-label `CREDIT` byte and
-  packed `CREDST` backup in BCD sync for the translated `ST1`/`ST2` credit
-  gates, while the translated `LCOIN` / `RCOIN` / `CCOIN` / `CN1` process path
-  now models the source coin counters, `CNSND`, slot audits, paid-credit audit,
-  `CUNITS`/`BUNITS`, and CMOS-backed credit updates. The no-credit one-player
-  quick-start remains a compatibility shortcut until source-exact boot and the
-  full live coin scheduler handoff own the live session. After a translated
-  start, live player controls stay gated while the active `PLSTRT` / `PLSTR3` /
-  `PLS01` / `PLS1` player-start handoff advances. `REV` sets
+  switch process. Live coin input now enters through the translated `CSCAN` /
+  `SWTAB1` / `SWP` scheduler path, ticks the source slam/coin debounce
+  counters, sleeps through `LCOIN` / `RCOIN` / `CCOIN`, and awards credit from
+  `CN1` with `CNSND`, slot audits, paid-credit audit, `CUNITS`/`BUNITS`, and
+  CMOS-backed `CREDIT` / `CREDST` updates. The no-credit one-player quick-start
+  remains a compatibility shortcut until source-exact boot owns the live
+  session. After a translated start, live player controls stay gated while the
+  active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1` player-start handoff advances.
+  `REV` sets
   `REVFLG`, negates `PLADIR` into `NPLAD`, debounces `PIA21`, clears the flag,
   and returns the process to the free list.
 - ROM files are optional verification inputs only. The deployed runtime remains

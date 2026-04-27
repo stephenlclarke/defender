@@ -617,10 +617,7 @@ mod tests {
         assert_eq!(trace.seed, output.red_label_trace.seed);
         assert_eq!(trace.hseed, output.red_label_trace.hseed);
         assert_eq!(trace.lseed, output.red_label_trace.lseed);
-        assert_eq!(
-            trace.events,
-            vec![MachineEvent::CreditAdded, MachineEvent::GameStarted]
-        );
+        assert_eq!(trace.events, vec![MachineEvent::GameStarted]);
         assert_eq!(trace.sound_commands, Vec::new());
         assert_eq!(trace.object_table_crc32, output.object_table_crc32);
         assert_eq!(trace.shell_table_crc32, output.shell_table_crc32);
@@ -645,14 +642,17 @@ mod tests {
             trace.object_table_crc32.expect("object CRC"),
             trace.shell_table_crc32.expect("shell CRC")
         )));
-        assert!(line.ends_with("\tcredit_added,game_started"));
+        assert!(line.ends_with("\tgame_started"));
     }
 
     #[test]
     fn trace_frame_records_source_sound_commands_from_frame_output() {
         let mut machine = ArcadeMachine::new();
+        insert_live_coin(&mut machine);
+        for _ in 0..128 {
+            machine.step(CabinetInput::NONE);
+        }
         machine.step(CabinetInput {
-            coin: true,
             start_one: true,
             ..CabinetInput::NONE
         });
@@ -666,6 +666,23 @@ mod tests {
             vec![SoundCommand::from_main_board_pia_port_b(0x35)]
         );
         assert!(trace.to_tsv_line().contains("\t0xF5\t"));
+    }
+
+    fn insert_live_coin(machine: &mut ArcadeMachine) {
+        machine.step(CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        });
+        for _ in 0..64 {
+            let output = machine.step(CabinetInput::NONE);
+            if output
+                .events()
+                .any(|event| event == MachineEvent::CreditAdded)
+            {
+                return;
+            }
+        }
+        panic!("live coin process did not award credit");
     }
 
     #[test]
