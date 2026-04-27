@@ -17363,7 +17363,17 @@ impl ArcadeMachine {
         self.rng.advance();
 
         let mut events = Vec::new();
+        let mut sound_commands = Vec::new();
         if self.trace_power_up_ram_fill.is_none() {
+            if let Some(command) = self
+                .memory
+                .step_sound_sequence()
+                .expect("embedded red-label sound sequence layout is valid")
+                .command
+            {
+                sound_commands.push(command);
+            }
+
             let feed_high_score_entry = self.phase == GamePhase::HighScoreEntry
                 || (self.phase == GamePhase::GameOver
                     && self
@@ -17386,7 +17396,7 @@ impl ArcadeMachine {
             Some(self.memory.object_table_crc32()),
             Some(self.memory.shell_table_crc32()),
             &events,
-            &[],
+            &sound_commands,
         )
     }
 
@@ -33386,6 +33396,64 @@ mod tests {
         });
 
         assert_eq!(output.sound_commands().collect::<Vec<_>>(), Vec::new());
+    }
+
+    #[test]
+    fn translated_start_sound_command_reaches_next_frame_output() {
+        let mut machine = ArcadeMachine::new();
+        let start = machine.step(CabinetInput {
+            coin: true,
+            start_one: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(start.sound_commands().collect::<Vec<_>>(), Vec::new());
+
+        let next = machine.step(CabinetInput::NONE);
+
+        assert_eq!(
+            next.sound_commands().collect::<Vec<_>>(),
+            vec![SoundCommand::from_main_board_pia_port_b(0x35)]
+        );
+    }
+
+    #[test]
+    fn live_thrust_sound_command_follows_previous_switch_scan() {
+        let mut machine = ArcadeMachine::new();
+        machine.step(CabinetInput {
+            start_one: true,
+            ..CabinetInput::NONE
+        });
+
+        let thrust_pressed = machine.step(CabinetInput {
+            thrust: true,
+            ..CabinetInput::NONE
+        });
+        assert_eq!(
+            thrust_pressed.sound_commands().collect::<Vec<_>>(),
+            Vec::<SoundCommand>::new()
+        );
+
+        let thrust_held = machine.step(CabinetInput {
+            thrust: true,
+            ..CabinetInput::NONE
+        });
+        assert_eq!(
+            thrust_held.sound_commands().collect::<Vec<_>>(),
+            vec![SoundCommand::from_main_board_pia_port_b(0x29)]
+        );
+
+        let thrust_released = machine.step(CabinetInput::NONE);
+        assert_eq!(
+            thrust_released.sound_commands().collect::<Vec<_>>(),
+            Vec::<SoundCommand>::new()
+        );
+
+        let after_release = machine.step(CabinetInput::NONE);
+        assert_eq!(
+            after_release.sound_commands().collect::<Vec<_>>(),
+            vec![SoundCommand::from_main_board_pia_port_b(0x30)]
+        );
     }
 
     #[test]

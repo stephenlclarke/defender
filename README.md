@@ -330,9 +330,10 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   also runs translated `BGOUT`; otherwise it records that `BGOUT` is due. The
   pre-tail `SNDSEQ` sound-table sequencer now advances `SNDX` / `SNDPRI` /
   `SNDTMR` / `SNDREP`, emits source-shaped main-board sound commands, and
-  handles the thrust sound gate. The remaining `CSCAN`, palette copy side
-  effects, live stack-context wiring, sound trace plumbing from the full frame
-  step, and hardware-map restoration still need full scheduler integration.
+  handles the thrust sound gate. Full frame output and fidelity traces now
+  include the resulting raw command bytes. The remaining `CSCAN`, palette copy
+  side effects, live stack-context wiring, and hardware-map restoration still
+  need full scheduler integration.
   The `GEXEC` tail slice now
   restores `STRCNT` after star
   overflow, advances `GTIME` through the source

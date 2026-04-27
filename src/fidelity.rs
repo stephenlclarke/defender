@@ -483,6 +483,7 @@ mod tests {
         input::CabinetInput,
         machine::{ArcadeMachine, GamePhase, MachineEvent},
         rom::crc32,
+        sound::SoundCommand,
         video::RenderedImage,
     };
 
@@ -645,6 +646,26 @@ mod tests {
             trace.shell_table_crc32.expect("shell CRC")
         )));
         assert!(line.ends_with("\tcredit_added,game_started"));
+    }
+
+    #[test]
+    fn trace_frame_records_source_sound_commands_from_frame_output() {
+        let mut machine = ArcadeMachine::new();
+        machine.step(CabinetInput {
+            coin: true,
+            start_one: true,
+            ..CabinetInput::NONE
+        });
+        let input = CabinetInput::NONE;
+
+        let output = machine.step(input);
+        let trace = TraceFrame::from_output(input, &output);
+
+        assert_eq!(
+            trace.sound_commands,
+            vec![SoundCommand::from_main_board_pia_port_b(0x35)]
+        );
+        assert!(trace.to_tsv_line().contains("\t0xF5\t"));
     }
 
     #[test]

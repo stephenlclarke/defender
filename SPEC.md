@@ -558,9 +558,10 @@ This section records drift found during the repository review on
   `BGOUT`; otherwise it records that `BGOUT` is due. The pre-tail `SNDSEQ`
   sound-table sequencer now advances `SNDX` / `SNDPRI` / `SNDTMR` / `SNDREP`,
   emits source-shaped main-board sound commands, and handles the thrust sound
-  gate. The remaining `CSCAN`, palette copy side effects, live stack-context
-  wiring, sound trace plumbing from the full frame step, and hardware-map
-  restoration still need full scheduler integration.
+  gate. Full frame output and fidelity traces now include the resulting raw
+  command bytes. The remaining `CSCAN`, palette copy side effects,
+  live stack-context wiring, and hardware-map restoration still need full
+  scheduler integration.
   The `GEXEC` tail slice
   now restores `STRCNT` toward 16, advances `GTIME` through the source
   audit-meter wrap, decrements the process `PD` counter, and applies the
@@ -776,8 +777,8 @@ This section records drift found during the repository review on
   callback boundary. The main-board `SNDSEQ` table sequencer is translated for
   source-shaped command writes and the thrust sound gate. Command CB1 now sets
   the sound PIA IRQ state, but the tree does not yet include sound-routine
-  execution, CPU IRQ scheduling, sample generation, or full-frame sound trace
-  emission from the live scheduler.
+  execution, CPU IRQ scheduling, sample generation, or golden command-sequence
+  and waveform fixtures.
 - Sound must be rebuilt as command writes into a translated sound-board state
   machine from `VSNDRM1.SRC`, not as high-level gameplay cues.
 
@@ -1257,13 +1258,12 @@ their behavior from labels.
 
 1. Continue replacing high-level gameplay cue dispatch with source-shaped sound
    command writes.
-2. Integrate `SNDSEQ` command output into the full frame/trace scheduler.
-3. Model the sound board state, command latch, and routine dispatch.
-4. Port remaining `VSNDRM1.SRC` routines needed by Defender.
-5. Verify command sequences against red-label traces.
-6. Add waveform tests with tolerance for deterministic generated buffers.
-7. Keep `--mute` as an output-layer switch only.
-8. Do not trigger sound from semantic Rust events unless that event is proven to
+2. Model the sound board state, command latch, and routine dispatch.
+3. Port remaining `VSNDRM1.SRC` routines needed by Defender.
+4. Verify command sequences against red-label traces.
+5. Add waveform tests with tolerance for deterministic generated buffers.
+6. Keep `--mute` as an output-layer switch only.
+7. Do not trigger sound from semantic Rust events unless that event is proven to
    correspond to a red-label sound command write.
 
 ### Phase 9: CLI, Tooling, And Developer Workflow
