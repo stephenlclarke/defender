@@ -135,6 +135,8 @@ Notes:
 Current live controls with the default `planetoid` input profile:
 
 - `5`: insert a left-slot coin
+- `6`: insert a center-slot coin
+- `7`: insert a right-slot coin
 - `ENTER` or `1`: start a one-player game when credit or free play is available
 - `A`: move up
 - `Z`: move down

@@ -288,6 +288,8 @@ impl InputMapper {
             }
             KeyCode::Char('1') if pressed => input.cabinet.start_one = true,
             KeyCode::Char('5') if pressed => input.cabinet.coin = true,
+            KeyCode::Char('6') if pressed => input.cabinet.coin_two = true,
+            KeyCode::Char('7') if pressed => input.cabinet.coin_three = true,
             KeyCode::Char('a') | KeyCode::Char('A') => set_held_flag(
                 &mut self.held.altitude_up,
                 key_event.kind,
@@ -323,6 +325,8 @@ impl InputMapper {
         let pressed = !matches!(key_event.kind, KeyEventKind::Release);
         match key_event.code {
             KeyCode::Char('5') if pressed => input.cabinet.coin = true,
+            KeyCode::Char('6') if pressed => input.cabinet.coin_two = true,
+            KeyCode::Char('7') if pressed => input.cabinet.coin_three = true,
             KeyCode::Char('1') if pressed => input.cabinet.start_one = true,
             KeyCode::Char('2') if pressed => input.cabinet.start_two = true,
             KeyCode::Up => set_held_flag(
@@ -473,6 +477,14 @@ mod tests {
             &mut input,
         );
         mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Char('6'), KeyModifiers::NONE),
+            &mut input,
+        );
+        mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Char('7'), KeyModifiers::NONE),
+            &mut input,
+        );
+        mapper.handle_key_event(
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
             &mut input,
         );
@@ -485,6 +497,8 @@ mod tests {
         mapper.handle_key_event(KeyEvent::new(KeyCode::F(5), KeyModifiers::NONE), &mut input);
 
         assert!(input.cabinet.coin);
+        assert!(input.cabinet.coin_two);
+        assert!(input.cabinet.coin_three);
         assert!(input.cabinet.altitude_up);
         assert!(input.cabinet.thrust);
         assert!(input.cabinet.reverse);
@@ -508,6 +522,14 @@ mod tests {
             &mut input,
         );
         mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Char('6'), KeyModifiers::NONE),
+            &mut input,
+        );
+        mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Char('7'), KeyModifiers::NONE),
+            &mut input,
+        );
+        mapper.handle_key_event(
             KeyEvent::new(KeyCode::Char('1'), KeyModifiers::NONE),
             &mut input,
         );
@@ -520,6 +542,8 @@ mod tests {
         mapper.handle_key_event(KeyEvent::new(KeyCode::F(5), KeyModifiers::NONE), &mut input);
 
         assert!(input.cabinet.coin);
+        assert!(input.cabinet.coin_two);
+        assert!(input.cabinet.coin_three);
         assert!(input.cabinet.start_one);
         assert!(input.cabinet.service_advance);
         assert!(input.cabinet.high_score_reset);

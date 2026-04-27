@@ -387,9 +387,10 @@ This file records behavior that must not be guessed in arcade-core code.
   buttons now enter through `SWTAB`/`ST1`/`ST2`; no-credit one-player starts
   die at the translated credit gate, and live controls are gated while the
   active translated player-start handoff advances. The terminal input profiles
-  map `F2`, `F3`, held `F4`, and `F5` onto service advance, high-score reset,
-  the auto/up selector, and the slam/tilt switch. Source-exact
-  boot/start-ready state is still not translated.
+  map `5`, `6`, `7`, `F2`, `F3`, held `F4`, and `F5` onto the three coin
+  slots, service advance, high-score reset, the auto/up selector, and the
+  slam/tilt switch. Source-exact boot/start-ready state is still not
+  translated.
   Generic/untranslated process bodies, broader suicide resume semantics, the
   remaining `SWTAB` routine bodies and no-process input effects, exact
   frame/cycle integration, and golden-trace equivalence are not translated.

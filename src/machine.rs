@@ -19256,6 +19256,34 @@ mod tests {
     }
 
     #[test]
+    fn live_center_coin_slot_awards_translated_multiplier_credit() {
+        let mut machine = ArcadeMachine::new();
+
+        machine.step(CabinetInput {
+            coin_two: true,
+            ..CabinetInput::NONE
+        });
+        let output = step_until_credit_added(&mut machine);
+        let events = output.events().collect::<Vec<_>>();
+
+        assert!(events.contains(&MachineEvent::CreditAdded));
+        assert_eq!(output.snapshot.phase, GamePhase::Attract);
+        assert_eq!(output.snapshot.credits, 4);
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA03A),
+            Some(&[0x04, 0x00, 0x04][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x05..0x09),
+            Some(&[0xF0, 0xF0, 0xF0, 0xF1][..])
+        );
+        assert_eq!(
+            machine.red_label_cmos_range(0x0D..0x11),
+            Some(&[0xF0, 0xF0, 0xF0, 0xF4][..])
+        );
+    }
+
+    #[test]
     fn live_advance_switch_reports_manual_or_auto_admin_target() {
         for (input, event) in [
             (
