@@ -377,11 +377,11 @@ This file records behavior that must not be guessed in arcade-core code.
   scheduler path, ticks the source slam/coin debounce counters, sleeps through
   `LCOIN` / `RCOIN` / `CCOIN`, and awards credit from `CN1` with `CNSND`, slot
   audits, paid-credit audit, `CUNITS`/`BUNITS`, and CMOS-backed `CREDIT` /
-  `CREDST` updates. Credited/free-play live one- and two-player start buttons
-  now enter through `SWTAB`/`ST1`/`ST2`; live controls are gated while the
-  active translated player-start handoff advances. Source-exact
-  boot/start-ready state and the no-credit one-player quick-start shortcut are
-  still not translated.
+  `CREDST` updates. Live one- and two-player start buttons now enter through
+  `SWTAB`/`ST1`/`ST2`; no-credit one-player starts die at the translated credit
+  gate, and live controls are gated while the active translated player-start
+  handoff advances. Source-exact boot/start-ready state is still not
+  translated.
   Generic/untranslated process bodies, broader suicide resume semantics, the
   remaining `SWTAB` routine bodies and no-process input effects, exact
   frame/cycle integration, and golden-trace equivalence are not translated.

@@ -591,10 +591,10 @@ This section records drift found during the repository review on
   remaining object callbacks, live respawn orchestration beyond the `PLSTRT`
   runtime snapshot handoff,
   full trace proof for the translated `BONUS` wave-clear death-tail path,
-  source-exact boot/start-ready state, no-credit quick-start removal, broader
-  `SWTAB` cabinet-session integration, scanline scheduling, live video
-  presentation, and full frame/cycle integration remain gaps. Live coin input
-  now enters through translated `CSCAN` / `SWTAB1` / `SWP`, ticks the source
+  source-exact boot/start-ready state, broader `SWTAB` cabinet-session
+  integration, scanline scheduling, live video presentation, and full
+  frame/cycle integration remain gaps. Live coin input now enters through
+  translated `CSCAN` / `SWTAB1` / `SWP`, ticks the source
   slam/coin debounce counters, sleeps through `LCOIN` / `RCOIN` / `CCOIN`, and
   awards credit from `CN1` with `CNSND`, slot audits, paid-credit audit,
   `CUNITS`/`BUNITS`, and CMOS-backed `CREDIT` / `CREDST` updates.

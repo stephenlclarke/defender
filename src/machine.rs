@@ -17893,21 +17893,9 @@ impl ArcadeMachine {
         if (input.start_one || input.start_two)
             && matches!(self.phase, GamePhase::Attract | GamePhase::GameOver)
             && self
-                .should_use_translated_live_start_switch(input)
-                .expect("embedded red-label start credit layout is valid")
-        {
-            if self
                 .step_red_label_live_start_switch(input)
                 .expect("live start switch creates only translated red-label processes")
-            {
-                events.push(MachineEvent::GameStarted);
-                started_this_frame = true;
-            }
-        } else if input.start_one
-            && !input.start_two
-            && matches!(self.phase, GamePhase::Attract | GamePhase::GameOver)
         {
-            self.start_one_player_game();
             events.push(MachineEvent::GameStarted);
             started_this_frame = true;
         }
@@ -17918,19 +17906,6 @@ impl ArcadeMachine {
                 self.step_player_controls(input, events, switch_outcome);
             }
         }
-    }
-
-    fn should_use_translated_live_start_switch(&self, input: CabinetInput) -> Result<bool, String> {
-        if input.start_two {
-            return Ok(true);
-        }
-
-        let layout = red_label_ram_layout()?;
-        let credit = self
-            .memory
-            .read_field_byte(&layout, "base_page", "CREDIT")?;
-        let free_play = self.memory.read_cmos_byte_by_symbol("FREEPL")?;
-        Ok(credit != 0 || free_play == 1)
     }
 
     fn step_red_label_live_start_switch(&mut self, input: CabinetInput) -> Result<bool, String> {
@@ -18101,6 +18076,7 @@ impl ArcadeMachine {
         if self.current_player == 2 { 2 } else { 1 }
     }
 
+    #[cfg(test)]
     fn start_one_player_game(&mut self) {
         self.phase = GamePhase::Playing;
         self.current_player = 1;
@@ -18992,6 +18968,10 @@ mod tests {
         snapshot.phase = GamePhase::GameOver;
         snapshot.scores.player_one = 10;
         machine.restore(snapshot);
+        machine
+            .memory
+            .write_cmos_byte_by_symbol("FREEPL", 1)
+            .expect("enable free play");
 
         let output = machine.step_with_typed_chars(
             CabinetInput {
@@ -19011,18 +18991,20 @@ mod tests {
     }
 
     #[test]
-    fn start_button_enters_one_player_game() {
+    fn start_button_without_credit_does_not_start_game() {
         let mut machine = ArcadeMachine::new();
         let output = machine.step(CabinetInput {
             start_one: true,
             ..CabinetInput::NONE
         });
+        let events = output.events().collect::<Vec<_>>();
 
-        assert_eq!(output.snapshot.phase, GamePhase::Playing);
-        assert!(
-            output
-                .events()
-                .any(|event| event == MachineEvent::GameStarted)
+        assert_eq!(output.snapshot.phase, GamePhase::Attract);
+        assert_eq!(output.snapshot.credits, 0);
+        assert!(!events.contains(&MachineEvent::GameStarted));
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x00][..])
         );
     }
 
@@ -19226,12 +19208,9 @@ mod tests {
     }
 
     #[test]
-    fn start_button_initializes_red_label_player_runtime_state() {
+    fn one_player_game_setup_initializes_red_label_player_runtime_state() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
 
         assert_eq!(
             machine.red_label_ram_range(0xA020..0xA024),
@@ -19278,10 +19257,7 @@ mod tests {
     #[test]
     fn player_motion_applies_source_thrust_damping_scroll_and_absolute_x() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         machine.memory.write_byte(0xA07B, 0x02).expect("set PIA21");
 
         let motion = machine
@@ -19326,10 +19302,7 @@ mod tests {
     #[test]
     fn player_motion_applies_source_altitude_up_velocity() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         machine.memory.write_byte(0xA07D, 0x01).expect("set PIA31");
 
         let motion = machine
@@ -19366,10 +19339,7 @@ mod tests {
     #[test]
     fn player_motion_respects_status_and_vertical_limits() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         machine.memory.write_byte(0xA0BA, 0x40).expect("set STATUS");
         machine.memory.write_byte(0xA07B, 0x82).expect("set PIA21");
         assert_eq!(
@@ -19413,10 +19383,7 @@ mod tests {
     #[test]
     fn player_display_draws_on86_picture_and_erases_old_footprint() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         seed_thrust_table(&mut machine);
         let old_picture = red_label_object_picture_address("PLAPIC").expect("PLAPIC address");
         write_object_footprint(&mut machine, 0x2080, old_picture, 0xCC);
@@ -19499,10 +19466,7 @@ mod tests {
     #[test]
     fn player_display_draws_forward_thout_and_erases_old_backward_thrust() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         seed_thrust_table(&mut machine);
         let old_picture = red_label_object_picture_address("PLBPIC").expect("PLBPIC address");
         write_object_footprint(&mut machine, 0x2080, old_picture, 0xCC);
@@ -19569,10 +19533,7 @@ mod tests {
     #[test]
     fn player_display_skips_status_and_outside_scanline_band() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let picture = red_label_object_picture_address("PLAPIC").expect("PLAPIC address");
         write_object_footprint(&mut machine, 0x2080, picture, 0xCC);
         machine.memory.write_byte(0xA0BA, 0x10).expect("set STATUS");
@@ -19617,10 +19578,7 @@ mod tests {
     #[test]
     fn live_thrust_and_altitude_inputs_update_player_pia_and_motion_ram() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
 
         machine.step(CabinetInput {
             thrust: true,
@@ -20440,12 +20398,9 @@ mod tests {
     }
 
     #[test]
-    fn start_button_seeds_player_table_from_source_start_path() {
+    fn one_player_game_setup_seeds_player_table_from_source_start_path() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
 
         assert_eq!(
             machine.red_label_ram_range(0xA1C2..0xA1C6),
@@ -23114,10 +23069,7 @@ mod tests {
     #[test]
     fn live_fire_switch_runs_lfire_through_translated_scheduler() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
 
         let output = machine.step(CabinetInput {
             fire: true,
@@ -23150,10 +23102,7 @@ mod tests {
     #[test]
     fn live_reverse_switch_runs_rev_through_translated_scheduler() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
 
         let output = machine.step(CabinetInput {
             reverse: true,
@@ -23186,10 +23135,7 @@ mod tests {
     #[test]
     fn live_smart_bomb_switch_runs_sbomb_without_scaffold_double_spend() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         machine.memory.write_byte(0xA026, 0x55).expect("seed PCRAM");
 
         let output = machine.step(CabinetInput {
@@ -30580,10 +30526,7 @@ mod tests {
     #[test]
     fn score_current_player_matches_score_bcd_add_without_replay_award() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
 
         let outcome = machine
             .red_label_score_current_player(0x0025)
@@ -30615,10 +30558,7 @@ mod tests {
     #[test]
     fn score_current_player_awards_replay_stock_and_loads_replay_sound() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         write_ram_bytes(&mut machine, 0xA1C2, &[0x00, 0x00, 0x99, 0x90]);
 
         let outcome = machine
@@ -30791,10 +30731,7 @@ mod tests {
     #[test]
     fn kill_bomb_shell_collision_matches_bkil_visible_mutations() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let source = machine
             .red_label_get_object_cell()
             .expect("get firing object cell");
@@ -30890,10 +30827,7 @@ mod tests {
     #[test]
     fn object_collision_dispatch_routes_bkil_from_ocvect() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let source = machine
             .red_label_get_object_cell()
             .expect("get firing object cell");
@@ -31929,10 +31863,7 @@ mod tests {
     #[test]
     fn colide_shell_path_uses_picture_masks_and_dispatches_bkil() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let shell = setup_collision_bomb_shell(
             &mut machine,
             0x4050,
@@ -31976,10 +31907,7 @@ mod tests {
     #[test]
     fn colide_shell_path_rejects_bounding_box_overlap_when_masks_do_not_touch() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let shell = setup_collision_bomb_shell(&mut machine, 0x4750, 0x1234);
         write_shell_footprint(&mut machine, 0x4750, 0xDD);
 
@@ -32008,10 +31936,7 @@ mod tests {
     #[test]
     fn colchk_sets_player_death_status_and_process_after_shell_collision() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let shell = setup_collision_bomb_shell(
             &mut machine,
             0x4050,
@@ -32146,6 +32071,10 @@ mod tests {
             process
         );
         process
+    }
+
+    fn start_one_player_game_for_test(machine: &mut ArcadeMachine) {
+        machine.start_one_player_game();
     }
 
     fn insert_live_coin(machine: &mut ArcadeMachine) -> super::FrameOutput {
@@ -33344,10 +33273,7 @@ mod tests {
     #[test]
     fn smart_bomb_entry_decrements_inventory_loads_sound_and_enters_flash_sleep() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let process = schedule_smart_bomb_process(&mut machine);
         machine.memory.write_byte(0xA026, 0x55).expect("seed PCRAM");
 
@@ -33399,10 +33325,7 @@ mod tests {
     #[test]
     fn smart_bomb_flash_tail_counts_down_and_enters_debounce_sleep() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let process = schedule_smart_bomb_process(&mut machine);
         machine.memory.write_byte(0xA026, 0x55).expect("seed PCRAM");
         machine
@@ -33481,10 +33404,7 @@ mod tests {
     #[test]
     fn translated_process_dispatch_runs_smart_bomb_path_from_scheduler() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let process = machine
             .red_label_make_process(
                 red_label_routine_address("SBOMB").expect("SBOMB address"),
@@ -33551,10 +33471,7 @@ mod tests {
     #[test]
     fn translated_process_dispatch_suicides_guarded_smart_bomb_without_clearing_flag() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let process = machine
             .red_label_make_process(
                 red_label_routine_address("SBOMB").expect("SBOMB address"),
@@ -33614,10 +33531,7 @@ mod tests {
     #[test]
     fn smart_bomb_debounce_tail_repeats_until_switch_released_then_suicides() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let process = schedule_smart_bomb_process(&mut machine);
         machine
             .red_label_start_smart_bomb_current_player()
@@ -33695,10 +33609,7 @@ mod tests {
     #[test]
     fn smart_bomb_entry_respects_sbflg_and_empty_inventory_guards() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         machine
             .memory
             .write_byte(0xA09A, 1)
@@ -34403,10 +34314,7 @@ mod tests {
     #[test]
     fn snapshot_restore_round_trips_state() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let snapshot = machine.snapshot();
         machine.step(CabinetInput {
             thrust: true,
@@ -34482,10 +34390,7 @@ mod tests {
     #[test]
     fn playing_controls_emit_core_events() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let output = machine.step(CabinetInput {
             reverse: true,
             thrust: true,
@@ -34505,10 +34410,7 @@ mod tests {
     #[test]
     fn scaffold_does_not_emit_uncited_sound_commands() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         let output = machine.step(CabinetInput {
             fire: true,
             smart_bomb: true,
@@ -34543,10 +34445,7 @@ mod tests {
     #[test]
     fn live_thrust_sound_command_follows_previous_switch_scan() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
 
         let thrust_pressed = machine.step(CabinetInput {
             thrust: true,
@@ -34582,10 +34481,7 @@ mod tests {
     #[test]
     fn xyzzy_auto_fire_and_unlimited_bombs_are_overlay_state() {
         let mut machine = ArcadeMachine::new();
-        machine.step(CabinetInput {
-            start_one: true,
-            ..CabinetInput::NONE
-        });
+        start_one_player_game_for_test(&mut machine);
         machine.player.smart_bombs = 0;
         machine.set_compatibility(super::CompatibilityState {
             xyzzy_active: true,

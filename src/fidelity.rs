@@ -590,8 +590,11 @@ mod tests {
     #[test]
     fn trace_frame_records_machine_output_with_red_label_ram_observed_state() {
         let mut machine = ArcadeMachine::new();
+        insert_live_coin(&mut machine);
+        for _ in 0..128 {
+            machine.step(CabinetInput::NONE);
+        }
         let input = CabinetInput {
-            coin: true,
             start_one: true,
             ..CabinetInput::NONE
         };
@@ -599,7 +602,7 @@ mod tests {
         let output = machine.step(input);
         let trace = TraceFrame::from_output(input, &output);
 
-        assert_eq!(trace.frame, 1);
+        assert_eq!(trace.frame, output.snapshot.frame);
         assert_eq!(trace.input_bits, input.bits());
         assert_eq!(trace.input_ports, input.defender_input_ports());
         assert_eq!(trace.phase, GamePhase::Playing);

@@ -369,10 +369,11 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   `SWTAB1` / `SWP` scheduler path, ticks the source slam/coin debounce
   counters, sleeps through `LCOIN` / `RCOIN` / `CCOIN`, and awards credit from
   `CN1` with `CNSND`, slot audits, paid-credit audit, `CUNITS`/`BUNITS`, and
-  CMOS-backed `CREDIT` / `CREDST` updates. The no-credit one-player quick-start
-  remains a compatibility shortcut until source-exact boot owns the live
-  session. After a translated start, live player controls stay gated while the
-  active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1` player-start handoff advances.
+  CMOS-backed `CREDIT` / `CREDST` updates. No-credit one-player starts now enter
+  translated `ST1` and die at the source credit gate instead of using the old
+  compatibility shortcut. After a translated start, live player controls stay
+  gated while the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1` player-start
+  handoff advances.
   `REV` sets
   `REVFLG`, negates `PLADIR` into `NPLAD`, debounces `PIA21`, clears the flag,
   and returns the process to the free list.
