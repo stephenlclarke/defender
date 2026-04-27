@@ -598,8 +598,9 @@ This section records drift found during the repository review on
   frame/cycle integration remain gaps. Live coin/admin input now enters through
   translated `CSCAN` / `SWTAB1` / `SWP`, ignores the source auto/manual
   selector for queue priority while preserving it for `ADVSW`, ticks the source
-  slam/coin debounce counters, sleeps through `LCOIN` / `RCOIN` / `CCOIN`, and
-  awards credit from `CN1` with `CNSND`, slot audits, paid-credit audit,
+  slam/coin debounce counters from live tilt/coin input, sleeps through
+  `LCOIN` / `RCOIN` / `CCOIN`, and awards credit from `CN1` with `CNSND`,
+  slot audits, paid-credit audit,
   `CUNITS`/`BUNITS`, and CMOS-backed `CREDIT` / `CREDST` updates. Live
   high-score reset now runs through `HSRES`, live service advance reports the
   translated diagnostics/audits target, and credited/free-play live one- and
@@ -700,7 +701,8 @@ This section records drift found during the repository review on
   remain open.
 - The live keyboard profiles expose operator cabinet bits with `F2` for
   service advance, `F3` for high-score reset, and held `F4` for the
-  auto/up selector used with service advance.
+  auto/up selector used with service advance, plus `F5` for the slam/tilt
+  switch.
 - Input profiles and MAME IN0/IN1/IN2 port projection exist, and the main-board
   CPU can now read those bytes through the PIA data/control register path once
   the ROM selects data registers. Cabinet control behavior and initials entry

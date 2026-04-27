@@ -146,6 +146,7 @@ Current live controls with the default `planetoid` input profile:
 - `F2`: service advance / diagnostics target
 - `F3`: reset today's high-score table from ROM defaults
 - hold `F4` with `F2`: select the auto/audits target
+- `F5`: slam/tilt switch
 - `A`-`Z`: enter initials while high-score entry is active
 - `BACKSPACE`: delete the previous initial while high-score entry is active
 - `Q` or `ESC`: quit
@@ -374,8 +375,9 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   switch process. Live coin/admin input now enters through the translated
   `CSCAN` / `SWTAB1` / `SWP` scheduler path, ignores the source auto/manual
   selector for queue priority while preserving it for `ADVSW`, ticks the source
-  slam/coin debounce counters, sleeps through `LCOIN` / `RCOIN` / `CCOIN`, and
-  awards credit from `CN1` with `CNSND`, slot audits, paid-credit audit,
+  slam/coin debounce counters from live tilt/coin input, sleeps through
+  `LCOIN` / `RCOIN` / `CCOIN`, and awards credit from `CN1` with `CNSND`,
+  slot audits, paid-credit audit,
   `CUNITS`/`BUNITS`, and CMOS-backed `CREDIT` / `CREDST` updates. Live
   high-score reset now runs through `HSRES`, and live service advance reports
   the translated diagnostics/audits target. No-credit one-player starts now

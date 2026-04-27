@@ -19231,6 +19231,31 @@ mod tests {
     }
 
     #[test]
+    fn live_tilt_blocks_coin_credit_through_translated_slam_counter() {
+        let mut machine = ArcadeMachine::new();
+
+        let output = machine.step(CabinetInput {
+            coin: true,
+            tilt: true,
+            ..CabinetInput::NONE
+        });
+        let events = output.events().collect::<Vec<_>>();
+
+        assert_eq!(output.snapshot.phase, GamePhase::Attract);
+        assert_eq!(output.snapshot.credits, 0);
+        assert!(!events.contains(&MachineEvent::CreditAdded));
+        assert_eq!(
+            machine.red_label_ram_range(0xA07E..0xA07F),
+            Some(&[super::RED_LABEL_SLAM_DEBOUNCE_COUNT - 1][..])
+        );
+        assert!(
+            !machine
+                .red_label_live_coin_door_process_active()
+                .expect("live coin-door process query")
+        );
+    }
+
+    #[test]
     fn live_advance_switch_reports_manual_or_auto_admin_target() {
         for (input, event) in [
             (

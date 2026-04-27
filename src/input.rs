@@ -314,6 +314,7 @@ impl InputMapper {
                 key_event.kind,
                 &mut input.cabinet.auto_up_manual_down,
             ),
+            KeyCode::F(5) if pressed => input.cabinet.tilt = true,
             _ => {}
         }
     }
@@ -350,6 +351,7 @@ impl InputMapper {
                 key_event.kind,
                 &mut input.cabinet.auto_up_manual_down,
             ),
+            KeyCode::F(5) if pressed => input.cabinet.tilt = true,
             _ => {}
         }
     }
@@ -480,6 +482,7 @@ mod tests {
             KeyEvent::new_with_kind(KeyCode::F(4), KeyModifiers::NONE, KeyEventKind::Press),
             &mut input,
         );
+        mapper.handle_key_event(KeyEvent::new(KeyCode::F(5), KeyModifiers::NONE), &mut input);
 
         assert!(input.cabinet.coin);
         assert!(input.cabinet.altitude_up);
@@ -492,6 +495,7 @@ mod tests {
         assert!(input.cabinet.service_advance);
         assert!(input.cabinet.high_score_reset);
         assert!(input.cabinet.auto_up_manual_down);
+        assert!(input.cabinet.tilt);
     }
 
     #[test]
@@ -513,12 +517,14 @@ mod tests {
             KeyEvent::new_with_kind(KeyCode::F(4), KeyModifiers::NONE, KeyEventKind::Press),
             &mut input,
         );
+        mapper.handle_key_event(KeyEvent::new(KeyCode::F(5), KeyModifiers::NONE), &mut input);
 
         assert!(input.cabinet.coin);
         assert!(input.cabinet.start_one);
         assert!(input.cabinet.service_advance);
         assert!(input.cabinet.high_score_reset);
         assert!(input.cabinet.auto_up_manual_down);
+        assert!(input.cabinet.tilt);
     }
 
     #[test]
