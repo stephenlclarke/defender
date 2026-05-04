@@ -1,6 +1,6 @@
 # Defender Completion Plan
 
-Last reviewed: `2026-05-04 16:48:21 BST`
+Last reviewed: `2026-05-05 00:12:36 BST`
 
 ## Purpose
 
@@ -57,6 +57,50 @@ Status values:
   frame/cycle integration, golden-trace proof for translated gameplay/session
   paths, pixel/audio golden fixtures, cycle-scheduled sound-board execution,
   and the later large refactor.
+
+### Fidelity Gap Review 2026-05-05
+
+This review checked `SPEC.md`, `docs/fidelity/gaps.md`,
+`docs/fidelity/golden-comparison-results.md`, the ignored fidelity tests in
+`src/fidelity.rs` and `src/app.rs`, and the current completion plan.
+Slack report:
+`https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777936475910379`
+
+Gap inventory:
+
+- Trace oracle fixtures: local MAME reference fixtures exist as ignored local
+  artifacts, but `docs/fidelity/fixtures/local/rust-current` is absent in the
+  current local tree. Exact local-reference tests are still ignored until each
+  scenario is made source-equivalent.
+- `attract_boot`: Rust matches the local reference through frame 732, then
+  diverges at frame 733 only in `process_table_crc32`. The remaining blocker is
+  post-`INIT20` `ATTR` / executive process-table cadence.
+- Focused gameplay traces: `start_game`, `firing`, `thrust_reverse`,
+  `smart_bomb`, `hyperspace`, `death`, and `wave_advance` still fail exact
+  local-reference comparison. The recurring gaps are credited-start transition
+  timing, RNG call order, and post-start object/process scheduler execution.
+- CPU, IRQ, and frame ownership: exact main CPU scheduling, IRQ timing,
+  A/X/Y/S/CC/B register context, scanline/video counter ownership, watchdog
+  timing/reset side effects, palette/rendering timing side effects, and sound
+  IRQ ownership are not yet fully source-exact.
+- Hardware edge cases: exact Williams power-on RAM contents, physical advance
+  switch timing, physical lamp timing, decoder PROM behavior, full ROM/bank
+  memory integration, generated derived assets, and remaining collision or
+  no-process `SWTAB` effects still need source-backed closure.
+- Video: native video rendering exists, but MAME-derived pixel golden fixtures
+  are absent. Remaining untranslated screens still render native black, and
+  remaining HUD, general text, boot/game-over presentation, and non-IRQ
+  scanline ownership need proof or owner-approved scope decisions.
+- Audio: source-shaped sound tables, command flow, and in-repo deterministic
+  waveform signatures exist, but live MAME command-sequence fixtures, external
+  waveform golden fixtures, cycle-accurate DAC scheduling, exact sound-board
+  CPU IRQ cadence, and remaining waveform routines are not complete.
+- Session and operator flows: two-player, high-score, operator/service,
+  cabinet profile, and longer session paths need end-to-end local MAME golden
+  traces before final release.
+- Compatibility overlays: `DC-14` closed current Planetoid and `xyzzy`
+  isolation, but any future `xyzzy` hook still requires paired disabled/enabled
+  tests and red-label trace proof.
 
 ## Phase 0: Documentation And Guardrails
 
@@ -1732,9 +1776,187 @@ Work log:
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777936144932939`
 
-## Phase 8: Planned Large Refactor
+## Phase 8: Fidelity Gap Closure Before Refactor
 
-### DC-15: Refactor Freeze And API Shape
+### DC-15: Trace Oracle Promotion And Gap Recheck
+
+Status: `planned`
+
+Goal: restore a repeatable local Rust-vs-MAME proof loop before new fidelity
+closure work resumes.
+
+Steps:
+
+- [ ] DC-15.1 Re-run `make reference-fixtures-check` and exact
+  `attract_boot` comparison against the local reference fixture.
+- [ ] DC-15.2 Generate or refresh the ignored
+  `docs/fidelity/fixtures/local/rust-current` fixture set only for scenarios
+  whose current Rust output is intentionally being compared.
+- [ ] DC-15.3 Re-run every ignored `local_reference_*_matches_red_label` test,
+  then unignore passing scenarios or narrow ignored reasons to the remaining
+  mismatch.
+- [ ] DC-15.4 Record the comparison deltas in
+  `docs/fidelity/golden-comparison-results.md`, update gap text in
+  `SPEC.md`, and post the result to Slack.
+
+Completion gate: the local trace oracle state is current, every ignored
+reference test has a specific reason, and the next mismatch boundary is known.
+
+### DC-16: Post-`INIT20` `ATTR` And Executive Cadence
+
+Status: `planned`
+
+Goal: close the current `attract_boot` process-table mismatch at frame 733.
+
+Steps:
+
+- [ ] DC-16.1 Trace frame-733 `ATTR` / `EXEC` process-table mutations from the
+  local reference and source listings.
+- [ ] DC-16.2 Add source-visible mutation tests for the affected process cells
+  and scheduler rows.
+- [ ] DC-16.3 Fix the translated scheduler cadence until `attract_boot` matches
+  the local reference through frame 900.
+- [ ] DC-16.4 Promote the passing `attract_boot` local-reference test by
+  unignoring it, or narrow any remaining ignored reason to the next exact
+  mismatch.
+
+Completion gate: `local_reference_attract_boot_matches_red_label` passes
+locally with the reference fixture, or the next mismatch is documented with
+frame, column, expected value, and actual value.
+
+### DC-17: Full Frame And CPU/IRQ Ownership
+
+Status: `planned`
+
+Goal: replace frame-model shortcuts with source-shaped board, CPU, IRQ, and
+scanline ownership wherever current proof still depends on scaffolding.
+
+Steps:
+
+- [ ] DC-17.1 Model the missing CPU IRQ scheduling and register context needed
+  by translated dispatch paths, including A/X/Y/S/CC/B where traces or source
+  evidence prove the values.
+- [ ] DC-17.2 Integrate main IRQ, scanline/video counter, watchdog,
+  palette/rendering side effects, and sound IRQ ownership into frame stepping.
+- [ ] DC-17.3 Replace trace-only scheduling shortcuts with source-shaped
+  execution for reset, boot, attract, and gameplay frame boundaries.
+- [ ] DC-17.4 Add trace columns or mutation tests only where they expose
+  source-visible state needed for equivalence.
+
+Completion gate: frame stepping has explicit ownership for CPU, IRQ, video,
+watchdog, palette, and sound-board handoff behavior, with characterization tests
+locking every new mutation surface.
+
+### DC-18: Gameplay Golden Trace Closure
+
+Status: `planned`
+
+Goal: make the credited-start and active-player scenarios match local
+MAME/source references.
+
+Steps:
+
+- [ ] DC-18.1 Recompare `start_game`, `firing`, `thrust_reverse`,
+  `smart_bomb`, and `hyperspace` after `DC-16` and `DC-17`.
+- [ ] DC-18.2 Close credited-start transition timing, player setup, and RNG
+  call-order drift.
+- [ ] DC-18.3 Close post-start object/process scheduler drift for firing,
+  thrust, reverse, smart bomb, and hyperspace paths.
+- [ ] DC-18.4 Unignore passing gameplay local-reference tests and update
+  `SPEC.md` / `docs/fidelity/gaps.md` with remaining exact mismatches.
+
+Completion gate: the focused start and player-action traces either pass exact
+local-reference comparison or have only newly documented, narrower blockers.
+
+### DC-19: Death, Wave, Session, And Operator Trace Closure
+
+Status: `planned`
+
+Goal: prove longer gameplay, session, and cabinet/service paths against local
+references.
+
+Steps:
+
+- [ ] DC-19.1 Close `death` and `wave_advance` scheduler, RNG, phase, lives,
+  smart-bomb, object-table, and process-table drift.
+- [ ] DC-19.2 Add or refresh local reference scenarios for two-player sessions,
+  high-score entry, operator/service screens, and cabinet input profiles.
+- [ ] DC-19.3 Verify high-score, audit, operator, coin, credit, and game-over
+  mutations with before/after tests and exact traces.
+- [ ] DC-19.4 Confirm `xyzzy` disabled stays red-label equivalent and enabled
+  behavior differs only through documented overlay hooks.
+
+Completion gate: session/operator traces are source-equivalent or each
+remaining delta is explicitly recorded in the gap register.
+
+### DC-20: MAME Pixel Golden Fixtures
+
+Status: `planned`
+
+Goal: prove native video output against MAME-derived pixel fixtures rather than
+only source-native CRCs.
+
+Steps:
+
+- [ ] DC-20.1 Add local MAME frame capture tooling and an ignored fixture
+  convention for pixel golden frames.
+- [ ] DC-20.2 Compare boot, attract, credited start, gameplay, death,
+  high-score, and operator/service frames.
+- [ ] DC-20.3 Replace remaining native-black untranslated screens, or record an
+  owner-approved out-of-scope decision for each screen.
+- [ ] DC-20.4 Keep renderer tests focused on stable source-visible pixels,
+  palette indices, and video RAM mutations.
+
+Completion gate: representative MAME-derived pixel fixtures pass, and any
+remaining non-rendered screens are explicitly scoped.
+
+### DC-21: Sound-Board Cycle And Waveform Golden Fixtures
+
+Status: `planned`
+
+Goal: close sound fidelity beyond command dispatch and deterministic in-repo
+waveform signatures.
+
+Steps:
+
+- [ ] DC-21.1 Integrate source-shaped 6808 cycle/IRQ cadence and DAC scheduling
+  for live sound-board execution.
+- [ ] DC-21.2 Generate and check local MAME command-sequence fixtures for
+  trace-required sound commands.
+- [ ] DC-21.3 Generate and check external waveform golden fixtures for
+  representative red-label sound routines.
+- [ ] DC-21.4 Finish remaining `VSNDRM1` waveform routine translations and
+  unignore or narrow the sound equivalence tests.
+
+Completion gate: command timing and representative DAC output are proven
+against local MAME/source fixtures, with remaining audio gaps narrowed to named
+routines.
+
+### DC-22: Hardware Edge Cases, ROM Assets, And Scaffold Removal
+
+Status: `planned`
+
+Goal: close remaining hardware and asset fidelity gaps before the large
+refactor begins.
+
+Steps:
+
+- [ ] DC-22.1 Model exact Williams power-on RAM contents, physical advance
+  switch timing, physical lamp timing, watchdog reset side effects, and decoder
+  PROM behavior where source or MAME evidence is available.
+- [ ] DC-22.2 Complete full ROM/bank memory integration and regenerate any
+  source/ROM-derived assets needed by runtime paths.
+- [ ] DC-22.3 Close remaining collision callbacks and no-process `SWTAB` input
+  effects.
+- [ ] DC-22.4 Remove obsolete scaffold or archived prototype runtime
+  dependencies only after replacement tests prove exact behavior.
+
+Completion gate: no known pre-refactor fidelity gap remains without a passing
+fixture, a focused mutation test, or a recorded owner-approved scope decision.
+
+## Phase 9: Planned Large Refactor
+
+### DC-23: Refactor Freeze And API Shape
 
 Status: `planned`
 
@@ -1742,19 +1964,19 @@ Goal: prepare for the large refactor only after behavior is well characterized.
 
 Steps:
 
-- [ ] DC-15.1 Freeze a full characterization suite covering traces, mutation
+- [ ] DC-23.1 Freeze a full characterization suite covering traces, mutation
   tests, pixel fixtures, audio fixtures, and live/session edge cases.
-- [ ] DC-15.2 Define the public arcade API: `new`, `reset`, `step`,
+- [ ] DC-23.2 Define the public arcade API: `new`, `reset`, `step`,
   `snapshot`, and `restore`.
-- [ ] DC-15.3 Identify module boundaries for CPU/board, scheduler, memory,
+- [ ] DC-23.3 Identify module boundaries for CPU/board, scheduler, memory,
   video, sound, input/session, compatibility, and assets.
-- [ ] DC-15.4 Document every behavior that must remain byte-for-byte compatible
+- [ ] DC-23.4 Document every behavior that must remain byte-for-byte compatible
   during the refactor.
 
 Completion gate: the refactor has a test-backed API contract and no major
 untested mutation surfaces.
 
-### DC-16: Module Split And Behavior Preservation
+### DC-24: Module Split And Behavior Preservation
 
 Status: `planned`
 
@@ -1762,21 +1984,21 @@ Goal: split the large core safely without changing behavior.
 
 Steps:
 
-- [ ] DC-16.1 Move code in small ownership-based slices with no unrelated
+- [ ] DC-24.1 Move code in small ownership-based slices with no unrelated
   rewrites.
-- [ ] DC-16.2 Run the full characterization gate after every slice.
-- [ ] DC-16.3 Keep public surfaces narrow and source-cited.
-- [ ] DC-16.4 Remove dead scaffold paths only after tests prove exact
+- [ ] DC-24.2 Run the full characterization gate after every slice.
+- [ ] DC-24.3 Keep public surfaces narrow and source-cited.
+- [ ] DC-24.4 Remove dead scaffold paths only after tests prove exact
   replacements.
-- [ ] DC-16.5 Update docs after each module boundary becomes stable.
+- [ ] DC-24.5 Update docs after each module boundary becomes stable.
 
 Completion gate: the refactored code produces the same traces, byte mutations,
 pixel fixtures, audio fixtures, and live/session behavior as the pre-refactor
 implementation.
 
-## Phase 9: Release Readiness
+## Phase 10: Release Readiness
 
-### DC-17: Final Acceptance And Documentation
+### DC-25: Final Acceptance And Documentation
 
 Status: `planned`
 
@@ -1785,17 +2007,17 @@ supported compatibility overlays.
 
 Steps:
 
-- [ ] DC-17.1 Run `make fidelity`, local reference fixtures, pixel fixtures,
+- [ ] DC-25.1 Run `make fidelity`, local reference fixtures, pixel fixtures,
   audio fixtures, and any CI/Sonar gates.
-- [ ] DC-17.2 Perform live terminal smoke tests in Kitty-compatible terminals
+- [ ] DC-25.2 Perform live terminal smoke tests in Kitty-compatible terminals
   and record rendering, input, sound, and quit behavior.
-- [ ] DC-17.3 Update `README.md`, `SPEC.md`, `docs/fidelity/`, and install/run
+- [ ] DC-25.3 Update `README.md`, `SPEC.md`, `docs/fidelity/`, and install/run
   documentation to match final behavior.
-- [ ] DC-17.4 Confirm no runtime dependency on local ROMs or generated fixture
+- [ ] DC-25.4 Confirm no runtime dependency on local ROMs or generated fixture
   files.
-- [ ] DC-17.5 Confirm `xyzzy` disabled is red-label equivalent and `xyzzy`
+- [ ] DC-25.5 Confirm `xyzzy` disabled is red-label equivalent and `xyzzy`
   enabled differs only through documented overlay hooks.
-- [ ] DC-17.6 Close remaining gap entries or explicitly mark them out of scope.
+- [ ] DC-25.6 Close remaining gap entries or explicitly mark them out of scope.
 
 Completion gate: every acceptance item in `SPEC.md` is satisfied or explicitly
 documented as out of scope by project owner decision.
