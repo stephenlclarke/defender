@@ -1063,6 +1063,13 @@ Additional gaps and corrections found during this review:
   input bits, MAME IN0/IN1/IN2 bytes, scores, sound commands, and events stayed
   aligned. Credited-start transition timing, RNG call order, and post-start
   object/process scheduler execution remain golden-trace gaps.
+- `DC-04.3` added ignored `local_reference_*_matches_red_label` tests in
+  `src/app.rs` for `attract_boot`, `start_game`, `firing`, `thrust_reverse`,
+  `smart_bomb`, `hyperspace`, `death`, and `wave_advance`. Default test runs
+  skip them; explicitly running
+  `cargo test local_reference_ --all-targets -- --ignored` with local fixtures
+  currently fails through the exact TSV comparison path and should pass only
+  after the corresponding trace gaps are fixed.
 - There are no object-table, shell-table, or pixel-frame golden tests against
   attract/gameplay references, though the trace format can now carry raw table
   and native frame CRC-32 values.

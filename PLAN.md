@@ -378,8 +378,9 @@ Steps:
 - [x] DC-04.2 Compare start, fire, thrust/reverse, smart bomb, hyperspace, death,
   and wave-clear slices against focused traces.
   Completed: `2026-05-04 17:59:19 BST`
-- [ ] DC-04.3 Add ignored or failing fidelity tests for every still-unknown
+- [x] DC-04.3 Add ignored or failing fidelity tests for every still-unknown
   trace mismatch before implementing a fix.
+  Completed: `2026-05-04 18:03:50 BST`
 - [ ] DC-04.4 Keep exact TSV comparison as the first gate, then add narrower
   mutation tests for the routine causing each mismatch.
 
@@ -435,6 +436,28 @@ Work log:
   comparison results and gaps.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913989696059`
+- `2026-05-04 18:00:45 BST` Started `DC-04.3`: adding ignored local
+  fidelity tests for the known boot, focused gameplay, death, and wave-advance
+  trace mismatches before changing scheduler or boot behavior.
+- `2026-05-04 18:03:50 BST` Completed `DC-04.3`: added eight ignored
+  `local_reference_*_matches_red_label` tests in `src/app.rs` for
+  `attract_boot`, `start_game`, `firing`, `thrust_reverse`, `smart_bomb`,
+  `hyperspace`, `death`, and `wave_advance`. The tests skip default validation,
+  use the same exact TSV comparison path as `--fidelity-check-trace`, skip
+  cleanly when local fixtures are absent, and fail when explicitly run against
+  the current local references. Updated `docs/fidelity/README.md`,
+  `docs/fidelity/golden-comparison-results.md`, `docs/fidelity/gaps.md`, and
+  `SPEC.md` to document the ignored-test workflow. Validation passed with
+  `cargo fmt --check`, `cargo test local_reference_ --all-targets`,
+  expected-failing `cargo test local_reference_ --all-targets -- --ignored`,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/characterization-tests.md
+  docs/fidelity/local-reference-runs.md
+  docs/fidelity/golden-comparison-results.md assets/red-label/README.md`, and
+  `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777914263794419`
 
 ## Phase 2: Hardware, Scheduler, And Frame Execution
 

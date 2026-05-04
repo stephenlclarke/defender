@@ -50,6 +50,10 @@ Current trace format:
   validates that every required Phase 1 scenario has a matching input script
   and expected trace using the checked-in schema header plus
   `assets/red-label/trace-requirements.tsv` evidence markers.
+- Ignored tests named `local_reference_*_matches_red_label` in `src/app.rs`
+  encode the current local MAME/reference exact-match gaps. Run
+  `cargo test local_reference_ --all-targets -- --ignored` only when
+  intentionally checking or unignoring those known mismatches.
 - `defender --verify-roms /path/to/roms` validates local red-label ROM files and
   verifies that they map into the embedded MAME red-label ROM regions.
 - Future subsystem traces should extend this format only when a red-label

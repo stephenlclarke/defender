@@ -121,3 +121,34 @@ Interpretation:
 - The largest remaining blockers are source-exact boot/start-ready process
   state, credited-start state transition timing, RNG call order, and
   object/process scheduler execution after play begins.
+
+## 2026-05-04 `DC-04.3` Ignored Local Reference Tests
+
+The current known local reference mismatches are encoded as ignored Rust tests
+in `src/app.rs`:
+
+- `local_reference_attract_boot_matches_red_label`
+- `local_reference_start_game_matches_red_label`
+- `local_reference_firing_matches_red_label`
+- `local_reference_thrust_reverse_matches_red_label`
+- `local_reference_smart_bomb_matches_red_label`
+- `local_reference_hyperspace_matches_red_label`
+- `local_reference_death_matches_red_label`
+- `local_reference_wave_advance_matches_red_label`
+
+Default validation skips these tests:
+
+```sh
+cargo test local_reference_ --all-targets
+```
+
+When local reference fixtures exist, explicitly running the ignored tests
+currently fails through the exact TSV comparison path:
+
+```sh
+cargo test local_reference_ --all-targets -- --ignored
+```
+
+These tests should stay ignored until the corresponding boot, credited-start,
+death, and wave-advance trace gaps are fixed. When a gap is fixed, unignore the
+matching test or narrow it to the remaining mismatched scenario.

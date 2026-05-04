@@ -1595,6 +1595,70 @@ mod tests {
         assert!(error.to_string().contains("trace mismatch at line 1"));
     }
 
+    fn assert_local_reference_trace_matches(scenario: &str) {
+        let fixture_dir = Path::new("docs/fidelity/fixtures/local/reference");
+        let inputs_path = fixture_dir.join(format!("{scenario}.inputs.txt"));
+        let expected_path = fixture_dir.join(format!("{scenario}.expected.tsv"));
+        if !inputs_path.exists() || !expected_path.exists() {
+            eprintln!(
+                "local reference fixture pair for {scenario} is missing under {}; skipped",
+                fixture_dir.display()
+            );
+            return;
+        }
+
+        fidelity_check_trace_text(&inputs_path, &expected_path)
+            .unwrap_or_else(|error| panic!("{scenario} local reference mismatch: {error:#}"));
+    }
+
+    #[test]
+    #[ignore = "known DC-04.1 mismatch: boot process/super-process CRC drift"]
+    fn local_reference_attract_boot_matches_red_label() {
+        assert_local_reference_trace_matches("attract_boot");
+    }
+
+    #[test]
+    #[ignore = "known DC-04.2 mismatch: credited-start timing and process state drift"]
+    fn local_reference_start_game_matches_red_label() {
+        assert_local_reference_trace_matches("start_game");
+    }
+
+    #[test]
+    #[ignore = "known DC-04.2 mismatch: post-start process and object state drift"]
+    fn local_reference_firing_matches_red_label() {
+        assert_local_reference_trace_matches("firing");
+    }
+
+    #[test]
+    #[ignore = "known DC-04.2 mismatch: post-start process and object state drift"]
+    fn local_reference_thrust_reverse_matches_red_label() {
+        assert_local_reference_trace_matches("thrust_reverse");
+    }
+
+    #[test]
+    #[ignore = "known DC-04.2 mismatch: post-start process and object state drift"]
+    fn local_reference_smart_bomb_matches_red_label() {
+        assert_local_reference_trace_matches("smart_bomb");
+    }
+
+    #[test]
+    #[ignore = "known DC-04.2 mismatch: post-start process and object state drift"]
+    fn local_reference_hyperspace_matches_red_label() {
+        assert_local_reference_trace_matches("hyperspace");
+    }
+
+    #[test]
+    #[ignore = "known DC-04.2 mismatch: death trace scheduler and state drift"]
+    fn local_reference_death_matches_red_label() {
+        assert_local_reference_trace_matches("death");
+    }
+
+    #[test]
+    #[ignore = "known DC-04.2 mismatch: wave-advance scheduler and state drift"]
+    fn local_reference_wave_advance_matches_red_label() {
+        assert_local_reference_trace_matches("wave_advance");
+    }
+
     #[test]
     fn fidelity_check_trace_dir_text_skips_missing_directory() {
         let path = env::temp_dir().join(format!(
