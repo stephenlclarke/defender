@@ -922,8 +922,9 @@ Steps:
 - [x] DC-08.4 Finish hyperspace failure/safe paths and rematerialization
   movement.
   Completed: `2026-05-04 21:44:47 BST`
-- [ ] DC-08.5 Finish carried-human, falling-human, catch, landing, and rescue
+- [x] DC-08.5 Finish carried-human, falling-human, catch, landing, and rescue
   paths.
+  Completed: `2026-05-04 21:48:08 BST`
 - [ ] DC-08.6 Prove death, respawn, wave-clear, and game-over branches with
   golden traces.
 
@@ -988,6 +989,20 @@ Work log:
   --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777927508535499`
+- `2026-05-04 21:46:26 BST` Started `DC-08.5`: adding a human rescue
+  refactor fixture that ties `AFALL2` player-carried motion, `AKIL1` catch,
+  `AFALL` safe landing, and `P500` rescue scoring to stable RAM mutations.
+- `2026-05-04 21:48:08 BST` Completed `DC-08.5`: added
+  `human_rescue_fixture_covers_carried_catch_landing_and_score_paths`, proving
+  player-carried `AFALL2` updates astronaut `OX16`/`OY16` from `PLABX` and
+  `PLAY16`, `AKIL1` switches the fall process to `AFALL2` and starts `P500`,
+  safe `AFALL` landing resets the astronaut and starts `P250`, and `P500`
+  rescue scoring creates the score sprite, carries player X velocity, and adds
+  500 points. Validation passed with `cargo fmt --check` and
+  `cargo test human_rescue_fixture_covers_carried_catch_landing_and_score_paths
+  --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777927711664639`
 
 ### DC-09: Cabinet Session And Operator Flow
 

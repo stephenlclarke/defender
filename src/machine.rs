@@ -45300,6 +45300,235 @@ mod tests {
     }
 
     #[test]
+    fn human_rescue_fixture_covers_carried_catch_landing_and_score_paths() {
+        let mut carried = ArcadeMachine::new();
+        let carried_process = schedule_support_process(&mut carried, "AFALL2");
+        let carried_astronaut = carried
+            .red_label_init_object_cell(
+                carried_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("ASTP1")
+                        .expect("ASTP1 address"),
+                    collision_vector_address: red_label_routine_address("AKIL1")
+                        .expect("AKIL1 address"),
+                    scanner_color: 0x1111,
+                },
+            )
+            .expect("init carried astronaut")
+            .object_address;
+        carried
+            .red_label_activate_object_cell(carried_astronaut)
+            .expect("activate carried astronaut");
+        carried
+            .memory
+            .write_word(carried_process + 0x07, carried_astronaut)
+            .expect("set AFALL2 PD");
+        carried
+            .memory
+            .write_word(0xA0CC, 0x3000)
+            .expect("set PLABX");
+        carried
+            .memory
+            .write_word(0xA0C5, 0x4000)
+            .expect("set PLAY16");
+        carried
+            .memory
+            .write_word(carried_astronaut + 0x0C, 0x2001)
+            .expect("set carried OY16");
+        carried
+            .memory
+            .write_byte(0xB3C2, 0x90)
+            .expect("set carried ALTTBL altitude");
+
+        let carried_step = carried
+            .red_label_step_falling_astronaut_current_process(true)
+            .expect("step AFALL2");
+
+        assert_eq!(
+            carried_step,
+            RedLabelFallingAstronautStep::CarriedSleeping {
+                process_address: carried_process,
+                object_address: carried_astronaut,
+                x16: 0x3080,
+                y16: 0x4A01,
+                altitude: 0x90,
+                wakeup_address: red_label_routine_address("AFALL2").expect("AFALL2 address"),
+            }
+        );
+        assert_eq!(
+            carried.red_label_ram_range(carried_astronaut + 0x0A..carried_astronaut + 0x12),
+            Some(&[0x30, 0x80, 0x4A, 0x01, 0x00, 0x00, 0x00, 0x00][..])
+        );
+
+        let mut caught = ArcadeMachine::new();
+        let falling_process = caught
+            .red_label_make_process(
+                red_label_routine_address("AFALL").expect("AFALL address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make AFALL process")
+            .process_address;
+        let caught_astronaut = caught
+            .red_label_init_object_cell(
+                falling_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("ASTP1")
+                        .expect("ASTP1 address"),
+                    collision_vector_address: red_label_routine_address("AKIL1")
+                        .expect("AKIL1 address"),
+                    scanner_color: 0x1111,
+                },
+            )
+            .expect("init caught astronaut")
+            .object_address;
+        caught
+            .red_label_activate_object_cell(caught_astronaut)
+            .expect("activate caught astronaut");
+        caught
+            .memory
+            .write_word(caught_astronaut + 0x06, falling_process)
+            .expect("set falling OBJID");
+        caught.memory.write_byte(0xA0DE, 1).expect("set PCFLG");
+
+        let collision = caught
+            .red_label_dispatch_object_collision_vector(caught_astronaut)
+            .expect("dispatch AKIL1");
+        let RedLabelObjectCollision::CapturedAstronaut(
+            RedLabelCapturedAstronautCollision::PlayerCaught {
+                falling_process_address,
+                score_process,
+                ..
+            },
+        ) = collision
+        else {
+            panic!("expected player-caught astronaut");
+        };
+
+        assert_eq!(falling_process_address, falling_process);
+        assert_eq!(
+            score_process.expect("P500 score process").routine_address,
+            red_label_routine_address("P500").expect("P500 address")
+        );
+        assert_eq!(
+            caught.red_label_ram_range(falling_process + 0x02..falling_process + 0x04),
+            Some(&[0xF2, 0x4C][..])
+        );
+
+        let mut landed = ArcadeMachine::new();
+        let landing_process = schedule_support_process(&mut landed, "AFALL");
+        let landing_astronaut = landed
+            .red_label_init_object_cell(
+                landing_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("ASTP1")
+                        .expect("ASTP1 address"),
+                    collision_vector_address: red_label_routine_address("ASTKIL")
+                        .expect("ASTKIL address"),
+                    scanner_color: 0x1111,
+                },
+            )
+            .expect("init landing astronaut")
+            .object_address;
+        landed
+            .red_label_activate_object_cell(landing_astronaut)
+            .expect("activate landing astronaut");
+        landed
+            .memory
+            .write_word(landing_process + 0x07, landing_astronaut)
+            .expect("set AFALL PD");
+        landed
+            .memory
+            .write_word(landing_astronaut + 0x0A, 0x1000)
+            .expect("set landing OX16");
+        landed
+            .memory
+            .write_word(landing_astronaut + 0x0C, 0x6000)
+            .expect("set landing OY16");
+        landed
+            .memory
+            .write_word(landing_astronaut + 0x10, 0x00D0)
+            .expect("set landing OYV");
+        landed
+            .memory
+            .write_byte(0xB340, 0x50)
+            .expect("set landing ALTTBL altitude");
+
+        let landing = landed
+            .red_label_step_falling_astronaut_current_process(false)
+            .expect("step landing AFALL");
+        assert!(matches!(
+            landing,
+            RedLabelFallingAstronautStep::Landed {
+                process_address,
+                object_address,
+                score_routine_address,
+                ..
+            } if process_address == landing_process
+                && object_address == landing_astronaut
+                && score_routine_address == red_label_routine_address("P250")
+                    .expect("P250 address")
+        ));
+        assert_eq!(
+            landed.red_label_ram_range(landing_astronaut + 0x06..landing_astronaut + 0x12),
+            Some(
+                &[
+                    0x00, 0x00, 0xED, 0x70, 0x10, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00,
+                ][..],
+            )
+        );
+
+        let mut rescue = ArcadeMachine::new();
+        let rescue_process = schedule_support_process(&mut rescue, "P500");
+        let rescue_astronaut = rescue
+            .red_label_init_object_cell(
+                rescue_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("ASTP1")
+                        .expect("ASTP1 address"),
+                    collision_vector_address: red_label_routine_address("ASTKIL")
+                        .expect("ASTKIL address"),
+                    scanner_color: 0x1111,
+                },
+            )
+            .expect("init rescue astronaut")
+            .object_address;
+        rescue
+            .memory
+            .write_word(rescue_process + 0x07, rescue_astronaut)
+            .expect("set P500 PD");
+        rescue
+            .memory
+            .write_word(rescue_astronaut + 0x0A, 0x2100)
+            .expect("set rescue OX16");
+        rescue
+            .memory
+            .write_word(rescue_astronaut + 0x0C, 0x4000)
+            .expect("set rescue OY16");
+        write_ram_bytes(&mut rescue, 0xA0C7, &[0x12, 0x34, 0x56]);
+        rescue
+            .memory
+            .write_byte(0xA08B, 1)
+            .expect("set current player");
+        rescue
+            .memory
+            .write_word(0xA08D, 0xA1C2)
+            .expect("set current player record");
+
+        let score = rescue
+            .red_label_start_score_sprite_current_process(RedLabelScoreSpriteKind::Points500)
+            .expect("start P500");
+
+        let RedLabelScoreSpriteStep::StartedSleeping(score) = score else {
+            panic!("expected P500 score sprite");
+        };
+        assert_eq!(score.astronaut_object_address, rescue_astronaut);
+        assert_eq!(score.x_velocity, 0x1234);
+        assert_eq!(score.x16, 0x2100);
+        assert_eq!(score.y16, 0x5800);
+        assert_eq!(rescue.snapshot().scores.player_one, 500);
+    }
+
+    #[test]
     fn player_restore_runs_tieres_tiest_tie_branch() {
         let mut machine = ArcadeMachine::new();
         let _process = machine
