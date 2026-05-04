@@ -647,8 +647,10 @@ This file records behavior that must not be guessed in arcade-core code.
   video RAM through the native cabinet-frame scaler without a synthetic
   scaffold fallback, with native visible pixel-nibble checksum fixtures for the
   first `AMODES` / `LOGO` attract slice, source `SCORE` score/replay HUD
-  refresh paths, and a live IRQ scanline frame; live playing frames now run
-  upright `IRQ` and
+  refresh paths, and a live IRQ scanline frame. Source-native video fixture
+  coverage now also locks exact pixel checksums and coarse visible-shape
+  signatures for boot, attract, start, gameplay, death, high-score, and
+  operator/AUDITG frames; live playing frames now run upright `IRQ` and
   `IRQHK`-selected flipped `IRQB` video passes through the source `VERTCT` /
   `IFLG` scheduler, including map writes, timer/watchdog side effects, palette
   copy, translated `PLAYER`, `STOUT`, upper/lower `OPROC` / `PRDISP` bands,

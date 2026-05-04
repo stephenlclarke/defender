@@ -1384,8 +1384,9 @@ Steps:
 - [x] DC-12.2 Implement HUD, score fields, lives, smart-bomb icons, scanner,
   text, game-over, high-score, initials, and attract screens from source.
   Completed: `2026-05-04 23:12:31 BST`
-- [ ] DC-12.3 Add pixel checksum and perceptual diff fixtures for boot, attract,
+- [x] DC-12.3 Add pixel checksum and perceptual diff fixtures for boot, attract,
   start, gameplay, death, high-score, and operator frames.
+  Completed: `2026-05-04 23:23:09 BST`
 - [ ] DC-12.4 Switch live mode from `render_scaffold` to `render_cabinet_frame`
   only after fixture proof.
 - [ ] DC-12.5 Remove or regenerate archived prototype visual assets from
@@ -1426,6 +1427,24 @@ Work log:
   --all-targets`, and `cargo test score_current_player --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777932776615679`
+- `2026-05-04 23:13:23 BST` Started `DC-12.3`: adding deterministic native
+  video checksum and coarse visual-signature fixtures for boot, attract, start,
+  gameplay, death, high-score, and operator frames without checking external
+  ROM or MAME golden captures into the repository.
+- `2026-05-04 23:23:09 BST` Completed `DC-12.3`: added source-native video
+  fixture signatures in `src/machine.rs` for boot, attract, start, gameplay,
+  death, and high-score frames, plus a `src/board.rs` operator/AUDITG fixture.
+  Each fixture locks exact native pixel data with CRC-32 and a coarse
+  visible-shape signature with nonzero-pixel bounds so later refactors can
+  prove the same frame output without storing external captures. Updated
+  `SPEC.md` and `docs/fidelity/gaps.md` to record that these source-native
+  fixtures exist while MAME-derived golden pixel proof remains open. Validation
+  passed with `cargo test native_video --all-targets`, `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`,
+  `markdownlint PLAN.md SPEC.md docs/fidelity/gaps.md`, and
+  `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777933418941519`
 
 ## Phase 6: Sound Board And Audio
 

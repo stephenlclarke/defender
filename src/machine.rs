@@ -26460,7 +26460,7 @@ mod tests {
             RedLabelTerrainOutput, RedLabelTerrainTablesInit, RedLabelThrustProcessStep,
             RedLabelThrustTableInit, RedLabelTieBombStart, RedLabelTieProcessStep,
             RedLabelUfoProcessStep, RedLabelUfoStart, RedLabelUfoVelocityUpdate, RedLabelWaveDelta,
-            RedLabelWaveParameters,
+            RedLabelWaveParameters, VISIBLE_HEIGHT, VISIBLE_WIDTH,
         },
         red_label::{Facing, Fixed16, RandState, rmax},
         red_label_memory::{red_label_linked_lists, red_label_ram_layout},
@@ -26673,6 +26673,103 @@ mod tests {
                 .red_label_ram_range(range)
                 .expect("red-label RAM range should be valid"),
         )
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct NativeVideoBounds {
+        min_x: u16,
+        min_y: u16,
+        max_x: u16,
+        max_y: u16,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct NativeVideoFixtureSignature {
+        pixel_nibbles_crc32: u32,
+        rgba_crc32: u32,
+        perceptual_crc32: u32,
+        nonzero_nibbles: usize,
+        bounds: Option<NativeVideoBounds>,
+    }
+
+    fn native_video_fixture_signature(machine: &mut ArcadeMachine) -> NativeVideoFixtureSignature {
+        machine
+            .red_label_copy_color_mapping_to_palette_ram()
+            .expect("copy PCRAM to palette RAM before native frame signature");
+        let visible_nibbles = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("native pixel-nibble frame");
+        assert_eq!(
+            visible_nibbles.len(),
+            usize::from(VISIBLE_WIDTH) * usize::from(VISIBLE_HEIGHT)
+        );
+        let visible = machine
+            .red_label_visible_rgba_image()
+            .expect("native RGBA frame");
+        assert_eq!(visible.width, u32::from(VISIBLE_WIDTH));
+        assert_eq!(visible.height, u32::from(VISIBLE_HEIGHT));
+
+        NativeVideoFixtureSignature {
+            pixel_nibbles_crc32: crc32(&visible_nibbles),
+            rgba_crc32: crc32(&visible.pixels),
+            perceptual_crc32: native_video_perceptual_crc32(&visible_nibbles),
+            nonzero_nibbles: visible_nibbles
+                .iter()
+                .filter(|nibble| **nibble != 0)
+                .count(),
+            bounds: native_video_nibble_bounds(&visible_nibbles),
+        }
+    }
+
+    fn native_video_perceptual_crc32(visible_nibbles: &[u8]) -> u32 {
+        const COARSE_WIDTH: usize = 16;
+        const COARSE_HEIGHT: usize = 12;
+        const CHANNELS_PER_BUCKET: usize = 2;
+
+        let mut buckets = [0u8; COARSE_WIDTH * COARSE_HEIGHT * CHANNELS_PER_BUCKET];
+        let width = usize::from(VISIBLE_WIDTH);
+        let height = usize::from(VISIBLE_HEIGHT);
+        for y in 0..height {
+            for x in 0..width {
+                let nibble = visible_nibbles[y * width + x];
+                if nibble == 0 {
+                    continue;
+                }
+                let bucket_x = x * COARSE_WIDTH / width;
+                let bucket_y = y * COARSE_HEIGHT / height;
+                let bucket = (bucket_y * COARSE_WIDTH + bucket_x) * CHANNELS_PER_BUCKET;
+                buckets[bucket] = buckets[bucket].saturating_add(1);
+                buckets[bucket + 1] = buckets[bucket + 1].wrapping_add(nibble);
+            }
+        }
+        crc32(&buckets)
+    }
+
+    fn native_video_nibble_bounds(visible_nibbles: &[u8]) -> Option<NativeVideoBounds> {
+        let width = usize::from(VISIBLE_WIDTH);
+        let mut bounds: Option<NativeVideoBounds> = None;
+        for (index, nibble) in visible_nibbles.iter().copied().enumerate() {
+            if nibble == 0 {
+                continue;
+            }
+            let x = u16::try_from(index % width).expect("visible x fits u16");
+            let y = u16::try_from(index / width).expect("visible y fits u16");
+            bounds = Some(match bounds {
+                Some(bounds) => NativeVideoBounds {
+                    min_x: bounds.min_x.min(x),
+                    min_y: bounds.min_y.min(y),
+                    max_x: bounds.max_x.max(x),
+                    max_y: bounds.max_y.max(y),
+                },
+                None => NativeVideoBounds {
+                    min_x: x,
+                    min_y: y,
+                    max_x: x,
+                    max_y: y,
+                },
+            });
+        }
+        bounds
     }
 
     fn zero_bytes(range: std::ops::Range<u16>) -> Vec<u8> {
@@ -57454,6 +57551,312 @@ mod tests {
         assert_ne!(*machine.red_label_palette_ram(), palette_before);
         assert_eq!(machine.red_label_palette_ram(), &palette_source);
         assert_eq!(board.palette_ram, *machine.red_label_palette_ram());
+    }
+
+    #[test]
+    fn native_video_fixture_matrix_locks_key_frame_checksums_and_perceptual_shapes() {
+        let fixtures = [
+            ("boot", boot_native_video_fixture_signature()),
+            ("attract", attract_native_video_fixture_signature()),
+            ("start", start_native_video_fixture_signature()),
+            ("gameplay", gameplay_native_video_fixture_signature()),
+            ("death", death_native_video_fixture_signature()),
+            ("high_score", high_score_native_video_fixture_signature()),
+        ];
+
+        assert_eq!(
+            fixtures,
+            [
+                (
+                    "boot",
+                    NativeVideoFixtureSignature {
+                        pixel_nibbles_crc32: 0x9067_8703,
+                        rgba_crc32: 0x294B_1DDA,
+                        perceptual_crc32: 0x1C4B_9B58,
+                        nonzero_nibbles: 65_627,
+                        bounds: Some(NativeVideoBounds {
+                            min_x: 0,
+                            min_y: 0,
+                            max_x: 291,
+                            max_y: 239,
+                        }),
+                    },
+                ),
+                (
+                    "attract",
+                    NativeVideoFixtureSignature {
+                        pixel_nibbles_crc32: 0xB08F_FE8A,
+                        rgba_crc32: 0x926E_A52A,
+                        perceptual_crc32: 0xCE5B_E7AD,
+                        nonzero_nibbles: 5,
+                        bounds: Some(NativeVideoBounds {
+                            min_x: 104,
+                            min_y: 57,
+                            max_x: 104,
+                            max_y: 61,
+                        }),
+                    },
+                ),
+                (
+                    "start",
+                    NativeVideoFixtureSignature {
+                        pixel_nibbles_crc32: 0x7342_397A,
+                        rgba_crc32: 0x1986_42B3,
+                        perceptual_crc32: 0x5C44_2BC3,
+                        nonzero_nibbles: 1_021,
+                        bounds: Some(NativeVideoBounds {
+                            min_x: 0,
+                            min_y: 0,
+                            max_x: 291,
+                            max_y: 34,
+                        }),
+                    },
+                ),
+                (
+                    "gameplay",
+                    NativeVideoFixtureSignature {
+                        pixel_nibbles_crc32: 0xB0E3_5EDE,
+                        rgba_crc32: 0x9EB5_79C8,
+                        perceptual_crc32: 0xAA52_2C63,
+                        nonzero_nibbles: 364,
+                        bounds: Some(NativeVideoBounds {
+                            min_x: 0,
+                            min_y: 40,
+                            max_x: 291,
+                            max_y: 220,
+                        }),
+                    },
+                ),
+                (
+                    "death",
+                    NativeVideoFixtureSignature {
+                        pixel_nibbles_crc32: 0x56A7_3C25,
+                        rgba_crc32: 0x7656_F140,
+                        perceptual_crc32: 0x7829_5CC2,
+                        nonzero_nibbles: 44,
+                        bounds: Some(NativeVideoBounds {
+                            min_x: 148,
+                            min_y: 89,
+                            max_x: 162,
+                            max_y: 94,
+                        }),
+                    },
+                ),
+                (
+                    "high_score",
+                    NativeVideoFixtureSignature {
+                        pixel_nibbles_crc32: 0xFFC9_5732,
+                        rgba_crc32: 0xD8F1_1D8A,
+                        perceptual_crc32: 0xF62E_DF5D,
+                        nonzero_nibbles: 2_184,
+                        bounds: Some(NativeVideoBounds {
+                            min_x: 28,
+                            min_y: 49,
+                            max_x: 271,
+                            max_y: 177,
+                        }),
+                    },
+                ),
+            ]
+        );
+    }
+
+    fn boot_native_video_fixture_signature() -> NativeVideoFixtureSignature {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        let before = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("boot pre-frame nibbles");
+
+        let before_crc = crc32(&before);
+        let mut after_crc = before_crc;
+        for _ in 0..=240 {
+            machine.step(CabinetInput::NONE);
+            let after = machine
+                .red_label_visible_pixel_nibbles()
+                .expect("boot post-frame nibbles");
+            after_crc = crc32(&after);
+            if after_crc != before_crc {
+                break;
+            }
+        }
+        assert_ne!(after_crc, before_crc);
+        native_video_fixture_signature(&mut machine)
+    }
+
+    fn attract_native_video_fixture_signature() -> NativeVideoFixtureSignature {
+        let mut machine = ArcadeMachine::new();
+        let amodes_address = red_label_routine_address("AMODES").expect("AMODES address");
+        let logo_address = red_label_routine_address("LOGO").expect("LOGO address");
+        machine
+            .red_label_make_process(amodes_address, RED_LABEL_ATTRACT_PROCESS_TYPE)
+            .expect("make AMODES process");
+        let before = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("attract pre-frame nibbles");
+
+        let page = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODES")
+            .expect("scheduled AMODES");
+        assert!(matches!(
+            page,
+            RedLabelProcessDispatch::AttractWilliamsPage(_)
+        ));
+        let logo = machine
+            .memory
+            .dispatch_translated_process_routine(logo_address)
+            .expect("dispatch LOGO");
+        assert!(matches!(
+            logo,
+            RedLabelProcessDispatch::AttractLogo(RedLabelAttractLogo {
+                initialized: true,
+                ..
+            })
+        ));
+
+        let after = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("attract post-frame nibbles");
+        assert_ne!(crc32(&after), crc32(&before));
+        native_video_fixture_signature(&mut machine)
+    }
+
+    fn start_native_video_fixture_signature() -> NativeVideoFixtureSignature {
+        let mut machine = ArcadeMachine::new();
+        insert_live_coin(&mut machine);
+        let before = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("start pre-frame nibbles");
+
+        let output = machine.step(CabinetInput {
+            start_one: true,
+            ..CabinetInput::NONE
+        });
+        assert!(
+            output
+                .events()
+                .any(|event| event == MachineEvent::GameStarted)
+        );
+        let display = machine.red_label_top_display().expect("TDISP start frame");
+        assert!(!display.score_transfers.is_empty());
+        assert!(!display.laser_displays.is_empty());
+        assert!(!display.smart_bomb_displays.is_empty());
+
+        let after = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("start post-frame nibbles");
+        assert_ne!(crc32(&after), crc32(&before));
+        native_video_fixture_signature(&mut machine)
+    }
+
+    fn gameplay_native_video_fixture_signature() -> NativeVideoFixtureSignature {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        let object = setup_active_display_object(&mut machine, "BMBP1");
+        machine
+            .memory
+            .write_word(object + 0x0A, 0x1420)
+            .expect("set object OX16");
+        machine
+            .memory
+            .write_word(object + 0x0C, 0x8055)
+            .expect("set object OY16");
+        machine
+            .memory
+            .write_word(object + 0x0E, 0x0100)
+            .expect("set object OXV");
+        machine
+            .memory
+            .write_word(object + 0x10, 0x0200)
+            .expect("set object OYV");
+        let before = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("gameplay pre-frame nibbles");
+
+        let frame = machine
+            .red_label_run_normal_live_irq_video_frame()
+            .expect("gameplay IRQ frame");
+
+        assert_eq!(
+            frame.upper_object_band.phase,
+            RedLabelIrqObjectBandPhase::NormalUpper
+        );
+        assert_eq!(
+            frame.lower_object_band.phase,
+            RedLabelIrqObjectBandPhase::NormalLower
+        );
+        let after = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("gameplay post-frame nibbles");
+        assert_ne!(crc32(&after), crc32(&before));
+        native_video_fixture_signature(&mut machine)
+    }
+
+    fn death_native_video_fixture_signature() -> NativeVideoFixtureSignature {
+        let mut machine = ArcadeMachine::new();
+        schedule_player_death_process(&mut machine);
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine
+            .memory
+            .write_word(0xA0BB, 0x0300)
+            .expect("set NPLAD");
+        machine
+            .memory
+            .write_word(0xA0C1, 0x5060)
+            .expect("set NPLAXC");
+        let before = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("death pre-frame nibbles");
+
+        machine
+            .red_label_start_player_death_current_process()
+            .expect("PLEND entry");
+        let glow = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("PDTH2").expect("PDTH2 address"),
+            )
+            .expect("PDTH2 glow frame");
+        assert!(matches!(
+            glow,
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::GlowWrittenSleeping {
+                player_screen_address: 0x5060,
+                ..
+            })
+        ));
+
+        let after = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("death post-frame nibbles");
+        assert_ne!(crc32(&after), crc32(&before));
+        native_video_fixture_signature(&mut machine)
+    }
+
+    fn high_score_native_video_fixture_signature() -> NativeVideoFixtureSignature {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = 50_000;
+        machine.restore(snapshot);
+        let before = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("high-score pre-frame nibbles");
+
+        let output = machine.step_with_typed_chars(CabinetInput::NONE, &['q']);
+
+        assert_eq!(output.snapshot.phase, GamePhase::HighScoreEntry);
+        assert_eq!(
+            output
+                .snapshot
+                .high_score_entry
+                .expect("entry active")
+                .initials,
+            [b'Q', b' ', b' ']
+        );
+        let after = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("high-score post-frame nibbles");
+        assert_ne!(crc32(&after), crc32(&before));
+        native_video_fixture_signature(&mut machine)
     }
 
     #[test]

@@ -433,10 +433,10 @@ Additional gaps and corrections found during this review:
   depends on user-supplied ROMs and local MAME to prove golden equivalence.
 - Remaining open gaps include the post-INIT20 ATTR/executive scheduler cadence
   from `attract_boot` frame 733 onward, full frame/cycle integration,
-  end-to-end golden-trace proof for translated session/operator paths, pixel
-  golden fixtures, full sound-board cycle/waveform scheduling, audio command
-  and waveform fixtures, and removal or regeneration of archived prototype
-  visual/audio assets.
+  end-to-end golden-trace proof for translated session/operator paths,
+  MAME-derived pixel golden fixtures, full sound-board cycle/waveform
+  scheduling, audio command and waveform fixtures, and removal or regeneration
+  of archived prototype visual/audio assets.
 - The prior local implementation notes listed "Fix Mutant score to `150`" as
   future work even though `assets/red-label/scores.tsv` and unit tests already
   enforce it. The current contract is to keep that regression covered through
@@ -1112,9 +1112,12 @@ Additional gaps and corrections found during this review:
   first gate, every fix must add a narrow source-visible mutation test at the
   responsible routine boundary, and local reference tests should be unignored
   only after the corresponding exact fixture is stable.
-- There are no object-table, shell-table, or pixel-frame golden tests against
-  attract/gameplay references, though the trace format can now carry raw table
-  and native frame CRC-32 values.
+- Source-native native-video fixtures now lock exact pixel checksums and coarse
+  visible-shape signatures for boot, attract, start, gameplay, death,
+  high-score, and operator/AUDITG frames. There are still no object-table,
+  shell-table, or pixel-frame golden tests against MAME attract/gameplay
+  references, though the trace format can carry raw table and native frame
+  CRC-32 values.
 - There are no audio waveform or command-sequence golden tests.
 - There is no end-to-end MAME golden regression suite for two-player state,
   coin/start flow, operator settings, or cabinet input profiles.

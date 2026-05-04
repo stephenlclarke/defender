@@ -5423,6 +5423,7 @@ mod tests {
             CabinetInput, DEFENDER_IN0_FIRE, DEFENDER_IN0_THRUST, DEFENDER_IN1_ALTITUDE_UP,
             DEFENDER_IN2_COIN_ONE, DEFENDER_IN2_HIGH_SCORE_RESET, DefenderInputPorts,
         },
+        machine::{VISIBLE_HEIGHT, VISIBLE_WIDTH},
         pia::PIA_IRQ1,
         red_label_memory::{
             MemoryMapCpu, RedLabelMemoryMapEntry, red_label_audit_adjustments,
@@ -5437,7 +5438,7 @@ mod tests {
             RED_LABEL_CROM0_OK_COLOR, RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS,
             RedLabelCrom0AdvanceGate, RedLabelCrom0BadRomDisplay, RedLabelCrom0RomStage,
             RedLabelCrom0RomStageStatus, RedLabelCrom0RomStageTarget, RedLabelRomImages,
-            RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile, VerifiedRomSet,
+            RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile, VerifiedRomSet, crc32,
         },
         sound::SoundCommandLatch,
     };
@@ -5525,6 +5526,99 @@ mod tests {
 
         RedLabelRomImages::from_parts_for_test(&rom_set, &regions, &loads)
             .expect("test ROM image should build")
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct OperatorVideoBounds {
+        min_x: u16,
+        min_y: u16,
+        max_x: u16,
+        max_y: u16,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct OperatorVideoFixtureSignature {
+        palette_indices_crc32: u32,
+        rgba_crc32: u32,
+        perceptual_crc32: u32,
+        nonzero_pixels: usize,
+        bounds: Option<OperatorVideoBounds>,
+    }
+
+    fn operator_video_fixture_signature(
+        board: &DefenderMainBoard<'_>,
+    ) -> OperatorVideoFixtureSignature {
+        let palette_indices = board
+            .visible_palette_indices()
+            .expect("operator visible palette-index frame");
+        assert_eq!(
+            palette_indices.len(),
+            usize::from(VISIBLE_WIDTH) * usize::from(VISIBLE_HEIGHT)
+        );
+        let visible = board
+            .visible_rgba_image()
+            .expect("operator visible RGBA frame");
+        assert_eq!(visible.width, u32::from(VISIBLE_WIDTH));
+        assert_eq!(visible.height, u32::from(VISIBLE_HEIGHT));
+
+        OperatorVideoFixtureSignature {
+            palette_indices_crc32: crc32(&palette_indices),
+            rgba_crc32: crc32(&visible.pixels),
+            perceptual_crc32: operator_video_perceptual_crc32(&palette_indices),
+            nonzero_pixels: palette_indices.iter().filter(|index| **index != 0).count(),
+            bounds: operator_video_bounds(&palette_indices),
+        }
+    }
+
+    fn operator_video_perceptual_crc32(palette_indices: &[u8]) -> u32 {
+        const COARSE_WIDTH: usize = 16;
+        const COARSE_HEIGHT: usize = 12;
+        const CHANNELS_PER_BUCKET: usize = 2;
+
+        let mut buckets = [0u8; COARSE_WIDTH * COARSE_HEIGHT * CHANNELS_PER_BUCKET];
+        let width = usize::from(VISIBLE_WIDTH);
+        let height = usize::from(VISIBLE_HEIGHT);
+        for y in 0..height {
+            for x in 0..width {
+                let palette_index = palette_indices[y * width + x];
+                if palette_index == 0 {
+                    continue;
+                }
+                let bucket_x = x * COARSE_WIDTH / width;
+                let bucket_y = y * COARSE_HEIGHT / height;
+                let bucket = (bucket_y * COARSE_WIDTH + bucket_x) * CHANNELS_PER_BUCKET;
+                buckets[bucket] = buckets[bucket].saturating_add(1);
+                buckets[bucket + 1] = buckets[bucket + 1].wrapping_add(palette_index);
+            }
+        }
+        crc32(&buckets)
+    }
+
+    fn operator_video_bounds(palette_indices: &[u8]) -> Option<OperatorVideoBounds> {
+        let width = usize::from(VISIBLE_WIDTH);
+        let mut bounds: Option<OperatorVideoBounds> = None;
+        for (index, palette_index) in palette_indices.iter().copied().enumerate() {
+            if palette_index == 0 {
+                continue;
+            }
+            let x = u16::try_from(index % width).expect("visible x fits u16");
+            let y = u16::try_from(index / width).expect("visible y fits u16");
+            bounds = Some(match bounds {
+                Some(bounds) => OperatorVideoBounds {
+                    min_x: bounds.min_x.min(x),
+                    min_y: bounds.min_y.min(y),
+                    max_x: bounds.max_x.max(x),
+                    max_y: bounds.max_y.max(y),
+                },
+                None => OperatorVideoBounds {
+                    min_x: x,
+                    min_y: y,
+                    max_x: x,
+                    max_y: y,
+                },
+            });
+        }
+        bounds
     }
 
     fn assert_message_glyph_at(
@@ -9208,6 +9302,44 @@ mod tests {
         assert_message_glyph_at(&board, RED_LABEL_AUDIT_TITLE_ADDRESS, 'W');
         assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, 'P');
         assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0], 'P');
+    }
+
+    #[test]
+    fn operator_native_video_fixture_locks_auditg_checksum_and_perceptual_shape() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+        let before = board
+            .visible_palette_indices()
+            .expect("operator pre-frame palette indices");
+
+        let transfer = board
+            .red_label_write_audit_game_adjust_start()
+            .expect("operator AUDITG frame");
+
+        assert_eq!(transfer.screen_clear_end, RED_LABEL_SCREEN_CLEAR_END);
+        assert_message_glyph_at(&board, RED_LABEL_AUDIT_TITLE_ADDRESS, 'W');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, 'P');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0], 'P');
+        let after = board
+            .visible_palette_indices()
+            .expect("operator post-frame palette indices");
+        assert_ne!(crc32(&after), crc32(&before));
+
+        assert_eq!(
+            operator_video_fixture_signature(&board),
+            OperatorVideoFixtureSignature {
+                palette_indices_crc32: 0x365B_565A,
+                rgba_crc32: 0xCDBC_AF4A,
+                perceptual_crc32: 0x2605_B852,
+                nonzero_pixels: 1_613,
+                bounds: Some(OperatorVideoBounds {
+                    min_x: 21,
+                    min_y: 25,
+                    max_x: 285,
+                    max_y: 217,
+                }),
+            }
+        );
     }
 
     #[test]
