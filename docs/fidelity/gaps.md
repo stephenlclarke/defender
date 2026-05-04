@@ -561,11 +561,16 @@ This file records behavior that must not be guessed in arcade-core code.
   decrements `PD`, applies source `WDELT` intra-wall deltas to `ELIST`, and
   sleeps back to `GEX0`; the wave-clear path now runs `GNCIDE` / `PLSAV`,
   enters the shared `BONUS` body with the assembled `GEXBON` return site, and
-  resumes through the translated `PLSTR0` handoff after `BC3`. `GETWV` now
+  resumes through the translated `PLSTRT` / `PLSTR3` handoff after `BC3`.
+  `GETWV` now
   increments `PWAV`, refreshes
   `PENEMY` from
   source-order `WVTAB`, applies CMOS difficulty/ceiling inter-wall `WDELT`
-  updates, and restores `PTARG` on the `GA1+6` restore-wave cadence. `BGI`
+  updates, and restores `PTARG` on the `GA1+6` restore-wave cadence. DC-10
+  source-backed fixtures now cover launch timing, reserve allocation,
+  terrain/scanner mutation, `TERBLO`, `GETWV` / `WDELT`, survivor bonus, and
+  wave-to-wave RAM/list mutations; whole-session MAME trace proof remains open.
+  `BGI`
   now selects bank/map 7 and runs the translated `BGINIT` terrain-table
   generator. DC-08 refactor fixtures now lock the translated `BONUS` / `SCLR1`
   wave-clear death tail, respawn/game-over branches, human rescue, hyperspace,
@@ -581,7 +586,9 @@ This file records behavior that must not be guessed in arcade-core code.
   destroyed-planet `TERBLO` / `TBL3` / `TBL4` behavior are translated.
 - Wave launch uses source-order `WVTAB` / `WDELT` data and translated `GEXEC` /
   `GEX0` pacing to launch `UFOST` baiters and `LANDST` squads from red-label
-  reserve counters.
+  reserve counters. Current source-backed fixtures cover the translated
+  wave/world RAM, process-list, object-list, and terrain/scanner mutations, but
+  not full-session MAME trace equivalence.
 - Schizoid/mutant, UFO/baiter, lander, tie-fighter/bomber, probe/pod,
   mini-swarmer, astronaut, falling-astronaut, score-popup, and terrain-blow
   process slices are translated. End-to-end interaction proof against local

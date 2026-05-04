@@ -701,10 +701,14 @@ Additional gaps and corrections found during this review:
   intra-wall update to `ELIST` every 40 passes, and sleeps back to `GEX0`. The
   wave-clear path now sets `STATUS=$77`, runs `GNCIDE` / `PLSAV`, enters the
   shared `BONUS` body with the assembled `GEXBON` return site, increments
-  `PLAS`, and restarts through the translated `PLSTR0` handoff. The `GETWV`
+  `PLAS`, and runs the translated `PLSTRT` / `PLSTR3` handoff. The `GETWV`
   wave parameter path now increments `PWAV`, refreshes `PENEMY` from
   source-order `WVTAB`, applies CMOS difficulty/ceiling inter-wall `WDELT`
-  updates, and restores `PTARG` on the `GA1+6` restore-wave cadence. The
+  updates, and restores `PTARG` on the `GA1+6` restore-wave cadence. Focused
+  fixtures now lock wave launch timing, terrain/scanner mutation, `TERBLO`,
+  `GETWV` / `WDELT`, survivor-bonus, and wave-to-wave RAM/list behavior for
+  later refactors while keeping end-to-end MAME trace proof as a documented
+  fidelity gap. The
   start-flow foundation now extracts the `CREDIT`,
   `CUNITS`, and `BUNITS` base-page fields, translates exact `FPLAY` free-play
   credit seeding from the core CMOS image, and translates the RAM-visible
@@ -1566,7 +1570,9 @@ end-to-end MAME trace acceptance remain in later phases.
    `TERBLO`, scanner mini-terrain `MTERR`, `TDATA`, `ALINIT`, `BGINIT`,
    RAM-level `BGOUT`, and `BGERAS`.
 2. Done: wave setup and launch use red-label `WVTAB`, `WDELT`, `GEXEC` /
-   `GEX0`, `UFOST`, and `LANDST` paths instead of hand-placed opener slots.
+   `GEX0`, `UFOST`, and `LANDST` paths instead of hand-placed opener slots,
+   with source-backed fixtures covering timing, reserve allocation, and
+   wave-to-wave RAM/list mutations.
 3. Done: Landers and human abduction/carry/release/catch/fall behavior are
    translated.
 4. Done: Mutants are represented by the translated `SCZ` process family,
@@ -1579,8 +1585,8 @@ end-to-end MAME trace acceptance remain in later phases.
    lifetime process behavior are translated through `UFOST` / `UFOLP`.
 8. Done: shell rendering/output and collision behavior for the translated
    families uses source shell cells and `BMBOUT` / `FBOUT` / `BKIL`.
-9. Done at unit level for the translated enemy subsystems; end-to-end MAME
-   trace proof remains in the final fidelity phase.
+9. Done at unit level for the translated world/wave/enemy subsystems;
+   end-to-end MAME trace proof remains in the final fidelity phase.
 10. Done: Phase 5 uses red-label routines/tables and does not port archived
     `oldsrc/src/game.rs` behavior.
 

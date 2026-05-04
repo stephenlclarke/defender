@@ -39742,9 +39742,9 @@ mod tests {
         assert_eq!(lander.requested_count, Some(1));
         assert_eq!(lander.reserve_count_after, Some(0));
         let started = lander.started.expect("LANDST fallback");
-        assert_eq!(started.requested_count, 2);
+        assert_eq!(started.requested_count, 1);
         assert!(started.landers.is_empty());
-        assert_eq!(started.schizoid_fallback.len(), 2);
+        assert_eq!(started.schizoid_fallback.len(), 1);
         assert_eq!(run.star_time.previous_delta_counter, 40);
         assert_eq!(run.star_time.delta_counter, 39);
         assert_eq!(
@@ -39752,7 +39752,7 @@ mod tests {
             red_label_routine_address("GEX0").expect("GEX0 address")
         );
         assert_eq!(machine.red_label_ram_range(0xA0FB..0xA0FC), Some(&[0][..]));
-        assert_eq!(machine.red_label_ram_range(0xA115..0xA116), Some(&[2][..]));
+        assert_eq!(machine.red_label_ram_range(0xA115..0xA116), Some(&[1][..]));
         assert_eq!(
             machine.red_label_ram_range(0xA117..0xA119),
             Some(&[5, 1][..])
@@ -40326,6 +40326,167 @@ mod tests {
             machine.red_label_ram_range(process + 0x0D..process + 0x0F),
             Some(&[0xDD, 0x02][..])
         );
+    }
+
+    #[test]
+    fn wave_to_wave_regression_fixture_locks_ram_and_process_object_lists() {
+        let mut wave = ArcadeMachine::new();
+        let process = schedule_game_exec_process(&mut wave, "GEX0");
+        let victim = wave
+            .red_label_make_process(0x1234, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make DC-10.4 victim process")
+            .process_address;
+        wave.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        wave.memory.write_byte(0xA0FA, 0).expect("clear ASTCNT");
+        wave.memory.write_byte(0xA0FB, 0).expect("clear LNDRES");
+        wave.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        wave.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
+        wave.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        wave.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        wave.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        wave.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        wave.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        wave.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        wave.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        wave.memory.write_byte(0xA1C9, 2).expect("set PLAS");
+        wave.memory.write_byte(0xA1CA, 3).expect("set PWAV");
+        let player_wave = red_label_ram_snapshot(&wave, "DC-10.4 player wave RAM", 0xA1C9..0xA1CB);
+        let free_process_head =
+            red_label_ram_snapshot(&wave, "DC-10.4 free process head", 0xA061..0xA063);
+        let victim_process = red_label_process_cell_snapshot(&wave, victim);
+
+        let exec = wave
+            .red_label_step_game_exec_current_process()
+            .expect("DC-10.4 wave clear");
+        let RedLabelGameExec::WaveClearBonusSleeping(clear) = exec else {
+            panic!("expected DC-10.4 wave-clear bonus branch");
+        };
+
+        assert_eq!(clear.process_address, process);
+        assert_eq!(clear.enemy_total, 0);
+        assert_eq!(clear.genocide.killed_processes.len(), 1);
+        assert_eq!(
+            clear.genocide.killed_processes[0].killed_process_address,
+            victim
+        );
+        assert!(matches!(
+            clear.bonus,
+            RedLabelPlayerDeath::PostExplosionBonusWaveAdvanceSleeping {
+                process_address,
+                previous_astronaut_counter: 0,
+                wave: RedLabelWaveParameters {
+                    previous_wave: 3,
+                    wave: 4,
+                    ..
+                },
+                wakeup_address: 0xDE79,
+                ..
+            } if process_address == process
+        ));
+        player_wave.assert_current_changed_to(&wave, &[2, 4]);
+        free_process_head.assert_current_changed(&wave);
+        victim_process.assert_current_changed(&wave);
+        assert_eq!(
+            wave.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xDE, 0x79, 0x80][..])
+        );
+
+        let restart = wave
+            .red_label_finish_game_exec_wave_clear_current_process()
+            .expect("DC-10.4 GEXBON restart");
+        let RedLabelGameExec::WaveClearRestart(restart) = restart else {
+            panic!("expected DC-10.4 wave-clear restart");
+        };
+        assert_eq!(restart.process_address, process);
+        assert_eq!(restart.lives_before, 2);
+        assert_eq!(restart.lives_after, 3);
+        assert!(matches!(
+            restart.player_start,
+            RedLabelPlayerStart::RuntimeProcessCreated {
+                process_address,
+                runtime_process: RedLabelCreatedProcess {
+                    process_address: runtime_process_address,
+                    routine_address,
+                    process_type: RED_LABEL_SYSTEM_PROCESS_TYPE,
+                    class: RedLabelProcessClass::Regular,
+                },
+                ..
+            } if process_address == process
+                && runtime_process_address == process
+                && routine_address == red_label_routine_address("PLSTR3").expect("PLSTR3 address")
+        ));
+        assert_eq!(
+            wave.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&[0xD9, 0x50][..])
+        );
+
+        let mut restore = ArcadeMachine::new();
+        restore
+            .red_label_make_process(
+                red_label_routine_address("PLS1").expect("PLS1 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make DC-10.4 PLS1 process");
+        restore
+            .step_red_label_process_scheduler()
+            .expect("schedule DC-10.4 PLS1");
+        restore
+            .memory
+            .write_word(0xA08D, 0xA1C2)
+            .expect("set restore PLRX");
+        restore
+            .memory
+            .write_byte(0xA1CC, 2)
+            .expect("set restore PTARG");
+        restore
+            .memory
+            .write_byte(0xA0DF, 0x12)
+            .expect("set restore SEED");
+        restore
+            .memory
+            .write_byte(0xA0E0, 0x20)
+            .expect("set restore HSEED");
+        restore
+            .memory
+            .write_byte(0xA0E1, 0x40)
+            .expect("set restore LSEED");
+        write_ram_bytes(&mut restore, 0xA1CD, &[0; 0x17]);
+        for address in 0xA112..0xA11A {
+            restore
+                .memory
+                .write_byte(address, 0xFE)
+                .expect("dirty restore active count byte");
+        }
+        let free_object_head =
+            red_label_ram_snapshot(&restore, "DC-10.4 free object head", 0xA067..0xA069);
+        let target_list =
+            red_label_ram_snapshot(&restore, "DC-10.4 target list head", 0xA11A..0xA122);
+        let active_counts =
+            red_label_ram_snapshot(&restore, "DC-10.4 active count bytes", 0xA112..0xA11A);
+
+        let finish = restore
+            .red_label_finish_player_start_current_process()
+            .expect("DC-10.4 PLS1 restore");
+        let RedLabelPlayerStart::GameExecReady {
+            restore: restored, ..
+        } = finish
+        else {
+            panic!("expected DC-10.4 game exec ready restore");
+        };
+
+        assert_eq!(restored.target_count, 2);
+        assert_eq!(restored.target_objects.len(), 2);
+        assert_eq!(
+            restored
+                .target_objects
+                .iter()
+                .map(|object| object.object_address)
+                .collect::<Vec<_>>(),
+            vec![0xA23C, 0xA253]
+        );
+        free_object_head.assert_current_changed(&restore);
+        target_list.assert_current_changed_to(&restore, &[0xA2, 0x3C, 0xA2, 0x53, 0, 0, 0, 0]);
+        active_counts.assert_current_changed_to(&restore, &[0; 8]);
     }
 
     #[test]

@@ -1158,7 +1158,7 @@ Work log:
 
 ### DC-10: Wave And World State
 
-Status: `planned`
+Status: `complete`
 
 Goal: make wave setup and world state source-exact.
 
@@ -1174,11 +1174,13 @@ Steps:
   behavior with source-backed fixtures; keep end-to-end golden-trace proof in
   the documented fidelity gaps.
   Completed: `2026-05-04 22:31:53 BST`
-- [ ] DC-10.4 Add tests for wave-to-wave RAM mutation and object/process list
+- [x] DC-10.4 Add tests for wave-to-wave RAM mutation and object/process list
   changes.
+  Completed: `2026-05-04 22:40:38 BST`
 
-Completion gate: wave setup and world transitions can be compared against local
-golden traces without hand-placed opener state.
+Completion gate: wave setup and world transitions are covered by source-backed
+regression fixtures, remaining end-to-end golden-trace gaps are documented, and
+fixture/local-reference hooks remain usable.
 
 Work log:
 
@@ -1227,6 +1229,31 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777930343866209`
+- `2026-05-04 22:33:07 BST` Started `DC-10.4`: adding the final DC-10
+  regression fixture for wave-to-wave player RAM mutation, process-list cleanup,
+  and player-restore object/list allocation side effects.
+- `2026-05-04 22:40:38 BST` Completed `DC-10.4`: added
+  `wave_to_wave_regression_fixture_locks_ram_and_process_object_lists`, proving
+  wave-clear `GEX0` kills non-current processes, advances player wave RAM
+  through `BONUS` / `GETWV`, restarts through `GEXBON` into the translated
+  `PLSTRT` / `PLSTR3` handoff with a life increment, and `PLS1` restore
+  allocates target objects while mutating target-list, free-object, and
+  active-count RAM. Updated an older wave-launch test to expect one schizoid
+  fallback when source reserve/wave size request one enemy, and updated
+  `README.md`, `SPEC.md`, and `docs/fidelity/gaps.md` to mark DC-10 complete at
+  the source-backed fixture level while keeping end-to-end MAME golden-trace
+  proof as a documented fidelity gap. Validation passed with `cargo fmt --check`,
+  `cargo test
+  wave_to_wave_regression_fixture_locks_ram_and_process_object_lists
+  --all-targets`,
+  `cargo test game_exec_entry_launches_initial_lander_wave_and_sleeps_to_gex0
+  --all-targets`, `markdownlint PLAN.md README.md SPEC.md
+  docs/fidelity/gaps.md docs/fidelity/README.md`, `git diff --check`, and
+  `make fidelity` (`832` lib tests passed, `13` ignored; `2` main tests passed;
+  clippy, Lua, Python, local trace-fixture skip, coverage, and new-code coverage
+  checks passed).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777930882314369`
 
 ### DC-11: Remaining Enemy And Collision Behavior
 

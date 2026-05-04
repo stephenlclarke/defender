@@ -470,11 +470,14 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   `WDELT` intra-wall deltas to `ELIST` every 40 passes, and sleeps back to
   `GEX0`. The wave-clear path now sets `STATUS=$77`, runs `GNCIDE` / `PLSAV`,
   enters the shared `BONUS` body with the assembled `GEXBON` return site,
-  increments `PLAS`, and restarts through the translated `PLSTR0` handoff. The
+  increments `PLAS`, and runs the translated `PLSTRT` / `PLSTR3` handoff. The
   `GETWV` wave parameter path now increments `PWAV`, refreshes `PENEMY` from
-  source-order
-  `WVTAB`, applies CMOS difficulty/ceiling inter-wall `WDELT` updates, and
-  restores `PTARG` on the `GA1+6` restore-wave cadence. The start-flow
+  source-order `WVTAB`, applies CMOS difficulty/ceiling inter-wall `WDELT`
+  updates, and restores `PTARG` on the `GA1+6` restore-wave cadence. Focused
+  fixtures now lock the wave launch, terrain/scanner, `TERBLO`, `GETWV` /
+  `WDELT`, survivor-bonus, and wave-to-wave RAM/list mutations for later
+  refactors; end-to-end MAME trace proof remains a later fidelity phase. The
+  start-flow
   foundation now extracts `CREDIT`,
   `CUNITS`, and `BUNITS`; implements exact `FPLAY` free-play credit seeding;
   and translates the RAM-visible `START` power-page gate, first-game player
