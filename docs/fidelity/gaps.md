@@ -195,9 +195,11 @@ This file records behavior that must not be guessed in arcade-core code.
   dispatch `AuditGate` into the source-visible `AUDITG` entry screen, and
   step/read/format/mutate and video-transfer the source `AUDITG` / `MSGAUD`
   table rows and its post-display debounce countdown as one deterministic cycle
-  plus the post-`PWRUP` outer frame path, but CPU IRQ scheduling, exact Williams
-  power-on RAM contents, physical advance-switch timing, physical lamp timing,
-  default live CMOS path policy,
+  plus the post-`PWRUP` outer frame path. `ArcadeMachine::step` now samples the
+  current main-board-facing PIA input-port bytes, RAM/CMOS/palette state,
+  watchdog reset count, and modeled video-counter value, but CPU IRQ
+  scheduling, exact Williams power-on RAM contents, physical advance-switch
+  timing, physical lamp timing, default live CMOS path policy,
   screen scanline scheduling, watchdog timing/reset side effects,
   palette/rendering timing side effects, decoder PROM behavior, and complete
   DAC sample output scheduling are not modeled.
@@ -218,7 +220,8 @@ This file records behavior that must not be guessed in arcade-core code.
   projects the cached snapshot back onto source-owned red-label RAM for
   credits, current-player pointer, player scores, wave/lives/smart bombs,
   player motion, facing, and RNG seeds, and full save-state restore includes
-  the RAM/CMOS/palette/hardware-map image plus trace scheduler state.
+  the RAM/CMOS/palette/hardware-map image, main-board input/watchdog/video
+  counter state, and trace scheduler state.
   The executive scheduler now keeps walking `DISP` in the same source pass after
   process `SLEEP` and `SUCIDE` tails resume through `DISP2`.
 - `--verify-roms PATH` can validate and map a local red-label ROM set into the

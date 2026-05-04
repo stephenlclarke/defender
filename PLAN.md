@@ -493,8 +493,9 @@ Steps:
 - [x] DC-05.1 Model exact power-on RAM, reset path, ROM/RAM/CMOS diagnostic
   progression, and start-ready state from red-label source or MAME traces.
   Completed: `2026-05-04 18:19:19 BST`
-- [ ] DC-05.2 Wire the main-board RAM, CMOS, PIA, palette, watchdog, and video
+- [x] DC-05.2 Wire the main-board RAM, CMOS, PIA, palette, watchdog, and video
   counter surfaces into `ArcadeMachine::step`.
+  Completed: `2026-05-04 18:28:29 BST`
 - [ ] DC-05.3 Wire the sound-command latch and sound-board PIA boundary into the
   frame output path without high-level cue shortcuts.
 - [ ] DC-05.4 Add mutation tests for every board and machine byte range touched.
@@ -505,6 +506,39 @@ on trace-only scheduling shortcuts.
 
 Work log:
 
+- `2026-05-04 18:21:16 BST` Started `DC-05.2`: wiring the existing
+  MAME-modeled main-board RAM, CMOS, PIA, palette, watchdog, and video-counter
+  surfaces into the `ArcadeMachine::step` path without changing gameplay
+  semantics yet, so later exact CPU/IRQ work can replace the remaining
+  high-level scheduler safely.
+- `2026-05-04 18:28:29 BST` Completed `DC-05.2`: added a
+  `RedLabelMainBoardSnapshot` surface and step-level main-board state for PIA
+  input-port bytes, RAM/CMOS CRCs, palette RAM, hardware-map state, watchdog
+  reset recognition, and the modeled video-counter sample. `ArcadeMachine::step`
+  now refreshes the PIA input-port surface every frame and records watchdog and
+  video-counter effects from the translated live IRQ video frame while
+  preserving existing gameplay semantics. Save-state restore now includes the
+  main-board input/watchdog/video-counter state. Added focused tests for the
+  input/memory/palette snapshot, live IRQ watchdog/video-counter recording, and
+  save-state restoration of the new surface. Updated `SPEC.md` and
+  `docs/fidelity/gaps.md` to state that this is a board-facing snapshot, not
+  full CPU/IRQ/sound execution. Validation passed with
+  `cargo test step_updates_main_board_input_and_memory_surfaces --all-targets`,
+  `cargo test step_records_live_irq_watchdog_and_video_counter_surface
+  --all-targets`,
+  `cargo test save_state_restore_round_trips_red_label_memory_and_trace_scheduler
+  --all-targets`,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/characterization-tests.md
+  docs/fidelity/local-reference-runs.md
+  docs/fidelity/golden-comparison-results.md assets/red-label/README.md`,
+  `git diff --check`, `cargo fmt --check`, and `make fidelity`.
+  `make fidelity` passed regular tests with 801 passed and 13 known ignored
+  tests, clippy, trace script tests, and coverage with 35/35 added executable
+  Rust lines covered; `make trace-fixtures` skipped only because the ignored
+  local `docs/fidelity/fixtures/local/rust-current` directory is absent.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777915754689049`
 - `2026-05-04 18:09:14 BST` Started `DC-05.1`: modeling the source-shaped
   power-on/reset diagnostic progression and start-ready transition as a
   deterministic boot-state surface before wiring board hardware directly into

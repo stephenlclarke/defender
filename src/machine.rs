@@ -12,8 +12,9 @@ use crate::{
         CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, PALETTE_RAM_SIZE,
         RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_HIGH_SCORE_ENTRIES,
         RED_LABEL_HIGH_SCORE_ENTRY_CELLS, RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START,
-        cleared_main_cpu_ram, cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte,
-        cmos_sram_write_word, red_label_crom0_ram_test_next_word,
+        WATCHDOG_RESET_BYTE, cleared_main_cpu_ram, cmos_sram_read_byte, cmos_sram_read_word,
+        cmos_sram_write_byte, cmos_sram_write_word, red_label_crom0_ram_test_next_word,
+        video_counter_read_value,
     },
     input::{CabinetInput, DefenderInputPorts},
     red_label::{
@@ -461,6 +462,18 @@ pub struct MachineSnapshot {
     pub high_score_submission: Option<HighScoreSubmissionState>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelMainBoardSnapshot {
+    pub input_ports: DefenderInputPorts,
+    pub main_ram_crc32: u32,
+    pub cmos_crc32: u32,
+    pub palette_ram: [u8; PALETTE_RAM_SIZE],
+    pub hardware_map: u8,
+    pub watchdog_reset_count: u64,
+    pub video_counter_vpos: u16,
+    pub video_counter_value: u8,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MachineSaveState {
     snapshot: MachineSnapshot,
@@ -468,6 +481,9 @@ pub struct MachineSaveState {
     trace_power_up_ram_fill: Option<RedLabelPowerUpRamFill>,
     trace_start_asserted_frames: u8,
     trace_player_start_release_frame: Option<u64>,
+    main_board_input_ports: DefenderInputPorts,
+    main_board_watchdog_reset_count: u64,
+    main_board_video_counter_vpos: u16,
     high_score_entry_player: u8,
     high_score_completed_players_mask: u8,
 }
@@ -23620,6 +23636,9 @@ pub struct ArcadeMachine {
     last_input_bits: u16,
     compatibility: CompatibilityState,
     memory: RedLabelRuntimeMemory,
+    main_board_input_ports: DefenderInputPorts,
+    main_board_watchdog_reset_count: u64,
+    main_board_video_counter_vpos: u16,
     trace_power_up_ram_fill: Option<RedLabelPowerUpRamFill>,
     trace_start_asserted_frames: u8,
     trace_player_start_release_frame: Option<u64>,
@@ -23706,6 +23725,9 @@ impl ArcadeMachine {
             last_input_bits: 0,
             compatibility: CompatibilityState::default(),
             memory,
+            main_board_input_ports: DefenderInputPorts::EMPTY,
+            main_board_watchdog_reset_count: 0,
+            main_board_video_counter_vpos: 0,
             trace_power_up_ram_fill: None,
             trace_start_asserted_frames: 0,
             trace_player_start_release_frame: None,
@@ -23747,6 +23769,9 @@ impl ArcadeMachine {
             trace_power_up_ram_fill: self.trace_power_up_ram_fill,
             trace_start_asserted_frames: self.trace_start_asserted_frames,
             trace_player_start_release_frame: self.trace_player_start_release_frame,
+            main_board_input_ports: self.main_board_input_ports,
+            main_board_watchdog_reset_count: self.main_board_watchdog_reset_count,
+            main_board_video_counter_vpos: self.main_board_video_counter_vpos,
             high_score_entry_player: self.high_score_entry_player,
             high_score_completed_players_mask: self.high_score_completed_players_mask,
         }
@@ -23771,6 +23796,9 @@ impl ArcadeMachine {
         self.trace_power_up_ram_fill = state.trace_power_up_ram_fill;
         self.trace_start_asserted_frames = state.trace_start_asserted_frames;
         self.trace_player_start_release_frame = state.trace_player_start_release_frame;
+        self.main_board_input_ports = state.main_board_input_ports;
+        self.main_board_watchdog_reset_count = state.main_board_watchdog_reset_count;
+        self.main_board_video_counter_vpos = state.main_board_video_counter_vpos;
         self.high_score_entry = state.snapshot.high_score_entry;
         self.high_score_submission = state.snapshot.high_score_submission;
         self.high_score_entry_player = state.high_score_entry_player;
@@ -23792,6 +23820,9 @@ impl ArcadeMachine {
             xyzzy_invincible: snapshot.xyzzy_invincible,
             xyzzy_auto_fire: snapshot.xyzzy_auto_fire,
         };
+        self.main_board_input_ports = DefenderInputPorts::EMPTY;
+        self.main_board_watchdog_reset_count = 0;
+        self.main_board_video_counter_vpos = 0;
         self.trace_start_asserted_frames = 0;
         self.trace_player_start_release_frame = None;
         self.high_score_entry = snapshot.high_score_entry;
@@ -23867,6 +23898,19 @@ impl ArcadeMachine {
 
     pub fn red_label_cmos_ram(&self) -> &CmosRam {
         &self.memory.cmos
+    }
+
+    pub fn red_label_main_board_snapshot(&self) -> RedLabelMainBoardSnapshot {
+        RedLabelMainBoardSnapshot {
+            input_ports: self.main_board_input_ports,
+            main_ram_crc32: crc32(self.memory.ram()),
+            cmos_crc32: crc32(&self.memory.cmos),
+            palette_ram: self.memory.palette_ram,
+            hardware_map: self.memory.hardware_map(),
+            watchdog_reset_count: self.main_board_watchdog_reset_count,
+            video_counter_vpos: self.main_board_video_counter_vpos,
+            video_counter_value: video_counter_read_value(self.main_board_video_counter_vpos),
+        }
     }
 
     pub fn red_label_palette_ram(&self) -> &[u8; PALETTE_RAM_SIZE] {
@@ -25243,6 +25287,7 @@ impl ArcadeMachine {
     ) -> FrameOutput {
         self.frame = self.frame.saturating_add(1);
         self.last_input_bits = input.bits();
+        self.begin_main_board_frame(input);
         self.rng.advance();
 
         let mut events = Vec::new();
@@ -25290,6 +25335,21 @@ impl ArcadeMachine {
             &events,
             &sound_commands,
         )
+    }
+
+    fn begin_main_board_frame(&mut self, input: CabinetInput) {
+        self.main_board_input_ports = input.defender_input_ports();
+        self.main_board_video_counter_vpos = 0;
+    }
+
+    fn record_main_board_live_video_frame(&mut self, frame: &RedLabelLiveVideoFrame) {
+        for scanline in [&frame.upper_scanline, &frame.lower_scanline] {
+            self.main_board_video_counter_vpos = u16::from(scanline.vertical_counter);
+            if scanline.watchdog_value == Some(WATCHDOG_RESET_BYTE) {
+                self.main_board_watchdog_reset_count =
+                    self.main_board_watchdog_reset_count.saturating_add(1);
+            }
+        }
     }
 
     fn push_trace_sound_synchronized_events(
@@ -25880,8 +25940,10 @@ impl ArcadeMachine {
             events.push(MachineEvent::ReversePressed);
         }
 
-        self.red_label_update_live_video_frame()
+        let video_frame = self
+            .red_label_update_live_video_frame()
             .expect("embedded red-label live video IRQ layout is valid");
+        self.record_main_board_live_video_frame(&video_frame);
 
         if input.fire || (self.compatibility.xyzzy_active && self.compatibility.xyzzy_auto_fire) {
             events.push(MachineEvent::FirePressed);
@@ -25947,7 +26009,7 @@ mod tests {
             CMOS_RAM_SIZE, PALETTE_RAM_SIZE, RED_LABEL_CRHSTD_CELL_OFFSET,
             RED_LABEL_HIGH_SCORE_ENTRIES, RED_LABEL_HIGH_SCORE_ENTRY_CELLS,
             RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START, cmos_sram_read_byte,
-            cmos_sram_write_byte,
+            cmos_sram_write_byte, video_counter_read_value,
         },
         fidelity::TraceFrame,
         input::{CabinetInput, DefenderInputPorts},
@@ -53180,11 +53242,22 @@ mod tests {
         let mut machine = ArcadeMachine::new_cold_boot_trace();
         machine.memory.write_byte(0xA123, 0x5A).expect("seed RAM");
         machine.memory.hardware_map = 7;
+        machine.main_board_input_ports = DefenderInputPorts {
+            in0: 0x02,
+            in1: 0x40,
+            in2: 0x08,
+        };
+        machine.main_board_watchdog_reset_count = 3;
+        machine.main_board_video_counter_vpos = 0x00A8;
         let saved_snapshot = machine.snapshot();
+        let saved_board = machine.red_label_main_board_snapshot();
         let saved_state = machine.save_state();
 
         machine.memory.write_byte(0xA123, 0xA5).expect("mutate RAM");
         machine.memory.hardware_map = 2;
+        machine.main_board_input_ports = DefenderInputPorts::EMPTY;
+        machine.main_board_watchdog_reset_count = 0;
+        machine.main_board_video_counter_vpos = 0;
         machine.trace_power_up_ram_fill = None;
         machine.step(CabinetInput::NONE);
         machine.restore_state(saved_state);
@@ -53195,7 +53268,62 @@ mod tests {
             Some(&[0x5A][..])
         );
         assert_eq!(machine.red_label_hardware_map(), 7);
+        assert_eq!(machine.red_label_main_board_snapshot(), saved_board);
         assert!(machine.trace_power_up_ram_fill.is_some());
+    }
+
+    #[test]
+    fn step_updates_main_board_input_and_memory_surfaces() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        machine.memory.write_byte(0x0001, 0x5A).expect("seed RAM");
+        machine
+            .memory
+            .write_byte(0xA026, 0xD6)
+            .expect("seed color map");
+        let input = CabinetInput {
+            coin: true,
+            start_one: true,
+            thrust: true,
+            fire: true,
+            ..CabinetInput::NONE
+        };
+
+        machine.step(input);
+        let board = machine.red_label_main_board_snapshot();
+
+        assert_eq!(board.input_ports, input.defender_input_ports());
+        assert_eq!(board.main_ram_crc32, crc32(machine.red_label_ram()));
+        assert_eq!(board.cmos_crc32, crc32(machine.red_label_cmos_ram()));
+        assert_eq!(board.palette_ram, *machine.red_label_palette_ram());
+        assert_eq!(board.hardware_map, machine.red_label_hardware_map());
+        assert_eq!(board.watchdog_reset_count, 0);
+        assert_eq!(board.video_counter_vpos, 0);
+        assert_eq!(board.video_counter_value, video_counter_read_value(0));
+    }
+
+    #[test]
+    fn step_records_live_irq_watchdog_and_video_counter_surface() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        machine
+            .memory
+            .write_range(0xA08F..0xA092, &[0x7E, 0xDF, 0xC3])
+            .expect("select IRQB hook");
+
+        let output = machine.step(CabinetInput::NONE);
+        let board = machine.red_label_main_board_snapshot();
+
+        assert_eq!(output.snapshot.phase, GamePhase::Playing);
+        assert_eq!(board.watchdog_reset_count, 1);
+        assert_eq!(
+            board.video_counter_vpos,
+            u16::from(RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT)
+        );
+        assert_eq!(
+            board.video_counter_value,
+            video_counter_read_value(board.video_counter_vpos)
+        );
+        assert_eq!(board.palette_ram, *machine.red_label_palette_ram());
     }
 
     #[test]
