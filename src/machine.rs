@@ -44341,6 +44341,265 @@ mod tests {
     }
 
     #[test]
+    fn bomber_pod_swarmer_fixture_covers_bombs_bursts_and_swarm_fire() {
+        let mut tie = ArcadeMachine::new();
+        let tie_process = tie
+            .red_label_make_super_process(
+                red_label_routine_address("TIE").expect("TIE address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make DC-11.2 TIE super process")
+            .process_address;
+        let tie_object = tie
+            .red_label_init_object_cell(
+                tie_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("TIEP1").expect("TIEP1"),
+                    collision_vector_address: red_label_routine_address("TIEKIL").expect("TIEKIL"),
+                    scanner_color: 0x8888,
+                },
+            )
+            .expect("init DC-11.2 TIE object")
+            .object_address;
+        tie.red_label_activate_object_cell(tie_object)
+            .expect("activate DC-11.2 TIE object");
+        tie.memory
+            .write_word(tie_process + 0x07, tie_object)
+            .expect("set DC-11.2 TIE PD slot");
+        tie.step_red_label_process_scheduler()
+            .expect("schedule DC-11.2 TIE");
+        tie.memory.write_byte(0xA0DF, 0).expect("set TIE SEED");
+        tie.memory.write_byte(0xA0E0, 0x80).expect("set TIE HSEED");
+        tie.memory.write_byte(0xA0E1, 0).expect("set TIE LSEED");
+        tie.memory.write_byte(0xA0C0, 0x50).expect("set TIE PLAYC");
+        tie.memory.write_word(0xA020, 0x1000).expect("set TIE BGL");
+        tie.memory
+            .write_word(tie_object + 0x04, 0x0860)
+            .expect("set TIE screen address");
+        tie.memory
+            .write_word(tie_object + 0x0A, 0x1200)
+            .expect("set TIE OX16");
+        tie.memory
+            .write_word(tie_object + 0x0C, 0x6000)
+            .expect("set TIE OY16");
+        tie.memory
+            .write_word(tie_object + 0x10, 0)
+            .expect("clear TIE OYV");
+        let tie_object_before = red_label_object_cell_snapshot(&tie, tie_object);
+        let tie_shell_head = red_label_ram_snapshot(&tie, "DC-11.2 TIE shell head", 0xA06D..0xA06F);
+        let tie_bomb_count = red_label_ram_snapshot(&tie, "DC-11.2 TIE bomb count", 0xA099..0xA09A);
+
+        let tie_step = tie
+            .red_label_step_tie_current_process()
+            .expect("DC-11.2 TIE");
+        let tie_bomb = tie_step.bomb.expect("DC-11.2 TIE bomb");
+
+        assert_eq!(tie_step.process_address, tie_process);
+        assert_eq!(tie_step.object_address, Some(tie_object));
+        assert_eq!(
+            tie_step.picture_address,
+            Some(red_label_object_picture_address("TIEP2").expect("TIEP2"))
+        );
+        assert_eq!(tie_bomb.shell.shell_address, 0xA253);
+        assert_eq!(
+            tie_bomb.shell.descriptor.output_routine_address,
+            red_label_routine_address("BMBOUT").expect("BMBOUT")
+        );
+        assert_eq!(
+            tie_bomb.shell.descriptor.kill_routine_address,
+            red_label_routine_address("BKIL").expect("BKIL")
+        );
+        assert_eq!(tie_bomb.lifetime, 1);
+        tie_object_before.assert_current_changed(&tie);
+        tie_shell_head.assert_current_changed_to(&tie, &[0xA2, 0x53]);
+        tie_bomb_count.assert_current_changed_to(&tie, &[1]);
+        assert_eq!(
+            tie.red_label_ram_range(tie_process + 0x02..tie_process + 0x05),
+            Some(&[0xF2, 0xF7, 1][..])
+        );
+
+        let mut probe = ArcadeMachine::new();
+        let probe_process = probe
+            .red_label_make_process(
+                red_label_routine_address("PRBST").expect("PRBST"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make DC-11.2 probe process")
+            .process_address;
+        let probe_object = probe
+            .red_label_init_object_cell(
+                probe_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("PRBP1").expect("PRBP1"),
+                    collision_vector_address: red_label_routine_address("PRBKIL").expect("PRBKIL"),
+                    scanner_color: 0xCCCC,
+                },
+            )
+            .expect("init DC-11.2 probe object")
+            .object_address;
+        probe
+            .red_label_activate_object_cell(probe_object)
+            .expect("activate DC-11.2 probe object");
+        probe.memory.write_byte(0xA114, 1).expect("set PRBCNT");
+        probe.memory.write_byte(0xA116, 18).expect("set SWCNT");
+        probe.memory.write_byte(0xA10D, 0x10).expect("set SWSTIM");
+        probe.memory.write_byte(0xA10E, 0x3F).expect("set SWAC");
+        probe.memory.write_word(0xA020, 0).expect("set probe BGL");
+        probe.memory.write_word(0xA0DF, 0).expect("set probe RNG");
+        probe.memory.write_byte(0xA0E1, 0).expect("set probe LSEED");
+        probe
+            .memory
+            .write_byte(0xA08B, 1)
+            .expect("set probe CURPLR");
+        probe
+            .memory
+            .write_word(0xA08D, 0xA1C2)
+            .expect("set probe PLRX");
+        probe
+            .memory
+            .write_word(probe_object + 0x04, 0x5060)
+            .expect("set probe screen address");
+        probe
+            .memory
+            .write_word(probe_object + 0x0A, 0x2000)
+            .expect("set probe OX16");
+        probe
+            .memory
+            .write_word(probe_object + 0x0C, 0x6000)
+            .expect("set probe OY16");
+        let probe_counts =
+            red_label_ram_snapshot(&probe, "DC-11.2 probe/swarmer counts", 0xA114..0xA117);
+        let probe_object_before = red_label_object_cell_snapshot(&probe, probe_object);
+        let probe_active_head =
+            red_label_ram_snapshot(&probe, "DC-11.2 active object head", 0xA065..0xA067);
+
+        let probe_collision = probe
+            .red_label_dispatch_object_collision_vector(probe_object)
+            .expect("DC-11.2 PRBKIL");
+        let RedLabelObjectCollision::ProbeKilled(probe_kill) = probe_collision else {
+            panic!("expected DC-11.2 PRBKIL");
+        };
+
+        assert_eq!(probe_kill.requested_swarmer_count, 5);
+        assert_eq!(probe_kill.spawned_swarmers.len(), 2);
+        assert_eq!(probe_kill.active_probe_count, 0);
+        assert!(
+            probe_kill
+                .spawned_swarmers
+                .iter()
+                .all(|spawn| spawn.process.routine_address
+                    == red_label_routine_address("MSWM").expect("MSWM"))
+        );
+        assert!(
+            probe_kill.spawned_swarmers.iter().all(|spawn| spawn
+                .object
+                .descriptor
+                .collision_vector_address
+                == red_label_routine_address("MSWKIL").expect("MSWKIL"))
+        );
+        probe_counts.assert_current_changed_to(&probe, &[0, 0, 0x14]);
+        probe_object_before.assert_current_changed(&probe);
+        probe_active_head.assert_current_changed_to(&probe, &[0xA2, 0x53]);
+        assert_eq!(
+            probe.red_label_ram_range(0xA073..0xA074),
+            Some(&[probe_kill.requested_swarmer_count - 2][..])
+        );
+
+        let mut swarmer = ArcadeMachine::new();
+        let swarmer_process = swarmer
+            .red_label_make_process(
+                red_label_routine_address("MSWLP").expect("MSWLP"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make DC-11.2 MSWLP process")
+            .process_address;
+        let swarmer_object = swarmer
+            .red_label_init_object_cell(
+                swarmer_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("SWPIC1").expect("SWPIC1"),
+                    collision_vector_address: red_label_routine_address("MSWKIL").expect("MSWKIL"),
+                    scanner_color: 0x2424,
+                },
+            )
+            .expect("init DC-11.2 swarmer object")
+            .object_address;
+        swarmer
+            .memory
+            .write_word(swarmer_process + 0x07, swarmer_object)
+            .expect("set swarmer PD");
+        swarmer
+            .memory
+            .write_byte(swarmer_process + 0x09, 0x20)
+            .expect("set swarmer acceleration");
+        swarmer
+            .memory
+            .write_byte(swarmer_process + 0x0B, 1)
+            .expect("force swarmer shot");
+        swarmer
+            .step_red_label_process_scheduler()
+            .expect("schedule DC-11.2 swarmer");
+        swarmer
+            .memory
+            .write_word(0xA020, 0)
+            .expect("set swarmer BGL");
+        swarmer
+            .memory
+            .write_word(0xA0CC, 0x2200)
+            .expect("set swarmer PLABX");
+        swarmer
+            .memory
+            .write_byte(0xA0C0, 0x70)
+            .expect("set swarmer PLAYC");
+        write_ram_bytes(&mut swarmer, 0xA0DF, &[0x80, 0x00, 0x40]);
+        swarmer.memory.write_byte(0xA10D, 0x10).expect("set SWSTIM");
+        swarmer
+            .memory
+            .write_word(swarmer_object + 0x0A, 0x2000)
+            .expect("set swarmer OX16");
+        swarmer
+            .memory
+            .write_word(swarmer_object + 0x0C, 0x6000)
+            .expect("set swarmer OY16");
+        swarmer
+            .memory
+            .write_word(swarmer_object + 0x0E, 0x0020)
+            .expect("set swarmer OXV");
+        swarmer
+            .memory
+            .write_word(swarmer_object + 0x10, 0x0100)
+            .expect("set swarmer OYV");
+        let swarmer_object_before = red_label_object_cell_snapshot(&swarmer, swarmer_object);
+        let swarmer_process_before = red_label_process_cell_snapshot(&swarmer, swarmer_process);
+        let swarmer_shell_head =
+            red_label_ram_snapshot(&swarmer, "DC-11.2 swarmer shell head", 0xA06D..0xA06F);
+
+        let swarmer_step = swarmer
+            .red_label_step_mini_swarmer_current_process(false)
+            .expect("DC-11.2 MSWLP");
+
+        let swarmer_shot = swarmer_step.shot.expect("DC-11.2 swarmer shot");
+        assert_eq!(swarmer_step.process_address, swarmer_process);
+        assert_eq!(swarmer_step.object_address, swarmer_object);
+        assert!(swarmer_step.y_velocity.is_some());
+        assert_eq!(swarmer_shot.shell.shell_address, 0xA253);
+        assert_eq!(
+            swarmer_shot.shell.descriptor.output_routine_address,
+            red_label_routine_address("FBOUT").expect("FBOUT")
+        );
+        assert_eq!(
+            swarmer_shot.sound_loaded,
+            Some(RedLabelLoadedSoundTable {
+                address: 0xD534,
+                priority: 0xC0,
+            })
+        );
+        swarmer_object_before.assert_current_changed(&swarmer);
+        swarmer_process_before.assert_current_changed(&swarmer);
+        swarmer_shell_head.assert_current_changed_to(&swarmer, &[0xA2, 0x53]);
+    }
+
+    #[test]
     fn player_restore_runs_sczres_sczst_schizoid_branch() {
         let mut machine = ArcadeMachine::new();
         machine

@@ -1257,7 +1257,7 @@ Work log:
 
 ### DC-11: Remaining Enemy And Collision Behavior
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: finish all enemy, shell, mine, and collision routines.
 
@@ -1265,7 +1265,8 @@ Steps:
 
 - [x] DC-11.1 Finish Baiter spawn, pursuit, firing, and lifetime behavior.
   Completed: `2026-05-04 22:46:31 BST`
-- [ ] DC-11.2 Finish Bomber, Pod, minefield, and Pod/Swarmer burst behavior.
+- [x] DC-11.2 Finish Bomber, Pod, minefield, and Pod/Swarmer burst behavior.
+  Completed: `2026-05-04 22:50:38 BST`
 - [ ] DC-11.3 Finish remaining mutant behavior and firing checks.
 - [ ] DC-11.4 Finish remaining shell rendering/output and object collision
   vectors.
@@ -1292,6 +1293,19 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777931213795719`
+- `2026-05-04 22:47:15 BST` Started `DC-11.2`: adding a combined regression
+  fixture for bomber/tie bomb-shell allocation, probe/pod kill-to-swarmer burst,
+  and mini-swarmer movement/firing mutations.
+- `2026-05-04 22:50:38 BST` Completed `DC-11.2`: added
+  `bomber_pod_swarmer_fixture_covers_bombs_bursts_and_swarm_fire`, proving
+  TIE bomb-shell allocation and `BMBCNT` mutation, probe kill-to-mini-swarmer
+  burst creation and count mutation, and mini-swarmer movement, firing,
+  shell-list, object, process, and sound-command mutations. Validation passed
+  with `cargo fmt --check`,
+  `cargo test bomber_pod_swarmer_fixture_covers_bombs_bursts_and_swarm_fire
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777931464832619`
 
 ## Phase 5: Native Video And Presentation
 
