@@ -198,7 +198,7 @@ mod tests {
         );
         assert_eq!(
             first_tsv_line(RED_LABEL_TRACE_SCHEMA_TSV),
-            "frame\tinput_bits\tinput_in0\tinput_in1\tinput_in2\tphase\tp1_score\tp2_score\twave\tlives\tsmart_bombs\tseed\thseed\tlseed\tobject_table_crc32\tshell_table_crc32\tvideo_crc32\tsound_commands\tevents"
+            "frame\tinput_bits\tinput_in0\tinput_in1\tinput_in2\tphase\tp1_score\tp2_score\twave\tlives\tsmart_bombs\tseed\thseed\tlseed\tobject_table_crc32\tprocess_table_crc32\tsuper_process_table_crc32\tshell_table_crc32\tvideo_crc32\tsound_commands\tevents"
         );
         assert_eq!(
             first_tsv_line(RED_LABEL_WAVE_TABLE_TSV),

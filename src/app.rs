@@ -845,7 +845,7 @@ mod tests {
                 ("-", "-")
             };
             expected.push_str(&format!(
-                "{frame}\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t{sound_commands}\t{events}\n"
+                "{frame}\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\t{sound_commands}\t{events}\n"
             ));
         }
         fs::write(path.join(format!("{stem}.expected.tsv")), expected)
@@ -1461,7 +1461,7 @@ mod tests {
     fn check_reference_trace_evidence_rejects_missing_required_event() {
         let lines = [
             trace_header(),
-            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t0xE6\t-",
+            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\t0xE6\t-",
         ];
         let requirement = TraceRequirement {
             required_sound_commands: vec![String::from("0xE6")],
@@ -1487,7 +1487,7 @@ mod tests {
     fn check_reference_trace_evidence_rejects_bad_trace_columns() {
         let lines = [
             trace_header(),
-            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t0xE6",
+            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\t0xE6",
         ];
         let requirement = TraceRequirement {
             required_sound_commands: Vec::new(),
@@ -1502,15 +1502,15 @@ mod tests {
         )
         .expect_err("bad trace columns");
 
-        assert!(error.to_string().contains("has 18 columns, expected 19"));
+        assert!(error.to_string().contains("has 20 columns, expected 21"));
     }
 
     #[test]
     fn check_reference_trace_evidence_rejects_late_bad_trace_columns() {
         let lines = [
             trace_header(),
-            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t0xE6\tcredit_added",
-            "2\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\tlate",
+            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\t0xE6\tcredit_added",
+            "2\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\tlate",
         ];
         let requirement = TraceRequirement {
             required_sound_commands: vec![String::from("0xE6")],
@@ -1528,7 +1528,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("line 3 has 18 columns, expected 19")
+                .contains("line 3 has 20 columns, expected 21")
         );
     }
 

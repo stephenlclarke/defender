@@ -144,8 +144,9 @@ Steps:
 - [x] DC-02.3 Add snapshot/restore regression tests that prove restored state
   replays the same trace rows and mutations.
   Completed: `2026-05-04 17:23:46 BST`
-- [ ] DC-02.4 Extend trace columns only where a source routine needs more
+- [x] DC-02.4 Extend trace columns only where a source routine needs more
   observable state for equivalence.
+  Completed: `2026-05-04 17:37:09 BST`
 - [ ] DC-02.5 Document the characterization-test pattern in `docs/fidelity/`.
 
 Completion gate: new mutation helpers exist, representative high-risk routines
@@ -154,6 +155,27 @@ blocker.
 
 Work log:
 
+- `2026-05-04 17:26:42 BST` Started `DC-02.4`: reviewing the current trace
+  schema/output and recent characterization tests to add new trace columns only
+  if a translated source routine needs additional observable state for
+  equivalence.
+- `2026-05-04 17:37:09 BST` Completed `DC-02.4`: extended the trace schema
+  with `process_table_crc32` and `super_process_table_crc32`, backed those
+  columns from source-owned red-label process RAM, updated the MAME reference
+  exporter/debug stream, refreshed fixture/schema docs and `SPEC.md`, and added
+  tests for trace column stability, process-table CRC helpers, and schema column
+  counts. Validation passed with `markdownlint PLAN.md SPEC.md README.md
+  docs/fidelity/README.md docs/fidelity/gaps.md assets/red-label/README.md`,
+  `cargo test trace_ --all-targets`, `make trace-script-test`,
+  `cargo test trace_crc_helpers_sample_source_process_tables --all-targets`,
+  `git diff --check`, and `make fidelity`. `make fidelity` ran
+  `cargo fmt --check`, `cargo test --all-targets` with 798 passed and 5 known
+  ignored fidelity tests, `cargo clippy --all-targets -- -D warnings`, trace
+  script tests, `make trace-fixtures` which skipped because
+  `docs/fidelity/fixtures/local/rust-current` is absent locally, and
+  `make coverage` with 122/122 added executable Rust lines covered.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777912688322649`
 - `2026-05-04 16:58:21 BST` Started `DC-02.1`: adding shared
   mutation-assertion test helpers for red-label RAM, CMOS, object/process cells,
   shell-list state, and video RAM so future translations and the later refactor

@@ -300,7 +300,7 @@ if debug_path then
     -- It is intentionally separate from the checked fixture schema.
     debug_output = assert(io.open(debug_path, "w"))
     debug_output:write(
-        "frame\tpc\tinput_read_in0\tinput_read_in1\tinput_read_in2\tbank_select\tbank_writes\tstatus\tp1_lives\tp1_wave\tp1_bombs\tseed\thseed\tlseed\tobject_table_crc32\tshell_table_crc32\n"
+        "frame\tpc\tinput_read_in0\tinput_read_in1\tinput_read_in2\tbank_select\tbank_writes\tstatus\tp1_lives\tp1_wave\tp1_bombs\tseed\thseed\tlseed\tobject_table_crc32\tprocess_table_crc32\tsuper_process_table_crc32\tshell_table_crc32\n"
     )
 end
 
@@ -439,7 +439,7 @@ for frame_number, frame_text in ipairs(input_frames) do
     local event_text = format_events(events_for_commands(frame_sound_commands))
 
     output:write(string.format(
-        "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t%s\t%d\t%d\t%d\t%d\t%d\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\t-\t%s\t%s\n",
+        "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t%s\t%d\t%d\t%d\t%d\t%d\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\t0x%08X\t0x%08X\t-\t%s\t%s\n",
         frame_number,
         input_bits,
         input_ports.IN0,
@@ -455,6 +455,8 @@ for frame_number, frame_text in ipairs(input_frames) do
         read_u8(0xA0E0),
         read_u8(0xA0E1),
         crc_range(0xA23C, 0x17 * 95),
+        crc_range(0xAAC5, 0x0F * 75),
+        crc_range(0xAF2A, 0x17 * 5),
         crc_range(0xA06D, 2),
         sound_command_text,
         event_text
@@ -462,7 +464,7 @@ for frame_number, frame_text in ipairs(input_frames) do
     if debug_output then
         local input_read_ports = read_input_ports()
         debug_output:write(string.format(
-            "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t%s\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\n",
+            "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t%s\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\t0x%08X\t0x%08X\n",
             frame_number,
             maincpu.state["PC"].value,
             input_read_ports.IN0,
@@ -478,6 +480,8 @@ for frame_number, frame_text in ipairs(input_frames) do
             read_u8(0xA0E0),
             read_u8(0xA0E1),
             crc_range(0xA23C, 0x17 * 95),
+            crc_range(0xAAC5, 0x0F * 75),
+            crc_range(0xAF2A, 0x17 * 5),
             crc_range(0xA06D, 2)
         ))
     end

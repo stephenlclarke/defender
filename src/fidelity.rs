@@ -188,6 +188,8 @@ pub struct TraceFrame {
     pub hseed: u8,
     pub lseed: u8,
     pub object_table_crc32: Option<u32>,
+    pub process_table_crc32: Option<u32>,
+    pub super_process_table_crc32: Option<u32>,
     pub shell_table_crc32: Option<u32>,
     pub video_crc32: Option<u32>,
     pub sound_commands: Vec<SoundCommand>,
@@ -212,6 +214,8 @@ impl TraceFrame {
         frame.hseed = output.red_label_trace.hseed;
         frame.lseed = output.red_label_trace.lseed;
         frame.object_table_crc32 = output.object_table_crc32;
+        frame.process_table_crc32 = output.process_table_crc32;
+        frame.super_process_table_crc32 = output.super_process_table_crc32;
         frame.shell_table_crc32 = output.shell_table_crc32;
         frame
     }
@@ -245,6 +249,8 @@ impl TraceFrame {
             hseed: snapshot.rng.hseed,
             lseed: snapshot.rng.lseed,
             object_table_crc32: None,
+            process_table_crc32: None,
+            super_process_table_crc32: None,
             shell_table_crc32: None,
             video_crc32: None,
             sound_commands,
@@ -254,6 +260,16 @@ impl TraceFrame {
 
     pub fn with_object_table_bytes(mut self, object_table: &[u8]) -> Self {
         self.object_table_crc32 = Some(crc32(object_table));
+        self
+    }
+
+    pub fn with_process_table_bytes(mut self, process_table: &[u8]) -> Self {
+        self.process_table_crc32 = Some(crc32(process_table));
+        self
+    }
+
+    pub fn with_super_process_table_bytes(mut self, super_process_table: &[u8]) -> Self {
+        self.super_process_table_crc32 = Some(crc32(super_process_table));
         self
     }
 
@@ -269,7 +285,7 @@ impl TraceFrame {
 
     pub fn to_tsv_line(&self) -> String {
         format!(
-            "{}\t0x{:04X}\t0x{:02X}\t0x{:02X}\t0x{:02X}\t{}\t{}\t{}\t{}\t{}\t{}\t0x{:02X}\t0x{:02X}\t0x{:02X}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t0x{:04X}\t0x{:02X}\t0x{:02X}\t0x{:02X}\t{}\t{}\t{}\t{}\t{}\t{}\t0x{:02X}\t0x{:02X}\t0x{:02X}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             self.frame,
             self.input_bits,
             self.input_ports.in0,
@@ -285,6 +301,8 @@ impl TraceFrame {
             self.hseed,
             self.lseed,
             optional_crc32_label(self.object_table_crc32),
+            optional_crc32_label(self.process_table_crc32),
+            optional_crc32_label(self.super_process_table_crc32),
             optional_crc32_label(self.shell_table_crc32),
             optional_crc32_label(self.video_crc32),
             format_sound_command_list(&self.sound_commands),
@@ -494,7 +512,7 @@ mod tests {
     fn trace_header_is_stable() {
         assert_eq!(
             trace_header(),
-            "frame\tinput_bits\tinput_in0\tinput_in1\tinput_in2\tphase\tp1_score\tp2_score\twave\tlives\tsmart_bombs\tseed\thseed\tlseed\tobject_table_crc32\tshell_table_crc32\tvideo_crc32\tsound_commands\tevents"
+            "frame\tinput_bits\tinput_in0\tinput_in1\tinput_in2\tphase\tp1_score\tp2_score\twave\tlives\tsmart_bombs\tseed\thseed\tlseed\tobject_table_crc32\tprocess_table_crc32\tsuper_process_table_crc32\tshell_table_crc32\tvideo_crc32\tsound_commands\tevents"
         );
     }
 
@@ -626,9 +644,16 @@ mod tests {
         assert_eq!(trace.events, vec![MachineEvent::GameStarted]);
         assert_eq!(trace.sound_commands, Vec::new());
         assert_eq!(trace.object_table_crc32, output.object_table_crc32);
+        assert_eq!(trace.process_table_crc32, output.process_table_crc32);
+        assert_eq!(
+            trace.super_process_table_crc32,
+            output.super_process_table_crc32
+        );
         assert_eq!(trace.shell_table_crc32, output.shell_table_crc32);
         assert_eq!(trace.video_crc32, None);
         assert!(trace.object_table_crc32.is_some());
+        assert!(trace.process_table_crc32.is_some());
+        assert!(trace.super_process_table_crc32.is_some());
         assert!(trace.shell_table_crc32.is_some());
 
         let line = trace.to_tsv_line();
@@ -644,8 +669,10 @@ mod tests {
             output.red_label_trace.lseed
         )));
         assert!(line.contains(&format!(
-            "\t0x{:08X}\t0x{:08X}\t-\t-\t",
+            "\t0x{:08X}\t0x{:08X}\t0x{:08X}\t0x{:08X}\t-\t-\t",
             trace.object_table_crc32.expect("object CRC"),
+            trace.process_table_crc32.expect("process CRC"),
+            trace.super_process_table_crc32.expect("super-process CRC"),
             trace.shell_table_crc32.expect("shell CRC")
         )));
         assert!(line.ends_with("\tgame_started"));
@@ -691,6 +718,33 @@ mod tests {
         panic!("live coin process did not award credit");
     }
 
+    fn trace_field<'a>(line: &'a str, column: &str) -> &'a str {
+        let columns = trace_header().split('\t').collect::<Vec<_>>();
+        let fields = line.split('\t').collect::<Vec<_>>();
+        assert_eq!(fields.len(), columns.len(), "trace column count drift");
+        let index = columns
+            .iter()
+            .position(|candidate| *candidate == column)
+            .unwrap_or_else(|| panic!("missing trace column {column}"));
+        fields[index]
+    }
+
+    fn assert_trace_frame_state(
+        line: &str,
+        expected_state: &str,
+        expected_object_crc32: &str,
+        expected_shell_crc32: &str,
+    ) {
+        assert!(line.contains(expected_state));
+        assert_eq!(
+            trace_field(line, "object_table_crc32"),
+            expected_object_crc32
+        );
+        assert_ne!(trace_field(line, "process_table_crc32"), "-");
+        assert_ne!(trace_field(line, "super_process_table_crc32"), "-");
+        assert_eq!(trace_field(line, "shell_table_crc32"), expected_shell_crc32);
+    }
+
     #[test]
     fn attract_trace_samples_zeroed_red_label_player_and_seed_ram() {
         let mut machine = ArcadeMachine::new();
@@ -715,7 +769,10 @@ mod tests {
         let trace = trace_text_for_inputs(&[CabinetInput::NONE]).expect("trace text");
         let frame = trace.lines().nth(1).expect("first frame");
 
-        assert!(frame.contains("\t0xE15D8394\t0x41D912FF\t"));
+        assert_eq!(trace_field(frame, "object_table_crc32"), "0xE15D8394");
+        assert_ne!(trace_field(frame, "process_table_crc32"), "-");
+        assert_ne!(trace_field(frame, "super_process_table_crc32"), "-");
+        assert_eq!(trace_field(frame, "shell_table_crc32"), "0x41D912FF");
     }
 
     #[test]
@@ -747,39 +804,66 @@ mod tests {
         let frame_732 = trace.lines().nth(732).expect("frame 732");
         let frame_746 = trace.lines().nth(746).expect("frame 746");
 
-        assert!(frame_68.contains(
-            "\tgame_over\t145607283\t60413270\t174\t159\t79\t0x44\t0xA3\t0xA2\t0xA20F8966\t0x7C785B90\t"
-        ));
-        assert!(frame_72.contains(
-            "\tgame_over\t145607283\t60413270\t174\t159\t79\t0x44\t0xA3\t0xA2\t0x790AE7A4\t0x7C785B90\t"
-        ));
-        assert!(frame_240.contains(
-            "\tgame_over\t145607283\t60413270\t174\t159\t79\t0x44\t0xA3\t0xA2\t0x790AE7A4\t0x67D19934\t"
-        ));
-        assert!(frame_245.contains(
-            "\tgame_over\t73233961\t142405422\t71\t88\t44\t0x9A\t0x68\t0xCD\t0x4A92B837\t0x67D19934\t"
-        ));
-        assert!(frame_720.contains(
-            "\tplaying\t73233961\t142405422\t71\t88\t44\t0x00\t0x00\t0x00\t0x4A92B837\t0x41D912FF\t"
-        ));
-        assert!(
-            frame_721
-                .contains("\tattract\t0\t0\t0\t0\t0\t0x00\t0x00\t0x00\t0x6EE2736A\t0x41D912FF\t")
+        assert_trace_frame_state(
+            frame_68,
+            "\tgame_over\t145607283\t60413270\t174\t159\t79\t0x44\t0xA3\t0xA2\t",
+            "0xA20F8966",
+            "0x7C785B90",
         );
-        assert!(
-            frame_724
-                .contains("\tattract\t0\t0\t0\t0\t0\t0x00\t0x00\t0x00\t0xE15D8394\t0x41D912FF\t")
+        assert_trace_frame_state(
+            frame_72,
+            "\tgame_over\t145607283\t60413270\t174\t159\t79\t0x44\t0xA3\t0xA2\t",
+            "0x790AE7A4",
+            "0x7C785B90",
         );
-        assert!(frame_731.contains(
-            "\tattract\t0\t0\t0\t0\t0\t0xD9\t0xF6\t0xCC\t0xE15D8394\t0x41D912FF\t-\t0xC0\t"
-        ));
-        assert!(
-            frame_732
-                .contains("\tgame_over\t0\t0\t0\t0\t0\t0x3E\t0xB0\t0x13\t0x9075E2DD\t0x41D912FF\t")
+        assert_trace_frame_state(
+            frame_240,
+            "\tgame_over\t145607283\t60413270\t174\t159\t79\t0x44\t0xA3\t0xA2\t",
+            "0x790AE7A4",
+            "0x67D19934",
         );
-        assert!(
-            frame_746
-                .contains("\tgame_over\t0\t0\t0\t0\t0\t0xFE\t0x3A\t0x21\t0x9075E2DD\t0x41D912FF\t")
+        assert_trace_frame_state(
+            frame_245,
+            "\tgame_over\t73233961\t142405422\t71\t88\t44\t0x9A\t0x68\t0xCD\t",
+            "0x4A92B837",
+            "0x67D19934",
+        );
+        assert_trace_frame_state(
+            frame_720,
+            "\tplaying\t73233961\t142405422\t71\t88\t44\t0x00\t0x00\t0x00\t",
+            "0x4A92B837",
+            "0x41D912FF",
+        );
+        assert_trace_frame_state(
+            frame_721,
+            "\tattract\t0\t0\t0\t0\t0\t0x00\t0x00\t0x00\t",
+            "0x6EE2736A",
+            "0x41D912FF",
+        );
+        assert_trace_frame_state(
+            frame_724,
+            "\tattract\t0\t0\t0\t0\t0\t0x00\t0x00\t0x00\t",
+            "0xE15D8394",
+            "0x41D912FF",
+        );
+        assert_trace_frame_state(
+            frame_731,
+            "\tattract\t0\t0\t0\t0\t0\t0xD9\t0xF6\t0xCC\t",
+            "0xE15D8394",
+            "0x41D912FF",
+        );
+        assert_eq!(trace_field(frame_731, "sound_commands"), "0xC0");
+        assert_trace_frame_state(
+            frame_732,
+            "\tgame_over\t0\t0\t0\t0\t0\t0x3E\t0xB0\t0x13\t",
+            "0x9075E2DD",
+            "0x41D912FF",
+        );
+        assert_trace_frame_state(
+            frame_746,
+            "\tgame_over\t0\t0\t0\t0\t0\t0xFE\t0x3A\t0x21\t",
+            "0x9075E2DD",
+            "0x41D912FF",
         );
     }
 
@@ -880,20 +964,40 @@ mod tests {
         let input = CabinetInput::NONE;
         let output = machine.step(input);
         let object_table = [0x10, 0x20, 0x30, 0x40];
+        let process_table = [0x11, 0x22, 0x33];
+        let super_process_table = [0x44, 0x55, 0x66, 0x77];
         let shell_table = [0xAA, 0x55];
 
         let trace = TraceFrame::from_output(input, &output)
             .with_object_table_bytes(&object_table)
+            .with_process_table_bytes(&process_table)
+            .with_super_process_table_bytes(&super_process_table)
             .with_shell_table_bytes(&shell_table);
 
         let object_crc = crc32(&object_table);
+        let process_crc = crc32(&process_table);
+        let super_process_crc = crc32(&super_process_table);
         let shell_crc = crc32(&shell_table);
         assert_eq!(trace.object_table_crc32, Some(object_crc));
+        assert_eq!(trace.process_table_crc32, Some(process_crc));
+        assert_eq!(trace.super_process_table_crc32, Some(super_process_crc));
         assert_eq!(trace.shell_table_crc32, Some(shell_crc));
-        assert!(
-            trace
-                .to_tsv_line()
-                .contains(&format!("\t0x{object_crc:08X}\t0x{shell_crc:08X}\t"))
+        let line = trace.to_tsv_line();
+        assert_eq!(
+            trace_field(&line, "object_table_crc32"),
+            format!("0x{object_crc:08X}")
+        );
+        assert_eq!(
+            trace_field(&line, "process_table_crc32"),
+            format!("0x{process_crc:08X}")
+        );
+        assert_eq!(
+            trace_field(&line, "super_process_table_crc32"),
+            format!("0x{super_process_crc:08X}")
+        );
+        assert_eq!(
+            trace_field(&line, "shell_table_crc32"),
+            format!("0x{shell_crc:08X}")
         );
     }
 

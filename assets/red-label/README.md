@@ -171,7 +171,8 @@ Current files:
   including the MAME-observed credited-start sound commands and events.
 - `trace-schema.tsv`: current TSV trace header for fidelity fixtures, including
   internal input bits, MAME IN0/IN1/IN2 input bytes, and optional raw
-  object-table, shell-table, and native video-frame CRC-32 values.
+  object-table, process-table, super-process-table, shell-table, and native
+  video-frame CRC-32 values.
 - `wave-table.tsv`: extracted source-order `blk71.src` `WVTAB` wave records
   consumed by translated `GETWV` base copies and `WDELT` intra/inter-wall
   updates.

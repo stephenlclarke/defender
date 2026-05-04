@@ -17,13 +17,15 @@ Current trace format:
 - `assets/red-label/trace-schema.tsv` defines the first TSV frame trace schema,
   and `src/fidelity.rs` embeds it.
 - The schema records input bits, frame number, player/session state, RNG bytes,
-  optional raw object-table, SPTR-linked shell-object-list, and native
-  video-frame CRC-32 values, raw sound-command writes, and machine events.
-- The current Rust trace fills the object-table and SPTR-head CRC-32 columns
-  from the table-backed red-label runtime memory. Trace generation starts from
-  cold-boot object RAM, while the normal live/test constructor remains
-  pre-initialized for translated routine unit tests. Golden equivalence for
-  those columns still depends on local MAME/source expected traces.
+  optional raw object-table, process-table, super-process-table,
+  SPTR-linked shell-object-list, and native video-frame CRC-32 values, raw
+  sound-command writes, and machine events.
+- The current Rust trace fills the object-table, process-table,
+  super-process-table, and SPTR-head CRC-32 columns from the table-backed
+  red-label runtime memory. Trace generation starts from cold-boot object and
+  process RAM, while the normal live/test constructor remains pre-initialized
+  for translated routine unit tests. Golden equivalence for those columns still
+  depends on local MAME/source expected traces.
 - `defender --fidelity-trace 300` emits deterministic Rust trace rows for local
   fixture work. It is not a substitute for MAME/source-derived golden traces.
 - `defender --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'` emits
@@ -100,8 +102,9 @@ still allowing local overrides.
 Set `DEFENDER_TRACE_DEBUG=/path/to/debug.tsv` when invoking
 `tools/mame_defender_trace.lua` directly to write a local diagnostic stream
 with the main CPU PC, MAME-read IN0/IN1/IN2 bytes, current bank selection,
-per-frame bank-select writes, selected red-label RAM bytes, and object/shell
-CRCs. Debug traces are investigation aids only and are not part of the
+per-frame bank-select writes, selected red-label RAM bytes, and
+object/process/super-process/shell CRCs. Debug traces are investigation aids
+only and are not part of the
 checked-in fixture schema.
 
 ## Red-Label ROM Build Notes

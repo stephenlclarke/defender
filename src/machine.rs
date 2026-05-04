@@ -564,17 +564,26 @@ pub struct FrameOutput {
     pub snapshot: MachineSnapshot,
     pub red_label_trace: RedLabelTraceState,
     pub object_table_crc32: Option<u32>,
+    pub process_table_crc32: Option<u32>,
+    pub super_process_table_crc32: Option<u32>,
     pub shell_table_crc32: Option<u32>,
     pub events: [Option<MachineEvent>; 8],
     pub sound_commands: [Option<SoundCommand>; FRAME_SOUND_COMMAND_CAPACITY],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FrameTraceCrcs {
+    object_table_crc32: Option<u32>,
+    process_table_crc32: Option<u32>,
+    super_process_table_crc32: Option<u32>,
+    shell_table_crc32: Option<u32>,
 }
 
 impl FrameOutput {
     fn new(
         snapshot: MachineSnapshot,
         red_label_trace: RedLabelTraceState,
-        object_table_crc32: Option<u32>,
-        shell_table_crc32: Option<u32>,
+        trace_crcs: FrameTraceCrcs,
         events: &[MachineEvent],
         sound_commands: &[SoundCommand],
     ) -> Self {
@@ -592,8 +601,10 @@ impl FrameOutput {
         Self {
             snapshot,
             red_label_trace,
-            object_table_crc32,
-            shell_table_crc32,
+            object_table_crc32: trace_crcs.object_table_crc32,
+            process_table_crc32: trace_crcs.process_table_crc32,
+            super_process_table_crc32: trace_crcs.super_process_table_crc32,
+            shell_table_crc32: trace_crcs.shell_table_crc32,
             events: output,
             sound_commands: command_output,
         }
@@ -3650,6 +3661,8 @@ pub struct RedLabelRuntimeMemory {
     hardware_map: u8,
     cmos: CmosRam,
     object_table_range: std::ops::Range<usize>,
+    process_table_range: std::ops::Range<usize>,
+    super_process_table_range: std::ops::Range<usize>,
     shell_head_range: std::ops::Range<usize>,
 }
 
@@ -3835,6 +3848,8 @@ impl RedLabelRuntimeMemory {
         let layout = red_label_ram_layout()?;
         let lists = red_label_linked_lists()?;
         let object_table_range = table_range(&layout, "object")?;
+        let process_table_range = table_range(&layout, "process")?;
+        let super_process_table_range = table_range(&layout, "super_process")?;
         let shell_head = linked_list(&lists, "shell_object")?.head_address;
         let mut memory = Self {
             ram: cleared_main_cpu_ram(),
@@ -3842,6 +3857,8 @@ impl RedLabelRuntimeMemory {
             hardware_map: 0,
             cmos: [0xF0; CMOS_RAM_SIZE],
             object_table_range,
+            process_table_range,
+            super_process_table_range,
             shell_head_range: usize::from(shell_head)..usize::from(shell_head) + 2,
         };
         let cmos_defaults = red_label_cmos_defaults()?;
@@ -4213,6 +4230,14 @@ impl RedLabelRuntimeMemory {
 
     pub fn object_table_crc32(&self) -> u32 {
         crc32(&self.ram[self.object_table_range.clone()])
+    }
+
+    pub fn process_table_crc32(&self) -> u32 {
+        crc32(&self.ram[self.process_table_range.clone()])
+    }
+
+    pub fn super_process_table_crc32(&self) -> u32 {
+        crc32(&self.ram[self.super_process_table_range.clone()])
     }
 
     pub fn shell_table_crc32(&self) -> u32 {
@@ -23740,6 +23765,14 @@ impl ArcadeMachine {
         self.memory.object_table_crc32()
     }
 
+    pub fn red_label_process_table_crc32(&self) -> u32 {
+        self.memory.process_table_crc32()
+    }
+
+    pub fn red_label_super_process_table_crc32(&self) -> u32 {
+        self.memory.super_process_table_crc32()
+    }
+
     pub fn red_label_shell_table_crc32(&self) -> u32 {
         self.memory.shell_table_crc32()
     }
@@ -25184,8 +25217,12 @@ impl ArcadeMachine {
             self.snapshot(),
             self.red_label_trace_state_for_frame_output()
                 .expect("red-label trace state should match embedded RAM layout"),
-            Some(self.memory.object_table_crc32()),
-            Some(self.memory.shell_table_crc32()),
+            FrameTraceCrcs {
+                object_table_crc32: Some(self.memory.object_table_crc32()),
+                process_table_crc32: Some(self.memory.process_table_crc32()),
+                super_process_table_crc32: Some(self.memory.super_process_table_crc32()),
+                shell_table_crc32: Some(self.memory.shell_table_crc32()),
+            },
             &events,
             &sound_commands,
         )
@@ -26674,6 +26711,37 @@ mod tests {
         );
 
         assert!(events.is_empty());
+    }
+
+    #[test]
+    fn trace_crc_helpers_sample_source_process_tables() {
+        let machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("red-label RAM layout");
+        let process_range = super::table_descriptor(&layout, "process")
+            .expect("process table")
+            .table_range()
+            .expect("process range");
+        let super_process_range = super::table_descriptor(&layout, "super_process")
+            .expect("super-process table")
+            .table_range()
+            .expect("super-process range");
+
+        assert_eq!(
+            machine.red_label_process_table_crc32(),
+            crc32(
+                machine
+                    .red_label_ram_range(process_range)
+                    .expect("process table bytes")
+            )
+        );
+        assert_eq!(
+            machine.red_label_super_process_table_crc32(),
+            crc32(
+                machine
+                    .red_label_ram_range(super_process_range)
+                    .expect("super-process table bytes")
+            )
+        );
     }
 
     #[test]

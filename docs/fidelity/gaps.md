@@ -32,9 +32,10 @@ This file records behavior that must not be guessed in arcade-core code.
   rather than treating the current trace-column match as a complete emulator.
 - The first Rust trace schema exists in `src/fidelity.rs` and includes raw
   internal input bits, MAME IN0/IN1/IN2 input bytes, optional raw object-table,
-  shell-table, and native video-frame CRC-32 columns, and a raw sound-command
-  column. The local MAME trace exporter can now fill that sound-command column
-  from PIA1 port-B writes, with a standalone Lua self-test in `make fidelity`.
+  process-table, super-process-table, shell-table, and native video-frame
+  CRC-32 columns, and a raw sound-command column. The local MAME trace exporter
+  can now fill that sound-command column from PIA1 port-B writes, with a
+  standalone Lua self-test in `make fidelity`.
 - On `2026-05-03`, the local red-label ROM set was rebuilt from source and
   verified with both `defender --verify-roms assets/roms/defender` and
   Homebrew MAME `0.287` `-verifyroms`. The old cold-boot coin/start Phase 1
@@ -51,10 +52,11 @@ This file records behavior that must not be guessed in arcade-core code.
 - `assets/red-label/trace-schema.tsv` is the single checked-in trace schema
   source. The old duplicate `docs/fidelity/trace-schema.tsv` was removed to
   prevent fixture documentation drift.
-- The trace format can carry object and shell table checksums. The first
-  `phr6.src` RAM layouts and linked-list heads are embedded under
-  `assets/red-label/ram-layout.tsv` and `assets/red-label/linked-lists.tsv`,
-  the current Rust trace emits object-table and SPTR-head CRCs from the
+- The trace format can carry object, process, super-process, and shell table
+  checksums. The first `phr6.src` RAM layouts and linked-list heads are
+  embedded under `assets/red-label/ram-layout.tsv` and
+  `assets/red-label/linked-lists.tsv`, the current Rust trace emits
+  object-table, process-table, super-process-table, and SPTR-head CRCs from the
   table-backed runtime memory, and the local MAME runner can emit Phase 1
   fixture rows. The checked-in Rust code still cannot prove those CRCs against
   red-label behavior unless local expected fixtures have been generated.
@@ -185,7 +187,8 @@ This file records behavior that must not be guessed in arcade-core code.
   redraw, the visible RAM effects of `SNDLD`, `BKIL`, the `REV`
   reverse debounce path, and the `SBOMB` entry/flash/debounce tail, routes
   collision dispatch through `OCVECT` for translated vectors, and emits
-  object-table and SPTR-head CRCs in trace rows. Deterministic restore now
+  object-table, process-table, super-process-table, and SPTR-head CRCs in
+  trace rows. Deterministic restore now
   projects the cached snapshot back onto source-owned red-label RAM for
   credits, current-player pointer, player scores, wave/lives/smart bombs,
   player motion, facing, and RNG seeds, and full save-state restore includes

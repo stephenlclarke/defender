@@ -121,7 +121,8 @@ synthetic scaffold fallback; untranslated blank screens remain black:
   process, super-process, and object lists from
   `assets/red-label/ram-layout.tsv` and `assets/red-label/linked-lists.tsv`;
   seeds one-player `START` table fields from `romc8.src` CMOS defaults; exposes
-  object-table and SPTR-head CRCs to traces; and has source-shaped `MKPROC`,
+  object-table, process-table, super-process-table, and SPTR-head CRCs to
+  traces; and has source-shaped `MKPROC`,
   `MSPROC`, `SLEEP`, `KILL`, and `DISP` primitives for process creation, delay,
   free-list return, scheduler timer decrement, `CRPROC` update, and due-`PADDR`
   reporting. It translates active/inactive object and shell-list maintenance,
@@ -162,8 +163,9 @@ synthetic scaffold fallback; untranslated blank screens remain black:
   while running the translated visible high-score reset copy for the `0x25`
   special function. It can also return slices for source-owned CMOS fields from
   `assets/red-label/cmos-layout.tsv` and RAM fields from
-  `assets/red-label/ram-layout.tsv`, so future traces can checksum
-  CMOS/player/object/process bytes without Rust-only structs.
+  `assets/red-label/ram-layout.tsv`; current traces checksum object, process,
+  super-process, and shell-list bytes from those RAM layouts while CMOS-specific
+  trace columns remain a later high-score/operator-mode proof gap.
 - `src/sound.rs` exposes the first MAME-documented Defender 6808 sound-board
   address classifier and memory surface: internal RAM at `0x0000..=0x007f`,
   PIA IC4 at `0x0400..=0x0403` mirrored at `0x8400..=0x8403`, and sound ROM
@@ -405,9 +407,10 @@ Additional gaps and corrections found during this review:
   Remaining video risk is fixture proof: scanline scheduling, exact frame/cycle
   timing, pixel golden coverage, and intentionally native-black untranslated
   screens still need acceptance evidence.
-- The trace schema can record object CRCs, shell CRCs, sound commands, and
-  optional video CRCs, but pixel golden fixtures and audio command/waveform
-  fixtures remain absent.
+- The trace schema can record object CRCs, process CRCs, super-process CRCs,
+  shell CRCs, sound commands, and optional video CRCs, but CMOS-specific trace
+  columns, pixel golden fixtures, and audio command/waveform fixtures remain
+  absent.
 - The main-board and sound-board surfaces model useful MAME-documented
   behavior, but they are not yet fully integrated into `ArcadeMachine::step`
   as a source-exact CPU, IRQ, video-scanline, and sound-CPU execution path.
@@ -467,7 +470,9 @@ Additional gaps and corrections found during this review:
   reference traces are accepted.
 - `src/machine.rs` now backs the core trace CRC columns with red-label RAM
   bytes instead of placeholder `None` values: object-table CRCs come from the
-  initialized object cells, and shell CRCs come from the SPTR shell-list head.
+  initialized object cells, process and super-process CRCs come from the
+  source-owned process tables, and shell CRCs come from the SPTR shell-list
+  head.
 - The board and sound surfaces model useful MAME-documented boundaries, but
   they are not yet integrated into `ArcadeMachine::step`. The game core still
   advances most scaffold state directly instead of executing translated
@@ -567,8 +572,9 @@ Additional gaps and corrections found during this review:
   RAM tables from the embedded metadata, seeds one-player `START` fields from
   `NSHIP` and `REPLAY`, applies the visible `PLSTR5` player runtime bytes
   (`NPLAD`, `NPLAXC`, `PLAX16`, `PLAY16`, `PLAS`, `PCRAM+5`, and related
-  flags), and emits object-table and SPTR-head CRCs in trace rows. It also has
-  source-shaped `MKPROC`, `MSPROC`, `SLEEP`, `KILL`, asset-backed `SSCAN`
+  flags), and emits object-table, process-table, super-process-table, and
+  SPTR-head CRCs in trace rows. It also has source-shaped `MKPROC`, `MSPROC`,
+  `SLEEP`, `KILL`, asset-backed `SSCAN`
   switch history over all eight `SWTAB` IN0 bits, translated
   fire/smart-bomb/reverse switch queueing, `SWP` switch-process dispatch, and
   `DISP` primitives for active/free process-list mutation and process timer
@@ -1250,7 +1256,8 @@ a separate optional fixture directory while later subsystems are translated.
 Status: complete for the core-state replacement layer. The table-backed RAM
 image now initializes
 `PINIT`/`OINIT`-style process, super-process, and object free lists,
-one-player `START` table fields, trace-visible object/shell CRCs, and
+one-player `START` table fields, trace-visible object, process,
+super-process, and shell CRCs, and
 source-shaped `MKPROC`/`MSPROC`/`SLEEP`/`KILL` process-list mutation,
 `GETOB`/`OBINIT`/`KILLOB`/`KILSHL` object-list mutation, `OSCAN` / `ISCAN`
 active/inactive object scanner maintenance, and `GETSHL` shell-list allocation
