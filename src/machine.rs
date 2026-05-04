@@ -36591,6 +36591,105 @@ mod tests {
     }
 
     #[test]
+    fn executive_iteration_continues_after_super_process_sleep_and_suicide_like_disp2() {
+        let mut machine = ArcadeMachine::new();
+        let tail_suicide = machine
+            .red_label_make_process(
+                red_label_routine_address("SUCIDE").expect("SUCIDE address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make tail suicide")
+            .process_address;
+        let super_sleeper = machine
+            .red_label_make_super_process(
+                red_label_routine_address("COLR").expect("COLR address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make super sleeper")
+            .process_address;
+        let super_free_before = machine
+            .red_label_ram_range(0xA069..0xA06B)
+            .expect("SPFREE head")
+            .to_vec();
+        let head_suicide = machine
+            .red_label_make_process(
+                red_label_routine_address("SUCIDE").expect("SUCIDE address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make head suicide")
+            .process_address;
+
+        let step = machine
+            .step_red_label_executive_iteration()
+            .expect("EXEC iteration");
+
+        assert_eq!(
+            step.dispatches
+                .iter()
+                .map(|dispatch| dispatch.scheduled_process.process_address)
+                .collect::<Vec<_>>(),
+            vec![head_suicide, super_sleeper, tail_suicide]
+        );
+        assert!(matches!(
+            step.dispatches[1].dispatch,
+            RedLabelProcessDispatch::SupportProcess(
+                RedLabelSupportProcessStep::LaserColorSleeping {
+                    process_address,
+                    wakeup_address,
+                    ..
+                }
+            ) if process_address == super_sleeper
+                && wakeup_address == red_label_routine_address("COLRLP").expect("COLRLP address")
+        ));
+        assert!(matches!(
+            step.dispatches[2].dispatch,
+            RedLabelProcessDispatch::Suicide(RedLabelKilledProcess {
+                killed_process_address,
+                previous_link_address,
+            }) if killed_process_address == tail_suicide
+                && previous_link_address == super_sleeper
+        ));
+        assert_eq!(
+            machine.red_label_ram_range(0xA05F..0xA061),
+            Some(&super_sleeper.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(super_sleeper..super_sleeper + 7),
+            Some(
+                &[
+                    0x00,
+                    0x00,
+                    red_label_routine_address("COLRLP")
+                        .expect("COLRLP address")
+                        .to_be_bytes()[0],
+                    red_label_routine_address("COLRLP")
+                        .expect("COLRLP address")
+                        .to_be_bytes()[1],
+                    0x02,
+                    RED_LABEL_SYSTEM_PROCESS_TYPE,
+                    0x01,
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA069..0xA06B),
+            Some(&super_free_before[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA061..0xA063),
+            Some(&tail_suicide.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(tail_suicide..tail_suicide + 2),
+            Some(&head_suicide.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA063..0xA065),
+            Some(&super_sleeper.to_be_bytes()[..])
+        );
+    }
+
+    #[test]
     fn executive_iteration_reports_none_when_no_process_is_due() {
         let mut machine = ArcadeMachine::new();
         machine.memory.write_byte(0xA05D, 2).expect("set TIMER");

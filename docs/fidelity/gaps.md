@@ -464,7 +464,9 @@ This file records behavior that must not be guessed in arcade-core code.
   addresses, `ASTRO` and `MSWM` / `MSWLP` enemy process resumes, and the
   `COLR` / `FLPUP` / `CBOMB` / `TIECOL` support-process resumes from `PADDR`,
   including guarded `SBMBX2`/`SUCIDE`, and the translated executive pass
-  continues from the correct source link after sleeping or killed processes.
+  continues from the correct source link after sleeping or killed regular and
+  super processes, returning killed cells through the `PCOD`-selected free
+  list.
   Live coin/admin input now enters through the translated `CSCAN` / `SWTAB1` /
   `SWP` scheduler path, ignores the source auto/manual selector for queue
   priority while preserving it for `ADVSW`, ticks the source slam/coin debounce

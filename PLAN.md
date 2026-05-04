@@ -669,8 +669,9 @@ Steps:
 - [x] DC-06.2 Complete `PLRES` swarmer respawn once the entry B register value
   is trace-proven.
   Completed: `2026-05-04 20:13:37 BST`
-- [ ] DC-06.3 Finish suicide, resume, delay, super-process, and generic body
+- [x] DC-06.3 Finish suicide, resume, delay, super-process, and generic body
   dispatch semantics.
+  Completed: `2026-05-04 20:17:12 BST`
 - [ ] DC-06.4 Verify object/process order against golden traces.
 - [ ] DC-06.5 Remove scaffold state that duplicates exact red-label table
   fields.
@@ -719,6 +720,27 @@ Work log:
   directory, and coverage with 77/77 added executable Rust lines covered).
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777922045347629`
+- `2026-05-04 20:14:44 BST` Started `DC-06.3`: auditing the translated
+  process tails and dispatch loop for source-shaped `SUCIDE`, `SLEEP`,
+  resume-through-`DISP2`, super-process allocation/freeing, and generic
+  translated body dispatch, with new unit coverage for any scheduler mutation
+  semantics still handled by scaffolding.
+- `2026-05-04 20:17:12 BST` Completed `DC-06.3`: added executive-loop
+  coverage proving a super-process can run a translated generic body, sleep to
+  its resume address, preserve the `SPFREE` list, keep its `PCOD` super-process
+  marker, and still allow surrounding regular `SUCIDE` processes to continue
+  through the same `DISP2` pass with regular cells returned to `FREE`. Updated
+  `SPEC.md` and `docs/fidelity/gaps.md` to record the regular/super-process
+  scheduler semantics while leaving untranslated body coverage as an explicit
+  gap. Validation passed with the focused super-process executive-loop unit
+  test,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/gaps.md`,
+  `git diff --check`, and `make fidelity` (`cargo fmt --check`,
+  `cargo test --all-targets` with 813 passed and 13 known ignored library tests
+  plus 2 binary tests, clippy, trace script tests, skipped absent local fixture
+  directory, and coverage with no new executable Rust lines outside tests).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777922256258889`
 
 ### DC-07: IRQ, Scanline, And Palette Integration
 

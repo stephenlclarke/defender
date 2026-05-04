@@ -1371,8 +1371,9 @@ reserve restore. A, X, Y, S, CC, and other B values remain unknown until exact
 CPU scheduling or local traces prove them. The executive wrapper now runs the source
 `EXEC0`/`EXEC1` pre-dispatch slice and keeps walking `DISP` in the same pass
 after translated `SLEEP` and `SUCIDE` tails resume through the ROM's `DISP2`
-link, preserving same-frame process order for sleeping and killed cells. Body
-dispatch exists for the translated
+link, preserving same-frame process order for sleeping and killed regular and
+super-process cells, including `PCOD`-selected free-list return. Body dispatch
+exists for the translated
 `LFIRE`/laser-loop, `SBOMB`, `REV`, `SCPROC`/`SCP1`/`SCP2`,
 `PLSTRT`/`PLST1A`/`PLSTR3`/`PLS01`/`PLS1`, `COLR`/`COLRLP`,
 `FLPUP`/`FLP2`, `CBOMB`/`CBMB1`, `TIECOL`/`TIECL`, and
