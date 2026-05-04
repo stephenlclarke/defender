@@ -183,27 +183,38 @@ Letter-key controls accept either upper- or lower-case input.
 
 The live key layout is currently modelled on the BBC Micro `Planetoid`
 control scheme from Acornsoft's 1982 release of its `Defender` variant.
+That layout is an input profile only: terminal keys are translated into
+Defender cabinet actions before they reach the arcade core. Use
+`--input-profile cabinet` for a MAME-style keyboard profile.
 
 ## XYZZY Overlay
 
 During a live session, type `X`, `Y`, `Z`, `Z`, `Y` to toggle hidden `XYZZY`
 mode on or off.
 
+`XYZZY` is a deliberate compatibility overlay, not Williams red-label arcade
+behavior. With the overlay disabled, trace generation and live core stepping
+stay on the red-label path.
+
 Typing `XYZZY` a second time turns the mode off and resets the hidden
 invincibility and auto-fire toggles back to their default state.
 
 Implemented overlay behavior while `xyzzy` mode is active:
 
-- `F`: toggles the auto-fire compatibility flag.
-- `G`: toggles the invincibility compatibility flag.
-- Auto-fire emits the live fire event while playing.
-- Smart bombs can still emit an overlay smart-bomb event after red-label
-  inventory reaches zero; disabled-`xyzzy` zero-inventory behavior remains the
-  arcade path.
+- `auto_fire`: `F` toggles this hook; when enabled it emits the live fire event
+  while playing without changing the raw cabinet input bits.
+- `unlimited_smart_bombs`: active `xyzzy` can emit an overlay smart-bomb event
+  after red-label inventory reaches zero; disabled-`xyzzy` zero-inventory
+  behavior remains the arcade path.
+- `invincibility`: `G` toggles the compatibility flag. It is currently recorded
+  as overlay state only and is trace-invisible until a source-facing arcade hook
+  is implemented.
 
-Future `xyzzy` effects such as the arcade laser cap override, bullet and mine
-clearing, safe hyperspace, collision overrides, and falling-humanoid survival
-must be added as explicit overlay hooks with paired arcade-off tests.
+Future `xyzzy` effects are reserved as explicit overlay hook names:
+`shot_cap_override`, `bullet_mine_clear`, `safe_hyperspace`,
+`collision_death_override`, and `falling_humanoid_survival`. They are inactive
+until implemented with paired tests proving disabled arcade behavior and enabled
+compatibility behavior.
 
 ## Current Status
 

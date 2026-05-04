@@ -1149,14 +1149,25 @@ Requirements:
 - Typing `X`, `Y`, `Z`, `Z`, `Y` toggles `xyzzy`.
 - `F` toggles auto-fire only while `xyzzy` is active.
 - `G` toggles invincibility only while `xyzzy` is active.
-- `xyzzy` may override shot cap, smart bomb inventory, hyperspace failure,
-  collision death, and falling-human death only through explicit hooks.
+- Current `xyzzy` behavior is limited to explicit overlay hooks:
+  `auto_fire`, `unlimited_smart_bombs`, and `invincibility`.
+- `auto_fire` may synthesize the live fire event without changing raw cabinet
+  input bits.
+- `unlimited_smart_bombs` may synthesize an overlay smart-bomb event without
+  mutating the red-label smart-bomb inventory cell.
+- `invincibility` is currently overlay state only and must remain trace
+  invisible until a source-facing arcade hook is implemented.
+- Future `xyzzy` effects are reserved as explicit overlay hook names:
+  `shot_cap_override`, `bullet_mine_clear`, `safe_hyperspace`,
+  `collision_death_override`, and `falling_humanoid_survival`.
 - Every hook must have paired tests: arcade behavior with `xyzzy` off,
   compatibility behavior with `xyzzy` on.
 
 ### BBC Micro Planetoid Key Mapping
 
 The Planetoid layout is a keyboard compatibility profile, not game logic.
+Terminal keys must be translated into cabinet actions before they reach the
+arcade core; red-label routines should not branch on Planetoid key names.
 
 Required default profile:
 

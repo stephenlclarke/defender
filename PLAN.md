@@ -1635,8 +1635,9 @@ Steps:
 - [x] DC-14.4 Add trace checks that `xyzzy` disabled remains red-label
   equivalent.
   Completed: `2026-05-05 00:04:21 BST`
-- [ ] DC-14.5 Document compatibility behavior without presenting it as arcade
+- [x] DC-14.5 Document compatibility behavior without presenting it as arcade
   behavior.
+  Completed: `2026-05-05 00:05:36 BST`
 
 Completion gate: compatibility behavior is isolated, documented, and covered by
 paired tests.
@@ -1702,6 +1703,19 @@ Work log:
   deferred until the full `DC-14` cycle closes.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935880819719`
+- `2026-05-05 00:05:00 BST` Started `DC-14.5`: updating README and SPEC
+  compatibility wording so Planetoid and `xyzzy` remain documented as
+  non-arcade overlays and input profiles.
+- `2026-05-05 00:05:36 BST` Completed `DC-14.5`: updated `README.md` and
+  `SPEC.md` to state that the Planetoid layout is only an input profile and
+  that `xyzzy` is a deliberate compatibility overlay, not Williams red-label
+  arcade behavior. The docs now name implemented overlay hooks and reserved
+  future hooks, and state the paired-test requirement for any future enabled
+  hook. Validation passed with `markdownlint PLAN.md README.md SPEC.md` and a
+  hook-name drift search across `README.md`, `SPEC.md`, and `src/machine.rs`.
+  Broader `make fidelity` is deferred until the full `DC-14` cycle closes.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935954418139`
 
 ## Phase 8: Planned Large Refactor
 
