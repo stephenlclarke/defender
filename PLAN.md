@@ -1617,7 +1617,7 @@ Work log:
 
 ### DC-14: `xyzzy` And Input Profiles
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: finish supported non-arcade compatibility features without polluting the
 arcade core.
@@ -1716,6 +1716,21 @@ Work log:
   Broader `make fidelity` is deferred until the full `DC-14` cycle closes.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935954418139`
+- `2026-05-05 00:06:11 BST` Started final `DC-14` completion gate: running
+  broad fidelity validation and checking that compatibility behavior remains
+  isolated in input/profile, live wiring, documented overlay hooks, and tests.
+- `2026-05-05 00:08:29 BST` Completed final `DC-14` completion gate:
+  `make fidelity` passed, including formatting, all Rust targets, clippy, trace
+  script self-tests, trace tooling unit tests, fixture-check skip handling, LLVM
+  coverage generation, and new Rust coverage gating. The local trace fixture
+  directory `docs/fidelity/fixtures/local/rust-current` was absent, so the
+  fixture check used its documented skip path. The compatibility isolation
+  search found profile key handling confined to `src/input.rs`, live `xyzzy`
+  state wiring in `src/live.rs`, overlay hook gates and paired tests in
+  `src/machine.rs`, disabled-trace coverage in `src/fidelity.rs`, and matching
+  compatibility documentation in `README.md` and `SPEC.md`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777936144932939`
 
 ## Phase 8: Planned Large Refactor
 
