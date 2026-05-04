@@ -638,8 +638,9 @@ This file records behavior that must not be guessed in arcade-core code.
   renderer now copies source `PCRAM` into palette RAM and presents translated
   video RAM through the native cabinet-frame scaler without a synthetic
   scaffold fallback, with native visible pixel-nibble checksum fixtures for the
-  first `AMODES` / `LOGO` attract slice and source `SCORE` score/replay HUD
-  refresh paths; live playing frames now run upright `IRQ` and
+  first `AMODES` / `LOGO` attract slice, source `SCORE` score/replay HUD
+  refresh paths, and a live IRQ scanline frame; live playing frames now run
+  upright `IRQ` and
   `IRQHK`-selected flipped `IRQB` video passes through the source `VERTCT` /
   `IFLG` scheduler, including map writes, timer/watchdog side effects, palette
   copy, translated `PLAYER`, `STOUT`, upper/lower `OPROC` / `PRDISP` bands,
@@ -650,8 +651,8 @@ This file records behavior that must not be guessed in arcade-core code.
   source power-on `AMODES` / `LOGO` handoff before sleeping to `LOGO0`.
   Remaining untranslated screens stay black. Full
   remaining live HUD/video presentation, general text, remaining boot/game-over
-  presentation, exact hardware scanline cadence, and sound-IRQ ownership are
-  not translated. Live pacing is derived from
+  presentation, non-IRQ CPU-cycle ownership, and sound-IRQ ownership are not
+  translated. Live pacing is derived from
   the core red-label
   `FRAME_RATE_MILLIHZ` constant, and the live loop advances any due
   core frames before each terminal draw so presentation cadence no longer

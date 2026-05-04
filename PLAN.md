@@ -791,7 +791,7 @@ Work log:
 
 ### DC-07: IRQ, Scanline, And Palette Integration
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: integrate frame timing, scanline ownership, palette copy, and hardware map
 restoration into the core.
@@ -810,7 +810,8 @@ Steps:
 - [x] DC-07.4 Emit native video CRCs from actual red-label video RAM in trace
   output.
   Completed: `2026-05-04 21:22:56 BST`
-- [ ] DC-07.5 Add focused pixel/frame fixtures for scanline-sensitive slices.
+- [x] DC-07.5 Add focused pixel/frame fixtures for scanline-sensitive slices.
+  Completed: `2026-05-04 21:26:33 BST`
 
 Completion gate: one full core frame mutates RAM, video RAM, palette RAM,
 object lists, process lists, and sound commands in source order.
@@ -875,6 +876,29 @@ Work log:
   docs/fidelity/README.md docs/fidelity/gaps.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777926227787119`
+- `2026-05-04 21:24:14 BST` Started `DC-07.5`: adding a focused native
+  pixel-nibble fixture for the live IRQ scanline frame so upper/lower
+  `PRDISP`/`OPROC`/`SHELL`/`VELO` band work is tied to a stable rendered
+  red-label video-RAM checksum before later refactors.
+- `2026-05-04 21:26:33 BST` Completed `DC-07.5`: added a live IRQ
+  scanline-sensitive native pixel-nibble fixture that runs the normal live IRQ
+  frame with an active descriptor object, checks the upper/lower scanline band
+  phases, proves video RAM changed from the pre-frame image, and locks the
+  resulting visible pixel CRC at `0xB0E35EDE`. Updated `README.md`, `SPEC.md`,
+  and `docs/fidelity/gaps.md` to remove stale main-IRQ scanline-gap wording and
+  record the new live IRQ pixel fixture. Validation passed with
+  `cargo fmt --check`,
+  `cargo test live_irq_video_frame_has_scanline_sensitive_pixel_fixture --all-targets`,
+  `markdownlint PLAN.md README.md SPEC.md docs/fidelity/README.md
+  docs/fidelity/gaps.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777926418052399`
+- `2026-05-04 21:29:58 BST` Completed `DC-07` gate: `make fidelity`
+  passed after the DC-07 live IRQ schedule, palette, video CRC, and
+  scanline-sensitive pixel fixture work. The gate covered `cargo fmt --check`,
+  `cargo test --all-targets` with 817 passed, 0 failed, and 13 known ignored
+  library tests plus 2 passed binary tests, new-line coverage for 5 of 5 added
+  executable Rust lines, and regenerated lcov/cobertura reports.
 
 ## Phase 3: Player, Session, And Cabinet Flow
 

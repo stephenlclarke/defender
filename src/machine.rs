@@ -36065,6 +36065,50 @@ mod tests {
     }
 
     #[test]
+    fn live_irq_video_frame_has_scanline_sensitive_pixel_fixture() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        let object = setup_active_display_object(&mut machine, "BMBP1");
+        machine
+            .memory
+            .write_word(object + 0x0A, 0x1420)
+            .expect("set object OX16");
+        machine
+            .memory
+            .write_word(object + 0x0C, 0x8055)
+            .expect("set object OY16");
+        machine
+            .memory
+            .write_word(object + 0x0E, 0x0100)
+            .expect("set object OXV");
+        machine
+            .memory
+            .write_word(object + 0x10, 0x0200)
+            .expect("set object OYV");
+        let before = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("pre-frame visible pixel nibbles");
+
+        let frame = machine
+            .red_label_run_normal_live_irq_video_frame()
+            .expect("normal live IRQ video frame");
+        let visible = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("post-frame visible pixel nibbles");
+
+        assert_eq!(
+            frame.upper_object_band.phase,
+            RedLabelIrqObjectBandPhase::NormalUpper
+        );
+        assert_eq!(
+            frame.lower_object_band.phase,
+            RedLabelIrqObjectBandPhase::NormalLower
+        );
+        assert_ne!(crc32(&visible), crc32(&before));
+        assert_eq!(crc32(&visible), 0xB0E3_5EDE);
+    }
+
+    #[test]
     fn live_irq_video_frame_uses_inverted_irq_hook_for_flipped_source_order() {
         let mut machine = ArcadeMachine::new();
         start_one_player_game_for_test(&mut machine);

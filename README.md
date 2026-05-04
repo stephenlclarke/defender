@@ -452,8 +452,8 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   `BGOUT`, and `VELO` instead of the old player-plus-terrain shortcut. The
   initialized core now applies translated `P1SW`, and the `PLSTR3` cocktail
   path now runs translated `P1SW` / `P2SW` IRQ-hook selection before live
-  frames read `IRQHK`. Exact hardware scanline cadence and sound-IRQ ownership
-  remain open.
+  frames read `IRQHK`. Sound-IRQ ownership and remaining non-gameplay
+  presentation paths remain open.
   The `GEXEC` / `GEX0` game-executive slice now initializes `PD`, `UFOTMR`,
   and `WAVTMR`, runs the source `WVCHK` gate, accelerates and decrements
   `UFOTMR`, dispatches `UFOST` and increments `UFOCNT` when the baiter timer
@@ -867,7 +867,8 @@ WAV files under `assets/sounds/` are legacy prototype references unless a
 clean-slate module explicitly embeds them through `src/assets.rs`. The live
 renderer no longer uses a temporary scaffold frame; it scales native red-label
 video RAM directly, and source-backed score/replay and attract-logo slices now
-have native visible pixel-nibble checksum fixtures.
+have native visible pixel-nibble checksum fixtures alongside a live IRQ
+scanline-frame fixture.
 
 ## Platform Support
 

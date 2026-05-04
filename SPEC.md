@@ -835,8 +835,8 @@ Additional gaps and corrections found during this review:
   velocity addition is translated for direct dispatch. `BGI` now selects
   bank/map 7 and runs the translated `BGINIT` terrain-table generator.
   `PLSTRT` live respawn orchestration beyond runtime snapshot sync,
-  human-carry behavior, and full IRQ scanline/live rendering integration
-  remain open.
+  human-carry behavior, and respawn-specific live rendering integration remain
+  open.
 - The live keyboard profiles expose operator cabinet bits with `F2` for
   service advance, `F3` for high-score reset, and held `F4` for the
   auto/up selector used with service advance, plus `F5` for the slam/tilt
@@ -878,7 +878,7 @@ Additional gaps and corrections found during this review:
   The `VELO` active-object velocity slice now covers source X addition and
   Y wrap through cabinet bounds. Remaining `PLSTRT` live respawn integration,
   golden-trace proof for the
-  `BONUS`/`SCLR1` wave-clear tail, full IRQ scanline/live rendering integration,
+  `BONUS`/`SCLR1` wave-clear tail, remaining respawn/game-over presentation,
   and full frame/cycle integration are still scaffold/open. The
   current smart-bomb slice covers the `SBOMB` entry/flash/debounce tail, and
   the current player-death slice covers `PLEND`/`PDEATH`, `PLSAV`, `MONO`,
@@ -962,10 +962,9 @@ Additional gaps and corrections found during this review:
   `VELO`. Cocktail player-start screen switching now runs translated `P1SW` /
   `P2SW` hook setup before that `IRQHK` selection. Idle live attract now starts
   source `ATTR` and follows the immediate power-on `AMODES` / `LOGO` handoff
-  before sleeping to `LOGO0`. Full
-  hardware scanline cadence, sound-IRQ ownership, color walkers, general text
-  beyond the translated message vectors, remaining game-over presentation, and
-  exact scanline ownership still need exact translation.
+  before sleeping to `LOGO0`. Full sound-IRQ ownership, color walkers, general
+  text beyond the translated message vectors, remaining game-over presentation,
+  and non-IRQ cycle ownership still need exact translation.
 - Embedded PNGs are acceptable only as generated/self-contained deployment
   assets. The verified renderer must be derived from red-label ROM/source data
   and fixture-checked.
@@ -1481,8 +1480,9 @@ still explicit. The IRQ scheduler records the source `MAPC`
 clear/select/restore write sequence and restores hardware map selection from
 `MAPCR`. The source IRQ `BGOUT` context now derives the saved `SSTACK` value
 from `HSTK=$BFFF`, the 12-byte 6809 IRQ frame, and the `JSR` return address.
-Full hardware IRQ integration still needs full frame-level IRQ scheduling. The `SCPROC`
-scanner
+Live frame-level IRQ scheduling now runs the source-selected upright/flipped
+passes; remaining hardware work is full CPU-cycle ownership and sound-IRQ
+scheduling. The `SCPROC` scanner
 maintenance process is translated through `ISCAN`, `OSCAN`, `SHSCAN`, and
 `SCNRV` with exact
 `SCP1`/`SCP2` sleep cadence, including `SETAB` / `SETEND` object/player blip

@@ -790,7 +790,7 @@ mod tests {
         let frame = trace.lines().nth(1).expect("first frame");
 
         assert!(frame.starts_with("1\t0x0003\t0x20\t0x00\t0x10\tattract\t"));
-        assert!(frame.ends_with("\t-\t-\t-"));
+        assert!(frame.ends_with("\t-\t-"));
     }
 
     #[test]
@@ -899,8 +899,8 @@ mod tests {
         let frame_911 = trace.lines().nth(911).expect("frame 911");
         let frame_912 = trace.lines().nth(912).expect("frame 912");
 
-        assert!(frame_911.ends_with("\t-\t-\t-"));
-        assert!(frame_912.ends_with("\t-\t0xE6\tcredit_added"));
+        assert!(frame_911.ends_with("\t-\t-"));
+        assert!(frame_912.ends_with("\t0xE6\tcredit_added"));
     }
 
     #[test]
@@ -924,9 +924,9 @@ mod tests {
         let frame_1026 = trace.lines().nth(1026).expect("frame 1026");
         let frame_1027 = trace.lines().nth(1027).expect("frame 1027");
 
-        assert!(frame_1026.ends_with("\t-\t-\t-"));
+        assert!(frame_1026.ends_with("\t-\t-"));
         assert!(frame_1027.contains("\tplaying\t0\t0\t1\t3\t3\t0x24\t0x08\t0x82\t"));
-        assert!(frame_1027.ends_with("\t-\t0xF5\tgame_started"));
+        assert!(frame_1027.ends_with("\t0xF5\tgame_started"));
     }
 
     #[test]
