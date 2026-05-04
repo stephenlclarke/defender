@@ -1257,7 +1257,7 @@ Work log:
 
 ### DC-11: Remaining Enemy And Collision Behavior
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: finish all enemy, shell, mine, and collision routines.
 
@@ -1275,7 +1275,8 @@ Steps:
 - [x] DC-11.5 Add score regression tests for enemies, bullets, mines, humans,
   rescue, Pods, Swarmers, extra stocks, and smart bombs.
   Completed: `2026-05-04 23:03:57 BST`
-- [ ] DC-11.6 Verify each enemy subsystem with focused traces before moving on.
+- [x] DC-11.6 Verify each enemy subsystem with focused traces before moving on.
+  Completed: `2026-05-04 23:06:03 BST`
 
 Completion gate: all red-label enemy processes are either translated and tested
 or explicitly recorded as gaps with ignored/failing tests.
@@ -1353,6 +1354,19 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777932258187679`
+- `2026-05-04 23:04:51 BST` Started `DC-11.6`: running focused verification
+  for the DC-11 enemy, shell, collision, score, smart-bomb, and trace-style
+  characterization fixtures before closing the cycle.
+- `2026-05-04 23:06:03 BST` Completed `DC-11.6`: verified the completed
+  enemy subsystem coverage with `cargo test fixture_covers --all-targets`
+  (16 passed), `cargo test collision --all-targets` (20 passed),
+  `cargo test shell --all-targets` (23 passed), and
+  `cargo test trace_ --all-targets` (65 passed, 5 known ignored fidelity
+  tests). `make trace-fixtures` passed with the documented local skip because
+  `docs/fidelity/fixtures/local/rust-current` is absent. Final checks passed
+  with `cargo fmt --check`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777932385273839`
 
 ## Phase 5: Native Video And Presentation
 
