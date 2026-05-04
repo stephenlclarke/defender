@@ -3740,7 +3740,7 @@ struct RedLabelPowerUpRamFillTarget {
     target_address: u16,
 }
 
-const RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 5] = [
+const RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 7] = [
     RedLabelPowerUpRamFillTarget {
         frame: 68,
         target_address: 0xA26A,
@@ -3759,11 +3759,19 @@ const RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS: [RedLabelPowerUpRamFillTar
     },
     RedLabelPowerUpRamFillTarget {
         frame: 72,
-        target_address: 0xAAC6,
+        target_address: 0xABF8,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 73,
+        target_address: 0xAE5C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 74,
+        target_address: 0xC000,
     },
 ];
 
-const RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 5] = [
+const RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 8] = [
     RedLabelPowerUpRamFillTarget {
         frame: 240,
         target_address: 0xA070,
@@ -3783,6 +3791,18 @@ const RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS: [RedLabelPowerUpRamFillTa
     RedLabelPowerUpRamFillTarget {
         frame: 244,
         target_address: 0xAA6A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 245,
+        target_address: 0xACCE,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 246,
+        target_address: 0xAF34,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 247,
+        target_address: 0xC000,
     },
 ];
 
@@ -3837,7 +3857,7 @@ const RED_LABEL_SINIT_OBJECT_CLEAR_TARGETS: [RedLabelPowerUpRamFillTarget; 4] = 
     },
     RedLabelPowerUpRamFillTarget {
         frame: 724,
-        target_address: 0xAAC5,
+        target_address: 0xAD89,
     },
 ];
 
@@ -3890,16 +3910,16 @@ impl RedLabelPowerUpRamFill {
 fn red_label_trace_power_up_ram_fill_target(frame: u64) -> u16 {
     match frame {
         0..=67 => 0x0000,
-        68..=72 => red_label_power_up_ram_fill_target_for_frame(
+        68..=74 => red_label_power_up_ram_fill_target_for_frame(
             frame,
             &RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS,
         ),
-        73..=239 => 0xC000,
-        240..=244 => red_label_power_up_ram_fill_target_for_frame(
+        75..=239 => 0xC000,
+        240..=247 => red_label_power_up_ram_fill_target_for_frame(
             frame,
             &RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS,
         ),
-        _ => 0xAAC6,
+        _ => 0xC000,
     }
 }
 
@@ -3927,10 +3947,10 @@ pub fn red_label_power_on_frame_model(frame: u64) -> Result<RedLabelPowerOnFrame
         frame,
         stage: match frame {
             0..=67 => RedLabelPowerOnStage::ResetHold,
-            68..=72 => RedLabelPowerOnStage::RamTestFirstPass,
-            73..=239 => RedLabelPowerOnStage::RamTestBetweenPasses,
-            240..=244 => RedLabelPowerOnStage::RamTestSecondPass,
-            245..=719 => RedLabelPowerOnStage::RamTestComplete,
+            68..=74 => RedLabelPowerOnStage::RamTestFirstPass,
+            75..=239 => RedLabelPowerOnStage::RamTestBetweenPasses,
+            240..=247 => RedLabelPowerOnStage::RamTestSecondPass,
+            248..=719 => RedLabelPowerOnStage::RamTestComplete,
             RED_LABEL_TRACE_SINIT_ZERO_SEED_FRAME => RedLabelPowerOnStage::SinitZeroSeed,
             RED_LABEL_TRACE_SINIT_CLEAR_PLAYER_FRAME => RedLabelPowerOnStage::SinitClearPlayer,
             722..=724 => RedLabelPowerOnStage::SinitClearObjects,
@@ -3976,11 +3996,11 @@ pub fn red_label_power_on_frame_model(frame: u64) -> Result<RedLabelPowerOnFrame
             model.rand_state = Some(RED_LABEL_TRACE_INIT20_SOUND_RAND_STATE);
             model.phase = Some(GamePhase::Attract);
             model.sound_command_port_b = Some(RED_LABEL_TRACE_INIT20_SOUND_COMMAND_PORT_B);
+            model.initializes_process_lists = true;
         }
         RedLabelPowerOnStage::Init20ObjectLists => {
             model.rand_state = Some(RED_LABEL_TRACE_INIT20_OBJECT_LIST_RAND_STATE);
             model.phase = Some(GamePhase::GameOver);
-            model.initializes_process_lists = true;
             model.initializes_object_lists = true;
         }
         RedLabelPowerOnStage::ExecIdleSeed => {
@@ -23714,13 +23734,6 @@ impl ArcadeMachine {
                 .expect("embedded red-label RAM layout assets are valid"),
         );
         machine.trace_power_up_ram_fill = Some(RedLabelPowerUpRamFill::new());
-        let layout = red_label_ram_layout().expect("embedded red-label RAM layout is valid");
-        let lists =
-            red_label_linked_lists().expect("embedded red-label linked-list layout is valid");
-        machine
-            .memory
-            .initialize_process_lists(&layout, &lists)
-            .expect("embedded red-label process-list layout is valid");
         machine
     }
 
@@ -24048,17 +24061,24 @@ impl ArcadeMachine {
 
         if model.initializes_process_lists || model.initializes_object_lists {
             let lists = red_label_linked_lists()?;
-            let cmos_defaults = red_label_cmos_defaults()?;
-            self.memory
-                .apply_todays_high_score_defaults(&cmos_defaults)?;
             if model.initializes_process_lists {
                 self.memory.initialize_process_lists(&layout, &lists)?;
             }
             if model.initializes_object_lists {
+                let cmos_defaults = red_label_cmos_defaults()?;
+                self.memory
+                    .apply_todays_high_score_defaults(&cmos_defaults)?;
                 self.memory.initialize_object_lists(&layout, &lists)?;
+                self.memory
+                    .write_field_byte(&layout, "base_page", "STATUS", 0xFF)?;
             }
-            self.memory
-                .write_field_byte(&layout, "base_page", "STATUS", 0xFF)?;
+        }
+
+        if model.stage == RedLabelPowerOnStage::Init20ObjectLists {
+            self.memory.make_process(
+                red_label_routine_address("ATTR")?,
+                RED_LABEL_ATTRACT_PROCESS_TYPE,
+            )?;
         }
 
         if let Some(phase) = model.phase {
@@ -25343,6 +25363,7 @@ impl ArcadeMachine {
             let feed_high_score_entry = !game_over_handoff_active
                 && (self.phase == GamePhase::HighScoreEntry
                     || (self.phase == GamePhase::GameOver
+                        && self.trace_power_up_ram_fill.is_none()
                         && self
                             .begin_next_live_high_score_entry(&mut events)
                             .expect("red-label high-score table should be valid")));
@@ -26857,44 +26878,41 @@ mod tests {
         assert_eq!(red_label_trace_power_up_ram_fill_target(69), 0xA4CE);
         assert_eq!(red_label_trace_power_up_ram_fill_target(70), 0xA730);
         assert_eq!(red_label_trace_power_up_ram_fill_target(71), 0xA994);
-        assert_eq!(red_label_trace_power_up_ram_fill_target(72), 0xAAC6);
-        assert_eq!(red_label_trace_power_up_ram_fill_target(73), 0xC000);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(72), 0xABF8);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(73), 0xAE5C);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(74), 0xC000);
         assert_eq!(red_label_trace_power_up_ram_fill_target(239), 0xC000);
         assert_eq!(red_label_trace_power_up_ram_fill_target(240), 0xA070);
         assert_eq!(red_label_trace_power_up_ram_fill_target(241), 0xA340);
         assert_eq!(red_label_trace_power_up_ram_fill_target(242), 0xA5A4);
         assert_eq!(red_label_trace_power_up_ram_fill_target(243), 0xA806);
         assert_eq!(red_label_trace_power_up_ram_fill_target(244), 0xAA6A);
-        assert_eq!(red_label_trace_power_up_ram_fill_target(245), 0xAAC6);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(245), 0xACCE);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(246), 0xAF34);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(247), 0xC000);
     }
 
     #[test]
     fn power_up_ram_fill_mutates_observed_pass_ranges() {
         let mut machine = ArcadeMachine::new_cold_boot_trace();
-        let first_pass_tail = red_label_ram_snapshot(
-            &machine,
-            "power-up first-pass untouched tail",
-            0xAAC6..0xC000,
-        );
 
-        for _ in 0..72 {
+        for _ in 0..74 {
             machine.step(CabinetInput::NONE);
         }
 
-        assert_eq!(red_label_ram_crc(&machine, 0x0000..0xAAC6), 0xF777_54A6);
-        first_pass_tail.assert_current_unchanged(&machine);
+        assert_eq!(red_label_ram_crc(&machine, 0x0000..0xC000), 0x6EE2_63D2);
 
         let first_pass = red_label_ram_snapshot(
             &machine,
             "power-up second-pass rewritten range",
-            0x0000..0xAAC6,
+            0x0000..0xC000,
         );
-        for _ in 72..245 {
+        for _ in 74..247 {
             machine.step(CabinetInput::NONE);
         }
 
         first_pass.assert_current_changed(&machine);
-        assert_eq!(red_label_ram_crc(&machine, 0x0000..0xAAC6), 0x67D6_72B3);
+        assert_eq!(red_label_ram_crc(&machine, 0x0000..0xC000), 0x613F_AF0E);
     }
 
     #[test]
@@ -26915,7 +26933,7 @@ mod tests {
                 false,
             ),
             (
-                73,
+                75,
                 super::RedLabelPowerOnStage::RamTestBetweenPasses,
                 0xC000,
                 true,
@@ -26929,37 +26947,37 @@ mod tests {
                 false,
             ),
             (
-                245,
+                248,
                 super::RedLabelPowerOnStage::RamTestComplete,
-                0xAAC6,
+                0xC000,
                 true,
                 false,
             ),
             (
                 732,
                 super::RedLabelPowerOnStage::Init20ObjectLists,
-                0xAAC6,
+                0xC000,
                 true,
                 false,
             ),
             (
                 733,
                 super::RedLabelPowerOnStage::ExecIdleSeed,
-                0xAAC6,
+                0xC000,
                 false,
                 false,
             ),
             (
                 745,
                 super::RedLabelPowerOnStage::ExecIdleSeed,
-                0xAAC6,
+                0xC000,
                 false,
                 false,
             ),
             (
                 746,
                 super::RedLabelPowerOnStage::StartReady,
-                0xAAC6,
+                0xC000,
                 false,
                 true,
             ),
@@ -27009,7 +27027,7 @@ mod tests {
             clear_tail.stage,
             super::RedLabelPowerOnStage::SinitClearObjects
         );
-        assert_eq!(clear_tail.sinit_clear_target, Some(0xAAC5));
+        assert_eq!(clear_tail.sinit_clear_target, Some(0xAD89));
 
         let clear_complete = super::red_label_power_on_frame_model(725).expect("frame 725 model");
         assert_eq!(
@@ -27038,6 +27056,7 @@ mod tests {
         );
         assert_eq!(init20_sound.phase, Some(GamePhase::Attract));
         assert_eq!(init20_sound.sound_command_port_b, Some(0x00));
+        assert!(init20_sound.initializes_process_lists);
 
         let init20_lists = super::red_label_power_on_frame_model(732).expect("frame 732 model");
         assert_eq!(
@@ -27049,7 +27068,7 @@ mod tests {
             Some(super::RED_LABEL_TRACE_INIT20_OBJECT_LIST_RAND_STATE)
         );
         assert_eq!(init20_lists.phase, Some(GamePhase::GameOver));
-        assert!(init20_lists.initializes_process_lists);
+        assert!(!init20_lists.initializes_process_lists);
         assert!(init20_lists.initializes_object_lists);
 
         let exec_idle = super::red_label_power_on_frame_model(733).expect("frame 733 model");
@@ -27177,8 +27196,8 @@ mod tests {
             (721, seed_range.end..0xA4AC),
             (722, 0xA4AC..0xA7A0),
             (723, 0xA7A0..0xAA94),
-            (724, 0xAA94..0xAAC5),
-            (725, 0xAAC5..0xC000),
+            (724, 0xAA94..0xAD89),
+            (725, 0xAD89..0xC000),
         ] {
             let before = red_label_ram_snapshot(&machine, "SINIT clear segment", range.clone());
 
@@ -27207,6 +27226,7 @@ mod tests {
         let process_base = process.base.to_be_bytes();
         let super_process_base = super_process.base.to_be_bytes();
         let object_base = object.base.to_be_bytes();
+        let next_process_base = (process.base + process.entry_size).to_be_bytes();
         let high_score_cells =
             u16::try_from(RED_LABEL_HIGH_SCORE_ENTRIES * RED_LABEL_HIGH_SCORE_ENTRY_CELLS)
                 .expect("today's high-score table size fits u16");
@@ -27239,10 +27259,29 @@ mod tests {
             .head_address;
 
         let mut machine = ArcadeMachine::new_cold_boot_trace();
-        for _ in 0..731 {
+        for _ in 0..730 {
             machine.step(CabinetInput::NONE);
         }
+        let process_before_init =
+            red_label_ram_snapshot(&machine, "INIT20 process-list init", process_range.clone());
+        let super_process_before_init = red_label_ram_snapshot(
+            &machine,
+            "INIT20 super-process-list init",
+            super_process_range.clone(),
+        );
+        machine.step(CabinetInput::NONE);
         let sound_before = machine.red_label_sound_board_snapshot();
+        process_before_init.assert_current_changed(&machine);
+        super_process_before_init.assert_current_changed(&machine);
+        assert_eq!(
+            red_label_ram_crc(&machine, process_range.clone()),
+            0xB2B2_58E3
+        );
+        assert_eq!(
+            red_label_ram_crc(&machine, super_process_range.clone()),
+            0x5EDF_4A6B
+        );
+
         let todays = red_label_ram_snapshot(&machine, "INIT20 today's scores", todays_range);
         let status = red_label_ram_snapshot(&machine, "INIT20 STATUS", status_range.clone());
         let process_table =
@@ -27270,9 +27309,9 @@ mod tests {
         todays.assert_current_changed(&machine);
         status.assert_current_changed_to(&machine, &[0xFF]);
         process_table.assert_current_changed(&machine);
-        super_process_table.assert_current_changed(&machine);
+        super_process_table.assert_current_unchanged(&machine);
         object_table.assert_current_changed(&machine);
-        assert_eq!(red_label_ram_crc(&machine, process_range), 0xB2B2_58E3);
+        assert_eq!(red_label_ram_crc(&machine, process_range), 0xA424_BDF6);
         assert_eq!(
             red_label_ram_crc(&machine, super_process_range),
             0x5EDF_4A6B
@@ -27281,7 +27320,7 @@ mod tests {
         assert_eq!(red_label_ram_crc(&machine, todays.range()), 0xE50A_C8F3);
         assert_eq!(
             machine.red_label_ram_range(free_process_head..free_process_head + 2),
-            Some(&process_base[..])
+            Some(&next_process_base[..])
         );
         assert_eq!(
             machine.red_label_ram_range(free_super_process_head..free_super_process_head + 2),
@@ -27289,7 +27328,7 @@ mod tests {
         );
         assert_eq!(
             machine.red_label_ram_range(active_process_head..active_process_head + 2),
-            Some(&[0, 0][..])
+            Some(&process_base[..])
         );
         assert_eq!(
             machine.red_label_ram_range(crproc_range),
@@ -53507,7 +53546,8 @@ mod tests {
         machine.sound_board_last_command_latch = None;
         machine.sound_board_latch_write_count = 0;
         machine.trace_power_up_ram_fill = None;
-        machine.step(CabinetInput::NONE);
+        machine.frame = 99;
+        machine.phase = GamePhase::Playing;
         machine.restore_state(saved_state);
 
         assert_eq!(machine.snapshot(), saved_snapshot);

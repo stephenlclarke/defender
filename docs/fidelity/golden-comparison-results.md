@@ -20,7 +20,9 @@ cargo run --quiet -- \
   docs/fidelity/fixtures/local/reference/attract_boot.expected.tsv
 ```
 
-Result: exact TSV comparison failed at line 2, frame 1.
+Result: exact TSV comparison failed at line 2, frame 1. This is the original
+baseline comparison; `DC-05.5` below records the current narrowed result after
+the source-shaped boot/start-ready work.
 
 First mismatch:
 
@@ -44,10 +46,53 @@ Interpretation:
 
 - The current Rust trace has source-visible object and shell-list state aligned
   with the local `attract_boot` reference for this window.
-- Boot/start-ready process and super-process RAM state or scheduling is still
-  not exact enough to promote `attract_boot` as a passing exact golden test.
+- Boot/start-ready process and super-process RAM state or scheduling was not
+  exact enough at this point to promote `attract_boot` as a passing exact
+  golden test.
 - Later `DC-04` work should add an ignored or failing fixture test for this
   mismatch before changing source-exact boot, executive, or scheduler code.
+
+## 2026-05-04 `DC-05.5` Attract Boot Recheck
+
+Scenario: `attract_boot`
+
+Purpose: re-run the same 900-frame cold boot/attract readiness comparison after
+the source-shaped `DC-05` boot, RAM-fill, SINIT, INIT20, board-latch, and
+mutation-surface work.
+
+Command:
+
+```sh
+cargo run --quiet -- \
+  --fidelity-check-trace \
+  docs/fidelity/fixtures/local/reference/attract_boot.inputs.txt \
+  docs/fidelity/fixtures/local/reference/attract_boot.expected.tsv
+```
+
+Result: exact TSV comparison now matches through frame 732 and fails first at
+line 734, frame 733.
+
+First mismatch:
+
+- `process_table_crc32`: expected `0x62E1AD30`, actual `0xA424BDF6`.
+
+Column summary:
+
+- `process_table_crc32` differed on 168 of 900 frames. The first mismatch was
+  line 734, frame 733. The last mismatch was line 901, frame 900, where the
+  reference expected `0x1A0C7932` and Rust produced `0xA424BDF6`.
+- All other trace columns matched for the 900-frame comparison: input bits,
+  MAME input-port bytes, phase, scores, wave, lives, smart bombs, RNG bytes,
+  object-table CRC, super-process-table CRC, shell-table CRC, video CRC
+  placeholder, sound commands, and events.
+
+Interpretation:
+
+- The local reference now proves the cold-boot reset/RAM-fill, SINIT clear,
+  INIT20 process/super-process/object-list setup, sound command, RNG state, and
+  start-ready handoff through frame 732.
+- The remaining `attract_boot` exact-fixture blocker is the first post-INIT20
+  ATTR/executive scheduler cadence at frame 733 and later process-table state.
 
 ## 2026-05-04 `DC-04.2` Focused Gameplay Slices
 

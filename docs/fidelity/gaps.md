@@ -76,6 +76,16 @@ This file records behavior that must not be guessed in arcade-core code.
   golden-trace gap before `attract_boot` can become a passing exact fixture.
   The gap is encoded by the ignored
   `local_reference_attract_boot_matches_red_label` test.
+- `DC-05.5` re-ran the exact local `attract_boot` comparison after the
+  source-shaped boot/start-ready work. Rust now matches the local reference
+  through frame 732; the first remaining mismatch is line 734, frame 733, where
+  `process_table_crc32` expects `0x62E1AD30` and Rust emits `0xA424BDF6`.
+  Across the full 900-frame comparison, only `process_table_crc32` differs,
+  with 168 mismatched frames ending at frame 900. The remaining blocker is the
+  post-INIT20 ATTR/executive scheduler cadence and later process-table state,
+  not cold-boot RAM fill, SINIT clear, INIT20 list setup, sound command, object
+  table, super-process table, shell table, RNG, input, phase, score, event, or
+  sound-command output through the start-ready handoff.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process
@@ -462,12 +472,13 @@ This file records behavior that must not be guessed in arcade-core code.
   active translated player-start handoff advances. The terminal input profiles
   map `5`, `6`, `7`, `F2`, `F3`, held `F4`, and `F5` onto the three coin
   slots, service advance, high-score reset, the auto/up selector, and the
-  slam/tilt switch. Source-exact boot/start-ready state is still not
-  translated. Generic `SUCIDE` / `HYPX` tails now use the translated
-  process-list cleanup path.
+  slam/tilt switch. The local `attract_boot` fixture now proves boot/start-ready
+  state through frame 732, but the post-INIT20 ATTR/executive scheduler cadence
+  still diverges from frame 733. Generic `SUCIDE` / `HYPX` tails now use the
+  translated process-list cleanup path.
   Generic/untranslated process bodies, the remaining `SWTAB` routine bodies and
-  no-process input effects, exact frame/cycle integration, and golden-trace
-  equivalence are not translated.
+  no-process input effects, exact frame/cycle integration, post-start-ready
+  ATTR scheduling, and golden-trace equivalence are not translated.
 - CMOS layout, ROM default bytes, 4-bit cell writes, `CLRAUD`/`CMINIT` visible
   cell effects, the CMOS-visible `PWRUP` branch and source dispatch target,
   `RHSTD`/`RHSTDS` reset copies, `AUDITG` / `MSGAUD` message-offset rows and

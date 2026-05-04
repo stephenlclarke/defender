@@ -483,7 +483,7 @@ Work log:
 
 ### DC-05: Source-Exact Boot And Hardware Step
 
-Status: `in_progress`
+Status: `completed`
 
 Goal: replace trace-only boot scaffolding with source-shaped reset, ROM-test,
 RAM-test, CMOS, and start-ready execution.
@@ -501,13 +501,41 @@ Steps:
   Completed: `2026-05-04 18:35:07 BST`
 - [x] DC-05.4 Add mutation tests for every board and machine byte range touched.
   Completed: `2026-05-04 18:44:31 BST`
-- [ ] DC-05.5 Prove boot/start-ready trace equivalence with local fixtures.
+- [x] DC-05.5 Prove boot/start-ready trace equivalence with local fixtures.
+  Completed: `2026-05-04 19:05:30 BST`
 
 Completion gate: boot/start-ready state is source-shaped and no longer depends
 on trace-only scheduling shortcuts.
 
 Work log:
 
+- `2026-05-04 18:45:55 BST` Started `DC-05.5`: running the exact
+  `attract_boot` local reference comparison to prove or isolate the remaining
+  boot/start-ready trace gap before deciding whether the current source-shaped
+  boot surfaces are sufficient to close `DC-05`.
+- `2026-05-04 19:05:30 BST` Completed `DC-05.5`: removed the premature cold
+  boot process-list initialization, aligned the MAME-observed RAM-fill pass
+  targets, extended the SINIT clear boundary, split INIT20 process-list and
+  object-list handoff side effects, and created the boot ATTR process from the
+  source-shaped object-list handoff. The exact local `attract_boot` comparison
+  now matches through frame 732 and first fails at line 734, frame 733, only in
+  `process_table_crc32` (`0x62E1AD30` expected, `0xA424BDF6` actual), isolating
+  the remaining work to post-INIT20 ATTR/executive scheduler cadence. Updated
+  `SPEC.md`, `docs/fidelity/gaps.md`, and
+  `docs/fidelity/golden-comparison-results.md` with the narrowed fixture gap.
+  Adjusted refactor-safety tests for the new boot surfaces and kept the
+  credited-start trace test pinned to current behavior while the exact local
+  gameplay references remain ignored. Validation passed with `cargo fmt
+  --check`, `cargo test --all-targets`, the exact local `attract_boot`
+  comparison as an expected frame-733 failure, `markdownlint PLAN.md SPEC.md
+  docs/fidelity/gaps.md docs/fidelity/golden-comparison-results.md`,
+  `git diff --check`, and `make fidelity`. `make fidelity` passed regular tests
+  with 806 passed and 13 known ignored tests, main tests with 2 passed, clippy,
+  trace script tests, and coverage with 19/19 added executable Rust lines
+  covered; `make trace-fixtures` skipped only because the ignored local
+  `docs/fidelity/fixtures/local/rust-current` directory is absent.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777917986222729`
 - `2026-05-04 18:36:18 BST` Started `DC-05.4`: auditing the `DC-05`
   board and machine byte surfaces already wired into frame stepping, then
   adding focused mutation tests for any touched RAM, CMOS, palette, latch, or

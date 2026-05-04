@@ -427,10 +427,10 @@ Additional gaps and corrections found during this review:
 - Local MAME reference traces are intentionally ignored artifacts. The checked
   in code can validate local fixture presence and shape, but the repo still
   depends on user-supplied ROMs and local MAME to prove golden equivalence.
-- Remaining open gaps include source-exact boot/start-ready proof beyond the
-  `DC-05.1` frame model, complete CPU IRQ and screen-scanline frame scheduling,
-  full frame/cycle integration, golden-trace proof for translated
-  gameplay/session paths, pixel golden fixtures, full sound-board
+- Remaining open gaps include the post-INIT20 ATTR/executive scheduler cadence
+  from `attract_boot` frame 733 onward, complete CPU IRQ and screen-scanline
+  frame scheduling, full frame/cycle integration, golden-trace proof for
+  translated gameplay/session paths, pixel golden fixtures, full sound-board
   cycle/waveform scheduling, audio command and waveform fixtures, and removal
   or regeneration of archived prototype visual/audio assets.
 - The prior local implementation notes listed "Fix Mutant score to `150`" as
@@ -1066,6 +1066,16 @@ Additional gaps and corrections found during this review:
   frames. All other trace columns matched. Boot/start-ready process and
   super-process RAM state or scheduling remains a known golden-trace gap before
   `attract_boot` can be promoted as a passing exact fixture.
+- `DC-05.5` narrowed the local `attract_boot` reference gap. The exact
+  comparison now matches through frame 732 and first fails at line 734, frame
+  733, solely in `process_table_crc32`: the reference expects `0x62E1AD30` and
+  Rust emits `0xA424BDF6`. Across the 900-frame comparison,
+  `process_table_crc32` differs on 168 frames through frame 900, while input
+  bits, MAME input-port bytes, phase, scores, wave, lives, smart bombs, RNG
+  bytes, object-table CRC, super-process-table CRC, shell-table CRC, video CRC
+  placeholder, sound commands, and events match. The remaining exact-fixture
+  blocker is post-INIT20 ATTR/executive scheduler cadence, not cold-boot
+  RAM-fill, SINIT, INIT20 list setup, sound command, or start-ready state.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot
