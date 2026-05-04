@@ -1626,7 +1626,8 @@ Steps:
 
 - [x] DC-14.1 Keep Planetoid and cabinet mappings in input-profile code only.
   Completed: `2026-05-04 23:56:39 BST`
-- [ ] DC-14.2 Add every future `xyzzy` hook as an explicit overlay hook.
+- [x] DC-14.2 Add every future `xyzzy` hook as an explicit overlay hook.
+  Completed: `2026-05-04 23:59:18 BST`
 - [ ] DC-14.3 For each hook, add paired tests proving arcade behavior is
   unchanged when `xyzzy` is disabled and compatibility behavior applies when it
   is enabled.
@@ -1652,6 +1653,21 @@ Work log:
   Broader `make fidelity` is deferred until the full `DC-14` cycle closes.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935421675149`
+- `2026-05-04 23:57:27 BST` Started `DC-14.2`: replacing direct gameplay
+  checks of raw `xyzzy` flags with explicit named overlay hooks for current
+  behavior and the documented future compatibility hooks.
+- `2026-05-04 23:59:18 BST` Completed `DC-14.2`: added
+  `XyzzyOverlayHook` names for the implemented auto-fire, unlimited smart-bomb,
+  and invincibility surfaces plus the documented future shot-cap,
+  bullet/mine-clear, safe-hyperspace, collision-death, and falling-humanoid
+  hooks. Live gameplay now gates auto-fire and unlimited smart bombs through
+  `CompatibilityState::overlay_hook` instead of direct raw-flag checks.
+  Validation passed with `cargo fmt --check`, `cargo test xyzzy_ --all-targets`,
+  the raw-flag source search across `src/machine.rs`, `src/live.rs`, and
+  `src/input.rs`, and `cargo clippy --all-targets -- -D warnings`. Broader
+  `make fidelity` is deferred until the full `DC-14` cycle closes.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935581955939`
 
 ## Phase 8: Planned Large Refactor
 

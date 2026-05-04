@@ -550,6 +550,63 @@ pub struct CompatibilityState {
     pub xyzzy_auto_fire: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XyzzyOverlayHook {
+    AutoFire,
+    UnlimitedSmartBombs,
+    Invincibility,
+    ShotCapOverride,
+    BulletMineClear,
+    SafeHyperspace,
+    CollisionDeathOverride,
+    FallingHumanoidSurvival,
+}
+
+impl XyzzyOverlayHook {
+    pub const ALL: [Self; 8] = [
+        Self::AutoFire,
+        Self::UnlimitedSmartBombs,
+        Self::Invincibility,
+        Self::ShotCapOverride,
+        Self::BulletMineClear,
+        Self::SafeHyperspace,
+        Self::CollisionDeathOverride,
+        Self::FallingHumanoidSurvival,
+    ];
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::AutoFire => "auto_fire",
+            Self::UnlimitedSmartBombs => "unlimited_smart_bombs",
+            Self::Invincibility => "invincibility",
+            Self::ShotCapOverride => "shot_cap_override",
+            Self::BulletMineClear => "bullet_mine_clear",
+            Self::SafeHyperspace => "safe_hyperspace",
+            Self::CollisionDeathOverride => "collision_death_override",
+            Self::FallingHumanoidSurvival => "falling_humanoid_survival",
+        }
+    }
+}
+
+impl CompatibilityState {
+    pub const fn overlay_hook(self, hook: XyzzyOverlayHook) -> bool {
+        if !self.xyzzy_active {
+            return false;
+        }
+
+        match hook {
+            XyzzyOverlayHook::AutoFire => self.xyzzy_auto_fire,
+            XyzzyOverlayHook::UnlimitedSmartBombs => true,
+            XyzzyOverlayHook::Invincibility => self.xyzzy_invincible,
+            XyzzyOverlayHook::ShotCapOverride
+            | XyzzyOverlayHook::BulletMineClear
+            | XyzzyOverlayHook::SafeHyperspace
+            | XyzzyOverlayHook::CollisionDeathOverride
+            | XyzzyOverlayHook::FallingHumanoidSurvival => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct LiveTranslatedSwitchOutcome {
     smart_bomb_started: bool,
@@ -26206,10 +26263,11 @@ impl ArcadeMachine {
         &mut self,
         input: CabinetInput,
     ) -> LiveTranslatedSwitchOutcome {
-        let overlay_smart_bombs = self
+        let auto_fire = self.compatibility.overlay_hook(XyzzyOverlayHook::AutoFire);
+        let unlimited_smart_bombs = self
             .compatibility
-            .xyzzy_active
-            .then_some(self.player.smart_bombs);
+            .overlay_hook(XyzzyOverlayHook::UnlimitedSmartBombs);
+        let overlay_smart_bombs = unlimited_smart_bombs.then_some(self.player.smart_bombs);
         let player_start_active = self
             .red_label_live_player_start_process_active()
             .expect("embedded red-label player-start process labels are valid");
@@ -26218,9 +26276,8 @@ impl ArcadeMachine {
                 .expect("live player start creates only translated red-label processes")
         } else {
             let mut translated_input = CabinetInput::NONE;
-            translated_input.fire = input.fire
-                || (self.compatibility.xyzzy_active && self.compatibility.xyzzy_auto_fire);
-            translated_input.smart_bomb = input.smart_bomb && !self.compatibility.xyzzy_active;
+            translated_input.fire = input.fire || auto_fire;
+            translated_input.smart_bomb = input.smart_bomb && !unlimited_smart_bombs;
             translated_input.reverse = input.reverse;
             translated_input.thrust = input.thrust;
             translated_input.altitude_down = input.altitude_down;
@@ -26323,13 +26380,16 @@ impl ArcadeMachine {
             .expect("embedded red-label live video IRQ layout is valid");
         self.record_main_board_live_video_frame(&video_frame);
 
-        if input.fire || (self.compatibility.xyzzy_active && self.compatibility.xyzzy_auto_fire) {
+        let auto_fire = self.compatibility.overlay_hook(XyzzyOverlayHook::AutoFire);
+        let unlimited_smart_bombs = self
+            .compatibility
+            .overlay_hook(XyzzyOverlayHook::UnlimitedSmartBombs);
+
+        if input.fire || auto_fire {
             events.push(MachineEvent::FirePressed);
         }
 
-        if input.smart_bomb
-            && (switch_outcome.smart_bomb_started || self.compatibility.xyzzy_active)
-        {
+        if input.smart_bomb && (switch_outcome.smart_bomb_started || unlimited_smart_bombs) {
             events.push(MachineEvent::SmartBombPressed);
         }
 
@@ -58113,6 +58173,49 @@ mod tests {
             after_release.sound_commands().collect::<Vec<_>>(),
             vec![SoundCommand::from_main_board_pia_port_b(0x30)]
         );
+    }
+
+    #[test]
+    fn xyzzy_overlay_hooks_are_explicit_and_disabled_until_enabled() {
+        let disabled = super::CompatibilityState::default();
+        for hook in super::XyzzyOverlayHook::ALL {
+            assert!(
+                !disabled.overlay_hook(hook),
+                "{} should be disabled without xyzzy",
+                hook.label()
+            );
+        }
+
+        let active = super::CompatibilityState {
+            xyzzy_active: true,
+            xyzzy_invincible: false,
+            xyzzy_auto_fire: false,
+        };
+        assert!(active.overlay_hook(super::XyzzyOverlayHook::UnlimitedSmartBombs));
+        assert!(!active.overlay_hook(super::XyzzyOverlayHook::AutoFire));
+        assert!(!active.overlay_hook(super::XyzzyOverlayHook::Invincibility));
+
+        let toggled = super::CompatibilityState {
+            xyzzy_active: true,
+            xyzzy_invincible: true,
+            xyzzy_auto_fire: true,
+        };
+        assert!(toggled.overlay_hook(super::XyzzyOverlayHook::AutoFire));
+        assert!(toggled.overlay_hook(super::XyzzyOverlayHook::UnlimitedSmartBombs));
+        assert!(toggled.overlay_hook(super::XyzzyOverlayHook::Invincibility));
+        for hook in [
+            super::XyzzyOverlayHook::ShotCapOverride,
+            super::XyzzyOverlayHook::BulletMineClear,
+            super::XyzzyOverlayHook::SafeHyperspace,
+            super::XyzzyOverlayHook::CollisionDeathOverride,
+            super::XyzzyOverlayHook::FallingHumanoidSurvival,
+        ] {
+            assert!(
+                !toggled.overlay_hook(hook),
+                "{} should stay explicit but inactive until implemented",
+                hook.label()
+            );
+        }
     }
 
     #[test]
