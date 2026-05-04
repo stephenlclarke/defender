@@ -13,6 +13,9 @@ Rules:
   binary must remain self-contained.
 - Characterization tests follow `characterization-tests.md` so later refactors
   preserve source-visible mutations, not only returned values.
+- Golden-trace fixes follow the `characterization-tests.md` golden-fix workflow:
+  exact TSV comparison first, then narrow source-visible mutation tests for the
+  responsible routine.
 
 Current trace format:
 

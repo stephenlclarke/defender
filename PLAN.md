@@ -366,7 +366,7 @@ Work log:
 
 ### DC-04: Golden Tests For Existing Translated Slices
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: move existing translated routines from unit-only confidence toward
 red-label equivalence.
@@ -381,8 +381,9 @@ Steps:
 - [x] DC-04.3 Add ignored or failing fidelity tests for every still-unknown
   trace mismatch before implementing a fix.
   Completed: `2026-05-04 18:03:50 BST`
-- [ ] DC-04.4 Keep exact TSV comparison as the first gate, then add narrower
+- [x] DC-04.4 Keep exact TSV comparison as the first gate, then add narrower
   mutation tests for the routine causing each mismatch.
+  Completed: `2026-05-04 18:05:59 BST`
 
 Completion gate: translated slices either match local golden fixtures or have
 explicit ignored/failing tests and `SPEC.md` gap entries.
@@ -458,6 +459,25 @@ Work log:
   `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777914263794419`
+- `2026-05-04 18:05:05 BST` Started `DC-04.4`: documenting the golden-fix
+  workflow so exact TSV comparisons stay the first gate and each future
+  mismatch fix adds a narrow source-visible mutation test at the responsible
+  routine boundary.
+- `2026-05-04 18:05:59 BST` Completed `DC-04.4`: added the exact-first
+  golden-fix workflow to `docs/fidelity/characterization-tests.md`, linked it
+  from `docs/fidelity/README.md`, and updated `SPEC.md`. The workflow requires
+  future fixes to run exact TSV comparison first, record the first mismatch,
+  add a narrow source-visible mutation test at the responsible routine
+  boundary, rerun the exact TSV gate, and unignore local reference tests only
+  once the fixture is stable. Validation passed with
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/characterization-tests.md
+  docs/fidelity/local-reference-runs.md
+  docs/fidelity/golden-comparison-results.md assets/red-label/README.md` and
+  `git diff --check`. No cargo test was run because the change is
+  documentation-only.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777914395566329`
 
 ## Phase 2: Hardware, Scheduler, And Frame Execution
 

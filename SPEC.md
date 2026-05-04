@@ -1070,6 +1070,11 @@ Additional gaps and corrections found during this review:
   `cargo test local_reference_ --all-targets -- --ignored` with local fixtures
   currently fails through the exact TSV comparison path and should pass only
   after the corresponding trace gaps are fixed.
+- `DC-04.4` records the fix workflow in
+  `docs/fidelity/characterization-tests.md`: exact TSV comparison remains the
+  first gate, every fix must add a narrow source-visible mutation test at the
+  responsible routine boundary, and local reference tests should be unignored
+  only after the corresponding exact fixture is stable.
 - There are no object-table, shell-table, or pixel-frame golden tests against
   attract/gameplay references, though the trace format can now carry raw table
   and native frame CRC-32 values.
