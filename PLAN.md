@@ -1040,7 +1040,8 @@ Steps:
 - [x] DC-09.1 Finish one-player and two-player session flow, including
   alternating turns and current-player table swaps.
   Completed: `2026-05-04 22:01:58 BST`
-- [ ] DC-09.2 Finish credit, coinage, free-play, replay, and bonus-stock rules.
+- [x] DC-09.2 Finish credit, coinage, free-play, replay, and bonus-stock rules.
+  Completed: `2026-05-04 22:03:46 BST`
 - [ ] DC-09.3 Translate exact initials-entry UI, high-score screens, and
   game-over-to-attract timing.
 - [ ] DC-09.4 Decide and document the default live CMOS persistence policy.
@@ -1068,6 +1069,20 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928532126079`
+- `2026-05-04 22:02:42 BST` Started `DC-09.2`: adding a combined credit
+  accounting fixture that proves coin multiplier credits, free-play start
+  credits, CMOS credit backup writes, replay sound loading, and bonus-stock
+  mutations remain stable for the later refactor.
+- `2026-05-04 22:03:46 BST` Completed `DC-09.2`: added
+  `credit_rules_fixture_covers_coinage_freeplay_replay_and_bonus_stock`, proving
+  center-slot multiplier credit accounting, paid-credit audit mutation, CMOS
+  `CREDST` backup, free-play two-player start without a coin event, replay-award
+  bonus-stock mutation, and `RPSND` sound loading. Validation passed with
+  `cargo fmt --check`,
+  `cargo test credit_rules_fixture_covers_coinage_freeplay_replay_and_bonus_stock
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928635916079`
 
 ## Phase 4: World, Waves, Humans, And Enemies
 

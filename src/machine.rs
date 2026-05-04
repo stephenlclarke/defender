@@ -32958,6 +32958,109 @@ mod tests {
     }
 
     #[test]
+    fn credit_rules_fixture_covers_coinage_freeplay_replay_and_bonus_stock() {
+        let mut coin = ArcadeMachine::new();
+        coin.step(CabinetInput {
+            coin_two: true,
+            ..CabinetInput::NONE
+        });
+
+        let credited = step_until_credit_added(&mut coin);
+
+        assert_eq!(credited.snapshot.credits, 4);
+        assert!(
+            credited
+                .events()
+                .any(|event| event == MachineEvent::CreditAdded)
+        );
+        assert_eq!(
+            coin.red_label_ram_range(0xA037..0xA03A),
+            Some(&[0x04, 0x00, 0x04][..])
+        );
+        assert_eq!(
+            coin.red_label_cmos_range(0x05..0x09),
+            Some(&[0xF0, 0xF0, 0xF0, 0xF1][..])
+        );
+        assert_eq!(
+            coin.red_label_cmos_range(0x0D..0x11),
+            Some(&[0xF0, 0xF0, 0xF0, 0xF4][..])
+        );
+        assert_eq!(
+            coin.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF0, 0xF4][..])
+        );
+
+        let mut free_play = ArcadeMachine::new();
+        free_play
+            .memory
+            .write_cmos_byte_by_symbol("FREEPL", 1)
+            .expect("enable free play");
+
+        let started = free_play.step(CabinetInput {
+            start_two: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(started.snapshot.phase, GamePhase::Playing);
+        assert_eq!(started.snapshot.credits, 0);
+        assert!(
+            !started
+                .events()
+                .any(|event| event == MachineEvent::CreditAdded)
+        );
+        assert!(
+            started
+                .events()
+                .any(|event| event == MachineEvent::GameStarted)
+        );
+        assert_eq!(
+            free_play.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x00][..])
+        );
+        assert_eq!(
+            free_play.red_label_cmos_range(0x7D..0x7F),
+            Some(&[0xF0, 0xF0][..])
+        );
+        assert_eq!(
+            free_play.red_label_ram_range(0xA08C..0xA08D),
+            Some(&[0x02][..])
+        );
+
+        let mut replay = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut replay);
+        write_ram_bytes(&mut replay, 0xA1C2, &[0x00, 0x00, 0x99, 0x90]);
+
+        let outcome = replay
+            .red_label_score_current_player(0x0010)
+            .expect("score replay boundary");
+
+        assert_eq!(outcome.player_number, 1);
+        assert!(outcome.bonus_awarded);
+        assert_eq!(
+            outcome.sound_loaded,
+            Some(RedLabelLoadedSoundTable {
+                address: red_label_sound_table_address("RPSND").expect("RPSND"),
+                priority: 0xFF,
+            })
+        );
+        assert_eq!(
+            replay.red_label_ram_range(0xA1C2..0xA1C6),
+            Some(&[0x00, 0x01, 0x00, 0x00][..])
+        );
+        assert_eq!(
+            replay.red_label_ram_range(0xA1C9..0xA1CC),
+            Some(&[0x03, 0x01, 0x04][..])
+        );
+        assert_eq!(replay.snapshot().scores.player_one, 10_000);
+        assert_eq!(replay.snapshot().player.lives, 3);
+        assert_eq!(replay.snapshot().player.smart_bombs, 4);
+        assert_eq!(
+            replay.red_label_ram_range(0xA0B0..0xA0B5),
+            Some(&[0xD4, 0xAE, 0xFF, 0x01, 0x01][..])
+        );
+    }
+
+    #[test]
     fn one_player_game_setup_initializes_red_label_player_runtime_state() {
         let mut machine = ArcadeMachine::new();
         start_one_player_game_for_test(&mut machine);
