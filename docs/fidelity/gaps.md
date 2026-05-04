@@ -496,9 +496,9 @@ This file records behavior that must not be guessed in arcade-core code.
   state through frame 732, but the post-INIT20 ATTR/executive scheduler cadence
   still diverges from frame 733. Generic `SUCIDE` / `HYPX` tails now use the
   translated process-list cleanup path.
-  Generic/untranslated process bodies, the remaining `SWTAB` routine bodies and
-  no-process input effects, exact frame/cycle integration, post-start-ready
-  ATTR scheduling, and golden-trace equivalence are not translated.
+  Generic/untranslated process bodies, any remaining no-process `SWTAB` input
+  effects, exact frame/cycle integration, post-start-ready ATTR scheduling, and
+  end-to-end golden-trace equivalence are not translated.
 - CMOS layout, ROM default bytes, 4-bit cell writes, `CLRAUD`/`CMINIT` visible
   cell effects, the CMOS-visible `PWRUP` branch and source dispatch target,
   `RHSTD`/`RHSTDS` reset copies, `AUDITG` / `MSGAUD` message-offset rows and

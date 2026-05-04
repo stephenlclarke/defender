@@ -33224,6 +33224,119 @@ mod tests {
     }
 
     #[test]
+    fn session_regression_fixture_locks_scores_stocks_credits_high_scores_and_cmos() {
+        let mut credits = ArcadeMachine::new();
+        insert_live_coin(&mut credits);
+        insert_live_right_coin(&mut credits);
+
+        let credit_backup =
+            red_label_cmos_snapshot(&credits, "DC-09.6 live credit backup", 0x7D..0x7F);
+        let started = credits.step(CabinetInput {
+            start_two: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(started.snapshot.phase, GamePhase::Playing);
+        assert_eq!(started.snapshot.credits, 0);
+        assert_eq!(
+            credits.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x00][..])
+        );
+        credit_backup.assert_current_changed_to(&credits, &[0xF0, 0xF0]);
+
+        let mut player_one = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut player_one);
+        let p1_smart_bombs = red_label_ram_snapshot(
+            &player_one,
+            "DC-09.6 player one smart bombs",
+            0xA1CB..0xA1CC,
+        );
+        let p1_lives =
+            red_label_ram_snapshot(&player_one, "DC-09.6 player one lives", 0xA1C9..0xA1CA);
+        assert_eq!(player_one.snapshot().player.lives, 2);
+        assert_eq!(player_one.snapshot().player.smart_bombs, 3);
+        player_one
+            .red_label_score_current_player(0x0025)
+            .expect("score player one");
+        schedule_smart_bomb_process(&mut player_one);
+        player_one
+            .red_label_start_smart_bomb_current_player()
+            .expect("start player one smart bomb")
+            .expect("player one smart bomb available");
+        assert_eq!(player_one.snapshot().scores.player_one, 25);
+        assert_eq!(player_one.snapshot().player.lives, 2);
+        assert_eq!(player_one.snapshot().player.smart_bombs, 2);
+        p1_smart_bombs.assert_current_changed_to(&player_one, &[0x02]);
+        p1_lives.assert_current_unchanged(&player_one);
+
+        let mut player_two = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut player_two);
+        player_two.current_player = 2;
+        player_two.memory.write_byte(0xA08B, 2).expect("set CURPLR");
+        player_two
+            .memory
+            .write_word(0xA08D, 0xA1FF)
+            .expect("set PLRX");
+        let p2_smart_bombs = red_label_ram_snapshot(
+            &player_two,
+            "DC-09.6 player two smart bombs",
+            0xA208..0xA209,
+        );
+        let p2_lives =
+            red_label_ram_snapshot(&player_two, "DC-09.6 player two lives", 0xA206..0xA207);
+        assert_eq!(player_two.snapshot().player.lives, 3);
+        assert_eq!(player_two.snapshot().player.smart_bombs, 3);
+        player_two
+            .red_label_score_current_player(0x0030)
+            .expect("score player two");
+        schedule_smart_bomb_process(&mut player_two);
+        player_two
+            .red_label_start_smart_bomb_current_player()
+            .expect("start player two smart bomb")
+            .expect("player two smart bomb available");
+        assert_eq!(player_two.snapshot().scores.player_one, 0);
+        assert_eq!(player_two.snapshot().scores.player_two, 30);
+        assert_eq!(player_two.snapshot().player.lives, 3);
+        assert_eq!(player_two.snapshot().player.smart_bombs, 2);
+        p2_smart_bombs.assert_current_changed_to(&player_two, &[0x02]);
+        p2_lives.assert_current_unchanged(&player_two);
+
+        let mut high_score = ArcadeMachine::new();
+        let mut snapshot = high_score.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = 50_000;
+        high_score.restore(snapshot);
+        let all_time_top = red_label_cmos_snapshot(
+            &high_score,
+            "DC-09.6 all-time high-score entry",
+            u16::from(RED_LABEL_CRHSTD_CELL_OFFSET)
+                ..u16::from(RED_LABEL_CRHSTD_CELL_OFFSET) + RED_LABEL_HIGH_SCORE_ENTRY_CELLS as u16,
+        );
+        let todays_top = red_label_ram_snapshot(
+            &high_score,
+            "DC-09.6 today's high-score entry",
+            RED_LABEL_THSTAB_START
+                ..RED_LABEL_THSTAB_START + RED_LABEL_HIGH_SCORE_ENTRY_CELLS as u16,
+        );
+
+        let submitted = high_score.step_with_typed_chars(CabinetInput::NONE, &['a', 'c', 'e']);
+
+        assert_eq!(
+            submitted.snapshot.high_score_submission,
+            Some(super::HighScoreSubmissionState {
+                player: 1,
+                score: 50_000,
+            })
+        );
+        let expected_entry = [
+            0xF0, 0xF5, 0xF0, 0xF0, 0xF0, 0xF0, 0xF4, 0xF1, 0xF4, 0xF3, 0xF4, 0xF5,
+        ];
+        all_time_top.assert_current_changed_to(&high_score, &expected_entry);
+        todays_top.assert_current_changed_to(&high_score, &expected_entry);
+        assert_eq!(submitted.snapshot.scores.high_score, 50_000);
+    }
+
+    #[test]
     fn one_player_game_setup_initializes_red_label_player_runtime_state() {
         let mut machine = ArcadeMachine::new();
         start_one_player_game_for_test(&mut machine);

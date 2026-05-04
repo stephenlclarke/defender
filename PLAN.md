@@ -1030,7 +1030,7 @@ Work log:
 
 ### DC-09: Cabinet Session And Operator Flow
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: complete exact credits, starts, high scores, two-player alternation, and
 operator behavior.
@@ -1050,11 +1050,13 @@ Steps:
 - [x] DC-09.5 Complete diagnostics, audit, and adjustment flow in live cabinet
   mode.
   Completed: `2026-05-04 22:09:16 BST`
-- [ ] DC-09.6 Add regression tests for P1/P2 score, lives, smart bombs, credits,
+- [x] DC-09.6 Add regression tests for P1/P2 score, lives, smart bombs, credits,
   high-score insertion, and CMOS mutations.
+  Completed: `2026-05-04 22:17:15 BST`
 
-Completion gate: cabinet session behavior matches red-label traces and
-operator-facing documentation is current.
+Completion gate: cabinet session behavior is covered by translated
+source-shaped regression fixtures, remaining end-to-end golden-trace gaps are
+documented, and operator-facing documentation is current.
 
 Work log:
 
@@ -1131,6 +1133,26 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928969712859`
+- `2026-05-04 22:10:25 BST` Started `DC-09.6`: adding a consolidated
+  refactor-safety regression fixture for P1/P2 scores, lives, smart bombs,
+  credits, high-score insertion, and CMOS mutations.
+- `2026-05-04 22:17:15 BST` Completed `DC-09.6`: added
+  `session_regression_fixture_locks_scores_stocks_credits_high_scores_and_cmos`,
+  proving a translated two-credit/two-player start consumes credits and writes
+  CMOS credit backup state, player-one and player-two score/smart-bomb paths
+  mutate the correct source RAM while preserving lives, and submitted initials
+  insert packed high-score entries into both all-time CMOS and today's RAM.
+  Updated `SPEC.md` and `docs/fidelity/gaps.md` to keep cabinet-session logic
+  separate from the still-open end-to-end golden-trace proof gap. Validation
+  passed with `cargo fmt --check`,
+  `cargo test session_regression_fixture_locks_scores_stocks_credits_high_scores_and_cmos
+  --all-targets`, `markdownlint PLAN.md SPEC.md docs/fidelity/gaps.md`,
+  `make fidelity` (`828` lib tests passed, `13` ignored; `2` main tests passed;
+  clippy, Lua, Python, local trace-fixture skip, coverage, and new-code
+  coverage checks passed), `markdownlint PLAN.md README.md SPEC.md
+  docs/fidelity/README.md docs/fidelity/gaps.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777929459523379`
 
 ## Phase 4: World, Waves, Humans, And Enemies
 

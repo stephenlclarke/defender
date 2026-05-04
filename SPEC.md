@@ -433,9 +433,9 @@ Additional gaps and corrections found during this review:
   depends on user-supplied ROMs and local MAME to prove golden equivalence.
 - Remaining open gaps include the post-INIT20 ATTR/executive scheduler cadence
   from `attract_boot` frame 733 onward, full frame/cycle integration,
-  golden-trace proof for translated session/operator paths, pixel golden
-  fixtures, full sound-board cycle/waveform scheduling, audio command and
-  waveform fixtures, and removal or regeneration of archived prototype
+  end-to-end golden-trace proof for translated session/operator paths, pixel
+  golden fixtures, full sound-board cycle/waveform scheduling, audio command
+  and waveform fixtures, and removal or regeneration of archived prototype
   visual/audio assets.
 - The prior local implementation notes listed "Fix Mutant score to `150`" as
   future work even though `assets/red-label/scores.tsv` and unit tests already
@@ -888,8 +888,8 @@ Additional gaps and corrections found during this review:
   such as `BKIL` and `NOKILL`.
 - Wave setup uses source-order `WVTAB` / `WDELT` data and translated `GEXEC` /
   `GEX0` pacing to launch `UFOST` baiters and `LANDST` squads from red-label
-  reserve counters. Two-player session state remains a later cabinet-session
-  phase.
+  reserve counters. Two-player session state is now covered by the
+  cabinet-session phase; whole-game trace proof remains a later fidelity phase.
 - Planet destruction, humanoid restoration, human abduction/rescue, and falling
   humanoid/catch behavior are translated as source-owned process slices; live
   whole-game trace proof remains a later fidelity phase.
@@ -1559,8 +1559,8 @@ their behavior from labels.
 ### Phase 5: World, Waves, Humans, And Enemies
 
 Status: complete for the world/wave/human/enemy translation boundary; full
-frame-level IRQ scheduling, complete cabinet session flow, and end-to-end MAME
-trace acceptance remain in later phases.
+frame-level IRQ scheduling, end-to-end cabinet-session golden-trace proof, and
+end-to-end MAME trace acceptance remain in later phases.
 
 1. Done: exact terrain state now covers live `BGOUT` scheduling, destroyed-planet
    `TERBLO`, scanner mini-terrain `MTERR`, `TDATA`, `ALINIT`, `BGINIT`,
