@@ -23815,6 +23815,16 @@ pub struct ArcadeMachine {
     high_score_completed_players_mask: u8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RedLabelSnapshotProjection {
+    credits: u8,
+    current_player: u8,
+    wave: u8,
+    rng: RandState,
+    player: PlayerState,
+    scores: ScoreState,
+}
+
 impl Default for ArcadeMachine {
     fn default() -> Self {
         Self::new()
@@ -23905,23 +23915,103 @@ impl ArcadeMachine {
     }
 
     pub fn snapshot(&self) -> MachineSnapshot {
+        let projection = self
+            .red_label_snapshot_projection()
+            .unwrap_or_else(|_| self.cached_snapshot_projection());
         MachineSnapshot {
             frame: self.frame,
             phase: self.phase,
-            credits: self.credits,
-            current_player: self.current_player,
-            wave: self.wave,
-            rng: self.rng,
-            player: self.player,
-            scores: self.scores,
+            credits: projection.credits,
+            current_player: projection.current_player,
+            wave: projection.wave,
+            rng: projection.rng,
+            player: projection.player,
+            scores: projection.scores,
             last_input_bits: self.last_input_bits,
-            wave_profile: red_label_wave_table().profile_for_wave(self.wave),
+            wave_profile: red_label_wave_table().profile_for_wave(projection.wave),
             xyzzy_active: self.compatibility.xyzzy_active,
             xyzzy_invincible: self.compatibility.xyzzy_invincible,
             xyzzy_auto_fire: self.compatibility.xyzzy_auto_fire,
             high_score_entry: self.high_score_entry,
             high_score_submission: self.high_score_submission,
         }
+    }
+
+    fn cached_snapshot_projection(&self) -> RedLabelSnapshotProjection {
+        RedLabelSnapshotProjection {
+            credits: self.credits,
+            current_player: self.current_player,
+            wave: self.wave,
+            rng: self.rng,
+            player: self.player,
+            scores: self.scores,
+        }
+    }
+
+    fn red_label_snapshot_projection(&self) -> Result<RedLabelSnapshotProjection, String> {
+        let layout = red_label_ram_layout()?;
+        let player_table = table_descriptor(&layout, "player")?;
+        let credit = self
+            .memory
+            .read_field_byte(&layout, "base_page", "CREDIT")?;
+        let current_player = self
+            .memory
+            .read_field_byte(&layout, "base_page", "CURPLR")?;
+        if current_player == 0 || u16::from(current_player) > player_table.entries {
+            return Err(format!(
+                "red-label snapshot current player {current_player} is outside player table"
+            ));
+        }
+
+        let player_index = u16::from(current_player - 1);
+        let player_x16 = self
+            .memory
+            .read_field_word(&layout, "base_page", "PLAX16")?;
+        let player_y16 = self
+            .memory
+            .read_field_word(&layout, "base_page", "PLAY16")?;
+        let player_x_velocity = self
+            .memory
+            .read_fixed_bytes::<3>(field_range(&layout, "base_page", "PLAXV")?.start)?;
+        let player_y_velocity = self.memory.read_field_word(&layout, "base_page", "PLAYV")?;
+        let player_direction = self
+            .memory
+            .read_field_word(&layout, "base_page", "PLADIR")?;
+        let mut scores = self.scores;
+        scores.player_one = self.memory.player_score_value(1)?;
+        scores.player_two = self.memory.player_score_value(2)?;
+        scores.high_score = self.memory.all_time_high_score_value()?;
+
+        Ok(RedLabelSnapshotProjection {
+            credits: bcd_byte_to_u16(credit).min(u16::from(u8::MAX)) as u8,
+            current_player,
+            wave: self
+                .memory
+                .read_player_field_byte(&layout, player_index, "PWAV")?,
+            rng: RandState {
+                seed: self.memory.read_field_byte(&layout, "base_page", "SEED")?,
+                hseed: self.memory.read_field_byte(&layout, "base_page", "HSEED")?,
+                lseed: self.memory.read_field_byte(&layout, "base_page", "LSEED")?,
+            },
+            player: PlayerState {
+                x: Fixed16(i32::from(player_x16) << 8),
+                y: Fixed16(i32::from(player_y16) << 8),
+                xv: Fixed16(sign_extend_24_to_i32(player_x_velocity) << 8),
+                yv: Fixed16(i32::from(player_y_velocity as i16) << 8),
+                facing: if player_direction & 0x8000 == 0 {
+                    Facing::Right
+                } else {
+                    Facing::Left
+                },
+                lives: self
+                    .memory
+                    .read_player_field_byte(&layout, player_index, "PLAS")?,
+                smart_bombs: self
+                    .memory
+                    .read_player_field_byte(&layout, player_index, "PSBC")?,
+            },
+            scores,
+        })
     }
 
     pub fn save_state(&self) -> MachineSaveState {
@@ -53964,6 +54054,97 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_reads_table_backed_red_label_state_instead_of_cached_scaffold_fields() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("layout");
+        let player_table = super::table_descriptor(&layout, "player").expect("player table");
+        let player_two_address = super::table_entry_range(player_table, 1)
+            .expect("player two range")
+            .start;
+        let ram_player = super::PlayerState {
+            x: Fixed16(0x2468 << 8),
+            y: Fixed16(0x1357 << 8),
+            xv: Fixed16(0x0012_3400),
+            yv: Fixed16(i32::from(-321i16) << 8),
+            facing: Facing::Left,
+            lives: 6,
+            smart_bombs: 4,
+        };
+        let ram_rng = RandState {
+            seed: 0x77,
+            hseed: 0x88,
+            lseed: 0x99,
+        };
+
+        machine.credits = 99;
+        machine.current_player = 1;
+        machine.wave = 1;
+        machine.rng = RandState {
+            seed: 0x01,
+            hseed: 0x02,
+            lseed: 0x03,
+        };
+        machine.player = super::PlayerState::default();
+        machine.scores = super::ScoreState {
+            player_one: 1,
+            player_two: 2,
+            high_score: 3,
+            next_bonus: 321_000,
+        };
+
+        machine
+            .memory
+            .write_field_byte(&layout, "base_page", "CREDIT", 0x12)
+            .expect("write credits");
+        machine
+            .memory
+            .write_field_byte(&layout, "base_page", "CURPLR", 2)
+            .expect("write current player");
+        machine
+            .memory
+            .write_field_word(&layout, "base_page", "PLRX", player_two_address)
+            .expect("write player pointer");
+        machine
+            .memory
+            .write_player_score_value(&layout, 0, 123_456)
+            .expect("write player one score");
+        machine
+            .memory
+            .write_player_score_value(&layout, 1, 654_321)
+            .expect("write player two score");
+        machine
+            .memory
+            .write_player_runtime_snapshot(&layout, 1, ram_player, 9)
+            .expect("write player two runtime");
+        machine
+            .memory
+            .write_red_label_rand_state(&layout, ram_rng)
+            .expect("write random state");
+
+        let snapshot = machine.snapshot();
+
+        assert_eq!(snapshot.credits, 12);
+        assert_eq!(snapshot.current_player, 2);
+        assert_eq!(snapshot.wave, 9);
+        assert_eq!(
+            snapshot.wave_profile,
+            super::red_label_wave_table().profile_for_wave(9)
+        );
+        assert_eq!(snapshot.rng, ram_rng);
+        assert_eq!(snapshot.player, ram_player);
+        assert_eq!(snapshot.scores.player_one, 123_456);
+        assert_eq!(snapshot.scores.player_two, 654_321);
+        assert_eq!(
+            snapshot.scores.high_score,
+            machine
+                .memory
+                .all_time_high_score_value()
+                .expect("high score")
+        );
+        assert_eq!(snapshot.scores.next_bonus, 321_000);
+    }
+
+    #[test]
     fn save_state_restore_round_trips_red_label_memory_and_trace_scheduler() {
         let mut machine = ArcadeMachine::new_cold_boot_trace();
         machine.memory.write_byte(0xA123, 0x5A).expect("seed RAM");
@@ -54363,6 +54544,10 @@ mod tests {
         let mut machine = ArcadeMachine::new();
         start_one_player_game_for_test(&mut machine);
         machine.player.smart_bombs = 0;
+        machine
+            .memory
+            .write_byte(0xA1CB, 0)
+            .expect("empty current player smart bombs");
         machine.set_compatibility(super::CompatibilityState {
             xyzzy_active: true,
             xyzzy_invincible: true,

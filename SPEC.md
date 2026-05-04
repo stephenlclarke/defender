@@ -1345,10 +1345,14 @@ including guarded `SBMBX2`/`SUCIDE`. Deterministic restore now writes the
 observable snapshot state back into the source-owned red-label RAM fields for
 credits, current player pointer, player scores, wave/lives/smart bombs, player
 motion, facing, and RNG seeds, and full save-state restore now round-trips the
-RAM/CMOS/palette/hardware-map image plus trace scheduler state. Remaining work
-after this phase is scheduler, video, player, enemy, session, and audio
-integration tracked by the later phases rather than more core-state
-replacement.
+RAM/CMOS/palette/hardware-map image plus trace scheduler state.
+`ArcadeMachine::snapshot()` now projects credits, current player, wave, player
+runtime state, player scores, high score, and RNG from source-owned
+red-label RAM/CMOS whenever those tables are initialized; the cached fallback
+is limited to cold-boot trace frames before the source tables exist and to
+non-table compatibility/control fields. Remaining work after this phase is
+scheduler, video, player, enemy, session, and audio integration tracked by the
+later phases rather than more core-state replacement.
 
 1. Continue expanding `src/machine.rs` or split it into `arcade_core` modules
    once table/process size justifies it.

@@ -657,7 +657,7 @@ Work log:
 
 ### DC-06: Process Scheduler Completion
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: make red-label process execution the normal core path.
 
@@ -674,8 +674,9 @@ Steps:
   Completed: `2026-05-04 20:17:12 BST`
 - [x] DC-06.4 Verify object/process order against golden traces.
   Completed: `2026-05-04 20:20:58 BST`
-- [ ] DC-06.5 Remove scaffold state that duplicates exact red-label table
+- [x] DC-06.5 Remove scaffold state that duplicates exact red-label table
   fields.
+  Completed: `2026-05-04 20:29:59 BST`
 
 Completion gate: translated process dispatch drives gameplay state by default,
 with explicit gaps only for unimplemented routine bodies.
@@ -765,6 +766,28 @@ Work log:
   coverage with no new executable Rust lines outside docs).
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777922489392159`
+- `2026-05-04 20:21:47 BST` Started `DC-06.5`: auditing cached scaffold state
+  that duplicates exact red-label table fields now owned by the translated
+  process/object/player RAM surfaces, then removing only redundant fields whose
+  behavior can be preserved with existing mutation and trace tests.
+- `2026-05-04 20:29:59 BST` Completed `DC-06.5`: introduced a table-backed
+  snapshot projection over red-label RAM/CMOS for credits, current player, wave,
+  player runtime state, scores, high score, and RNG, with the cached fallback
+  limited to cold-boot trace frames before source tables are initialized and to
+  compatibility/control state. Added a regression test that intentionally stales
+  cached fields and proves public snapshots read RAM/CMOS, adjusted the `xyzzy`
+  overlay test to seed smart-bomb inventory through source RAM, and updated
+  `README.md`, `SPEC.md`, and `docs/fidelity/gaps.md`. Validation passed with
+  `cargo test snapshot_ --all-targets`,
+  `cargo test xyzzy_auto_fire_and_unlimited_bombs_are_overlay_state --all-targets`,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/gaps.md`,
+  `git diff --check`, and `make fidelity`
+  (`cargo fmt --check`, `cargo test --all-targets` with 814 passed and 13 known
+  ignored library tests plus 2 binary tests, clippy, trace script tests, skipped
+  absent local Rust-current fixture directory, and coverage with 70/70 added
+  executable Rust lines covered).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777923063018929`
 
 ### DC-07: IRQ, Scanline, And Palette Integration
 

@@ -235,11 +235,13 @@ This file records behavior that must not be guessed in arcade-core code.
   collision dispatch through `OCVECT` for translated vectors, and emits
   object-table, process-table, super-process-table, and SPTR-head CRCs in
   trace rows. Deterministic restore now
-  projects the cached snapshot back onto source-owned red-label RAM for
-  credits, current-player pointer, player scores, wave/lives/smart bombs,
-  player motion, facing, and RNG seeds, and full save-state restore includes
-  the RAM/CMOS/palette/hardware-map image, main-board input/watchdog/video
-  counter state, sound-board latch state, and trace scheduler state.
+  projects snapshots back onto source-owned red-label RAM for credits,
+  current-player pointer, player scores, wave/lives/smart bombs, player motion,
+  facing, and RNG seeds, and public snapshots project those same table-backed
+  fields from red-label RAM/CMOS whenever the source tables are initialized.
+  Full save-state restore includes the RAM/CMOS/palette/hardware-map image,
+  main-board input/watchdog/video counter state, sound-board latch state, and
+  trace scheduler state.
   The executive scheduler now keeps walking `DISP` in the same source pass after
   process `SLEEP` and `SUCIDE` tails resume through `DISP2`. Scheduled-process
   rows now include register context for translated dispatch: source `DISP`
