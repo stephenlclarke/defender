@@ -657,14 +657,15 @@ Work log:
 
 ### DC-06: Process Scheduler Completion
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: make red-label process execution the normal core path.
 
 Steps:
 
-- [ ] DC-06.1 Add register-aware process entry/resume state where source
+- [x] DC-06.1 Add register-aware process entry/resume state where source
   routines require A/B/X/Y/U/S/CC context.
+  Completed: `2026-05-04 19:27:41 BST`
 - [ ] DC-06.2 Complete `PLRES` swarmer respawn once the entry B register value
   is trace-proven.
 - [ ] DC-06.3 Finish suicide, resume, delay, super-process, and generic body
@@ -675,6 +676,29 @@ Steps:
 
 Completion gate: translated process dispatch drives gameplay state by default,
 with explicit gaps only for unimplemented routine bodies.
+
+Work log:
+
+- `2026-05-04 19:19:05 BST` Started `DC-06.1`: adding a
+  register-aware scheduled-process surface so translated routines can receive
+  source-shaped A/B/X/Y/U/S/CC entry and resume context instead of depending
+  only on `PADDR` and ambient RAM.
+- `2026-05-04 19:27:41 BST` Completed `DC-06.1`: added
+  `RedLabelCpuRegisters` and register-aware scheduled-process state, wired the
+  process scheduler and translated dispatch paths through the source `DISP`
+  context, and validate `U`/`CRPROC`/process-cell agreement before dispatching.
+  Source evidence currently proves `U` is the due process cell; A/B/X/Y/S/CC
+  remain explicit unknowns until CPU/IRQ scheduling or traces prove exact values.
+  Added unit coverage for the register snapshot, mismatched source context, and
+  lower-level runtime dispatch path, and updated `SPEC.md` plus
+  `docs/fidelity/gaps.md`. Validation passed with focused scheduler/dispatch
+  tests, `make fidelity` (`cargo fmt --check`, `cargo test --all-targets` with
+  809 passed and 13 known ignored library tests plus 2 binary tests, clippy,
+  trace script tests, skipped absent local fixture directory, and coverage with
+  44/44 added executable Rust lines covered), `markdownlint PLAN.md SPEC.md
+  docs/fidelity/gaps.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777919311049749`
 
 ### DC-07: IRQ, Scanline, And Palette Integration
 

@@ -132,7 +132,10 @@ synthetic scaffold fallback; untranslated blank screens remain black:
   has source-shaped `MKPROC`,
   `MSPROC`, `SLEEP`, `KILL`, and `DISP` primitives for process creation, delay,
   free-list return, scheduler timer decrement, `CRPROC` update, and due-`PADDR`
-  reporting. It translates active/inactive object and shell-list maintenance,
+  reporting. Scheduled-process rows now carry a `RedLabelCpuRegisters` entry
+  snapshot: source `DISP` proves `U` equals the due process cell, while A, B, X,
+  Y, S, and CC stay explicit unknowns until the CPU/IRQ scheduler can prove
+  them. It translates active/inactive object and shell-list maintenance,
   player/start/death slices, switch dispatch for translated actions, selected
   enemy/support process bodies, terrain-table generation, scoring, collision,
   object-picture output, and IRQ object-band slices while preserving explicit
@@ -1359,7 +1362,10 @@ Status: complete for the translated red-label scheduler layer. Source-shaped
 `DISP` primitives can allocate regular/super processes, splice them through
 `CRPROC`, delay the current process, return killed cells to the right free list,
 walk the active-process list, decrement `PTIME`, write `CRPROC`, and return
-`PADDR` for the due process. The executive wrapper now runs the source
+`PADDR` plus source-proven entry register context for the due process. The
+current register surface records `U` as the process cell selected by `DISP` and
+leaves A/B/X/Y/S/CC unknown until exact CPU scheduling or local traces prove
+them. The executive wrapper now runs the source
 `EXEC0`/`EXEC1` pre-dispatch slice and keeps walking `DISP` in the same pass
 after translated `SLEEP` and `SUCIDE` tails resume through the ROM's `DISP2`
 link, preserving same-frame process order for sleeping and killed cells. Body

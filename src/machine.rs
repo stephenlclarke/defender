@@ -645,10 +645,59 @@ impl FrameOutput {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct RedLabelCpuRegisters {
+    pub a: Option<u8>,
+    pub b: Option<u8>,
+    pub x: Option<u16>,
+    pub y: Option<u16>,
+    pub u: Option<u16>,
+    pub s: Option<u16>,
+    pub cc: Option<u8>,
+}
+
+impl RedLabelCpuRegisters {
+    pub const fn from_source_disp(process_address: u16) -> Self {
+        Self {
+            a: None,
+            b: None,
+            x: None,
+            y: None,
+            u: Some(process_address),
+            s: None,
+            cc: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RedLabelScheduledProcess {
     pub process_address: u16,
     pub routine_address: u16,
+    pub entry_registers: RedLabelCpuRegisters,
+}
+
+impl RedLabelScheduledProcess {
+    pub const fn from_source_disp(process_address: u16, routine_address: u16) -> Self {
+        Self {
+            process_address,
+            routine_address,
+            entry_registers: RedLabelCpuRegisters::from_source_disp(process_address),
+        }
+    }
+
+    fn validate_source_disp_context(self, current_process: u16) -> Result<(), String> {
+        if self.entry_registers.u == Some(current_process)
+            && self.process_address == current_process
+        {
+            return Ok(());
+        }
+
+        Err(format!(
+            "red-label scheduled process 0x{:04X} does not match source DISP U/CRPROC 0x{current_process:04X}",
+            self.process_address
+        ))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14042,10 +14091,10 @@ impl RedLabelRuntimeMemory {
                 let paddr =
                     process_field_range_for_address(&layout, table, process_address, "PADDR")?
                         .start;
-                return Ok(Some(RedLabelScheduledProcess {
+                return Ok(Some(RedLabelScheduledProcess::from_source_disp(
                     process_address,
-                    routine_address: self.read_word(paddr)?,
-                }));
+                    self.read_word(paddr)?,
+                )));
             }
 
             let plink =
@@ -14873,8 +14922,19 @@ impl RedLabelRuntimeMemory {
         let Some(scheduled) = self.step_process_scheduler()? else {
             return Ok(None);
         };
-        self.dispatch_translated_process_routine(scheduled.routine_address)
+        self.dispatch_translated_scheduled_process(scheduled)
             .map(Some)
+    }
+
+    fn dispatch_translated_scheduled_process(
+        &mut self,
+        scheduled: RedLabelScheduledProcess,
+    ) -> Result<RedLabelProcessDispatch, String> {
+        let layout = red_label_ram_layout()?;
+        let current_process = self.read_field_word(&layout, "runtime_pointers", "CRPROC")?;
+        scheduled.validate_source_disp_context(current_process)?;
+
+        self.dispatch_translated_process_routine(scheduled.routine_address)
     }
 
     fn make_process_from_free_list(
@@ -24126,8 +24186,7 @@ impl ArcadeMachine {
             .memory
             .step_process_scheduler_from_link(scheduler_link)?
         {
-            let dispatch =
-                self.dispatch_red_label_process_routine(scheduled_process.routine_address)?;
+            let dispatch = self.dispatch_red_label_scheduled_process(scheduled_process)?;
             self.apply_process_dispatch_state(&dispatch)?;
             self.sync_scores_from_red_label_memory()?;
             scheduler_link = self
@@ -24154,6 +24213,19 @@ impl ArcadeMachine {
         })
     }
 
+    fn dispatch_red_label_scheduled_process(
+        &mut self,
+        scheduled: RedLabelScheduledProcess,
+    ) -> Result<RedLabelProcessDispatch, String> {
+        let layout = red_label_ram_layout()?;
+        let current_process = self
+            .memory
+            .read_field_word(&layout, "runtime_pointers", "CRPROC")?;
+        scheduled.validate_source_disp_context(current_process)?;
+
+        self.dispatch_red_label_process_routine(scheduled.routine_address)
+    }
+
     pub fn red_label_dispatch_translated_process_routine(
         &mut self,
         routine_address: u16,
@@ -24170,7 +24242,7 @@ impl ArcadeMachine {
         let Some(scheduled) = self.memory.step_process_scheduler()? else {
             return Ok(None);
         };
-        let dispatch = self.dispatch_red_label_process_routine(scheduled.routine_address)?;
+        let dispatch = self.dispatch_red_label_scheduled_process(scheduled)?;
         self.apply_process_dispatch_state(&dispatch)?;
         self.sync_scores_from_red_label_memory()?;
         Ok(Some(dispatch))
@@ -27879,10 +27951,7 @@ mod tests {
 
         assert_eq!(
             scheduled,
-            RedLabelScheduledProcess {
-                process_address,
-                routine_address: hall13_address,
-            }
+            RedLabelScheduledProcess::from_source_disp(process_address, hall13_address)
         );
 
         let display = machine
@@ -36315,10 +36384,10 @@ mod tests {
         assert_eq!(step.pre_dispatch.expanded_updates, Vec::new());
         assert_eq!(
             step.scheduled_process,
-            Some(RedLabelScheduledProcess {
-                process_address: process,
-                routine_address: red_label_routine_address("SUCIDE").expect("SUCIDE address"),
-            })
+            Some(RedLabelScheduledProcess::from_source_disp(
+                process,
+                red_label_routine_address("SUCIDE").expect("SUCIDE address"),
+            ))
         );
         assert_eq!(
             step.dispatch,
@@ -36468,16 +36537,92 @@ mod tests {
 
         assert_eq!(
             scheduled,
-            Some(RedLabelScheduledProcess {
-                process_address: 0xAAC5,
-                routine_address: 0x1234,
-            })
+            Some(RedLabelScheduledProcess::from_source_disp(0xAAC5, 0x1234))
         );
         assert_eq!(
             machine.red_label_ram_range(0xA063..0xA065),
             Some(&[0xAA, 0xC5][..])
         );
         assert_eq!(machine.red_label_ram_range(0xAAC9..0xAACA), Some(&[0][..]));
+    }
+
+    #[test]
+    fn process_scheduler_reports_source_disp_entry_register_context() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .write_word(0xA05F, 0xAAC5)
+            .expect("active head");
+        machine
+            .memory
+            .write_word(0xAAC5, 0)
+            .expect("single active process");
+        machine
+            .memory
+            .write_word(0xAAC7, 0x1234)
+            .expect("process address");
+        machine.memory.write_byte(0xAAC9, 1).expect("process time");
+
+        let scheduled = machine
+            .step_red_label_process_scheduler()
+            .expect("scheduler step")
+            .expect("due process");
+
+        assert_eq!(scheduled.process_address, 0xAAC5);
+        assert_eq!(scheduled.routine_address, 0x1234);
+        assert_eq!(scheduled.entry_registers.u, Some(0xAAC5));
+        assert_eq!(scheduled.entry_registers.a, None);
+        assert_eq!(scheduled.entry_registers.b, None);
+        assert_eq!(scheduled.entry_registers.x, None);
+        assert_eq!(scheduled.entry_registers.y, None);
+        assert_eq!(scheduled.entry_registers.s, None);
+        assert_eq!(scheduled.entry_registers.cc, None);
+    }
+
+    #[test]
+    fn scheduled_process_rejects_mismatched_source_disp_context() {
+        let scheduled = RedLabelScheduledProcess::from_source_disp(0xAAC5, 0x1234);
+
+        let error = scheduled
+            .validate_source_disp_context(0xA05F)
+            .expect_err("mismatched source DISP context should fail");
+
+        assert!(error.contains("0xAAC5"));
+        assert!(error.contains("0xA05F"));
+    }
+
+    #[test]
+    fn runtime_step_translated_process_dispatches_with_source_disp_context() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("SUCIDE").expect("SUCIDE address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make translated process")
+            .process_address;
+
+        let dispatch = machine
+            .memory
+            .step_translated_process()
+            .expect("translated process step")
+            .expect("scheduled process");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::Suicide(RedLabelKilledProcess {
+                killed_process_address: process,
+                previous_link_address: 0xA05F,
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA05F..0xA061),
+            Some(&[0x00, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA061..0xA063),
+            Some(&process.to_be_bytes()[..])
+        );
     }
 
     #[test]
@@ -36544,10 +36689,7 @@ mod tests {
             .expect("scheduler step");
         assert_eq!(
             scheduled,
-            Some(RedLabelScheduledProcess {
-                process_address: 0xAAC5,
-                routine_address: 0x1234,
-            })
+            Some(RedLabelScheduledProcess::from_source_disp(0xAAC5, 0x1234))
         );
 
         let second = machine
@@ -37847,10 +37989,7 @@ mod tests {
             .expect("scheduler step");
         assert_eq!(
             scheduled,
-            Some(RedLabelScheduledProcess {
-                process_address: 0xAF2A,
-                routine_address: 0x2468,
-            })
+            Some(RedLabelScheduledProcess::from_source_disp(0xAF2A, 0x2468))
         );
     }
 

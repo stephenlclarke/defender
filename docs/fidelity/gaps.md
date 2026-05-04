@@ -233,7 +233,10 @@ This file records behavior that must not be guessed in arcade-core code.
   the RAM/CMOS/palette/hardware-map image, main-board input/watchdog/video
   counter state, sound-board latch state, and trace scheduler state.
   The executive scheduler now keeps walking `DISP` in the same source pass after
-  process `SLEEP` and `SUCIDE` tails resume through `DISP2`.
+  process `SLEEP` and `SUCIDE` tails resume through `DISP2`. Scheduled-process
+  rows now include register context for translated dispatch: source `DISP`
+  proves `U` equals the due process cell, while A/B/X/Y/S/CC remain unknown
+  until exact CPU scheduling or local traces prove them.
 - `--verify-roms PATH` can validate and map a local red-label ROM set into the
   embedded MAME region layout. ROM execution, golden traces, and generated
   derived assets remain future work.
