@@ -11,6 +11,8 @@ Rules:
 - Golden traces must not include copyrighted ROM payloads.
 - Verification tooling may depend on local ROMs or MAME, but the deployed game
   binary must remain self-contained.
+- Characterization tests follow `characterization-tests.md` so later refactors
+  preserve source-visible mutations, not only returned values.
 
 Current trace format:
 

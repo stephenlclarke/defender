@@ -127,7 +127,7 @@ Work log:
 
 ### DC-02: Refactor-Safety Test Harness
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: make future translation and later refactor work easy to verify by
 capturing source-visible mutations deliberately.
@@ -147,7 +147,8 @@ Steps:
 - [x] DC-02.4 Extend trace columns only where a source routine needs more
   observable state for equivalence.
   Completed: `2026-05-04 17:37:09 BST`
-- [ ] DC-02.5 Document the characterization-test pattern in `docs/fidelity/`.
+- [x] DC-02.5 Document the characterization-test pattern in `docs/fidelity/`.
+  Completed: `2026-05-04 17:39:52 BST`
 
 Completion gate: new mutation helpers exist, representative high-risk routines
 use them, and `make fidelity` remains green or has a recorded external-tool
@@ -155,6 +156,19 @@ blocker.
 
 Work log:
 
+- `2026-05-04 17:38:58 BST` Started `DC-02.5`: documenting the
+  characterization-test pattern in `docs/fidelity/` so future translation and
+  refactor work uses the same before/after mutation and trace-replay approach.
+- `2026-05-04 17:39:52 BST` Completed `DC-02.5`: added
+  `docs/fidelity/characterization-tests.md` with the required
+  characterization-test shape, shared snapshot helpers, trace/replay guidance,
+  and later-refactor safety rules. Linked the pattern from
+  `docs/fidelity/README.md`. Validation passed with `markdownlint PLAN.md
+  SPEC.md README.md docs/fidelity/README.md docs/fidelity/gaps.md
+  docs/fidelity/characterization-tests.md assets/red-label/README.md` and
+  `git diff --check`. No cargo tests were run for this docs-only step.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777912813670469`
 - `2026-05-04 17:26:42 BST` Started `DC-02.4`: reviewing the current trace
   schema/output and recent characterization tests to add new trace columns only
   if a translated source routine needs additional observable state for
