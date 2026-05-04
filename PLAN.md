@@ -269,8 +269,9 @@ Steps:
 - [x] DC-03.3 Verify `make reference-fixtures-check` catches missing headers,
   missing scenarios, and frame-count drift.
   Completed: `2026-05-04 17:45:36 BST`
-- [ ] DC-03.4 Add any missing scenario required before the next subsystem is
+- [x] DC-03.4 Add any missing scenario required before the next subsystem is
   translated.
+  Completed: `2026-05-04 17:47:12 BST`
 - [ ] DC-03.5 Record fixture generation date, MAME version, ROM path policy, and
   validation result in `docs/fidelity/`.
 
@@ -326,6 +327,23 @@ Work log:
   shows only ignored local fixture output plus the tracked `PLAN.md` update.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913165185189`
+- `2026-05-04 17:46:40 BST` Started `DC-03.4`: reviewing the Phase 1 scenario
+  manifest and requirement evidence against the next golden-equivalence work to
+  decide whether a missing scenario must be added before implementation
+  continues.
+- `2026-05-04 17:47:12 BST` Completed `DC-03.4`: reviewed
+  `assets/red-label/trace-scenarios.tsv`, `assets/red-label/trace-requirements.tsv`,
+  and the `DC-04` golden-equivalence scope. The existing 12 scenarios cover the
+  next boot/start, first 300 frames, firing, thrust/reverse, smart bomb,
+  hyperspace, abduction, death, wave progression, planet destruction, and
+  high-score-entry work, so no new scenario was required. Validation passed with
+  `cargo run --quiet -- --fidelity-list-scenarios`,
+  `cargo test trace_scenarios_cover_phase_one_required_cases --all-targets`,
+  `cargo test trace_requirements_must_reference_known_scenarios --all-targets`,
+  a manifest-name comparison using `comm`, and a scenario count check reporting
+  12 entries.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913256407929`
 
 ### DC-04: Golden Tests For Existing Translated Slices
 
