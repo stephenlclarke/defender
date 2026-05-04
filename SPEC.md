@@ -1032,7 +1032,10 @@ Additional gaps and corrections found during this review:
   source NMI diagnostic checksum-to-VARI branch are translated. The timed IRQ
   window consumes the command latch, reports generated DAC bytes in source
   order with monotonic DAC-write ticks, and keeps GWAVE DAC samples tied to the
-  board DAC latch. The tree does not yet include cycle-accurate waveform
+  board DAC latch. Focused unit tests now lock representative GWAVE, VARI,
+  LITE, TURBO, CANNON, RADIO, HYPER, SCREAM, and ORGAN generated buffers with
+  deterministic length/CRC signatures, final DAC latch values, and direct-page
+  RAM mutation CRCs. The tree does not yet include cycle-accurate waveform
   routine scheduling, independent sound CPU IRQ scheduling, or external
   waveform golden fixtures.
 - Sound must be rebuilt as command writes into a translated sound-board state
@@ -1680,7 +1683,8 @@ end-to-end MAME trace acceptance remain in later phases.
    IRQ DAC windows into 6808-cycle-scheduled translated routine execution.
 3. Port remaining `VSNDRM1.SRC` routines needed by Defender.
 4. Verify command sequences against red-label traces.
-5. Add waveform tests with tolerance for deterministic generated buffers.
+5. Maintain deterministic generated-buffer waveform signature tests while
+   adding external golden waveform fixtures.
 6. Keep `--mute` as an output-layer switch only.
 7. Do not trigger sound from semantic Rust events unless that event is proven to
    correspond to a red-label sound command write.

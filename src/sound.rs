@@ -3254,7 +3254,7 @@ mod tests {
         red_label_memory::{MemoryMapCpu, RedLabelMemoryMapEntry, red_label_memory_map},
         rom::{
             RedLabelRomImages, RomDescriptor, RomLoad, RomRegion, RomView, VerifiedRomFile,
-            VerifiedRomSet,
+            VerifiedRomSet, crc32,
         },
         sound::{
             DefenderSoundBoard, SOUND_CPU_INTERNAL_RAM_SIZE, SOUND_PIA_UNCONNECTED_PORT_A_INPUT,
@@ -5340,6 +5340,218 @@ mod tests {
 
     fn count_dac_samples(samples: &[u8], expected: u8) -> usize {
         samples.iter().filter(|&&sample| sample == expected).count()
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct VSoundDacSignature {
+        sample_count: usize,
+        crc32: u32,
+        first_sample: Option<u8>,
+        last_sample: Option<u8>,
+        last_dac_value: Option<u8>,
+        direct_page_crc32: u32,
+    }
+
+    #[test]
+    fn vsnd_waveform_signature_matrix_locks_deterministic_dac_buffers() {
+        let images = test_rom_images_with_vsnd_tables();
+        let mut signatures = Vec::new();
+
+        let mut gwave = DefenderSoundBoard::with_cleared_ram(&images);
+        gwave
+            .load_vsnd_gwave_vector(13)
+            .expect("load BONV GWAVE state");
+        let gwave_step = gwave.run_vsnd_gwave_start().expect("GWAVE period");
+        let VSoundGWaveStep::Playing(gwave_period) = &gwave_step else {
+            panic!("expected GWAVE playback");
+        };
+        signatures.push(dac_signature(
+            "gwave_bonus2",
+            &gwave,
+            &gwave_period.dac_samples,
+        ));
+
+        let mut vari = DefenderSoundBoard::with_cleared_ram(&images);
+        vari.load_vsnd_vari_vector(0).expect("load VARI vector");
+        let vari_sweep = vari.run_vsnd_vari_start();
+        signatures.push(dac_signature(
+            "vari_vector0",
+            &vari,
+            &vari_sweep.dac_samples,
+        ));
+
+        let mut lite = DefenderSoundBoard::with_cleared_ram(&images);
+        lite.write_byte(0x0009, 0x3C).expect("seed LITE HI");
+        lite.write_byte(0x000A, 0x00).expect("seed LITE LO");
+        let lite_noise = lite.run_vsnd_lite();
+        signatures.push(dac_signature("lite", &lite, &lite_noise.dac_samples));
+
+        let mut turbo = DefenderSoundBoard::with_cleared_ram(&images);
+        turbo.write_byte(0x0009, 0x3C).expect("seed TURBO HI");
+        turbo.write_byte(0x000A, 0x00).expect("seed TURBO LO");
+        let turbo_noise = turbo.run_vsnd_turbo();
+        signatures.push(dac_signature("turbo", &turbo, &turbo_noise.dac_samples));
+
+        let mut cannon = DefenderSoundBoard::with_cleared_ram(&images);
+        cannon.write_byte(0x0009, 0x3C).expect("seed CANNON HI");
+        cannon.write_byte(0x000A, 0x00).expect("seed CANNON LO");
+        let cannon_noise = cannon.run_vsnd_cannon();
+        signatures.push(dac_signature("cannon", &cannon, &cannon_noise.dac_samples));
+
+        let mut radio = DefenderSoundBoard::with_cleared_ram(&images);
+        let radio_wave = radio.run_vsnd_radio().expect("RADIO");
+        signatures.push(dac_signature("radio", &radio, &radio_wave.dac_samples));
+
+        let mut hyper = DefenderSoundBoard::with_cleared_ram(&images);
+        let hyper_sweep = hyper.run_vsnd_hyper();
+        signatures.push(dac_signature("hyper", &hyper, &hyper_sweep.dac_samples));
+
+        let mut scream = DefenderSoundBoard::with_cleared_ram(&images);
+        let scream_wave = scream.run_vsnd_scream();
+        signatures.push(dac_signature("scream", &scream, &scream_wave.dac_samples));
+
+        let mut organ = DefenderSoundBoard::with_cleared_ram(&images);
+        organ.run_vsnd_organ_note_start();
+        organ
+            .step_vsnd_organ_note_parameter(0x07)
+            .expect("first organ parameter");
+        organ
+            .step_vsnd_organ_note_parameter(0x0C)
+            .expect("second organ parameter");
+        let organ_note = organ
+            .step_vsnd_organ_note_parameter(0x06)
+            .expect("D organ note");
+        let VSoundOrganNoteStep::NoteStarted(organ_window) = &organ_note else {
+            panic!("expected organ note window");
+        };
+        signatures.push(dac_signature(
+            "organ_note_d",
+            &organ,
+            &organ_window.window.dac_samples,
+        ));
+
+        assert_eq!(
+            signatures,
+            vec![
+                (
+                    "gwave_bonus2",
+                    VSoundDacSignature {
+                        sample_count: 8,
+                        crc32: 0xACC3_61E2,
+                        first_sample: Some(0),
+                        last_sample: Some(64),
+                        last_dac_value: Some(64),
+                        direct_page_crc32: 0xB1F0_43F9,
+                    },
+                ),
+                (
+                    "vari_vector0",
+                    VSoundDacSignature {
+                        sample_count: 5,
+                        crc32: 0x9FDC_EBF1,
+                        first_sample: Some(0xFF),
+                        last_sample: Some(0xFF),
+                        last_dac_value: Some(0xFF),
+                        direct_page_crc32: 0x8CB8_76B7,
+                    },
+                ),
+                (
+                    "lite",
+                    VSoundDacSignature {
+                        sample_count: 386,
+                        crc32: 0x39D3_9D89,
+                        first_sample: Some(0xFF),
+                        last_sample: Some(0),
+                        last_dac_value: Some(0),
+                        direct_page_crc32: 0x726C_8C1F,
+                    },
+                ),
+                (
+                    "turbo",
+                    VSoundDacSignature {
+                        sample_count: 8160,
+                        crc32: 0x9E91_31E4,
+                        first_sample: Some(0),
+                        last_sample: Some(1),
+                        last_dac_value: Some(1),
+                        direct_page_crc32: 0xFB8E_EC11,
+                    },
+                ),
+                (
+                    "cannon",
+                    VSoundDacSignature {
+                        sample_count: 73673,
+                        crc32: 0x13A2_622B,
+                        first_sample: Some(0),
+                        last_sample: Some(0x90),
+                        last_dac_value: Some(0x90),
+                        direct_page_crc32: 0xA9DE_95F1,
+                    },
+                ),
+                (
+                    "radio",
+                    VSoundDacSignature {
+                        sample_count: 425344,
+                        crc32: 0x6BB4_AAA3,
+                        first_sample: Some(0x8C),
+                        last_sample: Some(0x73),
+                        last_dac_value: Some(0x73),
+                        direct_page_crc32: 0x883E_D08C,
+                    },
+                ),
+                (
+                    "hyper",
+                    VSoundDacSignature {
+                        sample_count: 257,
+                        crc32: 0x250C_A37B,
+                        first_sample: Some(0),
+                        last_sample: Some(0),
+                        last_dac_value: Some(0),
+                        direct_page_crc32: 0xE0C9_9B0E,
+                    },
+                ),
+                (
+                    "scream",
+                    VSoundDacSignature {
+                        sample_count: 24320,
+                        crc32: 0x98DC_C563,
+                        first_sample: Some(0),
+                        last_sample: Some(0),
+                        last_dac_value: Some(0),
+                        direct_page_crc32: 0x266B_1967,
+                    },
+                ),
+                (
+                    "organ_note_d",
+                    VSoundDacSignature {
+                        sample_count: 65535,
+                        crc32: 0x7103_0F73,
+                        first_sample: Some(0),
+                        last_sample: Some(80),
+                        last_dac_value: Some(80),
+                        direct_page_crc32: 0x6816_4827,
+                    },
+                ),
+            ]
+        );
+    }
+
+    fn dac_signature(
+        name: &'static str,
+        board: &DefenderSoundBoard<'_>,
+        samples: &[u8],
+    ) -> (&'static str, VSoundDacSignature) {
+        (
+            name,
+            VSoundDacSignature {
+                sample_count: samples.len(),
+                crc32: crc32(samples),
+                first_sample: samples.first().copied(),
+                last_sample: samples.last().copied(),
+                last_dac_value: board.last_dac_value(),
+                direct_page_crc32: crc32(&board.ram()[0x04..0x34]),
+            },
+        )
     }
 
     #[test]

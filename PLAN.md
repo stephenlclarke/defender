@@ -1505,7 +1505,8 @@ Steps:
   Completed: `2026-05-04 23:41:27 BST`
 - [x] DC-13.3 Add command-sequence fixtures from red-label traces.
   Completed: `2026-05-04 23:43:58 BST`
-- [ ] DC-13.4 Add waveform tests with deterministic tolerance.
+- [x] DC-13.4 Add waveform tests with deterministic tolerance.
+  Completed: `2026-05-04 23:47:34 BST`
 - [ ] DC-13.5 Keep `--mute` as an output-layer mixer switch only.
 
 Completion gate: sound command traces and generated audio pass fixtures, and no
@@ -1561,6 +1562,24 @@ Work log:
   `make fidelity` is deferred until the full `DC-13` cycle closes.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777934661712669`
+- `2026-05-04 23:44:43 BST` Started `DC-13.4`: adding deterministic waveform
+  signature coverage for representative translated sound-board generators so
+  later refactors can compare generated buffers and source-visible mutations.
+- `2026-05-04 23:47:34 BST` Completed `DC-13.4`: added a deterministic
+  generated-waveform signature matrix covering GWAVE, VARI, LITE, TURBO,
+  CANNON, RADIO, HYPER, SCREAM, and ORGAN note buffers. The signatures lock
+  sample counts, sample CRC-32 values, first/last samples, final DAC latch
+  values, and direct-page RAM mutation CRCs; the deterministic tolerance is
+  currently exact byte-for-byte matching. `SPEC.md` now records that in-repo
+  waveform signatures exist while external waveform golden fixtures remain a
+  fidelity gap. Validation passed with `markdownlint PLAN.md SPEC.md`,
+  `cargo fmt --check`,
+  `cargo test vsnd_waveform_signature_matrix_locks_deterministic_dac_buffers
+  --all-targets`, `cargo test vsnd_ --all-targets`, and
+  `cargo clippy --all-targets -- -D warnings`. Broader `make fidelity` is
+  deferred until the full `DC-13` cycle closes.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777934878763819`
 
 ## Phase 7: Compatibility Features
 
