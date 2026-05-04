@@ -1500,8 +1500,9 @@ Steps:
 - [x] DC-13.1 Translate the `VSNDRM1.SRC` IRQ dispatch path and Defender sound
   routines needed by the main board.
   Completed: `2026-05-04 23:34:26 BST`
-- [ ] DC-13.2 Model sound CPU timing, command latch consumption, DAC writes, and
+- [x] DC-13.2 Model sound CPU timing, command latch consumption, DAC writes, and
   sample generation.
+  Completed: `2026-05-04 23:41:27 BST`
 - [ ] DC-13.3 Add command-sequence fixtures from red-label traces.
 - [ ] DC-13.4 Add waveform tests with deterministic tolerance.
 - [ ] DC-13.5 Keep `--mute` as an output-layer mixer switch only.
@@ -1525,6 +1526,24 @@ Work log:
   `PLAN.md`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777934086750959`
+- `2026-05-04 23:36:23 BST` Started `DC-13.2`: adding source-visible sound CPU
+  timing/sample reporting around IRQ cycles and tightening DAC latch updates
+  for generated GWAVE samples so command consumption, DAC writes, and sample
+  order survive later refactors.
+- `2026-05-04 23:41:27 BST` Completed `DC-13.2`: added source-visible timed
+  IRQ cycle reporting in `src/sound.rs`, including monotonic DAC-write ticks,
+  generated sample windows, final DAC state, and post-cycle IRQ state. GWAVE
+  periods now update the board DAC latch through the same sample emission path
+  as the other translated waveform routines. `SPEC.md` now records the new
+  timed IRQ/DAC behavior while keeping exact 6808-cycle sample spacing and
+  independent sound CPU IRQ cadence as fidelity gaps. Validation passed with
+  `markdownlint PLAN.md SPEC.md`, `cargo fmt --check`,
+  `cargo test vsnd_irq_timed_cycle --all-targets`,
+  `cargo test vsnd_gwave --all-targets`, `cargo test vsnd_irq --all-targets`,
+  and `cargo clippy --all-targets -- -D warnings`. Broader `make fidelity` is
+  deferred until the full `DC-13` cycle closes.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777934506876679`
 
 ## Phase 7: Compatibility Features
 

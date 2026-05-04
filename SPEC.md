@@ -186,7 +186,10 @@ synthetic scaffold fallback; untranslated blank screens remain black:
   port-B output values are ORed with `0xc0`, latched on sound PIA port B, and
   assert sound CB1 for every byte except `0xff`. The sound CPU can now read the
   latched command through the PIA IC4 port-B data/control register path, and
-  sound PIA port-A output writes are captured as the DAC boundary.
+  sound PIA port-A output writes are captured as the DAC boundary. Translated
+  IRQ cycles can also expose source-visible DAC sample windows with monotonic
+  DAC-write ticks; those ticks preserve generated sample order but are not yet
+  exact 6808 CPU-cycle timings.
 - `src/video.rs`, `src/kitty.rs`, and `src/terminal.rs` provide a
   self-contained Kitty presentation path for native red-label frames.
   `src/video.rs` also exposes the MAME-documented Williams screen-format
@@ -420,8 +423,8 @@ Additional gaps and corrections found during this review:
   golden coverage, and intentionally native-black untranslated screens.
 - The trace schema can record object CRCs, process CRCs, super-process CRCs,
   shell CRCs, sound commands, and optional video CRCs, but CMOS-specific trace
-  columns, pixel golden fixtures, and audio command/waveform fixtures remain
-  absent.
+  columns, pixel golden fixtures, and external audio waveform golden fixtures
+  remain absent.
 - The main-board and sound-board surfaces model useful MAME-documented
   behavior. `ArcadeMachine::step` now maintains a main-board-facing snapshot for
   input ports, memory/palette state, watchdog reset recognition, and the
@@ -434,8 +437,8 @@ Additional gaps and corrections found during this review:
 - Remaining open gaps include the post-INIT20 ATTR/executive scheduler cadence
   from `attract_boot` frame 733 onward, full frame/cycle integration,
   end-to-end golden-trace proof for translated session/operator paths,
-  MAME-derived pixel golden fixtures, full sound-board cycle/waveform
-  scheduling, audio command and waveform fixtures, and removal or regeneration
+  MAME-derived pixel golden fixtures, cycle-accurate sound-board CPU cadence
+  and waveform spacing, external waveform fixtures, and removal or regeneration
   of archived prototype visual/audio assets.
 - The prior local implementation notes listed "Fix Mutant score to `150`" as
   future work even though `assets/red-label/scores.tsv` and unit tests already
@@ -1024,11 +1027,14 @@ Additional gaps and corrections found during this review:
   command return/readiness classification, source-shaped `IRQ1`
   command-to-`IRQ3` background step, the top-level source IRQ organ gate, the
   source IRQ organ-continuation gate, the source IRQ prelude-to-flow cycle,
-  plus the shared `GEND` / `GEND40` / `GEND50` / `GEND60` / `GEND61` echo and
-  frequency-window updates and the source NMI diagnostic checksum-to-VARI
-  branch are translated. The tree does not yet include cycle-accurate waveform routine
-  scheduling, CPU IRQ scheduling, or golden command-sequence and waveform
-  fixtures.
+  source-visible timed IRQ DAC windows, plus the shared `GEND` / `GEND40` /
+  `GEND50` / `GEND60` / `GEND61` echo and frequency-window updates and the
+  source NMI diagnostic checksum-to-VARI branch are translated. The timed IRQ
+  window consumes the command latch, reports generated DAC bytes in source
+  order with monotonic DAC-write ticks, and keeps GWAVE DAC samples tied to the
+  board DAC latch. The tree does not yet include cycle-accurate waveform
+  routine scheduling, independent sound CPU IRQ scheduling, or external
+  waveform golden fixtures.
 - Sound must be rebuilt as command writes into a translated sound-board state
   machine from `VSNDRM1.SRC`, not as high-level gameplay cues.
 
@@ -1670,8 +1676,8 @@ end-to-end MAME trace acceptance remain in later phases.
    extraction, `HYPER` phase-edge extraction, `SCREAM` echo-cascade
    extraction, `ORGANN` / `ORGNN1` first-duration `ORGAN` note extraction,
    `ORGNT1` / `ORGTAB` organ tune extraction, the source `IRQ3` background
-   handoff, and the source IRQ organ-continuation gate into cycle-scheduled
-   translated routine execution.
+   handoff, the source IRQ organ-continuation gate, and source-visible timed
+   IRQ DAC windows into 6808-cycle-scheduled translated routine execution.
 3. Port remaining `VSNDRM1.SRC` routines needed by Defender.
 4. Verify command sequences against red-label traces.
 5. Add waveform tests with tolerance for deterministic generated buffers.

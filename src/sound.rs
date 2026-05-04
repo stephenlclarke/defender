@@ -20,8 +20,9 @@
 //! GWAVE/VARI command flow, and source-shaped GWAVE period, VARI sweep, LITEN
 //! random-complement, TURBO noise-decay, BG1 / THRUST / CANNON filtered-noise,
 //! RADIO timer-table, HYPER phase-edge, SCREAM echo-cascade, and ORGAN
-//! tune/note byte extraction. It does not emulate cycle-accurate sample
-//! scheduling or CPU IRQ scheduling yet.
+//! tune/note byte extraction. It exposes source-visible IRQ DAC write order and
+//! ticks; it does not emulate 6808-cycle-accurate sample spacing or independent
+//! sound CPU IRQ scheduling yet.
 
 use crate::{
     pia::{Pia6821, PiaOutputEvent},
@@ -42,6 +43,9 @@ pub const MAIN_BOARD_SOUND_COMMAND_HIGH_BITS: u8 = 0xC0;
 pub const SOUND_COMMAND_IDLE_BYTE: u8 = 0xFF;
 pub const SOUND_PIA_UNCONNECTED_PORT_A_INPUT: u8 = 0xFF;
 pub const VSNDRM1_STACK_TOP: u8 = 0x7F;
+/// One source-visible DAC write in the translated sound-board timing model.
+/// This is deliberately not a 6808 CPU-cycle duration.
+pub const VSOUND_SOURCE_DAC_TICK_STEP: u64 = 1;
 pub const VSNDRM1_SPINNER_SOUND_CODE: u8 = 0x0E;
 pub const VSNDRM1_BONUS2_SOUND_CODE: u8 = 0x12;
 pub const VSNDRM1_BG2_MAX: u8 = 29;
@@ -281,6 +285,45 @@ pub enum VSoundIrqFlow {
 pub struct VSoundIrqCycle {
     pub prelude: VSoundIrqPrelude,
     pub flow: VSoundIrqFlow,
+}
+
+impl VSoundIrqCycle {
+    pub fn dac_samples(&self) -> Vec<u8> {
+        self.flow.dac_samples()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VSoundDacSampleWindow {
+    pub first_tick: Option<u64>,
+    pub tick_step: u64,
+    pub dac_samples: Vec<u8>,
+    pub last_dac_value: Option<u8>,
+}
+
+impl VSoundDacSampleWindow {
+    pub fn sample_count(&self) -> usize {
+        self.dac_samples.len()
+    }
+
+    pub fn sample_tick(&self, sample_index: usize) -> Option<u64> {
+        if sample_index >= self.dac_samples.len() {
+            return None;
+        }
+
+        self.first_tick.map(|first_tick| {
+            first_tick
+                + u64::try_from(sample_index).expect("sample index fits in u64") * self.tick_step
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VSoundIrqTimedCycle {
+    pub irq_tick: u64,
+    pub cycle: VSoundIrqCycle,
+    pub dac: VSoundDacSampleWindow,
+    pub irq_asserted_after_cycle: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -938,6 +981,147 @@ pub enum VSoundOrganNoteStep {
     NoteStarted(VSoundOrganNoteWindow),
 }
 
+impl VSoundIrqFlow {
+    pub fn dac_samples(&self) -> Vec<u8> {
+        let mut samples = Vec::new();
+        self.append_dac_samples(&mut samples);
+        samples
+    }
+
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundIrqFlow::Command(flow) => flow.append_dac_samples(samples),
+            VSoundIrqFlow::OrganTune { organ, irq3 } => {
+                organ.append_dac_samples(samples);
+                irq3.append_dac_samples(samples);
+            }
+            VSoundIrqFlow::OrganNote { organ } => organ.append_dac_samples(samples),
+        }
+    }
+}
+
+impl VSoundIrqOrganFlow {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundIrqOrganFlow::Inactive { .. } => {}
+            VSoundIrqOrganFlow::Tune { tune, .. } => tune.append_dac_samples(samples),
+            VSoundIrqOrganFlow::Note { step, .. } => step.append_dac_samples(samples),
+        }
+    }
+}
+
+impl VSoundIrqCommandAndBackgroundFlow {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        self.command.append_dac_samples(samples);
+        self.irq3.append_dac_samples(samples);
+    }
+}
+
+impl VSoundIrqCommandFlow {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundIrqCommandFlow::Invalid { .. } => {}
+            VSoundIrqCommandFlow::GWave { step, .. } => step.append_dac_samples(samples),
+            VSoundIrqCommandFlow::Special { step, .. } => step.append_dac_samples(samples),
+            VSoundIrqCommandFlow::Vari { sweep, .. } => {
+                samples.extend_from_slice(&sweep.dac_samples);
+            }
+        }
+    }
+}
+
+impl VSoundIrq3AfterCommand {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundIrq3AfterCommand::Entered(flow) => flow.append_dac_samples(samples),
+            VSoundIrq3AfterCommand::Skipped(_) => {}
+        }
+    }
+}
+
+impl VSoundIrq3BackgroundFlow {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundIrq3BackgroundFlow::WaitingForBackground
+            | VSoundIrq3BackgroundFlow::Background2(_) => {}
+            VSoundIrq3BackgroundFlow::Background1(window) => {
+                samples.extend_from_slice(&window.dac_samples);
+            }
+        }
+    }
+}
+
+impl VSoundIrqSpecialFlow {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundIrqSpecialFlow::Deferred { .. }
+            | VSoundIrqSpecialFlow::Background2Increment(_)
+            | VSoundIrqSpecialFlow::BackgroundEnd(_)
+            | VSoundIrqSpecialFlow::OrganTune(_)
+            | VSoundIrqSpecialFlow::OrganNote(_) => {}
+            VSoundIrqSpecialFlow::Spinner1(command) => {
+                samples.extend_from_slice(&command.sweep.dac_samples);
+            }
+            VSoundIrqSpecialFlow::Background1(window) | VSoundIrqSpecialFlow::Thrust(window) => {
+                samples.extend_from_slice(&window.dac_samples);
+            }
+            VSoundIrqSpecialFlow::Lite(noise) | VSoundIrqSpecialFlow::Appear(noise) => {
+                samples.extend_from_slice(&noise.dac_samples);
+            }
+            VSoundIrqSpecialFlow::Bonus2(command) => command.append_dac_samples(samples),
+            VSoundIrqSpecialFlow::Turbo(noise) => samples.extend_from_slice(&noise.dac_samples),
+            VSoundIrqSpecialFlow::Cannon(noise) => samples.extend_from_slice(&noise.dac_samples),
+            VSoundIrqSpecialFlow::Radio(wave) => samples.extend_from_slice(&wave.dac_samples),
+            VSoundIrqSpecialFlow::Hyper(sweep) => samples.extend_from_slice(&sweep.dac_samples),
+            VSoundIrqSpecialFlow::Scream(scream) => {
+                samples.extend_from_slice(&scream.dac_samples);
+            }
+        }
+    }
+}
+
+impl VSoundBonus2Command {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundBonus2Command::Started { step, .. } => step.append_dac_samples(samples),
+            VSoundBonus2Command::Continued { .. } => {}
+        }
+    }
+}
+
+impl VSoundGWaveStep {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundGWaveStep::Playing(period) => samples.extend_from_slice(&period.dac_samples),
+            VSoundGWaveStep::Ended(_) => {}
+        }
+    }
+}
+
+impl VSoundOrganTuneStep {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundOrganTuneStep::Played(tune) => {
+                for note in &tune.notes {
+                    samples.extend_from_slice(&note.window.dac_samples);
+                }
+            }
+            VSoundOrganTuneStep::InvalidTune { .. } => {}
+        }
+    }
+}
+
+impl VSoundOrganNoteStep {
+    fn append_dac_samples(&self, samples: &mut Vec<u8>) {
+        match self {
+            VSoundOrganNoteStep::MaskByte(_) => {}
+            VSoundOrganNoteStep::NoteStarted(note) => {
+                samples.extend_from_slice(&note.window.dac_samples);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VSoundOrganLoadError {
     MissingSoundRomByte { address: u16 },
@@ -1185,6 +1369,36 @@ impl<'a> DefenderSoundBoard<'a> {
             Ok(flow) => Ok(VSoundIrqCycle { prelude, flow }),
             Err(error) => Err(error),
         }
+    }
+
+    /// Source-visible timed IRQ cycle: run the translated IRQ entry, collect
+    /// the generated DAC write bytes in source order, and attach monotonically
+    /// increasing DAC-write ticks. The tick unit is one translated DAC write,
+    /// not a 6808 CPU cycle.
+    pub fn step_vsnd_irq_timed_cycle(
+        &mut self,
+        irq_tick: u64,
+    ) -> Result<VSoundIrqTimedCycle, VSoundIrqFlowError> {
+        let cycle = self.step_vsnd_irq_cycle()?;
+        let dac_samples = cycle.dac_samples();
+        let last_dac_value = self.last_dac_value();
+        let dac = VSoundDacSampleWindow {
+            first_tick: if dac_samples.is_empty() {
+                None
+            } else {
+                Some(irq_tick)
+            },
+            tick_step: VSOUND_SOURCE_DAC_TICK_STEP,
+            dac_samples,
+            last_dac_value,
+        };
+
+        Ok(VSoundIrqTimedCycle {
+            irq_tick,
+            cycle,
+            dac,
+            irq_asserted_after_cycle: self.sound_irq_asserted(),
+        })
     }
 
     /// Source-shaped `VSNDRM1.SRC` `NMI` diagnostic cycle: reset the stack,
@@ -2447,10 +2661,13 @@ impl<'a> DefenderSoundBoard<'a> {
         let waveform_length = self.current_vsnd_waveform_length(waveform_address)?;
         let wave_ram_start = VSNDRM1_GWTAB_OFFSET;
         let wave_ram_end = wave_ram_start + usize::from(waveform_length);
+        let waveform = self.ram[wave_ram_start..wave_ram_end].to_vec();
         let mut dac_samples =
             Vec::with_capacity(usize::from(waveform_length) * usize::from(waveform_cycles));
         for _ in 0..waveform_cycles {
-            dac_samples.extend_from_slice(&self.ram[wave_ram_start..wave_ram_end]);
+            for sample in &waveform {
+                self.emit_vsnd_dac_sample(&mut dac_samples, *sample);
+            }
         }
 
         Ok(VSoundGWaveStep::Playing(VSoundGWavePeriod {
@@ -3043,21 +3260,21 @@ mod tests {
             DefenderSoundBoard, SOUND_CPU_INTERNAL_RAM_SIZE, SOUND_PIA_UNCONNECTED_PORT_A_INPUT,
             SoundCommand, SoundCommandLatch, SoundCpuAddressTarget, SoundCpuReadError,
             SoundCpuWriteError, VSNDRM1_BG2_MAX, VSNDRM1_BONUS2_SOUND_CODE, VSNDRM1_SPINNER_MAX,
-            VSNDRM1_SPINNER_SOUND_CODE, VSoundBackground2Setup, VSoundBackgroundContinuation,
-            VSoundBackgroundFlags, VSoundBonus2Command, VSoundBonus2Setup, VSoundFilteredNoise,
-            VSoundFilteredNoiseWindow, VSoundGEnd50Step, VSoundGEnd61Result, VSoundGEndStep,
-            VSoundGWaveLoad, VSoundGWaveLoadError, VSoundGWavePeriod, VSoundGWaveStep,
-            VSoundHyperSweep, VSoundIrq3AfterCommand, VSoundIrq3BackgroundFlow, VSoundIrq3Handoff,
-            VSoundIrqCommandAndBackgroundFlowError, VSoundIrqCommandFlow,
-            VSoundIrqCommandFlowError, VSoundIrqDispatch, VSoundIrqFlow, VSoundIrqFlowError,
-            VSoundIrqOrganFlow, VSoundIrqPrelude, VSoundIrqRoutine, VSoundIrqRunningRoutine,
-            VSoundIrqSpecialFlow, VSoundLiteNoise, VSoundNmiChecksum, VSoundNmiDiagnosticCycle,
-            VSoundNmiDiagnosticError, VSoundOrganIrqStep, VSoundOrganLoadError,
-            VSoundOrganNoteStart, VSoundOrganNoteStep, VSoundOrganTuneStart, VSoundOrganTuneStep,
-            VSoundRadioWave, VSoundScream, VSoundSpecialRoutine, VSoundSpinner1Command,
-            VSoundTurboNoise, VSoundVariLoad, VSoundVariLoadError, VSoundVariSweep,
-            VSoundVariSweepResult, format_sound_command_list, sound_cpu_address_target,
-            vsnd_irq_routine,
+            VSNDRM1_SPINNER_SOUND_CODE, VSOUND_SOURCE_DAC_TICK_STEP, VSoundBackground2Setup,
+            VSoundBackgroundContinuation, VSoundBackgroundFlags, VSoundBonus2Command,
+            VSoundBonus2Setup, VSoundFilteredNoise, VSoundFilteredNoiseWindow, VSoundGEnd50Step,
+            VSoundGEnd61Result, VSoundGEndStep, VSoundGWaveLoad, VSoundGWaveLoadError,
+            VSoundGWavePeriod, VSoundGWaveStep, VSoundHyperSweep, VSoundIrq3AfterCommand,
+            VSoundIrq3BackgroundFlow, VSoundIrq3Handoff, VSoundIrqCommandAndBackgroundFlowError,
+            VSoundIrqCommandFlow, VSoundIrqCommandFlowError, VSoundIrqDispatch, VSoundIrqFlow,
+            VSoundIrqFlowError, VSoundIrqOrganFlow, VSoundIrqPrelude, VSoundIrqRoutine,
+            VSoundIrqRunningRoutine, VSoundIrqSpecialFlow, VSoundLiteNoise, VSoundNmiChecksum,
+            VSoundNmiDiagnosticCycle, VSoundNmiDiagnosticError, VSoundOrganIrqStep,
+            VSoundOrganLoadError, VSoundOrganNoteStart, VSoundOrganNoteStep, VSoundOrganTuneStart,
+            VSoundOrganTuneStep, VSoundRadioWave, VSoundScream, VSoundSpecialRoutine,
+            VSoundSpinner1Command, VSoundTurboNoise, VSoundVariLoad, VSoundVariLoadError,
+            VSoundVariSweep, VSoundVariSweepResult, format_sound_command_list,
+            sound_cpu_address_target, vsnd_irq_routine,
         },
     };
 
@@ -3648,6 +3865,50 @@ mod tests {
     }
 
     #[test]
+    fn vsnd_irq_timed_cycle_consumes_latch_and_reports_dac_window() {
+        let images = test_rom_images_with_vsnd_tables();
+        let mut board = DefenderSoundBoard::with_cleared_ram(&images);
+        board.run_vsnd_setup().expect("VSNDRM1 SETUP");
+        board.latch_main_board_sound_command(raw_for_vsound_code(1));
+
+        assert!(board.sound_irq_asserted());
+
+        let timed = board
+            .step_vsnd_irq_timed_cycle(512)
+            .expect("timed GWAVE IRQ cycle");
+
+        assert_eq!(timed.irq_tick, 512);
+        assert_eq!(
+            timed.cycle.prelude,
+            VSoundIrqPrelude {
+                stack_top: 0x7F,
+                latched_port_b: 0xDE,
+                command_code: 1,
+                irq_asserted_before_read: true,
+                irq_asserted_after_read: false,
+            }
+        );
+        assert_eq!(timed.dac.first_tick, Some(512));
+        assert_eq!(timed.dac.tick_step, VSOUND_SOURCE_DAC_TICK_STEP);
+        assert_eq!(timed.dac.sample_tick(0), Some(512));
+        assert_eq!(timed.dac.sample_tick(15), Some(527));
+        assert_eq!(timed.dac.sample_tick(16), None);
+        assert_eq!(timed.dac.sample_count(), 16);
+        assert_eq!(
+            timed.dac.dac_samples.as_slice(),
+            &[
+                0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0,
+            ]
+        );
+        assert_eq!(timed.dac.last_dac_value, Some(0));
+        assert_eq!(board.last_dac_value(), Some(0));
+        assert!(!timed.irq_asserted_after_cycle);
+        assert!(!board.sound_irq_asserted());
+        assert_eq!(&board.ram()[0x0D..0x0F], &[0xFF, 0x87]);
+        assert_eq!(board.ram()[0x21], 0);
+    }
+
+    #[test]
     fn vsnd_nmi_diagnostic_cycle_runs_vari_vector_after_matching_checksum() {
         let images = test_rom_images_with_nmi_diagnostic_checksum(0xB4);
         let mut board = DefenderSoundBoard::with_cleared_ram(&images);
@@ -4066,7 +4327,7 @@ mod tests {
         );
         assert_eq!(board.ram()[0x04], 0x44);
         assert_eq!(board.ram()[0x07], 0);
-        assert_eq!(board.last_dac_value(), None);
+        assert_eq!(board.last_dac_value(), Some(0));
     }
 
     #[test]
@@ -5314,6 +5575,7 @@ mod tests {
         assert_eq!(&board.ram()[0x0D..0x0F], &[0xFF, 0x56]);
         assert_eq!(board.ram()[0x21], 0xA0);
         assert_eq!(board.ram()[0x22], 3);
+        assert_eq!(board.last_dac_value(), Some(64));
     }
 
     #[test]
@@ -5340,6 +5602,7 @@ mod tests {
             &period.dac_samples[period.dac_samples.len() - 8..],
             &[0, 64, 128, 0, 255, 0, 128, 64]
         );
+        assert_eq!(board.last_dac_value(), Some(64));
     }
 
     #[test]
@@ -6010,7 +6273,7 @@ mod tests {
             }
         );
         assert_eq!(&board.ram()[0x0D..0x0F], &[0xFF, 0x87]);
-        assert_eq!(board.last_dac_value(), None);
+        assert_eq!(board.last_dac_value(), Some(0));
     }
 
     #[test]
@@ -6269,7 +6532,7 @@ mod tests {
         assert_eq!(&board.ram()[0x0D..0x0F], &[0xFF, 0x56]);
         assert_eq!(board.ram()[0x21], 0xA0);
         assert_eq!(board.ram()[0x22], 3);
-        assert_eq!(board.last_dac_value(), None);
+        assert_eq!(board.last_dac_value(), Some(64));
     }
 
     #[test]
