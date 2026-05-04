@@ -148,7 +148,9 @@ Current files:
   the direct `PDTH5`, `PLE2`, and `LNDFX0` command callsites.
 - `sound-table-command-sequences.tsv`: source-derived `SNDOUT` write rows
   generated from `sound-table-timelines.tsv`, with each table command expanded
-  into idle and complemented command writes.
+  into idle and complemented command writes. The asset tests also verify that
+  MAME-observed trace-required start/credit commands from
+  `trace-requirements.tsv` are present in these command-sequence fixtures.
 - `sound-table-timelines.tsv`: source-derived command and sequence-end rows
   generated from `sound-tables.tsv`, `SNDSEQ`, and `SNDOUT`; the Rust timeline
   helper is tested against this embedded fixture, and the fixture validator

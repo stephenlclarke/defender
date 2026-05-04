@@ -590,9 +590,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known unknown: unignore when sound command and waveform fixtures exist"]
+    #[ignore = "known unknown: unignore when waveform fixtures and end-to-end sound traces exist"]
     fn known_unknown_sound_trace_equivalence() {
-        panic!("sound commands and waveforms must match red-label golden traces");
+        panic!("sound command timing and waveforms must match red-label golden traces");
     }
 
     #[test]

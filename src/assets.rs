@@ -56,6 +56,8 @@ pub fn first_tsv_line(asset: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::{
         RED_LABEL_AUDIT_ADJUSTMENTS_TSV, RED_LABEL_CMOS_DEFAULTS_TSV, RED_LABEL_CMOS_LAYOUT_TSV,
         RED_LABEL_COLOR_CYCLE_TSV, RED_LABEL_COLOR_RAM_TSV, RED_LABEL_DEFAULTS_TSV,
@@ -214,5 +216,76 @@ mod tests {
             !duplicate.exists(),
             "assets/red-label/trace-schema.tsv is the single checked-in trace schema source"
         );
+    }
+
+    #[test]
+    fn red_label_trace_required_sound_commands_are_fixture_backed() {
+        let required = trace_required_sound_commands();
+        assert_eq!(
+            required,
+            BTreeSet::from([String::from("0xE6"), String::from("0xF5")])
+        );
+
+        let mut fixture_commands = sound_command_sequence_commands(
+            RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV,
+            "sound-table-command-sequences.tsv",
+        );
+        fixture_commands.extend(sound_command_sequence_commands(
+            RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV,
+            "sound-direct-command-sequences.tsv",
+        ));
+        fixture_commands.extend(sound_command_sequence_commands(
+            RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV,
+            "sound-thrust-command-sequences.tsv",
+        ));
+
+        for command in required {
+            assert!(
+                fixture_commands.contains(&command),
+                "trace-required sound command {command} is missing from sound command fixtures"
+            );
+        }
+    }
+
+    fn trace_required_sound_commands() -> BTreeSet<String> {
+        let mut commands = BTreeSet::new();
+        for line in RED_LABEL_TRACE_REQUIREMENTS_TSV.lines().skip(1) {
+            let fields = line.split('\t').collect::<Vec<_>>();
+            assert_eq!(fields.len(), 5, "trace requirement row shape");
+            if fields[1] == "-" {
+                continue;
+            }
+            commands.extend(fields[1].split(',').map(String::from));
+        }
+        commands
+    }
+
+    fn sound_command_sequence_commands(tsv: &str, name: &str) -> BTreeSet<String> {
+        let mut lines = tsv.lines();
+        let header = lines.next().expect("sound command fixture header");
+        let columns = header.split('\t').collect::<Vec<_>>();
+        let write_kind_index = columns
+            .iter()
+            .position(|column| *column == "write_kind")
+            .unwrap_or_else(|| panic!("{name} is missing write_kind column"));
+        let command_index = columns
+            .iter()
+            .position(|column| *column == "command")
+            .unwrap_or_else(|| panic!("{name} is missing command column"));
+
+        let mut commands = BTreeSet::new();
+        for (line_index, line) in lines.enumerate() {
+            let fields = line.split('\t').collect::<Vec<_>>();
+            assert_eq!(
+                fields.len(),
+                columns.len(),
+                "{name} line {} column count",
+                line_index + 2
+            );
+            if fields[write_kind_index] == "command" {
+                commands.insert(fields[command_index].to_string());
+            }
+        }
+        commands
     }
 }

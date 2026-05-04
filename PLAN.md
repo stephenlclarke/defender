@@ -1503,7 +1503,8 @@ Steps:
 - [x] DC-13.2 Model sound CPU timing, command latch consumption, DAC writes, and
   sample generation.
   Completed: `2026-05-04 23:41:27 BST`
-- [ ] DC-13.3 Add command-sequence fixtures from red-label traces.
+- [x] DC-13.3 Add command-sequence fixtures from red-label traces.
+  Completed: `2026-05-04 23:43:58 BST`
 - [ ] DC-13.4 Add waveform tests with deterministic tolerance.
 - [ ] DC-13.5 Keep `--mute` as an output-layer mixer switch only.
 
@@ -1544,6 +1545,22 @@ Work log:
   deferred until the full `DC-13` cycle closes.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777934506876679`
+- `2026-05-04 23:42:09 BST` Started `DC-13.3`: verifying the embedded
+  red-label sound command-sequence fixtures and validators, then adding any
+  missing fixture guard needed to lock command traces for later refactors.
+- `2026-05-04 23:43:58 BST` Completed `DC-13.3`: verified the existing
+  embedded sound command fixtures for table, direct, thrust, and timeline
+  command rows, then added an asset-level guard that every MAME-observed
+  trace-required sound command in `trace-requirements.tsv` is present in the
+  command-sequence fixtures. Updated the stale ignored sound-equivalence test
+  reason to reflect that command fixtures now exist and only waveform/end-to-end
+  sound trace proof remains. Validation passed with `markdownlint PLAN.md
+  SPEC.md assets/red-label/README.md`, `cargo fmt --check`,
+  `cargo test red_label_trace_required_sound_commands_are_fixture_backed
+  --all-targets`, and `cargo test sound_ --all-targets`. Broader
+  `make fidelity` is deferred until the full `DC-13` cycle closes.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777934661712669`
 
 ## Phase 7: Compatibility Features
 
