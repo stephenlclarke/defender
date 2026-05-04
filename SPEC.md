@@ -78,6 +78,12 @@ wave, attract, high-score, and cabinet-state behavior:
 - keep compatibility features such as `xyzzy` and Planetoid controls outside
   the arcade core as explicit overlays;
 - maintain at least 80% unit-test line coverage;
+- add focused unit or characterization tests for new code that assert both
+  source-visible outputs and source-visible mutations; when a routine mutates
+  red-label RAM, CMOS, video RAM, palette RAM, sound-command state, process
+  lists, object lists, or scheduler state, tests must prove those byte-level
+  mutations so the later large refactor can be checked against the original
+  behavior;
 - add golden-trace, pixel, waveform, or command-sequence tests for every
   translated subsystem where possible;
 - keep the binary self-contained: no runtime dependency on local ROMs or assets
@@ -378,6 +384,46 @@ This section records drift found during the repository review on
   `0xA071`. The earlier `ITEMP` / `ITEMP2` entries incorrectly overlapped the
   message workspace and have been moved behind `SPTR` where `phr6.src` places
   them.
+
+### Review Addendum 2026-05-04
+
+This review checked the local source tree, the current docs, the build
+metadata, and the key external source-of-truth links. The red-label source
+repository, MAME Williams driver/video references, Williams sound-ROM source
+repository, and red-label ROM metadata page remain valid references for this
+spec.
+
+Additional gaps and corrections found during this review:
+
+- `PLAN.md` was absent. The forward execution plan now lives there, while this
+  spec remains the behavior contract and gap register.
+- `src/machine.rs` is large enough that the eventual module split must be
+  treated as a planned refactor, not incidental cleanup. New code must keep
+  adding mutation-preserving unit and characterization tests before the refactor
+  starts.
+- The live path now feeds translated video RAM into `render_cabinet_frame`.
+  Remaining video risk is fixture proof: scanline scheduling, exact frame/cycle
+  timing, pixel golden coverage, and intentionally native-black untranslated
+  screens still need acceptance evidence.
+- The trace schema can record object CRCs, shell CRCs, sound commands, and
+  optional video CRCs, but pixel golden fixtures and audio command/waveform
+  fixtures remain absent.
+- The main-board and sound-board surfaces model useful MAME-documented
+  behavior, but they are not yet fully integrated into `ArcadeMachine::step`
+  as a source-exact CPU, IRQ, video-scanline, and sound-CPU execution path.
+- Local MAME reference traces are intentionally ignored artifacts. The checked
+  in code can validate local fixture presence and shape, but the repo still
+  depends on user-supplied ROMs and local MAME to prove golden equivalence.
+- Remaining open gaps include source-exact boot/start-ready proof, complete CPU
+  IRQ and screen-scanline frame scheduling, full frame/cycle integration,
+  golden-trace proof for translated gameplay/session paths, pixel golden
+  fixtures, full sound-board cycle/waveform scheduling, audio command and
+  waveform fixtures, and removal or regeneration of archived prototype
+  visual/audio assets.
+- The prior local implementation notes listed "Fix Mutant score to `150`" as
+  future work even though `assets/red-label/scores.tsv` and unit tests already
+  enforce it. The current contract is to keep that regression covered through
+  live scoring and future refactors.
 
 ### Drift And Cleanup Items
 
@@ -1422,7 +1468,8 @@ their behavior from labels.
 3. Done for Phase 4: live reverse movement/rendering now reaches translated
    `PLAYER` and `PRDISP`; respawn, human-carry behavior, and full scanline
    frame scheduling remain in the later world/video/fidelity phases.
-4. Done: Mutant score is `150` in the arcade core.
+4. Done: Mutant score is `150` in the arcade core and covered by regression
+   tests.
 5. Done: `xyzzy` is an overlay with explicit state and tests.
 6. Done: high-level `SessionState` remains orchestration around the core.
 7. Done: Planetoid key mapping remains in input-profile code only.
@@ -1583,7 +1630,7 @@ trace acceptance remain in later phases.
 - `xyzzy` enabled: only documented overlay behavior differs.
 - Planetoid profile maps to cabinet actions without changing arcade core
   semantics.
-- Mutant score is `150` in live gameplay.
+- Mutant score is `150` in live gameplay and protected by regression tests.
 - Gameplay runs at cabinet cadence internally.
 - Native video frames match reference frames within accepted tolerance.
 - Sound command traces and generated audio pass fixture tests.
@@ -1594,6 +1641,9 @@ trace acceptance remain in later phases.
 - Whole-project unit-test line coverage is at least 80%, and `make coverage`
   enforces coverage for added executable Rust lines against
   `NEW_CODE_COVERAGE_BASE`, which defaults to `HEAD` for local dirty worktrees.
+- Every material new code path has focused unit or characterization tests for
+  source-visible outputs and byte-level state mutations, so the later refactor
+  can prove behavior preservation.
 - Every arcade-core routine cites a red-label source/trace, or is listed as an
   unknown gap with an ignored/failing fidelity test.
 - `README.md` and this spec agree on current behavior and remaining gaps.

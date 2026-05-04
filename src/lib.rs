@@ -23,3 +23,6 @@ pub mod rom;
 pub mod sound;
 pub mod terminal;
 pub mod video;
+
+#[cfg(test)]
+pub(crate) mod test_support;
