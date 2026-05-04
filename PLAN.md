@@ -141,8 +141,9 @@ Steps:
 - [x] DC-02.2 Add characterization tests around the highest-risk translated
   routines that currently rely on many scattered byte mutations.
   Completed: `2026-05-04 17:19:14 BST`
-- [ ] DC-02.3 Add snapshot/restore regression tests that prove restored state
+- [x] DC-02.3 Add snapshot/restore regression tests that prove restored state
   replays the same trace rows and mutations.
+  Completed: `2026-05-04 17:23:46 BST`
 - [ ] DC-02.4 Extend trace columns only where a source routine needs more
   observable state for equivalence.
 - [ ] DC-02.5 Document the characterization-test pattern in `docs/fidelity/`.
@@ -195,6 +196,22 @@ Work log:
   and `make coverage`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777911583450689`
+- `2026-05-04 17:20:19 BST` Started `DC-02.3`: adding snapshot/restore
+  regression tests that prove restored machine state replays the same trace rows
+  and source-visible byte mutations.
+- `2026-05-04 17:23:46 BST` Completed `DC-02.3`: added replay regression
+  tests for public `snapshot`/`restore` through live attract process creation
+  and full `save_state`/`restore_state` through the cold-boot trace RAM-fill
+  scheduler. Both tests compare replayed TSV trace rows and exact source-visible
+  RAM/process byte mutations. Validation passed with
+  `markdownlint PLAN.md SPEC.md`, `git diff --check`, `cargo fmt --check`,
+  `cargo test restore_replays --all-targets`, `cargo test --all-targets` with
+  797 passed and 5 known ignored fidelity tests,
+  `cargo clippy --all-targets -- -D warnings`, `make trace-fixtures` which
+  skipped because `docs/fidelity/fixtures/local/rust-current` is absent locally,
+  and `make coverage`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777911855566369`
 
 ## Phase 1: Reference Fixtures And Golden Equivalence
 

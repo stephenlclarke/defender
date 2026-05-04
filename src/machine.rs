@@ -25848,6 +25848,7 @@ mod tests {
             RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START, cmos_sram_read_byte,
             cmos_sram_write_byte,
         },
+        fidelity::TraceFrame,
         input::{CabinetInput, DefenderInputPorts},
         machine::{
             ArcadeMachine, GamePhase, MachineEvent, RED_LABEL_ATTRACT_PROCESS_TYPE,
@@ -52629,6 +52630,83 @@ mod tests {
         machine.restore(snapshot);
 
         assert_eq!(machine.snapshot(), snapshot);
+    }
+
+    #[test]
+    fn snapshot_restore_replays_trace_row_and_process_mutations() {
+        let mut snapshot = ArcadeMachine::new().snapshot();
+        snapshot.rng = RandState {
+            seed: 0x11,
+            hseed: 0x22,
+            lseed: 0x33,
+        };
+
+        let mut machine = ArcadeMachine::new();
+        machine.restore(snapshot);
+        let active_head = red_label_ram_snapshot(
+            &machine,
+            "snapshot replay active process head",
+            0xA05F..0xA061,
+        );
+        let attract_process = red_label_process_cell_snapshot(&machine, 0xAAC5);
+
+        let input = CabinetInput::NONE;
+        let output = machine.step(input);
+        let trace_row = TraceFrame::from_output(input, &output).to_tsv_line();
+        let active_head_after = machine
+            .red_label_ram_range(active_head.range())
+            .expect("active process head range")
+            .to_vec();
+        let attract_process_after = machine
+            .red_label_ram_range(attract_process.range())
+            .expect("attract process range")
+            .to_vec();
+
+        let mut replay = ArcadeMachine::new();
+        replay.restore(snapshot);
+        let replay_active_head = red_label_ram_snapshot(
+            &replay,
+            "snapshot replay active process head",
+            0xA05F..0xA061,
+        );
+        let replay_attract_process = red_label_process_cell_snapshot(&replay, 0xAAC5);
+
+        let replay_output = replay.step(input);
+        let replay_trace_row = TraceFrame::from_output(input, &replay_output).to_tsv_line();
+
+        assert_eq!(replay_trace_row, trace_row);
+        replay_active_head.assert_current_changed_to(&replay, &active_head_after);
+        replay_attract_process.assert_current_changed_to(&replay, &attract_process_after);
+    }
+
+    #[test]
+    fn save_state_restore_replays_cold_boot_trace_row_and_ram_fill() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..67 {
+            machine.step(CabinetInput::NONE);
+        }
+        let saved_state = machine.save_state();
+        let ram_fill =
+            red_label_ram_snapshot(&machine, "cold-boot RAM-fill replay", 0x0000..0x0100);
+
+        let input = CabinetInput::NONE;
+        let output = machine.step(input);
+        let trace_row = TraceFrame::from_output(input, &output).to_tsv_line();
+        let ram_fill_after = machine
+            .red_label_ram_range(ram_fill.range())
+            .expect("cold-boot RAM-fill range")
+            .to_vec();
+
+        let mut replay = ArcadeMachine::new();
+        replay.restore_state(saved_state);
+        let replay_ram_fill =
+            red_label_ram_snapshot(&replay, "cold-boot RAM-fill replay", 0x0000..0x0100);
+
+        let replay_output = replay.step(input);
+        let replay_trace_row = TraceFrame::from_output(input, &replay_output).to_tsv_line();
+
+        assert_eq!(replay_trace_row, trace_row);
+        replay_ram_fill.assert_current_changed_to(&replay, &ram_fill_after);
     }
 
     #[test]
