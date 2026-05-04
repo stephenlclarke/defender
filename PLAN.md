@@ -499,7 +499,8 @@ Steps:
 - [x] DC-05.3 Wire the sound-command latch and sound-board PIA boundary into the
   frame output path without high-level cue shortcuts.
   Completed: `2026-05-04 18:35:07 BST`
-- [ ] DC-05.4 Add mutation tests for every board and machine byte range touched.
+- [x] DC-05.4 Add mutation tests for every board and machine byte range touched.
+  Completed: `2026-05-04 18:44:31 BST`
 - [ ] DC-05.5 Prove boot/start-ready trace equivalence with local fixtures.
 
 Completion gate: boot/start-ready state is source-shaped and no longer depends
@@ -507,6 +508,34 @@ on trace-only scheduling shortcuts.
 
 Work log:
 
+- `2026-05-04 18:36:18 BST` Started `DC-05.4`: auditing the `DC-05`
+  board and machine byte surfaces already wired into frame stepping, then
+  adding focused mutation tests for any touched RAM, CMOS, palette, latch, or
+  source-visible status ranges that are not already protected.
+- `2026-05-04 18:44:31 BST` Completed `DC-05.4`: added refactor-safety
+  mutation tests for the cold-boot RAM-fill pass ranges, SINIT observed clear
+  segments, INIT20 today's-high-score/process/super-process/object/list/status
+  byte ranges, and sound-latch preservation across INIT20 object-list setup.
+  Expanded the main-board live IRQ test to prove palette RAM mutates from the
+  PCRAM source bytes, and expanded save-state coverage to round-trip a CMOS
+  cell and palette RAM byte alongside RAM, hardware-map, main-board, sound-latch,
+  and trace-scheduler state. Validation passed with
+  `cargo test power_up_ram_fill_mutates_observed_pass_ranges --all-targets`,
+  `cargo test sinit_handoff_clears_each_observed_ram_segment --all-targets`,
+  `cargo test init20_handoff_mutates_list_score_status_and_latch_ranges
+  --all-targets`,
+  `cargo test step_records_live_irq_watchdog_and_video_counter_surface
+  --all-targets`,
+  `cargo test
+  save_state_restore_round_trips_red_label_memory_and_trace_scheduler
+  --all-targets`, `cargo fmt --check`, and `make fidelity`.
+  `make fidelity` passed regular tests with 806 passed and 13 known ignored
+  tests, main tests with 2 passed, clippy, trace script tests, and coverage
+  with 0/0 added executable Rust lines because this step only added test code;
+  `make trace-fixtures` skipped only because the ignored local
+  `docs/fidelity/fixtures/local/rust-current` directory is absent.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777916705268889`
 - `2026-05-04 18:29:44 BST` Started `DC-05.3`: routing frame-level
   sound-command writes through the MAME-modeled main-board latch and
   sound-board PIA boundary while preserving the existing command sequence as

@@ -26127,7 +26127,7 @@ mod tests {
             RedLabelWaveParameters,
         },
         red_label::{Facing, Fixed16, RandState, rmax},
-        red_label_memory::red_label_ram_layout,
+        red_label_memory::{red_label_linked_lists, red_label_ram_layout},
         rom::crc32,
         sound::{SoundCommand, SoundCommandLatch},
         test_support::{
@@ -26329,6 +26329,18 @@ mod tests {
             confirmed_bits: 0,
             queued: None,
         }
+    }
+
+    fn red_label_ram_crc(machine: &ArcadeMachine, range: std::ops::Range<u16>) -> u32 {
+        crc32(
+            machine
+                .red_label_ram_range(range)
+                .expect("red-label RAM range should be valid"),
+        )
+    }
+
+    fn zero_bytes(range: std::ops::Range<u16>) -> Vec<u8> {
+        vec![0; usize::from(range.end - range.start)]
     }
 
     fn screen_clear() -> RedLabelScreenClear {
@@ -26857,6 +26869,35 @@ mod tests {
     }
 
     #[test]
+    fn power_up_ram_fill_mutates_observed_pass_ranges() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        let first_pass_tail = red_label_ram_snapshot(
+            &machine,
+            "power-up first-pass untouched tail",
+            0xAAC6..0xC000,
+        );
+
+        for _ in 0..72 {
+            machine.step(CabinetInput::NONE);
+        }
+
+        assert_eq!(red_label_ram_crc(&machine, 0x0000..0xAAC6), 0xF777_54A6);
+        first_pass_tail.assert_current_unchanged(&machine);
+
+        let first_pass = red_label_ram_snapshot(
+            &machine,
+            "power-up second-pass rewritten range",
+            0x0000..0xAAC6,
+        );
+        for _ in 72..245 {
+            machine.step(CabinetInput::NONE);
+        }
+
+        first_pass.assert_current_changed(&machine);
+        assert_eq!(red_label_ram_crc(&machine, 0x0000..0xAAC6), 0x67D6_72B3);
+    }
+
+    #[test]
     fn power_on_frame_model_tracks_source_boot_boundaries() {
         let cases = [
             (
@@ -27117,6 +27158,159 @@ mod tests {
             .apply_trace_power_up_handoff(&mut sound_commands, false)
             .expect("frame 746 handoff");
         assert_eq!(machine.snapshot().rng, expected);
+    }
+
+    #[test]
+    fn sinit_handoff_clears_each_observed_ram_segment() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let seed_range = super::field_range(&layout, "base_page", "LSEED").expect("LSEED range");
+        let seeded_range = 0x9C00..0xC000;
+        machine
+            .memory
+            .write_range(seeded_range.clone(), &vec![0xA5; seeded_range.len()])
+            .expect("seed SINIT clear window");
+        let mut sound_commands = Vec::new();
+
+        for (frame, range) in [
+            (720, 0x9C00..seed_range.end),
+            (721, seed_range.end..0xA4AC),
+            (722, 0xA4AC..0xA7A0),
+            (723, 0xA7A0..0xAA94),
+            (724, 0xAA94..0xAAC5),
+            (725, 0xAAC5..0xC000),
+        ] {
+            let before = red_label_ram_snapshot(&machine, "SINIT clear segment", range.clone());
+
+            machine.frame = frame;
+            machine
+                .apply_trace_power_up_handoff(&mut sound_commands, false)
+                .expect("SINIT handoff frame");
+
+            before.assert_current_changed_to(&machine, &zero_bytes(range));
+        }
+
+        assert!(sound_commands.is_empty());
+    }
+
+    #[test]
+    fn init20_handoff_mutates_list_score_status_and_latch_ranges() {
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let lists = red_label_linked_lists().expect("linked-list layout");
+        let process = super::table_descriptor(&layout, "process").expect("process table");
+        let super_process =
+            super::table_descriptor(&layout, "super_process").expect("super-process table");
+        let object = super::table_descriptor(&layout, "object").expect("object table");
+        let process_range = process.table_range().expect("process range");
+        let super_process_range = super_process.table_range().expect("super-process range");
+        let object_range = object.table_range().expect("object range");
+        let process_base = process.base.to_be_bytes();
+        let super_process_base = super_process.base.to_be_bytes();
+        let object_base = object.base.to_be_bytes();
+        let high_score_cells =
+            u16::try_from(RED_LABEL_HIGH_SCORE_ENTRIES * RED_LABEL_HIGH_SCORE_ENTRY_CELLS)
+                .expect("today's high-score table size fits u16");
+        let todays_range = RED_LABEL_THSTAB_START..RED_LABEL_THSTAB_START + high_score_cells;
+        let status_range =
+            super::field_range(&layout, "base_page", "STATUS").expect("STATUS range");
+        let crproc_range =
+            super::field_range(&layout, "runtime_pointers", "CRPROC").expect("CRPROC range");
+        let free_process_head = super::linked_list(&lists, "free_process")
+            .expect("free_process list")
+            .head_address;
+        let free_super_process_head = super::linked_list(&lists, "free_super_process")
+            .expect("free_super_process list")
+            .head_address;
+        let active_process_head = super::linked_list(&lists, "active_process")
+            .expect("active_process list")
+            .head_address;
+        let active_process_head_bytes = active_process_head.to_be_bytes();
+        let free_object_head = super::linked_list(&lists, "free_object")
+            .expect("free_object list")
+            .head_address;
+        let active_object_head = super::linked_list(&lists, "active_object")
+            .expect("active_object list")
+            .head_address;
+        let inactive_object_head = super::linked_list(&lists, "inactive_object")
+            .expect("inactive_object list")
+            .head_address;
+        let shell_object_head = super::linked_list(&lists, "shell_object")
+            .expect("shell_object list")
+            .head_address;
+
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..731 {
+            machine.step(CabinetInput::NONE);
+        }
+        let sound_before = machine.red_label_sound_board_snapshot();
+        let todays = red_label_ram_snapshot(&machine, "INIT20 today's scores", todays_range);
+        let status = red_label_ram_snapshot(&machine, "INIT20 STATUS", status_range.clone());
+        let process_table =
+            red_label_ram_snapshot(&machine, "INIT20 process table", process_range.clone());
+        let super_process_table = red_label_ram_snapshot(
+            &machine,
+            "INIT20 super-process table",
+            super_process_range.clone(),
+        );
+        let object_table =
+            red_label_ram_snapshot(&machine, "INIT20 object table", object_range.clone());
+
+        machine.step(CabinetInput::NONE);
+
+        assert_eq!(
+            sound_before,
+            RedLabelSoundBoardSnapshot {
+                last_command_latch: Some(SoundCommandLatch::from_main_board_pia_port_b(0xC0)),
+                latched_port_b: Some(0xC0),
+                command_cb1_asserted: true,
+                latch_write_count: 1,
+            }
+        );
+        assert_eq!(machine.red_label_sound_board_snapshot(), sound_before);
+        todays.assert_current_changed(&machine);
+        status.assert_current_changed_to(&machine, &[0xFF]);
+        process_table.assert_current_changed(&machine);
+        super_process_table.assert_current_changed(&machine);
+        object_table.assert_current_changed(&machine);
+        assert_eq!(red_label_ram_crc(&machine, process_range), 0xB2B2_58E3);
+        assert_eq!(
+            red_label_ram_crc(&machine, super_process_range),
+            0x5EDF_4A6B
+        );
+        assert_eq!(red_label_ram_crc(&machine, object_range), 0x9075_E2DD);
+        assert_eq!(red_label_ram_crc(&machine, todays.range()), 0xE50A_C8F3);
+        assert_eq!(
+            machine.red_label_ram_range(free_process_head..free_process_head + 2),
+            Some(&process_base[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(free_super_process_head..free_super_process_head + 2),
+            Some(&super_process_base[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(active_process_head..active_process_head + 2),
+            Some(&[0, 0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(crproc_range),
+            Some(&active_process_head_bytes[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(free_object_head..free_object_head + 2),
+            Some(&object_base[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(active_object_head..active_object_head + 2),
+            Some(&[0, 0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(inactive_object_head..inactive_object_head + 2),
+            Some(&[0, 0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(shell_object_head..shell_object_head + 2),
+            Some(&[0, 0][..])
+        );
     }
 
     #[test]
@@ -53284,6 +53478,8 @@ mod tests {
     fn save_state_restore_round_trips_red_label_memory_and_trace_scheduler() {
         let mut machine = ArcadeMachine::new_cold_boot_trace();
         machine.memory.write_byte(0xA123, 0x5A).expect("seed RAM");
+        machine.memory.cmos[0x7D] = 0xF1;
+        machine.memory.palette_ram[5] = 0x5C;
         machine.memory.hardware_map = 7;
         machine.main_board_input_ports = DefenderInputPorts {
             in0: 0x02,
@@ -53298,9 +53494,12 @@ mod tests {
         let saved_snapshot = machine.snapshot();
         let saved_board = machine.red_label_main_board_snapshot();
         let saved_sound = machine.red_label_sound_board_snapshot();
+        let saved_cmos = red_label_cmos_snapshot(&machine, "save-state CMOS cell", 0x7D..0x7E);
         let saved_state = machine.save_state();
 
         machine.memory.write_byte(0xA123, 0xA5).expect("mutate RAM");
+        machine.memory.cmos[0x7D] = 0xF0;
+        machine.memory.palette_ram[5] = 0x00;
         machine.memory.hardware_map = 2;
         machine.main_board_input_ports = DefenderInputPorts::EMPTY;
         machine.main_board_watchdog_reset_count = 0;
@@ -53316,6 +53515,8 @@ mod tests {
             machine.red_label_ram_range(0xA123..0xA124),
             Some(&[0x5A][..])
         );
+        saved_cmos.assert_current_unchanged(&machine);
+        assert_eq!(machine.red_label_palette_ram()[5], 0x5C);
         assert_eq!(machine.red_label_hardware_map(), 7);
         assert_eq!(machine.red_label_main_board_snapshot(), saved_board);
         assert_eq!(machine.red_label_sound_board_snapshot(), saved_sound);
@@ -53359,6 +53560,15 @@ mod tests {
             .memory
             .write_range(0xA08F..0xA092, &[0x7E, 0xDF, 0xC3])
             .expect("select IRQB hook");
+        let palette_source = [
+            0xA0, 0xA1, 0xA2, 0xA3, 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xC0, 0xC1, 0xC2, 0xC3,
+            0xC4, 0xC5,
+        ];
+        machine
+            .memory
+            .write_range(0xA026..0xA036, &palette_source)
+            .expect("seed PCRAM for live IRQ palette copy");
+        let palette_before = *machine.red_label_palette_ram();
 
         let output = machine.step(CabinetInput::NONE);
         let board = machine.red_label_main_board_snapshot();
@@ -53373,6 +53583,8 @@ mod tests {
             board.video_counter_value,
             video_counter_read_value(board.video_counter_vpos)
         );
+        assert_ne!(*machine.red_label_palette_ram(), palette_before);
+        assert_eq!(machine.red_label_palette_ram(), &palette_source);
         assert_eq!(board.palette_ram, *machine.red_label_palette_ram());
     }
 
