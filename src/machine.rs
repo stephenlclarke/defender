@@ -58219,14 +58219,123 @@ mod tests {
     }
 
     #[test]
+    fn xyzzy_auto_fire_hook_has_paired_arcade_and_overlay_behavior() {
+        let mut arcade = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut arcade);
+        arcade.set_compatibility(super::CompatibilityState {
+            xyzzy_active: true,
+            xyzzy_invincible: false,
+            xyzzy_auto_fire: false,
+        });
+
+        let arcade_output = arcade.step(CabinetInput::NONE);
+        assert!(
+            !arcade_output
+                .events()
+                .any(|event| event == MachineEvent::FirePressed)
+        );
+        assert_eq!(
+            arcade.red_label_main_board_snapshot().input_ports,
+            DefenderInputPorts::EMPTY
+        );
+
+        let mut overlay = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut overlay);
+        overlay.set_compatibility(super::CompatibilityState {
+            xyzzy_active: true,
+            xyzzy_invincible: false,
+            xyzzy_auto_fire: true,
+        });
+
+        let overlay_output = overlay.step(CabinetInput::NONE);
+        assert!(
+            overlay_output
+                .events()
+                .any(|event| event == MachineEvent::FirePressed)
+        );
+        assert_eq!(
+            overlay_output.snapshot.last_input_bits,
+            CabinetInput::NONE.bits()
+        );
+        assert_eq!(
+            overlay.red_label_main_board_snapshot().input_ports,
+            DefenderInputPorts::EMPTY
+        );
+    }
+
+    #[test]
+    fn xyzzy_unlimited_smart_bomb_hook_has_paired_arcade_and_overlay_behavior() {
+        let mut arcade = started_machine_with_empty_smart_bombs();
+        let arcade_output = arcade.step(CabinetInput {
+            smart_bomb: true,
+            ..CabinetInput::NONE
+        });
+        assert!(
+            !arcade_output
+                .events()
+                .any(|event| event == MachineEvent::SmartBombPressed)
+        );
+        assert_eq!(arcade_output.snapshot.player.smart_bombs, 0);
+        assert_eq!(
+            arcade.red_label_ram_range(0xA1CB..0xA1CC),
+            Some(&[0x00][..])
+        );
+
+        let mut overlay = started_machine_with_empty_smart_bombs();
+        overlay.set_compatibility(super::CompatibilityState {
+            xyzzy_active: true,
+            xyzzy_invincible: false,
+            xyzzy_auto_fire: false,
+        });
+        let overlay_output = overlay.step(CabinetInput {
+            smart_bomb: true,
+            ..CabinetInput::NONE
+        });
+        assert!(
+            overlay_output
+                .events()
+                .any(|event| event == MachineEvent::SmartBombPressed)
+        );
+        assert_eq!(overlay_output.snapshot.player.smart_bombs, 0);
+        assert_eq!(
+            overlay.red_label_ram_range(0xA1CB..0xA1CC),
+            Some(&[0x00][..])
+        );
+    }
+
+    #[test]
+    fn xyzzy_invincibility_hook_is_trace_invisible_until_arcade_hook_exists() {
+        let mut arcade = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut arcade);
+        let arcade_output = arcade.step(CabinetInput::NONE);
+
+        let mut overlay = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut overlay);
+        overlay.set_compatibility(super::CompatibilityState {
+            xyzzy_active: true,
+            xyzzy_invincible: true,
+            xyzzy_auto_fire: false,
+        });
+        let overlay_output = overlay.step(CabinetInput::NONE);
+
+        assert!(overlay_output.snapshot.xyzzy_invincible);
+        assert_eq!(
+            TraceFrame::from_output(CabinetInput::NONE, &arcade_output),
+            TraceFrame::from_output(CabinetInput::NONE, &overlay_output)
+        );
+        assert_eq!(
+            arcade.red_label_main_board_snapshot(),
+            overlay.red_label_main_board_snapshot()
+        );
+        assert_eq!(
+            arcade.red_label_sound_board_snapshot(),
+            overlay.red_label_sound_board_snapshot()
+        );
+    }
+
+    #[test]
     fn xyzzy_disabled_empty_bombs_does_not_emit_overlay_smart_bomb() {
-        let mut machine = ArcadeMachine::new();
-        start_one_player_game_for_test(&mut machine);
-        machine.player.smart_bombs = 0;
-        machine
-            .memory
-            .write_byte(0xA1CB, 0)
-            .expect("empty current player smart bombs");
+        let mut machine = started_machine_with_empty_smart_bombs();
 
         let output = machine.step(CabinetInput {
             smart_bomb: true,
@@ -58267,5 +58376,16 @@ mod tests {
         assert!(events.contains(&MachineEvent::SmartBombPressed));
         assert_eq!(output.snapshot.player.smart_bombs, 0);
         assert!(output.snapshot.xyzzy_invincible);
+    }
+
+    fn started_machine_with_empty_smart_bombs() -> ArcadeMachine {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        machine.player.smart_bombs = 0;
+        machine
+            .memory
+            .write_byte(0xA1CB, 0)
+            .expect("empty current player smart bombs");
+        machine
     }
 }

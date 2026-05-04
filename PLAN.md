@@ -1628,9 +1628,10 @@ Steps:
   Completed: `2026-05-04 23:56:39 BST`
 - [x] DC-14.2 Add every future `xyzzy` hook as an explicit overlay hook.
   Completed: `2026-05-04 23:59:18 BST`
-- [ ] DC-14.3 For each hook, add paired tests proving arcade behavior is
+- [x] DC-14.3 For each hook, add paired tests proving arcade behavior is
   unchanged when `xyzzy` is disabled and compatibility behavior applies when it
   is enabled.
+  Completed: `2026-05-05 00:01:48 BST`
 - [ ] DC-14.4 Add trace checks that `xyzzy` disabled remains red-label
   equivalent.
 - [ ] DC-14.5 Document compatibility behavior without presenting it as arcade
@@ -1668,6 +1669,24 @@ Work log:
   `make fidelity` is deferred until the full `DC-14` cycle closes.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935581955939`
+- `2026-05-05 00:00:21 BST` Started `DC-14.3`: adding paired disabled/enabled
+  tests for each currently implemented `xyzzy` hook, with trace and RAM-visible
+  assertions where compatibility must not pollute arcade state.
+- `2026-05-05 00:01:48 BST` Completed `DC-14.3`: added paired hook tests for
+  auto-fire, unlimited smart bombs, and invincibility. The auto-fire pair proves
+  the disabled hook does not emit fire while the enabled hook emits
+  `FirePressed` without mutating raw cabinet input bits. The smart-bomb pair
+  proves empty-inventory arcade behavior stays silent with `xyzzy` off while
+  enabled `xyzzy` emits the overlay event without changing the red-label smart
+  bomb RAM cell. The invincibility pair proves the current flag is
+  trace-invisible and leaves main-board and sound-board snapshots unchanged
+  until a future arcade hook is implemented. Validation passed with
+  `cargo fmt --check`, the three focused paired-hook tests,
+  `cargo test xyzzy_ --all-targets`, and
+  `cargo clippy --all-targets -- -D warnings`. Broader `make fidelity` is
+  deferred until the full `DC-14` cycle closes.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935729220189`
 
 ## Phase 8: Planned Large Refactor
 
