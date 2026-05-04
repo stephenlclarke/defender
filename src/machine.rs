@@ -3775,6 +3775,27 @@ const RED_LABEL_TRACE_SINIT_RAM_CLEAR_END: u16 = 0xC000;
 const RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME: u64 = 725;
 const RED_LABEL_TRACE_PLAYER_START_EXEC_DELAY_FRAMES: u64 = 51;
 
+const RED_LABEL_TRACE_ZERO_RAND_STATE: RandState = RandState {
+    seed: 0,
+    hseed: 0,
+    lseed: 0,
+};
+const RED_LABEL_TRACE_INIT20_SOUND_RAND_STATE: RandState = RandState {
+    seed: 0xD9,
+    hseed: 0xF6,
+    lseed: 0xCC,
+};
+const RED_LABEL_TRACE_INIT20_OBJECT_LIST_RAND_STATE: RandState = RandState {
+    seed: 0x3E,
+    hseed: 0xB0,
+    lseed: 0x13,
+};
+const RED_LABEL_TRACE_EXEC_IDLE_RAND_STATE: RandState = RandState {
+    seed: 0x86,
+    hseed: 0x74,
+    lseed: 0x42,
+};
+
 const RED_LABEL_SINIT_OBJECT_CLEAR_TARGETS: [RedLabelPowerUpRamFillTarget; 4] = [
     RedLabelPowerUpRamFillTarget {
         frame: 721,
@@ -3793,6 +3814,38 @@ const RED_LABEL_SINIT_OBJECT_CLEAR_TARGETS: [RedLabelPowerUpRamFillTarget; 4] = 
         target_address: 0xAAC5,
     },
 ];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelPowerOnStage {
+    ResetHold,
+    RamTestFirstPass,
+    RamTestBetweenPasses,
+    RamTestSecondPass,
+    RamTestComplete,
+    SinitZeroSeed,
+    SinitClearPlayer,
+    SinitClearObjects,
+    SinitClearComplete,
+    Init20Sound,
+    Init20ObjectLists,
+    ExecIdleSeed,
+    StartReady,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelPowerOnFrameModel {
+    pub frame: u64,
+    pub stage: RedLabelPowerOnStage,
+    pub ram_fill_target: u16,
+    pub sinit_clear_target: Option<u16>,
+    pub rand_state: Option<RandState>,
+    pub phase: Option<GamePhase>,
+    pub sound_command_port_b: Option<u8>,
+    pub initializes_process_lists: bool,
+    pub initializes_object_lists: bool,
+    pub live_io_blocked: bool,
+    pub start_ready: bool,
+}
 
 impl RedLabelPowerUpRamFill {
     fn new() -> Self {
@@ -3841,6 +3894,81 @@ fn red_label_sinit_object_clear_target(frame: u64) -> Result<u16, String> {
         .find(|target| target.frame == frame)
         .map(|target| target.target_address)
         .ok_or_else(|| format!("red-label SINIT object clear frame {frame} is not mapped"))
+}
+
+pub fn red_label_power_on_frame_model(frame: u64) -> Result<RedLabelPowerOnFrameModel, String> {
+    let mut model = RedLabelPowerOnFrameModel {
+        frame,
+        stage: match frame {
+            0..=67 => RedLabelPowerOnStage::ResetHold,
+            68..=72 => RedLabelPowerOnStage::RamTestFirstPass,
+            73..=239 => RedLabelPowerOnStage::RamTestBetweenPasses,
+            240..=244 => RedLabelPowerOnStage::RamTestSecondPass,
+            245..=719 => RedLabelPowerOnStage::RamTestComplete,
+            RED_LABEL_TRACE_SINIT_ZERO_SEED_FRAME => RedLabelPowerOnStage::SinitZeroSeed,
+            RED_LABEL_TRACE_SINIT_CLEAR_PLAYER_FRAME => RedLabelPowerOnStage::SinitClearPlayer,
+            722..=724 => RedLabelPowerOnStage::SinitClearObjects,
+            RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME..=730 => {
+                RedLabelPowerOnStage::SinitClearComplete
+            }
+            RED_LABEL_TRACE_INIT20_SOUND_FRAME => RedLabelPowerOnStage::Init20Sound,
+            RED_LABEL_TRACE_INIT20_OBJECT_LIST_FRAME => RedLabelPowerOnStage::Init20ObjectLists,
+            RED_LABEL_TRACE_EXEC_IDLE_SEED_FRAME..=745 => RedLabelPowerOnStage::ExecIdleSeed,
+            _ => RedLabelPowerOnStage::StartReady,
+        },
+        ram_fill_target: red_label_trace_power_up_ram_fill_target(frame),
+        sinit_clear_target: None,
+        rand_state: None,
+        phase: None,
+        sound_command_port_b: None,
+        initializes_process_lists: false,
+        initializes_object_lists: false,
+        live_io_blocked: frame <= RED_LABEL_TRACE_POWER_UP_LIVE_IO_HOLDOFF_END_FRAME,
+        start_ready: frame >= RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME,
+    };
+
+    match model.stage {
+        RedLabelPowerOnStage::SinitZeroSeed => {
+            let layout = red_label_ram_layout()?;
+            model.sinit_clear_target = Some(field_range(&layout, "base_page", "LSEED")?.end);
+            model.rand_state = Some(RED_LABEL_TRACE_ZERO_RAND_STATE);
+            model.phase = Some(GamePhase::Playing);
+        }
+        RedLabelPowerOnStage::SinitClearPlayer | RedLabelPowerOnStage::SinitClearObjects => {
+            model.sinit_clear_target = Some(red_label_sinit_object_clear_target(frame)?);
+            model.rand_state = Some(RED_LABEL_TRACE_ZERO_RAND_STATE);
+            model.phase = Some(GamePhase::Attract);
+        }
+        RedLabelPowerOnStage::SinitClearComplete => {
+            if frame == RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME {
+                model.sinit_clear_target = Some(RED_LABEL_TRACE_SINIT_RAM_CLEAR_END);
+            }
+            model.rand_state = Some(RED_LABEL_TRACE_ZERO_RAND_STATE);
+            model.phase = Some(GamePhase::Attract);
+        }
+        RedLabelPowerOnStage::Init20Sound => {
+            model.rand_state = Some(RED_LABEL_TRACE_INIT20_SOUND_RAND_STATE);
+            model.phase = Some(GamePhase::Attract);
+            model.sound_command_port_b = Some(RED_LABEL_TRACE_INIT20_SOUND_COMMAND_PORT_B);
+        }
+        RedLabelPowerOnStage::Init20ObjectLists => {
+            model.rand_state = Some(RED_LABEL_TRACE_INIT20_OBJECT_LIST_RAND_STATE);
+            model.phase = Some(GamePhase::GameOver);
+            model.initializes_process_lists = true;
+            model.initializes_object_lists = true;
+        }
+        RedLabelPowerOnStage::ExecIdleSeed => {
+            model.rand_state = Some(RED_LABEL_TRACE_EXEC_IDLE_RAND_STATE);
+        }
+        RedLabelPowerOnStage::ResetHold
+        | RedLabelPowerOnStage::RamTestFirstPass
+        | RedLabelPowerOnStage::RamTestBetweenPasses
+        | RedLabelPowerOnStage::RamTestSecondPass
+        | RedLabelPowerOnStage::RamTestComplete
+        | RedLabelPowerOnStage::StartReady => {}
+    }
+
+    Ok(model)
 }
 
 impl RedLabelRuntimeMemory {
@@ -23823,112 +23951,48 @@ impl ArcadeMachine {
         live_process_ran: bool,
     ) -> Result<(), String> {
         let layout = red_label_ram_layout()?;
-        match self.frame {
-            RED_LABEL_TRACE_SINIT_ZERO_SEED_FRAME => {
-                let seed_end = field_range(&layout, "base_page", "LSEED")?.end;
-                self.memory.clear_trace_sinit_ram_to(seed_end)?;
-                self.write_trace_rand_state(
-                    &layout,
-                    RandState {
-                        seed: 0,
-                        hseed: 0,
-                        lseed: 0,
-                    },
-                )?;
-                self.memory.clear_shell_head()?;
-                self.phase = GamePhase::Playing;
-            }
-            RED_LABEL_TRACE_SINIT_CLEAR_PLAYER_FRAME => {
-                self.write_trace_rand_state(
-                    &layout,
-                    RandState {
-                        seed: 0,
-                        hseed: 0,
-                        lseed: 0,
-                    },
-                )?;
-                self.memory
-                    .clear_trace_sinit_ram_to(red_label_sinit_object_clear_target(self.frame)?)?;
-                self.phase = GamePhase::Attract;
-            }
-            722..=724 => {
-                self.write_trace_rand_state(
-                    &layout,
-                    RandState {
-                        seed: 0,
-                        hseed: 0,
-                        lseed: 0,
-                    },
-                )?;
-                self.memory
-                    .clear_trace_sinit_ram_to(red_label_sinit_object_clear_target(self.frame)?)?;
-                self.phase = GamePhase::Attract;
-            }
-            RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME..=730 => {
-                if self.frame == RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME {
-                    self.memory
-                        .clear_trace_sinit_ram_to(RED_LABEL_TRACE_SINIT_RAM_CLEAR_END)?;
-                }
-                self.write_trace_rand_state(
-                    &layout,
-                    RandState {
-                        seed: 0,
-                        hseed: 0,
-                        lseed: 0,
-                    },
-                )?;
-                self.phase = GamePhase::Attract;
-            }
-            RED_LABEL_TRACE_INIT20_SOUND_FRAME => {
-                self.write_trace_rand_state(
-                    &layout,
-                    RandState {
-                        seed: 0xD9,
-                        hseed: 0xF6,
-                        lseed: 0xCC,
-                    },
-                )?;
-                sound_commands.push(SoundCommand::from_main_board_pia_port_b(
-                    RED_LABEL_TRACE_INIT20_SOUND_COMMAND_PORT_B,
-                ));
-                self.phase = GamePhase::Attract;
-            }
-            RED_LABEL_TRACE_INIT20_OBJECT_LIST_FRAME => {
-                self.write_trace_rand_state(
-                    &layout,
-                    RandState {
-                        seed: 0x3E,
-                        hseed: 0xB0,
-                        lseed: 0x13,
-                    },
-                )?;
-                let lists = red_label_linked_lists()?;
-                let cmos_defaults = red_label_cmos_defaults()?;
-                self.memory
-                    .apply_todays_high_score_defaults(&cmos_defaults)?;
-                self.memory.initialize_process_lists(&layout, &lists)?;
-                self.memory.initialize_object_lists(&layout, &lists)?;
-                self.memory
-                    .write_field_byte(&layout, "base_page", "STATUS", 0xFF)?;
-                self.phase = GamePhase::GameOver;
-            }
-            RED_LABEL_TRACE_EXEC_IDLE_SEED_FRAME..=745 => {
-                self.write_trace_rand_state(
-                    &layout,
-                    RandState {
-                        seed: 0x86,
-                        hseed: 0x74,
-                        lseed: 0x42,
-                    },
-                )?;
-            }
-            frame if frame >= RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME && !live_process_ran => {
-                let state = self.memory.advance_red_label_rand(&layout)?;
-                self.rng = state;
-            }
-            frame if frame >= RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME => {}
-            _ => {}
+        let model = red_label_power_on_frame_model(self.frame)?;
+
+        if let Some(target) = model.sinit_clear_target {
+            self.memory.clear_trace_sinit_ram_to(target)?;
         }
+
+        if let Some(state) = model.rand_state {
+            self.write_trace_rand_state(&layout, state)?;
+        }
+
+        if model.stage == RedLabelPowerOnStage::SinitZeroSeed {
+            self.memory.clear_shell_head()?;
+        }
+
+        if let Some(port_b) = model.sound_command_port_b {
+            sound_commands.push(SoundCommand::from_main_board_pia_port_b(port_b));
+        }
+
+        if model.initializes_process_lists || model.initializes_object_lists {
+            let lists = red_label_linked_lists()?;
+            let cmos_defaults = red_label_cmos_defaults()?;
+            self.memory
+                .apply_todays_high_score_defaults(&cmos_defaults)?;
+            if model.initializes_process_lists {
+                self.memory.initialize_process_lists(&layout, &lists)?;
+            }
+            if model.initializes_object_lists {
+                self.memory.initialize_object_lists(&layout, &lists)?;
+            }
+            self.memory
+                .write_field_byte(&layout, "base_page", "STATUS", 0xFF)?;
+        }
+
+        if let Some(phase) = model.phase {
+            self.phase = phase;
+        }
+
+        if model.start_ready && !live_process_ran {
+            let state = self.memory.advance_red_label_rand(&layout)?;
+            self.rng = state;
+        }
+
         Ok(())
     }
 
@@ -26685,6 +26749,269 @@ mod tests {
         assert_eq!(red_label_trace_power_up_ram_fill_target(243), 0xA806);
         assert_eq!(red_label_trace_power_up_ram_fill_target(244), 0xAA6A);
         assert_eq!(red_label_trace_power_up_ram_fill_target(245), 0xAAC6);
+    }
+
+    #[test]
+    fn power_on_frame_model_tracks_source_boot_boundaries() {
+        let cases = [
+            (
+                67,
+                super::RedLabelPowerOnStage::ResetHold,
+                0x0000,
+                true,
+                false,
+            ),
+            (
+                68,
+                super::RedLabelPowerOnStage::RamTestFirstPass,
+                0xA26A,
+                true,
+                false,
+            ),
+            (
+                73,
+                super::RedLabelPowerOnStage::RamTestBetweenPasses,
+                0xC000,
+                true,
+                false,
+            ),
+            (
+                240,
+                super::RedLabelPowerOnStage::RamTestSecondPass,
+                0xA070,
+                true,
+                false,
+            ),
+            (
+                245,
+                super::RedLabelPowerOnStage::RamTestComplete,
+                0xAAC6,
+                true,
+                false,
+            ),
+            (
+                732,
+                super::RedLabelPowerOnStage::Init20ObjectLists,
+                0xAAC6,
+                true,
+                false,
+            ),
+            (
+                733,
+                super::RedLabelPowerOnStage::ExecIdleSeed,
+                0xAAC6,
+                false,
+                false,
+            ),
+            (
+                745,
+                super::RedLabelPowerOnStage::ExecIdleSeed,
+                0xAAC6,
+                false,
+                false,
+            ),
+            (
+                746,
+                super::RedLabelPowerOnStage::StartReady,
+                0xAAC6,
+                false,
+                true,
+            ),
+        ];
+
+        for (frame, stage, ram_fill_target, live_io_blocked, start_ready) in cases {
+            let model = super::red_label_power_on_frame_model(frame).expect("power-on model");
+
+            assert_eq!(model.frame, frame);
+            assert_eq!(model.stage, stage);
+            assert_eq!(model.ram_fill_target, ram_fill_target);
+            assert_eq!(model.live_io_blocked, live_io_blocked);
+            assert_eq!(model.start_ready, start_ready);
+        }
+    }
+
+    #[test]
+    fn power_on_frame_model_records_sinit_and_init20_mutations() {
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let seed_end = super::field_range(&layout, "base_page", "LSEED")
+            .expect("LSEED range")
+            .end;
+
+        let zero_seed = super::red_label_power_on_frame_model(720).expect("frame 720 model");
+        assert_eq!(zero_seed.stage, super::RedLabelPowerOnStage::SinitZeroSeed);
+        assert_eq!(zero_seed.sinit_clear_target, Some(seed_end));
+        assert_eq!(
+            zero_seed.rand_state,
+            Some(super::RED_LABEL_TRACE_ZERO_RAND_STATE)
+        );
+        assert_eq!(zero_seed.phase, Some(GamePhase::Playing));
+
+        let clear_player = super::red_label_power_on_frame_model(721).expect("frame 721 model");
+        assert_eq!(
+            clear_player.stage,
+            super::RedLabelPowerOnStage::SinitClearPlayer
+        );
+        assert_eq!(clear_player.sinit_clear_target, Some(0xA4AC));
+        assert_eq!(
+            clear_player.rand_state,
+            Some(super::RED_LABEL_TRACE_ZERO_RAND_STATE)
+        );
+        assert_eq!(clear_player.phase, Some(GamePhase::Attract));
+
+        let clear_tail = super::red_label_power_on_frame_model(724).expect("frame 724 model");
+        assert_eq!(
+            clear_tail.stage,
+            super::RedLabelPowerOnStage::SinitClearObjects
+        );
+        assert_eq!(clear_tail.sinit_clear_target, Some(0xAAC5));
+
+        let clear_complete = super::red_label_power_on_frame_model(725).expect("frame 725 model");
+        assert_eq!(
+            clear_complete.stage,
+            super::RedLabelPowerOnStage::SinitClearComplete
+        );
+        assert_eq!(clear_complete.sinit_clear_target, Some(0xC000));
+        assert_eq!(clear_complete.phase, Some(GamePhase::Attract));
+
+        let clear_hold = super::red_label_power_on_frame_model(726).expect("frame 726 model");
+        assert_eq!(
+            clear_hold.stage,
+            super::RedLabelPowerOnStage::SinitClearComplete
+        );
+        assert_eq!(clear_hold.sinit_clear_target, None);
+        assert_eq!(
+            clear_hold.rand_state,
+            Some(super::RED_LABEL_TRACE_ZERO_RAND_STATE)
+        );
+
+        let init20_sound = super::red_label_power_on_frame_model(731).expect("frame 731 model");
+        assert_eq!(init20_sound.stage, super::RedLabelPowerOnStage::Init20Sound);
+        assert_eq!(
+            init20_sound.rand_state,
+            Some(super::RED_LABEL_TRACE_INIT20_SOUND_RAND_STATE)
+        );
+        assert_eq!(init20_sound.phase, Some(GamePhase::Attract));
+        assert_eq!(init20_sound.sound_command_port_b, Some(0x00));
+
+        let init20_lists = super::red_label_power_on_frame_model(732).expect("frame 732 model");
+        assert_eq!(
+            init20_lists.stage,
+            super::RedLabelPowerOnStage::Init20ObjectLists
+        );
+        assert_eq!(
+            init20_lists.rand_state,
+            Some(super::RED_LABEL_TRACE_INIT20_OBJECT_LIST_RAND_STATE)
+        );
+        assert_eq!(init20_lists.phase, Some(GamePhase::GameOver));
+        assert!(init20_lists.initializes_process_lists);
+        assert!(init20_lists.initializes_object_lists);
+
+        let exec_idle = super::red_label_power_on_frame_model(733).expect("frame 733 model");
+        assert_eq!(
+            exec_idle.rand_state,
+            Some(super::RED_LABEL_TRACE_EXEC_IDLE_RAND_STATE)
+        );
+        assert_eq!(exec_idle.phase, None);
+    }
+
+    #[test]
+    fn trace_power_on_handoff_applies_model_mutations() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let seed_range = super::field_range(&layout, "base_page", "LSEED").expect("LSEED range");
+        let status_range =
+            super::field_range(&layout, "base_page", "STATUS").expect("STATUS range");
+        let mut sound_commands = Vec::new();
+
+        machine
+            .memory
+            .write_byte(0x9C00, 0xAA)
+            .expect("seed SINIT byte");
+        machine
+            .memory
+            .write_byte(seed_range.start, 0x55)
+            .expect("seed LSEED byte");
+        machine.frame = 720;
+        machine
+            .apply_trace_power_up_handoff(&mut sound_commands, false)
+            .expect("frame 720 handoff");
+
+        assert_eq!(
+            machine
+                .memory
+                .read_byte(0x9C00)
+                .expect("SINIT clear start byte"),
+            0
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_byte(seed_range.start)
+                .expect("LSEED byte"),
+            0
+        );
+        assert_eq!(
+            machine.snapshot().rng,
+            super::RED_LABEL_TRACE_ZERO_RAND_STATE
+        );
+        assert_eq!(machine.snapshot().phase, GamePhase::Playing);
+
+        machine.frame = 731;
+        machine
+            .apply_trace_power_up_handoff(&mut sound_commands, false)
+            .expect("frame 731 handoff");
+
+        assert_eq!(
+            machine.snapshot().rng,
+            super::RED_LABEL_TRACE_INIT20_SOUND_RAND_STATE
+        );
+        assert_eq!(machine.snapshot().phase, GamePhase::Attract);
+        assert_eq!(
+            sound_commands
+                .iter()
+                .map(|command| command.raw())
+                .collect::<Vec<_>>(),
+            vec![0xC0]
+        );
+
+        machine
+            .memory
+            .write_byte(status_range.start, 0x00)
+            .expect("clear STATUS");
+        machine.frame = 732;
+        machine
+            .apply_trace_power_up_handoff(&mut sound_commands, false)
+            .expect("frame 732 handoff");
+
+        assert_eq!(
+            machine.snapshot().rng,
+            super::RED_LABEL_TRACE_INIT20_OBJECT_LIST_RAND_STATE
+        );
+        assert_eq!(machine.snapshot().phase, GamePhase::GameOver);
+        assert_eq!(
+            machine
+                .memory
+                .read_byte(status_range.start)
+                .expect("STATUS byte"),
+            0xFF
+        );
+
+        machine.frame = 733;
+        machine
+            .apply_trace_power_up_handoff(&mut sound_commands, false)
+            .expect("frame 733 handoff");
+        assert_eq!(
+            machine.snapshot().rng,
+            super::RED_LABEL_TRACE_EXEC_IDLE_RAND_STATE
+        );
+
+        let mut expected = super::RED_LABEL_TRACE_EXEC_IDLE_RAND_STATE;
+        expected.advance();
+        machine.frame = 746;
+        machine
+            .apply_trace_power_up_handoff(&mut sound_commands, false)
+            .expect("frame 746 handoff");
+        assert_eq!(machine.snapshot().rng, expected);
     }
 
     #[test]

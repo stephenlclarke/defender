@@ -483,15 +483,16 @@ Work log:
 
 ### DC-05: Source-Exact Boot And Hardware Step
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: replace trace-only boot scaffolding with source-shaped reset, ROM-test,
 RAM-test, CMOS, and start-ready execution.
 
 Steps:
 
-- [ ] DC-05.1 Model exact power-on RAM, reset path, ROM/RAM/CMOS diagnostic
+- [x] DC-05.1 Model exact power-on RAM, reset path, ROM/RAM/CMOS diagnostic
   progression, and start-ready state from red-label source or MAME traces.
+  Completed: `2026-05-04 18:19:19 BST`
 - [ ] DC-05.2 Wire the main-board RAM, CMOS, PIA, palette, watchdog, and video
   counter surfaces into `ArcadeMachine::step`.
 - [ ] DC-05.3 Wire the sound-command latch and sound-board PIA boundary into the
@@ -501,6 +502,36 @@ Steps:
 
 Completion gate: boot/start-ready state is source-shaped and no longer depends
 on trace-only scheduling shortcuts.
+
+Work log:
+
+- `2026-05-04 18:09:14 BST` Started `DC-05.1`: modeling the source-shaped
+  power-on/reset diagnostic progression and start-ready transition as a
+  deterministic boot-state surface before wiring board hardware directly into
+  `ArcadeMachine::step` in later `DC-05` steps.
+- `2026-05-04 18:19:19 BST` Completed `DC-05.1`: added
+  `RedLabelPowerOnFrameModel` and `RedLabelPowerOnStage` to centralize the
+  source/MAME-observed reset hold, RAM-test fill targets, `SINIT` clears,
+  `INIT20` sound/list handoff, `EXEC` idle seeding, live-input holdoff, and
+  start-ready transition. Rewired the cold-boot trace handoff to consume that
+  model and added focused unit/mutation tests for the modeled frame boundaries,
+  SINIT RAM clears, RNG writes, INIT20 sound command, STATUS write, phase
+  changes, and start-ready RAND advance. Updated `SPEC.md` and
+  `docs/fidelity/gaps.md` so the remaining gap is explicit board/CPU/IRQ/sound
+  execution and fixture proof, not the frame model itself. Validation passed
+  with `cargo test power_on_frame_model --all-targets`,
+  `cargo test trace_power_on_handoff_applies_model_mutations --all-targets`,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/characterization-tests.md
+  docs/fidelity/local-reference-runs.md
+  docs/fidelity/golden-comparison-results.md assets/red-label/README.md`,
+  `git diff --check`, `cargo fmt --check`, and `make fidelity`.
+  `make fidelity` passed regular tests with 799 passed and 13 known ignored tests,
+  clippy, trace script tests, and coverage with 74/74 added executable Rust
+  lines covered; `make trace-fixtures` skipped only because the ignored local
+  `docs/fidelity/fixtures/local/rust-current` directory is absent.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777915229545099`
 
 ### DC-06: Process Scheduler Completion
 

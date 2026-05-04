@@ -27,9 +27,13 @@ This file records behavior that must not be guessed in arcade-core code.
   setup at lines 1463-1489, `RAM2` seed save at line 1498, `RAM3` RNG update
   at line 1500, and `RAM6` RAM-fill writes at line 1515:
   <https://github.com/mwenge/defender/blob/master/src/defb6.src#L1463-L1515>.
+  `DC-05.1` now centralizes the source/MAME-observed power-on frame model for
+  reset hold, RAM-test targets, `SINIT` clears, `INIT20` sound/list handoff,
+  `EXEC` idle seeding, live-input holdoff, and start-ready detection.
   The remaining acceptance work is to keep replacing trace-only scheduling with
-  source-shaped reset, ROM-test, interrupt, and translated gameplay execution
-  rather than treating the current trace-column match as a complete emulator.
+  source-shaped board, CPU, IRQ, sound, ROM-test, and translated gameplay
+  execution rather than treating the current trace-column match or frame model
+  as a complete emulator.
 - The first Rust trace schema exists in `src/fidelity.rs` and includes raw
   internal input bits, MAME IN0/IN1/IN2 input bytes, optional raw object-table,
   process-table, super-process-table, shell-table, and native video-frame

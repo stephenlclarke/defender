@@ -122,7 +122,10 @@ synthetic scaffold fallback; untranslated blank screens remain black:
   `assets/red-label/ram-layout.tsv` and `assets/red-label/linked-lists.tsv`;
   seeds one-player `START` table fields from `romc8.src` CMOS defaults; exposes
   object-table, process-table, super-process-table, and SPTR-head CRCs to
-  traces; and has source-shaped `MKPROC`,
+  traces; centralizes the source/MAME-observed power-on frame surface for reset
+  hold, RAM-test fill targets, `SINIT` clears, `INIT20` sound/list handoff,
+  `EXEC` idle seeding, live-input holdoff, and start-ready transition; and has
+  source-shaped `MKPROC`,
   `MSPROC`, `SLEEP`, `KILL`, and `DISP` primitives for process creation, delay,
   free-list return, scheduler timer decrement, `CRPROC` update, and due-`PADDR`
   reporting. It translates active/inactive object and shell-list maintenance,
@@ -417,12 +420,12 @@ Additional gaps and corrections found during this review:
 - Local MAME reference traces are intentionally ignored artifacts. The checked
   in code can validate local fixture presence and shape, but the repo still
   depends on user-supplied ROMs and local MAME to prove golden equivalence.
-- Remaining open gaps include source-exact boot/start-ready proof, complete CPU
-  IRQ and screen-scanline frame scheduling, full frame/cycle integration,
-  golden-trace proof for translated gameplay/session paths, pixel golden
-  fixtures, full sound-board cycle/waveform scheduling, audio command and
-  waveform fixtures, and removal or regeneration of archived prototype
-  visual/audio assets.
+- Remaining open gaps include source-exact boot/start-ready proof beyond the
+  `DC-05.1` frame model, complete CPU IRQ and screen-scanline frame scheduling,
+  full frame/cycle integration, golden-trace proof for translated
+  gameplay/session paths, pixel golden fixtures, full sound-board
+  cycle/waveform scheduling, audio command and waveform fixtures, and removal
+  or regeneration of archived prototype visual/audio assets.
 - The prior local implementation notes listed "Fix Mutant score to `150`" as
   future work even though `assets/red-label/scores.tsv` and unit tests already
   enforce it. The current contract is to keep that regression covered through
@@ -1070,6 +1073,10 @@ Additional gaps and corrections found during this review:
   `cargo test local_reference_ --all-targets -- --ignored` with local fixtures
   currently fails through the exact TSV comparison path and should pass only
   after the corresponding trace gaps are fixed.
+- `DC-05.1` added focused unit tests for the source/MAME-observed
+  `RedLabelPowerOnFrameModel` and mutation tests proving the cold-boot handoff
+  applies the modeled SINIT RAM clears, RNG writes, INIT20 sound command,
+  STATUS write, phase changes, and start-ready RAND advance.
 - `DC-04.4` records the fix workflow in
   `docs/fidelity/characterization-tests.md`: exact TSV comparison remains the
   first gate, every fix must add a narrow source-visible mutation test at the
