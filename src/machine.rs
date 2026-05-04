@@ -25844,8 +25844,9 @@ mod tests {
     use crate::{
         board::{
             CMOS_RAM_SIZE, PALETTE_RAM_SIZE, RED_LABEL_CRHSTD_CELL_OFFSET,
-            RED_LABEL_HIGH_SCORE_ENTRIES, RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START,
-            cmos_sram_read_byte, cmos_sram_write_byte,
+            RED_LABEL_HIGH_SCORE_ENTRIES, RED_LABEL_HIGH_SCORE_ENTRY_CELLS,
+            RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START, cmos_sram_read_byte,
+            cmos_sram_write_byte,
         },
         input::{CabinetInput, DefenderInputPorts},
         machine::{
@@ -25922,6 +25923,10 @@ mod tests {
         red_label_memory::red_label_ram_layout,
         rom::crc32,
         sound::SoundCommand,
+        test_support::{
+            red_label_cmos_snapshot, red_label_process_cell_snapshot, red_label_ram_snapshot,
+            red_label_video_ram_snapshot,
+        },
         video::defender_visible_byte_offset,
     };
 
@@ -31633,6 +31638,42 @@ mod tests {
             machine.red_label_ram_range(0xAAD6..0xAAD8),
             Some(&player_start_address[..])
         );
+    }
+
+    #[test]
+    fn characterization_credited_start_mutates_credit_player_and_process_bytes() {
+        let mut machine = ArcadeMachine::new();
+        insert_live_coin(&mut machine);
+
+        let credit = red_label_ram_snapshot(&machine, "credited-start credit byte", 0xA037..0xA038);
+        let credit_backup =
+            red_label_cmos_snapshot(&machine, "credited-start credit backup", 0x7D..0x7F);
+        let player_count =
+            red_label_ram_snapshot(&machine, "credited-start player count", 0xA08C..0xA08D);
+        let start_table =
+            red_label_ram_snapshot(&machine, "credited-start switch handoff", 0xA07B..0xA07D);
+        let game_status =
+            red_label_ram_snapshot(&machine, "credited-start game status", 0xA0BA..0xA0BB);
+        let active_head = red_label_ram_snapshot(
+            &machine,
+            "credited-start active process head",
+            0xA05F..0xA061,
+        );
+        let player_start_process = red_label_process_cell_snapshot(&machine, 0xAAD4);
+
+        let output = machine.step(CabinetInput {
+            start_one: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(output.snapshot.phase, GamePhase::Playing);
+        credit.assert_current_changed_to(&machine, &[0x00]);
+        credit_backup.assert_current_changed_to(&machine, &[0xF0, 0xF0]);
+        player_count.assert_current_changed_to(&machine, &[0x01]);
+        start_table.assert_current_changed_to(&machine, &[0x20, 0x00]);
+        game_status.assert_current_changed_to(&machine, &[0x7F]);
+        active_head.assert_current_changed(&machine);
+        player_start_process.assert_current_changed(&machine);
     }
 
     #[test]
@@ -39369,6 +39410,61 @@ mod tests {
             machine.red_label_ram_range(process + 0x02..process + 0x05),
             Some(&[0xDA, 0x32, 0x60][..])
         );
+    }
+
+    #[test]
+    fn characterization_player_runtime_start_mutates_runtime_tables_lists_and_video() {
+        let mut machine = ArcadeMachine::new();
+        seed_player_one_for_player_start(&mut machine);
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("PLSTR3").expect("PLSTR3 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PLSTR3 process")
+            .process_address;
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule PLSTR3");
+        machine
+            .memory
+            .write_byte(0x202A, 0xE7)
+            .expect("seed active screen byte");
+
+        let current_process = red_label_process_cell_snapshot(&machine, process);
+        let first_support_process = red_label_process_cell_snapshot(&machine, 0xAAD4);
+        let free_head =
+            red_label_ram_snapshot(&machine, "PLSTR3 free process head", 0xA061..0xA063);
+        let current_player =
+            red_label_ram_snapshot(&machine, "PLSTR3 current player pointer", 0xA08D..0xA08F);
+        let game_status = red_label_ram_snapshot(&machine, "PLSTR3 game status", 0xA0BA..0xA0BB);
+        let altitude_head =
+            red_label_ram_snapshot(&machine, "PLSTR3 altitude table head", 0xB300..0xB308);
+        let terrain_head =
+            red_label_ram_snapshot(&machine, "PLSTR3 terrain table head", 0xB700..0xB709);
+        let active_screen_byte = red_label_video_ram_snapshot(
+            &machine,
+            "PLSTR3 active screen clear byte",
+            0x202A..0x202B,
+        );
+
+        let start = machine
+            .red_label_start_player_runtime_current_process()
+            .expect("PLSTR3 runtime start");
+
+        assert!(matches!(start, RedLabelPlayerStart::RuntimeSleeping { .. }));
+        current_process.assert_current_changed(&machine);
+        first_support_process.assert_current_changed(&machine);
+        free_head.assert_current_changed(&machine);
+        current_player.assert_current_changed_to(&machine, &[0xA1, 0xC2]);
+        game_status.assert_current_changed_to(&machine, &[0x05]);
+        altitude_head
+            .assert_current_changed_to(&machine, &[0xE0, 0xE2, 0xE2, 0xE2, 0xE2, 0xE2, 0xE2, 0xE2]);
+        terrain_head.assert_current_changed_to(
+            &machine,
+            &[0xDE, 0x07, 0x70, 0xDE, 0x07, 0x70, 0xDE, 0x07, 0x70],
+        );
+        active_screen_byte.assert_current_changed_to(&machine, &[0x00]);
     }
 
     #[test]
@@ -49473,6 +49569,84 @@ mod tests {
             machine.red_label_ram_range(process + 0x02..process + 0x05),
             Some(&[0xC1, 0x44, RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS][..])
         );
+    }
+
+    #[test]
+    fn characterization_hall6_submission_mutates_score_tables_and_processes() {
+        let hall1 = red_label_routine_address("HALL1").expect("HALL1 address");
+        let hall6 = red_label_routine_address("HALL6").expect("HALL6 address");
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            1_000,
+        );
+        seed_high_score_table(&mut machine, super::RuntimeHighScoreTable::AllTime, 1_000);
+        seed_hall6_submission(
+            &mut machine,
+            1,
+            50_000,
+            [b'A', RED_LABEL_HOF_BLANK_INITIAL_BYTE, b'Z'],
+            1,
+        );
+        let extra_process = machine
+            .red_label_make_process(
+                red_label_routine_address("HOFUD").expect("HOFUD address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make HOFUD process")
+            .process_address;
+        let process = schedule_support_process(&mut machine, "HALL6");
+
+        let todays_top_entry = red_label_ram_snapshot(
+            &machine,
+            "HALL6 today's top high-score entry",
+            RED_LABEL_THSTAB_START
+                ..RED_LABEL_THSTAB_START + RED_LABEL_HIGH_SCORE_ENTRY_CELLS as u16,
+        );
+        let all_time_top_entry = red_label_cmos_snapshot(
+            &machine,
+            "HALL6 all-time top high-score entry",
+            u16::from(RED_LABEL_CRHSTD_CELL_OFFSET)
+                ..u16::from(RED_LABEL_CRHSTD_CELL_OFFSET) + RED_LABEL_HIGH_SCORE_ENTRY_CELLS as u16,
+        );
+        let player_number = red_label_ram_snapshot(
+            &machine,
+            "HALL6 next player number",
+            RED_LABEL_HOF_PLAYER_NUMBER_RAM..RED_LABEL_HOF_PLAYER_NUMBER_RAM + 1,
+        );
+        let score_pointer = red_label_ram_snapshot(
+            &machine,
+            "HALL6 next player score pointer",
+            RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM..RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM + 2,
+        );
+        let hall6_process = red_label_process_cell_snapshot(&machine, process);
+        let killed_process = red_label_process_cell_snapshot(&machine, extra_process);
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall6)
+            .expect("dispatch HALL6 characterization");
+
+        assert!(matches!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreSubmission(RedLabelHighScoreSubmission {
+                handoff: RedLabelHighScoreSubmissionHandoff::NextPlayerJump {
+                    target_address,
+                    ..
+                },
+                ..
+            }) if target_address == hall1
+        ));
+        let expected_top_entry = [
+            0xF0, 0xF5, 0xF0, 0xF0, 0xF0, 0xF0, 0xF4, 0xF1, 0xF4, 0xF0, 0xF5, 0xFA,
+        ];
+        todays_top_entry.assert_current_changed_to(&machine, &expected_top_entry);
+        all_time_top_entry.assert_current_changed_to(&machine, &expected_top_entry);
+        player_number.assert_current_changed_to(&machine, &[2]);
+        score_pointer
+            .assert_current_changed_to(&machine, &high_score_player_score_pointer(1).to_be_bytes());
+        hall6_process.assert_current_changed(&machine);
+        killed_process.assert_current_changed(&machine);
     }
 
     #[test]

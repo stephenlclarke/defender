@@ -138,8 +138,9 @@ Steps:
   over red-label RAM, CMOS, object cells, process cells, shell lists, and video
   RAM.
   Completed: `2026-05-04 17:05:10 BST`
-- [ ] DC-02.2 Add characterization tests around the highest-risk translated
+- [x] DC-02.2 Add characterization tests around the highest-risk translated
   routines that currently rely on many scattered byte mutations.
+  Completed: `2026-05-04 17:19:14 BST`
 - [ ] DC-02.3 Add snapshot/restore regression tests that prove restored state
   replays the same trace rows and mutations.
 - [ ] DC-02.4 Extend trace columns only where a source routine needs more
@@ -177,6 +178,23 @@ Work log:
   tests, `cargo clippy --all-targets -- -D warnings`, `make trace-fixtures`
   which skipped because `docs/fidelity/fixtures/local/rust-current` is absent
   locally, and `make coverage` which passed the configured coverage gate.
+- `2026-05-04 17:13:57 BST` Started `DC-02.2`: adding characterization tests
+  around translated routines with broad byte-level side effects, using the
+  `DC-02.1` mutation snapshot helpers to lock down source-visible RAM, CMOS,
+  process-list, object-list, and video mutations before later refactors.
+- `2026-05-04 17:19:14 BST` Completed `DC-02.2`: added mutation-preserving
+  characterization tests for the live credited-start path, `PLSTR3` player
+  runtime initialization, and `HALL6` high-score submission. These tests assert
+  exact RAM, CMOS, process-cell, process-list, and video-RAM byte mutations
+  through the `DC-02.1` snapshot helpers. Validation passed with
+  `markdownlint PLAN.md SPEC.md`, `git diff --check`, `cargo fmt --check`,
+  `cargo test characterization_ --all-targets`, `cargo test --all-targets`
+  with 795 passed and 5 known ignored fidelity tests,
+  `cargo clippy --all-targets -- -D warnings`, `make trace-fixtures` which
+  skipped because `docs/fidelity/fixtures/local/rust-current` is absent locally,
+  and `make coverage`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777911583450689`
 
 ## Phase 1: Reference Fixtures And Golden Equivalence
 
