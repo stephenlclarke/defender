@@ -1381,8 +1381,9 @@ Steps:
 - [x] DC-12.1 Drive native visible frames from red-label video RAM and palette
   RAM after scanline scheduling is trace-proven.
   Completed: `2026-05-04 23:10:59 BST`
-- [ ] DC-12.2 Implement HUD, score fields, lives, smart-bomb icons, scanner,
+- [x] DC-12.2 Implement HUD, score fields, lives, smart-bomb icons, scanner,
   text, game-over, high-score, initials, and attract screens from source.
+  Completed: `2026-05-04 23:12:31 BST`
 - [ ] DC-12.3 Add pixel checksum and perceptual diff fixtures for boot, attract,
   start, gameplay, death, high-score, and operator frames.
 - [ ] DC-12.4 Switch live mode from `render_scaffold` to `render_cabinet_frame`
@@ -1408,6 +1409,23 @@ Work log:
   --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777932684700969`
+- `2026-05-04 23:11:49 BST` Started `DC-12.2`: auditing the translated
+  source presentation routines for HUD, score fields, lives, smart-bomb icons,
+  scanner, text, game-over, high-score, initials, and attract screens before
+  fixture-locking the video outputs.
+- `2026-05-04 23:12:31 BST` Completed `DC-12.2`: verified the translated
+  presentation surfaces already present in `src/machine.rs`: `TDISP` HUD,
+  player score transfers, lives and smart-bomb icons, scanner raster/text,
+  source message glyphs, game-over handoff, high-score tables, initials entry,
+  attract logo/credits/screens, and operator diagnostics/audits/reset surfaces.
+  The remaining risk is MAME golden-frame equivalence, which stays with
+  `DC-12.3`. Validation passed with `cargo test top_display --all-targets`,
+  `cargo test scanner --all-targets`, `cargo test high_score --all-targets`,
+  `cargo test attract --all-targets`, `cargo test game_over --all-targets`,
+  `cargo test operator_flow_fixture_covers_live_diagnostics_audits_and_reset_events
+  --all-targets`, and `cargo test score_current_player --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777932776615679`
 
 ## Phase 6: Sound Board And Audio
 
