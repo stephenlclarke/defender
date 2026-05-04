@@ -50769,6 +50769,230 @@ mod tests {
     }
 
     #[test]
+    fn shell_output_and_collision_fixture_covers_render_dispatch_and_vectors() {
+        let mut bomb = ArcadeMachine::new();
+        let bomb_source = bomb
+            .red_label_get_object_cell()
+            .expect("get DC-11.4 bomb source object");
+        bomb.memory.write_word(0xA020, 0x1040).expect("set BGL");
+        bomb.memory.write_word(0xA022, 0x1020).expect("set BGLX");
+        bomb.memory
+            .write_word(0xA0A6, 0xCCB0)
+            .expect("set BAX to BMBD10");
+        bomb.memory
+            .write_word(bomb_source + 0x0A, 0x1100)
+            .expect("set bomb source OX16");
+        bomb.memory
+            .write_word(bomb_source + 0x0C, 0x5001)
+            .expect("set bomb source OY16");
+        let bomb_shell = bomb
+            .red_label_get_shell_cell(
+                bomb_source,
+                0x4444,
+                RedLabelShellDescriptor {
+                    output_routine_address: red_label_routine_address("BMBOUT")
+                        .expect("BMBOUT address"),
+                    picture_address: 0x2222,
+                    kill_routine_address: red_label_routine_address("BKIL").expect("BKIL"),
+                },
+            )
+            .expect("get DC-11.4 bomb shell")
+            .expect("allocated DC-11.4 bomb shell")
+            .shell_address;
+        bomb.memory
+            .write_word(bomb_shell + 0x04, 0x4455)
+            .expect("set old bomb shell screen address");
+        bomb.memory
+            .write_word(bomb_shell + 0x0A, 0x2000)
+            .expect("set bomb shell OX16");
+        bomb.memory
+            .write_word(bomb_shell + 0x0C, 0x5000)
+            .expect("set bomb shell OY16");
+        bomb.memory
+            .write_word(bomb_shell + 0x0E, 0x0200)
+            .expect("set bomb shell OXV");
+        bomb.memory
+            .write_word(bomb_shell + 0x10, 0x0100)
+            .expect("set bomb shell OYV");
+        write_shell_footprint(&mut bomb, 0x4455, 0xCC);
+        let bomb_shell_before = red_label_object_cell_snapshot(&bomb, bomb_shell);
+        let bomb_old_top =
+            red_label_video_ram_snapshot(&bomb, "DC-11.4 bomb old top", 0x4455..0x4458);
+        let bomb_old_bottom =
+            red_label_video_ram_snapshot(&bomb, "DC-11.4 bomb old bottom", 0x4555..0x4558);
+        let bomb_new_top =
+            red_label_video_ram_snapshot(&bomb, "DC-11.4 bomb new top", 0x2151..0x2154);
+        let bomb_new_bottom =
+            red_label_video_ram_snapshot(&bomb, "DC-11.4 bomb new bottom", 0x2251..0x2254);
+
+        let bomb_steps = bomb.red_label_step_shell_output().expect("DC-11.4 SHELL");
+        let bomb_routines = bomb
+            .red_label_dispatch_shell_output_steps(&bomb_steps)
+            .expect("DC-11.4 bomb shell dispatch");
+
+        assert_eq!(
+            bomb_steps,
+            vec![RedLabelShellStep::Output {
+                shell_address: bomb_shell,
+                old_screen_address: 0x4455,
+                new_screen_address: 0x2151,
+                output_routine_address: red_label_routine_address("BMBOUT")
+                    .expect("BMBOUT address"),
+            }]
+        );
+        assert_eq!(bomb_routines, vec![RedLabelShellOutputRoutine::Bomb]);
+        bomb_shell_before.assert_current_changed(&bomb);
+        bomb_old_top.assert_current_changed_to(&bomb, &[0, 0, 0]);
+        bomb_old_bottom.assert_current_changed_to(&bomb, &[0, 0, 0]);
+        bomb_new_top.assert_current_changed_to(&bomb, &[0x0A, 0x00, 0x0A]);
+        bomb_new_bottom.assert_current_changed_to(&bomb, &[0x0A, 0xA0, 0x0A]);
+
+        let mut fireball = ArcadeMachine::new();
+        let fireball_shell = fireball
+            .red_label_get_object_cell()
+            .expect("get DC-11.4 fireball shell");
+        fireball.memory.write_word(0xA0A8, 0x8100).expect("set FBX");
+        write_ram_bytes(&mut fireball, 0x8100, &[0xAB, 0xCD, 0xEF, 0x12]);
+        fireball
+            .memory
+            .write_word(fireball_shell + 0x04, 0x7600)
+            .expect("set fireball screen address");
+        fireball
+            .memory
+            .write_word(fireball_shell + 0x0A, 0x1200)
+            .expect("set fireball flavor");
+        write_shell_footprint(&mut fireball, 0x7300, 0xDD);
+        let fireball_old =
+            red_label_video_ram_snapshot(&fireball, "DC-11.4 fireball old", 0x7300..0x7303);
+        let fireball_new =
+            red_label_video_ram_snapshot(&fireball, "DC-11.4 fireball new", 0x7600..0x7603);
+
+        let fireball_routine = fireball
+            .red_label_dispatch_shell_output_step(RedLabelShellStep::Output {
+                shell_address: fireball_shell,
+                old_screen_address: 0x7300,
+                new_screen_address: 0x7600,
+                output_routine_address: red_label_routine_address("FBOUT").expect("FBOUT address"),
+            })
+            .expect("DC-11.4 FBOUT");
+
+        assert_eq!(fireball_routine, Some(RedLabelShellOutputRoutine::Fireball));
+        fireball_old.assert_current_changed_to(&fireball, &[0, 0, 0]);
+        fireball_new.assert_current_changed_to(&fireball, &[0x0B, 0xCD, 0x0F]);
+
+        let mut collision = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut collision);
+        let collision_source = collision
+            .red_label_get_object_cell()
+            .expect("get DC-11.4 collision source object");
+        collision
+            .memory
+            .write_word(0xA020, 0x3000)
+            .expect("set collision BGL");
+        collision
+            .memory
+            .write_word(collision_source + 0x0A, 0x3400)
+            .expect("set collision source OX16");
+        collision
+            .memory
+            .write_word(collision_source + 0x0C, 0x6001)
+            .expect("set collision source OY16");
+        let collision_shell = collision
+            .red_label_get_shell_cell(
+                collision_source,
+                0x5555,
+                RedLabelShellDescriptor {
+                    output_routine_address: red_label_routine_address("BMBOUT")
+                        .expect("BMBOUT address"),
+                    picture_address: red_label_object_picture_address("BMBP1")
+                        .expect("BMBP1 address"),
+                    kill_routine_address: red_label_routine_address("BKIL").expect("BKIL"),
+                },
+            )
+            .expect("get DC-11.4 collision shell")
+            .expect("allocated DC-11.4 collision shell")
+            .shell_address;
+        collision
+            .memory
+            .write_word(collision_shell + 0x04, 0x6400)
+            .expect("set collision shell screen address");
+        collision
+            .memory
+            .write_word(collision_shell + 0x0A, 0x1800)
+            .expect("set collision shell OX16");
+        collision
+            .memory
+            .write_word(collision_shell + 0x0C, 0x6202)
+            .expect("set collision shell OY16");
+        write_shell_footprint(&mut collision, 0x6400, 0xCC);
+        let collision_shell_before = red_label_object_cell_snapshot(&collision, collision_shell);
+        let collision_old =
+            red_label_video_ram_snapshot(&collision, "DC-11.4 collision old", 0x6400..0x6403);
+        let collision_shell_head =
+            red_label_ram_snapshot(&collision, "DC-11.4 shell head", 0xA06D..0xA06F);
+        let collision_free_head =
+            red_label_ram_snapshot(&collision, "DC-11.4 free object head", 0xA067..0xA069);
+        let collision_count =
+            red_label_ram_snapshot(&collision, "DC-11.4 shell count", 0xA099..0xA09A);
+        let collision_score =
+            red_label_ram_snapshot(&collision, "DC-11.4 shell collision score", 0xA1C2..0xA1C6);
+        let collision_sound =
+            red_label_ram_snapshot(&collision, "DC-11.4 shell collision sound", 0xA0B0..0xA0B5);
+
+        let vector_collision = collision
+            .red_label_dispatch_object_collision_vector(collision_shell)
+            .expect("DC-11.4 BKIL OCVECT");
+
+        let RedLabelObjectCollision::BombShell(bomb_collision) = vector_collision else {
+            panic!("expected DC-11.4 BKIL bomb-shell collision");
+        };
+        assert_eq!(bomb_collision.shell_address, collision_shell);
+        assert_eq!(bomb_collision.old_screen_address, 0x6400);
+        assert_eq!(bomb_collision.score.player_number, 1);
+        assert_eq!(collision.snapshot().scores.player_one, 25);
+        collision_shell_before.assert_current_changed(&collision);
+        collision_old.assert_current_changed_to(&collision, &[0, 0, 0]);
+        collision_shell_head.assert_current_changed_to(&collision, &[0, 0]);
+        collision_free_head.assert_current_changed_to(&collision, &collision_shell.to_be_bytes());
+        collision_count.assert_current_changed_to(&collision, &[0]);
+        collision_score.assert_current_changed_to(&collision, &[0, 0, 0, 0x25]);
+        collision_sound.assert_current_changed_to(&collision, &[0xD4, 0xE2, 0xE0, 0x01, 0x01]);
+
+        let mut nokill = ArcadeMachine::new();
+        let nokill_object = nokill
+            .red_label_get_object_cell()
+            .expect("get DC-11.4 NOKILL object");
+        nokill
+            .memory
+            .write_word(
+                nokill_object + 0x08,
+                red_label_routine_address("NOKILL").expect("NOKILL address"),
+            )
+            .expect("set NOKILL OCVECT");
+        nokill
+            .memory
+            .write_word(nokill_object + 0x04, 0x6600)
+            .expect("set NOKILL screen address");
+        write_shell_footprint(&mut nokill, 0x6600, 0xEE);
+        let nokill_object_before = red_label_object_cell_snapshot(&nokill, nokill_object);
+        let nokill_footprint =
+            red_label_video_ram_snapshot(&nokill, "DC-11.4 NOKILL footprint", 0x6600..0x6603);
+
+        let nokill_collision = nokill
+            .red_label_dispatch_object_collision_vector(nokill_object)
+            .expect("DC-11.4 NOKILL");
+
+        assert_eq!(
+            nokill_collision,
+            RedLabelObjectCollision::NoKill {
+                object_address: nokill_object,
+            }
+        );
+        nokill_object_before.assert_current_unchanged(&nokill);
+        nokill_footprint.assert_current_unchanged(&nokill);
+    }
+
+    #[test]
     fn lcol_selects_character_map_and_collides_laser_with_active_objects() {
         let mut machine = ArcadeMachine::new();
         let object = machine

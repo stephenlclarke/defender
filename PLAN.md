@@ -1269,8 +1269,9 @@ Steps:
   Completed: `2026-05-04 22:50:38 BST`
 - [x] DC-11.3 Finish remaining mutant behavior and firing checks.
   Completed: `2026-05-04 22:56:23 BST`
-- [ ] DC-11.4 Finish remaining shell rendering/output and object collision
+- [x] DC-11.4 Finish remaining shell rendering/output and object collision
   vectors.
+  Completed: `2026-05-04 22:59:23 BST`
 - [ ] DC-11.5 Add score regression tests for enemies, bullets, mines, humans,
   rescue, Pods, Swarmers, extra stocks, and smart bombs.
 - [ ] DC-11.6 Verify each enemy subsystem with focused traces before moving on.
@@ -1321,6 +1322,21 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777931802683199`
+- `2026-05-04 22:57:03 BST` Started `DC-11.4`: reviewing shell output and
+  object collision-vector dispatch coverage, then adding a regression fixture
+  for remaining shell rendering/output and collision-vector mutations.
+- `2026-05-04 22:59:23 BST` Completed `DC-11.4`: added
+  `shell_output_and_collision_fixture_covers_render_dispatch_and_vectors`,
+  proving `SHELL` movement into `BMBOUT`, bomb-shell old-footprint erase and
+  new video writes, `FBOUT` fireball erase/write behavior, `BKIL` collision
+  dispatch through `OCVECT`, shell-list/free-list/count mutation, 25-point
+  score mutation, shell-collision sound RAM pointer state, and source no-op
+  `NOKILL` object/vector behavior without mutation. Validation passed with
+  `cargo fmt --check`,
+  `cargo test shell_output_and_collision_fixture_covers_render_dispatch_and_vectors
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777931983454029`
 
 ## Phase 5: Native Video And Presentation
 
