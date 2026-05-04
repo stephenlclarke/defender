@@ -1,13 +1,5 @@
 //! Self-contained RGBA rendering for the clean-slate arcade core.
 
-#[cfg(test)]
-use std::io::Cursor;
-
-#[cfg(test)]
-use anyhow::Context;
-#[cfg(test)]
-use png::{ColorType, Decoder, Transformations};
-
 use crate::{
     machine::{VISIBLE_HEIGHT, VISIBLE_WIDTH},
     terminal::TerminalGeometry,
@@ -191,49 +183,6 @@ fn draw_scaled_image(
             }
         }
     }
-}
-
-#[cfg(test)]
-fn decode_png_image(bytes: &[u8]) -> anyhow::Result<RenderedImage> {
-    let cursor = Cursor::new(bytes);
-    let mut decoder = Decoder::new(cursor);
-    decoder.set_transformations(Transformations::EXPAND | Transformations::STRIP_16);
-    let mut reader = decoder.read_info().context("reading embedded png header")?;
-    let out_size = reader
-        .output_buffer_size()
-        .expect("expanded PNG should report an output size");
-    let mut buffer = vec![0; out_size];
-    let info = reader
-        .next_frame(&mut buffer)
-        .context("decoding embedded png frame")?;
-    let pixels = &buffer[..info.buffer_size()];
-
-    let mut rgba = Vec::with_capacity(info.width as usize * info.height as usize * 4);
-    match info.color_type {
-        ColorType::Rgba => rgba.extend_from_slice(pixels),
-        ColorType::Rgb => {
-            for chunk in pixels.chunks_exact(3) {
-                rgba.extend_from_slice(&[chunk[0], chunk[1], chunk[2], 255]);
-            }
-        }
-        ColorType::GrayscaleAlpha => {
-            for chunk in pixels.chunks_exact(2) {
-                rgba.extend_from_slice(&[chunk[0], chunk[0], chunk[0], chunk[1]]);
-            }
-        }
-        ColorType::Grayscale => {
-            for value in pixels {
-                rgba.extend_from_slice(&[*value, *value, *value, 255]);
-            }
-        }
-        ColorType::Indexed => unreachable!("indexed pngs are expanded before decoding"),
-    }
-
-    Ok(RenderedImage {
-        width: info.width,
-        height: info.height,
-        pixels: rgba,
-    })
 }
 
 pub fn native_visible_size() -> (u16, u16) {
@@ -428,12 +377,11 @@ fn combine_palette_weights(weights: [f64; 3], bits: [bool; 3]) -> u8 {
 mod tests {
     use super::{
         DEFENDER_VISIBLE_X_END, DEFENDER_VISIBLE_X_START, DEFENDER_VISIBLE_Y_END,
-        DEFENDER_VISIBLE_Y_START, RenderedImage, Renderer, decode_png_image,
-        defender_visible_byte_offset, defender_visible_palette_index,
-        defender_visible_pixel_nibble, fit_image_rect, native_visible_size, raster_size,
-        render_defender_visible_palette_indices, render_defender_visible_pixel_nibbles,
-        render_defender_visible_rgba, williams_palette_lookup, williams_palette_rgba,
-        williams_screen_byte_offset,
+        DEFENDER_VISIBLE_Y_START, RenderedImage, Renderer, defender_visible_byte_offset,
+        defender_visible_palette_index, defender_visible_pixel_nibble, fit_image_rect,
+        native_visible_size, raster_size, render_defender_visible_palette_indices,
+        render_defender_visible_pixel_nibbles, render_defender_visible_rgba,
+        williams_palette_lookup, williams_palette_rgba, williams_screen_byte_offset,
     };
     use crate::{
         board::{MAIN_CPU_RAM_SIZE, PALETTE_RAM_SIZE},
@@ -453,15 +401,6 @@ mod tests {
         image.resize(2, 1, [5, 6, 7, 8]);
         assert_eq!(image.width, 2);
         assert_eq!(image.pixels, vec![5, 6, 7, 8, 5, 6, 7, 8]);
-    }
-
-    #[test]
-    fn embedded_logo_decodes() {
-        let logo =
-            decode_png_image(crate::assets::ARCADE_LOGO_PAGE_PNG).expect("logo should decode");
-        assert!(logo.width > 0);
-        assert!(logo.height > 0);
-        assert!(logo.pixels.chunks_exact(4).any(|pixel| pixel[3] > 0));
     }
 
     #[test]

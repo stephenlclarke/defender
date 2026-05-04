@@ -1372,7 +1372,7 @@ Work log:
 
 ### DC-12: Verified Cabinet Video
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: replace the live scaffold renderer with verified native cabinet frames.
 
@@ -1390,8 +1390,9 @@ Steps:
 - [x] DC-12.4 Switch live mode from `render_scaffold` to `render_cabinet_frame`
   only after fixture proof.
   Completed: `2026-05-04 23:24:16 BST`
-- [ ] DC-12.5 Remove or regenerate archived prototype visual assets from
+- [x] DC-12.5 Remove or regenerate archived prototype visual assets from
   red-label source/ROM-derived data.
+  Completed: `2026-05-04 23:28:02 BST`
 
 Completion gate: verified native frames are the only live cabinet image source,
 and temporary visuals are outside the verified frame.
@@ -1461,6 +1462,29 @@ Work log:
   and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777933481608959`
+- `2026-05-04 23:25:02 BST` Started `DC-12.5`: removing the remaining runtime
+  embedding of archived prototype visual assets and documenting archived visual
+  files as reference-only material outside the verified native cabinet frame.
+- `2026-05-04 23:28:02 BST` Completed `DC-12.5`: removed the
+  `ARCADE_LOGO_PAGE_PNG` runtime embedding from `src/assets.rs`, removed the
+  now-unused test-only PNG decoder and embedded-logo decode test from
+  `src/video.rs`, and updated `README.md`, `SPEC.md`, and
+  `assets/arcade/README.md` to state that `assets/arcade/*.png` files are
+  archived prototype references only and not runtime presentation inputs.
+  Validation passed with `cargo test
+  embedded_red_label_assets_have_expected_headers --all-targets`,
+  `cargo test video::tests --all-targets`, `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`, the asset-embed `rg` check
+  returning no matches, `markdownlint
+  PLAN.md SPEC.md README.md assets/arcade/README.md docs/fidelity/gaps.md`,
+  `git diff --check`, and the final `make fidelity` DC-12 gate.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777933840717529`
+- `2026-05-04 23:30:01 BST` Completed `DC-12` gate: `make fidelity` passed
+  after the verified-cabinet-video work, including `cargo fmt --check`,
+  all-target Rust tests, coverage generation, and the new-Rust-coverage check.
+  The coverage run reported 837 passed, 13 known ignored, and 2 main tests
+  passed.
 
 ## Phase 6: Sound Board And Audio
 

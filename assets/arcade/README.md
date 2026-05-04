@@ -1,12 +1,12 @@
 # Arcade Prototype Assets
 
-This directory holds legacy PNG assets from the archived prototype.
+This directory holds legacy PNG assets and rule notes from the archived
+prototype.
 
-The clean-slate red-label runtime currently embeds only
-`assets/arcade/logo-page.png`, through `src/assets.rs`, as a temporary
-self-contained presentation asset. The remaining PNG files and
-`arcade-rules.txt` are archived prototype references and must not be treated as
-authoritative red-label arcade assets.
+The clean-slate red-label runtime does not embed any file from this directory.
+All PNG files and `arcade-rules.txt` are archived prototype references and must
+not be treated as authoritative red-label arcade assets or shipped presentation
+inputs.
 
 Future runtime visuals should come from source-cited red-label data under
 `assets/red-label/`, red-label ROM/MAME-derived fixtures, or generated assets

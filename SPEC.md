@@ -187,11 +187,11 @@ synthetic scaffold fallback; untranslated blank screens remain black:
   assert sound CB1 for every byte except `0xff`. The sound CPU can now read the
   latched command through the PIA IC4 port-B data/control register path, and
   sound PIA port-A output writes are captured as the DAC boundary.
-- `src/video.rs`, `src/kitty.rs`, and `src/terminal.rs` provide a temporary
-  self-contained Kitty presentation path using embedded assets. `src/video.rs`
-  also exposes the MAME-documented Williams screen-format helpers for the
-  native Defender visible area: absolute screen-to-video-RAM byte offsets,
-  high/low pixel nibbles, palette-RAM-index visible frames, and
+- `src/video.rs`, `src/kitty.rs`, and `src/terminal.rs` provide a
+  self-contained Kitty presentation path for native red-label frames.
+  `src/video.rs` also exposes the MAME-documented Williams screen-format
+  helpers for the native Defender visible area: absolute screen-to-video-RAM
+  byte offsets, high/low pixel nibbles, palette-RAM-index visible frames, and
   resistor-weighted RGBA palette conversion. The renderer can scale and
   letterbox a native RGBA cabinet frame for Kitty presentation.
 - `assets/red-label/` now holds embedded TSV source assets for ROM metadata,
@@ -447,10 +447,11 @@ Additional gaps and corrections found during this review:
 - `assets/arcade/*.png`, `assets/arcade/arcade-rules.txt`, and
   `assets/sounds/*.wav` remain from the prototype. `assets/arcade/README.md`
   and `assets/sounds/README.md` classify them as archived prototype references.
-  Only `assets/arcade/logo-page.png` is currently embedded by the clean-slate
-  runtime, and it is explicitly temporary until video RAM output is proven.
-  Remaining work: regenerate any needed visual/audio asset from red-label
-  source/ROM data or remove it from the shipped runtime path.
+  No clean-slate runtime module embeds `assets/arcade/*.png`; verified native
+  cabinet frames now come from red-label video RAM, palette RAM, and
+  source/ROM-derived red-label data. Remaining work: regenerate any needed
+  visual/audio asset from red-label source/ROM data before it can re-enter a
+  shipped runtime path.
 - `assets/red-label/high-scores.tsv` is parsed as a seed table,
   `assets/red-label/cmos-defaults.tsv` records the matching ROM default CMOS
   bytes, and the board can compare/insert entries in both all-time and today's

@@ -1,9 +1,8 @@
 //! Embedded asset manifest for the self-contained runtime.
 //!
-//! Source data lives under `assets/`; runtime code embeds it from here so the
-//! release binary can be copied to a new machine without a local asset tree.
-
-pub const ARCADE_LOGO_PAGE_PNG: &[u8] = include_bytes!("../assets/arcade/logo-page.png");
+//! Source data lives under `assets/red-label/`; runtime code embeds it from
+//! here so the release binary can be copied to a new machine without a local
+//! asset tree.
 
 pub const RED_LABEL_AUDIT_ADJUSTMENTS_TSV: &str =
     include_str!("../assets/red-label/audit-adjustments.tsv");
@@ -58,14 +57,14 @@ pub fn first_tsv_line(asset: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{
-        ARCADE_LOGO_PAGE_PNG, RED_LABEL_AUDIT_ADJUSTMENTS_TSV, RED_LABEL_CMOS_DEFAULTS_TSV,
-        RED_LABEL_CMOS_LAYOUT_TSV, RED_LABEL_COLOR_CYCLE_TSV, RED_LABEL_COLOR_RAM_TSV,
-        RED_LABEL_DEFAULTS_TSV, RED_LABEL_HIGH_SCORES_TSV, RED_LABEL_INPUT_PORTS_TSV,
-        RED_LABEL_LINKED_LISTS_TSV, RED_LABEL_MEMORY_MAP_TSV, RED_LABEL_MESSAGE_GLYPHS_TSV,
-        RED_LABEL_MESSAGES_TSV, RED_LABEL_OBJECT_IMAGES_TSV, RED_LABEL_OBJECT_PICTURES_TSV,
-        RED_LABEL_PLAYER_DEATH_TSV, RED_LABEL_RAM_LAYOUT_TSV, RED_LABEL_ROM_MAP_TSV,
-        RED_LABEL_ROM_REGIONS_TSV, RED_LABEL_ROMS_TSV, RED_LABEL_ROUTINE_ADDRESSES_TSV,
-        RED_LABEL_SCORE_DIGITS_TSV, RED_LABEL_SCORES_TSV, RED_LABEL_SHELL_IMAGES_TSV,
+        RED_LABEL_AUDIT_ADJUSTMENTS_TSV, RED_LABEL_CMOS_DEFAULTS_TSV, RED_LABEL_CMOS_LAYOUT_TSV,
+        RED_LABEL_COLOR_CYCLE_TSV, RED_LABEL_COLOR_RAM_TSV, RED_LABEL_DEFAULTS_TSV,
+        RED_LABEL_HIGH_SCORES_TSV, RED_LABEL_INPUT_PORTS_TSV, RED_LABEL_LINKED_LISTS_TSV,
+        RED_LABEL_MEMORY_MAP_TSV, RED_LABEL_MESSAGE_GLYPHS_TSV, RED_LABEL_MESSAGES_TSV,
+        RED_LABEL_OBJECT_IMAGES_TSV, RED_LABEL_OBJECT_PICTURES_TSV, RED_LABEL_PLAYER_DEATH_TSV,
+        RED_LABEL_RAM_LAYOUT_TSV, RED_LABEL_ROM_MAP_TSV, RED_LABEL_ROM_REGIONS_TSV,
+        RED_LABEL_ROMS_TSV, RED_LABEL_ROUTINE_ADDRESSES_TSV, RED_LABEL_SCORE_DIGITS_TSV,
+        RED_LABEL_SCORES_TSV, RED_LABEL_SHELL_IMAGES_TSV,
         RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV, RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV,
         RED_LABEL_SOUND_TABLE_TIMELINES_TSV, RED_LABEL_SOUND_TABLES_TSV,
         RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV, RED_LABEL_SRAM_ROUTINES_TSV,
@@ -204,11 +203,6 @@ mod tests {
             first_tsv_line(RED_LABEL_WAVE_TABLE_TSV),
             "key\tceiling\tfloor\tintra_delta\tinter_delta\twave1\twave2\twave3\twave4"
         );
-    }
-
-    #[test]
-    fn logo_asset_is_embedded_png_data() {
-        assert!(ARCADE_LOGO_PAGE_PNG.starts_with(b"\x89PNG\r\n\x1A\n"));
     }
 
     #[test]

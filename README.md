@@ -583,11 +583,11 @@ yet; current implementation status is tracked in `SPEC.md` and
 - <https://github.com/mwenge/defender>: Motorola 6809 assembly language for the
   'Red Label' version of the game. Used for reference implementation and ROM
   layout comparison point, especially for the red-label `defend.*` program ROM
-  names, the `mess0.src` `CHRTBL` / `CHARACTERS` font tables used to build the
-  embedded `assets/arcade/font-sheet.png`, and the `amode1.src` `LGOTAB`,
-  `DEFDAT`, `CPRTAB`, `TEXTAB`, `TENT`, `ENMYTB`, `PICTS`, `XS`, and `BLIPS`
-  tables used to reconstruct the embedded attract-logo page, `DEFENDER`
-  wordmark assets, instruction-page rescue/legend sequence, and source
+  names, the `mess0.src` `CHRTBL` / `CHARACTERS` font tables that supersede the
+  archived prototype `assets/arcade/font-sheet.png`, and the `amode1.src`
+  `LGOTAB`, `DEFDAT`, `CPRTAB`, `TEXTAB`, `TENT`, `ENMYTB`, `PICTS`, `XS`, and
+  `BLIPS` tables used to reconstruct the attract-logo page, `DEFENDER`
+  wordmark, instruction-page rescue/legend sequence, and source
   `TEXTP` / `TEXTP2` text cadence, plus the
   source-ordered `blk71.src` `WVTAB` records used to reconstruct the compiled
   red-label wave/fire tables, `GETWV` base values, and `WDELT` updates now
@@ -874,11 +874,12 @@ into Rust. The active embedded assets currently include:
 
 `assets/arcade/arcade-rules.txt`, the PNG files under `assets/arcade/`, and the
 WAV files under `assets/sounds/` are legacy prototype references unless a
-clean-slate module explicitly embeds them through `src/assets.rs`. The live
-renderer no longer uses a temporary scaffold frame; it scales native red-label
-video RAM directly, and source-backed score/replay and attract-logo slices now
-have native visible pixel-nibble checksum fixtures alongside a live IRQ
-scanline-frame fixture.
+clean-slate module explicitly reclassifies them with source/ROM provenance.
+The runtime no longer embeds any `assets/arcade/*.png` file. The live renderer
+no longer uses a temporary scaffold frame; it scales native red-label video RAM
+directly, and source-backed score/replay, attract-logo, boot, start, gameplay,
+death, high-score, and operator/AUDITG frames now have native video fixture
+signatures.
 
 ## Platform Support
 
