@@ -1046,6 +1046,15 @@ Additional gaps and corrections found during this review:
   list/write/check the required Phase 1 scenario fixtures, and the local MAME
   runner can generate the ignored expected TSV files when user-supplied ROMs
   and MAME are available.
+- On `2026-05-04`, `DC-04.1` exact-compared the 900-frame `attract_boot` Rust
+  trace against the local MAME/source reference. The comparison failed at line
+  2, frame 1, because `process_table_crc32` expected `0xC4C53DA1` and got
+  `0xB2B258E3`, while `super_process_table_crc32` expected `0x05B7E865` and
+  got `0x5EDF4A6B`. Across the full comparison, only those two columns drifted:
+  process CRCs differed on 723 frames and super-process CRCs differed on 553
+  frames. All other trace columns matched. Boot/start-ready process and
+  super-process RAM state or scheduling remains a known golden-trace gap before
+  `attract_boot` can be promoted as a passing exact fixture.
 - There are no object-table, shell-table, or pixel-frame golden tests against
   attract/gameplay references, though the trace format can now carry raw table
   and native frame CRC-32 values.

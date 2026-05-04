@@ -60,6 +60,16 @@ This file records behavior that must not be guessed in arcade-core code.
   table-backed runtime memory, and the local MAME runner can emit Phase 1
   fixture rows. The checked-in Rust code still cannot prove those CRCs against
   red-label behavior unless local expected fixtures have been generated.
+- On `2026-05-04`, `DC-04.1` compared Rust `attract_boot` output against the
+  local 900-frame MAME/source reference. The exact TSV comparison failed at
+  line 2, frame 1. Only `process_table_crc32` and
+  `super_process_table_crc32` drifted across the full comparison:
+  `process_table_crc32` differed on 723 frames and
+  `super_process_table_crc32` differed on 553 frames. Input bytes, phase,
+  player/session columns, RNG bytes, object-table CRC, shell-table CRC, video
+  CRC placeholder, sound commands, and events matched for the whole scenario.
+  Boot/start-ready process and super-process RAM state or scheduling remains a
+  golden-trace gap before `attract_boot` can become a passing exact fixture.
 - `--fidelity-trace [FRAMES]` can emit deterministic Rust TSV frames for local
   fixture work, but it is not a MAME/source golden-trace generator.
 - `--fidelity-trace-inputs SCRIPT` can apply scripted per-frame cabinet inputs

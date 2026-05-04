@@ -366,14 +366,15 @@ Work log:
 
 ### DC-04: Golden Tests For Existing Translated Slices
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: move existing translated routines from unit-only confidence toward
 red-label equivalence.
 
 Steps:
 
-- [ ] DC-04.1 Compare boot/cold-start trace columns against local golden traces.
+- [x] DC-04.1 Compare boot/cold-start trace columns against local golden traces.
+  Completed: `2026-05-04 17:55:34 BST`
 - [ ] DC-04.2 Compare start, fire, thrust/reverse, smart bomb, hyperspace, death,
   and wave-clear slices against focused traces.
 - [ ] DC-04.3 Add ignored or failing fidelity tests for every still-unknown
@@ -383,6 +384,33 @@ Steps:
 
 Completion gate: translated slices either match local golden fixtures or have
 explicit ignored/failing tests and `SPEC.md` gap entries.
+
+Work log:
+
+- `2026-05-04 17:52:35 BST` Started `DC-04.1`: comparing boot/cold-start
+  Rust trace output against the local MAME/source golden reference fixtures
+  and recording any exact-match blocker before adding later subsystem tests.
+- `2026-05-04 17:55:34 BST` Completed `DC-04.1`: ran exact
+  `attract_boot` comparison against the local MAME/source reference fixture.
+  The compare failed at line 2, frame 1, only in `process_table_crc32` and
+  `super_process_table_crc32`; column analysis showed process CRC drift on 723
+  frames and super-process CRC drift on 553 frames, while all other trace
+  columns matched for the 900-frame scenario. Added
+  `docs/fidelity/golden-comparison-results.md`, linked it from
+  `docs/fidelity/README.md`, and updated `SPEC.md` plus
+  `docs/fidelity/gaps.md` with the boot/start-ready process RAM scheduling gap.
+  Validation passed with the expected-failing
+  `cargo run --quiet -- --fidelity-check-trace
+  docs/fidelity/fixtures/local/reference/attract_boot.inputs.txt
+  docs/fidelity/fixtures/local/reference/attract_boot.expected.tsv`,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/characterization-tests.md
+  docs/fidelity/local-reference-runs.md
+  docs/fidelity/golden-comparison-results.md assets/red-label/README.md`, and
+  `git diff --check`. No cargo test was run because this step only records the
+  comparison result and gap.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913765944929`
 
 ## Phase 2: Hardware, Scheduler, And Frame Execution
 
