@@ -21,7 +21,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCENARIO_TSV = REPO_ROOT / "assets" / "red-label" / "trace-scenarios.tsv"
 SCHEMA_TSV = REPO_ROOT / "assets" / "red-label" / "trace-schema.tsv"
+CMOS_DEFAULTS_TSV = REPO_ROOT / "assets" / "red-label" / "cmos-defaults.tsv"
 MAME_LUA = REPO_ROOT / "tools" / "mame_defender_trace.lua"
+MAME_CMOS_CELLS = 256
 
 
 @dataclass(frozen=True)
@@ -48,7 +50,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--out-dir",
         default=os.environ.get(
-            "DEFENDER_REFERENCE_TRACE_DIR", "docs/fidelity/fixtures/local"
+            "DEFENDER_REFERENCE_TRACE_DIR", "docs/fidelity/fixtures/local/reference"
         ),
         help="Ignored local fixture output directory.",
     )
@@ -61,6 +63,11 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Write input scripts and print MAME commands without running MAME.",
+    )
+    parser.add_argument(
+        "--blank-nvram",
+        action="store_true",
+        help="Leave MAME NVRAM blank instead of seeding romc8.src DEFALT CMOS defaults.",
     )
     return parser.parse_args()
 
@@ -88,6 +95,37 @@ def expand_input_program(program: str) -> str:
         else:
             frames.append(segment)
     return ";".join(frames) + "\n"
+
+
+def source_cmos_default_nvram(defaults_tsv: Path = CMOS_DEFAULTS_TSV) -> bytes:
+    cells = bytearray([0xF0] * MAME_CMOS_CELLS)
+    with defaults_tsv.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for row_number, row in enumerate(reader, start=2):
+            offset = int(row["offset"], 0)
+            declared_cells = int(row["cells"], 0)
+            values = [int(value, 16) for value in row["bytes"].split()]
+            if declared_cells != len(values) * 2:
+                raise ValueError(
+                    f"{defaults_tsv}:{row_number}: declared {declared_cells} cell(s) "
+                    f"for {len(values)} byte(s)"
+                )
+            if offset + declared_cells > MAME_CMOS_CELLS:
+                raise ValueError(
+                    f"{defaults_tsv}:{row_number}: CMOS defaults exceed "
+                    f"{MAME_CMOS_CELLS} MAME NVRAM cells"
+                )
+            for index, value in enumerate(values):
+                cells[offset + index * 2] = 0xF0 | ((value >> 4) & 0x0F)
+                cells[offset + index * 2 + 1] = 0xF0 | (value & 0x0F)
+    return bytes(cells)
+
+
+def write_source_cmos_default_nvram(nvram_dir: Path) -> Path:
+    nvram_path = nvram_dir / "defender" / "nvram"
+    nvram_path.parent.mkdir(parents=True, exist_ok=True)
+    nvram_path.write_bytes(source_cmos_default_nvram())
+    return nvram_path
 
 
 def select_scenarios(all_scenarios: list[Scenario], requested: list[str] | None) -> list[Scenario]:
@@ -125,12 +163,15 @@ def generate_expected(
     scenario: Scenario,
     inputs_path: Path,
     dry_run: bool,
+    seed_cmos_defaults: bool,
 ) -> None:
     expected_path = out_dir / f"{scenario.name}.expected.tsv"
     mame_state_dir = out_dir / "mame-state" / scenario.name
     cfg_dir = mame_state_dir / "cfg"
     nvram_dir = mame_state_dir / "nvram"
     env = os.environ.copy()
+    env.setdefault("SDL_AUDIODRIVER", "dummy")
+    env.setdefault("SDL_VIDEODRIVER", "dummy")
     env.update(
         {
             "DEFENDER_TRACE_INPUTS": str(inputs_path),
@@ -168,6 +209,8 @@ def generate_expected(
         shutil.rmtree(mame_state_dir)
     cfg_dir.mkdir(parents=True, exist_ok=True)
     nvram_dir.mkdir(parents=True, exist_ok=True)
+    if seed_cmos_defaults:
+        write_source_cmos_default_nvram(nvram_dir)
     subprocess.run(command, cwd=REPO_ROOT, env=env, check=True)
 
 
@@ -186,7 +229,15 @@ def main() -> int:
 
     for scenario in scenarios:
         inputs_path = write_inputs(out_dir, scenario)
-        generate_expected(mame, rom_dir, out_dir, scenario, inputs_path, args.dry_run)
+        generate_expected(
+            mame,
+            rom_dir,
+            out_dir,
+            scenario,
+            inputs_path,
+            args.dry_run,
+            not args.blank_nvram,
+        )
 
     print(f"processed {len(scenarios)} trace scenario(s) in {out_dir}")
     return 0

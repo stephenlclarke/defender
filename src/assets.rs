@@ -32,12 +32,22 @@ pub const RED_LABEL_ROUTINE_ADDRESSES_TSV: &str =
 pub const RED_LABEL_SCORE_DIGITS_TSV: &str = include_str!("../assets/red-label/score-digits.tsv");
 pub const RED_LABEL_SCORES_TSV: &str = include_str!("../assets/red-label/scores.tsv");
 pub const RED_LABEL_SHELL_IMAGES_TSV: &str = include_str!("../assets/red-label/shell-images.tsv");
+pub const RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV: &str =
+    include_str!("../assets/red-label/sound-direct-command-sequences.tsv");
+pub const RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV: &str =
+    include_str!("../assets/red-label/sound-table-command-sequences.tsv");
 pub const RED_LABEL_SOUND_TABLES_TSV: &str = include_str!("../assets/red-label/sound-tables.tsv");
+pub const RED_LABEL_SOUND_TABLE_TIMELINES_TSV: &str =
+    include_str!("../assets/red-label/sound-table-timelines.tsv");
+pub const RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV: &str =
+    include_str!("../assets/red-label/sound-thrust-command-sequences.tsv");
 pub const RED_LABEL_SRAM_ROUTINES_TSV: &str = include_str!("../assets/red-label/sram-routines.tsv");
 pub const RED_LABEL_SWITCH_TABLE_TSV: &str = include_str!("../assets/red-label/switch-table.tsv");
 pub const RED_LABEL_TERRAIN_DATA_TSV: &str = include_str!("../assets/red-label/terrain-data.tsv");
 pub const RED_LABEL_TRACE_SCENARIOS_TSV: &str =
     include_str!("../assets/red-label/trace-scenarios.tsv");
+pub const RED_LABEL_TRACE_REQUIREMENTS_TSV: &str =
+    include_str!("../assets/red-label/trace-requirements.tsv");
 pub const RED_LABEL_TRACE_SCHEMA_TSV: &str = include_str!("../assets/red-label/trace-schema.tsv");
 pub const RED_LABEL_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv");
 
@@ -56,9 +66,12 @@ mod tests {
         RED_LABEL_PLAYER_DEATH_TSV, RED_LABEL_RAM_LAYOUT_TSV, RED_LABEL_ROM_MAP_TSV,
         RED_LABEL_ROM_REGIONS_TSV, RED_LABEL_ROMS_TSV, RED_LABEL_ROUTINE_ADDRESSES_TSV,
         RED_LABEL_SCORE_DIGITS_TSV, RED_LABEL_SCORES_TSV, RED_LABEL_SHELL_IMAGES_TSV,
-        RED_LABEL_SOUND_TABLES_TSV, RED_LABEL_SRAM_ROUTINES_TSV, RED_LABEL_SWITCH_TABLE_TSV,
-        RED_LABEL_TERRAIN_DATA_TSV, RED_LABEL_TRACE_SCENARIOS_TSV, RED_LABEL_TRACE_SCHEMA_TSV,
-        RED_LABEL_WAVE_TABLE_TSV, first_tsv_line,
+        RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV, RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV,
+        RED_LABEL_SOUND_TABLE_TIMELINES_TSV, RED_LABEL_SOUND_TABLES_TSV,
+        RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV, RED_LABEL_SRAM_ROUTINES_TSV,
+        RED_LABEL_SWITCH_TABLE_TSV, RED_LABEL_TERRAIN_DATA_TSV, RED_LABEL_TRACE_REQUIREMENTS_TSV,
+        RED_LABEL_TRACE_SCENARIOS_TSV, RED_LABEL_TRACE_SCHEMA_TSV, RED_LABEL_WAVE_TABLE_TSV,
+        first_tsv_line,
     };
 
     #[test]
@@ -148,6 +161,22 @@ mod tests {
             "label\taddress\tbytes\tsource"
         );
         assert_eq!(
+            first_tsv_line(RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV),
+            "callsite\tsource_file\tsource_line\tsource_label\tsound_number\twrite_index\twrite_kind\tport_b\tcommand\tsource"
+        );
+        assert_eq!(
+            first_tsv_line(RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV),
+            "label\ttable_address\tpriority\tsequencer_tick\twrite_index\twrite_kind\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tport_b\tcommand"
+        );
+        assert_eq!(
+            first_tsv_line(RED_LABEL_SOUND_TABLE_TIMELINES_TSV),
+            "label\ttable_address\tpriority\tsequencer_tick\tevent\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tidle_port_b\tidle_command\tcommand_port_b\tcommand\tsequence_end_tick\tterminator_pointer"
+        );
+        assert_eq!(
+            first_tsv_line(RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV),
+            "gate_event\tsource_label\tpia21_mask\tstatus_block_mask\tthrust_flag_before\tthrust_flag_after\tsound_number\twrite_index\twrite_kind\tport_b\tcommand"
+        );
+        assert_eq!(
             first_tsv_line(RED_LABEL_SRAM_ROUTINES_TSV),
             "routine\taddress\tregister\twidth_nibbles\tx_advance\toperation\tsource"
         );
@@ -162,6 +191,10 @@ mod tests {
         assert_eq!(
             first_tsv_line(RED_LABEL_TRACE_SCENARIOS_TSV),
             "scenario\tframes\tinput_program\tdescription\tsource"
+        );
+        assert_eq!(
+            first_tsv_line(RED_LABEL_TRACE_REQUIREMENTS_TSV),
+            "scenario\trequired_sound_commands\trequired_events\tdescription\tsource"
         );
         assert_eq!(
             first_tsv_line(RED_LABEL_TRACE_SCHEMA_TSV),

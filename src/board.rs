@@ -113,6 +113,7 @@ pub const RED_LABEL_CROM0_ALL_ROMS_OK_TEXT: &str = "ALL ROMS OK";
 pub const RED_LABEL_CROM0_BAD_ROM_LABEL_TEXT: &str = "ROM";
 pub const RED_LABEL_CROM0_OPERATOR_PROMPT_TEXT: &str = "PRESS ADVANCE WITH SWITCH SET FOR:";
 pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT: &str = "AUTO FOR RAM TEST";
+pub const RED_LABEL_CROM0_MANUAL_FOR_ROM_TEST_TEXT: &str = "MANUAL FOR ROM TEST";
 pub const RED_LABEL_CROM0_RAM_TEST_TEXT: &str = "RAM TEST";
 pub const RED_LABEL_CROM0_RAM_FAILURE_TEXT: &str = "RAM FAILURE";
 pub const RED_LABEL_CROM0_BAD_RAM_LABEL_TEXT: &str = "RAM";
@@ -133,10 +134,15 @@ pub const RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT: &str = "AUTO FOR COLOR R
 pub const RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT: &str = "AUTO FOR SWITCH TEST";
 pub const RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT: &str =
     "AUTO FOR MONITOR TEST PATTERNS";
+pub const RED_LABEL_CROM0_AUTO_FOR_AUDIO_TEST_TEXT: &str = "AUTO FOR AUDIO TEST";
 pub const RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT: &str = "AUTO FOR AUDIT, GAME ADJUST";
 pub const RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT: &str =
     "MANUAL TO TEST INDIVIDUAL SOUNDS";
 pub const RED_LABEL_CROM0_MANUAL_TO_STEP_THRU_PATTERNS_TEXT: &str = "MANUAL TO STEP THRU PATTERNS";
+pub const RED_LABEL_CROM0_GAME_OVER_INSTRUCTIONS: &[&str] = &[
+    RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT,
+    RED_LABEL_CROM0_MANUAL_FOR_ROM_TEST_TEXT,
+];
 pub const RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT];
 pub const RED_LABEL_CROM0_RAM_TEST_START_INSTRUCTIONS: &[&str] =
@@ -147,6 +153,8 @@ pub const RED_LABEL_CROM0_CMOS_RAM_TEST_DONE_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT];
 pub const RED_LABEL_CROM0_COLOR_RAM_TEST_INSTRUCTIONS: &[&str] =
     &[RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT];
+pub const RED_LABEL_CROM0_COLOR_RAM_TEST_DONE_INSTRUCTIONS: &[&str] =
+    &[RED_LABEL_CROM0_AUTO_FOR_AUDIO_TEST_TEXT];
 pub const RED_LABEL_CROM0_AUDIO_TEST_INSTRUCTIONS: &[&str] = &[
     RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT,
     RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT,
@@ -4754,10 +4762,12 @@ const RED_LABEL_CROM0_MONITOR_BLUE_TOUCH_RANGES: [(u16, u16); 2] =
 fn red_label_crom0_operator_instruction_vector(line: &str) -> Result<&'static str, String> {
     match line {
         RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT => Ok("VINS2"),
+        RED_LABEL_CROM0_MANUAL_FOR_ROM_TEST_TEXT => Ok("VINS3"),
         RED_LABEL_CROM0_AUTO_FOR_RAM_TEST_TEXT => Ok("VINS4"),
         RED_LABEL_CROM0_AUTO_TO_EXIT_TEST_TEXT => Ok("VINS5"),
         RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT => Ok("VINS6"),
         RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT => Ok("VINS7"),
+        RED_LABEL_CROM0_AUTO_FOR_AUDIO_TEST_TEXT => Ok("VINS8"),
         RED_LABEL_CROM0_AUTO_FOR_SWITCH_TEST_TEXT => Ok("VINS9"),
         RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT => Ok("VINS10"),
         RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT => Ok("VINS11"),
@@ -5314,7 +5324,8 @@ mod tests {
             RED_LABEL_CROM0_AUDIO_SOUND_NUMBER_ADDRESS, RED_LABEL_CROM0_AUDIO_TEST_FIRST_DELAY_MS,
             RED_LABEL_CROM0_AUDIO_TEST_LED, RED_LABEL_CROM0_AUDIO_TEST_PLAYB_DELAY_MS,
             RED_LABEL_CROM0_AUDIO_TEST_SOUND_DELAY_MS, RED_LABEL_CROM0_AUDIO_TEST_TEXT,
-            RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT,
+            RED_LABEL_CROM0_AUDIO_TEST_TEXT_ADDRESS, RED_LABEL_CROM0_AUTO_FOR_AUDIO_TEST_TEXT,
+            RED_LABEL_CROM0_AUTO_FOR_CMOS_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_COLOR_RAM_TEST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT,
             RED_LABEL_CROM0_AUTO_FOR_MONITOR_TEST_PATTERNS_TEXT,
@@ -5330,9 +5341,12 @@ mod tests {
             RED_LABEL_CROM0_CMOS_RAM_OK_TEXT_ADDRESS, RED_LABEL_CROM0_CMOS_RAM_TEST_LED,
             RED_LABEL_CROM0_COLOR_RAM_BAR_BYTES, RED_LABEL_CROM0_COLOR_RAM_BAR_WIDTH_BYTES,
             RED_LABEL_CROM0_COLOR_RAM_PALETTE_BYTES, RED_LABEL_CROM0_COLOR_RAM_TEST_COLOR_DELAY_MS,
+            RED_LABEL_CROM0_COLOR_RAM_TEST_DONE_INSTRUCTIONS,
             RED_LABEL_CROM0_COLOR_RAM_TEST_INITIAL_DELAY_MS, RED_LABEL_CROM0_COLOR_RAM_TEST_LED,
             RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT, RED_LABEL_CROM0_COLOR_RAM_TEST_TEXT_ADDRESS,
+            RED_LABEL_CROM0_GAME_OVER_INSTRUCTIONS,
             RED_LABEL_CROM0_MANUAL_FOR_INDIVIDUAL_SOUNDS_TEXT,
+            RED_LABEL_CROM0_MANUAL_FOR_ROM_TEST_TEXT,
             RED_LABEL_CROM0_MANUAL_TO_STEP_THRU_PATTERNS_TEXT,
             RED_LABEL_CROM0_MONITOR_BLUE_FIELD_COLOR, RED_LABEL_CROM0_MONITOR_COLOR_BAR_BYTES,
             RED_LABEL_CROM0_MONITOR_COLOR_BAR_PALETTE_BYTES,
@@ -5415,7 +5429,9 @@ mod tests {
             red_label_cmos_defaults, red_label_cmos_layout, red_label_memory_map,
             red_label_ram_layout,
         },
-        red_label_message::{red_label_message_glyph, red_label_score_digit_image},
+        red_label_message::{
+            red_label_message, red_label_message_glyph, red_label_score_digit_image,
+        },
         rom::{
             RED_LABEL_CROM0_ALL_ROMS_OK_TEXT_ADDRESS, RED_LABEL_CROM0_FAILURE_COLOR,
             RED_LABEL_CROM0_OK_COLOR, RED_LABEL_CROM0_ROM_FAILURE_TEXT_ADDRESS,
@@ -6296,6 +6312,61 @@ mod tests {
         assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_PROMPT_ADDRESS, 'P');
         assert_message_glyph_at(&board, 0x58CE, 'H');
         assert_message_glyph_at(&board, 0x92CE, ':');
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0], 'A');
+    }
+
+    #[test]
+    fn main_board_writes_missing_source_operator_instruction_vectors() {
+        let images = test_rom_images();
+        let mut board = DefenderMainBoard::with_cleared_ram(&images);
+
+        let game_over = board
+            .red_label_write_crom0_operator_instruction_text(&RedLabelDiagnosticInstructionWrite {
+                table_label: "IGAMEO",
+                lines: RED_LABEL_CROM0_GAME_OVER_INSTRUCTIONS,
+            })
+            .expect("IGAMEO instruction transfer");
+
+        assert_eq!(game_over.table_label, "IGAMEO");
+        assert_eq!(game_over.lines.len(), 2);
+        assert_eq!(game_over.lines[0].vector_label, "VINS2");
+        assert_eq!(
+            game_over.lines[0].text,
+            RED_LABEL_CROM0_AUTO_FOR_GAME_AUDIT_ADJUST_TEXT
+        );
+        assert_eq!(game_over.lines[1].vector_label, "VINS3");
+        assert_eq!(
+            game_over.lines[1].text,
+            RED_LABEL_CROM0_MANUAL_FOR_ROM_TEST_TEXT
+        );
+        assert_eq!(
+            red_label_message("VINS3")
+                .expect("VINS3 message")
+                .vector_address,
+            0xC0BF
+        );
+        assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[1], 'M');
+
+        let color_done = board
+            .red_label_write_crom0_operator_instruction_text(&RedLabelDiagnosticInstructionWrite {
+                table_label: "ICOLDO",
+                lines: RED_LABEL_CROM0_COLOR_RAM_TEST_DONE_INSTRUCTIONS,
+            })
+            .expect("ICOLDO instruction transfer");
+
+        assert_eq!(color_done.table_label, "ICOLDO");
+        assert_eq!(color_done.lines.len(), 1);
+        assert_eq!(color_done.lines[0].vector_label, "VINS8");
+        assert_eq!(
+            color_done.lines[0].text,
+            RED_LABEL_CROM0_AUTO_FOR_AUDIO_TEST_TEXT
+        );
+        assert_eq!(
+            red_label_message("VINS8")
+                .expect("VINS8 message")
+                .vector_address,
+            0xC0C9
+        );
         assert_message_glyph_at(&board, RED_LABEL_CROM0_OPERATOR_LINE_ADDRESSES[0], 'A');
     }
 

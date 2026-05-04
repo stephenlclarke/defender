@@ -352,10 +352,15 @@ mod tests {
         assert!(glyphs.iter().any(|glyph| glyph.character == 'J'));
         assert!(glyphs.iter().any(|glyph| glyph.character == 'Y'));
         assert!(glyphs.iter().any(|glyph| glyph.character == ','));
+        assert!(glyphs.iter().any(|glyph| glyph.character == '.'));
         assert!(glyphs.iter().any(|glyph| glyph.character == ':'));
         assert_eq!(
             red_label_message_glyph(',').expect("comma glyph").address,
             0xC6B7
+        );
+        assert_eq!(
+            red_label_message_glyph('.').expect("period glyph").address,
+            0xC6BF
         );
         assert_eq!(
             red_label_message_glyph('H').expect("H glyph").address,
@@ -391,6 +396,24 @@ mod tests {
                 String::from("SET"),
                 String::from("FOR:")
             ]
+        );
+        assert_eq!(
+            red_label_message("VINS3")
+                .expect("VINS3 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("MANUAL"),
+                String::from("FOR"),
+                String::from("ROM"),
+                String::from("TEST")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS3")
+                .expect("VINS3 message")
+                .vector_address,
+            0xC0BF
         );
         assert_eq!(
             red_label_message("VRAMTS")
@@ -451,6 +474,24 @@ mod tests {
             ]
         );
         assert_eq!(
+            red_label_message("VINS8")
+                .expect("VINS8 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUTO"),
+                String::from("FOR"),
+                String::from("AUDIO"),
+                String::from("TEST")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS8")
+                .expect("VINS8 message")
+                .vector_address,
+            0xC0C9
+        );
+        assert_eq!(
             red_label_message("VCMSFL")
                 .expect("VCMSFL message")
                 .words
@@ -504,6 +545,52 @@ mod tests {
                 String::from("RAM"),
                 String::from("TEST")
             ]
+        );
+        assert_eq!(
+            red_label_message("ELECV")
+                .expect("ELECV message")
+                .words
+                .as_slice(),
+            &[
+                String::from("ELECTRONICS"),
+                String::from("INC."),
+                String::from("[RLF]"),
+                String::from("[RLF]"),
+                String::from("[HMC:0x0C]"),
+                String::from("PRESENTS")
+            ]
+        );
+        assert_eq!(
+            red_label_message("LANDV")
+                .expect("LANDV message")
+                .words
+                .as_slice(),
+            &[
+                String::from("LANDER"),
+                String::from("[RLF]"),
+                String::from("[HMC:0x06]"),
+                String::from("150")
+            ]
+        );
+        assert_eq!(
+            red_label_message("SWRMPV")
+                .expect("SWRMPV message")
+                .words
+                .as_slice(),
+            &[
+                String::from("[HMC:0x02]"),
+                String::from("POD"),
+                String::from("[RLF]"),
+                String::from("[HMC:0x00]"),
+                String::from("1000")
+            ]
+        );
+        assert_eq!(
+            red_label_message("SCANV")
+                .expect("SCANV message")
+                .words
+                .as_slice(),
+            &[String::from("SCANNER")]
         );
         assert_eq!(
             red_label_message("VCOLTS")

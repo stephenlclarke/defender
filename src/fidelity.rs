@@ -523,10 +523,10 @@ mod tests {
                 "high_score_entry",
             ]
         );
-        assert_eq!(scenarios[0].frames, 300);
+        assert_eq!(scenarios[0].frames, 900);
         assert_eq!(
             expanded_trace_input_text(&scenarios[0].input_program).expect("expand input program"),
-            format!("{}\n", vec!["none"; 300].join(";"))
+            format!("{}\n", vec!["none"; 900].join(";"))
         );
     }
 
@@ -583,7 +583,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known unknown: unignore when cabinet session/high-score flow is translated"]
+    #[ignore = "known unknown: unignore when cabinet session/high-score MAME golden traces exist"]
     fn known_unknown_session_and_high_score_trace_equivalence() {
         panic!(
             "coin, two-player, operator, and high-score state must match red-label golden traces"
@@ -705,7 +705,7 @@ mod tests {
         assert_eq!(trace.wave, 0);
         assert_eq!(trace.lives, 0);
         assert_eq!(trace.smart_bombs, 0);
-        assert_eq!(trace.seed, 0);
+        assert_eq!(trace.seed, 0x35);
         assert_eq!(trace.hseed, 0);
         assert_eq!(trace.lseed, 0);
     }
@@ -734,12 +734,18 @@ mod tests {
 
     #[test]
     fn trace_text_advances_source_power_up_ram_fill_at_observed_frame_boundary() {
-        let inputs = vec![CabinetInput::NONE; 245];
+        let inputs = vec![CabinetInput::NONE; 747];
         let trace = trace_text_for_inputs(&inputs).expect("trace text");
         let frame_68 = trace.lines().nth(68).expect("frame 68");
         let frame_72 = trace.lines().nth(72).expect("frame 72");
         let frame_240 = trace.lines().nth(240).expect("frame 240");
         let frame_245 = trace.lines().nth(245).expect("frame 245");
+        let frame_720 = trace.lines().nth(720).expect("frame 720");
+        let frame_721 = trace.lines().nth(721).expect("frame 721");
+        let frame_724 = trace.lines().nth(724).expect("frame 724");
+        let frame_731 = trace.lines().nth(731).expect("frame 731");
+        let frame_732 = trace.lines().nth(732).expect("frame 732");
+        let frame_746 = trace.lines().nth(746).expect("frame 746");
 
         assert!(frame_68.contains(
             "\tgame_over\t145607283\t60413270\t174\t159\t79\t0x44\t0xA3\t0xA2\t0xA20F8966\t0x7C785B90\t"
@@ -753,6 +759,119 @@ mod tests {
         assert!(frame_245.contains(
             "\tgame_over\t73233961\t142405422\t71\t88\t44\t0x9A\t0x68\t0xCD\t0x4A92B837\t0x67D19934\t"
         ));
+        assert!(frame_720.contains(
+            "\tplaying\t73233961\t142405422\t71\t88\t44\t0x00\t0x00\t0x00\t0x4A92B837\t0x41D912FF\t"
+        ));
+        assert!(
+            frame_721
+                .contains("\tattract\t0\t0\t0\t0\t0\t0x00\t0x00\t0x00\t0x6EE2736A\t0x41D912FF\t")
+        );
+        assert!(
+            frame_724
+                .contains("\tattract\t0\t0\t0\t0\t0\t0x00\t0x00\t0x00\t0xE15D8394\t0x41D912FF\t")
+        );
+        assert!(frame_731.contains(
+            "\tattract\t0\t0\t0\t0\t0\t0xD9\t0xF6\t0xCC\t0xE15D8394\t0x41D912FF\t-\t0xC0\t"
+        ));
+        assert!(
+            frame_732
+                .contains("\tgame_over\t0\t0\t0\t0\t0\t0x3E\t0xB0\t0x13\t0x9075E2DD\t0x41D912FF\t")
+        );
+        assert!(
+            frame_746
+                .contains("\tgame_over\t0\t0\t0\t0\t0\t0xFE\t0x3A\t0x21\t0x9075E2DD\t0x41D912FF\t")
+        );
+    }
+
+    #[test]
+    fn trace_text_does_not_hold_rand_on_credited_start_fixture_frames_without_live_process() {
+        let inputs = vec![CabinetInput::NONE; 1018];
+        let trace = trace_text_for_inputs(&inputs).expect("trace text");
+        let frame_1017 = trace.lines().nth(1017).expect("frame 1017");
+        let frame_1018 = trace.lines().nth(1018).expect("frame 1018");
+
+        assert_ne!(
+            trace_frame_rand_state(frame_1017),
+            trace_frame_rand_state(frame_1018)
+        );
+    }
+
+    #[test]
+    fn trace_text_aligns_delayed_coin_credit_event_with_source_sound_command() {
+        let mut inputs = vec![CabinetInput::NONE; 900];
+        inputs.extend(
+            [CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+        inputs.extend([CabinetInput::NONE; 9]);
+
+        let trace = trace_text_for_inputs(&inputs).expect("trace text");
+        let frame_911 = trace.lines().nth(911).expect("frame 911");
+        let frame_912 = trace.lines().nth(912).expect("frame 912");
+
+        assert!(frame_911.ends_with("\t-\t-\t-"));
+        assert!(frame_912.ends_with("\t-\t0xE6\tcredit_added"));
+    }
+
+    #[test]
+    fn trace_text_aligns_debounced_start_event_with_source_sound_command() {
+        let mut inputs = vec![CabinetInput::NONE; 900];
+        inputs.extend(
+            [CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+        inputs.extend([CabinetInput::NONE; 120]);
+        inputs.extend(
+            [CabinetInput {
+                start_one: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+
+        let trace = trace_text_for_inputs(&inputs).expect("trace text");
+        let frame_1026 = trace.lines().nth(1026).expect("frame 1026");
+        let frame_1027 = trace.lines().nth(1027).expect("frame 1027");
+
+        assert!(frame_1026.ends_with("\t-\t-\t-"));
+        assert!(frame_1027.contains("\tplaying\t0\t0\t1\t3\t3\t0xD2\t0xAB\t0x88\t"));
+        assert!(frame_1027.ends_with("\t-\t0xF5\tgame_started"));
+    }
+
+    #[test]
+    fn trace_text_keeps_late_post_start_gameplay_state_after_cold_boot_handoff() {
+        let mut inputs = vec![CabinetInput::NONE; 900];
+        inputs.extend(
+            [CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+        inputs.extend([CabinetInput::NONE; 120]);
+        inputs.extend(
+            [CabinetInput {
+                start_one: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+        inputs.extend([CabinetInput::NONE; 300]);
+
+        let trace = trace_text_for_inputs(&inputs).expect("trace text");
+        let frame_1328 = trace.lines().nth(1328).expect("frame 1328");
+        let fields = frame_1328.split('\t').collect::<Vec<_>>();
+
+        assert_eq!(fields[5], "playing");
+        assert_eq!(fields[8], "1");
+        assert_ne!(fields[9], "0");
+        assert_ne!(fields[10], "0");
+    }
+
+    fn trace_frame_rand_state(line: &str) -> (&str, &str, &str) {
+        let fields = line.split('\t').collect::<Vec<_>>();
+        (fields[11], fields[12], fields[13])
     }
 
     #[test]

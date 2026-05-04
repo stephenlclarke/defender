@@ -1,6 +1,6 @@
 //! CLI entrypoint for the clean-slate implementation.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
@@ -301,6 +301,12 @@ fn fidelity_check_reference_trace_dir_text(path: &Path) -> Result<String> {
     }
 
     let scenarios = trace_scenarios().map_err(|error| anyhow!(error))?;
+    let scenario_names = scenarios
+        .iter()
+        .map(|scenario| scenario.scenario.as_str())
+        .collect::<HashSet<_>>();
+    let requirements = trace_requirements()?;
+    validate_trace_requirements_reference_known_scenarios(&scenario_names, &requirements)?;
     let expected_header = trace_header();
     let mut frames = 0;
     for scenario in &scenarios {
@@ -336,6 +342,10 @@ fn fidelity_check_reference_trace_dir_text(path: &Path) -> Result<String> {
                 scenario.frames
             );
         }
+        if let Some(requirement) = requirements.get(&scenario.scenario) {
+            let input_frames = actual_inputs.trim_end().split(';').collect::<Vec<_>>();
+            check_reference_trace_evidence(&expected_path, &lines, requirement, &input_frames)?;
+        }
         frames += trace_frames;
     }
 
@@ -345,6 +355,178 @@ fn fidelity_check_reference_trace_dir_text(path: &Path) -> Result<String> {
         scenarios.len(),
         frames
     ))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TraceRequirement {
+    required_sound_commands: Vec<String>,
+    required_events: Vec<String>,
+}
+
+fn trace_requirements() -> Result<HashMap<String, TraceRequirement>> {
+    parse_trace_requirements(crate::assets::RED_LABEL_TRACE_REQUIREMENTS_TSV)
+}
+
+fn parse_trace_requirements(tsv: &str) -> Result<HashMap<String, TraceRequirement>> {
+    let mut lines = tsv.lines();
+    let Some(header) = lines.next() else {
+        bail!("trace requirement TSV is empty");
+    };
+    if header != "scenario\trequired_sound_commands\trequired_events\tdescription\tsource" {
+        bail!("unexpected trace requirement header: {header}");
+    }
+
+    let mut requirements = HashMap::new();
+    for (index, line) in lines.enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let fields = line.split('\t').collect::<Vec<_>>();
+        if fields.len() != 5 {
+            bail!(
+                "trace requirement line {} has {} fields, expected 5",
+                index + 2,
+                fields.len()
+            );
+        }
+        let scenario = fields[0].trim();
+        if scenario.is_empty() {
+            bail!("trace requirement line {} has empty scenario", index + 2);
+        }
+        if requirements
+            .insert(
+                String::from(scenario),
+                TraceRequirement {
+                    required_sound_commands: parse_requirement_values(fields[1]),
+                    required_events: parse_requirement_values(fields[2]),
+                },
+            )
+            .is_some()
+        {
+            bail!("trace requirement line {} duplicates {scenario}", index + 2);
+        }
+    }
+    Ok(requirements)
+}
+
+fn parse_requirement_values(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && *value != "-")
+        .map(String::from)
+        .collect()
+}
+
+fn validate_trace_requirements_reference_known_scenarios(
+    scenario_names: &HashSet<&str>,
+    requirements: &HashMap<String, TraceRequirement>,
+) -> Result<()> {
+    for scenario in requirements.keys() {
+        if !scenario_names.contains(scenario.as_str()) {
+            bail!("trace requirement references unknown scenario {scenario}");
+        }
+    }
+    Ok(())
+}
+
+fn check_reference_trace_evidence(
+    expected_path: &Path,
+    lines: &[&str],
+    requirement: &TraceRequirement,
+    input_frames: &[&str],
+) -> Result<()> {
+    let header = lines.first().copied().unwrap_or_default();
+    let columns = header.split('\t').collect::<Vec<_>>();
+    let sound_index = trace_column_index(&columns, "sound_commands")?;
+    let events_index = trace_column_index(&columns, "events")?;
+    let mut sound_commands = HashSet::new();
+    let mut events = HashSet::new();
+    let evidence_deadline = reference_evidence_deadline_frame(input_frames, requirement);
+
+    for (index, line) in lines.iter().copied().enumerate().skip(1) {
+        let frame_number = index;
+        let fields = line.split('\t').collect::<Vec<_>>();
+        if fields.len() != columns.len() {
+            bail!(
+                "reference trace fixture {} line {} has {} columns, expected {}",
+                expected_path.display(),
+                index + 1,
+                fields.len(),
+                columns.len()
+            );
+        }
+        if evidence_deadline.is_none_or(|deadline| frame_number <= deadline) {
+            sound_commands.extend(trace_cell_values(fields[sound_index]));
+            events.extend(trace_cell_values(fields[events_index]));
+        }
+    }
+
+    for command in &requirement.required_sound_commands {
+        if !sound_commands.contains(command) {
+            let timing = evidence_timing_message(evidence_deadline);
+            bail!(
+                "reference trace fixture {} is missing required sound command {}{}",
+                expected_path.display(),
+                command,
+                timing
+            );
+        }
+    }
+    for event in &requirement.required_events {
+        if !events.contains(event) {
+            let timing = evidence_timing_message(evidence_deadline);
+            bail!(
+                "reference trace fixture {} is missing required event {}{}",
+                expected_path.display(),
+                event,
+                timing
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn reference_evidence_deadline_frame(
+    input_frames: &[&str],
+    requirement: &TraceRequirement,
+) -> Option<usize> {
+    if requirement.required_sound_commands.is_empty() && requirement.required_events.is_empty() {
+        return None;
+    }
+    input_frames
+        .iter()
+        .rposition(|frame| trace_input_frame_contains_start(frame))
+        .map(|index| index + 1)
+}
+
+fn trace_input_frame_contains_start(frame: &str) -> bool {
+    frame
+        .split(',')
+        .map(str::trim)
+        .any(|action| matches!(action, "start_one" | "start1" | "start_two" | "start2"))
+}
+
+fn evidence_timing_message(deadline: Option<usize>) -> String {
+    deadline
+        .map(|frame| format!(" by frame {frame}"))
+        .unwrap_or_default()
+}
+
+fn trace_column_index(columns: &[&str], column: &str) -> Result<usize> {
+    columns
+        .iter()
+        .position(|candidate| *candidate == column)
+        .ok_or_else(|| anyhow!("trace schema is missing {column} column"))
+}
+
+fn trace_cell_values(cell: &str) -> Vec<String> {
+    cell.split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && *value != "-")
+        .map(String::from)
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -626,23 +808,72 @@ fn print_help() {
 }
 
 fn help_text() -> &'static str {
-    "defender\n  cargo run\n  cargo run -- --mute\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play requires an interactive terminal with Kitty graphics support.\n"
+    "defender\n  cargo run\n  cargo run -- --mute\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play requires an interactive terminal with Kitty graphics support.\n"
 }
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::collections::{HashMap, HashSet};
+    use std::path::{Path, PathBuf};
     use std::{env, fs};
 
     use super::{
-        Command, fidelity_check_reference_trace_dir_text, fidelity_check_trace_dir_text,
+        Command, TraceRequirement, check_reference_trace_evidence,
+        fidelity_check_reference_trace_dir_text, fidelity_check_trace_dir_text,
         fidelity_check_trace_text, fidelity_list_scenarios_text, fidelity_trace_input_file_text,
         fidelity_trace_input_text, fidelity_trace_text, fidelity_write_scenario_inputs_text,
-        help_text, parse_args, rom_listing_text, rom_report_text,
+        help_text, parse_args, parse_requirement_values, parse_trace_requirements,
+        rom_listing_text, rom_report_text, trace_cell_values,
+        validate_trace_requirements_reference_known_scenarios,
     };
     use crate::fidelity::{expanded_trace_input_text, trace_header};
     use crate::input::InputProfile;
     use crate::rom::RomReport;
+
+    fn write_minimal_expected_fixture(
+        path: &Path,
+        stem: &str,
+        frame_count: usize,
+        evidence_frame: Option<usize>,
+    ) {
+        let mut expected = String::from(trace_header());
+        expected.push('\n');
+        for frame in 1..=frame_count {
+            let (sound_commands, events) = if evidence_frame == Some(frame) {
+                ("0xE6,0xF5", "credit_added,game_started")
+            } else {
+                ("-", "-")
+            };
+            expected.push_str(&format!(
+                "{frame}\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t{sound_commands}\t{events}\n"
+            ));
+        }
+        fs::write(path.join(format!("{stem}.expected.tsv")), expected)
+            .expect("write expected fixture");
+    }
+
+    fn write_minimal_reference_fixtures(path: &Path, include_start_evidence: bool) {
+        for entry in fs::read_dir(path).expect("read scenario input dir") {
+            let input_path = entry.expect("dir entry").path();
+            let Some(name) = input_path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            let Some(stem) = name.strip_suffix(".inputs.txt") else {
+                continue;
+            };
+            let frame_count = fs::read_to_string(&input_path)
+                .expect("read inputs")
+                .trim_end()
+                .split(';')
+                .count();
+            let evidence_frame = if include_start_evidence && stem != "attract_boot" {
+                Some(1)
+            } else {
+                None
+            };
+            write_minimal_expected_fixture(path, stem, frame_count, evidence_frame);
+        }
+    }
 
     #[test]
     fn parse_args_defaults_to_live_planetoid_audio() {
@@ -958,6 +1189,8 @@ mod tests {
         assert!(text.contains("--fidelity-list-scenarios"));
         assert!(text.contains("--fidelity-write-scenario-inputs"));
         assert!(text.contains("--fidelity-check-reference-trace-dir"));
+        assert!(text.contains("docs/fidelity/fixtures/local/rust-current"));
+        assert!(text.contains("docs/fidelity/fixtures/local/reference"));
         assert!(text.contains("copy-only deployment"));
         assert!(text.contains("Kitty graphics"));
     }
@@ -1070,7 +1303,7 @@ mod tests {
         assert!(text.contains("12 Phase 1 trace scenario input script(s)"));
         assert_eq!(
             attract,
-            expanded_trace_input_text("none*300").expect("expanded attract")
+            expanded_trace_input_text("none*900").expect("expanded attract")
         );
     }
 
@@ -1082,35 +1315,221 @@ mod tests {
         ));
         let _ = fs::remove_dir_all(&path);
         fidelity_write_scenario_inputs_text(&path).expect("write scenario inputs");
-        for entry in fs::read_dir(&path).expect("read scenario input dir") {
-            let input_path = entry.expect("dir entry").path();
-            let Some(name) = input_path.file_name().and_then(|name| name.to_str()) else {
-                continue;
-            };
-            let Some(stem) = name.strip_suffix(".inputs.txt") else {
-                continue;
-            };
-            let frame_count = fs::read_to_string(&input_path)
-                .expect("read inputs")
-                .trim_end()
-                .split(';')
-                .count();
-            let mut expected = String::from(trace_header());
-            expected.push('\n');
-            for frame in 1..=frame_count {
-                expected.push_str(&format!(
-                    "{frame}\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\n"
-                ));
-            }
-            fs::write(path.join(format!("{stem}.expected.tsv")), expected)
-                .expect("write expected fixture");
-        }
+        write_minimal_reference_fixtures(&path, true);
 
         let text =
             fidelity_check_reference_trace_dir_text(&path).expect("reference fixtures complete");
         let _ = fs::remove_dir_all(&path);
 
         assert!(text.contains("12 complete Phase 1 fixture(s)"));
+    }
+
+    #[test]
+    fn fidelity_check_reference_trace_dir_text_rejects_missing_required_start_evidence() {
+        let path = env::temp_dir().join(format!(
+            "defender-reference-fixtures-missing-evidence-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&path);
+        fidelity_write_scenario_inputs_text(&path).expect("write scenario inputs");
+        write_minimal_reference_fixtures(&path, false);
+
+        let error =
+            fidelity_check_reference_trace_dir_text(&path).expect_err("missing start evidence");
+        let _ = fs::remove_dir_all(&path);
+
+        assert!(
+            error
+                .to_string()
+                .contains("missing required sound command 0xE6")
+        );
+    }
+
+    #[test]
+    fn fidelity_check_reference_trace_dir_text_rejects_late_start_evidence() {
+        let path = env::temp_dir().join(format!(
+            "defender-reference-fixtures-late-evidence-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&path);
+        fidelity_write_scenario_inputs_text(&path).expect("write scenario inputs");
+        write_minimal_reference_fixtures(&path, false);
+        let start_frame_count = fs::read_to_string(path.join("start_game.inputs.txt"))
+            .expect("read start_game inputs")
+            .trim_end()
+            .split(';')
+            .count();
+        write_minimal_expected_fixture(
+            &path,
+            "start_game",
+            start_frame_count,
+            Some(start_frame_count),
+        );
+
+        let error =
+            fidelity_check_reference_trace_dir_text(&path).expect_err("late start evidence");
+        let _ = fs::remove_dir_all(&path);
+
+        assert!(
+            error
+                .to_string()
+                .contains("missing required sound command 0xE6 by frame")
+        );
+    }
+
+    #[test]
+    fn trace_requirement_parser_handles_lists_and_rejects_duplicate_scenarios() {
+        let requirements = parse_trace_requirements(
+            "scenario\trequired_sound_commands\trequired_events\tdescription\tsource\n\
+             start_game\t0xE6,0xF5\tcredit_added,game_started\tdescription\tsource\n\
+             \n",
+        )
+        .expect("requirements");
+
+        assert_eq!(
+            requirements["start_game"],
+            TraceRequirement {
+                required_sound_commands: vec![String::from("0xE6"), String::from("0xF5")],
+                required_events: vec![String::from("credit_added"), String::from("game_started")],
+            }
+        );
+        assert_eq!(parse_requirement_values("-"), Vec::<String>::new());
+        assert_eq!(
+            trace_cell_values("credit_added, game_started"),
+            vec![String::from("credit_added"), String::from("game_started")]
+        );
+
+        let error = parse_trace_requirements(
+            "scenario\trequired_sound_commands\trequired_events\tdescription\tsource\n\
+             start_game\t-\t-\tdescription\tsource\n\
+             start_game\t-\t-\tdescription\tsource\n",
+        )
+        .expect_err("duplicate scenario");
+        assert!(error.to_string().contains("duplicates start_game"));
+    }
+
+    #[test]
+    fn trace_requirement_parser_rejects_malformed_rows() {
+        let error = parse_trace_requirements("").expect_err("empty requirements");
+        assert!(error.to_string().contains("trace requirement TSV is empty"));
+
+        let error = parse_trace_requirements("bad\theader\n").expect_err("bad header");
+        assert!(
+            error
+                .to_string()
+                .contains("unexpected trace requirement header")
+        );
+
+        let error = parse_trace_requirements(
+            "scenario\trequired_sound_commands\trequired_events\tdescription\tsource\n\
+             start_game\t-\t-\n",
+        )
+        .expect_err("short row");
+        assert!(error.to_string().contains("has 3 fields, expected 5"));
+
+        let error = parse_trace_requirements(
+            "scenario\trequired_sound_commands\trequired_events\tdescription\tsource\n\
+             \t-\t-\tdescription\tsource\n",
+        )
+        .expect_err("empty scenario");
+        assert!(error.to_string().contains("empty scenario"));
+    }
+
+    #[test]
+    fn trace_requirements_must_reference_known_scenarios() {
+        let scenario_names = HashSet::from(["attract_boot"]);
+        let requirements = HashMap::from([(
+            String::from("missing"),
+            TraceRequirement {
+                required_sound_commands: Vec::new(),
+                required_events: Vec::new(),
+            },
+        )]);
+
+        let error =
+            validate_trace_requirements_reference_known_scenarios(&scenario_names, &requirements)
+                .expect_err("unknown scenario");
+
+        assert!(
+            error
+                .to_string()
+                .contains("trace requirement references unknown scenario missing")
+        );
+    }
+
+    #[test]
+    fn check_reference_trace_evidence_rejects_missing_required_event() {
+        let lines = [
+            trace_header(),
+            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t0xE6\t-",
+        ];
+        let requirement = TraceRequirement {
+            required_sound_commands: vec![String::from("0xE6")],
+            required_events: vec![String::from("credit_added")],
+        };
+
+        let error = check_reference_trace_evidence(
+            &PathBuf::from("/tmp/start_game.expected.tsv"),
+            &lines,
+            &requirement,
+            &["coin,start_one"],
+        )
+        .expect_err("missing event");
+
+        assert!(
+            error
+                .to_string()
+                .contains("missing required event credit_added")
+        );
+    }
+
+    #[test]
+    fn check_reference_trace_evidence_rejects_bad_trace_columns() {
+        let lines = [
+            trace_header(),
+            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t0xE6",
+        ];
+        let requirement = TraceRequirement {
+            required_sound_commands: Vec::new(),
+            required_events: vec![String::from("credit_added")],
+        };
+
+        let error = check_reference_trace_evidence(
+            &PathBuf::from("/tmp/start_game.expected.tsv"),
+            &lines,
+            &requirement,
+            &["coin,start_one"],
+        )
+        .expect_err("bad trace columns");
+
+        assert!(error.to_string().contains("has 18 columns, expected 19"));
+    }
+
+    #[test]
+    fn check_reference_trace_evidence_rejects_late_bad_trace_columns() {
+        let lines = [
+            trace_header(),
+            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t0xE6\tcredit_added",
+            "2\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\tlate",
+        ];
+        let requirement = TraceRequirement {
+            required_sound_commands: vec![String::from("0xE6")],
+            required_events: vec![String::from("credit_added")],
+        };
+
+        let error = check_reference_trace_evidence(
+            &PathBuf::from("/tmp/start_game.expected.tsv"),
+            &lines,
+            &requirement,
+            &["start_one", "none"],
+        )
+        .expect_err("late bad trace columns");
+
+        assert!(
+            error
+                .to_string()
+                .contains("line 3 has 18 columns, expected 19")
+        );
     }
 
     #[test]

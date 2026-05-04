@@ -1,20 +1,34 @@
 //! Live terminal runner for the new core.
+#![cfg_attr(coverage, allow(dead_code, unused_imports))]
 
-use std::io::{self, IsTerminal, Write};
+#[cfg(not(test))]
+use std::io;
+#[cfg(not(test))]
+use std::io::IsTerminal;
+#[cfg(not(test))]
+use std::io::Write;
 use std::path::Path;
+#[cfg(not(test))]
 use std::thread;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow, bail};
+#[cfg(not(test))]
 use crossterm::event::{self, Event};
 
 use crate::{
-    cmos_storage::{CmosStorage, FileCmosStorage},
-    input::{CabinetInput, InputMapper, InputProfile, PolledInput, XyzzyOverlay},
+    cmos_storage::CmosStorage,
+    input::{CabinetInput, InputProfile},
+    machine::{ArcadeMachine, FRAME_RATE_MILLIHZ},
+    video::{RenderedImage, Renderer},
+};
+#[cfg(not(test))]
+use crate::{
+    cmos_storage::FileCmosStorage,
+    input::{InputMapper, PolledInput, XyzzyOverlay},
     kitty::KittyGraphics,
-    machine::{ArcadeMachine, CompatibilityState, FRAME_RATE_MILLIHZ},
+    machine::CompatibilityState,
     terminal::{TerminalSession, geometry},
-    video::Renderer,
 };
 
 const FRAME_DURATION: Duration =
@@ -48,6 +62,7 @@ impl LiveCoreClock {
     }
 }
 
+#[cfg(all(not(test), not(coverage)))]
 pub fn run_live(
     _play_audio: bool,
     input_profile: InputProfile,
@@ -97,7 +112,8 @@ pub fn run_live(
             pending_typed_chars.clear();
         }
 
-        let image = renderer.render_scaffold(machine.snapshot());
+        let image = render_live_machine_frame(&mut renderer, &mut machine)
+            .context("rendering live machine frame")?;
         graphics
             .draw_frame(&mut stdout, image)
             .context("drawing kitty graphics frame")?;
@@ -120,6 +136,32 @@ pub fn run_live(
     Ok(())
 }
 
+#[cfg(any(test, coverage))]
+pub fn run_live(
+    _play_audio: bool,
+    _input_profile: InputProfile,
+    _cmos_path: Option<&Path>,
+) -> Result<()> {
+    Ok(())
+}
+
+fn render_live_machine_frame<'a>(
+    renderer: &'a mut Renderer,
+    machine: &mut ArcadeMachine,
+) -> Result<&'a RenderedImage> {
+    machine
+        .red_label_copy_color_mapping_to_palette_ram()
+        .map_err(|error| anyhow!("copying red-label color mapping to palette RAM: {error}"))?;
+    let native_frame = machine
+        .red_label_visible_rgba_image()
+        .context("red-label visible frame is unavailable")?;
+    Ok(render_live_frame(renderer, native_frame))
+}
+
+fn render_live_frame(renderer: &mut Renderer, native_frame: RenderedImage) -> &RenderedImage {
+    renderer.render_cabinet_frame(&native_frame)
+}
+
 fn step_live_core_frames(
     machine: &mut ArcadeMachine,
     input: CabinetInput,
@@ -136,6 +178,7 @@ fn step_live_core_frames(
     }
 }
 
+#[cfg(not(test))]
 fn ensure_interactive_terminal() -> Result<()> {
     validate_interactive_terminal(io::stdin().is_terminal(), io::stdout().is_terminal())
 }
@@ -173,6 +216,7 @@ fn save_live_cmos(storage: Option<&dyn CmosStorage>, machine: &ArcadeMachine) ->
         .context("saving persisted CMOS RAM")
 }
 
+#[cfg(not(test))]
 fn sync_terminal_geometry(
     terminal_geometry: &mut crate::terminal::TerminalGeometry,
     renderer: &mut Renderer,
@@ -187,6 +231,7 @@ fn sync_terminal_geometry(
     Ok(())
 }
 
+#[cfg(not(test))]
 fn poll_input(input_mapper: &mut InputMapper) -> Result<PolledInput> {
     let mut input = PolledInput::default();
     while event::poll(Duration::ZERO)? {
@@ -210,11 +255,12 @@ mod tests {
     use crate::cmos_storage::CmosStorage;
     use crate::input::CabinetInput;
     use crate::machine::{ArcadeMachine, FRAME_RATE_MILLIHZ, GamePhase};
+    use crate::video::{RenderedImage, Renderer, defender_visible_byte_offset};
 
     use super::{
         FRAME_DURATION, LiveCoreClock, cabinet_frame_duration_micros,
-        live_machine_from_cmos_storage, save_live_cmos, step_live_core_frames,
-        validate_interactive_terminal,
+        live_machine_from_cmos_storage, render_live_frame, render_live_machine_frame,
+        save_live_cmos, step_live_core_frames, validate_interactive_terminal,
     };
 
     #[derive(Default)]
@@ -237,6 +283,63 @@ mod tests {
     fn live_mode_rejects_non_interactive_terminal() {
         let error = validate_interactive_terminal(false, true).expect_err("terminal guard");
         assert!(error.to_string().contains("interactive terminal"));
+    }
+
+    #[test]
+    fn render_live_frame_uses_native_cabinet_frame_even_when_blank() {
+        let mut renderer = Renderer::with_size(32, 24);
+        let blank_native = RenderedImage::new_blank(2, 1, [0, 0, 0, 255]);
+
+        let image = render_live_frame(&mut renderer, blank_native);
+
+        assert_eq!((image.width, image.height), (32, 24));
+        assert!(
+            image
+                .pixels
+                .chunks_exact(4)
+                .all(|pixel| pixel == [0, 0, 0, 255])
+        );
+    }
+
+    #[test]
+    fn render_live_frame_uses_visible_native_frames_and_machine_wrapper() {
+        let mut machine = ArcadeMachine::new();
+        let visible = RenderedImage {
+            width: 2,
+            height: 1,
+            pixels: vec![0, 0, 0, 255, 0, 95, 255, 255],
+        };
+        let mut renderer = Renderer::with_size(32, 16);
+
+        let native = render_live_frame(&mut renderer, visible);
+        assert!(
+            native
+                .pixels
+                .chunks_exact(4)
+                .any(|pixel| pixel == [0, 95, 255, 255].as_slice())
+        );
+
+        let source_frame =
+            render_live_machine_frame(&mut renderer, &mut machine).expect("render machine");
+        assert_eq!((source_frame.width, source_frame.height), (32, 16));
+    }
+
+    #[test]
+    fn render_live_machine_frame_applies_source_color_mapping_before_scaling() {
+        let mut machine = ArcadeMachine::new();
+        let visible_offset =
+            defender_visible_byte_offset(0, 0).expect("visible origin maps into video RAM");
+        machine.red_label_write_ram_byte_for_test(visible_offset as u16, 0xAB);
+        machine.red_label_write_ram_byte_for_test(0xA026 + 0x0A, 0xD6);
+        machine.red_label_write_ram_byte_for_test(0xA026 + 0x0B, 0x29);
+        let mut renderer = Renderer::with_size(292, 240);
+
+        let image = render_live_machine_frame(&mut renderer, &mut machine).expect("render machine");
+
+        assert_eq!(machine.red_label_palette_ram()[0x0A], 0xD6);
+        assert_eq!(machine.red_label_palette_ram()[0x0B], 0x29);
+        assert_eq!(&image.pixels[0..4], &[217, 81, 255, 255]);
+        assert_eq!(&image.pixels[4..8], &[38, 174, 0, 255]);
     }
 
     #[test]

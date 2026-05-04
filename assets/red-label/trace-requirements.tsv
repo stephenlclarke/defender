@@ -1,0 +1,13 @@
+scenario	required_sound_commands	required_events	description	source
+attract_boot	-	-	Boot/attract readiness fixture; credited-start evidence is not required for this idle scenario	romc8.src DEFALT + MAME 0.287 observed ready window
+start_game	0xE6,0xF5	credit_added,game_started	Credited one-player start must show coin accepted and start accepted sound/event markers	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+first_300_frames	0xE6,0xF5	credit_added,game_started	Credited one-player start must occur before the first 300 post-start frames	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+firing	0xE6,0xF5	credit_added,game_started	Credited one-player start must occur before firing input is sampled	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+thrust_reverse	0xE6,0xF5	credit_added,game_started	Credited one-player start must occur before thrust/reverse input is sampled	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+smart_bomb	0xE6,0xF5	credit_added,game_started	Credited one-player start must occur before smart-bomb input is sampled	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+hyperspace	0xE6,0xF5	credit_added,game_started	Credited one-player start must occur before hyperspace input is sampled	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+abduction	0xE6,0xF5	credit_added,game_started	Long gameplay fixture must include credited one-player start evidence	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+death	0xE6,0xF5	credit_added,game_started	Long gameplay fixture must include credited one-player start evidence	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+wave_advance	0xE6,0xF5	credit_added,game_started	Long gameplay fixture must include credited one-player start evidence	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+planet_destruction	0xE6,0xF5	credit_added,game_started	Long gameplay fixture must include credited one-player start evidence	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace
+high_score_entry	0xE6,0xF5	credit_added,game_started	Long gameplay fixture must include credited one-player start evidence	defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 PIA1 port-B trace

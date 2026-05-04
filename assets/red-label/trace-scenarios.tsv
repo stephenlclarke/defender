@@ -1,13 +1,13 @@
 scenario	frames	input_program	description	source
-attract_boot	300	none*300	Idle boot/attract observation window for the first 300 frames	SPEC.md Phase 1 required golden trace
-start_game	120	coin,start_one;none*119	Coin and one-player start transition from attract into game state	SPEC.md Phase 1 required golden trace
-first_300_frames	300	coin,start_one;none*299	First 300 frames after one-player start with no further controls	SPEC.md Phase 1 required golden trace
-firing	120	coin,start_one;none*30;fire*12;none*77	One-player start followed by a held fire window	SPEC.md Phase 1 required golden trace
-thrust_reverse	120	coin,start_one;none*30;thrust*24;reverse,thrust*12;none*53	One-player start followed by thrust and reverse-thrust input windows	SPEC.md Phase 1 required golden trace
-smart_bomb	120	coin,start_one;none*60;smart_bomb;none*58	One-player start followed by one smart-bomb input edge	SPEC.md Phase 1 required golden trace
-hyperspace	120	coin,start_one;none*60;hyperspace;none*58	One-player start followed by one hyperspace input edge	SPEC.md Phase 1 required golden trace
-abduction	900	coin,start_one;none*899	Long one-player run intended to capture early lander/humanoid abduction state	SPEC.md Phase 1 required golden trace
-death	900	coin,start_one;none*899	Long one-player run intended to capture first unassisted death state	SPEC.md Phase 1 required golden trace
-wave_advance	1800	coin,start_one;none*1799	Long one-player run intended to capture wave progression state	SPEC.md Phase 1 required golden trace
-planet_destruction	2400	coin,start_one;none*2399	Long one-player run intended to capture destroyed-planet state when reached	SPEC.md Phase 1 required golden trace
-high_score_entry	2400	coin,start_one;none*2399	Long one-player run intended to capture game-over/high-score entry state when reached	SPEC.md Phase 1 required golden trace
+attract_boot	900	none*900	Source CMOS default boot/attract readiness window before credited play	romc8.src DEFALT + MAME 0.287 observed ready window
+start_game	1228	none*900;coin*4;none*120;start_one*4;none*200	Source CMOS default boot plus MAME-proven credited one-player start	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+first_300_frames	1328	none*900;coin*4;none*120;start_one*4;none*300	First 300 frames after MAME-proven credited one-player start	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+firing	1328	none*900;coin*4;none*120;start_one*4;none*30;fire*12;none*258	Credited one-player start followed by a held fire window	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+thrust_reverse	1328	none*900;coin*4;none*120;start_one*4;none*30;thrust*24;reverse,thrust*12;none*234	Credited one-player start followed by thrust and reverse-thrust input windows	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+smart_bomb	1328	none*900;coin*4;none*120;start_one*4;none*60;smart_bomb;none*239	Credited one-player start followed by one smart-bomb input edge	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+hyperspace	1328	none*900;coin*4;none*120;start_one*4;none*60;hyperspace;none*239	Credited one-player start followed by one hyperspace input edge	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+abduction	1928	none*900;coin*4;none*120;start_one*4;none*900	Long credited one-player run intended to capture early lander/humanoid abduction state	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+death	1928	none*900;coin*4;none*120;start_one*4;none*900	Long credited one-player run intended to capture first unassisted death state	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+wave_advance	2828	none*900;coin*4;none*120;start_one*4;none*1800	Long credited one-player run intended to capture wave progression state	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+planet_destruction	3428	none*900;coin*4;none*120;start_one*4;none*2400	Long credited one-player run intended to capture destroyed-planet state when reached	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace
+high_score_entry	3428	none*900;coin*4;none*120;start_one*4;none*2400	Long credited one-player run intended to capture game-over/high-score entry state when reached	romc8.src DEFALT + defa7.src CSCAN/SSCAN/ST1 + MAME 0.287 sound trace

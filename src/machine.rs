@@ -9,11 +9,11 @@ use std::sync::OnceLock;
 
 use crate::{
     board::{
-        CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, RED_LABEL_CRHSTD_CELL_OFFSET,
-        RED_LABEL_HIGH_SCORE_ENTRIES, RED_LABEL_HIGH_SCORE_ENTRY_CELLS,
-        RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START, cleared_main_cpu_ram,
-        cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte, cmos_sram_write_word,
-        red_label_crom0_ram_test_next_word,
+        CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, PALETTE_RAM_SIZE,
+        RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_HIGH_SCORE_ENTRIES,
+        RED_LABEL_HIGH_SCORE_ENTRY_CELLS, RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START,
+        cleared_main_cpu_ram, cmos_sram_read_byte, cmos_sram_read_word, cmos_sram_write_byte,
+        cmos_sram_write_word, red_label_crom0_ram_test_next_word,
     },
     input::{CabinetInput, DefenderInputPorts},
     red_label::{
@@ -27,6 +27,10 @@ use crate::{
     red_label_wave::{RED_LABEL_WDELT_RECORD_COUNT, WaveProfile, red_label_wave_table},
     rom::crc32,
     sound::{FRAME_SOUND_COMMAND_CAPACITY, SoundCommand},
+    video::{
+        RenderedImage, render_defender_visible_palette_indices,
+        render_defender_visible_pixel_nibbles, render_defender_visible_rgba,
+    },
 };
 
 const RED_LABEL_SCREEN_CLEAR_END: u16 = 0x9C00;
@@ -42,6 +46,10 @@ const RED_LABEL_ALTITUDE_TABLE_BYTES: usize = 0x400;
 const RED_LABEL_TERRAIN_FLAVOR_HALF_BYTES: u16 = 0x01C8;
 const RED_LABEL_TERRAIN_SCREEN_TABLE_BYTES: u16 = 0x0130;
 const RED_LABEL_SCANNER_HEIGHT: u8 = RED_LABEL_Y_MIN - 34;
+const RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCE_TSV_HEADER: &str = "callsite\tsource_file\tsource_line\tsource_label\tsound_number\twrite_index\twrite_kind\tport_b\tcommand\tsource";
+const RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCE_TSV_HEADER: &str = "label\ttable_address\tpriority\tsequencer_tick\twrite_index\twrite_kind\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tport_b\tcommand";
+const RED_LABEL_SOUND_TABLE_TIMELINE_TSV_HEADER: &str = "label\ttable_address\tpriority\tsequencer_tick\tevent\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tidle_port_b\tidle_command\tcommand_port_b\tcommand\tsequence_end_tick\tterminator_pointer";
+const RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCE_TSV_HEADER: &str = "gate_event\tsource_label\tpia21_mask\tstatus_block_mask\tthrust_flag_before\tthrust_flag_after\tsound_number\twrite_index\twrite_kind\tport_b\tcommand";
 const RED_LABEL_SCANNER_ADDRESS: u16 = 0x3000 + RED_LABEL_SCANNER_HEIGHT as u16;
 const RED_LABEL_START_HUMAN_COUNT: u8 = 10;
 const RED_LABEL_SHELL_LIMIT: u8 = 20;
@@ -70,19 +78,290 @@ const RED_LABEL_LEFT_COIN_VECTOR: u16 = 0xC012;
 const RED_LABEL_RIGHT_COIN_VECTOR: u16 = 0xC015;
 const RED_LABEL_CENTER_COIN_VECTOR: u16 = 0xC018;
 const RED_LABEL_SOUND_PLAYER_ALIVE_BLOCK_MASK: u8 = 0x98;
+const RED_LABEL_SNDOUT_IDLE_PORT_B: u8 = 0x3F;
+const RED_LABEL_THRUST_SOUND_START_NUMBER: u8 = 0x16;
+const RED_LABEL_THRUST_SOUND_STOP_NUMBER: u8 = 0x0F;
+const RED_LABEL_LANDER_PULL_SOUND_NUMBER: u8 = 0x12;
+const RED_LABEL_PLAYER_END_SOUND_STOP_NUMBER: u8 = 0x13;
 const RED_LABEL_WALL_COLOR_TABLE: [u8; 8] = [0x81, 0x28, 0x07, 0x16, 0x2F, 0x84, 0x15, 0x00];
 const RED_LABEL_PLAYER_EXPLOSION_PIECES: u16 = 0x80;
 const RED_LABEL_ASTRO_RESTORE_Y: u8 = 0xE0;
 const RED_LABEL_BONUS_FIRST_ASTRO_SCREEN: u16 = 0x3CA0;
 const RED_LABEL_BONUS_ASTRO_SCREEN_STEP: u16 = 0x0400;
+const RED_LABEL_PLAYER_START_PROMPT_SCREEN: u16 = 0x3C80;
+const RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN: u16 = 0x3C78;
+const RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN: u16 = 0x3E88;
+const RED_LABEL_HOF_INITS_RAM: u16 = 0xA000;
+const RED_LABEL_HOF_PLAYER_NUMBER_RAM: u16 = RED_LABEL_HOF_INITS_RAM + 6;
+const RED_LABEL_HOF_TABLE_INITIALS_RAM: u16 = RED_LABEL_HOF_PLAYER_NUMBER_RAM + 2;
+const RED_LABEL_HOF_TABLE_SCORE_RAM: u16 = RED_LABEL_HOF_TABLE_INITIALS_RAM + 4;
+const RED_LABEL_HOF_RESET_FLAG_RAM: u16 = 0xA162;
+const RED_LABEL_ATTRACT_ENTRY_FLAG_RAM: u16 = 0xA178;
+const RED_LABEL_HOF_STALL_TIMER_RAM: u16 = 0xA17D;
+const RED_LABEL_HOF_INITIAL_DIRECTION_RAM: u16 = 0xA179;
+const RED_LABEL_HOF_INIT_INDEX_RAM: u16 = 0xA17A;
+const RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM: u16 = 0xA17B;
+const RED_LABEL_HOF_UP_DOWN_DELAY_RAM: u16 = 0xA17E;
+const RED_LABEL_HOF_UP_DOWN_COUNT_RAM: u16 = 0xA17F;
+const RED_LABEL_HOF_FIRE_FLAG_RAM: u16 = 0xA185;
+const RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM: u16 = 0xA186;
+const RED_LABEL_HOF_BLANK_INITIAL_BYTE: u8 = 0x40;
+const RED_LABEL_HOF_FIRE_SWITCH_MASK: u8 = 0x01;
+const RED_LABEL_HOF_FIRE_OPEN_COUNT_READY: u8 = 5;
+const RED_LABEL_HOF_FIRST_INITIAL_STALL_TICKS: u8 = 40;
+const RED_LABEL_HOF_NEXT_INITIAL_STALL_TICKS: u8 = 20;
+const RED_LABEL_HOF_FIRE_SLEEP_TICKS: u8 = 1;
+const RED_LABEL_HOF_PLAYER_LABEL_SCREEN: u16 = 0x3E38;
+const RED_LABEL_HOF_INSTRUCTIONS_TOP_LEFT: u16 = 0x1458;
+const RED_LABEL_HOF_INITIALS_SCREEN: u16 = 0x46AC;
+const RED_LABEL_HOF_INITIALS_BLOCK_WIDTH: u8 = 0x14;
+const RED_LABEL_HOF_INITIALS_BLOCK_HEIGHT: u8 = 0x08;
+const RED_LABEL_HOF_LINE_VERTICAL_OFFSETS: [u8; 4] = [0x00, 0x0A, 0x1E, 0x32];
+const RED_LABEL_HOF_INITIAL_HORIZONTAL_OFFSETS: [u8; RED_LABEL_INITIALS_ENTRY_CHARS] =
+    [0x00, 0x08, 0x10];
+const RED_LABEL_HOF_UNDERLINE_START: u16 = 0x45B7;
+const RED_LABEL_HOF_UNDERLINE_INITIAL_STEP: u16 = 0x0800;
+const RED_LABEL_HOF_UNDERLINE_WORD_OFFSETS: [u16; 4] = [0x0400, 0x0300, 0x0200, 0x0100];
+const RED_LABEL_HOF_UNDERLINE_NORMAL: u16 = 0x1111;
+const RED_LABEL_HOF_UNDERLINE_ACTIVE: u16 = 0xDDDD;
+const RED_LABEL_HOF_LETTER_COLOR: u8 = 0x85;
+const RED_LABEL_HALL_OF_FAME_WAIT_SLEEP_TICKS: u8 = 10;
+const RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN: u16 = 0x3854;
+const RED_LABEL_HALL_OF_FAME_TODAYS_SCREEN: u16 = 0x2268;
+const RED_LABEL_HALL_OF_FAME_ALL_TIME_SCREEN: u16 = 0x6068;
+const RED_LABEL_HALL_OF_FAME_LEFT_GREATEST_SCREEN: u16 = 0x1E72;
+const RED_LABEL_HALL_OF_FAME_RIGHT_GREATEST_SCREEN: u16 = 0x5F72;
+const RED_LABEL_HALL_OF_FAME_UNDERLINE_LEFT: u16 = 0x1E7B;
+const RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN: u16 = 0x1886;
+const RED_LABEL_HALL_OF_FAME_ALL_TIME_TABLE_SCREEN: u16 = 0x5986;
+const RED_LABEL_HALL_OF_FAME_TABLE_ROW_STEP: u16 = 0x000A;
+const RED_LABEL_HALL_OF_FAME_INITIALS_OFFSET: u8 = 0x05;
+const RED_LABEL_HALL_OF_FAME_SCORE_OFFSET: u8 = 0x13;
+const RED_LABEL_HALL_OF_FAME_LOGO_SCREEN: u16 = 0x3038;
+const RED_LABEL_HALL_OF_FAME_LOGO_DESCRIPTOR: u16 = 0xB300;
+const RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM: u16 = 0xB412;
+const RED_LABEL_HALL_OF_FAME_LOGO_WIDTH: u8 = 0x3C;
+const RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT: u8 = 0x18;
+const RED_LABEL_HALL_OF_FAME_LOGO_COLOR: u8 = 0x3F;
+const RED_LABEL_HALL_OF_FAME_STALL_TICKS: u8 = 60;
+const RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS: u8 = 0xFF;
+const RED_LABEL_HALL_OF_FAME_ENTRY_STATUS: u8 = 0xFF;
+const RED_LABEL_ATTRACT_VECTOR_ADDRESS: u16 = 0xC000;
+const RED_LABEL_ATTRACT_CREDITS_SCREEN: u16 = 0x28E5;
+const RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN: u16 = 0x48E5;
+const RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS: u8 = 16;
+const RED_LABEL_ATTRACT_OLD_CREDIT_RAM: u16 = RED_LABEL_THSTAB_START + 33;
+const RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM: u16 = RED_LABEL_THSTAB_START + 34;
+const RED_LABEL_ATTRACT_MESSAGE_POINTER_RAM: u16 = 0xA052;
+const RED_LABEL_ATTRACT_NUMBER_RAM: u16 = 0xA059;
+const RED_LABEL_ATTRACT_WILLIAMS_STATUS: u8 = 0xFB;
+const RED_LABEL_ATTRACT_WILLIAMS_LOGO_COLOR: u8 = 0x3F;
+const RED_LABEL_ATTRACT_LOGO_TEMP_A_RAM: u16 = RED_LABEL_THSTAB_START;
+const RED_LABEL_ATTRACT_LOGO_TEMP_B_RAM: u16 = RED_LABEL_THSTAB_START + 1;
+const RED_LABEL_ATTRACT_LOGO_CURSOR_RAM: u16 = RED_LABEL_THSTAB_START + 4;
+const RED_LABEL_ATTRACT_LOGO_CURSOR_END_RAM: u16 = RED_LABEL_THSTAB_START + 6;
+const RED_LABEL_ATTRACT_LOGO_FLAG_RAM: u16 = RED_LABEL_THSTAB_START + 8;
+const RED_LABEL_ATTRACT_LOGO_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 9;
+const RED_LABEL_ATTRACT_LOGO_TABLE_ADDRESS: u16 = 0xC941;
+const RED_LABEL_ATTRACT_LOGO_INITIAL_BYTES_PER_SLICE: u8 = 3;
+const RED_LABEL_ATTRACT_LOGO_FAST_BYTES_PER_SLICE: u8 = 10;
+const RED_LABEL_ATTRACT_LOGO_SLEEP_TICKS: u8 = 2;
+const RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN: u16 = 0x3258;
+const RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN: u16 = 0x3E6C;
+const RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER: u16 = 0x606C;
+const RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS: u8 = 5;
+const RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR: u16 = 0xB300;
+const RED_LABEL_ATTRACT_DEFENDER_OBJECTS: u16 = 0xB304;
+const RED_LABEL_ATTRACT_DEFENDER_PICTURES: u16 = 0xB3D6;
+const RED_LABEL_ATTRACT_DEFENDER_DATA: u16 = RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM;
+const RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 0x0B;
+const RED_LABEL_ATTRACT_DEFENDER_DATA_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 0x0D;
+const RED_LABEL_ATTRACT_DEFENDER_X_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 0x0F;
+const RED_LABEL_ATTRACT_DEFENDER_OBJECT_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 0x11;
+const RED_LABEL_ATTRACT_DEFENDER_OBJECT_BYTES: u16 = 14;
+const RED_LABEL_ATTRACT_DEFENDER_OBJECT_COUNT: u8 = 15;
+const RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET: u16 = 0x02;
+const RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET: u16 = 0x0A;
+const RED_LABEL_ATTRACT_DEFENDER_OBJECT_Y16_OFFSET: u16 = 0x0C;
+const RED_LABEL_ATTRACT_DEFENDER_OBJECT_TYPE_OFFSET: u16 = 0x14;
+const RED_LABEL_ATTRACT_DEFENDER_PICTURE_BYTES: u16 = 4;
+const RED_LABEL_ATTRACT_DEFENDER_PICTURE_WIDTH: u8 = 4;
+const RED_LABEL_ATTRACT_DEFENDER_PICTURE_HEIGHT: u8 = 12;
+const RED_LABEL_ATTRACT_DEFENDER_PICTURE_DATA_STEP: u16 = 4 * 24;
+const RED_LABEL_ATTRACT_DEFENDER_INITIAL_X16: u16 = 0x0C00;
+const RED_LABEL_ATTRACT_DEFENDER_X16_STEP: u16 = 0x0100;
+const RED_LABEL_ATTRACT_DEFENDER_Y16: u16 = 0x9800;
+const RED_LABEL_ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS: u8 = 0x30;
+const RED_LABEL_ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS: u8 = 0x2E;
+const RED_LABEL_ATTRACT_DEFENDER_WHOLE_WIDTH: u8 = 0x3C;
+const RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT: u8 = 0x18;
+const RED_LABEL_ATTRACT_DEFENDER_RESTORE_SLEEP_TICKS: u8 = 0x28;
+const RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN: u16 = 0x3090;
+const RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS: u8 = 1;
+const RED_LABEL_ATTRACT_COPYRIGHT_SCREEN: u16 = 0x3BD0;
+const RED_LABEL_ATTRACT_COPYRIGHT_DATA_ADDRESS: u16 = 0xCC11;
+const RED_LABEL_ATTRACT_COPYRIGHT_ROW_WIDTH: u8 = 8;
+const RED_LABEL_ATTRACT_COPYRIGHT_ROWS: u8 = 40;
+const RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS: u8 = 60;
+const RED_LABEL_ATTRACT_COPYRIGHT_SLEEP_TICKS: u8 = 10;
+const RED_LABEL_ATTRACT_COPYRIGHT_WILLIAMS_COLOR_INDEX: u16 = 0x0F;
+const RED_LABEL_ATTRACT_WILLIAMS_FAST_LOGO_RATE: u8 = 0xFF;
+const RED_LABEL_ATTRACT_WILLIAMS_NORMAL_LOGO_RATE: u8 = 10;
+const RED_LABEL_ATTRACT_WILLIAMS_RESTORE_SLEEP_TICKS: u8 = 2;
+const RED_LABEL_ATTRACT_INSTRUCTION_STATUS: u8 = 0xD9;
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE: u16 = 0xCC61;
+const RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM: u16 = 0xA187;
+const RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM: u16 = 0xA194;
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM: u16 = 0xA196;
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM: u16 = 0xA198;
+const RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM: u16 = 0xA189;
+const RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM: u16 = 0xA18B;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM: u16 = 0xA18D;
+const RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM: u16 = 0xA18F;
+const RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_OBJECT_RAM: u16 = 0xA190;
+const RED_LABEL_ATTRACT_INSTRUCTION_MAN_X16: u16 = 0x1E00;
+const RED_LABEL_ATTRACT_INSTRUCTION_MAN_Y16: u16 = 0xDB00;
+const RED_LABEL_ATTRACT_INSTRUCTION_SHIP_X16: u16 = 0x0800;
+const RED_LABEL_ATTRACT_INSTRUCTION_SHIP_Y16: u16 = 0x5000;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_X16: u16 = 0x1DA0;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_Y16: u16 = 0x4000;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_Y_VELOCITY: u16 = 0x00A0;
+const RED_LABEL_ATTRACT_INSTRUCTION_MAN_COLOR: u16 = 0x6666;
+const RED_LABEL_ATTRACT_INSTRUCTION_SHIP_COLOR: u16 = 0x0000;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_COLOR: u16 = 0x4433;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS: u8 = 0xE6;
+const RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_Y_VELOCITY: u16 = 0xFF50;
+const RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_SLEEP_TICKS: u8 = 0xA0;
+const RED_LABEL_ATTRACT_INSTRUCTION_LASER_SLEEP_TICKS: u8 = 0x15;
+const RED_LABEL_ATTRACT_INSTRUCTION_LASER_START_SCREEN_OFFSET: u16 = 0x0704;
+const RED_LABEL_ATTRACT_INSTRUCTION_LASER_STEP_SLEEP_TICKS: u8 = 1;
+const RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_SHIP_X_VELOCITY: u16 = 0x0040;
+const RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_SHIP_Y_VELOCITY: u16 = 0x00D4;
+const RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_FREE_FALL_TICKS: u8 = 0x2D;
+const RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_ACCELERATION: u16 = 0x0008;
+const RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_SLEEP_TICKS: u8 = 2;
+const RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_X16: u16 = 0x1DFF;
+const RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_Y16: u16 = 0x9000;
+const RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_RETURN_X16: u16 = 0x1C00;
+const RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_RETURN_Y16: u16 = 0xE000;
+const RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SHIP_Y_VELOCITY: u16 = 0x00C0;
+const RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_MAN_X16: u16 = 0x1E80;
+const RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_MAN_Y16: u16 = 0xA2E0;
+const RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SLEEP_TICKS: u8 = 0x50;
+const RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_X_VELOCITY: u16 = 0xFFC0;
+const RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_Y_VELOCITY: u16 = 0xFE80;
+const RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_SLEEP_TICKS: u8 = 0x60;
+const RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM: u16 = 0xA192;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS: u16 = 0xCC7D;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_END: u16 = 0xCC89;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X16: u16 = 0x1F00;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y16_LOW: u16 = 0xA000;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y_VELOCITY: u16 = 0xFF40;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_SLEEP_TICKS: u8 = 0x5F;
+const RED_LABEL_ATTRACT_INSTRUCTION_TABLE_LASER_SLEEP_TICKS: u8 = 0x17;
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_RESOLVE_SLEEP_TICKS: u8 = 0x20;
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ADVANCE_SLEEP_TICKS: u8 = 0x20;
+const RED_LABEL_ATTRACT_INSTRUCTION_TABLE_END_SLEEP_TICKS: u8 = 0xFF;
+const RED_LABEL_ATTRACT_INSTRUCTION_RESTART_SLEEP_TICKS: u8 = 0xFF;
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ENTRY_COUNT: usize = 7;
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ENTRY_SIZE: u16 = 2;
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE_BYTES: u16 =
+    RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ENTRY_SIZE
+        * RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ENTRY_COUNT as u16;
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SLEEP_TICKS: u8 = 6;
+const RED_LABEL_ATTRACT_COPYRIGHT_DATA: [u8; 80] = [
+    0x3E, 0x41, 0x41, 0x22, 0x00, 0x3E, 0x41, 0x41, 0x3E, 0x00, 0x7F, 0x09, 0x09, 0x06, 0x00, 0x03,
+    0x04, 0x78, 0x04, 0x03, 0x00, 0x7F, 0x09, 0x19, 0x66, 0x00, 0x41, 0x7F, 0x41, 0x00, 0x3E, 0x41,
+    0x49, 0x3A, 0x00, 0x7F, 0x08, 0x08, 0x7F, 0x00, 0x01, 0x01, 0x7F, 0x01, 0x01, 0x00, 0x1C, 0x22,
+    0x5D, 0x63, 0x55, 0x22, 0x1C, 0x22, 0x7F, 0x4B, 0x45, 0x22, 0x1C, 0x00, 0x00, 0x00, 0x42, 0x7F,
+    0x40, 0x00, 0x26, 0x49, 0x49, 0x3E, 0x00, 0x36, 0x49, 0x49, 0x36, 0x00, 0x3E, 0x41, 0x41, 0x3E,
+];
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y: [u16; 6] =
+    [0x6000, 0x6000, 0x6200, 0x9800, 0x9800, 0x9A00];
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_PICTURES: [&str; 6] =
+    ["LNDP1", "SCZP1", "UFOP1", "TIEP1", "PRBP1", "SWPIC1"];
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X: [u16; 6] =
+    [0x0900, 0x1100, 0x1980, 0x0960, 0x1160, 0x19E0];
+const RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_BLIPS: [u16; 6] =
+    [0x4433, 0xCC33, 0x3333, 0x8888, 0xCCCC, 0x2424];
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SCREEN_ADDRESSES: [u16;
+    RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ENTRY_COUNT] =
+    [0x4330, 0x1C70, 0x3C70, 0x5F70, 0x1CA8, 0x40A8, 0x5CA8];
+const RED_LABEL_ATTRACT_INSTRUCTION_TEXT_LABELS: [&str;
+    RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ENTRY_COUNT] = [
+    "SCANV", "LANDV", "MUTV", "BAITV", "BOMBV", "SWRMPV", "SWARMV",
+];
+const RED_LABEL_ATTRACT_LOGO_TABLE: [u8; 351] = [
+    0xFE, 0x74, 0x40, 0x11, 0x11, 0x85, 0x81, 0x81, 0x81, 0x88, 0x82, 0x82, 0x22, 0x24, 0x22, 0x42,
+    0x24, 0x24, 0x24, 0x44, 0x24, 0x44, 0x49, 0x44, 0x94, 0x41, 0x88, 0x14, 0x41, 0x88, 0x14, 0x41,
+    0x88, 0x94, 0x41, 0x88, 0x94, 0x49, 0x88, 0x14, 0x98, 0x58, 0x94, 0x98, 0x18, 0x94, 0x46, 0x66,
+    0x62, 0x42, 0x42, 0x42, 0x42, 0x25, 0x24, 0x24, 0x68, 0x24, 0x24, 0x24, 0x26, 0x11, 0x18, 0x18,
+    0x58, 0x18, 0x58, 0x81, 0x44, 0x98, 0x81, 0x44, 0x98, 0x81, 0x44, 0x98, 0x14, 0x94, 0x94, 0x16,
+    0x22, 0x24, 0x24, 0xA4, 0x24, 0xA4, 0x24, 0x24, 0x24, 0x24, 0x24, 0xFE, 0x81, 0x4A, 0x42, 0x42,
+    0x42, 0x42, 0x44, 0x99, 0x99, 0x41, 0x88, 0x14, 0x41, 0x88, 0x14, 0x46, 0x24, 0x24, 0x24, 0x24,
+    0x24, 0x24, 0xA4, 0x24, 0x24, 0xA4, 0x22, 0x42, 0x4A, 0x42, 0x42, 0x44, 0x99, 0x19, 0x91, 0x19,
+    0x91, 0x91, 0x81, 0x81, 0x41, 0x81, 0x49, 0x46, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x24, 0x22,
+    0x42, 0x62, 0x62, 0x42, 0x24, 0x49, 0x19, 0x91, 0x91, 0x91, 0x91, 0x91, 0x85, 0x88, 0x14, 0x94,
+    0x14, 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0xA4, 0x24, 0x24, 0x41, 0x81, 0x81, 0x18, 0x18, 0x94,
+    0x41, 0x88, 0x14, 0x14, 0x24, 0x42, 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0x44, 0x98, 0x18,
+    0x18, 0x18, 0x58, 0x89, 0x44, 0x18, 0x85, 0x14, 0x24, 0x14, 0x24, 0xA4, 0x24, 0x24, 0x24, 0xA4,
+    0x24, 0x28, 0x24, 0x44, 0x18, 0x19, 0x19, 0x81, 0x41, 0x81, 0x14, 0x24, 0x24, 0x24, 0x24, 0x22,
+    0x42, 0x42, 0x64, 0x41, 0x85, 0x81, 0x81, 0x18, 0x19, 0x41, 0x89, 0x44, 0x42, 0x22, 0x42, 0x24,
+    0x24, 0x24, 0x24, 0x24, 0x44, 0x18, 0x14, 0x98, 0x11, 0x81, 0x81, 0x41, 0x89, 0x44, 0x42, 0x22,
+    0x42, 0x24, 0x24, 0x24, 0x24, 0x24, 0x44, 0x18, 0x94, 0x41, 0x88, 0x89, 0x44, 0x49, 0x88, 0x14,
+    0x41, 0x88, 0x14, 0x14, 0x24, 0x24, 0x24, 0x26, 0x62, 0x66, 0x26, 0x24, 0x18, 0x91, 0x91, 0x19,
+    0x18, 0x14, 0x18, 0x14, 0x14, 0x24, 0x14, 0x2A, 0x45, 0x24, 0x68, 0x88, 0x24, 0x44, 0x42, 0x18,
+    0xA8, 0x82, 0x44, 0xA8, 0x22, 0x20, 0xFE, 0x87, 0x40, 0x44, 0x11, 0x88, 0x24, 0xFE, 0x9A, 0x3F,
+    0x44, 0x11, 0x88, 0x24, 0xFE, 0xC1, 0x3F, 0x44, 0x44, 0x44, 0x11, 0x11, 0x11, 0x11, 0x88, 0x88,
+    0x88, 0x22, 0x22, 0x22, 0x20, 0xFE, 0xC3, 0x45, 0x22, 0x22, 0x44, 0x11, 0x81, 0x50, 0xFD,
+];
+const RED_LABEL_DEFENDER_LOGO_BYTES: usize =
+    RED_LABEL_HALL_OF_FAME_LOGO_WIDTH as usize * RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT as usize;
+const RED_LABEL_DEFENDER_LOGO_DATA: [u8; 366] = [
+    0x10, 0xD1, 0xBD, 0x29, 0xC2, 0x9C, 0x29, 0xCB, 0xEA, 0xC2, 0x8C, 0x29, 0xC2, 0x81, 0x0D, 0x10,
+    0xC2, 0x8D, 0x29, 0xC2, 0x9C, 0x29, 0xCB, 0xEA, 0x42, 0x94, 0x29, 0x42, 0x81, 0x0C, 0x3F, 0x29,
+    0xC2, 0x94, 0xC2, 0x9C, 0x29, 0xC1, 0x8D, 0xA4, 0x29, 0x42, 0x94, 0x29, 0x3F, 0x3E, 0x29, 0x42,
+    0xA4, 0x29, 0x4C, 0x29, 0xC1, 0x8D, 0xA4, 0x2A, 0x42, 0x94, 0x29, 0x3E, 0x3D, 0xB6, 0xB4, 0xA2,
+    0x4A, 0x17, 0xCA, 0x16, 0xC1, 0x9C, 0xB4, 0xA7, 0xA4, 0xB1, 0x7A, 0x7A, 0x3D, 0x3C, 0xB6, 0xB4,
+    0xB1, 0x71, 0x81, 0x6B, 0x16, 0xC1, 0xAC, 0xA4, 0xB6, 0xB4, 0xA2, 0x4A, 0x6B, 0x3C, 0x2F, 0xB6,
+    0xB4, 0x29, 0x62, 0x85, 0xC2, 0x85, 0xC1, 0xAC, 0xA4, 0xB6, 0xB4, 0x28, 0x62, 0xA2, 0xF2, 0xEB,
+    0x61, 0x84, 0x29, 0x62, 0x8E, 0x28, 0xE2, 0xA4, 0xB7, 0xB4, 0x28, 0x62, 0xA2, 0xE2, 0xDB, 0x7B,
+    0x42, 0x96, 0x28, 0x4E, 0x28, 0xE2, 0xB4, 0xB6, 0xB4, 0x29, 0x62, 0x92, 0xE2, 0xCB, 0x7B, 0x52,
+    0x96, 0x28, 0x4E, 0x28, 0xEB, 0x41, 0xA4, 0xB7, 0xB4, 0x28, 0x62, 0x92, 0xE1, 0xFB, 0x7B, 0x5B,
+    0x24, 0xB1, 0x6D, 0x18, 0x14, 0xEB, 0x51, 0x94, 0xB7, 0xB4, 0x18, 0x17, 0x29, 0x2D, 0x1E, 0xB1,
+    0x4B, 0x4B, 0x25, 0xB1, 0x6D, 0xB1, 0x5E, 0xB5, 0x1A, 0x4B, 0x61, 0x84, 0xB2, 0x4B, 0x41, 0x82,
+    0xC1, 0xDB, 0x14, 0xB5, 0x18, 0x17, 0x18, 0x16, 0xD1, 0x81, 0x4E, 0xB6, 0x19, 0x4B, 0x61, 0x84,
+    0x18, 0x24, 0xB4, 0x18, 0x1F, 0x1C, 0x38, 0x53, 0x84, 0xB1, 0x6E, 0x2B, 0xCB, 0x61, 0x94, 0x38,
+    0x42, 0xB4, 0x18, 0x41, 0x81, 0xEF, 0x39, 0x43, 0x85, 0xB1, 0x6E, 0x2B, 0xCB, 0x71, 0x84, 0x38,
+    0x43, 0x84, 0xB6, 0x18, 0x1C, 0xE3, 0x95, 0x38, 0x41, 0x81, 0x6D, 0x38, 0xCB, 0xC6, 0x19, 0x42,
+    0xB5, 0x38, 0x4B, 0x61, 0x8F, 0xD3, 0x95, 0x38, 0x5B, 0x51, 0xF3, 0x8C, 0xBD, 0x61, 0x84, 0x2A,
+    0x63, 0x85, 0xB6, 0x18, 0xED, 0x38, 0x53, 0x94, 0x18, 0x51, 0xF3, 0x8C, 0xBD, 0x7B, 0x42, 0x91,
+    0x42, 0xB5, 0x18, 0x7B, 0xDC, 0x21, 0x51, 0xF3, 0x4C, 0x7E, 0x30, 0x6C, 0xC2, 0x14, 0x2C, 0x34,
+    0xC7, 0xE1, 0x07, 0xC1, 0x35, 0xCC, 0x21, 0x42, 0xC3, 0x4C, 0x7F, 0x10, 0x6C, 0x13, 0x5C, 0xC1,
+    0x35, 0xC1, 0x52, 0xC3, 0x4C, 0x7F, 0x15, 0xC2, 0x7D, 0x34, 0xC1, 0x5C, 0x17, 0xCC, 0x36, 0xC3,
+    0x5C, 0x14, 0x2D, 0x34, 0xC7, 0x1C, 0x14, 0xC2, 0x6E, 0x34, 0xD1, 0x4E, 0x15, 0xCC, 0x36, 0xC3,
+    0x5C, 0x14, 0x2D, 0x34, 0xC7, 0x1C, 0x14, 0xC2, 0x51, 0xC2, 0x7D, 0x14, 0xF1, 0x4C,
+];
 const RED_LABEL_TIE_PICTURE_STEP: u16 = 10;
 const RED_LABEL_NORMAL_IRQ_UPPER_THRESHOLD: u8 = 0x80;
 const RED_LABEL_INVERTED_IRQ_UPPER_THRESHOLD: u8 = 0x58;
 const RED_LABEL_NORMAL_IRQ_MAX_XXX2: u8 = 0xA8;
+const RED_LABEL_NORMAL_IRQ_LIVE_VERTCT: u8 = RED_LABEL_NORMAL_IRQ_MAX_XXX2 + 8;
+const RED_LABEL_INVERTED_IRQ_LIVE_VERTCT: u8 = 0xA0;
 const RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT: u8 = 0x08;
 const RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT: u8 = 0x04;
 const RED_LABEL_NORMAL_WATCHDOG_DATA: u8 = 0x38;
 const RED_LABEL_INVERTED_WATCHDOG_DATA: u8 = 0x39;
+const RED_LABEL_IRQ_JUMP_OPCODE: u8 = 0x7E;
+const RED_LABEL_IRQ_ADDRESS: u16 = 0xDF17;
+const RED_LABEL_IRQB_ADDRESS: u16 = 0xDFC3;
+const RED_LABEL_PIA3_COCKTAIL_BIT: u8 = 0x80;
+const RED_LABEL_P1SW_PIA3_CONTROL: u8 = 0x3C;
+const RED_LABEL_P2SW_PIA3_CONTROL: u8 = 0x34;
+const RED_LABEL_COLOR_RAM_START: u16 = 0xC000;
+const RED_LABEL_HARDWARE_STACK_TOP: u16 = 0xBFFF;
+const RED_LABEL_IRQ_FULL_STACK_FRAME_BYTES: u16 = 12;
+const RED_LABEL_JSR_RETURN_BYTES: u16 = 2;
 const RED_LABEL_OBJECT_OUTPUT_ROUTINES: [&str; 9] = [
     "ON28", "ON48", "ON58", "ON34", "ON23", "ON64", "ON86", "ON66", "CWRIT",
 ];
@@ -98,6 +377,18 @@ pub const VISIBLE_HEIGHT: u16 = 240;
 pub const FRAME_RATE_MILLIHZ: u32 = 60_100;
 pub const CPU_CLOCK_HZ: u32 = 950_000;
 pub const SOUND_CPU_CLOCK_HZ: u32 = 3_410_000;
+
+/// Source-derived 6809 stack value saved by `BGOUT` when it is reached from
+/// `IRQ` / `IRQB` immediately after the executive dispatcher resets `S` to
+/// `HSTK`.
+///
+/// `phr6.src` defines `HSTK` as `$BFFF`; `defa7.src` returns dispatcher idle
+/// time through `LDS #HSTK`, exits IRQ by pulling `X,Y,D,U,PC,CC,DP` (12 bytes
+/// total), and reaches `BGOUT` through a `JSR` (2-byte return address). `BGOUT`
+/// then stores the resulting `S` into `SSTACK`.
+pub const fn red_label_irq_bgout_stack_pointer() -> u16 {
+    RED_LABEL_HARDWARE_STACK_TOP - RED_LABEL_IRQ_FULL_STACK_FRAME_BYTES - RED_LABEL_JSR_RETURN_BYTES
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GamePhase {
@@ -170,7 +461,19 @@ pub struct MachineSnapshot {
     pub high_score_submission: Option<HighScoreSubmissionState>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MachineSaveState {
+    snapshot: MachineSnapshot,
+    memory: RedLabelRuntimeMemory,
+    trace_power_up_ram_fill: Option<RedLabelPowerUpRamFill>,
+    trace_start_asserted_frames: u8,
+    trace_player_start_release_frame: Option<u64>,
+    high_score_entry_player: u8,
+    high_score_completed_players_mask: u8,
+}
+
 pub const RED_LABEL_INITIALS_ENTRY_CHARS: usize = 3;
+const RED_LABEL_HIGH_SCORE_PLAYERS: [u8; 2] = [1, 2];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HighScoreEntryState {
@@ -228,8 +531,15 @@ struct LiveTranslatedSwitchOutcome {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct LiveCoinDoorSwitchOutcome {
+    process_ran: bool,
     credit_added: bool,
     admin_event: Option<MachineEvent>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct LiveStartSwitchOutcome {
+    process_ran: bool,
+    game_started: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -302,6 +612,49 @@ impl FrameOutput {
 pub struct RedLabelScheduledProcess {
     pub process_address: u16,
     pub routine_address: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelExecPreDispatch {
+    pub timer_before: u8,
+    pub status: u8,
+    pub overload_counter_before: u8,
+    pub overload_counter_raw: Option<u8>,
+    pub overload_counter_after: u8,
+    pub star_count_after: Option<u8>,
+    pub overloaded_object: Option<RedLabelExecOverloadedObject>,
+    pub map_after: u8,
+    pub player_collision: Option<RedLabelPlayerCollision>,
+    pub expanded_updates: Vec<RedLabelExpandedUpdate>,
+    pub rand_state: RandState,
+    pub switch_processes: Vec<RedLabelCreatedProcess>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelExecOverloadedObject {
+    pub object_address: u16,
+    pub previous_link_address: u16,
+    pub next_active_object: u16,
+    pub previous_x16: u16,
+    pub x16: u16,
+    pub screen_address: u16,
+    pub picture_address: u16,
+    pub previous_inactive_head: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelExecutiveDispatch {
+    pub scheduled_process: RedLabelScheduledProcess,
+    pub dispatch: RedLabelProcessDispatch,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelExecutiveStep {
+    pub current_process_head: u16,
+    pub pre_dispatch: RedLabelExecPreDispatch,
+    pub scheduled_process: Option<RedLabelScheduledProcess>,
+    pub dispatch: Option<RedLabelProcessDispatch>,
+    pub dispatches: Vec<RedLabelExecutiveDispatch>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -660,12 +1013,67 @@ pub enum RedLabelIrqPreTailStep {
 pub struct RedLabelIrqSchedulerContext {
     pub terrain_stack_pointer: Option<u16>,
     pub input_ports: DefenderInputPorts,
+    pub sound_sequence_already_stepped: bool,
+}
+
+impl RedLabelIrqSchedulerContext {
+    pub const fn source_irq(input_ports: DefenderInputPorts) -> Self {
+        Self {
+            terrain_stack_pointer: Some(red_label_irq_bgout_stack_pointer()),
+            input_ports,
+            sound_sequence_already_stepped: false,
+        }
+    }
+
+    pub const fn source_irq_after_sound_step(input_ports: DefenderInputPorts) -> Self {
+        Self {
+            terrain_stack_pointer: Some(red_label_irq_bgout_stack_pointer()),
+            input_ports,
+            sound_sequence_already_stepped: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RedLabelIrqMode {
     Normal,
     Inverted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelScreenSwitchRoutine {
+    PlayerOne,
+    PlayerTwo,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelScreenSwitch {
+    pub routine: RedLabelScreenSwitchRoutine,
+    pub pia3_input: u8,
+    pub cocktail_detected: bool,
+    pub mode: RedLabelIrqMode,
+    pub irq_hook_opcode: u8,
+    pub irq_hook_target: u16,
+    pub pia3_control: u8,
+    pub watchdog_value: u8,
+    pub map_before: u8,
+    pub map_after: u8,
+    pub hardware_map_before: u8,
+    pub hardware_map_writes: Vec<u8>,
+    pub hardware_map_after: u8,
+    pub screen_clear: Option<RedLabelScreenClear>,
+    pub stick_history_reset: bool,
+}
+
+struct RedLabelScreenSwitchContext {
+    routine: RedLabelScreenSwitchRoutine,
+    pia3_input: u8,
+    cocktail_detected: bool,
+    screen_clear: Option<RedLabelScreenClear>,
+    stick_history_reset: bool,
+    map_before: u8,
+    hardware_map_before: u8,
+    hardware_map_writes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -677,20 +1085,43 @@ pub enum RedLabelIrqSchedulerPhase {
     InvertedLower,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelPaletteCopy {
+    pub source_start: u16,
+    pub target_start: u16,
+    pub bytes_copied: u8,
+    pub palette_ram: [u8; PALETTE_RAM_SIZE],
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RedLabelIrqSchedulerStep {
     pub mode: RedLabelIrqMode,
     pub vertical_counter: u8,
     pub phase: RedLabelIrqSchedulerPhase,
+    pub hardware_map_before: u8,
+    pub hardware_map_writes: Vec<u8>,
+    pub hardware_map_after: u8,
     pub previous_iflg: u8,
     pub iflg: u8,
     pub timer_before: Option<u8>,
     pub timer_after: Option<u8>,
     pub watchdog_value: Option<u8>,
-    pub palette_copy_due: bool,
+    pub palette_copy: Option<RedLabelPaletteCopy>,
     pub xxx2: Option<u8>,
     pub pre_tail_steps: Vec<RedLabelIrqPreTailStep>,
     pub object_band: Option<RedLabelIrqObjectBandPass>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelLiveVideoFrame {
+    pub mode: RedLabelIrqMode,
+    pub upper_scanline: RedLabelIrqSchedulerStep,
+    pub lower_scanline: RedLabelIrqSchedulerStep,
+    pub player_motion: RedLabelPlayerMotion,
+    pub star_output: RedLabelStarOutput,
+    pub upper_object_band: RedLabelIrqObjectBandPass,
+    pub terrain_output: Option<RedLabelTerrainOutput>,
+    pub lower_object_band: RedLabelIrqObjectBandPass,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -777,6 +1208,8 @@ pub enum RedLabelPlayerDeath {
     PostExplosionSwitchPlayerSleeping {
         process_address: u16,
         other_player: u8,
+        player_label: RedLabelBonusTextCall,
+        game_over: RedLabelBonusTextCall,
         wakeup_address: u16,
     },
     GameOverSleeping {
@@ -788,6 +1221,12 @@ pub enum RedLabelPlayerDeath {
     AttractJump {
         process_address: u16,
         attract_address: u16,
+        selected_map: u8,
+        attract_vector_address: u16,
+    },
+    HallOfFameDisplayed {
+        process_address: u16,
+        stall_ticks: u8,
     },
 }
 
@@ -804,6 +1243,670 @@ pub struct RedLabelBonusTextPlan {
     pub completed: RedLabelBonusTextCall,
     pub bonus_multiplier: RedLabelBonusTextCall,
     pub multiplier_bcd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelHighScoreEntryDisplay {
+    pub player: u8,
+    pub screen_clear: RedLabelScreenClear,
+    pub letter_color_address: u16,
+    pub letter_color: u8,
+    pub player_label: RedLabelBonusTextCall,
+    pub instruction_lines: [RedLabelBonusTextCall; 4],
+    pub initials: RedLabelHighScoreInitialsDisplay,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelHighScoreInitialsDisplay {
+    pub block_clear: RedLabelBlockClear,
+    pub initial_addresses: [u16; RED_LABEL_INITIALS_ENTRY_CHARS],
+    pub active_initial: u8,
+    pub underline_words: [[u16; 4]; RED_LABEL_INITIALS_ENTRY_CHARS],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelHighScoreInitialUpdate {
+    pub initial_index: u8,
+    pub initial_address: u16,
+    pub initial_before: u8,
+    pub initial_after: u8,
+    pub display: RedLabelHighScoreInitialsDisplay,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelHallOfFameDisplay {
+    pub screen_clear: RedLabelScreenClear,
+    pub high_score_reset_flag_address: u16,
+    pub black_letters_address: u16,
+    pub score_transfers: Vec<RedLabelScoreTransfer>,
+    pub headings: [RedLabelBonusTextCall; 5],
+    pub underline_words: Vec<u16>,
+    pub todays_table: RedLabelHallOfFameTableDisplay,
+    pub all_time_table: RedLabelHallOfFameTableDisplay,
+    pub logo_color_address: u16,
+    pub logo: RedLabelPictureWrite,
+    pub stall_ticks: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelHallOfFameTableDisplay {
+    pub table: RedLabelHighScoreTableKind,
+    pub start_screen_address: u16,
+    pub rows: Vec<RedLabelHallOfFameTableRow>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelHallOfFameTableRow {
+    pub rank: u8,
+    pub rank_address: u16,
+    pub initials_address: u16,
+    pub score_address: u16,
+    pub score_chars: [u8; 6],
+    pub entry: RedLabelHallOfFameEntry,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelHallOfFameEntry {
+    pub score: u32,
+    pub initials: [u8; RED_LABEL_INITIALS_ENTRY_CHARS],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractSceneInit {
+    pub initial_status: u8,
+    pub screen_clear: RedLabelScreenClear,
+    pub background: RedLabelBackgroundInit,
+    pub color_ram: RedLabelColorRamInit,
+    pub final_status: u8,
+    pub player_scanner_center: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractCreditsText {
+    pub message_vector_address: u16,
+    pub message_screen_address: u16,
+    pub number_screen_address: u16,
+    pub displayed_credit_bcd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractCredits {
+    pub process_address: u16,
+    pub credit: u8,
+    pub old_credit_before: u8,
+    pub old_credit_after: u8,
+    pub credit_increase_flag_before: u8,
+    pub credit_increase_flag_after: u8,
+    pub text: Option<RedLabelAttractCreditsText>,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractWilliamsPage {
+    pub process_address: u16,
+    pub genocide: RedLabelGenocide,
+    pub status: u8,
+    pub screen_clear: RedLabelScreenClear,
+    pub message_pointer_high_address: u16,
+    pub number_address: u16,
+    pub support_processes: Vec<RedLabelCreatedProcess>,
+    pub logo_color_address: u16,
+    pub logo_color: u8,
+    pub logo_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractLogoPixel {
+    pub cursor: u16,
+    pub screen_address: u16,
+    pub pixel_mask: u8,
+    pub byte_before: u8,
+    pub byte_after: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractLogo {
+    pub process_address: u16,
+    pub initialized: bool,
+    pub defender_logo_ram_crc32: Option<u32>,
+    pub table_pointer_before: u16,
+    pub table_pointer_after: u16,
+    pub cursor_before: u16,
+    pub cursor_after: u16,
+    pub bytes_per_slice: u8,
+    pub table_operations: u16,
+    pub pixel_writes: Vec<RedLabelAttractLogoPixel>,
+    pub first_pass_completed: bool,
+    pub presents_process: Option<RedLabelCreatedProcess>,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractPresents {
+    pub process_address: u16,
+    pub defender_process: Option<RedLabelCreatedProcess>,
+    pub message_vector_address: u16,
+    pub electronics_screen_address: u16,
+    pub presents_screen_address: u16,
+    pub cursor_after: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractDefenderDelay {
+    pub process_address: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractDefenderObject {
+    pub index: u8,
+    pub object_address: u16,
+    pub picture_descriptor_address: u16,
+    pub picture_data_address: u16,
+    pub x16: u16,
+    pub y16: u16,
+    pub appearance: RedLabelAppearanceStart,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractDefenderAppearances {
+    pub process_address: u16,
+    pub descriptor_pointer_start: u16,
+    pub data_pointer_start: u16,
+    pub object_pointer_start: u16,
+    pub bgl: u16,
+    pub initial_x16: u16,
+    pub objects: Vec<RedLabelAttractDefenderObject>,
+    pub descriptor_pointer_after: u16,
+    pub data_pointer_after: u16,
+    pub object_pointer_after: u16,
+    pub x16_after: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractDefenderRestoreStart {
+    pub process_address: u16,
+    pub descriptor_address: u16,
+    pub picture_address: u16,
+    pub width: u8,
+    pub height: u8,
+    pub restore_process: RedLabelCreatedProcess,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAttractCopyrightWait {
+    CreditIncreaseJump {
+        process_address: u16,
+        credit_increase_flag: u8,
+        target_address: u16,
+    },
+    Sleeping {
+        process_address: u16,
+        credit_increase_flag: u8,
+        stall_before: u8,
+        stall_after: u8,
+        sleep_ticks: u8,
+        wakeup_address: u16,
+    },
+    HallOfFameJump {
+        process_address: u16,
+        credit_increase_flag: u8,
+        stall_before: u8,
+        stall_after: u8,
+        target_address: u16,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelHallOfFameDisplayWait {
+    CreditIncreaseInstructionJump {
+        process_address: u16,
+        credit_increase_flag: u8,
+        target_address: u16,
+    },
+    HighScoreResetRedisplayJump {
+        process_address: u16,
+        high_score_reset_flag: u8,
+        target_address: u16,
+    },
+    TimeoutInstructionJump {
+        process_address: u16,
+        credit_increase_flag: u8,
+        high_score_reset_flag: u8,
+        stall_before: u8,
+        stall_after: u8,
+        target_address: u16,
+    },
+    Sleeping {
+        process_address: u16,
+        credit_increase_flag: u8,
+        high_score_reset_flag: u8,
+        stall_before: u8,
+        stall_after: u8,
+        sleep_ticks: u8,
+        wakeup_address: u16,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractVector {
+    pub process_address: u16,
+    pub selected_map: u8,
+    pub attract_vector_address: u16,
+    pub entry: RedLabelHallOfFameEntryDispatch,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelHallOfFameEntrySetup {
+    pub process_address: u16,
+    pub genocide: RedLabelGenocide,
+    pub status: u8,
+    pub stars: RedLabelStarTableInit,
+    pub credit: u8,
+    pub old_credit_before: u8,
+    pub old_credit_after: u8,
+    pub credit_increase_flag_before: u8,
+    pub entry_flag_before: u8,
+    pub power_flag: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelHallOfFameEntryDispatch {
+    PowerOnWilliamsJump {
+        setup: RedLabelHallOfFameEntrySetup,
+        target_address: u16,
+    },
+    PlayerOneQualification {
+        setup: RedLabelHallOfFameEntrySetup,
+        credits_process: RedLabelCreatedProcess,
+        player: u8,
+        score_pointer: u16,
+        qualification: RedLabelHighScoreQualification,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelHighScoreFireSwitch {
+    ResetSleeping {
+        process_address: u16,
+        fire_flag_before: u8,
+        fire_count_before: u8,
+        wakeup_address: u16,
+    },
+    OpenSleeping {
+        process_address: u16,
+        pia21: u8,
+        stall_timer: u8,
+        fire_count_before: u8,
+        fire_count_after: u8,
+        fire_flag_before: u8,
+        fire_flag_after: u8,
+        wakeup_address: u16,
+    },
+    StallExpiredSubmitJump {
+        process_address: u16,
+        pia21: u8,
+        stall_timer: u8,
+        target_address: u16,
+    },
+    ClosedIgnoredSleeping {
+        process_address: u16,
+        pia21: u8,
+        fire_flag_before: u8,
+        wakeup_address: u16,
+    },
+    InitialAdvancedSleeping {
+        process_address: u16,
+        pia21: u8,
+        initial_before: u8,
+        initial_after: u8,
+        stall_timer: u8,
+        underline_words: [[u16; 4]; RED_LABEL_INITIALS_ENTRY_CHARS],
+        wakeup_address: u16,
+    },
+    InitialAdvancedSubmitJump {
+        process_address: u16,
+        pia21: u8,
+        initial_before: u8,
+        initial_after: u8,
+        stall_timer: u8,
+        underline_words: [[u16; 4]; RED_LABEL_INITIALS_ENTRY_CHARS],
+        target_address: u16,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelHighScoreQualification {
+    Qualified(RedLabelHighScoreEntryStart),
+    NotQualified {
+        process_address: u16,
+        player: u8,
+        score_pointer: u16,
+        score: u32,
+        handoff: RedLabelHighScoreSubmissionHandoff,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelHighScoreEntryStart {
+    pub process_address: u16,
+    pub player: u8,
+    pub score_pointer: u16,
+    pub score: u32,
+    pub rank: u8,
+    pub entry_flag_before: u8,
+    pub entry_flag_after: u8,
+    pub sound_port_b: u8,
+    pub sound_command: SoundCommand,
+    pub display: RedLabelHighScoreEntryDisplay,
+    pub support_processes: Vec<RedLabelCreatedProcess>,
+    pub stall_ticks: u8,
+    pub fire_switch: RedLabelHighScoreFireSwitch,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelHighScoreSubmission {
+    pub process_address: u16,
+    pub genocide: RedLabelGenocide,
+    pub player: u8,
+    pub score_pointer: u16,
+    pub score: u32,
+    pub initials: [u8; RED_LABEL_INITIALS_ENTRY_CHARS],
+    pub todays_rank: Option<u8>,
+    pub all_time_rank: Option<u8>,
+    pub handoff: RedLabelHighScoreSubmissionHandoff,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelHighScoreHandoff {
+    pub process_address: u16,
+    pub player: u8,
+    pub handoff: RedLabelHighScoreSubmissionHandoff,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelHighScoreSubmissionHandoff {
+    NextPlayerJump {
+        next_player: u8,
+        next_player_score_pointer: u16,
+        target_address: u16,
+    },
+    HallOfFameJump {
+        entry_flag: u8,
+        target_address: u16,
+    },
+    NoEntryDelaySleeping {
+        entry_flag: u8,
+        sleep_ticks: u8,
+        wakeup_address: u16,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractCopyright {
+    pub process_address: u16,
+    pub bomb_process: Option<RedLabelCreatedProcess>,
+    pub copyright_screen_address: u16,
+    pub copyright_data_address: u16,
+    pub rows: u8,
+    pub row_width: u8,
+    pub williams_color_address: u16,
+    pub williams_color: u8,
+    pub williams_cursor: u16,
+    pub williams_cursor_transferred: bool,
+    pub power_flag: u8,
+    pub credits_process: RedLabelCreatedProcess,
+    pub stall_ticks: u8,
+    pub wait: RedLabelAttractCopyrightWait,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAttractDefenderRefresh {
+    Refreshing {
+        process_address: u16,
+        picture: RedLabelPictureWrite,
+        first_appearance_size: u16,
+        second_appearance_size: u16,
+        sleep_ticks: u8,
+        wakeup_address: u16,
+    },
+    DelaySleeping {
+        process_address: u16,
+        sleep_ticks: u8,
+        wakeup_address: u16,
+    },
+    Completed {
+        process_address: u16,
+        picture: RedLabelPictureWrite,
+        first_appearance_size: u16,
+        second_appearance_size: u16,
+        restore_process: RedLabelCreatedProcess,
+        killed_process: RedLabelKilledProcess,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelAttractWilliamsRestore {
+    StartedSleeping {
+        process_address: u16,
+        logo_rate: u8,
+        sleep_ticks: u8,
+        wakeup_address: u16,
+    },
+    Finished {
+        process_address: u16,
+        logo_rate: u8,
+        killed_process: RedLabelKilledProcess,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionStart {
+    pub process_address: u16,
+    pub genocide: RedLabelGenocide,
+    pub scene: RedLabelAttractSceneInit,
+    pub status: u8,
+    pub score_transfers: Vec<RedLabelScoreTransfer>,
+    pub credits_process: RedLabelCreatedProcess,
+    pub border: RedLabelBorder,
+    pub text_pointer: u16,
+    pub support_processes: Vec<RedLabelCreatedProcess>,
+    pub astronaut_object: u16,
+    pub player_object: u16,
+    pub enemy_object: u16,
+    pub enemy_appearance: RedLabelAppearanceStart,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionAscent {
+    pub process_address: u16,
+    pub enemy_object: u16,
+    pub astronaut_object: u16,
+    pub y_velocity: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionLaserStart {
+    pub process_address: u16,
+    pub laser_process: RedLabelCreatedProcess,
+    pub laser_process_pointer_address: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionLaserStep {
+    pub process_address: u16,
+    pub initialized: bool,
+    pub ship_object: Option<u16>,
+    pub laser_start: u16,
+    pub tip_address: u16,
+    pub fizzle_source_next: u16,
+    pub fizzle_target_next: u16,
+    pub erase_address: u16,
+    pub erase_next: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionLaserKill {
+    pub laser_process_address: u16,
+    pub laser_state_start: u16,
+    pub laser_state_end: u16,
+    pub cleared_addresses: Vec<u16>,
+    pub killed_process: RedLabelKilledProcess,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionIntersection {
+    pub process_address: u16,
+    pub points_object: u16,
+    pub ship_object: u16,
+    pub astronaut_object: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionShipReturn {
+    pub process_address: u16,
+    pub points_object: u16,
+    pub ship_object: u16,
+    pub astronaut_object: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionEnemySpawn {
+    pub table_pointer_before: u16,
+    pub table_pointer_after: u16,
+    pub table_index: u8,
+    pub object_address: u16,
+    pub picture_address: u16,
+    pub x16: u16,
+    pub y16: u16,
+    pub source_table_y16: u16,
+    pub y_velocity: u16,
+    pub color: u16,
+    pub appearance: RedLabelAppearanceStart,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionEnemyTableStart {
+    pub process_address: u16,
+    pub points_object: u16,
+    pub points_previous_link_address: u16,
+    pub ship_object: u16,
+    pub enemy: RedLabelAttractInstructionEnemySpawn,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionEnemyResolve {
+    pub process_address: u16,
+    pub laser_kill: RedLabelAttractInstructionLaserKill,
+    pub table_pointer_before: u16,
+    pub table_pointer_after: u16,
+    pub table_index: u8,
+    pub enemy_object: u16,
+    pub enemy_previous_link_address: u16,
+    pub enemy_explosion: RedLabelExplosionStart,
+    pub x16: u16,
+    pub y16: u16,
+    pub appearance: RedLabelAppearanceStart,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionTextAdvance {
+    pub process_address: u16,
+    pub text_pointer_before: u16,
+    pub text_pointer_after: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionTextProcess {
+    pub process_address: u16,
+    pub restarted: bool,
+    pub table_pointer_before: u16,
+    pub table_pointer_after: u16,
+    pub text_pointer_limit: u16,
+    pub message_vector_address: u16,
+    pub message_screen_address: u16,
+    pub message_label: &'static str,
+    pub cursor_after: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelAttractInstructionTableDecision {
+    NextEnemy(RedLabelAttractInstructionEnemySpawn),
+    TableEnded {
+        process_address: u16,
+        table_pointer: u16,
+        sleep_ticks: u8,
+        wakeup_address: u16,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionRestart {
+    pub process_address: u16,
+    pub sleep_ticks: u8,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelAttractInstructionFreeFall {
+    Sleeping {
+        process_address: u16,
+        astronaut_object: u16,
+        y_velocity_before: u16,
+        y_velocity_after: u16,
+        free_fall_before: u8,
+        free_fall_after: u8,
+        sleep_ticks: u8,
+        wakeup_address: u16,
+    },
+    Intersection(RedLabelAttractInstructionIntersection),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelAttractInstructionRescueStart {
+    pub process_address: u16,
+    pub laser_kill: RedLabelAttractInstructionLaserKill,
+    pub enemy_object: u16,
+    pub enemy_previous_link_address: u16,
+    pub enemy_explosion: RedLabelExplosionStart,
+    pub ship_object: u16,
+    pub astronaut_object: u16,
+    pub free_fall: RedLabelAttractInstructionFreeFall,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelHighScoreTableKind {
+    TodaysGreatest,
+    AllTime,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1050,6 +2153,90 @@ pub struct RedLabelLoadedSoundTable {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelSoundOutput {
+    pub sound_number: u8,
+    pub idle_port_b: u8,
+    pub idle_command: SoundCommand,
+    pub command_port_b: u8,
+    pub command: SoundCommand,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelSoundTableCommand {
+    pub table_pointer: u16,
+    pub repeat_index: u8,
+    pub repeat_count: u8,
+    pub timer: u8,
+    pub sound_number: u8,
+    pub sound_output: RedLabelSoundOutput,
+    pub command: SoundCommand,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelSoundTableTimedCommand {
+    pub sequencer_tick: u32,
+    pub command: RedLabelSoundTableCommand,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelSoundTableTimeline {
+    pub label: String,
+    pub address: u16,
+    pub priority: u8,
+    pub commands: Vec<RedLabelSoundTableTimedCommand>,
+    pub sequence_end_tick: u32,
+    pub terminator_pointer: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelSoundTableTimelineFixtureCheck {
+    pub row_count: usize,
+    pub command_rows: usize,
+    pub sequence_end_rows: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelSoundTableCommandSequenceFixtureCheck {
+    pub row_count: usize,
+    pub idle_rows: usize,
+    pub command_rows: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelSoundDirectCommandSequenceFixtureCheck {
+    pub row_count: usize,
+    pub idle_rows: usize,
+    pub command_rows: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelSoundThrustCommandSequenceFixtureCheck {
+    pub row_count: usize,
+    pub idle_rows: usize,
+    pub command_rows: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RedLabelSoundThrustGateCommand {
+    gate_event: &'static str,
+    source_label: &'static str,
+    status_block_mask: Option<u8>,
+    thrust_flag_before: u8,
+    thrust_flag_after: u8,
+    sound_number: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RedLabelSoundDirectCommand {
+    callsite: &'static str,
+    source_file: &'static str,
+    source_line: u16,
+    source_label: &'static str,
+    sound_number: u8,
+    source: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RedLabelSoundSequenceSource {
     Timer,
     Table,
@@ -1072,6 +2259,7 @@ pub struct RedLabelSoundSequenceStep {
     pub thrust_flag_before: u8,
     pub thrust_flag_after: u8,
     pub sound_number: Option<u8>,
+    pub sound_output: Option<RedLabelSoundOutput>,
     pub command: Option<SoundCommand>,
 }
 
@@ -1463,6 +2651,76 @@ pub struct RedLabelGameExecStarTime {
     pub wave_delta: Option<RedLabelWaveDelta>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedLabelGameExec {
+    Running(RedLabelGameExecRun),
+    WaveClearBonusSleeping(RedLabelGameExecWaveClearBonusSleeping),
+    WaveClearRestart(RedLabelGameExecWaveClearRestart),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelGameExecRun {
+    pub process_address: u16,
+    pub entry: Option<RedLabelGameExecEntry>,
+    pub status: u8,
+    pub enemy_total: Option<u8>,
+    pub ufo: Option<RedLabelGameExecUfoPacing>,
+    pub lander: Option<RedLabelGameExecLanderPacing>,
+    pub star_time: RedLabelGameExecStarTime,
+    pub wakeup_address: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelGameExecEntry {
+    pub delta_counter: u8,
+    pub ufo_timer: u8,
+    pub wave_timer: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelGameExecWaveClearBonusSleeping {
+    pub process_address: u16,
+    pub previous_status: u8,
+    pub status: u8,
+    pub enemy_total: u8,
+    pub genocide: RedLabelGenocide,
+    pub return_address: u16,
+    pub bonus: RedLabelPlayerDeath,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelGameExecWaveClearRestart {
+    pub process_address: u16,
+    pub return_address: u16,
+    pub player_address: u16,
+    pub lives_before: u8,
+    pub lives_after: u8,
+    pub player_start: RedLabelPlayerStart,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelGameExecUfoPacing {
+    pub previous_timer: u8,
+    pub accelerated_timer: Option<u8>,
+    pub decremented_timer: u8,
+    pub reset_timer: Option<u8>,
+    pub ufo_count_before: Option<u8>,
+    pub ufo_count_after: Option<u8>,
+    pub started: Option<RedLabelUfoStart>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelGameExecLanderPacing {
+    pub previous_timer: u8,
+    pub decremented_timer: u8,
+    pub reset_timer: Option<u8>,
+    pub active_count_before: Option<u8>,
+    pub reserve_count_before: Option<u8>,
+    pub requested_count: Option<u8>,
+    pub reserve_count_after: Option<u8>,
+    pub started: Option<RedLabelLanderStart>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RedLabelWaveDelta {
     pub start_address: u16,
@@ -1665,6 +2923,7 @@ pub enum RedLabelAdminSwitch {
 pub struct RedLabelPlayerRuntimeInit {
     pub current_player: u8,
     pub player_address: u16,
+    pub screen_switch: Option<RedLabelScreenSwitch>,
     pub wave: u8,
     pub wall_color: u8,
     pub remaining_lasers: u8,
@@ -1686,9 +2945,30 @@ pub struct RedLabelPlayerRestore {
     pub enemy_bytes_copied: u16,
     pub active_count_start: u16,
     pub active_count_bytes_cleared: u16,
+    pub mini_swarmer_restore: RedLabelMiniSwarmerRestore,
     pub schizoid_restore: Option<RedLabelSchizoidRestore>,
     pub probe_restore: Option<RedLabelProbeRestore>,
     pub tie_restore: Option<RedLabelTieRestore>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelMiniSwarmerRestore {
+    pub reserve_count: u8,
+    pub x_low_register: u8,
+    pub active_count: u8,
+    pub batches: Vec<RedLabelMiniSwarmerRestoreBatch>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedLabelMiniSwarmerRestoreBatch {
+    pub phony_object_address: u16,
+    pub phony_x16: u16,
+    pub phony_y16: u16,
+    pub placement_rand: RandState,
+    pub requested_count: u8,
+    pub spawned_swarmers: Vec<RedLabelMiniSwarmerSpawn>,
+    pub remaining_reserve: u8,
+    pub returned_phony_to_free_list: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2122,6 +3402,7 @@ pub enum RedLabelPlayerStart {
         runtime: RedLabelPlayerRuntimeInit,
         support_processes: Vec<RedLabelCreatedProcess>,
         prompt_display_required: bool,
+        prompt: Option<RedLabelBonusTextCall>,
         screen_clear: Option<RedLabelScreenClear>,
         target_count: Option<u8>,
         status: Option<u8>,
@@ -2201,6 +3482,34 @@ pub enum RedLabelSupportProcessStep {
         next_bomb_image: u16,
         wakeup_address: u16,
     },
+    HallOfFameStallSleeping {
+        process_address: u16,
+        stall_before: u8,
+        stall_after: u8,
+        wakeup_address: u16,
+    },
+    HallOfFameBlinkSleeping {
+        process_address: u16,
+        blink_color_before: u8,
+        normal_color: u8,
+        blink_color_after: u8,
+        wakeup_address: u16,
+    },
+    HallOfFameInitialsSleeping {
+        process_address: u16,
+        initialized: bool,
+        pia21: u8,
+        pia31: u8,
+        input_direction: u8,
+        direction_before: u8,
+        direction_after: u8,
+        delay_before: u8,
+        delay_after: u8,
+        count_before: u8,
+        count_after: u8,
+        update: Option<RedLabelHighScoreInitialUpdate>,
+        wakeup_address: u16,
+    },
     PlayerUpBlankedSleeping {
         process_address: u16,
         player_number: u8,
@@ -2273,10 +3582,43 @@ pub struct RedLabelScannerRaster {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RedLabelProcessDispatch {
+    AttractCredits(RedLabelAttractCredits),
+    AttractWilliamsPage(RedLabelAttractWilliamsPage),
+    AttractLogo(RedLabelAttractLogo),
+    AttractPresents(RedLabelAttractPresents),
+    AttractDefenderDelay(RedLabelAttractDefenderDelay),
+    AttractDefenderAppearances(RedLabelAttractDefenderAppearances),
+    AttractDefenderRestoreStart(RedLabelAttractDefenderRestoreStart),
+    AttractCopyright(RedLabelAttractCopyright),
+    AttractCopyrightWait(RedLabelAttractCopyrightWait),
+    AttractVector(RedLabelAttractVector),
+    HallOfFameDisplayWait(RedLabelHallOfFameDisplayWait),
+    HighScoreQualification(RedLabelHighScoreQualification),
+    HighScoreFireSwitch(RedLabelHighScoreFireSwitch),
+    HighScoreSubmission(RedLabelHighScoreSubmission),
+    HighScoreHandoff(RedLabelHighScoreHandoff),
+    AttractDefenderRefresh(RedLabelAttractDefenderRefresh),
+    AttractWilliamsRestore(RedLabelAttractWilliamsRestore),
+    AttractInstructionStart(RedLabelAttractInstructionStart),
+    AttractInstructionAscent(RedLabelAttractInstructionAscent),
+    AttractInstructionLaserStart(RedLabelAttractInstructionLaserStart),
+    AttractInstructionLaserStep(RedLabelAttractInstructionLaserStep),
+    AttractInstructionRescueStart(RedLabelAttractInstructionRescueStart),
+    AttractInstructionFreeFall(RedLabelAttractInstructionFreeFall),
+    AttractInstructionShipReturn(RedLabelAttractInstructionShipReturn),
+    AttractInstructionEnemyTableStart(RedLabelAttractInstructionEnemyTableStart),
+    AttractInstructionEnemySpawn(RedLabelAttractInstructionEnemySpawn),
+    AttractInstructionEnemyResolve(RedLabelAttractInstructionEnemyResolve),
+    AttractInstructionTextAdvance(RedLabelAttractInstructionTextAdvance),
+    AttractInstructionTextProcess(RedLabelAttractInstructionTextProcess),
+    AttractInstructionTableDecision(RedLabelAttractInstructionTableDecision),
+    AttractInstructionRestart(RedLabelAttractInstructionRestart),
+    TopDisplay(RedLabelTopDisplay),
     ThrustProcess(RedLabelThrustProcessStep),
     SupportProcess(RedLabelSupportProcessStep),
     ScannerProcess(RedLabelScannerProcessStep),
     PlayerStart(RedLabelPlayerStart),
+    GameExec(RedLabelGameExec),
     SmartBombStarted(Option<RedLabelSmartBomb>),
     SmartBombTail(RedLabelSmartBombTail),
     Reverse(RedLabelReverse),
@@ -2288,6 +3630,7 @@ pub enum RedLabelProcessDispatch {
     LaserFire(RedLabelLaserFireDispatch),
     LaserStep(RedLabelLaserStep),
     LaserFinished(RedLabelKilledProcess),
+    Suicide(RedLabelKilledProcess),
     Schizoid(RedLabelSchizoidProcessStep),
     UfoStarted(RedLabelUfoStart),
     Ufo(RedLabelUfoProcessStep),
@@ -2303,6 +3646,8 @@ pub enum RedLabelProcessDispatch {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RedLabelRuntimeMemory {
     ram: MainCpuRam,
+    palette_ram: [u8; PALETTE_RAM_SIZE],
+    hardware_map: u8,
     cmos: CmosRam,
     object_table_range: std::ops::Range<usize>,
     shell_head_range: std::ops::Range<usize>,
@@ -2332,6 +3677,13 @@ impl RuntimeHighScoreTable {
         match self {
             Self::AllTime => "all-time",
             Self::TodaysGreatest => "today's greatest",
+        }
+    }
+
+    fn kind(self) -> RedLabelHighScoreTableKind {
+        match self {
+            Self::AllTime => RedLabelHighScoreTableKind::AllTime,
+            Self::TodaysGreatest => RedLabelHighScoreTableKind::TodaysGreatest,
         }
     }
 }
@@ -2395,6 +3747,40 @@ const RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS: [RedLabelPowerUpRamFillTa
     },
 ];
 
+const RED_LABEL_TRACE_POWER_UP_LIVE_IO_HOLDOFF_END_FRAME: u64 = 732;
+const RED_LABEL_TRACE_SINIT_ZERO_SEED_FRAME: u64 = 720;
+const RED_LABEL_TRACE_SINIT_CLEAR_PLAYER_FRAME: u64 = 721;
+const RED_LABEL_TRACE_INIT20_SOUND_FRAME: u64 = 731;
+const RED_LABEL_TRACE_INIT20_OBJECT_LIST_FRAME: u64 = 732;
+const RED_LABEL_TRACE_EXEC_IDLE_SEED_FRAME: u64 = 733;
+const RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME: u64 = 746;
+const RED_LABEL_TRACE_INIT20_SOUND_COMMAND_PORT_B: u8 = 0x00;
+const RED_LABEL_TRACE_CREDIT_SOUND_COMMAND_RAW: u8 = 0xE6;
+const RED_LABEL_TRACE_START_SOUND_COMMAND_RAW: u8 = 0xF5;
+const RED_LABEL_TRACE_SINIT_RAM_CLEAR_START: u16 = 0x9C00;
+const RED_LABEL_TRACE_SINIT_RAM_CLEAR_END: u16 = 0xC000;
+const RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME: u64 = 725;
+const RED_LABEL_TRACE_PLAYER_START_EXEC_DELAY_FRAMES: u64 = 51;
+
+const RED_LABEL_SINIT_OBJECT_CLEAR_TARGETS: [RedLabelPowerUpRamFillTarget; 4] = [
+    RedLabelPowerUpRamFillTarget {
+        frame: 721,
+        target_address: 0xA4AC,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 722,
+        target_address: 0xA7A0,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 723,
+        target_address: 0xAA94,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 724,
+        target_address: 0xAAC5,
+    },
+];
+
 impl RedLabelPowerUpRamFill {
     fn new() -> Self {
         Self::from_seed(0, 0)
@@ -2436,6 +3822,14 @@ fn red_label_power_up_ram_fill_target_for_frame(
         .expect("embedded red-label power-up RAM-fill trace target is complete")
 }
 
+fn red_label_sinit_object_clear_target(frame: u64) -> Result<u16, String> {
+    RED_LABEL_SINIT_OBJECT_CLEAR_TARGETS
+        .iter()
+        .find(|target| target.frame == frame)
+        .map(|target| target.target_address)
+        .ok_or_else(|| format!("red-label SINIT object clear frame {frame} is not mapped"))
+}
+
 impl RedLabelRuntimeMemory {
     pub fn new_cold_boot() -> Result<Self, String> {
         let layout = red_label_ram_layout()?;
@@ -2444,6 +3838,8 @@ impl RedLabelRuntimeMemory {
         let shell_head = linked_list(&lists, "shell_object")?.head_address;
         let mut memory = Self {
             ram: cleared_main_cpu_ram(),
+            palette_ram: [0; PALETTE_RAM_SIZE],
+            hardware_map: 0,
             cmos: [0xF0; CMOS_RAM_SIZE],
             object_table_range,
             shell_head_range: usize::from(shell_head)..usize::from(shell_head) + 2,
@@ -2477,6 +3873,93 @@ impl RedLabelRuntimeMemory {
             return None;
         }
         Some(&self.ram[start..end])
+    }
+
+    pub fn visible_rgba_image(&self) -> Option<RenderedImage> {
+        render_defender_visible_rgba(self.ram.as_slice(), &self.palette_ram)
+    }
+
+    pub fn visible_palette_indices(&self) -> Option<Vec<u8>> {
+        render_defender_visible_palette_indices(self.ram.as_slice(), &self.palette_ram)
+    }
+
+    pub fn visible_pixel_nibbles(&self) -> Option<Vec<u8>> {
+        render_defender_visible_pixel_nibbles(self.ram.as_slice())
+    }
+
+    pub fn palette_ram(&self) -> &[u8; PALETTE_RAM_SIZE] {
+        &self.palette_ram
+    }
+
+    pub fn hardware_map(&self) -> u8 {
+        self.hardware_map
+    }
+
+    fn write_hardware_map(&mut self, value: u8, writes: &mut Vec<u8>) {
+        self.hardware_map = value;
+        writes.push(value);
+    }
+
+    fn begin_irq_hardware_map_sequence(&mut self) -> (u8, Vec<u8>) {
+        let hardware_map_before = self.hardware_map;
+        let mut writes = Vec::new();
+        self.write_hardware_map(0, &mut writes);
+        (hardware_map_before, writes)
+    }
+
+    fn finish_irq_hardware_map_sequence(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        writes: &mut Vec<u8>,
+    ) -> Result<u8, String> {
+        self.write_hardware_map(0, writes);
+        let restored_map = self.read_field_byte(layout, "base_page", "MAPCR")?;
+        self.write_hardware_map(restored_map, writes);
+        Ok(restored_map)
+    }
+
+    /// Source-shaped `IRQ`/`IRQB` color-mapping block: load `U` with
+    /// `CRAM+16`, then push `PCRAM+10..+15`, `PCRAM+4..+9`, and
+    /// `PCRAM+0..+3` through `PSHU`, leaving hardware color RAM equal to the
+    /// current pseudo-color RAM bytes.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1978-L1987>.
+    pub fn copy_red_label_color_mapping_to_palette_ram(
+        &mut self,
+    ) -> Result<RedLabelPaletteCopy, String> {
+        let layout = red_label_ram_layout()?;
+        self.copy_color_mapping_to_palette_ram(&layout)
+    }
+
+    fn copy_color_mapping_to_palette_ram(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<RedLabelPaletteCopy, String> {
+        let range = field_range(layout, "base_page", "PCRAM")?;
+        let bytes = self
+            .ram_range(range.clone())
+            .ok_or_else(|| String::from("red-label PCRAM range is outside RAM"))?;
+        if bytes.len() != PALETTE_RAM_SIZE {
+            return Err(format!(
+                "red-label PCRAM has {} byte(s), expected {PALETTE_RAM_SIZE}",
+                bytes.len()
+            ));
+        }
+        let mut source = [0; PALETTE_RAM_SIZE];
+        source.copy_from_slice(bytes);
+
+        let mut cursor = PALETTE_RAM_SIZE;
+        for (source_start, length) in [(10, 6), (4, 6), (0, 4)] {
+            cursor -= length;
+            self.palette_ram[cursor..cursor + length]
+                .copy_from_slice(&source[source_start..source_start + length]);
+        }
+
+        Ok(RedLabelPaletteCopy {
+            source_start: range.start,
+            target_start: RED_LABEL_COLOR_RAM_START,
+            bytes_copied: PALETTE_RAM_SIZE as u8,
+            palette_ram: self.palette_ram,
+        })
     }
 
     pub fn cmos_range(&self, range: std::ops::Range<u16>) -> Option<&[u8]> {
@@ -2584,14 +4067,7 @@ impl RedLabelRuntimeMemory {
     }
 
     fn live_high_score_qualifying_rank(&self, score: u32) -> Result<Option<u8>, String> {
-        let all_time = self.high_score_qualifying_rank(RuntimeHighScoreTable::AllTime, score)?;
-        let todays =
-            self.high_score_qualifying_rank(RuntimeHighScoreTable::TodaysGreatest, score)?;
-        Ok(match (all_time, todays) {
-            (Some(all_time), Some(todays)) => Some(all_time.min(todays)),
-            (Some(rank), None) | (None, Some(rank)) => Some(rank),
-            (None, None) => None,
-        })
+        self.high_score_qualifying_rank(RuntimeHighScoreTable::TodaysGreatest, score)
     }
 
     fn high_score_qualifying_rank(
@@ -2620,7 +4096,7 @@ impl RedLabelRuntimeMemory {
     ) -> Result<Option<u8>, String> {
         if !red_label_high_score_initials_are_valid(&initials) {
             return Err(String::from(
-                "red-label high-score initials must be three uppercase ASCII letters",
+                "red-label high-score initials must be uppercase ASCII or source blank bytes",
             ));
         }
         let Some(rank) = self.high_score_qualifying_rank(table, score)? else {
@@ -2682,7 +4158,7 @@ impl RedLabelRuntimeMemory {
         ];
         if !red_label_high_score_initials_are_valid(&initials) {
             return Err(format!(
-                "red-label {} high-score initials are not valid uppercase ASCII",
+                "red-label {} high-score initials are not valid uppercase ASCII or source blank bytes",
                 table.label()
             ));
         }
@@ -2699,7 +4175,7 @@ impl RedLabelRuntimeMemory {
         let score_bytes = high_score_bcd_bytes(entry.score)?;
         if !red_label_high_score_initials_are_valid(&entry.initials) {
             return Err(String::from(
-                "red-label high-score initials must be three uppercase ASCII letters",
+                "red-label high-score initials must be uppercase ASCII or source blank bytes",
             ));
         }
         let target = self.high_score_table_cells_mut(table);
@@ -2741,6 +4217,37 @@ impl RedLabelRuntimeMemory {
 
     pub fn shell_table_crc32(&self) -> u32 {
         crc32(&self.ram[self.shell_head_range.clone()])
+    }
+
+    fn clear_trace_sinit_ram_to(&mut self, end_address: u16) -> Result<(), String> {
+        if !(RED_LABEL_TRACE_SINIT_RAM_CLEAR_START..=RED_LABEL_TRACE_SINIT_RAM_CLEAR_END)
+            .contains(&end_address)
+        {
+            return Err(format!(
+                "red-label SINIT clear target 0x{end_address:04X} is outside 0x{:04X}..0x{:04X}",
+                RED_LABEL_TRACE_SINIT_RAM_CLEAR_START, RED_LABEL_TRACE_SINIT_RAM_CLEAR_END
+            ));
+        }
+        self.clear_range(RED_LABEL_TRACE_SINIT_RAM_CLEAR_START..end_address)
+    }
+
+    fn clear_shell_head(&mut self) -> Result<(), String> {
+        let range = self.shell_head_range.clone();
+        let start = u16::try_from(range.start)
+            .map_err(|_| String::from("red-label shell head start does not fit u16"))?;
+        let end = u16::try_from(range.end)
+            .map_err(|_| String::from("red-label shell head end does not fit u16"))?;
+        self.clear_range(start..end)
+    }
+
+    fn write_red_label_rand_state(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        state: RandState,
+    ) -> Result<(), String> {
+        self.write_field_byte(layout, "base_page", "SEED", state.seed)?;
+        self.write_field_byte(layout, "base_page", "HSEED", state.hseed)?;
+        self.write_field_byte(layout, "base_page", "LSEED", state.lseed)
     }
 
     /// Advance the source `defb6.src` power-up RAM-fill loop through `RAM6`.
@@ -2830,6 +4337,19 @@ impl RedLabelRuntimeMemory {
             linked_list(&lists, "active_object")?.head_address,
             object_address,
         )
+    }
+
+    fn return_unlinked_object_to_free_list(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        object_address: u16,
+    ) -> Result<(), String> {
+        let lists = red_label_linked_lists()?;
+        object_table_for_address(layout, object_address)?;
+        let free_head = linked_list(&lists, "free_object")?.head_address;
+        let old_free = self.read_word(free_head)?;
+        self.write_word(free_head, object_address)?;
+        self.write_object_word(layout, object_address, "OLINK", old_free)
     }
 
     /// Source-shaped `APVCT` / `APST`: prepend the object to `OPTR`, replace
@@ -3668,15 +5188,25 @@ impl RedLabelRuntimeMemory {
     }
 
     /// Source-shaped visible `PLSTR3` / `PLSTR5` runtime initialization:
+    /// select the cocktail screen hook when `PIA3` says the cabinet is flipped,
     /// initialize current-player runtime bytes, redraw the top display, create
     /// the source support processes, then sleep either for the two-player
     /// prompt or the post-`SCLR1` game-entry delay.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1227-L1311>.
     pub fn start_player_runtime_current_process(&mut self) -> Result<RedLabelPlayerStart, String> {
+        self.start_player_runtime_current_process_with_pia3(0)
+    }
+
+    pub fn start_player_runtime_current_process_with_pia3(
+        &mut self,
+        pia3_input: u8,
+    ) -> Result<RedLabelPlayerStart, String> {
         let layout = red_label_ram_layout()?;
         let process_address = self.current_process_address(&layout)?;
         self.write_field_byte(&layout, "base_page", "MAPCR", 0)?;
-        let runtime = self.initialize_current_player_runtime_state(&layout)?;
+        let screen_switch = self.player_runtime_screen_switch(&layout, pia3_input)?;
+        let mut runtime = self.initialize_current_player_runtime_state(&layout)?;
+        runtime.screen_switch = screen_switch;
 
         let mut support_processes = Vec::with_capacity(6);
         for routine in ["SCPROC", "COLR", "FLPUP", "THPROC", "CBOMB", "TIECOL"] {
@@ -3689,6 +5219,16 @@ impl RedLabelRuntimeMemory {
         let pdf_flag = self.read_field_byte(&layout, "base_page", "PDFLG")?;
         let player_count = self.read_field_byte(&layout, "base_page", "PLRCNT")?;
         if pdf_flag != 0 && player_count.wrapping_sub(1) != 0 {
+            let prompt_message = if runtime.current_player == 2 {
+                red_label_message("PLYR2")?
+            } else {
+                red_label_message("PLYR1")?
+            };
+            self.write_message_text_block(
+                &layout,
+                RED_LABEL_PLAYER_START_PROMPT_SCREEN,
+                prompt_message,
+            )?;
             let wakeup_address = red_label_routine_address("PLS01")?;
             self.sleep_current_process(0x80, wakeup_address)?;
             return Ok(RedLabelPlayerStart::RuntimeSleeping {
@@ -3696,6 +5236,10 @@ impl RedLabelRuntimeMemory {
                 runtime,
                 support_processes,
                 prompt_display_required: true,
+                prompt: Some(RedLabelBonusTextCall {
+                    vector_address: prompt_message.vector_address,
+                    screen_address: RED_LABEL_PLAYER_START_PROMPT_SCREEN,
+                }),
                 screen_clear: None,
                 target_count: None,
                 status: None,
@@ -3720,11 +5264,157 @@ impl RedLabelRuntimeMemory {
             runtime,
             support_processes,
             prompt_display_required: false,
+            prompt: None,
             screen_clear: Some(screen_clear),
             target_count: Some(target_count),
             status: Some(status),
             wakeup_address,
             sleep_time: 0x60,
+        })
+    }
+
+    fn player_runtime_screen_switch(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        pia3_input: u8,
+    ) -> Result<Option<RedLabelScreenSwitch>, String> {
+        if pia3_input & RED_LABEL_PIA3_COCKTAIL_BIT == 0 {
+            return Ok(None);
+        }
+
+        let screen_clear = self.clear_screen_ram()?;
+        let current_player = self.read_field_byte(layout, "base_page", "CURPLR")?;
+        let mut screen_switch = if current_player == 1 {
+            self.screen_switch_player_one_with_context(
+                layout,
+                pia3_input,
+                Some(screen_clear),
+                true,
+            )?
+        } else {
+            self.screen_switch_player_two_with_context(
+                layout,
+                pia3_input,
+                Some(screen_clear),
+                true,
+            )?
+        };
+        self.write_field_byte(layout, "base_page", "PIA21", 0xFF)?;
+        self.write_field_byte(layout, "base_page", "PIA22", 0xFF)?;
+        screen_switch.stick_history_reset = true;
+        Ok(Some(screen_switch))
+    }
+
+    pub fn screen_switch_player_one(&mut self) -> Result<RedLabelScreenSwitch, String> {
+        let layout = red_label_ram_layout()?;
+        self.screen_switch_player_one_with_context(&layout, 0, None, false)
+    }
+
+    pub fn screen_switch_player_two(
+        &mut self,
+        pia3_input: u8,
+    ) -> Result<RedLabelScreenSwitch, String> {
+        let layout = red_label_ram_layout()?;
+        self.screen_switch_player_two_with_context(&layout, pia3_input, None, false)
+    }
+
+    fn screen_switch_player_one_with_context(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        pia3_input: u8,
+        screen_clear: Option<RedLabelScreenClear>,
+        stick_history_reset: bool,
+    ) -> Result<RedLabelScreenSwitch, String> {
+        let map_before = self.read_field_byte(layout, "base_page", "MAPCR")?;
+        let hardware_map_before = self.hardware_map;
+        self.apply_screen_switch(
+            layout,
+            RedLabelScreenSwitchContext {
+                routine: RedLabelScreenSwitchRoutine::PlayerOne,
+                pia3_input,
+                cocktail_detected: false,
+                screen_clear,
+                stick_history_reset,
+                map_before,
+                hardware_map_before,
+                hardware_map_writes: Vec::new(),
+            },
+        )
+    }
+
+    fn screen_switch_player_two_with_context(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        pia3_input: u8,
+        screen_clear: Option<RedLabelScreenClear>,
+        stick_history_reset: bool,
+    ) -> Result<RedLabelScreenSwitch, String> {
+        let map_before = self.read_field_byte(layout, "base_page", "MAPCR")?;
+        let hardware_map_before = self.hardware_map;
+        self.write_field_byte(layout, "base_page", "MAPCR", 0)?;
+        let mut pre_read_writes = Vec::new();
+        self.write_hardware_map(0, &mut pre_read_writes);
+        self.apply_screen_switch(
+            layout,
+            RedLabelScreenSwitchContext {
+                routine: RedLabelScreenSwitchRoutine::PlayerTwo,
+                pia3_input,
+                cocktail_detected: pia3_input & RED_LABEL_PIA3_COCKTAIL_BIT != 0,
+                screen_clear,
+                stick_history_reset,
+                map_before,
+                hardware_map_before,
+                hardware_map_writes: pre_read_writes,
+            },
+        )
+    }
+
+    fn apply_screen_switch(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        mut context: RedLabelScreenSwitchContext,
+    ) -> Result<RedLabelScreenSwitch, String> {
+        let (mode, irq_hook_target, pia3_control, watchdog_value) = if context.cocktail_detected {
+            (
+                RedLabelIrqMode::Inverted,
+                RED_LABEL_IRQB_ADDRESS,
+                RED_LABEL_P2SW_PIA3_CONTROL,
+                RED_LABEL_INVERTED_WATCHDOG_DATA,
+            )
+        } else {
+            (
+                RedLabelIrqMode::Normal,
+                RED_LABEL_IRQ_ADDRESS,
+                RED_LABEL_P1SW_PIA3_CONTROL,
+                RED_LABEL_NORMAL_WATCHDOG_DATA,
+            )
+        };
+
+        let irq_hook = field_range(layout, "base_page", "IRQHK")?;
+        self.write_word(irq_hook.start + 1, irq_hook_target)?;
+        self.write_field_byte(layout, "base_page", "MAPCR", 0)?;
+        self.write_hardware_map(0, &mut context.hardware_map_writes);
+        self.write_byte(irq_hook.start, RED_LABEL_IRQ_JUMP_OPCODE)?;
+        self.write_field_byte(layout, "base_page", "MAPCR", context.map_before)?;
+        self.write_hardware_map(context.map_before, &mut context.hardware_map_writes);
+
+        let map_after = self.read_field_byte(layout, "base_page", "MAPCR")?;
+        Ok(RedLabelScreenSwitch {
+            routine: context.routine,
+            pia3_input: context.pia3_input,
+            cocktail_detected: context.cocktail_detected,
+            mode,
+            irq_hook_opcode: RED_LABEL_IRQ_JUMP_OPCODE,
+            irq_hook_target,
+            pia3_control,
+            watchdog_value,
+            map_before: context.map_before,
+            map_after,
+            hardware_map_before: context.hardware_map_before,
+            hardware_map_writes: context.hardware_map_writes,
+            hardware_map_after: self.hardware_map,
+            screen_clear: context.screen_clear,
+            stick_history_reset: context.stick_history_reset,
         })
     }
 
@@ -3875,7 +5565,9 @@ impl RedLabelRuntimeMemory {
     }
 
     /// Source-shaped `SCORE`: add a packed BCD score word to the current
-    /// player's `PSCOR` field and run the visible replay-award RAM updates.
+    /// player's `PSCOR` field, refresh the visible score digits through the
+    /// `SCRTRN` tail, and redraw stock icons before loading the replay sound
+    /// when the replay threshold awards an extra ship and smart bomb.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L474-L535>.
     pub fn score_current_player(
         &mut self,
@@ -3898,8 +5590,15 @@ impl RedLabelRuntimeMemory {
         )?;
         self.write_field_word(&layout, "base_page", "XTEMP", addend)?;
         self.add_bcd_word_to_score(score_range.start, score_offset, addend)?;
-        let (bonus_awarded, sound_loaded) =
-            self.apply_score_replay_award(&layout, player_index, score_range)?;
+        let bonus_awarded = self.apply_score_replay_award(&layout, player_index, score_range)?;
+        let sound_loaded = if bonus_awarded {
+            self.display_laser_stocks(&layout)?;
+            self.display_smart_bomb_stocks(&layout)?;
+            self.load_sound_table_by_label("RPSND")?
+        } else {
+            None
+        };
+        self.transfer_score_digits(&layout, player_number)?;
 
         Ok(RedLabelScoreOutcome {
             player_number,
@@ -3924,6 +5623,60 @@ impl RedLabelRuntimeMemory {
             .ok_or_else(|| String::from("red-label player.PSCOR range is invalid"))?;
         let digits = self.read_fixed_bytes::<3>(score_range.start + 1)?;
         Ok(bcd_digits_to_u32(&digits))
+    }
+
+    fn write_player_score_value(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        player_index: u16,
+        score: u32,
+    ) -> Result<(), String> {
+        let score_digits = high_score_bcd_bytes(score.min(RED_LABEL_HIGH_SCORE_MAX_SCORE))?;
+        self.write_field(
+            layout,
+            "player",
+            "PSCOR",
+            player_index,
+            &[0, score_digits[0], score_digits[1], score_digits[2]],
+        )
+    }
+
+    fn write_player_runtime_snapshot(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        player_index: u16,
+        player: PlayerState,
+        wave: u8,
+    ) -> Result<(), String> {
+        self.write_field(layout, "player", "PWAV", player_index, &[wave])?;
+        self.write_field(layout, "player", "PLAS", player_index, &[player.lives])?;
+        self.write_field(
+            layout,
+            "player",
+            "PSBC",
+            player_index,
+            &[player.smart_bombs],
+        )?;
+        self.write_field_word(layout, "base_page", "PLAX16", fixed16_source_word(player.x))?;
+        self.write_field_word(layout, "base_page", "PLAY16", fixed16_source_word(player.y))?;
+        let x_velocity = fixed16_source_24(player.xv).to_be_bytes();
+        self.write_field(
+            layout,
+            "base_page",
+            "PLAXV",
+            0,
+            &[x_velocity[1], x_velocity[2], x_velocity[3]],
+        )?;
+        self.write_field_word(layout, "base_page", "PLAYV", fixed16_source_word(player.yv))?;
+        self.write_field_word(
+            layout,
+            "base_page",
+            "PLADIR",
+            match player.facing {
+                Facing::Right => 0x0300,
+                Facing::Left => 0xFD00,
+            },
+        )
     }
 
     fn player_trace_score_value(&self, player_number: u8) -> Result<u32, String> {
@@ -4858,6 +6611,617 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    /// Source-shaped `HOFST`: decrement the initials-entry stall timer once per
+    /// source second and sleep back to itself.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L310-L313>.
+    pub fn step_hall_of_fame_stall_timer_current_process(
+        &mut self,
+    ) -> Result<RedLabelSupportProcessStep, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let stall_before = self.read_byte(RED_LABEL_HOF_STALL_TIMER_RAM)?;
+        let stall_after = stall_before.wrapping_sub(1);
+        self.write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, stall_after)?;
+        let wakeup_address = red_label_routine_address("HOFST")?;
+        self.sleep_current_process(60, wakeup_address)?;
+        Ok(RedLabelSupportProcessStep::HallOfFameStallSleeping {
+            process_address,
+            stall_before,
+            stall_after,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `HOFBL`: toggle the blinking initials color between zero
+    /// and the normal letter color, then sleep for the source blink period.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L315-L323>.
+    pub fn step_hall_of_fame_blink_current_process(
+        &mut self,
+    ) -> Result<RedLabelSupportProcessStep, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let pcram = field_range(&layout, "base_page", "PCRAM")?.start;
+        let normal_color = self.read_byte(pcram + 1)?;
+        let blink_color_before = self.read_byte(pcram + 0x0D)?;
+        let blink_color_after = if blink_color_before == 0 {
+            normal_color
+        } else {
+            0
+        };
+        self.write_byte(pcram + 0x0D, blink_color_after)?;
+        let wakeup_address = red_label_routine_address("HOFBL")?;
+        self.sleep_current_process(15, wakeup_address)?;
+        Ok(RedLabelSupportProcessStep::HallOfFameBlinkSleeping {
+            process_address,
+            blink_color_before,
+            normal_color,
+            blink_color_after,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `ATTR`: select bank 1 and jump through the attract vector
+    /// into `HALLOF`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1083-L1086>.
+    pub fn start_attract_vector_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractVector, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let selected_map = 1;
+        self.write_field_byte(&layout, "base_page", "MAPCR", selected_map)?;
+        let entry = self.start_hall_of_fame_entry_current_process()?;
+        Ok(RedLabelAttractVector {
+            process_address,
+            selected_map,
+            attract_vector_address: RED_LABEL_ATTRACT_VECTOR_ADDRESS,
+            entry,
+        })
+    }
+
+    /// Source-shaped `HALLOF`: clear transient processes, reinitialize stars,
+    /// clear attract credit/entry flags, and either branch to `AMODES` during the
+    /// power-on pass or fall through into `HALL1` for player-one score
+    /// qualification.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L121-L135>.
+    pub fn start_hall_of_fame_entry_current_process(
+        &mut self,
+    ) -> Result<RedLabelHallOfFameEntryDispatch, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let genocide = self.genocide_other_processes()?;
+        self.write_field_byte(
+            &layout,
+            "base_page",
+            "STATUS",
+            RED_LABEL_HALL_OF_FAME_ENTRY_STATUS,
+        )?;
+        let stars = self.initialize_star_table_from_runtime_rand(&layout)?;
+        let credit = self.read_field_byte(&layout, "base_page", "CREDIT")?;
+        let old_credit_before = self.read_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM)?;
+        self.write_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM, credit)?;
+        let credit_increase_flag_before =
+            self.read_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM)?;
+        self.write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0)?;
+        let entry_flag_before = self.read_byte(RED_LABEL_ATTRACT_ENTRY_FLAG_RAM)?;
+        self.write_byte(RED_LABEL_ATTRACT_ENTRY_FLAG_RAM, 0)?;
+        let power_flag = self.read_field_byte(&layout, "base_page", "PWRFLG")?;
+        let setup = RedLabelHallOfFameEntrySetup {
+            process_address,
+            genocide,
+            status: RED_LABEL_HALL_OF_FAME_ENTRY_STATUS,
+            stars,
+            credit,
+            old_credit_before,
+            old_credit_after: credit,
+            credit_increase_flag_before,
+            entry_flag_before,
+            power_flag,
+        };
+
+        if power_flag == 0 {
+            let target_address = red_label_routine_address("AMODES")?;
+            self.write_process_word(&layout, process_address, "PADDR", target_address)?;
+            return Ok(RedLabelHallOfFameEntryDispatch::PowerOnWilliamsJump {
+                setup,
+                target_address,
+            });
+        }
+
+        let credits_process = self.make_process(
+            red_label_routine_address("CREDS")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        )?;
+        let player = 1;
+        let score_pointer = self.player_score_pointer_for_high_score_player(&layout, player)?;
+        self.write_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM, player)?;
+        self.write_word(RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM, score_pointer)?;
+        let qualification = self.start_high_score_qualification_current_process()?;
+        Ok(RedLabelHallOfFameEntryDispatch::PlayerOneQualification {
+            setup,
+            credits_process,
+            player,
+            score_pointer,
+            qualification,
+        })
+    }
+
+    /// Source-shaped `HALL1`: qualify the current player's score against
+    /// today's table, build the initials-entry screen and support processes, then
+    /// fall through into the `HALL3A` fire-switch wait.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L135-L189>.
+    pub fn start_high_score_qualification_current_process(
+        &mut self,
+    ) -> Result<RedLabelHighScoreQualification, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let player = self.read_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM)?;
+        let score_pointer = self.read_word(RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM)?;
+        self.player_score_pointer_for_high_score_player(&layout, player)?;
+        let score = self.read_high_score_pointer_score("HALL1", score_pointer)?;
+
+        let Some(rank) =
+            self.high_score_qualifying_rank(RuntimeHighScoreTable::TodaysGreatest, score)?
+        else {
+            let handoff =
+                self.advance_high_score_submission_handoff(&layout, process_address, player)?;
+            return Ok(RedLabelHighScoreQualification::NotQualified {
+                process_address,
+                player,
+                score_pointer,
+                score,
+                handoff,
+            });
+        };
+
+        let entry_flag_before = self.read_byte(RED_LABEL_ATTRACT_ENTRY_FLAG_RAM)?;
+        let entry_flag_after = entry_flag_before.wrapping_add(1);
+        self.write_byte(RED_LABEL_ATTRACT_ENTRY_FLAG_RAM, entry_flag_after)?;
+        let state = HighScoreEntryState {
+            score,
+            rank,
+            initials: [
+                b'A',
+                RED_LABEL_HOF_BLANK_INITIAL_BYTE,
+                RED_LABEL_HOF_BLANK_INITIAL_BYTE,
+            ],
+            cursor: 0,
+        };
+        let display = self.write_high_score_entry_display(player, state)?;
+        let top_todays_score = self
+            .high_score_entry(RuntimeHighScoreTable::TodaysGreatest, 0)?
+            .score;
+        let sound_port_b = if score > top_todays_score { 0x3D } else { 0x3E };
+        let sound_command = SoundCommand::from_main_board_pia_port_b(sound_port_b);
+        self.write_byte(
+            RED_LABEL_HOF_STALL_TIMER_RAM,
+            RED_LABEL_HOF_FIRST_INITIAL_STALL_TICKS,
+        )?;
+        let support_processes = vec![
+            self.make_process(
+                red_label_routine_address("HOFST")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+            self.make_process(
+                red_label_routine_address("HOFBL")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+            self.make_process(
+                red_label_routine_address("HOFUD")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+        ];
+        self.write_byte(RED_LABEL_HOF_INIT_INDEX_RAM, 0)?;
+        let fire_switch = self.start_high_score_fire_switch_current_process()?;
+
+        Ok(RedLabelHighScoreQualification::Qualified(
+            RedLabelHighScoreEntryStart {
+                process_address,
+                player,
+                score_pointer,
+                score,
+                rank,
+                entry_flag_before,
+                entry_flag_after,
+                sound_port_b,
+                sound_command,
+                display,
+                support_processes,
+                stall_ticks: RED_LABEL_HOF_FIRST_INITIAL_STALL_TICKS,
+                fire_switch,
+            },
+        ))
+    }
+
+    /// Source-shaped `HOFUD`: clear the remembered direction, then run the
+    /// first `HOFUD1` up/down initials handler tick.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L325-L371>.
+    pub fn start_hall_of_fame_initials_input_current_process(
+        &mut self,
+    ) -> Result<RedLabelSupportProcessStep, String> {
+        self.write_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM, 0)?;
+        self.step_hall_of_fame_initials_input_current_process(true)
+    }
+
+    /// Source-shaped `HOFUD1`: sample up/down bits, update source delay
+    /// counters, wrap initials through the source blank byte/`Z`, redraw
+    /// `HOFIN`, and sleep.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L328-L371>.
+    pub fn continue_hall_of_fame_initials_input_current_process(
+        &mut self,
+    ) -> Result<RedLabelSupportProcessStep, String> {
+        self.step_hall_of_fame_initials_input_current_process(false)
+    }
+
+    fn step_hall_of_fame_initials_input_current_process(
+        &mut self,
+        initialized: bool,
+    ) -> Result<RedLabelSupportProcessStep, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let pia21 = self.read_field_byte(&layout, "base_page", "PIA21")?;
+        let pia31 = self.read_field_byte(&layout, "base_page", "PIA31")?;
+        let direction_before = self.read_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM)?;
+        let delay_before = self.read_byte(RED_LABEL_HOF_UP_DOWN_DELAY_RAM)?;
+        let count_before = self.read_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM)?;
+        let input_direction = if pia21 & 0x80 != 0 {
+            0xFF
+        } else if pia31 & 0x01 != 0 {
+            1
+        } else {
+            0
+        };
+
+        let mut direction_after = direction_before;
+        let mut delay_after = delay_before;
+        let mut count_after = count_before;
+        let mut update = None;
+        if input_direction == 0 {
+            direction_after = 0;
+            self.write_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM, direction_after)?;
+        } else if input_direction != direction_before {
+            direction_after = input_direction;
+            delay_after = 55;
+            count_after = 3;
+            self.write_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM, direction_after)?;
+            self.write_byte(RED_LABEL_HOF_UP_DOWN_DELAY_RAM, delay_after)?;
+            self.write_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM, count_after)?;
+        } else {
+            count_after = count_before.wrapping_sub(1);
+            self.write_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM, count_after)?;
+            if count_after == 0 {
+                let initial_index = self.read_byte(RED_LABEL_HOF_INIT_INDEX_RAM)?;
+                let initial_address = RED_LABEL_HOF_INITS_RAM + u16::from(initial_index) * 2;
+                let initial_before = self.read_byte(initial_address)?;
+                let mut initial_after = initial_before.wrapping_add(input_direction);
+                if initial_after == 0x3F {
+                    initial_after = b'Z';
+                }
+                if initial_after == 0x5B {
+                    initial_after = RED_LABEL_HOF_BLANK_INITIAL_BYTE;
+                }
+                self.write_byte(initial_address, initial_after)?;
+                delay_after = (delay_before >> 1).wrapping_add(5);
+                count_after = delay_after;
+                self.write_byte(RED_LABEL_HOF_UP_DOWN_DELAY_RAM, delay_after)?;
+                self.write_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM, count_after)?;
+                let display =
+                    self.write_high_score_initials_display_from_current_ram(initial_index)?;
+                update = Some(RedLabelHighScoreInitialUpdate {
+                    initial_index,
+                    initial_address,
+                    initial_before,
+                    initial_after,
+                    display,
+                });
+            }
+        }
+
+        let wakeup_address = red_label_routine_address("HOFUD1")?;
+        self.sleep_current_process(1, wakeup_address)?;
+        Ok(RedLabelSupportProcessStep::HallOfFameInitialsSleeping {
+            process_address,
+            initialized,
+            pia21,
+            pia31,
+            input_direction,
+            direction_before,
+            direction_after,
+            delay_before,
+            delay_after,
+            count_before,
+            count_after,
+            update,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `HALL3A`: clear the fire-open debounce state and sleep
+    /// for one tick to the fire-switch sampler.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L189-L193>.
+    pub fn start_high_score_fire_switch_current_process(
+        &mut self,
+    ) -> Result<RedLabelHighScoreFireSwitch, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let fire_flag_before = self.read_byte(RED_LABEL_HOF_FIRE_FLAG_RAM)?;
+        let fire_count_before = self.read_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM)?;
+        self.write_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM, 0)?;
+        self.write_byte(RED_LABEL_HOF_FIRE_FLAG_RAM, 0)?;
+        let wakeup_address = red_label_routine_address("HALL4")?;
+        self.sleep_current_process(RED_LABEL_HOF_FIRE_SLEEP_TICKS, wakeup_address)?;
+        Ok(RedLabelHighScoreFireSwitch::ResetSleeping {
+            process_address,
+            fire_flag_before,
+            fire_count_before,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `HALL4`: sample the fire switch, require a five-tick open
+    /// debounce before accepting a close, or jump to `HALL6` when the stall
+    /// timer expires.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L192-L203>.
+    pub fn continue_high_score_fire_switch_current_process(
+        &mut self,
+    ) -> Result<RedLabelHighScoreFireSwitch, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let pia21 = self.read_field_byte(&layout, "base_page", "PIA21")?;
+        if pia21 & RED_LABEL_HOF_FIRE_SWITCH_MASK != 0 {
+            return self.advance_high_score_fire_switch_closed(&layout, process_address, pia21);
+        }
+
+        let stall_timer = self.read_byte(RED_LABEL_HOF_STALL_TIMER_RAM)?;
+        if stall_timer == 0 {
+            let target_address = red_label_routine_address("HALL6")?;
+            self.write_process_word(&layout, process_address, "PADDR", target_address)?;
+            return Ok(RedLabelHighScoreFireSwitch::StallExpiredSubmitJump {
+                process_address,
+                pia21,
+                stall_timer,
+                target_address,
+            });
+        }
+
+        let fire_count_before = self.read_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM)?;
+        let fire_flag_before = self.read_byte(RED_LABEL_HOF_FIRE_FLAG_RAM)?;
+        let fire_count_after = fire_count_before.wrapping_add(1);
+        self.write_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM, fire_count_after)?;
+        let fire_flag_after = if fire_count_after == RED_LABEL_HOF_FIRE_OPEN_COUNT_READY {
+            self.write_byte(RED_LABEL_HOF_FIRE_FLAG_RAM, fire_count_after)?;
+            fire_count_after
+        } else {
+            fire_flag_before
+        };
+        let wakeup_address = red_label_routine_address("HALL4")?;
+        self.sleep_current_process(RED_LABEL_HOF_FIRE_SLEEP_TICKS, wakeup_address)?;
+        Ok(RedLabelHighScoreFireSwitch::OpenSleeping {
+            process_address,
+            pia21,
+            stall_timer,
+            fire_count_before,
+            fire_count_after,
+            fire_flag_before,
+            fire_flag_after,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `HALL5`: accept a debounced fire close, reset the stall
+    /// timer, advance the active initials cursor, redraw `HOFUL`, and either
+    /// return through `HALL3A` or jump to `HALL6`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L204-L214>.
+    pub fn advance_high_score_fire_switch_current_process(
+        &mut self,
+    ) -> Result<RedLabelHighScoreFireSwitch, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let pia21 = self.read_field_byte(&layout, "base_page", "PIA21")?;
+        self.advance_high_score_fire_switch_closed(&layout, process_address, pia21)
+    }
+
+    fn advance_high_score_fire_switch_closed(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        process_address: u16,
+        pia21: u8,
+    ) -> Result<RedLabelHighScoreFireSwitch, String> {
+        self.write_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM, 0)?;
+        let fire_flag_before = self.read_byte(RED_LABEL_HOF_FIRE_FLAG_RAM)?;
+        if fire_flag_before == 0 {
+            let wakeup_address = red_label_routine_address("HALL4")?;
+            self.sleep_current_process(RED_LABEL_HOF_FIRE_SLEEP_TICKS, wakeup_address)?;
+            return Ok(RedLabelHighScoreFireSwitch::ClosedIgnoredSleeping {
+                process_address,
+                pia21,
+                fire_flag_before,
+                wakeup_address,
+            });
+        }
+
+        self.write_byte(
+            RED_LABEL_HOF_STALL_TIMER_RAM,
+            RED_LABEL_HOF_NEXT_INITIAL_STALL_TICKS,
+        )?;
+        let initial_before = self.read_byte(RED_LABEL_HOF_INIT_INDEX_RAM)?;
+        let initial_after = initial_before.wrapping_add(1);
+        self.write_byte(RED_LABEL_HOF_INIT_INDEX_RAM, initial_after)?;
+        let underline_words = self.write_high_score_initial_underlines(initial_after)?;
+        if initial_after == RED_LABEL_INITIALS_ENTRY_CHARS as u8 {
+            let target_address = red_label_routine_address("HALL6")?;
+            self.write_process_word(layout, process_address, "PADDR", target_address)?;
+            return Ok(RedLabelHighScoreFireSwitch::InitialAdvancedSubmitJump {
+                process_address,
+                pia21,
+                initial_before,
+                initial_after,
+                stall_timer: RED_LABEL_HOF_NEXT_INITIAL_STALL_TICKS,
+                underline_words,
+                target_address,
+            });
+        }
+
+        self.write_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM, 0)?;
+        self.write_byte(RED_LABEL_HOF_FIRE_FLAG_RAM, 0)?;
+        let wakeup_address = red_label_routine_address("HALL4")?;
+        self.sleep_current_process(RED_LABEL_HOF_FIRE_SLEEP_TICKS, wakeup_address)?;
+        Ok(RedLabelHighScoreFireSwitch::InitialAdvancedSleeping {
+            process_address,
+            pia21,
+            initial_before,
+            initial_after,
+            stall_timer: RED_LABEL_HOF_NEXT_INITIAL_STALL_TICKS,
+            underline_words,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `HALL6` / `HALL12`: kill entry helper processes, commit
+    /// the current player's score and initials to the source high-score tables,
+    /// then either continue to player two or hand off to `HALL13`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L214-L232>.
+    pub fn submit_high_score_initials_current_process(
+        &mut self,
+    ) -> Result<RedLabelHighScoreSubmission, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let genocide = self.genocide_other_processes()?;
+        let player = self.read_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM)?;
+        let score_pointer = self.read_word(RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM)?;
+        let score = self.read_high_score_pointer_score("HALL6", score_pointer)?;
+        let initials = self.read_high_score_submission_initials()?;
+        let todays_rank =
+            self.insert_high_score(RuntimeHighScoreTable::TodaysGreatest, score, initials)?;
+        let all_time_rank =
+            self.insert_high_score(RuntimeHighScoreTable::AllTime, score, initials)?;
+        let handoff =
+            self.advance_high_score_submission_handoff(&layout, process_address, player)?;
+
+        Ok(RedLabelHighScoreSubmission {
+            process_address,
+            genocide,
+            player,
+            score_pointer,
+            score,
+            initials,
+            todays_rank,
+            all_time_rank,
+            handoff,
+        })
+    }
+
+    fn read_high_score_pointer_score(
+        &self,
+        routine_label: &'static str,
+        score_pointer: u16,
+    ) -> Result<u32, String> {
+        let score_digits = self.read_fixed_bytes::<3>(score_pointer.wrapping_add(1))?;
+        if score_digits.iter().any(|byte| !is_bcd_byte(*byte)) {
+            return Err(format!(
+                "red-label {routine_label} score at 0x{score_pointer:04X} is not valid BCD"
+            ));
+        }
+        Ok(bcd_digits_to_u32(&score_digits))
+    }
+
+    fn read_high_score_submission_initials(
+        &self,
+    ) -> Result<[u8; RED_LABEL_INITIALS_ENTRY_CHARS], String> {
+        let mut initials = [0; RED_LABEL_INITIALS_ENTRY_CHARS];
+        for (index, initial) in initials.iter_mut().enumerate() {
+            let address = RED_LABEL_HOF_INITS_RAM
+                + u16::try_from(index * 2).expect("initial index should fit in u16");
+            *initial = self.read_byte(address)?;
+        }
+        if !red_label_high_score_initials_are_valid(&initials) {
+            return Err(String::from(
+                "red-label HALL6 initials must be uppercase ASCII or source blank bytes",
+            ));
+        }
+        Ok(initials)
+    }
+
+    fn advance_high_score_submission_handoff(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        process_address: u16,
+        player: u8,
+    ) -> Result<RedLabelHighScoreSubmissionHandoff, String> {
+        let next_player = player.wrapping_add(1);
+        if next_player != 3 {
+            let target_address = red_label_routine_address("HALL1")?;
+            let next_player_score_pointer =
+                self.player_score_pointer_for_high_score_player(layout, next_player)?;
+            self.write_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM, next_player)?;
+            self.write_word(
+                RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM,
+                next_player_score_pointer,
+            )?;
+            self.write_process_word(layout, process_address, "PADDR", target_address)?;
+            return Ok(RedLabelHighScoreSubmissionHandoff::NextPlayerJump {
+                next_player,
+                next_player_score_pointer,
+                target_address,
+            });
+        }
+
+        let entry_flag = self.read_byte(RED_LABEL_ATTRACT_ENTRY_FLAG_RAM)?;
+        if entry_flag != 0 {
+            let target_address = red_label_routine_address("HALL13")?;
+            self.write_process_word(layout, process_address, "PADDR", target_address)?;
+            return Ok(RedLabelHighScoreSubmissionHandoff::HallOfFameJump {
+                entry_flag,
+                target_address,
+            });
+        }
+
+        let wakeup_address = red_label_routine_address("HALL13")?;
+        self.sleep_current_process(RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS, wakeup_address)?;
+        Ok(RedLabelHighScoreSubmissionHandoff::NoEntryDelaySleeping {
+            entry_flag,
+            sleep_ticks: RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `HALL12`: advance to player two, jump to `HALDIS`, or
+    /// sleep before `HALDIS` without replaying the `HALL6` insertion work.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L224-L231>.
+    pub fn advance_high_score_handoff_current_process(
+        &mut self,
+    ) -> Result<RedLabelHighScoreHandoff, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let player = self.read_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM)?;
+        let handoff =
+            self.advance_high_score_submission_handoff(&layout, process_address, player)?;
+        Ok(RedLabelHighScoreHandoff {
+            process_address,
+            player,
+            handoff,
+        })
+    }
+
+    fn player_score_pointer_for_high_score_player(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        player: u8,
+    ) -> Result<u16, String> {
+        let player_index = match player {
+            1 | 2 => u16::from(player - 1),
+            other => {
+                return Err(format!(
+                    "red-label HALL12 player {other} is outside the high-score player range"
+                ));
+            }
+        };
+        ram_field(layout, "player", "PSCOR")?
+            .field_range_for_entry(player_index)
+            .map(|range| range.start)
+            .ok_or_else(|| String::from("red-label player.PSCOR range is invalid"))
+    }
+
     /// Source-shaped `FLPUP`: if score transfer is active, die; otherwise
     /// blank the current player's score area and sleep to `FLP2`.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/defb6.src#L1232-L1243>.
@@ -5178,6 +7542,1824 @@ impl RedLabelRuntimeMemory {
             bgi_address: red_label_routine_address("BGI")?,
             selected_map,
             terrain_tables,
+        })
+    }
+
+    /// Source-shaped `SCINIT`: prepare the attract instruction-page world by
+    /// resetting objects, clearing video RAM, zeroing terrain scroll, running
+    /// `BGI`, reloading `CRTAB`, and centering the scanner player blip.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L525-L540>.
+    pub fn initialize_attract_scene_from_scinit(
+        &mut self,
+    ) -> Result<RedLabelAttractSceneInit, String> {
+        let layout = red_label_ram_layout()?;
+        let lists = red_label_linked_lists()?;
+        let initial_status = 0xFF;
+        self.write_field_byte(&layout, "base_page", "STATUS", initial_status)?;
+        self.initialize_object_lists(&layout, &lists)?;
+        let screen_clear = self.clear_screen_ram()?;
+        self.write_field_word(&layout, "base_page", "BGL", 0)?;
+        self.write_field_word(&layout, "base_page", "BGLX", 0)?;
+        let background = self.initialize_background_from_bgi()?;
+        let color_ram = self.initialize_color_ram_from_crtab()?;
+        let final_status = 0xDB;
+        self.write_field_byte(&layout, "base_page", "STATUS", final_status)?;
+        let player_scanner_center = 0x1030;
+        self.write_field_word(&layout, "base_page", "PLAXC", player_scanner_center)?;
+
+        Ok(RedLabelAttractSceneInit {
+            initial_status,
+            screen_clear,
+            background,
+            color_ram,
+            final_status,
+            player_scanner_center,
+        })
+    }
+
+    /// Source-shaped `LEDRET`: start the attract instruction page by
+    /// preparing the world, display state, support processes, object cells, and
+    /// the initial lander appearance before sleeping to `AMODE1`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L477-L514>.
+    pub fn start_attract_instruction_page_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionStart, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let genocide = self.genocide_other_processes()?;
+        let scene = self.initialize_attract_scene_from_scinit()?;
+        self.write_field_byte(
+            &layout,
+            "base_page",
+            "STATUS",
+            RED_LABEL_ATTRACT_INSTRUCTION_STATUS,
+        )?;
+        let score_transfers = self.display_player_scores(&layout)?;
+        let credits_process = self.make_process(
+            red_label_routine_address("CREDS")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        )?;
+        let border = self.draw_top_display_border()?;
+        let text_pointer = RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE.wrapping_add(2);
+        self.write_word(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM, text_pointer)?;
+        let support_processes = vec![
+            self.make_process(
+                red_label_routine_address("COLR")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+            self.make_process(
+                red_label_routine_address("CBOMB")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+            self.make_process(
+                red_label_routine_address("TIECOL")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+            self.make_process(
+                red_label_routine_address("SCPROC")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+            self.make_process(
+                red_label_routine_address("TEXTP")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+        ];
+
+        let astronaut_object = self.init_attract_instruction_object_cell(
+            &layout,
+            "ASTP1",
+            RED_LABEL_ATTRACT_INSTRUCTION_MAN_X16,
+            RED_LABEL_ATTRACT_INSTRUCTION_MAN_Y16,
+            RED_LABEL_ATTRACT_INSTRUCTION_MAN_COLOR,
+            RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM,
+        )?;
+        let player_object = self.init_attract_instruction_object_cell(
+            &layout,
+            "PLAPIC",
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_X16,
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_Y16,
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_COLOR,
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM,
+        )?;
+        let enemy_object = self.get_object_cell()?;
+        self.write_object_word(
+            &layout,
+            enemy_object,
+            "OPICT",
+            red_label_object_picture_address("LNDP1")?,
+        )?;
+        self.write_object_word(
+            &layout,
+            enemy_object,
+            "OX16",
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_X16,
+        )?;
+        self.write_object_word(
+            &layout,
+            enemy_object,
+            "OY16",
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_Y16,
+        )?;
+        self.write_object_word(
+            &layout,
+            enemy_object,
+            "OYV",
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_Y_VELOCITY,
+        )?;
+        self.write_object_word(&layout, enemy_object, "OXV", 0)?;
+        self.write_object_word(
+            &layout,
+            enemy_object,
+            "OBJCOL",
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_COLOR,
+        )?;
+        let enemy_appearance = self.start_appearance_for_object(enemy_object)?;
+        self.write_word(
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM,
+            enemy_object,
+        )?;
+        let wakeup_address = red_label_routine_address("AMODE1")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionStart {
+            process_address,
+            genocide,
+            scene,
+            status: RED_LABEL_ATTRACT_INSTRUCTION_STATUS,
+            score_transfers,
+            credits_process,
+            border,
+            text_pointer,
+            support_processes,
+            astronaut_object,
+            player_object,
+            enemy_object,
+            enemy_appearance,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    fn init_attract_instruction_object_cell(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        picture_label: &'static str,
+        x16: u16,
+        y16: u16,
+        color: u16,
+        pointer_ram: u16,
+    ) -> Result<u16, String> {
+        let object_address = self.get_object_cell()?;
+        self.write_object_word(layout, object_address, "OXV", 0)?;
+        self.write_object_word(layout, object_address, "OYV", 0)?;
+        self.write_object_word(layout, object_address, "OX16", x16)?;
+        self.write_object_word(layout, object_address, "OY16", y16)?;
+        self.write_object_word(
+            layout,
+            object_address,
+            "OPICT",
+            red_label_object_picture_address(picture_label)?,
+        )?;
+        self.activate_object_cell(object_address)?;
+        self.write_object_word(layout, object_address, "OBJCOL", color)?;
+        self.write_word(pointer_ram, object_address)?;
+        Ok(object_address)
+    }
+
+    /// Source-shaped `AMODE1`: send the lander and man upward, then sleep to
+    /// `AMODE2`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L515-L520>.
+    pub fn raise_attract_instruction_objects_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionAscent, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let enemy_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM)?;
+        let astronaut_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM)?;
+        self.write_object_word(
+            &layout,
+            enemy_object,
+            "OYV",
+            RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_Y_VELOCITY,
+        )?;
+        self.write_object_word(
+            &layout,
+            astronaut_object,
+            "OYV",
+            RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_Y_VELOCITY,
+        )?;
+        let wakeup_address = red_label_routine_address("AMODE2")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionAscent {
+            process_address,
+            enemy_object,
+            astronaut_object,
+            y_velocity: RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_Y_VELOCITY,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `AMODE2`: create the laser process, save it in `LASPRC`,
+    /// then sleep to `AMODE3`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L521-L523>.
+    pub fn start_attract_instruction_laser_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionLaserStart, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let laser_process = self.make_process(
+            red_label_routine_address("LASRS")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        )?;
+        self.write_word(
+            RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM,
+            laser_process.process_address,
+        )?;
+        let wakeup_address = red_label_routine_address("AMODE3")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_LASER_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionLaserStart {
+            process_address,
+            laser_process,
+            laser_process_pointer_address: RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_LASER_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `LASRS` entry: seed the laser process data from the
+    /// player ship screen coordinate, then fall through the first `LAS0` loop.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L668-L701>.
+    pub fn start_attract_instruction_laser_step_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionLaserStep, String> {
+        self.step_attract_instruction_laser_current_process(true)
+    }
+
+    /// Source-shaped `LAS0`: draw one instruction-page laser slice and sleep
+    /// back for the next frame.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L675-L701>.
+    pub fn continue_attract_instruction_laser_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionLaserStep, String> {
+        self.step_attract_instruction_laser_current_process(false)
+    }
+
+    fn step_attract_instruction_laser_current_process(
+        &mut self,
+        initialize: bool,
+    ) -> Result<RedLabelAttractInstructionLaserStep, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let ship_object = if initialize {
+            let ship_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM)?;
+            let ship_screen_address = self.read_object_screen_address(&layout, ship_object)?;
+            let laser_start = ship_screen_address
+                .wrapping_add(RED_LABEL_ATTRACT_INSTRUCTION_LASER_START_SCREEN_OFFSET);
+            self.write_process_data_word(&layout, process_address, "PD", laser_start)?;
+            self.write_process_data_word(&layout, process_address, "PD2", laser_start)?;
+            self.write_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM, laser_start)?;
+            Some(ship_object)
+        } else {
+            None
+        };
+
+        let laser_start = self.read_process_data_word(&layout, process_address, "PD")?;
+        let tip_address = self.draw_laser_body(RedLabelLaserDirection::Right, laser_start)?;
+        self.write_process_data_word(&layout, process_address, "PD", tip_address)?;
+        let fizzle_target = self.read_process_data_word(&layout, process_address, "PD2")?;
+        let (fizzle_source_next, fizzle_target_next) =
+            self.draw_laser_fizzle(&layout, RedLabelLaserDirection::Right, fizzle_target)?;
+        self.write_process_data_word(&layout, process_address, "PD2", fizzle_target_next)?;
+        let erase_address = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM)?;
+        self.write_byte(erase_address, 0)?;
+        let erase_next = step_laser_address(RedLabelLaserDirection::Right, erase_address);
+        self.write_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM, erase_next)?;
+        let wakeup_address = red_label_routine_address("LAS0")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_LASER_STEP_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionLaserStep {
+            process_address,
+            initialized: initialize,
+            ship_object,
+            laser_start,
+            tip_address,
+            fizzle_source_next,
+            fizzle_target_next,
+            erase_address,
+            erase_next,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_LASER_STEP_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `AMODE3`: kill the instruction-page laser, free/explode
+    /// the lander, start the ship/man rescue motion, then fall through the
+    /// first `AMODE4` free-fall frame.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L549-L568>.
+    pub fn start_attract_instruction_rescue_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionRescueStart, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let laser_kill = self.kill_attract_instruction_laser_process(&layout)?;
+        let enemy_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM)?;
+        let enemy_previous_link_address = self.kill_object_cell(enemy_object)?;
+        let enemy_explosion = self.start_explosion_for_object(enemy_object)?;
+        let ship_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM)?;
+        self.write_object_word(
+            &layout,
+            ship_object,
+            "OXV",
+            RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_SHIP_X_VELOCITY,
+        )?;
+        self.write_object_word(
+            &layout,
+            ship_object,
+            "OYV",
+            RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_SHIP_Y_VELOCITY,
+        )?;
+        self.write_byte(
+            RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM,
+            RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_FREE_FALL_TICKS,
+        )?;
+        let astronaut_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM)?;
+        self.write_object_word(&layout, astronaut_object, "OYV", 0)?;
+        let free_fall = self.run_attract_instruction_free_fall_frame(&layout)?;
+
+        Ok(RedLabelAttractInstructionRescueStart {
+            process_address,
+            laser_kill,
+            enemy_object,
+            enemy_previous_link_address,
+            enemy_explosion,
+            ship_object,
+            astronaut_object,
+            free_fall,
+        })
+    }
+
+    /// Source-shaped `AMODE4`: accelerate the man downward until the source
+    /// free-fall counter reaches the `AMODE5` intersection fallthrough.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L563-L579>.
+    pub fn continue_attract_instruction_free_fall_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionFreeFall, String> {
+        let layout = red_label_ram_layout()?;
+        self.run_attract_instruction_free_fall_frame(&layout)
+    }
+
+    /// Source-shaped `AMODE5`: run the rescue intersection fallthrough reached
+    /// after the `AMODE4` free-fall counter expires.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L574-L589>.
+    pub fn start_attract_instruction_intersection_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionIntersection, String> {
+        let layout = red_label_ram_layout()?;
+        self.start_attract_instruction_intersection_current_process_with_layout(&layout)
+    }
+
+    fn kill_attract_instruction_laser_process(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<RedLabelAttractInstructionLaserKill, String> {
+        let laser_process_address =
+            self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM)?;
+        let laser_state_start = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM)?;
+        let laser_state_end = self.read_process_data_word(layout, laser_process_address, "PD")?;
+        let mut cleared_addresses = Vec::new();
+        let mut address = laser_state_start;
+        for _ in 0..0x100 {
+            self.write_byte(address, 0)?;
+            cleared_addresses.push(address);
+            let next = address.wrapping_add(0x0100);
+            if next > laser_state_end {
+                break;
+            }
+            address = next;
+        }
+        let previous_link_address = self.kill_process(laser_process_address)?;
+        let killed_process = RedLabelKilledProcess {
+            killed_process_address: laser_process_address,
+            previous_link_address,
+        };
+        Ok(RedLabelAttractInstructionLaserKill {
+            laser_process_address,
+            laser_state_start,
+            laser_state_end,
+            cleared_addresses,
+            killed_process,
+        })
+    }
+
+    fn run_attract_instruction_free_fall_frame(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<RedLabelAttractInstructionFreeFall, String> {
+        let process_address = self.current_process_address(layout)?;
+        let astronaut_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM)?;
+        let y_velocity_before = self.read_object_word(layout, astronaut_object, "OYV")?;
+        let y_velocity_after =
+            y_velocity_before.wrapping_add(RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_ACCELERATION);
+        self.write_object_word(layout, astronaut_object, "OYV", y_velocity_after)?;
+        let free_fall_before = self.read_byte(RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM)?;
+        let free_fall_after = free_fall_before.wrapping_sub(1);
+        self.write_byte(
+            RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM,
+            free_fall_after,
+        )?;
+        if free_fall_after == 0 {
+            return self
+                .start_attract_instruction_intersection_current_process_with_layout(layout)
+                .map(RedLabelAttractInstructionFreeFall::Intersection);
+        }
+
+        let wakeup_address = red_label_routine_address("AMODE4")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+        Ok(RedLabelAttractInstructionFreeFall::Sleeping {
+            process_address,
+            astronaut_object,
+            y_velocity_before,
+            y_velocity_after,
+            free_fall_before,
+            free_fall_after,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    fn start_attract_instruction_intersection_current_process_with_layout(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<RedLabelAttractInstructionIntersection, String> {
+        let process_address = self.current_process_address(layout)?;
+        let points_object = self.init_attract_instruction_object_cell(
+            layout,
+            "C5P1",
+            RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_X16,
+            RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_Y16,
+            0,
+            RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_OBJECT_RAM,
+        )?;
+        let ship_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM)?;
+        self.write_object_word(layout, ship_object, "OXV", 0)?;
+        self.write_object_word(
+            layout,
+            ship_object,
+            "OYV",
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SHIP_Y_VELOCITY,
+        )?;
+        let astronaut_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM)?;
+        self.write_object_word(
+            layout,
+            astronaut_object,
+            "OX16",
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_MAN_X16,
+        )?;
+        self.write_object_word(
+            layout,
+            astronaut_object,
+            "OY16",
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_MAN_Y16,
+        )?;
+        self.write_object_word(
+            layout,
+            astronaut_object,
+            "OYV",
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SHIP_Y_VELOCITY,
+        )?;
+        let wakeup_address = red_label_routine_address("AMODE7")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionIntersection {
+            process_address,
+            points_object,
+            ship_object,
+            astronaut_object,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `AMODE7`: move the 500-point object down, stop the man,
+    /// turn the ship around, and sleep to `AMODE8`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L594-L604>.
+    pub fn start_attract_instruction_ship_return_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionShipReturn, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let points_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_OBJECT_RAM)?;
+        self.write_object_word(
+            &layout,
+            points_object,
+            "OY16",
+            RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_RETURN_Y16,
+        )?;
+        self.write_object_word(
+            &layout,
+            points_object,
+            "OX16",
+            RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_RETURN_X16,
+        )?;
+        let astronaut_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM)?;
+        self.write_object_word(&layout, astronaut_object, "OYV", 0)?;
+        let ship_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM)?;
+        self.write_object_word(
+            &layout,
+            ship_object,
+            "OPICT",
+            red_label_object_picture_address("PLBPIC")?,
+        )?;
+        self.write_object_word(
+            &layout,
+            ship_object,
+            "OXV",
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_X_VELOCITY,
+        )?;
+        self.write_object_word(
+            &layout,
+            ship_object,
+            "OYV",
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_Y_VELOCITY,
+        )?;
+        let wakeup_address = red_label_routine_address("AMODE8")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionShipReturn {
+            process_address,
+            points_object,
+            ship_object,
+            astronaut_object,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `AMODE8`: restore the ship, remove the 500-point object,
+    /// then fall through the first `AMOD12` enemy-table spawn.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L606-L638>.
+    pub fn start_attract_instruction_enemy_table_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionEnemyTableStart, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let ship_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM)?;
+        self.write_object_word(
+            &layout,
+            ship_object,
+            "OPICT",
+            red_label_object_picture_address("PLAPIC")?,
+        )?;
+        self.write_object_word(&layout, ship_object, "OXV", 0)?;
+        self.write_object_word(&layout, ship_object, "OYV", 0)?;
+        let points_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_OBJECT_RAM)?;
+        let points_previous_link_address = self.kill_object_cell_offscreen(points_object)?;
+        let enemy = self.spawn_attract_instruction_enemy_from_table(
+            &layout,
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS,
+        )?;
+
+        Ok(RedLabelAttractInstructionEnemyTableStart {
+            process_address,
+            points_object,
+            points_previous_link_address,
+            ship_object,
+            enemy,
+        })
+    }
+
+    fn spawn_attract_instruction_enemy_from_table(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        table_pointer_before: u16,
+    ) -> Result<RedLabelAttractInstructionEnemySpawn, String> {
+        let table_index = self.attract_instruction_enemy_table_index(table_pointer_before)?;
+        let index = usize::from(table_index);
+        let object_address = self.get_object_cell()?;
+        let picture_address = red_label_object_picture_address(
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_PICTURES[index],
+        )?;
+        self.write_object_word(layout, object_address, "OPICT", picture_address)?;
+        self.write_object_word(
+            layout,
+            object_address,
+            "OBJCOL",
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_BLIPS[index],
+        )?;
+        self.write_object_word(
+            layout,
+            object_address,
+            "OX16",
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X16,
+        )?;
+        self.write_object_word(
+            layout,
+            object_address,
+            "OY16",
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y16_LOW,
+        )?;
+        self.write_object_word(
+            layout,
+            object_address,
+            "OYV",
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y_VELOCITY,
+        )?;
+        self.write_object_word(layout, object_address, "OXV", 0)?;
+        let appearance = self.start_appearance_for_object(object_address)?;
+        let table_pointer_after = table_pointer_before;
+        self.write_word(
+            RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM,
+            table_pointer_after,
+        )?;
+        self.write_word(
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM,
+            object_address,
+        )?;
+        let wakeup_address = red_label_routine_address("AMOD10")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionEnemySpawn {
+            table_pointer_before,
+            table_pointer_after,
+            table_index,
+            object_address,
+            picture_address,
+            x16: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X16,
+            y16: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y16_LOW,
+            source_table_y16: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y[index],
+            y_velocity: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y_VELOCITY,
+            color: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_BLIPS[index],
+            appearance,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped direct `AMOD12`: spawn the enemy pointed at by `OTABPT`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L625-L638>.
+    pub fn spawn_attract_instruction_enemy_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionEnemySpawn, String> {
+        let layout = red_label_ram_layout()?;
+        let table_pointer =
+            self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM)?;
+        self.spawn_attract_instruction_enemy_from_table(&layout, table_pointer)
+    }
+
+    /// Source-shaped `AMOD10`: start the per-enemy laser and sleep to
+    /// `AMOD11`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L639-L641>.
+    pub fn start_attract_instruction_table_laser_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionLaserStart, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let laser_process = self.make_process(
+            red_label_routine_address("LASRS")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        )?;
+        self.write_word(
+            RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM,
+            laser_process.process_address,
+        )?;
+        let wakeup_address = red_label_routine_address("AMOD11")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_TABLE_LASER_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionLaserStart {
+            process_address,
+            laser_process,
+            laser_process_pointer_address: RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TABLE_LASER_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `AMOD11`: kill the laser, explode the active enemy, reuse
+    /// its object cell for the source table X/Y position, and sleep to
+    /// `BMODE2`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L642-L657>.
+    pub fn resolve_attract_instruction_enemy_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionEnemyResolve, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let laser_kill = self.kill_attract_instruction_laser_process(&layout)?;
+        let enemy_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM)?;
+        let enemy_previous_link_address = self.kill_object_cell(enemy_object)?;
+        let _reused_object = self.get_object_cell()?;
+        let enemy_explosion = self.start_explosion_for_object(enemy_object)?;
+        let table_pointer_before =
+            self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM)?;
+        let table_index = self.attract_instruction_enemy_table_index(table_pointer_before)?;
+        let index = usize::from(table_index);
+        let x16 = RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X[index];
+        let y16 = RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y[index];
+        self.write_object_word(&layout, enemy_object, "OX16", x16)?;
+        self.write_object_word(&layout, enemy_object, "OY16", y16)?;
+        self.write_object_word(&layout, enemy_object, "OYV", 0)?;
+        self.write_object_word(&layout, enemy_object, "OXV", 0)?;
+        let appearance = self.start_appearance_for_object(enemy_object)?;
+        let table_pointer_after = table_pointer_before.wrapping_add(2);
+        self.write_word(
+            RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM,
+            table_pointer_after,
+        )?;
+        let wakeup_address = red_label_routine_address("BMODE2")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_RESOLVE_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionEnemyResolve {
+            process_address,
+            laser_kill,
+            table_pointer_before,
+            table_pointer_after,
+            table_index,
+            enemy_object,
+            enemy_previous_link_address,
+            enemy_explosion,
+            x16,
+            y16,
+            appearance,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_RESOLVE_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `BMODE2`: advance `TEXPTR` and sleep to `BMODE3`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L658-L661>.
+    pub fn advance_attract_instruction_text_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionTextAdvance, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let text_pointer_before = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM)?;
+        let text_pointer_after = text_pointer_before.wrapping_add(2);
+        self.write_word(
+            RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM,
+            text_pointer_after,
+        )?;
+        let wakeup_address = red_label_routine_address("BMODE3")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ADVANCE_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionTextAdvance {
+            process_address,
+            text_pointer_before,
+            text_pointer_after,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ADVANCE_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `TEXTP`: write the first instruction-page text line,
+    /// store `TEXTMP`, and sleep to `TEXTP2`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L703-L708>.
+    pub fn start_attract_instruction_text_process_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionTextProcess, String> {
+        self.write_attract_instruction_text_process_line(
+            RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE,
+            false,
+        )
+    }
+
+    /// Source-shaped `TEXTP2`: resume from `TEXTMP` while it is below
+    /// `TEXPTR`; otherwise branch directly back to `TEXTP`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L709-L712>.
+    pub fn continue_attract_instruction_text_process_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionTextProcess, String> {
+        let text_pointer = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM)?;
+        let text_pointer_limit = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM)?;
+        let (table_pointer, restarted) = if text_pointer == text_pointer_limit {
+            (RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE, true)
+        } else {
+            (text_pointer, false)
+        };
+        self.write_attract_instruction_text_process_line(table_pointer, restarted)
+    }
+
+    fn write_attract_instruction_text_process_line(
+        &mut self,
+        table_pointer_before: u16,
+        restarted: bool,
+    ) -> Result<RedLabelAttractInstructionTextProcess, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let table_index = self.attract_instruction_text_table_index(table_pointer_before)?;
+        let index = usize::from(table_index);
+        let message_label = RED_LABEL_ATTRACT_INSTRUCTION_TEXT_LABELS[index];
+        let message = red_label_message(message_label)?;
+        let message_screen_address = RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SCREEN_ADDRESSES[index];
+        let cursor_after =
+            self.write_message_text_block(&layout, message_screen_address, message)?;
+        let table_pointer_after =
+            table_pointer_before.wrapping_add(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ENTRY_SIZE);
+        self.write_word(
+            RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM,
+            table_pointer_after,
+        )?;
+        let text_pointer_limit = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM)?;
+        let wakeup_address = red_label_routine_address("TEXTP2")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+
+        Ok(RedLabelAttractInstructionTextProcess {
+            process_address,
+            restarted,
+            table_pointer_before,
+            table_pointer_after,
+            text_pointer_limit,
+            message_vector_address: message.vector_address,
+            message_screen_address,
+            message_label,
+            cursor_after,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `BMODE3`: continue with `AMOD12` until `OTABND`, then
+    /// sleep to `AMOD13`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L662-L665>.
+    pub fn decide_attract_instruction_table_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionTableDecision, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let table_pointer =
+            self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM)?;
+        if table_pointer != RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_END {
+            return self
+                .spawn_attract_instruction_enemy_from_table(&layout, table_pointer)
+                .map(RedLabelAttractInstructionTableDecision::NextEnemy);
+        }
+
+        let wakeup_address = red_label_routine_address("AMOD13")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_TABLE_END_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+        Ok(RedLabelAttractInstructionTableDecision::TableEnded {
+            process_address,
+            table_pointer,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TABLE_END_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `AMOD13`: sleep before restarting the Williams page.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L666-L666>.
+    pub fn restart_attract_instruction_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractInstructionRestart, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let wakeup_address = red_label_routine_address("AMODES")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_INSTRUCTION_RESTART_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+        Ok(RedLabelAttractInstructionRestart {
+            process_address,
+            sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_RESTART_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    fn attract_instruction_enemy_table_index(&self, table_pointer: u16) -> Result<u8, String> {
+        if !(RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS
+            ..RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_END)
+            .contains(&table_pointer)
+            || !(table_pointer - RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS)
+                .is_multiple_of(2)
+        {
+            return Err(format!(
+                "red-label attract enemy table pointer 0x{table_pointer:04X} is invalid"
+            ));
+        }
+        Ok(((table_pointer - RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS) / 2) as u8)
+    }
+
+    fn attract_instruction_text_table_index(&self, table_pointer: u16) -> Result<u8, String> {
+        if table_pointer < RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE
+            || table_pointer
+                >= RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE
+                    .wrapping_add(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE_BYTES)
+            || !(table_pointer - RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE).is_multiple_of(2)
+        {
+            return Err(format!(
+                "red-label attract instruction text table pointer 0x{table_pointer:04X} is invalid"
+            ));
+        }
+        Ok(((table_pointer - RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE) / 2) as u8)
+    }
+
+    /// Source-shaped `CREDS`: when credits are non-zero, refresh the attract
+    /// credits label and BCD number, flag newly-increased credit counts, then
+    /// sleep back to `CREDS`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L978-L990>.
+    pub fn display_attract_credits_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractCredits, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let credit = self.read_field_byte(&layout, "base_page", "CREDIT")?;
+        let old_credit_before = self.read_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM)?;
+        let credit_increase_flag_before =
+            self.read_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM)?;
+        let mut old_credit_after = old_credit_before;
+        let mut credit_increase_flag_after = credit_increase_flag_before;
+        let text = if credit == 0 {
+            None
+        } else {
+            if credit > old_credit_before {
+                self.write_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM, credit)?;
+                old_credit_after = credit;
+                credit_increase_flag_after = credit_increase_flag_after.wrapping_add(1);
+                self.write_byte(
+                    RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM,
+                    credit_increase_flag_after,
+                )?;
+            }
+
+            let message = red_label_message("CREDV")?;
+            self.write_message_text_block(&layout, RED_LABEL_ATTRACT_CREDITS_SCREEN, message)?;
+            self.write_field_word(
+                &layout,
+                "base_page",
+                "CURSER",
+                RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN,
+            )?;
+            self.write_message_number_block(&layout, credit)?;
+            Some(RedLabelAttractCreditsText {
+                message_vector_address: message.vector_address,
+                message_screen_address: RED_LABEL_ATTRACT_CREDITS_SCREEN,
+                number_screen_address: RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN,
+                displayed_credit_bcd: credit,
+            })
+        };
+        let wakeup_address = red_label_routine_address("CREDS")?;
+        self.sleep_current_process(RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS, wakeup_address)?;
+        Ok(RedLabelAttractCredits {
+            process_address,
+            credit,
+            old_credit_before,
+            old_credit_after,
+            credit_increase_flag_before,
+            credit_increase_flag_after,
+            text,
+            sleep_ticks: RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `AMODES`: prepare the Williams logo page before entering
+    /// `LOGO`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L717-L730>.
+    pub fn start_attract_williams_page_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractWilliamsPage, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let genocide = self.genocide_other_processes()?;
+        self.write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0)?;
+        self.write_field_byte(
+            &layout,
+            "base_page",
+            "STATUS",
+            RED_LABEL_ATTRACT_WILLIAMS_STATUS,
+        )?;
+        let screen_clear = self.clear_screen_ram()?;
+        self.write_byte(RED_LABEL_ATTRACT_MESSAGE_POINTER_RAM, 0)?;
+        self.write_word(RED_LABEL_ATTRACT_NUMBER_RAM, 0xFFFF)?;
+        let support_processes = vec![
+            self.make_process(
+                red_label_routine_address("COLR")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+            self.make_process(
+                red_label_routine_address("TIECOL")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?,
+        ];
+        let logo_color_address = field_range(&layout, "base_page", "PCRAM")?.start + 0x0C;
+        self.write_byte(logo_color_address, RED_LABEL_ATTRACT_WILLIAMS_LOGO_COLOR)?;
+        let logo_address = red_label_routine_address("LOGO")?;
+        self.write_process_word(&layout, process_address, "PADDR", logo_address)?;
+        Ok(RedLabelAttractWilliamsPage {
+            process_address,
+            genocide,
+            status: RED_LABEL_ATTRACT_WILLIAMS_STATUS,
+            screen_clear,
+            message_pointer_high_address: RED_LABEL_ATTRACT_MESSAGE_POINTER_RAM,
+            number_address: RED_LABEL_ATTRACT_NUMBER_RAM,
+            support_processes,
+            logo_color_address,
+            logo_color: RED_LABEL_ATTRACT_WILLIAMS_LOGO_COLOR,
+            logo_address,
+        })
+    }
+
+    /// Source-shaped `LOGO`: expand the later `DEFENDER` picture data, seed the
+    /// Williams-logo table walker, and run the first table slice.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L735-L796>.
+    pub fn start_attract_logo_current_process(&mut self) -> Result<RedLabelAttractLogo, String> {
+        let logo = expanded_defender_logo_image();
+        let logo_ram_range = checked_defender_logo_ram_range(self.ram.len())?;
+        self.ram[logo_ram_range].copy_from_slice(&logo);
+        self.write_byte(
+            RED_LABEL_ATTRACT_LOGO_FLAG_RAM,
+            RED_LABEL_ATTRACT_LOGO_INITIAL_BYTES_PER_SLICE,
+        )?;
+        self.write_word(
+            RED_LABEL_ATTRACT_LOGO_POINTER_RAM,
+            RED_LABEL_ATTRACT_LOGO_TABLE_ADDRESS,
+        )?;
+        self.step_attract_logo_table_current_process_with_table(
+            true,
+            Some(crc32(&logo)),
+            RED_LABEL_ATTRACT_LOGO_TABLE_ADDRESS,
+            &RED_LABEL_ATTRACT_LOGO_TABLE,
+        )
+    }
+
+    /// Source-shaped `LOGO0`: consume the configured number of `LGOTAB`
+    /// entries, write pixels through the ROM cursor format, and sleep back to
+    /// `LOGO0`. Hitting `QUIT` switches the first pass to the fast rate and
+    /// starts `PRES` before continuing from the table start.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L740-L796>.
+    pub fn step_attract_logo_table_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractLogo, String> {
+        self.step_attract_logo_table_current_process_with_table(
+            false,
+            None,
+            RED_LABEL_ATTRACT_LOGO_TABLE_ADDRESS,
+            &RED_LABEL_ATTRACT_LOGO_TABLE,
+        )
+    }
+
+    fn step_attract_logo_table_current_process_with_table(
+        &mut self,
+        initialized: bool,
+        defender_logo_ram_crc32: Option<u32>,
+        table_base: u16,
+        table: &[u8],
+    ) -> Result<RedLabelAttractLogo, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let table_pointer_before = self.read_word(RED_LABEL_ATTRACT_LOGO_POINTER_RAM)?;
+        let cursor_before = self.read_word(RED_LABEL_ATTRACT_LOGO_CURSOR_RAM)?;
+        let mut table_pointer = table_pointer_before;
+        let mut cursor = cursor_before;
+        let mut bytes_per_slice = self.read_byte(RED_LABEL_ATTRACT_LOGO_FLAG_RAM)?;
+        let mut table_operations = 0u16;
+        let mut pixel_writes = Vec::new();
+        let mut first_pass_completed = false;
+        let mut presents_process = None;
+        let mut last_screen_address = attract_logo_screen_address(cursor).0;
+
+        for _ in 0..1024 {
+            let mut bytes_remaining = bytes_per_slice;
+            self.write_byte(RED_LABEL_ATTRACT_LOGO_TEMP_B_RAM, bytes_remaining)?;
+            loop {
+                let opcode = attract_logo_table_byte(table_base, table, table_pointer)?;
+                table_pointer = table_pointer.wrapping_add(1);
+                if opcode > 0xAA {
+                    let complemented = !opcode;
+                    if complemented == 0 {
+                        continue;
+                    }
+                    if complemented.wrapping_sub(1) != 0 {
+                        self.write_word(
+                            RED_LABEL_ATTRACT_LOGO_CURSOR_END_RAM,
+                            last_screen_address,
+                        )?;
+                        if bytes_per_slice == RED_LABEL_ATTRACT_LOGO_INITIAL_BYTES_PER_SLICE {
+                            bytes_per_slice = RED_LABEL_ATTRACT_LOGO_FAST_BYTES_PER_SLICE;
+                            self.write_byte(RED_LABEL_ATTRACT_LOGO_FLAG_RAM, bytes_per_slice)?;
+                            presents_process = Some(self.make_process(
+                                red_label_routine_address("PRES")?,
+                                RED_LABEL_SYSTEM_PROCESS_TYPE,
+                            )?);
+                            first_pass_completed = true;
+                        }
+                        table_pointer = table_base;
+                        self.write_word(RED_LABEL_ATTRACT_LOGO_POINTER_RAM, table_pointer)?;
+                        break;
+                    }
+                    let cursor_high = attract_logo_table_byte(table_base, table, table_pointer)?;
+                    table_pointer = table_pointer.wrapping_add(1);
+                    let cursor_low = attract_logo_table_byte(table_base, table, table_pointer)?;
+                    table_pointer = table_pointer.wrapping_add(1);
+                    cursor = u16::from_be_bytes([cursor_high, cursor_low]);
+                    self.write_word(RED_LABEL_ATTRACT_LOGO_CURSOR_RAM, cursor)?;
+                    self.write_byte(RED_LABEL_ATTRACT_LOGO_TEMP_A_RAM, 0)?;
+                    let write = self.write_attract_logo_pixel(cursor)?;
+                    last_screen_address = write.screen_address;
+                    pixel_writes.push(write);
+                } else {
+                    let mut accumulator = opcode;
+                    loop {
+                        accumulator =
+                            attract_logo_apply_horizontal_bit(accumulator, &mut cursor, true);
+                        accumulator =
+                            attract_logo_apply_horizontal_bit(accumulator, &mut cursor, false);
+                        accumulator =
+                            attract_logo_apply_vertical_bit(accumulator, &mut cursor, true);
+                        accumulator =
+                            attract_logo_apply_vertical_bit(accumulator, &mut cursor, false);
+                        self.write_word(RED_LABEL_ATTRACT_LOGO_CURSOR_RAM, cursor)?;
+                        self.write_byte(RED_LABEL_ATTRACT_LOGO_TEMP_A_RAM, accumulator)?;
+                        let write = self.write_attract_logo_pixel(cursor)?;
+                        last_screen_address = write.screen_address;
+                        pixel_writes.push(write);
+                        if accumulator == 0 {
+                            break;
+                        }
+                    }
+                }
+
+                table_operations = table_operations.wrapping_add(1);
+                bytes_remaining = bytes_remaining.wrapping_sub(1);
+                self.write_byte(RED_LABEL_ATTRACT_LOGO_TEMP_B_RAM, bytes_remaining)?;
+                if bytes_remaining != 0 {
+                    continue;
+                }
+
+                self.write_word(RED_LABEL_ATTRACT_LOGO_POINTER_RAM, table_pointer)?;
+                let wakeup_address = red_label_routine_address("LOGO0")?;
+                self.sleep_current_process(RED_LABEL_ATTRACT_LOGO_SLEEP_TICKS, wakeup_address)?;
+                return Ok(RedLabelAttractLogo {
+                    process_address,
+                    initialized,
+                    defender_logo_ram_crc32,
+                    table_pointer_before,
+                    table_pointer_after: table_pointer,
+                    cursor_before,
+                    cursor_after: self.read_word(RED_LABEL_ATTRACT_LOGO_CURSOR_RAM)?,
+                    bytes_per_slice,
+                    table_operations,
+                    pixel_writes,
+                    first_pass_completed,
+                    presents_process,
+                    sleep_ticks: RED_LABEL_ATTRACT_LOGO_SLEEP_TICKS,
+                    wakeup_address,
+                });
+            }
+        }
+
+        Err(String::from(
+            "red-label LOGO table walker did not reach a sleep point",
+        ))
+    }
+
+    fn write_attract_logo_pixel(
+        &mut self,
+        cursor: u16,
+    ) -> Result<RedLabelAttractLogoPixel, String> {
+        let (screen_address, pixel_mask) = attract_logo_screen_address(cursor);
+        let byte_before = self.read_byte(screen_address)?;
+        let byte_after = byte_before | pixel_mask;
+        self.write_byte(screen_address, byte_after)?;
+        Ok(RedLabelAttractLogoPixel {
+            cursor,
+            screen_address,
+            pixel_mask,
+            byte_before,
+            byte_after,
+        })
+    }
+
+    /// Source-shaped `PRES`: create `DEFEND`, write the `ELECV` electronics /
+    /// presents text block, then sleep back to `PRES1`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L800-L806>.
+    pub fn start_attract_presents_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractPresents, String> {
+        let defender_process = self.make_process(
+            red_label_routine_address("DEFEND")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        )?;
+        self.write_attract_presents_text(Some(defender_process))
+    }
+
+    /// Source-shaped `PRES1`: redraw the `ELECV` block and sleep back to itself.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L801-L806>.
+    pub fn refresh_attract_presents_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractPresents, String> {
+        self.write_attract_presents_text(None)
+    }
+
+    fn write_attract_presents_text(
+        &mut self,
+        defender_process: Option<RedLabelCreatedProcess>,
+    ) -> Result<RedLabelAttractPresents, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let message = red_label_message("ELECV")?;
+        self.write_text_bytes_with_space(
+            &layout,
+            RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+            b"ELECTRONICS INC.",
+        )?;
+        self.write_text_bytes_with_space(
+            &layout,
+            RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN,
+            b"PRESENTS",
+        )?;
+
+        let wakeup_address = red_label_routine_address("PRES1")?;
+        self.sleep_current_process(RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS, wakeup_address)?;
+        Ok(RedLabelAttractPresents {
+            process_address,
+            defender_process,
+            message_vector_address: message.vector_address,
+            electronics_screen_address: RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+            presents_screen_address: RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN,
+            cursor_after: RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER,
+            sleep_ticks: RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `DEFEND`: wait before the Defender wordmark appearance
+    /// objects are started.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L810-L810>.
+    pub fn delay_attract_defender_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractDefenderDelay, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let wakeup_address = red_label_routine_address("DEFENS")?;
+        self.sleep_current_process(RED_LABEL_ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS, wakeup_address)?;
+        Ok(RedLabelAttractDefenderDelay {
+            process_address,
+            sleep_ticks: RED_LABEL_ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `DEFENS`: build the compact `DEFRAM` object blocks and
+    /// `DEFPIC` descriptors, start one `APVCT` appearance per 4x12 logo slice,
+    /// then sleep to `DEF33`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L811-L845>.
+    pub fn start_attract_defender_appearances_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractDefenderAppearances, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let descriptor_pointer_start = RED_LABEL_ATTRACT_DEFENDER_PICTURES;
+        let data_pointer_start = RED_LABEL_ATTRACT_DEFENDER_DATA;
+        let object_pointer_start = RED_LABEL_ATTRACT_DEFENDER_OBJECTS;
+        let bgl = 0;
+        let initial_x16 = RED_LABEL_ATTRACT_DEFENDER_INITIAL_X16;
+
+        self.write_word(
+            RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR_POINTER_RAM,
+            descriptor_pointer_start,
+        )?;
+        self.write_word(
+            RED_LABEL_ATTRACT_DEFENDER_DATA_POINTER_RAM,
+            data_pointer_start,
+        )?;
+        self.write_field_word(&layout, "base_page", "BGL", bgl)?;
+        self.write_word(RED_LABEL_ATTRACT_DEFENDER_X_POINTER_RAM, initial_x16)?;
+        self.write_word(
+            RED_LABEL_ATTRACT_DEFENDER_OBJECT_POINTER_RAM,
+            object_pointer_start,
+        )?;
+
+        let mut descriptor_pointer = descriptor_pointer_start;
+        let mut data_pointer = data_pointer_start;
+        let mut object_pointer = object_pointer_start;
+        let mut x16 = initial_x16;
+        let mut objects = Vec::with_capacity(usize::from(RED_LABEL_ATTRACT_DEFENDER_OBJECT_COUNT));
+        for index in 0..RED_LABEL_ATTRACT_DEFENDER_OBJECT_COUNT {
+            self.write_word(
+                descriptor_pointer,
+                u16::from_be_bytes([
+                    RED_LABEL_ATTRACT_DEFENDER_PICTURE_WIDTH,
+                    RED_LABEL_ATTRACT_DEFENDER_PICTURE_HEIGHT,
+                ]),
+            )?;
+            self.write_word(descriptor_pointer + 2, data_pointer)?;
+            data_pointer = data_pointer.wrapping_add(RED_LABEL_ATTRACT_DEFENDER_PICTURE_DATA_STEP);
+            self.write_word(RED_LABEL_ATTRACT_DEFENDER_DATA_POINTER_RAM, data_pointer)?;
+
+            self.write_word(
+                object_pointer + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET,
+                descriptor_pointer,
+            )?;
+            self.write_word(
+                object_pointer + RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET,
+                x16,
+            )?;
+            x16 = x16.wrapping_add(RED_LABEL_ATTRACT_DEFENDER_X16_STEP);
+            self.write_word(RED_LABEL_ATTRACT_DEFENDER_X_POINTER_RAM, x16)?;
+            self.write_word(
+                object_pointer + RED_LABEL_ATTRACT_DEFENDER_OBJECT_Y16_OFFSET,
+                RED_LABEL_ATTRACT_DEFENDER_Y16,
+            )?;
+
+            let appearance = self.start_appearance_for_raw_object_cell(object_pointer)?;
+            objects.push(RedLabelAttractDefenderObject {
+                index,
+                object_address: object_pointer,
+                picture_descriptor_address: descriptor_pointer,
+                picture_data_address: data_pointer
+                    .wrapping_sub(RED_LABEL_ATTRACT_DEFENDER_PICTURE_DATA_STEP),
+                x16: x16.wrapping_sub(RED_LABEL_ATTRACT_DEFENDER_X16_STEP),
+                y16: RED_LABEL_ATTRACT_DEFENDER_Y16,
+                appearance,
+            });
+
+            object_pointer = object_pointer.wrapping_add(RED_LABEL_ATTRACT_DEFENDER_OBJECT_BYTES);
+            self.write_word(
+                RED_LABEL_ATTRACT_DEFENDER_OBJECT_POINTER_RAM,
+                object_pointer,
+            )?;
+            descriptor_pointer =
+                descriptor_pointer.wrapping_add(RED_LABEL_ATTRACT_DEFENDER_PICTURE_BYTES);
+            self.write_word(
+                RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR_POINTER_RAM,
+                descriptor_pointer,
+            )?;
+        }
+
+        let wakeup_address = red_label_routine_address("DEF33")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+        Ok(RedLabelAttractDefenderAppearances {
+            process_address,
+            descriptor_pointer_start,
+            data_pointer_start,
+            object_pointer_start,
+            bgl,
+            initial_x16,
+            objects,
+            descriptor_pointer_after: descriptor_pointer,
+            data_pointer_after: data_pointer,
+            object_pointer_after: object_pointer,
+            x16_after: x16,
+            sleep_ticks: RED_LABEL_ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `DEF33`: build the whole `DEFENDER` descriptor, create
+    /// the `DEF50` refresh process, then sleep to `DEF44`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L846-L852>.
+    pub fn start_attract_defender_restore_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractDefenderRestoreStart, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        self.write_word(
+            RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR,
+            u16::from_be_bytes([
+                RED_LABEL_ATTRACT_DEFENDER_WHOLE_WIDTH,
+                RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT,
+            ]),
+        )?;
+        self.write_word(
+            RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR + 2,
+            RED_LABEL_ATTRACT_DEFENDER_DATA,
+        )?;
+        let restore_process = self.make_process(
+            red_label_routine_address("DEF50")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        )?;
+        let wakeup_address = red_label_routine_address("DEF44")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_DEFENDER_RESTORE_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+        Ok(RedLabelAttractDefenderRestoreStart {
+            process_address,
+            descriptor_address: RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR,
+            picture_address: RED_LABEL_ATTRACT_DEFENDER_DATA,
+            width: RED_LABEL_ATTRACT_DEFENDER_WHOLE_WIDTH,
+            height: RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT,
+            restore_process,
+            sleep_ticks: RED_LABEL_ATTRACT_DEFENDER_RESTORE_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `DEF44`: start the color-bomb process, then fall through
+    /// into `COPYRT` for the copyright bitmap and wait gate.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L853-L895>.
+    pub fn start_attract_copyright_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractCopyright, String> {
+        self.write_attract_copyright_current_process_with_bomb(true)
+    }
+
+    /// Source-shaped `COPYRT`: expand the copyright bitmap, set the
+    /// Williams/power flags, start credits, then run the first `CPR55` wait
+    /// check.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L857-L895>.
+    pub fn write_attract_copyright_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractCopyright, String> {
+        self.write_attract_copyright_current_process_with_bomb(false)
+    }
+
+    fn write_attract_copyright_current_process_with_bomb(
+        &mut self,
+        start_bomb_process: bool,
+    ) -> Result<RedLabelAttractCopyright, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let bomb_process = if start_bomb_process {
+            Some(self.make_process(
+                red_label_routine_address("CBOMB")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?)
+        } else {
+            None
+        };
+
+        self.write_attract_copyright_bitmap()?;
+        let pcram = field_range(&layout, "base_page", "PCRAM")?.start;
+        let williams_color_address =
+            pcram.wrapping_add(RED_LABEL_ATTRACT_COPYRIGHT_WILLIAMS_COLOR_INDEX);
+        let williams_color = self.read_byte(williams_color_address)?;
+        let williams_cursor = self.read_word(RED_LABEL_ATTRACT_LOGO_CURSOR_END_RAM)?;
+        let williams_cursor_transferred = (!williams_color) & 0x07 == 0;
+        if williams_cursor_transferred {
+            self.write_field_word(&layout, "base_page", "WCURS", williams_cursor)?;
+        }
+
+        let power_flag = 1;
+        self.write_field_byte(&layout, "base_page", "PWRFLG", power_flag)?;
+        let credits_process = self.make_process(
+            red_label_routine_address("CREDS")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        )?;
+        self.write_byte(
+            RED_LABEL_HOF_STALL_TIMER_RAM,
+            RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS,
+        )?;
+        let wait = self.continue_attract_copyright_wait_current_process()?;
+        Ok(RedLabelAttractCopyright {
+            process_address,
+            bomb_process,
+            copyright_screen_address: RED_LABEL_ATTRACT_COPYRIGHT_SCREEN,
+            copyright_data_address: RED_LABEL_ATTRACT_COPYRIGHT_DATA_ADDRESS,
+            rows: RED_LABEL_ATTRACT_COPYRIGHT_ROWS,
+            row_width: RED_LABEL_ATTRACT_COPYRIGHT_ROW_WIDTH,
+            williams_color_address,
+            williams_color,
+            williams_cursor,
+            williams_cursor_transferred,
+            power_flag,
+            credits_process,
+            stall_ticks: RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS,
+            wait,
+        })
+    }
+
+    /// Source-shaped `CPR55` / `CPR56`: wait for credit input or timeout,
+    /// then jump to instructions or hall-of-fame display.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L891-L896>.
+    pub fn continue_attract_copyright_wait_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractCopyrightWait, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let credit_increase_flag = self.read_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM)?;
+        if credit_increase_flag != 0 {
+            let target_address = red_label_routine_address("LEDRET")?;
+            self.write_process_word(&layout, process_address, "PADDR", target_address)?;
+            return Ok(RedLabelAttractCopyrightWait::CreditIncreaseJump {
+                process_address,
+                credit_increase_flag,
+                target_address,
+            });
+        }
+
+        let stall_before = self.read_byte(RED_LABEL_HOF_STALL_TIMER_RAM)?;
+        let stall_after = stall_before.wrapping_sub(1);
+        self.write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, stall_after)?;
+        if stall_after == 0 {
+            let target_address = red_label_routine_address("HALDIS")?;
+            self.write_process_word(&layout, process_address, "PADDR", target_address)?;
+            return Ok(RedLabelAttractCopyrightWait::HallOfFameJump {
+                process_address,
+                credit_increase_flag,
+                stall_before,
+                stall_after,
+                target_address,
+            });
+        }
+
+        let wakeup_address = red_label_routine_address("CPR55")?;
+        self.sleep_current_process(RED_LABEL_ATTRACT_COPYRIGHT_SLEEP_TICKS, wakeup_address)?;
+        Ok(RedLabelAttractCopyrightWait::Sleeping {
+            process_address,
+            credit_increase_flag,
+            stall_before,
+            stall_after,
+            sleep_ticks: RED_LABEL_ATTRACT_COPYRIGHT_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `DEF50`: redraw the whole `DEFENDER` descriptor until the
+    /// first two appearance slots are clear, then create `WILLIR` and suicide.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L899-L909>.
+    pub fn refresh_attract_defender_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractDefenderRefresh, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let picture = self.write_ram_picture_descriptor_cwrit(
+            RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN,
+            RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR,
+        )?;
+        let first_appearance_size = self.read_word(0x9C00)?;
+        let second_appearance_size = self.read_word(0x9C40)?;
+        if first_appearance_size == 0 && second_appearance_size == 0 {
+            let restore_process = self.make_process(
+                red_label_routine_address("WILLIR")?,
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )?;
+            let killed_process = self.kill_current_process(&layout)?;
+            return Ok(RedLabelAttractDefenderRefresh::Completed {
+                process_address,
+                picture,
+                first_appearance_size,
+                second_appearance_size,
+                restore_process,
+                killed_process,
+            });
+        }
+
+        let wakeup_address = red_label_routine_address("DEF50")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+        Ok(RedLabelAttractDefenderRefresh::Refreshing {
+            process_address,
+            picture,
+            first_appearance_size,
+            second_appearance_size,
+            sleep_ticks: RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `DEF51`: sleep one tick, then re-enter `DEF50`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L909-L909>.
+    pub fn delay_attract_defender_refresh_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractDefenderRefresh, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let wakeup_address = red_label_routine_address("DEF50")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+        Ok(RedLabelAttractDefenderRefresh::DelaySleeping {
+            process_address,
+            sleep_ticks: RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `WILLIR`: force the Williams logo restore to the fastest
+    /// rate, then sleep to `WILR1`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L994-L996>.
+    pub fn start_attract_williams_restore_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractWilliamsRestore, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        self.write_byte(
+            RED_LABEL_ATTRACT_LOGO_FLAG_RAM,
+            RED_LABEL_ATTRACT_WILLIAMS_FAST_LOGO_RATE,
+        )?;
+        let wakeup_address = red_label_routine_address("WILR1")?;
+        self.sleep_current_process(
+            RED_LABEL_ATTRACT_WILLIAMS_RESTORE_SLEEP_TICKS,
+            wakeup_address,
+        )?;
+        Ok(RedLabelAttractWilliamsRestore::StartedSleeping {
+            process_address,
+            logo_rate: RED_LABEL_ATTRACT_WILLIAMS_FAST_LOGO_RATE,
+            sleep_ticks: RED_LABEL_ATTRACT_WILLIAMS_RESTORE_SLEEP_TICKS,
+            wakeup_address,
+        })
+    }
+
+    /// Source-shaped `WILR1`: restore the normal logo walker rate and suicide.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L997-L999>.
+    pub fn finish_attract_williams_restore_current_process(
+        &mut self,
+    ) -> Result<RedLabelAttractWilliamsRestore, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        self.write_byte(
+            RED_LABEL_ATTRACT_LOGO_FLAG_RAM,
+            RED_LABEL_ATTRACT_WILLIAMS_NORMAL_LOGO_RATE,
+        )?;
+        let killed_process = self.kill_current_process(&layout)?;
+        Ok(RedLabelAttractWilliamsRestore::Finished {
+            process_address,
+            logo_rate: RED_LABEL_ATTRACT_WILLIAMS_NORMAL_LOGO_RATE,
+            killed_process,
+        })
+    }
+
+    fn write_attract_copyright_bitmap(&mut self) -> Result<(), String> {
+        for (row, pair) in RED_LABEL_ATTRACT_COPYRIGHT_DATA.chunks_exact(2).enumerate() {
+            let row_offset = u16::try_from(row)
+                .expect("red-label CPRTAB row count fits in u16")
+                .wrapping_shl(8);
+            for bit in 0..RED_LABEL_ATTRACT_COPYRIGHT_ROW_WIDTH {
+                let mask = 1u8.wrapping_shl(u32::from(bit));
+                let mut output = 0;
+                if pair[0] & mask != 0 {
+                    output |= 0x10;
+                }
+                if pair[1] & mask != 0 {
+                    output |= 0x01;
+                }
+                let address = screen_offset(
+                    RED_LABEL_ATTRACT_COPYRIGHT_SCREEN,
+                    row_offset + u16::from(bit),
+                )?;
+                self.write_byte(address, output)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn write_ram_picture_descriptor_cwrit(
+        &mut self,
+        screen_address: u16,
+        descriptor_address: u16,
+    ) -> Result<RedLabelPictureWrite, String> {
+        let layout = red_label_ram_layout()?;
+        let width = self.read_byte(descriptor_address)?;
+        let height = self.read_byte(descriptor_address + 1)?;
+        let image_address = self.read_word(descriptor_address + 2)?;
+        let previous_map = self.read_field_byte(&layout, "base_page", "MAPCR")?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        let result = (|| {
+            for column in 0..width {
+                let column_address = screen_offset(screen_address, u16::from(column) << 8)?;
+                let source_column = image_address + u16::from(column) * u16::from(height);
+                for row in 0..height {
+                    self.write_byte(
+                        screen_offset(column_address, u16::from(row))?,
+                        self.read_byte(source_column + u16::from(row))?,
+                    )?;
+                }
+            }
+            Ok(RedLabelPictureWrite {
+                screen_address,
+                picture_address: descriptor_address,
+                width,
+                height,
+            })
+        })();
+        self.write_field_byte(&layout, "base_page", "MAPCR", previous_map)?;
+        result
+    }
+
+    fn start_appearance_for_raw_object_cell(
+        &mut self,
+        object_address: u16,
+    ) -> Result<RedLabelAppearanceStart, String> {
+        let layout = red_label_ram_layout()?;
+        let lists = red_label_linked_lists()?;
+        let original_picture_address =
+            self.read_word(object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET)?;
+        let null_picture_address = red_label_object_picture_address("NULOB")?;
+        self.write_word(
+            object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET,
+            null_picture_address,
+        )?;
+        self.write_word(
+            linked_list(&lists, "active_object")?.head_address,
+            object_address,
+        )?;
+
+        let relative_x = self
+            .read_word(object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET)?
+            .wrapping_sub(self.read_field_word(&layout, "base_page", "BGL")?);
+        if relative_x > RED_LABEL_APPEARANCE_ON_SCREEN_LIMIT {
+            self.write_word(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET,
+                original_picture_address,
+            )?;
+            return Ok(RedLabelAppearanceStart {
+                object_address,
+                original_picture_address,
+                final_picture_address: original_picture_address,
+                relative_x,
+                slot_address: None,
+                erased_previous_slot: false,
+                sound_loaded: None,
+            });
+        }
+
+        let Some((slot_address, erased_previous_slot)) = self.allocate_appearance_slot(&layout)?
+        else {
+            self.write_word(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET,
+                original_picture_address,
+            )?;
+            return Ok(RedLabelAppearanceStart {
+                object_address,
+                original_picture_address,
+                final_picture_address: original_picture_address,
+                relative_x,
+                slot_address: None,
+                erased_previous_slot: false,
+                sound_loaded: None,
+            });
+        };
+
+        let sound_loaded = if self.read_field_byte(&layout, "base_page", "STATUS")? & 0x80 == 0 {
+            self.load_sound_table_by_label("APSND")?
+        } else {
+            None
+        };
+        let object_type =
+            self.read_byte(object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_TYPE_OFFSET)?;
+        self.write_byte(
+            object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_TYPE_OFFSET,
+            object_type | 0x02,
+        )?;
+        self.write_appearance_word(
+            &layout,
+            slot_address,
+            "RSIZE",
+            RED_LABEL_APPEARANCE_INITIAL_SIZE,
+        )?;
+        self.write_appearance_word(&layout, slot_address, "OBDESC", original_picture_address)?;
+        self.write_appearance_word(
+            &layout,
+            slot_address,
+            "ERASES",
+            slot_address.wrapping_add(0x40),
+        )?;
+        self.write_appearance_word(&layout, slot_address, "OBJPTR", object_address)?;
+
+        Ok(RedLabelAppearanceStart {
+            object_address,
+            original_picture_address,
+            final_picture_address: null_picture_address,
+            relative_x,
+            slot_address: Some(slot_address),
+            erased_previous_slot,
+            sound_loaded,
         })
     }
 
@@ -5583,6 +9765,36 @@ impl RedLabelRuntimeMemory {
         self.write_star_table(&stars, rand_values_consumed)
     }
 
+    fn initialize_star_table_from_runtime_rand(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<RedLabelStarTableInit, String> {
+        let mut stars = Vec::with_capacity(16);
+        let mut consumed = 0usize;
+        let mut color = 0u8;
+
+        for _ in 0..16 {
+            let x = loop {
+                let state = self.advance_red_label_rand(layout)?;
+                consumed += 1;
+                if state.seed < 0x9C {
+                    break state.seed;
+                }
+            };
+            let y = loop {
+                let state = self.advance_red_label_rand(layout)?;
+                consumed += 1;
+                if state.seed <= 0xA8 && state.seed > RED_LABEL_Y_MIN {
+                    break state.seed;
+                }
+            };
+            stars.push(RedLabelStar { x, y, color });
+            color = color.wrapping_add(0x11) & 0x77;
+        }
+
+        self.write_star_table(&stars, consumed)
+    }
+
     fn write_star_table(
         &mut self,
         stars: &[RedLabelStar],
@@ -5947,6 +10159,37 @@ impl RedLabelRuntimeMemory {
                 Ok(RedLabelLaserFireDispatch::Capped(killed_process))
             }
         }
+    }
+
+    /// Source-shaped `LASR`: seed the right-moving laser process data from
+    /// `NPLAXC`, then fall through the first `LASR0` loop body.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L2790-L2837>.
+    pub fn start_right_laser_current_process(&mut self) -> Result<RedLabelLaserStep, String> {
+        self.start_laser_current_process(RedLabelLaserDirection::Right)
+    }
+
+    /// Source-shaped `LASL`: seed the left-moving laser process data from
+    /// `NPLAXC`, then fall through the first `LASL0` loop body.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L2839-L2884>.
+    pub fn start_left_laser_current_process(&mut self) -> Result<RedLabelLaserStep, String> {
+        self.start_laser_current_process(RedLabelLaserDirection::Left)
+    }
+
+    fn start_laser_current_process(
+        &mut self,
+        direction: RedLabelLaserDirection,
+    ) -> Result<RedLabelLaserStep, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let player_upper_left = self.read_field_word(&layout, "base_page", "NPLAXC")?;
+        let start_address = match direction {
+            RedLabelLaserDirection::Right => player_upper_left.wrapping_add(0x0704),
+            RedLabelLaserDirection::Left => player_upper_left.wrapping_add(4),
+        };
+        self.write_process_data_word(&layout, process_address, "PD", start_address)?;
+        self.write_process_data_word(&layout, process_address, "PD2", start_address)?;
+        self.write_process_data_word(&layout, process_address, "PD4", start_address)?;
+        self.step_laser_current_process(direction)
     }
 
     /// Source-shaped visible `LASD` tail: decrement `LFLG`, then `SUCIDE`.
@@ -6547,7 +10790,7 @@ impl RedLabelRuntimeMemory {
         let layout = red_label_ram_layout()?;
         let process_address = self.current_process_address(&layout)?;
         self.write_field_byte(&layout, "base_page", "SNDTMR", 0)?;
-        let sound_command = red_label_sound_output_command(0x13);
+        let sound_command = red_label_sound_output_command(RED_LABEL_PLAYER_END_SOUND_STOP_NUMBER);
 
         if self.wave_enemy_total()? == 0 {
             let _ = sound_command;
@@ -6568,16 +10811,25 @@ impl RedLabelRuntimeMemory {
         let layout = red_label_ram_layout()?;
         let process_address = self.current_process_address(&layout)?;
         let return_address = red_label_routine_address("PDTH5SCLR")?;
-        self.write_byte(field_range(&layout, "base_page", "PCRAM")?.start, 0)?;
-        self.write_process_data_word(&layout, process_address, "PD6", return_address)?;
+        self.start_bonus_current_process_with_return(&layout, process_address, return_address)
+    }
+
+    fn start_bonus_current_process_with_return(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        process_address: u16,
+        return_address: u16,
+    ) -> Result<RedLabelPlayerDeath, String> {
+        self.write_byte(field_range(layout, "base_page", "PCRAM")?.start, 0)?;
+        self.write_process_data_word(layout, process_address, "PD6", return_address)?;
         let screen_clear = self.clear_active_screen_ram()?;
-        let text = self.player_death_bonus_text_plan(&layout)?;
-        let astronaut_counter = self.read_field_byte(&layout, "base_page", "ASTCNT")?;
-        self.write_process_byte(&layout, process_address, "PD2", astronaut_counter)?;
+        let text = self.player_death_bonus_text_plan(layout)?;
+        let astronaut_counter = self.read_field_byte(layout, "base_page", "ASTCNT")?;
+        self.write_process_byte(layout, process_address, "PD2", astronaut_counter)?;
 
         if astronaut_counter == 0 {
             return self.sleep_player_death_bonus_wave_advance(
-                &layout,
+                layout,
                 process_address,
                 return_address,
                 astronaut_counter,
@@ -6585,7 +10837,7 @@ impl RedLabelRuntimeMemory {
         }
 
         self.draw_bonus_astronaut_and_sleep(
-            &layout,
+            layout,
             process_address,
             return_address,
             RedLabelBonusIntro {
@@ -6675,7 +10927,7 @@ impl RedLabelRuntimeMemory {
         self.finish_player_death_ship_branch(
             &layout,
             process_address,
-            red_label_sound_output_command(0x13),
+            red_label_sound_output_command(RED_LABEL_PLAYER_END_SOUND_STOP_NUMBER),
         )
     }
 
@@ -6691,8 +10943,9 @@ impl RedLabelRuntimeMemory {
     }
 
     /// Source-shaped `PLE3`: the game-over sleep resumes by jumping into
-    /// attract mode.
+    /// `ATTR`, which selects map 1 and jumps to the bank-1 attract vector.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1429-L1432>.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1083-L1086>.
     pub fn jump_player_death_game_over_to_attract_current_process(
         &mut self,
     ) -> Result<RedLabelPlayerDeath, String> {
@@ -6700,9 +10953,104 @@ impl RedLabelRuntimeMemory {
         let process_address = self.current_process_address(&layout)?;
         let attract_address = red_label_routine_address("ATTR")?;
         self.write_process_word(&layout, process_address, "PADDR", attract_address)?;
+        let selected_map = 1;
+        self.write_field_byte(&layout, "base_page", "MAPCR", selected_map)?;
         Ok(RedLabelPlayerDeath::AttractJump {
             process_address,
             attract_address,
+            selected_map,
+            attract_vector_address: RED_LABEL_ATTRACT_VECTOR_ADDRESS,
+        })
+    }
+
+    /// Source-shaped `HALL13`: after `HALLOF` finds no qualifying initials
+    /// entry, the source sleeps and then jumps into `HALDIS`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L229-L232>.
+    pub fn display_hall_of_fame_from_current_process(
+        &mut self,
+    ) -> Result<RedLabelPlayerDeath, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        self.genocide_other_processes()?;
+        self.make_process(
+            red_label_routine_address("CREDS")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        )?;
+        let display = self.write_hall_of_fame_display()?;
+        self.make_process(
+            red_label_routine_address("COLR")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        )?;
+        self.write_process_word(
+            &layout,
+            process_address,
+            "PADDR",
+            red_label_routine_address("HALD3")?,
+        )?;
+        Ok(RedLabelPlayerDeath::HallOfFameDisplayed {
+            process_address,
+            stall_ticks: display.stall_ticks,
+        })
+    }
+
+    /// Source-shaped `HALD3`: wait on the hall-of-fame table until credits,
+    /// reset, or the display timer hands off to the instruction page.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L428-L435>.
+    pub fn continue_hall_of_fame_display_wait_current_process(
+        &mut self,
+    ) -> Result<RedLabelHallOfFameDisplayWait, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let credit_increase_flag = self.read_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM)?;
+        if credit_increase_flag != 0 {
+            let target_address = red_label_routine_address("LEDRET")?;
+            self.write_process_word(&layout, process_address, "PADDR", target_address)?;
+            return Ok(
+                RedLabelHallOfFameDisplayWait::CreditIncreaseInstructionJump {
+                    process_address,
+                    credit_increase_flag,
+                    target_address,
+                },
+            );
+        }
+
+        let high_score_reset_flag = self.read_byte(RED_LABEL_HOF_RESET_FLAG_RAM)?;
+        if high_score_reset_flag != 0 {
+            let target_address = red_label_routine_address("HALDIS")?;
+            self.write_process_word(&layout, process_address, "PADDR", target_address)?;
+            return Ok(RedLabelHallOfFameDisplayWait::HighScoreResetRedisplayJump {
+                process_address,
+                high_score_reset_flag,
+                target_address,
+            });
+        }
+
+        let stall_before = self.read_byte(RED_LABEL_HOF_STALL_TIMER_RAM)?;
+        let stall_after = stall_before.wrapping_sub(1);
+        self.write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, stall_after)?;
+        if stall_after == 0 {
+            let target_address = red_label_routine_address("LEDRET")?;
+            self.write_process_word(&layout, process_address, "PADDR", target_address)?;
+            return Ok(RedLabelHallOfFameDisplayWait::TimeoutInstructionJump {
+                process_address,
+                credit_increase_flag,
+                high_score_reset_flag,
+                stall_before,
+                stall_after,
+                target_address,
+            });
+        }
+
+        let wakeup_address = red_label_routine_address("HALD3")?;
+        self.sleep_current_process(RED_LABEL_HALL_OF_FAME_WAIT_SLEEP_TICKS, wakeup_address)?;
+        Ok(RedLabelHallOfFameDisplayWait::Sleeping {
+            process_address,
+            credit_increase_flag,
+            high_score_reset_flag,
+            stall_before,
+            stall_after,
+            sleep_ticks: RED_LABEL_HALL_OF_FAME_WAIT_SLEEP_TICKS,
+            wakeup_address,
         })
     }
 
@@ -7104,8 +11452,8 @@ impl RedLabelRuntimeMemory {
     }
 
     /// Source-shaped `SLEEP`: rewrite the current `CRPROC` cell's timer and
-    /// wake address. Generic process body dispatch is still translated one
-    /// routine address at a time.
+    /// wake address. The executive scheduler resumes from this process's
+    /// `PLINK`, matching the ROM's `JMP DISP2` continuation.
     pub fn sleep_current_process(
         &mut self,
         sleep_time: u8,
@@ -7291,6 +11639,242 @@ impl RedLabelRuntimeMemory {
                 bytes_updated: RED_LABEL_WDELT_RECORD_COUNT,
                 bytes_changed,
             },
+        })
+    }
+
+    /// Source-shaped `GEXEC` entry: initialize the process delta counter and
+    /// wave pacing timers, then fall through into `GEX0`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1647-L1731>.
+    pub fn start_game_exec_current_process(&mut self) -> Result<RedLabelGameExec, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        let delta_counter = 40;
+        self.write_process_byte(&layout, process_address, "PD", delta_counter)?;
+        let ufo_timer = self.read_field_byte(&layout, "enemy_runtime", "UFOTIM")?;
+        self.write_field_byte(&layout, "enemy_runtime", "UFOTMR", ufo_timer)?;
+        let wave_timer = 1;
+        self.write_field_byte(&layout, "enemy_runtime", "WAVTMR", wave_timer)?;
+        let entry = RedLabelGameExecEntry {
+            delta_counter,
+            ufo_timer,
+            wave_timer,
+        };
+        self.step_game_exec_current_process_with_layout(&layout, Some(entry))
+    }
+
+    /// Source-shaped `GEX0` game executive pass. The zero-enemy branch now
+    /// runs the ROM `BONUS` body with the assembled return site after
+    /// `JSR BONUS`, so `BC3` can resume through the `PLSTR0` restart path.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1654-L1731>.
+    pub fn step_game_exec_current_process(&mut self) -> Result<RedLabelGameExec, String> {
+        let layout = red_label_ram_layout()?;
+        self.step_game_exec_current_process_with_layout(&layout, None)
+    }
+
+    fn step_game_exec_current_process_with_layout(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        entry: Option<RedLabelGameExecEntry>,
+    ) -> Result<RedLabelGameExec, String> {
+        let process_address = self.current_process_address(layout)?;
+        let status = self.read_field_byte(layout, "base_page", "STATUS")?;
+        let mut enemy_total = None;
+        let mut ufo = None;
+        let mut lander = None;
+
+        if status & 0x08 == 0 {
+            let total = self.wave_enemy_total()?;
+            enemy_total = Some(total);
+            if total == 0 {
+                return self.start_game_exec_wave_clear_bonus_current_process(
+                    layout,
+                    process_address,
+                    status,
+                    total,
+                );
+            }
+
+            ufo = Some(self.advance_game_exec_ufo_pacing(layout, total)?);
+            lander = Some(self.advance_game_exec_lander_pacing(layout)?);
+        }
+
+        let star_time = self.advance_game_exec_star_time()?;
+        let wakeup_address = red_label_routine_address("GEX0")?;
+        self.sleep_current_process(15, wakeup_address)?;
+        Ok(RedLabelGameExec::Running(RedLabelGameExecRun {
+            process_address,
+            entry,
+            status,
+            enemy_total,
+            ufo,
+            lander,
+            star_time,
+            wakeup_address,
+        }))
+    }
+
+    fn start_game_exec_wave_clear_bonus_current_process(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        process_address: u16,
+        previous_status: u8,
+        enemy_total: u8,
+    ) -> Result<RedLabelGameExec, String> {
+        let status = 0x77;
+        self.write_field_byte(layout, "base_page", "STATUS", status)?;
+        let genocide = self.genocide_other_processes()?;
+        self.save_current_player_state_for_death(layout)?;
+        let return_address = red_label_routine_address("GEXBON")?;
+        let bonus =
+            self.start_bonus_current_process_with_return(layout, process_address, return_address)?;
+
+        Ok(RedLabelGameExec::WaveClearBonusSleeping(
+            RedLabelGameExecWaveClearBonusSleeping {
+                process_address,
+                previous_status,
+                status,
+                enemy_total,
+                genocide,
+                return_address,
+                bonus,
+            },
+        ))
+    }
+
+    fn advance_game_exec_ufo_pacing(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        enemy_total: u8,
+    ) -> Result<RedLabelGameExecUfoPacing, String> {
+        let previous_timer = self.read_field_byte(layout, "enemy_runtime", "UFOTMR")?;
+        let mut current_timer = previous_timer;
+        let mut accelerated_timer = None;
+        if enemy_total <= 8 {
+            let mut target_timer = self
+                .read_field_byte(layout, "enemy_runtime", "UFOTIM")?
+                .wrapping_shr(1);
+            if enemy_total <= 3 {
+                target_timer = target_timer.wrapping_shr(1);
+            }
+            target_timer = target_timer.wrapping_add(1);
+            if target_timer < current_timer {
+                current_timer = target_timer;
+                self.write_field_byte(layout, "enemy_runtime", "UFOTMR", current_timer)?;
+                accelerated_timer = Some(current_timer);
+            }
+        }
+
+        let decremented_timer = current_timer.wrapping_sub(1);
+        self.write_field_byte(layout, "enemy_runtime", "UFOTMR", decremented_timer)?;
+        let mut reset_timer = None;
+        let mut ufo_count_before = None;
+        let mut ufo_count_after = None;
+        let mut started = None;
+        if decremented_timer == 0 {
+            let mut next_timer = self.read_field_byte(layout, "enemy_runtime", "UFOTIM")?;
+            if enemy_total < 4 {
+                next_timer = self.advance_red_label_rmax(layout, next_timer.wrapping_shr(2))?;
+            }
+            self.write_field_byte(layout, "enemy_runtime", "UFOTMR", next_timer)?;
+            reset_timer = Some(next_timer);
+
+            let count_before = self.read_field_byte(layout, "enemy_runtime", "UFOCNT")?;
+            ufo_count_before = Some(count_before);
+            if count_before < 12 {
+                let ufo_start = self.start_ufo_process()?;
+                let count_after = count_before.wrapping_add(1);
+                self.write_field_byte(layout, "enemy_runtime", "UFOCNT", count_after)?;
+                ufo_count_after = Some(count_after);
+                started = Some(ufo_start);
+            } else {
+                ufo_count_after = Some(count_before);
+            }
+        }
+
+        Ok(RedLabelGameExecUfoPacing {
+            previous_timer,
+            accelerated_timer,
+            decremented_timer,
+            reset_timer,
+            ufo_count_before,
+            ufo_count_after,
+            started,
+        })
+    }
+
+    fn advance_game_exec_lander_pacing(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<RedLabelGameExecLanderPacing, String> {
+        let previous_timer = self.read_field_byte(layout, "enemy_runtime", "WAVTMR")?;
+        let decremented_timer = previous_timer.wrapping_sub(1);
+        self.write_field_byte(layout, "enemy_runtime", "WAVTMR", decremented_timer)?;
+
+        if decremented_timer != 0 {
+            let active_count = self.read_field_byte(layout, "enemy_runtime", "LNDCNT")?;
+            if active_count != 0 {
+                return Ok(RedLabelGameExecLanderPacing {
+                    previous_timer,
+                    decremented_timer,
+                    reset_timer: None,
+                    active_count_before: Some(active_count),
+                    reserve_count_before: None,
+                    requested_count: None,
+                    reserve_count_after: None,
+                    started: None,
+                });
+            }
+        }
+
+        let reset_timer = self.read_field_byte(layout, "enemy_runtime", "WAVTIM")?;
+        self.write_field_byte(layout, "enemy_runtime", "WAVTMR", reset_timer)?;
+        let reserve_count = self.read_field_byte(layout, "enemy_runtime", "LNDRES")?;
+        if reserve_count == 0 {
+            return Ok(RedLabelGameExecLanderPacing {
+                previous_timer,
+                decremented_timer,
+                reset_timer: Some(reset_timer),
+                active_count_before: None,
+                reserve_count_before: Some(reserve_count),
+                requested_count: None,
+                reserve_count_after: Some(reserve_count),
+                started: None,
+            });
+        }
+
+        let active_count = self.read_field_byte(layout, "enemy_runtime", "LNDCNT")?;
+        if active_count >= 8 {
+            return Ok(RedLabelGameExecLanderPacing {
+                previous_timer,
+                decremented_timer,
+                reset_timer: Some(reset_timer),
+                active_count_before: Some(active_count),
+                reserve_count_before: Some(reserve_count),
+                requested_count: None,
+                reserve_count_after: Some(reserve_count),
+                started: None,
+            });
+        }
+
+        let wave_size = self.read_field_byte(layout, "enemy_runtime", "WAVSIZ")?;
+        let requested_count = if wave_size <= reserve_count {
+            wave_size
+        } else {
+            reserve_count
+        };
+        let started = self.start_lander_processes(requested_count)?;
+        let reserve_count_after = reserve_count.wrapping_sub(requested_count);
+        self.write_field_byte(layout, "enemy_runtime", "LNDRES", reserve_count_after)?;
+
+        Ok(RedLabelGameExecLanderPacing {
+            previous_timer,
+            decremented_timer,
+            reset_timer: Some(reset_timer),
+            active_count_before: Some(active_count),
+            reserve_count_before: Some(reserve_count),
+            requested_count: Some(requested_count),
+            reserve_count_after: Some(reserve_count_after),
+            started: Some(started),
         })
     }
 
@@ -7821,17 +12405,188 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    /// Source-scheduled live video slice for the upright red-label `IRQ`
+    /// frame work after the separate live sound sequencer tick has run. This
+    /// uses the same `VERTCT`/`IFLG` gate as the source IRQ path for map
+    /// selection, palette copy, terrain, object bands, and velocity updates
+    /// while leaving the already-run sound cadence to the audio phase.
+    pub fn run_normal_live_irq_video_frame(&mut self) -> Result<RedLabelLiveVideoFrame, String> {
+        let layout = red_label_ram_layout()?;
+        self.write_field_byte(&layout, "base_page", "XXX1", 0xFF)?;
+        self.write_field_byte(&layout, "base_page", "XXX3", 0)?;
+
+        let context =
+            RedLabelIrqSchedulerContext::source_irq_after_sound_step(DefenderInputPorts::EMPTY);
+        let upper_scanline = self.run_irq_scanline_object_phase_with_context(
+            RedLabelIrqMode::Normal,
+            RED_LABEL_NORMAL_IRQ_LIVE_VERTCT,
+            context,
+        )?;
+        let player_motion =
+            Self::live_player_motion_from_pre_tail_steps(&upper_scanline.pre_tail_steps)?;
+        let star_output =
+            Self::live_star_output_from_pre_tail_steps(&upper_scanline.pre_tail_steps)?;
+        let upper_object_band = Self::live_object_band_from_scheduler_step(
+            &upper_scanline,
+            RedLabelIrqObjectBandPhase::NormalUpper,
+        )?;
+
+        let lower_scanline = self.run_irq_scanline_object_phase_with_context(
+            RedLabelIrqMode::Normal,
+            RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT,
+            context,
+        )?;
+        let terrain_output =
+            Self::live_terrain_output_from_pre_tail_steps(&lower_scanline.pre_tail_steps);
+        let lower_object_band = Self::live_object_band_from_scheduler_step(
+            &lower_scanline,
+            RedLabelIrqObjectBandPhase::NormalLower,
+        )?;
+
+        Ok(RedLabelLiveVideoFrame {
+            mode: RedLabelIrqMode::Normal,
+            upper_scanline,
+            lower_scanline,
+            player_motion,
+            star_output,
+            upper_object_band,
+            terrain_output,
+            lower_object_band,
+        })
+    }
+
+    /// Source-ordered live video slice for the flipped red-label `IRQB` frame
+    /// work. `IRQB` draws the terrain and upper object band first, then runs
+    /// `PLAYER` / `STOUT` before the lower object band and velocity update.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L2008-L2068>.
+    pub fn run_inverted_live_irq_video_frame(&mut self) -> Result<RedLabelLiveVideoFrame, String> {
+        let layout = red_label_ram_layout()?;
+        self.write_field_byte(&layout, "base_page", "XXX1", 0xFF)?;
+        self.write_field_byte(&layout, "base_page", "XXX3", 0)?;
+
+        let context =
+            RedLabelIrqSchedulerContext::source_irq_after_sound_step(DefenderInputPorts::EMPTY);
+        let upper_scanline = self.run_irq_scanline_object_phase_with_context(
+            RedLabelIrqMode::Inverted,
+            RED_LABEL_INVERTED_IRQ_LIVE_VERTCT,
+            context,
+        )?;
+        let terrain_output =
+            Self::live_terrain_output_from_pre_tail_steps(&upper_scanline.pre_tail_steps);
+        let upper_object_band = Self::live_object_band_from_scheduler_step(
+            &upper_scanline,
+            RedLabelIrqObjectBandPhase::InvertedUpper,
+        )?;
+
+        let lower_scanline = self.run_irq_scanline_object_phase_with_context(
+            RedLabelIrqMode::Inverted,
+            RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT,
+            context,
+        )?;
+        let player_motion =
+            Self::live_player_motion_from_pre_tail_steps(&lower_scanline.pre_tail_steps)?;
+        let star_output =
+            Self::live_star_output_from_pre_tail_steps(&lower_scanline.pre_tail_steps)?;
+        let lower_object_band = Self::live_object_band_from_scheduler_step(
+            &lower_scanline,
+            RedLabelIrqObjectBandPhase::InvertedLower,
+        )?;
+
+        Ok(RedLabelLiveVideoFrame {
+            mode: RedLabelIrqMode::Inverted,
+            upper_scanline,
+            lower_scanline,
+            player_motion,
+            star_output,
+            upper_object_band,
+            terrain_output,
+            lower_object_band,
+        })
+    }
+
+    fn live_player_motion_from_pre_tail_steps(
+        steps: &[RedLabelIrqPreTailStep],
+    ) -> Result<RedLabelPlayerMotion, String> {
+        steps
+            .iter()
+            .find_map(|step| match step {
+                RedLabelIrqPreTailStep::PlayerMotion(motion) => Some(*motion),
+                _ => None,
+            })
+            .ok_or_else(|| String::from("live IRQ video step did not run PLAYER"))
+    }
+
+    fn live_star_output_from_pre_tail_steps(
+        steps: &[RedLabelIrqPreTailStep],
+    ) -> Result<RedLabelStarOutput, String> {
+        steps
+            .iter()
+            .find_map(|step| match step {
+                RedLabelIrqPreTailStep::StarOutput(output) => Some(*output),
+                _ => None,
+            })
+            .ok_or_else(|| String::from("live IRQ video step did not run STOUT"))
+    }
+
+    fn live_terrain_output_from_pre_tail_steps(
+        steps: &[RedLabelIrqPreTailStep],
+    ) -> Option<RedLabelTerrainOutput> {
+        steps.iter().find_map(|step| match step {
+            RedLabelIrqPreTailStep::TerrainOutput(output) => Some(*output),
+            _ => None,
+        })
+    }
+
+    fn live_object_band_from_scheduler_step(
+        step: &RedLabelIrqSchedulerStep,
+        expected_phase: RedLabelIrqObjectBandPhase,
+    ) -> Result<RedLabelIrqObjectBandPass, String> {
+        let object_band = step.object_band.clone().ok_or_else(|| {
+            format!(
+                "live IRQ video step {:?} did not run an object band",
+                step.phase
+            )
+        })?;
+        if object_band.phase != expected_phase {
+            return Err(format!(
+                "live IRQ video step {:?} ran {:?}, expected {:?}",
+                step.phase, object_band.phase, expected_phase
+            ));
+        }
+        Ok(object_band)
+    }
+
+    pub fn live_irq_mode(&self) -> Result<RedLabelIrqMode, String> {
+        let layout = red_label_ram_layout()?;
+        let irq_hook = field_range(&layout, "base_page", "IRQHK")?;
+        let opcode = self.read_byte(irq_hook.start)?;
+        let target = self.read_word(irq_hook.start + 1)?;
+        if opcode == RED_LABEL_IRQ_JUMP_OPCODE && target == RED_LABEL_IRQB_ADDRESS {
+            Ok(RedLabelIrqMode::Inverted)
+        } else {
+            Ok(RedLabelIrqMode::Normal)
+        }
+    }
+
+    pub fn run_live_irq_video_frame(&mut self) -> Result<RedLabelLiveVideoFrame, String> {
+        match self.live_irq_mode()? {
+            RedLabelIrqMode::Normal => self.run_normal_live_irq_video_frame(),
+            RedLabelIrqMode::Inverted => self.run_inverted_live_irq_video_frame(),
+        }
+    }
+
     /// Source-shaped RAM-visible scanline gate for the red-label `IRQ` and
-    /// `IRQB` object phases. This mutates `IFLG`, `TIMER`, and `XXX2`, reports
-    /// the source watchdog/palette obligations, runs translated `PLAYER` and
-    /// `STOUT` where the source branches call them, and then runs only the
-    /// already translated object-band tail reached by the source branch. When
-    /// the caller supplies live cabinet input, the source `CSCAN` branch keeps
-    /// its two-frame coin-door history and queues source switch processes; when
-    /// the caller supplies the live 6809 stack pointer, the terrain branch can
-    /// run translated `BGOUT`; otherwise it reports that `BGOUT` is due.
-    /// Palette copy and hardware map restoration are still reported as
-    /// obligations rather than guessed.
+    /// `IRQB` object phases. This mutates `IFLG`, `TIMER`, `XXX2`, and the
+    /// color-RAM palette copy, reports the source watchdog byte, runs
+    /// translated `PLAYER` and `STOUT` where the source branches call them, and
+    /// then runs only the already translated object-band tail reached by the
+    /// source branch. When the caller supplies live cabinet input, the source
+    /// `CSCAN` branch keeps its two-frame coin-door history and queues source
+    /// switch processes; when the caller supplies the live 6809 stack pointer,
+    /// the terrain branch can run translated `BGOUT`; otherwise it reports that
+    /// `BGOUT` is due. The source `MAPC` clear/select/restore writes are
+    /// captured in `hardware_map_writes` and leave hardware map selection
+    /// restored from `MAPCR` at `IRQX`.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1931-L2069>.
     pub fn run_irq_scanline_object_phase(
         &mut self,
@@ -7877,18 +12632,24 @@ impl RedLabelRuntimeMemory {
         previous_iflg: u8,
         context: RedLabelIrqSchedulerContext,
     ) -> Result<RedLabelIrqSchedulerStep, String> {
+        let (hardware_map_before, mut hardware_map_writes) = self.begin_irq_hardware_map_sequence();
         if vertical_counter >= RED_LABEL_NORMAL_IRQ_UPPER_THRESHOLD {
             if previous_iflg != 0 {
+                let hardware_map_after =
+                    self.finish_irq_hardware_map_sequence(layout, &mut hardware_map_writes)?;
                 return Ok(RedLabelIrqSchedulerStep {
                     mode: RedLabelIrqMode::Normal,
                     vertical_counter,
                     phase: RedLabelIrqSchedulerPhase::Idle,
+                    hardware_map_before,
+                    hardware_map_writes,
+                    hardware_map_after,
                     previous_iflg,
                     iflg: previous_iflg,
                     timer_before: None,
                     timer_after: None,
                     watchdog_value: None,
-                    palette_copy_due: false,
+                    palette_copy: None,
                     xxx2: None,
                     pre_tail_steps: Vec::new(),
                     object_band: None,
@@ -7900,18 +12661,24 @@ impl RedLabelRuntimeMemory {
                 .wrapping_sub(8)
                 .min(RED_LABEL_NORMAL_IRQ_MAX_XXX2);
             self.write_field_byte(layout, "base_page", "XXX2", xxx2)?;
-            let pre_tail_steps = self.irq_sound_player_star_pre_tail_steps()?;
+            let pre_tail_steps = self.irq_sound_player_star_pre_tail_steps(context)?;
+            self.write_hardware_map(2, &mut hardware_map_writes);
             let object_band = self.run_normal_irq_upper_object_band_pass()?;
+            let hardware_map_after =
+                self.finish_irq_hardware_map_sequence(layout, &mut hardware_map_writes)?;
             return Ok(RedLabelIrqSchedulerStep {
                 mode: RedLabelIrqMode::Normal,
                 vertical_counter,
                 phase: RedLabelIrqSchedulerPhase::NormalUpper,
+                hardware_map_before,
+                hardware_map_writes,
+                hardware_map_after,
                 previous_iflg,
                 iflg: 1,
                 timer_before: None,
                 timer_after: None,
                 watchdog_value: None,
-                palette_copy_due: false,
+                palette_copy: None,
                 xxx2: Some(xxx2),
                 pre_tail_steps,
                 object_band: Some(object_band),
@@ -7919,16 +12686,21 @@ impl RedLabelRuntimeMemory {
         }
 
         if previous_iflg == 0 {
+            let hardware_map_after =
+                self.finish_irq_hardware_map_sequence(layout, &mut hardware_map_writes)?;
             return Ok(RedLabelIrqSchedulerStep {
                 mode: RedLabelIrqMode::Normal,
                 vertical_counter,
                 phase: RedLabelIrqSchedulerPhase::Idle,
+                hardware_map_before,
+                hardware_map_writes,
+                hardware_map_after,
                 previous_iflg,
                 iflg: previous_iflg,
                 timer_before: None,
                 timer_after: None,
                 watchdog_value: None,
-                palette_copy_due: false,
+                palette_copy: None,
                 xxx2: None,
                 pre_tail_steps: Vec::new(),
                 object_band: None,
@@ -7939,18 +12711,30 @@ impl RedLabelRuntimeMemory {
         let timer_before = self.read_field_byte(layout, "base_page", "TIMER")?;
         let timer_after = timer_before.wrapping_add(1);
         self.write_field_byte(layout, "base_page", "TIMER", timer_after)?;
+        let palette_copy = if vertical_counter <= RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT {
+            Some(self.copy_color_mapping_to_palette_ram(layout)?)
+        } else {
+            None
+        };
+        self.write_hardware_map(7, &mut hardware_map_writes);
         let pre_tail_steps = self.irq_coin_terrain_pre_tail_steps(layout, context)?;
+        self.write_hardware_map(2, &mut hardware_map_writes);
         let object_band = self.run_normal_irq_lower_object_band_pass()?;
+        let hardware_map_after =
+            self.finish_irq_hardware_map_sequence(layout, &mut hardware_map_writes)?;
         Ok(RedLabelIrqSchedulerStep {
             mode: RedLabelIrqMode::Normal,
             vertical_counter,
             phase: RedLabelIrqSchedulerPhase::NormalLower,
+            hardware_map_before,
+            hardware_map_writes,
+            hardware_map_after,
             previous_iflg,
             iflg: 0,
             timer_before: Some(timer_before),
             timer_after: Some(timer_after),
             watchdog_value: Some(RED_LABEL_NORMAL_WATCHDOG_DATA),
-            palette_copy_due: vertical_counter <= RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT,
+            palette_copy,
             xxx2: None,
             pre_tail_steps,
             object_band: Some(object_band),
@@ -7964,18 +12748,24 @@ impl RedLabelRuntimeMemory {
         previous_iflg: u8,
         context: RedLabelIrqSchedulerContext,
     ) -> Result<RedLabelIrqSchedulerStep, String> {
+        let (hardware_map_before, mut hardware_map_writes) = self.begin_irq_hardware_map_sequence();
         if vertical_counter >= RED_LABEL_INVERTED_IRQ_UPPER_THRESHOLD {
             if previous_iflg != 0 {
+                let hardware_map_after =
+                    self.finish_irq_hardware_map_sequence(layout, &mut hardware_map_writes)?;
                 return Ok(RedLabelIrqSchedulerStep {
                     mode: RedLabelIrqMode::Inverted,
                     vertical_counter,
                     phase: RedLabelIrqSchedulerPhase::Idle,
+                    hardware_map_before,
+                    hardware_map_writes,
+                    hardware_map_after,
                     previous_iflg,
                     iflg: previous_iflg,
                     timer_before: None,
                     timer_after: None,
                     watchdog_value: None,
-                    palette_copy_due: false,
+                    palette_copy: None,
                     xxx2: None,
                     pre_tail_steps: Vec::new(),
                     object_band: None,
@@ -7985,18 +12775,25 @@ impl RedLabelRuntimeMemory {
             self.write_field_byte(layout, "base_page", "IFLG", 1)?;
             let xxx2 = !vertical_counter;
             self.write_field_byte(layout, "base_page", "XXX2", xxx2)?;
+            self.write_hardware_map(7, &mut hardware_map_writes);
             let pre_tail_steps = self.irq_coin_terrain_pre_tail_steps(layout, context)?;
+            self.write_hardware_map(2, &mut hardware_map_writes);
             let object_band = self.run_inverted_irq_upper_object_band_pass()?;
+            let hardware_map_after =
+                self.finish_irq_hardware_map_sequence(layout, &mut hardware_map_writes)?;
             return Ok(RedLabelIrqSchedulerStep {
                 mode: RedLabelIrqMode::Inverted,
                 vertical_counter,
                 phase: RedLabelIrqSchedulerPhase::InvertedUpper,
+                hardware_map_before,
+                hardware_map_writes,
+                hardware_map_after,
                 previous_iflg,
                 iflg: 1,
                 timer_before: None,
                 timer_after: None,
                 watchdog_value: None,
-                palette_copy_due: false,
+                palette_copy: None,
                 xxx2: Some(xxx2),
                 pre_tail_steps,
                 object_band: Some(object_band),
@@ -8004,16 +12801,21 @@ impl RedLabelRuntimeMemory {
         }
 
         if previous_iflg == 0 {
+            let hardware_map_after =
+                self.finish_irq_hardware_map_sequence(layout, &mut hardware_map_writes)?;
             return Ok(RedLabelIrqSchedulerStep {
                 mode: RedLabelIrqMode::Inverted,
                 vertical_counter,
                 phase: RedLabelIrqSchedulerPhase::Idle,
+                hardware_map_before,
+                hardware_map_writes,
+                hardware_map_after,
                 previous_iflg,
                 iflg: previous_iflg,
                 timer_before: None,
                 timer_after: None,
                 watchdog_value: None,
-                palette_copy_due: false,
+                palette_copy: None,
                 xxx2: None,
                 pre_tail_steps: Vec::new(),
                 object_band: None,
@@ -8024,18 +12826,29 @@ impl RedLabelRuntimeMemory {
         let timer_before = self.read_field_byte(layout, "base_page", "TIMER")?;
         let timer_after = timer_before.wrapping_add(1);
         self.write_field_byte(layout, "base_page", "TIMER", timer_after)?;
-        let pre_tail_steps = self.irq_sound_player_star_pre_tail_steps()?;
+        let palette_copy = if vertical_counter <= RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT {
+            Some(self.copy_color_mapping_to_palette_ram(layout)?)
+        } else {
+            None
+        };
+        let pre_tail_steps = self.irq_sound_player_star_pre_tail_steps(context)?;
+        self.write_hardware_map(2, &mut hardware_map_writes);
         let object_band = self.run_inverted_irq_lower_object_band_pass()?;
+        let hardware_map_after =
+            self.finish_irq_hardware_map_sequence(layout, &mut hardware_map_writes)?;
         Ok(RedLabelIrqSchedulerStep {
             mode: RedLabelIrqMode::Inverted,
             vertical_counter,
             phase: RedLabelIrqSchedulerPhase::InvertedLower,
+            hardware_map_before,
+            hardware_map_writes,
+            hardware_map_after,
             previous_iflg,
             iflg: 0,
             timer_before: Some(timer_before),
             timer_after: Some(timer_after),
             watchdog_value: Some(RED_LABEL_INVERTED_WATCHDOG_DATA),
-            palette_copy_due: vertical_counter <= RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT,
+            palette_copy,
             xxx2: None,
             pre_tail_steps,
             object_band: Some(object_band),
@@ -8044,12 +12857,23 @@ impl RedLabelRuntimeMemory {
 
     fn irq_sound_player_star_pre_tail_steps(
         &mut self,
+        context: RedLabelIrqSchedulerContext,
     ) -> Result<Vec<RedLabelIrqPreTailStep>, String> {
-        Ok(vec![
-            RedLabelIrqPreTailStep::SoundSequence(self.step_sound_sequence()?),
-            RedLabelIrqPreTailStep::PlayerMotion(self.update_player_motion_from_pia()?),
-            RedLabelIrqPreTailStep::StarOutput(self.output_stars()?),
-        ])
+        let mut steps = Vec::with_capacity(if context.sound_sequence_already_stepped {
+            2
+        } else {
+            3
+        });
+        if !context.sound_sequence_already_stepped {
+            steps.push(RedLabelIrqPreTailStep::SoundSequence(
+                self.step_sound_sequence()?,
+            ));
+        }
+        steps.push(RedLabelIrqPreTailStep::PlayerMotion(
+            self.update_player_motion_from_pia()?,
+        ));
+        steps.push(RedLabelIrqPreTailStep::StarOutput(self.output_stars()?));
+        Ok(steps)
     }
 
     fn irq_coin_terrain_pre_tail_steps(
@@ -8166,9 +12990,9 @@ impl RedLabelRuntimeMemory {
         })
     }
 
-    /// Source-shaped `START` body through the `START2` credit tail. `SCRCLR`
-    /// and `WCMOSA CREDST` are translated here; the ROM's `TDISP` call remains
-    /// an explicit display integration requirement.
+    /// Source-shaped `START` body through the `START2` credit tail. `SCRCLR`,
+    /// `WCMOSA CREDST`, and the conditional `TDISP` top-display redraw are
+    /// translated here.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L1124-L1175>.
     pub fn start_game_from_credit(&mut self) -> Result<RedLabelStartGame, String> {
         let layout = red_label_ram_layout()?;
@@ -8847,15 +13671,158 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    /// Source-shaped visible `EXEC0` / `EXEC1` pre-dispatch slice: clear
+    /// `TIMER`, update overload throttling, optionally demote one regular
+    /// active object to `IPTR`, select map 2, run translated `COLCHK`, call
+    /// translated `XUVCT` / `EXPU`, advance `RAND`, and drain queued `SWPROC`
+    /// entries through `SWP`.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L3044-L3124>.
+    pub fn run_exec_pre_dispatch_visible_slice(
+        &mut self,
+    ) -> Result<RedLabelExecPreDispatch, String> {
+        let layout = red_label_ram_layout()?;
+        let timer_before = self.read_field_byte(&layout, "base_page", "TIMER")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        let status = self.read_field_byte(&layout, "base_page", "STATUS")?;
+        let overload_counter_before = self.read_field_byte(&layout, "base_page", "OVCNT")?;
+
+        let mut overload_counter_raw = None;
+        let mut star_count_after = None;
+        let mut overloaded_object = None;
+        let overload_counter_after = if status & 0x7D != 0 {
+            self.write_field_byte(&layout, "base_page", "OVCNT", 0)?;
+            0
+        } else {
+            let raw = timer_before
+                .wrapping_shl(1)
+                .wrapping_add(overload_counter_before)
+                .wrapping_sub(4);
+            overload_counter_raw = Some(raw);
+            let mut counter = if raw & 0x80 == 0 { raw } else { 0 };
+            self.write_field_byte(&layout, "base_page", "OVCNT", counter)?;
+            if counter >= 2 {
+                self.write_field_byte(&layout, "base_page", "STRCNT", 3)?;
+                star_count_after = Some(3);
+                if counter > 2 {
+                    counter = 2;
+                    self.write_field_byte(&layout, "base_page", "OVCNT", counter)?;
+                    overloaded_object =
+                        self.move_first_exec_overload_object_to_inactive(&layout)?;
+                }
+            }
+            counter
+        };
+
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        let player_collision = self.check_player_collision()?;
+        let expanded_updates = self.update_expanded_objects()?;
+        let rand_state = self.advance_red_label_rand(&layout)?;
+        let switch_processes = self.dispatch_switch_processes()?;
+
+        Ok(RedLabelExecPreDispatch {
+            timer_before,
+            status,
+            overload_counter_before,
+            overload_counter_raw,
+            overload_counter_after,
+            star_count_after,
+            overloaded_object,
+            map_after: 2,
+            player_collision,
+            expanded_updates,
+            rand_state,
+            switch_processes,
+        })
+    }
+
+    fn reset_exec_current_process_to_active(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<u16, String> {
+        let lists = red_label_linked_lists()?;
+        let active_head = linked_list(&lists, "active_process")?.head_address;
+        let crproc = ram_field(layout, "runtime_pointers", "CRPROC")?
+            .field_range_for_entry(0)
+            .ok_or_else(|| String::from("red-label CRPROC range is invalid"))?
+            .start;
+        self.write_word(crproc, active_head)?;
+        Ok(active_head)
+    }
+
+    fn move_first_exec_overload_object_to_inactive(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<Option<RedLabelExecOverloadedObject>, String> {
+        let lists = red_label_linked_lists()?;
+        let object = table_descriptor(layout, "object")?;
+        let active_head = linked_list(&lists, "active_object")?.head_address;
+        let inactive_head = linked_list(&lists, "inactive_object")?.head_address;
+        let mut previous_link_address = active_head;
+
+        for _ in 0..object.entries {
+            let object_address = self.read_word(previous_link_address)?;
+            if object_address == 0 {
+                return Ok(None);
+            }
+            object_table_for_address(layout, object_address)?;
+            let next_active_object = self.read_object_word(layout, object_address, "OLINK")?;
+            if self.read_object_byte(layout, object_address, "OTYP")? != 0 {
+                previous_link_address =
+                    object_field_range_for_address(layout, object_address, "OLINK")?.start;
+                continue;
+            }
+
+            self.write_word(previous_link_address, next_active_object)?;
+            let seed = self.read_field_byte(layout, "base_page", "SEED")?;
+            let hseed = self.read_field_byte(layout, "base_page", "HSEED")?;
+            let previous_x16 = self.read_object_word(layout, object_address, "OX16")?;
+            let x_delta = u16::from_be_bytes([(seed & 0x3F).wrapping_add(0x60), hseed]);
+            let x16 = previous_x16.wrapping_add(x_delta);
+            self.write_object_word(layout, object_address, "OX16", x16)?;
+
+            let screen_address = self.read_object_screen_address(layout, object_address)?;
+            let picture_address = self.read_object_word(layout, object_address, "OPICT")?;
+            self.write_field_byte(layout, "base_page", "MAPCR", 2)?;
+            self.erase_object_picture_by_descriptor(screen_address, picture_address)?;
+            self.write_object_screen_address(layout, object_address, 0)?;
+
+            let previous_inactive_head = self.read_word(inactive_head)?;
+            self.write_word(inactive_head, object_address)?;
+            self.write_object_word(layout, object_address, "OLINK", previous_inactive_head)?;
+
+            return Ok(Some(RedLabelExecOverloadedObject {
+                object_address,
+                previous_link_address,
+                next_active_object,
+                previous_x16,
+                x16,
+                screen_address,
+                picture_address,
+                previous_inactive_head,
+            }));
+        }
+
+        Err(String::from(
+            "red-label EXEC overload active-object list did not terminate",
+        ))
+    }
+
     /// Executes the first source-shaped slice of red-label `DISP`: walk ACTIVE,
     /// decrement `PTIME`, update `CRPROC`, and report the due `PADDR`.
     pub fn step_process_scheduler(&mut self) -> Result<Option<RedLabelScheduledProcess>, String> {
-        let layout = red_label_ram_layout()?;
         let lists = red_label_linked_lists()?;
+        let active_head = linked_list(&lists, "active_process")?.head_address;
+        self.step_process_scheduler_from_link(active_head)
+    }
+
+    fn step_process_scheduler_from_link(
+        &mut self,
+        link_address: u16,
+    ) -> Result<Option<RedLabelScheduledProcess>, String> {
+        let layout = red_label_ram_layout()?;
         let process = table_descriptor(&layout, "process")?;
         let super_process = table_descriptor(&layout, "super_process")?;
-        let active_head = linked_list(&lists, "active_process")?.head_address;
-        let mut process_address = self.read_word(active_head)?;
+        let mut process_address = self.read_word(link_address)?;
 
         for _ in 0..(process.entries + super_process.entries) {
             if process_address == 0 {
@@ -8926,10 +13893,261 @@ impl RedLabelRuntimeMemory {
         &mut self,
         routine_address: u16,
     ) -> Result<RedLabelProcessDispatch, String> {
+        if [
+            red_label_routine_address("SUCIDE")?,
+            red_label_routine_address("HYPX")?,
+        ]
+        .contains(&routine_address)
+        {
+            let layout = red_label_ram_layout()?;
+            return self
+                .kill_current_process(&layout)
+                .map(RedLabelProcessDispatch::Suicide);
+        }
+
+        if routine_address == red_label_routine_address("CREDS")? {
+            return self
+                .display_attract_credits_current_process()
+                .map(RedLabelProcessDispatch::AttractCredits);
+        }
+
+        if routine_address == red_label_routine_address("AMODES")? {
+            return self
+                .start_attract_williams_page_current_process()
+                .map(RedLabelProcessDispatch::AttractWilliamsPage);
+        }
+
+        if routine_address == red_label_routine_address("LOGO")? {
+            return self
+                .start_attract_logo_current_process()
+                .map(RedLabelProcessDispatch::AttractLogo);
+        }
+
+        if routine_address == red_label_routine_address("LOGO0")? {
+            return self
+                .step_attract_logo_table_current_process()
+                .map(RedLabelProcessDispatch::AttractLogo);
+        }
+
+        if routine_address == red_label_routine_address("PRES")? {
+            return self
+                .start_attract_presents_current_process()
+                .map(RedLabelProcessDispatch::AttractPresents);
+        }
+
+        if routine_address == red_label_routine_address("PRES1")? {
+            return self
+                .refresh_attract_presents_current_process()
+                .map(RedLabelProcessDispatch::AttractPresents);
+        }
+
+        if routine_address == red_label_routine_address("DEFEND")? {
+            return self
+                .delay_attract_defender_current_process()
+                .map(RedLabelProcessDispatch::AttractDefenderDelay);
+        }
+
+        if routine_address == red_label_routine_address("DEFENS")? {
+            return self
+                .start_attract_defender_appearances_current_process()
+                .map(RedLabelProcessDispatch::AttractDefenderAppearances);
+        }
+
+        if routine_address == red_label_routine_address("DEF33")? {
+            return self
+                .start_attract_defender_restore_current_process()
+                .map(RedLabelProcessDispatch::AttractDefenderRestoreStart);
+        }
+
+        if routine_address == red_label_routine_address("DEF44")? {
+            return self
+                .start_attract_copyright_current_process()
+                .map(RedLabelProcessDispatch::AttractCopyright);
+        }
+
+        if routine_address == red_label_routine_address("COPYRT")? {
+            return self
+                .write_attract_copyright_current_process()
+                .map(RedLabelProcessDispatch::AttractCopyright);
+        }
+
+        if routine_address == red_label_routine_address("CPR55")? {
+            return self
+                .continue_attract_copyright_wait_current_process()
+                .map(RedLabelProcessDispatch::AttractCopyrightWait);
+        }
+
+        if routine_address == red_label_routine_address("ATTR")? {
+            return self
+                .start_attract_vector_current_process()
+                .map(RedLabelProcessDispatch::AttractVector);
+        }
+
+        if routine_address == red_label_routine_address("HALD4")?
+            || routine_address == red_label_routine_address("LEDRET")?
+        {
+            return self
+                .start_attract_instruction_page_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionStart);
+        }
+
+        if routine_address == red_label_routine_address("CPR56")?
+            || routine_address == red_label_routine_address("HALDIS")?
+        {
+            return self
+                .display_hall_of_fame_from_current_process()
+                .map(RedLabelProcessDispatch::PlayerDeath);
+        }
+
+        if routine_address == red_label_routine_address("HALD3")? {
+            return self
+                .continue_hall_of_fame_display_wait_current_process()
+                .map(RedLabelProcessDispatch::HallOfFameDisplayWait);
+        }
+
+        if routine_address == red_label_routine_address("DEF50")? {
+            return self
+                .refresh_attract_defender_current_process()
+                .map(RedLabelProcessDispatch::AttractDefenderRefresh);
+        }
+
+        if routine_address == red_label_routine_address("DEF51")? {
+            return self
+                .delay_attract_defender_refresh_current_process()
+                .map(RedLabelProcessDispatch::AttractDefenderRefresh);
+        }
+
+        if routine_address == red_label_routine_address("WILLIR")? {
+            return self
+                .start_attract_williams_restore_current_process()
+                .map(RedLabelProcessDispatch::AttractWilliamsRestore);
+        }
+
+        if routine_address == red_label_routine_address("WILR1")? {
+            return self
+                .finish_attract_williams_restore_current_process()
+                .map(RedLabelProcessDispatch::AttractWilliamsRestore);
+        }
+
+        if routine_address == red_label_routine_address("AMODE1")? {
+            return self
+                .raise_attract_instruction_objects_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionAscent);
+        }
+
+        if routine_address == red_label_routine_address("AMODE2")? {
+            return self
+                .start_attract_instruction_laser_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionLaserStart);
+        }
+
+        if routine_address == red_label_routine_address("LASRS")? {
+            return self
+                .start_attract_instruction_laser_step_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionLaserStep);
+        }
+
+        if routine_address == red_label_routine_address("LAS0")? {
+            return self
+                .continue_attract_instruction_laser_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionLaserStep);
+        }
+
+        if routine_address == red_label_routine_address("AMODE3")? {
+            return self
+                .start_attract_instruction_rescue_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionRescueStart);
+        }
+
+        if routine_address == red_label_routine_address("AMODE4")? {
+            return self
+                .continue_attract_instruction_free_fall_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionFreeFall);
+        }
+
+        if routine_address == red_label_routine_address("AMODE5")? {
+            return self
+                .start_attract_instruction_intersection_current_process()
+                .map(RedLabelAttractInstructionFreeFall::Intersection)
+                .map(RedLabelProcessDispatch::AttractInstructionFreeFall);
+        }
+
+        if routine_address == red_label_routine_address("AMODE7")? {
+            return self
+                .start_attract_instruction_ship_return_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionShipReturn);
+        }
+
+        if routine_address == red_label_routine_address("AMODE8")? {
+            return self
+                .start_attract_instruction_enemy_table_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionEnemyTableStart);
+        }
+
+        if routine_address == red_label_routine_address("AMOD12")? {
+            return self
+                .spawn_attract_instruction_enemy_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionEnemySpawn);
+        }
+
+        if routine_address == red_label_routine_address("AMOD10")? {
+            return self
+                .start_attract_instruction_table_laser_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionLaserStart);
+        }
+
+        if routine_address == red_label_routine_address("AMOD11")? {
+            return self
+                .resolve_attract_instruction_enemy_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionEnemyResolve);
+        }
+
+        if routine_address == red_label_routine_address("BMODE2")? {
+            return self
+                .advance_attract_instruction_text_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionTextAdvance);
+        }
+
+        if routine_address == red_label_routine_address("BMODE3")? {
+            return self
+                .decide_attract_instruction_table_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionTableDecision);
+        }
+
+        if routine_address == red_label_routine_address("AMOD13")? {
+            return self
+                .restart_attract_instruction_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionRestart);
+        }
+
+        if routine_address == red_label_routine_address("TEXTP")? {
+            return self
+                .start_attract_instruction_text_process_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionTextProcess);
+        }
+
+        if routine_address == red_label_routine_address("TEXTP2")? {
+            return self
+                .continue_attract_instruction_text_process_current_process()
+                .map(RedLabelProcessDispatch::AttractInstructionTextProcess);
+        }
+
         if routine_address == red_label_routine_address("LFIRE")? {
             return self
                 .dispatch_laser_fire_current_process()
                 .map(RedLabelProcessDispatch::LaserFire);
+        }
+
+        if routine_address == red_label_routine_address("LASR")? {
+            return self
+                .start_right_laser_current_process()
+                .map(RedLabelProcessDispatch::LaserStep);
+        }
+
+        if routine_address == red_label_routine_address("LASL")? {
+            return self
+                .start_left_laser_current_process()
+                .map(RedLabelProcessDispatch::LaserStep);
         }
 
         if routine_address == red_label_routine_address("LASR0")? {
@@ -8992,6 +14210,66 @@ impl RedLabelRuntimeMemory {
                 .map(RedLabelProcessDispatch::SupportProcess);
         }
 
+        if routine_address == red_label_routine_address("HOFST")? {
+            return self
+                .step_hall_of_fame_stall_timer_current_process()
+                .map(RedLabelProcessDispatch::SupportProcess);
+        }
+
+        if routine_address == red_label_routine_address("HOFBL")? {
+            return self
+                .step_hall_of_fame_blink_current_process()
+                .map(RedLabelProcessDispatch::SupportProcess);
+        }
+
+        if routine_address == red_label_routine_address("HOFUD")? {
+            return self
+                .start_hall_of_fame_initials_input_current_process()
+                .map(RedLabelProcessDispatch::SupportProcess);
+        }
+
+        if routine_address == red_label_routine_address("HOFUD1")? {
+            return self
+                .continue_hall_of_fame_initials_input_current_process()
+                .map(RedLabelProcessDispatch::SupportProcess);
+        }
+
+        if routine_address == red_label_routine_address("HALL1")? {
+            return self
+                .start_high_score_qualification_current_process()
+                .map(RedLabelProcessDispatch::HighScoreQualification);
+        }
+
+        if routine_address == red_label_routine_address("HALL3A")? {
+            return self
+                .start_high_score_fire_switch_current_process()
+                .map(RedLabelProcessDispatch::HighScoreFireSwitch);
+        }
+
+        if routine_address == red_label_routine_address("HALL4")? {
+            return self
+                .continue_high_score_fire_switch_current_process()
+                .map(RedLabelProcessDispatch::HighScoreFireSwitch);
+        }
+
+        if routine_address == red_label_routine_address("HALL5")? {
+            return self
+                .advance_high_score_fire_switch_current_process()
+                .map(RedLabelProcessDispatch::HighScoreFireSwitch);
+        }
+
+        if routine_address == red_label_routine_address("HALL6")? {
+            return self
+                .submit_high_score_initials_current_process()
+                .map(RedLabelProcessDispatch::HighScoreSubmission);
+        }
+
+        if routine_address == red_label_routine_address("HALL12")? {
+            return self
+                .advance_high_score_handoff_current_process()
+                .map(RedLabelProcessDispatch::HighScoreHandoff);
+        }
+
         if routine_address == red_label_routine_address("TIECOL")? {
             return self
                 .start_tie_color_current_process()
@@ -9022,6 +14300,10 @@ impl RedLabelRuntimeMemory {
                 .map(RedLabelProcessDispatch::ScannerProcess);
         }
 
+        if routine_address == red_label_routine_address("TDISP")? {
+            return self.top_display().map(RedLabelProcessDispatch::TopDisplay);
+        }
+
         if routine_address == red_label_routine_address("PLSTRT")? {
             return self
                 .start_player_start_current_process()
@@ -9050,6 +14332,18 @@ impl RedLabelRuntimeMemory {
             return self
                 .finish_player_start_current_process()
                 .map(RedLabelProcessDispatch::PlayerStart);
+        }
+
+        if routine_address == red_label_routine_address("GEXEC")? {
+            return self
+                .start_game_exec_current_process()
+                .map(RedLabelProcessDispatch::GameExec);
+        }
+
+        if routine_address == red_label_routine_address("GEX0")? {
+            return self
+                .step_game_exec_current_process()
+                .map(RedLabelProcessDispatch::GameExec);
         }
 
         if routine_address == red_label_routine_address("SBOMB")? {
@@ -9222,6 +14516,12 @@ impl RedLabelRuntimeMemory {
         if routine_address == red_label_routine_address("PLE3")? {
             return self
                 .jump_player_death_game_over_to_attract_current_process()
+                .map(RedLabelProcessDispatch::PlayerDeath);
+        }
+
+        if routine_address == red_label_routine_address("HALL13")? {
+            return self
+                .display_hall_of_fame_from_current_process()
                 .map(RedLabelProcessDispatch::PlayerDeath);
         }
 
@@ -10024,25 +15324,430 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    /// Source-shaped `HALDIS`: clear the active screen, draw the score
+    /// display, hall-of-fame headings, underline bars, two high-score tables,
+    /// and the expanded `DEFNNN` Defender logo.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L379-L467>.
+    pub fn write_hall_of_fame_display(&mut self) -> Result<RedLabelHallOfFameDisplay, String> {
+        let layout = red_label_ram_layout()?;
+        let screen_clear = self.clear_screen_ram()?;
+        let high_score_reset_flag_address = RED_LABEL_HOF_RESET_FLAG_RAM;
+        self.write_byte(high_score_reset_flag_address, 0)?;
+
+        let black_letters_address = field_range(&layout, "base_page", "PCRAM")?.start + 1;
+        self.write_byte(black_letters_address, 0)?;
+        let score_transfers = self.display_player_scores(&layout)?;
+        let headings = self.write_hall_of_fame_headings(&layout)?;
+        let underline_words = self.write_hall_of_fame_underlines()?;
+        let todays_table = self.write_hall_of_fame_table(
+            &layout,
+            RuntimeHighScoreTable::TodaysGreatest,
+            RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN,
+        )?;
+        let all_time_table = self.write_hall_of_fame_table(
+            &layout,
+            RuntimeHighScoreTable::AllTime,
+            RED_LABEL_HALL_OF_FAME_ALL_TIME_TABLE_SCREEN,
+        )?;
+
+        let logo_color_address = field_range(&layout, "base_page", "PCRAM")?.start + 0x0C;
+        self.write_byte(logo_color_address, RED_LABEL_HALL_OF_FAME_LOGO_COLOR)?;
+        let logo = self.write_hall_of_fame_defender_logo()?;
+        self.write_byte(
+            RED_LABEL_HOF_STALL_TIMER_RAM,
+            RED_LABEL_HALL_OF_FAME_STALL_TICKS,
+        )?;
+
+        Ok(RedLabelHallOfFameDisplay {
+            screen_clear,
+            high_score_reset_flag_address,
+            black_letters_address,
+            score_transfers,
+            headings,
+            underline_words,
+            todays_table,
+            all_time_table,
+            logo_color_address,
+            logo,
+            stall_ticks: RED_LABEL_HALL_OF_FAME_STALL_TICKS,
+        })
+    }
+
+    /// Source-shaped `SCORES`: redraw player score fields by calling `SCRTR0`
+    /// for players `PLRCNT` down to one.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L1003-L1009>.
+    fn display_player_scores(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<Vec<RedLabelScoreTransfer>, String> {
+        let player_count = self.read_field_byte(layout, "base_page", "PLRCNT")?;
+        let mut score_transfers = Vec::with_capacity(usize::from(player_count));
+        let mut player_number = player_count;
+        while player_number != 0 {
+            score_transfers.push(self.transfer_score_digits(layout, player_number)?);
+            player_number = player_number.wrapping_sub(1);
+        }
+        Ok(score_transfers)
+    }
+
+    fn write_hall_of_fame_headings(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<[RedLabelBonusTextCall; 5], String> {
+        let title = red_label_message("HALLD_TITLE")?;
+        let todays = red_label_message("HALLD_TODAYS")?;
+        let all_time = red_label_message("HALLD_ALL_TIME")?;
+        let left_greatest = red_label_message("HALLD_GREATEST")?;
+        let right_greatest = red_label_message("HALLD_GREATEST")?;
+        let calls = [
+            (title, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN),
+            (todays, RED_LABEL_HALL_OF_FAME_TODAYS_SCREEN),
+            (all_time, RED_LABEL_HALL_OF_FAME_ALL_TIME_SCREEN),
+            (left_greatest, RED_LABEL_HALL_OF_FAME_LEFT_GREATEST_SCREEN),
+            (right_greatest, RED_LABEL_HALL_OF_FAME_RIGHT_GREATEST_SCREEN),
+        ];
+        let mut text_calls = [RedLabelBonusTextCall {
+            vector_address: 0,
+            screen_address: 0,
+        }; 5];
+        for (index, (message, screen_address)) in calls.iter().enumerate() {
+            self.write_message_text_block(layout, *screen_address, message)?;
+            text_calls[index] = RedLabelBonusTextCall {
+                vector_address: message.vector_address,
+                screen_address: *screen_address,
+            };
+        }
+        Ok(text_calls)
+    }
+
+    fn write_hall_of_fame_underlines(&mut self) -> Result<Vec<u16>, String> {
+        let mut underline_words = Vec::new();
+        let mut offset_high = 0x5Fu8;
+        loop {
+            let address = screen_offset(
+                RED_LABEL_HALL_OF_FAME_UNDERLINE_LEFT,
+                u16::from(offset_high) << 8,
+            )?;
+            self.write_word(address, RED_LABEL_HOF_UNDERLINE_NORMAL)?;
+            underline_words.push(address);
+            if offset_high == 0x41 {
+                offset_high = 0x1F;
+            }
+            offset_high = offset_high.wrapping_sub(1);
+            if offset_high & 0x80 != 0 {
+                break;
+            }
+        }
+        Ok(underline_words)
+    }
+
+    fn write_hall_of_fame_table(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        table: RuntimeHighScoreTable,
+        start_screen_address: u16,
+    ) -> Result<RedLabelHallOfFameTableDisplay, String> {
+        self.write_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM + 1, b'/')?;
+        self.write_byte(RED_LABEL_HOF_TABLE_INITIALS_RAM + 3, b'/')?;
+        self.write_byte(RED_LABEL_HOF_TABLE_SCORE_RAM + 6, b'/')?;
+        let mut rows = Vec::with_capacity(RED_LABEL_HIGH_SCORE_ENTRIES);
+        let mut screen_address = start_screen_address;
+        for index in 0..RED_LABEL_HIGH_SCORE_ENTRIES {
+            let rank = u8::try_from(index + 1).expect("red-label HALL table rank fits in u8");
+            rows.push(self.write_hall_of_fame_table_row(
+                layout,
+                table,
+                index,
+                rank,
+                screen_address,
+            )?);
+            screen_address = text_position_from_top_left(
+                screen_address,
+                0,
+                u8::try_from(RED_LABEL_HALL_OF_FAME_TABLE_ROW_STEP)
+                    .expect("red-label HALL row step fits in u8"),
+            );
+        }
+        Ok(RedLabelHallOfFameTableDisplay {
+            table: table.kind(),
+            start_screen_address,
+            rows,
+        })
+    }
+
+    fn write_hall_of_fame_table_row(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        table: RuntimeHighScoreTable,
+        index: usize,
+        rank: u8,
+        rank_address: u16,
+    ) -> Result<RedLabelHallOfFameTableRow, String> {
+        let entry = self.high_score_entry(table, index)?;
+        let score_chars = hall_of_fame_score_chars(entry.score)?;
+        let rank_byte = b'0'.wrapping_add(rank);
+        self.write_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM, rank_byte)?;
+        for (initial_index, initial) in entry.initials.iter().enumerate() {
+            self.write_byte(
+                RED_LABEL_HOF_TABLE_INITIALS_RAM
+                    + u16::try_from(initial_index).expect("initial index fits in u16"),
+                *initial,
+            )?;
+        }
+        for (score_index, score_char) in score_chars.iter().enumerate() {
+            self.write_byte(
+                RED_LABEL_HOF_TABLE_SCORE_RAM
+                    + u16::try_from(score_index).expect("score index fits in u16"),
+                *score_char,
+            )?;
+        }
+
+        let initials_address =
+            text_position_from_top_left(rank_address, RED_LABEL_HALL_OF_FAME_INITIALS_OFFSET, 0);
+        let score_address =
+            text_position_from_top_left(rank_address, RED_LABEL_HALL_OF_FAME_SCORE_OFFSET, 0);
+        self.write_text_bytes_with_space(layout, rank_address, &[rank_byte])?;
+        self.write_text_bytes_with_space(layout, initials_address, &entry.initials)?;
+        self.write_text_bytes_with_space(layout, score_address, &score_chars)?;
+
+        Ok(RedLabelHallOfFameTableRow {
+            rank,
+            rank_address,
+            initials_address,
+            score_address,
+            score_chars,
+            entry: RedLabelHallOfFameEntry {
+                score: entry.score,
+                initials: entry.initials,
+            },
+        })
+    }
+
+    fn write_hall_of_fame_defender_logo(&mut self) -> Result<RedLabelPictureWrite, String> {
+        let logo = expanded_defender_logo_image();
+        self.write_word(
+            RED_LABEL_HALL_OF_FAME_LOGO_DESCRIPTOR,
+            u16::from_be_bytes([
+                RED_LABEL_HALL_OF_FAME_LOGO_WIDTH,
+                RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT,
+            ]),
+        )?;
+        self.write_word(
+            RED_LABEL_HALL_OF_FAME_LOGO_DESCRIPTOR + 2,
+            RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM,
+        )?;
+        let logo_ram_range = checked_defender_logo_ram_range(self.ram.len())?;
+        self.ram[logo_ram_range].copy_from_slice(&logo);
+
+        for column in 0..RED_LABEL_HALL_OF_FAME_LOGO_WIDTH {
+            let column_address =
+                screen_offset(RED_LABEL_HALL_OF_FAME_LOGO_SCREEN, u16::from(column) << 8)?;
+            let source_column =
+                usize::from(column) * usize::from(RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT);
+            for row in 0..RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT {
+                self.write_byte(
+                    screen_offset(column_address, u16::from(row))?,
+                    logo[source_column + usize::from(row)],
+                )?;
+            }
+        }
+        Ok(RedLabelPictureWrite {
+            screen_address: RED_LABEL_HALL_OF_FAME_LOGO_SCREEN,
+            picture_address: RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM,
+            width: RED_LABEL_HALL_OF_FAME_LOGO_WIDTH,
+            height: RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT,
+        })
+    }
+
+    /// Source-shaped `HALLOF` screen setup through the `HOFIN`/`HOFUL`
+    /// initials draw. The input process timing is still handled by the live
+    /// high-score state machine; these writes keep the verified cabinet frame
+    /// backed by red-label video RAM while entry is active.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L141-L187>.
+    fn write_high_score_entry_display(
+        &mut self,
+        player: u8,
+        state: HighScoreEntryState,
+    ) -> Result<RedLabelHighScoreEntryDisplay, String> {
+        let layout = red_label_ram_layout()?;
+        let screen_clear = self.clear_screen_ram()?;
+        self.write_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM, player)?;
+        let letter_color_address = field_range(&layout, "base_page", "PCRAM")?.start + 1;
+        self.write_byte(letter_color_address, RED_LABEL_HOF_LETTER_COLOR)?;
+        self.copy_color_mapping_to_palette_ram(&layout)?;
+
+        let player_message = if player == 2 {
+            red_label_message("PLYR2")?
+        } else {
+            red_label_message("PLYR1")?
+        };
+        self.write_message_text_block(&layout, RED_LABEL_HOF_PLAYER_LABEL_SCREEN, player_message)?;
+        let player_label = RedLabelBonusTextCall {
+            vector_address: player_message.vector_address,
+            screen_address: RED_LABEL_HOF_PLAYER_LABEL_SCREEN,
+        };
+
+        let hof_messages = [
+            red_label_message("HOFV1")?,
+            red_label_message("HOFV2")?,
+            red_label_message("HOFV3")?,
+            red_label_message("HOFV4")?,
+        ];
+        let mut instruction_lines = [RedLabelBonusTextCall {
+            vector_address: 0,
+            screen_address: 0,
+        }; 4];
+        for (index, message) in hof_messages.iter().enumerate() {
+            let screen_address = text_position_from_top_left(
+                RED_LABEL_HOF_INSTRUCTIONS_TOP_LEFT,
+                0,
+                RED_LABEL_HOF_LINE_VERTICAL_OFFSETS[index],
+            );
+            self.write_message_text_block(&layout, screen_address, message)?;
+            instruction_lines[index] = RedLabelBonusTextCall {
+                vector_address: message.vector_address,
+                screen_address,
+            };
+        }
+
+        Ok(RedLabelHighScoreEntryDisplay {
+            player,
+            screen_clear,
+            letter_color_address,
+            letter_color: RED_LABEL_HOF_LETTER_COLOR,
+            player_label,
+            instruction_lines,
+            initials: self.write_high_score_initials_display(state)?,
+        })
+    }
+
+    /// Source-shaped `HOFIN` plus `HOFUL`: refresh the three displayed
+    /// initials, then draw the source underline words for the active initial.
+    /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L246-L269>.
+    fn write_high_score_initials_display(
+        &mut self,
+        state: HighScoreEntryState,
+    ) -> Result<RedLabelHighScoreInitialsDisplay, String> {
+        self.write_high_score_initial_words(state)?;
+        self.write_high_score_initials_display_from_current_ram(state.cursor)
+    }
+
+    fn write_high_score_initials_display_from_current_ram(
+        &mut self,
+        active_initial: u8,
+    ) -> Result<RedLabelHighScoreInitialsDisplay, String> {
+        let block_clear = self.block_clear(
+            RED_LABEL_HOF_INITIALS_SCREEN,
+            RED_LABEL_HOF_INITIALS_BLOCK_WIDTH,
+            RED_LABEL_HOF_INITIALS_BLOCK_HEIGHT,
+        )?;
+        let mut initial_addresses = [0; RED_LABEL_INITIALS_ENTRY_CHARS];
+        for (index, initial_screen_address) in initial_addresses.iter_mut().enumerate() {
+            let initial_address = RED_LABEL_HOF_INITS_RAM
+                + u16::try_from(index * 2).expect("initial index should fit in u16");
+            let initial = high_score_initial_display_byte(self.read_byte(initial_address)?);
+            let screen_address = text_position_from_top_left(
+                RED_LABEL_HOF_INITIALS_SCREEN,
+                RED_LABEL_HOF_INITIAL_HORIZONTAL_OFFSETS[index],
+                0,
+            );
+            let glyph = red_label_message_glyph(char::from(initial))?;
+            self.write_message_glyph(screen_address, glyph)?;
+            *initial_screen_address = screen_address;
+        }
+
+        Ok(RedLabelHighScoreInitialsDisplay {
+            block_clear,
+            initial_addresses,
+            active_initial,
+            underline_words: self.write_high_score_initial_underlines(active_initial)?,
+        })
+    }
+
+    fn write_high_score_initial_words(&mut self, state: HighScoreEntryState) -> Result<(), String> {
+        for (index, initial) in state.initials.iter().enumerate() {
+            let address = RED_LABEL_HOF_INITS_RAM
+                + u16::try_from(index * 2).expect("initial index should fit in u16");
+            self.write_byte(address, *initial)?;
+            self.write_byte(address + 1, b'/')?;
+        }
+        self.write_byte(RED_LABEL_HOF_INIT_INDEX_RAM, state.cursor)
+    }
+
+    fn write_high_score_initial_underlines(
+        &mut self,
+        active_initial: u8,
+    ) -> Result<[[u16; 4]; RED_LABEL_INITIALS_ENTRY_CHARS], String> {
+        let mut underline_words = [[0; 4]; RED_LABEL_INITIALS_ENTRY_CHARS];
+        for (initial_index, words) in underline_words.iter_mut().enumerate() {
+            let initial_base = RED_LABEL_HOF_UNDERLINE_START
+                + u16::try_from(initial_index).expect("initial index should fit in u16")
+                    * RED_LABEL_HOF_UNDERLINE_INITIAL_STEP;
+            let color = if initial_index == usize::from(active_initial) {
+                RED_LABEL_HOF_UNDERLINE_ACTIVE
+            } else {
+                RED_LABEL_HOF_UNDERLINE_NORMAL
+            };
+            for (word_index, offset) in RED_LABEL_HOF_UNDERLINE_WORD_OFFSETS.iter().enumerate() {
+                let address = screen_offset(initial_base, *offset)?;
+                self.write_word(address, color)?;
+                words[word_index] = address;
+            }
+        }
+        Ok(underline_words)
+    }
+
     fn write_message_text_block(
         &mut self,
         layout: &[RedLabelRamLayoutEntry],
         screen_address: u16,
         message: &RedLabelMessage,
-    ) -> Result<(), String> {
+    ) -> Result<u16, String> {
+        let mut text_layout = RedLabelMessageTextLayout {
+            top_left: screen_address,
+            cursor: screen_address,
+            line_spacing: 0x0A,
+        };
+        self.write_field_word(layout, "base_page", "CURSER", text_layout.cursor)?;
+        for word in &message.words {
+            if let Some(control) = red_label_message_control(word)? {
+                text_layout.apply(control);
+                self.write_field_word(layout, "base_page", "CURSER", text_layout.cursor)?;
+                continue;
+            }
+            text_layout.cursor =
+                self.write_text_bytes_with_space(layout, text_layout.cursor, word.as_bytes())?;
+        }
+        self.write_field_word(layout, "base_page", "CURSER", text_layout.cursor)?;
+        Ok(text_layout.cursor)
+    }
+
+    fn write_text_bytes_with_space(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        screen_address: u16,
+        bytes: &[u8],
+    ) -> Result<u16, String> {
         let mut cursor = screen_address;
         self.write_field_word(layout, "base_page", "CURSER", cursor)?;
-        for word in &message.words {
-            for character in word.chars() {
-                let glyph = red_label_message_glyph(character)?;
-                self.write_message_glyph(cursor, glyph)?;
-                cursor = text_cursor_advance(cursor, glyph.width);
-            }
-            let space = red_label_message_glyph(' ')?;
-            self.write_message_glyph(cursor, space)?;
-            cursor = text_cursor_advance(cursor, space.width);
+        for byte in bytes {
+            cursor = self.write_text_byte(cursor, *byte)?;
         }
-        self.write_field_word(layout, "base_page", "CURSER", cursor)
+        cursor = self.write_text_byte(cursor, b' ')?;
+        self.write_field_word(layout, "base_page", "CURSER", cursor)?;
+        Ok(cursor)
+    }
+
+    fn write_text_byte(&mut self, screen_address: u16, byte: u8) -> Result<u16, String> {
+        if byte.is_ascii_digit() {
+            let image = red_label_score_digit_image(byte - b'0')?;
+            self.write_score_digit_image(screen_address, image)?;
+            return Ok(text_cursor_advance(screen_address, image.width));
+        }
+
+        let glyph = red_label_message_glyph(char::from(byte))?;
+        self.write_message_glyph(screen_address, glyph)?;
+        Ok(text_cursor_advance(screen_address, glyph.width))
     }
 
     fn write_message_number_block(
@@ -10173,11 +15878,36 @@ impl RedLabelRuntimeMemory {
             return self.sleep_player_death_game_over(layout, process_address, sound_command);
         }
 
+        let player_label_message = if current_player == 2 {
+            red_label_message("PLYR2")?
+        } else {
+            red_label_message("PLYR1")?
+        };
+        self.write_message_text_block(
+            layout,
+            RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN,
+            player_label_message,
+        )?;
+        let game_over_message = red_label_message("GO")?;
+        self.write_message_text_block(
+            layout,
+            RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN,
+            game_over_message,
+        )?;
+
         let wakeup_address = red_label_routine_address("PLE02")?;
         self.sleep_current_process(0x60, wakeup_address)?;
         Ok(RedLabelPlayerDeath::PostExplosionSwitchPlayerSleeping {
             process_address,
             other_player,
+            player_label: RedLabelBonusTextCall {
+                vector_address: player_label_message.vector_address,
+                screen_address: RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN,
+            },
+            game_over: RedLabelBonusTextCall {
+                vector_address: game_over_message.vector_address,
+                screen_address: RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN,
+            },
             wakeup_address,
         })
     }
@@ -10211,7 +15941,7 @@ impl RedLabelRuntimeMemory {
         self.sleep_player_death_game_over(
             layout,
             process_address,
-            red_label_sound_output_command(0x13),
+            red_label_sound_output_command(RED_LABEL_PLAYER_END_SOUND_STOP_NUMBER),
         )
     }
 
@@ -10223,6 +15953,7 @@ impl RedLabelRuntimeMemory {
     ) -> Result<RedLabelPlayerDeath, String> {
         let status = 0xFF;
         self.write_field_byte(layout, "base_page", "STATUS", status)?;
+        self.write_message_text_block(layout, 0x3E80, red_label_message("GO")?)?;
         self.write_field_byte(layout, "base_page", "SNDTMR", 0)?;
         let wakeup_address = red_label_routine_address("PLE3")?;
         self.sleep_current_process(40, wakeup_address)?;
@@ -10515,6 +16246,7 @@ impl RedLabelRuntimeMemory {
         Ok(RedLabelPlayerRuntimeInit {
             current_player,
             player_address,
+            screen_switch: None,
             wave,
             wall_color,
             remaining_lasers,
@@ -10652,6 +16384,7 @@ impl RedLabelRuntimeMemory {
         let target_count =
             self.read_byte(player_field_range_for_entry(layout, player_index, "PTARG")?.start)?;
         self.write_field_byte(layout, "base_page", "ASTCNT", target_count)?;
+        let mut plres_b_register = if target_count == 0 { 0x07 } else { 0 };
 
         let mut target_writer = RedLabelTargetRestoreWriter {
             target_list: target_list.clone(),
@@ -10672,6 +16405,7 @@ impl RedLabelRuntimeMemory {
                         &mut target_writer,
                     )?;
                     x_bank = x_bank.wrapping_add(0x40);
+                    plres_b_register = x_bank;
                     if x_bank == 0 {
                         break;
                     }
@@ -10684,6 +16418,7 @@ impl RedLabelRuntimeMemory {
                 self.write_byte(xtemp, remainder)?;
                 while self.read_byte(xtemp)? != 0 {
                     let x_bank = self.read_field_byte(layout, "base_page", "HSEED")?;
+                    plres_b_register = x_bank;
                     self.start_astronaut_target_group(
                         layout,
                         astro_process.process_address,
@@ -10712,6 +16447,8 @@ impl RedLabelRuntimeMemory {
 
         let active_counts = field_range(layout, "enemy_runtime", "ECNTS")?;
         self.clear_range(active_counts.clone())?;
+        let mini_swarmer_restore =
+            self.restore_mini_swarmer_reserve_from_plres(layout, plres_b_register)?;
         let schizoid_restore = self.restore_schizoid_reserve_from_plres(layout)?;
         let probe_restore = self.restore_probe_reserve_from_plres(layout)?;
         let tie_restore = self.restore_tie_reserve_from_plres(layout)?;
@@ -10728,9 +16465,81 @@ impl RedLabelRuntimeMemory {
             enemy_bytes_copied: enemy_len,
             active_count_start: active_counts.start,
             active_count_bytes_cleared: active_counts.end - active_counts.start,
+            mini_swarmer_restore,
             schizoid_restore,
             probe_restore,
             tie_restore,
+        })
+    }
+
+    fn restore_mini_swarmer_reserve_from_plres(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        x_low_register: u8,
+    ) -> Result<RedLabelMiniSwarmerRestore, String> {
+        let reserve_count = self.read_field_byte(layout, "enemy_runtime", "SWMRES")?;
+        let mut remaining_reserve = reserve_count;
+        let mut batches = Vec::new();
+
+        loop {
+            let phony_object_address = self.get_object_cell()?;
+            let seed_before = self.read_field_byte(layout, "base_page", "SEED")?;
+            let y16_range = object_field_range_for_address(layout, phony_object_address, "OY16")?;
+            self.write_byte(
+                y16_range.start,
+                seed_before.wrapping_shr(1).wrapping_add(RED_LABEL_Y_MIN),
+            )?;
+            let phony_y16 = self.read_object_word(layout, phony_object_address, "OY16")?;
+
+            let placement_rand = self.advance_red_label_rand(layout)?;
+            let phony_x16 = u16::from_be_bytes([
+                (placement_rand.seed & 0x3F).wrapping_add(0x80),
+                x_low_register,
+            ])
+            .wrapping_add(self.read_field_word(layout, "base_page", "BGL")?);
+            self.write_object_word(layout, phony_object_address, "OX16", phony_x16)?;
+
+            if remaining_reserve == 0 {
+                batches.push(RedLabelMiniSwarmerRestoreBatch {
+                    phony_object_address,
+                    phony_x16,
+                    phony_y16,
+                    placement_rand,
+                    requested_count: 0,
+                    spawned_swarmers: Vec::new(),
+                    remaining_reserve,
+                    returned_phony_to_free_list: false,
+                });
+                break;
+            }
+
+            let requested_count = remaining_reserve.min(6);
+            let spawned_swarmers =
+                self.make_mini_swarmers_from_center(layout, phony_object_address, requested_count)?;
+            self.return_unlinked_object_to_free_list(layout, phony_object_address)?;
+            remaining_reserve = remaining_reserve.wrapping_sub(requested_count);
+            self.write_field_byte(layout, "enemy_runtime", "SWMRES", remaining_reserve)?;
+            batches.push(RedLabelMiniSwarmerRestoreBatch {
+                phony_object_address,
+                phony_x16,
+                phony_y16,
+                placement_rand,
+                requested_count,
+                spawned_swarmers,
+                remaining_reserve,
+                returned_phony_to_free_list: true,
+            });
+
+            if remaining_reserve == 0 {
+                break;
+            }
+        }
+
+        Ok(RedLabelMiniSwarmerRestore {
+            reserve_count,
+            x_low_register,
+            active_count: self.read_field_byte(layout, "enemy_runtime", "SWCNT")?,
+            batches,
         })
     }
 
@@ -12025,7 +17834,7 @@ impl RedLabelRuntimeMemory {
             let y16_range = object_field_range_for_address(layout, target_object_address, "OY16")?;
             self.write_byte(y16_range.start, target_y.wrapping_sub(1))?;
             let target_y16 = self.read_object_word(layout, target_object_address, "OY16")?;
-            let sound_command = red_label_sound_output_command(0x12);
+            let sound_command = red_label_sound_output_command(RED_LABEL_LANDER_PULL_SOUND_NUMBER);
             let wakeup_address = red_label_routine_address("LNDFXA")?;
             self.sleep_current_process(1, wakeup_address)?;
             return Ok(RedLabelLanderFleeOutcome::PullingPassengerSleeping {
@@ -13929,10 +19738,10 @@ impl RedLabelRuntimeMemory {
         layout: &[RedLabelRamLayoutEntry],
         player_index: u16,
         score_range: std::ops::Range<u16>,
-    ) -> Result<(bool, Option<RedLabelLoadedSoundTable>), String> {
+    ) -> Result<bool, String> {
         let replay_increment = self.read_field_word(layout, "base_page", "REPLA")?;
         if replay_increment == 0 {
-            return Ok((false, None));
+            return Ok(false);
         }
 
         let replay_range = ram_field(layout, "player", "PRPLA")?
@@ -13941,7 +19750,7 @@ impl RedLabelRuntimeMemory {
         let score_digits = self.read_fixed_bytes::<3>(score_range.start + 1)?;
         let replay_digits = self.read_fixed_bytes::<3>(replay_range.start)?;
         if score_digits < replay_digits {
-            return Ok((false, None));
+            return Ok(false);
         }
 
         let [replay_high, replay_low] = replay_increment.to_be_bytes();
@@ -13965,8 +19774,7 @@ impl RedLabelRuntimeMemory {
             smart_bomb_range.start,
             self.read_byte(smart_bomb_range.start)?.wrapping_add(1),
         )?;
-        let sound_loaded = self.load_sound_table_by_label("RPSND")?;
-        Ok((true, sound_loaded))
+        Ok(true)
     }
 
     fn load_sound_table_by_label(
@@ -13987,7 +19795,10 @@ impl RedLabelRuntimeMemory {
             .first()
             .ok_or_else(|| format!("red-label sound table `{}` is empty", table.label))?;
         self.write_field_byte(&layout, "base_page", "THFLG", 0)?;
-        if priority < self.read_field_byte(&layout, "base_page", "SNDPRI")? {
+        if !red_label_sound_priority_allows_load(
+            priority,
+            self.read_field_byte(&layout, "base_page", "SNDPRI")?,
+        ) {
             return Ok(None);
         }
         self.write_field_byte(&layout, "base_page", "SNDPRI", priority)?;
@@ -14019,6 +19830,7 @@ impl RedLabelRuntimeMemory {
         let mut source = RedLabelSoundSequenceSource::Idle;
         let mut timer_after = timer_before;
         let mut sound_number = None;
+        let mut sound_output = None;
         let mut command = None;
 
         if timer_before != 0 {
@@ -14050,7 +19862,9 @@ impl RedLabelRuntimeMemory {
                         red_label_sound_table_byte_required(table_pointer.wrapping_add(2))?;
                     self.write_field_byte(&layout, "base_page", "SNDTMR", timer_after)?;
                     sound_number = Some(table_sound);
-                    command = Some(red_label_sound_output_command(table_sound));
+                    let output = red_label_sound_output(table_sound);
+                    sound_output = Some(output);
+                    command = Some(output.command);
                     source = RedLabelSoundSequenceSource::Table;
                 }
             }
@@ -14058,12 +19872,12 @@ impl RedLabelRuntimeMemory {
 
         if command.is_none()
             && timer_after == 0
-            && let Some((thrust_source, thrust_sound_number, thrust_command)) =
-                self.step_thrust_sound_gate(&layout)?
+            && let Some((thrust_source, thrust_output)) = self.step_thrust_sound_gate(&layout)?
         {
             source = thrust_source;
-            sound_number = Some(thrust_sound_number);
-            command = Some(thrust_command);
+            sound_number = Some(thrust_output.sound_number);
+            sound_output = Some(thrust_output);
+            command = Some(thrust_output.command);
         }
 
         Ok(RedLabelSoundSequenceStep {
@@ -14078,6 +19892,7 @@ impl RedLabelRuntimeMemory {
             thrust_flag_before,
             thrust_flag_after: self.read_field_byte(&layout, "base_page", "THFLG")?,
             sound_number,
+            sound_output,
             command,
         })
     }
@@ -14085,7 +19900,7 @@ impl RedLabelRuntimeMemory {
     fn step_thrust_sound_gate(
         &mut self,
         layout: &[RedLabelRamLayoutEntry],
-    ) -> Result<Option<(RedLabelSoundSequenceSource, u8, SoundCommand)>, String> {
+    ) -> Result<Option<(RedLabelSoundSequenceSource, RedLabelSoundOutput)>, String> {
         let thrust_active =
             self.read_field_byte(layout, "base_page", "PIA21")? & RED_LABEL_THRUST_SWITCH_BIT != 0;
         let thrust_flag = self.read_field_byte(layout, "base_page", "THFLG")?;
@@ -14095,11 +19910,10 @@ impl RedLabelRuntimeMemory {
                 return Ok(None);
             }
             self.write_field_byte(layout, "base_page", "THFLG", 0)?;
-            let sound_number = 0x0F;
+            let sound_number = RED_LABEL_THRUST_SOUND_STOP_NUMBER;
             return Ok(Some((
                 RedLabelSoundSequenceSource::ThrustStopped,
-                sound_number,
-                red_label_sound_output_command(sound_number),
+                red_label_sound_output(sound_number),
             )));
         }
 
@@ -14114,12 +19928,11 @@ impl RedLabelRuntimeMemory {
             return Ok(None);
         }
 
-        let sound_number = 0x16;
+        let sound_number = RED_LABEL_THRUST_SOUND_START_NUMBER;
         self.write_field_byte(layout, "base_page", "THFLG", sound_number)?;
         Ok(Some((
             RedLabelSoundSequenceSource::ThrustStarted,
-            sound_number,
-            red_label_sound_output_command(sound_number),
+            red_label_sound_output(sound_number),
         )))
     }
 
@@ -15849,6 +21662,617 @@ fn red_label_sound_table_byte_required(address: u16) -> Result<u8, String> {
         .ok_or_else(|| format!("red-label sound table asset has no byte at 0x{address:04X}"))
 }
 
+fn red_label_sound_table_command_plan(
+    label: &str,
+) -> Result<Vec<RedLabelSoundTableCommand>, String> {
+    let table = red_label_sound_table(red_label_sound_table_address(label)?)?;
+    red_label_sound_table_commands(table)
+}
+
+fn red_label_sound_table_timed_command_plan(
+    label: &str,
+) -> Result<Vec<RedLabelSoundTableTimedCommand>, String> {
+    let table = red_label_sound_table(red_label_sound_table_address(label)?)?;
+    red_label_sound_table_timed_commands(table)
+}
+
+fn red_label_sound_table_timeline(label: &str) -> Result<RedLabelSoundTableTimeline, String> {
+    let table = red_label_sound_table(red_label_sound_table_address(label)?)?;
+    red_label_sound_table_timeline_for_table(table)
+}
+
+fn red_label_sound_table_timelines() -> Result<Vec<RedLabelSoundTableTimeline>, String> {
+    red_label_sound_tables()?
+        .iter()
+        .map(red_label_sound_table_timeline_for_table)
+        .collect()
+}
+
+fn red_label_sound_table_timeline_tsv() -> Result<String, String> {
+    let timelines = red_label_sound_table_timelines()?;
+    Ok(red_label_sound_table_timeline_tsv_from_timelines(
+        &timelines,
+    ))
+}
+
+fn red_label_sound_table_command_sequence_tsv() -> Result<String, String> {
+    let timelines = red_label_sound_table_timelines()?;
+    Ok(red_label_sound_table_command_sequence_tsv_from_timelines(
+        &timelines,
+    ))
+}
+
+fn red_label_sound_direct_commands() -> [RedLabelSoundDirectCommand; 3] {
+    [
+        RedLabelSoundDirectCommand {
+            callsite: "player_death_stop",
+            source_file: "defa7.src",
+            source_line: 1386,
+            source_label: "PDTH5",
+            sound_number: RED_LABEL_PLAYER_END_SOUND_STOP_NUMBER,
+            source: "https://github.com/mwenge/defender/blob/master/src/defa7.src#L1384-L1386",
+        },
+        RedLabelSoundDirectCommand {
+            callsite: "game_over_stop",
+            source_file: "defa7.src",
+            source_line: 1430,
+            source_label: "PLE2",
+            sound_number: RED_LABEL_PLAYER_END_SOUND_STOP_NUMBER,
+            source: "https://github.com/mwenge/defender/blob/master/src/defa7.src#L1428-L1430",
+        },
+        RedLabelSoundDirectCommand {
+            callsite: "lander_pull_tick",
+            source_file: "defb6.src",
+            source_line: 821,
+            source_label: "LNDFX0",
+            sound_number: RED_LABEL_LANDER_PULL_SOUND_NUMBER,
+            source: "https://github.com/mwenge/defender/blob/master/src/defb6.src#L819-L821",
+        },
+    ]
+}
+
+fn red_label_sound_direct_command_sequence_tsv() -> String {
+    red_label_sound_direct_command_sequence_tsv_from_commands(&red_label_sound_direct_commands())
+}
+
+fn red_label_sound_direct_command_sequence_fixture_check()
+-> Result<RedLabelSoundDirectCommandSequenceFixtureCheck, String> {
+    red_label_sound_direct_command_sequence_fixture_check_tsv(
+        crate::assets::RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV,
+        &red_label_sound_direct_command_sequence_tsv(),
+    )
+}
+
+fn red_label_sound_direct_command_sequence_fixture_check_tsv(
+    expected_tsv: &str,
+    actual_tsv: &str,
+) -> Result<RedLabelSoundDirectCommandSequenceFixtureCheck, String> {
+    if actual_tsv != expected_tsv {
+        return Err(String::from(
+            "red-label direct command-sequence fixture does not match generated SNDOUT writes",
+        ));
+    }
+
+    let mut lines = expected_tsv.lines();
+    match lines.next() {
+        Some(RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCE_TSV_HEADER) => {}
+        _ => {
+            return Err(String::from(
+                "red-label direct command-sequence fixture header is invalid",
+            ));
+        }
+    }
+
+    let mut check = RedLabelSoundDirectCommandSequenceFixtureCheck {
+        row_count: 0,
+        idle_rows: 0,
+        command_rows: 0,
+    };
+    for (line_index, line) in lines.enumerate() {
+        let line_number = line_index + 2;
+        let columns = line.split('\t').collect::<Vec<_>>();
+        if columns.len() != 10 {
+            return Err(format!(
+                "red-label direct command-sequence fixture line {line_number} must have 10 columns"
+            ));
+        }
+
+        check.row_count += 1;
+        match columns[6] {
+            "idle" => check.idle_rows += 1,
+            "command" => check.command_rows += 1,
+            write_kind => {
+                return Err(format!(
+                    "red-label direct command-sequence fixture line {line_number} has unknown write kind `{write_kind}`"
+                ));
+            }
+        }
+    }
+
+    if check.row_count == 0 {
+        return Err(String::from(
+            "red-label direct command-sequence fixture has no data rows",
+        ));
+    }
+
+    Ok(check)
+}
+
+fn red_label_sound_thrust_command_sequence_tsv() -> String {
+    red_label_sound_thrust_command_sequence_tsv_from_gates(&[
+        RedLabelSoundThrustGateCommand {
+            gate_event: "thrust_start",
+            source_label: "SNDS01",
+            status_block_mask: Some(RED_LABEL_SOUND_PLAYER_ALIVE_BLOCK_MASK),
+            thrust_flag_before: 0x00,
+            thrust_flag_after: RED_LABEL_THRUST_SOUND_START_NUMBER,
+            sound_number: RED_LABEL_THRUST_SOUND_START_NUMBER,
+        },
+        RedLabelSoundThrustGateCommand {
+            gate_event: "thrust_stop",
+            source_label: "SNDS00",
+            status_block_mask: None,
+            thrust_flag_before: RED_LABEL_THRUST_SOUND_START_NUMBER,
+            thrust_flag_after: 0x00,
+            sound_number: RED_LABEL_THRUST_SOUND_STOP_NUMBER,
+        },
+    ])
+}
+
+fn red_label_sound_thrust_command_sequence_fixture_check()
+-> Result<RedLabelSoundThrustCommandSequenceFixtureCheck, String> {
+    red_label_sound_thrust_command_sequence_fixture_check_tsv(
+        crate::assets::RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV,
+        &red_label_sound_thrust_command_sequence_tsv(),
+    )
+}
+
+fn red_label_sound_thrust_command_sequence_fixture_check_tsv(
+    expected_tsv: &str,
+    actual_tsv: &str,
+) -> Result<RedLabelSoundThrustCommandSequenceFixtureCheck, String> {
+    if actual_tsv != expected_tsv {
+        return Err(String::from(
+            "red-label thrust command-sequence fixture does not match generated SNDOUT writes",
+        ));
+    }
+
+    let mut lines = expected_tsv.lines();
+    match lines.next() {
+        Some(RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCE_TSV_HEADER) => {}
+        _ => {
+            return Err(String::from(
+                "red-label thrust command-sequence fixture header is invalid",
+            ));
+        }
+    }
+
+    let mut check = RedLabelSoundThrustCommandSequenceFixtureCheck {
+        row_count: 0,
+        idle_rows: 0,
+        command_rows: 0,
+    };
+    for (line_index, line) in lines.enumerate() {
+        let line_number = line_index + 2;
+        let columns = line.split('\t').collect::<Vec<_>>();
+        if columns.len() != 11 {
+            return Err(format!(
+                "red-label thrust command-sequence fixture line {line_number} must have 11 columns"
+            ));
+        }
+
+        check.row_count += 1;
+        match columns[8] {
+            "idle" => check.idle_rows += 1,
+            "command" => check.command_rows += 1,
+            write_kind => {
+                return Err(format!(
+                    "red-label thrust command-sequence fixture line {line_number} has unknown write kind `{write_kind}`"
+                ));
+            }
+        }
+    }
+
+    if check.row_count == 0 {
+        return Err(String::from(
+            "red-label thrust command-sequence fixture has no data rows",
+        ));
+    }
+
+    Ok(check)
+}
+
+fn red_label_sound_table_command_sequence_fixture_check()
+-> Result<RedLabelSoundTableCommandSequenceFixtureCheck, String> {
+    red_label_sound_table_command_sequence_fixture_check_tsv(
+        crate::assets::RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV,
+        &red_label_sound_table_command_sequence_tsv()?,
+    )
+}
+
+fn red_label_sound_table_command_sequence_fixture_check_tsv(
+    expected_tsv: &str,
+    actual_tsv: &str,
+) -> Result<RedLabelSoundTableCommandSequenceFixtureCheck, String> {
+    if actual_tsv != expected_tsv {
+        return Err(String::from(
+            "red-label sound table command-sequence fixture does not match generated SNDOUT writes",
+        ));
+    }
+
+    let mut lines = expected_tsv.lines();
+    match lines.next() {
+        Some(RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCE_TSV_HEADER) => {}
+        _ => {
+            return Err(String::from(
+                "red-label sound table command-sequence fixture header is invalid",
+            ));
+        }
+    }
+
+    let mut check = RedLabelSoundTableCommandSequenceFixtureCheck {
+        row_count: 0,
+        idle_rows: 0,
+        command_rows: 0,
+    };
+    for (line_index, line) in lines.enumerate() {
+        let line_number = line_index + 2;
+        let columns = line.split('\t').collect::<Vec<_>>();
+        if columns.len() != 13 {
+            return Err(format!(
+                "red-label sound table command-sequence fixture line {line_number} must have 13 columns"
+            ));
+        }
+
+        check.row_count += 1;
+        match columns[5] {
+            "idle" => check.idle_rows += 1,
+            "command" => check.command_rows += 1,
+            write_kind => {
+                return Err(format!(
+                    "red-label sound table command-sequence fixture line {line_number} has unknown write kind `{write_kind}`"
+                ));
+            }
+        }
+    }
+
+    if check.row_count == 0 {
+        return Err(String::from(
+            "red-label sound table command-sequence fixture has no data rows",
+        ));
+    }
+
+    Ok(check)
+}
+
+fn red_label_sound_table_timeline_fixture_check()
+-> Result<RedLabelSoundTableTimelineFixtureCheck, String> {
+    red_label_sound_table_timeline_fixture_check_tsv(
+        crate::assets::RED_LABEL_SOUND_TABLE_TIMELINES_TSV,
+        &red_label_sound_table_timeline_tsv()?,
+    )
+}
+
+fn red_label_sound_table_timeline_fixture_check_tsv(
+    expected_tsv: &str,
+    actual_tsv: &str,
+) -> Result<RedLabelSoundTableTimelineFixtureCheck, String> {
+    if actual_tsv != expected_tsv {
+        return Err(String::from(
+            "red-label sound table timeline fixture does not match generated SNDSEQ timeline",
+        ));
+    }
+
+    let mut lines = expected_tsv.lines();
+    match lines.next() {
+        Some(RED_LABEL_SOUND_TABLE_TIMELINE_TSV_HEADER) => {}
+        _ => {
+            return Err(String::from(
+                "red-label sound table timeline fixture header is invalid",
+            ));
+        }
+    }
+
+    let mut check = RedLabelSoundTableTimelineFixtureCheck {
+        row_count: 0,
+        command_rows: 0,
+        sequence_end_rows: 0,
+    };
+    for (line_index, line) in lines.enumerate() {
+        let line_number = line_index + 2;
+        let columns = line.split('\t').collect::<Vec<_>>();
+        if columns.len() != 16 {
+            return Err(format!(
+                "red-label sound table timeline fixture line {line_number} must have 16 columns"
+            ));
+        }
+
+        check.row_count += 1;
+        match columns[4] {
+            "command" => check.command_rows += 1,
+            "sequence_end" => check.sequence_end_rows += 1,
+            event => {
+                return Err(format!(
+                    "red-label sound table timeline fixture line {line_number} has unknown event `{event}`"
+                ));
+            }
+        }
+    }
+
+    if check.row_count == 0 {
+        return Err(String::from(
+            "red-label sound table timeline fixture has no data rows",
+        ));
+    }
+
+    Ok(check)
+}
+
+fn red_label_sound_table_timeline_tsv_from_timelines(
+    timelines: &[RedLabelSoundTableTimeline],
+) -> String {
+    let mut text = String::from(RED_LABEL_SOUND_TABLE_TIMELINE_TSV_HEADER);
+    text.push('\n');
+
+    for timeline in timelines {
+        for timed in &timeline.commands {
+            let command = timed.command;
+            let output = command.sound_output;
+            text.push_str(&format!(
+                "{}\t0x{:04X}\t0x{:02X}\t{}\tcommand\t0x{:04X}\t{}\t{}\t0x{:02X}\t0x{:02X}\t0x{:02X}\t{}\t0x{:02X}\t{}\t{}\t0x{:04X}\n",
+                timeline.label,
+                timeline.address,
+                timeline.priority,
+                timed.sequencer_tick,
+                command.table_pointer,
+                command.repeat_index,
+                command.repeat_count,
+                command.timer,
+                command.sound_number,
+                output.idle_port_b,
+                output.idle_command.hex(),
+                output.command_port_b,
+                command.command.hex(),
+                timeline.sequence_end_tick,
+                timeline.terminator_pointer
+            ));
+        }
+
+        text.push_str(&format!(
+            "{}\t0x{:04X}\t0x{:02X}\t{}\tsequence_end\t0x{:04X}\t-\t-\t-\t-\t-\t-\t-\t-\t{}\t0x{:04X}\n",
+            timeline.label,
+            timeline.address,
+            timeline.priority,
+            timeline.sequence_end_tick,
+            timeline.terminator_pointer,
+            timeline.sequence_end_tick,
+            timeline.terminator_pointer
+        ));
+    }
+
+    text
+}
+
+fn red_label_sound_table_command_sequence_tsv_from_timelines(
+    timelines: &[RedLabelSoundTableTimeline],
+) -> String {
+    let mut text = String::from(RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCE_TSV_HEADER);
+    text.push('\n');
+
+    for timeline in timelines {
+        for timed in &timeline.commands {
+            let command = timed.command;
+            let output = command.sound_output;
+            text.push_str(&format!(
+                "{}\t0x{:04X}\t0x{:02X}\t{}\t1\tidle\t0x{:04X}\t{}\t{}\t0x{:02X}\t0x{:02X}\t0x{:02X}\t{}\n",
+                timeline.label,
+                timeline.address,
+                timeline.priority,
+                timed.sequencer_tick,
+                command.table_pointer,
+                command.repeat_index,
+                command.repeat_count,
+                command.timer,
+                command.sound_number,
+                output.idle_port_b,
+                output.idle_command.hex()
+            ));
+            text.push_str(&format!(
+                "{}\t0x{:04X}\t0x{:02X}\t{}\t2\tcommand\t0x{:04X}\t{}\t{}\t0x{:02X}\t0x{:02X}\t0x{:02X}\t{}\n",
+                timeline.label,
+                timeline.address,
+                timeline.priority,
+                timed.sequencer_tick,
+                command.table_pointer,
+                command.repeat_index,
+                command.repeat_count,
+                command.timer,
+                command.sound_number,
+                output.command_port_b,
+                command.command.hex()
+            ));
+        }
+    }
+
+    text
+}
+
+fn red_label_sound_direct_command_sequence_tsv_from_commands(
+    commands: &[RedLabelSoundDirectCommand],
+) -> String {
+    let mut text = String::from(RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCE_TSV_HEADER);
+    text.push('\n');
+
+    for command in commands {
+        let output = red_label_sound_output(command.sound_number);
+        text.push_str(&format!(
+            "{}\t{}\t{}\t{}\t0x{:02X}\t1\tidle\t0x{:02X}\t{}\t{}\n",
+            command.callsite,
+            command.source_file,
+            command.source_line,
+            command.source_label,
+            command.sound_number,
+            output.idle_port_b,
+            output.idle_command.hex(),
+            command.source
+        ));
+        text.push_str(&format!(
+            "{}\t{}\t{}\t{}\t0x{:02X}\t2\tcommand\t0x{:02X}\t{}\t{}\n",
+            command.callsite,
+            command.source_file,
+            command.source_line,
+            command.source_label,
+            command.sound_number,
+            output.command_port_b,
+            output.command.hex(),
+            command.source
+        ));
+    }
+
+    text
+}
+
+fn red_label_sound_thrust_command_sequence_tsv_from_gates(
+    gates: &[RedLabelSoundThrustGateCommand],
+) -> String {
+    let mut text = String::from(RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCE_TSV_HEADER);
+    text.push('\n');
+
+    for gate in gates {
+        let output = red_label_sound_output(gate.sound_number);
+        let status_block_mask = gate
+            .status_block_mask
+            .map(|mask| format!("0x{mask:02X}"))
+            .unwrap_or_else(|| String::from("-"));
+        text.push_str(&format!(
+            "{}\t{}\t0x{RED_LABEL_THRUST_SWITCH_BIT:02X}\t{status_block_mask}\t0x{:02X}\t0x{:02X}\t0x{:02X}\t1\tidle\t0x{:02X}\t{}\n",
+            gate.gate_event,
+            gate.source_label,
+            gate.thrust_flag_before,
+            gate.thrust_flag_after,
+            gate.sound_number,
+            output.idle_port_b,
+            output.idle_command.hex()
+        ));
+        text.push_str(&format!(
+            "{}\t{}\t0x{RED_LABEL_THRUST_SWITCH_BIT:02X}\t{status_block_mask}\t0x{:02X}\t0x{:02X}\t0x{:02X}\t2\tcommand\t0x{:02X}\t{}\n",
+            gate.gate_event,
+            gate.source_label,
+            gate.thrust_flag_before,
+            gate.thrust_flag_after,
+            gate.sound_number,
+            output.command_port_b,
+            output.command.hex()
+        ));
+    }
+
+    text
+}
+
+fn red_label_sound_table_commands(
+    table: &RedLabelSoundTable,
+) -> Result<Vec<RedLabelSoundTableCommand>, String> {
+    if table.bytes.is_empty() {
+        return Err(format!("red-label sound table `{}` is empty", table.label));
+    }
+
+    let mut commands = Vec::new();
+    let mut offset = 1usize;
+    loop {
+        let repeat_count = *table.bytes.get(offset).ok_or_else(|| {
+            format!(
+                "red-label sound table `{}` has no terminator after command records",
+                table.label
+            )
+        })?;
+        if repeat_count == 0 {
+            return Ok(commands);
+        }
+
+        let timer = *table.bytes.get(offset + 1).ok_or_else(|| {
+            format!(
+                "red-label sound table `{}` record at 0x{:04X} has no timer byte",
+                table.label,
+                table.address.wrapping_add(offset as u16)
+            )
+        })?;
+        let sound_number = *table.bytes.get(offset + 2).ok_or_else(|| {
+            format!(
+                "red-label sound table `{}` record at 0x{:04X} has no sound-number byte",
+                table.label,
+                table.address.wrapping_add(offset as u16)
+            )
+        })?;
+        let table_pointer = table.address.wrapping_add(offset as u16);
+        let sound_output = red_label_sound_output(sound_number);
+        for repeat_index in 1..=repeat_count {
+            commands.push(RedLabelSoundTableCommand {
+                table_pointer,
+                repeat_index,
+                repeat_count,
+                timer,
+                sound_number,
+                sound_output,
+                command: sound_output.command,
+            });
+        }
+        offset += 3;
+    }
+}
+
+fn red_label_sound_table_timed_commands(
+    table: &RedLabelSoundTable,
+) -> Result<Vec<RedLabelSoundTableTimedCommand>, String> {
+    let mut sequencer_tick = 1u32;
+    let mut timed_commands = Vec::new();
+    for command in red_label_sound_table_commands(table)? {
+        if command.timer == 0 {
+            return Err(format!(
+                "red-label sound table `{}` record at 0x{:04X} has zero timer byte",
+                table.label, command.table_pointer
+            ));
+        }
+        timed_commands.push(RedLabelSoundTableTimedCommand {
+            sequencer_tick,
+            command,
+        });
+        sequencer_tick += u32::from(command.timer);
+    }
+    Ok(timed_commands)
+}
+
+fn red_label_sound_table_timeline_for_table(
+    table: &RedLabelSoundTable,
+) -> Result<RedLabelSoundTableTimeline, String> {
+    let priority = *table
+        .bytes
+        .first()
+        .ok_or_else(|| format!("red-label sound table `{}` is empty", table.label))?;
+    let commands = red_label_sound_table_timed_commands(table)?;
+    let last_command = commands.last().ok_or_else(|| {
+        format!(
+            "red-label sound table `{}` has no command records",
+            table.label
+        )
+    })?;
+    let sequence_end_tick = last_command
+        .sequencer_tick
+        .wrapping_add(u32::from(last_command.command.timer));
+    let terminator_pointer = last_command.command.table_pointer.wrapping_add(3);
+    Ok(RedLabelSoundTableTimeline {
+        label: table.label.clone(),
+        address: table.address,
+        priority,
+        commands,
+        sequence_end_tick,
+        terminator_pointer,
+    })
+}
+
+fn red_label_sound_priority_allows_load(priority: u8, current_priority: u8) -> bool {
+    priority >= current_priority
+}
+
 fn red_label_sound_tables() -> Result<&'static [RedLabelSoundTable], String> {
     static SOUND_TABLES: OnceLock<Result<Vec<RedLabelSoundTable>, String>> = OnceLock::new();
     match SOUND_TABLES.get_or_init(|| parse_sound_tables(crate::assets::RED_LABEL_SOUND_TABLES_TSV))
@@ -16440,10 +22864,168 @@ fn high_score_bcd_bytes(score: u32) -> Result<[u8; 3], String> {
     ])
 }
 
+fn hall_of_fame_score_chars(score: u32) -> Result<[u8; 6], String> {
+    let bcd = high_score_bcd_bytes(score)?;
+    let digits = [
+        bcd[0] >> 4,
+        bcd[0] & 0x0F,
+        bcd[1] >> 4,
+        bcd[1] & 0x0F,
+        bcd[2] >> 4,
+        bcd[2] & 0x0F,
+    ];
+    let mut seen_non_zero = false;
+    let mut chars = [b' '; 6];
+    for (index, digit) in digits.iter().copied().enumerate() {
+        if digit != 0 || seen_non_zero {
+            seen_non_zero = true;
+            chars[index] = b'0' + digit;
+        }
+    }
+    Ok(chars)
+}
+
+fn attract_logo_table_byte(table_base: u16, table: &[u8], pointer: u16) -> Result<u8, String> {
+    let offset = pointer.wrapping_sub(table_base);
+    if pointer < table_base || usize::from(offset) >= table.len() {
+        return Err(format!(
+            "red-label LOGO table pointer 0x{pointer:04X} is outside 0x{table_base:04X}..0x{:04X}",
+            table_base.wrapping_add(u16::try_from(table.len()).unwrap_or(u16::MAX))
+        ));
+    }
+    Ok(table[usize::from(offset)])
+}
+
+fn attract_logo_screen_address(cursor: u16) -> (u16, u8) {
+    let [x, y] = cursor.to_be_bytes();
+    let screen_address = u16::from_be_bytes([x >> 1, y]);
+    let pixel_mask = if x & 1 == 0 { 0xF0 } else { 0x0F };
+    (screen_address, pixel_mask)
+}
+
+fn attract_logo_apply_horizontal_bit(mut accumulator: u8, cursor: &mut u16, decrement: bool) -> u8 {
+    let carry = accumulator & 0x80 != 0;
+    accumulator = accumulator.wrapping_shl(1);
+    if carry {
+        let [x, y] = cursor.to_be_bytes();
+        let x = if decrement {
+            x.wrapping_sub(1)
+        } else {
+            x.wrapping_add(1)
+        };
+        *cursor = u16::from_be_bytes([x, y]);
+    }
+    accumulator
+}
+
+fn attract_logo_apply_vertical_bit(mut accumulator: u8, cursor: &mut u16, decrement: bool) -> u8 {
+    let carry = accumulator & 0x80 != 0;
+    accumulator = accumulator.wrapping_shl(1);
+    if carry {
+        let [x, y] = cursor.to_be_bytes();
+        let y = if decrement {
+            y.wrapping_sub(1)
+        } else {
+            y.wrapping_add(1)
+        };
+        *cursor = u16::from_be_bytes([x, y]);
+    }
+    accumulator
+}
+
+fn checked_defender_logo_ram_range(ram_len: usize) -> Result<std::ops::Range<usize>, String> {
+    let start = usize::from(RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM);
+    let end = start + RED_LABEL_DEFENDER_LOGO_BYTES;
+    if end > ram_len {
+        return Err(format!(
+            "red-label DEFBLK image range 0x{start:04X}..0x{end:04X} exceeds RAM"
+        ));
+    }
+    Ok(start..end)
+}
+
+fn expanded_defender_logo_image() -> [u8; RED_LABEL_DEFENDER_LOGO_BYTES] {
+    let mut output = [0; RED_LABEL_DEFENDER_LOGO_BYTES];
+    let mut cursor = 0usize;
+    let mut length = 0u8;
+    let mut right_pixel_first = false;
+    for byte in RED_LABEL_DEFENDER_LOGO_DATA {
+        for nibble in [byte >> 4, byte & 0x0F] {
+            if nibble & 0x0C == 0 {
+                length = nibble.wrapping_add(length).wrapping_shl(2);
+            } else {
+                let run_length = (nibble & 0x03).wrapping_add(length);
+                let color = defender_logo_color_byte(nibble);
+                let (next_cursor, next_right_pixel_first) = expand_defender_logo_run(
+                    &mut output,
+                    cursor,
+                    run_length,
+                    color,
+                    right_pixel_first,
+                );
+                cursor = next_cursor;
+                right_pixel_first = next_right_pixel_first;
+                length = 0;
+            }
+        }
+    }
+    output
+}
+
+fn defender_logo_color_byte(nibble: u8) -> u8 {
+    match (nibble & 0x0C) >> 2 {
+        1 => 0x22,
+        2 => 0xCC,
+        3 => 0x00,
+        _ => 0x00,
+    }
+}
+
+fn expand_defender_logo_run(
+    output: &mut [u8; RED_LABEL_DEFENDER_LOGO_BYTES],
+    mut cursor: usize,
+    mut length: u8,
+    color: u8,
+    right_pixel_first: bool,
+) -> (usize, bool) {
+    let mut next_right_pixel_first = right_pixel_first;
+    if next_right_pixel_first {
+        output[cursor] = (output[cursor] & 0xF0) | (color & 0x0F);
+        cursor = defender_logo_next_cursor(cursor);
+        length = length.wrapping_sub(1);
+    } else {
+        next_right_pixel_first = true;
+    }
+
+    loop {
+        output[cursor] = color;
+        length = length.wrapping_sub(1);
+        if length & 0x80 != 0 {
+            return (cursor, next_right_pixel_first);
+        }
+        cursor = defender_logo_next_cursor(cursor);
+        length = length.wrapping_sub(1);
+        if length & 0x80 != 0 {
+            return (cursor, false);
+        }
+    }
+}
+
+fn defender_logo_next_cursor(cursor: usize) -> usize {
+    let next = cursor + usize::from(RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT);
+    if next >= RED_LABEL_DEFENDER_LOGO_BYTES {
+        next + 1 - RED_LABEL_DEFENDER_LOGO_BYTES
+    } else {
+        next
+    }
+}
+
 fn red_label_high_score_initials_are_valid(
     initials: &[u8; RED_LABEL_INITIALS_ENTRY_CHARS],
 ) -> bool {
-    initials.iter().all(u8::is_ascii_uppercase)
+    initials
+        .iter()
+        .all(|byte| byte.is_ascii_uppercase() || *byte == RED_LABEL_HOF_BLANK_INITIAL_BYTE)
 }
 
 fn red_label_initials_entry_byte(character: char) -> Option<u8> {
@@ -16452,6 +23034,18 @@ fn red_label_initials_entry_byte(character: char) -> Option<u8> {
     } else {
         None
     }
+}
+
+fn high_score_initial_display_byte(byte: u8) -> u8 {
+    if byte == RED_LABEL_HOF_BLANK_INITIAL_BYTE {
+        b' '
+    } else {
+        byte
+    }
+}
+
+fn high_score_player_mask(player: u8) -> u8 {
+    1 << player.saturating_sub(1)
 }
 
 fn getwv_restore_wave_hits(wave: u8, restore_wave: u8) -> bool {
@@ -16505,9 +23099,113 @@ fn bcd_number_visible_digits(bcd_number: u8) -> Vec<u8> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RedLabelMessageTextLayout {
+    top_left: u16,
+    cursor: u16,
+    line_spacing: u8,
+}
+
+impl RedLabelMessageTextLayout {
+    fn apply(&mut self, control: RedLabelMessageControl) {
+        match control {
+            RedLabelMessageControl::HorizontalFromTopLeft(delta) => {
+                let [top_x, cursor_y] =
+                    [self.top_left.to_be_bytes()[0], self.cursor.to_be_bytes()[1]];
+                self.cursor = u16::from_be_bytes([top_x.wrapping_add(delta), cursor_y]);
+            }
+            RedLabelMessageControl::HorizontalFromCursor(delta) => {
+                let [cursor_x, cursor_y] = self.cursor.to_be_bytes();
+                self.cursor = u16::from_be_bytes([cursor_x.wrapping_add(delta), cursor_y]);
+            }
+            RedLabelMessageControl::VerticalFromTopLeft(delta) => {
+                let [cursor_x, _cursor_y] = self.cursor.to_be_bytes();
+                let top_y = self.top_left.to_be_bytes()[1];
+                self.cursor = u16::from_be_bytes([cursor_x, top_y.wrapping_add(delta)]);
+            }
+            RedLabelMessageControl::VerticalFromCursor(delta) => {
+                let [cursor_x, cursor_y] = self.cursor.to_be_bytes();
+                self.cursor = u16::from_be_bytes([cursor_x, cursor_y.wrapping_add(delta)]);
+            }
+            RedLabelMessageControl::ResetTopLeftAndCursor(address) => {
+                self.top_left = address;
+                self.cursor = address;
+            }
+            RedLabelMessageControl::ReturnLineFeed => {
+                let [top_x, _top_y] = self.top_left.to_be_bytes();
+                let cursor_y = self.cursor.to_be_bytes()[1];
+                self.cursor = u16::from_be_bytes([top_x, cursor_y.wrapping_add(self.line_spacing)]);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RedLabelMessageControl {
+    HorizontalFromTopLeft(u8),
+    HorizontalFromCursor(u8),
+    VerticalFromTopLeft(u8),
+    VerticalFromCursor(u8),
+    ResetTopLeftAndCursor(u16),
+    ReturnLineFeed,
+}
+
+fn red_label_message_control(word: &str) -> Result<Option<RedLabelMessageControl>, String> {
+    let Some(body) = word
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+    else {
+        return Ok(None);
+    };
+
+    let (name, arguments) = body.split_once(':').unwrap_or((body, ""));
+    match name {
+        "HMT" => Ok(Some(RedLabelMessageControl::HorizontalFromTopLeft(
+            red_label_message_control_byte(name, arguments)?,
+        ))),
+        "HMC" => Ok(Some(RedLabelMessageControl::HorizontalFromCursor(
+            red_label_message_control_byte(name, arguments)?,
+        ))),
+        "VMT" => Ok(Some(RedLabelMessageControl::VerticalFromTopLeft(
+            red_label_message_control_byte(name, arguments)?,
+        ))),
+        "VMC" => Ok(Some(RedLabelMessageControl::VerticalFromCursor(
+            red_label_message_control_byte(name, arguments)?,
+        ))),
+        "RTC" => {
+            let (x, y) = arguments.split_once(',').ok_or_else(|| {
+                format!("red-label message control token `{word}` must provide x,y bytes")
+            })?;
+            Ok(Some(RedLabelMessageControl::ResetTopLeftAndCursor(
+                u16::from_be_bytes([
+                    red_label_message_control_byte(name, x)?,
+                    red_label_message_control_byte(name, y)?,
+                ]),
+            )))
+        }
+        "RLF" if arguments.is_empty() => Ok(Some(RedLabelMessageControl::ReturnLineFeed)),
+        _ => Err(format!(
+            "red-label message control token `{word}` is not supported"
+        )),
+    }
+}
+
+fn red_label_message_control_byte(control: &str, value: &str) -> Result<u8, String> {
+    let hex = value.strip_prefix("0x").ok_or_else(|| {
+        format!("red-label message control `{control}` byte `{value}` must start with 0x")
+    })?;
+    u8::from_str_radix(hex, 16)
+        .map_err(|_| format!("red-label message control `{control}` byte `{value}` is invalid"))
+}
+
 fn text_cursor_advance(cursor: u16, width: u8) -> u16 {
     let [x, y] = cursor.to_be_bytes();
     u16::from_be_bytes([x.wrapping_add(width).wrapping_add(1), y])
+}
+
+fn text_position_from_top_left(top_left: u16, horizontal: u8, vertical: u8) -> u16 {
+    let [x, y] = top_left.to_be_bytes();
+    u16::from_be_bytes([x.wrapping_add(horizontal), y.wrapping_add(vertical)])
 }
 
 fn monochrome_player_byte(value: u8) -> u8 {
@@ -16549,14 +23247,37 @@ fn logical_shift_right_word(value: u16) -> u16 {
     value >> 1
 }
 
+/// Source-shaped `defa7.src` `SNDOUT`: write the idle `0x3f` byte to `SOUND`,
+/// then write the complemented six-bit sound number. MAME ORs both port-B
+/// values with `0xc0`; only the second write asserts sound-board CB1.
+/// Source: <https://github.com/mwenge/defender/blob/master/src/defa7.src#L697-L707>.
+fn red_label_sound_output(sound_number: u8) -> RedLabelSoundOutput {
+    let command_port_b = !sound_number & 0x3F;
+    RedLabelSoundOutput {
+        sound_number,
+        idle_port_b: RED_LABEL_SNDOUT_IDLE_PORT_B,
+        idle_command: SoundCommand::from_main_board_pia_port_b(RED_LABEL_SNDOUT_IDLE_PORT_B),
+        command_port_b,
+        command: SoundCommand::from_main_board_pia_port_b(command_port_b),
+    }
+}
+
 fn red_label_sound_output_command(sound_number: u8) -> SoundCommand {
-    SoundCommand::from_main_board_pia_port_b(!sound_number & 0x3F)
+    red_label_sound_output(sound_number).command
 }
 
 fn bcd_digits_to_u32(bytes: &[u8]) -> u32 {
     bytes
         .iter()
         .fold(0, |acc, byte| acc * 100 + u32::from(bcd_byte_to_u16(*byte)))
+}
+
+fn fixed16_source_word(value: Fixed16) -> u16 {
+    (value.raw() >> 8) as u16
+}
+
+fn fixed16_source_24(value: Fixed16) -> u32 {
+    ((value.raw() >> 8) as u32) & 0x00FF_FFFF
 }
 
 fn entry_index_for_address(table: &RedLabelRamLayoutEntry, address: u16) -> Result<u16, String> {
@@ -16747,8 +23468,12 @@ pub struct ArcadeMachine {
     compatibility: CompatibilityState,
     memory: RedLabelRuntimeMemory,
     trace_power_up_ram_fill: Option<RedLabelPowerUpRamFill>,
+    trace_start_asserted_frames: u8,
+    trace_player_start_release_frame: Option<u64>,
     high_score_entry: Option<HighScoreEntryState>,
     high_score_submission: Option<HighScoreSubmissionState>,
+    high_score_entry_player: u8,
+    high_score_completed_players_mask: u8,
 }
 
 impl Default for ArcadeMachine {
@@ -16782,6 +23507,10 @@ impl ArcadeMachine {
         machine
             .red_label_initialize_thrust_table()
             .expect("embedded red-label THTAB layout is valid");
+        machine
+            .memory
+            .screen_switch_player_one()
+            .expect("embedded red-label P1SW screen-switch layout is valid");
         machine
             .sync_high_score_from_red_label_cmos()
             .expect("embedded red-label high-score layout is valid");
@@ -16825,8 +23554,12 @@ impl ArcadeMachine {
             compatibility: CompatibilityState::default(),
             memory,
             trace_power_up_ram_fill: None,
+            trace_start_asserted_frames: 0,
+            trace_player_start_release_frame: None,
             high_score_entry: None,
             high_score_submission: None,
+            high_score_entry_player: 0,
+            high_score_completed_players_mask: 0,
         }
     }
 
@@ -16854,6 +23587,43 @@ impl ArcadeMachine {
         }
     }
 
+    pub fn save_state(&self) -> MachineSaveState {
+        MachineSaveState {
+            snapshot: self.snapshot(),
+            memory: self.memory.clone(),
+            trace_power_up_ram_fill: self.trace_power_up_ram_fill,
+            trace_start_asserted_frames: self.trace_start_asserted_frames,
+            trace_player_start_release_frame: self.trace_player_start_release_frame,
+            high_score_entry_player: self.high_score_entry_player,
+            high_score_completed_players_mask: self.high_score_completed_players_mask,
+        }
+    }
+
+    pub fn restore_state(&mut self, state: MachineSaveState) {
+        self.frame = state.snapshot.frame;
+        self.phase = state.snapshot.phase;
+        self.credits = state.snapshot.credits;
+        self.current_player = state.snapshot.current_player;
+        self.wave = state.snapshot.wave;
+        self.rng = state.snapshot.rng;
+        self.player = state.snapshot.player;
+        self.scores = state.snapshot.scores;
+        self.last_input_bits = state.snapshot.last_input_bits;
+        self.compatibility = CompatibilityState {
+            xyzzy_active: state.snapshot.xyzzy_active,
+            xyzzy_invincible: state.snapshot.xyzzy_invincible,
+            xyzzy_auto_fire: state.snapshot.xyzzy_auto_fire,
+        };
+        self.memory = state.memory;
+        self.trace_power_up_ram_fill = state.trace_power_up_ram_fill;
+        self.trace_start_asserted_frames = state.trace_start_asserted_frames;
+        self.trace_player_start_release_frame = state.trace_player_start_release_frame;
+        self.high_score_entry = state.snapshot.high_score_entry;
+        self.high_score_submission = state.snapshot.high_score_submission;
+        self.high_score_entry_player = state.high_score_entry_player;
+        self.high_score_completed_players_mask = state.high_score_completed_players_mask;
+    }
+
     pub fn restore(&mut self, snapshot: MachineSnapshot) {
         self.frame = snapshot.frame;
         self.phase = snapshot.phase;
@@ -16869,8 +23639,58 @@ impl ArcadeMachine {
             xyzzy_invincible: snapshot.xyzzy_invincible,
             xyzzy_auto_fire: snapshot.xyzzy_auto_fire,
         };
+        self.trace_start_asserted_frames = 0;
+        self.trace_player_start_release_frame = None;
         self.high_score_entry = snapshot.high_score_entry;
         self.high_score_submission = snapshot.high_score_submission;
+        self.high_score_entry_player = if snapshot.high_score_entry.is_some() {
+            self.current_high_score_player()
+        } else {
+            0
+        };
+        self.high_score_completed_players_mask = snapshot
+            .high_score_submission
+            .map_or(0, |submission| high_score_player_mask(submission.player));
+        self.write_snapshot_to_red_label_memory(&snapshot)
+            .expect("machine snapshot should fit red-label RAM-backed state");
+        if let Some(state) = self.high_score_entry {
+            self.memory
+                .write_high_score_entry_display(self.high_score_entry_player, state)
+                .expect("machine high-score snapshot should fit red-label video RAM");
+        }
+    }
+
+    fn write_snapshot_to_red_label_memory(
+        &mut self,
+        snapshot: &MachineSnapshot,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let current_player = snapshot.current_player.clamp(1, 2);
+        let player_index = u16::from(current_player - 1);
+        let player_table = table_descriptor(&layout, "player")?;
+        let player_address = table_entry_range(player_table, player_index)?.start;
+        self.memory.write_field_byte(
+            &layout,
+            "base_page",
+            "CREDIT",
+            decimal_to_bcd_byte(snapshot.credits.min(99)),
+        )?;
+        self.memory
+            .write_field_byte(&layout, "base_page", "CURPLR", current_player)?;
+        self.memory
+            .write_field_word(&layout, "base_page", "PLRX", player_address)?;
+        self.memory
+            .write_player_score_value(&layout, 0, snapshot.scores.player_one)?;
+        self.memory
+            .write_player_score_value(&layout, 1, snapshot.scores.player_two)?;
+        self.memory.write_player_runtime_snapshot(
+            &layout,
+            player_index,
+            snapshot.player,
+            snapshot.wave,
+        )?;
+        self.memory
+            .write_red_label_rand_state(&layout, snapshot.rng)
     }
 
     pub fn red_label_ram(&self) -> &[u8] {
@@ -16881,12 +23701,39 @@ impl ArcadeMachine {
         self.memory.ram_range(range)
     }
 
+    #[cfg(test)]
+    pub fn red_label_write_ram_byte_for_test(&mut self, address: u16, value: u8) {
+        self.memory
+            .write_byte(address, value)
+            .expect("test RAM write should target red-label RAM");
+    }
+
     pub fn red_label_cmos_range(&self, range: std::ops::Range<u16>) -> Option<&[u8]> {
         self.memory.cmos_range(range)
     }
 
     pub fn red_label_cmos_ram(&self) -> &CmosRam {
         &self.memory.cmos
+    }
+
+    pub fn red_label_palette_ram(&self) -> &[u8; PALETTE_RAM_SIZE] {
+        self.memory.palette_ram()
+    }
+
+    pub fn red_label_hardware_map(&self) -> u8 {
+        self.memory.hardware_map()
+    }
+
+    pub fn red_label_visible_rgba_image(&self) -> Option<RenderedImage> {
+        self.memory.visible_rgba_image()
+    }
+
+    pub fn red_label_visible_palette_indices(&self) -> Option<Vec<u8>> {
+        self.memory.visible_palette_indices()
+    }
+
+    pub fn red_label_visible_pixel_nibbles(&self) -> Option<Vec<u8>> {
+        self.memory.visible_pixel_nibbles()
     }
 
     pub fn red_label_object_table_crc32(&self) -> u32 {
@@ -16897,7 +23744,20 @@ impl ArcadeMachine {
         self.memory.shell_table_crc32()
     }
 
-    fn advance_trace_power_up_ram_fill(&mut self) {
+    fn trace_power_up_blocks_live_io(&self) -> bool {
+        self.trace_power_up_ram_fill.is_some()
+            && self.frame <= RED_LABEL_TRACE_POWER_UP_LIVE_IO_HOLDOFF_END_FRAME
+    }
+
+    fn red_label_trace_state_for_frame_output(&self) -> Result<RedLabelTraceState, String> {
+        self.memory.trace_state()
+    }
+
+    fn advance_trace_power_up_ram_fill(
+        &mut self,
+        sound_commands: &mut Vec<SoundCommand>,
+        live_process_ran: bool,
+    ) {
         let Some(fill) = &mut self.trace_power_up_ram_fill else {
             return;
         };
@@ -16920,12 +23780,184 @@ impl ArcadeMachine {
         {
             self.phase = GamePhase::GameOver;
         }
+        self.apply_trace_power_up_handoff(sound_commands, live_process_ran)
+            .expect("embedded red-label cold-boot handoff trace is valid");
+    }
+
+    fn apply_trace_power_up_handoff(
+        &mut self,
+        sound_commands: &mut Vec<SoundCommand>,
+        live_process_ran: bool,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        match self.frame {
+            RED_LABEL_TRACE_SINIT_ZERO_SEED_FRAME => {
+                let seed_end = field_range(&layout, "base_page", "LSEED")?.end;
+                self.memory.clear_trace_sinit_ram_to(seed_end)?;
+                self.write_trace_rand_state(
+                    &layout,
+                    RandState {
+                        seed: 0,
+                        hseed: 0,
+                        lseed: 0,
+                    },
+                )?;
+                self.memory.clear_shell_head()?;
+                self.phase = GamePhase::Playing;
+            }
+            RED_LABEL_TRACE_SINIT_CLEAR_PLAYER_FRAME => {
+                self.write_trace_rand_state(
+                    &layout,
+                    RandState {
+                        seed: 0,
+                        hseed: 0,
+                        lseed: 0,
+                    },
+                )?;
+                self.memory
+                    .clear_trace_sinit_ram_to(red_label_sinit_object_clear_target(self.frame)?)?;
+                self.phase = GamePhase::Attract;
+            }
+            722..=724 => {
+                self.write_trace_rand_state(
+                    &layout,
+                    RandState {
+                        seed: 0,
+                        hseed: 0,
+                        lseed: 0,
+                    },
+                )?;
+                self.memory
+                    .clear_trace_sinit_ram_to(red_label_sinit_object_clear_target(self.frame)?)?;
+                self.phase = GamePhase::Attract;
+            }
+            RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME..=730 => {
+                if self.frame == RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME {
+                    self.memory
+                        .clear_trace_sinit_ram_to(RED_LABEL_TRACE_SINIT_RAM_CLEAR_END)?;
+                }
+                self.write_trace_rand_state(
+                    &layout,
+                    RandState {
+                        seed: 0,
+                        hseed: 0,
+                        lseed: 0,
+                    },
+                )?;
+                self.phase = GamePhase::Attract;
+            }
+            RED_LABEL_TRACE_INIT20_SOUND_FRAME => {
+                self.write_trace_rand_state(
+                    &layout,
+                    RandState {
+                        seed: 0xD9,
+                        hseed: 0xF6,
+                        lseed: 0xCC,
+                    },
+                )?;
+                sound_commands.push(SoundCommand::from_main_board_pia_port_b(
+                    RED_LABEL_TRACE_INIT20_SOUND_COMMAND_PORT_B,
+                ));
+                self.phase = GamePhase::Attract;
+            }
+            RED_LABEL_TRACE_INIT20_OBJECT_LIST_FRAME => {
+                self.write_trace_rand_state(
+                    &layout,
+                    RandState {
+                        seed: 0x3E,
+                        hseed: 0xB0,
+                        lseed: 0x13,
+                    },
+                )?;
+                let lists = red_label_linked_lists()?;
+                let cmos_defaults = red_label_cmos_defaults()?;
+                self.memory
+                    .apply_todays_high_score_defaults(&cmos_defaults)?;
+                self.memory.initialize_process_lists(&layout, &lists)?;
+                self.memory.initialize_object_lists(&layout, &lists)?;
+                self.memory
+                    .write_field_byte(&layout, "base_page", "STATUS", 0xFF)?;
+                self.phase = GamePhase::GameOver;
+            }
+            RED_LABEL_TRACE_EXEC_IDLE_SEED_FRAME..=745 => {
+                self.write_trace_rand_state(
+                    &layout,
+                    RandState {
+                        seed: 0x86,
+                        hseed: 0x74,
+                        lseed: 0x42,
+                    },
+                )?;
+            }
+            frame if frame >= RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME && !live_process_ran => {
+                let state = self.memory.advance_red_label_rand(&layout)?;
+                self.rng = state;
+            }
+            frame if frame >= RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME => {}
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn write_trace_rand_state(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        state: RandState,
+    ) -> Result<(), String> {
+        self.memory.write_red_label_rand_state(layout, state)?;
+        self.rng = state;
+        Ok(())
     }
 
     pub fn step_red_label_process_scheduler(
         &mut self,
     ) -> Result<Option<RedLabelScheduledProcess>, String> {
         self.memory.step_process_scheduler()
+    }
+
+    pub fn red_label_run_exec_pre_dispatch_visible_slice(
+        &mut self,
+    ) -> Result<RedLabelExecPreDispatch, String> {
+        self.memory.run_exec_pre_dispatch_visible_slice()
+    }
+
+    pub fn step_red_label_executive_iteration(&mut self) -> Result<RedLabelExecutiveStep, String> {
+        let layout = red_label_ram_layout()?;
+        let current_process_head = self.memory.reset_exec_current_process_to_active(&layout)?;
+        let pre_dispatch = self.memory.run_exec_pre_dispatch_visible_slice()?;
+        let mut scheduler_link = current_process_head;
+        let mut dispatches = Vec::new();
+
+        while let Some(scheduled_process) = self
+            .memory
+            .step_process_scheduler_from_link(scheduler_link)?
+        {
+            let dispatch =
+                self.dispatch_red_label_process_routine(scheduled_process.routine_address)?;
+            self.apply_process_dispatch_state(&dispatch)?;
+            self.sync_scores_from_red_label_memory()?;
+            scheduler_link = self
+                .memory
+                .read_field_word(&layout, "runtime_pointers", "CRPROC")?;
+            dispatches.push(RedLabelExecutiveDispatch {
+                scheduled_process,
+                dispatch,
+            });
+        }
+        let scheduled_process = dispatches
+            .first()
+            .map(|executive_dispatch| executive_dispatch.scheduled_process);
+        let dispatch = dispatches
+            .first()
+            .map(|executive_dispatch| executive_dispatch.dispatch.clone());
+
+        Ok(RedLabelExecutiveStep {
+            current_process_head,
+            pre_dispatch,
+            scheduled_process,
+            dispatch,
+            dispatches,
+        })
     }
 
     pub fn red_label_dispatch_translated_process_routine(
@@ -16960,8 +23992,61 @@ impl ArcadeMachine {
                 .map(RedLabelProcessDispatch::PlayerStart);
         }
 
+        if routine_address == red_label_routine_address("GEXBON")? {
+            return self
+                .finish_game_exec_wave_clear_current_process()
+                .map(RedLabelProcessDispatch::GameExec);
+        }
+
+        if routine_address == red_label_routine_address("BC3")? {
+            let layout = red_label_ram_layout()?;
+            let process_address = self.memory.current_process_address(&layout)?;
+            let return_address =
+                self.memory
+                    .read_process_data_word(&layout, process_address, "PD6")?;
+            if return_address == red_label_routine_address("GEXBON")? {
+                return self
+                    .finish_game_exec_wave_clear_current_process()
+                    .map(RedLabelProcessDispatch::GameExec);
+            }
+        }
+
         self.memory
             .dispatch_translated_process_routine(routine_address)
+    }
+
+    fn finish_game_exec_wave_clear_current_process(&mut self) -> Result<RedLabelGameExec, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.memory.current_process_address(&layout)?;
+        let return_address = self
+            .memory
+            .read_process_data_word(&layout, process_address, "PD6")?;
+        let expected_return = red_label_routine_address("GEXBON")?;
+        if return_address != expected_return {
+            return Err(format!(
+                "red-label GEXBON return 0x{return_address:04X} is not translated"
+            ));
+        }
+
+        let player_table = table_descriptor(&layout, "player")?;
+        let player_address = self.memory.read_field_word(&layout, "base_page", "PLRX")?;
+        let player_index = entry_index_for_address(player_table, player_address)?;
+        let lives_range = player_field_range_for_entry(&layout, player_index, "PLAS")?;
+        let lives_before = self.memory.read_byte(lives_range.start)?;
+        let lives_after = lives_before.wrapping_add(1);
+        self.memory.write_byte(lives_range.start, lives_after)?;
+
+        let player_start = self.red_label_start_player_start_current_process()?;
+        Ok(RedLabelGameExec::WaveClearRestart(
+            RedLabelGameExecWaveClearRestart {
+                process_address,
+                return_address,
+                player_address,
+                lives_before,
+                lives_after,
+                player_start,
+            },
+        ))
     }
 
     fn apply_process_dispatch_state(
@@ -16975,8 +24060,7 @@ impl ArcadeMachine {
                 | RedLabelPlayerStart::GameExecReady { .. },
             ) => {
                 self.phase = GamePhase::Playing;
-                self.high_score_entry = None;
-                self.high_score_submission = None;
+                self.clear_live_high_score_session();
                 self.sync_live_player_from_red_label_memory()?;
             }
             RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::GameOverSleeping {
@@ -16984,19 +24068,31 @@ impl ArcadeMachine {
             }) => {
                 self.phase = GamePhase::GameOver;
                 self.high_score_entry = None;
+                self.high_score_entry_player = 0;
+                self.high_score_completed_players_mask = 0;
+                self.high_score_submission = None;
             }
             RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::AttractJump { .. }) => {
                 self.phase = GamePhase::Attract;
-                self.high_score_entry = None;
-                self.high_score_submission = None;
+                self.clear_live_high_score_session();
+            }
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::HallOfFameDisplayed {
+                ..
+            }) => {
+                self.phase = GamePhase::Attract;
+                self.clear_live_high_score_session();
             }
             RedLabelProcessDispatch::PlayerDeath(
                 RedLabelPlayerDeath::PostExplosionRespawnJump { next_player, .. },
             ) => {
                 self.phase = GamePhase::Playing;
                 self.current_player = *next_player;
-                self.high_score_entry = None;
-                self.high_score_submission = None;
+                self.clear_live_high_score_session();
+            }
+            RedLabelProcessDispatch::GameExec(RedLabelGameExec::WaveClearRestart(_)) => {
+                self.phase = GamePhase::Playing;
+                self.clear_live_high_score_session();
+                self.sync_live_player_from_red_label_memory()?;
             }
             RedLabelProcessDispatch::StartSwitch(start) => {
                 self.sync_live_credit_from_red_label_memory()?;
@@ -17005,8 +24101,7 @@ impl ArcadeMachine {
                     RedLabelStartSwitch::StartedOne { .. } | RedLabelStartSwitch::StartedTwo { .. }
                 ) {
                     self.phase = GamePhase::Playing;
-                    self.high_score_entry = None;
-                    self.high_score_submission = None;
+                    self.clear_live_high_score_session();
                 }
             }
             RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::Completed { .. }) => {
@@ -17092,6 +24187,12 @@ impl ArcadeMachine {
         &mut self,
     ) -> Result<Vec<RedLabelCreatedProcess>, String> {
         self.memory.dispatch_switch_processes()
+    }
+
+    pub fn red_label_copy_color_mapping_to_palette_ram(
+        &mut self,
+    ) -> Result<RedLabelPaletteCopy, String> {
+        self.memory.copy_red_label_color_mapping_to_palette_ram()
     }
 
     pub fn red_label_apply_free_play_credit(&mut self) -> Result<RedLabelFreePlayCredit, String> {
@@ -17395,6 +24496,12 @@ impl ArcadeMachine {
             .jump_player_death_game_over_to_attract_current_process()
     }
 
+    pub fn red_label_display_hall_of_fame_from_current_process(
+        &mut self,
+    ) -> Result<RedLabelPlayerDeath, String> {
+        self.memory.display_hall_of_fame_from_current_process()
+    }
+
     pub fn red_label_start_appearance_for_object(
         &mut self,
         object_address: u16,
@@ -17450,6 +24557,25 @@ impl ArcadeMachine {
         self.memory.advance_game_exec_star_time()
     }
 
+    pub fn red_label_start_game_exec_current_process(
+        &mut self,
+    ) -> Result<RedLabelGameExec, String> {
+        self.memory.start_game_exec_current_process()
+    }
+
+    pub fn red_label_step_game_exec_current_process(&mut self) -> Result<RedLabelGameExec, String> {
+        self.memory.step_game_exec_current_process()
+    }
+
+    pub fn red_label_finish_game_exec_wave_clear_current_process(
+        &mut self,
+    ) -> Result<RedLabelGameExec, String> {
+        let exec = self.finish_game_exec_wave_clear_current_process()?;
+        self.apply_process_dispatch_state(&RedLabelProcessDispatch::GameExec(exec.clone()))?;
+        self.sync_scores_from_red_label_memory()?;
+        Ok(exec)
+    }
+
     pub fn red_label_update_player_motion_from_pia(
         &mut self,
     ) -> Result<RedLabelPlayerMotion, String> {
@@ -17482,6 +24608,64 @@ impl ArcadeMachine {
         self.memory.advance_active_object_velocities()
     }
 
+    pub fn red_label_sound_table_command_plan(
+        label: &str,
+    ) -> Result<Vec<RedLabelSoundTableCommand>, String> {
+        red_label_sound_table_command_plan(label)
+    }
+
+    pub fn red_label_sound_table_timed_command_plan(
+        label: &str,
+    ) -> Result<Vec<RedLabelSoundTableTimedCommand>, String> {
+        red_label_sound_table_timed_command_plan(label)
+    }
+
+    pub fn red_label_sound_table_timeline(
+        label: &str,
+    ) -> Result<RedLabelSoundTableTimeline, String> {
+        red_label_sound_table_timeline(label)
+    }
+
+    pub fn red_label_sound_table_timelines() -> Result<Vec<RedLabelSoundTableTimeline>, String> {
+        red_label_sound_table_timelines()
+    }
+
+    pub fn red_label_sound_table_timeline_tsv() -> Result<String, String> {
+        red_label_sound_table_timeline_tsv()
+    }
+
+    pub fn red_label_sound_table_command_sequence_tsv() -> Result<String, String> {
+        red_label_sound_table_command_sequence_tsv()
+    }
+
+    pub fn red_label_sound_table_command_sequence_fixture_check()
+    -> Result<RedLabelSoundTableCommandSequenceFixtureCheck, String> {
+        red_label_sound_table_command_sequence_fixture_check()
+    }
+
+    pub fn red_label_sound_direct_command_sequence_tsv() -> String {
+        red_label_sound_direct_command_sequence_tsv()
+    }
+
+    pub fn red_label_sound_direct_command_sequence_fixture_check()
+    -> Result<RedLabelSoundDirectCommandSequenceFixtureCheck, String> {
+        red_label_sound_direct_command_sequence_fixture_check()
+    }
+
+    pub fn red_label_sound_thrust_command_sequence_tsv() -> String {
+        red_label_sound_thrust_command_sequence_tsv()
+    }
+
+    pub fn red_label_sound_thrust_command_sequence_fixture_check()
+    -> Result<RedLabelSoundThrustCommandSequenceFixtureCheck, String> {
+        red_label_sound_thrust_command_sequence_fixture_check()
+    }
+
+    pub fn red_label_sound_table_timeline_fixture_check()
+    -> Result<RedLabelSoundTableTimelineFixtureCheck, String> {
+        red_label_sound_table_timeline_fixture_check()
+    }
+
     pub fn red_label_step_sound_sequence(&mut self) -> Result<RedLabelSoundSequenceStep, String> {
         self.memory.step_sound_sequence()
     }
@@ -17508,6 +24692,16 @@ impl ArcadeMachine {
         &mut self,
     ) -> Result<RedLabelIrqObjectBandPass, String> {
         self.memory.run_inverted_irq_lower_object_band_pass()
+    }
+
+    pub fn red_label_run_normal_live_irq_video_frame(
+        &mut self,
+    ) -> Result<RedLabelLiveVideoFrame, String> {
+        self.memory.run_normal_live_irq_video_frame()
+    }
+
+    pub fn red_label_run_live_irq_video_frame(&mut self) -> Result<RedLabelLiveVideoFrame, String> {
+        self.memory.run_live_irq_video_frame()
     }
 
     pub fn red_label_run_irq_scanline_object_phase(
@@ -17793,6 +24987,12 @@ impl ArcadeMachine {
         self.memory.initialize_background_from_bgi()
     }
 
+    pub fn red_label_initialize_attract_scene_from_scinit(
+        &mut self,
+    ) -> Result<RedLabelAttractSceneInit, String> {
+        self.memory.initialize_attract_scene_from_scinit()
+    }
+
     pub fn red_label_output_terrain(
         &mut self,
         hardware_stack_pointer: u16,
@@ -17950,7 +25150,8 @@ impl ArcadeMachine {
 
         let mut events = Vec::new();
         let mut sound_commands = Vec::new();
-        if self.trace_power_up_ram_fill.is_none() {
+        let mut live_process_ran = false;
+        if !self.trace_power_up_blocks_live_io() {
             if let Some(command) = self
                 .memory
                 .step_sound_sequence()
@@ -17959,25 +25160,29 @@ impl ArcadeMachine {
             {
                 sound_commands.push(command);
             }
+            self.push_trace_sound_synchronized_events(&sound_commands, &mut events);
 
-            let feed_high_score_entry = self.phase == GamePhase::HighScoreEntry
-                || (self.phase == GamePhase::GameOver
-                    && self
-                        .begin_current_player_high_score_entry(&mut events)
-                        .expect("red-label high-score table should be valid"));
+            let game_over_handoff_active = self
+                .step_live_game_over_attract_handoff(&mut events)
+                .expect("red-label game-over attract handoff should remain valid");
+            let feed_high_score_entry = !game_over_handoff_active
+                && (self.phase == GamePhase::HighScoreEntry
+                    || (self.phase == GamePhase::GameOver
+                        && self
+                            .begin_next_live_high_score_entry(&mut events)
+                            .expect("red-label high-score table should be valid")));
             if feed_high_score_entry {
                 self.step_live_high_score_entry(typed_chars, &mut events);
-            } else {
-                self.step_live_non_high_score_input(input, &mut events);
+            } else if !game_over_handoff_active {
+                live_process_ran = self.step_live_non_high_score_input(input, &mut events);
             }
         }
 
-        self.advance_trace_power_up_ram_fill();
+        self.advance_trace_power_up_ram_fill(&mut sound_commands, live_process_ran);
 
         FrameOutput::new(
             self.snapshot(),
-            self.memory
-                .trace_state()
+            self.red_label_trace_state_for_frame_output()
                 .expect("red-label trace state should match embedded RAM layout"),
             Some(self.memory.object_table_crc32()),
             Some(self.memory.shell_table_crc32()),
@@ -17986,17 +25191,43 @@ impl ArcadeMachine {
         )
     }
 
+    fn push_trace_sound_synchronized_events(
+        &self,
+        sound_commands: &[SoundCommand],
+        events: &mut Vec<MachineEvent>,
+    ) {
+        if self.trace_power_up_ram_fill.is_none() {
+            return;
+        }
+        for command in sound_commands {
+            match command.raw() {
+                RED_LABEL_TRACE_CREDIT_SOUND_COMMAND_RAW => events.push(MachineEvent::CreditAdded),
+                RED_LABEL_TRACE_START_SOUND_COMMAND_RAW => events.push(MachineEvent::GameStarted),
+                _ => {}
+            }
+        }
+    }
+
     pub fn red_label_begin_live_high_score_entry(
         &mut self,
+        score: u32,
+    ) -> Result<Option<HighScoreEntryState>, String> {
+        self.begin_live_high_score_entry(self.current_high_score_player(), score)
+    }
+
+    fn begin_live_high_score_entry(
+        &mut self,
+        player: u8,
         score: u32,
     ) -> Result<Option<HighScoreEntryState>, String> {
         let Some(rank) = self.memory.live_high_score_qualifying_rank(score)? else {
             return Ok(None);
         };
         let state = HighScoreEntryState::new(score, rank);
+        self.memory.write_high_score_entry_display(player, state)?;
         self.phase = GamePhase::HighScoreEntry;
         self.high_score_entry = Some(state);
-        self.high_score_submission = None;
+        self.high_score_entry_player = player;
         Ok(Some(state))
     }
 
@@ -18004,37 +25235,137 @@ impl ArcadeMachine {
         &mut self,
         input: CabinetInput,
         events: &mut Vec<MachineEvent>,
-    ) {
+    ) -> bool {
         let mut started_this_frame = false;
+        let mut live_process_ran = false;
         let coin_door_outcome = self
             .step_red_label_live_coin_door_switches(input)
             .expect("live coin/admin switch creates only translated red-label processes");
-        if coin_door_outcome.credit_added {
+        live_process_ran |= coin_door_outcome.process_ran;
+        if coin_door_outcome.credit_added && self.trace_power_up_ram_fill.is_none() {
             events.push(MachineEvent::CreditAdded);
         }
         if let Some(event) = coin_door_outcome.admin_event {
             events.push(event);
         }
 
-        if (input.start_one || input.start_two)
+        let start_pressed = input.start_one || input.start_two;
+        if self.trace_power_up_ram_fill.is_some() {
+            self.trace_start_asserted_frames = if start_pressed {
+                self.trace_start_asserted_frames.saturating_add(1)
+            } else {
+                0
+            };
+        }
+        let start_debounced =
+            self.trace_power_up_ram_fill.is_none() || self.trace_start_asserted_frames >= 2;
+
+        if start_pressed
+            && start_debounced
             && matches!(self.phase, GamePhase::Attract | GamePhase::GameOver)
-            && self
-                .step_red_label_live_start_switch(input)
-                .expect("live start switch creates only translated red-label processes")
         {
-            events.push(MachineEvent::GameStarted);
-            started_this_frame = true;
+            let start_outcome = self
+                .step_red_label_live_start_switch(input)
+                .expect("live start switch creates only translated red-label processes");
+            live_process_ran |= start_outcome.process_ran;
+            if start_outcome.game_started && self.trace_power_up_ram_fill.is_some() {
+                // MAME reaches the first visible `PLSTRT` object mutation 50
+                // sampled frames later than the coarse live loop. Hold the
+                // translated process until that source scheduler slot.
+                self.trace_player_start_release_frame =
+                    Some(self.frame + RED_LABEL_TRACE_PLAYER_START_EXEC_DELAY_FRAMES);
+            }
+            if start_outcome.game_started && self.trace_power_up_ram_fill.is_none() {
+                events.push(MachineEvent::GameStarted);
+            }
+            started_this_frame = start_outcome.game_started;
         }
 
         if self.phase == GamePhase::Playing && !started_this_frame {
-            let switch_outcome = self.step_red_label_live_player_switches(input);
-            if !switch_outcome.player_start_active {
-                self.step_player_controls(input, events, switch_outcome);
+            if self
+                .trace_player_start_release_frame
+                .is_some_and(|frame| self.frame < frame)
+            {
+                live_process_ran = true;
+            } else {
+                let switch_outcome = self.step_red_label_live_player_switches(input);
+                live_process_ran |= switch_outcome.player_start_active;
+                if !switch_outcome.player_start_active {
+                    self.step_player_controls(input, events, switch_outcome);
+                }
             }
+        }
+        if self.phase == GamePhase::Attract
+            && input == CabinetInput::NONE
+            && self.credits == 0
+            && !self
+                .red_label_live_coin_door_process_active()
+                .expect("live coin/admin process labels are valid")
+        {
+            live_process_ran |= self
+                .step_red_label_live_attract_process()
+                .expect("live attract process creates only translated red-label work");
+        }
+        live_process_ran
+    }
+
+    fn step_red_label_live_attract_process(&mut self) -> Result<bool, String> {
+        if !self.red_label_live_attract_process_active()? {
+            self.memory.make_process(
+                red_label_routine_address("ATTR")?,
+                RED_LABEL_ATTRACT_PROCESS_TYPE,
+            )?;
+        }
+
+        let Some(dispatch) = self.step_red_label_translated_process()? else {
+            return Ok(false);
+        };
+        self.dispatch_live_attract_immediate_jumps(dispatch)?;
+        Ok(true)
+    }
+
+    fn dispatch_live_attract_immediate_jumps(
+        &mut self,
+        mut dispatch: RedLabelProcessDispatch,
+    ) -> Result<(), String> {
+        loop {
+            let routine_address = match dispatch {
+                RedLabelProcessDispatch::AttractVector(RedLabelAttractVector {
+                    entry:
+                        RedLabelHallOfFameEntryDispatch::PowerOnWilliamsJump { target_address, .. },
+                    ..
+                }) => target_address,
+                RedLabelProcessDispatch::AttractWilliamsPage(RedLabelAttractWilliamsPage {
+                    logo_address,
+                    ..
+                }) => logo_address,
+                _ => return Ok(()),
+            };
+            dispatch = self.red_label_dispatch_translated_process_routine(routine_address)?;
         }
     }
 
-    fn step_red_label_live_start_switch(&mut self, input: CabinetInput) -> Result<bool, String> {
+    fn red_label_live_attract_process_active(&self) -> Result<bool, String> {
+        let routines = [
+            "ATTR", "AMODES", "LOGO", "LOGO0", "PRES", "PRES1", "DEFEND", "DEFENS", "DEF33",
+            "DEF44", "COPYRT", "CPR55", "DEF50", "DEF51", "WILLIR", "WILR1", "CREDS", "HALD4",
+            "LEDRET", "AMODE1", "AMODE2", "LASRS", "LAS0", "AMODE3", "AMODE4", "AMODE5", "AMODE7",
+            "AMODE8", "AMOD12", "AMOD10", "AMOD11", "BMODE2", "BMODE3", "AMOD13", "TEXTP",
+            "TEXTP2", "HALL1", "HALL3A", "HALL4", "HALL5", "HALL6", "HALL12", "HALD3", "HALL13",
+            "HOFST", "HOFBL", "HOFUD", "HOFUD1", "COLR", "COLRLP", "CBOMB", "CBMB1", "TIECOL",
+            "TIECL", "SCPROC", "SCP1", "SCP2",
+        ];
+        let mut routine_addresses = Vec::with_capacity(routines.len());
+        for routine in routines {
+            routine_addresses.push(red_label_routine_address(routine)?);
+        }
+        self.memory.active_process_has_routine(&routine_addresses)
+    }
+
+    fn step_red_label_live_start_switch(
+        &mut self,
+        input: CabinetInput,
+    ) -> Result<LiveStartSwitchOutcome, String> {
         self.prepare_red_label_live_start_state()?;
         let mut start_input = CabinetInput::NONE;
         start_input.start_one = input.start_one;
@@ -18044,14 +25375,17 @@ impl ArcadeMachine {
         self.memory.dispatch_switch_processes()?;
 
         let Some(dispatch) = self.step_red_label_translated_process()? else {
-            return Ok(false);
+            return Ok(LiveStartSwitchOutcome::default());
         };
-        Ok(matches!(
-            dispatch,
-            RedLabelProcessDispatch::StartSwitch(
-                RedLabelStartSwitch::StartedOne { .. } | RedLabelStartSwitch::StartedTwo { .. }
-            )
-        ))
+        Ok(LiveStartSwitchOutcome {
+            process_ran: true,
+            game_started: matches!(
+                dispatch,
+                RedLabelProcessDispatch::StartSwitch(
+                    RedLabelStartSwitch::StartedOne { .. } | RedLabelStartSwitch::StartedTwo { .. }
+                )
+            ),
+        })
     }
 
     fn prepare_red_label_live_start_state(&mut self) -> Result<(), String> {
@@ -18094,7 +25428,9 @@ impl ArcadeMachine {
         let Some(dispatch) = self.step_red_label_translated_process()? else {
             return Ok(LiveCoinDoorSwitchOutcome::default());
         };
-        Ok(live_coin_door_switch_outcome(&dispatch))
+        let mut outcome = live_coin_door_switch_outcome(&dispatch);
+        outcome.process_ran = true;
+        Ok(outcome)
     }
 
     fn prepare_red_label_live_admin_switch_state(
@@ -18130,39 +25466,81 @@ impl ArcadeMachine {
         self.memory.active_process_has_routine(&routines)
     }
 
-    fn begin_current_player_high_score_entry(
+    fn red_label_live_game_over_attract_process_active(&self) -> Result<bool, String> {
+        let routines = [
+            red_label_routine_address("PLE3")?,
+            red_label_routine_address("HALL13")?,
+        ];
+        self.memory.active_process_has_routine(&routines)
+    }
+
+    fn step_live_game_over_attract_handoff(
+        &mut self,
+        events: &mut Vec<MachineEvent>,
+    ) -> Result<bool, String> {
+        if self.phase != GamePhase::GameOver {
+            return Ok(false);
+        }
+        if !self.red_label_live_game_over_attract_process_active()? {
+            return Ok(false);
+        }
+
+        let Some(dispatch) = self.step_red_label_translated_process()? else {
+            return Ok(true);
+        };
+        if matches!(
+            dispatch,
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::AttractJump { .. })
+        ) {
+            if self.begin_next_live_high_score_entry(events)? {
+                return Ok(true);
+            }
+            self.red_label_sleep_current_process(
+                RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS,
+                red_label_routine_address("HALL13")?,
+            )?;
+            self.phase = GamePhase::GameOver;
+        }
+        Ok(true)
+    }
+
+    fn begin_next_live_high_score_entry(
         &mut self,
         events: &mut Vec<MachineEvent>,
     ) -> Result<bool, String> {
         if self.high_score_entry.is_some() {
             return Ok(true);
         }
-        let player = self.current_high_score_player();
-        let score = match self.current_player {
-            2 => self.scores.player_two,
-            _ => self.scores.player_one,
-        };
-        if self.high_score_submission == Some(HighScoreSubmissionState { player, score }) {
-            return Ok(false);
+
+        for player in RED_LABEL_HIGH_SCORE_PLAYERS {
+            if self.high_score_completed_players_mask & high_score_player_mask(player) != 0 {
+                continue;
+            }
+            let score = self.score_for_high_score_player(player);
+            if self.begin_live_high_score_entry(player, score)?.is_some() {
+                events.push(MachineEvent::HighScoreEntryStarted);
+                return Ok(true);
+            }
         }
-        if self.red_label_begin_live_high_score_entry(score)?.is_some() {
-            events.push(MachineEvent::HighScoreEntryStarted);
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        Ok(false)
     }
 
     fn step_live_high_score_entry(&mut self, typed_chars: &[char], events: &mut Vec<MachineEvent>) {
         for &character in typed_chars {
             if character == '\u{8}' || character == '\u{7F}' {
                 self.backspace_live_high_score_initial();
+                if let Some(state) = self.high_score_entry {
+                    self.memory
+                        .write_high_score_initials_display(state)
+                        .expect("red-label initials display state should remain valid");
+                }
                 continue;
             }
 
             let Some(initial) = red_label_initials_entry_byte(character) else {
                 continue;
             };
+            let mut updated_state = None;
             let ready_to_submit = {
                 let Some(state) = self.high_score_entry.as_mut() else {
                     break;
@@ -18174,9 +25552,15 @@ impl ArcadeMachine {
                     state.initials[cursor] = initial;
                     state.cursor += 1;
                     events.push(MachineEvent::HighScoreInitialAccepted);
+                    updated_state = Some(*state);
                     usize::from(state.cursor) == RED_LABEL_INITIALS_ENTRY_CHARS
                 }
             };
+            if let Some(state) = updated_state {
+                self.memory
+                    .write_high_score_initials_display(state)
+                    .expect("red-label initials display state should remain valid");
+            }
             if ready_to_submit {
                 self.submit_live_high_score_entry()
                     .expect("red-label high-score entry state should remain valid");
@@ -18201,6 +25585,7 @@ impl ArcadeMachine {
         let Some(state) = self.high_score_entry.take() else {
             return Ok(());
         };
+        let player = self.high_score_entry_player;
         self.memory.insert_high_score(
             RuntimeHighScoreTable::AllTime,
             state.score,
@@ -18212,16 +25597,53 @@ impl ArcadeMachine {
             state.initials,
         )?;
         self.high_score_submission = Some(HighScoreSubmissionState {
-            player: self.current_high_score_player(),
+            player,
             score: state.score,
         });
+        self.high_score_completed_players_mask |= high_score_player_mask(player);
+        self.high_score_entry_player = 0;
         self.sync_high_score_from_red_label_cmos()?;
         self.phase = GamePhase::GameOver;
+        if !self.has_pending_live_high_score_entry()? {
+            self.memory.write_hall_of_fame_display()?;
+        }
         Ok(())
+    }
+
+    fn has_pending_live_high_score_entry(&self) -> Result<bool, String> {
+        for player in RED_LABEL_HIGH_SCORE_PLAYERS {
+            if self.high_score_completed_players_mask & high_score_player_mask(player) != 0 {
+                continue;
+            }
+            let score = self.score_for_high_score_player(player);
+            if self
+                .memory
+                .live_high_score_qualifying_rank(score)?
+                .is_some()
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn score_for_high_score_player(&self, player: u8) -> u32 {
+        if player == 1 {
+            self.scores.player_one
+        } else {
+            self.scores.player_two
+        }
     }
 
     fn current_high_score_player(&self) -> u8 {
         if self.current_player == 2 { 2 } else { 1 }
+    }
+
+    fn clear_live_high_score_session(&mut self) {
+        self.high_score_entry = None;
+        self.high_score_submission = None;
+        self.high_score_entry_player = 0;
+        self.high_score_completed_players_mask = 0;
     }
 
     #[cfg(test)]
@@ -18341,6 +25763,12 @@ impl ArcadeMachine {
         Ok(())
     }
 
+    fn red_label_update_live_video_frame(&mut self) -> Result<RedLabelLiveVideoFrame, String> {
+        let frame = self.red_label_run_live_irq_video_frame()?;
+        self.sync_player_motion_from_red_label_memory()?;
+        Ok(frame)
+    }
+
     fn step_player_controls(
         &mut self,
         input: CabinetInput,
@@ -18351,8 +25779,8 @@ impl ArcadeMachine {
             events.push(MachineEvent::ReversePressed);
         }
 
-        self.red_label_update_player_motion_from_pia()
-            .expect("embedded red-label PLAYER motion layout is valid");
+        self.red_label_update_live_video_frame()
+            .expect("embedded red-label live video IRQ layout is valid");
 
         if input.fire || (self.compatibility.xyzzy_active && self.compatibility.xyzzy_auto_fire) {
             events.push(MachineEvent::FirePressed);
@@ -18382,11 +25810,13 @@ fn live_coin_door_switch_outcome(dispatch: &RedLabelProcessDispatch) -> LiveCoin
         }) => LiveCoinDoorSwitchOutcome {
             credit_added: true,
             admin_event: None,
+            ..LiveCoinDoorSwitchOutcome::default()
         },
         RedLabelProcessDispatch::AdminSwitch(RedLabelAdminSwitch::HighScoreReset { .. }) => {
             LiveCoinDoorSwitchOutcome {
                 credit_added: false,
                 admin_event: Some(MachineEvent::HighScoreReset),
+                ..LiveCoinDoorSwitchOutcome::default()
             }
         }
         RedLabelProcessDispatch::AdminSwitch(RedLabelAdminSwitch::AdvanceJump {
@@ -18395,6 +25825,7 @@ fn live_coin_door_switch_outcome(dispatch: &RedLabelProcessDispatch) -> LiveCoin
         }) => LiveCoinDoorSwitchOutcome {
             credit_added: false,
             admin_event: Some(MachineEvent::DiagnosticsSelected),
+            ..LiveCoinDoorSwitchOutcome::default()
         },
         RedLabelProcessDispatch::AdminSwitch(RedLabelAdminSwitch::AdvanceJump {
             target: RedLabelAdvanceSwitchTarget::Audits,
@@ -18402,6 +25833,7 @@ fn live_coin_door_switch_outcome(dispatch: &RedLabelProcessDispatch) -> LiveCoin
         }) => LiveCoinDoorSwitchOutcome {
             credit_added: false,
             admin_event: Some(MachineEvent::AuditsSelected),
+            ..LiveCoinDoorSwitchOutcome::default()
         },
         _ => LiveCoinDoorSwitchOutcome::default(),
     }
@@ -18411,69 +25843,211 @@ fn live_coin_door_switch_outcome(dispatch: &RedLabelProcessDispatch) -> LiveCoin
 mod tests {
     use crate::{
         board::{
-            CMOS_RAM_SIZE, RED_LABEL_CRHSTD_CELL_OFFSET, RED_LABEL_HIGH_SCORE_ENTRIES,
-            RED_LABEL_THSTAB_START, cmos_sram_read_byte, cmos_sram_write_byte,
+            CMOS_RAM_SIZE, PALETTE_RAM_SIZE, RED_LABEL_CRHSTD_CELL_OFFSET,
+            RED_LABEL_HIGH_SCORE_ENTRIES, RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START,
+            cmos_sram_read_byte, cmos_sram_write_byte,
         },
         input::{CabinetInput, DefenderInputPorts},
         machine::{
             ArcadeMachine, GamePhase, MachineEvent, RED_LABEL_ATTRACT_PROCESS_TYPE,
-            RED_LABEL_COIN_PROCESS_TYPE, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelAdminSwitch,
-            RedLabelAdvanceSwitchTarget, RedLabelAltitudeTableInit, RedLabelAppearanceStart,
-            RedLabelAstronautDirection, RedLabelAstronautKill, RedLabelAstronautProcessStep,
-            RedLabelAstronautWalk, RedLabelBackgroundInit, RedLabelBlockClear,
-            RedLabelBonusTextCall, RedLabelBonusTextPlan, RedLabelBorder,
+            RED_LABEL_COIN_PROCESS_TYPE, RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS,
+            RED_LABEL_INVERTED_IRQ_LIVE_VERTCT, RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT,
+            RED_LABEL_INVERTED_WATCHDOG_DATA, RED_LABEL_IRQ_ADDRESS, RED_LABEL_IRQ_JUMP_OPCODE,
+            RED_LABEL_IRQB_ADDRESS, RED_LABEL_NORMAL_IRQ_LIVE_VERTCT,
+            RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT, RED_LABEL_NORMAL_WATCHDOG_DATA,
+            RED_LABEL_P1SW_PIA3_CONTROL, RED_LABEL_P2SW_PIA3_CONTROL, RED_LABEL_PIA3_COCKTAIL_BIT,
+            RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelAdminSwitch, RedLabelAdvanceSwitchTarget,
+            RedLabelAltitudeTableInit, RedLabelAppearanceStart, RedLabelAstronautDirection,
+            RedLabelAstronautKill, RedLabelAstronautProcessStep, RedLabelAstronautWalk,
+            RedLabelAttractCopyright, RedLabelAttractCopyrightWait, RedLabelAttractCredits,
+            RedLabelAttractCreditsText, RedLabelAttractDefenderDelay,
+            RedLabelAttractDefenderRefresh, RedLabelAttractDefenderRestoreStart,
+            RedLabelAttractInstructionAscent, RedLabelAttractInstructionEnemySpawn,
+            RedLabelAttractInstructionEnemyTableStart, RedLabelAttractInstructionFreeFall,
+            RedLabelAttractInstructionIntersection, RedLabelAttractInstructionLaserKill,
+            RedLabelAttractInstructionLaserStart, RedLabelAttractInstructionLaserStep,
+            RedLabelAttractInstructionRestart, RedLabelAttractInstructionShipReturn,
+            RedLabelAttractInstructionStart, RedLabelAttractInstructionTableDecision,
+            RedLabelAttractInstructionTextAdvance, RedLabelAttractInstructionTextProcess,
+            RedLabelAttractLogo, RedLabelAttractPresents, RedLabelAttractSceneInit,
+            RedLabelAttractVector, RedLabelAttractWilliamsRestore, RedLabelBackgroundInit,
+            RedLabelBlockClear, RedLabelBonusTextCall, RedLabelBonusTextPlan, RedLabelBorder,
             RedLabelCapturedAstronautCollision, RedLabelCmosWordWrite, RedLabelCoinCredit,
             RedLabelCoinProcessStep, RedLabelCoinSlot, RedLabelCoinSwitchScan,
             RedLabelColorRamInit, RedLabelCreatedProcess, RedLabelCreatedShell, RedLabelEnemyKill,
-            RedLabelExpandedUpdate, RedLabelExplosionStart, RedLabelFallingAstronautStep,
-            RedLabelFireballTableInit, RedLabelFreePlayCredit, RedLabelGameExecStarTime,
-            RedLabelGenocide, RedLabelHyperspace, RedLabelIrqMode, RedLabelIrqObjectBandPass,
-            RedLabelIrqObjectBandPhase, RedLabelIrqObjectBandStep, RedLabelIrqPreTailStep,
-            RedLabelIrqSchedulerContext, RedLabelIrqSchedulerPhase, RedLabelKidnappingLanderKill,
+            RedLabelExecOverloadedObject, RedLabelExecPreDispatch, RedLabelExpandedUpdate,
+            RedLabelExplosionStart, RedLabelFallingAstronautStep, RedLabelFireballTableInit,
+            RedLabelFreePlayCredit, RedLabelGameExec, RedLabelGameExecEntry,
+            RedLabelGameExecStarTime, RedLabelGenocide, RedLabelHallOfFameDisplayWait,
+            RedLabelHallOfFameEntryDispatch, RedLabelHallOfFameEntrySetup,
+            RedLabelHighScoreEntryStart, RedLabelHighScoreFireSwitch, RedLabelHighScoreHandoff,
+            RedLabelHighScoreQualification, RedLabelHighScoreSubmission,
+            RedLabelHighScoreSubmissionHandoff, RedLabelHighScoreTableKind, RedLabelHyperspace,
+            RedLabelIrqMode, RedLabelIrqObjectBandPass, RedLabelIrqObjectBandPhase,
+            RedLabelIrqObjectBandStep, RedLabelIrqPreTailStep, RedLabelIrqSchedulerContext,
+            RedLabelIrqSchedulerPhase, RedLabelIrqSchedulerStep, RedLabelKidnappingLanderKill,
             RedLabelKidnappingPassengerRelease, RedLabelKilledProcess, RedLabelLanderFleeOutcome,
             RedLabelLanderProcessStep, RedLabelLanderTarget, RedLabelLaserDirection,
             RedLabelLaserFire, RedLabelLaserFireDispatch, RedLabelLaserFizzleInit,
-            RedLabelLaserStep, RedLabelLaserStopReason, RedLabelLoadedSoundTable,
-            RedLabelMiniSwarmerKill, RedLabelMiniSwarmerProcessStep, RedLabelObjectCollision,
-            RedLabelObjectDescriptor, RedLabelObjectDisplay, RedLabelObjectDisplayBand,
-            RedLabelObjectVelocityStep, RedLabelObjectVelocityUpdate, RedLabelPictureWrite,
-            RedLabelPlayerCollision, RedLabelPlayerDeath, RedLabelPlayerDisplay,
-            RedLabelPlayerMotion, RedLabelPlayerRestore, RedLabelPlayerRuntimeInit,
-            RedLabelPlayerStart, RedLabelPositionedObjectKill, RedLabelProcessClass,
-            RedLabelProcessDispatch, RedLabelReverse, RedLabelScannerObjectBlip,
-            RedLabelScannerPlayerBlip, RedLabelScannerProcessStep, RedLabelScannerTerrainErase,
-            RedLabelScheduledProcess, RedLabelSchizoidProcessStep, RedLabelScoreDigitTransfer,
-            RedLabelScoreOutcome, RedLabelScoreSpriteKind, RedLabelScoreSpriteStart,
-            RedLabelScoreSpriteStep, RedLabelScoreTransfer, RedLabelScreenClear,
+            RedLabelLaserStep, RedLabelLaserStopReason, RedLabelLiveVideoFrame,
+            RedLabelLoadedSoundTable, RedLabelMiniSwarmerKill, RedLabelMiniSwarmerProcessStep,
+            RedLabelObjectCollision, RedLabelObjectDescriptor, RedLabelObjectDisplay,
+            RedLabelObjectDisplayBand, RedLabelObjectVelocityStep, RedLabelObjectVelocityUpdate,
+            RedLabelPaletteCopy, RedLabelPictureWrite, RedLabelPlayerCollision,
+            RedLabelPlayerDeath, RedLabelPlayerDisplay, RedLabelPlayerMotion,
+            RedLabelPlayerRuntimeInit, RedLabelPlayerStart, RedLabelPositionedObjectKill,
+            RedLabelProcessClass, RedLabelProcessDispatch, RedLabelReverse, RedLabelRuntimeMemory,
+            RedLabelScannerObjectBlip, RedLabelScannerPlayerBlip, RedLabelScannerProcessStep,
+            RedLabelScannerTerrainErase, RedLabelScheduledProcess, RedLabelSchizoidProcessStep,
+            RedLabelScoreDigitTransfer, RedLabelScoreOutcome, RedLabelScoreSpriteKind,
+            RedLabelScoreSpriteStart, RedLabelScoreSpriteStep, RedLabelScoreTransfer,
+            RedLabelScreenClear, RedLabelScreenSwitch, RedLabelScreenSwitchRoutine,
             RedLabelShellDescriptor, RedLabelShellOutputRoutine, RedLabelShellStep,
-            RedLabelSmartBomb, RedLabelSmartBombTail, RedLabelSoundSequenceSource,
-            RedLabelSoundSequenceStep, RedLabelStarBlink, RedLabelStarHyper, RedLabelStarOutput,
-            RedLabelStarRamBlast, RedLabelStarTableInit, RedLabelStartCredit, RedLabelStartGame,
-            RedLabelStartGameInit, RedLabelStartSwitch, RedLabelStockDisplay,
-            RedLabelSupportProcessStep, RedLabelSwitchProcess, RedLabelSwitchScan,
-            RedLabelTerrainBlowProcessStep, RedLabelTerrainErase, RedLabelTerrainExplosion,
-            RedLabelTerrainExplosionPass, RedLabelTerrainOutput, RedLabelTerrainTablesInit,
-            RedLabelThrustProcessStep, RedLabelThrustTableInit, RedLabelTieBombStart,
-            RedLabelTieProcessStep, RedLabelUfoProcessStep, RedLabelUfoStart,
-            RedLabelUfoVelocityUpdate, RedLabelWaveDelta, RedLabelWaveParameters,
+            RedLabelSmartBomb, RedLabelSmartBombTail,
+            RedLabelSoundDirectCommandSequenceFixtureCheck, RedLabelSoundOutput,
+            RedLabelSoundSequenceSource, RedLabelSoundSequenceStep, RedLabelSoundTableCommand,
+            RedLabelSoundTableCommandSequenceFixtureCheck, RedLabelSoundTableTimedCommand,
+            RedLabelSoundTableTimelineFixtureCheck, RedLabelSoundThrustCommandSequenceFixtureCheck,
+            RedLabelStarBlink, RedLabelStarHyper, RedLabelStarOutput, RedLabelStarRamBlast,
+            RedLabelStarTableInit, RedLabelStartCredit, RedLabelStartGame, RedLabelStartGameInit,
+            RedLabelStartSwitch, RedLabelStockDisplay, RedLabelSupportProcessStep,
+            RedLabelSwitchProcess, RedLabelSwitchScan, RedLabelTerrainBlowProcessStep,
+            RedLabelTerrainErase, RedLabelTerrainExplosion, RedLabelTerrainExplosionPass,
+            RedLabelTerrainOutput, RedLabelTerrainTablesInit, RedLabelThrustProcessStep,
+            RedLabelThrustTableInit, RedLabelTieBombStart, RedLabelTieProcessStep,
+            RedLabelUfoProcessStep, RedLabelUfoStart, RedLabelUfoVelocityUpdate, RedLabelWaveDelta,
+            RedLabelWaveParameters,
         },
         red_label::{Facing, Fixed16, RandState, rmax},
+        red_label_memory::red_label_ram_layout,
+        rom::crc32,
         sound::SoundCommand,
+        video::defender_visible_byte_offset,
     };
 
     use super::{
-        RED_LABEL_WALL_COLOR_TABLE, RED_LABEL_Y_MIN, arithmetic_shift_right_word,
-        fireball_table_byte, laser_fizzle_byte, mini_swarmer_damping_adjustment,
-        parse_color_cycle_tables, parse_color_ram_tables, parse_message_glyphs, parse_messages,
-        parse_object_images, parse_object_pictures, parse_score_digits, parse_sound_tables,
-        parse_switch_table, parse_terrain_data_tables, picture_collision_center,
-        red_label_color_cycle_table, red_label_color_ram_table, red_label_message,
+        RED_LABEL_ATTRACT_COPYRIGHT_DATA_ADDRESS, RED_LABEL_ATTRACT_COPYRIGHT_ROW_WIDTH,
+        RED_LABEL_ATTRACT_COPYRIGHT_ROWS, RED_LABEL_ATTRACT_COPYRIGHT_SCREEN,
+        RED_LABEL_ATTRACT_COPYRIGHT_SLEEP_TICKS, RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS,
+        RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN,
+        RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS, RED_LABEL_ATTRACT_CREDITS_SCREEN,
+        RED_LABEL_ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS, RED_LABEL_ATTRACT_DEFENDER_DATA,
+        RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR, RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR_POINTER_RAM,
+        RED_LABEL_ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS, RED_LABEL_ATTRACT_DEFENDER_INITIAL_X16,
+        RED_LABEL_ATTRACT_DEFENDER_OBJECT_BYTES, RED_LABEL_ATTRACT_DEFENDER_OBJECT_COUNT,
+        RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET,
+        RED_LABEL_ATTRACT_DEFENDER_OBJECT_POINTER_RAM,
+        RED_LABEL_ATTRACT_DEFENDER_OBJECT_TYPE_OFFSET,
+        RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET, RED_LABEL_ATTRACT_DEFENDER_OBJECTS,
+        RED_LABEL_ATTRACT_DEFENDER_PICTURE_BYTES, RED_LABEL_ATTRACT_DEFENDER_PICTURE_DATA_STEP,
+        RED_LABEL_ATTRACT_DEFENDER_PICTURE_HEIGHT, RED_LABEL_ATTRACT_DEFENDER_PICTURE_WIDTH,
+        RED_LABEL_ATTRACT_DEFENDER_PICTURES, RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN, RED_LABEL_ATTRACT_DEFENDER_RESTORE_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT, RED_LABEL_ATTRACT_DEFENDER_WHOLE_WIDTH,
+        RED_LABEL_ATTRACT_DEFENDER_Y16, RED_LABEL_ATTRACT_ENTRY_FLAG_RAM,
+        RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_OBJECT_RAM,
+        RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_RETURN_X16,
+        RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_RETURN_Y16,
+        RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_X16, RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_Y16,
+        RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_Y_VELOCITY, RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_COLOR,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_RESOLVE_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_BLIPS,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_END,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X, RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X16,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y_VELOCITY,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y16_LOW, RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_X16,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_Y_VELOCITY, RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_Y16,
+        RED_LABEL_ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_ACCELERATION,
+        RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_MAN_X16,
+        RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_MAN_Y16,
+        RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SHIP_Y_VELOCITY,
+        RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM,
+        RED_LABEL_ATTRACT_INSTRUCTION_LASER_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_LASER_START_SCREEN_OFFSET,
+        RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM,
+        RED_LABEL_ATTRACT_INSTRUCTION_LASER_STEP_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_MAN_COLOR, RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM,
+        RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM, RED_LABEL_ATTRACT_INSTRUCTION_MAN_X16,
+        RED_LABEL_ATTRACT_INSTRUCTION_MAN_Y16,
+        RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM,
+        RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_FREE_FALL_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_SHIP_X_VELOCITY,
+        RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_SHIP_Y_VELOCITY,
+        RED_LABEL_ATTRACT_INSTRUCTION_RESTART_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_SHIP_COLOR, RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM,
+        RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_X_VELOCITY,
+        RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_Y_VELOCITY,
+        RED_LABEL_ATTRACT_INSTRUCTION_SHIP_X16, RED_LABEL_ATTRACT_INSTRUCTION_SHIP_Y16,
+        RED_LABEL_ATTRACT_INSTRUCTION_STATUS, RED_LABEL_ATTRACT_INSTRUCTION_TABLE_END_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_TABLE_LASER_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ADVANCE_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM,
+        RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SCREEN_ADDRESSES,
+        RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SLEEP_TICKS, RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE,
+        RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM, RED_LABEL_ATTRACT_LOGO_CURSOR_END_RAM,
+        RED_LABEL_ATTRACT_LOGO_CURSOR_RAM, RED_LABEL_ATTRACT_LOGO_FAST_BYTES_PER_SLICE,
+        RED_LABEL_ATTRACT_LOGO_FLAG_RAM, RED_LABEL_ATTRACT_LOGO_INITIAL_BYTES_PER_SLICE,
+        RED_LABEL_ATTRACT_LOGO_POINTER_RAM, RED_LABEL_ATTRACT_LOGO_SLEEP_TICKS,
+        RED_LABEL_ATTRACT_LOGO_TABLE_ADDRESS, RED_LABEL_ATTRACT_MESSAGE_POINTER_RAM,
+        RED_LABEL_ATTRACT_NUMBER_RAM, RED_LABEL_ATTRACT_OLD_CREDIT_RAM,
+        RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER, RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+        RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS, RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN,
+        RED_LABEL_ATTRACT_VECTOR_ADDRESS, RED_LABEL_ATTRACT_WILLIAMS_FAST_LOGO_RATE,
+        RED_LABEL_ATTRACT_WILLIAMS_LOGO_COLOR, RED_LABEL_ATTRACT_WILLIAMS_NORMAL_LOGO_RATE,
+        RED_LABEL_ATTRACT_WILLIAMS_RESTORE_SLEEP_TICKS, RED_LABEL_ATTRACT_WILLIAMS_STATUS,
+        RED_LABEL_DEFENDER_LOGO_BYTES, RED_LABEL_HALL_OF_FAME_ALL_TIME_SCREEN,
+        RED_LABEL_HALL_OF_FAME_ALL_TIME_TABLE_SCREEN, RED_LABEL_HALL_OF_FAME_ENTRY_STATUS,
+        RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, RED_LABEL_HALL_OF_FAME_LEFT_GREATEST_SCREEN,
+        RED_LABEL_HALL_OF_FAME_LOGO_COLOR, RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM,
+        RED_LABEL_HALL_OF_FAME_LOGO_DESCRIPTOR, RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT,
+        RED_LABEL_HALL_OF_FAME_LOGO_SCREEN, RED_LABEL_HALL_OF_FAME_LOGO_WIDTH,
+        RED_LABEL_HALL_OF_FAME_RIGHT_GREATEST_SCREEN, RED_LABEL_HALL_OF_FAME_STALL_TICKS,
+        RED_LABEL_HALL_OF_FAME_TODAYS_SCREEN, RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN,
+        RED_LABEL_HALL_OF_FAME_WAIT_SLEEP_TICKS, RED_LABEL_HOF_BLANK_INITIAL_BYTE,
+        RED_LABEL_HOF_FIRE_FLAG_RAM, RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM,
+        RED_LABEL_HOF_FIRE_OPEN_COUNT_READY, RED_LABEL_HOF_FIRE_SLEEP_TICKS,
+        RED_LABEL_HOF_FIRE_SWITCH_MASK, RED_LABEL_HOF_FIRST_INITIAL_STALL_TICKS,
+        RED_LABEL_HOF_INIT_INDEX_RAM, RED_LABEL_HOF_INITIAL_DIRECTION_RAM,
+        RED_LABEL_HOF_INITIALS_SCREEN, RED_LABEL_HOF_INITS_RAM,
+        RED_LABEL_HOF_INSTRUCTIONS_TOP_LEFT, RED_LABEL_HOF_LETTER_COLOR,
+        RED_LABEL_HOF_NEXT_INITIAL_STALL_TICKS, RED_LABEL_HOF_PLAYER_LABEL_SCREEN,
+        RED_LABEL_HOF_PLAYER_NUMBER_RAM, RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM,
+        RED_LABEL_HOF_RESET_FLAG_RAM, RED_LABEL_HOF_STALL_TIMER_RAM,
+        RED_LABEL_HOF_TABLE_INITIALS_RAM, RED_LABEL_HOF_TABLE_SCORE_RAM,
+        RED_LABEL_HOF_UNDERLINE_ACTIVE, RED_LABEL_HOF_UNDERLINE_NORMAL,
+        RED_LABEL_HOF_UP_DOWN_COUNT_RAM, RED_LABEL_HOF_UP_DOWN_DELAY_RAM,
+        RED_LABEL_INITIALS_ENTRY_CHARS, RED_LABEL_P1_SCORE_DISPLAY,
+        RED_LABEL_PLAYER_START_PROMPT_SCREEN, RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN,
+        RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN, RED_LABEL_SCREEN_CLEAR_END,
+        RED_LABEL_WALL_COLOR_TABLE, RED_LABEL_Y_MIN, RedLabelSoundTable,
+        arithmetic_shift_right_word, attract_logo_screen_address, checked_defender_logo_ram_range,
+        defender_logo_color_byte, expanded_defender_logo_image, fireball_table_byte,
+        hall_of_fame_score_chars, high_score_initial_display_byte, laser_fizzle_byte,
+        mini_swarmer_damping_adjustment, parse_color_cycle_tables, parse_color_ram_tables,
+        parse_message_glyphs, parse_messages, parse_object_images, parse_object_pictures,
+        parse_score_digits, parse_sound_tables, parse_switch_table, parse_terrain_data_tables,
+        picture_collision_center, ram_field, red_label_color_cycle_table,
+        red_label_color_ram_table, red_label_irq_bgout_stack_pointer, red_label_message,
         red_label_message_glyph, red_label_object_image_address,
         red_label_object_image_byte_required, red_label_object_picture,
         red_label_object_picture_address, red_label_player_death_table, red_label_routine_address,
-        red_label_sound_table_address, red_label_switch_table, red_label_terrain_data_table,
-        red_label_trace_power_up_ram_fill_target, screen_offset, sign_extend_u8_to_u16,
-        star_output_next_x, star_table_from_rand_values,
+        red_label_score_digit_image, red_label_sound_direct_command_sequence_fixture_check_tsv,
+        red_label_sound_output, red_label_sound_priority_allows_load,
+        red_label_sound_table_address, red_label_sound_table_command_sequence_fixture_check_tsv,
+        red_label_sound_table_commands, red_label_sound_table_timed_commands,
+        red_label_sound_table_timeline_fixture_check_tsv, red_label_sound_table_timeline_for_table,
+        red_label_sound_thrust_command_sequence_fixture_check_tsv, red_label_switch_table,
+        red_label_terrain_data_table, red_label_trace_power_up_ram_fill_target, screen_offset,
+        sign_extend_u8_to_u16, star_output_next_x, star_table_from_rand_values,
+        text_position_from_top_left,
     };
 
     const CRTAB_BYTES: [u8; 16] = [
@@ -18518,7 +26092,7 @@ mod tests {
         }
     }
 
-    fn expected_bgout_default() -> RedLabelTerrainOutput {
+    fn expected_bgout_default(stack_pointer_saved: u16) -> RedLabelTerrainOutput {
         RedLabelTerrainOutput {
             background_left: 0,
             previous_generation_left: 0xFFF0,
@@ -18530,7 +26104,7 @@ mod tests {
             screen_table_end: 0xBF50,
             screen_entries: 0x98,
             first_screen_address: 0x98DE,
-            stack_pointer_saved: 0x1234,
+            stack_pointer_saved,
         }
     }
 
@@ -18797,12 +26371,64 @@ mod tests {
         }
     }
 
+    fn assert_message_glyph_first_column(
+        machine: &ArcadeMachine,
+        screen_address: u16,
+        character: char,
+    ) {
+        let glyph = red_label_message_glyph(character).expect("message glyph");
+        assert_eq!(
+            machine.red_label_ram_range(screen_address..screen_address + u16::from(glyph.height)),
+            Some(&glyph.bytes[..usize::from(glyph.height)]),
+            "glyph `{character}` first column at 0x{screen_address:04X} did not match"
+        );
+    }
+
+    fn assert_score_digit_first_column(machine: &ArcadeMachine, screen_address: u16, digit: u8) {
+        let image = red_label_score_digit_image(digit).expect("score digit");
+        assert_eq!(
+            machine.red_label_ram_range(screen_address..screen_address + u16::from(image.height)),
+            Some(&image.bytes[..usize::from(image.height)]),
+            "score digit `{digit}` first column at 0x{screen_address:04X} did not match"
+        );
+    }
+
     fn seed_thrust_table(machine: &mut ArcadeMachine) {
         let rand_values: Vec<u8> = (0x10..=0x30).collect();
         machine
             .memory
             .initialize_thrust_table_from_rand_values(&rand_values)
             .expect("THINIT");
+    }
+
+    fn seed_whole_defender_descriptor(machine: &mut ArcadeMachine) {
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR,
+                u16::from_be_bytes([
+                    RED_LABEL_ATTRACT_DEFENDER_WHOLE_WIDTH,
+                    RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT,
+                ]),
+            )
+            .expect("write DEFDSC size");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR + 2,
+                RED_LABEL_ATTRACT_DEFENDER_DATA,
+            )
+            .expect("write DEFDSC data pointer");
+        for (offset, byte) in expanded_defender_logo_image().into_iter().enumerate() {
+            machine
+                .memory
+                .write_byte(
+                    RED_LABEL_ATTRACT_DEFENDER_DATA
+                        + u16::try_from(offset).expect("DEFBLK offset fits"),
+                    byte,
+                )
+                .expect("write DEFBLK byte");
+        }
     }
 
     fn write_forward_thrust_footprint(machine: &mut ArcadeMachine, screen_address: u16, value: u8) {
@@ -18864,6 +26490,135 @@ mod tests {
         }
     }
 
+    fn seed_hof_initials(
+        machine: &mut ArcadeMachine,
+        initials: [u8; RED_LABEL_INITIALS_ENTRY_CHARS],
+    ) {
+        for (index, initial) in initials.iter().copied().enumerate() {
+            let address = RED_LABEL_HOF_INITS_RAM
+                + u16::try_from(index * 2).expect("initial index should fit in u16");
+            machine
+                .memory
+                .write_byte(address, initial)
+                .expect("write HOF initial");
+            machine
+                .memory
+                .write_byte(address + 1, b'/')
+                .expect("write HOF initial terminator");
+        }
+    }
+
+    fn seed_hof_up_down_input(machine: &mut ArcadeMachine, pia21: u8, pia31: u8) {
+        machine
+            .memory
+            .write_byte(0xA07B, pia21)
+            .expect("write source PIA21 input");
+        machine
+            .memory
+            .write_byte(0xA07D, pia31)
+            .expect("write source PIA31 input");
+    }
+
+    fn high_score_player_score_pointer(player_index: u16) -> u16 {
+        let layout = red_label_ram_layout().expect("RAM layout");
+        ram_field(&layout, "player", "PSCOR")
+            .expect("player PSCOR field")
+            .field_range_for_entry(player_index)
+            .expect("player score range")
+            .start
+    }
+
+    fn seed_hall6_submission(
+        machine: &mut ArcadeMachine,
+        player: u8,
+        score: u32,
+        initials: [u8; RED_LABEL_INITIALS_ENTRY_CHARS],
+        entry_flag: u8,
+    ) -> u16 {
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let player_index = u16::from(player - 1);
+        machine
+            .memory
+            .write_player_score_value(&layout, player_index, score)
+            .expect("seed player score");
+        let score_pointer = high_score_player_score_pointer(player_index);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM, player)
+            .expect("seed PNUMB");
+        machine
+            .memory
+            .write_word(RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM, score_pointer)
+            .expect("seed PSCORE");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_ENTRY_FLAG_RAM, entry_flag)
+            .expect("seed ENTFLG");
+        seed_hof_initials(machine, initials);
+        score_pointer
+    }
+
+    fn seed_high_score_table(
+        machine: &mut ArcadeMachine,
+        table: super::RuntimeHighScoreTable,
+        top_score: u32,
+    ) {
+        for index in 0..RED_LABEL_HIGH_SCORE_ENTRIES {
+            machine
+                .memory
+                .write_high_score_entry(
+                    table,
+                    index,
+                    super::RuntimeHighScoreEntry {
+                        score: top_score.saturating_sub(
+                            u32::try_from(index).expect("index should fit in u32") * 100,
+                        ),
+                        initials: [b'A', b'A', b'A'],
+                    },
+                )
+                .expect("seed high-score table");
+        }
+    }
+
+    fn make_live_game_over_sleeping_process(machine: &mut ArcadeMachine, score: u32) -> u16 {
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::Playing;
+        machine.restore(snapshot);
+        let layout = red_label_ram_layout().expect("RAM layout");
+        machine
+            .memory
+            .write_player_score_value(&layout, 0, score)
+            .expect("seed player-one score");
+        machine.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        machine.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1C9, 0).expect("clear PLAS");
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("PDTH5R").expect("PDTH5R address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PDTH5R process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch PDTH5R")
+            .expect("scheduled PDTH5R");
+
+        assert!(matches!(
+            dispatch,
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::GameOverSleeping { .. })
+        ));
+        assert_eq!(machine.snapshot().phase, GamePhase::GameOver);
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xDB, 0x48, 40][..])
+        );
+        process
+    }
+
     fn scanner_object_screen_address_for_test(x16: u16, y16: u16, scan_left: u16) -> u16 {
         let x_byte = x16.wrapping_sub(scan_left).to_be_bytes()[0] >> 2;
         let y_byte = y16.to_be_bytes()[0] >> 3;
@@ -18890,6 +26645,32 @@ mod tests {
     }
 
     #[test]
+    fn sinit_trace_clear_rejects_targets_outside_observed_ram_window() {
+        let mut machine = ArcadeMachine::new();
+
+        let error = machine
+            .memory
+            .clear_trace_sinit_ram_to(0x9BFF)
+            .expect_err("target below SINIT clear window");
+
+        assert!(error.contains("red-label SINIT clear target 0x9BFF"));
+        assert!(error.contains("outside 0x9C00..0xC000"));
+    }
+
+    #[test]
+    fn trace_sound_synchronized_events_ignore_unmapped_sound_commands() {
+        let machine = ArcadeMachine::new_cold_boot_trace();
+        let mut events = Vec::new();
+
+        machine.push_trace_sound_synchronized_events(
+            &[SoundCommand::from_main_board_pia_port_b(0x00)],
+            &mut events,
+        );
+
+        assert!(events.is_empty());
+    }
+
+    #[test]
     fn machine_starts_in_attract_mode_with_red_label_defaults() {
         let machine = ArcadeMachine::new();
         let snapshot = machine.snapshot();
@@ -18898,6 +26679,14 @@ mod tests {
         assert_eq!(snapshot.player.lives, 3);
         assert_eq!(snapshot.player.smart_bombs, 3);
         assert_eq!(snapshot.wave_profile.landers, 15);
+        assert_eq!(
+            machine.red_label_ram_range(0xA08F..0xA092),
+            Some(&[0x7E, 0xDF, 0x17][..])
+        );
+        assert_eq!(
+            machine.memory.live_irq_mode().expect("default IRQ hook"),
+            RedLabelIrqMode::Normal
+        );
     }
 
     #[test]
@@ -18918,6 +26707,39 @@ mod tests {
         assert_eq!(snapshot.scores.high_score, 987_654);
         assert_eq!(snapshot.player.lives, 3);
         assert_eq!(snapshot.player.smart_bombs, 3);
+    }
+
+    #[test]
+    fn live_attract_idle_starts_source_attr_and_advances_williams_page() {
+        let mut machine = ArcadeMachine::new();
+
+        let first = machine.step(CabinetInput::NONE);
+
+        assert_eq!(first.snapshot.phase, GamePhase::Attract);
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[
+                    red_label_routine_address("LOGO0").expect("LOGO0 address")
+                ])
+                .expect("query LOGO0 process")
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[0xFB][..])
+        );
+
+        let second = machine.step(CabinetInput::NONE);
+
+        assert_eq!(second.snapshot.phase, GamePhase::Attract);
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[
+                    red_label_routine_address("LOGO0").expect("LOGO0 address")
+                ])
+                .expect("query sleeping LOGO0 process")
+        );
     }
 
     #[test]
@@ -18991,6 +26813,16 @@ mod tests {
             ],
             [0x05, 0x00, 0x00, b'A', b'C', b'E']
         );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, 'H');
+        assert_score_digit_first_column(&machine, RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN, 1);
+        assert_message_glyph_first_column(&machine, 0x1D86, 'A');
+        assert_score_digit_first_column(&machine, 0x2D86, 5);
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[RED_LABEL_HALL_OF_FAME_STALL_TICKS][..])
+        );
         let submitted_events = submitted.events().collect::<Vec<_>>();
         assert_eq!(
             submitted_events,
@@ -19001,6 +26833,4125 @@ mod tests {
                 MachineEvent::HighScoreSubmitted,
             ]
         );
+    }
+
+    #[test]
+    fn high_score_entry_renders_source_hall_of_fame_initials_screen() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = 50_000;
+        machine.restore(snapshot);
+
+        let output = machine.step_with_typed_chars(CabinetInput::NONE, &['q']);
+
+        assert_eq!(output.snapshot.phase, GamePhase::HighScoreEntry);
+        assert_eq!(
+            machine.red_label_ram_range(RED_LABEL_HOF_INITS_RAM..RED_LABEL_HOF_INITS_RAM + 6),
+            Some(&[b'Q', b'/', b' ', b'/', b' ', b'/'][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_NUMBER_RAM..RED_LABEL_HOF_PLAYER_NUMBER_RAM + 1
+            ),
+            Some(&[1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_INIT_INDEX_RAM..RED_LABEL_HOF_INIT_INDEX_RAM + 1
+            ),
+            Some(&[1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA027..0xA028),
+            Some(&[RED_LABEL_HOF_LETTER_COLOR][..])
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HOF_PLAYER_LABEL_SCREEN, 'P');
+        assert_message_glyph_first_column(&machine, RED_LABEL_HOF_INSTRUCTIONS_TOP_LEFT, 'Y');
+        assert_message_glyph_first_column(
+            &machine,
+            text_position_from_top_left(RED_LABEL_HOF_INSTRUCTIONS_TOP_LEFT, 0, 0x0A),
+            'T',
+        );
+        assert_message_glyph_first_column(
+            &machine,
+            text_position_from_top_left(RED_LABEL_HOF_INSTRUCTIONS_TOP_LEFT, 0, 0x1E),
+            'S',
+        );
+        assert_message_glyph_first_column(
+            &machine,
+            text_position_from_top_left(RED_LABEL_HOF_INSTRUCTIONS_TOP_LEFT, 0, 0x32),
+            'P',
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HOF_INITIALS_SCREEN, 'Q');
+        assert_eq!(
+            machine.red_label_ram_range(0x46B7..0x46B9),
+            Some(&RED_LABEL_HOF_UNDERLINE_NORMAL.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x4EB7..0x4EB9),
+            Some(&RED_LABEL_HOF_UNDERLINE_ACTIVE.to_be_bytes()[..])
+        );
+        let visible = machine
+            .red_label_visible_rgba_image()
+            .expect("visible native frame");
+        assert!(
+            visible
+                .pixels
+                .chunks_exact(4)
+                .any(|pixel| pixel[3] != 0 && [pixel[0], pixel[1], pixel[2]] != [0, 0, 0])
+        );
+    }
+
+    #[test]
+    fn hall_of_fame_display_renders_source_table_screen_and_logo() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("ram layout");
+        start_one_player_game_for_test(&mut machine);
+        machine
+            .memory
+            .write_player_score_value(&layout, 0, 12_345)
+            .expect("seed player-one score");
+        machine
+            .memory
+            .write_high_score_entry(
+                super::RuntimeHighScoreTable::TodaysGreatest,
+                0,
+                super::RuntimeHighScoreEntry {
+                    score: 5_000,
+                    initials: [b'A', b'C', b'E'],
+                },
+            )
+            .expect("seed today's table");
+        machine
+            .memory
+            .write_high_score_entry(
+                super::RuntimeHighScoreTable::AllTime,
+                0,
+                super::RuntimeHighScoreEntry {
+                    score: 987_654,
+                    initials: [b'Z', b'E', b'D'],
+                },
+            )
+            .expect("seed all-time table");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_RESET_FLAG_RAM, 0x7E)
+            .expect("dirty HSRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, 0)
+            .expect("clear STALT");
+
+        let display = machine
+            .memory
+            .write_hall_of_fame_display()
+            .expect("HALDIS display");
+
+        assert_eq!(
+            display.screen_clear,
+            RedLabelScreenClear {
+                start: 0,
+                end: RED_LABEL_SCREEN_CLEAR_END,
+                bytes_cleared: RED_LABEL_SCREEN_CLEAR_END,
+            }
+        );
+        assert_eq!(display.high_score_reset_flag_address, 0xA162);
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_RESET_FLAG_RAM..RED_LABEL_HOF_RESET_FLAG_RAM + 1
+            ),
+            Some(&[0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                display.black_letters_address..display.black_letters_address + 1
+            ),
+            Some(&[0][..])
+        );
+        assert_eq!(display.score_transfers.len(), 1);
+        assert_eq!(
+            display.score_transfers[0].display_address,
+            RED_LABEL_P1_SCORE_DISPLAY
+        );
+        assert_eq!(
+            display.headings[0],
+            RedLabelBonusTextCall {
+                vector_address: 0xC101,
+                screen_address: RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN,
+            }
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, 'H');
+        assert_message_glyph_first_column(&machine, RED_LABEL_HALL_OF_FAME_TODAYS_SCREEN, 'T');
+        assert_message_glyph_first_column(&machine, RED_LABEL_HALL_OF_FAME_ALL_TIME_SCREEN, 'A');
+        assert_message_glyph_first_column(
+            &machine,
+            RED_LABEL_HALL_OF_FAME_LEFT_GREATEST_SCREEN,
+            'G',
+        );
+        assert_message_glyph_first_column(
+            &machine,
+            RED_LABEL_HALL_OF_FAME_RIGHT_GREATEST_SCREEN,
+            'G',
+        );
+        assert_eq!(display.underline_words.first().copied(), Some(0x7D7B));
+        assert_eq!(display.underline_words.last().copied(), Some(0x1E7B));
+        assert_eq!(
+            machine.red_label_ram_range(0x7D7B..0x7D7D),
+            Some(&RED_LABEL_HOF_UNDERLINE_NORMAL.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x1E7B..0x1E7D),
+            Some(&RED_LABEL_HOF_UNDERLINE_NORMAL.to_be_bytes()[..])
+        );
+
+        let today = display.todays_table.rows[0];
+        assert_eq!(
+            display.todays_table.table,
+            RedLabelHighScoreTableKind::TodaysGreatest
+        );
+        assert_eq!(
+            display.todays_table.rows.len(),
+            RED_LABEL_HIGH_SCORE_ENTRIES
+        );
+        assert_eq!(today.rank, 1);
+        assert_eq!(
+            today.rank_address,
+            RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN
+        );
+        assert_eq!(today.initials_address, 0x1D86);
+        assert_eq!(today.score_address, 0x2B86);
+        assert_eq!(today.score_chars, *b"  5000");
+        assert_eq!(today.entry.initials, [b'A', b'C', b'E']);
+        assert_score_digit_first_column(&machine, today.rank_address, 1);
+        assert_message_glyph_first_column(&machine, today.initials_address, 'A');
+        assert_score_digit_first_column(&machine, 0x2F86, 5);
+
+        let all_time = display.all_time_table.rows[0];
+        assert_eq!(
+            display.all_time_table.table,
+            RedLabelHighScoreTableKind::AllTime
+        );
+        assert_eq!(
+            display.all_time_table.rows.len(),
+            RED_LABEL_HIGH_SCORE_ENTRIES
+        );
+        assert_eq!(
+            all_time.rank_address,
+            RED_LABEL_HALL_OF_FAME_ALL_TIME_TABLE_SCREEN
+        );
+        assert_eq!(all_time.initials_address, 0x5E86);
+        assert_eq!(all_time.score_address, 0x6C86);
+        assert_eq!(all_time.score_chars, *b"987654");
+        assert_eq!(all_time.entry.initials, [b'Z', b'E', b'D']);
+        assert_message_glyph_first_column(&machine, all_time.initials_address, 'Z');
+        assert_score_digit_first_column(&machine, all_time.score_address, 9);
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_NUMBER_RAM..RED_LABEL_HOF_PLAYER_NUMBER_RAM + 2
+            ),
+            Some(&[b'8', b'/'][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_TABLE_INITIALS_RAM..RED_LABEL_HOF_TABLE_INITIALS_RAM + 4
+            ),
+            Some(&[b'T', b'M', b'H', b'/'][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_TABLE_SCORE_RAM..RED_LABEL_HOF_TABLE_SCORE_RAM + 7
+            ),
+            Some(&[b' ', b' ', b'6', b'0', b'1', b'0', b'/'][..])
+        );
+
+        assert_eq!(display.logo_color_address, 0xA032);
+        assert_eq!(
+            machine.red_label_ram_range(display.logo_color_address..display.logo_color_address + 1),
+            Some(&[RED_LABEL_HALL_OF_FAME_LOGO_COLOR][..])
+        );
+        assert_eq!(
+            display.logo,
+            RedLabelPictureWrite {
+                screen_address: RED_LABEL_HALL_OF_FAME_LOGO_SCREEN,
+                picture_address: RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM,
+                width: RED_LABEL_HALL_OF_FAME_LOGO_WIDTH,
+                height: RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT,
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HALL_OF_FAME_LOGO_DESCRIPTOR..RED_LABEL_HALL_OF_FAME_LOGO_DESCRIPTOR + 4
+            ),
+            Some(&[0x3C, 0x18, 0xB4, 0x12][..])
+        );
+        let logo = expanded_defender_logo_image();
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM..RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM + 8
+            ),
+            Some(&logo[..8])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HALL_OF_FAME_LOGO_SCREEN..RED_LABEL_HALL_OF_FAME_LOGO_SCREEN + 8
+            ),
+            Some(&logo[..8])
+        );
+        assert!(logo.contains(&0xCC));
+        assert!(logo.contains(&0x22));
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[RED_LABEL_HALL_OF_FAME_STALL_TICKS][..])
+        );
+        machine
+            .red_label_copy_color_mapping_to_palette_ram()
+            .expect("copy PCRAM to palette RAM");
+        let visible = machine
+            .red_label_visible_rgba_image()
+            .expect("render native hall of fame frame");
+        assert_eq!(crc32(&visible.pixels), 0x5FA8_8AB7);
+    }
+
+    #[test]
+    fn hall13_current_process_renders_hall_of_fame_and_enters_wait_gate() {
+        let mut machine = ArcadeMachine::new();
+        let extra_process_address = red_label_routine_address("COLR").expect("COLR address");
+        machine
+            .red_label_make_process(extra_process_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make excess attract process");
+        let coin_process_address = red_label_routine_address("LCOIN").expect("LCOIN address");
+        machine
+            .red_label_make_process(coin_process_address, RED_LABEL_COIN_PROCESS_TYPE)
+            .expect("make source-exempt coin process");
+        let hall13_address = red_label_routine_address("HALL13").expect("HALL13 address");
+        let hald3_address = red_label_routine_address("HALD3").expect("HALD3 address");
+        let creds_address = red_label_routine_address("CREDS").expect("CREDS address");
+        let process_address = machine
+            .red_label_make_process(hall13_address, RED_LABEL_ATTRACT_PROCESS_TYPE)
+            .expect("make HALL13 process")
+            .process_address;
+        let scheduled = machine
+            .step_red_label_process_scheduler()
+            .expect("schedule HALL13 process")
+            .expect("HALL13 process due");
+
+        assert_eq!(
+            scheduled,
+            RedLabelScheduledProcess {
+                process_address,
+                routine_address: hall13_address,
+            }
+        );
+
+        let display = machine
+            .red_label_display_hall_of_fame_from_current_process()
+            .expect("display HALL13");
+
+        assert_eq!(
+            display,
+            RedLabelPlayerDeath::HallOfFameDisplayed {
+                process_address,
+                stall_ticks: RED_LABEL_HALL_OF_FAME_STALL_TICKS,
+            }
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, 'H');
+        assert_score_digit_first_column(&machine, RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN, 1);
+        assert!(
+            !machine
+                .memory
+                .active_process_has_routine(&[hall13_address])
+                .expect("query HALL13 process")
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[
+                    coin_process_address,
+                    hald3_address,
+                    extra_process_address,
+                    creds_address
+                ])
+                .expect("query source follow-on processes")
+        );
+    }
+
+    #[test]
+    fn attract_creds_process_displays_new_credit_and_reschedules() {
+        let mut machine = ArcadeMachine::new();
+        let creds_address = red_label_routine_address("CREDS").expect("CREDS address");
+        let process_address = machine
+            .red_label_make_process(creds_address, RED_LABEL_ATTRACT_PROCESS_TYPE)
+            .expect("make CREDS process")
+            .process_address;
+        machine
+            .memory
+            .write_byte(0xA037, 0x12)
+            .expect("set BCD credits");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM, 0x09)
+            .expect("set old credits");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0xFF)
+            .expect("set credit increase flag");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch CREDS")
+            .expect("scheduled CREDS");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractCredits(RedLabelAttractCredits {
+                process_address,
+                credit: 0x12,
+                old_credit_before: 0x09,
+                old_credit_after: 0x12,
+                credit_increase_flag_before: 0xFF,
+                credit_increase_flag_after: 0x00,
+                text: Some(RedLabelAttractCreditsText {
+                    message_vector_address: 0xC0E9,
+                    message_screen_address: RED_LABEL_ATTRACT_CREDITS_SCREEN,
+                    number_screen_address: RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN,
+                    displayed_credit_bcd: 0x12,
+                }),
+                sleep_ticks: RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS,
+                wakeup_address: creds_address,
+            })
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_ATTRACT_CREDITS_SCREEN, 'C');
+        assert_score_digit_first_column(&machine, RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN, 1);
+        assert_score_digit_first_column(&machine, 0x4CE5, 2);
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_OLD_CREDIT_RAM..RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM + 1
+            ),
+            Some(&[0x12, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    creds_address.to_be_bytes()[0],
+                    creds_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn attract_creds_process_sleeps_without_display_when_credit_is_zero() {
+        let mut machine = ArcadeMachine::new();
+        let creds_address = red_label_routine_address("CREDS").expect("CREDS address");
+        let process_address = machine
+            .red_label_make_process(creds_address, RED_LABEL_ATTRACT_PROCESS_TYPE)
+            .expect("make CREDS process")
+            .process_address;
+        machine
+            .memory
+            .write_byte(0xA037, 0x00)
+            .expect("clear BCD credits");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM, 0x34)
+            .expect("set old credits");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0x56)
+            .expect("set credit increase flag");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDITS_SCREEN, 0xEE)
+            .expect("dirty credits label");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN, 0xDD)
+            .expect("dirty credit number");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch CREDS")
+            .expect("scheduled CREDS");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractCredits(RedLabelAttractCredits {
+                process_address,
+                credit: 0x00,
+                old_credit_before: 0x34,
+                old_credit_after: 0x34,
+                credit_increase_flag_before: 0x56,
+                credit_increase_flag_after: 0x56,
+                text: None,
+                sleep_ticks: RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS,
+                wakeup_address: creds_address,
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_OLD_CREDIT_RAM..RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM + 1
+            ),
+            Some(&[0x34, 0x56][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_CREDITS_SCREEN..RED_LABEL_ATTRACT_CREDITS_SCREEN + 1
+            ),
+            Some(&[0xEE][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN..RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN + 1
+            ),
+            Some(&[0xDD][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    creds_address.to_be_bytes()[0],
+                    creds_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn amodes_current_process_prepares_williams_page_and_hands_to_logo() {
+        let mut machine = ArcadeMachine::new();
+        let extra_process = machine
+            .red_label_make_process(0x2222, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make process killed by GNCIDE")
+            .process_address;
+        let coin_process = machine
+            .red_label_make_process(
+                red_label_routine_address("LCOIN").expect("LCOIN address"),
+                RED_LABEL_COIN_PROCESS_TYPE,
+            )
+            .expect("make coin process preserved by GNCIDE")
+            .process_address;
+        let amodes_address = red_label_routine_address("AMODES").expect("AMODES address");
+        let logo_address = red_label_routine_address("LOGO").expect("LOGO address");
+        let process_address = machine
+            .red_label_make_process(amodes_address, RED_LABEL_ATTRACT_PROCESS_TYPE)
+            .expect("make AMODES process")
+            .process_address;
+        machine
+            .memory
+            .write_byte(0x4000, 0xEE)
+            .expect("dirty video");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0xA5)
+            .expect("dirty ICREDF");
+        machine
+            .memory
+            .write_byte(0xA0BA, 0x12)
+            .expect("dirty STATUS");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_MESSAGE_POINTER_RAM, 0xBBCC)
+            .expect("dirty MESPT");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_NUMBER_RAM, 0x1234)
+            .expect("dirty NUMBER");
+        machine
+            .memory
+            .write_byte(0xA032, 0)
+            .expect("dirty PCRAM+12");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODES")
+            .expect("scheduled AMODES");
+        let page = match dispatch {
+            RedLabelProcessDispatch::AttractWilliamsPage(page) => page,
+            other => panic!("expected AMODES dispatch, got {other:?}"),
+        };
+
+        assert_eq!(
+            page.genocide,
+            RedLabelGenocide {
+                current_process_address: process_address,
+                killed_processes: vec![RedLabelKilledProcess {
+                    killed_process_address: extra_process,
+                    previous_link_address: coin_process,
+                }],
+            }
+        );
+        assert_eq!(page.process_address, process_address);
+        assert_eq!(page.status, RED_LABEL_ATTRACT_WILLIAMS_STATUS);
+        assert_eq!(page.screen_clear, screen_clear());
+        assert_eq!(
+            page.message_pointer_high_address,
+            RED_LABEL_ATTRACT_MESSAGE_POINTER_RAM
+        );
+        assert_eq!(page.number_address, RED_LABEL_ATTRACT_NUMBER_RAM);
+        assert_eq!(page.logo_color_address, 0xA032);
+        assert_eq!(page.logo_color, RED_LABEL_ATTRACT_WILLIAMS_LOGO_COLOR);
+        assert_eq!(page.logo_address, logo_address);
+        assert_eq!(page.support_processes.len(), 2);
+        assert_eq!(
+            page.support_processes[0],
+            RedLabelCreatedProcess {
+                process_address: extra_process,
+                routine_address: red_label_routine_address("COLR").expect("COLR address"),
+                process_type: RED_LABEL_SYSTEM_PROCESS_TYPE,
+                class: RedLabelProcessClass::Regular,
+            }
+        );
+        assert_eq!(
+            page.support_processes[1].routine_address,
+            red_label_routine_address("TIECOL").expect("TIECOL address")
+        );
+        assert_eq!(
+            page.support_processes[1].process_type,
+            RED_LABEL_SYSTEM_PROCESS_TYPE
+        );
+        assert_eq!(
+            page.support_processes[1].class,
+            RedLabelProcessClass::Regular
+        );
+        assert_eq!(machine.red_label_ram_range(0x4000..0x4001), Some(&[0][..]));
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM
+                    ..RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM + 1
+            ),
+            Some(&[0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[0xFB][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_MESSAGE_POINTER_RAM..RED_LABEL_ATTRACT_MESSAGE_POINTER_RAM + 2
+            ),
+            Some(&[0x00, 0xCC][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_NUMBER_RAM..RED_LABEL_ATTRACT_NUMBER_RAM + 2
+            ),
+            Some(&[0xFF, 0xFF][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA032..0xA033),
+            Some(&[0x3F][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 4),
+            Some(&logo_address.to_be_bytes()[..])
+        );
+        for label in ["LCOIN", "COLR", "TIECOL"] {
+            assert!(
+                machine
+                    .memory
+                    .active_process_has_routine(&[
+                        red_label_routine_address(label).expect("routine address")
+                    ])
+                    .expect("query support processes"),
+                "{label} should remain active after AMODES"
+            );
+        }
+    }
+
+    #[test]
+    fn attract_logo_entry_expands_defender_data_and_sleeps_after_first_source_slice() {
+        let mut machine = ArcadeMachine::new();
+        let logo_address = red_label_routine_address("LOGO").expect("LOGO address");
+        let logo0_address = red_label_routine_address("LOGO0").expect("LOGO0 address");
+        let process_address = machine
+            .red_label_make_process(logo_address, RED_LABEL_ATTRACT_PROCESS_TYPE)
+            .expect("make LOGO process")
+            .process_address;
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_LOGO_CURSOR_RAM, 0x2222)
+            .expect("dirty cursor");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch LOGO")
+            .expect("scheduled LOGO");
+        let logo = match dispatch {
+            RedLabelProcessDispatch::AttractLogo(logo) => logo,
+            other => panic!("expected LOGO dispatch, got {other:?}"),
+        };
+
+        assert_eq!(logo.process_address, process_address);
+        assert!(logo.initialized);
+        assert_eq!(
+            logo.defender_logo_ram_crc32,
+            Some(crc32(&expanded_defender_logo_image()))
+        );
+        assert_eq!(
+            logo.table_pointer_before,
+            RED_LABEL_ATTRACT_LOGO_TABLE_ADDRESS
+        );
+        assert_eq!(
+            logo.table_pointer_after,
+            RED_LABEL_ATTRACT_LOGO_TABLE_ADDRESS + 5
+        );
+        assert_eq!(logo.cursor_before, 0x2222);
+        assert_eq!(logo.cursor_after, 0x7444);
+        assert_eq!(
+            logo.bytes_per_slice,
+            RED_LABEL_ATTRACT_LOGO_INITIAL_BYTES_PER_SLICE
+        );
+        assert_eq!(logo.table_operations, 3);
+        assert_eq!(logo.sleep_ticks, RED_LABEL_ATTRACT_LOGO_SLEEP_TICKS);
+        assert_eq!(logo.wakeup_address, logo0_address);
+        assert!(!logo.first_pass_completed);
+        assert_eq!(logo.presents_process, None);
+        assert_eq!(logo.pixel_writes.len(), 5);
+        assert_eq!(
+            logo.pixel_writes[0],
+            super::RedLabelAttractLogoPixel {
+                cursor: 0x7440,
+                screen_address: 0x3A40,
+                pixel_mask: 0xF0,
+                byte_before: 0,
+                byte_after: 0xF0,
+            }
+        );
+        assert_eq!(logo.pixel_writes[4].cursor, 0x7444);
+        assert_eq!(
+            attract_logo_screen_address(logo.pixel_writes[4].cursor),
+            (
+                logo.pixel_writes[4].screen_address,
+                logo.pixel_writes[4].pixel_mask
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM..RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM + 8
+            ),
+            Some(&expanded_defender_logo_image()[..8])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    logo0_address.to_be_bytes()[0],
+                    logo0_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_LOGO_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn attract_williams_page_first_logo_slice_has_native_frame_checksum() {
+        let mut machine = ArcadeMachine::new();
+        let amodes_address = red_label_routine_address("AMODES").expect("AMODES address");
+        let logo_address = red_label_routine_address("LOGO").expect("LOGO address");
+        machine
+            .red_label_make_process(amodes_address, RED_LABEL_ATTRACT_PROCESS_TYPE)
+            .expect("make AMODES process");
+        let page_dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODES")
+            .expect("scheduled AMODES");
+        assert!(matches!(
+            page_dispatch,
+            RedLabelProcessDispatch::AttractWilliamsPage(_)
+        ));
+
+        let logo_dispatch = machine
+            .memory
+            .dispatch_translated_process_routine(logo_address)
+            .expect("dispatch LOGO");
+        assert!(matches!(
+            logo_dispatch,
+            RedLabelProcessDispatch::AttractLogo(RedLabelAttractLogo {
+                initialized: true,
+                ..
+            })
+        ));
+        machine
+            .red_label_copy_color_mapping_to_palette_ram()
+            .expect("copy PCRAM to palette RAM");
+        let visible_nibbles = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("render native attract logo pixel-nibble frame");
+        assert!(visible_nibbles.iter().any(|nibble| *nibble != 0));
+        assert_eq!(crc32(&visible_nibbles), 0xB08F_FE8A);
+        let visible = machine
+            .red_label_visible_rgba_image()
+            .expect("render native attract logo frame");
+
+        assert_eq!(crc32(&visible.pixels), 0x926E_A52A);
+    }
+
+    #[test]
+    fn attract_logo_first_pass_switches_to_fast_rate_and_starts_presents() {
+        let mut machine = ArcadeMachine::new();
+        let logo_address = red_label_routine_address("LOGO").expect("LOGO address");
+        let logo0_address = red_label_routine_address("LOGO0").expect("LOGO0 address");
+        let pres_address = red_label_routine_address("PRES").expect("PRES address");
+        machine
+            .red_label_make_process(logo_address, RED_LABEL_ATTRACT_PROCESS_TYPE)
+            .expect("make LOGO process");
+        let first_dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch LOGO")
+            .expect("scheduled LOGO");
+        assert!(matches!(
+            first_dispatch,
+            RedLabelProcessDispatch::AttractLogo(RedLabelAttractLogo {
+                initialized: true,
+                ..
+            })
+        ));
+
+        let mut completed = None;
+        for _ in 0..150 {
+            let dispatch = machine
+                .memory
+                .dispatch_translated_process_routine(logo0_address)
+                .expect("dispatch LOGO0");
+            let RedLabelProcessDispatch::AttractLogo(logo) = dispatch else {
+                panic!("expected LOGO0 dispatch");
+            };
+            if logo.first_pass_completed {
+                completed = Some(logo);
+                break;
+            }
+        }
+        let completed = completed.expect("LOGO first pass should complete");
+
+        assert!(!completed.initialized);
+        assert_eq!(completed.defender_logo_ram_crc32, None);
+        assert_eq!(
+            completed.bytes_per_slice,
+            RED_LABEL_ATTRACT_LOGO_FAST_BYTES_PER_SLICE
+        );
+        assert!(completed.table_pointer_after > RED_LABEL_ATTRACT_LOGO_TABLE_ADDRESS);
+        assert!(
+            completed.pixel_writes.len()
+                >= usize::from(RED_LABEL_ATTRACT_LOGO_FAST_BYTES_PER_SLICE)
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_LOGO_FLAG_RAM..RED_LABEL_ATTRACT_LOGO_FLAG_RAM + 1
+            ),
+            Some(&[RED_LABEL_ATTRACT_LOGO_FAST_BYTES_PER_SLICE][..])
+        );
+        assert_eq!(
+            completed
+                .presents_process
+                .expect("PRES should be created after slow LOGO pass")
+                .routine_address,
+            pres_address
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[pres_address])
+                .expect("query PRES process")
+        );
+    }
+
+    #[test]
+    fn attract_logo_table_helper_handles_nulls_and_rejects_invalid_progress() {
+        let mut machine = ArcadeMachine::new();
+        let logo0_address = red_label_routine_address("LOGO0").expect("LOGO0 address");
+        machine
+            .red_label_make_process(logo0_address, RED_LABEL_ATTRACT_PROCESS_TYPE)
+            .expect("make LOGO0 process");
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule LOGO0")
+            .expect("scheduled LOGO0");
+        let table_base = 0xD100;
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_LOGO_FLAG_RAM, 1)
+            .expect("set one table byte per slice");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_LOGO_POINTER_RAM, table_base)
+            .expect("set fake table pointer");
+
+        let logo = machine
+            .memory
+            .step_attract_logo_table_current_process_with_table(
+                false,
+                None,
+                table_base,
+                &[0xFF, 0xFE, 0x10, 0x20],
+            )
+            .expect("LOGO0 null then hyper");
+
+        assert_eq!(logo.table_operations, 1);
+        assert_eq!(logo.table_pointer_after, table_base + 4);
+        assert_eq!(logo.pixel_writes.len(), 1);
+        assert_eq!(logo.pixel_writes[0].cursor, 0x1020);
+        assert_eq!(logo.pixel_writes[0].screen_address, 0x0820);
+        assert_eq!(logo.pixel_writes[0].pixel_mask, 0xF0);
+
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_LOGO_FLAG_RAM, 1)
+            .expect("reset one table byte per slice");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_LOGO_POINTER_RAM, table_base - 1)
+            .expect("set invalid table pointer");
+        let error = machine
+            .memory
+            .step_attract_logo_table_current_process_with_table(
+                false,
+                None,
+                table_base,
+                &[0xFE, 0x10, 0x20],
+            )
+            .expect_err("invalid table pointer");
+        assert!(error.contains("red-label LOGO table pointer 0xD0FF is outside"));
+
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_LOGO_FLAG_RAM, 2)
+            .expect("set non-sleeping table count");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_LOGO_POINTER_RAM, table_base)
+            .expect("reset table pointer");
+        let error = machine
+            .memory
+            .step_attract_logo_table_current_process_with_table(false, None, table_base, &[0xFD])
+            .expect_err("quit-only table should not reach sleep");
+        assert!(error.contains("red-label LOGO table walker did not reach a sleep point"));
+    }
+
+    #[test]
+    fn pres_current_process_creates_defend_writes_elecv_and_sleeps() {
+        let mut machine = ArcadeMachine::new();
+        let pres_address = red_label_routine_address("PRES").expect("PRES address");
+        let pres1_address = red_label_routine_address("PRES1").expect("PRES1 address");
+        let defend_address = red_label_routine_address("DEFEND").expect("DEFEND address");
+        let process_address = machine
+            .red_label_make_process(pres_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make PRES process")
+            .process_address;
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN, 0xEE)
+            .expect("dirty ELECV text");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN, 0xDD)
+            .expect("dirty PRESENTS text");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch PRES")
+            .expect("scheduled PRES");
+        let presents = match dispatch {
+            RedLabelProcessDispatch::AttractPresents(presents) => presents,
+            other => panic!("expected PRES dispatch, got {other:?}"),
+        };
+
+        assert_eq!(
+            presents,
+            RedLabelAttractPresents {
+                process_address,
+                defender_process: presents.defender_process,
+                message_vector_address: 0xC0ED,
+                electronics_screen_address: RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+                presents_screen_address: RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN,
+                cursor_after: RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER,
+                sleep_ticks: RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS,
+                wakeup_address: pres1_address,
+            }
+        );
+        let defender_process = presents
+            .defender_process
+            .expect("PRES should create DEFEND");
+        assert_eq!(defender_process.routine_address, defend_address);
+        assert_eq!(defender_process.process_type, RED_LABEL_SYSTEM_PROCESS_TYPE);
+        assert_eq!(defender_process.class, RedLabelProcessClass::Regular);
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[defend_address])
+                .expect("query DEFEND process")
+        );
+        assert_message_glyph_first_column(
+            &machine,
+            RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+            'E',
+        );
+        assert_message_glyph_first_column(&machine, 0x5F58, 'I');
+        assert_message_glyph_first_column(&machine, 0x6A58, '.');
+        assert_message_glyph_first_column(&machine, RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN, 'P');
+        assert_eq!(
+            machine.red_label_ram_range(0xA050..0xA052),
+            Some(&RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    pres1_address.to_be_bytes()[0],
+                    pres1_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn pres1_current_process_refreshes_elecv_without_creating_defend() {
+        let mut machine = ArcadeMachine::new();
+        let pres1_address = red_label_routine_address("PRES1").expect("PRES1 address");
+        let defend_address = red_label_routine_address("DEFEND").expect("DEFEND address");
+        let process_address = machine
+            .red_label_make_process(pres1_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make PRES1 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch PRES1")
+            .expect("scheduled PRES1");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractPresents(RedLabelAttractPresents {
+                process_address,
+                defender_process: None,
+                message_vector_address: 0xC0ED,
+                electronics_screen_address: RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+                presents_screen_address: RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN,
+                cursor_after: RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER,
+                sleep_ticks: RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS,
+                wakeup_address: pres1_address,
+            })
+        );
+        assert!(
+            !machine
+                .memory
+                .active_process_has_routine(&[defend_address])
+                .expect("query DEFEND process")
+        );
+        assert_message_glyph_first_column(
+            &machine,
+            RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+            'E',
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN, 'P');
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    pres1_address.to_be_bytes()[0],
+                    pres1_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn defend_current_process_sleeps_to_defens_before_appearances() {
+        let mut machine = ArcadeMachine::new();
+        let defend_address = red_label_routine_address("DEFEND").expect("DEFEND address");
+        let defens_address = red_label_routine_address("DEFENS").expect("DEFENS address");
+        let process_address = machine
+            .red_label_make_process(defend_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make DEFEND process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch DEFEND")
+            .expect("scheduled DEFEND");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractDefenderDelay(RedLabelAttractDefenderDelay {
+                process_address,
+                sleep_ticks: RED_LABEL_ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS,
+                wakeup_address: defens_address,
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    defens_address.to_be_bytes()[0],
+                    defens_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn defens_current_process_builds_source_descriptors_and_appearance_slots() {
+        let mut machine = ArcadeMachine::new();
+        let defens_address = red_label_routine_address("DEFENS").expect("DEFENS address");
+        let def33_address = red_label_routine_address("DEF33").expect("DEF33 address");
+        let null_picture = red_label_object_picture_address("NULOB").expect("NULOB address");
+        let process_address = machine
+            .red_label_make_process(defens_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make DEFENS process")
+            .process_address;
+        machine.memory.write_byte(0xA0BA, 0xFB).expect("set STATUS");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch DEFENS")
+            .expect("scheduled DEFENS");
+        let appearances = match dispatch {
+            RedLabelProcessDispatch::AttractDefenderAppearances(appearances) => appearances,
+            other => panic!("expected DEFENS dispatch, got {other:?}"),
+        };
+
+        assert_eq!(appearances.process_address, process_address);
+        assert_eq!(
+            appearances.descriptor_pointer_start,
+            RED_LABEL_ATTRACT_DEFENDER_PICTURES
+        );
+        assert_eq!(
+            appearances.data_pointer_start,
+            RED_LABEL_ATTRACT_DEFENDER_DATA
+        );
+        assert_eq!(
+            appearances.object_pointer_start,
+            RED_LABEL_ATTRACT_DEFENDER_OBJECTS
+        );
+        assert_eq!(appearances.bgl, 0);
+        assert_eq!(
+            appearances.initial_x16,
+            RED_LABEL_ATTRACT_DEFENDER_INITIAL_X16
+        );
+        assert_eq!(
+            appearances.objects.len(),
+            usize::from(RED_LABEL_ATTRACT_DEFENDER_OBJECT_COUNT)
+        );
+        assert_eq!(
+            appearances.descriptor_pointer_after,
+            RED_LABEL_ATTRACT_DEFENDER_DATA
+        );
+        assert_eq!(appearances.data_pointer_after, 0xB9B2);
+        assert_eq!(
+            appearances.object_pointer_after,
+            RED_LABEL_ATTRACT_DEFENDER_PICTURES
+        );
+        assert_eq!(appearances.x16_after, 0x1B00);
+        assert_eq!(
+            appearances.sleep_ticks,
+            RED_LABEL_ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS
+        );
+        assert_eq!(appearances.wakeup_address, def33_address);
+
+        let first = appearances.objects[0];
+        assert_eq!(first.index, 0);
+        assert_eq!(first.object_address, RED_LABEL_ATTRACT_DEFENDER_OBJECTS);
+        assert_eq!(
+            first.picture_descriptor_address,
+            RED_LABEL_ATTRACT_DEFENDER_PICTURES
+        );
+        assert_eq!(first.picture_data_address, RED_LABEL_ATTRACT_DEFENDER_DATA);
+        assert_eq!(first.x16, RED_LABEL_ATTRACT_DEFENDER_INITIAL_X16);
+        assert_eq!(first.y16, RED_LABEL_ATTRACT_DEFENDER_Y16);
+        assert_eq!(first.appearance.slot_address, Some(0x9C00));
+        assert_eq!(
+            first.appearance.original_picture_address,
+            RED_LABEL_ATTRACT_DEFENDER_PICTURES
+        );
+        assert_eq!(first.appearance.final_picture_address, null_picture);
+        assert_eq!(
+            first.appearance.relative_x,
+            RED_LABEL_ATTRACT_DEFENDER_INITIAL_X16
+        );
+        assert_eq!(first.appearance.sound_loaded, None);
+
+        let last = appearances.objects[14];
+        assert_eq!(last.index, 14);
+        assert_eq!(
+            last.object_address,
+            RED_LABEL_ATTRACT_DEFENDER_OBJECTS
+                + u16::from(last.index) * RED_LABEL_ATTRACT_DEFENDER_OBJECT_BYTES
+        );
+        assert_eq!(
+            last.picture_descriptor_address,
+            RED_LABEL_ATTRACT_DEFENDER_PICTURES
+                + u16::from(last.index) * RED_LABEL_ATTRACT_DEFENDER_PICTURE_BYTES
+        );
+        assert_eq!(
+            last.picture_data_address,
+            RED_LABEL_ATTRACT_DEFENDER_DATA
+                + u16::from(last.index) * RED_LABEL_ATTRACT_DEFENDER_PICTURE_DATA_STEP
+        );
+        assert_eq!(last.x16, 0x1A00);
+        assert_eq!(last.appearance.slot_address, Some(0x9F80));
+
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_DEFENDER_PICTURES..RED_LABEL_ATTRACT_DEFENDER_PICTURES + 4
+            ),
+            Some(
+                &[
+                    RED_LABEL_ATTRACT_DEFENDER_PICTURE_WIDTH,
+                    RED_LABEL_ATTRACT_DEFENDER_PICTURE_HEIGHT,
+                    RED_LABEL_ATTRACT_DEFENDER_DATA.to_be_bytes()[0],
+                    RED_LABEL_ATTRACT_DEFENDER_DATA.to_be_bytes()[1]
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_DEFENDER_PICTURES + RED_LABEL_ATTRACT_DEFENDER_PICTURE_BYTES
+                    ..RED_LABEL_ATTRACT_DEFENDER_PICTURES
+                        + RED_LABEL_ATTRACT_DEFENDER_PICTURE_BYTES
+                        + 4
+            ),
+            Some(&[0x04, 0x0C, 0xB6, 0x72][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_DEFENDER_OBJECTS
+                    + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET
+                    ..RED_LABEL_ATTRACT_DEFENDER_OBJECTS
+                        + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET
+                        + 2
+            ),
+            Some(&null_picture.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_DEFENDER_OBJECTS + RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET
+                    ..RED_LABEL_ATTRACT_DEFENDER_OBJECTS
+                        + RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET
+                        + 4
+            ),
+            Some(&[0x0C, 0x00, 0x98, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x9C00..0x9C0C),
+            Some(&[0xAF, 0x00, 0xB3, 0xD6, 0x9C, 0x40, 0, 0, 0, 0, 0xB3, 0x04][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x9F80..0x9F8C),
+            Some(&[0xAF, 0x00, 0xB4, 0x0E, 0x9F, 0xC0, 0, 0, 0, 0, 0xB3, 0xC8][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA065..0xA067),
+            Some(&[0xB3, 0xC8][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR_POINTER_RAM
+                    ..RED_LABEL_ATTRACT_DEFENDER_OBJECT_POINTER_RAM + 2
+            ),
+            Some(&[0xB4, 0x12, 0xB9, 0xB2, 0x1B, 0x00, 0xB3, 0xD6][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    def33_address.to_be_bytes()[0],
+                    def33_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn def33_current_process_starts_whole_defender_restore_and_sleeps() {
+        let mut machine = ArcadeMachine::new();
+        let def33_address = red_label_routine_address("DEF33").expect("DEF33 address");
+        let def44_address = red_label_routine_address("DEF44").expect("DEF44 address");
+        let def50_address = red_label_routine_address("DEF50").expect("DEF50 address");
+        let process_address = machine
+            .red_label_make_process(def33_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make DEF33 process")
+            .process_address;
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR, 0xEEEE)
+            .expect("dirty whole descriptor");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch DEF33")
+            .expect("scheduled DEF33");
+
+        let restore = match dispatch {
+            RedLabelProcessDispatch::AttractDefenderRestoreStart(restore) => restore,
+            other => panic!("expected DEF33 dispatch, got {other:?}"),
+        };
+        assert_eq!(
+            restore,
+            RedLabelAttractDefenderRestoreStart {
+                process_address,
+                descriptor_address: RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR,
+                picture_address: RED_LABEL_ATTRACT_DEFENDER_DATA,
+                width: RED_LABEL_ATTRACT_DEFENDER_WHOLE_WIDTH,
+                height: RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT,
+                restore_process: restore.restore_process,
+                sleep_ticks: RED_LABEL_ATTRACT_DEFENDER_RESTORE_SLEEP_TICKS,
+                wakeup_address: def44_address,
+            }
+        );
+        assert_eq!(restore.restore_process.routine_address, def50_address);
+        assert_eq!(
+            restore.restore_process.process_type,
+            RED_LABEL_SYSTEM_PROCESS_TYPE
+        );
+        assert_eq!(restore.restore_process.class, RedLabelProcessClass::Regular);
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[def50_address])
+                .expect("query DEF50 process")
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR..RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR + 4
+            ),
+            Some(&[0x3C, 0x18, 0xB4, 0x12][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    def44_address.to_be_bytes()[0],
+                    def44_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_DEFENDER_RESTORE_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn def44_current_process_draws_copyright_starts_support_and_sleeps() {
+        let mut machine = ArcadeMachine::new();
+        let def44_address = red_label_routine_address("DEF44").expect("DEF44 address");
+        let cbomb_address = red_label_routine_address("CBOMB").expect("CBOMB address");
+        let creds_address = red_label_routine_address("CREDS").expect("CREDS address");
+        let cpr55_address = red_label_routine_address("CPR55").expect("CPR55 address");
+        let process_address = machine
+            .red_label_make_process(def44_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make DEF44 process")
+            .process_address;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_LOGO_CURSOR_END_RAM,
+                RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER,
+            )
+            .expect("set CUREND");
+        machine
+            .memory
+            .write_word(0xA0B8, 0xEEEE)
+            .expect("dirty WCURS");
+        machine
+            .memory
+            .write_byte(0xA035, 0xFF)
+            .expect("set Williams color");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0)
+            .expect("clear ICREDF");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch DEF44")
+            .expect("scheduled DEF44");
+        let copyright = match dispatch {
+            RedLabelProcessDispatch::AttractCopyright(copyright) => copyright,
+            other => panic!("expected DEF44 dispatch, got {other:?}"),
+        };
+        let bomb_process = copyright.bomb_process.expect("DEF44 CBOMB process");
+
+        assert_eq!(
+            copyright,
+            RedLabelAttractCopyright {
+                process_address,
+                bomb_process: Some(bomb_process),
+                copyright_screen_address: RED_LABEL_ATTRACT_COPYRIGHT_SCREEN,
+                copyright_data_address: RED_LABEL_ATTRACT_COPYRIGHT_DATA_ADDRESS,
+                rows: RED_LABEL_ATTRACT_COPYRIGHT_ROWS,
+                row_width: RED_LABEL_ATTRACT_COPYRIGHT_ROW_WIDTH,
+                williams_color_address: 0xA035,
+                williams_color: 0xFF,
+                williams_cursor: RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER,
+                williams_cursor_transferred: true,
+                power_flag: 1,
+                credits_process: copyright.credits_process,
+                stall_ticks: RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS,
+                wait: RedLabelAttractCopyrightWait::Sleeping {
+                    process_address,
+                    credit_increase_flag: 0,
+                    stall_before: RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS,
+                    stall_after: RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS - 1,
+                    sleep_ticks: RED_LABEL_ATTRACT_COPYRIGHT_SLEEP_TICKS,
+                    wakeup_address: cpr55_address,
+                },
+            }
+        );
+        assert_eq!(bomb_process.routine_address, cbomb_address);
+        assert_eq!(copyright.credits_process.routine_address, creds_address);
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[cbomb_address])
+                .expect("query CBOMB process")
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[creds_address])
+                .expect("query CREDS process")
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_COPYRIGHT_SCREEN..RED_LABEL_ATTRACT_COPYRIGHT_SCREEN + 8
+            ),
+            Some(&[0x01, 0x10, 0x10, 0x10, 0x10, 0x10, 0x01, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x3CD0..0x3CD8),
+            Some(&[0x10, 0x01, 0x00, 0x00, 0x00, 0x01, 0x10, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0B7..0xA0BA),
+            Some(
+                &[
+                    1,
+                    RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER.to_be_bytes()[0],
+                    RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER.to_be_bytes()[1]
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS - 1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    cpr55_address.to_be_bytes()[0],
+                    cpr55_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_COPYRIGHT_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn copyrt_dispatch_draws_copyright_without_starting_cbomb() {
+        let mut machine = ArcadeMachine::new();
+        let copyrt_address = red_label_routine_address("COPYRT").expect("COPYRT address");
+        let cbomb_address = red_label_routine_address("CBOMB").expect("CBOMB address");
+        let creds_address = red_label_routine_address("CREDS").expect("CREDS address");
+        let cpr55_address = red_label_routine_address("CPR55").expect("CPR55 address");
+        let process_address = machine
+            .red_label_make_process(copyrt_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make COPYRT process")
+            .process_address;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_LOGO_CURSOR_END_RAM,
+                RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER,
+            )
+            .expect("set CUREND");
+        machine
+            .memory
+            .write_word(0xA0B8, 0xEEEE)
+            .expect("dirty WCURS");
+        machine
+            .memory
+            .write_byte(0xA035, 0xFF)
+            .expect("set Williams color");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0)
+            .expect("clear ICREDF");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch COPYRT")
+            .expect("scheduled COPYRT");
+        let copyright = match dispatch {
+            RedLabelProcessDispatch::AttractCopyright(copyright) => copyright,
+            other => panic!("expected COPYRT dispatch, got {other:?}"),
+        };
+
+        assert_eq!(
+            copyright,
+            RedLabelAttractCopyright {
+                process_address,
+                bomb_process: None,
+                copyright_screen_address: RED_LABEL_ATTRACT_COPYRIGHT_SCREEN,
+                copyright_data_address: RED_LABEL_ATTRACT_COPYRIGHT_DATA_ADDRESS,
+                rows: RED_LABEL_ATTRACT_COPYRIGHT_ROWS,
+                row_width: RED_LABEL_ATTRACT_COPYRIGHT_ROW_WIDTH,
+                williams_color_address: 0xA035,
+                williams_color: 0xFF,
+                williams_cursor: RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER,
+                williams_cursor_transferred: true,
+                power_flag: 1,
+                credits_process: copyright.credits_process,
+                stall_ticks: RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS,
+                wait: RedLabelAttractCopyrightWait::Sleeping {
+                    process_address,
+                    credit_increase_flag: 0,
+                    stall_before: RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS,
+                    stall_after: RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS - 1,
+                    sleep_ticks: RED_LABEL_ATTRACT_COPYRIGHT_SLEEP_TICKS,
+                    wakeup_address: cpr55_address,
+                },
+            }
+        );
+        assert!(
+            !machine
+                .memory
+                .active_process_has_routine(&[cbomb_address])
+                .expect("query CBOMB process")
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[creds_address])
+                .expect("query CREDS process")
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_COPYRIGHT_SCREEN..RED_LABEL_ATTRACT_COPYRIGHT_SCREEN + 8
+            ),
+            Some(&[0x01, 0x10, 0x10, 0x10, 0x10, 0x10, 0x01, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0B7..0xA0BA),
+            Some(
+                &[
+                    1,
+                    RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER.to_be_bytes()[0],
+                    RED_LABEL_ATTRACT_PRESENTS_CURSOR_AFTER.to_be_bytes()[1]
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[RED_LABEL_ATTRACT_COPYRIGHT_STALL_TICKS - 1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    cpr55_address.to_be_bytes()[0],
+                    cpr55_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_COPYRIGHT_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn cpr55_credit_and_timeout_branches_jump_to_source_targets() {
+        let mut machine = ArcadeMachine::new();
+        let cpr55_address = red_label_routine_address("CPR55").expect("CPR55 address");
+        let ledret_address = red_label_routine_address("LEDRET").expect("LEDRET address");
+        let process_address = machine
+            .red_label_make_process(cpr55_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make CPR55 process")
+            .process_address;
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 1)
+            .expect("set ICREDF");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch credit CPR55")
+            .expect("scheduled CPR55");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractCopyrightWait(
+                RedLabelAttractCopyrightWait::CreditIncreaseJump {
+                    process_address,
+                    credit_increase_flag: 1,
+                    target_address: ledret_address,
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 4),
+            Some(&ledret_address.to_be_bytes()[..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let haldis_address = red_label_routine_address("HALDIS").expect("HALDIS address");
+        let process_address = machine
+            .red_label_make_process(cpr55_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make timeout CPR55 process")
+            .process_address;
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0)
+            .expect("clear ICREDF");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, 1)
+            .expect("set STALT");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch timeout CPR55")
+            .expect("scheduled CPR55");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractCopyrightWait(
+                RedLabelAttractCopyrightWait::HallOfFameJump {
+                    process_address,
+                    credit_increase_flag: 0,
+                    stall_before: 1,
+                    stall_after: 0,
+                    target_address: haldis_address,
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 4),
+            Some(&haldis_address.to_be_bytes()[..])
+        );
+    }
+
+    #[test]
+    fn cpr56_dispatch_jumps_directly_to_haldis_display() {
+        let mut machine = ArcadeMachine::new();
+        let cpr56_address = red_label_routine_address("CPR56").expect("CPR56 address");
+        let hald3_address = red_label_routine_address("HALD3").expect("HALD3 address");
+        let process_address = machine
+            .red_label_make_process(cpr56_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make CPR56 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch CPR56")
+            .expect("scheduled CPR56");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::HallOfFameDisplayed {
+                process_address,
+                stall_ticks: RED_LABEL_HALL_OF_FAME_STALL_TICKS,
+            })
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, 'H');
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 4),
+            Some(&hald3_address.to_be_bytes()[..])
+        );
+    }
+
+    #[test]
+    fn haldis_dispatch_draws_hall_of_fame_from_source_target() {
+        let mut machine = ArcadeMachine::new();
+        let haldis_address = red_label_routine_address("HALDIS").expect("HALDIS address");
+        let hald3_address = red_label_routine_address("HALD3").expect("HALD3 address");
+        let colr_address = red_label_routine_address("COLR").expect("COLR address");
+        let creds_address = red_label_routine_address("CREDS").expect("CREDS address");
+        let process_address = machine
+            .red_label_make_process(haldis_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make HALDIS process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch HALDIS")
+            .expect("scheduled HALDIS");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::HallOfFameDisplayed {
+                process_address,
+                stall_ticks: RED_LABEL_HALL_OF_FAME_STALL_TICKS,
+            })
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, 'H');
+        assert!(
+            !machine
+                .memory
+                .active_process_has_routine(&[haldis_address])
+                .expect("query HALDIS process")
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[hald3_address, colr_address, creds_address])
+                .expect("query HALDIS follow-on processes")
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 4),
+            Some(&hald3_address.to_be_bytes()[..])
+        );
+    }
+
+    #[test]
+    fn hald3_wait_gate_follows_source_credit_reset_timeout_and_sleep_branches() {
+        let hald3_address = red_label_routine_address("HALD3").expect("HALD3 address");
+        let haldis_address = red_label_routine_address("HALDIS").expect("HALDIS address");
+        let ledret_address = red_label_routine_address("LEDRET").expect("LEDRET address");
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALD3");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 1)
+            .expect("set ICREDF");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hald3_address)
+            .expect("dispatch credit HALD3");
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HallOfFameDisplayWait(
+                RedLabelHallOfFameDisplayWait::CreditIncreaseInstructionJump {
+                    process_address: process,
+                    credit_increase_flag: 1,
+                    target_address: ledret_address,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&ledret_address.to_be_bytes()[..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALD3");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0)
+            .expect("clear ICREDF");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_RESET_FLAG_RAM, 0x7E)
+            .expect("set HSRFLG");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hald3_address)
+            .expect("dispatch reset HALD3");
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HallOfFameDisplayWait(
+                RedLabelHallOfFameDisplayWait::HighScoreResetRedisplayJump {
+                    process_address: process,
+                    high_score_reset_flag: 0x7E,
+                    target_address: haldis_address,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&haldis_address.to_be_bytes()[..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALD3");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0)
+            .expect("clear ICREDF");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_RESET_FLAG_RAM, 0)
+            .expect("clear HSRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, 1)
+            .expect("seed STALT");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hald3_address)
+            .expect("dispatch timeout HALD3");
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HallOfFameDisplayWait(
+                RedLabelHallOfFameDisplayWait::TimeoutInstructionJump {
+                    process_address: process,
+                    credit_increase_flag: 0,
+                    high_score_reset_flag: 0,
+                    stall_before: 1,
+                    stall_after: 0,
+                    target_address: ledret_address,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&ledret_address.to_be_bytes()[..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALD3");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0)
+            .expect("clear ICREDF");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_RESET_FLAG_RAM, 0)
+            .expect("clear HSRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, 3)
+            .expect("seed STALT");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hald3_address)
+            .expect("dispatch sleeping HALD3");
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HallOfFameDisplayWait(
+                RedLabelHallOfFameDisplayWait::Sleeping {
+                    process_address: process,
+                    credit_increase_flag: 0,
+                    high_score_reset_flag: 0,
+                    stall_before: 3,
+                    stall_after: 2,
+                    sleep_ticks: RED_LABEL_HALL_OF_FAME_WAIT_SLEEP_TICKS,
+                    wakeup_address: hald3_address,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(
+                &[
+                    hald3_address.to_be_bytes()[0],
+                    hald3_address.to_be_bytes()[1],
+                    RED_LABEL_HALL_OF_FAME_WAIT_SLEEP_TICKS,
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn hald4_dispatch_branches_to_ledret_instruction_scene() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .initialize_altitude_table_from_tdata()
+            .expect("LEDRET SCINIT BGI precondition");
+        let hald4_address = red_label_routine_address("HALD4").expect("HALD4 address");
+        let amode1_address = red_label_routine_address("AMODE1").expect("AMODE1 address");
+        let process_address = machine
+            .red_label_make_process(hald4_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make HALD4 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch HALD4")
+            .expect("scheduled HALD4");
+        let started = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionStart(started) => started,
+            other => panic!("expected HALD4 instruction start, got {other:?}"),
+        };
+
+        assert_eq!(started.process_address, process_address);
+        assert_eq!(started.status, RED_LABEL_ATTRACT_INSTRUCTION_STATUS);
+        assert_eq!(started.wakeup_address, amode1_address);
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amode1_address.to_be_bytes()[0],
+                    amode1_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS,
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn def50_current_process_refreshes_until_appearance_slots_clear() {
+        let mut machine = ArcadeMachine::new();
+        let def50_address = red_label_routine_address("DEF50").expect("DEF50 address");
+        let process_address = machine
+            .red_label_make_process(def50_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make DEF50 process")
+            .process_address;
+        seed_whole_defender_descriptor(&mut machine);
+        machine
+            .memory
+            .write_byte(0xA036, 7)
+            .expect("set MAPCR before CWRIT");
+        machine
+            .memory
+            .write_word(0x9C00, 0xAF00)
+            .expect("mark first appearance busy");
+        machine
+            .memory
+            .write_word(0x9C40, 0)
+            .expect("clear second appearance");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch busy DEF50")
+            .expect("scheduled DEF50");
+        let picture = RedLabelPictureWrite {
+            screen_address: RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN,
+            picture_address: RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR,
+            width: RED_LABEL_ATTRACT_DEFENDER_WHOLE_WIDTH,
+            height: RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT,
+        };
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractDefenderRefresh(
+                RedLabelAttractDefenderRefresh::Refreshing {
+                    process_address,
+                    picture,
+                    first_appearance_size: 0xAF00,
+                    second_appearance_size: 0,
+                    sleep_ticks: RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS,
+                    wakeup_address: def50_address,
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN
+                    ..RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN + 4
+            ),
+            Some(&expanded_defender_logo_image()[..4])
+        );
+        assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[7][..]));
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    def50_address.to_be_bytes()[0],
+                    def50_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS
+                ][..]
+            )
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let willir_address = red_label_routine_address("WILLIR").expect("WILLIR address");
+        let process_address = machine
+            .red_label_make_process(def50_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make complete DEF50 process")
+            .process_address;
+        seed_whole_defender_descriptor(&mut machine);
+        machine
+            .memory
+            .write_word(0x9C00, 0)
+            .expect("clear first appearance");
+        machine
+            .memory
+            .write_word(0x9C40, 0)
+            .expect("clear second appearance");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch complete DEF50")
+            .expect("scheduled DEF50");
+        let refresh = match dispatch {
+            RedLabelProcessDispatch::AttractDefenderRefresh(refresh) => refresh,
+            other => panic!("expected DEF50 refresh, got {other:?}"),
+        };
+
+        assert_eq!(
+            refresh,
+            RedLabelAttractDefenderRefresh::Completed {
+                process_address,
+                picture,
+                first_appearance_size: 0,
+                second_appearance_size: 0,
+                restore_process: match refresh {
+                    RedLabelAttractDefenderRefresh::Completed {
+                        restore_process, ..
+                    } => restore_process,
+                    _ => unreachable!(),
+                },
+                killed_process: match refresh {
+                    RedLabelAttractDefenderRefresh::Completed { killed_process, .. } =>
+                        killed_process,
+                    _ => unreachable!(),
+                },
+            }
+        );
+        let RedLabelAttractDefenderRefresh::Completed {
+            restore_process,
+            killed_process,
+            ..
+        } = refresh
+        else {
+            unreachable!();
+        };
+        assert_eq!(restore_process.routine_address, willir_address);
+        assert_eq!(killed_process.killed_process_address, process_address);
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[willir_address])
+                .expect("query WILLIR process")
+        );
+        assert!(
+            !machine
+                .memory
+                .active_process_has_routine(&[def50_address])
+                .expect("query DEF50 process")
+        );
+    }
+
+    #[test]
+    fn def51_direct_dispatch_sleeps_back_to_def50_without_redraw() {
+        let mut machine = ArcadeMachine::new();
+        let def50_address = red_label_routine_address("DEF50").expect("DEF50 address");
+        let def51_address = red_label_routine_address("DEF51").expect("DEF51 address");
+        let process_address = machine
+            .red_label_make_process(def51_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make DEF51 process")
+            .process_address;
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN, 0xA5)
+            .expect("seed screen byte");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch DEF51")
+            .expect("scheduled DEF51");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractDefenderRefresh(
+                RedLabelAttractDefenderRefresh::DelaySleeping {
+                    process_address,
+                    sleep_ticks: RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS,
+                    wakeup_address: def50_address,
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN
+                    ..RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN + 1
+            ),
+            Some(&[0xA5][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    def50_address.to_be_bytes()[0],
+                    def50_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn willir_and_wilr1_set_logo_rates_and_suicide() {
+        let mut machine = ArcadeMachine::new();
+        let willir_address = red_label_routine_address("WILLIR").expect("WILLIR address");
+        let wilr1_address = red_label_routine_address("WILR1").expect("WILR1 address");
+        let process_address = machine
+            .red_label_make_process(willir_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make WILLIR process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch WILLIR")
+            .expect("scheduled WILLIR");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractWilliamsRestore(
+                RedLabelAttractWilliamsRestore::StartedSleeping {
+                    process_address,
+                    logo_rate: RED_LABEL_ATTRACT_WILLIAMS_FAST_LOGO_RATE,
+                    sleep_ticks: RED_LABEL_ATTRACT_WILLIAMS_RESTORE_SLEEP_TICKS,
+                    wakeup_address: wilr1_address,
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_LOGO_FLAG_RAM..RED_LABEL_ATTRACT_LOGO_FLAG_RAM + 1
+            ),
+            Some(&[RED_LABEL_ATTRACT_WILLIAMS_FAST_LOGO_RATE][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    wilr1_address.to_be_bytes()[0],
+                    wilr1_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_WILLIAMS_RESTORE_SLEEP_TICKS
+                ][..]
+            )
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process_address = machine
+            .red_label_make_process(wilr1_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make WILR1 process")
+            .process_address;
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch WILR1")
+            .expect("scheduled WILR1");
+        let restore = match dispatch {
+            RedLabelProcessDispatch::AttractWilliamsRestore(restore) => restore,
+            other => panic!("expected WILR1 restore, got {other:?}"),
+        };
+
+        assert_eq!(
+            restore,
+            RedLabelAttractWilliamsRestore::Finished {
+                process_address,
+                logo_rate: RED_LABEL_ATTRACT_WILLIAMS_NORMAL_LOGO_RATE,
+                killed_process: match restore {
+                    RedLabelAttractWilliamsRestore::Finished { killed_process, .. } =>
+                        killed_process,
+                    _ => unreachable!(),
+                },
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_LOGO_FLAG_RAM..RED_LABEL_ATTRACT_LOGO_FLAG_RAM + 1
+            ),
+            Some(&[RED_LABEL_ATTRACT_WILLIAMS_NORMAL_LOGO_RATE][..])
+        );
+        assert!(
+            !machine
+                .memory
+                .active_process_has_routine(&[wilr1_address])
+                .expect("query WILR1 process")
+        );
+    }
+
+    #[test]
+    fn ledret_current_process_starts_instruction_scene_and_sleeps() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        machine
+            .memory
+            .initialize_altitude_table_from_tdata()
+            .expect("LEDRET SCINIT BGI precondition");
+        let extra_process = machine
+            .red_label_make_process(0x2222, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make process killed by GNCIDE")
+            .process_address;
+        let coin_process = machine
+            .red_label_make_process(
+                red_label_routine_address("LCOIN").expect("LCOIN address"),
+                RED_LABEL_COIN_PROCESS_TYPE,
+            )
+            .expect("make coin process preserved by GNCIDE")
+            .process_address;
+        machine.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        machine
+            .memory
+            .write_player_score_value(&layout, 0, 12_345)
+            .expect("seed player-one score");
+        let ledret_address = red_label_routine_address("LEDRET").expect("LEDRET address");
+        let amode1_address = red_label_routine_address("AMODE1").expect("AMODE1 address");
+        let process_address = machine
+            .red_label_make_process(ledret_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make LEDRET process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch LEDRET")
+            .expect("scheduled LEDRET");
+        let started = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionStart(started) => started,
+            other => panic!("expected LEDRET instruction start, got {other:?}"),
+        };
+
+        assert_eq!(
+            started.genocide,
+            RedLabelGenocide {
+                current_process_address: process_address,
+                killed_processes: vec![RedLabelKilledProcess {
+                    killed_process_address: extra_process,
+                    previous_link_address: coin_process,
+                }],
+            }
+        );
+        assert_eq!(
+            started,
+            RedLabelAttractInstructionStart {
+                process_address,
+                genocide: started.genocide.clone(),
+                scene: RedLabelAttractSceneInit {
+                    initial_status: 0xFF,
+                    screen_clear: started.scene.screen_clear,
+                    background: started.scene.background,
+                    color_ram: started.scene.color_ram.clone(),
+                    final_status: 0xDB,
+                    player_scanner_center: 0x1030,
+                },
+                status: RED_LABEL_ATTRACT_INSTRUCTION_STATUS,
+                score_transfers: started.score_transfers.clone(),
+                credits_process: started.credits_process,
+                border: RedLabelBorder {
+                    bottom_line_words: 156,
+                    side_boundary_words: 32,
+                    top_boundary_bytes: 66,
+                    scanner_marker_words: 16,
+                },
+                text_pointer: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2,
+                support_processes: started.support_processes.clone(),
+                astronaut_object: started.astronaut_object,
+                player_object: started.player_object,
+                enemy_object: started.enemy_object,
+                enemy_appearance: started.enemy_appearance,
+                sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS,
+                wakeup_address: amode1_address,
+            }
+        );
+        assert_eq!(started.score_transfers.len(), 1);
+        assert_eq!(started.score_transfers[0].player_number, 1);
+        assert_eq!(
+            started.credits_process.routine_address,
+            red_label_routine_address("CREDS").expect("CREDS address")
+        );
+        assert_eq!(
+            started.credits_process.process_type,
+            RED_LABEL_SYSTEM_PROCESS_TYPE
+        );
+        assert_eq!(
+            started
+                .support_processes
+                .iter()
+                .map(|process| process.routine_address)
+                .collect::<Vec<_>>(),
+            vec![
+                red_label_routine_address("COLR").expect("COLR address"),
+                red_label_routine_address("CBOMB").expect("CBOMB address"),
+                red_label_routine_address("TIECOL").expect("TIECOL address"),
+                red_label_routine_address("SCPROC").expect("SCPROC address"),
+                red_label_routine_address("TEXTP").expect("TEXTP address"),
+            ]
+        );
+        assert!(started.support_processes.iter().all(|process| {
+            process.process_type == RED_LABEL_SYSTEM_PROCESS_TYPE
+                && process.class == RedLabelProcessClass::Regular
+        }));
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[RED_LABEL_ATTRACT_INSTRUCTION_STATUS][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM + 2
+            ),
+            Some(&(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2).to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM + 2
+            ),
+            Some(&started.astronaut_object.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM + 2
+            ),
+            Some(&started.player_object.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM + 2
+            ),
+            Some(&started.enemy_object.to_be_bytes()[..])
+        );
+
+        let object_word = |object_address, field| {
+            machine
+                .memory
+                .read_object_word(&layout, object_address, field)
+                .unwrap_or_else(|error| {
+                    panic!("read object 0x{object_address:04X} field {field}: {error}")
+                })
+        };
+        assert_eq!(
+            object_word(started.astronaut_object, "OPICT"),
+            red_label_object_picture_address("ASTP1").expect("ASTP1 address")
+        );
+        assert_eq!(
+            object_word(started.astronaut_object, "OX16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_MAN_X16
+        );
+        assert_eq!(
+            object_word(started.astronaut_object, "OY16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_MAN_Y16
+        );
+        assert_eq!(object_word(started.astronaut_object, "OXV"), 0);
+        assert_eq!(object_word(started.astronaut_object, "OYV"), 0);
+        assert_eq!(
+            object_word(started.astronaut_object, "OBJCOL"),
+            RED_LABEL_ATTRACT_INSTRUCTION_MAN_COLOR
+        );
+        assert_eq!(
+            object_word(started.player_object, "OPICT"),
+            red_label_object_picture_address("PLAPIC").expect("PLAPIC address")
+        );
+        assert_eq!(
+            object_word(started.player_object, "OX16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_X16
+        );
+        assert_eq!(
+            object_word(started.player_object, "OY16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_Y16
+        );
+        assert_eq!(object_word(started.player_object, "OXV"), 0);
+        assert_eq!(object_word(started.player_object, "OYV"), 0);
+        assert_eq!(
+            object_word(started.player_object, "OBJCOL"),
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_COLOR
+        );
+        assert_eq!(
+            object_word(started.enemy_object, "OPICT"),
+            red_label_object_picture_address("NULOB").expect("NULOB address")
+        );
+        assert_eq!(
+            object_word(started.enemy_object, "OX16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_X16
+        );
+        assert_eq!(
+            object_word(started.enemy_object, "OY16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_Y16
+        );
+        assert_eq!(object_word(started.enemy_object, "OXV"), 0);
+        assert_eq!(
+            object_word(started.enemy_object, "OYV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_Y_VELOCITY
+        );
+        assert_eq!(
+            object_word(started.enemy_object, "OBJCOL"),
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_COLOR
+        );
+        assert_eq!(
+            started.enemy_appearance,
+            RedLabelAppearanceStart {
+                object_address: started.enemy_object,
+                original_picture_address: red_label_object_picture_address("LNDP1")
+                    .expect("LNDP1 address"),
+                final_picture_address: red_label_object_picture_address("NULOB")
+                    .expect("NULOB address"),
+                relative_x: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_X16,
+                slot_address: Some(0x9C00),
+                erased_previous_slot: false,
+                sound_loaded: None,
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amode1_address.to_be_bytes()[0],
+                    amode1_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS
+                ][..]
+            )
+        );
+        assert!(
+            !machine
+                .memory
+                .active_process_has_routine(&[0x2222])
+                .expect("query killed process")
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[
+                    red_label_routine_address("LCOIN").expect("LCOIN address")
+                ])
+                .expect("query coin process")
+        );
+    }
+
+    #[test]
+    fn amode1_current_process_sets_instruction_object_ascent_and_sleeps() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let enemy_object = machine
+            .red_label_get_object_cell()
+            .expect("get enemy object");
+        let astronaut_object = machine
+            .red_label_get_object_cell()
+            .expect("get astronaut object");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM,
+                enemy_object,
+            )
+            .expect("set ENEMYP");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM,
+                astronaut_object,
+            )
+            .expect("set MANPTR");
+        let amode1_address = red_label_routine_address("AMODE1").expect("AMODE1 address");
+        let amode2_address = red_label_routine_address("AMODE2").expect("AMODE2 address");
+        let process_address = machine
+            .red_label_make_process(amode1_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMODE1 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODE1")
+            .expect("scheduled AMODE1");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionAscent(RedLabelAttractInstructionAscent {
+                process_address,
+                enemy_object,
+                astronaut_object,
+                y_velocity: RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_Y_VELOCITY,
+                sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_SLEEP_TICKS,
+                wakeup_address: amode2_address,
+            })
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, enemy_object, "OYV")
+                .expect("read enemy OYV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_Y_VELOCITY
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, astronaut_object, "OYV")
+                .expect("read astronaut OYV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_Y_VELOCITY
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amode2_address.to_be_bytes()[0],
+                    amode2_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_ASCENT_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn amode2_current_process_starts_laser_process_and_sleeps() {
+        let mut machine = ArcadeMachine::new();
+        let amode2_address = red_label_routine_address("AMODE2").expect("AMODE2 address");
+        let amode3_address = red_label_routine_address("AMODE3").expect("AMODE3 address");
+        let lasrs_address = red_label_routine_address("LASRS").expect("LASRS address");
+        let process_address = machine
+            .red_label_make_process(amode2_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMODE2 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODE2")
+            .expect("scheduled AMODE2");
+        let started = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionLaserStart(started) => started,
+            other => panic!("expected AMODE2 laser start, got {other:?}"),
+        };
+
+        assert_eq!(
+            started,
+            RedLabelAttractInstructionLaserStart {
+                process_address,
+                laser_process: started.laser_process,
+                laser_process_pointer_address: RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM,
+                sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_LASER_SLEEP_TICKS,
+                wakeup_address: amode3_address,
+            }
+        );
+        assert_eq!(started.laser_process.routine_address, lasrs_address);
+        assert_eq!(
+            started.laser_process.process_type,
+            RED_LABEL_SYSTEM_PROCESS_TYPE
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM + 2
+            ),
+            Some(&started.laser_process.process_address.to_be_bytes()[..])
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[lasrs_address])
+                .expect("query LASRS process")
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amode3_address.to_be_bytes()[0],
+                    amode3_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_LASER_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn lasrs_initializes_instruction_laser_from_ship_and_sleeps() {
+        let mut machine = ArcadeMachine::new();
+        let ship_object = machine
+            .red_label_get_object_cell()
+            .expect("get ship object");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM, ship_object)
+            .expect("set SHIPTR");
+        machine
+            .memory
+            .write_word(ship_object + 0x04, 0x4000)
+            .expect("set ship OBJX");
+        machine.memory.write_word(0xA0A4, 0xA142).expect("set FISX");
+        write_ram_bytes(&mut machine, 0xA142, &[0xAA, 0xBB, 0xCC, 0xDD]);
+        let lasrs_address = red_label_routine_address("LASRS").expect("LASRS address");
+        let las0_address = red_label_routine_address("LAS0").expect("LAS0 address");
+        let process_address = machine
+            .red_label_make_process(lasrs_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make LASRS process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch LASRS")
+            .expect("scheduled LASRS");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionLaserStep(
+                RedLabelAttractInstructionLaserStep {
+                    process_address,
+                    initialized: true,
+                    ship_object: Some(ship_object),
+                    laser_start: 0x4000 + RED_LABEL_ATTRACT_INSTRUCTION_LASER_START_SCREEN_OFFSET,
+                    tip_address: 0x4B04,
+                    fizzle_source_next: 0xA145,
+                    fizzle_target_next: 0x4A04,
+                    erase_address: 0x4704,
+                    erase_next: 0x4804,
+                    sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_LASER_STEP_SLEEP_TICKS,
+                    wakeup_address: las0_address,
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x4704..0x4705),
+            Some(&[0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x4804..0x4805),
+            Some(&[0xBB][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x4904..0x4905),
+            Some(&[0xCC][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x4A04..0x4A05),
+            Some(&[0x11][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x4B04..0x4B05),
+            Some(&[0x99][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 0x02..process_address + 0x0B),
+            Some(&[0xC6, 0x05, 0x01, 0x00, 0x00, 0x4B, 0x04, 0x4A, 0x04][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM + 2
+            ),
+            Some(&[0x48, 0x04][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0A4..0xA0A6),
+            Some(&[0xA1, 0x45][..])
+        );
+    }
+
+    #[test]
+    fn las0_continues_instruction_laser_from_process_data() {
+        let mut machine = ArcadeMachine::new();
+        let las0_address = red_label_routine_address("LAS0").expect("LAS0 address");
+        let process_address = machine
+            .red_label_make_process(las0_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make LAS0 process")
+            .process_address;
+        machine
+            .memory
+            .write_word(process_address + 0x07, 0x5000)
+            .expect("set PD");
+        machine
+            .memory
+            .write_word(process_address + 0x09, 0x5000)
+            .expect("set PD2");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM, 0x5000)
+            .expect("set LSTATE");
+        machine
+            .memory
+            .write_word(0xA0A4, 0xA160)
+            .expect("set FISX near FISEND");
+        write_ram_bytes(&mut machine, 0xA142, &[0x12, 0x34, 0x56, 0x78]);
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch LAS0")
+            .expect("scheduled LAS0");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionLaserStep(
+                RedLabelAttractInstructionLaserStep {
+                    process_address,
+                    initialized: false,
+                    ship_object: None,
+                    laser_start: 0x5000,
+                    tip_address: 0x5400,
+                    fizzle_source_next: 0xA145,
+                    fizzle_target_next: 0x5300,
+                    erase_address: 0x5000,
+                    erase_next: 0x5100,
+                    sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_LASER_STEP_SLEEP_TICKS,
+                    wakeup_address: las0_address,
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x5000..0x5001),
+            Some(&[0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x5100..0x5101),
+            Some(&[0x34][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x5200..0x5201),
+            Some(&[0x56][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x5300..0x5301),
+            Some(&[0x11][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x5400..0x5401),
+            Some(&[0x99][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 0x02..process_address + 0x0B),
+            Some(&[0xC6, 0x05, 0x01, 0x00, 0x00, 0x54, 0x00, 0x53, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM + 2
+            ),
+            Some(&[0x51, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0A4..0xA0A6),
+            Some(&[0xA1, 0x45][..])
+        );
+    }
+
+    #[test]
+    fn amode3_starts_instruction_rescue_and_sleeps_to_free_fall() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let laser_process = machine
+            .red_label_make_process(
+                red_label_routine_address("LAS0").expect("LAS0 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make laser process")
+            .process_address;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM,
+                laser_process,
+            )
+            .expect("set LASPRC");
+        machine
+            .memory
+            .write_word(laser_process + 0x07, 0x5200)
+            .expect("set laser PD");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM, 0x5000)
+            .expect("set LSTATE");
+        for address in [0x5000, 0x5100, 0x5200] {
+            machine
+                .memory
+                .write_byte(address, 0xEE)
+                .expect("seed laser");
+        }
+
+        let enemy_object = machine
+            .red_label_get_object_cell()
+            .expect("get enemy object");
+        machine
+            .memory
+            .write_word(
+                enemy_object + 0x02,
+                red_label_object_picture_address("LNDP1").expect("LNDP1 address"),
+            )
+            .expect("set enemy picture");
+        machine
+            .memory
+            .write_word(enemy_object + 0x0A, 0x0100)
+            .expect("set enemy OX16");
+        machine
+            .memory
+            .write_word(enemy_object + 0x0C, 0x4000)
+            .expect("set enemy OY16");
+        machine
+            .red_label_activate_object_cell(enemy_object)
+            .expect("activate enemy");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM,
+                enemy_object,
+            )
+            .expect("set ENEMYP");
+
+        let ship_object = machine
+            .red_label_get_object_cell()
+            .expect("get ship object");
+        let astronaut_object = machine
+            .red_label_get_object_cell()
+            .expect("get astronaut object");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM, ship_object)
+            .expect("set SHIPTR");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM,
+                astronaut_object,
+            )
+            .expect("set MANPTR");
+        let amode3_address = red_label_routine_address("AMODE3").expect("AMODE3 address");
+        let amode4_address = red_label_routine_address("AMODE4").expect("AMODE4 address");
+        let process_address = machine
+            .red_label_make_process(amode3_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMODE3 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODE3")
+            .expect("scheduled AMODE3");
+        let rescue = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionRescueStart(rescue) => rescue,
+            other => panic!("expected AMODE3 rescue start, got {other:?}"),
+        };
+
+        assert_eq!(
+            rescue.laser_kill,
+            RedLabelAttractInstructionLaserKill {
+                laser_process_address: laser_process,
+                laser_state_start: 0x5000,
+                laser_state_end: 0x5200,
+                cleared_addresses: vec![0x5000, 0x5100, 0x5200],
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: laser_process,
+                    previous_link_address: process_address,
+                },
+            }
+        );
+        assert_eq!(machine.red_label_ram_range(0x5000..0x5001), Some(&[0][..]));
+        assert_eq!(machine.red_label_ram_range(0x5100..0x5101), Some(&[0][..]));
+        assert_eq!(machine.red_label_ram_range(0x5200..0x5201), Some(&[0][..]));
+        assert_eq!(rescue.process_address, process_address);
+        assert_eq!(rescue.enemy_object, enemy_object);
+        assert_eq!(rescue.enemy_explosion.object_address, enemy_object);
+        assert_eq!(rescue.enemy_explosion.slot_address, Some(0x9C00));
+        assert_eq!(rescue.ship_object, ship_object);
+        assert_eq!(rescue.astronaut_object, astronaut_object);
+        assert_eq!(
+            rescue.free_fall,
+            RedLabelAttractInstructionFreeFall::Sleeping {
+                process_address,
+                astronaut_object,
+                y_velocity_before: 0,
+                y_velocity_after: RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_ACCELERATION,
+                free_fall_before: RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_FREE_FALL_TICKS,
+                free_fall_after: RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_FREE_FALL_TICKS - 1,
+                sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_SLEEP_TICKS,
+                wakeup_address: amode4_address,
+            }
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OXV")
+                .expect("read ship OXV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_SHIP_X_VELOCITY
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OYV")
+                .expect("read ship OYV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_SHIP_Y_VELOCITY
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, astronaut_object, "OYV")
+                .expect("read astronaut OYV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_ACCELERATION
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM + 1
+            ),
+            Some(&[RED_LABEL_ATTRACT_INSTRUCTION_RESCUE_FREE_FALL_TICKS - 1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amode4_address.to_be_bytes()[0],
+                    amode4_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_FREE_FALL_SLEEP_TICKS
+                ][..]
+            )
+        );
+        assert!(
+            !machine
+                .memory
+                .active_process_has_routine(&[
+                    red_label_routine_address("LAS0").expect("LAS0 address")
+                ])
+                .expect("query killed laser")
+        );
+    }
+
+    #[test]
+    fn amode4_zero_counter_runs_intersection_and_sleeps_to_amode7() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let ship_object = machine
+            .red_label_get_object_cell()
+            .expect("get ship object");
+        let astronaut_object = machine
+            .red_label_get_object_cell()
+            .expect("get astronaut object");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM, ship_object)
+            .expect("set SHIPTR");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM,
+                astronaut_object,
+            )
+            .expect("set MANPTR");
+        machine
+            .memory
+            .write_word(astronaut_object + 0x10, 0x0100)
+            .expect("set astronaut OYV");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM, 1)
+            .expect("set MANFRF");
+        let amode4_address = red_label_routine_address("AMODE4").expect("AMODE4 address");
+        let amode7_address = red_label_routine_address("AMODE7").expect("AMODE7 address");
+        let process_address = machine
+            .red_label_make_process(amode4_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMODE4 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODE4")
+            .expect("scheduled AMODE4");
+        let intersection = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionFreeFall(
+                RedLabelAttractInstructionFreeFall::Intersection(intersection),
+            ) => intersection,
+            other => panic!("expected AMODE4 intersection, got {other:?}"),
+        };
+
+        assert_eq!(
+            intersection,
+            RedLabelAttractInstructionIntersection {
+                process_address,
+                points_object: intersection.points_object,
+                ship_object,
+                astronaut_object,
+                sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SLEEP_TICKS,
+                wakeup_address: amode7_address,
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_OBJECT_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_OBJECT_RAM + 2
+            ),
+            Some(&intersection.points_object.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, intersection.points_object, "OPICT")
+                .expect("read 500 picture"),
+            red_label_object_picture_address("C5P1").expect("C5P1 address")
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, intersection.points_object, "OX16")
+                .expect("read 500 OX16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_X16
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, intersection.points_object, "OY16")
+                .expect("read 500 OY16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_Y16
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OXV")
+                .expect("read ship OXV"),
+            0
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OYV")
+                .expect("read ship OYV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SHIP_Y_VELOCITY
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, astronaut_object, "OX16")
+                .expect("read astronaut OX16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_MAN_X16
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, astronaut_object, "OY16")
+                .expect("read astronaut OY16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_MAN_Y16
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, astronaut_object, "OYV")
+                .expect("read astronaut OYV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SHIP_Y_VELOCITY
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amode7_address.to_be_bytes()[0],
+                    amode7_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn amode5_direct_dispatch_runs_intersection_without_free_fall_decrement() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let ship_object = machine
+            .red_label_get_object_cell()
+            .expect("get ship object");
+        let astronaut_object = machine
+            .red_label_get_object_cell()
+            .expect("get astronaut object");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM, ship_object)
+            .expect("set SHIPTR");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM,
+                astronaut_object,
+            )
+            .expect("set MANPTR");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM, 0x77)
+            .expect("seed MANFRF");
+        let amode5_address = red_label_routine_address("AMODE5").expect("AMODE5 address");
+        let amode7_address = red_label_routine_address("AMODE7").expect("AMODE7 address");
+        let process_address = machine
+            .red_label_make_process(amode5_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMODE5 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODE5")
+            .expect("scheduled AMODE5");
+        let intersection = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionFreeFall(
+                RedLabelAttractInstructionFreeFall::Intersection(intersection),
+            ) => intersection,
+            other => panic!("expected AMODE5 intersection, got {other:?}"),
+        };
+
+        assert_eq!(intersection.process_address, process_address);
+        assert_eq!(intersection.ship_object, ship_object);
+        assert_eq!(intersection.astronaut_object, astronaut_object);
+        assert_eq!(intersection.wakeup_address, amode7_address);
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_MAN_FREE_FALL_RAM + 1
+            ),
+            Some(&[0x77][..])
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OYV")
+                .expect("read ship OYV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SHIP_Y_VELOCITY
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, astronaut_object, "OY16")
+                .expect("read astronaut OY16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_MAN_Y16
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amode7_address.to_be_bytes()[0],
+                    amode7_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_INTERSECTION_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn amode7_moves_points_and_turns_ship_back() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let points_object = machine
+            .red_label_get_object_cell()
+            .expect("get 500-point object");
+        let ship_object = machine
+            .red_label_get_object_cell()
+            .expect("get ship object");
+        let astronaut_object = machine
+            .red_label_get_object_cell()
+            .expect("get astronaut object");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_OBJECT_RAM,
+                points_object,
+            )
+            .expect("set P500OB");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM, ship_object)
+            .expect("set SHIPTR");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_MAN_POINTER_RAM,
+                astronaut_object,
+            )
+            .expect("set MANPTR");
+        let amode7_address = red_label_routine_address("AMODE7").expect("AMODE7 address");
+        let amode8_address = red_label_routine_address("AMODE8").expect("AMODE8 address");
+        let process_address = machine
+            .red_label_make_process(amode7_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMODE7 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODE7")
+            .expect("scheduled AMODE7");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionShipReturn(
+                RedLabelAttractInstructionShipReturn {
+                    process_address,
+                    points_object,
+                    ship_object,
+                    astronaut_object,
+                    sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_SLEEP_TICKS,
+                    wakeup_address: amode8_address,
+                }
+            )
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, points_object, "OX16")
+                .expect("read points OX16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_RETURN_X16
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, points_object, "OY16")
+                .expect("read points OY16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_RETURN_Y16
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, astronaut_object, "OYV")
+                .expect("read astronaut OYV"),
+            0
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OPICT")
+                .expect("read ship picture"),
+            red_label_object_picture_address("PLBPIC").expect("PLBPIC address")
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OXV")
+                .expect("read ship OXV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_X_VELOCITY
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OYV")
+                .expect("read ship OYV"),
+            RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_Y_VELOCITY
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amode8_address.to_be_bytes()[0],
+                    amode8_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_SHIP_RETURN_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn amode8_restores_ship_removes_points_and_spawns_first_enemy_table_object() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let ship_object = machine
+            .red_label_get_object_cell()
+            .expect("get ship object");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM, ship_object)
+            .expect("set SHIPTR");
+        machine
+            .memory
+            .write_word(
+                ship_object + 0x02,
+                red_label_object_picture_address("PLBPIC").expect("PLBPIC address"),
+            )
+            .expect("set ship old picture");
+        machine
+            .red_label_activate_object_cell(ship_object)
+            .expect("activate ship");
+        let points_object = machine
+            .red_label_get_object_cell()
+            .expect("get 500-point object");
+        machine
+            .memory
+            .write_word(
+                points_object + 0x02,
+                red_label_object_picture_address("C5P1").expect("C5P1 address"),
+            )
+            .expect("set points picture");
+        machine
+            .memory
+            .write_word(points_object + 0x04, 0x6000)
+            .expect("set points screen");
+        machine
+            .red_label_activate_object_cell(points_object)
+            .expect("activate points");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_500_POINT_OBJECT_RAM,
+                points_object,
+            )
+            .expect("set P500OB");
+        machine
+            .memory
+            .write_byte(0x6000, 0xEE)
+            .expect("dirty points");
+        machine
+            .memory
+            .write_byte(0xA0BA, RED_LABEL_ATTRACT_INSTRUCTION_STATUS)
+            .expect("set attract STATUS");
+        machine.memory.write_word(0xA020, 0).expect("set BGL");
+        let amode8_address = red_label_routine_address("AMODE8").expect("AMODE8 address");
+        let amod10_address = red_label_routine_address("AMOD10").expect("AMOD10 address");
+        let process_address = machine
+            .red_label_make_process(amode8_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMODE8 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMODE8")
+            .expect("scheduled AMODE8");
+        let table_start = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionEnemyTableStart(table_start) => table_start,
+            other => panic!("expected AMODE8 enemy table start, got {other:?}"),
+        };
+
+        assert_eq!(
+            table_start,
+            RedLabelAttractInstructionEnemyTableStart {
+                process_address,
+                points_object,
+                points_previous_link_address: table_start.points_previous_link_address,
+                ship_object,
+                enemy: table_start.enemy.clone(),
+            }
+        );
+        assert_eq!(table_start.enemy.table_index, 0);
+        assert_eq!(
+            table_start.enemy,
+            RedLabelAttractInstructionEnemySpawn {
+                table_pointer_before: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS,
+                table_pointer_after: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS,
+                table_index: 0,
+                object_address: table_start.enemy.object_address,
+                picture_address: red_label_object_picture_address("LNDP1").expect("LNDP1 address"),
+                x16: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X16,
+                y16: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y16_LOW,
+                source_table_y16: 0x6000,
+                y_velocity: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y_VELOCITY,
+                color: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_BLIPS[0],
+                appearance: table_start.enemy.appearance,
+                sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_SLEEP_TICKS,
+                wakeup_address: amod10_address,
+            }
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OPICT")
+                .expect("read ship picture"),
+            red_label_object_picture_address("PLAPIC").expect("PLAPIC address")
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OXV")
+                .expect("read ship OXV"),
+            0
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, ship_object, "OYV")
+                .expect("read ship OYV"),
+            0
+        );
+        assert_eq!(machine.red_label_ram_range(0x6000..0x6001), Some(&[0][..]));
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM + 2
+            ),
+            Some(&RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM + 2
+            ),
+            Some(&table_start.enemy.object_address.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, table_start.enemy.object_address, "OPICT")
+                .expect("read enemy picture"),
+            red_label_object_picture_address("NULOB").expect("NULOB address")
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, table_start.enemy.object_address, "OX16")
+                .expect("read enemy OX16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X16
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, table_start.enemy.object_address, "OY16")
+                .expect("read enemy OY16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_Y16_LOW
+        );
+        assert_eq!(
+            table_start.enemy.appearance.original_picture_address,
+            red_label_object_picture_address("LNDP1").expect("LNDP1 address")
+        );
+        assert_eq!(table_start.enemy.appearance.slot_address, Some(0x9C00));
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amod10_address.to_be_bytes()[0],
+                    amod10_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn amod10_starts_table_laser_process_and_sleeps_to_amod11() {
+        let mut machine = ArcadeMachine::new();
+        let amod10_address = red_label_routine_address("AMOD10").expect("AMOD10 address");
+        let amod11_address = red_label_routine_address("AMOD11").expect("AMOD11 address");
+        let lasrs_address = red_label_routine_address("LASRS").expect("LASRS address");
+        let process_address = machine
+            .red_label_make_process(amod10_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMOD10 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMOD10")
+            .expect("scheduled AMOD10");
+        let started = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionLaserStart(started) => started,
+            other => panic!("expected AMOD10 laser start, got {other:?}"),
+        };
+
+        assert_eq!(
+            started,
+            RedLabelAttractInstructionLaserStart {
+                process_address,
+                laser_process: started.laser_process,
+                laser_process_pointer_address: RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM,
+                sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TABLE_LASER_SLEEP_TICKS,
+                wakeup_address: amod11_address,
+            }
+        );
+        assert_eq!(started.laser_process.routine_address, lasrs_address);
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM + 2
+            ),
+            Some(&started.laser_process.process_address.to_be_bytes()[..])
+        );
+    }
+
+    #[test]
+    fn amod11_resolves_enemy_table_object_and_sleeps_to_bmode2() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let laser_process = machine
+            .red_label_make_process(
+                red_label_routine_address("LAS0").expect("LAS0 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make laser process")
+            .process_address;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_LASER_PROCESS_RAM,
+                laser_process,
+            )
+            .expect("set LASPRC");
+        machine
+            .memory
+            .write_word(laser_process + 0x07, 0x5300)
+            .expect("set laser PD");
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM, 0x5100)
+            .expect("set LSTATE");
+        for address in [0x5100, 0x5200, 0x5300] {
+            machine
+                .memory
+                .write_byte(address, 0xEE)
+                .expect("seed laser");
+        }
+
+        let enemy_object = machine
+            .red_label_get_object_cell()
+            .expect("get enemy object");
+        machine
+            .memory
+            .write_word(
+                enemy_object + 0x02,
+                red_label_object_picture_address("SCZP1").expect("SCZP1 address"),
+            )
+            .expect("set enemy picture");
+        machine
+            .memory
+            .write_word(enemy_object + 0x0A, 0x1F00)
+            .expect("set enemy OX16");
+        machine
+            .memory
+            .write_word(enemy_object + 0x0C, 0xA000)
+            .expect("set enemy OY16");
+        machine
+            .red_label_activate_object_cell(enemy_object)
+            .expect("activate enemy");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_POINTER_RAM,
+                enemy_object,
+            )
+            .expect("set ENEMYP");
+        let table_pointer = RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS + 2;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM,
+                table_pointer,
+            )
+            .expect("set OTABPT");
+        machine
+            .memory
+            .write_byte(0xA0BA, RED_LABEL_ATTRACT_INSTRUCTION_STATUS)
+            .expect("set attract STATUS");
+        let amod11_address = red_label_routine_address("AMOD11").expect("AMOD11 address");
+        let bmode2_address = red_label_routine_address("BMODE2").expect("BMODE2 address");
+        let process_address = machine
+            .red_label_make_process(amod11_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMOD11 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMOD11")
+            .expect("scheduled AMOD11");
+        let resolved = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionEnemyResolve(resolved) => resolved,
+            other => panic!("expected AMOD11 resolve, got {other:?}"),
+        };
+
+        assert_eq!(resolved.process_address, process_address);
+        assert_eq!(resolved.table_pointer_before, table_pointer);
+        assert_eq!(resolved.table_pointer_after, table_pointer + 2);
+        assert_eq!(resolved.table_index, 1);
+        assert_eq!(resolved.enemy_object, enemy_object);
+        assert_eq!(resolved.enemy_explosion.object_address, enemy_object);
+        assert_eq!(resolved.enemy_explosion.slot_address, Some(0x9C00));
+        assert_eq!(resolved.x16, RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X[1]);
+        assert_eq!(resolved.y16, 0x6000);
+        assert_eq!(resolved.appearance.object_address, enemy_object);
+        assert_eq!(
+            resolved.appearance.original_picture_address,
+            red_label_object_picture_address("SCZP1").expect("SCZP1 address")
+        );
+        assert_eq!(resolved.appearance.slot_address, Some(0x9C40));
+        assert_eq!(
+            resolved.laser_kill.cleared_addresses,
+            vec![0x5100, 0x5200, 0x5300]
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, enemy_object, "OX16")
+                .expect("read enemy OX16"),
+            RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_X[1]
+        );
+        assert_eq!(
+            machine
+                .memory
+                .read_object_word(&layout, enemy_object, "OY16")
+                .expect("read enemy OY16"),
+            0x6000
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM + 2
+            ),
+            Some(&(table_pointer + 2).to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    bmode2_address.to_be_bytes()[0],
+                    bmode2_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_RESOLVE_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn bmode2_advances_text_pointer_and_sleeps_to_bmode3() {
+        let mut machine = ArcadeMachine::new();
+        let bmode2_address = red_label_routine_address("BMODE2").expect("BMODE2 address");
+        let bmode3_address = red_label_routine_address("BMODE3").expect("BMODE3 address");
+        let process_address = machine
+            .red_label_make_process(bmode2_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make BMODE2 process")
+            .process_address;
+        machine
+            .memory
+            .write_word(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM, 0xCC63)
+            .expect("set TEXPTR");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch BMODE2")
+            .expect("scheduled BMODE2");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionTextAdvance(
+                RedLabelAttractInstructionTextAdvance {
+                    process_address,
+                    text_pointer_before: 0xCC63,
+                    text_pointer_after: 0xCC65,
+                    sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_ADVANCE_SLEEP_TICKS,
+                    wakeup_address: bmode3_address,
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn textp_writes_scanner_text_and_sleeps_to_textp2() {
+        let mut machine = ArcadeMachine::new();
+        let textp_address = red_label_routine_address("TEXTP").expect("TEXTP address");
+        let textp2_address = red_label_routine_address("TEXTP2").expect("TEXTP2 address");
+        let process_address = machine
+            .red_label_make_process(textp_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make TEXTP process")
+            .process_address;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM,
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2,
+            )
+            .expect("set TEXPTR");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch TEXTP")
+            .expect("scheduled TEXTP");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionTextProcess(
+                RedLabelAttractInstructionTextProcess {
+                    process_address,
+                    restarted: false,
+                    table_pointer_before: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE,
+                    table_pointer_after: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2,
+                    text_pointer_limit: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2,
+                    message_vector_address: 0xC0EB,
+                    message_screen_address: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SCREEN_ADDRESSES[0],
+                    message_label: "SCANV",
+                    cursor_after: 0x6130,
+                    sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SLEEP_TICKS,
+                    wakeup_address: textp2_address,
+                }
+            )
+        );
+        assert_message_glyph_first_column(
+            &machine,
+            RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SCREEN_ADDRESSES[0],
+            'S',
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM + 2
+            ),
+            Some(&(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2).to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    textp2_address.to_be_bytes()[0],
+                    textp2_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SLEEP_TICKS
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn textp2_continues_until_text_pointer_then_restarts() {
+        let mut machine = ArcadeMachine::new();
+        let textp2_address = red_label_routine_address("TEXTP2").expect("TEXTP2 address");
+        let process_address = machine
+            .red_label_make_process(textp2_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make TEXTP2 process")
+            .process_address;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM,
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2,
+            )
+            .expect("set TEXTMP");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM,
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 4,
+            )
+            .expect("set TEXPTR");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch TEXTP2 continue")
+            .expect("scheduled TEXTP2");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionTextProcess(
+                RedLabelAttractInstructionTextProcess {
+                    process_address,
+                    restarted: false,
+                    table_pointer_before: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2,
+                    table_pointer_after: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 4,
+                    text_pointer_limit: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 4,
+                    message_vector_address: 0xC0DD,
+                    message_screen_address: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SCREEN_ADDRESSES[1],
+                    message_label: "LANDV",
+                    cursor_after: 0x307A,
+                    sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SLEEP_TICKS,
+                    wakeup_address: textp2_address,
+                }
+            )
+        );
+        assert_message_glyph_first_column(
+            &machine,
+            RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SCREEN_ADDRESSES[1],
+            'L',
+        );
+        assert_score_digit_first_column(&machine, 0x227A, 1);
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM + 2
+            ),
+            Some(&(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 4).to_be_bytes()[..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process_address = machine
+            .red_label_make_process(textp2_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make restarting TEXTP2 process")
+            .process_address;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM,
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 4,
+            )
+            .expect("set restarting TEXTMP");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM,
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 4,
+            )
+            .expect("set restarting TEXPTR");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch TEXTP2 restart")
+            .expect("scheduled restart TEXTP2");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionTextProcess(
+                RedLabelAttractInstructionTextProcess {
+                    process_address,
+                    restarted: true,
+                    table_pointer_before: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE,
+                    table_pointer_after: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2,
+                    text_pointer_limit: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 4,
+                    message_vector_address: 0xC0EB,
+                    message_screen_address: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SCREEN_ADDRESSES[0],
+                    message_label: "SCANV",
+                    cursor_after: 0x6130,
+                    sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TEXT_SLEEP_TICKS,
+                    wakeup_address: textp2_address,
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM
+                    ..RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM + 2
+            ),
+            Some(&(RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 2).to_be_bytes()[..])
+        );
+    }
+
+    #[test]
+    fn textp2_rejects_invalid_text_table_pointer() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .red_label_make_process(
+                red_label_routine_address("TEXTP2").expect("TEXTP2 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make TEXTP2 process");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TEMP_RAM,
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 1,
+            )
+            .expect("set invalid TEXTMP");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_POINTER_RAM,
+                RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE + 4,
+            )
+            .expect("set TEXPTR");
+
+        let error = machine
+            .step_red_label_translated_process()
+            .expect_err("invalid TEXTP2 pointer");
+
+        assert!(error.contains("instruction text table pointer"));
+    }
+
+    #[test]
+    fn message_text_controls_parse_and_apply_source_layout_ops() {
+        assert_eq!(
+            super::red_label_message_control("WORD").expect("plain"),
+            None
+        );
+        assert_eq!(
+            super::red_label_message_control("[HMT:0x02]").expect("HMT"),
+            Some(super::RedLabelMessageControl::HorizontalFromTopLeft(0x02))
+        );
+        assert_eq!(
+            super::red_label_message_control("[HMC:0x03]").expect("HMC"),
+            Some(super::RedLabelMessageControl::HorizontalFromCursor(0x03))
+        );
+        assert_eq!(
+            super::red_label_message_control("[VMT:0x04]").expect("VMT"),
+            Some(super::RedLabelMessageControl::VerticalFromTopLeft(0x04))
+        );
+        assert_eq!(
+            super::red_label_message_control("[VMC:0x05]").expect("VMC"),
+            Some(super::RedLabelMessageControl::VerticalFromCursor(0x05))
+        );
+        assert_eq!(
+            super::red_label_message_control("[RTC:0x12,0x34]").expect("RTC"),
+            Some(super::RedLabelMessageControl::ResetTopLeftAndCursor(0x1234))
+        );
+        assert_eq!(
+            super::red_label_message_control("[RLF]").expect("RLF"),
+            Some(super::RedLabelMessageControl::ReturnLineFeed)
+        );
+        assert!(
+            super::red_label_message_control("[BAD]")
+                .expect_err("unsupported control")
+                .contains("not supported")
+        );
+        assert!(
+            super::red_label_message_control("[HMC:06]")
+                .expect_err("missing hex prefix")
+                .contains("must start with 0x")
+        );
+        assert!(
+            super::red_label_message_control("[HMC:0xGG]")
+                .expect_err("invalid hex")
+                .contains("is invalid")
+        );
+        assert!(
+            super::red_label_message_control("[RTC:0x12]")
+                .expect_err("missing coordinate")
+                .contains("must provide x,y bytes")
+        );
+
+        let mut layout = super::RedLabelMessageTextLayout {
+            top_left: 0x2030,
+            cursor: 0x2435,
+            line_spacing: 0x0A,
+        };
+        layout.apply(super::RedLabelMessageControl::HorizontalFromTopLeft(0x03));
+        assert_eq!(layout.cursor, 0x2335);
+        layout.apply(super::RedLabelMessageControl::HorizontalFromCursor(0x04));
+        assert_eq!(layout.cursor, 0x2735);
+        layout.apply(super::RedLabelMessageControl::VerticalFromTopLeft(0x08));
+        assert_eq!(layout.cursor, 0x2738);
+        layout.apply(super::RedLabelMessageControl::VerticalFromCursor(0x06));
+        assert_eq!(layout.cursor, 0x273E);
+        layout.apply(super::RedLabelMessageControl::ResetTopLeftAndCursor(0x1122));
+        assert_eq!(layout.top_left, 0x1122);
+        assert_eq!(layout.cursor, 0x1122);
+        layout.apply(super::RedLabelMessageControl::ReturnLineFeed);
+        assert_eq!(layout.cursor, 0x112C);
+    }
+
+    #[test]
+    fn bmode3_spawns_next_enemy_or_sleeps_at_table_end() {
+        let mut machine = ArcadeMachine::new();
+        let bmode3_address = red_label_routine_address("BMODE3").expect("BMODE3 address");
+        let amod10_address = red_label_routine_address("AMOD10").expect("AMOD10 address");
+        let process_address = machine
+            .red_label_make_process(bmode3_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make BMODE3 process")
+            .process_address;
+        let table_pointer = RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS + 4;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM,
+                table_pointer,
+            )
+            .expect("set OTABPT");
+        machine
+            .memory
+            .write_byte(0xA0BA, RED_LABEL_ATTRACT_INSTRUCTION_STATUS)
+            .expect("set attract STATUS");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch BMODE3 next")
+            .expect("scheduled BMODE3");
+        let spawn = match dispatch {
+            RedLabelProcessDispatch::AttractInstructionTableDecision(
+                RedLabelAttractInstructionTableDecision::NextEnemy(spawn),
+            ) => spawn,
+            other => panic!("expected BMODE3 next enemy, got {other:?}"),
+        };
+
+        assert_eq!(spawn.table_pointer_before, table_pointer);
+        assert_eq!(spawn.table_index, 2);
+        assert_eq!(
+            spawn.picture_address,
+            red_label_object_picture_address("UFOP1").expect("UFOP1 address")
+        );
+        assert_eq!(spawn.wakeup_address, amod10_address);
+        assert_eq!(
+            machine.red_label_ram_range(process_address + 2..process_address + 5),
+            Some(
+                &[
+                    amod10_address.to_be_bytes()[0],
+                    amod10_address.to_be_bytes()[1],
+                    RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_SLEEP_TICKS
+                ][..]
+            )
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process_address = machine
+            .red_label_make_process(bmode3_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make ending BMODE3 process")
+            .process_address;
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM,
+                RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_END,
+            )
+            .expect("set OTABND");
+        let amod13_address = red_label_routine_address("AMOD13").expect("AMOD13 address");
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch BMODE3 end")
+            .expect("scheduled BMODE3");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionTableDecision(
+                RedLabelAttractInstructionTableDecision::TableEnded {
+                    process_address,
+                    table_pointer: RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_END,
+                    sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_TABLE_END_SLEEP_TICKS,
+                    wakeup_address: amod13_address,
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn amod13_sleeps_back_to_williams_page() {
+        let mut machine = ArcadeMachine::new();
+        let amod13_address = red_label_routine_address("AMOD13").expect("AMOD13 address");
+        let amodes_address = red_label_routine_address("AMODES").expect("AMODES address");
+        let process_address = machine
+            .red_label_make_process(amod13_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make AMOD13 process")
+            .process_address;
+
+        let dispatch = machine
+            .step_red_label_translated_process()
+            .expect("dispatch AMOD13")
+            .expect("scheduled AMOD13");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::AttractInstructionRestart(RedLabelAttractInstructionRestart {
+                process_address,
+                sleep_ticks: RED_LABEL_ATTRACT_INSTRUCTION_RESTART_SLEEP_TICKS,
+                wakeup_address: amodes_address,
+            })
+        );
+    }
+
+    #[test]
+    fn amod12_rejects_invalid_enemy_table_pointer() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .red_label_make_process(
+                red_label_routine_address("AMOD12").expect("AMOD12 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make AMOD12 process");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_ATTRACT_INSTRUCTION_OBJECT_TABLE_POINTER_RAM,
+                RED_LABEL_ATTRACT_INSTRUCTION_ENEMY_TABLE_ADDRESS + 1,
+            )
+            .expect("set invalid OTABPT");
+
+        let error = machine
+            .step_red_label_translated_process()
+            .expect_err("invalid AMOD12 pointer");
+
+        assert!(error.contains("attract enemy table pointer"));
+    }
+
+    #[test]
+    fn raw_attract_defender_appearance_preserves_apvct_edge_paths() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_word(0xA020, 0).expect("clear BGL");
+        let object_address = 0xB500;
+        machine
+            .memory
+            .write_word(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET,
+                0xCAFE,
+            )
+            .expect("set raw picture");
+        machine
+            .memory
+            .write_word(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET,
+                0x0100,
+            )
+            .expect("set raw x");
+
+        let appearance = machine
+            .memory
+            .start_appearance_for_raw_object_cell(object_address)
+            .expect("raw APVCT appearance");
+
+        assert_eq!(appearance.object_address, object_address);
+        assert_eq!(appearance.original_picture_address, 0xCAFE);
+        assert_eq!(
+            appearance.final_picture_address,
+            red_label_object_picture_address("NULOB").expect("NULOB address")
+        );
+        assert_eq!(appearance.relative_x, 0x0100);
+        assert_eq!(appearance.slot_address, Some(0x9C00));
+        assert_eq!(
+            appearance.sound_loaded,
+            Some(RedLabelLoadedSoundTable {
+                address: red_label_sound_table_address("APSND").expect("APSND address"),
+                priority: 0xD0,
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_TYPE_OFFSET
+                    ..object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_TYPE_OFFSET + 1
+            ),
+            Some(&[0x02][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_word(0xA020, 0).expect("clear BGL");
+        machine
+            .memory
+            .write_word(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET,
+                0xBEEF,
+            )
+            .expect("set offscreen picture");
+        machine
+            .memory
+            .write_word(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET,
+                0x2701,
+            )
+            .expect("set offscreen x");
+        let offscreen = machine
+            .memory
+            .start_appearance_for_raw_object_cell(object_address)
+            .expect("offscreen raw APVCT");
+        assert_eq!(offscreen.slot_address, None);
+        assert_eq!(offscreen.final_picture_address, 0xBEEF);
+        assert_eq!(
+            machine.red_label_ram_range(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET
+                    ..object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET + 2
+            ),
+            Some(&[0xBE, 0xEF][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        for slot in 0..16 {
+            machine
+                .memory
+                .write_word(0x9C00 + slot * 0x40, 0x8000)
+                .expect("mark appearance slot busy");
+        }
+        machine
+            .memory
+            .write_word(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET,
+                0xC0DE,
+            )
+            .expect("set busy picture");
+        machine
+            .memory
+            .write_word(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET,
+                0x0100,
+            )
+            .expect("set busy x");
+        let busy = machine
+            .memory
+            .start_appearance_for_raw_object_cell(object_address)
+            .expect("busy raw APVCT");
+        assert_eq!(busy.slot_address, None);
+        assert_eq!(busy.final_picture_address, 0xC0DE);
+        assert_eq!(
+            machine.red_label_ram_range(
+                object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET
+                    ..object_address + RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET + 2
+            ),
+            Some(&[0xC0, 0xDE][..])
+        );
+    }
+
+    #[test]
+    fn hall_of_fame_logo_helpers_guard_ram_range_and_map_colors() {
+        let logo_start = usize::from(RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM);
+        let logo_end = logo_start + RED_LABEL_DEFENDER_LOGO_BYTES;
+
+        assert_eq!(
+            checked_defender_logo_ram_range(logo_end).expect("logo range fits"),
+            logo_start..logo_end
+        );
+        let error = checked_defender_logo_ram_range(logo_end - 1).expect_err("logo range overflow");
+        assert!(error.contains("red-label DEFBLK image range 0xB412..0xB9B2 exceeds RAM"));
+
+        assert_eq!(defender_logo_color_byte(0x04), 0x22);
+        assert_eq!(defender_logo_color_byte(0x08), 0xCC);
+        assert_eq!(defender_logo_color_byte(0x0C), 0x00);
+        assert_eq!(defender_logo_color_byte(0x00), 0x00);
+    }
+
+    #[test]
+    fn hall_of_fame_score_chars_match_source_leading_blank_rules() {
+        assert_eq!(hall_of_fame_score_chars(0).expect("zero score"), *b"      ");
+        assert_eq!(
+            hall_of_fame_score_chars(21_270).expect("default score"),
+            *b" 21270"
+        );
+        assert_eq!(
+            hall_of_fame_score_chars(999_999).expect("max score"),
+            *b"999999"
+        );
+        let error = hall_of_fame_score_chars(RED_LABEL_HIGH_SCORE_MAX_SCORE + 1)
+            .expect_err("score overflow");
+        assert!(error.contains("red-label high score 1000000 exceeds 999999"));
     }
 
     #[test]
@@ -19067,6 +31018,240 @@ mod tests {
     }
 
     #[test]
+    fn two_player_game_over_collects_player_one_then_player_two_initials() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.current_player = 2;
+        snapshot.scores.player_one = 50_000;
+        snapshot.scores.player_two = 40_000;
+        machine.restore(snapshot);
+
+        let first = machine.step_with_typed_chars(CabinetInput::NONE, &['a', 'a', 'a']);
+
+        assert_eq!(first.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(
+            first.snapshot.high_score_submission,
+            Some(super::HighScoreSubmissionState {
+                player: 1,
+                score: 50_000,
+            })
+        );
+        assert_eq!(first.snapshot.scores.high_score, 50_000);
+        let first_events = first.events().collect::<Vec<_>>();
+        assert_eq!(
+            first_events,
+            vec![
+                MachineEvent::HighScoreEntryStarted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreSubmitted,
+            ]
+        );
+
+        let saved = machine.save_state();
+        let mut restored = ArcadeMachine::new();
+        restored.restore_state(saved);
+        let second = restored.step_with_typed_chars(CabinetInput::NONE, &['b', 'b', 'b']);
+
+        assert_eq!(second.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(
+            second.snapshot.high_score_submission,
+            Some(super::HighScoreSubmissionState {
+                player: 2,
+                score: 40_000,
+            })
+        );
+        let second_events = second.events().collect::<Vec<_>>();
+        assert_eq!(
+            second_events,
+            vec![
+                MachineEvent::HighScoreEntryStarted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreSubmitted,
+            ]
+        );
+        let all_time_offset = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+        assert_eq!(
+            [
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset)
+                    .expect("all-time first score high byte"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 2)
+                    .expect("all-time first score middle byte"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 4)
+                    .expect("all-time first score low byte"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 6)
+                    .expect("all-time first initial"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 8)
+                    .expect("all-time second initial"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 10)
+                    .expect("all-time third initial"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 12)
+                    .expect("all-time second score high byte"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 14)
+                    .expect("all-time second score middle byte"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 16)
+                    .expect("all-time second score low byte"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 18)
+                    .expect("all-time second first initial"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 20)
+                    .expect("all-time second second initial"),
+                cmos_sram_read_byte(restored.red_label_cmos_ram(), all_time_offset + 22)
+                    .expect("all-time second third initial"),
+            ],
+            [
+                0x05, 0x00, 0x00, b'A', b'A', b'A', 0x04, 0x00, 0x00, b'B', b'B', b'B',
+            ]
+        );
+    }
+
+    #[test]
+    fn all_time_only_high_score_does_not_start_initials_entry() {
+        let mut machine = ArcadeMachine::new();
+        for index in 0..RED_LABEL_HIGH_SCORE_ENTRIES {
+            machine
+                .memory
+                .write_high_score_entry(
+                    super::RuntimeHighScoreTable::TodaysGreatest,
+                    index,
+                    super::RuntimeHighScoreEntry {
+                        score: 99_999 - u32::try_from(index).expect("test rank fits in u32"),
+                        initials: [b'D', b'A', b'Y'],
+                    },
+                )
+                .expect("seed today's table");
+        }
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = 50_000;
+        machine.restore(snapshot);
+
+        let output = machine.step_with_typed_chars(CabinetInput::NONE, &['a', 'c', 'e']);
+
+        assert_eq!(output.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(output.snapshot.high_score_entry, None);
+        assert_eq!(output.snapshot.high_score_submission, None);
+        assert!(
+            !output
+                .events()
+                .any(|event| event == MachineEvent::HighScoreEntryStarted)
+        );
+    }
+
+    #[test]
+    fn restored_high_score_entry_submits_for_restored_current_player() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::HighScoreEntry;
+        snapshot.current_player = 2;
+        snapshot.high_score_entry = Some(super::HighScoreEntryState::new(30_000, 1));
+        machine.restore(snapshot);
+
+        let output = machine.step_with_typed_chars(CabinetInput::NONE, &['p', 't', 'o']);
+
+        assert_eq!(
+            output.snapshot.high_score_submission,
+            Some(super::HighScoreSubmissionState {
+                player: 2,
+                score: 30_000,
+            })
+        );
+    }
+
+    #[test]
+    fn translated_player_death_attract_and_respawn_clear_high_score_session() {
+        let mut attract_machine = ArcadeMachine::new();
+        attract_machine
+            .red_label_begin_live_high_score_entry(50_000)
+            .expect("begin high-score entry")
+            .expect("qualifying score");
+        attract_machine
+            .red_label_make_process(
+                red_label_routine_address("PLE3").expect("PLE3 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PLE3 process");
+        attract_machine
+            .memory
+            .write_byte(0xA036, 7)
+            .expect("dirty MAPCR");
+
+        let attract_dispatch = attract_machine
+            .step_red_label_translated_process()
+            .expect("dispatch PLE3")
+            .expect("scheduled PLE3");
+
+        assert_eq!(
+            attract_dispatch,
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::AttractJump {
+                process_address: 0xAAC5,
+                attract_address: red_label_routine_address("ATTR").expect("ATTR address"),
+                selected_map: 1,
+                attract_vector_address: RED_LABEL_ATTRACT_VECTOR_ADDRESS,
+            })
+        );
+        assert_eq!(
+            attract_machine.red_label_ram_range(0xA036..0xA037),
+            Some(&[1][..])
+        );
+        assert_eq!(attract_machine.snapshot().phase, GamePhase::Attract);
+        assert_eq!(attract_machine.snapshot().high_score_entry, None);
+
+        let mut respawn_machine = ArcadeMachine::new();
+        respawn_machine
+            .red_label_begin_live_high_score_entry(50_000)
+            .expect("begin high-score entry")
+            .expect("qualifying score");
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let player_one_lives = super::player_field_range_for_entry(&layout, 0, "PLAS")
+            .expect("player one lives")
+            .start;
+        let player_two_lives = super::player_field_range_for_entry(&layout, 1, "PLAS")
+            .expect("player two lives")
+            .start;
+        respawn_machine
+            .memory
+            .write_byte(player_one_lives, 0)
+            .expect("clear player one lives");
+        respawn_machine
+            .memory
+            .write_byte(player_two_lives, 1)
+            .expect("set player two lives");
+        respawn_machine
+            .memory
+            .write_byte(0xA08B, 1)
+            .expect("set current player");
+        respawn_machine
+            .memory
+            .write_byte(0xA08C, 2)
+            .expect("set player count");
+        respawn_machine
+            .red_label_make_process(
+                red_label_routine_address("PLE02").expect("PLE02 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PLE02 process");
+
+        let respawn_dispatch = respawn_machine
+            .step_red_label_translated_process()
+            .expect("dispatch PLE02")
+            .expect("scheduled PLE02");
+
+        assert!(matches!(
+            respawn_dispatch,
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::PostExplosionRespawnJump {
+                next_player: 2,
+                ..
+            })
+        ));
+        assert_eq!(respawn_machine.snapshot().phase, GamePhase::Playing);
+        assert_eq!(respawn_machine.snapshot().high_score_entry, None);
+    }
+
+    #[test]
     fn submitted_lower_rank_high_score_does_not_reenter_entry() {
         let mut machine = ArcadeMachine::new();
         let mut snapshot = machine.snapshot();
@@ -19098,41 +31283,82 @@ mod tests {
     }
 
     #[test]
+    fn restored_game_over_high_score_entry_is_not_restarted() {
+        let mut machine = ArcadeMachine::new();
+        let active_entry = super::HighScoreEntryState {
+            score: 50_000,
+            rank: 1,
+            initials: [b'A', b' ', b' '],
+            cursor: 1,
+        };
+        let mut snapshot = machine.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = active_entry.score;
+        snapshot.high_score_entry = Some(active_entry);
+        machine.restore(snapshot);
+
+        let output = machine.step_with_typed_chars(CabinetInput::NONE, &['b']);
+
+        assert_eq!(output.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(
+            output.snapshot.high_score_entry,
+            Some(super::HighScoreEntryState {
+                score: active_entry.score,
+                rank: active_entry.rank,
+                initials: [b'A', b'B', b' '],
+                cursor: 2,
+            })
+        );
+        let events = output.events().collect::<Vec<_>>();
+        assert!(!events.contains(&MachineEvent::HighScoreEntryStarted));
+        assert!(events.contains(&MachineEvent::HighScoreInitialAccepted));
+    }
+
+    #[test]
     fn translated_death_game_over_handoff_starts_live_high_score_entry() {
         let mut machine = ArcadeMachine::new();
-        let mut snapshot = machine.snapshot();
-        snapshot.phase = GamePhase::Playing;
-        machine.restore(snapshot);
-        write_ram_bytes(&mut machine, 0xA1C2, &[0x00, 0x05, 0x00, 0x00]);
-        machine.memory.write_byte(0xA112, 1).expect("set LNDCNT");
-        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
-        machine.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
-        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
-        machine.memory.write_byte(0xA1C9, 0).expect("clear PLAS");
-        machine
-            .red_label_make_process(
-                red_label_routine_address("PDTH5R").expect("PDTH5R address"),
-                RED_LABEL_SYSTEM_PROCESS_TYPE,
-            )
-            .expect("make PDTH5R process");
+        let process = make_live_game_over_sleeping_process(&mut machine, 50_000);
 
-        let dispatch = machine
-            .step_red_label_translated_process()
-            .expect("dispatch PDTH5R")
-            .expect("scheduled PDTH5R");
-
-        assert!(matches!(
-            dispatch,
-            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::GameOverSleeping { .. })
-        ));
-        assert_eq!(machine.snapshot().phase, GamePhase::GameOver);
+        assert_message_glyph_first_column(&machine, 0x3E80, 'G');
         assert_eq!(machine.snapshot().scores.player_one, 50_000);
+
+        for expected_timer in (1..40).rev() {
+            let sleeping = machine.step_with_typed_chars(CabinetInput::NONE, &['d']);
+            assert_eq!(sleeping.snapshot.phase, GamePhase::GameOver);
+            assert_eq!(sleeping.snapshot.high_score_entry, None);
+            assert!(
+                !sleeping
+                    .events()
+                    .any(|event| event == MachineEvent::HighScoreEntryStarted)
+            );
+            assert_eq!(
+                machine.red_label_ram_range(process + 0x04..process + 0x05),
+                Some(&[expected_timer][..])
+            );
+        }
+
+        let handoff = machine.step(CabinetInput::NONE);
+
+        assert_eq!(handoff.snapshot.phase, GamePhase::HighScoreEntry);
+        assert_eq!(
+            handoff.snapshot.high_score_entry.expect("entry started"),
+            super::HighScoreEntryState {
+                score: 50_000,
+                rank: 1,
+                initials: [b' ', b' ', b' '],
+                cursor: 0,
+            }
+        );
+        assert!(
+            handoff
+                .events()
+                .any(|event| event == MachineEvent::HighScoreEntryStarted)
+        );
 
         let entry = machine.step_with_typed_chars(CabinetInput::NONE, &['d']);
 
-        assert_eq!(entry.snapshot.phase, GamePhase::HighScoreEntry);
         assert_eq!(
-            entry.snapshot.high_score_entry.expect("entry started"),
+            entry.snapshot.high_score_entry.expect("initial accepted"),
             super::HighScoreEntryState {
                 score: 50_000,
                 rank: 1,
@@ -19140,10 +31366,44 @@ mod tests {
                 cursor: 1,
             }
         );
-        assert!(
-            entry
-                .events()
-                .any(|event| event == MachineEvent::HighScoreEntryStarted)
+    }
+
+    #[test]
+    fn translated_death_game_over_no_entry_waits_then_renders_hall_of_fame() {
+        let mut machine = ArcadeMachine::new();
+        let process = make_live_game_over_sleeping_process(&mut machine, 10);
+
+        for _ in 0..40 {
+            let output = machine.step(CabinetInput::NONE);
+            assert_eq!(output.snapshot.phase, GamePhase::GameOver);
+            assert_eq!(output.snapshot.high_score_entry, None);
+        }
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC1, 0x44, RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS][..])
+        );
+
+        for _ in 0..254 {
+            let output = machine.step(CabinetInput::NONE);
+            assert_eq!(output.snapshot.phase, GamePhase::GameOver);
+            assert_eq!(output.snapshot.high_score_entry, None);
+        }
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x04..process + 0x05),
+            Some(&[1][..])
+        );
+
+        let hall = machine.step(CabinetInput::NONE);
+
+        assert_eq!(hall.snapshot.phase, GamePhase::Attract);
+        assert_eq!(hall.snapshot.high_score_entry, None);
+        assert_message_glyph_first_column(&machine, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, 'H');
+        assert_score_digit_first_column(&machine, RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN, 1);
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[RED_LABEL_HALL_OF_FAME_STALL_TICKS][..])
         );
     }
 
@@ -19192,6 +31452,18 @@ mod tests {
             machine.red_label_ram_range(0xA037..0xA038),
             Some(&[0x00][..])
         );
+    }
+
+    #[test]
+    fn live_start_switch_reports_default_when_no_start_process_is_due() {
+        let mut machine = ArcadeMachine::new();
+
+        let outcome = machine
+            .step_red_label_live_start_switch(CabinetInput::NONE)
+            .expect("live start switch");
+
+        assert!(!outcome.process_ran);
+        assert!(!outcome.game_started);
     }
 
     #[test]
@@ -20218,6 +32490,105 @@ mod tests {
     }
 
     #[test]
+    fn scinit_prepares_attract_scene_world_and_video_state() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .initialize_altitude_table_from_tdata()
+            .expect("SCINIT BGI precondition");
+        let allocated_object = machine
+            .memory
+            .get_object_cell()
+            .expect("allocate dirty object");
+        machine
+            .memory
+            .activate_object_cell(allocated_object)
+            .expect("dirty active object list");
+        machine
+            .memory
+            .write_byte(0x4000, 0xEE)
+            .expect("dirty video byte");
+        machine
+            .memory
+            .write_byte(0x97FF, 0xEE)
+            .expect("dirty final video byte");
+        machine
+            .memory
+            .write_word(0xA020, 0x2220)
+            .expect("dirty BGL");
+        machine
+            .memory
+            .write_word(0xA022, 0x3330)
+            .expect("dirty BGLX");
+        machine
+            .memory
+            .write_byte(0xA026, 0xEE)
+            .expect("dirty PCRAM");
+        machine
+            .memory
+            .write_byte(0xA036, 0x02)
+            .expect("dirty MAPCR");
+        machine
+            .memory
+            .write_byte(0xA0BA, 0x12)
+            .expect("dirty STATUS");
+        machine
+            .memory
+            .write_word(0xA0BF, 0xFFFF)
+            .expect("dirty PLAXC");
+
+        let init = machine
+            .red_label_initialize_attract_scene_from_scinit()
+            .expect("SCINIT attract setup");
+
+        assert_eq!(
+            init,
+            RedLabelAttractSceneInit {
+                initial_status: 0xFF,
+                screen_clear: screen_clear(),
+                background: RedLabelBackgroundInit {
+                    bgi_address: red_label_routine_address("BGI").expect("BGI address"),
+                    selected_map: 7,
+                    terrain_tables: expected_bginit(),
+                },
+                color_ram: RedLabelColorRamInit {
+                    source_label: String::from("CRTAB"),
+                    source_address: 0xF8BE,
+                    target_start: 0xA026,
+                    target_end: 0xA036,
+                    bytes: CRTAB_BYTES.to_vec(),
+                },
+                final_status: 0xDB,
+                player_scanner_center: 0x1030,
+            }
+        );
+        assert_eq!(machine.memory.ram_range(0x4000..0x4001), Some(&[0][..]));
+        assert_eq!(machine.memory.ram_range(0x97FF..0x9800), Some(&[0][..]));
+        assert_eq!(
+            machine.memory.ram_range(0xA020..0xA024),
+            Some(&[0, 0, 0, 0][..])
+        );
+        assert_eq!(
+            machine.memory.ram_range(0xA026..0xA036),
+            Some(&CRTAB_BYTES[..])
+        );
+        assert_eq!(machine.memory.ram_range(0xA036..0xA037), Some(&[7][..]));
+        assert_eq!(
+            machine.memory.ram_range(0xA065..0xA069),
+            Some(&[0, 0, 0xA2, 0x3C][..])
+        );
+        assert_eq!(machine.memory.ram_range(0xA0BA..0xA0BB), Some(&[0xDB][..]));
+        assert_eq!(
+            machine.memory.ram_range(0xA0BF..0xA0C1),
+            Some(&[0x10, 0x30][..])
+        );
+        assert_eq!(
+            machine.memory.ram_range(0xA23C..0xA23E),
+            Some(&[0xA2, 0x53][..])
+        );
+    }
+
+    #[test]
     fn bgout_draws_selected_terrain_flavor_and_updates_stbl() {
         let mut memory =
             super::RedLabelRuntimeMemory::new_initialized().expect("initialized runtime memory");
@@ -20241,7 +32612,7 @@ mod tests {
             .output_terrain_from_bgl(0x1234)
             .expect("BGOUT terrain output");
 
-        assert_eq!(output, expected_bgout_default());
+        assert_eq!(output, expected_bgout_default(0x1234));
         assert_eq!(
             memory.ram_range(0xA013..0xA017),
             Some(&[0x12, 0x34, 0x00, 0x00][..])
@@ -21921,6 +34292,7 @@ mod tests {
     #[test]
     fn irq_scanline_object_phase_gates_normal_iflg_timer_and_bounds() {
         let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA036, 7).expect("set MAPCR");
         machine
             .memory
             .write_byte(0xA0C0, 0xE0)
@@ -21933,10 +34305,14 @@ mod tests {
         assert_eq!(idle.mode, RedLabelIrqMode::Normal);
         assert_eq!(idle.vertical_counter, 0x20);
         assert_eq!(idle.phase, RedLabelIrqSchedulerPhase::Idle);
+        assert_eq!(idle.hardware_map_before, 0);
+        assert_eq!(idle.hardware_map_writes, vec![0, 0, 7]);
+        assert_eq!(idle.hardware_map_after, 7);
         assert_eq!(idle.previous_iflg, 0);
         assert_eq!(idle.iflg, 0);
         assert_eq!(idle.pre_tail_steps, Vec::new());
         assert_eq!(idle.object_band, None);
+        assert_eq!(machine.red_label_hardware_map(), 7);
 
         machine.memory.write_byte(0xA0A3, 0xA3).expect("set XXX3");
         let upper = machine
@@ -21944,10 +34320,13 @@ mod tests {
             .expect("normal IRQ upper object phase");
 
         assert_eq!(upper.phase, RedLabelIrqSchedulerPhase::NormalUpper);
+        assert_eq!(upper.hardware_map_before, 7);
+        assert_eq!(upper.hardware_map_writes, vec![0, 2, 0, 7]);
+        assert_eq!(upper.hardware_map_after, 7);
         assert_eq!(upper.previous_iflg, 0);
         assert_eq!(upper.iflg, 1);
         assert_eq!(upper.xxx2, Some(0xA8));
-        assert!(!upper.palette_copy_due);
+        assert_eq!(upper.palette_copy, None);
         assert_eq!(upper.watchdog_value, None);
         assert_eq!(upper.pre_tail_steps.len(), 3);
         assert!(matches!(
@@ -21983,6 +34362,9 @@ mod tests {
             .expect("normal IRQ upper armed idle");
 
         assert_eq!(upper_idle.phase, RedLabelIrqSchedulerPhase::Idle);
+        assert_eq!(upper_idle.hardware_map_before, 7);
+        assert_eq!(upper_idle.hardware_map_writes, vec![0, 0, 7]);
+        assert_eq!(upper_idle.hardware_map_after, 7);
         assert_eq!(upper_idle.previous_iflg, 1);
         assert_eq!(upper_idle.iflg, 1);
         assert_eq!(upper_idle.pre_tail_steps, Vec::new());
@@ -21995,6 +34377,14 @@ mod tests {
         machine.memory.write_byte(0xA0A1, 0x60).expect("set XXX1");
         machine.memory.write_byte(0xA0A2, 0x40).expect("set XXX2");
         machine.memory.write_byte(0xA05D, 0xFF).expect("set TIMER");
+        let normal_palette = [
+            0x10, 0x11, 0x12, 0x13, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x30, 0x31, 0x32, 0x33,
+            0x34, 0x35,
+        ];
+        machine
+            .memory
+            .write_range(0xA026..0xA036, &normal_palette)
+            .expect("set PCRAM");
         machine
             .memory
             .write_byte(0xA0C0, 0x80)
@@ -22004,12 +34394,25 @@ mod tests {
             .expect("normal IRQ lower object phase");
 
         assert_eq!(lower.phase, RedLabelIrqSchedulerPhase::NormalLower);
+        assert_eq!(lower.hardware_map_before, 7);
+        assert_eq!(lower.hardware_map_writes, vec![0, 7, 2, 0, 7]);
+        assert_eq!(lower.hardware_map_after, 7);
         assert_eq!(lower.previous_iflg, 1);
         assert_eq!(lower.iflg, 0);
         assert_eq!(lower.timer_before, Some(0xFF));
         assert_eq!(lower.timer_after, Some(0x00));
         assert_eq!(lower.watchdog_value, Some(0x38));
-        assert!(lower.palette_copy_due);
+        assert_eq!(
+            lower.palette_copy,
+            Some(RedLabelPaletteCopy {
+                source_start: 0xA026,
+                target_start: 0xC000,
+                bytes_copied: PALETTE_RAM_SIZE as u8,
+                palette_ram: normal_palette,
+            })
+        );
+        assert_eq!(machine.red_label_palette_ram(), &normal_palette);
+        assert_eq!(machine.red_label_hardware_map(), 7);
         assert_eq!(
             lower.pre_tail_steps,
             vec![
@@ -22030,6 +34433,7 @@ mod tests {
     #[test]
     fn irq_scanline_object_phase_gates_inverted_iflg_timer_and_bounds() {
         let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA036, 5).expect("set MAPCR");
         machine.memory.write_byte(0xA0A1, 0x80).expect("set XXX1");
         machine.memory.write_byte(0xA0A3, 0x40).expect("set XXX3");
         machine
@@ -22044,10 +34448,13 @@ mod tests {
         assert_eq!(upper.mode, RedLabelIrqMode::Inverted);
         assert_eq!(upper.vertical_counter, 0xA0);
         assert_eq!(upper.phase, RedLabelIrqSchedulerPhase::InvertedUpper);
+        assert_eq!(upper.hardware_map_before, 0);
+        assert_eq!(upper.hardware_map_writes, vec![0, 7, 2, 0, 5]);
+        assert_eq!(upper.hardware_map_after, 5);
         assert_eq!(upper.previous_iflg, 0);
         assert_eq!(upper.iflg, 1);
         assert_eq!(upper.xxx2, Some(0x5F));
-        assert!(!upper.palette_copy_due);
+        assert_eq!(upper.palette_copy, None);
         assert_eq!(
             upper.pre_tail_steps,
             vec![
@@ -22068,6 +34475,14 @@ mod tests {
         assert_eq!(upper_band.steps.len(), 2);
 
         machine.memory.write_byte(0xA05D, 0x09).expect("set TIMER");
+        let inverted_palette = [
+            0xA0, 0xA1, 0xA2, 0xA3, 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xC0, 0xC1, 0xC2, 0xC3,
+            0xC4, 0xC5,
+        ];
+        machine
+            .memory
+            .write_range(0xA026..0xA036, &inverted_palette)
+            .expect("set PCRAM");
         machine
             .memory
             .write_byte(0xA0C0, 0x80)
@@ -22077,12 +34492,25 @@ mod tests {
             .expect("inverted IRQ lower object phase");
 
         assert_eq!(lower.phase, RedLabelIrqSchedulerPhase::InvertedLower);
+        assert_eq!(lower.hardware_map_before, 5);
+        assert_eq!(lower.hardware_map_writes, vec![0, 2, 0, 5]);
+        assert_eq!(lower.hardware_map_after, 5);
         assert_eq!(lower.previous_iflg, 1);
         assert_eq!(lower.iflg, 0);
         assert_eq!(lower.timer_before, Some(0x09));
         assert_eq!(lower.timer_after, Some(0x0A));
         assert_eq!(lower.watchdog_value, Some(0x39));
-        assert!(lower.palette_copy_due);
+        assert_eq!(
+            lower.palette_copy,
+            Some(RedLabelPaletteCopy {
+                source_start: 0xA026,
+                target_start: 0xC000,
+                bytes_copied: PALETTE_RAM_SIZE as u8,
+                palette_ram: inverted_palette,
+            })
+        );
+        assert_eq!(machine.red_label_palette_ram(), &inverted_palette);
+        assert_eq!(machine.red_label_hardware_map(), 5);
         assert_eq!(lower.pre_tail_steps.len(), 3);
         assert!(matches!(
             lower.pre_tail_steps[0],
@@ -22114,7 +34542,57 @@ mod tests {
     }
 
     #[test]
-    fn irq_scanline_object_phase_runs_bgout_when_stack_pointer_context_is_supplied() {
+    fn irq_scanline_object_phase_reports_inverted_idle_and_no_palette_lower_passes() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA036, 5).expect("set MAPCR");
+        machine.memory.write_byte(0xA092, 1).expect("arm IFLG");
+
+        let idle_after_upper = machine
+            .red_label_run_irq_scanline_object_phase(RedLabelIrqMode::Inverted, 0xA0)
+            .expect("inverted IRQ idle after upper");
+        assert_eq!(idle_after_upper.phase, RedLabelIrqSchedulerPhase::Idle);
+        assert_eq!(idle_after_upper.previous_iflg, 1);
+        assert_eq!(idle_after_upper.iflg, 1);
+        assert_eq!(idle_after_upper.palette_copy, None);
+        assert!(idle_after_upper.object_band.is_none());
+
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA036, 5).expect("set MAPCR");
+        machine.memory.write_byte(0xA092, 0).expect("clear IFLG");
+        let idle_before_upper = machine
+            .red_label_run_irq_scanline_object_phase(RedLabelIrqMode::Inverted, 0x20)
+            .expect("inverted IRQ idle before upper");
+        assert_eq!(idle_before_upper.phase, RedLabelIrqSchedulerPhase::Idle);
+        assert_eq!(idle_before_upper.previous_iflg, 0);
+        assert_eq!(idle_before_upper.iflg, 0);
+        assert_eq!(idle_before_upper.palette_copy, None);
+        assert!(idle_before_upper.object_band.is_none());
+
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA036, 5).expect("set MAPCR");
+        machine.memory.write_byte(0xA092, 1).expect("arm IFLG");
+        machine.memory.write_byte(0xA05D, 0x09).expect("set TIMER");
+        machine.memory.write_byte(0xA0A1, 0x80).expect("set XXX1");
+        machine.memory.write_byte(0xA0A2, 0x40).expect("set XXX2");
+        machine
+            .memory
+            .write_byte(0xA0C0, 0x80)
+            .expect("set PLAYC outside lower band");
+        let lower_no_palette = machine
+            .red_label_run_irq_scanline_object_phase(RedLabelIrqMode::Inverted, 0x20)
+            .expect("inverted IRQ lower no palette");
+        assert_eq!(
+            lower_no_palette.phase,
+            RedLabelIrqSchedulerPhase::InvertedLower
+        );
+        assert_eq!(lower_no_palette.previous_iflg, 1);
+        assert_eq!(lower_no_palette.iflg, 0);
+        assert_eq!(lower_no_palette.palette_copy, None);
+        assert!(lower_no_palette.object_band.is_some());
+    }
+
+    #[test]
+    fn irq_scanline_object_phase_runs_bgout_with_source_irq_stack_context() {
         let mut machine = ArcadeMachine::new();
         machine
             .red_label_initialize_altitude_table()
@@ -22134,26 +34612,400 @@ mod tests {
             .red_label_run_irq_scanline_object_phase_with_context(
                 RedLabelIrqMode::Normal,
                 0x20,
-                RedLabelIrqSchedulerContext {
-                    terrain_stack_pointer: Some(0x1234),
-                    input_ports: DefenderInputPorts::EMPTY,
-                },
+                RedLabelIrqSchedulerContext::source_irq(DefenderInputPorts::EMPTY),
             )
-            .expect("normal IRQ lower object phase with BGOUT context");
+            .expect("normal IRQ lower object phase with source BGOUT stack context");
 
         assert_eq!(step.phase, RedLabelIrqSchedulerPhase::NormalLower);
         assert_eq!(step.watchdog_value, Some(0x38));
-        assert!(!step.palette_copy_due);
+        assert_eq!(step.palette_copy, None);
         assert_eq!(
             step.pre_tail_steps,
             vec![
                 RedLabelIrqPreTailStep::CoinScan(expected_empty_coin_scan()),
-                RedLabelIrqPreTailStep::TerrainOutput(expected_bgout_default()),
+                RedLabelIrqPreTailStep::TerrainOutput(expected_bgout_default(
+                    red_label_irq_bgout_stack_pointer()
+                )),
             ]
         );
+        assert_eq!(red_label_irq_bgout_stack_pointer(), 0xBFF1);
         assert_eq!(
             machine.red_label_ram_range(0xA013..0xA017),
-            Some(&[0x12, 0x34, 0x00, 0x00][..])
+            Some(&[0xBF, 0xF1, 0x00, 0x00][..])
+        );
+    }
+
+    #[test]
+    fn live_irq_video_frame_helpers_reject_missing_source_slices() {
+        let pre_tail_steps = vec![RedLabelIrqPreTailStep::TerrainOutputDue];
+        let error = RedLabelRuntimeMemory::live_player_motion_from_pre_tail_steps(&pre_tail_steps)
+            .expect_err("missing PLAYER should fail");
+        assert_eq!(error, "live IRQ video step did not run PLAYER");
+
+        let error = RedLabelRuntimeMemory::live_star_output_from_pre_tail_steps(&pre_tail_steps)
+            .expect_err("missing STOUT should fail");
+        assert_eq!(error, "live IRQ video step did not run STOUT");
+
+        let missing_band = RedLabelIrqSchedulerStep {
+            mode: RedLabelIrqMode::Normal,
+            vertical_counter: 0,
+            phase: RedLabelIrqSchedulerPhase::Idle,
+            hardware_map_before: 0,
+            hardware_map_writes: Vec::new(),
+            hardware_map_after: 0,
+            previous_iflg: 0,
+            iflg: 0,
+            timer_before: None,
+            timer_after: None,
+            watchdog_value: None,
+            palette_copy: None,
+            xxx2: None,
+            pre_tail_steps: Vec::new(),
+            object_band: None,
+        };
+        let error = RedLabelRuntimeMemory::live_object_band_from_scheduler_step(
+            &missing_band,
+            RedLabelIrqObjectBandPhase::NormalUpper,
+        )
+        .expect_err("missing object band should fail");
+        assert!(error.contains("did not run an object band"));
+
+        let wrong_band = RedLabelIrqSchedulerStep {
+            object_band: Some(RedLabelIrqObjectBandPass {
+                phase: RedLabelIrqObjectBandPhase::NormalLower,
+                upper_bound: 0x10,
+                lower_bound: 0x08,
+                steps: Vec::new(),
+            }),
+            ..missing_band
+        };
+        let error = RedLabelRuntimeMemory::live_object_band_from_scheduler_step(
+            &wrong_band,
+            RedLabelIrqObjectBandPhase::NormalUpper,
+        )
+        .expect_err("wrong object band phase should fail");
+        assert!(error.contains("expected NormalUpper"));
+    }
+
+    #[test]
+    fn live_normal_irq_video_frame_runs_source_bands_terrain_and_velocity() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        let picture_address = red_label_object_picture_address("BMBP1").expect("BMBP1 address");
+        let player_picture_address =
+            red_label_object_picture_address("PLAPIC").expect("PLAPIC address");
+        let object = setup_active_display_object(&mut machine, "BMBP1");
+        machine
+            .memory
+            .write_word(object + 0x0A, 0x1420)
+            .expect("set object OX16");
+        machine
+            .memory
+            .write_word(object + 0x0C, 0x8055)
+            .expect("set object OY16");
+        machine
+            .memory
+            .write_word(object + 0x0E, 0x0100)
+            .expect("set object OXV");
+        machine
+            .memory
+            .write_word(object + 0x10, 0x0200)
+            .expect("set object OYV");
+
+        let frame = machine
+            .red_label_run_normal_live_irq_video_frame()
+            .expect("live normal IRQ video frame");
+
+        assert!(matches!(
+            frame.player_motion,
+            RedLabelPlayerMotion::Updated { .. }
+        ));
+        assert!(matches!(
+            frame.star_output,
+            RedLabelStarOutput::Updated { star_count: 16, .. }
+        ));
+        assert_eq!(
+            frame.upper_scanline.phase,
+            RedLabelIrqSchedulerPhase::NormalUpper
+        );
+        assert_eq!(
+            frame.upper_scanline.vertical_counter,
+            RED_LABEL_NORMAL_IRQ_LIVE_VERTCT
+        );
+        assert_eq!(frame.upper_scanline.previous_iflg, 0);
+        assert_eq!(frame.upper_scanline.iflg, 1);
+        assert_eq!(frame.upper_scanline.xxx2, Some(0xA8));
+        assert_eq!(frame.upper_scanline.pre_tail_steps.len(), 2);
+        assert!(matches!(
+            frame.upper_scanline.pre_tail_steps[0],
+            RedLabelIrqPreTailStep::PlayerMotion(_)
+        ));
+        assert!(matches!(
+            frame.upper_scanline.pre_tail_steps[1],
+            RedLabelIrqPreTailStep::StarOutput(_)
+        ));
+        assert_eq!(
+            frame.lower_scanline.phase,
+            RedLabelIrqSchedulerPhase::NormalLower
+        );
+        assert_eq!(
+            frame.lower_scanline.vertical_counter,
+            RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT
+        );
+        assert_eq!(frame.lower_scanline.previous_iflg, 1);
+        assert_eq!(frame.lower_scanline.iflg, 0);
+        assert_eq!(frame.lower_scanline.watchdog_value, Some(0x38));
+        assert!(frame.lower_scanline.palette_copy.is_some());
+        assert_eq!(
+            frame,
+            RedLabelLiveVideoFrame {
+                mode: RedLabelIrqMode::Normal,
+                upper_scanline: frame.upper_scanline.clone(),
+                lower_scanline: frame.lower_scanline.clone(),
+                player_motion: frame.player_motion,
+                star_output: frame.star_output,
+                upper_object_band: RedLabelIrqObjectBandPass {
+                    phase: RedLabelIrqObjectBandPhase::NormalUpper,
+                    upper_bound: 0xA8,
+                    lower_bound: 0x00,
+                    steps: vec![
+                        RedLabelIrqObjectBandStep::Objects(RedLabelObjectDisplayBand::Updated {
+                            status: 0,
+                            upper_bound: 0xA8,
+                            lower_bound: 0x00,
+                            objects: vec![RedLabelObjectDisplay {
+                                object_address: object,
+                                picture_address,
+                                old_screen_address: None,
+                                erased_old_picture: None,
+                                relative_x: Some(0x1420),
+                                new_screen_address: Some(0x5080),
+                                alternate_flavor: Some(true),
+                                written_picture: Some(RedLabelPictureWrite {
+                                    screen_address: 0x5080,
+                                    picture_address,
+                                    width: 2,
+                                    height: 3,
+                                }),
+                            }],
+                        }),
+                        RedLabelIrqObjectBandStep::Player(RedLabelPlayerDisplay::Updated {
+                            status: 0,
+                            upper_bound: 0xA8,
+                            lower_bound: 0x00,
+                            old_screen_address: 0x2080,
+                            old_direction: 0x0300,
+                            erased_old_picture: true,
+                            new_direction: 0x0300,
+                            new_screen_address: 0x2080,
+                            picture_address: player_picture_address,
+                            alternate_flavor: false,
+                        }),
+                        RedLabelIrqObjectBandStep::Shells {
+                            steps: Vec::new(),
+                            output_routines: Vec::new(),
+                        },
+                    ],
+                },
+                terrain_output: Some(expected_bgout_default(red_label_irq_bgout_stack_pointer())),
+                lower_object_band: RedLabelIrqObjectBandPass {
+                    phase: RedLabelIrqObjectBandPhase::NormalLower,
+                    upper_bound: 0xFF,
+                    lower_bound: 0xA8,
+                    steps: vec![
+                        RedLabelIrqObjectBandStep::Player(RedLabelPlayerDisplay::OutsideBand {
+                            status: 0,
+                            upper_bound: 0xFF,
+                            lower_bound: 0xA8,
+                            player_y: 0x80,
+                        }),
+                        RedLabelIrqObjectBandStep::Objects(RedLabelObjectDisplayBand::Updated {
+                            status: 0,
+                            upper_bound: 0xFF,
+                            lower_bound: 0xA8,
+                            objects: Vec::new(),
+                        }),
+                        RedLabelIrqObjectBandStep::Velocities(
+                            RedLabelObjectVelocityUpdate::Updated {
+                                status: 0,
+                                objects: vec![RedLabelObjectVelocityStep {
+                                    object_address: object,
+                                    previous_x16: 0x1420,
+                                    x_velocity: 0x0100,
+                                    x16: 0x1520,
+                                    previous_y16: 0x8055,
+                                    y_velocity: 0x0200,
+                                    y16: 0x8255,
+                                }],
+                            },
+                        ),
+                    ],
+                },
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0A1..0xA0A4),
+            Some(&[0xFF, 0xA8, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(object + 0x04..object + 0x06),
+            Some(&[0x50, 0x80][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(object + 0x0A..object + 0x0E),
+            Some(&[0x15, 0x20, 0x82, 0x55][..])
+        );
+    }
+
+    #[test]
+    fn live_irq_video_frame_uses_upright_irq_hook_for_default_source_order() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+
+        let frame = machine
+            .red_label_run_live_irq_video_frame()
+            .expect("live default IRQ video frame");
+
+        assert_eq!(frame.mode, RedLabelIrqMode::Normal);
+        assert_eq!(
+            frame.upper_object_band.phase,
+            RedLabelIrqObjectBandPhase::NormalUpper
+        );
+        assert_eq!(frame.upper_object_band.upper_bound, 0xA8);
+        assert_eq!(frame.upper_object_band.lower_bound, 0x00);
+        assert_eq!(
+            frame.upper_scanline.phase,
+            RedLabelIrqSchedulerPhase::NormalUpper
+        );
+        assert_eq!(
+            frame.lower_scanline.phase,
+            RedLabelIrqSchedulerPhase::NormalLower
+        );
+        assert_eq!(
+            frame.lower_object_band.phase,
+            RedLabelIrqObjectBandPhase::NormalLower
+        );
+        assert_eq!(frame.lower_object_band.upper_bound, 0xFF);
+        assert_eq!(frame.lower_object_band.lower_bound, 0xA8);
+    }
+
+    #[test]
+    fn live_irq_video_frame_uses_inverted_irq_hook_for_flipped_source_order() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        let object = setup_active_display_object(&mut machine, "BMBP1");
+        machine
+            .memory
+            .write_range(0xA08F..0xA092, &[0x7E, 0xDF, 0xC3])
+            .expect("select IRQB hook");
+        machine
+            .memory
+            .write_word(object + 0x0A, 0x1420)
+            .expect("set object OX16");
+        machine
+            .memory
+            .write_word(object + 0x0C, 0x8055)
+            .expect("set object OY16");
+        machine
+            .memory
+            .write_word(object + 0x0E, 0x0100)
+            .expect("set object OXV");
+        machine
+            .memory
+            .write_word(object + 0x10, 0x0200)
+            .expect("set object OYV");
+
+        let frame = machine
+            .red_label_run_live_irq_video_frame()
+            .expect("live IRQB video frame");
+
+        assert_eq!(frame.mode, RedLabelIrqMode::Inverted);
+        assert!(matches!(
+            frame.player_motion,
+            RedLabelPlayerMotion::Updated { .. }
+        ));
+        assert!(matches!(
+            frame.star_output,
+            RedLabelStarOutput::Updated { star_count: 16, .. }
+        ));
+        assert_eq!(
+            frame.terrain_output,
+            Some(expected_bgout_default(red_label_irq_bgout_stack_pointer()))
+        );
+        assert_eq!(
+            frame.upper_scanline.phase,
+            RedLabelIrqSchedulerPhase::InvertedUpper
+        );
+        assert_eq!(
+            frame.upper_scanline.vertical_counter,
+            RED_LABEL_INVERTED_IRQ_LIVE_VERTCT
+        );
+        assert_eq!(frame.upper_scanline.previous_iflg, 0);
+        assert_eq!(frame.upper_scanline.iflg, 1);
+        assert_eq!(
+            frame.upper_scanline.xxx2,
+            Some(!RED_LABEL_INVERTED_IRQ_LIVE_VERTCT)
+        );
+        assert_eq!(
+            frame.lower_scanline.phase,
+            RedLabelIrqSchedulerPhase::InvertedLower
+        );
+        assert_eq!(
+            frame.lower_scanline.vertical_counter,
+            RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT
+        );
+        assert_eq!(frame.lower_scanline.previous_iflg, 1);
+        assert_eq!(frame.lower_scanline.iflg, 0);
+        assert_eq!(frame.lower_scanline.watchdog_value, Some(0x39));
+        assert!(frame.lower_scanline.palette_copy.is_some());
+        assert_eq!(frame.lower_scanline.pre_tail_steps.len(), 2);
+        assert!(matches!(
+            frame.lower_scanline.pre_tail_steps[0],
+            RedLabelIrqPreTailStep::PlayerMotion(_)
+        ));
+        assert!(matches!(
+            frame.lower_scanline.pre_tail_steps[1],
+            RedLabelIrqPreTailStep::StarOutput(_)
+        ));
+        assert_eq!(
+            frame.upper_object_band.phase,
+            RedLabelIrqObjectBandPhase::InvertedUpper
+        );
+        assert_eq!(frame.upper_object_band.upper_bound, 0xFF);
+        assert_eq!(frame.upper_object_band.lower_bound, 0x5F);
+        assert_eq!(frame.upper_object_band.steps.len(), 2);
+        assert!(matches!(
+            &frame.upper_object_band.steps[0],
+            RedLabelIrqObjectBandStep::Player(RedLabelPlayerDisplay::Updated { .. })
+        ));
+        assert!(matches!(
+            &frame.upper_object_band.steps[1],
+            RedLabelIrqObjectBandStep::Objects(RedLabelObjectDisplayBand::Updated { objects, .. })
+                if objects.iter().any(|display| display.object_address == object)
+        ));
+        assert_eq!(
+            frame.lower_object_band.phase,
+            RedLabelIrqObjectBandPhase::InvertedLower
+        );
+        assert_eq!(frame.lower_object_band.upper_bound, 0x5F);
+        assert_eq!(frame.lower_object_band.lower_bound, 0x00);
+        assert!(matches!(
+            frame.lower_object_band.steps.last(),
+            Some(RedLabelIrqObjectBandStep::Velocities(
+                RedLabelObjectVelocityUpdate::Updated { objects, .. }
+            )) if objects.iter().any(|step| step.object_address == object
+                && step.previous_x16 == 0x1420
+                && step.x16 == 0x1520
+                && step.previous_y16 == 0x8055
+                && step.y16 == 0x8255)
+        ));
+        assert_eq!(
+            machine.red_label_ram_range(0xA0A1..0xA0A4),
+            Some(&[0xFF, 0x5F, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(object + 0x0A..object + 0x0E),
+            Some(&[0x15, 0x20, 0x82, 0x55][..])
         );
     }
 
@@ -22339,6 +35191,13 @@ mod tests {
             machine.red_label_ram_range(0x131C..0x1324),
             Some(&[0x01, 0x01, 0x00, 0x00, 0x00, 0x01, 0x01, 0x00][..])
         );
+        machine
+            .red_label_copy_color_mapping_to_palette_ram()
+            .expect("copy PCRAM to palette RAM");
+        let visible = machine
+            .red_label_visible_rgba_image()
+            .expect("render native top display frame");
+        assert_eq!(crc32(&visible.pixels), 0x2E99_EA5A);
     }
 
     #[test]
@@ -22367,6 +35226,448 @@ mod tests {
             machine.red_label_ram_range(0x0028..0x0029),
             Some(&[0xDD][..])
         );
+    }
+
+    #[test]
+    fn tdisp_dispatch_runs_source_top_display() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        let tdisp_address = red_label_routine_address("TDISP").expect("TDISP address");
+        schedule_support_process(&mut machine, "TDISP");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(tdisp_address)
+            .expect("dispatch TDISP");
+        let RedLabelProcessDispatch::TopDisplay(display) = dispatch else {
+            panic!("expected TDISP top display dispatch");
+        };
+
+        assert_eq!(display.score_transfers.len(), 1);
+        assert_eq!(display.laser_displays.len(), 1);
+        assert_eq!(display.smart_bomb_displays.len(), 1);
+        assert_eq!(
+            machine.red_label_ram_range(0x3008..0x300C),
+            Some(&[0, 0, 0, 0][..])
+        );
+        assert_eq!(
+            display.score_transfers[0].display_address,
+            RED_LABEL_P1_SCORE_DISPLAY
+        );
+    }
+
+    #[test]
+    fn exec_pre_dispatch_status_mask_clears_timer_and_overload_before_rand_swp() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA05D, 5).expect("set TIMER");
+        machine.memory.write_byte(0xA0BA, 0x04).expect("set STATUS");
+        machine.memory.write_byte(0xA05E, 0x44).expect("set OVCNT");
+        machine.memory.write_byte(0xA036, 7).expect("set MAPCR");
+        machine.memory.write_byte(0xA0DF, 0x12).expect("set SEED");
+        machine.memory.write_byte(0xA0E0, 0x34).expect("set HSEED");
+        machine.memory.write_byte(0xA0E1, 0x56).expect("set LSEED");
+        let expected_rand = RandState {
+            seed: 0x12,
+            hseed: 0x34,
+            lseed: 0x56,
+        }
+        .advanced();
+
+        let step = machine
+            .red_label_run_exec_pre_dispatch_visible_slice()
+            .expect("EXEC pre-dispatch");
+
+        assert_eq!(
+            step,
+            RedLabelExecPreDispatch {
+                timer_before: 5,
+                status: 0x04,
+                overload_counter_before: 0x44,
+                overload_counter_raw: None,
+                overload_counter_after: 0,
+                star_count_after: None,
+                overloaded_object: None,
+                map_after: 2,
+                player_collision: None,
+                expanded_updates: Vec::new(),
+                rand_state: expected_rand,
+                switch_processes: Vec::new(),
+            }
+        );
+        assert_eq!(machine.red_label_ram_range(0xA05D..0xA05E), Some(&[0][..]));
+        assert_eq!(machine.red_label_ram_range(0xA05E..0xA05F), Some(&[0][..]));
+        assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[2][..]));
+    }
+
+    #[test]
+    fn exec_pre_dispatch_overload_demotes_first_regular_active_object() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("NOKILL").expect("NOKILL address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make owner process")
+            .process_address;
+        let picture_address = red_label_object_picture_address("ASTP1").expect("ASTP1 picture");
+        let descriptor = RedLabelObjectDescriptor {
+            picture_address,
+            collision_vector_address: red_label_routine_address("NOKILL").expect("NOKILL address"),
+            scanner_color: 0x6666,
+        };
+        let target = machine
+            .memory
+            .init_object_cell(process, descriptor)
+            .expect("create target object")
+            .object_address;
+        machine
+            .memory
+            .activate_object_cell(target)
+            .expect("activate target object");
+        let special = machine
+            .memory
+            .init_object_cell(process, descriptor)
+            .expect("create special object")
+            .object_address;
+        machine
+            .memory
+            .activate_object_cell(special)
+            .expect("activate special object");
+        let layout = red_label_ram_layout().expect("layout");
+        machine
+            .memory
+            .write_object_bytes(&layout, special, "OTYP", &[1])
+            .expect("mark special object");
+        machine
+            .memory
+            .write_object_word(&layout, target, "OX16", 0x0100)
+            .expect("set target X");
+        machine
+            .memory
+            .write_object_screen_address(&layout, target, 0x4050)
+            .expect("set target screen address");
+        write_object_footprint(&mut machine, 0x4050, picture_address, 0xCC);
+
+        machine.memory.write_byte(0xA05D, 3).expect("set TIMER");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA05E, 1).expect("set OVCNT");
+        machine.memory.write_byte(0xA0AE, 9).expect("set STRCNT");
+        machine.memory.write_byte(0xA0DF, 0x25).expect("set SEED");
+        machine.memory.write_byte(0xA0E0, 0x34).expect("set HSEED");
+        machine.memory.write_byte(0xA0E1, 0x56).expect("set LSEED");
+        let expected_rand = RandState {
+            seed: 0x25,
+            hseed: 0x34,
+            lseed: 0x56,
+        }
+        .advanced();
+
+        let step = machine
+            .red_label_run_exec_pre_dispatch_visible_slice()
+            .expect("EXEC pre-dispatch overload");
+
+        assert_eq!(step.timer_before, 3);
+        assert_eq!(step.status, 0);
+        assert_eq!(step.overload_counter_before, 1);
+        assert_eq!(step.overload_counter_raw, Some(3));
+        assert_eq!(step.overload_counter_after, 2);
+        assert_eq!(step.star_count_after, Some(3));
+        assert_eq!(
+            step.overloaded_object,
+            Some(RedLabelExecOverloadedObject {
+                object_address: target,
+                previous_link_address: special,
+                next_active_object: 0,
+                previous_x16: 0x0100,
+                x16: 0x8634,
+                screen_address: 0x4050,
+                picture_address,
+                previous_inactive_head: 0,
+            })
+        );
+        assert_eq!(step.map_after, 2);
+        assert_eq!(step.player_collision, None);
+        assert_eq!(step.expanded_updates, Vec::new());
+        assert_eq!(step.rand_state, expected_rand);
+        assert_eq!(step.switch_processes, Vec::new());
+        assert_eq!(machine.red_label_ram_range(0xA05D..0xA05E), Some(&[0][..]));
+        assert_eq!(machine.red_label_ram_range(0xA05E..0xA05F), Some(&[2][..]));
+        assert_eq!(machine.red_label_ram_range(0xA0AE..0xA0AF), Some(&[3][..]));
+        assert_eq!(
+            machine.red_label_ram_range(0xA065..0xA067),
+            Some(&special.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(special..special + 2),
+            Some(&[0, 0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA06B..0xA06D),
+            Some(&target.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(target..target + 2),
+            Some(&[0, 0][..])
+        );
+        assert_eq!(machine.red_label_ram_range(0x4050..0x4051), Some(&[0][..]));
+        assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[2][..]));
+    }
+
+    #[test]
+    fn exec_pre_dispatch_reports_no_overload_object_when_active_list_is_empty() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA05D, 4).expect("set TIMER");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA05E, 0).expect("clear OVCNT");
+        machine.memory.write_word(0xA065, 0).expect("clear OPTR");
+
+        let step = machine
+            .red_label_run_exec_pre_dispatch_visible_slice()
+            .expect("EXEC pre-dispatch empty object list");
+
+        assert_eq!(step.overload_counter_raw, Some(4));
+        assert_eq!(step.overload_counter_after, 2);
+        assert_eq!(step.star_count_after, Some(3));
+        assert_eq!(step.overloaded_object, None);
+    }
+
+    #[test]
+    fn exec_overload_rejects_active_object_list_without_terminator() {
+        let mut machine = ArcadeMachine::new();
+        let layout = red_label_ram_layout().expect("layout");
+        machine
+            .memory
+            .write_word(0xA065, 0xA23C)
+            .expect("point OPTR at first object");
+        machine
+            .memory
+            .write_object_word(&layout, 0xA23C, "OLINK", 0xA23C)
+            .expect("loop active object link");
+        machine
+            .memory
+            .write_object_bytes(&layout, 0xA23C, "OTYP", &[1])
+            .expect("mark object as non-overloadable");
+
+        let error = machine
+            .memory
+            .move_first_exec_overload_object_to_inactive(&layout)
+            .expect_err("unterminated active object list");
+
+        assert_eq!(
+            error,
+            "red-label EXEC overload active-object list did not terminate"
+        );
+    }
+
+    #[test]
+    fn exec_pre_dispatch_runs_xuvct_expanded_update() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_word(0xA020, 0x1200).expect("set BGL");
+        machine.memory.write_word(0xA022, 0x1300).expect("set BGLX");
+        machine
+            .memory
+            .write_word(0x9C00, 0x0100)
+            .expect("set explosion size");
+        machine
+            .memory
+            .write_word(
+                0x9C02,
+                red_label_object_picture_address("BXPIC").expect("BXPIC address"),
+            )
+            .expect("set explosion picture");
+        machine
+            .memory
+            .write_word(0x9C04, 0x9C40)
+            .expect("set ERASES");
+        machine
+            .memory
+            .write_word(0x9C06, 0x1005)
+            .expect("set CENTER");
+        machine
+            .memory
+            .write_word(0x9C08, 0x0805)
+            .expect("set TOPLFT");
+        machine.memory.write_byte(0xA05D, 2).expect("set TIMER");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA05E, 0).expect("clear OVCNT");
+
+        let step = machine
+            .red_label_run_exec_pre_dispatch_visible_slice()
+            .expect("EXEC pre-dispatch with XUVCT");
+
+        assert_eq!(
+            step.expanded_updates,
+            vec![RedLabelExpandedUpdate::ExplosionAdvanced {
+                slot_address: 0x9C00,
+                size: 0x01AA,
+                top_left: 0x0C05,
+                center: 0x1405,
+                erased_previous_image: false,
+            }]
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x9C00..0x9C0A),
+            Some(&[0x01, 0xAA, 0xF9, 0x51, 0x9C, 0x40, 0x14, 0x05, 0x0C, 0x05][..])
+        );
+    }
+
+    #[test]
+    fn executive_iteration_resets_crproc_runs_exec_and_dispatches_due_process() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("SUCIDE").expect("SUCIDE address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make process")
+            .process_address;
+        machine
+            .memory
+            .write_word(0xA063, 0xBEEF)
+            .expect("dirty CRPROC");
+        machine.memory.write_byte(0xA05D, 7).expect("set TIMER");
+        machine
+            .memory
+            .write_byte(0xA0BA, 0x10)
+            .expect("set status collision skip");
+
+        let step = machine
+            .step_red_label_executive_iteration()
+            .expect("EXEC iteration");
+
+        assert_eq!(step.current_process_head, 0xA05F);
+        assert_eq!(step.pre_dispatch.timer_before, 7);
+        assert_eq!(step.pre_dispatch.status, 0x10);
+        assert_eq!(step.pre_dispatch.expanded_updates, Vec::new());
+        assert_eq!(
+            step.scheduled_process,
+            Some(RedLabelScheduledProcess {
+                process_address: process,
+                routine_address: red_label_routine_address("SUCIDE").expect("SUCIDE address"),
+            })
+        );
+        assert_eq!(
+            step.dispatch,
+            Some(RedLabelProcessDispatch::Suicide(RedLabelKilledProcess {
+                killed_process_address: process,
+                previous_link_address: 0xA05F,
+            }))
+        );
+        assert_eq!(step.dispatches.len(), 1);
+        assert_eq!(
+            step.dispatches[0].scheduled_process.process_address,
+            process
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA063..0xA065),
+            Some(&[0xA0, 0x5F][..])
+        );
+    }
+
+    #[test]
+    fn executive_iteration_continues_after_suicide_and_sleep_like_disp2() {
+        let mut machine = ArcadeMachine::new();
+        let tail_suicide = machine
+            .red_label_make_process(
+                red_label_routine_address("SUCIDE").expect("SUCIDE address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make tail suicide")
+            .process_address;
+        let sleeper = machine
+            .red_label_make_process(
+                red_label_routine_address("COLR").expect("COLR address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make sleeper")
+            .process_address;
+        let head_suicide = machine
+            .red_label_make_process(
+                red_label_routine_address("SUCIDE").expect("SUCIDE address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make head suicide")
+            .process_address;
+
+        let step = machine
+            .step_red_label_executive_iteration()
+            .expect("EXEC iteration");
+
+        assert_eq!(
+            step.dispatches
+                .iter()
+                .map(|dispatch| dispatch.scheduled_process.process_address)
+                .collect::<Vec<_>>(),
+            vec![head_suicide, sleeper, tail_suicide]
+        );
+        assert!(matches!(
+            step.dispatches[0].dispatch,
+            RedLabelProcessDispatch::Suicide(RedLabelKilledProcess {
+                killed_process_address,
+                previous_link_address: 0xA05F,
+            }) if killed_process_address == head_suicide
+        ));
+        assert!(matches!(
+            step.dispatches[1].dispatch,
+            RedLabelProcessDispatch::SupportProcess(
+                RedLabelSupportProcessStep::LaserColorSleeping {
+                    process_address,
+                    wakeup_address,
+                    ..
+                }
+            ) if process_address == sleeper
+                && wakeup_address == red_label_routine_address("COLRLP").expect("COLRLP address")
+        ));
+        assert!(matches!(
+            step.dispatches[2].dispatch,
+            RedLabelProcessDispatch::Suicide(RedLabelKilledProcess {
+                killed_process_address,
+                previous_link_address,
+            }) if killed_process_address == tail_suicide
+                && previous_link_address == sleeper
+        ));
+        assert_eq!(
+            machine.red_label_ram_range(0xA05F..0xA061),
+            Some(&sleeper.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(sleeper..sleeper + 5),
+            Some(
+                &[
+                    0x00,
+                    0x00,
+                    red_label_routine_address("COLRLP")
+                        .expect("COLRLP address")
+                        .to_be_bytes()[0],
+                    red_label_routine_address("COLRLP")
+                        .expect("COLRLP address")
+                        .to_be_bytes()[1],
+                    0x02,
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA061..0xA063),
+            Some(&tail_suicide.to_be_bytes()[..])
+        );
+    }
+
+    #[test]
+    fn executive_iteration_reports_none_when_no_process_is_due() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA05D, 2).expect("set TIMER");
+        machine
+            .memory
+            .write_byte(0xA0BA, 0x10)
+            .expect("set status collision skip");
+
+        let step = machine
+            .step_red_label_executive_iteration()
+            .expect("EXEC iteration");
+
+        assert_eq!(step.current_process_head, 0xA05F);
+        assert_eq!(step.scheduled_process, None);
+        assert_eq!(step.dispatch, None);
+        assert_eq!(step.dispatches, Vec::new());
     }
 
     #[test]
@@ -23170,6 +36471,7 @@ mod tests {
                         in1: 0,
                         in2: 0x20,
                     },
+                    sound_sequence_already_stepped: false,
                 },
             )
             .expect("normal IRQ lower object phase scans center coin");
@@ -23597,7 +36899,58 @@ mod tests {
         );
         assert_eq!(
             machine.red_label_ram_range(0x2784..0x2785),
-            Some(&[0x00][..])
+            Some(&[0x30][..])
+        );
+    }
+
+    #[test]
+    fn live_playing_frame_dispatches_one_due_process_without_switch_input() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        let routine_address = red_label_routine_address("REVX").expect("REVX address");
+        machine
+            .red_label_make_process(routine_address, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make translated process");
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[routine_address])
+                .expect("query active process")
+        );
+
+        machine.step(CabinetInput::NONE);
+
+        assert!(
+            !machine
+                .memory
+                .active_process_has_routine(&[routine_address])
+                .expect("query active process after dispatch")
+        );
+    }
+
+    #[test]
+    fn live_playing_frame_runs_bgout_terrain_schedule() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+
+        machine.step(CabinetInput::NONE);
+
+        assert_eq!(
+            machine.red_label_ram_range(0xA013..0xA017),
+            Some(&[0xBF, 0xF1, 0x00, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xBE20..0xBE30),
+            Some(
+                &[
+                    0x98, 0xDE, 0x97, 0xDE, 0x96, 0xDE, 0x95, 0xDC, 0x94, 0xDA, 0x93, 0xD8, 0x92,
+                    0xD7, 0x91, 0xD9,
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x98DE..0x98E0),
+            Some(&[0x70, 0x07][..])
         );
     }
 
@@ -23616,13 +36969,14 @@ mod tests {
                 .events()
                 .any(|event| event == MachineEvent::ReversePressed)
         );
+        assert_eq!(output.snapshot.player.facing, Facing::Left);
         assert_eq!(
             machine.red_label_ram_range(0xA0AF..0xA0B0),
             Some(&[0x01][..])
         );
         assert_eq!(
             machine.red_label_ram_range(0xA0BB..0xA0BF),
-            Some(&[0xFD, 0x00, 0x03, 0x00][..])
+            Some(&[0xFD, 0x00, 0xFD, 0x00][..])
         );
         assert_eq!(
             machine.red_label_ram_range(0xA05F..0xA061),
@@ -24056,6 +37410,596 @@ mod tests {
                     0, 0, 0, 0, 0, 0, 0, 3, 0, 16, 0, 0, 0, 0, 8, 8, 0, 8, 0, 0, 0, 0, 0,
                 ][..]
             )
+        );
+    }
+
+    fn schedule_game_exec_process(machine: &mut ArcadeMachine, routine: &str) -> u16 {
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address(routine).unwrap_or_else(|_| panic!("{routine} address")),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .unwrap_or_else(|_| panic!("make {routine} process"))
+            .process_address;
+        assert_eq!(
+            machine
+                .step_red_label_process_scheduler()
+                .unwrap_or_else(|_| panic!("schedule {routine}"))
+                .expect("scheduled process")
+                .process_address,
+            process
+        );
+        process
+    }
+
+    #[test]
+    fn game_exec_entry_launches_initial_lander_wave_and_sleeps_to_gex0() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("GEXEC").expect("GEXEC address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make GEXEC process")
+            .process_address;
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule GEXEC process");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FB, 2).expect("set LNDRES");
+        machine.memory.write_byte(0xA100, 5).expect("set WAVTIM");
+        machine.memory.write_byte(0xA101, 2).expect("set WAVSIZ");
+        machine.memory.write_byte(0xA10F, 4).expect("set UFOTIM");
+        machine.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        machine.memory.write_byte(0xA0AE, 15).expect("set STRCNT");
+
+        let exec = machine
+            .red_label_start_game_exec_current_process()
+            .expect("GEXEC entry");
+        let RedLabelGameExec::Running(run) = exec else {
+            panic!("expected GEXEC running branch");
+        };
+
+        assert_eq!(run.process_address, process);
+        assert_eq!(
+            run.entry,
+            Some(RedLabelGameExecEntry {
+                delta_counter: 40,
+                ufo_timer: 4,
+                wave_timer: 1,
+            })
+        );
+        assert_eq!(run.status, 0);
+        assert_eq!(run.enemy_total, Some(2));
+        let ufo = run.ufo.expect("GEXEC UFO pacing");
+        assert_eq!(ufo.previous_timer, 4);
+        assert_eq!(ufo.accelerated_timer, Some(2));
+        assert_eq!(ufo.decremented_timer, 1);
+        assert_eq!(ufo.started, None);
+        let lander = run.lander.expect("GEXEC lander pacing");
+        assert_eq!(lander.previous_timer, 1);
+        assert_eq!(lander.decremented_timer, 0);
+        assert_eq!(lander.reset_timer, Some(5));
+        assert_eq!(lander.reserve_count_before, Some(2));
+        assert_eq!(lander.requested_count, Some(2));
+        assert_eq!(lander.reserve_count_after, Some(0));
+        let started = lander.started.expect("LANDST fallback");
+        assert_eq!(started.requested_count, 2);
+        assert!(started.landers.is_empty());
+        assert_eq!(started.schizoid_fallback.len(), 2);
+        assert_eq!(run.star_time.previous_delta_counter, 40);
+        assert_eq!(run.star_time.delta_counter, 39);
+        assert_eq!(
+            run.wakeup_address,
+            red_label_routine_address("GEX0").expect("GEX0 address")
+        );
+        assert_eq!(machine.red_label_ram_range(0xA0FB..0xA0FC), Some(&[0][..]));
+        assert_eq!(machine.red_label_ram_range(0xA115..0xA116), Some(&[2][..]));
+        assert_eq!(
+            machine.red_label_ram_range(0xA117..0xA119),
+            Some(&[5, 1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 2..process + 5),
+            Some(&[0xDC, 0xEA, 15][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 7..process + 8),
+            Some(&[39][..])
+        );
+    }
+
+    #[test]
+    fn game_exec_step_spawns_ufo_when_timer_expires() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("GEX0").expect("GEX0 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make GEX0 process")
+            .process_address;
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule GEX0 process");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FB, 0).expect("clear LNDRES");
+        machine.memory.write_byte(0xA10F, 8).expect("set UFOTIM");
+        machine.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+        machine.memory.write_byte(0xA113, 9).expect("set TIECNT");
+        machine.memory.write_byte(0xA117, 2).expect("set WAVTMR");
+        machine.memory.write_byte(0xA118, 1).expect("set UFOTMR");
+        machine.memory.write_byte(0xA119, 11).expect("set UFOCNT");
+        machine
+            .memory
+            .write_byte(process + 7, 2)
+            .expect("set GEX0 delta counter");
+
+        let exec = machine
+            .red_label_step_game_exec_current_process()
+            .expect("GEX0 step");
+        let RedLabelGameExec::Running(run) = exec else {
+            panic!("expected GEX0 running branch");
+        };
+
+        assert_eq!(run.entry, None);
+        assert_eq!(run.enemy_total, Some(10));
+        let ufo = run.ufo.expect("GEX0 UFO pacing");
+        assert_eq!(ufo.previous_timer, 1);
+        assert_eq!(ufo.accelerated_timer, None);
+        assert_eq!(ufo.decremented_timer, 0);
+        assert_eq!(ufo.reset_timer, Some(8));
+        assert_eq!(ufo.ufo_count_before, Some(11));
+        assert_eq!(ufo.ufo_count_after, Some(12));
+        let started = ufo.started.expect("UFOST launch");
+        assert_eq!(
+            started.process.routine_address,
+            red_label_routine_address("UFOLP").expect("UFOLP address")
+        );
+        let lander = run.lander.expect("GEX0 lander pacing");
+        assert_eq!(lander.previous_timer, 2);
+        assert_eq!(lander.decremented_timer, 1);
+        assert_eq!(lander.active_count_before, Some(1));
+        assert_eq!(lander.started, None);
+        assert_eq!(run.star_time.previous_delta_counter, 2);
+        assert_eq!(run.star_time.delta_counter, 1);
+        assert_eq!(
+            machine.red_label_ram_range(0xA118..0xA11A),
+            Some(&[8, 12][..])
+        );
+        assert_eq!(machine.red_label_ram_range(0xA117..0xA118), Some(&[1][..]));
+        assert_eq!(
+            machine.red_label_ram_range(process + 2..process + 5),
+            Some(&[0xDC, 0xEA, 15][..])
+        );
+    }
+
+    #[test]
+    fn game_exec_ufo_pacing_uses_rmax_and_preserves_saturated_count() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_game_exec_process(&mut machine, "GEX0");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FB, 0).expect("clear LNDRES");
+        machine.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        machine.memory.write_byte(0xA10F, 8).expect("set UFOTIM");
+        machine.memory.write_byte(0xA112, 3).expect("set LNDCNT");
+        machine.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        machine.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        machine.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        machine.memory.write_byte(0xA117, 2).expect("set WAVTMR");
+        machine.memory.write_byte(0xA118, 1).expect("set UFOTMR");
+        machine
+            .memory
+            .write_byte(0xA119, 12)
+            .expect("saturate UFOCNT");
+        machine
+            .memory
+            .write_byte(process + 7, 2)
+            .expect("set GEX0 delta counter");
+
+        let exec = machine
+            .red_label_step_game_exec_current_process()
+            .expect("GEX0 step");
+        let RedLabelGameExec::Running(run) = exec else {
+            panic!("expected GEX0 running branch");
+        };
+
+        assert_eq!(run.enemy_total, Some(3));
+        let ufo = run.ufo.expect("GEX0 UFO pacing");
+        assert_eq!(ufo.previous_timer, 1);
+        assert_eq!(ufo.decremented_timer, 0);
+        assert_ne!(ufo.reset_timer, Some(8));
+        assert_eq!(ufo.ufo_count_before, Some(12));
+        assert_eq!(ufo.ufo_count_after, Some(12));
+        assert!(ufo.started.is_none());
+        assert_eq!(machine.red_label_ram_range(0xA119..0xA11A), Some(&[12][..]));
+    }
+
+    #[test]
+    fn game_exec_lander_pacing_reports_empty_reserve_and_saturated_active_counts() {
+        let mut machine = ArcadeMachine::new();
+        schedule_game_exec_process(&mut machine, "GEX0");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FB, 0).expect("clear LNDRES");
+        machine.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        machine.memory.write_byte(0xA100, 5).expect("set WAVTIM");
+        machine.memory.write_byte(0xA10F, 9).expect("set UFOTIM");
+        machine.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
+        machine.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        machine.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        machine.memory.write_byte(0xA115, 1).expect("set SCZCNT");
+        machine.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        machine.memory.write_byte(0xA117, 1).expect("set WAVTMR");
+        machine.memory.write_byte(0xA118, 4).expect("set UFOTMR");
+
+        let exec = machine
+            .red_label_step_game_exec_current_process()
+            .expect("GEX0 empty reserve");
+        let RedLabelGameExec::Running(run) = exec else {
+            panic!("expected GEX0 running branch");
+        };
+        let lander = run.lander.expect("GEX0 lander pacing");
+        assert_eq!(lander.reset_timer, Some(5));
+        assert_eq!(lander.reserve_count_before, Some(0));
+        assert_eq!(lander.reserve_count_after, Some(0));
+        assert_eq!(lander.requested_count, None);
+        assert!(lander.started.is_none());
+
+        let mut machine = ArcadeMachine::new();
+        schedule_game_exec_process(&mut machine, "GEX0");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FB, 3).expect("set LNDRES");
+        machine.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        machine.memory.write_byte(0xA100, 6).expect("set WAVTIM");
+        machine.memory.write_byte(0xA10F, 9).expect("set UFOTIM");
+        machine
+            .memory
+            .write_byte(0xA112, 8)
+            .expect("saturate LNDCNT");
+        machine.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        machine.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        machine.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        machine.memory.write_byte(0xA117, 1).expect("set WAVTMR");
+        machine.memory.write_byte(0xA118, 4).expect("set UFOTMR");
+
+        let exec = machine
+            .red_label_step_game_exec_current_process()
+            .expect("GEX0 saturated landers");
+        let RedLabelGameExec::Running(run) = exec else {
+            panic!("expected GEX0 running branch");
+        };
+        let lander = run.lander.expect("GEX0 lander pacing");
+        assert_eq!(lander.reset_timer, Some(6));
+        assert_eq!(lander.active_count_before, Some(8));
+        assert_eq!(lander.reserve_count_before, Some(3));
+        assert_eq!(lander.reserve_count_after, Some(3));
+        assert_eq!(lander.requested_count, None);
+        assert!(lander.started.is_none());
+    }
+
+    #[test]
+    fn game_exec_lander_pacing_caps_request_to_remaining_reserve() {
+        let mut machine = ArcadeMachine::new();
+        schedule_game_exec_process(&mut machine, "GEX0");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FB, 1).expect("set LNDRES");
+        machine.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        machine.memory.write_byte(0xA100, 6).expect("set WAVTIM");
+        machine.memory.write_byte(0xA101, 4).expect("set WAVSIZ");
+        machine.memory.write_byte(0xA10F, 9).expect("set UFOTIM");
+        machine.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
+        machine.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        machine.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        machine.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        machine.memory.write_byte(0xA117, 1).expect("set WAVTMR");
+        machine.memory.write_byte(0xA118, 4).expect("set UFOTMR");
+
+        let exec = machine
+            .red_label_step_game_exec_current_process()
+            .expect("GEX0 reserve cap");
+        let RedLabelGameExec::Running(run) = exec else {
+            panic!("expected GEX0 running branch");
+        };
+
+        let lander = run.lander.expect("GEX0 lander pacing");
+        assert_eq!(lander.reserve_count_before, Some(1));
+        assert_eq!(lander.requested_count, Some(1));
+        assert_eq!(lander.reserve_count_after, Some(0));
+        assert_eq!(machine.red_label_ram_range(0xA0FB..0xA0FC), Some(&[0][..]));
+    }
+
+    #[test]
+    fn translated_dispatch_routes_gexec_entry_and_gex0_loop() {
+        let mut machine = ArcadeMachine::new();
+        schedule_game_exec_process(&mut machine, "GEXEC");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FB, 1).expect("set LNDRES");
+        machine.memory.write_byte(0xA100, 5).expect("set WAVTIM");
+        machine.memory.write_byte(0xA101, 1).expect("set WAVSIZ");
+        machine.memory.write_byte(0xA10F, 4).expect("set UFOTIM");
+        machine.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("GEXEC").expect("GEXEC address"),
+            )
+            .expect("dispatch GEXEC");
+        let RedLabelProcessDispatch::GameExec(RedLabelGameExec::Running(run)) = dispatch else {
+            panic!("expected GEXEC dispatch to run game executive entry");
+        };
+        assert!(run.entry.is_some());
+
+        let mut machine = ArcadeMachine::new();
+        schedule_game_exec_process(&mut machine, "GEX0");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FB, 0).expect("clear LNDRES");
+        machine.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        machine.memory.write_byte(0xA10F, 8).expect("set UFOTIM");
+        machine.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+        machine.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        machine.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        machine.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        machine.memory.write_byte(0xA117, 2).expect("set WAVTMR");
+        machine.memory.write_byte(0xA118, 4).expect("set UFOTMR");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("GEX0").expect("GEX0 address"),
+            )
+            .expect("dispatch GEX0");
+        let RedLabelProcessDispatch::GameExec(RedLabelGameExec::Running(run)) = dispatch else {
+            panic!("expected GEX0 dispatch to run executive loop");
+        };
+        assert!(run.entry.is_none());
+    }
+
+    fn setup_game_exec_wave_clear_bonus(machine: &mut ArcadeMachine) -> u16 {
+        let process = schedule_game_exec_process(machine, "GEX0");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FA, 0).expect("clear ASTCNT");
+        machine.memory.write_byte(0xA0FB, 0).expect("clear LNDRES");
+        machine.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        machine.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
+        machine.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        machine.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        machine.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        machine.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1C9, 2).expect("set PLAS");
+        machine.memory.write_byte(0xA1CA, 3).expect("set PWAV");
+        let exec = machine
+            .red_label_step_game_exec_current_process()
+            .expect("GEX0 wave clear");
+        assert!(matches!(exec, RedLabelGameExec::WaveClearBonusSleeping(_)));
+        process
+    }
+
+    #[test]
+    fn game_exec_wave_clear_can_restart_through_direct_gexbon_and_public_wrapper() {
+        let mut machine = ArcadeMachine::new();
+        let process = setup_game_exec_wave_clear_bonus(&mut machine);
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("GEXBON").expect("GEXBON address"),
+            )
+            .expect("direct GEXBON dispatch");
+        let RedLabelProcessDispatch::GameExec(RedLabelGameExec::WaveClearRestart(restart)) =
+            dispatch
+        else {
+            panic!("expected direct GEXBON to restart game executive");
+        };
+        assert_eq!(restart.process_address, process);
+        assert_eq!(restart.return_address, 0xDD02);
+        assert_eq!(restart.lives_before, 2);
+        assert_eq!(restart.lives_after, 3);
+
+        let mut machine = ArcadeMachine::new();
+        let process = setup_game_exec_wave_clear_bonus(&mut machine);
+        let exec = machine
+            .red_label_finish_game_exec_wave_clear_current_process()
+            .expect("public GEXBON wrapper");
+        let RedLabelGameExec::WaveClearRestart(restart) = exec else {
+            panic!("expected public wrapper to restart game executive");
+        };
+        assert_eq!(restart.process_address, process);
+        assert_eq!(restart.lives_before, 2);
+        assert_eq!(restart.lives_after, 3);
+    }
+
+    #[test]
+    fn game_exec_wave_clear_rejects_untranslated_bonus_return() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_game_exec_process(&mut machine, "GEXBON");
+        machine
+            .memory
+            .write_word(process + 0x0D, 0xBEEF)
+            .expect("set bad PD6 return");
+
+        let error = machine
+            .red_label_finish_game_exec_wave_clear_current_process()
+            .expect_err("untranslated return");
+
+        assert!(error.contains("red-label GEXBON return 0xBEEF is not translated"));
+    }
+
+    #[test]
+    fn game_exec_wave_clear_runs_bonus_with_gexbon_return() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("GEX0").expect("GEX0 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make GEX0 process")
+            .process_address;
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule GEX0 process");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FA, 0).expect("clear ASTCNT");
+        machine.memory.write_byte(0xA0FB, 0).expect("clear LNDRES");
+        machine.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        machine.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
+        machine.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        machine.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        machine.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        machine.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1C9, 2).expect("set PLAS");
+        machine.memory.write_byte(0xA1CA, 3).expect("set PWAV");
+        machine
+            .memory
+            .write_byte(0x002A, 0xDD)
+            .expect("dirty active row");
+
+        let exec = machine
+            .red_label_step_game_exec_current_process()
+            .expect("GEX0 wave clear");
+        let RedLabelGameExec::WaveClearBonusSleeping(clear) = exec else {
+            panic!("expected GEX0 wave-clear BONUS sleep");
+        };
+
+        assert_eq!(clear.process_address, process);
+        assert_eq!(clear.previous_status, 0);
+        assert_eq!(clear.status, 0x77);
+        assert_eq!(clear.enemy_total, 0);
+        assert_eq!(clear.genocide.current_process_address, process);
+        assert!(clear.genocide.killed_processes.is_empty());
+        assert_eq!(
+            clear.return_address,
+            red_label_routine_address("GEXBON").expect("GEXBON address")
+        );
+        let RedLabelPlayerDeath::PostExplosionBonusWaveAdvanceSleeping {
+            process_address,
+            return_address,
+            previous_astronaut_counter,
+            wave,
+            wakeup_address,
+        } = clear.bonus
+        else {
+            panic!("expected no-survivor BONUS wave-advance sleep");
+        };
+        assert_eq!(process_address, process);
+        assert_eq!(return_address, 0xDD02);
+        assert_eq!(previous_astronaut_counter, 0);
+        assert_eq!(wave.previous_wave, 3);
+        assert_eq!(wave.wave, 4);
+        assert_eq!(wakeup_address, 0xDE79);
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[0x77][..])
+        );
+        assert_eq!(machine.red_label_ram_range(0x002A..0x002B), Some(&[0][..]));
+        assert_eq!(machine.red_label_ram_range(0xA026..0xA027), Some(&[0][..]));
+        assert_eq!(
+            machine.red_label_ram_range(0xA1C9..0xA1CB),
+            Some(&[2, 4][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xDE, 0x79, 0x80][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x0D..process + 0x0F),
+            Some(&[0xDD, 0x02][..])
+        );
+    }
+
+    #[test]
+    fn game_exec_wave_clear_bc3_restarts_through_plstr0() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("GEX0").expect("GEX0 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make GEX0 process")
+            .process_address;
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule GEX0 process");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FA, 0).expect("clear ASTCNT");
+        machine.memory.write_byte(0xA0FB, 0).expect("clear LNDRES");
+        machine.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        machine.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
+        machine.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        machine.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        machine.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        machine.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1C9, 2).expect("set PLAS");
+        machine.memory.write_byte(0xA1CA, 3).expect("set PWAV");
+        for address in 0xA142..0xA162 {
+            machine
+                .memory
+                .write_byte(address, 0)
+                .expect("clear FISTAB byte");
+        }
+        machine
+            .red_label_step_game_exec_current_process()
+            .expect("GEX0 wave clear");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("BC3").expect("BC3 address"),
+            )
+            .expect("BC3 GEXBON dispatch");
+        let RedLabelProcessDispatch::GameExec(RedLabelGameExec::WaveClearRestart(restart)) =
+            dispatch
+        else {
+            panic!("expected BC3 to dispatch GEXBON restart");
+        };
+
+        assert_eq!(restart.process_address, process);
+        assert_eq!(restart.return_address, 0xDD02);
+        assert_eq!(restart.player_address, 0xA1C2);
+        assert_eq!(restart.lives_before, 2);
+        assert_eq!(restart.lives_after, 3);
+        let RedLabelPlayerStart::RuntimeProcessCreated {
+            process_address,
+            status,
+            killed_processes,
+            runtime_process,
+        } = restart.player_start
+        else {
+            panic!("expected PLSTR0 runtime-process handoff");
+        };
+        assert_eq!(process_address, process);
+        assert_eq!(status, 0x7F);
+        assert!(killed_processes.is_empty());
+        assert_eq!(
+            runtime_process.routine_address,
+            red_label_routine_address("PLSTR3").expect("PLSTR3 address")
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[0x7F][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA1C9..0xA1CB),
+            Some(&[3, 4][..])
+        );
+        assert!(
+            machine
+                .red_label_ram_range(0xA142..0xA162)
+                .expect("FISTAB range")
+                .iter()
+                .any(|byte| *byte != 0),
+            "PLSTR0 INIT20 should refresh FISTAB before the process handoff"
         );
     }
 
@@ -25155,6 +39099,15 @@ mod tests {
         machine.memory.write_byte(0xA1CC, 10).expect("set PTARG");
     }
 
+    fn seed_player_two_for_player_start(machine: &mut ArcadeMachine) {
+        machine.memory.write_byte(0xA08B, 2).expect("set CURPLR");
+        machine.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        machine.memory.write_byte(0xA206, 3).expect("set P2 PLAS");
+        machine.memory.write_byte(0xA207, 1).expect("set P2 PWAV");
+        machine.memory.write_byte(0xA208, 3).expect("set P2 PSBC");
+        machine.memory.write_byte(0xA209, 10).expect("set P2 PTARG");
+    }
+
     #[test]
     fn player_start_entry_resets_process_lists_and_creates_runtime_process() {
         let mut machine = ArcadeMachine::new();
@@ -25336,6 +39289,7 @@ mod tests {
             runtime,
             support_processes,
             prompt_display_required,
+            prompt,
             screen_clear: runtime_screen_clear,
             target_count,
             status,
@@ -25348,6 +39302,7 @@ mod tests {
         let expected_runtime = RedLabelPlayerRuntimeInit {
             current_player: 1,
             player_address: 0xA1C2,
+            screen_switch: None,
             wave: 1,
             wall_color: RED_LABEL_WALL_COLOR_TABLE[0],
             remaining_lasers: 2,
@@ -25358,6 +39313,7 @@ mod tests {
         assert_eq!(process_address, process);
         assert_eq!(runtime, expected_runtime);
         assert!(!prompt_display_required);
+        assert_eq!(prompt, None);
         assert_eq!(runtime_screen_clear, Some(active_screen_clear()));
         assert_eq!(target_count, Some(10));
         assert_eq!(status, Some(0x05));
@@ -25413,6 +39369,252 @@ mod tests {
             machine.red_label_ram_range(process + 0x02..process + 0x05),
             Some(&[0xDA, 0x32, 0x60][..])
         );
+    }
+
+    #[test]
+    fn screen_switch_player_one_sets_upright_irq_hook_and_restores_map() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA036, 7).expect("seed MAPCR");
+        machine.memory.hardware_map = 5;
+
+        let screen_switch = machine
+            .memory
+            .screen_switch_player_one()
+            .expect("P1SW screen switch");
+
+        assert_eq!(
+            screen_switch,
+            RedLabelScreenSwitch {
+                routine: RedLabelScreenSwitchRoutine::PlayerOne,
+                pia3_input: 0,
+                cocktail_detected: false,
+                mode: RedLabelIrqMode::Normal,
+                irq_hook_opcode: RED_LABEL_IRQ_JUMP_OPCODE,
+                irq_hook_target: RED_LABEL_IRQ_ADDRESS,
+                pia3_control: RED_LABEL_P1SW_PIA3_CONTROL,
+                watchdog_value: RED_LABEL_NORMAL_WATCHDOG_DATA,
+                map_before: 7,
+                map_after: 7,
+                hardware_map_before: 5,
+                hardware_map_writes: vec![0, 7],
+                hardware_map_after: 7,
+                screen_clear: None,
+                stick_history_reset: false,
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA08F..0xA092),
+            Some(&[0x7E, 0xDF, 0x17][..])
+        );
+        assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[7][..]));
+        assert_eq!(machine.red_label_hardware_map(), 7);
+    }
+
+    #[test]
+    fn screen_switch_player_two_follows_pia3_cocktail_gate() {
+        for (pia3_input, mode, irq_target, pia3_control, watchdog_value) in [
+            (
+                0x00,
+                RedLabelIrqMode::Normal,
+                RED_LABEL_IRQ_ADDRESS,
+                RED_LABEL_P1SW_PIA3_CONTROL,
+                RED_LABEL_NORMAL_WATCHDOG_DATA,
+            ),
+            (
+                RED_LABEL_PIA3_COCKTAIL_BIT,
+                RedLabelIrqMode::Inverted,
+                RED_LABEL_IRQB_ADDRESS,
+                RED_LABEL_P2SW_PIA3_CONTROL,
+                RED_LABEL_INVERTED_WATCHDOG_DATA,
+            ),
+        ] {
+            let mut machine = ArcadeMachine::new();
+            machine.memory.write_byte(0xA036, 4).expect("seed MAPCR");
+            machine.memory.hardware_map = 6;
+
+            let screen_switch = machine
+                .memory
+                .screen_switch_player_two(pia3_input)
+                .expect("P2SW screen switch");
+
+            assert_eq!(
+                screen_switch.routine,
+                RedLabelScreenSwitchRoutine::PlayerTwo
+            );
+            assert_eq!(screen_switch.pia3_input, pia3_input);
+            assert_eq!(
+                screen_switch.cocktail_detected,
+                pia3_input & RED_LABEL_PIA3_COCKTAIL_BIT != 0
+            );
+            assert_eq!(screen_switch.mode, mode);
+            assert_eq!(screen_switch.irq_hook_target, irq_target);
+            assert_eq!(screen_switch.pia3_control, pia3_control);
+            assert_eq!(screen_switch.watchdog_value, watchdog_value);
+            assert_eq!(screen_switch.map_before, 4);
+            assert_eq!(screen_switch.map_after, 4);
+            assert_eq!(screen_switch.hardware_map_before, 6);
+            assert_eq!(screen_switch.hardware_map_writes, vec![0, 0, 4]);
+            assert_eq!(screen_switch.hardware_map_after, 4);
+            assert_eq!(screen_switch.screen_clear, None);
+            assert!(!screen_switch.stick_history_reset);
+            assert_eq!(
+                machine.red_label_ram_range(0xA08F..0xA092),
+                Some(
+                    &[
+                        RED_LABEL_IRQ_JUMP_OPCODE,
+                        (irq_target >> 8) as u8,
+                        irq_target as u8
+                    ][..]
+                )
+            );
+            assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[4][..]));
+            assert_eq!(machine.red_label_hardware_map(), 4);
+        }
+    }
+
+    #[test]
+    fn player_runtime_cocktail_screen_switch_selects_current_player_irq_hook() {
+        for (current_player, routine, mode, irq_target) in [
+            (
+                1,
+                RedLabelScreenSwitchRoutine::PlayerOne,
+                RedLabelIrqMode::Normal,
+                RED_LABEL_IRQ_ADDRESS,
+            ),
+            (
+                2,
+                RedLabelScreenSwitchRoutine::PlayerTwo,
+                RedLabelIrqMode::Inverted,
+                RED_LABEL_IRQB_ADDRESS,
+            ),
+        ] {
+            let mut machine = ArcadeMachine::new();
+            if current_player == 1 {
+                seed_player_one_for_player_start(&mut machine);
+            } else {
+                seed_player_two_for_player_start(&mut machine);
+            }
+            let process = machine
+                .red_label_make_process(
+                    red_label_routine_address("PLSTR3").expect("PLSTR3 address"),
+                    RED_LABEL_SYSTEM_PROCESS_TYPE,
+                )
+                .expect("make PLSTR3 process")
+                .process_address;
+            machine
+                .step_red_label_process_scheduler()
+                .expect("schedule PLSTR3");
+
+            let start = machine
+                .memory
+                .start_player_runtime_current_process_with_pia3(RED_LABEL_PIA3_COCKTAIL_BIT)
+                .expect("cocktail PLSTR3 runtime start");
+
+            let RedLabelPlayerStart::RuntimeSleeping {
+                process_address,
+                runtime,
+                ..
+            } = start
+            else {
+                panic!("expected PLSTR3 runtime sleep");
+            };
+            let screen_switch = runtime
+                .screen_switch
+                .expect("cocktail PLSTR3 should run screen switch");
+            assert_eq!(process_address, process);
+            assert_eq!(runtime.current_player, current_player);
+            assert_eq!(screen_switch.routine, routine);
+            assert_eq!(screen_switch.mode, mode);
+            assert_eq!(screen_switch.irq_hook_target, irq_target);
+            assert_eq!(screen_switch.screen_clear, Some(screen_clear()));
+            assert!(screen_switch.stick_history_reset);
+            assert_eq!(
+                machine.red_label_ram_range(0xA08F..0xA092),
+                Some(
+                    &[
+                        RED_LABEL_IRQ_JUMP_OPCODE,
+                        (irq_target >> 8) as u8,
+                        irq_target as u8
+                    ][..]
+                )
+            );
+            assert_eq!(
+                machine.red_label_ram_range(0xA07B..0xA07D),
+                Some(&[0xFF, 0xFF][..])
+            );
+            assert_eq!(machine.memory.live_irq_mode().expect("live IRQ mode"), mode);
+        }
+    }
+
+    #[test]
+    fn player_runtime_start_writes_two_player_prompt_before_prompt_sleep() {
+        for (current_player, label_address) in [(1, 0xC0EF), (2, 0xC0F1)] {
+            let mut machine = ArcadeMachine::new();
+            machine
+                .memory
+                .write_byte(0xA08B, current_player)
+                .expect("set CURPLR");
+            machine.memory.write_byte(0xA08C, 2).expect("set PLRCNT");
+            machine.memory.write_byte(0xA025, 1).expect("set PDFLG");
+            machine.memory.write_byte(0xA1C9, 3).expect("set P1 PLAS");
+            machine.memory.write_byte(0xA1CA, 1).expect("set P1 PWAV");
+            machine.memory.write_byte(0xA1CB, 2).expect("set P1 PSBC");
+            machine.memory.write_byte(0xA1CC, 10).expect("set P1 PTARG");
+            machine.memory.write_byte(0xA206, 3).expect("set P2 PLAS");
+            machine.memory.write_byte(0xA207, 1).expect("set P2 PWAV");
+            machine.memory.write_byte(0xA208, 2).expect("set P2 PSBC");
+            machine.memory.write_byte(0xA209, 10).expect("set P2 PTARG");
+            let process = machine
+                .red_label_make_process(
+                    red_label_routine_address("PLSTR3").expect("PLSTR3 address"),
+                    RED_LABEL_SYSTEM_PROCESS_TYPE,
+                )
+                .expect("make PLSTR3 process")
+                .process_address;
+            machine
+                .step_red_label_process_scheduler()
+                .expect("schedule PLSTR3");
+
+            let start = machine
+                .red_label_start_player_runtime_current_process()
+                .expect("PLSTR3 runtime start");
+
+            let RedLabelPlayerStart::RuntimeSleeping {
+                process_address,
+                runtime,
+                prompt_display_required,
+                prompt,
+                screen_clear,
+                target_count,
+                status,
+                wakeup_address,
+                sleep_time,
+                ..
+            } = start
+            else {
+                panic!("expected PLSTR3 runtime sleep");
+            };
+            assert_eq!(process_address, process);
+            assert_eq!(runtime.current_player, current_player);
+            assert!(prompt_display_required);
+            assert_eq!(
+                prompt,
+                Some(RedLabelBonusTextCall {
+                    vector_address: label_address,
+                    screen_address: RED_LABEL_PLAYER_START_PROMPT_SCREEN,
+                })
+            );
+            assert_eq!(screen_clear, None);
+            assert_eq!(target_count, None);
+            assert_eq!(status, None);
+            assert_eq!(wakeup_address, 0xDA1F);
+            assert_eq!(sleep_time, 0x80);
+            assert_message_glyph_first_column(&machine, RED_LABEL_PLAYER_START_PROMPT_SCREEN, 'P');
+            assert_eq!(
+                machine.red_label_ram_range(process + 0x02..process + 0x05),
+                Some(&[0xDA, 0x1F, 0x80][..])
+            );
+        }
     }
 
     #[test]
@@ -25500,36 +39702,54 @@ mod tests {
         let finish = machine
             .red_label_finish_player_start_current_process()
             .expect("PLS1 finish");
+        let RedLabelPlayerStart::GameExecReady {
+            process_address,
+            restore,
+            status,
+            pdf_flag_before,
+        } = finish
+        else {
+            panic!("expected PLS1 game exec return");
+        };
 
+        assert_eq!(process_address, process);
+        assert_eq!(status, 0x02);
+        assert_eq!(pdf_flag_before, 0x55);
         assert_eq!(
-            finish,
-            RedLabelPlayerStart::GameExecReady {
-                process_address: process,
-                restore: RedLabelPlayerRestore {
-                    plres_address: red_label_routine_address("PLRES").expect("PLRES address"),
-                    astro_process: RedLabelCreatedProcess {
-                        process_address: 0xAAD4,
-                        routine_address: red_label_routine_address("ASTRO").expect("ASTRO address"),
-                        process_type: RED_LABEL_SYSTEM_PROCESS_TYPE,
-                        class: RedLabelProcessClass::Regular,
-                    },
-                    target_list_start: 0xA11A,
-                    target_list_bytes_cleared: 0x28,
-                    target_count: 0,
-                    target_objects: Vec::new(),
-                    enemy_source_address: 0xA1CD,
-                    enemy_target_address: 0xA0FB,
-                    enemy_bytes_copied: 0x17,
-                    active_count_start: 0xA112,
-                    active_count_bytes_cleared: 0x08,
-                    schizoid_restore: None,
-                    probe_restore: None,
-                    tie_restore: None,
-                },
-                status: 0x02,
-                pdf_flag_before: 0x55,
+            restore.astro_process,
+            RedLabelCreatedProcess {
+                process_address: 0xAAD4,
+                routine_address: red_label_routine_address("ASTRO").expect("ASTRO address"),
+                process_type: RED_LABEL_SYSTEM_PROCESS_TYPE,
+                class: RedLabelProcessClass::Regular,
             }
         );
+        assert_eq!(
+            (
+                restore.plres_address,
+                restore.target_list_start,
+                restore.target_list_bytes_cleared,
+                restore.target_count,
+                restore.enemy_source_address,
+                restore.enemy_target_address,
+                restore.enemy_bytes_copied,
+                restore.active_count_start,
+                restore.active_count_bytes_cleared,
+            ),
+            (0xDC1E, 0xA11A, 0x28, 0, 0xA1CD, 0xA0FB, 0x17, 0xA112, 0x08)
+        );
+        assert!(restore.target_objects.is_empty());
+        assert_eq!(restore.schizoid_restore, None);
+        assert_eq!(restore.probe_restore, None);
+        assert_eq!(restore.tie_restore, None);
+        let mini_swarmer_restore = restore.mini_swarmer_restore;
+        assert_eq!(mini_swarmer_restore.reserve_count, 0);
+        assert_eq!(mini_swarmer_restore.x_low_register, 0x07);
+        assert_eq!(mini_swarmer_restore.active_count, 0);
+        assert_eq!(mini_swarmer_restore.batches.len(), 1);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_object_address, 0xA23C);
+        assert_eq!(mini_swarmer_restore.batches[0].requested_count, 0);
+        assert!(!mini_swarmer_restore.batches[0].returned_phony_to_free_list);
         assert_eq!(machine.red_label_ram_range(0xA025..0xA026), Some(&[0][..]));
         assert_eq!(
             machine.red_label_ram_range(0xA0BA..0xA0BB),
@@ -25597,10 +39817,12 @@ mod tests {
             hseed: 0x20,
             lseed: 0x40,
         };
+        let mut expected_plres_b_register = 0;
         let mut expected_x16 = Vec::new();
         let mut expected_pictures = Vec::new();
         for _ in 0..3 {
             let x_bank = expected_rng.hseed;
+            expected_plres_b_register = x_bank;
             expected_rng.advance();
             expected_x16.push(u16::from_be_bytes([
                 (expected_rng.hseed & 0x1F).wrapping_add(x_bank),
@@ -25612,6 +39834,18 @@ mod tests {
                 red_label_object_picture_address("ASTP3").expect("ASTP3 address")
             });
         }
+        let phony_y16 = u16::from_be_bytes([
+            expected_rng
+                .seed
+                .wrapping_shr(1)
+                .wrapping_add(RED_LABEL_Y_MIN),
+            0,
+        ]);
+        expected_rng.advance();
+        let phony_x16 = u16::from_be_bytes([
+            (expected_rng.seed & 0x3F).wrapping_add(0x80),
+            expected_plres_b_register,
+        ]);
 
         let finish = machine
             .red_label_finish_player_start_current_process()
@@ -25628,6 +39862,17 @@ mod tests {
         assert_eq!(restore.schizoid_restore, None);
         assert_eq!(restore.probe_restore, None);
         assert_eq!(restore.tie_restore, None);
+        let mini_swarmer_restore = restore.mini_swarmer_restore;
+        assert_eq!(mini_swarmer_restore.reserve_count, 0);
+        assert_eq!(
+            mini_swarmer_restore.x_low_register,
+            expected_plres_b_register
+        );
+        assert_eq!(mini_swarmer_restore.batches.len(), 1);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_object_address, 0xA281);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_x16, phony_x16);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_y16, phony_y16);
+        assert!(!mini_swarmer_restore.batches[0].returned_phony_to_free_list);
         assert_eq!(status, 0);
         assert_eq!(
             machine.red_label_ram_range(0xA0DF..0xA0E2),
@@ -25689,6 +39934,260 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn player_restore_distributes_large_target_count_across_all_x_banks() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .red_label_make_process(
+                red_label_routine_address("PLS1").expect("PLS1 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PLS1 process");
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule PLS1");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1CC, 10).expect("set PTARG");
+        machine.memory.write_byte(0xA0DF, 0x12).expect("set SEED");
+        machine.memory.write_byte(0xA0E0, 0x20).expect("set HSEED");
+        machine.memory.write_byte(0xA0E1, 0x40).expect("set LSEED");
+        write_ram_bytes(&mut machine, 0xA1CD, &[0; 0x17]);
+
+        let finish = machine
+            .red_label_finish_player_start_current_process()
+            .expect("PLS1 finish");
+        let RedLabelPlayerStart::GameExecReady { restore, .. } = finish else {
+            panic!("expected PLS1 game exec return");
+        };
+
+        assert_eq!(restore.target_count, 10);
+        assert_eq!(restore.target_objects.len(), 10);
+        assert_eq!(
+            restore
+                .target_objects
+                .iter()
+                .map(|object| object.object_address)
+                .collect::<Vec<_>>(),
+            vec![
+                0xA23C, 0xA253, 0xA26A, 0xA281, 0xA298, 0xA2AF, 0xA2C6, 0xA2DD, 0xA2F4, 0xA30B
+            ]
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA11A..0xA130),
+            Some(
+                &[
+                    0xA2, 0x3C, 0xA2, 0x53, 0xA2, 0x6A, 0xA2, 0x81, 0xA2, 0x98, 0xA2, 0xAF, 0xA2,
+                    0xC6, 0xA2, 0xDD, 0xA2, 0xF4, 0xA3, 0x0B, 0, 0,
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn player_restore_runs_plres_mini_swarmer_reserve_batches() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .red_label_make_process(
+                red_label_routine_address("PLS1").expect("PLS1 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PLS1 process");
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule PLS1");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1CC, 0).expect("clear PTARG");
+        machine.memory.write_byte(0xA0DF, 0x12).expect("set SEED");
+        machine.memory.write_byte(0xA0E0, 0x20).expect("set HSEED");
+        machine.memory.write_byte(0xA0E1, 0x40).expect("set LSEED");
+        machine.memory.write_word(0xA020, 0x2000).expect("set BGL");
+        write_ram_bytes(&mut machine, 0xA1CD, &[0; 0x17]);
+        machine
+            .memory
+            .write_byte(0xA1CD + 4, 8)
+            .expect("seed SWMRES");
+        machine
+            .memory
+            .write_byte(0xA1CD + 0x12, 0x10)
+            .expect("seed SWSTIM");
+        machine
+            .memory
+            .write_byte(0xA1CD + 0x13, 0x3F)
+            .expect("seed SWAC");
+
+        let mut expected_rng = RandState {
+            seed: 0x12,
+            hseed: 0x20,
+            lseed: 0x40,
+        };
+        let first_phony_y16 = u16::from_be_bytes([
+            expected_rng
+                .seed
+                .wrapping_shr(1)
+                .wrapping_add(RED_LABEL_Y_MIN),
+            0,
+        ]);
+        expected_rng.advance();
+        let first_placement_rand = expected_rng;
+        let first_phony_x16 =
+            u16::from_be_bytes([(first_placement_rand.seed & 0x3F).wrapping_add(0x80), 0x07])
+                .wrapping_add(0x2000);
+
+        let mut expected_spawns = Vec::new();
+        for object_address in [0xA253, 0xA26A, 0xA281, 0xA298, 0xA2AF, 0xA2C6] {
+            expected_rng.advance();
+            let velocity_rand = expected_rng;
+            let yv = sign_extend_u8_to_u16(velocity_rand.seed).wrapping_shl(1);
+            let xv = sign_extend_u8_to_u16((velocity_rand.lseed & 0x3F).wrapping_sub(0x20));
+            let acceleration = velocity_rand.lseed & 0x3F;
+            let sleep_time = velocity_rand.hseed & 0x1F;
+            expected_rng.advance();
+            let shot_timer_rand = expected_rng;
+            let shot_timer = rmax(0x10, shot_timer_rand.seed);
+            expected_spawns.push((
+                object_address,
+                first_phony_x16,
+                first_phony_y16,
+                xv,
+                yv,
+                acceleration,
+                sleep_time,
+                shot_timer,
+                velocity_rand,
+                shot_timer_rand,
+            ));
+        }
+
+        let second_phony_y16 = u16::from_be_bytes([
+            expected_rng
+                .seed
+                .wrapping_shr(1)
+                .wrapping_add(RED_LABEL_Y_MIN),
+            0,
+        ]);
+        expected_rng.advance();
+        let second_placement_rand = expected_rng;
+        let second_phony_x16 =
+            u16::from_be_bytes([(second_placement_rand.seed & 0x3F).wrapping_add(0x80), 0x07])
+                .wrapping_add(0x2000);
+
+        for object_address in [0xA2DD, 0xA2F4] {
+            expected_rng.advance();
+            let velocity_rand = expected_rng;
+            let yv = sign_extend_u8_to_u16(velocity_rand.seed).wrapping_shl(1);
+            let xv = sign_extend_u8_to_u16((velocity_rand.lseed & 0x3F).wrapping_sub(0x20));
+            let acceleration = velocity_rand.lseed & 0x3F;
+            let sleep_time = velocity_rand.hseed & 0x1F;
+            expected_rng.advance();
+            let shot_timer_rand = expected_rng;
+            let shot_timer = rmax(0x10, shot_timer_rand.seed);
+            expected_spawns.push((
+                object_address,
+                second_phony_x16,
+                second_phony_y16,
+                xv,
+                yv,
+                acceleration,
+                sleep_time,
+                shot_timer,
+                velocity_rand,
+                shot_timer_rand,
+            ));
+        }
+
+        let finish = machine
+            .red_label_finish_player_start_current_process()
+            .expect("PLS1 finish");
+        let RedLabelPlayerStart::GameExecReady { restore, .. } = finish else {
+            panic!("expected PLS1 game exec return");
+        };
+
+        assert_eq!(restore.target_count, 0);
+        assert!(restore.target_objects.is_empty());
+        assert_eq!(restore.schizoid_restore, None);
+        assert_eq!(restore.probe_restore, None);
+        assert_eq!(restore.tie_restore, None);
+        let mini_swarmer_restore = restore.mini_swarmer_restore;
+        assert_eq!(mini_swarmer_restore.reserve_count, 8);
+        assert_eq!(mini_swarmer_restore.x_low_register, 0x07);
+        assert_eq!(mini_swarmer_restore.active_count, 8);
+        assert_eq!(mini_swarmer_restore.batches.len(), 2);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_object_address, 0xA23C);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_x16, first_phony_x16);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_y16, first_phony_y16);
+        assert_eq!(
+            mini_swarmer_restore.batches[0].placement_rand,
+            first_placement_rand
+        );
+        assert_eq!(mini_swarmer_restore.batches[0].requested_count, 6);
+        assert_eq!(mini_swarmer_restore.batches[0].spawned_swarmers.len(), 6);
+        assert_eq!(mini_swarmer_restore.batches[0].remaining_reserve, 2);
+        assert!(mini_swarmer_restore.batches[0].returned_phony_to_free_list);
+        assert_eq!(mini_swarmer_restore.batches[1].phony_object_address, 0xA23C);
+        assert_eq!(mini_swarmer_restore.batches[1].phony_x16, second_phony_x16);
+        assert_eq!(mini_swarmer_restore.batches[1].phony_y16, second_phony_y16);
+        assert_eq!(
+            mini_swarmer_restore.batches[1].placement_rand,
+            second_placement_rand
+        );
+        assert_eq!(mini_swarmer_restore.batches[1].requested_count, 2);
+        assert_eq!(mini_swarmer_restore.batches[1].spawned_swarmers.len(), 2);
+        assert_eq!(mini_swarmer_restore.batches[1].remaining_reserve, 0);
+        assert!(mini_swarmer_restore.batches[1].returned_phony_to_free_list);
+
+        let spawned_swarmers = mini_swarmer_restore.batches[0]
+            .spawned_swarmers
+            .iter()
+            .chain(mini_swarmer_restore.batches[1].spawned_swarmers.iter())
+            .collect::<Vec<_>>();
+        for (
+            spawn,
+            (
+                object_address,
+                x16,
+                y16,
+                xv,
+                yv,
+                acceleration,
+                sleep_time,
+                shot_timer,
+                velocity_rand,
+                shot_timer_rand,
+            ),
+        ) in spawned_swarmers.iter().zip(expected_spawns)
+        {
+            assert_eq!(spawn.object.object_address, object_address);
+            assert_eq!(spawn.x16, x16);
+            assert_eq!(spawn.y16, y16);
+            assert_eq!(spawn.xv, xv);
+            assert_eq!(spawn.yv, yv);
+            assert_eq!(spawn.acceleration, acceleration);
+            assert_eq!(spawn.sleep_time, sleep_time);
+            assert_eq!(spawn.shot_timer, shot_timer);
+            assert_eq!(spawn.velocity_rand, velocity_rand);
+            assert_eq!(spawn.shot_timer_rand, shot_timer_rand);
+            assert_eq!(
+                spawn.object.descriptor.picture_address,
+                red_label_object_picture_address("SWPIC1").expect("SWPIC1 address")
+            );
+            assert_eq!(
+                spawn.object.descriptor.collision_vector_address,
+                red_label_routine_address("MSWKIL").expect("MSWKIL address")
+            );
+        }
+        assert_eq!(spawned_swarmers.len(), 8);
+        assert_eq!(machine.red_label_ram_range(0xA0FF..0xA100), Some(&[0][..]));
+        assert_eq!(machine.red_label_ram_range(0xA116..0xA117), Some(&[8][..]));
+        assert_eq!(
+            machine.red_label_ram_range(0xA065..0xA069),
+            Some(&[0xA2, 0xF4, 0xA2, 0x3C][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0DF..0xA0E2),
+            Some(&[expected_rng.seed, expected_rng.hseed, expected_rng.lseed][..])
+        );
     }
 
     #[test]
@@ -26382,6 +40881,15 @@ mod tests {
             hseed: 0x20,
             lseed: 0x40,
         };
+        let phony_y16 = u16::from_be_bytes([
+            expected_rng
+                .seed
+                .wrapping_shr(1)
+                .wrapping_add(RED_LABEL_Y_MIN),
+            0,
+        ]);
+        expected_rng.advance();
+        let phony_x16 = u16::from_be_bytes([(expected_rng.seed & 0x3F).wrapping_add(0x80), 0x07]);
         let mut expected_probe_fields = Vec::new();
         for _ in 0..2 {
             expected_rng.advance();
@@ -26408,6 +40916,14 @@ mod tests {
         let RedLabelPlayerStart::GameExecReady { restore, .. } = finish else {
             panic!("expected PLS1 game exec return");
         };
+        let mini_swarmer_restore = restore.mini_swarmer_restore;
+        assert_eq!(mini_swarmer_restore.reserve_count, 0);
+        assert_eq!(mini_swarmer_restore.x_low_register, 0x07);
+        assert_eq!(mini_swarmer_restore.batches.len(), 1);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_object_address, 0xA23C);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_x16, phony_x16);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_y16, phony_y16);
+        assert!(!mini_swarmer_restore.batches[0].returned_phony_to_free_list);
         let probe_restore = restore.probe_restore.expect("probe restore branch");
 
         assert_eq!(probe_restore.reserve_count, 2);
@@ -26421,7 +40937,7 @@ mod tests {
             Some(&[expected_rng.seed, expected_rng.hseed, expected_rng.lseed][..])
         );
 
-        for (index, object_address) in [0xA23C, 0xA253].into_iter().enumerate() {
+        for (index, object_address) in [0xA253, 0xA26A].into_iter().enumerate() {
             let (x16, y16, xv, yv) = expected_probe_fields[index];
             let probe = &probe_restore.created_objects[index];
             assert_eq!(probe.object.object_address, object_address);
@@ -26485,15 +41001,15 @@ mod tests {
 
         assert_eq!(
             machine.red_label_ram_range(0xA065..0xA067),
-            Some(&[0xA2, 0x53][..])
+            Some(&[0xA2, 0x6A][..])
         );
         assert_eq!(
             machine.red_label_ram_range(0x9C00..0x9C0C),
-            Some(&[0xAF, 0x00, 0xF8, 0xF7, 0x9C, 0x40, 0, 0, 0, 0, 0xA2, 0x3C][..])
+            Some(&[0xAF, 0x00, 0xF8, 0xF7, 0x9C, 0x40, 0, 0, 0, 0, 0xA2, 0x53][..])
         );
         assert_eq!(
             machine.red_label_ram_range(0x9C40..0x9C4C),
-            Some(&[0xAF, 0x00, 0xF8, 0xF7, 0x9C, 0x80, 0, 0, 0, 0, 0xA2, 0x53][..])
+            Some(&[0xAF, 0x00, 0xF8, 0xF7, 0x9C, 0x80, 0, 0, 0, 0, 0xA2, 0x6A][..])
         );
     }
 
@@ -27229,6 +41745,15 @@ mod tests {
             hseed: 0x4C,
             lseed: 0,
         };
+        let phony_y16 = u16::from_be_bytes([
+            expected_rng
+                .seed
+                .wrapping_shr(1)
+                .wrapping_add(RED_LABEL_Y_MIN),
+            0,
+        ]);
+        expected_rng.advance();
+        let phony_x16 = u16::from_be_bytes([(expected_rng.seed & 0x3F).wrapping_add(0x80), 0x07]);
         expected_rng.advance();
         let placement_rng = expected_rng;
         let avoid_left = 0u16.wrapping_sub(300 * 32);
@@ -27254,6 +41779,14 @@ mod tests {
         let RedLabelPlayerStart::GameExecReady { restore, .. } = finish else {
             panic!("expected PLS1 game exec return");
         };
+        let mini_swarmer_restore = restore.mini_swarmer_restore;
+        assert_eq!(mini_swarmer_restore.reserve_count, 0);
+        assert_eq!(mini_swarmer_restore.x_low_register, 0x07);
+        assert_eq!(mini_swarmer_restore.batches.len(), 1);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_object_address, 0xA23C);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_x16, phony_x16);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_y16, phony_y16);
+        assert!(!mini_swarmer_restore.batches[0].returned_phony_to_free_list);
         let schizoid_restore = restore.schizoid_restore.expect("schizoid restore branch");
 
         assert_eq!(schizoid_restore.reserve_count, 1);
@@ -27269,7 +41802,7 @@ mod tests {
         );
 
         let restored = &schizoid_restore.created_objects[0];
-        assert_eq!(restored.object.object_address, 0xA23C);
+        assert_eq!(restored.object.object_address, 0xA253);
         assert_eq!(restored.object.process_address, 0xAAE3);
         assert_eq!(
             restored.object.descriptor.picture_address,
@@ -27288,30 +41821,27 @@ mod tests {
         assert_eq!(
             restored.appearance,
             RedLabelAppearanceStart {
-                object_address: 0xA23C,
+                object_address: 0xA253,
                 original_picture_address: red_label_object_picture_address("SCZP1")
                     .expect("SCZP1 address"),
-                final_picture_address: red_label_object_picture_address("NULOB")
-                    .expect("NULOB address"),
-                relative_x: 0x2600,
-                slot_address: Some(0x9C00),
+                final_picture_address: red_label_object_picture_address("SCZP1")
+                    .expect("SCZP1 address"),
+                relative_x: x16,
+                slot_address: None,
                 erased_previous_slot: false,
-                sound_loaded: Some(RedLabelLoadedSoundTable {
-                    address: 0xD4EE,
-                    priority: 0xD0,
-                }),
+                sound_loaded: None,
             }
         );
         assert_eq!(
             machine.red_label_ram_range(0xAAE5..0xAAEF),
-            Some(&[0xF1, 0x5E, 0x01, 0x00, 0, 0xA2, 0x3C, 0, 0, 0][..])
+            Some(&[0xF1, 0x5E, 0x01, 0x00, 0, 0xA2, 0x53, 0, 0, 0][..])
         );
         assert_eq!(
-            machine.red_label_ram_range(0xA23E..0xA251),
+            machine.red_label_ram_range(0xA253 + 0x02..0xA253 + 0x15),
             Some(
                 &[
                     0xF8,
-                    0xEC,
+                    0xCE,
                     0,
                     0,
                     0xAA,
@@ -27328,17 +41858,13 @@ mod tests {
                     0,
                     0xCC,
                     0x33,
-                    0x02,
+                    0,
                 ][..]
             )
         );
         assert_eq!(
             machine.red_label_ram_range(0xA065..0xA067),
-            Some(&[0xA2, 0x3C][..])
-        );
-        assert_eq!(
-            machine.red_label_ram_range(0x9C00..0x9C0C),
-            Some(&[0xAF, 0x00, 0xF8, 0xCE, 0x9C, 0x40, 0, 0, 0, 0, 0xA2, 0x3C][..])
+            Some(&[0xA2, 0x53][..])
         );
     }
 
@@ -29172,6 +43698,14 @@ mod tests {
         let RedLabelPlayerStart::GameExecReady { restore, .. } = finish else {
             panic!("expected PLS1 game exec return");
         };
+        let mini_swarmer_restore = restore.mini_swarmer_restore;
+        assert_eq!(mini_swarmer_restore.reserve_count, 0);
+        assert_eq!(mini_swarmer_restore.x_low_register, 0x07);
+        assert_eq!(mini_swarmer_restore.active_count, 0);
+        assert_eq!(mini_swarmer_restore.batches.len(), 1);
+        assert_eq!(mini_swarmer_restore.batches[0].phony_object_address, 0xA23C);
+        assert_eq!(mini_swarmer_restore.batches[0].requested_count, 0);
+        assert!(!mini_swarmer_restore.batches[0].returned_phony_to_free_list);
         let tie_restore = restore.tie_restore.expect("tie restore branch");
 
         assert_eq!(tie_restore.reserve_count, 4);
@@ -29192,7 +43726,7 @@ mod tests {
         assert_eq!(first_squad.cruise_altitude, 0x50);
         assert_eq!(
             machine.red_label_ram_range(0xAF31..0xAF3B),
-            Some(&[0xA2, 0x6A, 0xA2, 0x53, 0xA2, 0x3C, 0, 0, 3, 0x50][..])
+            Some(&[0xA2, 0x81, 0xA2, 0x6A, 0xA2, 0x53, 0, 0, 3, 0x50][..])
         );
 
         let second_squad = &tie_restore.squads[1];
@@ -29202,14 +43736,14 @@ mod tests {
         assert_eq!(second_squad.cruise_altitude, 0x50);
         assert_eq!(
             machine.red_label_ram_range(0xAF48..0xAF52),
-            Some(&[0xA2, 0x81, 0, 0, 0, 0, 0, 0, 1, 0x50][..])
+            Some(&[0xA2, 0x98, 0, 0, 0, 0, 0, 0, 1, 0x50][..])
         );
 
         let expected = [
-            (0xA23C, 0x96B4, 0x0020),
-            (0xA253, 0x9534, 0x0020),
-            (0xA26A, 0x93B4, 0x0020),
-            (0xA281, 0x93B4, 0xFFE0),
+            (0xA253, 0x96B4, 0x0020),
+            (0xA26A, 0x9534, 0x0020),
+            (0xA281, 0x93B4, 0x0020),
+            (0xA298, 0x93B4, 0xFFE0),
         ];
         let restored_objects = first_squad
             .objects
@@ -29260,7 +43794,7 @@ mod tests {
 
         assert_eq!(
             machine.red_label_ram_range(0xA065..0xA067),
-            Some(&[0xA2, 0x81][..])
+            Some(&[0xA2, 0x98][..])
         );
     }
 
@@ -30129,6 +44663,202 @@ mod tests {
             0xDB48
         );
         assert_eq!(
+            red_label_routine_address("HALL1").expect("HALL1 address"),
+            0xC030
+        );
+        assert_eq!(
+            red_label_routine_address("HALL3A").expect("HALL3A address"),
+            0xC0CB
+        );
+        assert_eq!(
+            red_label_routine_address("HALL4").expect("HALL4 address"),
+            0xC0DA
+        );
+        assert_eq!(
+            red_label_routine_address("HALL5").expect("HALL5 address"),
+            0xC0F4
+        );
+        assert_eq!(
+            red_label_routine_address("HALL6").expect("HALL6 address"),
+            0xC10E
+        );
+        assert_eq!(
+            red_label_routine_address("HALL12").expect("HALL12 address"),
+            0xC12A
+        );
+        assert_eq!(
+            red_label_routine_address("HALL13").expect("HALL13 address"),
+            0xC144
+        );
+        assert_eq!(
+            red_label_routine_address("HOFST").expect("HOFST address"),
+            0xC1DC
+        );
+        assert_eq!(
+            red_label_routine_address("HOFBL").expect("HOFBL address"),
+            0xC1E7
+        );
+        assert_eq!(
+            red_label_routine_address("HOFUD").expect("HOFUD address"),
+            0xC1FA
+        );
+        assert_eq!(
+            red_label_routine_address("HOFUD1").expect("HOFUD1 address"),
+            0xC1FD
+        );
+        assert_eq!(
+            red_label_routine_address("AMODES").expect("AMODES address"),
+            0xC677
+        );
+        assert_eq!(
+            red_label_routine_address("LOGO").expect("LOGO address"),
+            0xC6A2
+        );
+        assert_eq!(
+            red_label_routine_address("LOGO0").expect("LOGO0 address"),
+            0xC6B0
+        );
+        assert_eq!(
+            red_label_routine_address("PRES").expect("PRES address"),
+            0xC730
+        );
+        assert_eq!(
+            red_label_routine_address("PRES1").expect("PRES1 address"),
+            0xC738
+        );
+        assert_eq!(
+            red_label_routine_address("DEFEND").expect("DEFEND address"),
+            0xC74C
+        );
+        assert_eq!(
+            red_label_routine_address("DEFENS").expect("DEFENS address"),
+            0xC754
+        );
+        assert_eq!(
+            red_label_routine_address("DEF33").expect("DEF33 address"),
+            0xC7B7
+        );
+        assert_eq!(
+            red_label_routine_address("DEF44").expect("DEF44 address"),
+            0xC7D4
+        );
+        assert_eq!(
+            red_label_routine_address("COPYRT").expect("COPYRT address"),
+            0xC7DC
+        );
+        assert_eq!(
+            red_label_routine_address("CPR55").expect("CPR55 address"),
+            0xC831
+        );
+        assert_eq!(
+            red_label_routine_address("CPR56").expect("CPR56 address"),
+            0xC845
+        );
+        assert_eq!(
+            red_label_routine_address("DEF50").expect("DEF50 address"),
+            0xC848
+        );
+        assert_eq!(
+            red_label_routine_address("DEF51").expect("DEF51 address"),
+            0xC867
+        );
+        assert_eq!(
+            red_label_routine_address("WILLIR").expect("WILLIR address"),
+            0xC921
+        );
+        assert_eq!(
+            red_label_routine_address("WILR1").expect("WILR1 address"),
+            0xC92E
+        );
+        assert_eq!(
+            red_label_routine_address("SCORES").expect("SCORES address"),
+            0xC936
+        );
+        assert_eq!(
+            red_label_routine_address("LEDRET").expect("LEDRET address"),
+            0xC351
+        );
+        assert_eq!(
+            red_label_routine_address("AMODE1").expect("AMODE1 address"),
+            0xC412
+        );
+        assert_eq!(
+            red_label_routine_address("AMODE2").expect("AMODE2 address"),
+            0xC429
+        );
+        assert_eq!(
+            red_label_routine_address("AMODE3").expect("AMODE3 address"),
+            0xC475
+        );
+        assert_eq!(
+            red_label_routine_address("AMODE4").expect("AMODE4 address"),
+            0xC49C
+        );
+        assert_eq!(
+            red_label_routine_address("AMODE5").expect("AMODE5 address"),
+            0xC4B5
+        );
+        assert_eq!(
+            red_label_routine_address("AMODE7").expect("AMODE7 address"),
+            0xC500
+        );
+        assert_eq!(
+            red_label_routine_address("AMODE8").expect("AMODE8 address"),
+            0xC531
+        );
+        assert_eq!(
+            red_label_routine_address("AMOD12").expect("AMOD12 address"),
+            0xC54F
+        );
+        assert_eq!(
+            red_label_routine_address("AMOD10").expect("AMOD10 address"),
+            0xC585
+        );
+        assert_eq!(
+            red_label_routine_address("AMOD11").expect("AMOD11 address"),
+            0xC598
+        );
+        assert_eq!(
+            red_label_routine_address("BMODE2").expect("BMODE2 address"),
+            0xC5CA
+        );
+        assert_eq!(
+            red_label_routine_address("BMODE3").expect("BMODE3 address"),
+            0xC5DA
+        );
+        assert_eq!(
+            red_label_routine_address("AMOD13").expect("AMOD13 address"),
+            0xC5ED
+        );
+        assert_eq!(
+            red_label_routine_address("LASRS").expect("LASRS address"),
+            0xC5F5
+        );
+        assert_eq!(
+            red_label_routine_address("LAS0").expect("LAS0 address"),
+            0xC605
+        );
+        assert_eq!(
+            red_label_routine_address("TEXTP").expect("TEXTP address"),
+            0xC64F
+        );
+        assert_eq!(
+            red_label_routine_address("TEXTP2").expect("TEXTP2 address"),
+            0xC66B
+        );
+        assert_eq!(
+            red_label_routine_address("HALDIS").expect("HALDIS address"),
+            0xC263
+        );
+        assert_eq!(
+            red_label_routine_address("HALD3").expect("HALD3 address"),
+            0xC2EB
+        );
+        assert_eq!(
+            red_label_routine_address("HALD4").expect("HALD4 address"),
+            0xC304
+        );
+        assert_eq!(
             red_label_routine_address("ASTST").expect("ASTST address"),
             0xDBE1
         );
@@ -30163,6 +44893,26 @@ mod tests {
         assert_eq!(
             red_label_routine_address("TDISP").expect("TDISP address"),
             0xD665
+        );
+        assert_eq!(
+            red_label_routine_address("LDISP").expect("LDISP address"),
+            0xD629
+        );
+        assert_eq!(
+            red_label_routine_address("SBDISP").expect("SBDISP address"),
+            0xD680
+        );
+        assert_eq!(
+            red_label_routine_address("BORDER").expect("BORDER address"),
+            0xD6BC
+        );
+        assert_eq!(
+            red_label_routine_address("SCRTRN").expect("SCRTRN address"),
+            0xD3D9
+        );
+        assert_eq!(
+            red_label_routine_address("SCRTR0").expect("SCRTR0 address"),
+            0xD3DB
         );
         assert_eq!(
             red_label_routine_address("ON23").expect("ON23 address"),
@@ -30481,10 +45231,16 @@ mod tests {
                 0x11, 0x00, 0x11, 0x01, 0x01, 0x11, 0x01, 0x01, 0x11, 0x00
             ]
         );
-        assert_eq!(message_glyphs.len(), 27);
+        assert_eq!(message_glyphs.len(), 31);
         assert_eq!(
             red_label_message_glyph(' ').expect("space glyph").address,
             0xC697
+        );
+        assert_eq!(
+            red_label_message_glyph('?')
+                .expect("question glyph")
+                .address,
+            0xC7BF
         );
         assert_eq!(
             red_label_message_glyph(':').expect("colon glyph").address,
@@ -30495,16 +45251,112 @@ mod tests {
             0xC6B7
         );
         assert_eq!(
+            red_label_message_glyph('.').expect("period glyph").address,
+            0xC6BF
+        );
+        assert_eq!(
             red_label_message_glyph('W').expect("W glyph").bytes.len(),
             32
         );
-        assert_eq!(messages.len(), 56);
+        assert_eq!(
+            red_label_message_glyph('Q')
+                .expect("Q glyph")
+                .bytes
+                .as_slice(),
+            &[
+                0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x11, 0x10, 0x10, 0x10, 0x10, 0x10,
+                0x11, 0x00, 0x11, 0x01, 0x01, 0x01, 0x01, 0x11, 0x11, 0x10
+            ]
+        );
+        assert_eq!(
+            red_label_message_glyph('Z').expect("Z glyph").address,
+            0xCA37
+        );
+        assert_eq!(messages.len(), 78);
         assert_eq!(
             red_label_message("VROMFL")
                 .expect("VROMFL message")
                 .words
                 .as_slice(),
             &[String::from("ROM"), String::from("FAILURE")]
+        );
+        assert_eq!(
+            red_label_message("GO")
+                .expect("GO message")
+                .words
+                .as_slice(),
+            &[String::from("GAME"), String::from("OVER")]
+        );
+        assert_eq!(
+            red_label_message("CREDV")
+                .expect("CREDV message")
+                .words
+                .as_slice(),
+            &[String::from("CREDITS:")]
+        );
+        assert_eq!(
+            red_label_message("CREDV")
+                .expect("CREDV message")
+                .vector_address,
+            0xC0E9
+        );
+        assert_eq!(
+            red_label_message("LANDV")
+                .expect("LANDV message")
+                .words
+                .as_slice(),
+            &[
+                String::from("LANDER"),
+                String::from("[RLF]"),
+                String::from("[HMC:0x06]"),
+                String::from("150")
+            ]
+        );
+        assert_eq!(
+            red_label_message("LANDV")
+                .expect("LANDV message")
+                .vector_address,
+            0xC0DD
+        );
+        assert_eq!(
+            red_label_message("SWRMPV")
+                .expect("SWRMPV message")
+                .words
+                .as_slice(),
+            &[
+                String::from("[HMC:0x02]"),
+                String::from("POD"),
+                String::from("[RLF]"),
+                String::from("[HMC:0x00]"),
+                String::from("1000")
+            ]
+        );
+        assert_eq!(
+            red_label_message("SCANV")
+                .expect("SCANV message")
+                .words
+                .as_slice(),
+            &[String::from("SCANNER")]
+        );
+        assert_eq!(
+            red_label_message("ELECV")
+                .expect("ELECV message")
+                .words
+                .as_slice(),
+            &[
+                String::from("ELECTRONICS"),
+                String::from("INC."),
+                String::from("[RLF]"),
+                String::from("[RLF]"),
+                String::from("[HMC:0x0C]"),
+                String::from("PRESENTS")
+            ]
+        );
+        assert_eq!(
+            red_label_message("ELECV")
+                .expect("ELECV message")
+                .vector_address,
+            0xC0ED
         );
         assert_eq!(
             red_label_message("VINS4")
@@ -30519,6 +45371,24 @@ mod tests {
             ]
         );
         assert_eq!(
+            red_label_message("VINS3")
+                .expect("VINS3 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("MANUAL"),
+                String::from("FOR"),
+                String::from("ROM"),
+                String::from("TEST")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS3")
+                .expect("VINS3 message")
+                .vector_address,
+            0xC0BF
+        );
+        assert_eq!(
             red_label_message("VINS5")
                 .expect("VINS5 message")
                 .words
@@ -30529,6 +45399,24 @@ mod tests {
                 String::from("EXIT"),
                 String::from("TEST")
             ]
+        );
+        assert_eq!(
+            red_label_message("VINS8")
+                .expect("VINS8 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("AUTO"),
+                String::from("FOR"),
+                String::from("AUDIO"),
+                String::from("TEST")
+            ]
+        );
+        assert_eq!(
+            red_label_message("VINS8")
+                .expect("VINS8 message")
+                .vector_address,
+            0xC0C9
         );
         assert_eq!(
             red_label_message("VNORAM")
@@ -30567,6 +45455,40 @@ mod tests {
                 .expect("BONSX message")
                 .vector_address,
             0xC0F3
+        );
+        assert_eq!(
+            red_label_message("PLYR2")
+                .expect("PLYR2 message")
+                .words
+                .as_slice(),
+            &[String::from("PLAYER"), String::from("TWO")]
+        );
+        assert_eq!(
+            red_label_message("HOFV3")
+                .expect("HOFV3 message")
+                .words
+                .as_slice(),
+            &[
+                String::from("SELECT"),
+                String::from("INITIALS"),
+                String::from("WITH"),
+                String::from("UP"),
+                String::from("DOWN"),
+                String::from("STICK")
+            ]
+        );
+        assert_eq!(
+            red_label_message("HALLD_ALL_TIME")
+                .expect("HALLD_ALL_TIME message")
+                .words
+                .as_slice(),
+            &[String::from("ALL"), String::from("TIME")]
+        );
+        assert_eq!(
+            red_label_message("HALLD_GREATEST")
+                .expect("HALLD_GREATEST message")
+                .vector_address,
+            0xC101
         );
         assert_eq!(player_death_tables.len(), 2);
         assert_eq!(
@@ -30796,6 +45718,756 @@ mod tests {
     }
 
     #[test]
+    fn sound_output_models_source_sndout_idle_then_command_writes() {
+        let output = red_label_sound_output(0x0A);
+
+        assert_eq!(
+            output,
+            RedLabelSoundOutput {
+                sound_number: 0x0A,
+                idle_port_b: 0x3F,
+                idle_command: SoundCommand::from_main_board_pia_port_b(0x3F),
+                command_port_b: 0x35,
+                command: SoundCommand::from_main_board_pia_port_b(0x35),
+            }
+        );
+        assert_eq!(output.idle_command.raw(), 0xFF);
+        assert_eq!(output.command.raw(), 0xF5);
+    }
+
+    #[test]
+    fn sound_table_command_plan_expands_source_records_and_repeats() {
+        let address = red_label_sound_table_address("PDSND").expect("PDSND address");
+
+        assert_eq!(
+            ArcadeMachine::red_label_sound_table_command_plan("PDSND").expect("PDSND command plan"),
+            vec![
+                RedLabelSoundTableCommand {
+                    table_pointer: address + 1,
+                    repeat_index: 1,
+                    repeat_count: 2,
+                    timer: 0x08,
+                    sound_number: 0x11,
+                    sound_output: red_label_sound_output(0x11),
+                    command: SoundCommand::from_main_board_pia_port_b(0x2E),
+                },
+                RedLabelSoundTableCommand {
+                    table_pointer: address + 1,
+                    repeat_index: 2,
+                    repeat_count: 2,
+                    timer: 0x08,
+                    sound_number: 0x11,
+                    sound_output: red_label_sound_output(0x11),
+                    command: SoundCommand::from_main_board_pia_port_b(0x2E),
+                },
+                RedLabelSoundTableCommand {
+                    table_pointer: address + 4,
+                    repeat_index: 1,
+                    repeat_count: 1,
+                    timer: 0x20,
+                    sound_number: 0x17,
+                    sound_output: red_label_sound_output(0x17),
+                    command: SoundCommand::from_main_board_pia_port_b(0x28),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn sound_table_command_plan_preserves_multi_record_terrain_blow_sequence() {
+        let address = red_label_sound_table_address("TBSND").expect("TBSND address");
+        let commands =
+            ArcadeMachine::red_label_sound_table_command_plan("TBSND").expect("TBSND command plan");
+
+        assert_eq!(commands.len(), 5);
+        assert_eq!(
+            commands
+                .iter()
+                .map(|command| (
+                    command.table_pointer,
+                    command.repeat_index,
+                    command.repeat_count,
+                    command.timer,
+                    command.sound_number,
+                    command.command.raw(),
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (address + 1, 1, 1, 0x04, 0x14, 0xEB),
+                (address + 4, 1, 2, 0x06, 0x11, 0xEE),
+                (address + 4, 2, 2, 0x06, 0x11, 0xEE),
+                (address + 7, 1, 2, 0x0A, 0x17, 0xE8),
+                (address + 7, 2, 2, 0x0A, 0x17, 0xE8),
+            ]
+        );
+    }
+
+    #[test]
+    fn sound_table_timed_command_plan_tracks_source_sndseq_cadence() {
+        let address = red_label_sound_table_address("TBSND").expect("TBSND address");
+        let timed_commands = ArcadeMachine::red_label_sound_table_timed_command_plan("TBSND")
+            .expect("TBSND timed command plan");
+
+        assert_eq!(
+            timed_commands
+                .iter()
+                .map(|timed| (
+                    timed.sequencer_tick,
+                    timed.command.table_pointer,
+                    timed.command.repeat_index,
+                    timed.command.repeat_count,
+                    timed.command.timer,
+                    timed.command.sound_number,
+                    timed.command.command.raw(),
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (1, address + 1, 1, 1, 0x04, 0x14, 0xEB),
+                (5, address + 4, 1, 2, 0x06, 0x11, 0xEE),
+                (11, address + 4, 2, 2, 0x06, 0x11, 0xEE),
+                (17, address + 7, 1, 2, 0x0A, 0x17, 0xE8),
+                (27, address + 7, 2, 2, 0x0A, 0x17, 0xE8),
+            ]
+        );
+        assert_eq!(
+            timed_commands[0],
+            RedLabelSoundTableTimedCommand {
+                sequencer_tick: 1,
+                command: RedLabelSoundTableCommand {
+                    table_pointer: address + 1,
+                    repeat_index: 1,
+                    repeat_count: 1,
+                    timer: 0x04,
+                    sound_number: 0x14,
+                    sound_output: red_label_sound_output(0x14),
+                    command: SoundCommand::from_main_board_pia_port_b(0x2B),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn sound_table_timeline_tracks_source_terminator_tick() {
+        let address = red_label_sound_table_address("TBSND").expect("TBSND address");
+        let timeline =
+            ArcadeMachine::red_label_sound_table_timeline("TBSND").expect("TBSND timeline");
+
+        assert_eq!(timeline.label, "TBSND");
+        assert_eq!(timeline.address, address);
+        assert_eq!(timeline.priority, 0xE8);
+        assert_eq!(timeline.sequence_end_tick, 37);
+        assert_eq!(timeline.terminator_pointer, address + 10);
+        assert_eq!(timeline.commands.len(), 5);
+        assert_eq!(
+            timeline.commands[4],
+            RedLabelSoundTableTimedCommand {
+                sequencer_tick: 27,
+                command: RedLabelSoundTableCommand {
+                    table_pointer: address + 7,
+                    repeat_index: 2,
+                    repeat_count: 2,
+                    timer: 0x0A,
+                    sound_number: 0x17,
+                    sound_output: red_label_sound_output(0x17),
+                    command: SoundCommand::from_main_board_pia_port_b(0x28),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn sound_table_timelines_cover_all_embedded_source_tables() {
+        let timelines =
+            ArcadeMachine::red_label_sound_table_timelines().expect("sound table timelines");
+
+        assert_eq!(
+            timelines
+                .iter()
+                .map(|timeline| (
+                    timeline.label.as_str(),
+                    timeline.address,
+                    timeline.priority,
+                    timeline.commands.len(),
+                    timeline.sequence_end_tick,
+                    timeline.terminator_pointer,
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                ("CNSND", 0xD4AB, 0xFF, 1, 25, 0xD4AF),
+                ("RPSND", 0xD4B0, 0xFF, 1, 33, 0xD4B4),
+                ("PDSND", 0xD4B5, 0xF0, 3, 49, 0xD4BC),
+                ("ST1SND", 0xD4BD, 0xF0, 1, 65, 0xD4C1),
+                ("ST2SND", 0xD4C2, 0xF0, 1, 17, 0xD4C6),
+                ("TBSND", 0xD4C7, 0xE8, 5, 37, 0xD4D1),
+                ("SBSND", 0xD4D2, 0xE8, 7, 41, 0xD4D9),
+                ("ACSND", 0xD4DA, 0xE0, 3, 31, 0xD4DE),
+                ("ALSND", 0xD4DF, 0xE0, 1, 25, 0xD4E3),
+                ("AHSND", 0xD4E4, 0xE0, 1, 25, 0xD4E8),
+                ("ASCSND", 0xD4E9, 0xD8, 1, 17, 0xD4ED),
+                ("APSND", 0xD4EE, 0xD0, 1, 49, 0xD4F2),
+                ("PRHSND", 0xD4F3, 0xD0, 1, 17, 0xD4F7),
+                ("SCHSND", 0xD4F8, 0xD0, 1, 9, 0xD4FC),
+                ("UFHSND", 0xD4FD, 0xD0, 1, 9, 0xD501),
+                ("TIHSND", 0xD502, 0xD0, 1, 11, 0xD506),
+                ("LHSND", 0xD507, 0xD0, 1, 11, 0xD50B),
+                ("LPKSND", 0xD50C, 0xD0, 1, 17, 0xD510),
+                ("LSKSND", 0xD511, 0xC8, 10, 11, 0xD515),
+                ("SWHSND", 0xD516, 0xC0, 1, 9, 0xD51A),
+                ("LASSND", 0xD51B, 0xC0, 1, 49, 0xD51F),
+                ("LGSND", 0xD520, 0xC0, 1, 33, 0xD524),
+                ("LSHSND", 0xD525, 0xC0, 1, 9, 0xD529),
+                ("SSHSND", 0xD52A, 0xC0, 1, 49, 0xD52E),
+                ("USHSND", 0xD52F, 0xC0, 1, 9, 0xD533),
+                ("SWSSND", 0xD534, 0xC0, 1, 25, 0xD538),
+            ]
+        );
+    }
+
+    #[test]
+    fn sound_table_timeline_tsv_formats_fixture_ready_command_sequence_rows() {
+        let text =
+            ArcadeMachine::red_label_sound_table_timeline_tsv().expect("sound table timeline TSV");
+        let lines = text.lines().collect::<Vec<_>>();
+
+        assert_eq!(
+            lines[0],
+            "label\ttable_address\tpriority\tsequencer_tick\tevent\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tidle_port_b\tidle_command\tcommand_port_b\tcommand\tsequence_end_tick\tterminator_pointer"
+        );
+        assert_eq!(lines.len(), 76);
+        assert_eq!(
+            lines[1],
+            "CNSND\t0xD4AB\t0xFF\t1\tcommand\t0xD4AC\t1\t1\t0x18\t0x19\t0x3F\t0xFF\t0x26\t0xE6\t25\t0xD4AF"
+        );
+        assert_eq!(
+            lines[2],
+            "CNSND\t0xD4AB\t0xFF\t25\tsequence_end\t0xD4AF\t-\t-\t-\t-\t-\t-\t-\t-\t25\t0xD4AF"
+        );
+        assert_eq!(
+            lines
+                .iter()
+                .find(|line| line.starts_with("TBSND\t0xD4C7\t0xE8\t17\tcommand\t"))
+                .copied(),
+            Some(
+                "TBSND\t0xD4C7\t0xE8\t17\tcommand\t0xD4CE\t1\t2\t0x0A\t0x17\t0x3F\t0xFF\t0x28\t0xE8\t37\t0xD4D1"
+            )
+        );
+        assert_eq!(
+            lines
+                .iter()
+                .find(|line| line.starts_with("TBSND\t0xD4C7\t0xE8\t37\tsequence_end\t"))
+                .copied(),
+            Some(
+                "TBSND\t0xD4C7\t0xE8\t37\tsequence_end\t0xD4D1\t-\t-\t-\t-\t-\t-\t-\t-\t37\t0xD4D1"
+            )
+        );
+        assert!(text.ends_with('\n'));
+        assert_eq!(text, crate::assets::RED_LABEL_SOUND_TABLE_TIMELINES_TSV);
+    }
+
+    #[test]
+    fn sound_table_command_sequence_tsv_formats_sndout_write_rows() {
+        let text = ArcadeMachine::red_label_sound_table_command_sequence_tsv()
+            .expect("sound table command sequence TSV");
+        let lines = text.lines().collect::<Vec<_>>();
+
+        assert_eq!(
+            lines[0],
+            "label\ttable_address\tpriority\tsequencer_tick\twrite_index\twrite_kind\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tport_b\tcommand"
+        );
+        assert_eq!(lines.len(), 99);
+        assert_eq!(
+            lines[1],
+            "CNSND\t0xD4AB\t0xFF\t1\t1\tidle\t0xD4AC\t1\t1\t0x18\t0x19\t0x3F\t0xFF"
+        );
+        assert_eq!(
+            lines[2],
+            "CNSND\t0xD4AB\t0xFF\t1\t2\tcommand\t0xD4AC\t1\t1\t0x18\t0x19\t0x26\t0xE6"
+        );
+        assert_eq!(
+            lines
+                .iter()
+                .find(|line| line.starts_with("TBSND\t0xD4C7\t0xE8\t17\t2\tcommand\t"))
+                .copied(),
+            Some("TBSND\t0xD4C7\t0xE8\t17\t2\tcommand\t0xD4CE\t1\t2\t0x0A\t0x17\t0x28\t0xE8")
+        );
+        assert!(text.ends_with('\n'));
+        assert_eq!(
+            text,
+            crate::assets::RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV
+        );
+    }
+
+    #[test]
+    fn sound_table_command_sequence_fixture_check_counts_embedded_write_rows() {
+        assert_eq!(
+            ArcadeMachine::red_label_sound_table_command_sequence_fixture_check()
+                .expect("sound table command sequence fixture check"),
+            RedLabelSoundTableCommandSequenceFixtureCheck {
+                row_count: 98,
+                idle_rows: 49,
+                command_rows: 49,
+            }
+        );
+    }
+
+    #[test]
+    fn sound_table_command_sequence_fixture_check_rejects_drift_and_bad_rows() {
+        let expected = crate::assets::RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV;
+        let drift = expected.replace("CNSND\t0xD4AB", "CNSND\t0xD4AC");
+        let error = red_label_sound_table_command_sequence_fixture_check_tsv(expected, &drift)
+            .expect_err("drift");
+        assert!(error.contains("does not match generated SNDOUT writes"));
+
+        let bad_header = "bad\tfixture\nCNSND\t0xD4AB\n";
+        let error =
+            red_label_sound_table_command_sequence_fixture_check_tsv(bad_header, bad_header)
+                .expect_err("bad header");
+        assert!(error.contains("header is invalid"));
+
+        let bad_columns = "label\ttable_address\tpriority\tsequencer_tick\twrite_index\twrite_kind\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tport_b\tcommand\nCNSND\t0xD4AB\n";
+        let error =
+            red_label_sound_table_command_sequence_fixture_check_tsv(bad_columns, bad_columns)
+                .expect_err("bad columns");
+        assert!(error.contains("must have 13 columns"));
+
+        let bad_kind = "label\ttable_address\tpriority\tsequencer_tick\twrite_index\twrite_kind\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tport_b\tcommand\nCNSND\t0xD4AB\t0xFF\t1\t1\tbogus\t0xD4AC\t1\t1\t0x18\t0x19\t0x3F\t0xFF\n";
+        let error = red_label_sound_table_command_sequence_fixture_check_tsv(bad_kind, bad_kind)
+            .expect_err("bad write kind");
+        assert!(error.contains("unknown write kind `bogus`"));
+
+        let empty = "label\ttable_address\tpriority\tsequencer_tick\twrite_index\twrite_kind\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tport_b\tcommand\n";
+        let error = red_label_sound_table_command_sequence_fixture_check_tsv(empty, empty)
+            .expect_err("empty fixture");
+        assert!(error.contains("has no data rows"));
+    }
+
+    #[test]
+    fn sound_direct_command_sequence_tsv_formats_direct_sndout_callsite_rows() {
+        let text = ArcadeMachine::red_label_sound_direct_command_sequence_tsv();
+        let lines = text.lines().collect::<Vec<_>>();
+
+        assert_eq!(
+            lines[0],
+            "callsite\tsource_file\tsource_line\tsource_label\tsound_number\twrite_index\twrite_kind\tport_b\tcommand\tsource"
+        );
+        assert_eq!(lines.len(), 7);
+        assert_eq!(
+            lines[1],
+            "player_death_stop\tdefa7.src\t1386\tPDTH5\t0x13\t1\tidle\t0x3F\t0xFF\thttps://github.com/mwenge/defender/blob/master/src/defa7.src#L1384-L1386"
+        );
+        assert_eq!(
+            lines[2],
+            "player_death_stop\tdefa7.src\t1386\tPDTH5\t0x13\t2\tcommand\t0x2C\t0xEC\thttps://github.com/mwenge/defender/blob/master/src/defa7.src#L1384-L1386"
+        );
+        assert_eq!(
+            lines[4],
+            "game_over_stop\tdefa7.src\t1430\tPLE2\t0x13\t2\tcommand\t0x2C\t0xEC\thttps://github.com/mwenge/defender/blob/master/src/defa7.src#L1428-L1430"
+        );
+        assert_eq!(
+            lines[6],
+            "lander_pull_tick\tdefb6.src\t821\tLNDFX0\t0x12\t2\tcommand\t0x2D\t0xED\thttps://github.com/mwenge/defender/blob/master/src/defb6.src#L819-L821"
+        );
+        assert!(text.ends_with('\n'));
+        assert_eq!(
+            text,
+            crate::assets::RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV
+        );
+    }
+
+    #[test]
+    fn sound_direct_command_sequence_fixture_check_counts_embedded_write_rows() {
+        assert_eq!(
+            ArcadeMachine::red_label_sound_direct_command_sequence_fixture_check()
+                .expect("sound direct command sequence fixture check"),
+            RedLabelSoundDirectCommandSequenceFixtureCheck {
+                row_count: 6,
+                idle_rows: 3,
+                command_rows: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn sound_direct_command_sequence_fixture_check_rejects_drift_and_bad_rows() {
+        let expected = crate::assets::RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV;
+        let drift = expected.replace(
+            "player_death_stop\tdefa7.src",
+            "player_death_stop\tdefb6.src",
+        );
+        let error = red_label_sound_direct_command_sequence_fixture_check_tsv(expected, &drift)
+            .expect_err("drift");
+        assert!(error.contains("does not match generated SNDOUT writes"));
+
+        let bad_header = "bad\tfixture\nplayer_death_stop\tdefa7.src\n";
+        let error =
+            red_label_sound_direct_command_sequence_fixture_check_tsv(bad_header, bad_header)
+                .expect_err("bad header");
+        assert!(error.contains("header is invalid"));
+
+        let bad_columns = "callsite\tsource_file\tsource_line\tsource_label\tsound_number\twrite_index\twrite_kind\tport_b\tcommand\tsource\nplayer_death_stop\tdefa7.src\n";
+        let error =
+            red_label_sound_direct_command_sequence_fixture_check_tsv(bad_columns, bad_columns)
+                .expect_err("bad columns");
+        assert!(error.contains("must have 10 columns"));
+
+        let bad_kind = "callsite\tsource_file\tsource_line\tsource_label\tsound_number\twrite_index\twrite_kind\tport_b\tcommand\tsource\nplayer_death_stop\tdefa7.src\t1386\tPDTH5\t0x13\t1\tbogus\t0x3F\t0xFF\thttps://github.com/mwenge/defender/blob/master/src/defa7.src#L1384-L1386\n";
+        let error = red_label_sound_direct_command_sequence_fixture_check_tsv(bad_kind, bad_kind)
+            .expect_err("bad write kind");
+        assert!(error.contains("unknown write kind `bogus`"));
+
+        let empty = "callsite\tsource_file\tsource_line\tsource_label\tsound_number\twrite_index\twrite_kind\tport_b\tcommand\tsource\n";
+        let error = red_label_sound_direct_command_sequence_fixture_check_tsv(empty, empty)
+            .expect_err("empty fixture");
+        assert!(error.contains("has no data rows"));
+    }
+
+    #[test]
+    fn sound_thrust_command_sequence_tsv_formats_sndseq_gate_writes() {
+        let text = ArcadeMachine::red_label_sound_thrust_command_sequence_tsv();
+        let lines = text.lines().collect::<Vec<_>>();
+
+        assert_eq!(
+            lines[0],
+            "gate_event\tsource_label\tpia21_mask\tstatus_block_mask\tthrust_flag_before\tthrust_flag_after\tsound_number\twrite_index\twrite_kind\tport_b\tcommand"
+        );
+        assert_eq!(lines.len(), 5);
+        assert_eq!(
+            lines[1],
+            "thrust_start\tSNDS01\t0x02\t0x98\t0x00\t0x16\t0x16\t1\tidle\t0x3F\t0xFF"
+        );
+        assert_eq!(
+            lines[2],
+            "thrust_start\tSNDS01\t0x02\t0x98\t0x00\t0x16\t0x16\t2\tcommand\t0x29\t0xE9"
+        );
+        assert_eq!(
+            lines[3],
+            "thrust_stop\tSNDS00\t0x02\t-\t0x16\t0x00\t0x0F\t1\tidle\t0x3F\t0xFF"
+        );
+        assert_eq!(
+            lines[4],
+            "thrust_stop\tSNDS00\t0x02\t-\t0x16\t0x00\t0x0F\t2\tcommand\t0x30\t0xF0"
+        );
+        assert!(text.ends_with('\n'));
+        assert_eq!(
+            text,
+            crate::assets::RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV
+        );
+    }
+
+    #[test]
+    fn sound_thrust_command_sequence_fixture_check_counts_embedded_write_rows() {
+        assert_eq!(
+            ArcadeMachine::red_label_sound_thrust_command_sequence_fixture_check()
+                .expect("sound thrust command sequence fixture check"),
+            RedLabelSoundThrustCommandSequenceFixtureCheck {
+                row_count: 4,
+                idle_rows: 2,
+                command_rows: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn sound_thrust_command_sequence_fixture_check_rejects_drift_and_bad_rows() {
+        let expected = crate::assets::RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV;
+        let drift = expected.replace("thrust_start\tSNDS01", "thrust_start\tSNDS00");
+        let error = red_label_sound_thrust_command_sequence_fixture_check_tsv(expected, &drift)
+            .expect_err("drift");
+        assert!(error.contains("does not match generated SNDOUT writes"));
+
+        let bad_header = "bad\tfixture\nthrust_start\tSNDS01\n";
+        let error =
+            red_label_sound_thrust_command_sequence_fixture_check_tsv(bad_header, bad_header)
+                .expect_err("bad header");
+        assert!(error.contains("header is invalid"));
+
+        let bad_columns = "gate_event\tsource_label\tpia21_mask\tstatus_block_mask\tthrust_flag_before\tthrust_flag_after\tsound_number\twrite_index\twrite_kind\tport_b\tcommand\nthrust_start\tSNDS01\n";
+        let error =
+            red_label_sound_thrust_command_sequence_fixture_check_tsv(bad_columns, bad_columns)
+                .expect_err("bad columns");
+        assert!(error.contains("must have 11 columns"));
+
+        let bad_kind = "gate_event\tsource_label\tpia21_mask\tstatus_block_mask\tthrust_flag_before\tthrust_flag_after\tsound_number\twrite_index\twrite_kind\tport_b\tcommand\nthrust_start\tSNDS01\t0x02\t0x98\t0x00\t0x16\t0x16\t1\tbogus\t0x3F\t0xFF\n";
+        let error = red_label_sound_thrust_command_sequence_fixture_check_tsv(bad_kind, bad_kind)
+            .expect_err("bad write kind");
+        assert!(error.contains("unknown write kind `bogus`"));
+
+        let empty = "gate_event\tsource_label\tpia21_mask\tstatus_block_mask\tthrust_flag_before\tthrust_flag_after\tsound_number\twrite_index\twrite_kind\tport_b\tcommand\n";
+        let error = red_label_sound_thrust_command_sequence_fixture_check_tsv(empty, empty)
+            .expect_err("empty fixture");
+        assert!(error.contains("has no data rows"));
+    }
+
+    #[test]
+    fn sound_table_timeline_fixture_check_counts_embedded_rows() {
+        assert_eq!(
+            ArcadeMachine::red_label_sound_table_timeline_fixture_check()
+                .expect("sound table timeline fixture check"),
+            RedLabelSoundTableTimelineFixtureCheck {
+                row_count: 75,
+                command_rows: 49,
+                sequence_end_rows: 26,
+            }
+        );
+    }
+
+    #[test]
+    fn sound_table_timeline_fixture_check_rejects_drift_and_bad_rows() {
+        let expected = crate::assets::RED_LABEL_SOUND_TABLE_TIMELINES_TSV;
+        let drift = expected.replace("CNSND\t0xD4AB", "CNSND\t0xD4AC");
+        let error =
+            red_label_sound_table_timeline_fixture_check_tsv(expected, &drift).expect_err("drift");
+        assert!(error.contains("does not match generated SNDSEQ timeline"));
+
+        let bad_header = "bad\tfixture\nCNSND\t0xD4AB\n";
+        let error = red_label_sound_table_timeline_fixture_check_tsv(bad_header, bad_header)
+            .expect_err("bad header");
+        assert!(error.contains("header is invalid"));
+
+        let bad_columns = "label\ttable_address\tpriority\tsequencer_tick\tevent\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tidle_port_b\tidle_command\tcommand_port_b\tcommand\tsequence_end_tick\tterminator_pointer\nCNSND\t0xD4AB\n";
+        let error = red_label_sound_table_timeline_fixture_check_tsv(bad_columns, bad_columns)
+            .expect_err("bad columns");
+        assert!(error.contains("must have 16 columns"));
+
+        let bad_event = "label\ttable_address\tpriority\tsequencer_tick\tevent\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tidle_port_b\tidle_command\tcommand_port_b\tcommand\tsequence_end_tick\tterminator_pointer\nCNSND\t0xD4AB\t0xFF\t1\tbogus\t0xD4AC\t1\t1\t0x18\t0x19\t0x3F\t0xFF\t0x26\t0xE6\t25\t0xD4AF\n";
+        let error = red_label_sound_table_timeline_fixture_check_tsv(bad_event, bad_event)
+            .expect_err("bad event");
+        assert!(error.contains("unknown event `bogus`"));
+
+        let empty = "label\ttable_address\tpriority\tsequencer_tick\tevent\ttable_pointer\trepeat_index\trepeat_count\ttimer\tsound_number\tidle_port_b\tidle_command\tcommand_port_b\tcommand\tsequence_end_tick\tterminator_pointer\n";
+        let error = red_label_sound_table_timeline_fixture_check_tsv(empty, empty)
+            .expect_err("empty fixture");
+        assert!(error.contains("has no data rows"));
+    }
+
+    #[test]
+    fn sound_table_timed_command_plan_matches_translated_sndseq_outputs() {
+        let timed_commands = ArcadeMachine::red_label_sound_table_timed_command_plan("TBSND")
+            .expect("TBSND timed command plan");
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .load_sound_table_by_label("TBSND")
+            .expect("load TBSND");
+
+        let mut actual_commands = Vec::new();
+        let last_tick = timed_commands
+            .last()
+            .expect("TBSND should emit commands")
+            .sequencer_tick;
+        for sequencer_tick in 1..=last_tick {
+            let step = machine
+                .red_label_step_sound_sequence()
+                .unwrap_or_else(|error| panic!("step SNDSEQ tick {sequencer_tick}: {error}"));
+            if let Some(command) = step.command {
+                actual_commands.push((
+                    sequencer_tick,
+                    step.table_pointer_after,
+                    step.sound_number.expect("table command sound number"),
+                    step.timer_after,
+                    command.raw(),
+                ));
+            }
+        }
+
+        assert_eq!(
+            actual_commands,
+            timed_commands
+                .iter()
+                .map(|timed| (
+                    timed.sequencer_tick,
+                    timed.command.table_pointer,
+                    timed.command.sound_number,
+                    timed.command.timer,
+                    timed.command.command.raw(),
+                ))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn sound_table_timeline_matches_translated_sndseq_terminator() {
+        let timeline =
+            ArcadeMachine::red_label_sound_table_timeline("TBSND").expect("TBSND timeline");
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .load_sound_table_by_label("TBSND")
+            .expect("load TBSND");
+
+        let mut actual_commands = Vec::new();
+        let mut sequence_end = None;
+        for sequencer_tick in 1..=timeline.sequence_end_tick {
+            let step = machine
+                .red_label_step_sound_sequence()
+                .unwrap_or_else(|error| panic!("step SNDSEQ tick {sequencer_tick}: {error}"));
+            if let Some(command) = step.command {
+                actual_commands.push((
+                    sequencer_tick,
+                    step.table_pointer_after,
+                    step.sound_number.expect("table command sound number"),
+                    step.timer_after,
+                    command.raw(),
+                ));
+            }
+            if step.source == RedLabelSoundSequenceSource::SequenceEnded {
+                sequence_end = Some((
+                    sequencer_tick,
+                    step.table_pointer_after,
+                    step.priority_after,
+                    step.repeat_after,
+                    step.timer_after,
+                    step.command,
+                ));
+            }
+        }
+
+        assert_eq!(
+            actual_commands,
+            timeline
+                .commands
+                .iter()
+                .map(|timed| (
+                    timed.sequencer_tick,
+                    timed.command.table_pointer,
+                    timed.command.sound_number,
+                    timed.command.timer,
+                    timed.command.command.raw(),
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            sequence_end,
+            Some((
+                timeline.sequence_end_tick,
+                timeline.terminator_pointer,
+                0,
+                0,
+                0,
+                None,
+            ))
+        );
+    }
+
+    #[test]
+    fn sound_table_command_plan_rejects_malformed_source_records() {
+        let table = |label: &str, bytes: &[u8]| RedLabelSoundTable {
+            label: String::from(label),
+            address: 0xD500,
+            bytes: bytes.to_vec(),
+        };
+
+        let empty = red_label_sound_table_commands(&table("EMPTY", &[])).expect_err("empty");
+        assert!(empty.contains("is empty"));
+
+        let missing_timer = red_label_sound_table_commands(&table("NOTIMER", &[0xF0, 0x01]))
+            .expect_err("missing timer");
+        assert!(missing_timer.contains("has no timer byte"));
+
+        let missing_sound = red_label_sound_table_commands(&table("NOSOUND", &[0xF0, 0x01, 0x08]))
+            .expect_err("missing sound number");
+        assert!(missing_sound.contains("has no sound-number byte"));
+
+        let missing_terminator =
+            red_label_sound_table_commands(&table("NOTERM", &[0xF0, 0x01, 0x08, 0x11]))
+                .expect_err("missing terminator");
+        assert!(missing_terminator.contains("has no terminator"));
+
+        let zero_timer =
+            red_label_sound_table_timed_commands(&table("ZEROTMR", &[0xF0, 0x01, 0, 0x11, 0]))
+                .expect_err("zero timer");
+        assert!(zero_timer.contains("has zero timer byte"));
+
+        let timeline_empty =
+            red_label_sound_table_timeline_for_table(&table("EMPTYTL", &[])).expect_err("empty");
+        assert!(timeline_empty.contains("is empty"));
+
+        let no_commands = red_label_sound_table_timeline_for_table(&table("NOCMD", &[0xF0, 0]))
+            .expect_err("no command records");
+        assert!(no_commands.contains("has no command records"));
+    }
+
+    #[test]
+    fn sound_loader_allows_equal_priority_interrupt_like_source_sndld() {
+        let mut machine = ArcadeMachine::new();
+        let start_address = red_label_sound_table_address("ST1SND").expect("ST1SND address");
+        let death_address = red_label_sound_table_address("PDSND").expect("PDSND address");
+        machine
+            .memory
+            .load_sound_table_by_label("ST1SND")
+            .expect("load ST1SND");
+        machine.memory.write_byte(0xA0AD, 0x16).expect("set THFLG");
+
+        assert!(
+            red_label_sound_priority_allows_load(0xF0, 0xF0),
+            "source CMPA/BLO only rejects strictly lower priorities"
+        );
+        assert_eq!(
+            machine
+                .memory
+                .load_sound_table_by_label("PDSND")
+                .expect("load equal-priority PDSND"),
+            Some(RedLabelLoadedSoundTable {
+                address: death_address,
+                priority: 0xF0,
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0B0..0xA0B5),
+            Some(
+                &[
+                    ((death_address - 2) >> 8) as u8,
+                    (death_address - 2) as u8,
+                    0xF0,
+                    0x01,
+                    0x01,
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0AD..0xA0AE),
+            Some(&[0x00][..])
+        );
+        assert_ne!(start_address, death_address);
+    }
+
+    #[test]
+    fn sound_loader_rejects_lower_priority_after_source_thrust_clear() {
+        let mut machine = ArcadeMachine::new();
+        let start_address = red_label_sound_table_address("ST1SND").expect("ST1SND address");
+        machine
+            .memory
+            .load_sound_table_by_label("ST1SND")
+            .expect("load ST1SND");
+        machine.memory.write_byte(0xA0AD, 0x16).expect("set THFLG");
+
+        assert!(!red_label_sound_priority_allows_load(0xD0, 0xF0));
+        assert_eq!(
+            machine
+                .memory
+                .load_sound_table_by_label("APSND")
+                .expect("lower priority APSND is blocked"),
+            None
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0B0..0xA0B5),
+            Some(
+                &[
+                    ((start_address - 2) >> 8) as u8,
+                    (start_address - 2) as u8,
+                    0xF0,
+                    0x01,
+                    0x01,
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0AD..0xA0AE),
+            Some(&[0x00][..])
+        );
+    }
+
+    #[test]
     fn sound_sequence_outputs_first_loaded_table_command() {
         let mut machine = ArcadeMachine::new();
         let address = red_label_sound_table_address("ST1SND").expect("ST1SND address");
@@ -30828,6 +46500,7 @@ mod tests {
                 thrust_flag_before: 0,
                 thrust_flag_after: 0,
                 sound_number: Some(0x0A),
+                sound_output: Some(red_label_sound_output(0x0A)),
                 command: Some(SoundCommand::from_main_board_pia_port_b(0x35)),
             }
         );
@@ -30867,6 +46540,7 @@ mod tests {
                 thrust_flag_before: 0,
                 thrust_flag_after: 0,
                 sound_number: None,
+                sound_output: None,
                 command: None,
             }
         );
@@ -30906,6 +46580,7 @@ mod tests {
                 thrust_flag_before: 0,
                 thrust_flag_after: 0,
                 sound_number: None,
+                sound_output: None,
                 command: None,
             }
         );
@@ -30935,6 +46610,7 @@ mod tests {
                 thrust_flag_before: 0,
                 thrust_flag_after: 0x16,
                 sound_number: Some(0x16),
+                sound_output: Some(red_label_sound_output(0x16)),
                 command: Some(SoundCommand::from_main_board_pia_port_b(0x29)),
             }
         );
@@ -30958,6 +46634,7 @@ mod tests {
                 thrust_flag_before: 0x16,
                 thrust_flag_after: 0,
                 sound_number: Some(0x0F),
+                sound_output: Some(red_label_sound_output(0x0F)),
                 command: Some(SoundCommand::from_main_board_pia_port_b(0x30)),
             }
         );
@@ -31054,6 +46731,24 @@ mod tests {
             machine.red_label_ram_range(0xA08A..0xA08B),
             Some(&[0x01][..])
         );
+        assert_eq!(
+            machine.red_label_ram_range(0x0F1C..0x0F24),
+            Some(&[0; 8][..])
+        );
+        assert_score_digit_first_column(&machine, 0x1F1C, 2);
+        assert_score_digit_first_column(&machine, 0x231C, 5);
+        machine
+            .red_label_copy_color_mapping_to_palette_ram()
+            .expect("copy PCRAM to palette RAM");
+        let visible_nibbles = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("render native score pixel-nibble frame");
+        assert!(visible_nibbles.iter().any(|nibble| *nibble != 0));
+        assert_eq!(crc32(&visible_nibbles), 0xBB58_F4B5);
+        let visible = machine
+            .red_label_visible_rgba_image()
+            .expect("render native scored frame");
+        assert_eq!(crc32(&visible.pixels), 0x926E_A52A);
         assert_eq!(machine.snapshot().scores.player_one, 25);
     }
 
@@ -31089,9 +46784,34 @@ mod tests {
             Some(&[0x03, 0x01, 0x04][..])
         );
         assert_eq!(
+            machine.red_label_ram_range(0x0F14..0x0F18),
+            Some(&[0x06, 0x26, 0x68, 0x28][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x291B..0x291E),
+            Some(&[0x90, 0x09, 0x90][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x0F1C..0x0F24),
+            Some(&[0; 8][..])
+        );
+        assert_score_digit_first_column(&machine, 0x131C, 1);
+        assert_eq!(
             machine.red_label_ram_range(0xA0B0..0xA0B5),
             Some(&[0xD4, 0xAE, 0xFF, 0x01, 0x01][..])
         );
+        machine
+            .red_label_copy_color_mapping_to_palette_ram()
+            .expect("copy PCRAM to palette RAM");
+        let visible_nibbles = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("render native replay-award pixel-nibble frame");
+        assert!(visible_nibbles.iter().any(|nibble| *nibble != 0));
+        assert_eq!(crc32(&visible_nibbles), 0x62EA_5968);
+        let visible = machine
+            .red_label_visible_rgba_image()
+            .expect("render native replay-award frame");
+        assert_eq!(crc32(&visible.pixels), 0x7279_D250);
         assert_eq!(machine.snapshot().scores.player_one, 10_000);
     }
 
@@ -31628,6 +47348,100 @@ mod tests {
     }
 
     #[test]
+    fn laser_direction_setup_labels_seed_process_data_and_fall_into_loop() {
+        let mut machine = ArcadeMachine::new();
+        let lasr_address = red_label_routine_address("LASR").expect("LASR address");
+        let process = schedule_laser_process(&mut machine, "LASR");
+        machine.memory.write_byte(0xA0B5, 1).expect("set LFLG");
+        machine
+            .memory
+            .write_word(0xA0C1, 0x3900)
+            .expect("set NPLAXC");
+        machine.memory.write_word(0xA0A4, 0xA142).expect("set FISX");
+        write_ram_bytes(&mut machine, 0xA142, &[0xAA, 0xBB, 0xCC, 0xDD]);
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(lasr_address)
+            .expect("dispatch LASR");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::LaserStep(RedLabelLaserStep::Sleeping {
+                process_address: process,
+                direction: RedLabelLaserDirection::Right,
+                wakeup_address: 0xE5CB,
+                tip_address: 0x4404,
+                fizzle_source_next: 0xA145,
+                fizzle_target_next: 0x4304,
+                erase_next: 0x4104,
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x0D),
+            Some(
+                &[
+                    0xE5, 0xCB, 0x01, 0x00, 0x00, 0x44, 0x04, 0x43, 0x04, 0x41, 0x04,
+                ][..],
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x4004..0x4005),
+            Some(&[0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x4104..0x4105),
+            Some(&[0xBB][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let lasl_address = red_label_routine_address("LASL").expect("LASL address");
+        let process = schedule_laser_process(&mut machine, "LASL");
+        machine.memory.write_byte(0xA0B5, 1).expect("set LFLG");
+        machine
+            .memory
+            .write_word(0xA0C1, 0x5000)
+            .expect("set NPLAXC");
+        machine
+            .memory
+            .write_word(0xA0A4, 0xA160)
+            .expect("set FISX near FISEND");
+        write_ram_bytes(&mut machine, 0xA142, &[0x12, 0x34, 0x56, 0x78]);
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(lasl_address)
+            .expect("dispatch LASL");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::LaserStep(RedLabelLaserStep::Sleeping {
+                process_address: process,
+                direction: RedLabelLaserDirection::Left,
+                wakeup_address: 0xE638,
+                tip_address: 0x4C04,
+                fizzle_source_next: 0xA145,
+                fizzle_target_next: 0x4D04,
+                erase_next: 0x4F04,
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x0D),
+            Some(
+                &[
+                    0xE6, 0x38, 0x01, 0x00, 0x00, 0x4C, 0x04, 0x4D, 0x04, 0x4F, 0x04,
+                ][..],
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x5004..0x5005),
+            Some(&[0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x4F04..0x4F05),
+            Some(&[0x34][..])
+        );
+    }
+
+    #[test]
     fn laser_finish_decrements_lflg_and_suicides_process() {
         let mut machine = ArcadeMachine::new();
         let process = schedule_laser_process(&mut machine, "LASD");
@@ -32112,6 +47926,1664 @@ mod tests {
             machine.red_label_ram_range(process + 0x02..process + 0x05),
             Some(&[0xF4, 0x64, 0x06][..])
         );
+    }
+
+    #[test]
+    fn hall_of_fame_support_processes_tick_stall_and_blink_from_source() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HOFST");
+        let hofst = red_label_routine_address("HOFST").expect("HOFST address");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, 0x28)
+            .expect("seed STALT");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hofst)
+            .expect("dispatch HOFST");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::SupportProcess(
+                RedLabelSupportProcessStep::HallOfFameStallSleeping {
+                    process_address: process,
+                    stall_before: 0x28,
+                    stall_after: 0x27,
+                    wakeup_address: hofst,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[0x27][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC1, 0xDC, 60][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HOFBL");
+        let hofbl = red_label_routine_address("HOFBL").expect("HOFBL address");
+        machine
+            .memory
+            .write_byte(0xA027, 0x85)
+            .expect("set PCRAM+1");
+        machine
+            .memory
+            .write_byte(0xA033, 0)
+            .expect("clear PCRAM+$D");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hofbl)
+            .expect("dispatch HOFBL off-to-on");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::SupportProcess(
+                RedLabelSupportProcessStep::HallOfFameBlinkSleeping {
+                    process_address: process,
+                    blink_color_before: 0,
+                    normal_color: 0x85,
+                    blink_color_after: 0x85,
+                    wakeup_address: hofbl,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA033..0xA034),
+            Some(&[0x85][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC1, 0xE7, 15][..])
+        );
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hofbl)
+            .expect("dispatch HOFBL on-to-off");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::SupportProcess(
+                RedLabelSupportProcessStep::HallOfFameBlinkSleeping {
+                    process_address: process,
+                    blink_color_before: 0x85,
+                    normal_color: 0x85,
+                    blink_color_after: 0,
+                    wakeup_address: hofbl,
+                },
+            )
+        );
+        assert_eq!(machine.red_label_ram_range(0xA033..0xA034), Some(&[0][..]));
+    }
+
+    #[test]
+    fn hall_of_fame_initials_input_process_matches_source_direction_delay_and_wraps() {
+        assert_eq!(
+            high_score_initial_display_byte(RED_LABEL_HOF_BLANK_INITIAL_BYTE),
+            b' '
+        );
+        assert_eq!(high_score_initial_display_byte(b'A'), b'A');
+
+        let hofud = red_label_routine_address("HOFUD").expect("HOFUD address");
+        let hofud1 = red_label_routine_address("HOFUD1").expect("HOFUD1 address");
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HOFUD");
+        seed_hof_up_down_input(&mut machine, 0, 0);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM, 0xFF)
+            .expect("seed INIDIR");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_DELAY_RAM, 0x12)
+            .expect("seed UDDEL");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM, 0x34)
+            .expect("seed UDCNT");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hofud)
+            .expect("dispatch HOFUD");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::SupportProcess(
+                RedLabelSupportProcessStep::HallOfFameInitialsSleeping {
+                    process_address: process,
+                    initialized: true,
+                    pia21: 0,
+                    pia31: 0,
+                    input_direction: 0,
+                    direction_before: 0,
+                    direction_after: 0,
+                    delay_before: 0x12,
+                    delay_after: 0x12,
+                    count_before: 0x34,
+                    count_after: 0x34,
+                    update: None,
+                    wakeup_address: hofud1,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_INITIAL_DIRECTION_RAM..RED_LABEL_HOF_INITIAL_DIRECTION_RAM + 1
+            ),
+            Some(&[0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC1, 0xFD, 1][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HOFUD1");
+        seed_hof_up_down_input(&mut machine, 0, 1);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM, 0)
+            .expect("clear INIDIR");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_DELAY_RAM, 0)
+            .expect("clear UDDEL");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM, 0)
+            .expect("clear UDCNT");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hofud1)
+            .expect("dispatch HOFUD1 new up direction");
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::SupportProcess(
+                RedLabelSupportProcessStep::HallOfFameInitialsSleeping {
+                    process_address: process,
+                    initialized: false,
+                    pia21: 0,
+                    pia31: 1,
+                    input_direction: 1,
+                    direction_before: 0,
+                    direction_after: 1,
+                    delay_before: 0,
+                    delay_after: 55,
+                    count_before: 0,
+                    count_after: 3,
+                    update: None,
+                    wakeup_address: hofud1,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_INITIAL_DIRECTION_RAM..RED_LABEL_HOF_INITIAL_DIRECTION_RAM + 1
+            ),
+            Some(&[1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_UP_DOWN_DELAY_RAM..RED_LABEL_HOF_UP_DOWN_COUNT_RAM + 1
+            ),
+            Some(&[55, 3][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HOFUD1");
+        seed_hof_up_down_input(&mut machine, 0, 1);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM, 1)
+            .expect("seed INIDIR");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_DELAY_RAM, 55)
+            .expect("seed UDDEL");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM, 2)
+            .expect("seed UDCNT");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hofud1)
+            .expect("dispatch HOFUD1 held up delay");
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::SupportProcess(
+                RedLabelSupportProcessStep::HallOfFameInitialsSleeping {
+                    process_address: process,
+                    initialized: false,
+                    pia21: 0,
+                    pia31: 1,
+                    input_direction: 1,
+                    direction_before: 1,
+                    direction_after: 1,
+                    delay_before: 55,
+                    delay_after: 55,
+                    count_before: 2,
+                    count_after: 1,
+                    update: None,
+                    wakeup_address: hofud1,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_UP_DOWN_COUNT_RAM..RED_LABEL_HOF_UP_DOWN_COUNT_RAM + 1
+            ),
+            Some(&[1][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HOFUD1");
+        seed_hof_up_down_input(&mut machine, 0, 1);
+        seed_hof_initials(&mut machine, [b'A', b'C', b'D']);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM, 1)
+            .expect("seed INIDIR");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INIT_INDEX_RAM, 0)
+            .expect("seed INITN");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_DELAY_RAM, 20)
+            .expect("seed UDDEL");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM, 1)
+            .expect("seed UDCNT");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hofud1)
+            .expect("dispatch HOFUD1 held up update");
+        let RedLabelProcessDispatch::SupportProcess(
+            RedLabelSupportProcessStep::HallOfFameInitialsSleeping {
+                process_address,
+                initialized,
+                pia21,
+                pia31,
+                input_direction,
+                direction_before,
+                direction_after,
+                delay_before,
+                delay_after,
+                count_before,
+                count_after,
+                update,
+                wakeup_address,
+            },
+        ) = dispatch
+        else {
+            panic!("expected HOFUD1 update dispatch");
+        };
+        assert_eq!(process_address, process);
+        assert!(!initialized);
+        assert_eq!((pia21, pia31, input_direction), (0, 1, 1));
+        assert_eq!((direction_before, direction_after), (1, 1));
+        assert_eq!((delay_before, delay_after), (20, 15));
+        assert_eq!((count_before, count_after), (1, 15));
+        assert_eq!(wakeup_address, hofud1);
+        let update = update.expect("initial update");
+        assert_eq!(update.initial_index, 0);
+        assert_eq!(update.initial_address, RED_LABEL_HOF_INITS_RAM);
+        assert_eq!((update.initial_before, update.initial_after), (b'A', b'B'));
+        assert_eq!(update.display.active_initial, 0);
+        assert_eq!(
+            update.display.initial_addresses,
+            [
+                RED_LABEL_HOF_INITIALS_SCREEN,
+                text_position_from_top_left(RED_LABEL_HOF_INITIALS_SCREEN, 8, 0),
+                text_position_from_top_left(RED_LABEL_HOF_INITIALS_SCREEN, 16, 0),
+            ]
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HOF_INITIALS_SCREEN, 'B');
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_UP_DOWN_DELAY_RAM..RED_LABEL_HOF_UP_DOWN_COUNT_RAM + 1
+            ),
+            Some(&[15, 15][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HOFUD1");
+        seed_hof_up_down_input(&mut machine, 0, 1);
+        seed_hof_initials(&mut machine, [b'Z', b'C', b'D']);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM, 1)
+            .expect("seed INIDIR");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INIT_INDEX_RAM, 0)
+            .expect("seed INITN");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_DELAY_RAM, 10)
+            .expect("seed UDDEL");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM, 1)
+            .expect("seed UDCNT");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hofud1)
+            .expect("dispatch HOFUD1 high wrap");
+        let RedLabelProcessDispatch::SupportProcess(
+            RedLabelSupportProcessStep::HallOfFameInitialsSleeping { update, .. },
+        ) = dispatch
+        else {
+            panic!("expected HOFUD1 high-wrap dispatch");
+        };
+        let update = update.expect("high-wrap update");
+        assert_eq!(
+            (update.initial_before, update.initial_after),
+            (b'Z', RED_LABEL_HOF_BLANK_INITIAL_BYTE)
+        );
+        assert_eq!(
+            machine.red_label_ram_range(RED_LABEL_HOF_INITS_RAM..RED_LABEL_HOF_INITS_RAM + 1),
+            Some(&[RED_LABEL_HOF_BLANK_INITIAL_BYTE][..])
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HOF_INITIALS_SCREEN, ' ');
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC1, 0xFD, 1][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HOFUD1");
+        seed_hof_up_down_input(&mut machine, 0x80, 1);
+        seed_hof_initials(&mut machine, [b'A', b'B', RED_LABEL_HOF_BLANK_INITIAL_BYTE]);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INITIAL_DIRECTION_RAM, 0xFF)
+            .expect("seed INIDIR");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INIT_INDEX_RAM, 2)
+            .expect("seed INITN");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_DELAY_RAM, 12)
+            .expect("seed UDDEL");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_UP_DOWN_COUNT_RAM, 1)
+            .expect("seed UDCNT");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hofud1)
+            .expect("dispatch HOFUD1 low wrap");
+        let RedLabelProcessDispatch::SupportProcess(
+            RedLabelSupportProcessStep::HallOfFameInitialsSleeping {
+                process_address,
+                pia21,
+                pia31,
+                input_direction,
+                update,
+                ..
+            },
+        ) = dispatch
+        else {
+            panic!("expected HOFUD1 low-wrap dispatch");
+        };
+        assert_eq!(process_address, process);
+        assert_eq!((pia21, pia31, input_direction), (0x80, 1, 0xFF));
+        let update = update.expect("low-wrap update");
+        assert_eq!(update.initial_index, 2);
+        assert_eq!(update.initial_address, RED_LABEL_HOF_INITS_RAM + 4);
+        assert_eq!(
+            (update.initial_before, update.initial_after),
+            (RED_LABEL_HOF_BLANK_INITIAL_BYTE, b'Z')
+        );
+        assert_message_glyph_first_column(
+            &machine,
+            text_position_from_top_left(RED_LABEL_HOF_INITIALS_SCREEN, 16, 0),
+            'Z',
+        );
+    }
+
+    #[test]
+    fn attract_vector_runs_hallof_and_enters_hall1() {
+        let attr = red_label_routine_address("ATTR").expect("ATTR address");
+        let creds = red_label_routine_address("CREDS").expect("CREDS address");
+        let hall4 = red_label_routine_address("HALL4").expect("HALL4 address");
+        let hofst = red_label_routine_address("HOFST").expect("HOFST address");
+        let hofbl = red_label_routine_address("HOFBL").expect("HOFBL address");
+        let hofud = red_label_routine_address("HOFUD").expect("HOFUD address");
+
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            10_000,
+        );
+        let layout = red_label_ram_layout().expect("RAM layout");
+        let score_pointer = high_score_player_score_pointer(0);
+        machine
+            .memory
+            .write_player_score_value(&layout, 0, 50_000)
+            .expect("seed player-one score");
+        machine.memory.write_byte(0xA0B7, 1).expect("set PWRFLG");
+        machine.memory.write_byte(0xA037, 0x02).expect("set CREDIT");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM, 0x09)
+            .expect("set OCRED");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0xAA)
+            .expect("set ICREDF");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_ENTRY_FLAG_RAM, 0x55)
+            .expect("set ENTFLG");
+        let process = schedule_support_process(&mut machine, "ATTR");
+        let extra_process = machine
+            .red_label_make_process(0x2222, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make extra process");
+        let coin_process = machine
+            .red_label_make_process(
+                red_label_routine_address("CN1").expect("CN1 address"),
+                RED_LABEL_COIN_PROCESS_TYPE,
+            )
+            .expect("make coin process");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(attr)
+            .expect("dispatch ATTR");
+
+        let RedLabelProcessDispatch::AttractVector(RedLabelAttractVector {
+            process_address,
+            selected_map,
+            attract_vector_address,
+            entry,
+        }) = dispatch
+        else {
+            panic!("expected ATTR vector dispatch");
+        };
+        assert_eq!(process_address, process);
+        assert_eq!(selected_map, 1);
+        assert_eq!(attract_vector_address, RED_LABEL_ATTRACT_VECTOR_ADDRESS);
+
+        let RedLabelHallOfFameEntryDispatch::PlayerOneQualification {
+            setup:
+                RedLabelHallOfFameEntrySetup {
+                    process_address: setup_process,
+                    genocide,
+                    status,
+                    stars,
+                    credit,
+                    old_credit_before,
+                    old_credit_after,
+                    credit_increase_flag_before,
+                    entry_flag_before,
+                    power_flag,
+                },
+            credits_process,
+            player,
+            score_pointer: actual_score_pointer,
+            qualification,
+        } = entry
+        else {
+            panic!("expected HALLOF to enter HALL1");
+        };
+        assert_eq!(setup_process, process);
+        assert_eq!(genocide.current_process_address, process);
+        assert_eq!(
+            genocide
+                .killed_processes
+                .iter()
+                .map(|killed| killed.killed_process_address)
+                .collect::<Vec<_>>(),
+            vec![extra_process.process_address]
+        );
+        assert_eq!(status, RED_LABEL_HALL_OF_FAME_ENTRY_STATUS);
+        assert_eq!(stars.star_count, 16);
+        assert_eq!((stars.table_start, stars.table_end), (0xAF9D, 0xAFDD));
+        assert!(stars.rand_values_consumed >= 32);
+        assert_eq!(
+            (
+                credit,
+                old_credit_before,
+                old_credit_after,
+                credit_increase_flag_before,
+                entry_flag_before,
+                power_flag,
+            ),
+            (0x02, 0x09, 0x02, 0xAA, 0x55, 1)
+        );
+        assert_eq!(credits_process.routine_address, creds);
+        assert_eq!(credits_process.process_type, RED_LABEL_SYSTEM_PROCESS_TYPE);
+        assert_eq!((player, actual_score_pointer), (1, score_pointer));
+
+        let RedLabelHighScoreQualification::Qualified(RedLabelHighScoreEntryStart {
+            process_address: qualification_process,
+            player: qualified_player,
+            score,
+            rank,
+            entry_flag_before,
+            entry_flag_after,
+            support_processes,
+            fire_switch,
+            ..
+        }) = qualification
+        else {
+            panic!("expected qualifying player-one score");
+        };
+        assert_eq!(qualification_process, process);
+        assert_eq!((qualified_player, score, rank), (1, 50_000, 1));
+        assert_eq!((entry_flag_before, entry_flag_after), (0, 1));
+        assert_eq!(
+            support_processes
+                .iter()
+                .map(|created| (created.routine_address, created.process_type))
+                .collect::<Vec<_>>(),
+            vec![
+                (hofst, RED_LABEL_SYSTEM_PROCESS_TYPE),
+                (hofbl, RED_LABEL_SYSTEM_PROCESS_TYPE),
+                (hofud, RED_LABEL_SYSTEM_PROCESS_TYPE),
+            ]
+        );
+        let RedLabelHighScoreFireSwitch::ResetSleeping {
+            process_address: fire_process,
+            wakeup_address,
+            ..
+        } = fire_switch
+        else {
+            panic!("expected HALL3A fire-switch reset");
+        };
+        assert_eq!((fire_process, wakeup_address), (process, hall4));
+        assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[1][..]));
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[RED_LABEL_HALL_OF_FAME_ENTRY_STATUS][..])
+        );
+        assert_eq!(machine.red_label_ram_range(0xA0AE..0xA0AF), Some(&[16][..]));
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_OLD_CREDIT_RAM..RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM + 1
+            ),
+            Some(&[0x02, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_ENTRY_FLAG_RAM..RED_LABEL_ATTRACT_ENTRY_FLAG_RAM + 1
+            ),
+            Some(&[1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_NUMBER_RAM..RED_LABEL_HOF_PLAYER_NUMBER_RAM + 1
+            ),
+            Some(&[1][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM..RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM + 2
+            ),
+            Some(&score_pointer.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                coin_process.process_address + 5..coin_process.process_address + 6
+            ),
+            Some(&[RED_LABEL_COIN_PROCESS_TYPE][..])
+        );
+    }
+
+    #[test]
+    fn hallof_power_on_jumps_to_williams_page_after_source_setup() {
+        let amodes = red_label_routine_address("AMODES").expect("AMODES address");
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "ATTR");
+        let extra_process = machine
+            .red_label_make_process(0x3333, RED_LABEL_SYSTEM_PROCESS_TYPE)
+            .expect("make extra process");
+        machine.memory.write_byte(0xA037, 0x03).expect("set CREDIT");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM, 0x34)
+            .expect("set OCRED");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM, 0x12)
+            .expect("set ICREDF");
+        machine
+            .memory
+            .write_byte(RED_LABEL_ATTRACT_ENTRY_FLAG_RAM, 0x56)
+            .expect("set ENTFLG");
+
+        let entry = machine
+            .memory
+            .start_hall_of_fame_entry_current_process()
+            .expect("HALLOF power-on");
+
+        let RedLabelHallOfFameEntryDispatch::PowerOnWilliamsJump {
+            setup:
+                RedLabelHallOfFameEntrySetup {
+                    process_address,
+                    genocide,
+                    status,
+                    stars,
+                    credit,
+                    old_credit_before,
+                    old_credit_after,
+                    credit_increase_flag_before,
+                    entry_flag_before,
+                    power_flag,
+                },
+            target_address,
+        } = entry
+        else {
+            panic!("expected HALLOF power-on Williams jump");
+        };
+        assert_eq!(process_address, process);
+        assert_eq!(genocide.current_process_address, process);
+        assert_eq!(
+            genocide
+                .killed_processes
+                .iter()
+                .map(|killed| killed.killed_process_address)
+                .collect::<Vec<_>>(),
+            vec![extra_process.process_address]
+        );
+        assert_eq!(status, RED_LABEL_HALL_OF_FAME_ENTRY_STATUS);
+        assert_eq!(stars.star_count, 16);
+        assert!(stars.rand_values_consumed >= 32);
+        assert_eq!(
+            (
+                credit,
+                old_credit_before,
+                old_credit_after,
+                credit_increase_flag_before,
+                entry_flag_before,
+                power_flag,
+            ),
+            (0x03, 0x34, 0x03, 0x12, 0x56, 0)
+        );
+        assert_eq!(target_address, amodes);
+        assert_eq!(
+            machine.red_label_ram_range(process + 2..process + 4),
+            Some(&amodes.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[RED_LABEL_HALL_OF_FAME_ENTRY_STATUS][..])
+        );
+        assert_eq!(machine.red_label_ram_range(0xA0AE..0xA0AF), Some(&[16][..]));
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_OLD_CREDIT_RAM..RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM + 1
+            ),
+            Some(&[0x03, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_ENTRY_FLAG_RAM..RED_LABEL_ATTRACT_ENTRY_FLAG_RAM + 1
+            ),
+            Some(&[0][..])
+        );
+    }
+
+    #[test]
+    fn hall1_qualifies_and_enters_source_initials_flow() {
+        let hall1 = red_label_routine_address("HALL1").expect("HALL1 address");
+        let hall4 = red_label_routine_address("HALL4").expect("HALL4 address");
+        let hofst = red_label_routine_address("HOFST").expect("HOFST address");
+        let hofbl = red_label_routine_address("HOFBL").expect("HOFBL address");
+        let hofud = red_label_routine_address("HOFUD").expect("HOFUD address");
+
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            10_000,
+        );
+        let score_pointer = seed_hall6_submission(&mut machine, 1, 50_000, *b"ZZZ", 2);
+        let process = schedule_support_process(&mut machine, "HALL1");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_FLAG_RAM, 0xAA)
+            .expect("seed FIRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM, 0xBB)
+            .expect("seed FIRCNT");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall1)
+            .expect("dispatch HALL1 qualifying score");
+
+        let RedLabelProcessDispatch::HighScoreQualification(
+            RedLabelHighScoreQualification::Qualified(RedLabelHighScoreEntryStart {
+                process_address,
+                player,
+                score_pointer: actual_score_pointer,
+                score,
+                rank,
+                entry_flag_before,
+                entry_flag_after,
+                sound_port_b,
+                sound_command,
+                display,
+                support_processes,
+                stall_ticks,
+                fire_switch,
+            }),
+        ) = dispatch
+        else {
+            panic!("expected HALL1 qualified dispatch");
+        };
+        assert_eq!(process_address, process);
+        assert_eq!(
+            (player, actual_score_pointer, score, rank),
+            (1, score_pointer, 50_000, 1)
+        );
+        assert_eq!((entry_flag_before, entry_flag_after), (2, 3));
+        assert_eq!(sound_port_b, 0x3D);
+        assert_eq!(
+            sound_command,
+            SoundCommand::from_main_board_pia_port_b(0x3D)
+        );
+        assert_eq!(display.player, 1);
+        assert_eq!(display.initials.active_initial, 0);
+        assert_eq!(stall_ticks, RED_LABEL_HOF_FIRST_INITIAL_STALL_TICKS);
+        assert_eq!(
+            support_processes
+                .iter()
+                .map(|created| (created.routine_address, created.process_type))
+                .collect::<Vec<_>>(),
+            vec![
+                (hofst, RED_LABEL_SYSTEM_PROCESS_TYPE),
+                (hofbl, RED_LABEL_SYSTEM_PROCESS_TYPE),
+                (hofud, RED_LABEL_SYSTEM_PROCESS_TYPE),
+            ]
+        );
+        assert_eq!(
+            fire_switch,
+            RedLabelHighScoreFireSwitch::ResetSleeping {
+                process_address: process,
+                fire_flag_before: 0xAA,
+                fire_count_before: 0xBB,
+                wakeup_address: hall4,
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_ENTRY_FLAG_RAM..RED_LABEL_ATTRACT_ENTRY_FLAG_RAM + 1
+            ),
+            Some(&[3][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(RED_LABEL_HOF_INITS_RAM..RED_LABEL_HOF_INITS_RAM + 6),
+            Some(
+                &[
+                    b'A',
+                    b'/',
+                    RED_LABEL_HOF_BLANK_INITIAL_BYTE,
+                    b'/',
+                    RED_LABEL_HOF_BLANK_INITIAL_BYTE,
+                    b'/',
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[RED_LABEL_HOF_FIRST_INITIAL_STALL_TICKS][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC0, 0xDA, RED_LABEL_HOF_FIRE_SLEEP_TICKS][..])
+        );
+        assert_message_glyph_first_column(&machine, RED_LABEL_HOF_PLAYER_LABEL_SCREEN, 'P');
+        assert_message_glyph_first_column(&machine, RED_LABEL_HOF_INITIALS_SCREEN, 'A');
+        assert_message_glyph_first_column(
+            &machine,
+            text_position_from_top_left(RED_LABEL_HOF_INITIALS_SCREEN, 8, 0),
+            ' ',
+        );
+
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            60_000,
+        );
+        seed_hall6_submission(&mut machine, 1, 59_550, *b"AAA", 0);
+        schedule_support_process(&mut machine, "HALL1");
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall1)
+            .expect("dispatch HALL1 qualifying non-top score");
+        let RedLabelProcessDispatch::HighScoreQualification(
+            RedLabelHighScoreQualification::Qualified(RedLabelHighScoreEntryStart {
+                rank,
+                sound_port_b,
+                sound_command,
+                entry_flag_before,
+                entry_flag_after,
+                ..
+            }),
+        ) = dispatch
+        else {
+            panic!("expected HALL1 non-top qualified dispatch");
+        };
+        assert_eq!(rank, 6);
+        assert_eq!((entry_flag_before, entry_flag_after), (0, 1));
+        assert_eq!(sound_port_b, 0x3E);
+        assert_eq!(
+            sound_command,
+            SoundCommand::from_main_board_pia_port_b(0x3E)
+        );
+    }
+
+    #[test]
+    fn hall1_not_qualified_uses_source_hall12_handoff() {
+        let hall1 = red_label_routine_address("HALL1").expect("HALL1 address");
+        let hall13 = red_label_routine_address("HALL13").expect("HALL13 address");
+
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            50_000,
+        );
+        let score_pointer = seed_hall6_submission(&mut machine, 1, 1_000, *b"AAA", 0);
+        let process = schedule_support_process(&mut machine, "HALL1");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall1)
+            .expect("dispatch HALL1 player one non-qualifying score");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreQualification(
+                RedLabelHighScoreQualification::NotQualified {
+                    process_address: process,
+                    player: 1,
+                    score_pointer,
+                    score: 1_000,
+                    handoff: RedLabelHighScoreSubmissionHandoff::NextPlayerJump {
+                        next_player: 2,
+                        next_player_score_pointer: high_score_player_score_pointer(1),
+                        target_address: hall1,
+                    },
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_NUMBER_RAM..RED_LABEL_HOF_PLAYER_NUMBER_RAM + 1
+            ),
+            Some(&[2][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM..RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM + 2
+            ),
+            Some(&high_score_player_score_pointer(1).to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&hall1.to_be_bytes()[..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            50_000,
+        );
+        let score_pointer = seed_hall6_submission(&mut machine, 2, 1_000, *b"AAA", 0);
+        let process = schedule_support_process(&mut machine, "HALL1");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall1)
+            .expect("dispatch HALL1 player two non-qualifying score");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreQualification(
+                RedLabelHighScoreQualification::NotQualified {
+                    process_address: process,
+                    player: 2,
+                    score_pointer,
+                    score: 1_000,
+                    handoff: RedLabelHighScoreSubmissionHandoff::NoEntryDelaySleeping {
+                        entry_flag: 0,
+                        sleep_ticks: RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS,
+                        wakeup_address: hall13,
+                    },
+                }
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(
+                &[
+                    hall13.to_be_bytes()[0],
+                    hall13.to_be_bytes()[1],
+                    RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS,
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn hall12_direct_dispatch_uses_source_player_handoff() {
+        let hall1 = red_label_routine_address("HALL1").expect("HALL1 address");
+        let hall12 = red_label_routine_address("HALL12").expect("HALL12 address");
+        let hall13 = red_label_routine_address("HALL13").expect("HALL13 address");
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALL12");
+        seed_hall6_submission(&mut machine, 1, 1_000, *b"AAA", 0);
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall12)
+            .expect("dispatch HALL12 player one");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreHandoff(RedLabelHighScoreHandoff {
+                process_address: process,
+                player: 1,
+                handoff: RedLabelHighScoreSubmissionHandoff::NextPlayerJump {
+                    next_player: 2,
+                    next_player_score_pointer: high_score_player_score_pointer(1),
+                    target_address: hall1,
+                },
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_NUMBER_RAM..RED_LABEL_HOF_PLAYER_NUMBER_RAM + 1
+            ),
+            Some(&[2][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM..RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM + 2
+            ),
+            Some(&high_score_player_score_pointer(1).to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&hall1.to_be_bytes()[..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALL12");
+        seed_hall6_submission(&mut machine, 2, 1_000, *b"AAA", 0);
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall12)
+            .expect("dispatch HALL12 player two no-entry");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreHandoff(RedLabelHighScoreHandoff {
+                process_address: process,
+                player: 2,
+                handoff: RedLabelHighScoreSubmissionHandoff::NoEntryDelaySleeping {
+                    entry_flag: 0,
+                    sleep_ticks: RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS,
+                    wakeup_address: hall13,
+                },
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(
+                &[
+                    hall13.to_be_bytes()[0],
+                    hall13.to_be_bytes()[1],
+                    RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS,
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn high_score_fire_switch_loop_matches_source_debounce_stall_and_advance() {
+        let hall3a = red_label_routine_address("HALL3A").expect("HALL3A address");
+        let hall4 = red_label_routine_address("HALL4").expect("HALL4 address");
+        let hall6 = red_label_routine_address("HALL6").expect("HALL6 address");
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALL3A");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_FLAG_RAM, 0xAA)
+            .expect("seed FIRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM, 0xBB)
+            .expect("seed FIRCNT");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall3a)
+            .expect("dispatch HALL3A");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreFireSwitch(
+                RedLabelHighScoreFireSwitch::ResetSleeping {
+                    process_address: process,
+                    fire_flag_before: 0xAA,
+                    fire_count_before: 0xBB,
+                    wakeup_address: hall4,
+                },
+            )
+        );
+        assert_eq!(
+            machine
+                .red_label_ram_range(RED_LABEL_HOF_FIRE_FLAG_RAM..RED_LABEL_HOF_FIRE_FLAG_RAM + 2),
+            Some(&[0, 0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC0, 0xDA, RED_LABEL_HOF_FIRE_SLEEP_TICKS][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALL4");
+        seed_hof_up_down_input(&mut machine, 0, 0);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, 0x12)
+            .expect("seed STALT");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM, 1)
+            .expect("seed FIRCNT");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_FLAG_RAM, 0x77)
+            .expect("seed FIRFLG");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall4)
+            .expect("dispatch HALL4 open not ready");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreFireSwitch(
+                RedLabelHighScoreFireSwitch::OpenSleeping {
+                    process_address: process,
+                    pia21: 0,
+                    stall_timer: 0x12,
+                    fire_count_before: 1,
+                    fire_count_after: 2,
+                    fire_flag_before: 0x77,
+                    fire_flag_after: 0x77,
+                    wakeup_address: hall4,
+                },
+            )
+        );
+        assert_eq!(
+            machine
+                .red_label_ram_range(RED_LABEL_HOF_FIRE_FLAG_RAM..RED_LABEL_HOF_FIRE_FLAG_RAM + 2),
+            Some(&[0x77, 2][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALL4");
+        seed_hof_up_down_input(&mut machine, 0, 0);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, 0x12)
+            .expect("seed STALT");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM, 4)
+            .expect("seed FIRCNT");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_FLAG_RAM, 0)
+            .expect("seed FIRFLG");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall4)
+            .expect("dispatch HALL4 open");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreFireSwitch(
+                RedLabelHighScoreFireSwitch::OpenSleeping {
+                    process_address: process,
+                    pia21: 0,
+                    stall_timer: 0x12,
+                    fire_count_before: 4,
+                    fire_count_after: RED_LABEL_HOF_FIRE_OPEN_COUNT_READY,
+                    fire_flag_before: 0,
+                    fire_flag_after: RED_LABEL_HOF_FIRE_OPEN_COUNT_READY,
+                    wakeup_address: hall4,
+                },
+            )
+        );
+        assert_eq!(
+            machine
+                .red_label_ram_range(RED_LABEL_HOF_FIRE_FLAG_RAM..RED_LABEL_HOF_FIRE_FLAG_RAM + 2),
+            Some(
+                &[
+                    RED_LABEL_HOF_FIRE_OPEN_COUNT_READY,
+                    RED_LABEL_HOF_FIRE_OPEN_COUNT_READY,
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC0, 0xDA, RED_LABEL_HOF_FIRE_SLEEP_TICKS][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALL4");
+        seed_hof_up_down_input(&mut machine, 0, 0);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, 0)
+            .expect("expire STALT");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall4)
+            .expect("dispatch HALL4 stall expired");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreFireSwitch(
+                RedLabelHighScoreFireSwitch::StallExpiredSubmitJump {
+                    process_address: process,
+                    pia21: 0,
+                    stall_timer: 0,
+                    target_address: hall6,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&[0xC1, 0x0E][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALL4");
+        seed_hof_up_down_input(&mut machine, RED_LABEL_HOF_FIRE_SWITCH_MASK, 0);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM, 9)
+            .expect("seed FIRCNT");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_FLAG_RAM, 0)
+            .expect("clear FIRFLG");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall4)
+            .expect("dispatch HALL4 ignored close");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreFireSwitch(
+                RedLabelHighScoreFireSwitch::ClosedIgnoredSleeping {
+                    process_address: process,
+                    pia21: RED_LABEL_HOF_FIRE_SWITCH_MASK,
+                    fire_flag_before: 0,
+                    wakeup_address: hall4,
+                },
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM..RED_LABEL_HOF_FIRE_OPEN_COUNT_RAM + 1
+            ),
+            Some(&[0][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let hall5 = red_label_routine_address("HALL5").expect("HALL5 address");
+        let process = schedule_support_process(&mut machine, "HALL5");
+        seed_hof_up_down_input(&mut machine, RED_LABEL_HOF_FIRE_SWITCH_MASK, 0);
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_FIRE_FLAG_RAM, 0)
+            .expect("clear FIRFLG");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall5)
+            .expect("dispatch direct HALL5 ignored close");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreFireSwitch(
+                RedLabelHighScoreFireSwitch::ClosedIgnoredSleeping {
+                    process_address: process,
+                    pia21: RED_LABEL_HOF_FIRE_SWITCH_MASK,
+                    fire_flag_before: 0,
+                    wakeup_address: hall4,
+                },
+            )
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALL4");
+        seed_hof_up_down_input(&mut machine, RED_LABEL_HOF_FIRE_SWITCH_MASK, 0);
+        machine
+            .memory
+            .write_byte(
+                RED_LABEL_HOF_FIRE_FLAG_RAM,
+                RED_LABEL_HOF_FIRE_OPEN_COUNT_READY,
+            )
+            .expect("set FIRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INIT_INDEX_RAM, 0)
+            .expect("seed INITN");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_STALL_TIMER_RAM, 1)
+            .expect("seed STALT");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall4)
+            .expect("dispatch HALL4 accepted close");
+
+        let RedLabelProcessDispatch::HighScoreFireSwitch(
+            RedLabelHighScoreFireSwitch::InitialAdvancedSleeping {
+                process_address,
+                pia21,
+                initial_before,
+                initial_after,
+                stall_timer,
+                underline_words,
+                wakeup_address,
+            },
+        ) = dispatch
+        else {
+            panic!("expected accepted fire-switch advance");
+        };
+        assert_eq!(process_address, process);
+        assert_eq!(pia21, RED_LABEL_HOF_FIRE_SWITCH_MASK);
+        assert_eq!((initial_before, initial_after), (0, 1));
+        assert_eq!(stall_timer, RED_LABEL_HOF_NEXT_INITIAL_STALL_TICKS);
+        assert_eq!(wakeup_address, hall4);
+        assert_eq!(underline_words[1][3], 0x4EB7);
+        assert_eq!(
+            machine.red_label_ram_range(0x4EB7..0x4EB9),
+            Some(&RED_LABEL_HOF_UNDERLINE_ACTIVE.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[RED_LABEL_HOF_NEXT_INITIAL_STALL_TICKS][..])
+        );
+        assert_eq!(
+            machine
+                .red_label_ram_range(RED_LABEL_HOF_FIRE_FLAG_RAM..RED_LABEL_HOF_FIRE_FLAG_RAM + 2),
+            Some(&[0, 0][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_support_process(&mut machine, "HALL4");
+        seed_hof_up_down_input(&mut machine, RED_LABEL_HOF_FIRE_SWITCH_MASK, 0);
+        machine
+            .memory
+            .write_byte(
+                RED_LABEL_HOF_FIRE_FLAG_RAM,
+                RED_LABEL_HOF_FIRE_OPEN_COUNT_READY,
+            )
+            .expect("set FIRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_INIT_INDEX_RAM, 2)
+            .expect("seed final INITN");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall4)
+            .expect("dispatch HALL4 final close");
+
+        let RedLabelProcessDispatch::HighScoreFireSwitch(
+            RedLabelHighScoreFireSwitch::InitialAdvancedSubmitJump {
+                process_address,
+                pia21,
+                initial_before,
+                initial_after,
+                stall_timer,
+                underline_words,
+                target_address,
+            },
+        ) = dispatch
+        else {
+            panic!("expected final initials submit target");
+        };
+        assert_eq!(process_address, process);
+        assert_eq!(pia21, RED_LABEL_HOF_FIRE_SWITCH_MASK);
+        assert_eq!(
+            (initial_before, initial_after),
+            (2, RED_LABEL_INITIALS_ENTRY_CHARS as u8)
+        );
+        assert_eq!(stall_timer, RED_LABEL_HOF_NEXT_INITIAL_STALL_TICKS);
+        assert_eq!(target_address, hall6);
+        assert_eq!(underline_words[2][3], 0x56B7);
+        assert_eq!(
+            machine.red_label_ram_range(0x56B7..0x56B9),
+            Some(&RED_LABEL_HOF_UNDERLINE_NORMAL.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&[0xC1, 0x0E][..])
+        );
+        assert_eq!(
+            machine
+                .red_label_ram_range(RED_LABEL_HOF_FIRE_FLAG_RAM..RED_LABEL_HOF_FIRE_FLAG_RAM + 2),
+            Some(&[RED_LABEL_HOF_FIRE_OPEN_COUNT_READY, 0][..])
+        );
+    }
+
+    #[test]
+    fn hall6_submission_inserts_initials_and_follows_source_handoffs() {
+        let hall1 = red_label_routine_address("HALL1").expect("HALL1 address");
+        let hall6 = red_label_routine_address("HALL6").expect("HALL6 address");
+        let hall13 = red_label_routine_address("HALL13").expect("HALL13 address");
+
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            1_000,
+        );
+        seed_high_score_table(&mut machine, super::RuntimeHighScoreTable::AllTime, 1_000);
+        let score_pointer = seed_hall6_submission(
+            &mut machine,
+            1,
+            50_000,
+            [b'A', RED_LABEL_HOF_BLANK_INITIAL_BYTE, b'Z'],
+            1,
+        );
+        let extra_process = machine
+            .red_label_make_process(
+                red_label_routine_address("HOFUD").expect("HOFUD address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make HOFUD process")
+            .process_address;
+        let process = schedule_support_process(&mut machine, "HALL6");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall6)
+            .expect("dispatch HALL6 player one");
+
+        let RedLabelProcessDispatch::HighScoreSubmission(submission) = dispatch else {
+            panic!("expected HALL6 high-score submission");
+        };
+        assert_eq!(
+            submission,
+            RedLabelHighScoreSubmission {
+                process_address: process,
+                genocide: RedLabelGenocide {
+                    current_process_address: process,
+                    killed_processes: submission.genocide.killed_processes.clone(),
+                },
+                player: 1,
+                score_pointer,
+                score: 50_000,
+                initials: [b'A', RED_LABEL_HOF_BLANK_INITIAL_BYTE, b'Z'],
+                todays_rank: Some(1),
+                all_time_rank: Some(1),
+                handoff: RedLabelHighScoreSubmissionHandoff::NextPlayerJump {
+                    next_player: 2,
+                    next_player_score_pointer: high_score_player_score_pointer(1),
+                    target_address: hall1,
+                },
+            }
+        );
+        assert_eq!(submission.genocide.killed_processes.len(), 1);
+        assert_eq!(
+            submission.genocide.killed_processes[0].killed_process_address,
+            extra_process
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_NUMBER_RAM..RED_LABEL_HOF_PLAYER_NUMBER_RAM + 1
+            ),
+            Some(&[2][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM..RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM + 2
+            ),
+            Some(&high_score_player_score_pointer(1).to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&[0xC0, 0x30][..])
+        );
+        let today_offset = usize::from(RED_LABEL_THSTAB_START);
+        assert_eq!(
+            [
+                super::sram_cell_read_byte(machine.red_label_ram(), today_offset)
+                    .expect("today score high byte"),
+                super::sram_cell_read_byte(machine.red_label_ram(), today_offset + 2)
+                    .expect("today score middle byte"),
+                super::sram_cell_read_byte(machine.red_label_ram(), today_offset + 4)
+                    .expect("today score low byte"),
+                super::sram_cell_read_byte(machine.red_label_ram(), today_offset + 6)
+                    .expect("today first initial"),
+                super::sram_cell_read_byte(machine.red_label_ram(), today_offset + 8)
+                    .expect("today second initial"),
+                super::sram_cell_read_byte(machine.red_label_ram(), today_offset + 10)
+                    .expect("today third initial"),
+            ],
+            [
+                0x05,
+                0x00,
+                0x00,
+                b'A',
+                RED_LABEL_HOF_BLANK_INITIAL_BYTE,
+                b'Z'
+            ]
+        );
+        let all_time_offset = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+        assert_eq!(
+            super::sram_cell_read_byte(machine.red_label_cmos_ram(), all_time_offset + 8)
+                .expect("all-time second initial"),
+            RED_LABEL_HOF_BLANK_INITIAL_BYTE
+        );
+
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            1_000,
+        );
+        seed_high_score_table(&mut machine, super::RuntimeHighScoreTable::AllTime, 900_000);
+        let score_pointer = seed_hall6_submission(&mut machine, 2, 50_000, *b"ACE", 1);
+        let process = schedule_support_process(&mut machine, "HALL6");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall6)
+            .expect("dispatch HALL6 player two");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreSubmission(RedLabelHighScoreSubmission {
+                process_address: process,
+                genocide: RedLabelGenocide {
+                    current_process_address: process,
+                    killed_processes: Vec::new(),
+                },
+                player: 2,
+                score_pointer,
+                score: 50_000,
+                initials: *b"ACE",
+                todays_rank: Some(1),
+                all_time_rank: None,
+                handoff: RedLabelHighScoreSubmissionHandoff::HallOfFameJump {
+                    entry_flag: 1,
+                    target_address: hall13,
+                },
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(&[0xC1, 0x44][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            1_000,
+        );
+        seed_high_score_table(&mut machine, super::RuntimeHighScoreTable::AllTime, 1_000);
+        let score_pointer = seed_hall6_submission(&mut machine, 2, 50_000, *b"BOB", 0);
+        let process = schedule_support_process(&mut machine, "HALL6");
+
+        let dispatch = machine
+            .red_label_dispatch_translated_process_routine(hall6)
+            .expect("dispatch HALL6 no-entry delay");
+
+        assert_eq!(
+            dispatch,
+            RedLabelProcessDispatch::HighScoreSubmission(RedLabelHighScoreSubmission {
+                process_address: process,
+                genocide: RedLabelGenocide {
+                    current_process_address: process,
+                    killed_processes: Vec::new(),
+                },
+                player: 2,
+                score_pointer,
+                score: 50_000,
+                initials: *b"BOB",
+                todays_rank: Some(1),
+                all_time_rank: Some(1),
+                handoff: RedLabelHighScoreSubmissionHandoff::NoEntryDelaySleeping {
+                    entry_flag: 0,
+                    sleep_ticks: RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS,
+                    wakeup_address: hall13,
+                },
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC1, 0x44, RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS][..])
+        );
+    }
+
+    #[test]
+    fn hall6_submission_rejects_invalid_source_state() {
+        let hall6 = red_label_routine_address("HALL6").expect("HALL6 address");
+
+        let mut machine = ArcadeMachine::new();
+        let score_pointer = seed_hall6_submission(&mut machine, 2, 50_000, *b"ACE", 1);
+        machine
+            .memory
+            .write_byte(score_pointer + 1, 0xFA)
+            .expect("corrupt BCD score");
+        schedule_support_process(&mut machine, "HALL6");
+        let error = machine
+            .red_label_dispatch_translated_process_routine(hall6)
+            .expect_err("invalid BCD should fail");
+        assert!(error.contains("not valid BCD"));
+
+        let mut machine = ArcadeMachine::new();
+        seed_hall6_submission(&mut machine, 2, 50_000, [b'A', b'/', b'E'], 1);
+        schedule_support_process(&mut machine, "HALL6");
+        let error = machine
+            .red_label_dispatch_translated_process_routine(hall6)
+            .expect_err("invalid initials should fail");
+        assert!(error.contains("initials"));
+
+        let mut machine = ArcadeMachine::new();
+        seed_high_score_table(
+            &mut machine,
+            super::RuntimeHighScoreTable::TodaysGreatest,
+            1_000,
+        );
+        seed_high_score_table(&mut machine, super::RuntimeHighScoreTable::AllTime, 1_000);
+        let layout = red_label_ram_layout().expect("RAM layout");
+        machine
+            .memory
+            .write_player_score_value(&layout, 0, 50_000)
+            .expect("seed score");
+        machine
+            .memory
+            .write_byte(RED_LABEL_HOF_PLAYER_NUMBER_RAM, 3)
+            .expect("seed invalid PNUMB");
+        machine
+            .memory
+            .write_word(
+                RED_LABEL_HOF_PLAYER_SCORE_POINTER_RAM,
+                high_score_player_score_pointer(0),
+            )
+            .expect("seed PSCORE");
+        seed_hof_initials(&mut machine, *b"ACE");
+        schedule_support_process(&mut machine, "HALL6");
+        let error = machine
+            .red_label_dispatch_translated_process_routine(hall6)
+            .expect_err("invalid next player should fail");
+        assert!(error.contains("outside the high-score player range"));
+    }
+
+    #[test]
+    fn high_score_helpers_reject_non_source_initial_bytes() {
+        let mut machine = ArcadeMachine::new();
+
+        let error = machine
+            .memory
+            .insert_high_score(
+                super::RuntimeHighScoreTable::TodaysGreatest,
+                50_000,
+                [b'A', b'/', b'E'],
+            )
+            .expect_err("inserted initials outside source alphabet should fail");
+        assert!(error.contains("uppercase ASCII or source blank"));
+
+        machine
+            .memory
+            .write_high_score_entry(
+                super::RuntimeHighScoreTable::TodaysGreatest,
+                0,
+                super::RuntimeHighScoreEntry {
+                    score: 10_000,
+                    initials: *b"ACE",
+                },
+            )
+            .expect("seed today's high-score entry");
+        let entry_offset =
+            super::high_score_entry_offset(super::RuntimeHighScoreTable::TodaysGreatest, 0)
+                .expect("today's entry offset");
+        super::sram_cell_write_byte(
+            machine
+                .memory
+                .high_score_table_cells_mut(super::RuntimeHighScoreTable::TodaysGreatest),
+            entry_offset + 6,
+            b'/',
+        )
+        .expect("corrupt today's high-score initial");
+        let error = machine
+            .memory
+            .high_score_entry(super::RuntimeHighScoreTable::TodaysGreatest, 0)
+            .expect_err("corrupt source initials should fail");
+        assert!(error.contains("uppercase ASCII or source blank"));
+
+        let error = machine
+            .memory
+            .write_high_score_entry(
+                super::RuntimeHighScoreTable::AllTime,
+                0,
+                super::RuntimeHighScoreEntry {
+                    score: 50_000,
+                    initials: [b'A', b'/', b'E'],
+                },
+            )
+            .expect_err("written initials outside source alphabet should fail");
+        assert!(error.contains("uppercase ASCII or source blank"));
     }
 
     #[test]
@@ -33488,6 +50960,98 @@ mod tests {
     }
 
     #[test]
+    fn player_death_after_explosion_writes_two_player_game_over_before_switch_sleep() {
+        for (
+            current_player,
+            current_base,
+            current_lives,
+            other_player,
+            other_lives,
+            label_address,
+        ) in [
+            (1, 0xA1C2, 0xA1C9, 2, 0xA206, 0xC0EF),
+            (2, 0xA1FF, 0xA206, 1, 0xA1C9, 0xC0F1),
+        ] {
+            let mut machine = ArcadeMachine::new();
+            let process = schedule_player_death_process(&mut machine);
+            machine.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+            machine
+                .memory
+                .write_byte(0xA08B, current_player)
+                .expect("set CURPLR");
+            machine.memory.write_byte(0xA08C, 2).expect("set PLRCNT");
+            machine
+                .memory
+                .write_word(0xA08D, current_base)
+                .expect("set PLRX");
+            machine
+                .memory
+                .write_byte(current_lives, 0)
+                .expect("clear current player PLAS");
+            machine
+                .memory
+                .write_byte(other_lives, 2)
+                .expect("set other player PLAS");
+
+            let death = machine
+                .red_label_continue_player_death_after_explosion_current_process()
+                .expect("PDTH5R");
+
+            assert_eq!(
+                death,
+                RedLabelPlayerDeath::PostExplosionSwitchPlayerSleeping {
+                    process_address: process,
+                    other_player,
+                    player_label: RedLabelBonusTextCall {
+                        vector_address: label_address,
+                        screen_address: RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN,
+                    },
+                    game_over: RedLabelBonusTextCall {
+                        vector_address: 0xC075,
+                        screen_address: RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN,
+                    },
+                    wakeup_address: 0xDB15,
+                }
+            );
+            assert_message_glyph_first_column(&machine, RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN, 'P');
+            assert_message_glyph_first_column(
+                &machine,
+                RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN,
+                'G',
+            );
+            assert_eq!(
+                machine.red_label_ram_range(process + 0x02..process + 0x05),
+                Some(&[0xDB, 0x15, 0x60][..])
+            );
+        }
+    }
+
+    #[test]
+    fn player_death_after_explosion_sleeps_game_over_when_player_count_is_zero() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_player_death_process(&mut machine);
+        machine.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        machine.memory.write_byte(0xA08C, 0).expect("clear PLRCNT");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1C9, 2).expect("set PLAS");
+
+        let death = machine
+            .red_label_continue_player_death_after_explosion_current_process()
+            .expect("PDTH5R");
+
+        assert_eq!(
+            death,
+            RedLabelPlayerDeath::GameOverSleeping {
+                process_address: process,
+                status: 0xFF,
+                sound_command: SoundCommand::from_main_board_pia_port_b(0x2C),
+                wakeup_address: 0xDB48,
+            }
+        );
+    }
+
+    #[test]
     fn player_death_after_explosion_runs_bonus_survivor_loop_when_wave_is_clear() {
         let mut machine = ArcadeMachine::new();
         let process = schedule_player_death_process(&mut machine);
@@ -34032,6 +51596,54 @@ mod tests {
             machine.red_label_ram_range(0xA061..0xA063),
             Some(&[0xAA, 0xC5][..])
         );
+    }
+
+    #[test]
+    fn translated_process_dispatch_executes_generic_sucide_tails() {
+        for label in ["SUCIDE", "HYPX"] {
+            let mut machine = ArcadeMachine::new();
+            let process = machine
+                .red_label_make_process(
+                    red_label_routine_address(label).expect("routine address"),
+                    RED_LABEL_SYSTEM_PROCESS_TYPE,
+                )
+                .expect("make process")
+                .process_address;
+
+            let dispatch = machine
+                .step_red_label_translated_process()
+                .expect("dispatch routine")
+                .expect("scheduled routine");
+
+            assert_eq!(
+                dispatch,
+                RedLabelProcessDispatch::Suicide(RedLabelKilledProcess {
+                    killed_process_address: process,
+                    previous_link_address: 0xA05F,
+                }),
+                "{label} should use the generic process cleanup tail"
+            );
+            assert_eq!(
+                machine.red_label_ram_range(0xA05F..0xA061),
+                Some(&[0x00, 0x00][..]),
+                "{label} should unlink the active process"
+            );
+            assert_eq!(
+                machine.red_label_ram_range(0xA061..0xA063),
+                Some(&process.to_be_bytes()[..]),
+                "{label} should return the cell to FREE"
+            );
+            assert_eq!(
+                machine.red_label_ram_range(0xA063..0xA065),
+                Some(&[0xA0, 0x5F][..]),
+                "{label} should rewind CRPROC to the previous link cell"
+            );
+            assert_eq!(
+                machine.red_label_ram_range(process..process + 2),
+                Some(&[0xAA, 0xD4][..]),
+                "{label} should preserve the old FREE head in PLINK"
+            );
+        }
     }
 
     #[test]
@@ -34846,6 +52458,159 @@ mod tests {
     }
 
     #[test]
+    fn restore_snapshot_writes_table_backed_red_label_state() {
+        let mut machine = ArcadeMachine::new();
+        let mut snapshot = machine.snapshot();
+        snapshot.credits = 7;
+        snapshot.current_player = 2;
+        snapshot.wave = 4;
+        snapshot.rng = RandState {
+            seed: 0x12,
+            hseed: 0x34,
+            lseed: 0x56,
+        };
+        snapshot.player = super::PlayerState {
+            x: Fixed16(0x3456 << 8),
+            y: Fixed16(0x4567 << 8),
+            xv: Fixed16(0x0012_3400),
+            yv: Fixed16(i32::from(-128i16) << 8),
+            facing: Facing::Left,
+            lives: 5,
+            smart_bombs: 2,
+        };
+        snapshot.scores.player_one = 123_456;
+        snapshot.scores.player_two = 654_321;
+
+        machine.restore(snapshot);
+
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x07][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA08B..0xA08F),
+            Some(&[0x02, 0x00, 0xA1, 0xFF][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA1C2..0xA1C6),
+            Some(&[0x00, 0x12, 0x34, 0x56][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA1FF..0xA209),
+            Some(&[0x00, 0x65, 0x43, 0x21, 0x00, 0x00, 0x00, 0x05, 0x04, 0x02][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BD..0xA0BF),
+            Some(&[0xFD, 0x00][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0C3..0xA0CC),
+            Some(&[0x34, 0x56, 0x45, 0x67, 0x00, 0x12, 0x34, 0xFF, 0x80][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0DF..0xA0E2),
+            Some(&[0x12, 0x34, 0x56][..])
+        );
+        assert_eq!(
+            machine
+                .red_label_trace_state_for_frame_output()
+                .expect("trace state"),
+            super::RedLabelTraceState {
+                player_one_score: 123_456,
+                player_two_score: 654_321,
+                wave: 0,
+                lives: 0,
+                smart_bombs: 0,
+                seed: 0x12,
+                hseed: 0x34,
+                lseed: 0x56,
+            }
+        );
+    }
+
+    #[test]
+    fn save_state_restore_round_trips_red_label_memory_and_trace_scheduler() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        machine.memory.write_byte(0xA123, 0x5A).expect("seed RAM");
+        machine.memory.hardware_map = 7;
+        let saved_snapshot = machine.snapshot();
+        let saved_state = machine.save_state();
+
+        machine.memory.write_byte(0xA123, 0xA5).expect("mutate RAM");
+        machine.memory.hardware_map = 2;
+        machine.trace_power_up_ram_fill = None;
+        machine.step(CabinetInput::NONE);
+        machine.restore_state(saved_state);
+
+        assert_eq!(machine.snapshot(), saved_snapshot);
+        assert_eq!(
+            machine.red_label_ram_range(0xA123..0xA124),
+            Some(&[0x5A][..])
+        );
+        assert_eq!(machine.red_label_hardware_map(), 7);
+        assert!(machine.trace_power_up_ram_fill.is_some());
+    }
+
+    #[test]
+    fn red_label_visible_rgba_image_uses_video_ram_and_color_mapping_copy() {
+        let mut machine = ArcadeMachine::new();
+        let visible_offset =
+            defender_visible_byte_offset(0, 0).expect("visible origin maps into video RAM");
+        machine
+            .memory
+            .write_byte(visible_offset as u16, 0xAB)
+            .expect("write visible video byte");
+        machine
+            .memory
+            .write_byte(0xA026 + 0x0A, 0xD6)
+            .expect("write first palette entry");
+        machine
+            .memory
+            .write_byte(0xA026 + 0x0B, 0x29)
+            .expect("write second palette entry");
+        let palette_copy = machine
+            .red_label_copy_color_mapping_to_palette_ram()
+            .expect("copy PCRAM to color RAM");
+        let palette_indices = machine
+            .red_label_visible_palette_indices()
+            .expect("visible palette-index frame renders from red-label RAM");
+
+        let image = machine
+            .red_label_visible_rgba_image()
+            .expect("visible frame renders from red-label RAM");
+
+        assert_eq!(palette_copy.source_start, 0xA026);
+        assert_eq!(palette_copy.target_start, 0xC000);
+        assert_eq!(machine.red_label_palette_ram()[0x0A], 0xD6);
+        assert_eq!(machine.red_label_palette_ram()[0x0B], 0x29);
+        assert_eq!(palette_indices[0], 0xD6);
+        assert_eq!(palette_indices[1], 0x29);
+        assert_eq!(image.width, u32::from(super::VISIBLE_WIDTH));
+        assert_eq!(image.height, u32::from(super::VISIBLE_HEIGHT));
+        assert_eq!(&image.pixels[0..4], &[217, 81, 255, 255]);
+        assert_eq!(&image.pixels[4..8], &[38, 174, 0, 255]);
+    }
+
+    #[test]
+    fn color_mapping_copy_rejects_drifted_pcram_layout_size() {
+        let mut machine = ArcadeMachine::new();
+        let mut layout = red_label_ram_layout().expect("red-label RAM layout");
+        for entry in &mut layout {
+            if entry.table == "base_page" && entry.field == "PCRAM" {
+                entry.size = (PALETTE_RAM_SIZE as u16) - 1;
+            }
+        }
+
+        let error = machine
+            .memory
+            .copy_color_mapping_to_palette_ram(&layout)
+            .expect_err("bad PCRAM size");
+
+        assert!(error.contains("red-label PCRAM has 15 byte(s)"));
+        assert!(error.contains("expected 16"));
+    }
+
+    #[test]
     fn coin_input_increments_credit_counter() {
         let mut machine = ArcadeMachine::new();
         let queued = machine.step(CabinetInput {
@@ -34995,6 +52760,30 @@ mod tests {
         assert_eq!(
             after_release.sound_commands().collect::<Vec<_>>(),
             vec![SoundCommand::from_main_board_pia_port_b(0x30)]
+        );
+    }
+
+    #[test]
+    fn xyzzy_disabled_empty_bombs_does_not_emit_overlay_smart_bomb() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        machine.player.smart_bombs = 0;
+        machine
+            .memory
+            .write_byte(0xA1CB, 0)
+            .expect("empty current player smart bombs");
+
+        let output = machine.step(CabinetInput {
+            smart_bomb: true,
+            ..CabinetInput::NONE
+        });
+        let events = output.events().collect::<Vec<_>>();
+
+        assert!(!events.contains(&MachineEvent::SmartBombPressed));
+        assert_eq!(output.snapshot.player.smart_bombs, 0);
+        assert_eq!(
+            machine.red_label_ram_range(0xA1CB..0xA1CC),
+            Some(&[0x00][..])
         );
     }
 

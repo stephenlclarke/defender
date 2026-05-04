@@ -1,13 +1,15 @@
 //! Self-contained RGBA rendering for the clean-slate arcade core.
 
+#[cfg(test)]
 use std::io::Cursor;
 
+#[cfg(test)]
 use anyhow::Context;
+#[cfg(test)]
 use png::{ColorType, Decoder, Transformations};
 
 use crate::{
-    assets::ARCADE_LOGO_PAGE_PNG,
-    machine::{GamePhase, MachineSnapshot, VISIBLE_HEIGHT, VISIBLE_WIDTH},
+    machine::{VISIBLE_HEIGHT, VISIBLE_WIDTH},
     terminal::TerminalGeometry,
 };
 
@@ -21,12 +23,6 @@ pub const WILLIAMS_RED_GREEN_RESISTORS: [f64; 3] = [1200.0, 560.0, 330.0];
 pub const WILLIAMS_BLUE_RESISTORS: [f64; 2] = [560.0, 330.0];
 
 const BACKGROUND: [u8; 4] = [0, 0, 0, 255];
-const GRID: [u8; 4] = [18, 44, 70, 255];
-const GREEN: [u8; 4] = [88, 255, 88, 255];
-const AMBER: [u8; 4] = [255, 184, 48, 255];
-const BLUE: [u8; 4] = [80, 160, 255, 255];
-const RED: [u8; 4] = [255, 72, 72, 255];
-const WHITE: [u8; 4] = [244, 244, 244, 255];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RenderedImage {
@@ -73,7 +69,6 @@ pub struct Renderer {
     image_width: u32,
     image_height: u32,
     target: RenderedImage,
-    logo: RenderedImage,
 }
 
 impl Renderer {
@@ -87,7 +82,6 @@ impl Renderer {
             image_width,
             image_height,
             target: RenderedImage::new_blank(image_width, image_height, BACKGROUND),
-            logo: decode_png_image(ARCADE_LOGO_PAGE_PNG).expect("embedded logo page should decode"),
         }
     }
 
@@ -115,106 +109,6 @@ impl Renderer {
             rect.height,
         );
         &self.target
-    }
-
-    pub fn render(&mut self, snapshot: MachineSnapshot) -> &RenderedImage {
-        self.render_scaffold(snapshot)
-    }
-
-    pub fn render_scaffold(&mut self, snapshot: MachineSnapshot) -> &RenderedImage {
-        self.target.clear(BACKGROUND);
-        self.draw_reference_frame();
-        self.draw_logo();
-        self.draw_status(snapshot);
-        &self.target
-    }
-
-    fn draw_reference_frame(&mut self) {
-        let left = 32;
-        let top = 34;
-        let width = self.image_width as i32 - 64;
-        let height = self.image_height as i32 - 68;
-        self.draw_rect_outline(left, top, width, height, GREEN);
-        self.draw_rect_outline(left + 10, top + 34, width - 20, 52, BLUE);
-        for index in 0..=8 {
-            let x = left + (width * index) / 8;
-            self.draw_vertical_line(x, top, top + height, GRID);
-        }
-        for index in 0..=6 {
-            let y = top + (height * index) / 6;
-            self.draw_horizontal_line(left, left + width, y, GRID);
-        }
-    }
-
-    fn draw_logo(&mut self) {
-        let logo_height = (self.image_height / 3).clamp(80, 220);
-        let scale = logo_height as f32 / self.logo.height as f32;
-        let logo_width = (self.logo.width as f32 * scale).round() as i32;
-        let x = self.image_width as i32 / 2 - logo_width / 2;
-        let y = 48;
-        draw_scaled_image(
-            &mut self.target,
-            &self.logo,
-            x,
-            y,
-            logo_width,
-            logo_height as i32,
-        );
-    }
-
-    fn draw_status(&mut self, snapshot: MachineSnapshot) {
-        let baseline = self.image_height as i32 - 72;
-        let phase_color = match snapshot.phase {
-            GamePhase::Attract => BLUE,
-            GamePhase::Playing => GREEN,
-            GamePhase::GameOver => RED,
-            GamePhase::HighScoreEntry => AMBER,
-        };
-        self.draw_horizontal_line(48, self.image_width as i32 - 48, baseline - 22, phase_color);
-
-        let player_x = 72 + ((snapshot.player.x.raw() >> 16).rem_euclid(180) * 3);
-        let player_y = baseline - 12 + ((snapshot.player.y.raw() >> 16).rem_euclid(18));
-        self.draw_ship_marker(player_x, player_y, phase_color);
-
-        let scanner_width = self.image_width as i32 - 144;
-        let scanner_left = 72;
-        let scanner_y = baseline + 20;
-        self.draw_rect_outline(scanner_left, scanner_y, scanner_width, 20, AMBER);
-        let blip_x = scanner_left
-            + ((snapshot.frame as i32 + snapshot.rng.seed as i32) % scanner_width.max(1));
-        self.fill_rect(blip_x - 2, scanner_y + 7, 5, 5, WHITE);
-    }
-
-    fn draw_ship_marker(&mut self, x: i32, y: i32, color: [u8; 4]) {
-        self.fill_rect(x - 8, y - 2, 16, 5, color);
-        self.fill_rect(x + 4, y - 7, 5, 15, color);
-    }
-
-    fn fill_rect(&mut self, x: i32, y: i32, width: i32, height: i32, color: [u8; 4]) {
-        for yy in y..y + height {
-            for xx in x..x + width {
-                self.target.put_pixel(xx, yy, color);
-            }
-        }
-    }
-
-    fn draw_rect_outline(&mut self, x: i32, y: i32, width: i32, height: i32, color: [u8; 4]) {
-        self.draw_horizontal_line(x, x + width, y, color);
-        self.draw_horizontal_line(x, x + width, y + height, color);
-        self.draw_vertical_line(x, y, y + height, color);
-        self.draw_vertical_line(x + width, y, y + height, color);
-    }
-
-    fn draw_horizontal_line(&mut self, x0: i32, x1: i32, y: i32, color: [u8; 4]) {
-        for x in x0.min(x1)..=x0.max(x1) {
-            self.target.put_pixel(x, y, color);
-        }
-    }
-
-    fn draw_vertical_line(&mut self, x: i32, y0: i32, y1: i32, color: [u8; 4]) {
-        for y in y0.min(y1)..=y0.max(y1) {
-            self.target.put_pixel(x, y, color);
-        }
     }
 }
 
@@ -299,6 +193,7 @@ fn draw_scaled_image(
     }
 }
 
+#[cfg(test)]
 fn decode_png_image(bytes: &[u8]) -> anyhow::Result<RenderedImage> {
     let cursor = Cursor::new(bytes);
     let mut decoder = Decoder::new(cursor);
@@ -415,6 +310,16 @@ pub fn render_defender_visible_palette_indices(
     Some(pixels)
 }
 
+pub fn render_defender_visible_pixel_nibbles(video_ram: &[u8]) -> Option<Vec<u8>> {
+    let mut pixels = Vec::with_capacity(usize::from(VISIBLE_WIDTH) * usize::from(VISIBLE_HEIGHT));
+    for y in 0..VISIBLE_HEIGHT {
+        for x in 0..VISIBLE_WIDTH {
+            pixels.push(defender_visible_pixel_nibble(video_ram, x, y)?);
+        }
+    }
+    Some(pixels)
+}
+
 /// Converts a Williams 8-bit palette value into RGBA using the same resistor
 /// weights MAME uses for the first-generation Williams boards.
 /// Source: <https://github.com/mamedev/mame/blob/master/src/mame/midway/williams_v.cpp>.
@@ -526,12 +431,13 @@ mod tests {
         DEFENDER_VISIBLE_Y_START, RenderedImage, Renderer, decode_png_image,
         defender_visible_byte_offset, defender_visible_palette_index,
         defender_visible_pixel_nibble, fit_image_rect, native_visible_size, raster_size,
-        render_defender_visible_palette_indices, render_defender_visible_rgba,
-        williams_palette_lookup, williams_palette_rgba, williams_screen_byte_offset,
+        render_defender_visible_palette_indices, render_defender_visible_pixel_nibbles,
+        render_defender_visible_rgba, williams_palette_lookup, williams_palette_rgba,
+        williams_screen_byte_offset,
     };
     use crate::{
         board::{MAIN_CPU_RAM_SIZE, PALETTE_RAM_SIZE},
-        machine::{ArcadeMachine, VISIBLE_HEIGHT, VISIBLE_WIDTH},
+        machine::{VISIBLE_HEIGHT, VISIBLE_WIDTH},
         terminal::TerminalGeometry,
     };
 
@@ -577,20 +483,6 @@ mod tests {
                 pixel_height: 0,
             }),
             (960, 720)
-        );
-    }
-
-    #[test]
-    fn renderer_outputs_non_blank_frame() {
-        let machine = ArcadeMachine::new();
-        let mut renderer = Renderer::with_size(640, 480);
-        let image = renderer.render(machine.snapshot());
-
-        assert!(
-            image
-                .pixels
-                .chunks_exact(4)
-                .any(|pixel| pixel != [0, 0, 0, 255])
         );
     }
 
@@ -701,6 +593,18 @@ mod tests {
         assert_eq!(
             defender_visible_pixel_nibble(&video_ram, VISIBLE_WIDTH - 1, VISIBLE_HEIGHT - 1),
             Some(0x0F)
+        );
+
+        let pixels = render_defender_visible_pixel_nibbles(&video_ram)
+            .expect("visible nibbles should render from full video RAM");
+        assert_eq!(
+            pixels.len(),
+            usize::from(VISIBLE_WIDTH) * usize::from(VISIBLE_HEIGHT)
+        );
+        assert_eq!(&pixels[0..4], &[0x0A, 0x0B, 0x0C, 0x0D]);
+        assert_eq!(
+            pixels[usize::from(VISIBLE_WIDTH) * usize::from(VISIBLE_HEIGHT) - 1],
+            0x0F
         );
     }
 

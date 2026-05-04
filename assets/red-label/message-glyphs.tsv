@@ -1,7 +1,9 @@
 label	character	address	width	height	bytes	source
 SPACE	SPACE	0xC697	1	8	0000000000000000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L469-L476
 COMMA	,	0xC6B7	1	8	0000000000010110	https://github.com/mwenge/defender/blob/master/src/mess0.src#L481-L482
+PERIOD	.	0xC6BF	1	8	0000000000000100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L498-L499
 COLON	:	0xC7B7	1	8	0000010000010000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L540-L541
+QUESMK	?	0xC7BF	3	8	010100000000000011000001010001001111111000000000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L542-L545
 LETTRA	A	0xC7D7	3	8	010101010101010011000011000000001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L522-L525
 LETTRB	B	0xC7EF	3	8	010101010101010011000011000011001111111111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L526-L529
 LETTRC	C	0xC807	3	8	010101010101010011101010101011001100000000001100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L530-L533
@@ -18,6 +20,7 @@ LETTRM	M	0xC8EF	4	8	010101010101010011101010101010001110101000000000111111111111
 LETTRN	N	0xC90F	3	8	010101010101010011101010101010001101010101010100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L571-L574
 LETTRO	O	0xC927	3	8	010101010101010011101010101011001101010101011100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L575-L578
 LETTRP	P	0xC93F	3	8	010101010101010011101011101010001101011100000000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L579-L582
+LETTRQ	Q	0xC957	3	8	010101010101010011101010101011001101010101111110	https://github.com/mwenge/defender/blob/master/src/mess0.src#L610-L614
 LETTRR	R	0xC96F	3	8	010101010101010011101011101010001101011110010100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L587-L590
 LETTRS	S	0xC987	3	8	010101010000010011101011000011001100001111111100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L591-L594
 LETTRT	T	0xC99F	3	8	110000000000000011111111111111001100000000000000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L595-L598
@@ -26,3 +29,4 @@ LETTRV	V	0xC9CF	3	8	010101010100000000000000001001000101010101100000	https://git
 LETTRW	W	0xC9E7	4	8	0101010101010000101010101010010010101010101001001010101010100000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L607-L611
 LETTRX	X	0xCA07	3	8	010100000001010000001001100000000101100010010100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L612-L615
 LETTRY	Y	0xCA1F	3	8	010100000000000000001001010101000101100000000000	https://github.com/mwenge/defender/blob/master/src/mess0.src#L643-L646
+LETTRZ	Z	0xCA37	3	8	010000000101010011000110000011001110000000001100	https://github.com/mwenge/defender/blob/master/src/mess0.src#L647-L650

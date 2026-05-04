@@ -44,12 +44,17 @@ Current files:
 - `message-glyphs.tsv`: source `mess0.src` character image bytes consumed by
   the translated `BONUS` `MESS` text calls and CROM0 diagnostic headline,
   bad-ROM-row, operator-instruction, RAM-test start/failure/no-error, and
-  CMOS/color/audio/switch-test/monitor-test/audit text transfer.
+  CMOS/color/audio/switch-test/monitor-test/audit text transfer plus the
+  `HALLOF` / `HOFIN` initials-entry screen.
 - `messages.tsv`: source `mess0.src` message vectors, word lists, and
   text-control tokens consumed by
   the translated `BONUS` screen text and CROM0 ROM-test diagnostic headline,
   bad-ROM-row, operator-instruction, RAM-test start/failure/no-error, and
-  CMOS/color/audio/switch-test/monitor-test/audit messages.
+  CMOS/color/audio/switch-test/monitor-test/audit messages, including the
+  `IGAMEO` / `ICOLDO` `VINS3` and `VINS8` operator vectors, plus the
+  high-score initials-entry player label, instruction lines, gameplay `GO`
+  text, attract `CREDV` credits text, and the `TEXTAB` / `TENT`
+  instruction-page AMODE message vectors.
 - `object-images.tsv`: red-label object image bytes currently needed by
   `COLIDE` / `COL0` picture-mask intersection, `PRDISP` / `ON86` player
   picture writes, and translated `CWRIT` / `COFF` plus descriptor ON/OFF
@@ -98,7 +103,15 @@ Current files:
   `LASD`, `COLIDE`, `COL0`, `COLCHK`, `REV`, `PLEND` / `PDTHL` / `PDTH2` /
   `PDTH4` / `PDTH5`, `PXVCT` / `PX1A`, `PDTH5R`, `PLE02`, `PLE3`, `PLSTRT`,
   `PLST1A`, `PLSTR3`, `PLS01`, `PLS1`,
-  `STCHK`, `ATTR`, `FPLAY`, `ST1`, `ST2`, `START`, `START2`, `TDISP`,
+  `STCHK`, `ATTR` / `HALLOF`, `AMODES`, `LOGO` / `LOGO0`, `PRES` / `PRES1`,
+  `DEFEND` / `DEFENS`, `DEF33`, `DEF44` / `COPYRT` / `CPR55` / `CPR56`,
+  `DEF50` / `DEF51`, `WILLIR` / `WILR1`, `LEDRET`,
+  `HOFST` / `HOFBL` / `HOFUD` / `HOFUD1`,
+  `HALL1` / `HALL3A` / `HALL4` / `HALL5` / `HALL6` / `HALL12` / `HALL13`,
+  `HALDIS` / `HALD3` / `HALD4`,
+  `CREDS`,
+  `FPLAY`, `ST1`, `ST2`, `START`, `START2`,
+  `TDISP`,
   `ON28` / `OFF28`, `ON48` / `OFF48`, `ON58` / `OFF58`, `ON34` / `OFF34`,
   `ON23` / `OFF23`, `ON64` / `OFF64`, `ON86` / `OFF86`, `ON66` / `OFF66`,
   `DRTS`, `CWRIT`, `COFF`, `BLKCLR`, `SCRCLR`, `WCMOSA`, `SBOMB`,
@@ -106,7 +119,8 @@ Current files:
   `HYP02` / `HYP2` entry/resume labels, `PRDISP`, `PLAYER`, `THPROC`,
   `SCPROC`, `SCP1`, `SCP2`, `OSCAN`, `ISCAN`, `SHSCAN`, `SCNRV`, `BGOUT`,
   `ALINIT`, `BGINIT`, `BGERAS`, `SCLR1`, `PLRES`, `BONUS`, `BC1`, `BC2`,
-  `BC3`, `GETWV`, `PDTH5SCLR`, `ASTST`, `ASTRO`, `ASTKIL`, `TERBLO`, `TBL3`,
+  `BC3`, `GETWV`, `PDTH5SCLR`, the assembled `GEXBON` return site, `ASTST`,
+  `ASTRO`, `ASTKIL`, `TERBLO`, `TBL3`,
   `TBL4`, `COLR`, `COLRLP`, `FLPUP`, `FLP2`, `CBOMB`, `CBMB1`, `TIECOL`,
   `TIECL`, `PRBST`, `PRBKIL`, `RANDV`, `MMSW`, `MSWM`, `MSWLP`, `SWBMB`,
   `MSWKIL`, `SHOOT`, `SCZST`, `SCZ0`, `SCZKIL`, `UFOST`, `UFOLP`, `BGI`,
@@ -126,7 +140,21 @@ Current files:
   terrain-blow, smart-bomb, bomb-hit, laser, appearance, probe-hit,
   schizoid-hit, swarmer-hit, swarmer-shot, UFO-hit, lander-hit, lander-pickup,
   lander-suck, lander-grab, lander-shot, astronaut-catch, astronaut-scream,
-  astronaut-land, UFO-shot, tie-hit, and schizoid-shot sound loads.
+  astronaut-land, UFO-shot, tie-hit, and schizoid-shot sound loads. The Rust
+  timeline helper now exposes every embedded table with its label, address,
+  priority, repeated command cadence, terminator pointer, and `SNDSEQ`
+  sequence-end tick as deterministic TSV rows.
+- `sound-direct-command-sequences.tsv`: source-derived `SNDOUT` write rows for
+  the direct `PDTH5`, `PLE2`, and `LNDFX0` command callsites.
+- `sound-table-command-sequences.tsv`: source-derived `SNDOUT` write rows
+  generated from `sound-table-timelines.tsv`, with each table command expanded
+  into idle and complemented command writes.
+- `sound-table-timelines.tsv`: source-derived command and sequence-end rows
+  generated from `sound-tables.tsv`, `SNDSEQ`, and `SNDOUT`; the Rust timeline
+  helper is tested against this embedded fixture, and the fixture validator
+  counts command versus sequence-end rows after the exact comparison.
+- `sound-thrust-command-sequences.tsv`: source-derived `SNDOUT` write rows for
+  the `SNDSEQ` thrust start and stop gate branches.
 - `sram-routines.tsv`: red-label SRAM routine metadata for the 4-bit cell
   packing used by CMOS/high-score reads and writes.
 - `switch-table.tsv`: red-label `defb6.src` `SWTAB` switch bit table for
@@ -136,8 +164,11 @@ Current files:
   by the translated `ALINIT` / `BGALT` altitude-table generator and `BGINIT`
   terrain flavor-table generator, plus `amode1.src` `MTERR` mini-terrain bytes
   consumed by `SCNRV`.
-- `trace-scenarios.tsv`: Phase 1 golden-trace scenario names, frame counts, and
-  compact cabinet input programs.
+- `trace-scenarios.tsv`: Phase 1 trace scenario names, frame counts, and
+  compact cabinet input programs, including the source-CMOS boot wait and
+  MAME-observed credited-start prefix used by gameplay reference fixtures.
+- `trace-requirements.tsv`: Phase 1 reference-fixture evidence requirements,
+  including the MAME-observed credited-start sound commands and events.
 - `trace-schema.tsv`: current TSV trace header for fidelity fixtures, including
   internal input bits, MAME IN0/IN1/IN2 input bytes, and optional raw
   object-table, shell-table, and native video-frame CRC-32 values.
@@ -209,16 +240,21 @@ support processes:
 <https://github.com/mwenge/defender/blob/master/src/defa7.src#L3035-L3042>.
 <https://github.com/mwenge/defender/blob/master/src/defb6.src#L1206-L1209>.
 `message-glyphs.tsv` and `messages.tsv` are derived from `mess0.src`
-`BONSX`, `ATWV`, `COMPV`, the CROM0
-diagnostic/RAM-test/CMOS/color/audio/switch/monitor-test and audit vectors,
-word records, text-control bytes, `CHRTBL`, and the character image records
-consumed by the `BONUS` routine's `MESS` / `WNBV` calls:
+`GO`, `LANDV`, `MUTV`, `SWRMPV`, `BOMBV`, `SWARMV`, `BAITV`, `CREDV`,
+`SCANV`, `ELECV`, `BONSX`, `ATWV`, `COMPV`, `PLYR1`, `PLYR2`, `HOFV`,
+`HALLD`, the CROM0 diagnostic/RAM-test/CMOS/color/audio/switch/monitor-test
+and audit vectors, word records, text-control bytes, `CHRTBL`, and the
+character image records consumed by the `BONUS` routine's `MESS` / `WNBV`
+calls, the `HALLOF` / `HOFIN` initials-entry screen, the `HALDIS`
+hall-of-fame table, and the instruction-page `TEXTP` / `TEXTP2` process:
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L91-L99>.
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L136-L153>.
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L188-L196>.
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L241-L262>.
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L170-L174>.
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L293-L296>.
+<https://github.com/mwenge/defender/blob/master/src/mess0.src#L168-L181>.
+<https://github.com/mwenge/defender/blob/master/src/mess0.src#L291-L322>.
 <https://github.com/mwenge/defender/blob/master/src/mess0.src#L448-L646>.
 `routine-addresses.tsv` is derived by assembling `phr6.src`, `defa7.src`,
 `defb6.src`, and `amode1.src` with the upstream red-label build recipe, then
@@ -226,12 +262,22 @@ recording the `SCORE`, `SNDLD`, `SHELL`, `BMBOUT`, `FBOUT`, `BKIL`, `LFIRE`,
 `LCOL`, `LASR` / `LASR0`, `LASL` / `LASL0`, `LASD`, `COLIDE`, `COL0`,
 `COLCHK`, `HSRES`, `ADVSW`, `LCOIN`, `RCOIN`, `CCOIN`, `CN1`, `REV`, `PLEND` /
 `PDTHL` / `PDTH2` / `PDTH4` / `PDTH5`, `PXVCT` / `PX1A`, `PDTH5R`, `PLE02`,
-`PLE3`, `PLSTRT`, `PLST1A`, `PLSTR3`, `PLS01`, `PLS1`, `STCHK`, `ASTST`,
-`ATTR`, `SBOMB`, smart-bomb tail, `HYPER` / `HYP02` / `HYP2`, `PRDISP`,
+`PLE3`, `HALL13`, `PLSTRT`, `PLST1A`, `PLSTR3`, `PLS01`, `PLS1`, `STCHK`,
+`ASTST`, `ATTR` / `HALLOF`, `AMODES`, `LOGO` / `LOGO0`, `PRES` / `PRES1`,
+`DEFEND` / `DEFENS`, `DEF33`, `DEF44` / `COPYRT` / `CPR55` / `CPR56`,
+`DEF50` / `DEF51`, `WILLIR` / `WILR1`, `LEDRET`,
+`HOFST` / `HOFBL` / `HOFUD` / `HOFUD1`,
+`HALL1` / `HALL3A` / `HALL4` / `HALL5` / `HALL6` / `HALL12` / `HALL13`,
+`HALDIS` / `HALD3` / `HALD4`,
+`CREDS`,
+`GEXEC` / `GEX0` / `GEXBON`, `RMAX`, `WVCHK`,
+`SBOMB`, smart-bomb tail,
+`HYPER` / `HYP02` / `HYP2`, `PRDISP`,
 `PLAYER`, `THPROC`, `SCPROC`, `SCP1`, `SCP2`,
 `OSCAN`, `ISCAN`, `SHSCAN`, `SCNRV`, `BGOUT`, `ALINIT`, `BGINIT`, `BGERAS`,
 `SCLR1`, `PLRES`, `BONUS`, `BC1`, `BC2`, `BC3`, `GETWV`, `PDTH5SCLR`,
-`ASTRO`, `ASTKIL`, `TERBLO`, `TBL3`, `TBL4`, `COLR`, `COLRLP`, `FLPUP`,
+`GEXBON`, `ASTRO`, `ASTKIL`, `TERBLO`, `TBL3`, `TBL4`, `COLR`, `COLRLP`,
+`FLPUP`,
 `FLP2`, `CBOMB`, `CBMB1`, `TIECOL`, `TIECL`, object-picture ON/OFF routines,
 `DRTS`, `CWRIT`, `COFF`, `PRBST`, `PRBKIL`, `RANDV`,
 `MMSW`, `MSWM`, `MSWLP`, `SWBMB`, `MSWKIL`, `SHOOT`, `SCZST`, `SCZ0`,

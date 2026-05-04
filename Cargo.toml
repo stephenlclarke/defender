@@ -19,3 +19,6 @@ rodio = "0.21"
 
 [dev-dependencies]
 gif = "0.13"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }

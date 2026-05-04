@@ -11,9 +11,15 @@ local schema_path = os.getenv("DEFENDER_TRACE_SCHEMA")
 local frame_limit = tonumber(os.getenv("DEFENDER_TRACE_FRAMES") or "0")
 local debug_path = os.getenv("DEFENDER_TRACE_DEBUG")
 
-if not inputs_path or not output_path or not schema_path or frame_limit <= 0 then
-    error("DEFENDER_TRACE_INPUTS, DEFENDER_TRACE_OUTPUT, DEFENDER_TRACE_SCHEMA, and DEFENDER_TRACE_FRAMES are required")
-end
+local MAIN_BOARD_SOUND_COMMAND_HIGH_BITS = 0xc0
+local SOUND_COMMAND_IDLE_BYTE = 0xff
+local PIA1_PORT_B_DATA_REGISTER = 0xcc02
+local PIA1_PORT_B_CONTROL_REGISTER = 0xcc03
+local PIA_CONTROL_DATA_REGISTER_SELECT = 0x04
+local DEFENDER_BANK_SELECT_REGISTER_START = 0xd000
+local DEFENDER_BANK_SELECT_REGISTER_END = 0xdfff
+local CREDIT_ADDED_SOUND_COMMAND = 0xe6
+local ONE_PLAYER_START_SOUND_COMMAND = 0xf5
 
 local function read_all(path)
     local handle = assert(io.open(path, "r"))
@@ -38,6 +44,238 @@ local function split(text, delimiter)
     return values
 end
 
+local function command_from_pia_port_b(data)
+    return (data | MAIN_BOARD_SOUND_COMMAND_HIGH_BITS) & 0xff
+end
+
+local function append_sound_command(commands, data)
+    local command = command_from_pia_port_b(data)
+    if command ~= SOUND_COMMAND_IDLE_BYTE then
+        commands[#commands + 1] = command
+    end
+end
+
+local function format_commands(commands)
+    if #commands == 0 then
+        return "-"
+    end
+
+    local values = {}
+    for index, command in ipairs(commands) do
+        values[index] = string.format("0x%02X", command)
+    end
+    return table.concat(values, ",")
+end
+
+local function copy_commands(commands)
+    local copied = {}
+    for index, command in ipairs(commands) do
+        copied[index] = command
+    end
+    return copied
+end
+
+local function take_commands(commands)
+    local text = format_commands(commands)
+    for index = #commands, 1, -1 do
+        commands[index] = nil
+    end
+    return text
+end
+
+local function command_list_contains(commands, expected_command)
+    for _, command in ipairs(commands) do
+        if command == expected_command then
+            return true
+        end
+    end
+    return false
+end
+
+local function events_for_commands(commands)
+    local events = {}
+    if command_list_contains(commands, CREDIT_ADDED_SOUND_COMMAND) then
+        events[#events + 1] = "credit_added"
+    end
+    if command_list_contains(commands, ONE_PLAYER_START_SOUND_COMMAND) then
+        events[#events + 1] = "game_started"
+    end
+    return events
+end
+
+local function format_events(events)
+    if #events == 0 then
+        return "-"
+    end
+    return table.concat(events, ",")
+end
+
+local function selected_bank_from_data(data)
+    return data & 0x0f
+end
+
+local function append_bank_select_write(writes, address, data)
+    local selected_bank = selected_bank_from_data(data)
+    writes[#writes + 1] = {
+        address = address & 0xffff,
+        data = data & 0xff,
+        selected_bank = selected_bank,
+    }
+    return selected_bank
+end
+
+local function format_bank_select_writes(writes)
+    if #writes == 0 then
+        return "-"
+    end
+
+    local values = {}
+    for index, write in ipairs(writes) do
+        values[index] = string.format(
+            "0x%04X=0x%02X->0x%02X",
+            write.address,
+            write.data,
+            write.selected_bank
+        )
+    end
+    return table.concat(values, ",")
+end
+
+local function take_bank_select_writes(writes)
+    local text = format_bank_select_writes(writes)
+    for index = #writes, 1, -1 do
+        writes[index] = nil
+    end
+    return text
+end
+
+local function input_ports_from_reader(read_port)
+    return {
+        IN0 = read_port("IN0") & 0xff,
+        IN1 = read_port("IN1") & 0xff,
+        IN2 = read_port("IN2") & 0xff,
+    }
+end
+
+local function install_sound_command_tap(program, commands)
+    local port_b_data_selected = false
+    return program:install_write_tap(
+        PIA1_PORT_B_DATA_REGISTER,
+        PIA1_PORT_B_CONTROL_REGISTER,
+        "defender_sound_command_trace",
+        function(offset, data, mask)
+            if offset == PIA1_PORT_B_CONTROL_REGISTER then
+                port_b_data_selected = (data & PIA_CONTROL_DATA_REGISTER_SELECT) ~= 0
+            elseif offset == PIA1_PORT_B_DATA_REGISTER and port_b_data_selected then
+                append_sound_command(commands, data)
+            end
+        end
+    )
+end
+
+local function install_bank_select_tap(program, writes, set_current_bank)
+    return program:install_write_tap(
+        DEFENDER_BANK_SELECT_REGISTER_START,
+        DEFENDER_BANK_SELECT_REGISTER_END,
+        "defender_bank_select_trace",
+        function(offset, data, mask)
+            local selected_bank = append_bank_select_write(writes, offset, data)
+            set_current_bank(selected_bank)
+        end
+    )
+end
+
+local function assert_equal(actual, expected, label)
+    if actual ~= expected then
+        error(string.format("%s: expected %s, got %s", label, tostring(expected), tostring(actual)))
+    end
+end
+
+local function run_self_test()
+    local installed = {}
+    local program = {
+        install_write_tap = function(_, start_address, end_address, name, callback)
+            installed.start_address = start_address
+            installed.end_address = end_address
+            installed.name = name
+            installed.callback = callback
+            return { remove = function() end }
+        end,
+    }
+    local commands = {}
+
+    install_sound_command_tap(program, commands)
+    assert_equal(installed.start_address, PIA1_PORT_B_DATA_REGISTER, "tap start")
+    assert_equal(installed.end_address, PIA1_PORT_B_CONTROL_REGISTER, "tap end")
+    assert_equal(installed.name, "defender_sound_command_trace", "tap name")
+
+    installed.callback(PIA1_PORT_B_DATA_REGISTER, 0x35, 0xff)
+    assert_equal(format_commands(commands), "-", "reset-time DDR write is ignored")
+    installed.callback(PIA1_PORT_B_CONTROL_REGISTER, 0x04, 0xff)
+    installed.callback(PIA1_PORT_B_DATA_REGISTER, 0x3f, 0xff)
+    assert_equal(format_commands(commands), "-", "idle command is suppressed")
+    installed.callback(PIA1_PORT_B_DATA_REGISTER, 0x35, 0xff)
+    assert_equal(format_commands(commands), "0xF5", "active command is recorded")
+    installed.callback(PIA1_PORT_B_CONTROL_REGISTER, 0x00, 0xff)
+    installed.callback(PIA1_PORT_B_DATA_REGISTER, 0x29, 0xff)
+    assert_equal(format_commands(commands), "0xF5", "DDRB write is ignored")
+    installed.callback(PIA1_PORT_B_CONTROL_REGISTER, 0x04, 0xff)
+    installed.callback(PIA1_PORT_B_DATA_REGISTER, 0x29, 0xff)
+    assert_equal(format_events(events_for_commands(copy_commands(commands))), "game_started", "start sound command marks game start")
+    assert_equal(take_commands(commands), "0xF5,0xE9", "commands are formatted and drained")
+    assert_equal(format_commands(commands), "-", "drained command list is empty")
+    assert_equal(format_events(events_for_commands({ 0xe6, 0xf5 })), "credit_added,game_started", "coin/start events are source markers")
+    assert_equal(format_events(events_for_commands({})), "-", "empty event list is formatted as dash")
+
+    local bank_installed = {}
+    local bank_program = {
+        install_write_tap = function(_, start_address, end_address, name, callback)
+            bank_installed.start_address = start_address
+            bank_installed.end_address = end_address
+            bank_installed.name = name
+            bank_installed.callback = callback
+            return { remove = function() end }
+        end,
+    }
+    local bank_writes = {}
+    local current_bank = 0xff
+
+    install_bank_select_tap(bank_program, bank_writes, function(selected_bank)
+        current_bank = selected_bank
+    end)
+    assert_equal(bank_installed.start_address, DEFENDER_BANK_SELECT_REGISTER_START, "bank tap start")
+    assert_equal(bank_installed.end_address, DEFENDER_BANK_SELECT_REGISTER_END, "bank tap end")
+    assert_equal(bank_installed.name, "defender_bank_select_trace", "bank tap name")
+
+    bank_installed.callback(0xd123, 0x17, 0xff)
+    assert_equal(current_bank, 0x07, "bank select uses low nibble")
+    bank_installed.callback(0xdfff, 0x00, 0xff)
+    assert_equal(current_bank, 0x00, "bank select records I/O bank")
+    assert_equal(
+        take_bank_select_writes(bank_writes),
+        "0xD123=0x17->0x07,0xDFFF=0x00->0x00",
+        "bank select writes are formatted and drained"
+    )
+    assert_equal(format_bank_select_writes(bank_writes), "-", "drained bank select list is empty")
+
+    local input_ports = input_ports_from_reader(function(port_name)
+        return ({ IN0 = 0x120, IN1 = 0x101, IN2 = 0x210 })[port_name]
+    end)
+    assert_equal(input_ports.IN0, 0x20, "debug IN0 read is byte-sized")
+    assert_equal(input_ports.IN1, 0x01, "debug IN1 read is byte-sized")
+    assert_equal(input_ports.IN2, 0x10, "debug IN2 read is byte-sized")
+    print("mame_defender_trace.lua self-test ok")
+end
+
+if os.getenv("DEFENDER_TRACE_SELF_TEST") == "1" then
+    run_self_test()
+    os.exit(0)
+end
+
+if not inputs_path or not output_path or not schema_path or frame_limit <= 0 then
+    error("DEFENDER_TRACE_INPUTS, DEFENDER_TRACE_OUTPUT, DEFENDER_TRACE_SCHEMA, and DEFENDER_TRACE_FRAMES are required")
+end
+
 local schema = trim(read_all(schema_path))
 local input_frames = split(trim(read_all(inputs_path)), ";")
 if #input_frames ~= frame_limit then
@@ -47,6 +285,13 @@ end
 local machine = manager.machine
 local maincpu = assert(machine.devices[":maincpu"])
 local program = assert(maincpu.spaces["program"])
+local sound_commands = {}
+local bank_select_writes = {}
+local current_bank_select = 0
+local sound_command_tap = install_sound_command_tap(program, sound_commands)
+local bank_select_tap = install_bank_select_tap(program, bank_select_writes, function(selected_bank)
+    current_bank_select = selected_bank
+end)
 local output = assert(io.open(output_path, "w"))
 output:write(schema, "\n")
 local debug_output = nil
@@ -55,37 +300,37 @@ if debug_path then
     -- It is intentionally separate from the checked fixture schema.
     debug_output = assert(io.open(debug_path, "w"))
     debug_output:write(
-        "frame\tpc\tstatus\tp1_lives\tp1_wave\tp1_bombs\tseed\thseed\tlseed\tobject_table_crc32\tshell_table_crc32\n"
+        "frame\tpc\tinput_read_in0\tinput_read_in1\tinput_read_in2\tbank_select\tbank_writes\tstatus\tp1_lives\tp1_wave\tp1_bombs\tseed\thseed\tlseed\tobject_table_crc32\tshell_table_crc32\n"
     )
 end
 
 local input_masks = {
-    fire = { port = "IN0", mask = 0x01 },
-    thrust = { port = "IN0", mask = 0x02 },
-    smart_bomb = { port = "IN0", mask = 0x04 },
-    smartbomb = { port = "IN0", mask = 0x04 },
-    hyperspace = { port = "IN0", mask = 0x08 },
-    start_two = { port = "IN0", mask = 0x10 },
-    start2 = { port = "IN0", mask = 0x10 },
-    start_one = { port = "IN0", mask = 0x20 },
-    start1 = { port = "IN0", mask = 0x20 },
-    reverse = { port = "IN0", mask = 0x40 },
-    altitude_down = { port = "IN0", mask = 0x80 },
-    down = { port = "IN0", mask = 0x80 },
-    altitude_up = { port = "IN1", mask = 0x01 },
-    up = { port = "IN1", mask = 0x01 },
-    auto_up_manual_down = { port = "IN2", mask = 0x01 },
-    service_advance = { port = "IN2", mask = 0x02 },
-    advance = { port = "IN2", mask = 0x02 },
-    coin_three = { port = "IN2", mask = 0x04 },
-    coin3 = { port = "IN2", mask = 0x04 },
-    high_score_reset = { port = "IN2", mask = 0x08 },
-    coin = { port = "IN2", mask = 0x10 },
-    coin_one = { port = "IN2", mask = 0x10 },
-    coin1 = { port = "IN2", mask = 0x10 },
-    coin_two = { port = "IN2", mask = 0x20 },
-    coin2 = { port = "IN2", mask = 0x20 },
-    tilt = { port = "IN2", mask = 0x40 },
+    fire = { port = "IN0", mask = 0x01, trace_bit = 0x0080 },
+    thrust = { port = "IN0", mask = 0x02, trace_bit = 0x0040 },
+    smart_bomb = { port = "IN0", mask = 0x04, trace_bit = 0x0100 },
+    smartbomb = { port = "IN0", mask = 0x04, trace_bit = 0x0100 },
+    hyperspace = { port = "IN0", mask = 0x08, trace_bit = 0x0200 },
+    start_two = { port = "IN0", mask = 0x10, trace_bit = 0x0004 },
+    start2 = { port = "IN0", mask = 0x10, trace_bit = 0x0004 },
+    start_one = { port = "IN0", mask = 0x20, trace_bit = 0x0002 },
+    start1 = { port = "IN0", mask = 0x20, trace_bit = 0x0002 },
+    reverse = { port = "IN0", mask = 0x40, trace_bit = 0x0020 },
+    altitude_down = { port = "IN0", mask = 0x80, trace_bit = 0x0010 },
+    down = { port = "IN0", mask = 0x80, trace_bit = 0x0010 },
+    altitude_up = { port = "IN1", mask = 0x01, trace_bit = 0x0008 },
+    up = { port = "IN1", mask = 0x01, trace_bit = 0x0008 },
+    auto_up_manual_down = { port = "IN2", mask = 0x01, trace_bit = 0x1000 },
+    service_advance = { port = "IN2", mask = 0x02, trace_bit = 0x2000 },
+    advance = { port = "IN2", mask = 0x02, trace_bit = 0x2000 },
+    coin_three = { port = "IN2", mask = 0x04, trace_bit = 0x0800 },
+    coin3 = { port = "IN2", mask = 0x04, trace_bit = 0x0800 },
+    high_score_reset = { port = "IN2", mask = 0x08, trace_bit = 0x4000 },
+    coin = { port = "IN2", mask = 0x10, trace_bit = 0x0001 },
+    coin_one = { port = "IN2", mask = 0x10, trace_bit = 0x0001 },
+    coin1 = { port = "IN2", mask = 0x10, trace_bit = 0x0001 },
+    coin_two = { port = "IN2", mask = 0x20, trace_bit = 0x0400 },
+    coin2 = { port = "IN2", mask = 0x20, trace_bit = 0x0400 },
+    tilt = { port = "IN2", mask = 0x40, trace_bit = 0x8000 },
 }
 
 local held_fields = {}
@@ -98,6 +343,15 @@ end
 local function field_for(port_name, mask)
     local port = assert(ioport(port_name), "missing MAME input port " .. port_name)
     return assert(port:field(mask), string.format("missing %s mask 0x%02X", port_name, mask))
+end
+
+local function read_input_port(port_name)
+    local port = assert(ioport(port_name), "missing MAME input port " .. port_name)
+    return port:read() & 0xff
+end
+
+local function read_input_ports()
+    return input_ports_from_reader(read_input_port)
 end
 
 for _, binding in pairs(input_masks) do
@@ -128,25 +382,8 @@ local function apply_inputs(frame_text)
         local key = binding.port .. ":" .. string.format("%02X", binding.mask)
         held_fields[key]:set_value(1)
         ports[binding.port] = ports[binding.port] | binding.mask
+        bits = bits | binding.trace_bit
     end
-
-    bits = 0
-    if (ports.IN2 & 0x10) ~= 0 then bits = bits | 0x0001 end
-    if (ports.IN0 & 0x20) ~= 0 then bits = bits | 0x0002 end
-    if (ports.IN0 & 0x10) ~= 0 then bits = bits | 0x0004 end
-    if (ports.IN0 & 0x80) ~= 0 then bits = bits | 0x0008 end
-    if (ports.IN1 & 0x01) ~= 0 then bits = bits | 0x0010 end
-    if (ports.IN0 & 0x40) ~= 0 then bits = bits | 0x0020 end
-    if (ports.IN0 & 0x02) ~= 0 then bits = bits | 0x0040 end
-    if (ports.IN0 & 0x01) ~= 0 then bits = bits | 0x0080 end
-    if (ports.IN0 & 0x04) ~= 0 then bits = bits | 0x0100 end
-    if (ports.IN0 & 0x08) ~= 0 then bits = bits | 0x0200 end
-    if (ports.IN2 & 0x20) ~= 0 then bits = bits | 0x0400 end
-    if (ports.IN2 & 0x04) ~= 0 then bits = bits | 0x0800 end
-    if (ports.IN2 & 0x02) ~= 0 then bits = bits | 0x1000 end
-    if (ports.IN2 & 0x08) ~= 0 then bits = bits | 0x2000 end
-    if (ports.IN2 & 0x40) ~= 0 then bits = bits | 0x4000 end
-    if (ports.IN2 & 0x01) ~= 0 then bits = bits | 0x8000 end
     return bits, ports
 end
 
@@ -194,16 +431,15 @@ local function phase_label()
     return "attract"
 end
 
-local function format_commands()
-    return "-"
-end
-
 for frame_number, frame_text in ipairs(input_frames) do
     local input_bits, input_ports = apply_inputs(frame_text)
     emu.wait_next_frame()
+    local frame_sound_commands = copy_commands(sound_commands)
+    local sound_command_text = take_commands(sound_commands)
+    local event_text = format_events(events_for_commands(frame_sound_commands))
 
     output:write(string.format(
-        "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t%s\t%d\t%d\t%d\t%d\t%d\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\t-\t%s\t-\n",
+        "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t%s\t%d\t%d\t%d\t%d\t%d\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\t-\t%s\t%s\n",
         frame_number,
         input_bits,
         input_ports.IN0,
@@ -220,13 +456,20 @@ for frame_number, frame_text in ipairs(input_frames) do
         read_u8(0xA0E1),
         crc_range(0xA23C, 0x17 * 95),
         crc_range(0xA06D, 2),
-        format_commands()
+        sound_command_text,
+        event_text
     ))
     if debug_output then
+        local input_read_ports = read_input_ports()
         debug_output:write(string.format(
-            "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\n",
+            "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t%s\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\n",
             frame_number,
             maincpu.state["PC"].value,
+            input_read_ports.IN0,
+            input_read_ports.IN1,
+            input_read_ports.IN2,
+            current_bank_select,
+            take_bank_select_writes(bank_select_writes),
             read_u8(0xA0BA),
             read_u8(0xA1C9),
             read_u8(0xA1CA),
@@ -241,6 +484,8 @@ for frame_number, frame_text in ipairs(input_frames) do
 end
 
 clear_inputs()
+sound_command_tap:remove()
+bank_select_tap:remove()
 output:close()
 if debug_output then
     debug_output:close()

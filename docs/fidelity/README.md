@@ -34,17 +34,18 @@ Current trace format:
 - `defender --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv`
   generates the Rust trace for a file-backed input script and compares it
   exactly with a local expected TSV fixture.
-- `defender --fidelity-check-trace-dir docs/fidelity/fixtures/local` checks all
-  paired `*.inputs.txt` / `*.expected.tsv` fixtures in a local directory. A
-  missing directory is skipped so the target remains usable before local
-  fixtures have been generated.
+- `defender --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current`
+  checks paired `*.inputs.txt` / `*.expected.tsv` fixtures for exact
+  Rust-current comparisons. A missing directory is skipped so the target
+  remains usable while only MAME reference fixtures exist.
 - `defender --fidelity-list-scenarios` lists the checked-in Phase 1 reference
   trace scenarios from `assets/red-label/trace-scenarios.tsv`.
-- `defender --fidelity-write-scenario-inputs docs/fidelity/fixtures/local`
+- `defender --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference`
   writes expanded `*.inputs.txt` files for every Phase 1 scenario.
-- `defender --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local`
+- `defender --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference`
   validates that every required Phase 1 scenario has a matching input script
-  and expected trace using the checked-in schema header.
+  and expected trace using the checked-in schema header plus
+  `assets/red-label/trace-requirements.tsv` evidence markers.
 - `defender --verify-roms /path/to/roms` validates local red-label ROM files and
   verifies that they map into the embedded MAME red-label ROM regions.
 - Future subsystem traces should extend this format only when a red-label
@@ -55,34 +56,53 @@ Initial local workflow:
 1. Build or provide the red-label ROM set locally under `assets/roms/` or set
    `DEFENDER_ROM_DIR`.
 2. Install MAME or set `DEFENDER_MAME` to the local MAME executable.
-3. Run `make reference-inputs` to write the Phase 1 scenario input scripts.
-4. Run `make reference-traces` to generate MAME/source traces into the ignored
-   local fixture directory.
-5. Run `make reference-fixtures-check` to verify that all required Phase 1
+3. Run `make trace-script-test` to verify the local Lua trace exporter before
+   asking MAME to produce reference traces.
+4. Run `make reference-inputs` to write the Phase 1 scenario input scripts.
+5. Run `make reference-traces` to generate MAME/source traces into the ignored
+   local reference fixture directory.
+6. Run `make reference-fixtures-check` to verify that all required Phase 1
    fixtures are present and use `assets/red-label/trace-schema.tsv`.
-6. Run `make trace-fixtures` to compare current Rust traces against local
-   expected fixtures when that comparison is appropriate for the subsystem.
-7. Translate one routine/table at a time into `src/`.
-8. Add a unit test for the translated routine and a fidelity test against the
+7. Run `make trace-fixtures` to compare current Rust traces against local
+   exact-match fixtures under `docs/fidelity/fixtures/local/rust-current` when
+   that comparison is appropriate for the subsystem.
+8. Translate one routine/table at a time into `src/`.
+9. Add a unit test for the translated routine and a fidelity test against the
    trace fixture.
-9. Keep `make fidelity` green before moving to the next routine.
+10. Keep `make fidelity` green before moving to the next routine.
 
-Local trace fixtures belong under `docs/fidelity/fixtures/local/` using paired
-`<scenario>.inputs.txt` and `<scenario>.expected.tsv` files. Run
-`make trace-fixtures` to check every local pair.
+Local MAME reference fixtures belong under
+`docs/fidelity/fixtures/local/reference/` using paired `<scenario>.inputs.txt`
+and `<scenario>.expected.tsv` files. Local exact-match Rust fixtures belong
+under `docs/fidelity/fixtures/local/rust-current/`. Run `make trace-fixtures`
+to check every local Rust-current pair.
 
 Optional local configuration is documented in `docs/fidelity/local.env.example`.
 The checked-in MAME runner is `tools/generate_reference_traces.py`; it invokes
 `tools/mame_defender_trace.lua` with MAME's Lua `-autoboot_script` mechanism.
+The Lua exporter records per-frame main-board sound commands by write-tapping
+the MAME main CPU program space at PIA1 port B/control, suppressing the idle
+byte and emitting the asserted raw command bytes into the existing trace
+schema. The exporter also maps the MAME-observed credited-start sound commands
+`0xE6` and `0xF5` to `credit_added` and `game_started` trace events so
+reference fixtures prove the source `CSCAN` / `SSCAN` / `ST1` path.
 Each generated scenario uses an isolated, freshly cleared MAME state directory
-under `docs/fidelity/fixtures/local/mame-state/<scenario>/` so NVRAM/config
-state cannot leak between local reference traces.
+under `docs/fidelity/fixtures/local/reference/mame-state/<scenario>/` so
+NVRAM/config state cannot leak between local reference traces. The generator
+seeds the MAME `defender/nvram` file from `assets/red-label/cmos-defaults.tsv`
+by default, matching `romc8.src` `DEFALT` as two MAME 4-bit CMOS cells per
+byte. Pass `--blank-nvram` only when intentionally investigating the invalid
+CMOS cold-boot/operator path. The generator defaults `SDL_VIDEODRIVER` and
+`SDL_AUDIODRIVER` to `dummy` when those variables are not already set, so MAME
+can run the `-video none` / `-sound none` trace job from headless shells while
+still allowing local overrides.
 
 Set `DEFENDER_TRACE_DEBUG=/path/to/debug.tsv` when invoking
 `tools/mame_defender_trace.lua` directly to write a local diagnostic stream
-with the main CPU PC, selected red-label RAM bytes, and object/shell CRCs.
-Debug traces are investigation aids only and are not part of the checked-in
-fixture schema.
+with the main CPU PC, MAME-read IN0/IN1/IN2 bytes, current bank selection,
+per-frame bank-select writes, selected red-label RAM bytes, and object/shell
+CRCs. Debug traces are investigation aids only and are not part of the
+checked-in fixture schema.
 
 ## Red-Label ROM Build Notes
 
@@ -111,3 +131,6 @@ make redlabel
 The upstream `make redlabel` target writes the red-label ROM files into its
 `redlabel/` directory. Point `DEFENDER_ROM_DIR` at that directory, or copy the
 files into this repo's ignored `assets/roms/` directory for local verification.
+On macOS, the upstream assembler may need Homebrew `bison` ahead of
+`/usr/bin/bison`, and the upstream checksum target expects GNU `md5sum -c`
+from Homebrew `coreutils`.

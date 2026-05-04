@@ -96,8 +96,8 @@ The repository is now in a clean-slate rewrite. The previous prototype has been
 moved to `oldsrc/` for reference, and the new implementation under `src/`
 has moved beyond foundation-only scaffolding into a table-backed red-label
 translation with many source-shaped routine slices. It is still incomplete and
-keeps live presentation explicitly scaffolded until video RAM output is proven
-against fixtures:
+now presents translated video RAM through the native cabinet scaler without a
+synthetic scaffold fallback; untranslated blank screens remain black:
 
 - `src/red_label.rs` holds translated tiny routines such as `RAND` and `RMAX`,
   and reads defaults, scores, and high-score seed data from embedded assets.
@@ -322,7 +322,8 @@ This section records drift found during the repository review on
   bytes are embedded from `assets/red-label/shell-images.tsv`. The first
   source-shaped scoring/collision slice embeds complete and short-form
   `defb6.src` object-picture metadata and object image bytes; translates
-  `SCORE`, the visible RAM effects of `SNDLD`, `BKIL`, `LFIRE` entry,
+  `SCORE` including visible score-digit refresh and replay stock-icon redraw,
+  the visible RAM effects of `SNDLD`, `BKIL`, `LFIRE` entry,
   `LASR0` / `LASL0` drawing/fizzle/erase/sleep loops, `LASD` tail, the
   RAM-visible part of `LCOL`, source-ordered `CRINIT` / `FISS` / `STINIT` /
   `OINIT` / `FBINIT` / `THINIT` boot table initialization, `STOUT` star output
@@ -335,10 +336,12 @@ This section records drift found during the repository review on
   debounce path, and the `SBOMB` entry/flash/debounce tail; and routes
   translated object
   collisions through `OCVECT`, currently including source no-op `NOKILL`.
-- `make fidelity` exists and runs formatting, tests, clippy, and the 80% line
-  coverage gate. This is no longer a placeholder.
-- The live path still calls `render_scaffold`, which matches the documented
-  status that visible gameplay is not yet red-label video RAM output.
+- `make fidelity` exists and runs formatting, tests, clippy, the MAME trace
+  script self-test, local trace-fixture checks, and the 80% line coverage gate.
+  This is no longer a placeholder.
+- The live path now feeds translated video RAM into the native
+  `render_cabinet_frame` presenter without a synthetic fallback; blank or
+  untranslated screens remain native black.
 
 ### Resolved Drift Items
 
@@ -366,7 +369,10 @@ This section records drift found during the repository review on
   now clear only rows `Y >= 42` on each video page, matching the original stack
   clear loop. The `BONUS` continuation labels and the return site back into
   `PDTH5` are also ROM-confirmed: `BC1` `0xDE66`, `BC2` `0xDE6C`, `BC3`
-  `0xDE79`, `GETWV` `0xDE7C`, and `PDTH5SCLR` `0xDADB`.
+  `0xDE79`, `GETWV` `0xDE7C`, and `PDTH5SCLR` `0xDADB`. The `GEX0`
+  post-`BONUS` return site is recorded as `GEXBON` `0xDD02`; it is an
+  assembled return address for the Rust dispatcher, not a standalone source
+  label.
 - The base-page scratch RAM layout was corrected from the source allocation:
   `CURSER` is recorded at `0xA050`, `ITEMP` at `0xA06F`, and `ITEMP2` at
   `0xA071`. The earlier `ITEMP` / `ITEMP2` entries incorrectly overlapped the
@@ -389,16 +395,30 @@ This section records drift found during the repository review on
   through a file-backed storage trait when `--cmos-path` is provided, and the
   core can collect three initials for a qualifying game-over score before
   submitting it to the all-time CMOS table and `THSTAB` today's-greatest RAM
-  table. Translated player-death game-over sleeps now hand the clean core to
-  `GameOver`, allowing the deterministic initials path to start from the
-  scheduler. There is still no exact
-  initials-entry UI, full game-over-to-attract timing, or high-score screen
-  rendering.
+  table. Translated player-death game-over sleeps now hold the clean core in
+  `GameOver` for the source `PLE2`/`PLE3` 40-tick delay before `HALLOF`;
+  non-qualifying sessions also sleep through the source `HALL13` no-entry delay
+  before `HALDIS`. The `PLE3` handoff now applies source `ATTR`'s map-1
+  select, and `HALLOF` runs source `GNCIDE`, `STINIT`, credit mirroring, and
+  entry-flag clearing before falling into `HALL1` or jumping to `AMODES` during
+  the power-on pass. `HALDIS` runs source `GNCIDE` before drawing while
+  preserving coin processes. Source branch-only labels `CPR56` and `HALD4`
+  now dispatch through the same translated `HALDIS` and `LEDRET` paths, and
+  live rendering copies source `PCRAM` into hardware palette RAM before
+  scaling each native cabinet frame. The
+  `HALL1` qualification/body path now drives the source-backed initials-entry
+  setup and falls through to `HALL3A`. The
+  `HALLOF` / `HOFIN` initials-entry UI now writes source-backed video RAM, and
+  submitted high-score sessions now render the source-backed `HALDIS`
+  hall-of-fame table.
 - The current deterministic trace compares Rust output to local expected TSV,
   `docs/fidelity/fixtures/` defines the ignored local fixture layout, and
   Phase 1 now has a local MAME/source trace runner plus a complete scenario
   manifest. Generated golden TSV files remain local artifacts, not checked-in
-  source.
+  source. The MAME generator now seeds source CMOS defaults by default, uses a
+  MAME-observed ready/coin/start sequence, and validates `0xE6` /
+  `credit_added` plus `0xF5` / `game_started` evidence before gameplay-named
+  reference traces are accepted.
 - `src/machine.rs` now backs the core trace CRC columns with red-label RAM
   bytes instead of placeholder `None` values: object-table CRCs come from the
   initialized object cells, and shell CRCs come from the SPTR shell-list head.
@@ -409,9 +429,8 @@ This section records drift found during the repository review on
 
 ### Next Work Order
 
-1. Run the Phase 1 local MAME runner against a user-supplied red-label ROM set
-   to populate `docs/fidelity/fixtures/local/`, then use those fixtures as the
-   acceptance gate for each translated subsystem.
+1. Use the new MAME/source Phase 1 reference oracle as the acceptance gate for
+   each translated subsystem as Rust-current exact-match fixtures are promoted.
 2. Continue the table-backed core path by translating the remaining reset,
    boot/default initialization beyond the translated `CRINIT` / `FISS` /
    `STINIT` / `OINIT` / `FBINIT` / `THINIT` table initializers, live scanline
@@ -427,11 +446,27 @@ This section records drift found during the repository review on
    embedded MAME address map, SRAM packing helpers, CMOS layout, and first
    `phr6.src` RAM table assets: video RAM ownership, field semantics inside
    object/process cells, and the exact per-routine bytes that must be traced.
-5. Drive native video RAM from translated routines and switch live rendering
-   from `render_scaffold` to `render_cabinet_frame` only after trace or pixel
-   fixtures prove the frame source.
-6. Port the Williams sound-board interrupt dispatch and DAC path from
-   `VSNDRM1.SRC`, then add command-sequence and waveform fixtures.
+5. Extend trace or pixel fixtures around the native video-RAM presenter, then
+   keep replacing untranslated blank screens with translated cabinet screens.
+6. Continue porting the Williams sound-board path from `VSNDRM1.SRC`: setup,
+   IRQ command decoding, the normal `IRQ1` `GWAVE` / `VARI` command runner,
+   the `SP1` / `BG1` / `BG2INC` / `LITE` / `BON2` / `BGEND` / `APPEAR` /
+   `TURBO` / `THRUST` / `CANNON` / `RADIO` / `HYPER` / `SCREAM` /
+   `ORGANT` / `ORGANN` special command runners,
+   the `GWLD` / `VARILD` table loaders, the `SP1` / `BON2` / `BG2` pre-loop
+   setup paths, and the shared
+   `GEND` / `GEND40` / `GEND50` / `GEND60` / `GEND61` echo and
+   frequency-window updates plus the `GWAVE` / `GPLAY`
+   per-period, `VARI` / `VSWEEP` per-sweep, `LITE` /
+   `APPEAR` shared `LITEN` random-complement, `TURBO` / `NOISE` noise-decay,
+   `BG1` / `THRUST` first-window `FNOISE`, `CANNON` / `FNOISE`
+   filtered-noise decay, `RADIO` / `RADSND` timer-table, `HYPER` phase-edge,
+   `SCREAM` echo-cascade, `ORGANN` / `ORGNN1` first-duration `ORGAN` note,
+   `ORGNT1` / `ORGTAB` organ tune DAC byte streams, the source `IRQ3`
+   background handoff, and the source IRQ organ-continuation gate are modeled,
+   while
+   cycle-accurate waveform/DAC routine scheduling and command-sequence fixtures
+   remain.
 7. Keep `xyzzy` and Planetoid behavior outside the arcade core; add paired
    off/on tests for each future `xyzzy` hook.
 
@@ -551,11 +586,15 @@ This section records drift found during the repository review on
   bounds from RAM and run `PRDISP`, `OPROC`, `SHELL`, and `VELO` in the exact
   visible order for those tail slices. The scanline object-phase gate now
   applies the source `VERTCT` thresholds, `IFLG` latch, `TIMER` increment,
-  normal/flipped watchdog data byte, palette-copy due tests, and `XXX2`
+  normal/flipped watchdog data byte, palette-copy thresholds, the source `PSHU`
+  color-mapping copy from `PCRAM` into hardware color RAM, and `XXX2`
   calculations before entering those tails, and it runs translated `PLAYER` /
-  `STOUT` pre-tail work on the source branches that call them. When the caller
-  supplies the live 6809 stack pointer, the terrain branch also runs translated
-  `BGOUT`; otherwise it records that `BGOUT` is due. The pre-tail `SNDSEQ`
+  `STOUT` pre-tail work on the source branches that call them. Native red-label
+  frame rendering now reads the modeled hardware color RAM after that copy.
+  When the caller supplies the source IRQ context or an explicit 6809 stack
+  pointer, the terrain branch also runs translated `BGOUT`; otherwise it
+  records that `BGOUT` is due. The
+  pre-tail `SNDSEQ`
   sound-table sequencer now advances `SNDX` / `SNDPRI` / `SNDTMR` / `SNDREP`,
   emits source-shaped main-board sound commands, and handles the thrust sound
   gate. Full frame output and fidelity traces now include the resulting raw
@@ -566,13 +605,33 @@ This section records drift found during the repository review on
   handling, `CN1` coin sound loading, and the fixed-bank BCD
   coinage/audit/credit updates. The queued admin switch path now translates
   `HSRES` today's-high-score reset and `ADVSW` manual diagnostics/audit target
-  selection, with the diagnostic/audit mode handoff still explicit. Palette
-  copy side effects, live stack-context wiring, and hardware-map restoration
-  still need full scheduler integration.
-  The `GEXEC` tail slice
-  now restores `STRCNT` toward 16, advances `GTIME` through the source
-  audit-meter wrap, decrements the process `PD` counter, and applies the
-  source `WDELT` intra-wall update to `ELIST` every 40 passes. The `GETWV`
+  selection, with the diagnostic/audit mode handoff still explicit. The IRQ
+  scheduler now records the source `MAPC` clear/select/restore write sequence
+  and leaves hardware map selection restored from `MAPCR`. The source IRQ
+  `BGOUT` context now derives the saved `SSTACK` value from `HSTK=$BFFF`, the
+  12-byte 6809 IRQ frame, and the `JSR` return address. Full frame-level IRQ
+  scheduling still needs integration. Initialized live machines now apply
+  source `P1SW`, and the source `P1SW` / `P2SW` screen-switch path now writes
+  the RAM-visible `IRQHK` hook for upright and cocktail flipped player starts
+  before the live renderer chooses the IRQ pass.
+  The source `EXEC0` / `EXEC1` pre-`DISP` slice now clears `TIMER`, updates
+  `OVCNT` / `STRCNT`, demotes the first overload-eligible active object through
+  the source `OFSHIT` / `IPTR` path, selects map 2, runs translated `COLCHK`,
+  calls the translated `XUVCT` / `EXPU` expanded-object update, advances
+  `RAND`, and drains queued `SWPROC` entries through `SWP`. A source-shaped
+  executive iteration wrapper now resets `CRPROC` to `#ACTIVE`, runs that
+  pre-dispatch slice, then performs one translated `DISP` scheduler/dispatch
+  pass without changing the live trace cadence.
+  The `GEXEC` / `GEX0` game-executive slice now initializes `PD`, `UFOTMR`,
+  and `WAVTMR`, runs the source `WVCHK` gate, accelerates and decrements
+  `UFOTMR`, dispatches `UFOST` and increments `UFOCNT` when the baiter timer
+  expires, launches `LANDST` squads from `WAVTMR` / `LNDRES` / `WAVSIZ`, then
+  restores `STRCNT` toward 16, advances `GTIME` through the source audit-meter
+  wrap, decrements the process `PD` counter, applies the source `WDELT`
+  intra-wall update to `ELIST` every 40 passes, and sleeps back to `GEX0`. The
+  wave-clear path now sets `STATUS=$77`, runs `GNCIDE` / `PLSAV`, enters the
+  shared `BONUS` body with the assembled `GEXBON` return site, increments
+  `PLAS`, and restarts through the translated `PLSTR0` handoff. The `GETWV`
   wave parameter path now increments `PWAV`, refreshes `PENEMY` from
   source-order `WVTAB`, applies CMOS difficulty/ceiling inter-wall `WDELT`
   updates, and restores `PTARG` on the `GA1+6` restore-wave cadence. The
@@ -582,13 +641,20 @@ This section records drift found during the repository review on
   `START` power-page gate, first-game player table reset/copy, `PLSTRT`
   process creation, source `SCRCLR` video-RAM clear, and `START2` `PLRCNT`
   increment plus `ADDA #$99` / `DAA` BCD credit decrement and `WCMOSA CREDST`
-  packed CMOS credit backup. The `START2` helper now runs the source `TDISP`
-  side effect when `PLRCNT` advances past one, using extracted score digit,
-  mini-ship, and smart-bomb image assets for `BORDER`, `LDISP`, `SBDISP`, and
-  `SCRTR0` visible RAM writes. `ST1` and `ST2` now execute through the
-  translated process dispatcher in the source order, including status/credit
-  gates, start sounds, one/two `START` calls, and the final `DIE` process
-  cleanup.
+  packed CMOS credit backup. The source `TDISP` HUD/top-display path now
+  dispatches directly and the `START2` helper runs the same side effect when
+  `PLRCNT` advances past one, using extracted score digit, mini-ship, and
+  smart-bomb image assets for `BORDER`, `LDISP`, `SBDISP`, and `SCRTR0`
+  visible RAM writes. The source `SCORES` player-score redraw used by `HALDIS`
+  and `LEDRET` now routes through the same score-transfer helper. The source
+  `SCORE` tail now reuses `SCRTRN`, `LDISP`, and `SBDISP` so score and replay
+  events refresh the live HUD from the same source assets. `ST1` and `ST2`
+  now execute through the translated process dispatcher in the source order,
+  including status/credit gates, start sounds, one/two `START` calls, and the
+  final `DIE` process cleanup. The generic `SUCIDE` / `HYPX` tail now runs
+  through the translated
+  dispatcher, unlinks the current active process, returns it to the correct
+  free list, and rewinds `CRPROC` to the previous link cell.
   Generic/untranslated process body dispatch,
   remaining object callbacks, live respawn orchestration beyond the `PLSTRT`
   runtime snapshot handoff,
@@ -636,8 +702,9 @@ This section records drift found during the repository review on
   writes, including DDR filtering and CA/CB edge IRQ flags. MAME's older
   Williams VA11/COUNT240 lines can drive PIA1 CB1/CA1, and the resulting PIA
   IRQ line state is visible to the deterministic harness. The board can expose
-  native visible palette-index and RGBA frames from its video RAM and palette
-  RAM, and can record source-shaped diagnostic LED output bytes, `FLASHL`
+  native visible pixel-nibble, palette-index, and RGBA frames from its video
+  RAM and palette RAM, and can record source-shaped diagnostic LED output bytes,
+  `FLASHL`
   events, CROM0 diagnostic text/palette intent, bitmap
   headline/bad-ROM-row/operator-instruction transfer, and `ADVSW` / `NEXTST`
   gate metadata. It can also render the source-visible RAM-test start,
@@ -653,14 +720,15 @@ This section records drift found during the repository review on
   switch-test heading/display table/PIA scan, CROM0 monitor-test
   heading/crosshatch/RGB-field/color-bar pattern displays, monitor-to-`AUDITG`
   entry transfer, and `AUDITG` title/prompt/row text transfers. CPU interrupt
-  scheduling, physical lamp timing, and sample generation remain gaps.
+  scheduling, physical lamp timing, and cycle-accurate sound sample scheduling
+  remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, physical advance-switch timing, physical lamp
   timing, default live CMOS path policy, screen scanline scheduler, watchdog
   timing/reset side effects, rendering timing side effects, decoder PROM
-  behavior, DAC sample output, CPU IRQ scheduling, or translated
-  `VSNDRM1.SRC` routines.
+  behavior, complete DAC sample output, CPU IRQ scheduling, or all translated
+  `VSNDRM1.SRC` waveform routines.
 
 ### Player And Controls
 
@@ -676,8 +744,9 @@ This section records drift found during the repository review on
   presentation, respawn/start bodies, and carried-human behavior.
 - The `REV` switch process is translated through the asset-backed `SWTAB`,
   `SSCAN`/`SWPROC`/`SWP`, and updates `REVFLG`/`NPLAD` with the source
-  debounce timing, but exact reverse integration with player movement and
-  rendering still needs the surrounding player routines. The `SBOMB` switch
+  debounce timing. Live reverse now reaches the translated `PLAYER` and
+  `PRDISP` slices so `NPLAD` is committed to rendered/facing `PLADIR` during
+  player frames. The `SBOMB` switch
   process also enters through `SWTAB`/`SSCAN`/`SWPROC`/`SWP`. The scanner now
   records fire, thrust, smart bomb, hyperspace, start-one, start-two, reverse,
   and altitude-down bits from the source table, but only fully translated
@@ -751,38 +820,83 @@ This section records drift found during the repository review on
   `COLIDE` / `COL0` over complete and short-form object-picture descriptors,
   visible `COLCHK` side effects, and dispatch to translated `OCVECT` routines
   such as `BKIL` and `NOKILL`.
-- Wave setup has `WVTAB` data available, but launch processes, spawn positions,
-  object slots, and process order are not implemented.
-- Planet destruction, humanoid restoration, human abduction/rescue, and
-  two-player session state are not implemented.
+- Wave setup uses source-order `WVTAB` / `WDELT` data and translated `GEXEC` /
+  `GEX0` pacing to launch `UFOST` baiters and `LANDST` squads from red-label
+  reserve counters. Two-player session state remains a later cabinet-session
+  phase.
+- Planet destruction, humanoid restoration, human abduction/rescue, and falling
+  humanoid/catch behavior are translated as source-owned process slices; live
+  whole-game trace proof remains a later fidelity phase.
 
 ### Enemy Behavior
 
-- Schizoid, UFO, lander, tie-fighter, mini-swarmer, astronaut,
-  falling-astronaut, and score-popup process slices are translated into the new
-  arcade core.
+- Schizoid/mutant, UFO/baiter, lander, tie-fighter/bomber, probe/pod,
+  mini-swarmer, astronaut, falling-astronaut, score-popup, and terrain-blow
+  process slices are translated into the new arcade core.
 - Object state must preserve raw `phr6.src` object cell fields such as position,
   velocity, picture, color, process state, counters, and shell ownership.
   The translated `GETOB`, `OBINIT`, `KILLOB`, `KILSHL`, `GETSHL`, `OSCAN`, and
   `ISCAN` list/scanner primitives are the first step; shells must remain
   SPTR-linked object cells rather than a separate gameplay-only collection.
-- Baiter, broader bomber/pod wave launch, full minefield behavior, full swarmer
-  respawn, wave launch setup, and remaining object/process behavior must be
-  translated from red-label routines and verified with traces.
+- Focused source-backed unit coverage exists for the translated enemy/process
+  families. End-to-end MAME trace proof for their interaction remains a later
+  fidelity phase once full-frame IRQ scheduling is promoted into the live core.
 
 ### Video, Appearance, And Attract Mode
 
-- The MAME Williams screen-memory byte layout, native visible-area
-  palette-index extraction, RGB palette resistor conversion, and an
+- The MAME Williams screen-memory byte layout, native visible-area pixel-nibble
+  and palette-index extraction, RGB palette resistor conversion, and an
   aspect-preserving native RGBA cabinet-frame scaler are implemented.
-- The current live loop still renders an explicitly named scaffold frame until
-  the arcade core produces real video RAM frames. It advances core frames from
-  the red-label frame clock before drawing the latest snapshot, so terminal
-  rendering no longer controls core frame count. `STOUT` / `SBLNK`, `PRDISP` /
-  `POUT`, `OPROC`, shell output, `EWRITE`, and player-explosion routines can
-  mutate video RAM directly, but full scanner/terrain/object scheduling, color
-  walkers, text, attract mode, game-over, high-score screens, and scanline
-  ownership still need exact translation.
+- The current live loop presents translated video RAM through the native
+  cabinet-frame scaler without a synthetic fallback. Untranslated screens stay
+  black until source-backed video RAM writes exist. It advances core frames
+  from the red-label frame clock before drawing the latest snapshot, so
+  terminal rendering no longer controls core frame count. Live playing frames
+  now run a source-ordered upright IRQ video slice over translated `PLAYER`,
+  `STOUT`, upper `OPROC` / `PRDISP` / `SHELL`, IRQ `BGOUT`, and lower
+  `PRDISP` / `OPROC` / `VELO`; `PRDISP` / `POUT`, `OPROC`, shell output,
+  `EWRITE`, and player-explosion routines can mutate video RAM directly, and
+  `HALLOF` / `HOFIN` now renders the source initials-entry player label,
+  hall-of-fame instructions, initials, underlines, and palette copy into video
+  RAM. The gameplay `PLE2` game-over
+  branch now writes source `GO` text at `0x3E80`; the two-player `PDTH5R`
+  handoff writes the current player label at `0x3C78` plus `GO` at `0x3E88`;
+  `PLSTR5` writes the two-player current-player start prompt at `0x3C80`;
+  source `SCINIT` clears video, resets object lists, zeroes `BGL`/`BGLX`, runs
+  `BGI`, reloads `CRTAB`, and sets `STATUS=$DB` plus `PLAXC=$1030`; `PLE3`
+  waits through the source handoff before `HALLOF` while applying `ATTR`'s
+  map-1 select, and submitted-score sessions render the source-backed
+  `HALDIS` hall-of-fame table after source `GNCIDE`; source `CREDS` writes the
+  attract credits label and BCD number while maintaining `OCRED` / `ICREDF`.
+  Source `AMODES` prepares the Williams-page state, starts `COLR` / `TIECOL`,
+  and source `LOGO` expands `DEFENDER`, walks `LGOTAB`, draws Williams-logo
+  pixels, switches to the fast pass, and creates `PRES`; `PRES` / `PRES1`
+  writes the source `ELECV` `ELECTRONICS INC.` / `PRESENTS` block and starts
+  `DEFEND`. `DEFEND` / `DEFENS` now drives the source wordmark appearances,
+  `DEF33` / `DEF50` refreshes the whole wordmark, `DEF44` starts `CBOMB`
+  before the source `COPYRT` copyright strip and wait gates, direct `COPYRT`
+  redraws without starting `CBOMB`, and `WILLIR` / `WILR1` restores the logo
+  rate. `DEF51`, `CPR56`, `HALL12`, and `HALD4` now dispatch through their
+  source `DEF50`, `HALDIS`, `HALL1` / `HALL13`, and `LEDRET` branch targets.
+  `LEDRET` now drives the source instruction-page setup, rescue, enemy table
+  loop, laser process, direct `LASR` / `LASL` setup labels, and `TEXTP` /
+  `TEXTP2` text cadence from `TEXTAB` / `TENT`; `HOFST`, `HOFBL`, `HOFUD` /
+  `HOFUD1`,
+  `HALL1` / `HALL3A` / `HALL4` / `HALL5` / `HALL6`, and `HALD3` now tick the
+  source initials-entry qualification, screen setup, stall, blink, up/down,
+  fire-switch debounce/advance, initials submission, hall-of-fame wait state,
+  and live `PCRAM` palette presentation. Live playing frames now select the
+  upright `IRQ` or flipped `IRQB` video path from `IRQHK` and run those passes
+  through the translated source `VERTCT` / `IFLG` scheduler, including map
+  writes, timer/watchdog side effects, palette copy, translated `PLAYER`,
+  `STOUT`, upper/lower `OPROC` / `PRDISP` bands, `SHELL`, IRQ `BGOUT`, and
+  `VELO`. Cocktail player-start screen switching now runs translated `P1SW` /
+  `P2SW` hook setup before that `IRQHK` selection. Idle live attract now starts
+  source `ATTR` and follows the immediate power-on `AMODES` / `LOGO` handoff
+  before sleeping to `LOGO0`. Full
+  hardware scanline cadence, sound-IRQ ownership, color walkers, general text
+  beyond the translated message vectors, remaining game-over presentation, and
+  exact scanline ownership still need exact translation.
 - Embedded PNGs are acceptable only as generated/self-contained deployment
   assets. The verified renderer must be derived from red-label ROM/source data
   and fixture-checked.
@@ -793,10 +907,58 @@ This section records drift found during the repository review on
   MAME-documented sound-board RAM/PIA/ROM memory surface plus the
   main-board-to-sound-board command latch handoff and sound PIA port-A DAC
   callback boundary. The main-board `SNDSEQ` table sequencer is translated for
-  source-shaped command writes and the thrust sound gate. Command CB1 now sets
-  the sound PIA IRQ state, but the tree does not yet include sound-routine
-  execution, CPU IRQ scheduling, sample generation, or golden command-sequence
-  and waveform fixtures.
+  source-shaped `SNDLD` priority/equal-interrupt loading, `SNDOUT`
+  idle-plus-command writes, and the thrust sound gate. All embedded sound-table
+  bytes can also be expanded into repeated command plans, the embedded
+  `sound-table-timelines.tsv` fixture with table labels, addresses, `SNDSEQ`
+  tick anchors, terminator pointers, and sequence-end ticks, and the
+  source-derived `sound-table-command-sequences.tsv` fixture with each table
+  command expanded through `SNDOUT` into idle and complemented command writes,
+  plus the source-derived `sound-thrust-command-sequences.tsv` fixture for the
+  `SNDS01` thrust-start and `SNDS00` thrust-stop branches, plus
+  `sound-direct-command-sequences.tsv` for the direct `PDTH5`, `PLE2`, and
+  `LNDFX0` `SNDOUT` callsites. The fixture validators compare those rows
+  against the generated data and count timeline command/sequence-end rows plus
+  command-sequence idle/command writes. Command CB1 now sets the sound PIA IRQ
+  state, and
+  the `VSNDRM1.SRC` `SETUP`
+  plus IRQ command decoder classify raw command bytes into GWAVE, jump-table
+  special, and VARI routine targets while applying the source-visible
+  background/spinner/bonus flag gates; normal `IRQ1` GWAVE/VARI commands can
+  now run their translated loader and first waveform window from that dispatch
+  result, `SP1` can run
+  its `CABSHK` `VARILD` setup and first translated `VARI` sweep, `BON2` can
+  run its first `BONV` `GWAVE` window or `GEND50` continuation, `LITE` /
+  `APPEAR` special commands can run the shared translated `LITEN` stream,
+  `BG2INC` can run its source flag update and first `BG2` setup, `BGEND`
+  can report its source flag-only result, `BG1` / `THRUST` special commands
+  can run their first translated
+  `FNOISE` windows, `TURBO` / `CANNON` / `RADIO` / `HYPER` / `SCREAM`
+  special commands can run their translated finite DAC streams, `ORGANT` /
+  `ORGANN` can report their source organ-flag setup states, and the source
+  `IRQ3` background handoff can kill `B2FLG` and run the first translated
+  `BG1` / `BG2` continuation step when background flags are active. The `GWLD`
+  loader now reads `SVTAB` / `GWVTAB` / `GFRTAB` from the loaded sound ROM and
+  populates direct-page GWAVE state through `WVDECA`
+  predecay, `VARILD` reads `VVECT` into the VARI direct-page parameters, and
+  the `SP1`, `BON2`, and `BG2` pre-loop setup paths, the `GWAVE` / `GPLAY`
+  per-period DAC byte stream, the `VARI` / `VSWEEP` per-sweep DAC byte stream,
+  the `LITE` / `APPEAR` shared `LITEN` random-complement byte stream, the
+  `TURBO` / `NOISE` noise-decay byte stream, the `HYPER` phase-edge DAC byte
+  stream, the `BG1` / `THRUST` first-window `FNOISE` byte streams, the
+  `CANNON` / `FNOISE` filtered-noise decay byte stream, the `RADIO` / `RADSND`
+  timer-table byte stream, the `SCREAM` echo-cascade byte stream, the
+  `ORGANN` / `ORGNN1` first-duration `ORGAN` note byte stream, the `ORGNT1` /
+  `ORGTAB` organ tune byte streams, the source `IRQ` PIA
+  command-read/CB1-clear prelude, the source `IRQ3` background handoff,
+  command return/readiness classification, source-shaped `IRQ1`
+  command-to-`IRQ3` background step, the top-level source IRQ organ gate, the
+  source IRQ organ-continuation gate, the source IRQ prelude-to-flow cycle,
+  plus the shared `GEND` / `GEND40` / `GEND50` / `GEND60` / `GEND61` echo and
+  frequency-window updates and the source NMI diagnostic checksum-to-VARI
+  branch are translated. The tree does not yet include cycle-accurate waveform routine
+  scheduling, CPU IRQ scheduling, or golden command-sequence and waveform
+  fixtures.
 - Sound must be rebuilt as command writes into a translated sound-board state
   machine from `VSNDRM1.SRC`, not as high-level gameplay cues.
 
@@ -807,12 +969,16 @@ This section records drift found during the repository review on
   starts are blocked by the source `ST1` credit gate.
 - CMOS-backed high-score reset copies all-time and today's tables from
   `DEFALT`, packed table comparison/insertion is modeled, and qualifying
-  game-over scores can collect initials and write both the all-time CMOS table
-  and `THSTAB` today's-greatest RAM table. Translated player-death game-over
-  dispatches hand live mode into that flow.
-  Exact initials screen rendering, full game-over-to-attract timing, two-player
-  state, service switches, diagnostics, audits, adjustments, and a default live
-  CMOS path policy are absent from the live cabinet flow.
+  game-over scores follow the `amode1.src` player-one-then-player-two
+  initials-entry order. Today's-greatest qualification gates entry, submitted
+  initials write `THSTAB`, all-time CMOS insertion runs when that table also
+  qualifies, translated player-death game-over dispatches hand live mode into
+  that flow, and live CMOS persistence remains explicit through `--cmos-path`.
+  Exact `HALLOF` / `HOFIN` initials screen rendering is backed by red-label
+  video RAM, and the submitted-score `HALDIS` hall-of-fame table is now
+  source-backed. The source `PLE2`/`PLE3` 40-tick game-over sleep and `HALL13`
+  no-entry delay are translated; operator-screen rendering and remaining
+  attract presentation remain Phase 7/video-scheduler work.
 - The CLI now has `--input-profile`, ROM metadata reporting with CRC-32
   validation, local ROM-set mapping verification, and deterministic Rust trace
   emission, exact local TSV fixture comparison, and an ignored local trace
@@ -832,8 +998,8 @@ This section records drift found during the repository review on
   attract/gameplay references, though the trace format can now carry raw table
   and native frame CRC-32 values.
 - There are no audio waveform or command-sequence golden tests.
-- There is no regression suite for two-player state, coin/start flow, operator
-  settings, or cabinet input profiles.
+- There is no end-to-end MAME golden regression suite for two-player state,
+  coin/start flow, operator settings, or cabinet input profiles.
 
 ## Required Compatibility Features
 
@@ -931,8 +1097,8 @@ or non-arcade UI.
 
 The Kitty presentation layer already has a native cabinet-frame handoff that
 scales and letterboxes `292x240` Defender RGBA frames without changing pixels.
-The runtime must switch from `render_scaffold` to that path only after video RAM
-is driven by translated arcade routines or trace-verified ROM-derived state.
+The runtime now uses that path for translated video RAM and leaves blank or
+untranslated screens black instead of substituting scaffold artwork.
 
 ### Assets
 
@@ -981,12 +1147,17 @@ The gameplay core should not directly play named high-level cues.
    cite a red-label routine/table/trace.
 8. Add an `UNKNOWN_BEHAVIOR.md` or `docs/fidelity/gaps.md` log. Unknowns must be
    recorded there rather than guessed in code.
-9. Keep unit-test line coverage at or above 80% at all times.
+9. Keep whole-project unit-test line coverage at or above 80% at all times, and
+   use the new-code coverage gate with a review base ref to require 100%
+   coverage for added executable Rust lines.
 
 ### Phase 1: Reference Build And Golden Trace Harness
 
-Status: complete for checked-in harness code. The generated golden traces are
-local ignored artifacts produced with user-supplied ROMs and MAME.
+Status: complete for checked-in harness code and the local MAME/source Phase 1
+reference oracle. Generated golden traces are local ignored artifacts produced
+with user-supplied ROMs and MAME. The current Rust core does not yet exactly
+match the gameplay reference traces; exact Rust-current comparisons are kept in
+a separate optional fixture directory while later subsystems are translated.
 
 1. Add tooling instructions to build red-label ROMs from `mwenge/defender`.
 2. Add optional local configuration for MAME path and ROM directory.
@@ -1009,12 +1180,18 @@ local ignored artifacts produced with user-supplied ROMs and MAME.
    advance, planet destruction, and high-score entry.
    - The required scenario names, frame counts, and compact input programs live
      in `assets/red-label/trace-scenarios.tsv`.
+   - The gameplay scenarios seed MAME NVRAM from `romc8.src` `DEFALT`, wait for
+     the source-shaped boot/attract window, then hold coin and delayed
+     one-player start long enough for the MAME-observed `CSCAN` / `SSCAN` /
+     `ST1` path.
    - `make reference-inputs` writes the expanded `*.inputs.txt` files.
    - `make reference-traces` invokes MAME through
      `tools/generate_reference_traces.py` and `tools/mame_defender_trace.lua`
      to produce local ignored `*.expected.tsv` files.
    - `make reference-fixtures-check` validates that every required expected
-     trace uses the checked-in schema and has the expected frame count.
+     trace uses the checked-in schema, has the expected frame count, and
+     contains the source-backed evidence markers from
+     `assets/red-label/trace-requirements.tsv`.
 5. Add tests that compare Rust trace output to golden traces when local
    fixtures are available, using `--fidelity-check-trace` for exact TSV
    comparison where practical, and `--fidelity-check-trace-dir` for local
@@ -1024,7 +1201,8 @@ local ignored artifacts produced with user-supplied ROMs and MAME.
 
 ### Phase 2: Core State Replacement
 
-Status: in progress. The first table-backed RAM image now initializes
+Status: complete for the core-state replacement layer. The table-backed RAM
+image now initializes
 `PINIT`/`OINIT`-style process, super-process, and object free lists,
 one-player `START` table fields, trace-visible object/shell CRCs, and
 source-shaped `MKPROC`/`MSPROC`/`SLEEP`/`KILL` process-list mutation,
@@ -1045,10 +1223,14 @@ the bank-7 `PXVCT` / `PX1A` explosion loop, `PXCOL`, `PDTH5R`, and non-wave-end
 respawn/game-over branch decisions. The dispatcher can now run translated
 `SBOMB` entry/resume addresses, `LFIRE` / `LASR0` / `LASL0` / `REV` resume
 addresses, and the translated player-death resume addresses from `PADDR`,
-including guarded `SBMBX2`/`SUCIDE`. Remaining work is to move scaffold state
-onto those bytes, integrate the translated IRQ object-phase gate with the
-remaining terrain stack-context, palette-copy, hardware-map, and video
-scheduler side effects, and translate the remaining process bodies.
+including guarded `SBMBX2`/`SUCIDE`. Deterministic restore now writes the
+observable snapshot state back into the source-owned red-label RAM fields for
+credits, current player pointer, player scores, wave/lives/smart bombs, player
+motion, facing, and RNG seeds, and full save-state restore now round-trips the
+RAM/CMOS/palette/hardware-map image plus trace scheduler state. Remaining work
+after this phase is scheduler, video, player, enemy, session, and audio
+integration tracked by the later phases rather than more core-state
+replacement.
 
 1. Continue expanding `src/machine.rs` or split it into `arcade_core` modules
    once table/process size justifies it.
@@ -1065,11 +1247,16 @@ scheduler side effects, and translate the remaining process bodies.
 
 ### Phase 3: Timing And Scheduler
 
-Status: started. Source-shaped `MKPROC`, `MSPROC`, `SLEEP`, `KILL`, and
+Status: complete for the translated red-label scheduler layer. Source-shaped
+`MKPROC`, `MSPROC`, `SLEEP`, `KILL`, and
 `DISP` primitives can allocate regular/super processes, splice them through
 `CRPROC`, delay the current process, return killed cells to the right free list,
 walk the active-process list, decrement `PTIME`, write `CRPROC`, and return
-`PADDR` for the due process. Body dispatch exists for the translated
+`PADDR` for the due process. The executive wrapper now runs the source
+`EXEC0`/`EXEC1` pre-dispatch slice and keeps walking `DISP` in the same pass
+after translated `SLEEP` and `SUCIDE` tails resume through the ROM's `DISP2`
+link, preserving same-frame process order for sleeping and killed cells. Body
+dispatch exists for the translated
 `LFIRE`/laser-loop, `SBOMB`, `REV`, `SCPROC`/`SCP1`/`SCP2`,
 `PLSTRT`/`PLST1A`/`PLSTR3`/`PLS01`/`PLS1`, `COLR`/`COLRLP`,
 `FLPUP`/`FLP2`, `CBOMB`/`CBMB1`, `TIECOL`/`TIECL`, and
@@ -1101,25 +1288,31 @@ allocation, and `SWSSND` sound loading, tie-fighter reserve `TIEST` restore from
 copied `TIERES`, the `TIE` process image/vertical/cruise slice, `BOMBST`
 bomb-shell allocation and lifetime path, plus the status/PDFLG path, with
 machine-level `INIT20` `CRINIT` / `FISS` / `STINIT` / `OINIT` / `FBINIT` /
-`THINIT` refresh. The remaining `PLRES` swarmer respawn path remains an
-explicit gap because its phony-object `OX16` low byte depends on the CPU B
-register carried into `PLRES`; implement it only after register-aware scheduler
-tracing proves that entry state. Broader body dispatch, suicide resume semantics,
-cycle/frame scheduling, and golden-trace verification are still open.
+`THINIT` refresh. `PLRES` mini-swarmer reserve restore now models the source
+`RSW0` phony-object placement, B-register `OX16` low-byte flow, `MMSW` batches
+of six, `SWMRES` decrement, and `OFREE` return/reuse path. Broader process body
+coverage, full hardware IRQ scanline/frame integration, and MAME golden-trace
+equivalence remain tracked by the later gameplay, video, and fidelity phases.
 
-1. Continue keeping terminal presentation outside the verified cabinet frame
+1. Done: keep terminal presentation outside the verified cabinet frame
    while the live loop advances due core frames from `FRAME_RATE_MILLIHZ`
    independently of draw calls.
-2. Port or model red-label process scheduling and delay semantics.
-3. Verify object process order against golden traces.
-4. Preserve compatibility frame pacing only in the renderer/application layer.
-5. Do not convert cycle/frame values by feel. Use source constants, MAME driver
+2. Done: port red-label process scheduling and delay semantics, including
+   same-pass `DISP2` continuation after `SLEEP` and `SUCIDE`.
+3. Done at unit level for translated scheduler order; MAME process/object CRC
+   equivalence remains a later full-fidelity gate once more process bodies and
+   frame IRQ integration are in place.
+4. Done: preserve compatibility frame pacing only in the renderer/application
+   layer.
+5. Done: do not convert cycle/frame values by feel. Use source constants, MAME driver
    metadata, or measured trace timing.
 
 ### Phase 4: Player, Inputs, And `xyzzy`
 
-Status: next implementation phase after golden local traces and the remaining
-table-backed initialization/scheduler work. `LFIRE` entry/fall-through,
+Status: complete for the player/input/`xyzzy` phase boundary; remaining world,
+full-frame IRQ, and golden-trace acceptance work is tracked by later phases.
+`LFIRE`
+entry/fall-through,
 `LASR0` / `LASL0`, `LASD`, RAM-visible `LCOL`, `CRINIT`, `FISS`, `STINIT`,
 `OINIT`, `FBINIT`, `THINIT`, `STOUT` / `SBLNK`, the `GEXEC`
 `STRCNT`/`GTIME`/`WDELT` tail
@@ -1132,25 +1325,33 @@ explosion loop, and the non-wave-end respawn/game-over branch decisions. The
 X/scroll correction, absolute-X, and altitude up/down velocity. The `PRDISP` /
 `POUT` player-picture slice is translated for the 8x6 ship body and `THOUT` /
 `THOFF` thrust-flame byte writes, with source boot table initialization and
-`THPROC` table advance translated. `OPROC` active-object band erase/write is
+`THPROC` table advance translated. The live player frame now runs translated
+`PLAYER` and translated `PRDISP` over the current player display band, so
+source `REV` changes to `NPLAD` are committed into rendered/facing `PLADIR`
+during live play. `OPROC` active-object band erase/write is
 translated for descriptor pictures, Y-band gating, BGL-relative X bounds, and
 alternate image flavor selection. `VELO` active-object position updates are
 translated for velocity addition and Y wrap. The normal/inverted IRQ
 object-band tails are translated for the source ordering around `PRDISP`,
 `OPROC`, `SHELL`, and `VELO`, using `XXX1`/`XXX2`/`XXX3` bounds from RAM. The
 IRQ object-phase gate now applies source `VERTCT` thresholds, `IFLG`, `TIMER`,
-watchdog data-byte reporting, palette-copy due tests, and the normal/flipped
+watchdog data-byte reporting, palette-copy thresholds, the source `PSHU`
+color-mapping copy from `PCRAM` into hardware color RAM, and the normal/flipped
 `XXX2` calculations, and runs translated `PLAYER` / `STOUT` pre-tail work on
-the branches that call them. It can also run translated `BGOUT` when the caller
-supplies the live 6809 stack pointer. The source `CSCAN` branch now keeps the
-`PIA01` / `PIA02` history and queues source `SWTAB1` coin/admin switch
-processes from caller-supplied IN2. The queued coin process path translates
+the branches that call them. Native red-label frame rendering uses that modeled
+hardware color RAM. It can also run translated `BGOUT` when the caller supplies
+the live 6809 stack pointer. The source `CSCAN` branch now keeps the `PIA01` /
+`PIA02` history and queues source `SWTAB1` coin/admin switch processes from
+caller-supplied IN2. The queued coin process path translates
 `LCOIN` / `RCOIN` / `CCOIN`, `CN1`, `CNSND`, fixed-bank coinage, slot audits,
 paid-credit audit, and `CUNITS`/`BUNITS`/`CREDIT` updates. The queued admin
 switch path translates `HSRES` today's-high-score reset and `ADVSW` manual
 diagnostics/audit target selection, with the diagnostic/audit mode handoff
-still explicit. Full hardware IRQ integration still needs palette copy side
-effects, live stack-context wiring, and hardware map restoration. The `SCPROC`
+still explicit. The IRQ scheduler records the source `MAPC`
+clear/select/restore write sequence and restores hardware map selection from
+`MAPCR`. The source IRQ `BGOUT` context now derives the saved `SSTACK` value
+from `HSTK=$BFFF`, the 12-byte 6809 IRQ frame, and the `JSR` return address.
+Full hardware IRQ integration still needs full frame-level IRQ scheduling. The `SCPROC`
 scanner
 maintenance process is translated through `ISCAN`, `OSCAN`, `SHSCAN`, and
 `SCNRV` with exact
@@ -1193,12 +1394,14 @@ lives, smart bombs, and player motion from red-label RAM. The `BONUS`
 wave-clear death tail reached through `PDTH5` now writes the `MESS` / `WNBV`
 bonus text and numbers, scores survivor icons through `BC1`, refreshes the
 next wave through `GETWV`, and returns through `BC3` to `PDTH5SCLR`. Full
-reverse movement/rendering integration, remaining enemy kill/collision vectors
+`GEX0` wave-clear completion uses the same `BONUS` body with the assembled
+post-call `GEXBON` return site, then increments `PLAS` and jumps through the
+translated `PLSTR0` restart. Remaining enemy kill/collision vectors
 beyond
 `BKIL` / `NOKILL` / `ASTKIL` / `MSWKIL` / `PRBKIL` / `SCZKIL` / `UFOKIL` /
-`LKILL` / `LKIL1` / `TIEKIL`, the remaining `PLRES` swarmer respawn path,
-full IRQ scanline/live video integration, full frame/cycle integration, and
-golden-trace proof for the translated death tail remain open.
+`LKILL` / `LKIL1` / `TIEKIL`, full IRQ scanline/live video integration, full
+frame/cycle integration, and golden-trace proof for the translated death tail
+remain open.
 The assembled/ROM-confirmed addresses for the remaining `PLSTRT` / `PLRES`
 companion labels (`SCLR1`, `ASTST`, `ASTRO`, `ASTKIL`, `PRBST`, `PRBKIL`,
 `MMSW`, `MSWM`, `MSWLP`, `SWBMB`, `MSWKIL`, `SHOOT`, `SCZST`, `SCZ0`,
@@ -1207,70 +1410,103 @@ companion labels (`SCLR1`, `ASTST`, `ASTRO`, `ASTKIL`, `PRBST`, `PRBKIL`,
 are embedded under
 `assets/red-label/routine-addresses.tsv`; `BONUS`
 continuation labels
-(`BC1`, `BC2`, `BC3`, `GETWV`) and `PDTH5SCLR` are embedded there as well.
+(`BC1`, `BC2`, `BC3`, `GETWV`), `PDTH5SCLR`, and the assembled `GEXBON`
+post-call return site are embedded there as well.
 The next `PLSTRT`
 work is to
 translate the remaining routine bodies from source or ROM traces, not to infer
 their behavior from labels.
 
-1. Define cabinet input bits and action names.
-2. Add input profiles:
-   - `planetoid`, preserving current keyboard mapping;
-   - `cabinet`, mapping original arcade actions;
-   - `test`, deterministic and easy for fixtures.
-3. Finish full reverse movement/rendering integration, respawn, scanline
-   display scheduling, live video presentation, and carry-human behavior.
-4. Fix Mutant score to `150` in the arcade core.
-5. Reimplement `xyzzy` as an overlay with explicit hooks and tests.
-6. Keep current high-level `SessionState` only as orchestration around the core.
-7. Keep Planetoid key mapping in input-profile code only. It must never alter
-   arcade-core semantics.
-8. Any `xyzzy` change must have a paired test proving the arcade path is
-   unchanged when `xyzzy` is disabled.
+1. Done: define cabinet input bits and action names.
+2. Done: add `planetoid`, `cabinet`, and deterministic `test` input profiles.
+3. Done for Phase 4: live reverse movement/rendering now reaches translated
+   `PLAYER` and `PRDISP`; respawn, human-carry behavior, and full scanline
+   frame scheduling remain in the later world/video/fidelity phases.
+4. Done: Mutant score is `150` in the arcade core.
+5. Done: `xyzzy` is an overlay with explicit state and tests.
+6. Done: high-level `SessionState` remains orchestration around the core.
+7. Done: Planetoid key mapping remains in input-profile code only.
+8. Done for current hooks: `xyzzy` smart-bomb/auto-fire behavior has paired
+   disabled/enabled coverage; future hooks must keep that paired-test rule.
 
 ### Phase 5: World, Waves, Humans, And Enemies
 
-1. Port remaining exact terrain state: live `BGOUT` scheduling, destroyed-planet
-   terrain, and mini-terrain behavior. `TDATA`, `ALINIT` altitude-table
-   generation, `BGINIT` terrain-table generation, RAM-level `BGOUT` terrain
-   output, and `BGERAS` screen-table erase are already source-derived.
-2. Port wave setup and launch processes from red-label source instead of
-   hand-placed opener slots.
-3. Port Landers and human abduction.
-4. Port Mutants, including planet-destroyed behavior.
-5. Port remaining bomber/pod wave-launch and minefield behavior.
-6. Port Pods and Swarmer burst behavior.
-7. Port Baiter spawn, pursuit, firing, and lifetime behavior.
-8. Port remaining shell rendering/output and collision behavior.
-9. Verify each enemy subsystem against focused traces.
-10. Do not port old `oldsrc/src/game.rs` behavior unless it is first traced back
-    to a red-label routine/table.
+Status: complete for the world/wave/human/enemy translation boundary; full
+frame-level IRQ scheduling, complete cabinet session flow, and end-to-end MAME
+trace acceptance remain in later phases.
+
+1. Done: exact terrain state now covers live `BGOUT` scheduling, destroyed-planet
+   `TERBLO`, scanner mini-terrain `MTERR`, `TDATA`, `ALINIT`, `BGINIT`,
+   RAM-level `BGOUT`, and `BGERAS`.
+2. Done: wave setup and launch use red-label `WVTAB`, `WDELT`, `GEXEC` /
+   `GEX0`, `UFOST`, and `LANDST` paths instead of hand-placed opener slots.
+3. Done: Landers and human abduction/carry/release/catch/fall behavior are
+   translated.
+4. Done: Mutants are represented by the translated `SCZ` process family,
+   including conversion after failed lander capture and planet-destroyed flow.
+5. Done: bomber/tie wave-launch, bomb-shell allocation, minefield-like bomb
+   shell output, and collision behavior are translated.
+6. Done: Pods/probes and Swarmer burst behavior are translated through
+   `PRBST`, `PRBKIL`, `MMSW`, `MSWM`, `MSWLP`, `SWBMB`, and `MSWKIL`.
+7. Done: Baiter/UFO spawn, pursuit velocity, firing, picture cycling, and
+   lifetime process behavior are translated through `UFOST` / `UFOLP`.
+8. Done: shell rendering/output and collision behavior for the translated
+   families uses source shell cells and `BMBOUT` / `FBOUT` / `BKIL`.
+9. Done at unit level for the translated enemy subsystems; end-to-end MAME
+   trace proof remains in the final fidelity phase.
+10. Done: Phase 5 uses red-label routines/tables and does not port archived
+    `oldsrc/src/game.rs` behavior.
 
 ### Phase 6: Scoring, Players, And Cabinet Session
 
-1. Implement one-player and two-player start/session flow.
-2. Implement credits and start buttons.
-3. Implement P1/P2 scores, lives, smart bombs, current player, and alternating
-   turns.
-4. Implement exact scoring for enemies, bullets, mines, humans, rescued humans,
-   Pods, Swarmers, wave-end humanoid bonuses, extra ships, and smart bombs.
-5. Translate red-label initials-entry/high-score screens and full
-   game-over-to-attract timing.
-6. Decide whether live CMOS persistence should remain explicit via
-   `--cmos-path` or gain a platform default path.
-7. Add operator/default settings needed for red-label exactness.
-8. Add negative tests for every corrected score so old prototype mistakes, such
-   as Mutant `250`, cannot return.
+1. Done: one-player and two-player start/session flow enters the translated
+   `ST1` / `ST2`, `START`, `START2`, `PLSTRT`, `PLE02`, and `PLE3` paths.
+2. Done: credits and start buttons run through translated coin/start switch
+   paths with source BCD credit and CMOS backup behavior.
+3. Done: P1/P2 scores, lives, smart bombs, current player, and alternating
+   turns are RAM-backed and covered by translated session tests.
+4. Done: exact scoring for translated enemies, bullets, mines, humans, rescued
+   humans, Pods, Swarmers, wave-end humanoid bonuses, extra ships, and smart
+   bombs is source-table backed with regression tests.
+5. Done for cabinet-session logic: high-score entry follows `amode1.src`
+   player-one/player-two order, today's-greatest qualification, all-time CMOS
+   insertion, deterministic initials submission, and source-backed
+   `HALLOF` / `HOFIN` initials-entry video RAM writes, gameplay `PLE2`
+   `GAME OVER` text write, two-player `PDTH5R` player/game-over labels, and
+   two-player `PLSTR5` start prompt. The submitted-score `HALDIS`
+   hall-of-fame table is source-backed, and the source `PLE3` / `HALL13`
+   handoff delays are modeled with `ATTR` map selection and `HALDIS` entry
+   `GNCIDE`; source `CREDS` attract credit display, `AMODES` Williams-page
+   setup, `LOGO` table drawing through the first-pass `PRES` handoff,
+   `PRES` / `PRES1` `ELECV` redraw, `DEFEND` / `DEFENS` wordmark
+   appearances, `DEF33` / `DEF50` whole-wordmark refresh, source-shaped
+   `DEF44` / direct `COPYRT` copyright wait, `DEF51`, `WILLIR` / `WILR1`
+   fast-logo restore, `LEDRET`
+   instruction-page setup/rescue/enemy-table/text flow through direct `LASR` /
+   `LASL` and `TEXTP2`,
+   `HOFST` / `HOFBL` / `HOFUD` / `HOFUD1`, `ATTR` / `HALLOF` entry setup,
+   `HALL1` / `HALL3A` / `HALL4` / `HALL5` / `HALL6` initials-entry support
+   ticks, and `HALD3` hall-of-fame wait are translated. Remaining
+   boot/game-over
+   presentation stays in Phase 7.
+6. Done: live CMOS persistence remains explicit via `--cmos-path`; there is no
+   implicit platform default path.
+7. Done at data/model level: red-label defaults, audit adjustments, coinage,
+   free play, replay, and game adjustments are embedded and used by translated
+   paths; full operator-screen presentation remains in Phase 7/final scheduler
+   work.
+8. Done: corrected score regressions include negative coverage so old prototype
+   mistakes, such as Mutant `250`, cannot return.
 
 ### Phase 7: Video And Appearance
 
 1. Define the native cabinet frame buffer and visible crop used by verification.
-2. Feed translated video RAM into the native cabinet-frame renderer.
+2. Extend translated video-RAM presenter coverage with pixel fixtures.
 3. Replace synthetic live terrain drawing with the cabinet terrain path.
 4. Generate or decode every gameplay object from red-label data.
 5. Preserve per-object `OPICT`, animation, palette, and color state.
-6. Continue integrating translated `SCNRV` scanner drawing into full-frame live
-   video presentation and pixel fixtures.
+6. Continue integrating translated `SCNRV` scanner drawing and IRQ scheduler
+   timing into full-frame live video presentation and pixel fixtures.
 7. Implement HUD, scores, lives, smart bomb icons, player-two fields, game-over,
    high-score, and initials screens from cabinet routines.
 8. Run the red-label attract process instead of a reconstructed beat script, or
@@ -1285,7 +1521,20 @@ their behavior from labels.
 
 1. Continue replacing high-level gameplay cue dispatch with source-shaped sound
    command writes.
-2. Model the sound board state, command latch, and routine dispatch.
+2. Extend the sound-board state beyond setup, IRQ command decoding, normal
+   `IRQ1` GWAVE/VARI and
+   `LITE`/`APPEAR`/`TURBO`/`CANNON`/`RADIO`/`HYPER`/`SCREAM` command-flow
+   execution, `GWLD` / `VARILD` table loading, `SP1` / `BON2` / `BG2` setup,
+   `GWAVE` / `GPLAY`
+   period-byte extraction, `VARI` / `VSWEEP` sweep-byte extraction, `TURBO` /
+   `NOISE` noise-decay
+   extraction, `BG1` / `THRUST` first-window `FNOISE` extraction, `CANNON` /
+   `FNOISE` filtered-noise decay extraction, `RADIO` / `RADSND` timer-table
+   extraction, `HYPER` phase-edge extraction, `SCREAM` echo-cascade
+   extraction, `ORGANN` / `ORGNN1` first-duration `ORGAN` note extraction,
+   `ORGNT1` / `ORGTAB` organ tune extraction, the source `IRQ3` background
+   handoff, and the source IRQ organ-continuation gate into cycle-scheduled
+   translated routine execution.
 3. Port remaining `VSNDRM1.SRC` routines needed by Defender.
 4. Verify command sequences against red-label traces.
 5. Add waveform tests with tolerance for deterministic generated buffers.
@@ -1342,7 +1591,9 @@ their behavior from labels.
 - Coin/start/high-score/session behavior matches red-label defaults.
 - `cargo test --all-targets` passes.
 - `cargo clippy --all-targets -- -D warnings` passes.
-- Unit-test line coverage is at least 80%.
+- Whole-project unit-test line coverage is at least 80%, and `make coverage`
+  enforces coverage for added executable Rust lines against
+  `NEW_CODE_COVERAGE_BASE`, which defaults to `HEAD` for local dirty worktrees.
 - Every arcade-core routine cites a red-label source/trace, or is listed as an
   unknown gap with an ignored/failing fidelity test.
 - `README.md` and this spec agree on current behavior and remaining gaps.

@@ -8,3 +8,4 @@ cfg/
 nvram/
 target/
 .scannerwork/
+__pycache__/
