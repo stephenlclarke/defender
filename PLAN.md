@@ -916,8 +916,9 @@ Steps:
 - [x] DC-08.2 Prove laser cap, laser lifetime, collision setup, and fizzle/erase
   timing against traces.
   Completed: `2026-05-04 21:38:30 BST`
-- [ ] DC-08.3 Finish smart-bomb world integration, including what is and is not
+- [x] DC-08.3 Finish smart-bomb world integration, including what is and is not
   destroyed.
+  Completed: `2026-05-04 21:41:32 BST`
 - [ ] DC-08.4 Finish hyperspace failure/safe paths and rematerialization
   movement.
 - [ ] DC-08.5 Finish carried-human, falling-human, catch, landing, and rescue
@@ -957,6 +958,21 @@ Work log:
   --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777927131955319`
+- `2026-05-04 21:40:33 BST` Started `DC-08.3`: adding a smart-bomb world
+  integration fixture that proves the active-object walk destroys qualifying
+  enemies, preserves non-enemy object types, and leaves the source flash/debounce
+  state ready for the existing tail tests.
+- `2026-05-04 21:41:32 BST` Completed `DC-08.3`: added
+  `smart_bomb_world_fixture_kills_enemies_and_preserves_non_enemy_objects`,
+  proving `SBOMB` decrements current-player stock, kills a qualifying
+  mini-swarmer through `MSWKIL`, clears its visible footprint and active count,
+  preserves a non-enemy active object with `OTYP=0x02`, and leaves the source
+  `SBMBX1` flash sleep/`SBFLG` state ready for the existing debounce-tail
+  tests. Validation passed with `cargo fmt --check` and
+  `cargo test smart_bomb_world_fixture_kills_enemies_and_preserves_non_enemy_objects
+  --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777927313145899`
 
 ### DC-09: Cabinet Session And Operator Flow
 

@@ -53235,6 +53235,131 @@ mod tests {
     }
 
     #[test]
+    fn smart_bomb_world_fixture_kills_enemies_and_preserves_non_enemy_objects() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        let smart_bomb_process = schedule_smart_bomb_process(&mut machine);
+        let skipped_process = machine
+            .red_label_make_process(
+                red_label_routine_address("NOKILL").expect("NOKILL address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make skipped owner process")
+            .process_address;
+        let skipped_object = machine
+            .red_label_init_object_cell(
+                skipped_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("SWPIC1")
+                        .expect("SWPIC1 address"),
+                    collision_vector_address: red_label_routine_address("NOKILL")
+                        .expect("NOKILL address"),
+                    scanner_color: 0x1212,
+                },
+            )
+            .expect("init skipped object")
+            .object_address;
+        machine
+            .red_label_activate_object_cell(skipped_object)
+            .expect("activate skipped object");
+        machine
+            .memory
+            .write_word(skipped_object + 0x04, 0x3040)
+            .expect("set skipped OBJX/OBJY");
+        machine
+            .memory
+            .write_byte(skipped_object + 0x14, 0x02)
+            .expect("mark skipped object as non-enemy type");
+
+        let enemy_process = machine
+            .red_label_make_process(
+                red_label_routine_address("MSWM").expect("MSWM address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make enemy owner process")
+            .process_address;
+        let enemy_object = machine
+            .red_label_init_object_cell(
+                enemy_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("SWPIC1")
+                        .expect("SWPIC1 address"),
+                    collision_vector_address: red_label_routine_address("MSWKIL")
+                        .expect("MSWKIL address"),
+                    scanner_color: 0x2424,
+                },
+            )
+            .expect("init enemy object")
+            .object_address;
+        machine
+            .red_label_activate_object_cell(enemy_object)
+            .expect("activate enemy object");
+        machine
+            .memory
+            .write_byte(0xA116, 1)
+            .expect("set active swarmer count");
+        machine.memory.write_word(0xA020, 0).expect("set BGL");
+        machine
+            .memory
+            .write_word(enemy_object + 0x04, 0x5060)
+            .expect("set enemy OBJX/OBJY");
+        machine
+            .memory
+            .write_word(enemy_object + 0x0A, 0x2040)
+            .expect("set enemy OX16");
+        machine
+            .memory
+            .write_word(enemy_object + 0x0C, 0x6200)
+            .expect("set enemy OY16");
+        write_ram_bytes(&mut machine, 0x5060, &[0xFF, 0xFF, 0xFF]);
+        write_ram_bytes(&mut machine, 0x5160, &[0xFF, 0xFF, 0xFF]);
+
+        let smart_bomb = machine
+            .red_label_start_smart_bomb_current_player()
+            .expect("start smart bomb")
+            .expect("smart bomb started");
+
+        assert_eq!(smart_bomb.player_number, 1);
+        assert_eq!(smart_bomb.remaining_smart_bombs, 2);
+        assert_eq!(smart_bomb.collisions.len(), 1);
+        let RedLabelObjectCollision::MiniSwarmerKilled(kill) = &smart_bomb.collisions[0] else {
+            panic!("expected smart bomb to kill mini swarmer");
+        };
+        assert_eq!(kill.object_address, enemy_object);
+        assert_eq!(kill.killed_process.killed_process_address, enemy_process);
+        assert_eq!(kill.active_swarmer_count, 0);
+        assert_eq!(
+            machine.red_label_ram_range(0xA065..0xA067),
+            Some(&skipped_object.to_be_bytes()[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(skipped_object + 0x04..skipped_object + 0x06),
+            Some(&[0x30, 0x40][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(skipped_object + 0x14..skipped_object + 0x15),
+            Some(&[0x02][..])
+        );
+        assert_eq!(machine.red_label_ram_range(0xA116..0xA117), Some(&[0][..]));
+        assert_eq!(
+            machine.red_label_ram_range(0x5060..0x5063),
+            Some(&[0, 0, 0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x5160..0x5163),
+            Some(&[0, 0, 0][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(smart_bomb_process + 0x02..smart_bomb_process + 0x08),
+            Some(&[0xE9, 0x00, 0x02, 0x00, 0x00, 0x04][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA09A..0xA09B),
+            Some(&[0x01][..])
+        );
+    }
+
+    #[test]
     fn smart_bomb_flash_tail_counts_down_and_enters_debounce_sleep() {
         let mut machine = ArcadeMachine::new();
         start_one_player_game_for_test(&mut machine);
