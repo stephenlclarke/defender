@@ -254,7 +254,10 @@ mod tests {
     };
     use crate::cmos_storage::CmosStorage;
     use crate::input::CabinetInput;
-    use crate::machine::{ArcadeMachine, FRAME_RATE_MILLIHZ, GamePhase};
+    use crate::machine::{
+        ArcadeMachine, FRAME_RATE_MILLIHZ, GamePhase, RedLabelSoundBoardSnapshot,
+    };
+    use crate::sound::SoundCommandLatch;
     use crate::video::{RenderedImage, Renderer, defender_visible_byte_offset};
 
     use super::{
@@ -389,6 +392,28 @@ mod tests {
                 .expect("entry still active")
                 .initials,
             [b'A', b' ', b' ']
+        );
+    }
+
+    #[test]
+    fn live_core_sound_state_is_independent_of_audio_output_mode() {
+        let mut audible_core = ArcadeMachine::new_cold_boot_trace();
+        let mut muted_core = ArcadeMachine::new_cold_boot_trace();
+
+        step_live_core_frames(&mut audible_core, CabinetInput::NONE, &[], 731);
+        step_live_core_frames(&mut muted_core, CabinetInput::NONE, &[], 731);
+
+        let expected = RedLabelSoundBoardSnapshot {
+            last_command_latch: Some(SoundCommandLatch::from_main_board_pia_port_b(0xC0)),
+            latched_port_b: Some(0xC0),
+            command_cb1_asserted: true,
+            latch_write_count: 1,
+        };
+        assert_eq!(audible_core.red_label_sound_board_snapshot(), expected);
+        assert_eq!(muted_core.red_label_sound_board_snapshot(), expected);
+        assert_eq!(
+            muted_core.red_label_sound_board_snapshot(),
+            audible_core.red_label_sound_board_snapshot()
         );
     }
 

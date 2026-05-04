@@ -1507,7 +1507,8 @@ Steps:
   Completed: `2026-05-04 23:43:58 BST`
 - [x] DC-13.4 Add waveform tests with deterministic tolerance.
   Completed: `2026-05-04 23:47:34 BST`
-- [ ] DC-13.5 Keep `--mute` as an output-layer mixer switch only.
+- [x] DC-13.5 Keep `--mute` as an output-layer mixer switch only.
+  Completed: `2026-05-04 23:50:46 BST`
 
 Completion gate: sound command traces and generated audio pass fixtures, and no
 gameplay code triggers high-level named cues directly.
@@ -1580,6 +1581,23 @@ Work log:
   deferred until the full `DC-13` cycle closes.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777934878763819`
+- `2026-05-04 23:48:18 BST` Started `DC-13.5`: verifying `--mute` remains an
+  output-layer switch and adding regression coverage that muted/unmuted CLI
+  configuration does not change core trace sound commands or sound-board state.
+- `2026-05-04 23:50:46 BST` Completed `DC-13.5`: added parser coverage proving
+  `--mute` changes only the live `play_audio` output flag, plus live-core
+  coverage proving muted and unmuted output modes share the same core
+  sound-board latch state after cold-boot stepping. `SPEC.md` now states that
+  mute must not alter frame stepping, sound-command generation, sound-board
+  latch state, or trace output. Validation passed with `markdownlint PLAN.md
+  SPEC.md`, `cargo fmt --check`,
+  `cargo test parse_args_mute_changes_only_live_audio_output_flag --all-targets`,
+  `cargo test live_core_sound_state_is_independent_of_audio_output_mode
+  --all-targets`, `rg -n "play_audio" src`, and
+  `cargo clippy --all-targets -- -D warnings`. Broader `make fidelity` is
+  deferred until the full `DC-13` cycle closes.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935066683769`
 
 ## Phase 7: Compatibility Features
 

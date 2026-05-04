@@ -908,6 +908,34 @@ mod tests {
     }
 
     #[test]
+    fn parse_args_mute_changes_only_live_audio_output_flag() {
+        let audible = parse_args(Vec::<String>::new()).expect("parse audible args");
+        let muted = parse_args(vec![String::from("--mute")]).expect("parse muted args");
+
+        let Command::PlayLive {
+            play_audio: audible_audio,
+            input_profile: audible_profile,
+            cmos_path: audible_cmos,
+        } = audible
+        else {
+            panic!("default command should play live");
+        };
+        let Command::PlayLive {
+            play_audio: muted_audio,
+            input_profile: muted_profile,
+            cmos_path: muted_cmos,
+        } = muted
+        else {
+            panic!("muted command should play live");
+        };
+
+        assert!(audible_audio);
+        assert!(!muted_audio);
+        assert_eq!(audible_profile, muted_profile);
+        assert_eq!(audible_cmos, muted_cmos);
+    }
+
+    #[test]
     fn parse_args_accepts_live_cmos_path() {
         let command = parse_args(vec![
             String::from("--cmos-path"),

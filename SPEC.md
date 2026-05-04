@@ -1038,6 +1038,10 @@ Additional gaps and corrections found during this review:
   RAM mutation CRCs. The tree does not yet include cycle-accurate waveform
   routine scheduling, independent sound CPU IRQ scheduling, or external
   waveform golden fixtures.
+- `--mute` is an output-layer live-mode option only. It may change whether a
+  future mixer writes to the host audio device, but it must not alter core
+  frame stepping, sound-command generation, sound-board command latch state, or
+  trace output.
 - Sound must be rebuilt as command writes into a translated sound-board state
   machine from `VSNDRM1.SRC`, not as high-level gameplay cues.
 
