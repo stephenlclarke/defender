@@ -1047,8 +1047,9 @@ Steps:
   Completed: `2026-05-04 22:05:20 BST`
 - [x] DC-09.4 Decide and document the default live CMOS persistence policy.
   Completed: `2026-05-04 22:07:24 BST`
-- [ ] DC-09.5 Complete diagnostics, audit, and adjustment flow in live cabinet
+- [x] DC-09.5 Complete diagnostics, audit, and adjustment flow in live cabinet
   mode.
+  Completed: `2026-05-04 22:09:16 BST`
 - [ ] DC-09.6 Add regression tests for P1/P2 score, lives, smart bombs, credits,
   high-score insertion, and CMOS mutations.
 
@@ -1112,6 +1113,24 @@ Work log:
   `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928856353239`
+- `2026-05-04 22:08:19 BST` Started `DC-09.5`: adding a live admin-switch
+  fixture for diagnostics, audits, and high-score reset events/mutations, then
+  rechecking the existing board audit-adjustment regression that owns the
+  source `AUDITG` row mutation behavior.
+- `2026-05-04 22:09:16 BST` Completed `DC-09.5`: added
+  `operator_flow_fixture_covers_live_diagnostics_audits_and_reset_events`,
+  proving live service advance selects diagnostics, auto+advance selects audits,
+  high-score reset emits the live event, resets today's table from ROM defaults,
+  mutates `HSRFLG`, and clears the admin switch process. Re-ran the board-level
+  `AUDITG` adjustment regression proving high-score reset adjustment mutations
+  through the source operator row path. Validation passed with `cargo fmt
+  --check`,
+  `cargo test operator_flow_fixture_covers_live_diagnostics_audits_and_reset_events
+  --all-targets`,
+  `cargo test main_board_auditg_operator_step_applies_high_score_reset_adjustments
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928969712859`
 
 ## Phase 4: World, Waves, Humans, And Enemies
 

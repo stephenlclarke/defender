@@ -32720,6 +32720,88 @@ mod tests {
     }
 
     #[test]
+    fn operator_flow_fixture_covers_live_diagnostics_audits_and_reset_events() {
+        let mut diagnostics = ArcadeMachine::new();
+        let diagnostics_output = diagnostics.step(CabinetInput {
+            service_advance: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(diagnostics_output.snapshot.phase, GamePhase::Attract);
+        assert!(
+            diagnostics_output
+                .events()
+                .any(|event| event == MachineEvent::DiagnosticsSelected)
+        );
+        assert_eq!(
+            diagnostics.red_label_ram_range(0xA036..0xA037),
+            Some(&[0x03][..])
+        );
+        assert_eq!(
+            diagnostics.red_label_ram_range(0xA082..0xA086),
+            Some(&[0, 0, 0, 0][..])
+        );
+
+        let mut audits = ArcadeMachine::new();
+        let audits_output = audits.step(CabinetInput {
+            auto_up_manual_down: true,
+            service_advance: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(audits_output.snapshot.phase, GamePhase::Attract);
+        assert!(
+            audits_output
+                .events()
+                .any(|event| event == MachineEvent::AuditsSelected)
+        );
+        assert_eq!(
+            audits.red_label_ram_range(0xA036..0xA037),
+            Some(&[0x03][..])
+        );
+        assert_eq!(
+            audits.red_label_ram_range(0xA082..0xA086),
+            Some(&[0, 0, 0, 0][..])
+        );
+
+        let mut reset = ArcadeMachine::new();
+        reset
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START, 0x7E)
+            .expect("dirty HSRFLG");
+        reset
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START + 1, 0x7D)
+            .expect("dirty today's high-score table");
+        let defaults = super::red_label_cmos_defaults().expect("CMOS defaults");
+        let mut expected =
+            super::red_label_high_score_default_cells(&defaults).expect("high-score defaults");
+        expected[0] = expected[0].wrapping_add(1);
+
+        let reset_output = reset.step(CabinetInput {
+            high_score_reset: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(reset_output.snapshot.phase, GamePhase::Attract);
+        assert!(
+            reset_output
+                .events()
+                .any(|event| event == MachineEvent::HighScoreReset)
+        );
+        let todays_end = RED_LABEL_THSTAB_START
+            + u16::try_from(expected.len()).expect("expected table length fits in u16");
+        assert_eq!(
+            reset.red_label_ram_range(RED_LABEL_THSTAB_START..todays_end),
+            Some(expected.as_slice())
+        );
+        assert_eq!(
+            reset.red_label_ram_range(0xA082..0xA086),
+            Some(&[0, 0, 0, 0][..])
+        );
+    }
+
+    #[test]
     fn credited_start_button_runs_translated_st1_path() {
         let mut machine = ArcadeMachine::new();
         insert_live_coin(&mut machine);
