@@ -266,8 +266,9 @@ Steps:
 - [x] DC-03.2 Verify `make reference-traces` with the local MAME and ROM path,
   or document the missing local dependency.
   Completed: `2026-05-04 17:43:34 BST`
-- [ ] DC-03.3 Verify `make reference-fixtures-check` catches missing headers,
+- [x] DC-03.3 Verify `make reference-fixtures-check` catches missing headers,
   missing scenarios, and frame-count drift.
+  Completed: `2026-05-04 17:45:36 BST`
 - [ ] DC-03.4 Add any missing scenario required before the next subsystem is
   translated.
 - [ ] DC-03.5 Record fixture generation date, MAME version, ROM path policy, and
@@ -310,6 +311,21 @@ Work log:
   output plus the tracked `PLAN.md` update.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913041385469`
+- `2026-05-04 17:44:32 BST` Started `DC-03.3`: verifying
+  `make reference-fixtures-check` against the generated local reference
+  fixtures and proving that the checker catches missing headers, missing
+  scenarios, and frame-count drift.
+- `2026-05-04 17:45:36 BST` Completed `DC-03.3`: ran
+  `make reference-fixtures-check`, which validated 12 complete Phase 1
+  reference fixtures and 22,308 frames from
+  `docs/fidelity/fixtures/local/reference`. Ran
+  `cargo test reference_trace_dir --all-targets` for the existing checker tests.
+  Used temporary fixture copies to prove the CLI rejects a bad header, a missing
+  `death.expected.tsv` scenario fixture, and a truncated `start_game` expected
+  trace with 1,227 frames instead of the manifest-required 1,228. Git status
+  shows only ignored local fixture output plus the tracked `PLAN.md` update.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913165185189`
 
 ### DC-04: Golden Tests For Existing Translated Slices
 
