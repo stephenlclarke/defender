@@ -375,8 +375,9 @@ Steps:
 
 - [x] DC-04.1 Compare boot/cold-start trace columns against local golden traces.
   Completed: `2026-05-04 17:55:34 BST`
-- [ ] DC-04.2 Compare start, fire, thrust/reverse, smart bomb, hyperspace, death,
+- [x] DC-04.2 Compare start, fire, thrust/reverse, smart bomb, hyperspace, death,
   and wave-clear slices against focused traces.
+  Completed: `2026-05-04 17:59:19 BST`
 - [ ] DC-04.3 Add ignored or failing fidelity tests for every still-unknown
   trace mismatch before implementing a fix.
 - [ ] DC-04.4 Keep exact TSV comparison as the first gate, then add narrower
@@ -411,6 +412,29 @@ Work log:
   comparison result and gap.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913765944929`
+- `2026-05-04 17:56:53 BST` Started `DC-04.2`: comparing start, fire,
+  thrust/reverse, smart bomb, hyperspace, death, and wave-advance trace slices
+  against the focused local MAME/source reference fixtures.
+- `2026-05-04 17:59:19 BST` Completed `DC-04.2`: compared `start_game`,
+  `firing`, `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and
+  `wave_advance` Rust traces against the local MAME/source references. All
+  seven exact comparisons failed first at line 2, frame 1, on the inherited
+  boot process/super-process CRC drift. Column summaries showed line counts and
+  input-port columns stayed aligned, while phase, wave, lives, smart bombs, RNG
+  bytes, object CRCs, and process CRCs diverged after the credited-start window.
+  Added the focused-slice results to
+  `docs/fidelity/golden-comparison-results.md` and updated `SPEC.md` plus
+  `docs/fidelity/gaps.md` with the credited-start timing, RNG order, and
+  post-start object/process scheduler gaps. Validation passed with
+  expected-failing `--fidelity-check-trace` runs for the seven scenarios,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/characterization-tests.md
+  docs/fidelity/local-reference-runs.md
+  docs/fidelity/golden-comparison-results.md assets/red-label/README.md`, and
+  `git diff --check`. No cargo test was run because this step only records the
+  comparison results and gaps.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913989696059`
 
 ## Phase 2: Hardware, Scheduler, And Frame Execution
 

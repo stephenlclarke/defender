@@ -1055,6 +1055,14 @@ Additional gaps and corrections found during this review:
   frames. All other trace columns matched. Boot/start-ready process and
   super-process RAM state or scheduling remains a known golden-trace gap before
   `attract_boot` can be promoted as a passing exact fixture.
+- `DC-04.2` exact-compared the focused `start_game`, `firing`,
+  `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
+  local references. All seven failed first on the same line 2 boot
+  process/super-process CRC mismatch. After the credited-start window, phase,
+  wave, lives, smart bombs, RNG bytes, object CRCs, and process CRCs diverge;
+  input bits, MAME IN0/IN1/IN2 bytes, scores, sound commands, and events stayed
+  aligned. Credited-start transition timing, RNG call order, and post-start
+  object/process scheduler execution remain golden-trace gaps.
 - There are no object-table, shell-table, or pixel-frame golden tests against
   attract/gameplay references, though the trace format can now carry raw table
   and native frame CRC-32 values.

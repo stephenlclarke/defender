@@ -70,6 +70,14 @@ This file records behavior that must not be guessed in arcade-core code.
   CRC placeholder, sound commands, and events matched for the whole scenario.
   Boot/start-ready process and super-process RAM state or scheduling remains a
   golden-trace gap before `attract_boot` can become a passing exact fixture.
+- `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
+  `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
+  Each exact comparison failed first on the same line 2 boot process/super-process
+  CRC drift. After the credited-start window, phase, wave, lives, smart bombs,
+  RNG bytes, object CRCs, and process CRCs diverge; input bits, MAME IN0/IN1/IN2
+  bytes, scores, sound commands, and events stayed aligned for those runs.
+  Credited-start transition timing, RNG call order, and post-start
+  object/process scheduler execution remain golden-trace gaps.
 - `--fidelity-trace [FRAMES]` can emit deterministic Rust TSV frames for local
   fixture work, but it is not a MAME/source golden-trace generator.
 - `--fidelity-trace-inputs SCRIPT` can apply scripted per-frame cabinet inputs
