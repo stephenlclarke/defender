@@ -1167,8 +1167,9 @@ Steps:
 - [x] DC-10.1 Translate wave launch process order, enemy reserve allocation, and
   spawn timing from source.
   Completed: `2026-05-04 22:27:15 BST`
-- [ ] DC-10.2 Finish terrain scheduling, destroyed-planet terrain, scanner
+- [x] DC-10.2 Finish terrain scheduling, destroyed-planet terrain, scanner
   terrain, and fifth-wave human restoration.
+  Completed: `2026-05-04 22:29:39 BST`
 - [ ] DC-10.3 Prove `GETWV`, `WDELT`, target restoration, and survivor bonus
   behavior against golden traces.
 - [ ] DC-10.4 Add tests for wave-to-wave RAM mutation and object/process list
@@ -1194,6 +1195,20 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777930065731819`
+- `2026-05-04 22:28:28 BST` Started `DC-10.2`: adding a terrain/world
+  fixture for live `BGOUT` scheduling, scanner mini-terrain writes,
+  destroyed-planet `TERBLO` mutation, and fifth-wave human restoration.
+- `2026-05-04 22:29:39 BST` Completed `DC-10.2`: added
+  `world_terrain_fixture_covers_bgout_scanner_terblo_and_restore_wave`, proving
+  `ALINIT`/`BGINIT`/`BGOUT` mutate `STBL` and preserve the IRQ stack context,
+  scanner rendering writes 64 `MTERR` terrain blips through `STETAB`, `TERBLO`
+  sets terrain-blown status, erases terrain/scanner footprints, spawns its
+  first explosion pass, and fifth-wave `GETWV` restores `PTARG` to 10 humans.
+  Validation passed with `cargo fmt --check`,
+  `cargo test world_terrain_fixture_covers_bgout_scanner_terblo_and_restore_wave
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777930206530419`
 
 ### DC-11: Remaining Enemy And Collision Behavior
 

@@ -34221,6 +34221,99 @@ mod tests {
     }
 
     #[test]
+    fn world_terrain_fixture_covers_bgout_scanner_terblo_and_restore_wave() {
+        let mut terrain = ArcadeMachine::new();
+        terrain
+            .red_label_initialize_altitude_table()
+            .expect("DC-10.2 ALINIT");
+        terrain
+            .red_label_initialize_terrain_tables()
+            .expect("DC-10.2 BGINIT");
+        let stbl_head = red_label_ram_snapshot(&terrain, "DC-10.2 STBL head", 0xBE20..0xBE30);
+        let terrain_output = terrain
+            .red_label_output_terrain(red_label_irq_bgout_stack_pointer())
+            .expect("DC-10.2 BGOUT");
+
+        assert_eq!(
+            terrain_output,
+            expected_bgout_default(red_label_irq_bgout_stack_pointer())
+        );
+        stbl_head.assert_current_changed_to(
+            &terrain,
+            &[
+                0x98, 0xDE, 0x97, 0xDE, 0x96, 0xDE, 0x95, 0xDC, 0x94, 0xDA, 0x93, 0xD8, 0x92, 0xD7,
+                0x91, 0xD9,
+            ],
+        );
+        assert_eq!(
+            terrain.red_label_ram_range(0xA013..0xA015),
+            Some(&red_label_irq_bgout_stack_pointer().to_be_bytes()[..])
+        );
+
+        let mut scanner = ArcadeMachine::new();
+        let raster = scanner
+            .red_label_draw_scanner_raster()
+            .expect("DC-10.2 scanner raster");
+        let terrain_blips = raster.terrain_blips.expect("DC-10.2 terrain blips");
+        assert_eq!(terrain_blips.len(), 64);
+        assert_eq!(terrain_blips[0].erase_table_address, 0xB125);
+        assert_eq!(terrain_blips[0].screen_address >> 8, 0x30);
+        assert_eq!(
+            scanner.red_label_ram_range(
+                terrain_blips[0].screen_address..terrain_blips[0].screen_address + 2
+            ),
+            Some(&terrain_blips[0].word.to_be_bytes()[..])
+        );
+
+        let mut destroyed = ArcadeMachine::new();
+        let process = destroyed
+            .red_label_make_process(
+                red_label_routine_address("TERBLO").expect("TERBLO address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make DC-10.2 TERBLO process")
+            .process_address;
+        destroyed
+            .step_red_label_process_scheduler()
+            .expect("schedule DC-10.2 TERBLO");
+        let status = red_label_ram_snapshot(&destroyed, "DC-10.2 terrain status", 0xA0BA..0xA0BB);
+        let step = destroyed
+            .red_label_start_terrain_blow_current_process()
+            .expect("DC-10.2 TERBLO start");
+        let RedLabelTerrainBlowProcessStep::StartedSleeping {
+            process_address,
+            status: terrain_status,
+            terrain_erase,
+            scanner_terrain_erase,
+            pass,
+        } = step
+        else {
+            panic!("expected DC-10.2 TERBLO start");
+        };
+        assert_eq!(process_address, process);
+        assert_eq!(terrain_status & 0x02, 0x02);
+        assert_eq!(terrain_erase.entries, 0x98);
+        assert_eq!(scanner_terrain_erase.entries, 64);
+        assert_eq!(pass.explosions.len(), 2);
+        assert_eq!(
+            pass.wakeup_address,
+            red_label_routine_address("TBL3").expect("TBL3 address")
+        );
+        status.assert_current_changed_to(&destroyed, &[0x02]);
+
+        let mut restore = ArcadeMachine::new();
+        restore.memory.write_byte(0xA1CA, 4).expect("set PWAV");
+        restore.memory.write_byte(0xA1CC, 0).expect("clear PTARG");
+        let wave = restore
+            .red_label_get_new_wave_parameters_for_player_address(0xA1C2)
+            .expect("DC-10.2 GETWV restore");
+        assert_eq!(wave.previous_wave, 4);
+        assert_eq!(wave.wave, 5);
+        assert!(wave.restored_humans);
+        assert_eq!(restore.red_label_ram_range(0xA1CC..0xA1CD), Some(&[10][..]));
+    }
+
+    #[test]
     fn machine_boot_initializes_source_init20_tables_from_rand() {
         let machine = ArcadeMachine::new();
         let mut rng = RandState::default();
