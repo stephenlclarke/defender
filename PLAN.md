@@ -253,15 +253,16 @@ Work log:
 
 ### DC-03: Local Reference Fixture Environment
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: make local MAME/source fixtures reliable enough to gate every translated
 subsystem.
 
 Steps:
 
-- [ ] DC-03.1 Verify `make reference-inputs` writes every scenario from
+- [x] DC-03.1 Verify `make reference-inputs` writes every scenario from
   `assets/red-label/trace-scenarios.tsv`.
+  Completed: `2026-05-04 17:41:35 BST`
 - [ ] DC-03.2 Verify `make reference-traces` with the local MAME and ROM path,
   or document the missing local dependency.
 - [ ] DC-03.3 Verify `make reference-fixtures-check` catches missing headers,
@@ -273,6 +274,24 @@ Steps:
 
 Completion gate: local reference generation and validation are repeatable, or
 all missing external dependencies are documented.
+
+Work log:
+
+- `2026-05-04 17:40:56 BST` Started `DC-03.1`: verifying that
+  `make reference-inputs` writes one expanded input script for every scenario in
+  `assets/red-label/trace-scenarios.tsv` under the ignored local reference
+  fixture tree.
+- `2026-05-04 17:41:35 BST` Completed `DC-03.1`: ran
+  `make reference-inputs`, which wrote 12 Phase 1 `*.inputs.txt` scripts to the
+  ignored `docs/fidelity/fixtures/local/reference` tree. Verified the generated
+  filenames exactly match `assets/red-label/trace-scenarios.tsv` with `comm`,
+  confirmed the generated count is 12, listed scenarios with
+  `cargo run --quiet -- --fidelity-list-scenarios`, and checked each generated
+  script expands to the frame count declared in the manifest with `awk`. Git
+  status shows only ignored local fixture output plus the tracked `PLAN.md`
+  update.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777912920816689`
 
 ### DC-04: Golden Tests For Existing Translated Slices
 
