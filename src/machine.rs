@@ -52375,6 +52375,116 @@ mod tests {
     }
 
     #[test]
+    fn hyperspace_fixture_covers_guard_rematerialization_safe_tail_and_death_risk() {
+        let mut guarded = ArcadeMachine::new();
+        let guarded_process = schedule_hyperspace_process(&mut guarded);
+        guarded
+            .memory
+            .write_byte(0xA0BA, 0x08)
+            .expect("set blocking STATUS");
+
+        let guarded_entry = guarded
+            .red_label_start_hyperspace_current_process()
+            .expect("guarded HYPER entry");
+
+        assert_eq!(
+            guarded_entry,
+            RedLabelHyperspace::Suppressed(RedLabelKilledProcess {
+                killed_process_address: guarded_process,
+                previous_link_address: 0xA05F,
+            })
+        );
+        assert_eq!(
+            guarded.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[0x08][..])
+        );
+
+        let mut safe = ArcadeMachine::new();
+        let safe_process = schedule_hyperspace_process(&mut safe);
+        safe.memory.write_byte(0xA0DF, 0x12).expect("set SEED");
+        safe.memory.write_byte(0xA0E0, 0x35).expect("set HSEED");
+        safe.memory.write_byte(0xA0E1, 0xC0).expect("set LSEED");
+        safe.memory.write_word(0xA0C5, 0x8034).expect("set PLAY16");
+        safe.memory.write_byte(0xA0FA, 1).expect("set ASTCNT");
+
+        let rematerializing = safe
+            .red_label_continue_hyperspace_current_process()
+            .expect("safe HYP02");
+        assert!(matches!(
+            rematerializing,
+            RedLabelHyperspace::RematerializingSleeping {
+                process_address,
+                seed_word: 0x1235,
+                player_x16: 0x2000,
+                player_y16: 0x4434,
+                player_upper_left: 0x2044,
+                player_direction: 0x0300,
+                phony_object_address: 0xA23C,
+                phony_picture_address: 0xF9C1,
+                wakeup_address: 0xE9AC,
+                ..
+            } if process_address == safe_process
+        ));
+        assert_eq!(
+            safe.red_label_ram_range(0xA0BA..0xA0CD),
+            Some(
+                &[
+                    0x50, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x44, 0x20, 0x00, 0x44, 0x34,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                ][..],
+            )
+        );
+
+        let safe_tail = safe
+            .red_label_finish_hyperspace_current_process()
+            .expect("safe HYP2");
+        assert_eq!(
+            safe_tail,
+            RedLabelHyperspace::Completed {
+                process_address: safe_process,
+                phony_object_address: 0xA23C,
+                previous_object_link_address: 0xA065,
+                status: 0x00,
+                lseed: 0xC0,
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: safe_process,
+                    previous_link_address: 0xA05F,
+                },
+            }
+        );
+        assert_eq!(safe.red_label_ram_range(0xA0BA..0xA0BB), Some(&[0][..]));
+
+        let mut risky = ArcadeMachine::new();
+        let risky_process = schedule_hyperspace_process(&mut risky);
+        risky.memory.write_byte(0xA0DF, 0x12).expect("set SEED");
+        risky.memory.write_byte(0xA0E0, 0x34).expect("set HSEED");
+        risky.memory.write_byte(0xA0E1, 0xC1).expect("set LSEED");
+        risky
+            .red_label_continue_hyperspace_current_process()
+            .expect("risky HYP02");
+
+        let risky_tail = risky
+            .red_label_finish_hyperspace_current_process()
+            .expect("risky HYP2");
+
+        assert_eq!(
+            risky_tail,
+            RedLabelHyperspace::DeathRisk {
+                process_address: risky_process,
+                phony_object_address: 0xA23C,
+                previous_object_link_address: 0xA065,
+                status: 0x02,
+                lseed: 0xC1,
+                plend_address: 0xDA46,
+            }
+        );
+        assert_eq!(
+            risky.red_label_ram_range(0xA05F..0xA063),
+            Some(&[0xAA, 0xC5, 0xAA, 0xD4][..])
+        );
+    }
+
+    #[test]
     fn player_death_entry_saves_state_builds_mono_picture_and_sleeps() {
         let mut machine = ArcadeMachine::new();
         let process = schedule_player_death_process(&mut machine);

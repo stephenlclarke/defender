@@ -919,8 +919,9 @@ Steps:
 - [x] DC-08.3 Finish smart-bomb world integration, including what is and is not
   destroyed.
   Completed: `2026-05-04 21:41:32 BST`
-- [ ] DC-08.4 Finish hyperspace failure/safe paths and rematerialization
+- [x] DC-08.4 Finish hyperspace failure/safe paths and rematerialization
   movement.
+  Completed: `2026-05-04 21:44:47 BST`
 - [ ] DC-08.5 Finish carried-human, falling-human, catch, landing, and rescue
   paths.
 - [ ] DC-08.6 Prove death, respawn, wave-clear, and game-over branches with
@@ -973,6 +974,20 @@ Work log:
   --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777927313145899`
+- `2026-05-04 21:42:42 BST` Started `DC-08.4`: adding a hyperspace refactor
+  fixture that proves the guarded entry path, rematerialization movement/object
+  creation, safe `HYP2` cleanup, and high-`LSEED` death-risk branch together.
+- `2026-05-04 21:44:47 BST` Completed `DC-08.4`: added
+  `hyperspace_fixture_covers_guard_rematerialization_safe_tail_and_death_risk`,
+  proving `HYPER` suppresses blocked status without mutation, `HYP02` derives
+  background/player position/direction from `SEED`/`HSEED`, creates the phony
+  player appearance object, safe `HYP2` clears status and suicides, and high
+  `LSEED` branches to `PLEND` without killing the hyperspace process.
+  Validation passed with `cargo fmt --check` and
+  `cargo test hyperspace_fixture_covers_guard_rematerialization_safe_tail_and_death_risk
+  --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777927508535499`
 
 ### DC-09: Cabinet Session And Operator Flow
 
