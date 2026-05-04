@@ -1632,8 +1632,9 @@ Steps:
   unchanged when `xyzzy` is disabled and compatibility behavior applies when it
   is enabled.
   Completed: `2026-05-05 00:01:48 BST`
-- [ ] DC-14.4 Add trace checks that `xyzzy` disabled remains red-label
+- [x] DC-14.4 Add trace checks that `xyzzy` disabled remains red-label
   equivalent.
+  Completed: `2026-05-05 00:04:21 BST`
 - [ ] DC-14.5 Document compatibility behavior without presenting it as arcade
   behavior.
 
@@ -1687,6 +1688,20 @@ Work log:
   deferred until the full `DC-14` cycle closes.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935729220189`
+- `2026-05-05 00:02:40 BST` Started `DC-14.4`: adding a trace-level
+  regression that explicitly disabled `xyzzy` remains byte-for-byte equivalent
+  to the default red-label trace path.
+- `2026-05-05 00:04:21 BST` Completed `DC-14.4`: added an internal
+  compatibility-aware trace generator and a regression that expands a
+  coin/start/player-action trace program, then proves an explicitly disabled
+  `xyzzy` state with hidden toggles set still matches the default red-label
+  trace byte-for-byte. Validation passed with `cargo fmt --check`,
+  `cargo test trace_text_with_xyzzy_disabled_is_red_label_equivalent
+  --all-targets`, `cargo test trace_text_ --all-targets`, and
+  `cargo clippy --all-targets -- -D warnings`. Broader `make fidelity` is
+  deferred until the full `DC-14` cycle closes.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935880819719`
 
 ## Phase 8: Planned Large Refactor
 

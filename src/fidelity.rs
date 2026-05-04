@@ -9,7 +9,9 @@ use std::fmt;
 
 use crate::{
     input::{CabinetInput, DefenderInputPorts},
-    machine::{ArcadeMachine, FrameOutput, GamePhase, MachineEvent, MachineSnapshot},
+    machine::{
+        ArcadeMachine, CompatibilityState, FrameOutput, GamePhase, MachineEvent, MachineSnapshot,
+    },
     rom::crc32,
     sound::{SoundCommand, format_sound_command_list},
     video::RenderedImage,
@@ -318,11 +320,19 @@ pub fn trace_output(input: CabinetInput, output: &FrameOutput) -> String {
 }
 
 pub fn trace_text_for_inputs(inputs: &[CabinetInput]) -> Result<String, String> {
+    trace_text_for_inputs_with_compatibility(inputs, CompatibilityState::default())
+}
+
+fn trace_text_for_inputs_with_compatibility(
+    inputs: &[CabinetInput],
+    compatibility: CompatibilityState,
+) -> Result<String, String> {
     if inputs.is_empty() {
         return Err(String::from("fidelity trace requires at least one frame"));
     }
 
     let mut machine = ArcadeMachine::new_cold_boot_trace();
+    machine.set_compatibility(compatibility);
     let mut text = String::from(trace_header());
     text.push('\n');
 
@@ -503,7 +513,7 @@ mod tests {
             trace_text_for_inputs,
         },
         input::CabinetInput,
-        machine::{ArcadeMachine, GamePhase, MachineEvent},
+        machine::{ArcadeMachine, CompatibilityState, GamePhase, MachineEvent},
         rom::crc32,
         sound::SoundCommand,
         video::RenderedImage,
@@ -791,6 +801,30 @@ mod tests {
 
         assert!(frame.starts_with("1\t0x0003\t0x20\t0x00\t0x10\tattract\t"));
         assert!(frame.ends_with("\t-\t-"));
+    }
+
+    #[test]
+    fn trace_text_with_xyzzy_disabled_is_red_label_equivalent() {
+        let expanded_inputs = expanded_trace_input_text(
+            "none*900;coin*3;none*9;start_one*2;none*120;fire,thrust;smart_bomb;hyperspace",
+        )
+        .expect("expanded trace input program");
+        let inputs =
+            parse_trace_input_script(expanded_inputs.trim_end()).expect("scripted trace inputs");
+        let default_trace = trace_text_for_inputs(&inputs).expect("default trace text");
+        let disabled_xyzzy_trace = super::trace_text_for_inputs_with_compatibility(
+            &inputs,
+            CompatibilityState {
+                xyzzy_active: false,
+                xyzzy_invincible: true,
+                xyzzy_auto_fire: true,
+            },
+        )
+        .expect("disabled xyzzy trace text");
+
+        let comparison =
+            compare_trace_text(&default_trace, &disabled_xyzzy_trace).expect("matching trace");
+        assert_eq!(comparison.frames, inputs.len());
     }
 
     #[test]
