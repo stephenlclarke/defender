@@ -92,6 +92,7 @@ const RED_LABEL_BONUS_ASTRO_SCREEN_STEP: u16 = 0x0400;
 const RED_LABEL_PLAYER_START_PROMPT_SCREEN: u16 = 0x3C80;
 const RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN: u16 = 0x3C78;
 const RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN: u16 = 0x3E88;
+const RED_LABEL_PLS1_ENTRY_B_REGISTER: u8 = 0x07;
 const RED_LABEL_HOF_INITS_RAM: u16 = 0xA000;
 const RED_LABEL_HOF_PLAYER_NUMBER_RAM: u16 = RED_LABEL_HOF_INITS_RAM + 6;
 const RED_LABEL_HOF_TABLE_INITIALS_RAM: u16 = RED_LABEL_HOF_PLAYER_NUMBER_RAM + 2;
@@ -686,6 +687,17 @@ impl RedLabelScheduledProcess {
         }
     }
 
+    pub fn from_source_routine(process_address: u16, routine_address: u16) -> Result<Self, String> {
+        Ok(Self {
+            process_address,
+            routine_address,
+            entry_registers: red_label_source_entry_registers_for_routine(
+                process_address,
+                routine_address,
+            )?,
+        })
+    }
+
     fn validate_source_disp_context(self, current_process: u16) -> Result<(), String> {
         if self.entry_registers.u == Some(current_process)
             && self.process_address == current_process
@@ -698,6 +710,17 @@ impl RedLabelScheduledProcess {
             self.process_address
         ))
     }
+}
+
+fn red_label_source_entry_registers_for_routine(
+    process_address: u16,
+    routine_address: u16,
+) -> Result<RedLabelCpuRegisters, String> {
+    let mut registers = RedLabelCpuRegisters::from_source_disp(process_address);
+    if routine_address == red_label_routine_address("PLS1")? {
+        registers.b = Some(RED_LABEL_PLS1_ENTRY_B_REGISTER);
+    }
+    Ok(registers)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -5683,7 +5706,26 @@ impl RedLabelRuntimeMemory {
     pub fn finish_player_start_current_process(&mut self) -> Result<RedLabelPlayerStart, String> {
         let layout = red_label_ram_layout()?;
         let process_address = self.current_process_address(&layout)?;
-        let restore = self.restore_player_world_current_process(&layout)?;
+        let entry_registers = red_label_source_entry_registers_for_routine(
+            process_address,
+            red_label_routine_address("PLS1")?,
+        )?;
+        self.finish_player_start_current_process_with_entry_registers(entry_registers)
+    }
+
+    fn finish_player_start_current_process_with_entry_registers(
+        &mut self,
+        entry_registers: RedLabelCpuRegisters,
+    ) -> Result<RedLabelPlayerStart, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.current_process_address(&layout)?;
+        if entry_registers.u != Some(process_address) {
+            return Err(format!(
+                "red-label PLS1 entry U {:?} does not match CRPROC 0x{process_address:04X}",
+                entry_registers.u
+            ));
+        }
+        let restore = self.restore_player_world_current_process(&layout, entry_registers)?;
         let status = self.write_terrain_status(&layout, 0)?;
         let pdf_flag_before = self.read_field_byte(&layout, "base_page", "PDFLG")?;
         self.write_field_byte(&layout, "base_page", "PDFLG", 0)?;
@@ -14091,10 +14133,10 @@ impl RedLabelRuntimeMemory {
                 let paddr =
                     process_field_range_for_address(&layout, table, process_address, "PADDR")?
                         .start;
-                return Ok(Some(RedLabelScheduledProcess::from_source_disp(
+                return Ok(Some(RedLabelScheduledProcess::from_source_routine(
                     process_address,
                     self.read_word(paddr)?,
-                )));
+                )?));
             }
 
             let plink =
@@ -14140,6 +14182,18 @@ impl RedLabelRuntimeMemory {
     pub fn dispatch_translated_process_routine(
         &mut self,
         routine_address: u16,
+    ) -> Result<RedLabelProcessDispatch, String> {
+        let entry_registers = self.source_entry_registers_for_current_routine(routine_address)?;
+        self.dispatch_translated_process_routine_with_entry_registers(
+            routine_address,
+            entry_registers,
+        )
+    }
+
+    fn dispatch_translated_process_routine_with_entry_registers(
+        &mut self,
+        routine_address: u16,
+        entry_registers: RedLabelCpuRegisters,
     ) -> Result<RedLabelProcessDispatch, String> {
         if [
             red_label_routine_address("SUCIDE")?,
@@ -14578,7 +14632,7 @@ impl RedLabelRuntimeMemory {
 
         if routine_address == red_label_routine_address("PLS1")? {
             return self
-                .finish_player_start_current_process()
+                .finish_player_start_current_process_with_entry_registers(entry_registers)
                 .map(RedLabelProcessDispatch::PlayerStart);
         }
 
@@ -14934,7 +14988,19 @@ impl RedLabelRuntimeMemory {
         let current_process = self.read_field_word(&layout, "runtime_pointers", "CRPROC")?;
         scheduled.validate_source_disp_context(current_process)?;
 
-        self.dispatch_translated_process_routine(scheduled.routine_address)
+        self.dispatch_translated_process_routine_with_entry_registers(
+            scheduled.routine_address,
+            scheduled.entry_registers,
+        )
+    }
+
+    fn source_entry_registers_for_current_routine(
+        &self,
+        routine_address: u16,
+    ) -> Result<RedLabelCpuRegisters, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.read_field_word(&layout, "runtime_pointers", "CRPROC")?;
+        red_label_source_entry_registers_for_routine(process_address, routine_address)
     }
 
     fn make_process_from_free_list(
@@ -16622,8 +16688,24 @@ impl RedLabelRuntimeMemory {
     fn restore_player_world_current_process(
         &mut self,
         layout: &[RedLabelRamLayoutEntry],
+        entry_registers: RedLabelCpuRegisters,
     ) -> Result<RedLabelPlayerRestore, String> {
         let plres_address = red_label_routine_address("PLRES")?;
+        let player_table = table_descriptor(layout, "player")?;
+        let player_address = self.read_field_word(layout, "base_page", "PLRX")?;
+        let player_index = entry_index_for_address(player_table, player_address)?;
+        let target_count =
+            self.read_byte(player_field_range_for_entry(layout, player_index, "PTARG")?.start)?;
+        let mut plres_b_register = if target_count == 0 {
+            entry_registers.b.ok_or_else(|| {
+                String::from(
+                    "red-label PLRES targetless mini-swarmer restore requires PLS1 entry B register",
+                )
+            })?
+        } else {
+            0
+        };
+
         let astro_process = self.make_process(
             red_label_routine_address("ASTRO")?,
             RED_LABEL_SYSTEM_PROCESS_TYPE,
@@ -16636,14 +16718,7 @@ impl RedLabelRuntimeMemory {
             target_list.start,
         )?;
         self.clear_range(target_list.clone())?;
-
-        let player_table = table_descriptor(layout, "player")?;
-        let player_address = self.read_field_word(layout, "base_page", "PLRX")?;
-        let player_index = entry_index_for_address(player_table, player_address)?;
-        let target_count =
-            self.read_byte(player_field_range_for_entry(layout, player_index, "PTARG")?.start)?;
         self.write_field_byte(layout, "base_page", "ASTCNT", target_count)?;
-        let mut plres_b_register = if target_count == 0 { 0x07 } else { 0 };
 
         let mut target_writer = RedLabelTargetRestoreWriter {
             target_list: target_list.clone(),
@@ -24223,7 +24298,10 @@ impl ArcadeMachine {
             .read_field_word(&layout, "runtime_pointers", "CRPROC")?;
         scheduled.validate_source_disp_context(current_process)?;
 
-        self.dispatch_red_label_process_routine(scheduled.routine_address)
+        self.dispatch_red_label_process_routine_with_entry_registers(
+            scheduled.routine_address,
+            scheduled.entry_registers,
+        )
     }
 
     pub fn red_label_dispatch_translated_process_routine(
@@ -24252,6 +24330,20 @@ impl ArcadeMachine {
         &mut self,
         routine_address: u16,
     ) -> Result<RedLabelProcessDispatch, String> {
+        let entry_registers = self
+            .memory
+            .source_entry_registers_for_current_routine(routine_address)?;
+        self.dispatch_red_label_process_routine_with_entry_registers(
+            routine_address,
+            entry_registers,
+        )
+    }
+
+    fn dispatch_red_label_process_routine_with_entry_registers(
+        &mut self,
+        routine_address: u16,
+        entry_registers: RedLabelCpuRegisters,
+    ) -> Result<RedLabelProcessDispatch, String> {
         if routine_address == red_label_routine_address("PLSTRT")? {
             return self
                 .red_label_start_player_start_current_process()
@@ -24278,7 +24370,10 @@ impl ArcadeMachine {
         }
 
         self.memory
-            .dispatch_translated_process_routine(routine_address)
+            .dispatch_translated_process_routine_with_entry_registers(
+                routine_address,
+                entry_registers,
+            )
     }
 
     fn finish_game_exec_wave_clear_current_process(&mut self) -> Result<RedLabelGameExec, String> {
@@ -26157,11 +26252,11 @@ mod tests {
             RED_LABEL_IRQB_ADDRESS, RED_LABEL_NORMAL_IRQ_LIVE_VERTCT,
             RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT, RED_LABEL_NORMAL_WATCHDOG_DATA,
             RED_LABEL_P1SW_PIA3_CONTROL, RED_LABEL_P2SW_PIA3_CONTROL, RED_LABEL_PIA3_COCKTAIL_BIT,
-            RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelAdminSwitch, RedLabelAdvanceSwitchTarget,
-            RedLabelAltitudeTableInit, RedLabelAppearanceStart, RedLabelAstronautDirection,
-            RedLabelAstronautKill, RedLabelAstronautProcessStep, RedLabelAstronautWalk,
-            RedLabelAttractCopyright, RedLabelAttractCopyrightWait, RedLabelAttractCredits,
-            RedLabelAttractCreditsText, RedLabelAttractDefenderDelay,
+            RED_LABEL_PLS1_ENTRY_B_REGISTER, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelAdminSwitch,
+            RedLabelAdvanceSwitchTarget, RedLabelAltitudeTableInit, RedLabelAppearanceStart,
+            RedLabelAstronautDirection, RedLabelAstronautKill, RedLabelAstronautProcessStep,
+            RedLabelAstronautWalk, RedLabelAttractCopyright, RedLabelAttractCopyrightWait,
+            RedLabelAttractCredits, RedLabelAttractCreditsText, RedLabelAttractDefenderDelay,
             RedLabelAttractDefenderRefresh, RedLabelAttractDefenderRestoreStart,
             RedLabelAttractInstructionAscent, RedLabelAttractInstructionEnemySpawn,
             RedLabelAttractInstructionEnemyTableStart, RedLabelAttractInstructionFreeFall,
@@ -26175,14 +26270,14 @@ mod tests {
             RedLabelBlockClear, RedLabelBonusTextCall, RedLabelBonusTextPlan, RedLabelBorder,
             RedLabelCapturedAstronautCollision, RedLabelCmosWordWrite, RedLabelCoinCredit,
             RedLabelCoinProcessStep, RedLabelCoinSlot, RedLabelCoinSwitchScan,
-            RedLabelColorRamInit, RedLabelCreatedProcess, RedLabelCreatedShell, RedLabelEnemyKill,
-            RedLabelExecOverloadedObject, RedLabelExecPreDispatch, RedLabelExpandedUpdate,
-            RedLabelExplosionStart, RedLabelFallingAstronautStep, RedLabelFireballTableInit,
-            RedLabelFreePlayCredit, RedLabelGameExec, RedLabelGameExecEntry,
-            RedLabelGameExecStarTime, RedLabelGenocide, RedLabelHallOfFameDisplayWait,
-            RedLabelHallOfFameEntryDispatch, RedLabelHallOfFameEntrySetup,
-            RedLabelHighScoreEntryStart, RedLabelHighScoreFireSwitch, RedLabelHighScoreHandoff,
-            RedLabelHighScoreQualification, RedLabelHighScoreSubmission,
+            RedLabelColorRamInit, RedLabelCpuRegisters, RedLabelCreatedProcess,
+            RedLabelCreatedShell, RedLabelEnemyKill, RedLabelExecOverloadedObject,
+            RedLabelExecPreDispatch, RedLabelExpandedUpdate, RedLabelExplosionStart,
+            RedLabelFallingAstronautStep, RedLabelFireballTableInit, RedLabelFreePlayCredit,
+            RedLabelGameExec, RedLabelGameExecEntry, RedLabelGameExecStarTime, RedLabelGenocide,
+            RedLabelHallOfFameDisplayWait, RedLabelHallOfFameEntryDispatch,
+            RedLabelHallOfFameEntrySetup, RedLabelHighScoreEntryStart, RedLabelHighScoreFireSwitch,
+            RedLabelHighScoreHandoff, RedLabelHighScoreQualification, RedLabelHighScoreSubmission,
             RedLabelHighScoreSubmissionHandoff, RedLabelHighScoreTableKind, RedLabelHyperspace,
             RedLabelIrqMode, RedLabelIrqObjectBandPass, RedLabelIrqObjectBandPhase,
             RedLabelIrqObjectBandStep, RedLabelIrqPreTailStep, RedLabelIrqSchedulerContext,
@@ -36580,6 +36675,39 @@ mod tests {
     }
 
     #[test]
+    fn process_scheduler_reports_pls1_entry_b_register_context() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("PLS1").expect("PLS1 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PLS1 process")
+            .process_address;
+
+        let scheduled = machine
+            .step_red_label_process_scheduler()
+            .expect("scheduler step")
+            .expect("due PLS1 process");
+
+        assert_eq!(scheduled.process_address, process);
+        assert_eq!(
+            scheduled.routine_address,
+            red_label_routine_address("PLS1").expect("PLS1 address")
+        );
+        assert_eq!(scheduled.entry_registers.u, Some(process));
+        assert_eq!(
+            scheduled.entry_registers.b,
+            Some(RED_LABEL_PLS1_ENTRY_B_REGISTER)
+        );
+        assert_eq!(scheduled.entry_registers.a, None);
+        assert_eq!(scheduled.entry_registers.x, None);
+        assert_eq!(scheduled.entry_registers.y, None);
+        assert_eq!(scheduled.entry_registers.s, None);
+        assert_eq!(scheduled.entry_registers.cc, None);
+    }
+
+    #[test]
     fn scheduled_process_rejects_mismatched_source_disp_context() {
         let scheduled = RedLabelScheduledProcess::from_source_disp(0xAAC5, 0x1234);
 
@@ -36622,6 +36750,90 @@ mod tests {
         assert_eq!(
             machine.red_label_ram_range(0xA061..0xA063),
             Some(&process.to_be_bytes()[..])
+        );
+    }
+
+    #[test]
+    fn player_restore_rejects_mismatched_pls1_entry_u_without_mutation() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("PLS1").expect("PLS1 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PLS1 process")
+            .process_address;
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule PLS1");
+        let active_before = machine
+            .red_label_ram_range(0xA05F..0xA061)
+            .expect("active head")
+            .to_vec();
+        let free_before = machine
+            .red_label_ram_range(0xA061..0xA063)
+            .expect("free head")
+            .to_vec();
+        let mut registers = RedLabelCpuRegisters::from_source_disp(process.wrapping_add(2));
+        registers.b = Some(RED_LABEL_PLS1_ENTRY_B_REGISTER);
+
+        let error = machine
+            .memory
+            .finish_player_start_current_process_with_entry_registers(registers)
+            .expect_err("mismatched PLS1 entry U should fail before PLRES mutation");
+
+        assert!(error.contains("entry U"));
+        assert!(error.contains(&format!("0x{process:04X}")));
+        assert_eq!(
+            machine.red_label_ram_range(0xA05F..0xA061),
+            Some(&active_before[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA061..0xA063),
+            Some(&free_before[..])
+        );
+    }
+
+    #[test]
+    fn player_restore_requires_pls1_entry_b_for_targetless_swarmer_restore() {
+        let mut machine = ArcadeMachine::new();
+        let process = machine
+            .red_label_make_process(
+                red_label_routine_address("PLS1").expect("PLS1 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make PLS1 process")
+            .process_address;
+        machine
+            .step_red_label_process_scheduler()
+            .expect("schedule PLS1");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1CC, 0).expect("clear PTARG");
+        let active_before = machine
+            .red_label_ram_range(0xA05F..0xA061)
+            .expect("active head")
+            .to_vec();
+        let free_before = machine
+            .red_label_ram_range(0xA061..0xA063)
+            .expect("free head")
+            .to_vec();
+
+        let error = machine
+            .memory
+            .finish_player_start_current_process_with_entry_registers(
+                RedLabelCpuRegisters::from_source_disp(process),
+            )
+            .expect_err("missing PLS1 entry B should fail before PLRES mutation");
+
+        assert!(error.contains("PLRES"));
+        assert!(error.contains("entry B"));
+        assert_eq!(
+            machine.red_label_ram_range(0xA05F..0xA061),
+            Some(&active_before[..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA061..0xA063),
+            Some(&free_before[..])
         );
     }
 

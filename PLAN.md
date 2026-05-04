@@ -666,8 +666,9 @@ Steps:
 - [x] DC-06.1 Add register-aware process entry/resume state where source
   routines require A/B/X/Y/U/S/CC context.
   Completed: `2026-05-04 19:27:41 BST`
-- [ ] DC-06.2 Complete `PLRES` swarmer respawn once the entry B register value
+- [x] DC-06.2 Complete `PLRES` swarmer respawn once the entry B register value
   is trace-proven.
+  Completed: `2026-05-04 20:13:37 BST`
 - [ ] DC-06.3 Finish suicide, resume, delay, super-process, and generic body
   dispatch semantics.
 - [ ] DC-06.4 Verify object/process order against golden traces.
@@ -699,6 +700,25 @@ Work log:
   docs/fidelity/gaps.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777919311049749`
+- `2026-05-04 20:06:47 BST` Started `DC-06.2`: moving the source `PLS1`/`PLRES`
+  B-register value used by mini-swarmer reserve restore into explicit scheduled
+  entry-register context, with tests for both the proven B value and the
+  missing-context failure mode.
+- `2026-05-04 20:13:37 BST` Completed `DC-06.2`: wired scheduled
+  `PLS1` entry context through translated dispatch so targetless `PLRES`
+  mini-swarmer reserve restore consumes source-proven B=`0x07` instead of a
+  hard-coded fallback, added guards for mismatched `U` and missing B before
+  list mutations, and added mutation-preserving unit tests for the proven B
+  snapshot plus both failure modes. Updated `SPEC.md`, `README.md`, and
+  `docs/fidelity/gaps.md` to record that A/X/Y/S/CC and other B values remain
+  unknown. Validation passed with focused scheduler/PLRES tests,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/gaps.md`,
+  `git diff --check`, and `make fidelity` (`cargo fmt --check`,
+  `cargo test --all-targets` with 812 passed and 13 known ignored library tests
+  plus 2 binary tests, clippy, trace script tests, skipped absent local fixture
+  directory, and coverage with 77/77 added executable Rust lines covered).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777922045347629`
 
 ### DC-07: IRQ, Scanline, And Palette Integration
 

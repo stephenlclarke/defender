@@ -235,8 +235,10 @@ This file records behavior that must not be guessed in arcade-core code.
   The executive scheduler now keeps walking `DISP` in the same source pass after
   process `SLEEP` and `SUCIDE` tails resume through `DISP2`. Scheduled-process
   rows now include register context for translated dispatch: source `DISP`
-  proves `U` equals the due process cell, while A/B/X/Y/S/CC remain unknown
-  until exact CPU scheduling or local traces prove them.
+  proves `U` equals the due process cell, and the source `PLS01`/`PLS1`/`PLRES`
+  flow proves B is `0x07` on the targetless `PLS1` mini-swarmer reserve restore
+  path. A/X/Y/S/CC and other B values remain unknown until exact CPU scheduling
+  or local traces prove them.
 - `--verify-roms PATH` can validate and map a local red-label ROM set into the
   embedded MAME region layout. ROM execution, golden traces, and generated
   derived assets remain future work.
@@ -343,7 +345,8 @@ This file records behavior that must not be guessed in arcade-core code.
   `XSVCT` score/sound path with `SWHSND`, `MSWM` / `MSWLP` now runs the
   mini-swarmer acceleration/damping/turnback loop and `SWBMB` `GETSHL` fireball
   shell path with `SWSSND`, `PLRES` mini-swarmer reserve restore now runs the
-  source `RSW0` phony-object placement, B-register X-low byte, `MMSW` batches,
+  source `RSW0` phony-object placement, source `PLS1` entry B=`0x07` for
+  targetless reserve restore, target-list B-register X-low byte, `MMSW` batches,
   `SWMRES` decrement, and `OFREE` return/reuse path, `TIE` runs the source
   image/vertical/cruise slice and `BOMBST` bomb-shell lifetime path, and
   `TIEKIL` runs the source `KILO` score/explosion/sound path with `TIHSND` plus

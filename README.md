@@ -365,9 +365,10 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   using embedded `COLTAB` / `TCTAB` assets. Translated `PLSTRT` runtime
   dispatch now syncs the live snapshot's current player, wave, lives, smart
   bombs, and player motion from red-label RAM. `PLRES` mini-swarmer reserve
-  restore now runs the source `RSW0` phony-object placement, reconstructed
-  B-register X-low byte, `MMSW` six-at-a-time batching, `SWMRES` decrement, and
-  `OFREE` return/reuse path. Live playing frames now schedule translated
+  restore now runs the source `RSW0` phony-object placement, source `PLS1`
+  entry B=`0x07` for targetless reserve restore, target-list B-register X-low
+  byte, `MMSW` six-at-a-time batching, `SWMRES` decrement, and `OFREE`
+  return/reuse path. Live playing frames now schedule translated
   `BGOUT` with the source-derived IRQ stack pointer, so the cabinet terrain
   screen table and video RAM advance through the red-label terrain output path.
   Full live respawn orchestration beyond the runtime snapshot handoff remains a

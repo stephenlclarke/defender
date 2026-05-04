@@ -133,9 +133,11 @@ synthetic scaffold fallback; untranslated blank screens remain black:
   `MSPROC`, `SLEEP`, `KILL`, and `DISP` primitives for process creation, delay,
   free-list return, scheduler timer decrement, `CRPROC` update, and due-`PADDR`
   reporting. Scheduled-process rows now carry a `RedLabelCpuRegisters` entry
-  snapshot: source `DISP` proves `U` equals the due process cell, while A, B, X,
-  Y, S, and CC stay explicit unknowns until the CPU/IRQ scheduler can prove
-  them. It translates active/inactive object and shell-list maintenance,
+  snapshot: source `DISP` proves `U` equals the due process cell, and the
+  source `PLS01`/`PLS1`/`PLRES` flow proves B is `0x07` on the targetless
+  `PLS1` mini-swarmer reserve restore path; A, X, Y, S, CC, and other B values
+  stay explicit unknowns until the CPU/IRQ scheduler can prove them. It
+  translates active/inactive object and shell-list maintenance,
   player/start/death slices, switch dispatch for translated actions, selected
   enemy/support process bodies, terrain-table generation, scoring, collision,
   object-picture output, and IRQ object-band slices while preserving explicit
@@ -1364,8 +1366,9 @@ Status: complete for the translated red-label scheduler layer. Source-shaped
 walk the active-process list, decrement `PTIME`, write `CRPROC`, and return
 `PADDR` plus source-proven entry register context for the due process. The
 current register surface records `U` as the process cell selected by `DISP` and
-leaves A/B/X/Y/S/CC unknown until exact CPU scheduling or local traces prove
-them. The executive wrapper now runs the source
+records source `PLS1` entry B as `0x07` for targetless `PLRES` mini-swarmer
+reserve restore. A, X, Y, S, CC, and other B values remain unknown until exact
+CPU scheduling or local traces prove them. The executive wrapper now runs the source
 `EXEC0`/`EXEC1` pre-dispatch slice and keeps walking `DISP` in the same pass
 after translated `SLEEP` and `SUCIDE` tails resume through the ROM's `DISP2`
 link, preserving same-frame process order for sleeping and killed cells. Body
@@ -1402,10 +1405,12 @@ copied `TIERES`, the `TIE` process image/vertical/cruise slice, `BOMBST`
 bomb-shell allocation and lifetime path, plus the status/PDFLG path, with
 machine-level `INIT20` `CRINIT` / `FISS` / `STINIT` / `OINIT` / `FBINIT` /
 `THINIT` refresh. `PLRES` mini-swarmer reserve restore now models the source
-`RSW0` phony-object placement, B-register `OX16` low-byte flow, `MMSW` batches
-of six, `SWMRES` decrement, and `OFREE` return/reuse path. Broader process body
-coverage, full hardware IRQ scanline/frame integration, and MAME golden-trace
-equivalence remain tracked by the later gameplay, video, and fidelity phases.
+`RSW0` phony-object placement, source `PLS1` entry B=`0x07` for targetless
+reserve restore, B-register `OX16` low-byte flow through target-list restore,
+`MMSW` batches of six, `SWMRES` decrement, and `OFREE` return/reuse path.
+Broader process body coverage, full hardware IRQ scanline/frame integration,
+and MAME golden-trace equivalence remain tracked by the later gameplay, video,
+and fidelity phases.
 
 1. Done: keep terminal presentation outside the verified cabinet frame
    while the live loop advances due core frames from `FRAME_RATE_MILLIHZ`
