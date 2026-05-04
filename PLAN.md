@@ -913,8 +913,9 @@ Steps:
 
 - [x] DC-08.1 Finish reverse integration with player movement and rendering.
   Completed: `2026-05-04 21:35:48 BST`
-- [ ] DC-08.2 Prove laser cap, laser lifetime, collision setup, and fizzle/erase
+- [x] DC-08.2 Prove laser cap, laser lifetime, collision setup, and fizzle/erase
   timing against traces.
+  Completed: `2026-05-04 21:38:30 BST`
 - [ ] DC-08.3 Finish smart-bomb world integration, including what is and is not
   destroyed.
 - [ ] DC-08.4 Finish hyperspace failure/safe paths and rematerialization
@@ -943,6 +944,19 @@ Work log:
   --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777926987448799`
+- `2026-05-04 21:37:29 BST` Started `DC-08.2`: adding a consolidated laser
+  lifecycle regression that covers the source four-laser cap plus the
+  fizzle/body/tail erase/collision finish mutations used by firing traces.
+- `2026-05-04 21:38:30 BST` Completed `DC-08.2`: added
+  `laser_lifecycle_fixture_covers_cap_fizzle_collision_and_erase_mutations`,
+  proving the four-laser `LFIRE` cap suicides without mutating sound state,
+  `LASR0` advances `FISX`, records the body/fizzle/tail process pointers,
+  dispatches collision through `LCOL`/`NOKILL`, erases the full beam trail, and
+  decrements `LFLG` on finish. Validation passed with `cargo fmt --check` and
+  `cargo test laser_lifecycle_fixture_covers_cap_fizzle_collision_and_erase_mutations
+  --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777927131955319`
 
 ### DC-09: Cabinet Session And Operator Flow
 

@@ -49381,6 +49381,120 @@ mod tests {
     }
 
     #[test]
+    fn laser_lifecycle_fixture_covers_cap_fizzle_collision_and_erase_mutations() {
+        let mut capped = ArcadeMachine::new();
+        let capped_process = schedule_laser_process(&mut capped, "LFIRE");
+        capped
+            .memory
+            .write_byte(0xA0B5, 4)
+            .expect("set source laser cap");
+
+        let cap = capped
+            .red_label_start_laser_fire_current_process()
+            .expect("capped LFIRE entry");
+
+        assert_eq!(
+            cap,
+            RedLabelLaserFire::Capped(RedLabelKilledProcess {
+                killed_process_address: capped_process,
+                previous_link_address: 0xA05F,
+            })
+        );
+        assert_eq!(
+            capped.red_label_ram_range(0xA0B5..0xA0B6),
+            Some(&[0x04][..])
+        );
+        assert_eq!(
+            capped.red_label_ram_range(0xA0B0..0xA0B5),
+            Some(&[0, 0, 0, 0, 0][..])
+        );
+
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_laser_process(&mut machine, "LASR0");
+        machine.memory.write_byte(0xA0B5, 1).expect("set LFLG");
+        machine.memory.write_word(0xA0A4, 0xA142).expect("set FISX");
+        write_ram_bytes(&mut machine, 0xA142, &[0xAA, 0xBB, 0xCC]);
+        machine
+            .memory
+            .write_word(process + 0x07, 0x4652)
+            .expect("set PD");
+        machine
+            .memory
+            .write_word(process + 0x09, 0x4652)
+            .expect("set PD2");
+        machine
+            .memory
+            .write_word(process + 0x0B, 0x4652)
+            .expect("set PD4");
+        let object = machine
+            .red_label_get_object_cell()
+            .expect("get active object cell");
+        machine
+            .memory
+            .write_word(
+                object + 0x02,
+                red_label_object_picture_address("LNDP1").expect("LNDP1"),
+            )
+            .expect("set object picture");
+        machine
+            .memory
+            .write_word(object + 0x04, 0x4450)
+            .expect("set object screen address");
+        machine
+            .memory
+            .write_word(
+                object + 0x08,
+                red_label_routine_address("NOKILL").expect("NOKILL address"),
+            )
+            .expect("set NOKILL OCVECT");
+        machine
+            .red_label_activate_object_cell(object)
+            .expect("activate object");
+
+        let step = machine
+            .red_label_step_right_laser_current_process()
+            .expect("LASR0 collision");
+
+        assert_eq!(
+            step,
+            RedLabelLaserStep::Finished {
+                process_address: process,
+                direction: RedLabelLaserDirection::Right,
+                reason: RedLabelLaserStopReason::Collision,
+                collision: Some(RedLabelObjectCollision::NoKill {
+                    object_address: object
+                }),
+                killed_process: RedLabelKilledProcess {
+                    killed_process_address: process,
+                    previous_link_address: 0xA05F,
+                },
+            }
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0A4..0xA0A6),
+            Some(&[0xA1, 0x45][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x07..process + 0x0D),
+            Some(&[0x4A, 0x52, 0x49, 0x52, 0x47, 0x52][..])
+        );
+        for address in [0x4652, 0x4752, 0x4852, 0x4952, 0x4A52] {
+            assert_eq!(
+                machine.red_label_ram_range(address..address + 1),
+                Some(&[0x00][..])
+            );
+        }
+        assert_eq!(
+            machine.red_label_ram_range(0xA0F8..0xA0FA),
+            Some(&[0x44, 0x52][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0B5..0xA0B6),
+            Some(&[0x00][..])
+        );
+    }
+
+    #[test]
     fn support_processes_cycle_laser_tie_and_bomb_colors_from_source_tables() {
         let mut machine = ArcadeMachine::new();
         let process = schedule_support_process(&mut machine, "COLR");
