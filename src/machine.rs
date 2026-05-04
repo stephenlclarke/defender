@@ -35977,6 +35977,37 @@ mod tests {
     }
 
     #[test]
+    fn live_irq_video_frame_runs_bgout_and_restores_hardware_map_from_mapcr() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        machine.memory.write_byte(0xA036, 6).expect("set MAPCR");
+
+        let frame = machine
+            .red_label_run_live_irq_video_frame()
+            .expect("live IRQ video frame");
+
+        assert_eq!(frame.mode, RedLabelIrqMode::Normal);
+        assert_eq!(
+            frame.terrain_output,
+            Some(expected_bgout_default(red_label_irq_bgout_stack_pointer()))
+        );
+        assert_eq!(frame.upper_scanline.hardware_map_before, 0);
+        assert_eq!(frame.upper_scanline.hardware_map_writes, vec![0, 2, 0, 6]);
+        assert_eq!(frame.upper_scanline.hardware_map_after, 6);
+        assert_eq!(frame.lower_scanline.hardware_map_before, 6);
+        assert_eq!(
+            frame.lower_scanline.hardware_map_writes,
+            vec![0, 7, 2, 0, 6]
+        );
+        assert_eq!(frame.lower_scanline.hardware_map_after, 6);
+        assert_eq!(machine.red_label_hardware_map(), 6);
+        assert_eq!(
+            machine.red_label_ram_range(0xA013..0xA017),
+            Some(&[0xBF, 0xF1, 0x00, 0x00][..])
+        );
+    }
+
+    #[test]
     fn live_irq_video_frame_uses_inverted_irq_hook_for_flipped_source_order() {
         let mut machine = ArcadeMachine::new();
         start_one_player_game_for_test(&mut machine);

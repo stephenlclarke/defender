@@ -801,8 +801,9 @@ Steps:
 - [x] DC-07.1 Implement source-exact CPU IRQ cadence and screen scanline
   scheduling from MAME/source measurements.
   Completed: `2026-05-04 21:16:00 BST`
-- [ ] DC-07.2 Finish `BGOUT` live stack-context wiring and hardware-map
+- [x] DC-07.2 Finish `BGOUT` live stack-context wiring and hardware-map
   restoration.
+  Completed: `2026-05-04 21:17:16 BST`
 - [ ] DC-07.3 Finish palette-copy side effects and validate palette RAM
   mutations.
 - [ ] DC-07.4 Emit native video CRCs from actual red-label video RAM in trace
@@ -828,6 +829,19 @@ Work log:
   `cargo test live_irq_video_frame_uses_ --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777925778062459`
+- `2026-05-04 21:16:35 BST` Started `DC-07.2`: checking the live IRQ terrain
+  branch end to end so `BGOUT` receives the derived source IRQ stack pointer
+  and the `MAPC` clear/select/restore sequence leaves hardware-map selection
+  restored from `MAPCR` after the full frame pass.
+- `2026-05-04 21:17:16 BST` Completed `DC-07.2`: added live-frame regression
+  coverage proving upright live IRQ execution runs translated `BGOUT` with the
+  derived source stack pointer `0xBFF1`, records the source `SSTACK` bytes, and
+  restores hardware-map selection from `MAPCR` after both upper and lower
+  scanline passes. Validation passed with `cargo fmt --check` and
+  `cargo test live_irq_video_frame_runs_bgout_and_restores_hardware_map_from_mapcr
+  --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777925859203229`
 
 ## Phase 3: Player, Session, And Cabinet Flow
 
