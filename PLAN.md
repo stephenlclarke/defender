@@ -1263,7 +1263,8 @@ Goal: finish all enemy, shell, mine, and collision routines.
 
 Steps:
 
-- [ ] DC-11.1 Finish Baiter spawn, pursuit, firing, and lifetime behavior.
+- [x] DC-11.1 Finish Baiter spawn, pursuit, firing, and lifetime behavior.
+  Completed: `2026-05-04 22:46:31 BST`
 - [ ] DC-11.2 Finish Bomber, Pod, minefield, and Pod/Swarmer burst behavior.
 - [ ] DC-11.3 Finish remaining mutant behavior and firing checks.
 - [ ] DC-11.4 Finish remaining shell rendering/output and object collision
@@ -1274,6 +1275,23 @@ Steps:
 
 Completion gate: all red-label enemy processes are either translated and tested
 or explicitly recorded as gaps with ignored/failing tests.
+
+Work log:
+
+- `2026-05-04 22:42:54 BST` Started `DC-11.1`: adding a focused regression
+  fixture for `UFOST` / `UFOLP` baiter spawn, pursuit, firing, picture cycle,
+  and kill/lifetime counter mutations before moving to the other enemy families.
+- `2026-05-04 22:46:31 BST` Completed `DC-11.1`: added
+  `baiter_regression_fixture_covers_spawn_pursuit_firing_and_lifetime`, proving
+  `UFOST` creates the `UFOLP` process/object pair with `UFOKIL` collision,
+  `UFOLP` fires through `SHOOT` / `GETSHL`, wraps `UFOP3` back to `UFOP1`,
+  updates pursuit velocity, mutates shell-list, object, process, and sound RAM,
+  and `UFOKIL` decrements `UFOCNT`, kills the owning process/object, and scores
+  200 points. Validation passed with `cargo fmt --check`,
+  `cargo test baiter_regression_fixture_covers_spawn_pursuit_firing_and_lifetime
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777931213795719`
 
 ## Phase 5: Native Video And Presentation
 

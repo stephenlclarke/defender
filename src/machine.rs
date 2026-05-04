@@ -26467,8 +26467,8 @@ mod tests {
         rom::crc32,
         sound::{SoundCommand, SoundCommandLatch},
         test_support::{
-            red_label_cmos_snapshot, red_label_process_cell_snapshot, red_label_ram_snapshot,
-            red_label_video_ram_snapshot,
+            red_label_cmos_snapshot, red_label_object_cell_snapshot,
+            red_label_process_cell_snapshot, red_label_ram_snapshot, red_label_video_ram_snapshot,
         },
         video::defender_visible_byte_offset,
     };
@@ -45147,6 +45147,188 @@ mod tests {
             machine.red_label_ram_range(0xA0B0..0xA0B5),
             Some(&[0xD5, 0x2D, 0xC0, 0x01, 0x01][..])
         );
+    }
+
+    #[test]
+    fn baiter_regression_fixture_covers_spawn_pursuit_firing_and_lifetime() {
+        let mut machine = ArcadeMachine::new();
+        machine.memory.write_byte(0xA0DF, 0x12).expect("set SEED");
+        machine.memory.write_byte(0xA0E0, 0x34).expect("set HSEED");
+        machine.memory.write_byte(0xA0E1, 0x13).expect("set LSEED");
+        machine.memory.write_word(0xA020, 0x2000).expect("set BGL");
+        machine
+            .memory
+            .write_word(0xA0CC, 0x0000)
+            .expect("set PLABX");
+        machine.memory.write_word(0xA0C7, 0).expect("set PLAXV");
+        machine.memory.write_byte(0xA0C0, 0x30).expect("set PLAYC");
+        machine.memory.write_word(0xA0CA, 0).expect("set PLAYV");
+        let free_process_head =
+            red_label_ram_snapshot(&machine, "DC-11.1 free process head", 0xA061..0xA063);
+        let free_object_head =
+            red_label_ram_snapshot(&machine, "DC-11.1 free object head", 0xA067..0xA069);
+        let active_object_head =
+            red_label_ram_snapshot(&machine, "DC-11.1 active object head", 0xA065..0xA067);
+
+        let start = machine
+            .red_label_start_ufo_process()
+            .expect("DC-11.1 UFOST");
+        let process = start.process.process_address;
+        let object = start.object.object_address;
+
+        assert_eq!(
+            start.process.routine_address,
+            red_label_routine_address("UFOLP").expect("UFOLP address")
+        );
+        assert_eq!(
+            start.object.descriptor.collision_vector_address,
+            red_label_routine_address("UFOKIL").expect("UFOKIL address")
+        );
+        assert_eq!(start.shot_timer, 8);
+        assert_eq!(
+            start.velocity,
+            RedLabelUfoVelocityUpdate {
+                x_velocity: Some(0xFFC0),
+                y_velocity: Some(0xFF80),
+            }
+        );
+        free_process_head.assert_current_changed(&machine);
+        free_object_head.assert_current_changed(&machine);
+        active_object_head.assert_current_changed_to(
+            &machine,
+            &[object.to_be_bytes()[0], object.to_be_bytes()[1]],
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x07..process + 0x0A),
+            Some(&[object.to_be_bytes()[0], object.to_be_bytes()[1], 8][..])
+        );
+
+        assert_eq!(
+            machine
+                .step_red_label_process_scheduler()
+                .expect("schedule DC-11.1 UFOLP")
+                .expect("scheduled DC-11.1 UFOLP")
+                .process_address,
+            process
+        );
+        machine
+            .memory
+            .write_byte(process + 0x09, 1)
+            .expect("force UFO shot timer");
+        machine
+            .memory
+            .write_word(
+                object + 0x02,
+                red_label_object_picture_address("UFOP3").expect("UFOP3 address"),
+            )
+            .expect("force UFO picture wrap");
+        machine
+            .memory
+            .write_word(object + 0x04, 0x4060)
+            .expect("set UFO screen address");
+        machine
+            .memory
+            .write_word(object + 0x0A, 0x1000)
+            .expect("set UFO OX16");
+        machine
+            .memory
+            .write_word(object + 0x0C, 0x6000)
+            .expect("set UFO OY16");
+        machine
+            .memory
+            .write_word(object + 0x0E, 0)
+            .expect("set pre-shot UFO OXV");
+        machine.memory.write_word(0xA020, 0).expect("set shot BGL");
+        machine
+            .memory
+            .write_word(0xA0CC, 0x4000)
+            .expect("set player absolute X");
+        machine
+            .memory
+            .write_byte(0xA0C0, 0x80)
+            .expect("set player Y");
+        machine.memory.write_byte(0xA110, 0x20).expect("set UFSTIM");
+        machine.memory.write_byte(0xA111, 0).expect("set UFOSK");
+        machine
+            .memory
+            .write_byte(0xA0DF, 0x90)
+            .expect("set shot SEED");
+        machine
+            .memory
+            .write_byte(0xA0E0, 0x20)
+            .expect("set shot HSEED");
+        machine
+            .memory
+            .write_byte(0xA0E1, 0x13)
+            .expect("set shot LSEED");
+        let object_before_loop = red_label_object_cell_snapshot(&machine, object);
+        let process_before_loop = red_label_process_cell_snapshot(&machine, process);
+        let shell_head =
+            red_label_ram_snapshot(&machine, "DC-11.1 shell list head", 0xA06D..0xA06F);
+        write_ram_bytes(&mut machine, 0xA0B0, &[0, 0, 0, 0, 0]);
+        let sound_state = red_label_ram_snapshot(&machine, "DC-11.1 sound state", 0xA0B0..0xA0B5);
+        let mut expected_rand = RandState {
+            seed: 0x90,
+            hseed: 0x20,
+            lseed: 0x13,
+        };
+        expected_rand.advance();
+        let expected_shot_timer = rmax(0x20, expected_rand.seed);
+
+        let step = machine
+            .red_label_step_ufo_current_process()
+            .expect("DC-11.1 UFOLP");
+
+        assert_eq!(step.process_address, process);
+        assert_eq!(step.object_address, object);
+        assert_eq!(step.shot_timer, expected_shot_timer);
+        assert!(step.shot.is_some());
+        assert_eq!(
+            step.picture_address,
+            red_label_object_picture_address("UFOP1").expect("UFOP1 address")
+        );
+        assert_eq!(
+            step.velocity,
+            Some(RedLabelUfoVelocityUpdate {
+                x_velocity: Some(0x0040),
+                y_velocity: Some(0x0080),
+            })
+        );
+        object_before_loop.assert_current_changed(&machine);
+        process_before_loop.assert_current_changed(&machine);
+        shell_head.assert_current_changed_to(&machine, &[0xA2, 0x53]);
+        sound_state.assert_current_changed_to(&machine, &[0xD5, 0x2D, 0xC0, 0x01, 0x01]);
+        assert_eq!(
+            machine.red_label_ram_range(object + 0x02..object + 0x12),
+            Some(
+                &[
+                    0xF9, 0xA3, 0x40, 0x60, 0xAA, 0xC5, 0xEB, 0x2B, 0x10, 0x00, 0x60, 0x00, 0x00,
+                    0x40, 0x00, 0x80,
+                ][..]
+            )
+        );
+
+        machine.memory.write_byte(0xA119, 1).expect("set UFOCNT");
+        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        let score_before_kill = red_label_ram_snapshot(&machine, "DC-11.1 score", 0xA1C2..0xA1C6);
+        let process_before_kill = red_label_process_cell_snapshot(&machine, process);
+        let object_before_kill = red_label_object_cell_snapshot(&machine, object);
+
+        let collision = machine
+            .red_label_dispatch_object_collision_vector(object)
+            .expect("DC-11.1 UFOKIL");
+        let RedLabelObjectCollision::UfoKilled(kill) = collision else {
+            panic!("expected DC-11.1 UFOKIL collision");
+        };
+
+        assert_eq!(kill.object_address, object);
+        assert_eq!(kill.killed_process.killed_process_address, process);
+        assert_eq!(machine.red_label_ram_range(0xA119..0xA11A), Some(&[0][..]));
+        score_before_kill.assert_current_changed_to(&machine, &[0x00, 0x00, 0x02, 0x00]);
+        process_before_kill.assert_current_changed(&machine);
+        object_before_kill.assert_current_changed(&machine);
+        assert_eq!(machine.snapshot().scores.player_one, 200);
     }
 
     #[test]
