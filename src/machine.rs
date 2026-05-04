@@ -32810,6 +32810,90 @@ mod tests {
     }
 
     #[test]
+    fn session_flow_fixture_covers_two_player_start_and_player_switch_respawn() {
+        let mut machine = ArcadeMachine::new();
+        insert_live_coin(&mut machine);
+        insert_live_right_coin(&mut machine);
+
+        let started = machine.step(CabinetInput {
+            start_two: true,
+            ..CabinetInput::NONE
+        });
+
+        assert_eq!(started.snapshot.phase, GamePhase::Playing);
+        assert_eq!(started.snapshot.credits, 0);
+        assert!(
+            started
+                .events()
+                .any(|event| event == MachineEvent::GameStarted)
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA08B..0xA08D),
+            Some(&[0x01, 0x02][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA037..0xA038),
+            Some(&[0x00][..])
+        );
+
+        let process = schedule_player_death_process(&mut machine);
+        machine.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+        machine.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        machine.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        machine.memory.write_byte(0xA1C9, 0).expect("clear P1 PLAS");
+        machine.memory.write_byte(0xA206, 2).expect("set P2 PLAS");
+
+        let switch_sleep = machine
+            .red_label_continue_player_death_after_explosion_current_process()
+            .expect("PDTH5R switch sleep");
+        assert!(matches!(
+            switch_sleep,
+            RedLabelPlayerDeath::PostExplosionSwitchPlayerSleeping {
+                process_address,
+                other_player: 2,
+                wakeup_address: 0xDB15,
+                ..
+            } if process_address == process
+        ));
+        assert_message_glyph_first_column(&machine, RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN, 'P');
+        assert_message_glyph_first_column(&machine, RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN, 'G');
+
+        let respawn = machine
+            .red_label_dispatch_translated_process_routine(
+                red_label_routine_address("PLE02").expect("PLE02 address"),
+            )
+            .expect("dispatch PLE02 player switch");
+
+        assert!(matches!(
+            respawn,
+            RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::PostExplosionRespawnJump {
+                process_address,
+                next_player: 2,
+                player_start_address,
+            }) if process_address == process
+                && player_start_address == red_label_routine_address("PLSTRT").expect("PLSTRT")
+        ));
+        assert_eq!(machine.snapshot().phase, GamePhase::Playing);
+        assert_eq!(machine.snapshot().current_player, 2);
+        assert_eq!(
+            machine.red_label_ram_range(0xA08B..0xA08C),
+            Some(&[0x02][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA025..0xA026),
+            Some(&[0x02][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x04),
+            Some(
+                &red_label_routine_address("PLSTRT")
+                    .expect("PLSTRT")
+                    .to_be_bytes()[..]
+            )
+        );
+    }
+
+    #[test]
     fn free_play_one_player_start_runs_translated_st1_path() {
         let mut machine = ArcadeMachine::new();
         machine

@@ -1030,15 +1030,16 @@ Work log:
 
 ### DC-09: Cabinet Session And Operator Flow
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: complete exact credits, starts, high scores, two-player alternation, and
 operator behavior.
 
 Steps:
 
-- [ ] DC-09.1 Finish one-player and two-player session flow, including
+- [x] DC-09.1 Finish one-player and two-player session flow, including
   alternating turns and current-player table swaps.
+  Completed: `2026-05-04 22:01:58 BST`
 - [ ] DC-09.2 Finish credit, coinage, free-play, replay, and bonus-stock rules.
 - [ ] DC-09.3 Translate exact initials-entry UI, high-score screens, and
   game-over-to-attract timing.
@@ -1050,6 +1051,23 @@ Steps:
 
 Completion gate: cabinet session behavior matches red-label traces and
 operator-facing documentation is current.
+
+Work log:
+
+- `2026-05-04 21:59:36 BST` Started `DC-09.1`: adding a
+  mutation-preserving live session fixture that starts a two-player game through
+  the translated switch path, then proves the later death/switch handoff moves
+  source current-player state to the surviving player.
+- `2026-05-04 22:01:58 BST` Completed `DC-09.1`: added
+  `session_flow_fixture_covers_two_player_start_and_player_switch_respawn`,
+  proving a credited live two-player `ST2` start mutates credit/player-count
+  state, then the translated `PDTH5R` / `PLE02` branch renders player-switch
+  text, moves `CURPLR` to player 2, updates `PDFLG`, and points the process
+  back to `PLSTRT`. Validation passed with `cargo fmt --check`,
+  `cargo test session_flow_fixture_covers_two_player_start_and_player_switch_respawn
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928532126079`
 
 ## Phase 4: World, Waves, Humans, And Enemies
 
