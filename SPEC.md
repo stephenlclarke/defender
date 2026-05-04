@@ -127,7 +127,9 @@ synthetic scaffold fallback; untranslated blank screens remain black:
   `EXEC` idle seeding, live-input holdoff, and start-ready transition; maintains
   a step-level main-board snapshot for PIA input-port bytes, RAM/CMOS CRCs,
   palette RAM, hardware-map state, watchdog reset recognition, and
-  video-counter sampling; and has source-shaped `MKPROC`,
+  video-counter sampling; records frame sound commands through a sound-board
+  latch snapshot using the MAME `port B | 0xc0` and CB1 assertion boundary; and
+  has source-shaped `MKPROC`,
   `MSPROC`, `SLEEP`, `KILL`, and `DISP` primitives for process creation, delay,
   free-list return, scheduler timer decrement, `CRPROC` update, and due-`PADDR`
   reporting. It translates active/inactive object and shell-list maintenance,
@@ -419,8 +421,9 @@ Additional gaps and corrections found during this review:
 - The main-board and sound-board surfaces model useful MAME-documented
   behavior. `ArcadeMachine::step` now maintains a main-board-facing snapshot for
   input ports, memory/palette state, watchdog reset recognition, and the
-  currently modeled video-counter sample, but it is not yet a source-exact CPU,
-  IRQ, video-scanline, and sound-CPU execution path.
+  currently modeled video-counter sample. It also records each frame-level
+  sound command through a sound-board latch snapshot, but it is not yet a
+  source-exact CPU, IRQ, video-scanline, and sound-CPU execution path.
 - Local MAME reference traces are intentionally ignored artifacts. The checked
   in code can validate local fixture presence and shape, but the repo still
   depends on user-supplied ROMs and local MAME to prove golden equivalence.
@@ -482,9 +485,9 @@ Additional gaps and corrections found during this review:
   head.
 - The board and sound surfaces model useful MAME-documented boundaries.
   `ArcadeMachine::step` now samples the main-board-facing input, memory,
-  palette, watchdog, and video-counter state, but the game core still advances
-  most scaffold state directly instead of executing translated red-label
-  routines against cabinet memory.
+  palette, watchdog, video-counter, and sound-command latch state, but the game
+  core still advances most scaffold state directly instead of executing
+  translated red-label routines against cabinet memory.
 
 ### Next Work Order
 

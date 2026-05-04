@@ -27,7 +27,7 @@ use crate::{
     },
     red_label_wave::{RED_LABEL_WDELT_RECORD_COUNT, WaveProfile, red_label_wave_table},
     rom::crc32,
-    sound::{FRAME_SOUND_COMMAND_CAPACITY, SoundCommand},
+    sound::{FRAME_SOUND_COMMAND_CAPACITY, SoundCommand, SoundCommandLatch},
     video::{
         RenderedImage, render_defender_visible_palette_indices,
         render_defender_visible_pixel_nibbles, render_defender_visible_rgba,
@@ -474,6 +474,14 @@ pub struct RedLabelMainBoardSnapshot {
     pub video_counter_value: u8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelSoundBoardSnapshot {
+    pub last_command_latch: Option<SoundCommandLatch>,
+    pub latched_port_b: Option<u8>,
+    pub command_cb1_asserted: bool,
+    pub latch_write_count: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MachineSaveState {
     snapshot: MachineSnapshot,
@@ -484,6 +492,8 @@ pub struct MachineSaveState {
     main_board_input_ports: DefenderInputPorts,
     main_board_watchdog_reset_count: u64,
     main_board_video_counter_vpos: u16,
+    sound_board_last_command_latch: Option<SoundCommandLatch>,
+    sound_board_latch_write_count: u64,
     high_score_entry_player: u8,
     high_score_completed_players_mask: u8,
 }
@@ -23639,6 +23649,8 @@ pub struct ArcadeMachine {
     main_board_input_ports: DefenderInputPorts,
     main_board_watchdog_reset_count: u64,
     main_board_video_counter_vpos: u16,
+    sound_board_last_command_latch: Option<SoundCommandLatch>,
+    sound_board_latch_write_count: u64,
     trace_power_up_ram_fill: Option<RedLabelPowerUpRamFill>,
     trace_start_asserted_frames: u8,
     trace_player_start_release_frame: Option<u64>,
@@ -23728,6 +23740,8 @@ impl ArcadeMachine {
             main_board_input_ports: DefenderInputPorts::EMPTY,
             main_board_watchdog_reset_count: 0,
             main_board_video_counter_vpos: 0,
+            sound_board_last_command_latch: None,
+            sound_board_latch_write_count: 0,
             trace_power_up_ram_fill: None,
             trace_start_asserted_frames: 0,
             trace_player_start_release_frame: None,
@@ -23772,6 +23786,8 @@ impl ArcadeMachine {
             main_board_input_ports: self.main_board_input_ports,
             main_board_watchdog_reset_count: self.main_board_watchdog_reset_count,
             main_board_video_counter_vpos: self.main_board_video_counter_vpos,
+            sound_board_last_command_latch: self.sound_board_last_command_latch,
+            sound_board_latch_write_count: self.sound_board_latch_write_count,
             high_score_entry_player: self.high_score_entry_player,
             high_score_completed_players_mask: self.high_score_completed_players_mask,
         }
@@ -23799,6 +23815,8 @@ impl ArcadeMachine {
         self.main_board_input_ports = state.main_board_input_ports;
         self.main_board_watchdog_reset_count = state.main_board_watchdog_reset_count;
         self.main_board_video_counter_vpos = state.main_board_video_counter_vpos;
+        self.sound_board_last_command_latch = state.sound_board_last_command_latch;
+        self.sound_board_latch_write_count = state.sound_board_latch_write_count;
         self.high_score_entry = state.snapshot.high_score_entry;
         self.high_score_submission = state.snapshot.high_score_submission;
         self.high_score_entry_player = state.high_score_entry_player;
@@ -23823,6 +23841,8 @@ impl ArcadeMachine {
         self.main_board_input_ports = DefenderInputPorts::EMPTY;
         self.main_board_watchdog_reset_count = 0;
         self.main_board_video_counter_vpos = 0;
+        self.sound_board_last_command_latch = None;
+        self.sound_board_latch_write_count = 0;
         self.trace_start_asserted_frames = 0;
         self.trace_player_start_release_frame = None;
         self.high_score_entry = snapshot.high_score_entry;
@@ -23910,6 +23930,19 @@ impl ArcadeMachine {
             watchdog_reset_count: self.main_board_watchdog_reset_count,
             video_counter_vpos: self.main_board_video_counter_vpos,
             video_counter_value: video_counter_read_value(self.main_board_video_counter_vpos),
+        }
+    }
+
+    pub fn red_label_sound_board_snapshot(&self) -> RedLabelSoundBoardSnapshot {
+        RedLabelSoundBoardSnapshot {
+            last_command_latch: self.sound_board_last_command_latch,
+            latched_port_b: self
+                .sound_board_last_command_latch
+                .map(|latch| latch.port_b().raw()),
+            command_cb1_asserted: self
+                .sound_board_last_command_latch
+                .is_some_and(SoundCommandLatch::cb1_asserted),
+            latch_write_count: self.sound_board_latch_write_count,
         }
     }
 
@@ -25321,6 +25354,7 @@ impl ArcadeMachine {
         }
 
         self.advance_trace_power_up_ram_fill(&mut sound_commands, live_process_ran);
+        self.record_sound_board_frame_commands(&sound_commands);
 
         FrameOutput::new(
             self.snapshot(),
@@ -25349,6 +25383,15 @@ impl ArcadeMachine {
                 self.main_board_watchdog_reset_count =
                     self.main_board_watchdog_reset_count.saturating_add(1);
             }
+        }
+    }
+
+    fn record_sound_board_frame_commands(&mut self, commands: &[SoundCommand]) {
+        for command in commands {
+            self.sound_board_last_command_latch =
+                Some(SoundCommandLatch::from_main_board_pia_port_b(command.raw()));
+            self.sound_board_latch_write_count =
+                self.sound_board_latch_write_count.saturating_add(1);
         }
     }
 
@@ -26068,7 +26111,7 @@ mod tests {
             RedLabelScoreSpriteStart, RedLabelScoreSpriteStep, RedLabelScoreTransfer,
             RedLabelScreenClear, RedLabelScreenSwitch, RedLabelScreenSwitchRoutine,
             RedLabelShellDescriptor, RedLabelShellOutputRoutine, RedLabelShellStep,
-            RedLabelSmartBomb, RedLabelSmartBombTail,
+            RedLabelSmartBomb, RedLabelSmartBombTail, RedLabelSoundBoardSnapshot,
             RedLabelSoundDirectCommandSequenceFixtureCheck, RedLabelSoundOutput,
             RedLabelSoundSequenceSource, RedLabelSoundSequenceStep, RedLabelSoundTableCommand,
             RedLabelSoundTableCommandSequenceFixtureCheck, RedLabelSoundTableTimedCommand,
@@ -26086,7 +26129,7 @@ mod tests {
         red_label::{Facing, Fixed16, RandState, rmax},
         red_label_memory::red_label_ram_layout,
         rom::crc32,
-        sound::SoundCommand,
+        sound::{SoundCommand, SoundCommandLatch},
         test_support::{
             red_label_cmos_snapshot, red_label_process_cell_snapshot, red_label_ram_snapshot,
             red_label_video_ram_snapshot,
@@ -53249,8 +53292,12 @@ mod tests {
         };
         machine.main_board_watchdog_reset_count = 3;
         machine.main_board_video_counter_vpos = 0x00A8;
+        machine.sound_board_last_command_latch =
+            Some(SoundCommandLatch::from_main_board_pia_port_b(0x35));
+        machine.sound_board_latch_write_count = 4;
         let saved_snapshot = machine.snapshot();
         let saved_board = machine.red_label_main_board_snapshot();
+        let saved_sound = machine.red_label_sound_board_snapshot();
         let saved_state = machine.save_state();
 
         machine.memory.write_byte(0xA123, 0xA5).expect("mutate RAM");
@@ -53258,6 +53305,8 @@ mod tests {
         machine.main_board_input_ports = DefenderInputPorts::EMPTY;
         machine.main_board_watchdog_reset_count = 0;
         machine.main_board_video_counter_vpos = 0;
+        machine.sound_board_last_command_latch = None;
+        machine.sound_board_latch_write_count = 0;
         machine.trace_power_up_ram_fill = None;
         machine.step(CabinetInput::NONE);
         machine.restore_state(saved_state);
@@ -53269,6 +53318,7 @@ mod tests {
         );
         assert_eq!(machine.red_label_hardware_map(), 7);
         assert_eq!(machine.red_label_main_board_snapshot(), saved_board);
+        assert_eq!(machine.red_label_sound_board_snapshot(), saved_sound);
         assert!(machine.trace_power_up_ram_fill.is_some());
     }
 
@@ -53324,6 +53374,50 @@ mod tests {
             video_counter_read_value(board.video_counter_vpos)
         );
         assert_eq!(board.palette_ram, *machine.red_label_palette_ram());
+    }
+
+    #[test]
+    fn frame_sound_commands_update_sound_board_latch_surface() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        let mut output = machine.step(CabinetInput::NONE);
+        for _ in 1..731 {
+            output = machine.step(CabinetInput::NONE);
+        }
+
+        assert_eq!(
+            output
+                .sound_commands()
+                .map(|command| command.raw())
+                .collect::<Vec<_>>(),
+            vec![0xC0]
+        );
+        assert_eq!(
+            machine.red_label_sound_board_snapshot(),
+            RedLabelSoundBoardSnapshot {
+                last_command_latch: Some(SoundCommandLatch::from_main_board_pia_port_b(0xC0)),
+                latched_port_b: Some(0xC0),
+                command_cb1_asserted: true,
+                latch_write_count: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn idle_sound_command_updates_latch_without_asserting_cb1() {
+        let mut machine = ArcadeMachine::new();
+
+        machine
+            .record_sound_board_frame_commands(&[SoundCommand::from_main_board_pia_port_b(0x3F)]);
+
+        assert_eq!(
+            machine.red_label_sound_board_snapshot(),
+            RedLabelSoundBoardSnapshot {
+                last_command_latch: Some(SoundCommandLatch::from_main_board_pia_port_b(0x3F)),
+                latched_port_b: Some(0xFF),
+                command_cb1_asserted: false,
+                latch_write_count: 1,
+            }
+        );
     }
 
     #[test]

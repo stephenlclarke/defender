@@ -197,9 +197,9 @@ This file records behavior that must not be guessed in arcade-core code.
   table rows and its post-display debounce countdown as one deterministic cycle
   plus the post-`PWRUP` outer frame path. `ArcadeMachine::step` now samples the
   current main-board-facing PIA input-port bytes, RAM/CMOS/palette state,
-  watchdog reset count, and modeled video-counter value, but CPU IRQ
-  scheduling, exact Williams power-on RAM contents, physical advance-switch
-  timing, physical lamp timing, default live CMOS path policy,
+  watchdog reset count, modeled video-counter value, and sound-command latch
+  state, but CPU IRQ scheduling, exact Williams power-on RAM contents, physical
+  advance-switch timing, physical lamp timing, default live CMOS path policy,
   screen scanline scheduling, watchdog timing/reset side effects,
   palette/rendering timing side effects, decoder PROM behavior, and complete
   DAC sample output scheduling are not modeled.
@@ -221,7 +221,7 @@ This file records behavior that must not be guessed in arcade-core code.
   credits, current-player pointer, player scores, wave/lives/smart bombs,
   player motion, facing, and RNG seeds, and full save-state restore includes
   the RAM/CMOS/palette/hardware-map image, main-board input/watchdog/video
-  counter state, and trace scheduler state.
+  counter state, sound-board latch state, and trace scheduler state.
   The executive scheduler now keeps walking `DISP` in the same source pass after
   process `SLEEP` and `SUCIDE` tails resume through `DISP2`.
 - `--verify-roms PATH` can validate and map a local red-label ROM set into the
@@ -651,9 +651,12 @@ This file records behavior that must not be guessed in arcade-core code.
   fixtures are still missing.
 - Sound-board RAM/PIA/ROM address classification exists, and the MAME-documented
   main-board command latch byte/CB1 handoff is modeled from the PIA1 port-B
-  output callback boundary. Sound CPU PIA IC4 register reads can consume the
-  latched command byte, and PIA port-A writes are captured at the DAC boundary.
-  Command CB1 drives the sound PIA IRQ state. The `VSNDRM1.SRC` `SETUP` plus
+  output callback boundary. `ArcadeMachine::step` now records every emitted
+  frame sound command through the same latch/CB1 boundary before trace output,
+  while preserving the existing command sequence as the observable frame
+  result. Sound CPU PIA IC4 register reads can consume the latched command
+  byte, and PIA port-A writes are captured at the DAC boundary. Command CB1
+  drives the sound PIA IRQ state. The `VSNDRM1.SRC` `SETUP` plus
   IRQ command decoder now classify raw command bytes into GWAVE, jump-table
   special, and VARI routine targets while applying the source-visible
   background/spinner/bonus flag gates. Normal `IRQ1` GWAVE/VARI commands can

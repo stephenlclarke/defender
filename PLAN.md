@@ -496,8 +496,9 @@ Steps:
 - [x] DC-05.2 Wire the main-board RAM, CMOS, PIA, palette, watchdog, and video
   counter surfaces into `ArcadeMachine::step`.
   Completed: `2026-05-04 18:28:29 BST`
-- [ ] DC-05.3 Wire the sound-command latch and sound-board PIA boundary into the
+- [x] DC-05.3 Wire the sound-command latch and sound-board PIA boundary into the
   frame output path without high-level cue shortcuts.
+  Completed: `2026-05-04 18:35:07 BST`
 - [ ] DC-05.4 Add mutation tests for every board and machine byte range touched.
 - [ ] DC-05.5 Prove boot/start-ready trace equivalence with local fixtures.
 
@@ -506,6 +507,36 @@ on trace-only scheduling shortcuts.
 
 Work log:
 
+- `2026-05-04 18:29:44 BST` Started `DC-05.3`: routing frame-level
+  sound-command writes through the MAME-modeled main-board latch and
+  sound-board PIA boundary while preserving the existing command sequence as
+  the observable output until the sound CPU is cycle-scheduled.
+- `2026-05-04 18:35:07 BST` Completed `DC-05.3`: added
+  `RedLabelSoundBoardSnapshot` and routed every emitted frame sound command
+  through `SoundCommandLatch::from_main_board_pia_port_b`, preserving the
+  current frame command sequence while exposing the MAME-modeled port-B and CB1
+  latch boundary for later sound-CPU scheduling. Save-state restore now includes
+  the sound-board latch and write count. Updated `SPEC.md` and
+  `docs/fidelity/gaps.md` to document that the latch boundary is modeled while
+  full sound-CPU execution remains a gap. Validation passed with
+  `cargo test frame_sound_commands_update_sound_board_latch_surface
+  --all-targets`, `cargo test
+  idle_sound_command_updates_latch_without_asserting_cb1 --all-targets`,
+  `cargo test
+  save_state_restore_round_trips_red_label_memory_and_trace_scheduler
+  --all-targets`,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/characterization-tests.md
+  docs/fidelity/local-reference-runs.md
+  docs/fidelity/golden-comparison-results.md assets/red-label/README.md`,
+  `git diff --check`, `cargo fmt --check`, and `make fidelity`.
+  `make fidelity` passed regular tests with 803 passed and 13 known ignored
+  tests, main tests with 2 passed, clippy, trace script tests, and coverage
+  with 24/24 added executable Rust lines covered; `make trace-fixtures` skipped
+  only because the ignored local `docs/fidelity/fixtures/local/rust-current`
+  directory is absent.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777916151274269`
 - `2026-05-04 18:21:16 BST` Started `DC-05.2`: wiring the existing
   MAME-modeled main-board RAM, CMOS, PIA, palette, watchdog, and video-counter
   surfaces into the `ArcadeMachine::step` path without changing gameplay
