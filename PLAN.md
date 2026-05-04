@@ -904,14 +904,15 @@ Work log:
 
 ### DC-08: Player Control And Respawn Completion
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: finish the exact player path around controls, death, respawn, and carried
 humans.
 
 Steps:
 
-- [ ] DC-08.1 Finish reverse integration with player movement and rendering.
+- [x] DC-08.1 Finish reverse integration with player movement and rendering.
+  Completed: `2026-05-04 21:35:48 BST`
 - [ ] DC-08.2 Prove laser cap, laser lifetime, collision setup, and fizzle/erase
   timing against traces.
 - [ ] DC-08.3 Finish smart-bomb world integration, including what is and is not
@@ -925,6 +926,23 @@ Steps:
 
 Completion gate: the player path can be exercised from live inputs through
 source-shaped process execution and trace-proven state mutations.
+
+Work log:
+
+- `2026-05-04 21:33:53 BST` Started `DC-08.1`: adding live-frame reverse
+  coverage that ties the translated `REV` switch process to player motion,
+  `PRDISP` direction commit, and native video RAM output before later player
+  refactors.
+- `2026-05-04 21:35:48 BST` Completed `DC-08.1`: added
+  `live_irq_frame_commits_reverse_process_to_motion_and_player_rendering`,
+  proving translated `REV` writes the reversed direction, the live IRQ frame
+  keeps source `PLAYER` motion stable, `PRDISP` commits `PLBPIC` rendering, RAM
+  mirrors `NPLAD` / `PLADIR`, and the native visible-video CRC locks at
+  `0x6B88AF41`. Validation passed with `cargo fmt --check` and
+  `cargo test live_irq_frame_commits_reverse_process_to_motion_and_player_rendering
+  --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777926987448799`
 
 ### DC-09: Cabinet Session And Operator Flow
 

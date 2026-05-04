@@ -38509,6 +38509,70 @@ mod tests {
     }
 
     #[test]
+    fn live_irq_frame_commits_reverse_process_to_motion_and_player_rendering() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        schedule_reverse_process(&mut machine, "REV");
+        let before_crc = machine
+            .red_label_visible_video_crc32()
+            .expect("pre-frame visible video CRC");
+
+        let reverse = machine
+            .red_label_start_reverse_current_process()
+            .expect("REV entry");
+        let frame = machine
+            .red_label_run_normal_live_irq_video_frame()
+            .expect("normal live IRQ video frame");
+        let after_crc = machine
+            .red_label_visible_video_crc32()
+            .expect("post-frame visible video CRC");
+
+        assert!(matches!(
+            reverse,
+            RedLabelReverse::StartedSleeping {
+                previous_direction: 0x0300,
+                new_direction: 0xFD00,
+                wakeup_address: 0xE8AE,
+                ..
+            }
+        ));
+        assert_eq!(
+            frame.player_motion,
+            RedLabelPlayerMotion::Updated {
+                status: 0,
+                pia21: 0,
+                pia31: 0,
+                player_velocity: [0, 0, 0],
+                player_calculated_x: 0x2000,
+                player_x16: 0x2000,
+                background_delta: 0,
+                background_left: 0,
+                absolute_x: 0x0800,
+                player_y_velocity: 0,
+                player_y16: 0x8000,
+                next_player_screen: 0x2080,
+            }
+        );
+        assert!(matches!(
+            &frame.upper_object_band.steps[1],
+            RedLabelIrqObjectBandStep::Player(RedLabelPlayerDisplay::Updated {
+                old_direction: 0x0300,
+                new_direction: 0xFD00,
+                new_screen_address: 0x2080,
+                picture_address,
+                ..
+            }) if *picture_address == red_label_object_picture_address("PLBPIC")
+                .expect("PLBPIC address")
+        ));
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BB..0xA0BF),
+            Some(&[0xFD, 0x00, 0xFD, 0x00][..])
+        );
+        assert_ne!(after_crc, before_crc);
+        assert_eq!(after_crc, 0x6B88_AF41);
+    }
+
+    #[test]
     fn live_smart_bomb_switch_runs_sbomb_without_scaffold_double_spend() {
         let mut machine = ArcadeMachine::new();
         start_one_player_game_for_test(&mut machine);
