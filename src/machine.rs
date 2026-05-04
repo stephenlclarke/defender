@@ -39490,9 +39490,9 @@ mod tests {
             .step_red_label_process_scheduler()
             .expect("schedule GEXEC process");
         machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
-        machine.memory.write_byte(0xA0FB, 2).expect("set LNDRES");
+        machine.memory.write_byte(0xA0FB, 1).expect("set LNDRES");
         machine.memory.write_byte(0xA100, 5).expect("set WAVTIM");
-        machine.memory.write_byte(0xA101, 2).expect("set WAVSIZ");
+        machine.memory.write_byte(0xA101, 1).expect("set WAVSIZ");
         machine.memory.write_byte(0xA10F, 4).expect("set UFOTIM");
         machine.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
         machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
@@ -39515,7 +39515,7 @@ mod tests {
             })
         );
         assert_eq!(run.status, 0);
-        assert_eq!(run.enemy_total, Some(2));
+        assert_eq!(run.enemy_total, Some(1));
         let ufo = run.ufo.expect("GEXEC UFO pacing");
         assert_eq!(ufo.previous_timer, 4);
         assert_eq!(ufo.accelerated_timer, Some(2));
@@ -39525,8 +39525,8 @@ mod tests {
         assert_eq!(lander.previous_timer, 1);
         assert_eq!(lander.decremented_timer, 0);
         assert_eq!(lander.reset_timer, Some(5));
-        assert_eq!(lander.reserve_count_before, Some(2));
-        assert_eq!(lander.requested_count, Some(2));
+        assert_eq!(lander.reserve_count_before, Some(1));
+        assert_eq!(lander.requested_count, Some(1));
         assert_eq!(lander.reserve_count_after, Some(0));
         let started = lander.started.expect("LANDST fallback");
         assert_eq!(started.requested_count, 2);
@@ -39551,6 +39551,161 @@ mod tests {
         assert_eq!(
             machine.red_label_ram_range(process + 7..process + 8),
             Some(&[39][..])
+        );
+    }
+
+    #[test]
+    fn wave_launch_fixture_covers_exec_order_reserve_allocation_and_spawn_timing() {
+        let mut machine = ArcadeMachine::new();
+        let process = schedule_game_exec_process(&mut machine, "GEXEC");
+        machine.memory.write_byte(0xA0FA, 0).expect("clear ASTCNT");
+        machine.memory.write_byte(0xA0BA, 0).expect("clear STATUS");
+        machine.memory.write_byte(0xA0FB, 2).expect("set LNDRES");
+        machine.memory.write_byte(0xA0FE, 0).expect("clear SCZRES");
+        machine.memory.write_byte(0xA100, 6).expect("set WAVTIM");
+        machine.memory.write_byte(0xA101, 2).expect("set WAVSIZ");
+        machine.memory.write_byte(0xA102, 8).expect("set LNDXV");
+        machine
+            .memory
+            .write_word(0xA103, 0x0100)
+            .expect("set LNDYV");
+        machine.memory.write_byte(0xA105, 0x20).expect("set LDSTIM");
+        machine.memory.write_byte(0xA10F, 4).expect("set UFOTIM");
+        machine.memory.write_byte(0xA112, 0).expect("clear LNDCNT");
+        machine.memory.write_byte(0xA113, 0).expect("clear TIECNT");
+        machine.memory.write_byte(0xA114, 0).expect("clear PRBCNT");
+        machine.memory.write_byte(0xA115, 0).expect("clear SCZCNT");
+        machine.memory.write_byte(0xA116, 0).expect("clear SWCNT");
+        machine.memory.write_byte(0xA119, 11).expect("seed UFOCNT");
+        machine.memory.write_byte(0xA0AE, 15).expect("set STRCNT");
+        write_ram_bytes(&mut machine, 0xA0DF, &[0x00, 0x00, 0x10]);
+
+        let reserves = red_label_ram_snapshot(&machine, "DC-10.1 enemy reserves", 0xA0FB..0xA11A);
+        let free_process_head =
+            red_label_ram_snapshot(&machine, "DC-10.1 free process head", 0xA061..0xA063);
+
+        let exec = machine
+            .red_label_start_game_exec_current_process()
+            .expect("DC-10.1 GEXEC entry");
+        let RedLabelGameExec::Running(run) = exec else {
+            panic!("expected DC-10.1 GEXEC running branch");
+        };
+
+        assert_eq!(
+            run.entry,
+            Some(RedLabelGameExecEntry {
+                delta_counter: 40,
+                ufo_timer: 4,
+                wave_timer: 1,
+            })
+        );
+        assert_eq!(run.enemy_total, Some(2));
+        let ufo = run.ufo.expect("DC-10.1 UFO pacing");
+        assert_eq!(ufo.previous_timer, 4);
+        assert_eq!(ufo.accelerated_timer, Some(2));
+        assert_eq!(ufo.decremented_timer, 1);
+        assert_eq!(ufo.ufo_count_before, None);
+        assert_eq!(ufo.ufo_count_after, None);
+        assert_eq!(ufo.started, None);
+
+        let lander = run.lander.expect("DC-10.1 lander pacing");
+        assert_eq!(lander.previous_timer, 1);
+        assert_eq!(lander.decremented_timer, 0);
+        assert_eq!(lander.reset_timer, Some(6));
+        assert_eq!(lander.reserve_count_before, Some(2));
+        assert_eq!(lander.requested_count, Some(2));
+        assert_eq!(lander.reserve_count_after, Some(0));
+        let lander_start = lander.started.expect("DC-10.1 LANDST fallback");
+        assert_eq!(lander_start.requested_count, 2);
+        assert_eq!(lander_start.landers.len(), 0);
+        assert_eq!(lander_start.schizoid_fallback.len(), 2);
+        assert_eq!(run.star_time.previous_star_count, 15);
+        assert_eq!(run.star_time.star_count, 16);
+        assert_eq!(run.star_time.previous_delta_counter, 40);
+        assert_eq!(run.star_time.delta_counter, 39);
+        assert_eq!(
+            run.wakeup_address,
+            red_label_routine_address("GEX0").expect("GEX0 address")
+        );
+        reserves.assert_current_changed(&machine);
+        free_process_head.assert_current_changed(&machine);
+        assert_eq!(machine.red_label_ram_range(0xA0FB..0xA0FC), Some(&[0][..]));
+        assert_eq!(
+            machine.red_label_ram_range(0xA112..0xA11A),
+            Some(&[0, 0, 0, 2, 0, 6, 1, 11][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xDC, 0xEA, 15][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x07..process + 0x08),
+            Some(&[39][..])
+        );
+
+        let mut ufo_machine = ArcadeMachine::new();
+        let ufo_process = schedule_game_exec_process(&mut ufo_machine, "GEX0");
+        ufo_machine
+            .memory
+            .write_byte(0xA0BA, 0)
+            .expect("clear UFO STATUS");
+        ufo_machine
+            .memory
+            .write_byte(0xA0FB, 0)
+            .expect("clear UFO LNDRES");
+        ufo_machine
+            .memory
+            .write_byte(0xA10F, 8)
+            .expect("set UFO UFOTIM");
+        ufo_machine
+            .memory
+            .write_byte(0xA112, 1)
+            .expect("set UFO LNDCNT");
+        ufo_machine
+            .memory
+            .write_byte(0xA113, 9)
+            .expect("set UFO TIECNT");
+        ufo_machine
+            .memory
+            .write_byte(0xA117, 2)
+            .expect("set UFO WAVTMR");
+        ufo_machine
+            .memory
+            .write_byte(0xA118, 1)
+            .expect("set UFO UFOTMR");
+        ufo_machine
+            .memory
+            .write_byte(0xA119, 11)
+            .expect("seed UFOCNT");
+        ufo_machine
+            .memory
+            .write_byte(ufo_process + 7, 2)
+            .expect("set UFO GEX0 delta counter");
+
+        let ufo_exec = ufo_machine
+            .red_label_step_game_exec_current_process()
+            .expect("DC-10.1 GEX0 UFO step");
+        let RedLabelGameExec::Running(ufo_run) = ufo_exec else {
+            panic!("expected DC-10.1 GEX0 running branch");
+        };
+        assert_eq!(ufo_run.enemy_total, Some(10));
+        let ufo = ufo_run.ufo.expect("DC-10.1 second UFO pacing");
+        assert_eq!(ufo.previous_timer, 1);
+        assert_eq!(ufo.decremented_timer, 0);
+        assert_eq!(ufo.ufo_count_before, Some(11));
+        assert_eq!(ufo.ufo_count_after, Some(12));
+        let ufo_start = ufo.started.expect("DC-10.1 UFOST launch");
+        assert_eq!(
+            ufo_start.process.routine_address,
+            red_label_routine_address("UFOLP").expect("UFOLP address")
+        );
+        assert_eq!(
+            ufo_machine.red_label_ram_range(0xA118..0xA11A),
+            Some(&[8, 12][..])
+        );
+        assert_eq!(
+            ufo_machine.red_label_ram_range(ufo_process + 0x02..ufo_process + 0x05),
+            Some(&[0xDC, 0xEA, 15][..])
         );
     }
 

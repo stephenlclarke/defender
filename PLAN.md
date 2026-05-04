@@ -1164,8 +1164,9 @@ Goal: make wave setup and world state source-exact.
 
 Steps:
 
-- [ ] DC-10.1 Translate wave launch process order, enemy reserve allocation, and
+- [x] DC-10.1 Translate wave launch process order, enemy reserve allocation, and
   spawn timing from source.
+  Completed: `2026-05-04 22:27:15 BST`
 - [ ] DC-10.2 Finish terrain scheduling, destroyed-planet terrain, scanner
   terrain, and fifth-wave human restoration.
 - [ ] DC-10.3 Prove `GETWV`, `WDELT`, target restoration, and survivor bonus
@@ -1175,6 +1176,24 @@ Steps:
 
 Completion gate: wave setup and world transitions can be compared against local
 golden traces without hand-placed opener state.
+
+Work log:
+
+- `2026-05-04 22:20:32 BST` Started `DC-10.1`: adding a combined
+  refactor-safety fixture for translated `GEXEC` / `GEX0` launch order, UFO
+  pacing, lander reserve allocation, and process sleep timing.
+- `2026-05-04 22:27:15 BST` Completed `DC-10.1`: added
+  `wave_launch_fixture_covers_exec_order_reserve_allocation_and_spawn_timing`,
+  proving translated `GEXEC` seeds `PD`/`UFOTMR`/`WAVTMR`, applies source
+  `WVCHK` gating, consumes lander reserves through the translated `LANDST` /
+  schizoid-fallback path, mutates enemy counters and free-process state, sleeps
+  back to `GEX0`, and separately proves timed `UFOST` launch increments
+  `UFOCNT` and returns to the same `GEX0` cadence. Validation passed with
+  `cargo fmt --check`,
+  `cargo test wave_launch_fixture_covers_exec_order_reserve_allocation_and_spawn_timing
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777930065731819`
 
 ### DC-11: Remaining Enemy And Collision Behavior
 
