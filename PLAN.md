@@ -1387,8 +1387,9 @@ Steps:
 - [x] DC-12.3 Add pixel checksum and perceptual diff fixtures for boot, attract,
   start, gameplay, death, high-score, and operator frames.
   Completed: `2026-05-04 23:23:09 BST`
-- [ ] DC-12.4 Switch live mode from `render_scaffold` to `render_cabinet_frame`
+- [x] DC-12.4 Switch live mode from `render_scaffold` to `render_cabinet_frame`
   only after fixture proof.
+  Completed: `2026-05-04 23:24:16 BST`
 - [ ] DC-12.5 Remove or regenerate archived prototype visual assets from
   red-label source/ROM-derived data.
 
@@ -1445,6 +1446,21 @@ Work log:
   `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777933418941519`
+- `2026-05-04 23:24:01 BST` Started `DC-12.4`: verifying the live presentation
+  path now stays on `render_cabinet_frame` after the `DC-12.3` fixture proof
+  and has no remaining `render_scaffold` live fallback.
+- `2026-05-04 23:24:16 BST` Completed `DC-12.4`: verified `src/live.rs`
+  renders the live machine frame by copying PCRAM into palette RAM, building a
+  native red-label RGBA frame, and handing it to `renderer.render_cabinet_frame`.
+  Repository search found no source `render_scaffold` symbol or live fallback;
+  the only remaining `render_scaffold` text is this plan's historical step
+  wording. Validation passed with `cargo test render_live_frame --all-targets`,
+  `cargo test render_live_machine_frame --all-targets`, `rg -n
+  "render_scaffold|render_cabinet_frame|render_live_frame|render_live_machine_frame"
+  src README.md SPEC.md docs/fidelity/gaps.md PLAN.md`, `markdownlint PLAN.md`,
+  and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777933481608959`
 
 ## Phase 6: Sound Board And Audio
 
