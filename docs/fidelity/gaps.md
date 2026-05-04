@@ -362,9 +362,10 @@ This file records behavior that must not be guessed in arcade-core code.
   `TIEKIL` runs the source `KILO` score/explosion/sound path with `TIHSND` plus
   squad-slot and final super-process cleanup. Enemy kill/collision vectors
   beyond `BKIL` / `NOKILL` / `ASTKIL` / `AKIL1` / `MSWKIL` / `PRBKIL` /
-  `SCZKIL` / `UFOKIL` / `LKILL` / `LKIL1` / `TIEKIL`, live terrain scheduling,
-  full live respawn orchestration beyond the runtime snapshot handoff, and
-  golden-trace proof for the translated death tail remain open. The
+  `SCZKIL` / `UFOKIL` / `LKILL` / `LKIL1` / `TIEKIL`, full CPU-cycle
+  integration, and non-gameplay presentation timing remain open. DC-08
+  refactor fixtures now cover the translated death tail, respawn, wave-clear,
+  and human rescue branches. The
   assembled/ROM-confirmed addresses for `BONUS`, `BC1`, `BC2`, `BC3`, `GETWV`,
   `PDTH5SCLR`, `GEXBON`, `SCLR1`, `PLRES`, `ASTST`, `ASTRO`, `ASTKIL`,
   `PRBST`, `PRBKIL`, `MMSW`, `MSWM`, `MSWLP`, `SWBMB`, `MSWKIL`, `SHOOT`,
@@ -566,10 +567,10 @@ This file records behavior that must not be guessed in arcade-core code.
   source-order `WVTAB`, applies CMOS difficulty/ceiling inter-wall `WDELT`
   updates, and restores `PTARG` on the `GA1+6` restore-wave cadence. `BGI`
   now selects bank/map 7 and runs the translated `BGINIT` terrain-table
-  generator. `PLSTRT` live respawn orchestration beyond runtime snapshot sync,
-  golden-trace proof for the translated `BONUS` / `SCLR1` wave-clear death
-  tail, respawn, human-carry routines, and full IRQ scanline/live rendering
-  integration remain open.
+  generator. DC-08 refactor fixtures now lock the translated `BONUS` / `SCLR1`
+  wave-clear death tail, respawn/game-over branches, human rescue, hyperspace,
+  laser, smart-bomb, and reverse-player paths; remaining player-path risk is
+  full CPU-cycle ownership and non-gameplay presentation timing.
 
 ## World And Enemies
 

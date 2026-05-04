@@ -416,9 +416,8 @@ Additional gaps and corrections found during this review:
   adding mutation-preserving unit and characterization tests before the refactor
   starts.
 - The live path now feeds translated video RAM into `render_cabinet_frame`.
-  Remaining video risk is fixture proof: scanline scheduling, exact frame/cycle
-  timing, pixel golden coverage, and intentionally native-black untranslated
-  screens still need acceptance evidence.
+  Remaining video risk is fixture proof for exact frame/cycle timing, pixel
+  golden coverage, and intentionally native-black untranslated screens.
 - The trace schema can record object CRCs, process CRCs, super-process CRCs,
   shell CRCs, sound commands, and optional video CRCs, but CMOS-specific trace
   columns, pixel golden fixtures, and audio command/waveform fixtures remain
@@ -433,11 +432,11 @@ Additional gaps and corrections found during this review:
   in code can validate local fixture presence and shape, but the repo still
   depends on user-supplied ROMs and local MAME to prove golden equivalence.
 - Remaining open gaps include the post-INIT20 ATTR/executive scheduler cadence
-  from `attract_boot` frame 733 onward, complete CPU IRQ and screen-scanline
-  frame scheduling, full frame/cycle integration, golden-trace proof for
-  translated gameplay/session paths, pixel golden fixtures, full sound-board
-  cycle/waveform scheduling, audio command and waveform fixtures, and removal
-  or regeneration of archived prototype visual/audio assets.
+  from `attract_boot` frame 733 onward, full frame/cycle integration,
+  golden-trace proof for translated session/operator paths, pixel golden
+  fixtures, full sound-board cycle/waveform scheduling, audio command and
+  waveform fixtures, and removal or regeneration of archived prototype
+  visual/audio assets.
 - The prior local implementation notes listed "Fix Mutant score to `150`" as
   future work even though `assets/red-label/scores.tsv` and unit tests already
   enforce it. The current contract is to keep that regression covered through
@@ -725,13 +724,10 @@ Additional gaps and corrections found during this review:
   dispatcher, unlinks the current active process, returns it to the correct
   free list, and rewinds `CRPROC` to the previous link cell.
   Generic/untranslated process body dispatch,
-  remaining object callbacks, live respawn orchestration beyond the `PLSTRT`
-  runtime snapshot handoff,
-  full trace proof for the translated `BONUS` wave-clear death-tail path,
-  source-exact boot/start-ready state, broader `SWTAB` cabinet-session
-  integration, scanline scheduling, live video presentation, and full
-  frame/cycle integration remain gaps. Live coin/admin input now enters through
-  translated `CSCAN` / `SWTAB1` / `SWP`, ignores the source auto/manual
+  remaining object callbacks, source-exact boot/start-ready state, broader
+  `SWTAB` cabinet-session integration, non-gameplay live video presentation,
+  and full frame/cycle integration remain gaps. Live coin/admin input now enters
+  through translated `CSCAN` / `SWTAB1` / `SWP`, ignores the source auto/manual
   selector for queue priority while preserving it for `ADVSW`, ticks the source
   slam/coin debounce counters from live tilt/coin input, sleeps through
   `LCOIN` / `RCOIN` / `CCOIN`, and awards credit from `CN1` with `CNSND`,
@@ -807,10 +803,9 @@ Additional gaps and corrections found during this review:
   `THOUT` / `THOFF` thrust-flame byte output slice. The translated `OPROC`
   slice can erase and redraw active-object descriptors in caller scanline
   bands. The source `STOUT` / `SBLNK` star-output path is translated over
-  `SMAP` and video RAM, but not yet wired into a cycle/scanline scheduler. The
-  remaining `defa7.src` /
-  `defb6.src` player path still needs scanline scheduling, full live video
-  presentation, respawn/start bodies, and carried-human behavior.
+  `SMAP` and video RAM, and live IRQ frame scheduling now exercises the
+  translated scanline object bands. Remaining player-path gaps are
+  CPU-cycle-exact ownership and non-gameplay presentation timing.
 - The `REV` switch process is translated through the asset-backed `SWTAB`,
   `SSCAN`/`SWPROC`/`SWP`, and updates `REVFLG`/`NPLAD` with the source
   debounce timing. Live reverse now reaches the translated `PLAYER` and
@@ -834,9 +829,9 @@ Additional gaps and corrections found during this review:
   BGL-relative X, width, and alternate-flavor checks. `VELO` active-object
   velocity addition is translated for direct dispatch. `BGI` now selects
   bank/map 7 and runs the translated `BGINIT` terrain-table generator.
-  `PLSTRT` live respawn orchestration beyond runtime snapshot sync,
-  human-carry behavior, and respawn-specific live rendering integration remain
-  open.
+  DC-08 fixtures now prove reverse rendering, laser lifecycle, smart-bomb
+  world effects, hyperspace safe/death-risk branches, human rescue, and
+  death/respawn/wave/game-over decisions for later refactors.
 - The live keyboard profiles expose operator cabinet bits with `F2` for
   service advance, `F3` for high-score reset, and held `F4` for the
   auto/up selector used with service advance, plus `F5` for the slam/tilt
@@ -876,10 +871,10 @@ Additional gaps and corrections found during this review:
   old-picture erase, new descriptor picture output, the ROM Y-band rules,
   BGL-relative X bounds, width clipping, and alternate image flavor selection.
   The `VELO` active-object velocity slice now covers source X addition and
-  Y wrap through cabinet bounds. Remaining `PLSTRT` live respawn integration,
-  golden-trace proof for the
-  `BONUS`/`SCLR1` wave-clear tail, remaining respawn/game-over presentation,
-  and full frame/cycle integration are still scaffold/open. The
+  Y wrap through cabinet bounds. DC-08 refactor fixtures now prove
+  `PLSTRT`/death-tail respawn decisions, the translated `BONUS`/`SCLR1`
+  wave-clear tail, human rescue, hyperspace, laser, smart-bomb, and reverse
+  player paths; full frame/cycle integration remains open. The
   current smart-bomb slice covers the `SBOMB` entry/flash/debounce tail, and
   the current player-death slice covers `PLEND`/`PDEATH`, `PLSAV`, `MONO`,
   `PDTHL`, `PDTH2`, `PXCTB` glow color writes, `PDTH4`, `PDTH5`,
@@ -1529,9 +1524,8 @@ post-call `GEXBON` return site, then increments `PLAS` and jumps through the
 translated `PLSTR0` restart. Remaining enemy kill/collision vectors
 beyond
 `BKIL` / `NOKILL` / `ASTKIL` / `MSWKIL` / `PRBKIL` / `SCZKIL` / `UFOKIL` /
-`LKILL` / `LKIL1` / `TIEKIL`, full IRQ scanline/live video integration, full
-frame/cycle integration, and golden-trace proof for the translated death tail
-remain open.
+`LKILL` / `LKIL1` / `TIEKIL`, full frame/cycle integration, and
+non-gameplay presentation timing remain open.
 The assembled/ROM-confirmed addresses for the remaining `PLSTRT` / `PLRES`
 companion labels (`SCLR1`, `ASTST`, `ASTRO`, `ASTKIL`, `PRBST`, `PRBKIL`,
 `MMSW`, `MSWM`, `MSWLP`, `SWBMB`, `MSWKIL`, `SHOOT`, `SCZST`, `SCZ0`,
@@ -1550,8 +1544,8 @@ their behavior from labels.
 1. Done: define cabinet input bits and action names.
 2. Done: add `planetoid`, `cabinet`, and deterministic `test` input profiles.
 3. Done for Phase 4: live reverse movement/rendering now reaches translated
-   `PLAYER` and `PRDISP`; respawn, human-carry behavior, and full scanline
-   frame scheduling remain in the later world/video/fidelity phases.
+   `PLAYER` and `PRDISP`; DC-08 fixtures cover respawn, human rescue, and
+   scanline-frame player-path behavior for later refactors.
 4. Done: Mutant score is `150` in the arcade core and covered by regression
    tests.
 5. Done: `xyzzy` is an overlay with explicit state and tests.

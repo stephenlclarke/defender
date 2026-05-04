@@ -53398,6 +53398,147 @@ mod tests {
     }
 
     #[test]
+    fn player_death_branch_fixture_covers_respawn_game_over_switch_and_wave_bonus() {
+        let mut respawn = ArcadeMachine::new();
+        let respawn_process = schedule_player_death_process(&mut respawn);
+        respawn.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+        respawn.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        respawn.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        respawn.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        respawn.memory.write_byte(0xA1C9, 2).expect("set PLAS");
+
+        let respawn_branch = respawn
+            .red_label_continue_player_death_after_explosion_current_process()
+            .expect("respawn PDTH5R");
+
+        assert_eq!(
+            respawn_branch,
+            RedLabelPlayerDeath::PostExplosionRespawnJump {
+                process_address: respawn_process,
+                next_player: 1,
+                player_start_address: 0xD919,
+            }
+        );
+        assert_eq!(
+            respawn.red_label_ram_range(respawn_process + 0x02..respawn_process + 0x04),
+            Some(&[0xD9, 0x19][..])
+        );
+
+        let mut game_over = ArcadeMachine::new();
+        let game_over_process = schedule_player_death_process(&mut game_over);
+        game_over.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+        game_over.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        game_over.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        game_over
+            .memory
+            .write_word(0xA08D, 0xA1C2)
+            .expect("set PLRX");
+        game_over.memory.write_byte(0xA1C9, 0).expect("clear PLAS");
+
+        let game_over_branch = game_over
+            .red_label_continue_player_death_after_explosion_current_process()
+            .expect("game-over PDTH5R");
+
+        assert_eq!(
+            game_over_branch,
+            RedLabelPlayerDeath::GameOverSleeping {
+                process_address: game_over_process,
+                status: 0xFF,
+                sound_command: SoundCommand::from_main_board_pia_port_b(0x2C),
+                wakeup_address: 0xDB48,
+            }
+        );
+        assert_eq!(
+            game_over.red_label_ram_range(game_over_process + 0x02..game_over_process + 0x05),
+            Some(&[0xDB, 0x48, 40][..])
+        );
+
+        let mut switch = ArcadeMachine::new();
+        let switch_process = schedule_player_death_process(&mut switch);
+        switch.memory.write_byte(0xA112, 1).expect("set LNDCNT");
+        switch.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        switch.memory.write_byte(0xA08C, 2).expect("set PLRCNT");
+        switch.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        switch
+            .memory
+            .write_byte(0xA1C9, 0)
+            .expect("clear player one PLAS");
+        switch
+            .memory
+            .write_byte(0xA206, 2)
+            .expect("set player two PLAS");
+
+        let switch_branch = switch
+            .red_label_continue_player_death_after_explosion_current_process()
+            .expect("switch-player PDTH5R");
+
+        assert!(matches!(
+            switch_branch,
+            RedLabelPlayerDeath::PostExplosionSwitchPlayerSleeping {
+                process_address,
+                other_player: 2,
+                wakeup_address: 0xDB15,
+                ..
+            } if process_address == switch_process
+        ));
+        assert_message_glyph_first_column(&switch, RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN, 'P');
+        assert_message_glyph_first_column(&switch, RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN, 'G');
+
+        let mut wave = ArcadeMachine::new();
+        let wave_process = schedule_player_death_process(&mut wave);
+        wave.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        wave.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        wave.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        wave.memory.write_byte(0xA0FA, 1).expect("set ASTCNT");
+        wave.memory.write_byte(0xA1C9, 2).expect("set PLAS");
+        wave.memory.write_byte(0xA1CA, 3).expect("set PWAV");
+
+        let bonus = wave
+            .red_label_continue_player_death_after_explosion_current_process()
+            .expect("wave-clear PDTH5R");
+        assert!(matches!(
+            bonus,
+            RedLabelPlayerDeath::PostExplosionBonusAstronautSleeping {
+                process_address,
+                astronaut_counter: 1,
+                score_word: 0x0130,
+                wakeup_address: 0xDE66,
+                ..
+            } if process_address == wave_process
+        ));
+
+        let wave_sleep = wave
+            .red_label_continue_player_death_bonus_astronaut_current_process()
+            .expect("wave advance after last survivor");
+        assert!(matches!(
+            wave_sleep,
+            RedLabelPlayerDeath::PostExplosionBonusWaveAdvanceSleeping {
+                process_address,
+                previous_astronaut_counter: 0,
+                wave: RedLabelWaveParameters {
+                    previous_wave: 3,
+                    wave: 4,
+                    ..
+                },
+                wakeup_address: 0xDE79,
+                ..
+            } if process_address == wave_process
+        ));
+
+        let restarted = wave
+            .red_label_finish_player_death_bonus_current_process()
+            .expect("BC3 return");
+        assert_eq!(
+            restarted,
+            RedLabelPlayerDeath::PostExplosionRespawnJump {
+                process_address: wave_process,
+                next_player: 1,
+                player_start_address: 0xD919,
+            }
+        );
+    }
+
+    #[test]
     fn reverse_entry_negates_direction_and_debounces_until_release() {
         let mut machine = ArcadeMachine::new();
         let process = schedule_reverse_process(&mut machine, "REV");

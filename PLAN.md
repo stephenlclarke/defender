@@ -904,7 +904,7 @@ Work log:
 
 ### DC-08: Player Control And Respawn Completion
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: finish the exact player path around controls, death, respawn, and carried
 humans.
@@ -925,8 +925,9 @@ Steps:
 - [x] DC-08.5 Finish carried-human, falling-human, catch, landing, and rescue
   paths.
   Completed: `2026-05-04 21:48:08 BST`
-- [ ] DC-08.6 Prove death, respawn, wave-clear, and game-over branches with
+- [x] DC-08.6 Prove death, respawn, wave-clear, and game-over branches with
   golden traces.
+  Completed: `2026-05-04 21:54:58 BST`
 
 Completion gate: the player path can be exercised from live inputs through
 source-shaped process execution and trace-proven state mutations.
@@ -1003,6 +1004,29 @@ Work log:
   --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777927711664639`
+- `2026-05-04 21:49:31 BST` Started `DC-08.6`: adding a player-death branch
+  fixture for respawn, one-player game over, two-player switch/game-over text,
+  and wave-clear bonus restart before running the full DC-08 validation gate.
+- `2026-05-04 21:54:58 BST` Completed `DC-08.6`: added
+  `player_death_branch_fixture_covers_respawn_game_over_switch_and_wave_bonus`,
+  proving the one-player respawn branch, one-player game-over sleep,
+  two-player switch/game-over text branch, wave-clear survivor bonus loop, wave
+  advance, and `BC3` restart into `PLSTR0`. Updated `README.md`, `SPEC.md`,
+  and `docs/fidelity/gaps.md` to remove stale DC-08 gaps and keep the remaining
+  documented gaps focused on frame/cycle integration, session/operator flow, and
+  non-gameplay presentation. Validation passed with `cargo fmt --check`,
+  `cargo test player_death_branch_fixture_covers_respawn_game_over_switch_and_wave_bonus
+  --all-targets`, `make fidelity`, markdownlint, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928097936399`
+- `2026-05-04 21:54:58 BST` Completed `DC-08` gate: `make fidelity`
+  passed after the DC-08.6 fixture and docs updates. The gate included
+  `cargo fmt --check`, `cargo test --all-targets` (`823 passed; 0 failed;
+  13 ignored` library tests, plus 2 CLI tests), `cargo clippy --all-targets
+  -- -D warnings`, Lua trace self-test, Python trace/coverage helper tests,
+  skipped missing local Rust trace fixture directory as expected, generated
+  `target/coverage/lcov.info` and `target/coverage/coverage.xml`, and reported
+  `new Rust line coverage: 0/0 added executable line(s)`.
 
 ### DC-09: Cabinet Session And Operator Flow
 

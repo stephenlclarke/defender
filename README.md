@@ -375,8 +375,9 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   return/reuse path. Live playing frames now schedule translated
   `BGOUT` with the source-derived IRQ stack pointer, so the cabinet terrain
   screen table and video RAM advance through the red-label terrain output path.
-  Full live respawn orchestration beyond the runtime snapshot handoff remains a
-  documented gap.
+  DC-08 proof fixtures now cover reverse rendering, laser lifecycle,
+  smart-bomb world effects, hyperspace branches, human rescue, and
+  death/respawn/wave/game-over branch decisions.
   The IRQ `PLAYER` motion slice now applies source-shaped 24-bit horizontal
   damping, thrust acceleration, X/scroll correction, absolute-X calculation,
   and altitude up/down velocity from `PIA21` / `PIA31`. The `PRDISP` player
@@ -498,8 +499,8 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   entry `GNCIDE`, and live `PCRAM` palette presentation are translated. Idle
   live attract mode now creates the source `ATTR` process and follows the
   immediate source `ATTR` -> `AMODES` -> `LOGO` jump chain before the logo
-  sleeps to `LOGO0`. Full scanline scheduling and remaining boot/attract
-  handoff video remain gaps.
+  sleeps to `LOGO0`. Remaining boot/attract handoff video and full
+  frame/cycle ownership remain gaps.
   Live fire, smart bomb, hyperspace, reverse, and credited/free-play one- and
   two-player start buttons now enter through an asset-backed red-label `SWTAB`,
   `SSCAN` switch history, `SWPROC` queue, `SWP` status gate, and translated
