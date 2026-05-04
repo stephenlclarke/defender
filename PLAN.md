@@ -791,15 +791,16 @@ Work log:
 
 ### DC-07: IRQ, Scanline, And Palette Integration
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: integrate frame timing, scanline ownership, palette copy, and hardware map
 restoration into the core.
 
 Steps:
 
-- [ ] DC-07.1 Implement source-exact CPU IRQ cadence and screen scanline
+- [x] DC-07.1 Implement source-exact CPU IRQ cadence and screen scanline
   scheduling from MAME/source measurements.
+  Completed: `2026-05-04 21:16:00 BST`
 - [ ] DC-07.2 Finish `BGOUT` live stack-context wiring and hardware-map
   restoration.
 - [ ] DC-07.3 Finish palette-copy side effects and validate palette RAM
@@ -810,6 +811,23 @@ Steps:
 
 Completion gate: one full core frame mutates RAM, video RAM, palette RAM,
 object lists, process lists, and sound commands in source order.
+
+Work log:
+
+- `2026-05-04 21:14:20 BST` Started `DC-07.1`: turning the existing upright
+  `IRQ` / flipped `IRQB` live scanline constants into an explicit frame
+  schedule surface, then validating that live frame execution uses the
+  source-selected `IRQHK` mode and the measured upper/lower `VERTCT` points.
+- `2026-05-04 21:16:00 BST` Completed `DC-07.1`: added
+  `RedLabelLiveIrqFrameSchedule` as the public source-derived live IRQ frame
+  schedule for upright `IRQ` and flipped `IRQB`, exposed it through
+  `ArcadeMachine`, and wired the live frame runner through that schedule rather
+  than directly embedding the scanline counters. Extended the upright/flipped
+  live IRQ tests to assert the `IRQHK`-selected schedule and the exact
+  upper/lower `VERTCT` points. Validation passed with `cargo fmt --check` and
+  `cargo test live_irq_video_frame_uses_ --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777925778062459`
 
 ## Phase 3: Player, Session, And Cabinet Flow
 

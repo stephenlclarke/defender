@@ -1195,6 +1195,36 @@ pub enum RedLabelIrqSchedulerPhase {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RedLabelLiveIrqFrameSchedule {
+    pub mode: RedLabelIrqMode,
+    pub upper_vertical_counter: u8,
+    pub lower_vertical_counter: u8,
+    pub upper_phase: RedLabelIrqSchedulerPhase,
+    pub lower_phase: RedLabelIrqSchedulerPhase,
+}
+
+impl RedLabelLiveIrqFrameSchedule {
+    pub const fn for_mode(mode: RedLabelIrqMode) -> Self {
+        match mode {
+            RedLabelIrqMode::Normal => Self {
+                mode,
+                upper_vertical_counter: RED_LABEL_NORMAL_IRQ_LIVE_VERTCT,
+                lower_vertical_counter: RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT,
+                upper_phase: RedLabelIrqSchedulerPhase::NormalUpper,
+                lower_phase: RedLabelIrqSchedulerPhase::NormalLower,
+            },
+            RedLabelIrqMode::Inverted => Self {
+                mode,
+                upper_vertical_counter: RED_LABEL_INVERTED_IRQ_LIVE_VERTCT,
+                lower_vertical_counter: RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT,
+                upper_phase: RedLabelIrqSchedulerPhase::InvertedUpper,
+                lower_phase: RedLabelIrqSchedulerPhase::InvertedLower,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RedLabelPaletteCopy {
     pub source_start: u16,
     pub target_start: u16,
@@ -12704,12 +12734,13 @@ impl RedLabelRuntimeMemory {
         let layout = red_label_ram_layout()?;
         self.write_field_byte(&layout, "base_page", "XXX1", 0xFF)?;
         self.write_field_byte(&layout, "base_page", "XXX3", 0)?;
+        let schedule = RedLabelLiveIrqFrameSchedule::for_mode(RedLabelIrqMode::Normal);
 
         let context =
             RedLabelIrqSchedulerContext::source_irq_after_sound_step(DefenderInputPorts::EMPTY);
         let upper_scanline = self.run_irq_scanline_object_phase_with_context(
             RedLabelIrqMode::Normal,
-            RED_LABEL_NORMAL_IRQ_LIVE_VERTCT,
+            schedule.upper_vertical_counter,
             context,
         )?;
         let player_motion =
@@ -12723,7 +12754,7 @@ impl RedLabelRuntimeMemory {
 
         let lower_scanline = self.run_irq_scanline_object_phase_with_context(
             RedLabelIrqMode::Normal,
-            RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT,
+            schedule.lower_vertical_counter,
             context,
         )?;
         let terrain_output =
@@ -12753,12 +12784,13 @@ impl RedLabelRuntimeMemory {
         let layout = red_label_ram_layout()?;
         self.write_field_byte(&layout, "base_page", "XXX1", 0xFF)?;
         self.write_field_byte(&layout, "base_page", "XXX3", 0)?;
+        let schedule = RedLabelLiveIrqFrameSchedule::for_mode(RedLabelIrqMode::Inverted);
 
         let context =
             RedLabelIrqSchedulerContext::source_irq_after_sound_step(DefenderInputPorts::EMPTY);
         let upper_scanline = self.run_irq_scanline_object_phase_with_context(
             RedLabelIrqMode::Inverted,
-            RED_LABEL_INVERTED_IRQ_LIVE_VERTCT,
+            schedule.upper_vertical_counter,
             context,
         )?;
         let terrain_output =
@@ -12770,7 +12802,7 @@ impl RedLabelRuntimeMemory {
 
         let lower_scanline = self.run_irq_scanline_object_phase_with_context(
             RedLabelIrqMode::Inverted,
-            RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT,
+            schedule.lower_vertical_counter,
             context,
         )?;
         let player_motion =
@@ -12856,6 +12888,12 @@ impl RedLabelRuntimeMemory {
         } else {
             Ok(RedLabelIrqMode::Normal)
         }
+    }
+
+    pub fn live_irq_frame_schedule(&self) -> Result<RedLabelLiveIrqFrameSchedule, String> {
+        Ok(RedLabelLiveIrqFrameSchedule::for_mode(
+            self.live_irq_mode()?,
+        ))
     }
 
     pub fn run_live_irq_video_frame(&mut self) -> Result<RedLabelLiveVideoFrame, String> {
@@ -25155,6 +25193,12 @@ impl ArcadeMachine {
         self.memory.run_live_irq_video_frame()
     }
 
+    pub fn red_label_live_irq_frame_schedule(
+        &self,
+    ) -> Result<RedLabelLiveIrqFrameSchedule, String> {
+        self.memory.live_irq_frame_schedule()
+    }
+
     pub fn red_label_run_irq_scanline_object_phase(
         &mut self,
         mode: RedLabelIrqMode,
@@ -26375,21 +26419,22 @@ mod tests {
             RedLabelKidnappingPassengerRelease, RedLabelKilledProcess, RedLabelLanderFleeOutcome,
             RedLabelLanderProcessStep, RedLabelLanderTarget, RedLabelLaserDirection,
             RedLabelLaserFire, RedLabelLaserFireDispatch, RedLabelLaserFizzleInit,
-            RedLabelLaserStep, RedLabelLaserStopReason, RedLabelLiveVideoFrame,
-            RedLabelLoadedSoundTable, RedLabelMiniSwarmerKill, RedLabelMiniSwarmerProcessStep,
-            RedLabelObjectCollision, RedLabelObjectDescriptor, RedLabelObjectDisplay,
-            RedLabelObjectDisplayBand, RedLabelObjectVelocityStep, RedLabelObjectVelocityUpdate,
-            RedLabelPaletteCopy, RedLabelPictureWrite, RedLabelPlayerCollision,
-            RedLabelPlayerDeath, RedLabelPlayerDisplay, RedLabelPlayerMotion,
-            RedLabelPlayerRuntimeInit, RedLabelPlayerStart, RedLabelPositionedObjectKill,
-            RedLabelProcessClass, RedLabelProcessDispatch, RedLabelReverse, RedLabelRuntimeMemory,
-            RedLabelScannerObjectBlip, RedLabelScannerPlayerBlip, RedLabelScannerProcessStep,
-            RedLabelScannerTerrainErase, RedLabelScheduledProcess, RedLabelSchizoidProcessStep,
-            RedLabelScoreDigitTransfer, RedLabelScoreOutcome, RedLabelScoreSpriteKind,
-            RedLabelScoreSpriteStart, RedLabelScoreSpriteStep, RedLabelScoreTransfer,
-            RedLabelScreenClear, RedLabelScreenSwitch, RedLabelScreenSwitchRoutine,
-            RedLabelShellDescriptor, RedLabelShellOutputRoutine, RedLabelShellStep,
-            RedLabelSmartBomb, RedLabelSmartBombTail, RedLabelSoundBoardSnapshot,
+            RedLabelLaserStep, RedLabelLaserStopReason, RedLabelLiveIrqFrameSchedule,
+            RedLabelLiveVideoFrame, RedLabelLoadedSoundTable, RedLabelMiniSwarmerKill,
+            RedLabelMiniSwarmerProcessStep, RedLabelObjectCollision, RedLabelObjectDescriptor,
+            RedLabelObjectDisplay, RedLabelObjectDisplayBand, RedLabelObjectVelocityStep,
+            RedLabelObjectVelocityUpdate, RedLabelPaletteCopy, RedLabelPictureWrite,
+            RedLabelPlayerCollision, RedLabelPlayerDeath, RedLabelPlayerDisplay,
+            RedLabelPlayerMotion, RedLabelPlayerRuntimeInit, RedLabelPlayerStart,
+            RedLabelPositionedObjectKill, RedLabelProcessClass, RedLabelProcessDispatch,
+            RedLabelReverse, RedLabelRuntimeMemory, RedLabelScannerObjectBlip,
+            RedLabelScannerPlayerBlip, RedLabelScannerProcessStep, RedLabelScannerTerrainErase,
+            RedLabelScheduledProcess, RedLabelSchizoidProcessStep, RedLabelScoreDigitTransfer,
+            RedLabelScoreOutcome, RedLabelScoreSpriteKind, RedLabelScoreSpriteStart,
+            RedLabelScoreSpriteStep, RedLabelScoreTransfer, RedLabelScreenClear,
+            RedLabelScreenSwitch, RedLabelScreenSwitchRoutine, RedLabelShellDescriptor,
+            RedLabelShellOutputRoutine, RedLabelShellStep, RedLabelSmartBomb,
+            RedLabelSmartBombTail, RedLabelSoundBoardSnapshot,
             RedLabelSoundDirectCommandSequenceFixtureCheck, RedLabelSoundOutput,
             RedLabelSoundSequenceSource, RedLabelSoundSequenceStep, RedLabelSoundTableCommand,
             RedLabelSoundTableCommandSequenceFixtureCheck, RedLabelSoundTableTimedCommand,
@@ -35891,6 +35936,19 @@ mod tests {
         let mut machine = ArcadeMachine::new();
         start_one_player_game_for_test(&mut machine);
 
+        assert_eq!(
+            machine
+                .red_label_live_irq_frame_schedule()
+                .expect("default live IRQ schedule"),
+            RedLabelLiveIrqFrameSchedule {
+                mode: RedLabelIrqMode::Normal,
+                upper_vertical_counter: RED_LABEL_NORMAL_IRQ_LIVE_VERTCT,
+                lower_vertical_counter: RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT,
+                upper_phase: RedLabelIrqSchedulerPhase::NormalUpper,
+                lower_phase: RedLabelIrqSchedulerPhase::NormalLower,
+            }
+        );
+
         let frame = machine
             .red_label_run_live_irq_video_frame()
             .expect("live default IRQ video frame");
@@ -35927,6 +35985,18 @@ mod tests {
             .memory
             .write_range(0xA08F..0xA092, &[0x7E, 0xDF, 0xC3])
             .expect("select IRQB hook");
+        assert_eq!(
+            machine
+                .red_label_live_irq_frame_schedule()
+                .expect("IRQB live schedule"),
+            RedLabelLiveIrqFrameSchedule {
+                mode: RedLabelIrqMode::Inverted,
+                upper_vertical_counter: RED_LABEL_INVERTED_IRQ_LIVE_VERTCT,
+                lower_vertical_counter: RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT,
+                upper_phase: RedLabelIrqSchedulerPhase::InvertedUpper,
+                lower_phase: RedLabelIrqSchedulerPhase::InvertedLower,
+            }
+        );
         machine
             .memory
             .write_word(object + 0x0A, 0x1420)
