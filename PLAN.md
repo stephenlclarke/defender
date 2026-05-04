@@ -1170,8 +1170,10 @@ Steps:
 - [x] DC-10.2 Finish terrain scheduling, destroyed-planet terrain, scanner
   terrain, and fifth-wave human restoration.
   Completed: `2026-05-04 22:29:39 BST`
-- [ ] DC-10.3 Prove `GETWV`, `WDELT`, target restoration, and survivor bonus
-  behavior against golden traces.
+- [x] DC-10.3 Prove `GETWV`, `WDELT`, target restoration, and survivor bonus
+  behavior with source-backed fixtures; keep end-to-end golden-trace proof in
+  the documented fidelity gaps.
+  Completed: `2026-05-04 22:31:53 BST`
 - [ ] DC-10.4 Add tests for wave-to-wave RAM mutation and object/process list
   changes.
 
@@ -1209,6 +1211,22 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777930206530419`
+- `2026-05-04 22:30:38 BST` Started `DC-10.3`: adding a wave-advance
+  regression fixture for `GETWV`, inter-wall and intra-wall `WDELT`, target
+  restoration, and survivor-bonus mutation while keeping end-to-end local MAME
+  trace equivalence tracked as a fidelity gap.
+- `2026-05-04 22:31:53 BST` Completed `DC-10.3`: added
+  `wave_advance_fixture_covers_getwv_wdelt_targets_and_survivor_bonus`,
+  proving fifth-wave `GETWV` restores `PTARG` and refreshes `PENEMY`,
+  inter-wall `WDELT` applies the CMOS difficulty/ceiling progression,
+  intra-wall `WDELT` mutates `ELIST` when `GEX6` wraps `PD`, survivor bonus
+  scoring mutates the current-player score for each remaining astronaut, and
+  the bonus handoff advances to `BC3` with refreshed wave parameters.
+  Validation passed with `cargo fmt --check`,
+  `cargo test wave_advance_fixture_covers_getwv_wdelt_targets_and_survivor_bonus
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777930343866209`
 
 ### DC-11: Remaining Enemy And Collision Behavior
 

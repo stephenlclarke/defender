@@ -39550,6 +39550,126 @@ mod tests {
         );
     }
 
+    #[test]
+    fn wave_advance_fixture_covers_getwv_wdelt_targets_and_survivor_bonus() {
+        let mut getwv = ArcadeMachine::new();
+        getwv.memory.write_byte(0xA1CA, 4).expect("set PWAV");
+        getwv.memory.write_byte(0xA1CC, 0x55).expect("set PTARG");
+        write_ram_bytes(&mut getwv, 0xA1CD, &[0xAA; 23]);
+        let target_count = red_label_ram_snapshot(&getwv, "DC-10.3 PTARG restore", 0xA1CC..0xA1CD);
+        let player_enemy = red_label_ram_snapshot(&getwv, "DC-10.3 PENEMY refresh", 0xA1CD..0xA1E4);
+
+        let wave = getwv
+            .red_label_get_new_wave_parameters_for_player_address(0xA1C2)
+            .expect("DC-10.3 GETWV");
+
+        assert_eq!(wave.previous_wave, 4);
+        assert_eq!(wave.wave, 5);
+        assert!(wave.restored_humans);
+        assert_eq!(wave.inter_wall_delta_iterations, 6);
+        assert_eq!(
+            wave.parameter_delta,
+            RedLabelWaveDelta {
+                start_address: 0xA1CD,
+                bytes_updated: 23,
+                bytes_changed: 23,
+            }
+        );
+        target_count.assert_current_changed_to(&getwv, &[10]);
+        player_enemy.assert_current_changed(&getwv);
+
+        let mut wdelt = ArcadeMachine::new();
+        let process = schedule_game_exec_process(&mut wdelt, "GEX0");
+        wdelt.memory.write_byte(0xA0AE, 16).expect("set STRCNT");
+        wdelt.memory.write_byte(0xA024, 0xF0).expect("set GTIME");
+        wdelt
+            .memory
+            .write_byte(process + 7, 1)
+            .expect("set GEX0 delta counter");
+        let enemy_delta =
+            red_label_ram_snapshot(&wdelt, "DC-10.3 ELIST intra-wall delta", 0xA0FB..0xA112);
+
+        let star_time = wdelt
+            .red_label_advance_game_exec_star_time()
+            .expect("DC-10.3 GEX6 WDELT");
+
+        assert_eq!(star_time.previous_game_time, 0xF0);
+        assert_eq!(star_time.game_time, 0);
+        assert_eq!(star_time.audit_meter, Some(0x06));
+        assert_eq!(star_time.previous_delta_counter, 1);
+        assert_eq!(star_time.delta_counter, 40);
+        assert_eq!(
+            star_time.wave_delta,
+            Some(RedLabelWaveDelta {
+                start_address: 0xA0FB,
+                bytes_updated: 23,
+                bytes_changed: 5,
+            })
+        );
+        enemy_delta.assert_current_changed(&wdelt);
+
+        let mut bonus = ArcadeMachine::new();
+        let bonus_process = schedule_player_death_process(&mut bonus);
+        bonus.memory.write_byte(0xA08B, 1).expect("set CURPLR");
+        bonus.memory.write_byte(0xA08C, 1).expect("set PLRCNT");
+        bonus.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        bonus.memory.write_byte(0xA0FA, 2).expect("set ASTCNT");
+        bonus.memory.write_byte(0xA1C9, 2).expect("set PLAS");
+        bonus.memory.write_byte(0xA1CA, 3).expect("set PWAV");
+        let score = red_label_ram_snapshot(&bonus, "DC-10.3 survivor bonus score", 0xA1C2..0xA1C6);
+
+        let first_bonus = bonus
+            .red_label_continue_player_death_after_explosion_current_process()
+            .expect("DC-10.3 first survivor bonus");
+        assert!(matches!(
+            first_bonus,
+            RedLabelPlayerDeath::PostExplosionBonusAstronautSleeping {
+                process_address,
+                astronaut_counter: 2,
+                score_word: 0x0130,
+                wakeup_address: 0xDE66,
+                ..
+            } if process_address == bonus_process
+        ));
+        assert_eq!(
+            bonus.red_label_ram_range(0xA1C2..0xA1C6),
+            Some(&[0x00, 0x00, 0x03, 0x00][..])
+        );
+
+        let second_bonus = bonus
+            .red_label_continue_player_death_bonus_astronaut_current_process()
+            .expect("DC-10.3 second survivor bonus");
+        assert!(matches!(
+            second_bonus,
+            RedLabelPlayerDeath::PostExplosionBonusAstronautSleeping {
+                process_address,
+                astronaut_counter: 1,
+                score_word: 0x0130,
+                wakeup_address: 0xDE66,
+                ..
+            } if process_address == bonus_process
+        ));
+        score.assert_current_changed_to(&bonus, &[0x00, 0x00, 0x06, 0x00]);
+
+        let wave_sleep = bonus
+            .red_label_continue_player_death_bonus_astronaut_current_process()
+            .expect("DC-10.3 survivor wave advance");
+        assert!(matches!(
+            wave_sleep,
+            RedLabelPlayerDeath::PostExplosionBonusWaveAdvanceSleeping {
+                process_address,
+                previous_astronaut_counter: 0,
+                wave: RedLabelWaveParameters {
+                    previous_wave: 3,
+                    wave: 4,
+                    ..
+                },
+                wakeup_address: 0xDE79,
+                ..
+            } if process_address == bonus_process
+        ));
+    }
+
     fn schedule_game_exec_process(machine: &mut ArcadeMachine, routine: &str) -> u16 {
         let process = machine
             .red_label_make_process(
