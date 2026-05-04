@@ -1272,8 +1272,9 @@ Steps:
 - [x] DC-11.4 Finish remaining shell rendering/output and object collision
   vectors.
   Completed: `2026-05-04 22:59:23 BST`
-- [ ] DC-11.5 Add score regression tests for enemies, bullets, mines, humans,
+- [x] DC-11.5 Add score regression tests for enemies, bullets, mines, humans,
   rescue, Pods, Swarmers, extra stocks, and smart bombs.
+  Completed: `2026-05-04 23:03:57 BST`
 - [ ] DC-11.6 Verify each enemy subsystem with focused traces before moving on.
 
 Completion gate: all red-label enemy processes are either translated and tested
@@ -1337,6 +1338,21 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777931983454029`
+- `2026-05-04 23:00:05 BST` Started `DC-11.5`: adding score regression
+  coverage for translated enemy, shell/mine, human/rescue, Pod/Swarmer,
+  replay-stock, and smart-bomb award paths.
+- `2026-05-04 23:03:57 BST` Completed `DC-11.5`: added
+  `score_regression_fixture_covers_enemy_human_stock_and_smart_bomb_awards`,
+  proving score words for bullet/mine shells, Landers, Mutants, Swarmers,
+  Baiters, UFOs, Bombers, rescue values, and Pods; actual `P250` / `P500`
+  human score-sprite mutations; actual `PRBKIL` Pod score/count mutation;
+  replay extra-life and smart-bomb award mutation; and smart-bomb mini-swarmer
+  kill score, inventory, and swarmer-count mutation. Validation passed with
+  `cargo fmt --check`,
+  `cargo test score_regression_fixture_covers_enemy_human_stock_and_smart_bomb_awards
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777932258187679`
 
 ## Phase 5: Native Video And Presentation
 

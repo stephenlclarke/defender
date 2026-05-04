@@ -50399,6 +50399,276 @@ mod tests {
     }
 
     #[test]
+    fn score_regression_fixture_covers_enemy_human_stock_and_smart_bomb_awards() {
+        let score_cases = [
+            (
+                "DC-11.5 bullet/mine BKIL score",
+                0x0025,
+                25,
+                [0x00, 0x00, 0x00, 0x25],
+            ),
+            (
+                "DC-11.5 lander/mutant/swarmer score",
+                0x0115,
+                150,
+                [0x00, 0x00, 0x01, 0x50],
+            ),
+            (
+                "DC-11.5 baiter/UFO score",
+                0x0120,
+                200,
+                [0x00, 0x00, 0x02, 0x00],
+            ),
+            (
+                "DC-11.5 bomber score",
+                0x0125,
+                250,
+                [0x00, 0x00, 0x02, 0x50],
+            ),
+            (
+                "DC-11.5 rescue score",
+                0x0150,
+                500,
+                [0x00, 0x00, 0x05, 0x00],
+            ),
+            ("DC-11.5 pod score", 0x0210, 1000, [0x00, 0x00, 0x10, 0x00]),
+        ];
+
+        for (label, score_word, expected_score, expected_score_bytes) in score_cases {
+            let mut machine = ArcadeMachine::new();
+            start_one_player_game_for_test(&mut machine);
+            let score_before = red_label_ram_snapshot(&machine, label, 0xA1C2..0xA1C6);
+
+            let outcome = machine
+                .red_label_score_current_player(score_word)
+                .expect("score DC-11.5 source word");
+
+            assert_eq!(outcome.player_number, 1, "{label}");
+            assert!(!outcome.bonus_awarded, "{label}");
+            assert_eq!(outcome.sound_loaded, None, "{label}");
+            assert_eq!(
+                machine.snapshot().scores.player_one,
+                expected_score,
+                "{label}"
+            );
+            score_before.assert_current_changed_to(&machine, &expected_score_bytes);
+        }
+
+        for (routine, kind, expected_score, expected_score_bytes) in [
+            (
+                "P250",
+                RedLabelScoreSpriteKind::Points250,
+                250,
+                [0x00, 0x00, 0x02, 0x50],
+            ),
+            (
+                "P500",
+                RedLabelScoreSpriteKind::Points500,
+                500,
+                [0x00, 0x00, 0x05, 0x00],
+            ),
+        ] {
+            let mut human = ArcadeMachine::new();
+            let process = schedule_support_process(&mut human, routine);
+            let astronaut = human
+                .red_label_init_object_cell(
+                    process,
+                    RedLabelObjectDescriptor {
+                        picture_address: red_label_object_picture_address("ASTP1")
+                            .expect("ASTP1 address"),
+                        collision_vector_address: red_label_routine_address("ASTKIL")
+                            .expect("ASTKIL address"),
+                        scanner_color: 0x1111,
+                    },
+                )
+                .expect("init DC-11.5 score astronaut")
+                .object_address;
+            human
+                .memory
+                .write_word(process + 0x07, astronaut)
+                .expect("set score sprite PD");
+            human
+                .memory
+                .write_word(astronaut + 0x0A, 0x2100)
+                .expect("set score astronaut OX16");
+            human
+                .memory
+                .write_word(astronaut + 0x0C, 0x4000)
+                .expect("set score astronaut OY16");
+            human
+                .memory
+                .write_byte(0xA08B, 1)
+                .expect("set current player");
+            human
+                .memory
+                .write_word(0xA08D, 0xA1C2)
+                .expect("set current player record");
+            let human_score = red_label_ram_snapshot(&human, "DC-11.5 human score", 0xA1C2..0xA1C6);
+
+            let dispatch = human
+                .red_label_dispatch_translated_process_routine(
+                    red_label_routine_address(routine).expect("score routine address"),
+                )
+                .expect("dispatch DC-11.5 score sprite");
+            let RedLabelProcessDispatch::ScoreSprite(RedLabelScoreSpriteStep::StartedSleeping(
+                score,
+            )) = dispatch
+            else {
+                panic!("expected DC-11.5 score sprite");
+            };
+
+            assert_eq!(score.kind, kind);
+            assert_eq!(score.astronaut_object_address, astronaut);
+            assert_eq!(human.snapshot().scores.player_one, expected_score);
+            human_score.assert_current_changed_to(&human, &expected_score_bytes);
+        }
+
+        let mut pod = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut pod);
+        let pod_process = pod
+            .red_label_make_process(
+                red_label_routine_address("PRBST").expect("PRBST address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make DC-11.5 pod process")
+            .process_address;
+        let pod_object = pod
+            .red_label_init_object_cell(
+                pod_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("PRBP1")
+                        .expect("PRBP1 address"),
+                    collision_vector_address: red_label_routine_address("PRBKIL")
+                        .expect("PRBKIL address"),
+                    scanner_color: 0xCCCC,
+                },
+            )
+            .expect("init DC-11.5 pod object")
+            .object_address;
+        pod.red_label_activate_object_cell(pod_object)
+            .expect("activate DC-11.5 pod object");
+        pod.memory.write_byte(0xA114, 1).expect("set PRBCNT");
+        pod.memory
+            .write_byte(0xA116, 20)
+            .expect("saturate SWCNT for pod score fixture");
+        pod.memory.write_word(0xA020, 0).expect("set pod BGL");
+        pod.memory.write_word(0xA0DF, 0).expect("set pod RNG");
+        pod.memory
+            .write_word(pod_object + 0x04, 0x5060)
+            .expect("set pod screen address");
+        pod.memory
+            .write_word(pod_object + 0x0A, 0x2000)
+            .expect("set pod OX16");
+        pod.memory
+            .write_word(pod_object + 0x0C, 0x6000)
+            .expect("set pod OY16");
+        let pod_score = red_label_ram_snapshot(&pod, "DC-11.5 pod score", 0xA1C2..0xA1C6);
+        let pod_count = red_label_ram_snapshot(&pod, "DC-11.5 PRBCNT", 0xA114..0xA115);
+
+        let pod_collision = pod
+            .red_label_dispatch_object_collision_vector(pod_object)
+            .expect("DC-11.5 PRBKIL");
+        let RedLabelObjectCollision::ProbeKilled(pod_kill) = pod_collision else {
+            panic!("expected DC-11.5 PRBKIL");
+        };
+
+        assert_eq!(pod_kill.object.object_address, pod_object);
+        assert_eq!(pod_kill.active_probe_count, 0);
+        assert_eq!(pod.snapshot().scores.player_one, 1000);
+        pod_score.assert_current_changed_to(&pod, &[0x00, 0x00, 0x10, 0x00]);
+        pod_count.assert_current_changed_to(&pod, &[0]);
+
+        let mut replay = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut replay);
+        write_ram_bytes(&mut replay, 0xA1C2, &[0x00, 0x00, 0x99, 0x90]);
+        let replay_score = red_label_ram_snapshot(&replay, "DC-11.5 replay score", 0xA1C2..0xA1C6);
+        let replay_lives = red_label_ram_snapshot(&replay, "DC-11.5 replay lives", 0xA1C9..0xA1CA);
+        let replay_smart_bombs =
+            red_label_ram_snapshot(&replay, "DC-11.5 replay smart bombs", 0xA1CB..0xA1CC);
+        let replay_sound = red_label_ram_snapshot(&replay, "DC-11.5 replay sound", 0xA0B0..0xA0B5);
+
+        let replay_outcome = replay
+            .red_label_score_current_player(0x0010)
+            .expect("DC-11.5 replay award score");
+
+        assert!(replay_outcome.bonus_awarded);
+        assert_eq!(replay.snapshot().scores.player_one, 10_000);
+        replay_score.assert_current_changed_to(&replay, &[0x00, 0x01, 0x00, 0x00]);
+        replay_lives.assert_current_changed_to(&replay, &[0x03]);
+        replay_smart_bombs.assert_current_changed_to(&replay, &[0x04]);
+        replay_sound.assert_current_changed_to(&replay, &[0xD4, 0xAE, 0xFF, 0x01, 0x01]);
+
+        let mut smart_bomb = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut smart_bomb);
+        schedule_smart_bomb_process(&mut smart_bomb);
+        let swarmer_process = smart_bomb
+            .red_label_make_process(
+                red_label_routine_address("MSWM").expect("MSWM address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make DC-11.5 swarmer process")
+            .process_address;
+        let swarmer_object = smart_bomb
+            .red_label_init_object_cell(
+                swarmer_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("SWPIC1")
+                        .expect("SWPIC1 address"),
+                    collision_vector_address: red_label_routine_address("MSWKIL")
+                        .expect("MSWKIL address"),
+                    scanner_color: 0x2424,
+                },
+            )
+            .expect("init DC-11.5 swarmer object")
+            .object_address;
+        smart_bomb
+            .red_label_activate_object_cell(swarmer_object)
+            .expect("activate DC-11.5 swarmer object");
+        smart_bomb
+            .memory
+            .write_byte(0xA116, 1)
+            .expect("set active swarmer count");
+        smart_bomb
+            .memory
+            .write_word(0xA020, 0)
+            .expect("set smart bomb BGL");
+        smart_bomb
+            .memory
+            .write_word(swarmer_object + 0x04, 0x5060)
+            .expect("set swarmer screen address");
+        smart_bomb
+            .memory
+            .write_word(swarmer_object + 0x0A, 0x2040)
+            .expect("set swarmer OX16");
+        smart_bomb
+            .memory
+            .write_word(swarmer_object + 0x0C, 0x6200)
+            .expect("set swarmer OY16");
+        let smart_score =
+            red_label_ram_snapshot(&smart_bomb, "DC-11.5 smart-bomb score", 0xA1C2..0xA1C6);
+        let smart_inventory =
+            red_label_ram_snapshot(&smart_bomb, "DC-11.5 smart-bomb inventory", 0xA1CB..0xA1CC);
+        let smart_swarmer_count =
+            red_label_ram_snapshot(&smart_bomb, "DC-11.5 smart-bomb SWCNT", 0xA116..0xA117);
+
+        let smart = smart_bomb
+            .red_label_start_smart_bomb_current_player()
+            .expect("DC-11.5 start smart bomb")
+            .expect("DC-11.5 smart bomb available");
+
+        assert_eq!(smart.remaining_smart_bombs, 2);
+        assert_eq!(smart.collisions.len(), 1);
+        assert!(matches!(
+            smart.collisions[0],
+            RedLabelObjectCollision::MiniSwarmerKilled(_)
+        ));
+        assert_eq!(smart_bomb.snapshot().scores.player_one, 150);
+        smart_score.assert_current_changed_to(&smart_bomb, &[0x00, 0x00, 0x01, 0x50]);
+        smart_inventory.assert_current_changed_to(&smart_bomb, &[0x02]);
+        smart_swarmer_count.assert_current_changed_to(&smart_bomb, &[0]);
+    }
+
+    #[test]
     fn dispatch_shell_output_steps_invokes_bomb_objcol_callback() {
         let mut machine = ArcadeMachine::new();
         let source = machine
