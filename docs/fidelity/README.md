@@ -82,7 +82,9 @@ under `docs/fidelity/fixtures/local/rust-current/`. Run `make trace-fixtures`
 to check every local Rust-current pair.
 
 Optional local configuration is documented in `docs/fidelity/local.env.example`.
-The checked-in MAME runner is `tools/generate_reference_traces.py`; it invokes
+Local reference fixture run records are documented in
+`docs/fidelity/local-reference-runs.md`. The checked-in MAME runner is
+`tools/generate_reference_traces.py`; it invokes
 `tools/mame_defender_trace.lua` with MAME's Lua `-autoboot_script` mechanism.
 The Lua exporter records per-frame main-board sound commands by write-tapping
 the MAME main CPU program space at PIA1 port B/control, suppressing the idle

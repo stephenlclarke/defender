@@ -253,7 +253,7 @@ Work log:
 
 ### DC-03: Local Reference Fixture Environment
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: make local MAME/source fixtures reliable enough to gate every translated
 subsystem.
@@ -272,8 +272,9 @@ Steps:
 - [x] DC-03.4 Add any missing scenario required before the next subsystem is
   translated.
   Completed: `2026-05-04 17:47:12 BST`
-- [ ] DC-03.5 Record fixture generation date, MAME version, ROM path policy, and
+- [x] DC-03.5 Record fixture generation date, MAME version, ROM path policy, and
   validation result in `docs/fidelity/`.
+  Completed: `2026-05-04 17:51:13 BST`
 
 Completion gate: local reference generation and validation are repeatable, or
 all missing external dependencies are documented.
@@ -344,6 +345,24 @@ Work log:
   12 entries.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913256407929`
+- `2026-05-04 17:49:46 BST` Started `DC-03.5`: recording the local
+  reference fixture generation date, MAME version, ROM path policy, and
+  validation result in `docs/fidelity/`.
+- `2026-05-04 17:51:13 BST` Completed `DC-03.5`: added
+  `docs/fidelity/local-reference-runs.md` and linked it from
+  `docs/fidelity/README.md`. The run record documents the
+  `2026-05-04 17:43:34 BST` local reference generation, MAME
+  `/opt/homebrew/bin/mame` version `0.287 (unknown)`, the
+  `assets/roms/defender` red-label ROM path, ignored local fixture policy, and
+  validation showing 12 complete Phase 1 fixtures and 22,308 frames. Validation
+  passed with `make reference-fixtures-check`,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/characterization-tests.md
+  docs/fidelity/local-reference-runs.md assets/red-label/README.md`, and
+  `git diff --check`. No cargo test was run because the change is
+  documentation-only.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913513773309`
 
 ### DC-04: Golden Tests For Existing Translated Slices
 
