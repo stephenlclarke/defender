@@ -263,8 +263,9 @@ Steps:
 - [x] DC-03.1 Verify `make reference-inputs` writes every scenario from
   `assets/red-label/trace-scenarios.tsv`.
   Completed: `2026-05-04 17:41:35 BST`
-- [ ] DC-03.2 Verify `make reference-traces` with the local MAME and ROM path,
+- [x] DC-03.2 Verify `make reference-traces` with the local MAME and ROM path,
   or document the missing local dependency.
+  Completed: `2026-05-04 17:43:34 BST`
 - [ ] DC-03.3 Verify `make reference-fixtures-check` catches missing headers,
   missing scenarios, and frame-count drift.
 - [ ] DC-03.4 Add any missing scenario required before the next subsystem is
@@ -292,6 +293,23 @@ Work log:
   update.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777912920816689`
+- `2026-05-04 17:42:33 BST` Started `DC-03.2`: verifying
+  `make reference-traces` against the local MAME executable and red-label ROM
+  path, or documenting the exact missing local dependency if trace generation
+  cannot run here.
+- `2026-05-04 17:43:34 BST` Completed `DC-03.2`: verified local MAME at
+  `/opt/homebrew/bin/mame` reports version `0.287 (unknown)` and
+  `assets/roms/defender` contains the expected red-label ROM files. Ran
+  `make reference-traces`, which invoked
+  `tools/generate_reference_traces.py --mame "mame" --rom-dir "assets/roms"
+  --out-dir "docs/fidelity/fixtures/local/reference"` and processed all 12
+  trace scenarios. MAME printed repeated `-video none` / `-seconds_to_run`
+  warnings, but the generator completed successfully. Verified that 12
+  `*.expected.tsv` files now exist under the ignored local reference fixture
+  tree, which is about 3.0 MiB, and git status shows only ignored local fixture
+  output plus the tracked `PLAN.md` update.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777913041385469`
 
 ### DC-04: Golden Tests For Existing Translated Slices
 
