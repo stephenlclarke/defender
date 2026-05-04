@@ -127,6 +127,11 @@ Notes:
 
 - Run `defender` inside `kitty`, `ghostty`, `warp`, or another terminal that
   supports the Kitty graphics protocol.
+- Live CMOS persistence is explicit opt-in. Running without `--cmos-path` uses
+  embedded red-label defaults for the session and does not create or update a
+  platform default CMOS file. Provide `--cmos-path <file>` when high scores,
+  credits, audits, and adjustment CMOS cells should be loaded and saved across
+  runs.
 - Download Ghostty: <https://ghostty.org/download>
 - Download Warp: <https://www.warp.dev/download>
 - The `amode1.src` `HALLOF` entry path now runs source `GNCIDE`, `STINIT`,
@@ -148,7 +153,8 @@ Notes:
   comparison/insertion helpers, translated death-tail game-over handoff,
   player-one/player-two initials-entry order, today's-greatest qualification
   gate, all-time CMOS insertion, and optional file-backed CMOS persistence
-  through `--cmos-path` are modeled.
+  through `--cmos-path` are modeled. Without `--cmos-path`, live sessions use
+  embedded red-label defaults and do not write an implicit CMOS file.
 
 ## Controls
 

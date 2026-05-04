@@ -217,8 +217,8 @@ This file records behavior that must not be guessed in arcade-core code.
   current main-board-facing PIA input-port bytes, RAM/CMOS/palette state,
   watchdog reset count, modeled video-counter value, and sound-command latch
   state, but CPU IRQ scheduling, exact Williams power-on RAM contents, physical
-  advance-switch timing, physical lamp timing, default live CMOS path policy,
-  screen scanline scheduling, watchdog timing/reset side effects,
+  advance-switch timing, physical lamp timing, screen scanline scheduling,
+  watchdog timing/reset side effects,
   palette/rendering timing side effects, decoder PROM behavior, and complete
   DAC sample output scheduling are not modeled.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core

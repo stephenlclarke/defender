@@ -1045,7 +1045,8 @@ Steps:
 - [x] DC-09.3 Translate exact initials-entry UI, high-score screens, and
   game-over-to-attract timing.
   Completed: `2026-05-04 22:05:20 BST`
-- [ ] DC-09.4 Decide and document the default live CMOS persistence policy.
+- [x] DC-09.4 Decide and document the default live CMOS persistence policy.
+  Completed: `2026-05-04 22:07:24 BST`
 - [ ] DC-09.5 Complete diagnostics, audit, and adjustment flow in live cabinet
   mode.
 - [ ] DC-09.6 Add regression tests for P1/P2 score, lives, smart bombs, credits,
@@ -1098,6 +1099,19 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928733411969`
+- `2026-05-04 22:06:02 BST` Started `DC-09.4`: documenting the default
+  live CMOS persistence policy as explicit opt-in storage via `--cmos-path`,
+  with embedded red-label defaults used when no path is provided.
+- `2026-05-04 22:07:24 BST` Completed `DC-09.4`: documented the live CMOS
+  persistence policy in `README.md` and `SPEC.md`, removed the stale default
+  CMOS path gap from `docs/fidelity/gaps.md`, and kept the policy explicit:
+  embedded red-label defaults are used unless `--cmos-path` is provided, and no
+  implicit platform default CMOS file is created. Validation passed with
+  `cargo test live_cmos_storage_loads_and_saves_machine_cmos --all-targets`,
+  `markdownlint PLAN.md README.md SPEC.md docs/fidelity/gaps.md`, and
+  `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928856353239`
 
 ## Phase 4: World, Waves, Humans, And Enemies
 

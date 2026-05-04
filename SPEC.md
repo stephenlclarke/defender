@@ -454,9 +454,11 @@ Additional gaps and corrections found during this review:
 - `assets/red-label/high-scores.tsv` is parsed as a seed table,
   `assets/red-label/cmos-defaults.tsv` records the matching ROM default CMOS
   bytes, and the board can compare/insert entries in both all-time and today's
-  packed high-score tables. Live mode can load/save the 256-cell CMOS image
-  through a file-backed storage trait when `--cmos-path` is provided, and the
-  core can collect three initials for a qualifying game-over score before
+  packed high-score tables. Live mode uses embedded red-label defaults unless
+  `--cmos-path` is provided; when it is provided, live mode loads and saves the
+  256-cell CMOS image through a file-backed storage trait. There is no implicit
+  platform default CMOS path. The core can collect three initials for a
+  qualifying game-over score before
   submitting it to the all-time CMOS table and `THSTAB` today's-greatest RAM
   table. Translated player-death game-over sleeps now hold the clean core in
   `GameOver` for the source `PLE2`/`PLE3` 40-tick delay before `HALLOF`;
@@ -790,10 +792,10 @@ Additional gaps and corrections found during this review:
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
   no exact power-on RAM state, physical advance-switch timing, physical lamp
-  timing, default live CMOS path policy, screen scanline scheduler, watchdog
-  timing/reset side effects, rendering timing side effects, decoder PROM
-  behavior, complete DAC sample output, CPU IRQ scheduling, or all translated
-  `VSNDRM1.SRC` waveform routines.
+  timing, screen scanline scheduler, watchdog timing/reset side effects,
+  rendering timing side effects, decoder PROM behavior, complete DAC sample
+  output, CPU IRQ scheduling, or all translated `VSNDRM1.SRC` waveform
+  routines.
 
 ### Player And Controls
 
