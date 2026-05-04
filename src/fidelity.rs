@@ -217,6 +217,7 @@ impl TraceFrame {
         frame.process_table_crc32 = output.process_table_crc32;
         frame.super_process_table_crc32 = output.super_process_table_crc32;
         frame.shell_table_crc32 = output.shell_table_crc32;
+        frame.video_crc32 = output.video_crc32;
         frame
     }
 
@@ -650,11 +651,13 @@ mod tests {
             output.super_process_table_crc32
         );
         assert_eq!(trace.shell_table_crc32, output.shell_table_crc32);
-        assert_eq!(trace.video_crc32, None);
+        assert_eq!(trace.video_crc32, output.video_crc32);
+        assert_eq!(trace.video_crc32, machine.red_label_visible_video_crc32());
         assert!(trace.object_table_crc32.is_some());
         assert!(trace.process_table_crc32.is_some());
         assert!(trace.super_process_table_crc32.is_some());
         assert!(trace.shell_table_crc32.is_some());
+        assert!(trace.video_crc32.is_some());
 
         let line = trace.to_tsv_line();
         assert!(line.contains(&format!(
@@ -669,11 +672,12 @@ mod tests {
             output.red_label_trace.lseed
         )));
         assert!(line.contains(&format!(
-            "\t0x{:08X}\t0x{:08X}\t0x{:08X}\t0x{:08X}\t-\t-\t",
+            "\t0x{:08X}\t0x{:08X}\t0x{:08X}\t0x{:08X}\t0x{:08X}\t-\t",
             trace.object_table_crc32.expect("object CRC"),
             trace.process_table_crc32.expect("process CRC"),
             trace.super_process_table_crc32.expect("super-process CRC"),
-            trace.shell_table_crc32.expect("shell CRC")
+            trace.shell_table_crc32.expect("shell CRC"),
+            trace.video_crc32.expect("video CRC")
         )));
         assert!(line.ends_with("\tgame_started"));
     }
@@ -1032,7 +1036,11 @@ mod tests {
         let trace = trace_output(input, &output);
 
         assert!(trace.starts_with(trace_header()));
-        assert!(trace.ends_with("\t-\t-\t-\n"));
+        assert_eq!(
+            TraceFrame::from_output(input, &output).video_crc32,
+            output.video_crc32
+        );
+        assert!(trace.ends_with("\t-\t-\n"));
     }
 
     #[test]

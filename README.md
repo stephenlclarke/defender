@@ -420,7 +420,8 @@ must be added as explicit overlay hooks with paired arcade-off tests.
   timeline command/sequence-end rows plus command-sequence idle/command writes.
   `SNDSEQ` models the source `SNDOUT` idle write before the complemented
   sound-number command and handles the thrust sound gate. Full frame output and
-  fidelity traces now include the resulting asserted raw command bytes. The
+  fidelity traces now include the resulting asserted raw command bytes and a
+  native visible-video CRC computed from red-label video RAM. The
   source `CSCAN` branch now keeps
   the `PIA01` / `PIA02` coin-door history, masks IN2 through `ANDB #$3F`,
   double-checks the sample, and queues the first surviving `SWTAB1`

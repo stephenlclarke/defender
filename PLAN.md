@@ -807,8 +807,9 @@ Steps:
 - [x] DC-07.3 Finish palette-copy side effects and validate palette RAM
   mutations.
   Completed: `2026-05-04 21:18:54 BST`
-- [ ] DC-07.4 Emit native video CRCs from actual red-label video RAM in trace
+- [x] DC-07.4 Emit native video CRCs from actual red-label video RAM in trace
   output.
+  Completed: `2026-05-04 21:22:56 BST`
 - [ ] DC-07.5 Add focused pixel/frame fixtures for scanline-sensitive slices.
 
 Completion gate: one full core frame mutates RAM, video RAM, palette RAM,
@@ -856,6 +857,24 @@ Work log:
   --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777925952570069`
+- `2026-05-04 21:19:32 BST` Started `DC-07.4`: wiring native visible-video
+  CRC emission into `FrameOutput` and `TraceFrame::from_output` so trace TSV
+  rows no longer leave `video_crc32` empty when the red-label video RAM surface
+  can render a native frame.
+- `2026-05-04 21:22:56 BST` Completed `DC-07.4`: added native visible-video
+  CRCs to `FrameOutput`, computed from the decoded red-label visible
+  pixel-nibble frame, and wired `TraceFrame::from_output` so generated TSV rows
+  now carry `video_crc32` directly from machine output. Updated trace docs in
+  `README.md`, `SPEC.md`, `docs/fidelity/README.md`, and
+  `docs/fidelity/gaps.md`. Validation passed with `cargo fmt --check`,
+  `cargo test trace_frame_records_machine_output_with_red_label_ram_observed_state
+  --all-targets`,
+  `cargo test trace_output_includes_header_and_empty_event_marker --all-targets`,
+  `cargo test fidelity_trace_text_emits_header_and_requested_frame_count
+  --all-targets`, `markdownlint PLAN.md README.md SPEC.md
+  docs/fidelity/README.md docs/fidelity/gaps.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777926227787119`
 
 ## Phase 3: Player, Session, And Cabinet Flow
 

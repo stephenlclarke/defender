@@ -666,9 +666,10 @@ Additional gaps and corrections found during this review:
   sound-table sequencer now advances `SNDX` / `SNDPRI` / `SNDTMR` / `SNDREP`,
   emits source-shaped main-board sound commands, and handles the thrust sound
   gate. Full frame output and fidelity traces now include the resulting raw
-  command bytes. The source `CSCAN` branch now keeps the `PIA01` / `PIA02`
-  coin-door history, masks IN2 through `ANDB #$3F`, double-checks the sample,
-  and queues the first surviving `SWTAB1` coin/admin switch process. The queued
+  command bytes and native visible-video CRCs computed from red-label video
+  RAM. The source `CSCAN` branch now keeps the `PIA01` / `PIA02` coin-door
+  history, masks IN2 through `ANDB #$3F`, double-checks the sample, and queues
+  the first surviving `SWTAB1` coin/admin switch process. The queued
   coin process path now translates `LCOIN` / `RCOIN` / `CCOIN` debounce/sleep
   handling, `CN1` coin sound loading, and the fixed-bank BCD
   coinage/audit/credit updates. The queued admin switch path now translates

@@ -594,6 +594,7 @@ pub struct FrameOutput {
     pub process_table_crc32: Option<u32>,
     pub super_process_table_crc32: Option<u32>,
     pub shell_table_crc32: Option<u32>,
+    pub video_crc32: Option<u32>,
     pub events: [Option<MachineEvent>; 8],
     pub sound_commands: [Option<SoundCommand>; FRAME_SOUND_COMMAND_CAPACITY],
 }
@@ -604,6 +605,7 @@ struct FrameTraceCrcs {
     process_table_crc32: Option<u32>,
     super_process_table_crc32: Option<u32>,
     shell_table_crc32: Option<u32>,
+    video_crc32: Option<u32>,
 }
 
 impl FrameOutput {
@@ -632,6 +634,7 @@ impl FrameOutput {
             process_table_crc32: trace_crcs.process_table_crc32,
             super_process_table_crc32: trace_crcs.super_process_table_crc32,
             shell_table_crc32: trace_crcs.shell_table_crc32,
+            video_crc32: trace_crcs.video_crc32,
             events: output,
             sound_commands: command_output,
         }
@@ -4178,6 +4181,11 @@ impl RedLabelRuntimeMemory {
 
     pub fn visible_pixel_nibbles(&self) -> Option<Vec<u8>> {
         render_defender_visible_pixel_nibbles(self.ram.as_slice())
+    }
+
+    pub fn visible_video_crc32(&self) -> Option<u32> {
+        self.visible_pixel_nibbles()
+            .map(|visible_nibbles| crc32(&visible_nibbles))
     }
 
     pub fn palette_ram(&self) -> &[u8; PALETTE_RAM_SIZE] {
@@ -24242,6 +24250,10 @@ impl ArcadeMachine {
         self.memory.visible_pixel_nibbles()
     }
 
+    pub fn red_label_visible_video_crc32(&self) -> Option<u32> {
+        self.memory.visible_video_crc32()
+    }
+
     pub fn red_label_object_table_crc32(&self) -> u32 {
         self.memory.object_table_crc32()
     }
@@ -25687,6 +25699,7 @@ impl ArcadeMachine {
                 process_table_crc32: Some(self.memory.process_table_crc32()),
                 super_process_table_crc32: Some(self.memory.super_process_table_crc32()),
                 shell_table_crc32: Some(self.memory.shell_table_crc32()),
+                video_crc32: self.memory.visible_video_crc32(),
             },
             &events,
             &sound_commands,

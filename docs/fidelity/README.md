@@ -26,11 +26,13 @@ Current trace format:
   SPTR-linked shell-object-list, and native video-frame CRC-32 values, raw
   sound-command writes, and machine events.
 - The current Rust trace fills the object-table, process-table,
-  super-process-table, and SPTR-head CRC-32 columns from the table-backed
-  red-label runtime memory. Trace generation starts from cold-boot object and
-  process RAM, while the normal live/test constructor remains pre-initialized
-  for translated routine unit tests. Golden equivalence for those columns still
-  depends on local MAME/source expected traces.
+  super-process-table, SPTR-head, and native visible-video CRC-32 columns from
+  the table-backed red-label runtime memory. The video CRC is computed over the
+  native visible pixel nibbles decoded from red-label video RAM. Trace
+  generation starts from cold-boot object and process RAM, while the normal
+  live/test constructor remains pre-initialized for translated routine unit
+  tests. Golden equivalence for those columns still depends on local
+  MAME/source expected traces.
 - `defender --fidelity-trace 300` emits deterministic Rust trace rows for local
   fixture work. It is not a substitute for MAME/source-derived golden traces.
 - `defender --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'` emits
