@@ -1042,8 +1042,9 @@ Steps:
   Completed: `2026-05-04 22:01:58 BST`
 - [x] DC-09.2 Finish credit, coinage, free-play, replay, and bonus-stock rules.
   Completed: `2026-05-04 22:03:46 BST`
-- [ ] DC-09.3 Translate exact initials-entry UI, high-score screens, and
+- [x] DC-09.3 Translate exact initials-entry UI, high-score screens, and
   game-over-to-attract timing.
+  Completed: `2026-05-04 22:05:20 BST`
 - [ ] DC-09.4 Decide and document the default live CMOS persistence policy.
 - [ ] DC-09.5 Complete diagnostics, audit, and adjustment flow in live cabinet
   mode.
@@ -1083,6 +1084,20 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928635916079`
+- `2026-05-04 22:04:25 BST` Started `DC-09.3`: adding a high-score flow
+  fixture that joins live initials acceptance/submission, source hall-of-fame
+  screen mutation, and translated game-over no-entry delay back to attract.
+- `2026-05-04 22:05:20 BST` Completed `DC-09.3`: added
+  `high_score_flow_fixture_covers_initials_hall_display_and_no_entry_attract_delay`,
+  proving live initials acceptance/submission inserts `ACE` into all-time CMOS,
+  renders the source hall-of-fame screen, emits high-score entry/submission
+  events, and the non-qualifying game-over path waits through translated
+  `PLE3` / `HALL13` timing before returning to attract. Validation passed with
+  `cargo fmt --check`,
+  `cargo test high_score_flow_fixture_covers_initials_hall_display_and_no_entry_attract_delay
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777928733411969`
 
 ## Phase 4: World, Waves, Humans, And Enemies
 

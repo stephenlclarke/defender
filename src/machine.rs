@@ -27890,6 +27890,87 @@ mod tests {
     }
 
     #[test]
+    fn high_score_flow_fixture_covers_initials_hall_display_and_no_entry_attract_delay() {
+        let mut entry = ArcadeMachine::new();
+        let mut snapshot = entry.snapshot();
+        snapshot.phase = GamePhase::GameOver;
+        snapshot.scores.player_one = 50_000;
+        entry.restore(snapshot);
+
+        let submitted = entry.step_with_typed_chars(CabinetInput::NONE, &['a', 'c', 'e']);
+
+        assert_eq!(submitted.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(submitted.snapshot.high_score_entry, None);
+        assert_eq!(
+            submitted.snapshot.high_score_submission,
+            Some(super::HighScoreSubmissionState {
+                player: 1,
+                score: 50_000,
+            })
+        );
+        assert_eq!(
+            submitted.events().collect::<Vec<_>>(),
+            vec![
+                MachineEvent::HighScoreEntryStarted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreInitialAccepted,
+                MachineEvent::HighScoreSubmitted,
+            ]
+        );
+        let all_time_offset = usize::from(RED_LABEL_CRHSTD_CELL_OFFSET);
+        assert_eq!(
+            [
+                cmos_sram_read_byte(entry.red_label_cmos_ram(), all_time_offset)
+                    .expect("all-time score high byte"),
+                cmos_sram_read_byte(entry.red_label_cmos_ram(), all_time_offset + 2)
+                    .expect("all-time score middle byte"),
+                cmos_sram_read_byte(entry.red_label_cmos_ram(), all_time_offset + 4)
+                    .expect("all-time score low byte"),
+                cmos_sram_read_byte(entry.red_label_cmos_ram(), all_time_offset + 6)
+                    .expect("all-time first initial"),
+                cmos_sram_read_byte(entry.red_label_cmos_ram(), all_time_offset + 8)
+                    .expect("all-time second initial"),
+                cmos_sram_read_byte(entry.red_label_cmos_ram(), all_time_offset + 10)
+                    .expect("all-time third initial"),
+            ],
+            [0x05, 0x00, 0x00, b'A', b'C', b'E']
+        );
+        assert_message_glyph_first_column(&entry, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, 'H');
+        assert_score_digit_first_column(&entry, RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN, 1);
+
+        let mut no_entry = ArcadeMachine::new();
+        let process = make_live_game_over_sleeping_process(&mut no_entry, 10);
+        for _ in 0..40 {
+            let sleeping = no_entry.step(CabinetInput::NONE);
+            assert_eq!(sleeping.snapshot.phase, GamePhase::GameOver);
+            assert_eq!(sleeping.snapshot.high_score_entry, None);
+        }
+        assert_eq!(
+            no_entry.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xC1, 0x44, RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS][..])
+        );
+        for _ in 0..254 {
+            let waiting = no_entry.step(CabinetInput::NONE);
+            assert_eq!(waiting.snapshot.phase, GamePhase::GameOver);
+            assert_eq!(waiting.snapshot.high_score_entry, None);
+        }
+
+        let hall = no_entry.step(CabinetInput::NONE);
+
+        assert_eq!(hall.snapshot.phase, GamePhase::Attract);
+        assert_eq!(hall.snapshot.high_score_entry, None);
+        assert_message_glyph_first_column(&no_entry, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, 'H');
+        assert_score_digit_first_column(&no_entry, RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN, 1);
+        assert_eq!(
+            no_entry.red_label_ram_range(
+                RED_LABEL_HOF_STALL_TIMER_RAM..RED_LABEL_HOF_STALL_TIMER_RAM + 1
+            ),
+            Some(&[RED_LABEL_HALL_OF_FAME_STALL_TICKS][..])
+        );
+    }
+
+    #[test]
     fn high_score_entry_renders_source_hall_of_fame_initials_screen() {
         let mut machine = ArcadeMachine::new();
         let mut snapshot = machine.snapshot();
