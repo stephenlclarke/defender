@@ -1372,14 +1372,15 @@ Work log:
 
 ### DC-12: Verified Cabinet Video
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: replace the live scaffold renderer with verified native cabinet frames.
 
 Steps:
 
-- [ ] DC-12.1 Drive native visible frames from red-label video RAM and palette
+- [x] DC-12.1 Drive native visible frames from red-label video RAM and palette
   RAM after scanline scheduling is trace-proven.
+  Completed: `2026-05-04 23:10:59 BST`
 - [ ] DC-12.2 Implement HUD, score fields, lives, smart-bomb icons, scanner,
   text, game-over, high-score, initials, and attract screens from source.
 - [ ] DC-12.3 Add pixel checksum and perceptual diff fixtures for boot, attract,
@@ -1391,6 +1392,22 @@ Steps:
 
 Completion gate: verified native frames are the only live cabinet image source,
 and temporary visuals are outside the verified frame.
+
+Work log:
+
+- `2026-05-04 23:09:44 BST` Started `DC-12.1`: verifying that live native
+  cabinet frames are driven from red-label video RAM and palette RAM after the
+  scanline-sensitive frame scheduling fixtures already added in Phase 3.
+- `2026-05-04 23:10:59 BST` Completed `DC-12.1`: verified the existing native
+  frame path with the scanline-sensitive live IRQ video-frame fixtures, the
+  PCRAM-to-palette-RAM copy fixture, the direct red-label visible RGBA fixture,
+  and the live renderer handoff from machine video RAM into the cabinet-frame
+  scaler. Validation passed with `cargo test live_irq_video_frame --all-targets`,
+  `cargo test render_live_machine_frame --all-targets`, and
+  `cargo test red_label_visible_rgba_image_uses_video_ram_and_color_mapping_copy
+  --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777932684700969`
 
 ## Phase 6: Sound Board And Audio
 
