@@ -36008,6 +36008,50 @@ mod tests {
     }
 
     #[test]
+    fn live_irq_video_frame_copies_pcram_into_palette_ram_for_native_rendering() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        let palette_source = [
+            0x10, 0x11, 0x12, 0x13, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0xD6, 0x29, 0x32, 0x33,
+            0x34, 0x35,
+        ];
+        machine
+            .memory
+            .write_range(0xA026..0xA036, &palette_source)
+            .expect("seed PCRAM");
+        let palette_before = *machine.red_label_palette_ram();
+
+        let frame = machine
+            .red_label_run_normal_live_irq_video_frame()
+            .expect("normal live IRQ video frame");
+
+        assert_eq!(
+            frame.lower_scanline.palette_copy,
+            Some(RedLabelPaletteCopy {
+                source_start: 0xA026,
+                target_start: 0xC000,
+                bytes_copied: PALETTE_RAM_SIZE as u8,
+                palette_ram: palette_source,
+            })
+        );
+        assert_ne!(palette_before, palette_source);
+        assert_eq!(machine.red_label_palette_ram(), &palette_source);
+
+        let visible_offset =
+            defender_visible_byte_offset(0, 0).expect("visible origin maps into video RAM");
+        machine
+            .memory
+            .write_byte(visible_offset as u16, 0xAB)
+            .expect("seed visible origin");
+        let image = machine
+            .red_label_visible_rgba_image()
+            .expect("render native frame through copied palette RAM");
+
+        assert_eq!(&image.pixels[0..4], &[217, 81, 255, 255]);
+        assert_eq!(&image.pixels[4..8], &[38, 174, 0, 255]);
+    }
+
+    #[test]
     fn live_irq_video_frame_uses_inverted_irq_hook_for_flipped_source_order() {
         let mut machine = ArcadeMachine::new();
         start_one_player_game_for_test(&mut machine);

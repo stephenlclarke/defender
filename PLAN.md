@@ -804,8 +804,9 @@ Steps:
 - [x] DC-07.2 Finish `BGOUT` live stack-context wiring and hardware-map
   restoration.
   Completed: `2026-05-04 21:17:16 BST`
-- [ ] DC-07.3 Finish palette-copy side effects and validate palette RAM
+- [x] DC-07.3 Finish palette-copy side effects and validate palette RAM
   mutations.
+  Completed: `2026-05-04 21:18:54 BST`
 - [ ] DC-07.4 Emit native video CRCs from actual red-label video RAM in trace
   output.
 - [ ] DC-07.5 Add focused pixel/frame fixtures for scanline-sensitive slices.
@@ -842,6 +843,19 @@ Work log:
   --all-targets`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777925859203229`
+- `2026-05-04 21:18:12 BST` Started `DC-07.3`: adding focused live-frame
+  palette mutation coverage around the source `PSHU` copy from `PCRAM` into
+  hardware color RAM, including both the scheduler's copy record and the actual
+  palette-RAM bytes used by native frame rendering.
+- `2026-05-04 21:18:54 BST` Completed `DC-07.3`: added live-frame regression
+  coverage proving the lower IRQ pass copies `PCRAM` into hardware palette RAM,
+  returns the exact `RedLabelPaletteCopy` record, mutates the machine palette
+  RAM bytes, and drives native RGBA rendering through the copied palette values.
+  Validation passed with `cargo fmt --check` and
+  `cargo test live_irq_video_frame_copies_pcram_into_palette_ram_for_native_rendering
+  --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777925952570069`
 
 ## Phase 3: Player, Session, And Cabinet Flow
 
