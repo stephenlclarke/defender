@@ -1267,7 +1267,8 @@ Steps:
   Completed: `2026-05-04 22:46:31 BST`
 - [x] DC-11.2 Finish Bomber, Pod, minefield, and Pod/Swarmer burst behavior.
   Completed: `2026-05-04 22:50:38 BST`
-- [ ] DC-11.3 Finish remaining mutant behavior and firing checks.
+- [x] DC-11.3 Finish remaining mutant behavior and firing checks.
+  Completed: `2026-05-04 22:56:23 BST`
 - [ ] DC-11.4 Finish remaining shell rendering/output and object collision
   vectors.
 - [ ] DC-11.5 Add score regression tests for enemies, bullets, mines, humans,
@@ -1306,6 +1307,20 @@ Work log:
   --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777931464832619`
+- `2026-05-04 22:52:02 BST` Started `DC-11.3`: adding a mutant/schizoid
+  characterization fixture that ties together reserve restore, `SCZ0`
+  movement, firing, shell/sound mutations, and `SCZKIL` kill scoring.
+- `2026-05-04 22:56:23 BST` Completed `DC-11.3`: added
+  `mutant_regression_fixture_covers_restore_movement_fire_and_kill`, proving
+  saved schizoid reserve restore, `SCZ0` horizontal/vertical movement and
+  random hop mutation, due-shot shell allocation through `SHOOT`, shot sound
+  RAM pointer state, `SCZKIL` count mutation, 150-point score mutation, killed
+  object/process mutation, and kill sound RAM pointer state. Validation passed
+  with `cargo fmt --check`,
+  `cargo test mutant_regression_fixture_covers_restore_movement_fire_and_kill
+  --all-targets`, `markdownlint PLAN.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777931802683199`
 
 ## Phase 5: Native Video And Presentation
 

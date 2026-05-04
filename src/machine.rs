@@ -45115,6 +45115,291 @@ mod tests {
     }
 
     #[test]
+    fn mutant_regression_fixture_covers_restore_movement_fire_and_kill() {
+        let mut restore = ArcadeMachine::new();
+        restore
+            .red_label_make_process(
+                red_label_routine_address("PLS1").expect("PLS1 address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make DC-11.3 PLS1 process");
+        restore
+            .step_red_label_process_scheduler()
+            .expect("schedule DC-11.3 PLS1");
+        restore.memory.write_word(0xA08D, 0xA1C2).expect("set PLRX");
+        restore.memory.write_byte(0xA1CC, 0).expect("clear PTARG");
+        write_ram_bytes(&mut restore, 0xA1CD, &[0; 0x17]);
+        restore
+            .memory
+            .write_byte(0xA1CD + 3, 1)
+            .expect("seed SCZRES");
+        restore
+            .memory
+            .write_byte(0xA1CD + 0x10, 0x1E)
+            .expect("seed SZSTIM");
+        restore
+            .memory
+            .write_byte(0xA0DF, 0)
+            .expect("set restore SEED");
+        restore
+            .memory
+            .write_byte(0xA0E0, 0x4C)
+            .expect("set restore HSEED");
+        restore
+            .memory
+            .write_byte(0xA0E1, 0)
+            .expect("set restore LSEED");
+        restore
+            .memory
+            .write_word(0xA020, 0)
+            .expect("set restore BGL");
+        let restore_active_count =
+            red_label_ram_snapshot(&restore, "DC-11.3 SCZCNT", 0xA115..0xA116);
+        let restore_active_head =
+            red_label_ram_snapshot(&restore, "DC-11.3 active object head", 0xA065..0xA067);
+        let restore_free_process =
+            red_label_ram_snapshot(&restore, "DC-11.3 free process head", 0xA061..0xA063);
+        let restore_free_object =
+            red_label_ram_snapshot(&restore, "DC-11.3 free object head", 0xA067..0xA069);
+
+        let finish = restore
+            .red_label_finish_player_start_current_process()
+            .expect("DC-11.3 PLS1 finish");
+        let RedLabelPlayerStart::GameExecReady {
+            restore: restored, ..
+        } = finish
+        else {
+            panic!("expected DC-11.3 PLS1 game exec return");
+        };
+        let schizoid_restore = restored.schizoid_restore.expect("DC-11.3 SCZST");
+        let restored_schizoid = &schizoid_restore.created_objects[0];
+
+        assert_eq!(schizoid_restore.reserve_count, 1);
+        assert_eq!(schizoid_restore.active_count, 1);
+        assert_eq!(schizoid_restore.created_objects.len(), 1);
+        assert_eq!(
+            restored_schizoid.object.descriptor.picture_address,
+            red_label_object_picture_address("SCZP1").expect("SCZP1 address")
+        );
+        assert_eq!(
+            restored_schizoid.object.descriptor.collision_vector_address,
+            red_label_routine_address("SCZKIL").expect("SCZKIL address")
+        );
+        assert_eq!(restored_schizoid.object.descriptor.scanner_color, 0xCC33);
+        assert_eq!(restore.red_label_ram_range(0xA0FE..0xA0FF), Some(&[0][..]));
+        restore_active_count.assert_current_changed_to(&restore, &[1]);
+        restore_active_head.assert_current_changed_to(&restore, &[0xA2, 0x53]);
+        restore_free_process.assert_current_changed(&restore);
+        restore_free_object.assert_current_changed(&restore);
+
+        let mut movement = ArcadeMachine::new();
+        let movement_process = schedule_support_process(&mut movement, "SCZ0");
+        let movement_object = movement
+            .red_label_init_object_cell(
+                movement_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("SCZP1")
+                        .expect("SCZP1 address"),
+                    collision_vector_address: red_label_routine_address("SCZKIL")
+                        .expect("SCZKIL address"),
+                    scanner_color: 0xCC33,
+                },
+            )
+            .expect("init DC-11.3 moving SCZ object")
+            .object_address;
+        movement
+            .memory
+            .write_word(movement_process + 0x07, movement_object)
+            .expect("set moving SCZ PD");
+        movement
+            .memory
+            .write_byte(movement_process + 0x09, 2)
+            .expect("set moving SCZ shot timer");
+        movement
+            .memory
+            .write_word(0xA0CC, 0x4000)
+            .expect("set moving PLABX");
+        movement
+            .memory
+            .write_byte(0xA0C0, 0x64)
+            .expect("set moving PLAYC");
+        movement
+            .memory
+            .write_byte(0xA0DF, 0)
+            .expect("set moving SEED");
+        movement.memory.write_byte(0xA107, 4).expect("set SZRY");
+        movement
+            .memory
+            .write_word(0xA108, 0x0100)
+            .expect("set SZYV");
+        movement.memory.write_byte(0xA10A, 0x20).expect("set SZXV");
+        movement
+            .memory
+            .write_word(movement_object + 0x04, 0x5060)
+            .expect("set moving object screen address");
+        movement
+            .memory
+            .write_word(movement_object + 0x0A, 0x2000)
+            .expect("set moving OX16");
+        movement
+            .memory
+            .write_word(movement_object + 0x0C, 0x6000)
+            .expect("set moving OY16");
+        let movement_object_before = red_label_object_cell_snapshot(&movement, movement_object);
+        let movement_process_before = red_label_process_cell_snapshot(&movement, movement_process);
+
+        let movement_step = movement
+            .red_label_step_schizoid_current_process()
+            .expect("DC-11.3 SCZ0 movement");
+
+        assert_eq!(movement_step.process_address, movement_process);
+        assert_eq!(movement_step.object_address, movement_object);
+        assert_eq!(movement_step.x_velocity, 0x0020);
+        assert_eq!(movement_step.y_velocity, 0xFEFF);
+        assert_eq!(movement_step.y_position, 0x5C);
+        assert_eq!(movement_step.shot_timer, 1);
+        assert_eq!(movement_step.shot, None);
+        movement_object_before.assert_current_changed(&movement);
+        movement_process_before.assert_current_changed(&movement);
+        assert_eq!(
+            movement.red_label_ram_range(movement_process + 0x02..movement_process + 0x0A),
+            Some(&[0xF1, 0x5E, 0x03, 0x00, 0x00, 0xA2, 0x3C, 0x01][..])
+        );
+
+        let mut fire = ArcadeMachine::new();
+        let fire_process = schedule_support_process(&mut fire, "SCZ0");
+        let fire_object = fire
+            .red_label_init_object_cell(
+                fire_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("SCZP1")
+                        .expect("SCZP1 address"),
+                    collision_vector_address: red_label_routine_address("SCZKIL")
+                        .expect("SCZKIL address"),
+                    scanner_color: 0xCC33,
+                },
+            )
+            .expect("init DC-11.3 firing SCZ object")
+            .object_address;
+        fire.red_label_activate_object_cell(fire_object)
+            .expect("activate DC-11.3 firing SCZ object");
+        fire.memory
+            .write_word(fire_process + 0x07, fire_object)
+            .expect("set firing SCZ PD");
+        fire.memory
+            .write_byte(fire_process + 0x09, 1)
+            .expect("set firing SCZ shot timer");
+        fire.memory.write_word(0xA020, 0).expect("set firing BGL");
+        fire.memory
+            .write_word(0xA0CC, 0x4000)
+            .expect("set firing PLABX");
+        fire.memory.write_byte(0xA0BF, 0x50).expect("set PLAXC");
+        fire.memory.write_byte(0xA0C0, 0x70).expect("set PLAYC");
+        fire.memory
+            .write_byte(0xA08B, 1)
+            .expect("set current player");
+        fire.memory
+            .write_word(0xA08D, 0xA1C2)
+            .expect("set current player record");
+        write_ram_bytes(&mut fire, 0xA0DF, &[0x80, 0x00, 0x40]);
+        fire.memory.write_byte(0xA107, 4).expect("set firing SZRY");
+        fire.memory
+            .write_word(0xA108, 0x0100)
+            .expect("set firing SZYV");
+        fire.memory
+            .write_byte(0xA10A, 0x20)
+            .expect("set firing SZXV");
+        fire.memory
+            .write_byte(0xA10B, 0x1E)
+            .expect("set firing SZSTIM");
+        fire.memory.write_byte(0xA115, 1).expect("set SCZCNT");
+        fire.memory
+            .write_word(fire_object + 0x04, 0x5060)
+            .expect("set firing object screen address");
+        fire.memory
+            .write_word(fire_object + 0x0A, 0x2000)
+            .expect("set firing OX16");
+        fire.memory
+            .write_word(fire_object + 0x0C, 0x6000)
+            .expect("set firing OY16");
+        let fire_object_before = red_label_object_cell_snapshot(&fire, fire_object);
+        let fire_process_before = red_label_process_cell_snapshot(&fire, fire_process);
+        let fire_shell_before = red_label_object_cell_snapshot(&fire, 0xA253);
+        let fire_shell_head = red_label_ram_snapshot(&fire, "DC-11.3 shell head", 0xA06D..0xA06F);
+        let fire_shell_count = red_label_ram_snapshot(&fire, "DC-11.3 shell count", 0xA099..0xA09A);
+        let fire_sound = red_label_ram_snapshot(&fire, "DC-11.3 shot sound", 0xA0B0..0xA0B5);
+        let mut expected_rng = RandState {
+            seed: 0x80,
+            hseed: 0x00,
+            lseed: 0x40,
+        };
+        expected_rng.advance();
+        let expected_shot_timer = rmax(0x1E, expected_rng.seed);
+
+        let fire_step = fire
+            .red_label_step_schizoid_current_process()
+            .expect("DC-11.3 SCZ0 fire");
+        let shot = fire_step.shot.expect("DC-11.3 schizoid shot");
+
+        assert_eq!(fire_step.process_address, fire_process);
+        assert_eq!(fire_step.object_address, fire_object);
+        assert_eq!(fire_step.shot_timer, expected_shot_timer);
+        assert_eq!(shot.shell.shell_address, 0xA253);
+        assert_eq!(
+            shot.shell.descriptor.output_routine_address,
+            red_label_routine_address("FBOUT").expect("FBOUT address")
+        );
+        assert_eq!(
+            shot.shell.descriptor.kill_routine_address,
+            red_label_routine_address("BKIL").expect("BKIL address")
+        );
+        assert_eq!(
+            shot.sound_loaded,
+            Some(RedLabelLoadedSoundTable {
+                address: 0xD52A,
+                priority: 0xC0,
+            })
+        );
+        fire_object_before.assert_current_changed(&fire);
+        fire_process_before.assert_current_changed(&fire);
+        fire_shell_before.assert_current_changed(&fire);
+        fire_shell_head.assert_current_changed_to(&fire, &[0xA2, 0x53]);
+        fire_shell_count.assert_current_changed_to(&fire, &[1]);
+        fire_sound.assert_current_changed_to(&fire, &[0xD5, 0x28, 0xC0, 0x01, 0x01]);
+
+        let kill_score = red_label_ram_snapshot(&fire, "DC-11.3 mutant score", 0xA1C2..0xA1C6);
+        let kill_count = red_label_ram_snapshot(&fire, "DC-11.3 kill SCZCNT", 0xA115..0xA116);
+        let kill_object_before = red_label_object_cell_snapshot(&fire, fire_object);
+        let kill_process_before = red_label_process_cell_snapshot(&fire, fire_process);
+        let kill_sound = red_label_ram_snapshot(&fire, "DC-11.3 kill sound", 0xA0B0..0xA0B5);
+        let kill_active_head =
+            red_label_ram_snapshot(&fire, "DC-11.3 kill active head", 0xA065..0xA067);
+
+        let collision = fire
+            .red_label_dispatch_object_collision_vector(fire_object)
+            .expect("DC-11.3 SCZKIL");
+        let RedLabelObjectCollision::EnemyKilled(kill) = collision else {
+            panic!("expected DC-11.3 SCZKIL enemy kill");
+        };
+
+        assert_eq!(kill.object_address, fire_object);
+        assert_eq!(
+            kill.sound_loaded,
+            Some(RedLabelLoadedSoundTable {
+                address: 0xD4F8,
+                priority: 0xD0,
+            })
+        );
+        assert_eq!(fire.snapshot().scores.player_one, 150);
+        kill_score.assert_current_changed_to(&fire, &[0x00, 0x00, 0x01, 0x50]);
+        kill_count.assert_current_changed_to(&fire, &[0]);
+        kill_object_before.assert_current_changed(&fire);
+        kill_process_before.assert_current_changed(&fire);
+        kill_sound.assert_current_changed_to(&fire, &[0xD4, 0xF6, 0xD0, 0x01, 0x01]);
+        kill_active_head.assert_current_changed_to(&fire, &[0, 0]);
+    }
+
+    #[test]
     fn ufost_starts_ufo_process_object_velocity_and_appearance() {
         let mut machine = ArcadeMachine::new();
         machine.memory.write_byte(0xA0DF, 0x12).expect("set SEED");
