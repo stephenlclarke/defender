@@ -1617,14 +1617,15 @@ Work log:
 
 ### DC-14: `xyzzy` And Input Profiles
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: finish supported non-arcade compatibility features without polluting the
 arcade core.
 
 Steps:
 
-- [ ] DC-14.1 Keep Planetoid and cabinet mappings in input-profile code only.
+- [x] DC-14.1 Keep Planetoid and cabinet mappings in input-profile code only.
+  Completed: `2026-05-04 23:56:39 BST`
 - [ ] DC-14.2 Add every future `xyzzy` hook as an explicit overlay hook.
 - [ ] DC-14.3 For each hook, add paired tests proving arcade behavior is
   unchanged when `xyzzy` is disabled and compatibility behavior applies when it
@@ -1636,6 +1637,21 @@ Steps:
 
 Completion gate: compatibility behavior is isolated, documented, and covered by
 paired tests.
+
+Work log:
+
+- `2026-05-04 23:56:03 BST` Started `DC-14.1`: auditing the live input
+  profile and overlay paths, then adding a regression guard that Planetoid and
+  cabinet key mappings remain isolated to the input-profile layer.
+- `2026-05-04 23:56:39 BST` Completed `DC-14.1`: added a focused
+  `src/input.rs` regression proving Planetoid and cabinet profile differences
+  stop at cabinet-action and typed-character projection, with `xyzzy` overlay
+  state left separate. Validation passed with `cargo fmt --check`,
+  `cargo test input_profiles_only_map_keys_to_cabinet_actions --all-targets`,
+  and the source search for key/profile references outside `src/input.rs`.
+  Broader `make fidelity` is deferred until the full `DC-14` cycle closes.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777935421675149`
 
 ## Phase 8: Planned Large Refactor
 

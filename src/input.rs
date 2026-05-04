@@ -552,6 +552,46 @@ mod tests {
     }
 
     #[test]
+    fn input_profiles_only_map_keys_to_cabinet_actions() {
+        let mut planetoid_mapper = InputMapper::new(InputProfile::Planetoid);
+        let mut planetoid_input = PolledInput::default();
+        let mut cabinet_mapper = InputMapper::new(InputProfile::Cabinet);
+        let mut cabinet_input = PolledInput::default();
+
+        planetoid_mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            &mut planetoid_input,
+        );
+        planetoid_mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Char('F'), KeyModifiers::SHIFT),
+            &mut planetoid_input,
+        );
+        cabinet_mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            &mut cabinet_input,
+        );
+        cabinet_mapper.handle_key_event(
+            KeyEvent::new(KeyCode::Char('F'), KeyModifiers::SHIFT),
+            &mut cabinet_input,
+        );
+
+        assert_eq!(planetoid_mapper.profile(), InputProfile::Planetoid);
+        assert!(planetoid_input.cabinet.start_one);
+        assert!(planetoid_input.cabinet.fire);
+        assert_eq!(planetoid_input.typed_chars, vec!['f']);
+
+        assert_eq!(cabinet_mapper.profile(), InputProfile::Cabinet);
+        assert!(!cabinet_input.cabinet.start_one);
+        assert!(cabinet_input.cabinet.fire);
+        assert_eq!(cabinet_input.typed_chars, vec!['f']);
+
+        let overlay = XyzzyOverlay::default();
+        assert!(!overlay.active());
+        assert!(!overlay.auto_fire());
+        assert!(!overlay.invincible());
+    }
+
+    #[test]
     fn operator_auto_up_selector_is_held_until_release() {
         let mut mapper = InputMapper::new(InputProfile::Planetoid);
         let mut input = PolledInput::default();
