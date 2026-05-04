@@ -94,6 +94,55 @@ Interpretation:
 - The remaining `attract_boot` exact-fixture blocker is the first post-INIT20
   ATTR/executive scheduler cadence at frame 733 and later process-table state.
 
+## 2026-05-04 `DC-06.4` Process/Object Order Recheck
+
+Scenario: `attract_boot`
+
+Purpose: re-run the local object/process/super-process/shell CRC comparison
+after the `DC-06.1` through `DC-06.3` translated scheduler work.
+
+Commands:
+
+```sh
+make reference-fixtures-check
+cargo run --quiet -- \
+  --fidelity-check-trace \
+  docs/fidelity/fixtures/local/reference/attract_boot.inputs.txt \
+  docs/fidelity/fixtures/local/reference/attract_boot.expected.tsv
+cargo run --quiet -- \
+  --fidelity-trace-inputs-file \
+  docs/fidelity/fixtures/local/reference/attract_boot.inputs.txt \
+  > /tmp/dc064-attract_boot.actual.tsv
+```
+
+Result: the local reference fixture set is present and valid with 12 complete
+Phase 1 fixtures and 22,308 frames. The exact `attract_boot` comparison still
+matches through frame 732 and fails first at line 734, frame 733.
+
+First mismatch:
+
+- `process_table_crc32`: expected `0x62E1AD30`, actual `0xA424BDF6`.
+
+Column summary:
+
+- `process_table_crc32` differed on 168 of 900 frames. The first mismatch was
+  line 734, frame 733. The last mismatch was line 901, frame 900, where the
+  reference expected `0x1A0C7932` and Rust produced `0xA424BDF6`.
+- All other trace columns matched for the 900-frame comparison: input bits,
+  MAME input-port bytes, phase, scores, wave, lives, smart bombs, RNG bytes,
+  object-table CRC, super-process-table CRC, shell-table CRC, video CRC
+  placeholder, sound commands, and events.
+
+Interpretation:
+
+- The translated scheduler work did not regress the source-visible object,
+  super-process, or shell ordering that already matched the local
+  `attract_boot` reference.
+- Exact process-table order/state remains blocked at the same post-INIT20
+  ATTR/executive cadence boundary. The ignored
+  `local_reference_attract_boot_matches_red_label` test stays in place until
+  that source timing gap is closed.
+
 ## 2026-05-04 `DC-04.2` Focused Gameplay Slices
 
 Scenarios:

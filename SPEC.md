@@ -1081,6 +1081,12 @@ Additional gaps and corrections found during this review:
   placeholder, sound commands, and events match. The remaining exact-fixture
   blocker is post-INIT20 ATTR/executive scheduler cadence, not cold-boot
   RAM-fill, SINIT, INIT20 list setup, sound command, or start-ready state.
+- `DC-06.4` rechecked that same local reference after the translated scheduler
+  register-context and super-process `DISP2` work. The local reference fixture
+  set is valid with 12 Phase 1 fixtures and 22,308 frames, and the exact
+  `attract_boot` result is unchanged: object-table, super-process-table, and
+  shell-table CRCs match the 900-frame reference, while `process_table_crc32`
+  still first diverges at frame 733 for 168 frames total.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot

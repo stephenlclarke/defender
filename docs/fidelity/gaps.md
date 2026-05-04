@@ -86,6 +86,14 @@ This file records behavior that must not be guessed in arcade-core code.
   not cold-boot RAM fill, SINIT clear, INIT20 list setup, sound command, object
   table, super-process table, shell table, RNG, input, phase, score, event, or
   sound-command output through the start-ready handoff.
+- `DC-06.4` rechecked local `attract_boot` after the translated scheduler
+  register-context and super-process `DISP2` work. The local reference fixture
+  set still validates with 12 Phase 1 fixtures and 22,308 frames, and the exact
+  Rust-vs-reference comparison has the same narrowed result: object-table,
+  super-process-table, and shell-table CRCs match, while `process_table_crc32`
+  still first diverges at line 734, frame 733, for 168 frames total. The
+  remaining blocker is exact post-INIT20 ATTR/executive process-table cadence,
+  not object, super-process, or shell ordering.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process

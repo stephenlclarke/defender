@@ -672,7 +672,8 @@ Steps:
 - [x] DC-06.3 Finish suicide, resume, delay, super-process, and generic body
   dispatch semantics.
   Completed: `2026-05-04 20:17:12 BST`
-- [ ] DC-06.4 Verify object/process order against golden traces.
+- [x] DC-06.4 Verify object/process order against golden traces.
+  Completed: `2026-05-04 20:20:58 BST`
 - [ ] DC-06.5 Remove scaffold state that duplicates exact red-label table
   fields.
 
@@ -741,6 +742,29 @@ Work log:
   directory, and coverage with no new executable Rust lines outside tests).
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777922256258889`
+- `2026-05-04 20:18:24 BST` Started `DC-06.4`: running the local
+  object/process golden-trace comparison gates for the translated scheduler,
+  then recording either the exact passing fixture proof or the current
+  source-visible drift as a documented fidelity gap with tests.
+- `2026-05-04 20:20:58 BST` Completed `DC-06.4`: rechecked the local
+  `attract_boot` object/process/super-process/shell CRC comparison after the
+  translated scheduler work. `make reference-fixtures-check` validated 12
+  Phase 1 reference fixtures and 22,308 frames. The exact `attract_boot`
+  comparison still intentionally fails first at line 734, frame 733, solely in
+  `process_table_crc32` (`0x62E1AD30` expected, `0xA424BDF6` actual), with 168
+  process-table mismatches through frame 900. Object-table, super-process-table,
+  and shell-table CRCs match the 900-frame reference, so the remaining gap is
+  post-INIT20 ATTR/executive process cadence. Recorded the result in
+  `docs/fidelity/golden-comparison-results.md`, `docs/fidelity/gaps.md`, and
+  `SPEC.md`. Validation passed with
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/gaps.md
+  docs/fidelity/golden-comparison-results.md`, `git diff --check`, and
+  `make fidelity` (`cargo fmt --check`, `cargo test --all-targets` with 813
+  passed and 13 known ignored library tests plus 2 binary tests, clippy, trace
+  script tests, skipped absent local Rust-current fixture directory, and
+  coverage with no new executable Rust lines outside docs).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777922489392159`
 
 ### DC-07: IRQ, Scanline, And Palette Integration
 
