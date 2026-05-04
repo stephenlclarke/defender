@@ -1490,15 +1490,16 @@ Work log:
 
 ### DC-13: Source-Shaped Sound Board
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: make audio come from source-shaped sound-board execution rather than
 semantic gameplay cues.
 
 Steps:
 
-- [ ] DC-13.1 Translate the `VSNDRM1.SRC` IRQ dispatch path and Defender sound
+- [x] DC-13.1 Translate the `VSNDRM1.SRC` IRQ dispatch path and Defender sound
   routines needed by the main board.
+  Completed: `2026-05-04 23:34:26 BST`
 - [ ] DC-13.2 Model sound CPU timing, command latch consumption, DAC writes, and
   sample generation.
 - [ ] DC-13.3 Add command-sequence fixtures from red-label traces.
@@ -1507,6 +1508,23 @@ Steps:
 
 Completion gate: sound command traces and generated audio pass fixtures, and no
 gameplay code triggers high-level named cues directly.
+
+Work log:
+
+- `2026-05-04 23:34:10 BST` Started `DC-13.1`: verifying the translated
+  `VSNDRM1.SRC` IRQ dispatch, command-flow branches, and source-visible sound
+  routine mutations already present in `src/sound.rs` before closing the step.
+- `2026-05-04 23:34:26 BST` Completed `DC-13.1`: verified the existing
+  `VSNDRM1.SRC` IRQ dispatch path, command latch prelude, normal GWAVE/VARI
+  branches, special routine branches, organ continuation gate, IRQ3 background
+  handoff, NMI diagnostic branch, and source-visible RAM/DAC mutations already
+  translated in `src/sound.rs`. Validation passed with
+  `cargo test vsnd_irq --all-targets`, `cargo test vsnd_nmi --all-targets`,
+  and `cargo test vsnd_organ --all-targets`. Broader `make fidelity` is
+  deferred until the full `DC-13` cycle because this step changed only
+  `PLAN.md`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1777934086750959`
 
 ## Phase 7: Compatibility Features
 
