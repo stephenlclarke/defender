@@ -647,6 +647,8 @@ pub enum MachineEvent {
 pub struct FrameOutput {
     pub snapshot: MachineSnapshot,
     pub red_label_trace: RedLabelTraceState,
+    pub main_board: RedLabelMainBoardSnapshot,
+    pub sound_board: RedLabelSoundBoardSnapshot,
     pub object_table_crc32: Option<u32>,
     pub process_table_crc32: Option<u32>,
     pub super_process_table_crc32: Option<u32>,
@@ -669,6 +671,8 @@ impl FrameOutput {
     fn new(
         snapshot: MachineSnapshot,
         red_label_trace: RedLabelTraceState,
+        main_board: RedLabelMainBoardSnapshot,
+        sound_board: RedLabelSoundBoardSnapshot,
         trace_crcs: FrameTraceCrcs,
         events: &[MachineEvent],
         sound_commands: &[SoundCommand],
@@ -687,6 +691,8 @@ impl FrameOutput {
         Self {
             snapshot,
             red_label_trace,
+            main_board,
+            sound_board,
             object_table_crc32: trace_crcs.object_table_crc32,
             process_table_crc32: trace_crcs.process_table_crc32,
             super_process_table_crc32: trace_crcs.super_process_table_crc32,
@@ -25794,6 +25800,8 @@ impl ArcadeMachine {
             self.snapshot(),
             self.red_label_trace_state_for_frame_output()
                 .expect("red-label trace state should match embedded RAM layout"),
+            self.red_label_main_board_snapshot(),
+            self.red_label_sound_board_snapshot(),
             FrameTraceCrcs {
                 object_table_crc32: Some(self.memory.object_table_crc32()),
                 process_table_crc32: Some(self.memory.process_table_crc32()),
@@ -58207,7 +58215,7 @@ mod tests {
             ..CabinetInput::NONE
         };
 
-        machine.step(input);
+        let output = machine.step(input);
         let board = machine.red_label_main_board_snapshot();
 
         assert_eq!(board.input_ports, input.defender_input_ports());
@@ -58218,6 +58226,8 @@ mod tests {
         assert_eq!(board.watchdog_reset_count, 0);
         assert_eq!(board.video_counter_vpos, 0);
         assert_eq!(board.video_counter_value, video_counter_read_value(0));
+        assert_eq!(output.main_board, board);
+        assert_eq!(output.sound_board, machine.red_label_sound_board_snapshot());
     }
 
     #[test]
@@ -58242,6 +58252,7 @@ mod tests {
         let board = machine.red_label_main_board_snapshot();
 
         assert_eq!(output.snapshot.phase, GamePhase::Playing);
+        assert_eq!(output.main_board, board);
         assert_eq!(board.watchdog_reset_count, 1);
         assert_eq!(
             board.video_counter_vpos,
@@ -58578,7 +58589,7 @@ mod tests {
             vec![0xC0]
         );
         assert_eq!(
-            machine.red_label_sound_board_snapshot(),
+            output.sound_board,
             RedLabelSoundBoardSnapshot {
                 last_command_latch: Some(SoundCommandLatch::from_main_board_pia_port_b(0xC0)),
                 latched_port_b: Some(0xC0),
@@ -58586,6 +58597,7 @@ mod tests {
                 latch_write_count: 1,
             }
         );
+        assert_eq!(machine.red_label_sound_board_snapshot(), output.sound_board);
     }
 
     #[test]

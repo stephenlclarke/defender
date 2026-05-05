@@ -124,6 +124,10 @@ This file records behavior that must not be guessed in arcade-core code.
   fixture has `video_crc32=-` while Rust emits native video CRCs. Ignoring that
   absent reference column, all 900 `attract_boot` frames now match every
   non-video column, including process-table CRC.
+- `DC-17.2` promoted the post-frame main-board and sound-board snapshots onto
+  `FrameOutput`. Frame-step tests now preserve the input-port, main RAM/CMOS
+  CRC, palette RAM, hardware map, watchdog, video-counter, sound latch, CB1 IRQ,
+  and latch-write-count surfaces that must survive the later large refactor.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process
@@ -246,9 +250,10 @@ This file records behavior that must not be guessed in arcade-core code.
   plus the post-`PWRUP` outer frame path. `ArcadeMachine::step` now samples the
   current main-board-facing PIA input-port bytes, RAM/CMOS/palette state,
   watchdog reset count, modeled video-counter value, and sound-command latch
-  state, but CPU IRQ scheduling, exact Williams power-on RAM contents, physical
-  advance-switch timing, physical lamp timing, screen scanline scheduling,
-  watchdog timing/reset side effects,
+  state and returns those snapshots on `FrameOutput`, but CPU IRQ scheduling,
+  exact Williams power-on RAM contents, physical advance-switch timing,
+  physical lamp timing, screen scanline scheduling, watchdog timing/reset side
+  effects,
   palette/rendering timing side effects, decoder PROM behavior, and complete
   DAC sample output scheduling are not modeled.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core

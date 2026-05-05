@@ -258,6 +258,10 @@ compatibility behavior.
   credit, and start-ready states. The title corruption and terminal/pixel proof
   remain tracked in `SPEC.md`, `docs/fidelity/gaps.md`, and `PLAN.md` until
   MAME-derived pixel fixtures prove the visible output.
+- `ArcadeMachine::step` returns post-frame main-board and sound-board snapshots
+  on `FrameOutput`. Tests now lock the input-port bytes, main RAM/CMOS CRCs,
+  palette RAM, hardware map, watchdog count, video-counter sample, sound latch,
+  CB1 IRQ state, and latch write count at the frame boundary.
 - The runtime embeds red-label defaults, score values, high-score seeds, CMOS
   layout/default metadata, input port metadata, RAM table metadata, ROM
   metadata, ROM-region/load maps with derived `CROM0` `ROMMAP` descriptors and

@@ -2020,8 +2020,9 @@ Steps:
   by translated dispatch paths, including A/X/Y/S/CC/B where traces or source
   evidence prove the values.
   Completed: `2026-05-05 21:11:10 BST`
-- [ ] DC-17.2 Integrate main IRQ, scanline/video counter, watchdog,
+- [x] DC-17.2 Integrate main IRQ, scanline/video counter, watchdog,
   palette/rendering side effects, and sound IRQ ownership into frame stepping.
+  Completed: `2026-05-05 21:25:02 BST`
 - [ ] DC-17.3 Replace trace-only scheduling shortcuts with source-shaped
   execution for reset, boot, attract, and gameplay frame boundaries.
 - [ ] DC-17.4 Add trace columns or mutation tests only where they expose
@@ -2058,6 +2059,30 @@ Work log:
   added executable Rust lines covered.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778011927254099`
+- `2026-05-05 21:12:43 BST` Started `DC-17.2`: integrating main IRQ,
+  scanline/video counter, watchdog, palette/rendering side effects, and sound
+  IRQ ownership into frame stepping by first inventorying which frame-output
+  surfaces are still owned by coarse trace or live shortcuts instead of
+  source-shaped board slices.
+- `2026-05-05 21:25:02 BST` Completed `DC-17.2`: promoted the post-frame
+  main-board and sound-board ownership surfaces into `FrameOutput`, so every
+  frame now carries the source-visible input-port, main RAM/CMOS CRC, palette
+  RAM, hardware map, watchdog count, video-counter value, sound latch, CB1 IRQ,
+  and sound-latch write-count snapshots after stepping. Extended the existing
+  frame-step tests to assert `FrameOutput` matches the machine-owned
+  main-board and sound-board snapshots for cold-boot input/latch frames and
+  live IRQ watchdog/video-counter/palette frames. Updated `README.md`,
+  `SPEC.md`, and `docs/fidelity/gaps.md` so the frame-output ownership surface
+  is documented for later refactor safety. Validation passed with
+  `cargo fmt --check`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/gaps.md docs/fidelity/golden-comparison-results.md`, `git
+  diff --check`, and `make fidelity`, including `853` passed Rust library
+  tests, `13` known ignored tests, two binary tests, clippy, Lua/Python
+  trace-tool tests, 10 Rust-current fixture pairs / 15,452 frames, LLVM
+  coverage, and new-code coverage with `6/6` added executable Rust lines
+  covered.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778012736397499`
 
 ### DC-18: Gameplay Golden Trace Closure
 
