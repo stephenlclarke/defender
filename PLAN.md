@@ -2276,24 +2276,64 @@ Work log:
 
 ### DC-19: Death, Wave, Session, And Operator Trace Closure
 
-Status: `planned`
+Status: `complete`
 
 Goal: prove longer gameplay, session, and cabinet/service paths against local
 references.
 
+Start note: `2026-05-05 23:17:15 BST` - starting `DC-19.1` by re-measuring the
+local `death` and `wave_advance` trace gaps against the current red-label
+runtime before changing tests or gap documentation.
+
 Steps:
 
-- [ ] DC-19.1 Close `death` and `wave_advance` scheduler, RNG, phase, lives,
+- [x] DC-19.1 Close `death` and `wave_advance` scheduler, RNG, phase, lives,
   smart-bomb, object-table, and process-table drift.
-- [ ] DC-19.2 Add or refresh local reference scenarios for two-player sessions,
+- [x] DC-19.2 Add or refresh local reference scenarios for two-player sessions,
   high-score entry, operator/service screens, and cabinet input profiles.
-- [ ] DC-19.3 Verify high-score, audit, operator, coin, credit, and game-over
+- [x] DC-19.3 Verify high-score, audit, operator, coin, credit, and game-over
   mutations with before/after tests and exact traces.
-- [ ] DC-19.4 Confirm `xyzzy` disabled stays red-label equivalent and enabled
+- [x] DC-19.4 Confirm `xyzzy` disabled stays red-label equivalent and enabled
   behavior differs only through documented overlay hooks.
 
 Completion gate: session/operator traces are source-equivalent or each
 remaining delta is explicitly recorded in the gap register.
+
+Completed: `2026-05-05 23:21:40 BST`
+
+Step notes:
+
+- `DC-19.1` generated fresh Rust traces from
+  `docs/fidelity/fixtures/local/reference/death.inputs.txt` and
+  `wave_advance.inputs.txt`, then compared them with the local MAME reference
+  TSVs. Exact comparison still fails first at line 2/frame 1 because reference
+  `video_crc32` is absent. Ignoring that column, both long scenarios first fail
+  at line 902/frame 901 in `process_table_crc32`, expected `0xDEFE9590`, actual
+  `0x640191A2`. The measured long-slice column counts are now recorded in
+  `SPEC.md`, `docs/fidelity/gaps.md`, and
+  `docs/fidelity/golden-comparison-results.md`; the ignored death/wave local
+  reference tests now point at the current `DC-19` blocker.
+- `DC-19.2` refreshed the local reference status: the Phase 1 local reference
+  directory still contains the long `high_score_entry` scenario, while
+  two-player, operator/service, and cabinet-profile MAME traces remain absent.
+  Those missing end-to-end references are explicitly registered as
+  pre-refactor gaps.
+- `DC-19.3` verified the existing source-native mutation fixtures that cover
+  live two-player session flow, high-score display/submission, operator
+  diagnostics/audits/reset paths, coin audits, credit backup, and game-over
+  handoff behavior. Exact MAME trace promotion remains blocked by the recorded
+  fixture gaps.
+- `DC-19.4` confirmed disabled `xyzzy` arcade equivalence remains covered by
+  `trace_text_with_xyzzy_disabled_is_red_label_equivalent`, with enabled
+  behavior isolated through the existing overlay hook tests.
+
+Validation:
+
+- `cargo test --all-targets` passed with 857 library tests, 13 known ignored
+  tests, and 2 binary tests.
+
+Slack update:
+`https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778019750859689`
 
 ### DC-20: MAME Pixel Golden Fixtures
 

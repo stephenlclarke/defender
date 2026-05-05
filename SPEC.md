@@ -1194,6 +1194,18 @@ Additional gaps and corrections found during this review:
   frames. A generic full-scheduler swap is not valid yet because the credited
   start window reaches the untranslated red-label `0xF4CC` attract sleep-return
   path.
+- `DC-19.1` rechecked the long `death` and `wave_advance` local references.
+  Exact comparison still fails first at line 2/frame 1 because the references
+  have `video_crc32=-` while Rust emits native CRCs. Ignoring that absent
+  column, both long traces now first fail at line 902/frame 901 in
+  `process_table_crc32`, expected `0xDEFE9590`, actual `0x640191A2`.
+  `death` still differs in phase/wave/lives/smart-bomb fields on 903 frames,
+  RNG fields on 909/908/908 frames, object-table CRC on 755 frames, and
+  process-table CRC on 1,028 frames. `wave_advance` differs in those gameplay
+  fields on 1,803 frames, RNG fields on 1,807/1,807/1,808 frames,
+  object-table CRC on 1,655 frames, and process-table CRC on 1,928 frames.
+  These are carried as downstream effects of the credited-start scheduler
+  boundary until `0xF4CC` and the following process handoff are translated.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot
@@ -1233,6 +1245,8 @@ Additional gaps and corrections found during this review:
 - There are no audio waveform or command-sequence golden tests.
 - There is no end-to-end MAME golden regression suite for two-player state,
   coin/start flow, operator settings, or cabinet input profiles.
+  Source-native mutation fixtures cover those paths, but MAME-derived session
+  and operator traces remain explicit pre-refactor fidelity gaps.
 
 ## Required Compatibility Features
 

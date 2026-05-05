@@ -1676,13 +1676,13 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known DC-15 mismatch: missing reference video CRC plus death drift"]
+    #[ignore = "known DC-19 mismatch: missing reference video CRC plus credited-start scheduler/death drift"]
     fn local_reference_death_matches_red_label() {
         assert_local_reference_trace_matches("death");
     }
 
     #[test]
-    #[ignore = "known DC-15 mismatch: missing reference video CRC plus wave drift"]
+    #[ignore = "known DC-19 mismatch: missing reference video CRC plus credited-start scheduler/wave drift"]
     fn local_reference_wave_advance_matches_red_label() {
         assert_local_reference_trace_matches("wave_advance");
     }

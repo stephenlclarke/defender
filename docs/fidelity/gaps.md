@@ -167,6 +167,19 @@ This file records behavior that must not be guessed in arcade-core code.
   full-scheduler path currently reaches untranslated `0xF4CC` attract
   sleep-return work, so that source routine remains the next scheduler owner
   needed before the focused gameplay traces can be promoted.
+- `DC-19.1` rechecked the long `death` and `wave_advance` references against
+  that baseline. Exact comparison still fails first at line 2/frame 1 because
+  the local references have `video_crc32=-` while Rust emits native CRCs.
+  Ignoring that absent column, both long traces now first fail at line
+  902/frame 901 in `process_table_crc32`, expected `0xDEFE9590`, actual
+  `0x640191A2`. `death` still differs in phase/wave/lives/smart-bomb fields on
+  903 frames, RNG fields on 909/908/908 frames, object-table CRC on 755 frames,
+  and process-table CRC on 1,028 frames. `wave_advance` differs in those
+  gameplay fields on 1,803 frames, RNG fields on 1,807/1,807/1,808 frames,
+  object-table CRC on 1,655 frames, and process-table CRC on 1,928 frames.
+  These long-slice failures are therefore carried as downstream effects of the
+  credited-start scheduler/sample boundary until `0xF4CC` and the following
+  process handoff are translated.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process
@@ -818,6 +831,13 @@ This file records behavior that must not be guessed in arcade-core code.
   IRQ scheduling, live MAME command-sequence fixtures, and the remaining
   waveform routines are not translated.
 - No waveform fixtures exist yet.
+- End-to-end MAME golden traces for two-player sessions, high-score entry,
+  operator/service screens, and cabinet input profiles do not exist yet. The
+  runtime has source-native mutation fixtures for live two-player session flow,
+  high-score display/submission, operator diagnostics/audits/reset paths, coin
+  audits, credit backup, and disabled/enabled `xyzzy` separation, but those
+  paths remain explicit pre-refactor gaps until locally generated MAME traces
+  can be checked and promoted.
 
 ## Compatibility
 

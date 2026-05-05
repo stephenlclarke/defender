@@ -687,3 +687,58 @@ Interpretation:
   untranslated red-label `0xF4CC` attract sleep-return path during the
   credited-start window. That path needs a source-shaped owner before the live
   coin/start path can stop prioritizing targeted switch processes.
+
+## 2026-05-05 `DC-19.1` Death And Wave Recheck
+
+Scenarios:
+
+- `death`
+- `wave_advance`
+
+Purpose: remeasure the long gameplay reference slices after `DC-18.3` so the
+death/wave gap register reflects current runtime behavior before the remaining
+session/operator proof work.
+
+Commands:
+
+```sh
+cargo run --quiet -- \
+  --fidelity-trace-inputs-file \
+  docs/fidelity/fixtures/local/reference/death.inputs.txt
+cargo run --quiet -- \
+  --fidelity-trace-inputs-file \
+  docs/fidelity/fixtures/local/reference/wave_advance.inputs.txt
+```
+
+Exact result:
+
+- Exact comparison still fails first at line 2/frame 1 because the local MAME
+  references have `video_crc32=-` while current Rust emits `0x157E98C7`.
+- Ignoring that absent reference `video_crc32` column, both scenarios first
+  fail at line 902/frame 901 in `process_table_crc32`, expected `0xDEFE9590`,
+  actual `0x640191A2`.
+- The long death/wave drift is therefore downstream of the same credited-start
+  scheduler/sample boundary recorded for `DC-18.3`; it is not yet a separate
+  proven death-tail or wave-advance routine failure.
+
+Column summary:
+
+- `death`: `video_crc32` differs on all 1,928 frames; `phase`, `wave`, `lives`,
+  and `smart_bombs` differ on 903 frames; `seed`, `hseed`, and `lseed` differ
+  on 909, 908, and 908 frames; `object_table_crc32` differs on 755 frames;
+  `process_table_crc32` differs on 1,028 frames.
+- `wave_advance`: `video_crc32` differs on all 2,828 frames; `phase`, `wave`,
+  `lives`, and `smart_bombs` differ on 1,803 frames; `seed`, `hseed`, and
+  `lseed` differ on 1,807, 1,807, and 1,808 frames; `object_table_crc32`
+  differs on 1,655 frames; `process_table_crc32` differs on 1,928 frames.
+
+Interpretation:
+
+- `local_reference_death_matches_red_label` and
+  `local_reference_wave_advance_matches_red_label` stay ignored. Their ignore
+  reasons now point at the current `DC-19` measurement rather than the older
+  `DC-15` broad drift label.
+- Two-player, high-score, operator/service, and cabinet-profile behavior is
+  currently covered by source-native mutation fixtures. End-to-end MAME golden
+  traces for those paths remain absent and are carried as explicit pre-refactor
+  fidelity gaps until local references can be generated and promoted.
