@@ -1640,49 +1640,49 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known DC-04.1 mismatch: boot process/super-process CRC drift"]
+    #[ignore = "known DC-15 mismatch: missing reference video CRC plus process drift"]
     fn local_reference_attract_boot_matches_red_label() {
         assert_local_reference_trace_matches("attract_boot");
     }
 
     #[test]
-    #[ignore = "known DC-04.2 mismatch: credited-start timing and process state drift"]
+    #[ignore = "known DC-15 mismatch: missing reference video CRC plus credited-start drift"]
     fn local_reference_start_game_matches_red_label() {
         assert_local_reference_trace_matches("start_game");
     }
 
     #[test]
-    #[ignore = "known DC-04.2 mismatch: post-start process and object state drift"]
+    #[ignore = "known DC-15 mismatch: missing reference video CRC plus gameplay drift"]
     fn local_reference_firing_matches_red_label() {
         assert_local_reference_trace_matches("firing");
     }
 
     #[test]
-    #[ignore = "known DC-04.2 mismatch: post-start process and object state drift"]
+    #[ignore = "known DC-15 mismatch: missing reference video CRC plus gameplay drift"]
     fn local_reference_thrust_reverse_matches_red_label() {
         assert_local_reference_trace_matches("thrust_reverse");
     }
 
     #[test]
-    #[ignore = "known DC-04.2 mismatch: post-start process and object state drift"]
+    #[ignore = "known DC-15 mismatch: missing reference video CRC plus gameplay drift"]
     fn local_reference_smart_bomb_matches_red_label() {
         assert_local_reference_trace_matches("smart_bomb");
     }
 
     #[test]
-    #[ignore = "known DC-04.2 mismatch: post-start process and object state drift"]
+    #[ignore = "known DC-15 mismatch: missing reference video CRC plus gameplay drift"]
     fn local_reference_hyperspace_matches_red_label() {
         assert_local_reference_trace_matches("hyperspace");
     }
 
     #[test]
-    #[ignore = "known DC-04.2 mismatch: death trace scheduler and state drift"]
+    #[ignore = "known DC-15 mismatch: missing reference video CRC plus death drift"]
     fn local_reference_death_matches_red_label() {
         assert_local_reference_trace_matches("death");
     }
 
     #[test]
-    #[ignore = "known DC-04.2 mismatch: wave-advance scheduler and state drift"]
+    #[ignore = "known DC-15 mismatch: missing reference video CRC plus wave drift"]
     fn local_reference_wave_advance_matches_red_label() {
         assert_local_reference_trace_matches("wave_advance");
     }

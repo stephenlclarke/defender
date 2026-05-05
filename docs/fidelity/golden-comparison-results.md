@@ -246,3 +246,111 @@ cargo test local_reference_ --all-targets -- --ignored
 These tests should stay ignored until the corresponding boot, credited-start,
 death, and wave-advance trace gaps are fixed. When a gap is fixed, unignore the
 matching test or narrow it to the remaining mismatched scenario.
+
+## 2026-05-05 `DC-15` Trace Oracle Recheck
+
+Purpose: refresh the local trace-oracle state after the native video CRC work,
+the later gameplay translation cycles, and the `DC-15` plan update.
+
+Commands:
+
+```sh
+make reference-fixtures-check
+cargo run --quiet -- \
+  --fidelity-check-trace \
+  docs/fidelity/fixtures/local/reference/attract_boot.inputs.txt \
+  docs/fidelity/fixtures/local/reference/attract_boot.expected.tsv
+cargo run --quiet -- \
+  --fidelity-write-scenario-inputs \
+  docs/fidelity/fixtures/local/rust-current
+make trace-fixtures
+cargo test local_reference_ --all-targets -- --ignored
+```
+
+Reference fixture result:
+
+- `make reference-fixtures-check` passed with 12 complete Phase 1 local
+  reference fixtures and 22,308 frames.
+
+Rust-current fixture result:
+
+- Current Rust fixtures were generated and checked for 10 Phase 1 scenarios:
+  `abduction`, `attract_boot`, `death`, `firing`, `first_300_frames`,
+  `hyperspace`, `smart_bomb`, `start_game`, `thrust_reverse`, and
+  `wave_advance`.
+- `make trace-fixtures` passed for those 10 ignored local pairs with 15,452
+  frames.
+- `planet_destruction` and `high_score_entry` were not promoted into
+  `rust-current` because current trace generation panics at
+  `src/machine.rs:26276` with `red-label OFREE object list is empty`.
+
+`attract_boot` exact result:
+
+- Exact comparison now fails first at line 2, frame 1, because the local MAME
+  reference still has `video_crc32=-` while current Rust emits `0x157E98C7`.
+- Across 900 frames, `video_crc32` differs on all 900 frames because the local
+  reference fixture has no native video CRC values.
+- The previous narrowed process-table mismatch is still present:
+  `process_table_crc32` differs on 168 frames, first at line 734/frame 733
+  where the reference expects `0x62E1AD30` and Rust emits `0xA424BDF6`.
+- All other columns match for `attract_boot`: inputs, phase, scores, wave,
+  lives, smart bombs, RNG bytes, object-table CRC, super-process-table CRC,
+  shell-table CRC, sound commands, and events.
+
+Focused scenario drift summary:
+
+- `start_game`: `video_crc32` differs on all 1,228 frames; `phase`, `wave`,
+  `lives`, and `smart_bombs` differ on 203 frames; `seed`, `hseed`, and
+  `lseed` differ on 326, 327, and 325 frames; `object_table_crc32` differs on
+  55 frames; `process_table_crc32` differs on 496 frames.
+- `first_300_frames`, `firing`, `thrust_reverse`, `smart_bomb`, and
+  `hyperspace`: `video_crc32` differs on all 1,328 frames; `phase`, `wave`,
+  `lives`, and `smart_bombs` differ on 303 frames; `seed`, `hseed`, and
+  `lseed` differ on 425 frames each; `object_table_crc32` differs on 155
+  frames; `process_table_crc32` differs on 596 frames.
+- `abduction` and `death`: `video_crc32` differs on all 1,928 frames; `phase`,
+  `wave`, `lives`, and `smart_bombs` differ on 903 frames; `seed`, `hseed`,
+  and `lseed` differ on 1,022, 1,024, and 1,022 frames;
+  `object_table_crc32` differs on 755 frames; `process_table_crc32` differs on
+  1,196 frames.
+- `wave_advance`: `video_crc32` differs on all 2,828 frames; `phase`, `wave`,
+  `lives`, and `smart_bombs` differ on 1,803 frames; `seed`, `hseed`, and
+  `lseed` differ on 1,919, 1,919, and 1,915 frames;
+  `object_table_crc32` differs on 1,655 frames; `process_table_crc32` differs
+  on 2,096 frames.
+
+No mismatches were observed in these columns for the 10 compared scenarios:
+
+- `input_bits`
+- `input_in0`
+- `input_in1`
+- `input_in2`
+- `p1_score`
+- `p2_score`
+- `super_process_table_crc32`
+- `shell_table_crc32`
+- `sound_commands`
+- `events`
+
+Ignored local-reference tests:
+
+- `cargo test local_reference_ --all-targets -- --ignored` ran all eight
+  local-reference tests. All eight failed at line 2/frame 1 on the missing
+  reference `video_crc32` value.
+- No local-reference test was unignored. The ignored reasons in `src/app.rs`
+  were narrowed to `DC-15` and now name the missing-reference-video-CRC blocker
+  plus each scenario's remaining process, credited-start, gameplay, death, or
+  wave drift.
+
+Interpretation:
+
+- The checked local reference traces remain present and structurally valid, but
+  they are no longer schema-complete for exact comparison because the MAME-side
+  reference fixtures do not populate `video_crc32`.
+- Once the reference video column is regenerated or intentionally normalized,
+  the next `attract_boot` blocker remains the post-`INIT20` process-table
+  cadence at frame 733.
+- Longer gameplay/session traces still show the same broad state classes of
+  drift: credited-start phase timing, RNG call order, object-table state, and
+  process-table state. The current counts differ from the older `DC-04.2`
+  baseline because later translation work changed the Rust side.

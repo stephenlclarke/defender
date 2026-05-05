@@ -1111,6 +1111,21 @@ Additional gaps and corrections found during this review:
   `attract_boot` result is unchanged: object-table, super-process-table, and
   shell-table CRCs match the 900-frame reference, while `process_table_crc32`
   still first diverges at frame 733 for 168 frames total.
+- `DC-15` refreshed the local trace-oracle state. The local reference fixture
+  set still validates with 12 complete Phase 1 fixtures and 22,308 frames, but
+  exact `attract_boot` comparison now fails first at line 2/frame 1 because the
+  local MAME reference fixtures still carry `video_crc32=-` while current Rust
+  emits native video CRCs, starting with `0x157E98C7`. Across 900
+  `attract_boot` frames, `video_crc32` differs on all frames and the existing
+  `process_table_crc32` drift remains 168 frames from frame 733 through frame
+  900. A refreshed ignored `rust-current` fixture set now passes
+  `make trace-fixtures` for 10 scenarios and 15,452 frames. `planet_destruction`
+  and `high_score_entry` could not be included because current trace generation
+  panics at `src/machine.rs:26276` with the red-label `OFREE` object list empty.
+  All eight ignored `local_reference_*_matches_red_label` tests still fail
+  first on the missing reference video CRC, so their ignored reasons were
+  narrowed to the `DC-15` blocker plus the remaining process, credited-start,
+  gameplay, death, or wave drift.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot

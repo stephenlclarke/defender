@@ -94,6 +94,21 @@ This file records behavior that must not be guessed in arcade-core code.
   still first diverges at line 734, frame 733, for 168 frames total. The
   remaining blocker is exact post-INIT20 ATTR/executive process-table cadence,
   not object, super-process, or shell ordering.
+- `DC-15` refreshed the trace-oracle state after native video CRCs and later
+  translation work. The local reference fixture set still validates with 12
+  complete Phase 1 fixtures and 22,308 frames, but exact `attract_boot`
+  comparison now fails first at line 2/frame 1 because the local MAME reference
+  fixtures have `video_crc32=-` while Rust emits native video CRCs, starting at
+  `0x157E98C7`. Across the 900-frame `attract_boot` comparison,
+  `video_crc32` differs on all frames and the existing
+  `process_table_crc32` drift remains 168 frames from frame 733 through frame
+  900. The ignored `rust-current` fixture directory now checks 10 current Rust
+  scenarios and 15,452 frames. `planet_destruction` and `high_score_entry` are
+  excluded because current trace generation panics at `src/machine.rs:26276`
+  with the red-label `OFREE` object list empty. All eight ignored
+  `local_reference_*_matches_red_label` tests still fail first on the missing
+  reference video CRC; their ignored reasons now name that `DC-15` blocker plus
+  the remaining process, credited-start, gameplay, death, or wave drift.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process

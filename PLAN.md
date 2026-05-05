@@ -1787,27 +1787,95 @@ Work log:
 
 ### DC-15: Trace Oracle Promotion And Gap Recheck
 
-Status: `planned`
+Status: `complete`
 
 Goal: restore a repeatable local Rust-vs-MAME proof loop before new fidelity
 closure work resumes.
 
 Steps:
 
-- [ ] DC-15.1 Re-run `make reference-fixtures-check` and exact
+- [x] DC-15.1 Re-run `make reference-fixtures-check` and exact
   `attract_boot` comparison against the local reference fixture.
-- [ ] DC-15.2 Generate or refresh the ignored
+  Completed: `2026-05-05 19:26:55 BST`
+- [x] DC-15.2 Generate or refresh the ignored
   `docs/fidelity/fixtures/local/rust-current` fixture set only for scenarios
   whose current Rust output is intentionally being compared.
-- [ ] DC-15.3 Re-run every ignored `local_reference_*_matches_red_label` test,
+  Completed: `2026-05-05 19:36:35 BST`
+- [x] DC-15.3 Re-run every ignored `local_reference_*_matches_red_label` test,
   then unignore passing scenarios or narrow ignored reasons to the remaining
   mismatch.
-- [ ] DC-15.4 Record the comparison deltas in
+  Completed: `2026-05-05 19:38:27 BST`
+- [x] DC-15.4 Record the comparison deltas in
   `docs/fidelity/golden-comparison-results.md`, update gap text in
   `SPEC.md`, and post the result to Slack.
+  Completed: `2026-05-05 19:45:06 BST`
 
 Completion gate: the local trace oracle state is current, every ignored
 reference test has a specific reason, and the next mismatch boundary is known.
+
+Work log:
+
+- `2026-05-05 19:25:58 BST` Started `DC-15.1`: re-running the local reference
+  fixture gate and exact `attract_boot` Rust-vs-reference comparison so the
+  trace oracle state is current before any fixture promotion or ignored-test
+  review.
+- `2026-05-05 19:26:55 BST` Completed `DC-15.1`: `make
+  reference-fixtures-check` validated 12 complete local reference fixtures and
+  22,308 frames. The exact `attract_boot` comparison failed at line 2, frame 1,
+  because the reference still has `video_crc32=-` while current Rust emits
+  `0x157E98C7`. A full column-delta check over 900 frames found 900
+  `video_crc32` mismatches and the known 168 `process_table_crc32` mismatches
+  from frame 733 through frame 900.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778005641744419`
+- `2026-05-05 19:27:37 BST` Started `DC-15.2`: generating the ignored
+  `docs/fidelity/fixtures/local/rust-current` fixture set from the current Rust
+  core for the Phase 1 scenarios, then checking the directory with
+  `make trace-fixtures`.
+- `2026-05-05 19:36:35 BST` Completed `DC-15.2`: generated ignored
+  Rust-current inputs for the Phase 1 scenarios and promoted only the 10
+  scenarios whose current Rust trace could be generated and checked:
+  `abduction`, `attract_boot`, `death`, `firing`, `first_300_frames`,
+  `hyperspace`, `smart_bomb`, `start_game`, `thrust_reverse`, and
+  `wave_advance`. `make trace-fixtures` passed for those 10 pairs with 15,452
+  frames. `planet_destruction` and `high_score_entry` were excluded from the
+  Rust-current fixture set because current trace generation panics at
+  `src/machine.rs:26276` with `red-label OFREE object list is empty`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778006215777289`
+- `2026-05-05 19:37:11 BST` Started `DC-15.3`: running the ignored
+  `local_reference_*_matches_red_label` tests against the local reference
+  fixture set, then updating ignored-test reasons to match the current first
+  blockers.
+- `2026-05-05 19:38:27 BST` Completed `DC-15.3`: ran
+  `cargo test local_reference_ --all-targets -- --ignored`; all eight
+  local-reference tests failed at line 2, frame 1 because the local reference
+  fixtures still have `video_crc32=-` while Rust emits `0x157E98C7`. No test
+  was safe to unignore. Updated the ignored-test reasons in `src/app.rs` to
+  name the current missing-reference-video-CRC blocker plus each scenario's
+  remaining process, credited-start, gameplay, death, or wave drift. Validation
+  passed with `cargo fmt --check` and `cargo test local_reference_
+  --all-targets`, which reports the eight tests ignored with the narrowed
+  `DC-15` reasons.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778006325800959`
+- `2026-05-05 19:39:04 BST` Started `DC-15.4`: recording the current
+  Rust-vs-reference comparison deltas in
+  `docs/fidelity/golden-comparison-results.md`, updating `SPEC.md`, and then
+  running the final DC-15 validation gate.
+- `2026-05-05 19:45:06 BST` Completed `DC-15.4` and final `DC-15` gate:
+  recorded the `DC-15` trace-oracle results in
+  `docs/fidelity/golden-comparison-results.md`, updated `SPEC.md` and
+  `docs/fidelity/gaps.md`, and completed the cycle with `make fidelity`.
+  Validation passed with `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/gaps.md docs/fidelity/golden-comparison-results.md`,
+  `git diff --check`, and `make fidelity`. The broad gate included
+  `cargo fmt --check`, `cargo test --all-targets` with 850 passed and 13
+  known ignored tests, `cargo clippy --all-targets -- -D warnings`, trace Lua
+  and Python self-tests, `make trace-fixtures` against the 10 refreshed
+  Rust-current pairs and 15,452 frames, and LLVM coverage/new-code coverage.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778006733565279`
 
 ### DC-16: Post-`INIT20` `ATTR` And Executive Cadence
 
