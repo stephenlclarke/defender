@@ -614,3 +614,76 @@ Interpretation:
   first credited input RNG call order: process-table cadence diverges when coin
   input interrupts the attract process, and Rust applies `START` player setup
   earlier than the local reference.
+
+## 2026-05-05 `DC-18.3` Credited-Start Scheduler Recheck
+
+Scenarios:
+
+- `start_game`
+- `firing`
+- `thrust_reverse`
+- `smart_bomb`
+- `hyperspace`
+
+Purpose: keep the cold-boot attract process cadence running after a credit is
+awarded, then remeasure the remaining credited-start scheduler/player setup
+drift.
+
+Commands:
+
+```sh
+cargo test \
+  trace_text_keeps_cold_boot_attract_process_cadence_after_credit \
+  --all-targets
+cargo run --quiet -- \
+  --fidelity-trace-inputs-file \
+  docs/fidelity/fixtures/local/reference/start_game.inputs.txt
+```
+
+The final command was repeated for `firing`, `thrust_reverse`, `smart_bomb`,
+and `hyperspace`, with the generated TSVs compared against the local reference
+fixtures.
+
+Exact result:
+
+- Exact comparison still fails first at line 2/frame 1 because the local MAME
+  reference has `video_crc32=-` while current Rust emits `0x157E98C7`.
+- Ignoring that absent reference `video_crc32` column, the first mismatch
+  remains `process_table_crc32` at line 902/frame 901, expected `0xDEFE9590`,
+  actual `0x640191A2`.
+- The post-credit process table no longer freezes after `credit_added`; the
+  trace now continues the cold-boot attract cadence after frame 912. Exact
+  process ordering is still wrong, so this is a narrowed scheduler-order
+  blocker rather than a passing gameplay fixture.
+
+Column summary:
+
+- `start_game`: `video_crc32` differs on all 1,228 frames; `phase`, `wave`,
+  `lives`, and `smart_bombs` differ on 203 frames; `seed`, `hseed`, and
+  `lseed` differ on 211, 210, and 210 frames; `object_table_crc32` differs on
+  55 frames; `process_table_crc32` differs on 328 frames.
+- `firing`, `thrust_reverse`, `smart_bomb`, and `hyperspace`: `video_crc32`
+  differs on all 1,328 frames; `phase`, `wave`, `lives`, and `smart_bombs`
+  differ on 303 frames; `seed`, `hseed`, and `lseed` differ on 311, 310, and
+  310 frames; `object_table_crc32` differs on 155 frames;
+  `process_table_crc32` differs on 428 frames.
+
+First remaining non-video mismatches:
+
+- `process_table_crc32`: line 902/frame 901, expected `0xDEFE9590`, actual
+  `0x640191A2`.
+- `seed`/`hseed`/`lseed`: line 1019/frame 1018, expected
+  `0x44/0xE2/0x2F`, actual `0x65/0x71/0x17`.
+- `phase`: line 1027/frame 1026, expected `game_over`, actual `playing`.
+- `object_table_crc32`: line 1175/frame 1174, expected `0x81575057`, actual
+  `0xD4938A5C`.
+
+Interpretation:
+
+- The remaining trace blocker is the source scheduler/sample boundary around
+  coin/start work, not the first credited-input RNG advance and not a frozen
+  post-credit attract cadence.
+- A generic full-scheduler swap is not safe yet: it reaches the currently
+  untranslated red-label `0xF4CC` attract sleep-return path during the
+  credited-start window. That path needs a source-shaped owner before the live
+  coin/start path can stop prioritizing targeted switch processes.

@@ -157,6 +157,16 @@ This file records behavior that must not be guessed in arcade-core code.
   `process_table_crc32` on frame 901, then RNG again at frame 1018 and
   player setup/phase at frame 1026 because Rust applies `START` setup earlier
   than the local reference.
+- `DC-18.3` keeps the cold-boot attract process cadence running after the
+  delayed credit event instead of freezing the process-table CRC once credit is
+  awarded. Exact gameplay comparison is still blocked by the source scheduler
+  boundary around coin/start work: ignoring the missing reference
+  `video_crc32` column, the first mismatch remains `process_table_crc32` on
+  frame 901 (`0xDEFE9590` expected, `0x640191A2` actual), with later RNG drift
+  at frame 1018 and early Rust player setup at frame 1026. A generic
+  full-scheduler path currently reaches untranslated `0xF4CC` attract
+  sleep-return work, so that source routine remains the next scheduler owner
+  needed before the focused gameplay traces can be promoted.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process

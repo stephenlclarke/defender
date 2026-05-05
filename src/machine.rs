@@ -25975,7 +25975,6 @@ impl ArcadeMachine {
                 .expect("live attract process labels are valid");
         if cold_boot_game_over_attract_active
             && input == CabinetInput::NONE
-            && self.credits == 0
             && !self
                 .red_label_live_coin_door_process_active()
                 .expect("live coin/admin process labels are valid")
@@ -26666,6 +26665,7 @@ impl ArcadeMachine {
         else {
             return Ok(None);
         };
+
         let Some(scheduled) = self
             .memory
             .step_single_process_scheduler_from_link(link_address)?

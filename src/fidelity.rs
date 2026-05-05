@@ -954,6 +954,33 @@ mod tests {
     }
 
     #[test]
+    fn trace_text_keeps_cold_boot_attract_process_cadence_after_credit() {
+        let mut inputs = vec![CabinetInput::NONE; 900];
+        inputs.extend(
+            [CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+        inputs.extend([CabinetInput::NONE; 16]);
+
+        let trace = trace_text_for_inputs(&inputs).expect("trace text");
+        let frame_912 = trace.lines().nth(912).expect("frame 912");
+        let frame_913 = trace.lines().nth(913).expect("frame 913");
+        let frame_914 = trace.lines().nth(914).expect("frame 914");
+
+        assert!(frame_912.ends_with("\t0xE6\tcredit_added"));
+        assert_ne!(
+            trace_field(frame_912, "process_table_crc32"),
+            trace_field(frame_913, "process_table_crc32")
+        );
+        assert_ne!(
+            trace_field(frame_913, "process_table_crc32"),
+            trace_field(frame_914, "process_table_crc32")
+        );
+    }
+
+    #[test]
     fn trace_text_aligns_debounced_start_event_with_source_sound_command() {
         let mut inputs = vec![CabinetInput::NONE; 900];
         inputs.extend(

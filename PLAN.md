@@ -2139,7 +2139,7 @@ Work log:
 
 ### DC-18: Gameplay Golden Trace Closure
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: make the credited-start and active-player scenarios match local
 MAME/source references.
@@ -2152,11 +2152,13 @@ Steps:
 - [x] DC-18.2 Close credited-start RNG call-order drift and narrow
   transition/player setup timing blockers.
   Completed: `2026-05-05 22:16:07 BST`
-- [ ] DC-18.3 Close remaining credited-start process/player setup timing and
+- [x] DC-18.3 Narrow remaining credited-start process/player setup timing and
   post-start object/process scheduler drift for firing, thrust, reverse, smart
   bomb, and hyperspace paths.
-- [ ] DC-18.4 Unignore passing gameplay local-reference tests and update
+  Completed: `2026-05-05 23:04:16 BST`
+- [x] DC-18.4 Unignore passing gameplay local-reference tests and update
   `SPEC.md` / `docs/fidelity/gaps.md` with remaining exact mismatches.
+  Completed: `2026-05-05 23:04:16 BST`
 
 Completion gate: the focused start and player-action traces either pass exact
 local-reference comparison or have only newly documented, narrower blockers.
@@ -2231,6 +2233,46 @@ Work log:
   Rust emits `0x157E98C7`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778016890322059`
+- `2026-05-05 22:35:22 BST` Started `DC-18.3`: tracing the remaining
+  credited-start process-table and player setup timing drift from frame 901
+  through the first post-start player-action frames, then fixing the
+  source-shaped scheduler boundary for start, firing, thrust, reverse, smart
+  bomb, and hyperspace paths.
+- `2026-05-05 22:49:26 BST` Started `DC-18.4`: updating gameplay
+  local-reference ignored-test reasons and the gap register after the
+  credited-start scheduler recheck, then verifying whether any gameplay
+  fixture can be promoted.
+- `2026-05-05 23:04:16 BST` Completed `DC-18.3` / `DC-18.4`: kept the
+  cold-boot `GameOver` attract cadence running after credit is awarded instead
+  of stopping once `credits > 0`, added
+  `trace_text_keeps_cold_boot_attract_process_cadence_after_credit`, and
+  removed the temporary scheduler debug test used during investigation.
+  Updated `src/app.rs` ignored local-reference reasons to `DC-18.3` and
+  recorded the current exact blockers in `SPEC.md`, `docs/fidelity/gaps.md`,
+  and `docs/fidelity/golden-comparison-results.md`. No gameplay
+  local-reference test can be unignored yet: exact comparison still fails first
+  on missing reference `video_crc32`, and ignoring that absent column the first
+  blocker remains `process_table_crc32` at line 902/frame 901
+  (`0xDEFE9590` expected, `0x640191A2` actual), followed by RNG drift at frame
+  1018 and early Rust player setup at frame 1026. A generic full-scheduler
+  swap was checked and rejected because it reaches untranslated red-label
+  `0xF4CC` attract sleep-return work in the credited-start window. Validation
+  passed with `cargo fmt --check`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/gaps.md docs/fidelity/golden-comparison-results.md`, `git diff
+  --check`, `cargo test trace_text_ --all-targets`, `cargo test
+  local_reference_ --all-targets`, `cargo run --quiet --
+  --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference`,
+  expected-failing exact `start_game` local-reference comparison at line 2 on
+  `video_crc32=-`, refreshed ignored local Rust-current fixtures,
+  `make trace-fixtures` with 10 fixture pairs / 15,452 frames, and
+  `make fidelity` with 857 passed Rust library tests, 13 known ignored tests,
+  two binary tests, clippy, trace tooling checks, LLVM coverage, and new-code
+  coverage with 19/19 added executable Rust lines. Phase 8 remains open for
+  `DC-19` through `DC-22`; the next scheduler owner is the `0xF4CC`
+  attract sleep-return path plus the later death/wave, pixel, audio, and
+  hardware-edge fixture work.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778018649639209`
 
 ### DC-19: Death, Wave, Session, And Operator Trace Closure
 

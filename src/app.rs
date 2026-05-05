@@ -1646,31 +1646,31 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known DC-18.2 mismatch: missing reference video CRC plus credited-start process/player setup drift"]
+    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus credited-start scheduler/player setup drift"]
     fn local_reference_start_game_matches_red_label() {
         assert_local_reference_trace_matches("start_game");
     }
 
     #[test]
-    #[ignore = "known DC-18.2 mismatch: missing reference video CRC plus gameplay process/player setup drift"]
+    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus gameplay scheduler/player setup drift"]
     fn local_reference_firing_matches_red_label() {
         assert_local_reference_trace_matches("firing");
     }
 
     #[test]
-    #[ignore = "known DC-18.2 mismatch: missing reference video CRC plus gameplay process/player setup drift"]
+    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus gameplay scheduler/player setup drift"]
     fn local_reference_thrust_reverse_matches_red_label() {
         assert_local_reference_trace_matches("thrust_reverse");
     }
 
     #[test]
-    #[ignore = "known DC-18.2 mismatch: missing reference video CRC plus gameplay process/player setup drift"]
+    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus gameplay scheduler/player setup drift"]
     fn local_reference_smart_bomb_matches_red_label() {
         assert_local_reference_trace_matches("smart_bomb");
     }
 
     #[test]
-    #[ignore = "known DC-18.2 mismatch: missing reference video CRC plus gameplay process/player setup drift"]
+    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus gameplay scheduler/player setup drift"]
     fn local_reference_hyperspace_matches_red_label() {
         assert_local_reference_trace_matches("hyperspace");
     }

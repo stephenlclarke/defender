@@ -1182,6 +1182,18 @@ Additional gaps and corrections found during this review:
   `start_game` now differs in RNG fields on 211/210/210 frames; the four
   player-action slices each differ on 311/310/310 RNG frames. Remaining
   process/player setup timing is carried into the scheduler drift closure step.
+- `DC-18.3` keeps the cold-boot attract process cadence running after the
+  delayed credited-coin event instead of freezing the process-table CRC once
+  credit is awarded. Exact gameplay comparison is still blocked: ignoring the
+  absent reference `video_crc32` column, the first mismatch remains
+  `process_table_crc32` at line 902/frame 901 (`0xDEFE9590` expected,
+  `0x640191A2` actual), then RNG drifts again at line 1019/frame 1018 and Rust
+  still applies `START` player setup at line 1027/frame 1026 before the local
+  reference leaves `game_over`. `start_game` now differs in process-table CRC
+  on 328 frames; the four player-action slices differ on 428 process-table
+  frames. A generic full-scheduler swap is not valid yet because the credited
+  start window reaches the untranslated red-label `0xF4CC` attract sleep-return
+  path.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot
