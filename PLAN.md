@@ -2139,15 +2139,16 @@ Work log:
 
 ### DC-18: Gameplay Golden Trace Closure
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: make the credited-start and active-player scenarios match local
 MAME/source references.
 
 Steps:
 
-- [ ] DC-18.1 Recompare `start_game`, `firing`, `thrust_reverse`,
+- [x] DC-18.1 Recompare `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, and `hyperspace` after `DC-16` and `DC-17`.
+  Completed: `2026-05-05 21:57:20 BST`
 - [ ] DC-18.2 Close credited-start transition timing, player setup, and RNG
   call-order drift.
 - [ ] DC-18.3 Close post-start object/process scheduler drift for firing,
@@ -2157,6 +2158,38 @@ Steps:
 
 Completion gate: the focused start and player-action traces either pass exact
 local-reference comparison or have only newly documented, narrower blockers.
+
+Work log:
+
+- `2026-05-05 21:53:19 BST` Started `DC-18.1`: re-running the
+  `start_game`, `firing`, `thrust_reverse`, `smart_bomb`, and `hyperspace`
+  local-reference comparisons after `DC-16` and `DC-17` so gameplay closure
+  starts from a fresh, documented drift baseline.
+- `2026-05-05 21:57:20 BST` Completed `DC-18.1`: rechecked the five focused
+  gameplay local references and updated the gap register with the current
+  drift baseline. The local reference directory is complete for 12 Phase 1
+  fixtures / 22,308 frames, and the ignored exact local-reference tests still
+  fail first at line 2/frame 1 because the references have `video_crc32=-`
+  while Rust emits native CRCs. Ignoring that missing video column,
+  `start_game`, `firing`, `thrust_reverse`, `smart_bomb`, and `hyperspace`
+  match through frame 900 and first drift at line 902/frame 901 in `seed`
+  (`0x81` expected, `0xDB` actual). `start_game` now has 325
+  process-table-CRC mismatches, while each player-action slice has 425.
+  Inputs, scores, super-process CRC, shell CRC, sound commands, and events
+  match for all five slices. Updated `src/app.rs` ignored reasons plus
+  `SPEC.md`, `docs/fidelity/gaps.md`, and
+  `docs/fidelity/golden-comparison-results.md`. Validation passed with
+  `cargo fmt --check`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/gaps.md docs/fidelity/golden-comparison-results.md`, `git
+  diff --check`, `cargo run -- --fidelity-check-reference-trace-dir
+  docs/fidelity/fixtures/local/reference`, `cargo test local_reference_
+  --all-targets`, the expected-failing exact `cargo test local_reference_
+  --all-targets -- --ignored`, and `make fidelity`, including `855` passed
+  Rust library tests, `13` known ignored tests, two binary tests, clippy,
+  Lua/Python trace-tool tests, 10 Rust-current fixture pairs / 15,452 frames,
+  LLVM coverage, and new-code coverage with `0/0` added executable Rust lines.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778015138997059`
 
 ### DC-19: Death, Wave, Session, And Operator Trace Closure
 

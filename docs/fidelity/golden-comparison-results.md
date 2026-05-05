@@ -447,3 +447,95 @@ Interpretation:
 - `attract_boot` is ready to promote once the local reference fixture gains
   MAME-derived `video_crc32` values or the acceptance policy explicitly permits
   comparing this scenario without the video column.
+
+## 2026-05-05 `DC-18.1` Gameplay Reference Recheck
+
+Scenarios:
+
+- `start_game`
+- `firing`
+- `thrust_reverse`
+- `smart_bomb`
+- `hyperspace`
+
+Purpose: re-run the focused credited-start and player-action comparisons after
+`DC-16` and `DC-17` closed the boot/attract process-table drift and promoted
+frame-output ownership surfaces.
+
+Commands:
+
+```sh
+cargo run --quiet -- \
+  --fidelity-check-reference-trace-dir \
+  docs/fidelity/fixtures/local/reference
+cargo test local_reference_ --all-targets -- --ignored
+target/debug/defender --fidelity-trace-inputs-file \
+  docs/fidelity/fixtures/local/reference/start_game.inputs.txt
+```
+
+The final command was repeated for `firing`, `thrust_reverse`, `smart_bomb`,
+and `hyperspace`, with an ad hoc TSV column-count comparison against each local
+`*.expected.tsv` reference.
+
+Reference fixture result:
+
+- The local reference directory is complete for 12 Phase 1 fixtures and 22,308
+  frames.
+- The ignored exact local-reference tests still fail first at line 2/frame 1
+  because the local MAME references have `video_crc32=-` while current Rust
+  emits native CRCs starting with `0x157E98C7`.
+
+Line counts:
+
+- `start_game`: 1,228 frames plus header.
+- `firing`: 1,328 frames plus header.
+- `thrust_reverse`: 1,328 frames plus header.
+- `smart_bomb`: 1,328 frames plus header.
+- `hyperspace`: 1,328 frames plus header.
+
+First non-video mismatch:
+
+- All five focused gameplay scenarios now match non-video columns through frame
+  900.
+- The first remaining non-video mismatch is line 902/frame 901 in `seed`, where
+  the reference expects `0x81` and Rust emits `0xDB`.
+
+Column summary:
+
+- `start_game`: `video_crc32` differs on all 1,228 frames; `phase`, `wave`,
+  `lives`, and `smart_bombs` differ on 203 frames; `seed`, `hseed`, and
+  `lseed` differ on 324, 325, and 324 frames; `object_table_crc32` differs on
+  55 frames; `process_table_crc32` differs on 325 frames.
+- `firing`, `thrust_reverse`, `smart_bomb`, and `hyperspace`: `video_crc32`
+  differs on all 1,328 frames; `phase`, `wave`, `lives`, and `smart_bombs`
+  differ on 303 frames; `seed`, `hseed`, and `lseed` differ on 423, 425, and
+  424 frames; `object_table_crc32` differs on 155 frames;
+  `process_table_crc32` differs on 425 frames.
+
+No mismatches were observed in these columns for the five focused gameplay
+scenarios:
+
+- `input_bits`
+- `input_in0`
+- `input_in1`
+- `input_in2`
+- `p1_score`
+- `p2_score`
+- `super_process_table_crc32`
+- `shell_table_crc32`
+- `sound_commands`
+- `events`
+
+Interpretation:
+
+- `DC-17` removed the inherited boot/attract process-table blocker from the
+  focused gameplay slices. The next exact gameplay blocker is the frame-901 RNG
+  call-order/player-start transition drift, followed by object/process-table
+  drift after the credited start.
+- The ignored `local_reference_start_game_matches_red_label`,
+  `local_reference_firing_matches_red_label`,
+  `local_reference_thrust_reverse_matches_red_label`,
+  `local_reference_smart_bomb_matches_red_label`, and
+  `local_reference_hyperspace_matches_red_label` tests remain ignored until the
+  missing reference video column and the frame-901 gameplay drift are closed or
+  explicitly scoped.

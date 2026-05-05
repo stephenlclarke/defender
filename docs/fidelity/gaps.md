@@ -140,6 +140,15 @@ This file records behavior that must not be guessed in arcade-core code.
   video-counter, sound-latch, and power-on scheduler state, restores the saved
   machine, and requires the replayed cold-boot sound-handoff `FrameOutput` to
   match byte-for-byte.
+- `DC-18.1` rechecked `start_game`, `firing`, `thrust_reverse`, `smart_bomb`,
+  and `hyperspace` against local references after the frame-ownership work.
+  Exact comparison still fails first on line 2/frame 1 because the reference
+  fixtures have `video_crc32=-` while Rust emits native CRCs. Ignoring that
+  missing column, the first remaining mismatch is line 902/frame 901 in RNG
+  state (`seed` expected `0x81`, actual `0xDB`). `start_game` now differs in
+  process-table CRC on 325 frames; each player-action slice differs on 425
+  process-table frames. Inputs, scores, super-process CRC, shell CRC, sound
+  commands, and events match for the five focused gameplay slices.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process

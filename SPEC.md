@@ -1158,6 +1158,19 @@ Additional gaps and corrections found during this review:
   video-counter, sound-latch, and power-on scheduler state after save, restores
   the saved machine, and requires the replayed cold-boot sound-handoff
   `FrameOutput` to match byte-for-byte.
+- `DC-18.1` rechecked the focused gameplay local references after `DC-16` and
+  `DC-17`. `start_game`, `firing`, `thrust_reverse`, `smart_bomb`, and
+  `hyperspace` still fail exact comparison first at line 2/frame 1 because the
+  local references have `video_crc32=-` while Rust emits native CRCs. Ignoring
+  that missing reference column, all five now match until line 902/frame 901,
+  where RNG bytes first drift (`seed` expected `0x81`, actual `0xDB`).
+  `start_game` still differs in phase/wave/lives/smart-bomb fields on 203
+  frames, RNG fields on 324/325/324 frames, object-table CRC on 55 frames, and
+  process-table CRC on 325 frames. The four player-action slices each differ
+  in phase/wave/lives/smart-bomb fields on 303 frames, RNG fields on
+  423/425/424 frames, object-table CRC on 155 frames, and process-table CRC on
+  425 frames. Inputs, scores, super-process CRC, shell CRC, sound commands, and
+  events match for those five slices.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot
