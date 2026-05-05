@@ -790,8 +790,11 @@ This file records behavior that must not be guessed in arcade-core code.
   `SNDSEQ` can model the source `SNDOUT` idle write followed by the
   complemented sound-number command for table playback and the thrust
   start/stop gate, and full frame output/fidelity traces carry the asserted raw
-  command bytes. Regenerated local MAME command-sequence fixtures and waveform
-  fixtures are still missing.
+  command bytes. `DC-21.2` regenerated a local MAME `start_game` trace under
+  `/tmp/defender-dc21-reference`; it records frame 731 `0xC0`, frame 912
+  `0xE6`/`credit_added`, and frame 1027 `0xF5`/`game_started`, and current Rust
+  matches those `sound_commands`/`events` rows exactly. Broader local MAME
+  command-sequence fixtures and external waveform fixtures are still missing.
 - Sound-board RAM/PIA/ROM address classification exists, and the MAME-documented
   main-board command latch byte/CB1 handoff is modeled from the PIA1 port-B
   output callback boundary. `ArcadeMachine::step` now records every emitted
@@ -833,10 +836,13 @@ This file records behavior that must not be guessed in arcade-core code.
   gate, the source IRQ organ-continuation gate, the source IRQ prelude-to-flow
   cycle, plus the shared `GEND` / `GEND40` / `GEND50` / `GEND60` / `GEND61`
   echo and frequency-window updates and the source NMI diagnostic
-  checksum-to-VARI branch are translated. Cycle-accurate DAC scheduling, CPU
-  IRQ scheduling, live MAME command-sequence fixtures, and the remaining
+  checksum-to-VARI branch are translated. The timed IRQ window reports DAC
+  bytes in source order with monotonic DAC-write ticks, but those ticks are not
+  6808 CPU cycles. Cycle-accurate DAC scheduling, independent CPU IRQ
+  scheduling, broader live MAME command-sequence fixtures, and the remaining
   waveform routines are not translated.
-- No waveform fixtures exist yet.
+- No external waveform fixtures exist yet; only deterministic in-repo DAC
+  buffer signatures cover representative translated routines.
 - End-to-end MAME golden traces for two-player sessions, high-score entry,
   operator/service screens, and cabinet input profiles do not exist yet. The
   runtime has source-native mutation fixtures for live two-player session flow,

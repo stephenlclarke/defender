@@ -455,6 +455,10 @@ compatibility behavior.
   sound-number command and handles the thrust sound gate. Full frame output and
   fidelity traces now include the resulting asserted raw command bytes and a
   native visible-video CRC computed from red-label video RAM. The
+  `DC-21.2` local MAME `start_game` recheck matched the trace-required sound
+  command/event rows at frames 731 (`0xC0`), 912 (`0xE6`, `credit_added`), and
+  1027 (`0xF5`, `game_started`). External waveform goldens and cycle-accurate
+  6808 DAC/IRQ scheduling remain open fidelity gaps. The
   source `CSCAN` branch now keeps
   the `PIA01` / `PIA02` coin-door history, masks IN2 through `ANDB #$3F`,
   double-checks the sample, and queues the first surviving `SWTAB1`

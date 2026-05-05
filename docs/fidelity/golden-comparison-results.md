@@ -794,3 +794,48 @@ Interpretation:
 - Generated pixel-bearing reference TSVs remain ignored local artifacts under
   `docs/fidelity/fixtures/local/` or `/tmp`; only findings and tooling belong
   in the checked-in repository.
+
+## 2026-05-05 `DC-21.2` Sound Command Fixture Recheck
+
+Scenario:
+
+- `start_game`
+
+Purpose: recheck that the local MAME command evidence for the trace-required
+credited-start sounds still matches current Rust after the Phase 8 trace
+exporter changes.
+
+Commands:
+
+```sh
+python3 tools/generate_reference_traces.py \
+  --scenario start_game \
+  --out-dir /tmp/defender-dc21-reference \
+  --rom-dir assets/roms
+cargo run --quiet -- \
+  --fidelity-trace-inputs-file \
+  /tmp/defender-dc21-reference/start_game.inputs.txt
+```
+
+Result:
+
+- The regenerated local MAME `start_game` trace contains asserted raw sound
+  commands at frame 731 (`0xC0`), frame 912 (`0xE6`, `credit_added`), and frame
+  1027 (`0xF5`, `game_started`).
+- Current Rust emits the same command/event rows at the same frames for that
+  input script. A column-only comparison of `sound_commands` and `events`
+  reported no mismatches.
+- The source-derived in-repo fixture validators still cover the `SNDLD` /
+  `SNDSEQ` table timelines, table command writes, thrust start/stop command
+  writes, and direct `SNDOUT` callsites. The deterministic sound-board DAC
+  signature matrix covers representative translated GWAVE, VARI, LITE, TURBO,
+  CANNON, RADIO, HYPER, SCREAM, and ORGAN buffers.
+
+Interpretation:
+
+- Local MAME command evidence exists for the trace-required credited-start
+  command frames. Broader local MAME command-sequence fixtures and external
+  waveform goldens remain missing.
+- The timed sound IRQ model remains source-visible, not cycle-accurate: DAC
+  ticks count translated DAC writes and do not yet model independent 6808 CPU
+  cycles or hardware sample spacing.

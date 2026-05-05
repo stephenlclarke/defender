@@ -1048,9 +1048,13 @@ Additional gaps and corrections found during this review:
   board DAC latch. Focused unit tests now lock representative GWAVE, VARI,
   LITE, TURBO, CANNON, RADIO, HYPER, SCREAM, and ORGAN generated buffers with
   deterministic length/CRC signatures, final DAC latch values, and direct-page
-  RAM mutation CRCs. The tree does not yet include cycle-accurate waveform
-  routine scheduling, independent sound CPU IRQ scheduling, or external
-  waveform golden fixtures.
+  RAM mutation CRCs. `DC-21.2` regenerated a local MAME `start_game` trace and
+  rechecked the trace-required command evidence: MAME and Rust both emit frame
+  731 `0xC0`, frame 912 `0xE6`/`credit_added`, and frame 1027
+  `0xF5`/`game_started` for that script. The tree does not yet include
+  cycle-accurate waveform routine scheduling, independent sound CPU IRQ
+  scheduling, broader MAME command-sequence coverage, or external waveform
+  golden fixtures.
 - `--mute` is an output-layer live-mode option only. It may change whether a
   future mixer writes to the host audio device, but it must not alter core
   frame stepping, sound-command generation, sound-board command latch state, or
@@ -1246,7 +1250,8 @@ Additional gaps and corrections found during this review:
   screen now has core-level coverage proving forward progress into later
   attract, credit, and start-ready states; visual terminal proof still belongs
   with the pixel fixture work.
-- There are no audio waveform or command-sequence golden tests.
+- There are source-derived command-sequence fixtures and local MAME
+  credited-start command evidence, but no external audio waveform golden tests.
 - There is no end-to-end MAME golden regression suite for two-player state,
   coin/start flow, operator settings, or cabinet input profiles.
   Source-native mutation fixtures cover those paths, but MAME-derived session

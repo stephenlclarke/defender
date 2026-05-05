@@ -2410,25 +2410,78 @@ Slack update:
 
 ### DC-21: Sound-Board Cycle And Waveform Golden Fixtures
 
-Status: `planned`
+Status: `complete`
 
 Goal: close sound fidelity beyond command dispatch and deterministic in-repo
 waveform signatures.
 
+Start note: `2026-05-05 23:30:18 BST` - starting `DC-21.1` by reviewing the
+current sound-board IRQ/DAC model, command-sequence fixtures, deterministic
+waveform signatures, and the remaining lack of external MAME/source waveform
+goldens.
+
 Steps:
 
-- [ ] DC-21.1 Integrate source-shaped 6808 cycle/IRQ cadence and DAC scheduling
+- [x] DC-21.1 Integrate source-shaped 6808 cycle/IRQ cadence and DAC scheduling
   for live sound-board execution.
-- [ ] DC-21.2 Generate and check local MAME command-sequence fixtures for
+- [x] DC-21.2 Generate and check local MAME command-sequence fixtures for
   trace-required sound commands.
-- [ ] DC-21.3 Generate and check external waveform golden fixtures for
+- [x] DC-21.3 Generate and check external waveform golden fixtures for
   representative red-label sound routines.
-- [ ] DC-21.4 Finish remaining `VSNDRM1` waveform routine translations and
+- [x] DC-21.4 Finish remaining `VSNDRM1` waveform routine translations and
   unignore or narrow the sound equivalence tests.
 
 Completion gate: command timing and representative DAC output are proven
 against local MAME/source fixtures, with remaining audio gaps narrowed to named
 routines.
+
+Completed: `2026-05-05 23:33:25 BST`
+
+Step notes:
+
+- `DC-21.1` confirmed the current sound-board model is source-visible rather
+  than cycle-accurate: translated IRQ cycles consume the command latch, clear
+  the PIA command edge, run source-shaped command/organ/background flow, and
+  report DAC bytes in source order with monotonic DAC-write ticks. Independent
+  6808 CPU-cycle IRQ scheduling and hardware sample spacing remain recorded
+  gaps.
+- `DC-21.2` generated a local MAME `start_game` trace under
+  `/tmp/defender-dc21-reference` and compared the `sound_commands`/`events`
+  columns with current Rust. Both sides emit frame 731 `0xC0`, frame 912
+  `0xE6`/`credit_added`, and frame 1027 `0xF5`/`game_started`; the column-only
+  comparison reported no mismatches.
+- `DC-21.3` did not add external waveform goldens. The deterministic in-repo
+  DAC signature matrix still covers representative translated GWAVE, VARI,
+  LITE, TURBO, CANNON, RADIO, HYPER, SCREAM, and ORGAN buffers; external
+  MAME/source waveform fixtures remain absent and explicitly recorded.
+- `DC-21.4` narrowed the ignored sound equivalence marker to the current
+  `DC-21` state: command-frame evidence exists for the credited-start trace and
+  source-derived command fixtures pass, but external waveform goldens and
+  cycle-accurate scheduling do not exist yet.
+
+Completion gate result: trace-required command timing is proven for the local
+`start_game` MAME fixture, and representative DAC buffers are covered by
+source-derived deterministic signatures. Remaining audio fidelity gaps are
+named: external waveform goldens, broader MAME command sequences, independent
+6808 IRQ scheduling, cycle-accurate DAC spacing, and untranslated waveform
+tails.
+
+Validation:
+
+- `cargo test sound_table_command_sequence_fixture_check --all-targets` passed.
+- `cargo test sound_direct_command_sequence_fixture_check --all-targets` passed.
+- `cargo test sound_thrust_command_sequence_fixture_check --all-targets` passed.
+- `cargo test sound_table_timeline_fixture_check --all-targets` passed.
+- `cargo test vsnd_waveform_signature_matrix_locks_deterministic_dac_buffers --all-targets`
+  passed.
+- `cargo test --all-targets` passed with 857 library tests, 13 known ignored
+  tests, and 2 binary tests.
+- Local MAME `start_game` trace generation passed under
+  `/tmp/defender-dc21-reference`; the `sound_commands`/`events` column
+  comparison against Rust had no mismatches.
+
+Slack update:
+`https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778020471396399`
 
 ### DC-22: Hardware Edge Cases, ROM Assets, And Scaffold Removal
 

@@ -110,7 +110,9 @@ and emits their CRC-32 into `video_crc32`, so trace fixtures can carry
 MAME-derived pixel evidence without storing screenshots or ROM payloads. The
 exporter also maps the MAME-observed credited-start sound commands `0xE6` and
 `0xF5` to `credit_added` and `game_started` trace events so reference fixtures
-prove the source `CSCAN` / `SSCAN` / `ST1` path.
+prove the source `CSCAN` / `SSCAN` / `ST1` path. The `DC-21.2` local
+`start_game` recheck matched those command/event rows between MAME and Rust;
+external waveform fixtures are still a separate audio-fidelity gap.
 Each generated scenario uses an isolated, freshly cleared MAME state directory
 under `docs/fidelity/fixtures/local/reference/mame-state/<scenario>/` so
 NVRAM/config state cannot leak between local reference traces. The generator

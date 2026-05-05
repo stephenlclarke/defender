@@ -600,7 +600,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known unknown: unignore when waveform fixtures and end-to-end sound traces exist"]
+    #[ignore = "known DC-21 gap: MAME command frames exist, external waveform goldens do not"]
     fn known_unknown_sound_trace_equivalence() {
         panic!("sound command timing and waveforms must match red-label golden traces");
     }
