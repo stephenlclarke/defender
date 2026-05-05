@@ -425,11 +425,11 @@ Additional gaps and corrections found during this review:
   wordmark/title graphic corrupted into large red/purple blocky bands; that is
   a named video fidelity gap until a MAME-derived pixel fixture proves the
   title/logo decode, plot, color, copy, and presentation cadence match
-  red-label output. The same live-review pass also reported that the app does
-  not advance beyond the initial Williams/`DEFENDER` screen, which is a
-  separate live attract-flow fidelity gap until the `ATTR` / `AMODES` / `LOGO`
-  / `DEFEND` / `LEDRET` cadence is proven to advance into later attract,
-  credit, and start-ready states.
+  red-label output. The same live-review pass also reported that the app did
+  not advance beyond the initial Williams/`DEFENDER` screen. `DC-16.5` now
+  adds a core smoke test proving idle live attract reaches later attract
+  processes, accepts credit, and starts play; terminal/pixel proof remains with
+  the MAME-derived pixel fixture work.
 - The trace schema can record object CRCs, process CRCs, super-process CRCs,
   shell CRCs, sound commands, and optional video CRCs, but CMOS-specific trace
   columns, pixel golden fixtures, and external audio waveform golden fixtures
@@ -443,8 +443,8 @@ Additional gaps and corrections found during this review:
 - Local MAME reference traces are intentionally ignored artifacts. The checked
   in code can validate local fixture presence and shape, but the repo still
   depends on user-supplied ROMs and local MAME to prove golden equivalence.
-- Remaining open gaps include the post-INIT20 ATTR/executive scheduler cadence
-  from `attract_boot` frame 733 onward, full frame/cycle integration,
+- Remaining open gaps include the post-AMODES ATTR/executive scheduler cadence
+  from `attract_boot` frame 746 onward, full frame/cycle integration,
   end-to-end golden-trace proof for translated session/operator paths,
   MAME-derived pixel golden fixtures, cycle-accurate sound-board CPU cadence
   and waveform spacing, external waveform fixtures, and removal or regeneration
@@ -1126,6 +1126,15 @@ Additional gaps and corrections found during this review:
   first on the missing reference video CRC, so their ignored reasons were
   narrowed to the `DC-15` blocker plus the remaining process, credited-start,
   gameplay, death, or wave drift.
+- `DC-16.3` narrowed the non-video `attract_boot` process drift. The exact
+  comparison still fails first at line 2/frame 1 on the missing reference
+  `video_crc32` value, but ignoring that absent local-reference column, Rust
+  now matches through frame 745 and first fails at line 747/frame 746 solely in
+  `process_table_crc32`: the reference expects `0xF9878193` and Rust emits
+  `0xE2155086`. `process_table_crc32` differs on 155 frames through frame 900;
+  inputs, phase, scores, wave, lives, smart bombs, RNG bytes, object-table
+  CRC, super-process-table CRC, shell-table CRC, sound commands, and events
+  match for `attract_boot`.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot
@@ -1157,11 +1166,11 @@ Additional gaps and corrections found during this review:
   references, though the trace format can carry raw table and native frame
   CRC-32 values. The observed corrupted title-screen `DEFENDER` graphic remains
   open until a MAME-derived title/logo pixel fixture fails on the current
-  output and passes after the corrected source-backed implementation. The live
-  app also remains blocked by an observed failure to progress beyond the
-  initial Williams/`DEFENDER` screen, so attract-flow proof must include both
-  visual correctness and forward progression to later attract/start-ready
-  states.
+  output and passes after the corrected source-backed implementation. The
+  previously observed failure to progress beyond the initial Williams/`DEFENDER`
+  screen now has core-level coverage proving forward progress into later
+  attract, credit, and start-ready states; visual terminal proof still belongs
+  with the pixel fixture work.
 - There are no audio waveform or command-sequence golden tests.
 - There is no end-to-end MAME golden regression suite for two-player state,
   coin/start flow, operator settings, or cabinet input profiles.

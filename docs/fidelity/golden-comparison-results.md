@@ -347,10 +347,63 @@ Interpretation:
 - The checked local reference traces remain present and structurally valid, but
   they are no longer schema-complete for exact comparison because the MAME-side
   reference fixtures do not populate `video_crc32`.
-- Once the reference video column is regenerated or intentionally normalized,
-  the next `attract_boot` blocker remains the post-`INIT20` process-table
-  cadence at frame 733.
+- At this point, once the reference video column was regenerated or
+  intentionally normalized, the next `attract_boot` blocker remained the
+  post-`INIT20` process-table cadence at frame 733. `DC-16.3` supersedes this
+  boundary with the frame-746 result below.
 - Longer gameplay/session traces still show the same broad state classes of
   drift: credited-start phase timing, RNG call order, object-table state, and
   process-table state. The current counts differ from the older `DC-04.2`
   baseline because later translation work changed the Rust side.
+
+## 2026-05-05 `DC-16.3` Attract Cadence Recheck
+
+Scenario: `attract_boot`
+
+Purpose: re-run the 900-frame cold boot/attract readiness comparison after the
+cold-boot `GameOver` `ATTR` handoff began applying the source-visible
+frame-733 and frame-739 process mutations.
+
+Commands:
+
+```sh
+cargo run --quiet -- \
+  --fidelity-check-trace \
+  docs/fidelity/fixtures/local/reference/attract_boot.inputs.txt \
+  docs/fidelity/fixtures/local/reference/attract_boot.expected.tsv
+cargo run --quiet -- \
+  --fidelity-trace-inputs-file \
+  docs/fidelity/fixtures/local/reference/attract_boot.inputs.txt \
+  > /tmp/dc16-attract_boot.actual.tsv
+```
+
+Exact result:
+
+- Exact comparison still fails first at line 2, frame 1, because the local MAME
+  reference has `video_crc32=-` while current Rust emits `0x157E98C7`.
+- Ignoring that absent reference `video_crc32` column, Rust now matches the
+  local reference through frame 745 and first fails at line 747, frame 746.
+
+First non-video mismatch:
+
+- `process_table_crc32`: expected `0xF9878193`, actual `0xE2155086`.
+
+Column summary:
+
+- `video_crc32` differs on all 900 frames because the local reference fixture
+  does not populate native video CRCs.
+- `process_table_crc32` now differs on 155 of 900 frames. The first non-video
+  mismatch is line 747, frame 746. The last mismatch is line 901, frame 900,
+  where the reference expects `0x1A0C7932` and Rust emits `0xE2155086`.
+- All other trace columns match for `attract_boot`: input bits, MAME input-port
+  bytes, phase, scores, wave, lives, smart bombs, RNG bytes, object-table CRC,
+  super-process-table CRC, shell-table CRC, sound commands, and events.
+
+Interpretation:
+
+- The source-visible `ATTR` scheduler row and initial `AMODES` support-process
+  mutations now match the reference from frame 733 through frame 745.
+- The remaining process-table blocker is the next executive cadence slice at
+  frame 746, where the source reference has advanced to the next process-table
+  sequence while Rust still holds the in-flight `ATTR`/Williams-page process
+  state at `0xE2155086`.

@@ -109,6 +109,15 @@ This file records behavior that must not be guessed in arcade-core code.
   `local_reference_*_matches_red_label` tests still fail first on the missing
   reference video CRC; their ignored reasons now name that `DC-15` blocker plus
   the remaining process, credited-start, gameplay, death, or wave drift.
+- `DC-16.3` narrowed the non-video `attract_boot` process drift. Exact
+  comparison still fails first at line 2/frame 1 because the local reference
+  fixture has `video_crc32=-` while Rust emits native video CRCs. Ignoring that
+  absent reference column, Rust now matches through frame 745 and first fails at
+  line 747/frame 746 solely in `process_table_crc32`: the reference expects
+  `0xF9878193` and Rust emits `0xE2155086`. `process_table_crc32` now differs
+  on 155 frames through frame 900; inputs, phase, scores, wave, lives, smart
+  bombs, RNG bytes, object-table CRC, super-process-table CRC, shell-table CRC,
+  sound commands, and events match for `attract_boot`.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process
@@ -507,10 +516,10 @@ This file records behavior that must not be guessed in arcade-core code.
   active translated player-start handoff advances. The terminal input profiles
   map `5`, `6`, `7`, `F2`, `F3`, held `F4`, and `F5` onto the three coin
   slots, service advance, high-score reset, the auto/up selector, and the
-  slam/tilt switch. The local `attract_boot` fixture now proves boot/start-ready
-  state through frame 732, but the post-INIT20 ATTR/executive scheduler cadence
-  still diverges from frame 733. Generic `SUCIDE` / `HYPX` tails now use the
-  translated process-list cleanup path.
+  slam/tilt switch. The local `attract_boot` fixture now proves the non-video
+  boot/start-ready state through frame 745, but the post-AMODES
+  ATTR/executive scheduler cadence still diverges from frame 746. Generic
+  `SUCIDE` / `HYPX` tails now use the translated process-list cleanup path.
   Generic/untranslated process bodies, any remaining no-process `SWTAB` input
   effects, exact frame/cycle integration, post-start-ready ATTR scheduling, and
   end-to-end golden-trace equivalence are not translated.
@@ -670,10 +679,10 @@ This file records behavior that must not be guessed in arcade-core code.
   bands; source-native checksums are therefore not enough to close title-screen
   fidelity until a MAME-derived title/logo pixel fixture proves the decode,
   plot, color, copy, and presentation cadence. The same live-review pass
-  reported that the app does not advance beyond the initial
-  Williams/`DEFENDER` screen; this is tracked as a live attract-flow gap until
-  source-backed `ATTR` / `AMODES` / `LOGO` / `DEFEND` / `LEDRET` cadence
-  advances into later attract, credit, and start-ready states. Live playing
+  reported that the app did not advance beyond the initial Williams/`DEFENDER`
+  screen; `DC-16.5` adds core-level coverage proving idle live attract reaches
+  later attract processes, accepts credit, and starts play. Visual terminal
+  proof still belongs with the MAME-derived pixel fixture work. Live playing
   frames now run upright `IRQ` and
   `IRQHK`-selected flipped `IRQB` video passes through the source `VERTCT` /
   `IFLG` scheduler, including map writes, timer/watchdog side effects, palette

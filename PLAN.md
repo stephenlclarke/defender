@@ -72,9 +72,12 @@ Gap inventory:
   artifacts, but `docs/fidelity/fixtures/local/rust-current` is absent in the
   current local tree. Exact local-reference tests are still ignored until each
   scenario is made source-equivalent.
-- `attract_boot`: Rust matches the local reference through frame 732, then
-  diverges at frame 733 only in `process_table_crc32`. The remaining blocker is
-  post-`INIT20` `ATTR` / executive process-table cadence.
+- `attract_boot`: exact comparison still fails first at line 2/frame 1 because
+  the local reference has `video_crc32=-` while Rust emits native video CRCs.
+  Ignoring that missing reference column, Rust now matches the local reference
+  through frame 745, then diverges at frame 746 only in
+  `process_table_crc32`. The remaining blocker is the next post-`AMODES`
+  executive/process-table cadence slice.
 - Focused gameplay traces: `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` still fail exact
   local-reference comparison. The recurring gaps are credited-start transition
@@ -90,11 +93,11 @@ Gap inventory:
 - Video: native video rendering exists, but MAME-derived pixel golden fixtures
   are absent. A `2026-05-05` live title-screen capture shows the `DEFENDER`
   wordmark/title graphic corrupted into large red/purple blocky bands.
-- Live attract flow: the app was also reported not to advance beyond the
-  initial Williams/`DEFENDER` screen. This is separate from the corrupted
-  title graphic and needs scheduler/presentation proof that live `ATTR` /
-  `AMODES` / `LOGO` / `DEFEND` / `LEDRET` cadence progresses into later
-  attract, credit, and start-ready states.
+- Live attract flow: `DC-16.5` adds a core smoke test proving idle live attract
+  progresses beyond the initial Williams screen into later attract processes,
+  can accept credit, and can start play. Terminal/pixel proof remains separate
+  from the corrupted title graphic and belongs with the MAME-derived pixel
+  fixture work.
 - Remaining untranslated screens still render native black, and remaining HUD,
   general text, boot/game-over presentation, and non-IRQ scanline ownership
   need proof or owner-approved scope decisions.
@@ -1879,29 +1882,129 @@ Work log:
 
 ### DC-16: Post-`INIT20` `ATTR` And Executive Cadence
 
-Status: `planned`
+Status: `complete`
 
 Goal: close the current `attract_boot` process-table mismatch at frame 733.
 
 Steps:
 
-- [ ] DC-16.1 Trace frame-733 `ATTR` / `EXEC` process-table mutations from the
+- [x] DC-16.1 Trace frame-733 `ATTR` / `EXEC` process-table mutations from the
   local reference and source listings.
-- [ ] DC-16.2 Add source-visible mutation tests for the affected process cells
+  Completed: `2026-05-05 19:52:24 BST`
+- [x] DC-16.2 Add source-visible mutation tests for the affected process cells
   and scheduler rows.
-- [ ] DC-16.3 Fix the translated scheduler cadence until `attract_boot` matches
+  Completed: `2026-05-05 20:04:14 BST`
+- [x] DC-16.3 Fix the translated scheduler cadence until `attract_boot` matches
   the local reference through frame 900.
-- [ ] DC-16.4 Promote the passing `attract_boot` local-reference test by
+  Completed: `2026-05-05 20:08:29 BST`
+- [x] DC-16.4 Promote the passing `attract_boot` local-reference test by
   unignoring it, or narrow any remaining ignored reason to the next exact
   mismatch.
-- [ ] DC-16.5 Add a live attract-flow smoke or trace check proving the app
+  Completed: `2026-05-05 20:09:41 BST`
+- [x] DC-16.5 Add a live attract-flow smoke or trace check proving the app
   advances beyond the initial Williams/`DEFENDER` screen into later attract,
   credit, and start-ready states.
+  Completed: `2026-05-05 20:13:44 BST`
 
 Completion gate: `local_reference_attract_boot_matches_red_label` passes
 locally with the reference fixture, or the next mismatch is documented with
 frame, column, expected value, and actual value. Live attract flow also
 progresses beyond the initial Williams/`DEFENDER` screen.
+
+Work log:
+
+- `2026-05-05 19:49:51 BST` Started `DC-16.1`: tracing the frame-733
+  `ATTR` / `EXEC` process-table drift from the local reference fixture and
+  source listings so the next scheduler cadence fix can be pinned to exact
+  process-cell mutations.
+- `2026-05-05 19:52:24 BST` Completed `DC-16.1`: regenerated a Rust
+  `attract_boot` trace and compared it with the local reference window around
+  frames 728 through 900. The reference creates the `ATTR` process at frame
+  732, then mutates the process table at frame 733 while phase remains
+  `game_over`; Rust also creates `ATTR` at frame 732, but keeps the process
+  table fixed at `0xA424BDF6` from frame 733 onward because the live attract
+  scheduler only runs in `Attract`, not the cold-boot `GameOver` handoff.
+  In the frame-720..910 window, only `process_table_crc32` differs: first
+  line 734/frame 733 expects `0x62E1AD30` and Rust emits `0xA424BDF6`; the
+  first source-visible `ATTR` path is `ATTR` -> `HALLOF` -> power-on `AMODES`,
+  followed by `LOGO` sleeping back to `LOGO0` after its initial slice.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778007167426639`
+- `2026-05-05 19:52:51 BST` Started `DC-16.2`: adding regression coverage for
+  the cold-boot `GameOver` `ATTR` scheduler row and the source-visible
+  `ATTR`/`AMODES` process-cell mutations before changing the live scheduler
+  gate.
+- `2026-05-05 20:04:14 BST` Completed `DC-16.2`: added
+  `cold_boot_game_over_attr_row_runs_williams_page_handoff` to lock the
+  source-visible frame-732 `ATTR` process row, frame-733 scheduler mutation to
+  `0x62E1AD30`, `STATUS=0xFB`, credit-increase flag clear, and frame-739
+  `COLR`/`TIECOL` support-process creation. Validation passed with
+  `cargo fmt` and `cargo test
+  cold_boot_game_over_attr_row_runs_williams_page_handoff --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778007878904839`
+- `2026-05-05 20:04:52 BST` Started `DC-16.3`: regenerating the
+  `attract_boot` Rust trace after the cold-boot `ATTR` handoff fix and
+  narrowing the remaining local-reference mismatch to the next exact frame,
+  column, expected value, and actual value if full frame-900 equality is still
+  blocked.
+- `2026-05-05 20:08:29 BST` Completed `DC-16.3`: added the cold-boot
+  `GameOver` `ATTR` handoff path that applies the source-visible frame-733
+  scheduler mutation and frame-739 Williams-page support-process creation, then
+  regenerated `/tmp/dc16-attract_boot.actual.tsv`. Exact comparison still fails
+  first at line 2/frame 1 because the local reference has `video_crc32=-` while
+  Rust emits `0x157E98C7`; ignoring that absent reference column, Rust now
+  matches through frame 745 and first fails at line 747/frame 746 solely in
+  `process_table_crc32` (`0xF9878193` expected, `0xE2155086` actual). Updated
+  `SPEC.md`, `docs/fidelity/gaps.md`, and
+  `docs/fidelity/golden-comparison-results.md` with the new boundary.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778008131324469`
+- `2026-05-05 20:09:01 BST` Started `DC-16.4`: checking whether
+  `local_reference_attract_boot_matches_red_label` can be unignored after the
+  frame-733 cadence fix, and narrowing its ignored reason to the current exact
+  frame-746 blocker if the missing reference video CRC still prevents
+  promotion.
+- `2026-05-05 20:09:41 BST` Completed `DC-16.4`: kept
+  `local_reference_attract_boot_matches_red_label` ignored because explicit
+  local-reference execution still fails at line 2/frame 1 on the missing
+  reference `video_crc32` value. Narrowed its ignored reason to the current
+  `DC-16` blocker: missing reference video CRC plus `attract_boot`
+  `process_table_crc32` drift at frame 746. Validation passed with
+  `cargo test local_reference_attract_boot_matches_red_label --all-targets`,
+  which reports the test ignored with the updated reason. The explicit ignored
+  run was intentionally checked and failed as expected on line 2/frame 1.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778008206218889`
+- `2026-05-05 20:10:26 BST` Started `DC-16.5`: adding a live idle-attract
+  progression smoke test for `ArcadeMachine::new()` so the reported
+  initial-Williams/`DEFENDER` screen stall is covered by an executable check
+  that the attract scheduler reaches later presentation states.
+- `2026-05-05 20:13:44 BST` Completed `DC-16.5`: added
+  `live_attract_idle_progresses_beyond_initial_williams_screen`, which steps
+  idle live attract for 420 frames, proves the video CRC changes, observes
+  later attract routines (`PRES`/`PRES1`/`DEFEND`/`DEFENS`/`DEF33`), then
+  inserts a live coin and holds start until `GameStarted` moves the machine to
+  `Playing`. Updated `README.md`, `SPEC.md`, and `docs/fidelity/gaps.md` to
+  distinguish the now-covered core progression from the still-open
+  terminal/pixel title-screen fidelity work. Validation passed with
+  `cargo fmt` and `cargo test
+  live_attract_idle_progresses_beyond_initial_williams_screen --all-targets`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778008451071989`
+- `2026-05-05 20:30:22 BST` Completed final `DC-16` gate: `make fidelity`
+  passed after the cold-boot `ATTR` cadence fix, ignored-test reason update,
+  deterministic trace seed update, and live attract progression smoke test.
+  The broad gate included formatting, all Rust targets, clippy, Lua/Python
+  trace-tool self-tests, `make trace-fixtures` against the refreshed ignored
+  Rust-current local fixture set, LLVM coverage generation, and new Rust
+  coverage gating with `55/55` added executable lines covered. `DC-16` closes
+  the frame-733 `ATTR` boundary and live-attract stall proof, while leaving the
+  next documented `attract_boot` blocker at frame 746
+  `process_table_crc32` (`0xF9878193` expected, `0xE2155086` actual) plus the
+  missing reference `video_crc32` column.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778009472007999`
 
 ### DC-17: Full Frame And CPU/IRQ Ownership
 

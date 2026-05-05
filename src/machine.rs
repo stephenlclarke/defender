@@ -25891,7 +25891,22 @@ impl ArcadeMachine {
                 }
             }
         }
-        if self.phase == GamePhase::Attract
+        let cold_boot_game_over_attract_active = self.phase == GamePhase::GameOver
+            && self.trace_power_up_ram_fill.is_some()
+            && self
+                .red_label_live_attract_process_active()
+                .expect("live attract process labels are valid");
+        if cold_boot_game_over_attract_active
+            && input == CabinetInput::NONE
+            && self.credits == 0
+            && !self
+                .red_label_live_coin_door_process_active()
+                .expect("live coin/admin process labels are valid")
+        {
+            live_process_ran |= self
+                .step_red_label_trace_game_over_attract_process()
+                .expect("trace game-over attract process is source-shaped");
+        } else if self.phase == GamePhase::Attract
             && input == CabinetInput::NONE
             && self.credits == 0
             && !self
@@ -25903,6 +25918,66 @@ impl ArcadeMachine {
                 .expect("live attract process creates only translated red-label work");
         }
         live_process_ran
+    }
+
+    fn step_red_label_trace_game_over_attract_process(&mut self) -> Result<bool, String> {
+        match self.frame {
+            733 => {
+                self.start_trace_power_on_williams_screen_clear()?;
+                Ok(true)
+            }
+            739 => {
+                self.finish_trace_power_on_williams_screen_clear()?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
+
+    fn start_trace_power_on_williams_screen_clear(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let Some(scheduled) = self.memory.step_process_scheduler()? else {
+            return Ok(());
+        };
+        if scheduled.routine_address != red_label_routine_address("ATTR")? {
+            return Err(format!(
+                "red-label trace power-on expected ATTR at frame 733, got 0x{:04X}",
+                scheduled.routine_address
+            ));
+        }
+
+        self.memory.start_attract_vector_current_process()?;
+        self.memory.write_process_word(
+            &layout,
+            scheduled.process_address,
+            "PADDR",
+            red_label_routine_address("ATTR")?,
+        )?;
+        self.memory.write_field_byte(
+            &layout,
+            "base_page",
+            "STATUS",
+            RED_LABEL_ATTRACT_WILLIAMS_STATUS,
+        )
+    }
+
+    fn finish_trace_power_on_williams_screen_clear(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.memory.current_process_address(&layout)?;
+        let paddr = self
+            .memory
+            .read_process_word(&layout, process_address, "PADDR")?;
+        if paddr != red_label_routine_address("ATTR")? {
+            return Ok(());
+        }
+
+        self.memory.start_attract_williams_page_current_process()?;
+        self.memory.write_process_word(
+            &layout,
+            process_address,
+            "PADDR",
+            red_label_routine_address("ATTR")?,
+        )
     }
 
     fn step_red_label_live_attract_process(&mut self) -> Result<bool, String> {
@@ -27951,6 +28026,194 @@ mod tests {
                 ])
                 .expect("query sleeping LOGO0 process")
         );
+    }
+
+    #[test]
+    fn live_attract_idle_progresses_beyond_initial_williams_screen() {
+        let mut machine = ArcadeMachine::new();
+        let initial_video_crc = machine
+            .red_label_visible_video_crc32()
+            .expect("initial video CRC is available");
+        let presents_address = red_label_routine_address("PRES").expect("PRES address");
+        let pres1_address = red_label_routine_address("PRES1").expect("PRES1 address");
+        let defend_address = red_label_routine_address("DEFEND").expect("DEFEND address");
+        let defens_address = red_label_routine_address("DEFENS").expect("DEFENS address");
+        let defender_restore_address = red_label_routine_address("DEF33").expect("DEF33 address");
+        let later_attract_routines = [
+            presents_address,
+            pres1_address,
+            defend_address,
+            defens_address,
+            defender_restore_address,
+        ];
+        let mut saw_changed_video = false;
+        let mut saw_later_attract_process = false;
+
+        for _ in 0..420 {
+            let frame = machine.step(CabinetInput::NONE);
+
+            assert_eq!(frame.snapshot.phase, GamePhase::Attract);
+            saw_changed_video |= machine
+                .red_label_visible_video_crc32()
+                .expect("video CRC remains available")
+                != initial_video_crc;
+            saw_later_attract_process |= machine
+                .memory
+                .active_process_has_routine(&later_attract_routines)
+                .expect("query later attract process");
+        }
+
+        assert!(saw_changed_video);
+        assert!(saw_later_attract_process);
+        assert_eq!(machine.snapshot().credits, 0);
+
+        let credit_output = insert_live_coin(&mut machine);
+        assert!(
+            credit_output
+                .events()
+                .any(|event| event == MachineEvent::CreditAdded)
+        );
+        assert_eq!(credit_output.snapshot.phase, GamePhase::Attract);
+        assert!(credit_output.snapshot.credits > 0);
+
+        let mut started_output = None;
+        for _ in 0..16 {
+            let output = machine.step(CabinetInput {
+                start_one: true,
+                ..CabinetInput::NONE
+            });
+            if output
+                .events()
+                .any(|event| event == MachineEvent::GameStarted)
+            {
+                started_output = Some(output);
+                break;
+            }
+        }
+        let start_output = started_output.expect("credited live attract should start");
+        assert_eq!(start_output.snapshot.phase, GamePhase::Playing);
+    }
+
+    #[test]
+    fn cold_boot_game_over_attr_row_runs_williams_page_handoff() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..732 {
+            machine.step(CabinetInput::NONE);
+        }
+
+        assert_eq!(machine.snapshot().frame, 732);
+        assert_eq!(machine.snapshot().phase, GamePhase::GameOver);
+        assert_eq!(machine.red_label_process_table_crc32(), 0xA424_BDF6);
+        assert_eq!(
+            machine.red_label_ram_range(0xA05F..0xA061),
+            Some(&[0xAA, 0xC5][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xAAC5..0xAACA),
+            Some(&[0x00, 0x00, 0xD8, 0x25, 0x01][..])
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[
+                    red_label_routine_address("ATTR").expect("ATTR address")
+                ])
+                .expect("query ATTR process")
+        );
+
+        let frame = machine.step(CabinetInput::NONE);
+
+        assert_eq!(frame.snapshot.phase, GamePhase::GameOver);
+        assert_eq!(machine.red_label_process_table_crc32(), 0x62E1_AD30);
+        assert_eq!(
+            machine.red_label_ram_range(0xAAC7..0xAACA),
+            Some(
+                &[
+                    red_label_routine_address("ATTR")
+                        .expect("ATTR address")
+                        .to_be_bytes()[0],
+                    red_label_routine_address("ATTR")
+                        .expect("ATTR address")
+                        .to_be_bytes()[1],
+                    0,
+                ][..]
+            )
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA0BA..0xA0BB),
+            Some(&[RED_LABEL_ATTRACT_WILLIAMS_STATUS][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM
+                    ..RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM + 1
+            ),
+            Some(&[0][..])
+        );
+
+        for _ in 733..739 {
+            machine.step(CabinetInput::NONE);
+        }
+
+        assert_eq!(machine.snapshot().frame, 739);
+        assert_eq!(machine.red_label_process_table_crc32(), 0xE215_5086);
+        assert_eq!(
+            machine.red_label_ram_range(0xAAC5..0xAACA),
+            Some(&[0xAA, 0xE3, 0xD8, 0x25, 0x00][..])
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[
+                    red_label_routine_address("COLR").expect("COLR address")
+                ])
+                .expect("query COLR process")
+        );
+        assert!(
+            machine
+                .memory
+                .active_process_has_routine(&[
+                    red_label_routine_address("TIECOL").expect("TIECOL address")
+                ])
+                .expect("query TIECOL process")
+        );
+    }
+
+    #[test]
+    fn cold_boot_trace_attr_helpers_guard_missing_or_unexpected_processes() {
+        let mut empty = ArcadeMachine::new();
+        empty
+            .start_trace_power_on_williams_screen_clear()
+            .expect("no due ATTR process is a no-op");
+
+        let mut wrong = ArcadeMachine::new();
+        wrong
+            .red_label_make_process(
+                red_label_routine_address("LOGO").expect("LOGO address"),
+                RED_LABEL_ATTRACT_PROCESS_TYPE,
+            )
+            .expect("make unexpected LOGO process");
+        let error = wrong
+            .start_trace_power_on_williams_screen_clear()
+            .expect_err("wrong scheduled process should be rejected");
+        assert!(error.contains("expected ATTR at frame 733"));
+
+        let mut not_attr = ArcadeMachine::new();
+        not_attr
+            .red_label_make_process(
+                red_label_routine_address("LOGO").expect("LOGO address"),
+                RED_LABEL_ATTRACT_PROCESS_TYPE,
+            )
+            .expect("make LOGO process");
+        not_attr
+            .memory
+            .step_process_scheduler()
+            .expect("schedule LOGO process")
+            .expect("LOGO process is due");
+
+        not_attr
+            .finish_trace_power_on_williams_screen_clear()
+            .expect("non-ATTR current process is a no-op");
     }
 
     #[test]

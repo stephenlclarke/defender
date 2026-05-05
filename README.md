@@ -252,11 +252,12 @@ compatibility behavior.
   due core frames before each terminal draw, and no longer lets terminal draw
   cadence decide core frame count.
 - Known live fidelity gap: a `2026-05-05` live-review pass reported that the
-  app does not advance beyond the initial Williams/`DEFENDER` screen. The title
-  graphic is also currently corrupted into large red/purple blocky bands. These
-  are tracked in `SPEC.md`, `docs/fidelity/gaps.md`, and `PLAN.md` until
-  MAME-derived pixel fixtures and attract-flow checks prove the title screen
-  and later attract/start-ready progression.
+  app did not advance beyond the initial Williams/`DEFENDER` screen, and that
+  the title graphic is corrupted into large red/purple blocky bands. `DC-16.5`
+  now has a core smoke test proving live attract progresses into later attract,
+  credit, and start-ready states. The title corruption and terminal/pixel proof
+  remain tracked in `SPEC.md`, `docs/fidelity/gaps.md`, and `PLAN.md` until
+  MAME-derived pixel fixtures prove the visible output.
 - The runtime embeds red-label defaults, score values, high-score seeds, CMOS
   layout/default metadata, input port metadata, RAM table metadata, ROM
   metadata, ROM-region/load maps with derived `CROM0` `ROMMAP` descriptors and
@@ -525,8 +526,9 @@ compatibility behavior.
   entry `GNCIDE`, and live `PCRAM` palette presentation are translated. Idle
   live attract mode now creates the source `ATTR` process and follows the
   immediate source `ATTR` -> `AMODES` -> `LOGO` jump chain before the logo
-  sleeps to `LOGO0`. Remaining boot/attract handoff video and full
-  frame/cycle ownership remain gaps.
+  sleeps to `LOGO0`; a core smoke test now proves it reaches later attract
+  processes, accepts credit, and starts play. Remaining boot/attract handoff
+  video and full frame/cycle ownership remain gaps.
   Live fire, smart bomb, hyperspace, reverse, and credited/free-play one- and
   two-player start buttons now enter through an asset-backed red-label `SWTAB`,
   `SSCAN` switch history, `SWPROC` queue, `SWP` status gate, and translated
