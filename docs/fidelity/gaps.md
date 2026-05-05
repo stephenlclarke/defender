@@ -128,6 +128,12 @@ This file records behavior that must not be guessed in arcade-core code.
   `FrameOutput`. Frame-step tests now preserve the input-port, main RAM/CMOS
   CRC, palette RAM, hardware map, watchdog, video-counter, sound latch, CB1 IRQ,
   and latch-write-count surfaces that must survive the later large refactor.
+- `DC-17.3` moved the cold-boot `ATTR` process-boundary actions for frames
+  733, 739, and 746 onward into `red_label_power_on_frame_model`. The frame
+  stepper now consumes one power-on boundary model for RAM-test, `SINIT`,
+  `INIT20`, `EXEC`, live-input holdoff, start-ready, and attract handoff
+  decisions instead of keeping a separate frame-number switch in the attract
+  scheduler.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process

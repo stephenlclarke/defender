@@ -124,8 +124,9 @@ synthetic scaffold fallback; untranslated blank screens remain black:
   object-table, process-table, super-process-table, and SPTR-head CRCs to
   traces; centralizes the source/MAME-observed power-on frame surface for reset
   hold, RAM-test fill targets, `SINIT` clears, `INIT20` sound/list handoff,
-  `EXEC` idle seeding, live-input holdoff, and start-ready transition; maintains
-  a step-level main-board snapshot for PIA input-port bytes, RAM/CMOS CRCs,
+  `EXEC` idle seeding, live-input holdoff, start-ready transition, and
+  cold-boot `ATTR` process-boundary actions; maintains a step-level main-board
+  snapshot for PIA input-port bytes, RAM/CMOS CRCs,
   palette RAM, hardware-map state, watchdog reset recognition, and
   video-counter sampling; records frame sound commands through a sound-board
   latch snapshot using the MAME `port B | 0xc0` and CB1 assertion boundary;
@@ -1144,6 +1145,12 @@ Additional gaps and corrections found during this review:
   fixture has `video_crc32=-` while Rust emits native video CRCs, but ignoring
   that absent column, every non-video `attract_boot` column matches through
   frame 900.
+- `DC-17.3` moved the cold-boot `ATTR` process-boundary actions for frames
+  733, 739, and 746 onward into `red_label_power_on_frame_model`, so the frame
+  stepper consumes the same power-on boundary model for RAM-test, `SINIT`,
+  `INIT20`, `EXEC`, live-input holdoff, start-ready, and attract handoff
+  decisions instead of keeping a separate frame-number switch in the attract
+  scheduler.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot

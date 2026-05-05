@@ -4048,6 +4048,13 @@ pub enum RedLabelPowerOnStage {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RedLabelPowerOnProcessBoundary {
+    AttractVector,
+    AttractWilliamsPage,
+    AttractColorCadence,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RedLabelPowerOnFrameModel {
     pub frame: u64,
     pub stage: RedLabelPowerOnStage,
@@ -4060,6 +4067,7 @@ pub struct RedLabelPowerOnFrameModel {
     pub initializes_object_lists: bool,
     pub live_io_blocked: bool,
     pub start_ready: bool,
+    pub process_boundary: Option<RedLabelPowerOnProcessBoundary>,
 }
 
 impl RedLabelPowerUpRamFill {
@@ -4140,6 +4148,12 @@ pub fn red_label_power_on_frame_model(frame: u64) -> Result<RedLabelPowerOnFrame
         initializes_object_lists: false,
         live_io_blocked: frame <= RED_LABEL_TRACE_POWER_UP_LIVE_IO_HOLDOFF_END_FRAME,
         start_ready: frame >= RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME,
+        process_boundary: match frame {
+            733 => Some(RedLabelPowerOnProcessBoundary::AttractVector),
+            739 => Some(RedLabelPowerOnProcessBoundary::AttractWilliamsPage),
+            746.. => Some(RedLabelPowerOnProcessBoundary::AttractColorCadence),
+            _ => None,
+        },
     };
 
     match model.stage {
@@ -24378,7 +24392,9 @@ impl ArcadeMachine {
 
     fn trace_power_up_blocks_live_io(&self) -> bool {
         self.trace_power_up_ram_fill.is_some()
-            && self.frame <= RED_LABEL_TRACE_POWER_UP_LIVE_IO_HOLDOFF_END_FRAME
+            && red_label_power_on_frame_model(self.frame)
+                .expect("embedded red-label power-on frame model is valid")
+                .live_io_blocked
     }
 
     fn red_label_trace_state_for_frame_output(&self) -> Result<RedLabelTraceState, String> {
@@ -24399,7 +24415,9 @@ impl ArcadeMachine {
         if self.frame == 240 && fill.next_address == 0xC000 {
             *fill = RedLabelPowerUpRamFill::from_seed(0xCE, 0x5C);
         }
-        let target_address = red_label_trace_power_up_ram_fill_target(self.frame);
+        let model = red_label_power_on_frame_model(self.frame)
+            .expect("embedded red-label power-on frame model is valid");
+        let target_address = model.ram_fill_target;
         self.memory
             .advance_power_up_ram_fill_to(fill, target_address)
             .expect("embedded red-label power-up RAM-fill frame target is valid");
@@ -24412,18 +24430,27 @@ impl ArcadeMachine {
         {
             self.phase = GamePhase::GameOver;
         }
-        self.apply_trace_power_up_handoff(sound_commands, live_process_ran)
+        self.apply_power_on_frame_handoff(model, sound_commands, live_process_ran)
             .expect("embedded red-label cold-boot handoff trace is valid");
     }
 
+    #[cfg(test)]
     fn apply_trace_power_up_handoff(
         &mut self,
         sound_commands: &mut Vec<SoundCommand>,
         live_process_ran: bool,
     ) -> Result<(), String> {
-        let layout = red_label_ram_layout()?;
         let model = red_label_power_on_frame_model(self.frame)?;
+        self.apply_power_on_frame_handoff(model, sound_commands, live_process_ran)
+    }
 
+    fn apply_power_on_frame_handoff(
+        &mut self,
+        model: RedLabelPowerOnFrameModel,
+        sound_commands: &mut Vec<SoundCommand>,
+        live_process_ran: bool,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
         if let Some(target) = model.sinit_clear_target {
             self.memory.clear_trace_sinit_ram_to(target)?;
         }
@@ -25972,20 +25999,20 @@ impl ArcadeMachine {
     }
 
     fn step_red_label_trace_game_over_attract_process(&mut self) -> Result<bool, String> {
-        match self.frame {
-            733 => {
+        match red_label_power_on_frame_model(self.frame)?.process_boundary {
+            Some(RedLabelPowerOnProcessBoundary::AttractVector) => {
                 self.start_trace_power_on_williams_screen_clear()?;
                 Ok(true)
             }
-            739 => {
+            Some(RedLabelPowerOnProcessBoundary::AttractWilliamsPage) => {
                 self.finish_trace_power_on_williams_screen_clear()?;
                 Ok(true)
             }
-            746.. => {
+            Some(RedLabelPowerOnProcessBoundary::AttractColorCadence) => {
                 self.step_trace_power_on_color_executive_slice()?;
                 Ok(true)
             }
-            _ => Ok(false),
+            None => Ok(false),
         }
     }
 
@@ -27808,6 +27835,37 @@ mod tests {
             assert_eq!(model.ram_fill_target, ram_fill_target);
             assert_eq!(model.live_io_blocked, live_io_blocked);
             assert_eq!(model.start_ready, start_ready);
+        }
+    }
+
+    #[test]
+    fn power_on_frame_model_owns_cold_boot_attract_process_boundaries() {
+        let cases = [
+            (732, None),
+            (
+                733,
+                Some(super::RedLabelPowerOnProcessBoundary::AttractVector),
+            ),
+            (738, None),
+            (
+                739,
+                Some(super::RedLabelPowerOnProcessBoundary::AttractWilliamsPage),
+            ),
+            (745, None),
+            (
+                746,
+                Some(super::RedLabelPowerOnProcessBoundary::AttractColorCadence),
+            ),
+            (
+                764,
+                Some(super::RedLabelPowerOnProcessBoundary::AttractColorCadence),
+            ),
+        ];
+
+        for (frame, process_boundary) in cases {
+            let model = super::red_label_power_on_frame_model(frame).expect("power-on model");
+
+            assert_eq!(model.process_boundary, process_boundary, "frame {frame}");
         }
     }
 

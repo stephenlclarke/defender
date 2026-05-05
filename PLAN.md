@@ -2023,8 +2023,9 @@ Steps:
 - [x] DC-17.2 Integrate main IRQ, scanline/video counter, watchdog,
   palette/rendering side effects, and sound IRQ ownership into frame stepping.
   Completed: `2026-05-05 21:25:02 BST`
-- [ ] DC-17.3 Replace trace-only scheduling shortcuts with source-shaped
+- [x] DC-17.3 Replace trace-only scheduling shortcuts with source-shaped
   execution for reset, boot, attract, and gameplay frame boundaries.
+  Completed: `2026-05-05 21:40:13 BST`
 - [ ] DC-17.4 Add trace columns or mutation tests only where they expose
   source-visible state needed for equivalence.
 
@@ -2083,6 +2084,33 @@ Work log:
   covered.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778012736397499`
+- `2026-05-05 21:26:17 BST` Started `DC-17.3`: inventorying remaining
+  trace-only frame-boundary shortcuts, starting with the cold-boot
+  `GameOver`/`ATTR` handoff and the delayed credited-start release path, so
+  reset, boot, attract, and gameplay boundaries can move toward the same
+  translated process scheduler instead of frame-number-specific branches.
+- `2026-05-05 21:40:13 BST` Completed `DC-17.3`: moved the cold-boot
+  `ATTR` process-boundary actions for frames 733, 739, and 746 onward into
+  `red_label_power_on_frame_model`, so the stepper now consumes one
+  source/MAME-observed power-on boundary model for RAM-fill, `SINIT`, `INIT20`,
+  `EXEC`, live-input holdoff, start-ready, and attract handoff decisions
+  instead of keeping a separate frame-number switch in the attract scheduler.
+  Added `power_on_frame_model_owns_cold_boot_attract_process_boundaries` and
+  routed power-on RAM-fill/live-IO checks through the same model. Updated
+  `SPEC.md` and `docs/fidelity/gaps.md` with the narrower ownership surface.
+  Validation passed with `cargo fmt --check`, `markdownlint README.md SPEC.md
+  PLAN.md docs/fidelity/gaps.md docs/fidelity/golden-comparison-results.md`,
+  `git diff --check`, focused `cargo test power_on_frame_model --all-targets`,
+  focused `cargo test
+  cold_boot_game_over_attr_row_runs_williams_page_handoff --all-targets`,
+  `cargo run --quiet -- --fidelity-check-trace-dir
+  docs/fidelity/fixtures/local/rust-current`, and `make fidelity`, including
+  `854` passed Rust library tests, `13` known ignored tests, two binary tests,
+  clippy, Lua/Python trace-tool tests, 10 Rust-current fixture pairs / 15,452
+  frames, LLVM coverage, and new-code coverage with `21/21` added executable
+  Rust lines covered.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778013648095269`
 
 ### DC-18: Gameplay Golden Trace Closure
 
