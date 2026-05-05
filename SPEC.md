@@ -420,7 +420,12 @@ Additional gaps and corrections found during this review:
   starts.
 - The live path now feeds translated video RAM into `render_cabinet_frame`.
   Remaining video risk is fixture proof for exact frame/cycle timing, pixel
-  golden coverage, and intentionally native-black untranslated screens.
+  golden coverage, and intentionally native-black untranslated screens. A live
+  title-screen capture reported on `2026-05-05` shows the `DEFENDER`
+  wordmark/title graphic corrupted into large red/purple blocky bands; that is
+  a named video fidelity gap until a MAME-derived pixel fixture proves the
+  title/logo decode, plot, color, copy, and presentation cadence match
+  red-label output.
 - The trace schema can record object CRCs, process CRCs, super-process CRCs,
   shell CRCs, sound commands, and optional video CRCs, but CMOS-specific trace
   columns, pixel golden fixtures, and external audio waveform golden fixtures
@@ -1131,7 +1136,9 @@ Additional gaps and corrections found during this review:
   high-score, and operator/AUDITG frames. There are still no object-table,
   shell-table, or pixel-frame golden tests against MAME attract/gameplay
   references, though the trace format can carry raw table and native frame
-  CRC-32 values.
+  CRC-32 values. The observed corrupted title-screen `DEFENDER` graphic remains
+  open until a MAME-derived title/logo pixel fixture fails on the current
+  output and passes after the corrected source-backed implementation.
 - There are no audio waveform or command-sequence golden tests.
 - There is no end-to-end MAME golden regression suite for two-player state,
   coin/start flow, operator settings, or cabinet input profiles.

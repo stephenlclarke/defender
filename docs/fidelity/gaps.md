@@ -650,7 +650,12 @@ This file records behavior that must not be guessed in arcade-core code.
   refresh paths, and a live IRQ scanline frame. Source-native video fixture
   coverage now also locks exact pixel checksums and coarse visible-shape
   signatures for boot, attract, start, gameplay, death, high-score, and
-  operator/AUDITG frames; live playing frames now run upright `IRQ` and
+  operator/AUDITG frames. A `2026-05-05` live title-screen capture shows the
+  `DEFENDER` wordmark/title graphic corrupted into large red/purple blocky
+  bands; source-native checksums are therefore not enough to close title-screen
+  fidelity until a MAME-derived title/logo pixel fixture proves the decode,
+  plot, color, copy, and presentation cadence. Live playing frames now run
+  upright `IRQ` and
   `IRQHK`-selected flipped `IRQB` video passes through the source `VERTCT` /
   `IFLG` scheduler, including map writes, timer/watchdog side effects, palette
   copy, translated `PLAYER`, `STOUT`, upper/lower `OPROC` / `PRDISP` bands,

@@ -88,9 +88,11 @@ Gap inventory:
   memory integration, generated derived assets, and remaining collision or
   no-process `SWTAB` effects still need source-backed closure.
 - Video: native video rendering exists, but MAME-derived pixel golden fixtures
-  are absent. Remaining untranslated screens still render native black, and
-  remaining HUD, general text, boot/game-over presentation, and non-IRQ
-  scanline ownership need proof or owner-approved scope decisions.
+  are absent. A `2026-05-05` live title-screen capture shows the `DEFENDER`
+  wordmark/title graphic corrupted into large red/purple blocky bands.
+  Remaining untranslated screens still render native black, and remaining HUD,
+  general text, boot/game-over presentation, and non-IRQ scanline ownership
+  need proof or owner-approved scope decisions.
 - Audio: source-shaped sound tables, command flow, and in-repo deterministic
   waveform signatures exist, but live MAME command-sequence fixtures, external
   waveform golden fixtures, cycle-accurate DAC scheduling, exact sound-board
@@ -1900,10 +1902,11 @@ Steps:
 
 - [ ] DC-20.1 Add local MAME frame capture tooling and an ignored fixture
   convention for pixel golden frames.
-- [ ] DC-20.2 Compare boot, attract, credited start, gameplay, death,
-  high-score, and operator/service frames.
-- [ ] DC-20.3 Replace remaining native-black untranslated screens, or record an
-  owner-approved out-of-scope decision for each screen.
+- [ ] DC-20.2 Compare boot, title/`DEFENDER` logo, attract, credited start,
+  gameplay, death, high-score, and operator/service frames.
+- [ ] DC-20.3 Fix the corrupted title/`DEFENDER` wordmark graphic and replace
+  remaining native-black untranslated screens, or record an owner-approved
+  out-of-scope decision for each screen.
 - [ ] DC-20.4 Keep renderer tests focused on stable source-visible pixels,
   palette indices, and video RAM mutations.
 
