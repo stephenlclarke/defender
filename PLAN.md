@@ -90,7 +90,12 @@ Gap inventory:
 - Video: native video rendering exists, but MAME-derived pixel golden fixtures
   are absent. A `2026-05-05` live title-screen capture shows the `DEFENDER`
   wordmark/title graphic corrupted into large red/purple blocky bands.
-  Remaining untranslated screens still render native black, and remaining HUD,
+- Live attract flow: the app was also reported not to advance beyond the
+  initial Williams/`DEFENDER` screen. This is separate from the corrupted
+  title graphic and needs scheduler/presentation proof that live `ATTR` /
+  `AMODES` / `LOGO` / `DEFEND` / `LEDRET` cadence progresses into later
+  attract, credit, and start-ready states.
+- Remaining untranslated screens still render native black, and remaining HUD,
   general text, boot/game-over presentation, and non-IRQ scanline ownership
   need proof or owner-approved scope decisions.
 - Audio: source-shaped sound tables, command flow, and in-repo deterministic
@@ -1821,10 +1826,14 @@ Steps:
 - [ ] DC-16.4 Promote the passing `attract_boot` local-reference test by
   unignoring it, or narrow any remaining ignored reason to the next exact
   mismatch.
+- [ ] DC-16.5 Add a live attract-flow smoke or trace check proving the app
+  advances beyond the initial Williams/`DEFENDER` screen into later attract,
+  credit, and start-ready states.
 
 Completion gate: `local_reference_attract_boot_matches_red_label` passes
 locally with the reference fixture, or the next mismatch is documented with
-frame, column, expected value, and actual value.
+frame, column, expected value, and actual value. Live attract flow also
+progresses beyond the initial Williams/`DEFENDER` screen.
 
 ### DC-17: Full Frame And CPU/IRQ Ownership
 

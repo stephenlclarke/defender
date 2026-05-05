@@ -251,6 +251,12 @@ compatibility behavior.
   is derived from the core red-label `FRAME_RATE_MILLIHZ` constant, advances any
   due core frames before each terminal draw, and no longer lets terminal draw
   cadence decide core frame count.
+- Known live fidelity gap: a `2026-05-05` live-review pass reported that the
+  app does not advance beyond the initial Williams/`DEFENDER` screen. The title
+  graphic is also currently corrupted into large red/purple blocky bands. These
+  are tracked in `SPEC.md`, `docs/fidelity/gaps.md`, and `PLAN.md` until
+  MAME-derived pixel fixtures and attract-flow checks prove the title screen
+  and later attract/start-ready progression.
 - The runtime embeds red-label defaults, score values, high-score seeds, CMOS
   layout/default metadata, input port metadata, RAM table metadata, ROM
   metadata, ROM-region/load maps with derived `CROM0` `ROMMAP` descriptors and

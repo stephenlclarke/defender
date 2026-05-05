@@ -425,7 +425,11 @@ Additional gaps and corrections found during this review:
   wordmark/title graphic corrupted into large red/purple blocky bands; that is
   a named video fidelity gap until a MAME-derived pixel fixture proves the
   title/logo decode, plot, color, copy, and presentation cadence match
-  red-label output.
+  red-label output. The same live-review pass also reported that the app does
+  not advance beyond the initial Williams/`DEFENDER` screen, which is a
+  separate live attract-flow fidelity gap until the `ATTR` / `AMODES` / `LOGO`
+  / `DEFEND` / `LEDRET` cadence is proven to advance into later attract,
+  credit, and start-ready states.
 - The trace schema can record object CRCs, process CRCs, super-process CRCs,
   shell CRCs, sound commands, and optional video CRCs, but CMOS-specific trace
   columns, pixel golden fixtures, and external audio waveform golden fixtures
@@ -1138,7 +1142,11 @@ Additional gaps and corrections found during this review:
   references, though the trace format can carry raw table and native frame
   CRC-32 values. The observed corrupted title-screen `DEFENDER` graphic remains
   open until a MAME-derived title/logo pixel fixture fails on the current
-  output and passes after the corrected source-backed implementation.
+  output and passes after the corrected source-backed implementation. The live
+  app also remains blocked by an observed failure to progress beyond the
+  initial Williams/`DEFENDER` screen, so attract-flow proof must include both
+  visual correctness and forward progression to later attract/start-ready
+  states.
 - There are no audio waveform or command-sequence golden tests.
 - There is no end-to-end MAME golden regression suite for two-player state,
   coin/start flow, operator settings, or cabinet input profiles.

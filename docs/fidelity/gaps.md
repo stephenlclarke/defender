@@ -654,8 +654,12 @@ This file records behavior that must not be guessed in arcade-core code.
   `DEFENDER` wordmark/title graphic corrupted into large red/purple blocky
   bands; source-native checksums are therefore not enough to close title-screen
   fidelity until a MAME-derived title/logo pixel fixture proves the decode,
-  plot, color, copy, and presentation cadence. Live playing frames now run
-  upright `IRQ` and
+  plot, color, copy, and presentation cadence. The same live-review pass
+  reported that the app does not advance beyond the initial
+  Williams/`DEFENDER` screen; this is tracked as a live attract-flow gap until
+  source-backed `ATTR` / `AMODES` / `LOGO` / `DEFEND` / `LEDRET` cadence
+  advances into later attract, credit, and start-ready states. Live playing
+  frames now run upright `IRQ` and
   `IRQHK`-selected flipped `IRQB` video passes through the source `VERTCT` /
   `IFLG` scheduler, including map writes, timer/watchdog side effects, palette
   copy, translated `PLAYER`, `STOUT`, upper/lower `OPROC` / `PRDISP` bands,
