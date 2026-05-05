@@ -118,6 +118,12 @@ This file records behavior that must not be guessed in arcade-core code.
   on 155 frames through frame 900; inputs, phase, scores, wave, lives, smart
   bombs, RNG bytes, object-table CRC, super-process-table CRC, shell-table CRC,
   sound commands, and events match for `attract_boot`.
+- `DC-17.1` closed the remaining non-video `attract_boot` process-table drift
+  by modeling the frame-746 cold-boot executive color-process cadence. Exact
+  comparison still fails first at line 2/frame 1 because the local reference
+  fixture has `video_crc32=-` while Rust emits native video CRCs. Ignoring that
+  absent reference column, all 900 `attract_boot` frames now match every
+  non-video column, including process-table CRC.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process
@@ -517,8 +523,8 @@ This file records behavior that must not be guessed in arcade-core code.
   map `5`, `6`, `7`, `F2`, `F3`, held `F4`, and `F5` onto the three coin
   slots, service advance, high-score reset, the auto/up selector, and the
   slam/tilt switch. The local `attract_boot` fixture now proves the non-video
-  boot/start-ready state through frame 745, but the post-AMODES
-  ATTR/executive scheduler cadence still diverges from frame 746. Generic
+  boot/start-ready state through frame 900; exact promotion is blocked only by
+  the missing local-reference `video_crc32` column. Generic
   `SUCIDE` / `HYPX` tails now use the translated process-list cleanup path.
   Generic/untranslated process bodies, any remaining no-process `SWTAB` input
   effects, exact frame/cycle integration, post-start-ready ATTR scheduling, and

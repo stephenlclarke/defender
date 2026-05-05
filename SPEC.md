@@ -443,12 +443,12 @@ Additional gaps and corrections found during this review:
 - Local MAME reference traces are intentionally ignored artifacts. The checked
   in code can validate local fixture presence and shape, but the repo still
   depends on user-supplied ROMs and local MAME to prove golden equivalence.
-- Remaining open gaps include the post-AMODES ATTR/executive scheduler cadence
-  from `attract_boot` frame 746 onward, full frame/cycle integration,
-  end-to-end golden-trace proof for translated session/operator paths,
-  MAME-derived pixel golden fixtures, cycle-accurate sound-board CPU cadence
-  and waveform spacing, external waveform fixtures, and removal or regeneration
-  of archived prototype visual/audio assets.
+- Remaining open gaps include exact `attract_boot` promotion after the local
+  reference fixture gains video CRCs, full frame/cycle integration, end-to-end
+  golden-trace proof for translated session/operator paths, MAME-derived pixel
+  golden fixtures, cycle-accurate sound-board CPU cadence and waveform spacing,
+  external waveform fixtures, and removal or regeneration of archived prototype
+  visual/audio assets.
 - The prior local implementation notes listed "Fix Mutant score to `150`" as
   future work even though `assets/red-label/scores.tsv` and unit tests already
   enforce it. The current contract is to keep that regression covered through
@@ -1135,6 +1135,12 @@ Additional gaps and corrections found during this review:
   inputs, phase, scores, wave, lives, smart bombs, RNG bytes, object-table
   CRC, super-process-table CRC, shell-table CRC, sound commands, and events
   match for `attract_boot`.
+- `DC-17.1` closed the remaining non-video `attract_boot` process-table drift
+  by modeling the frame-746 cold-boot executive color-process cadence. Exact
+  comparison still fails first at line 2/frame 1 because the local reference
+  fixture has `video_crc32=-` while Rust emits native video CRCs, but ignoring
+  that absent column, every non-video `attract_boot` column matches through
+  frame 900.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot

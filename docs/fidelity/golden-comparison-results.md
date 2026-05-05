@@ -407,3 +407,43 @@ Interpretation:
   frame 746, where the source reference has advanced to the next process-table
   sequence while Rust still holds the in-flight `ATTR`/Williams-page process
   state at `0xE2155086`.
+
+## 2026-05-05 `DC-17.1` Attract Non-Video Closure
+
+Scenario: `attract_boot`
+
+Purpose: re-run the 900-frame cold boot/attract readiness comparison after the
+frame-746 cold-boot executive color-process cadence was modeled.
+
+Commands:
+
+```sh
+cargo run --quiet -- \
+  --fidelity-trace-inputs-file \
+  docs/fidelity/fixtures/local/reference/attract_boot.inputs.txt \
+  > /tmp/dc17-attract_boot.actual.tsv
+cargo run --quiet -- \
+  --fidelity-check-trace \
+  docs/fidelity/fixtures/local/reference/attract_boot.inputs.txt \
+  docs/fidelity/fixtures/local/reference/attract_boot.expected.tsv
+```
+
+Exact result:
+
+- Exact comparison still fails first at line 2, frame 1, because the local MAME
+  reference has `video_crc32=-` while current Rust emits `0x157E98C7`.
+
+Column summary:
+
+- Ignoring the absent reference `video_crc32` column, all 900 `attract_boot`
+  frames now match every non-video trace column.
+- The previously open `process_table_crc32` drift is closed: object-table CRC,
+  process-table CRC, super-process-table CRC, shell-table CRC, inputs, phase,
+  scores, wave, lives, smart bombs, RNG bytes, sound commands, and events all
+  match the local reference through frame 900.
+
+Interpretation:
+
+- `attract_boot` is ready to promote once the local reference fixture gains
+  MAME-derived `video_crc32` values or the acceptance policy explicitly permits
+  comparing this scenario without the video column.

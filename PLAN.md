@@ -74,10 +74,11 @@ Gap inventory:
   scenario is made source-equivalent.
 - `attract_boot`: exact comparison still fails first at line 2/frame 1 because
   the local reference has `video_crc32=-` while Rust emits native video CRCs.
-  Ignoring that missing reference column, Rust now matches the local reference
-  through frame 745, then diverges at frame 746 only in
-  `process_table_crc32`. The remaining blocker is the next post-`AMODES`
-  executive/process-table cadence slice.
+  Ignoring that missing reference column, Rust now matches every non-video
+  column in the 900-frame local reference, including object/process/
+  super-process/shell CRCs, RNG bytes, sound commands, and events. The
+  remaining `attract_boot` promotion blocker is the missing reference
+  `video_crc32` column.
 - Focused gameplay traces: `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` still fail exact
   local-reference comparison. The recurring gaps are credited-start transition
@@ -2008,16 +2009,17 @@ Work log:
 
 ### DC-17: Full Frame And CPU/IRQ Ownership
 
-Status: `planned`
+Status: `in_progress`
 
 Goal: replace frame-model shortcuts with source-shaped board, CPU, IRQ, and
 scanline ownership wherever current proof still depends on scaffolding.
 
 Steps:
 
-- [ ] DC-17.1 Model the missing CPU IRQ scheduling and register context needed
+- [x] DC-17.1 Model the missing CPU IRQ scheduling and register context needed
   by translated dispatch paths, including A/X/Y/S/CC/B where traces or source
   evidence prove the values.
+  Completed: `2026-05-05 21:11:10 BST`
 - [ ] DC-17.2 Integrate main IRQ, scanline/video counter, watchdog,
   palette/rendering side effects, and sound IRQ ownership into frame stepping.
 - [ ] DC-17.3 Replace trace-only scheduling shortcuts with source-shaped
@@ -2028,6 +2030,34 @@ Steps:
 Completion gate: frame stepping has explicit ownership for CPU, IRQ, video,
 watchdog, palette, and sound-board handoff behavior, with characterization tests
 locking every new mutation surface.
+
+Work log:
+
+- `2026-05-05 20:34:21 BST` Started `DC-17.1`: using the new
+  `attract_boot` frame-746 boundary as the first full-frame ownership slice.
+  The work starts by replacing the remaining cold-boot post-`AMODES` trace
+  shortcut with a source-shaped executive pre-dispatch and process scheduler
+  path so `RAND`, `CRPROC`, `PTIME`, and `PADDR` mutations come from the same
+  frame-level owner before broader IRQ/sound ownership is expanded.
+- `2026-05-05 21:11:10 BST` Completed `DC-17.1`: replaced the cold-boot
+  post-`AMODES` trace shortcut with an executive pre-dispatch and
+  source-shaped `ATTR`/`TIECL`/`COLRLP` process cadence for frame 746 onward,
+  added process-table CRC assertions through the first full color-cycle loop,
+  and added guard tests for wrong intermediate routines and invalid `TCTAB`
+  pointers. Added a trace-prioritized live switch scheduler so coin, start,
+  and player-start processes can keep source timers after the frame-746
+  attract color cadence without dispatching untranslated `0xF4CC`. The
+  `attract_boot` local reference now matches every non-video column through
+  all 901 lines; exact promotion remains blocked only by the local reference
+  `video_crc32=-` values. Validation passed with focused cold-boot,
+  coin/start trace, and branch-coverage tests; `make trace-fixtures`; exact
+  `attract_boot` comparison confirming the expected video-only mismatch; and
+  `make fidelity`, including `853` passed Rust tests, `13` ignored known
+  local-reference tests, trace tooling checks, 10 ignored rust-current fixture
+  pairs / 15,452 frames, LLVM coverage, and new-code coverage with `213/213`
+  added executable Rust lines covered.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778011927254099`
 
 ### DC-18: Gameplay Golden Trace Closure
 

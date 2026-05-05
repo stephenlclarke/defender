@@ -1640,7 +1640,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known DC-16 mismatch: missing reference video CRC plus attract_boot process drift at frame 746"]
+    #[ignore = "known DC-17 mismatch: local reference fixture is missing video CRCs"]
     fn local_reference_attract_boot_matches_red_label() {
         assert_local_reference_trace_matches("attract_boot");
     }

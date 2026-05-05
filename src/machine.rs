@@ -3982,6 +3982,7 @@ const RED_LABEL_TRACE_SINIT_RAM_CLEAR_START: u16 = 0x9C00;
 const RED_LABEL_TRACE_SINIT_RAM_CLEAR_END: u16 = 0xC000;
 const RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME: u64 = 725;
 const RED_LABEL_TRACE_PLAYER_START_EXEC_DELAY_FRAMES: u64 = 51;
+const RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN: u16 = 0xF4CC;
 
 const RED_LABEL_TRACE_ZERO_RAND_STATE: RandState = RandState {
     seed: 0,
@@ -14252,32 +14253,74 @@ impl RedLabelRuntimeMemory {
         ))
     }
 
-    fn active_process_has_routine(&self, routine_addresses: &[u16]) -> Result<bool, String> {
+    fn step_single_process_scheduler_from_link(
+        &mut self,
+        link_address: u16,
+    ) -> Result<Option<RedLabelScheduledProcess>, String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.read_word(link_address)?;
+        if process_address == 0 {
+            return Ok(None);
+        }
+
+        let table = process_table_for_address(&layout, process_address)?;
+        let ptime_range =
+            process_field_range_for_address(&layout, table, process_address, "PTIME")?;
+        let ptime_address = ptime_range.start;
+        let ptime = self.read_byte(ptime_address)?.wrapping_sub(1);
+        self.write_byte(ptime_address, ptime)?;
+        if ptime != 0 {
+            return Ok(None);
+        }
+
+        let crproc = ram_field(&layout, "runtime_pointers", "CRPROC")?
+            .field_range_for_entry(0)
+            .ok_or_else(|| String::from("red-label CRPROC range is invalid"))?
+            .start;
+        self.write_word(crproc, process_address)?;
+        let paddr =
+            process_field_range_for_address(&layout, table, process_address, "PADDR")?.start;
+        Ok(Some(RedLabelScheduledProcess::from_source_routine(
+            process_address,
+            self.read_word(paddr)?,
+        )?))
+    }
+
+    fn active_process_link_before_routine(
+        &self,
+        routine_addresses: &[u16],
+    ) -> Result<Option<u16>, String> {
         let layout = red_label_ram_layout()?;
         let lists = red_label_linked_lists()?;
         let process = table_descriptor(&layout, "process")?;
         let super_process = table_descriptor(&layout, "super_process")?;
         let active_head = linked_list(&lists, "active_process")?.head_address;
-        let mut process_address = self.read_word(active_head)?;
+        let mut link_address = active_head;
+        let mut process_address = self.read_word(link_address)?;
 
         for _ in 0..(process.entries + super_process.entries) {
             if process_address == 0 {
-                return Ok(false);
+                return Ok(None);
             }
             let table = process_table_for_address(&layout, process_address)?;
             let routine_address = self.read_process_word(&layout, process_address, "PADDR")?;
             if routine_addresses.contains(&routine_address) {
-                return Ok(true);
+                return Ok(Some(link_address));
             }
 
-            let plink =
+            link_address =
                 process_field_range_for_address(&layout, table, process_address, "PLINK")?.start;
-            process_address = self.read_word(plink)?;
+            process_address = self.read_word(link_address)?;
         }
 
         Err(String::from(
             "red-label active process list did not terminate while searching routine addresses",
         ))
+    }
+
+    fn active_process_has_routine(&self, routine_addresses: &[u16]) -> Result<bool, String> {
+        self.active_process_link_before_routine(routine_addresses)
+            .map(|link_address| link_address.is_some())
     }
 
     /// Dispatches the translated routine body currently named by `PADDR`.
@@ -25930,6 +25973,10 @@ impl ArcadeMachine {
                 self.finish_trace_power_on_williams_screen_clear()?;
                 Ok(true)
             }
+            746.. => {
+                self.step_trace_power_on_color_executive_slice()?;
+                Ok(true)
+            }
             _ => Ok(false),
         }
     }
@@ -25978,6 +26025,159 @@ impl ArcadeMachine {
             "PADDR",
             red_label_routine_address("ATTR")?,
         )
+    }
+
+    fn step_trace_power_on_color_executive_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        self.memory.run_exec_pre_dispatch_visible_slice()?;
+        let lists = red_label_linked_lists()?;
+        let active_head = linked_list(&lists, "active_process")?.head_address;
+        let attr_process = self.memory.read_word(active_head)?;
+        let tie_process = self
+            .memory
+            .read_process_word(&layout, attr_process, "PLINK")?;
+        let tie_routine = self
+            .memory
+            .read_process_word(&layout, tie_process, "PADDR")?;
+        let tiecol = red_label_routine_address("TIECOL")?;
+        let tiecl = red_label_routine_address("TIECL")?;
+        if tie_routine != tiecol && tie_routine != tiecl {
+            return Err(format!(
+                "red-label trace power-on expected TIECOL before COLR at frame {}, got 0x{tie_routine:04X}",
+                self.frame
+            ));
+        }
+        let tie_table = process_table_for_address(&layout, tie_process)?;
+        let color_link_address =
+            process_field_range_for_address(&layout, tie_table, tie_process, "PLINK")?.start;
+        let color_process = self.memory.read_word(color_link_address)?;
+        let colr = red_label_routine_address("COLR")?;
+        let colrlp = red_label_routine_address("COLRLP")?;
+        let color_routine = self
+            .memory
+            .read_process_word(&layout, color_process, "PADDR")?;
+        if color_routine != colr && color_routine != colrlp {
+            return Err(format!(
+                "red-label trace power-on expected COLR/COLRLP at frame {}, got 0x{:04X}",
+                self.frame, color_routine
+            ));
+        }
+
+        if tie_routine == tiecol {
+            self.start_trace_power_on_color_cadence(
+                &layout,
+                attr_process,
+                tie_process,
+                color_process,
+            )?;
+        } else {
+            self.step_trace_power_on_color_cadence(
+                &layout,
+                attr_process,
+                tie_process,
+                color_process,
+            )?;
+        }
+        self.sync_scores_from_red_label_memory()
+    }
+
+    fn start_trace_power_on_color_cadence(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        attr_process: u16,
+        tie_process: u16,
+        color_process: u16,
+    ) -> Result<(), String> {
+        self.memory.write_process_word(
+            layout,
+            attr_process,
+            "PADDR",
+            RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN,
+        )?;
+        self.memory
+            .write_process_byte(layout, attr_process, "PTIME", 1)?;
+        self.memory
+            .write_process_byte(layout, attr_process, "PD5", 1)?;
+        self.memory.write_process_data_word(
+            layout,
+            attr_process,
+            "PD6",
+            red_label_routine_address("LOGO0")?,
+        )?;
+
+        self.memory.write_process_word(
+            layout,
+            color_process,
+            "PADDR",
+            red_label_routine_address("COLRLP")?,
+        )?;
+        self.memory
+            .write_process_byte(layout, color_process, "PTIME", 1)?;
+
+        let table = red_label_color_cycle_table("TCTAB")?;
+        self.memory.write_process_word(
+            layout,
+            tie_process,
+            "PADDR",
+            red_label_routine_address("TIECL")?,
+        )?;
+        self.memory
+            .write_process_byte(layout, tie_process, "PTIME", 5)?;
+        self.memory
+            .write_process_data_word(layout, tie_process, "PD", table.address)
+    }
+
+    fn step_trace_power_on_color_cadence(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        attr_process: u16,
+        tie_process: u16,
+        color_process: u16,
+    ) -> Result<(), String> {
+        self.toggle_trace_power_on_sleep(layout, attr_process)?;
+        self.toggle_trace_power_on_sleep(layout, color_process)?;
+
+        let tie_time = self
+            .memory
+            .read_process_byte(layout, tie_process, "PTIME")?;
+        if tie_time > 1 {
+            return self
+                .memory
+                .write_process_byte(layout, tie_process, "PTIME", tie_time - 1);
+        }
+
+        let table = red_label_color_cycle_table("TCTAB")?;
+        let table_pointer = self
+            .memory
+            .read_process_data_word(layout, tie_process, "PD")?;
+        let table_offset = table_pointer.checked_sub(table.address).ok_or_else(|| {
+            format!(
+                "red-label trace TIECL PD 0x{table_pointer:04X} precedes TCTAB at 0x{:04X}",
+                table.address
+            )
+        })?;
+        let next_table_pointer = if table_offset + 3 < table.bytes.len() as u16 {
+            table_pointer + 3
+        } else {
+            table.address
+        };
+        self.memory
+            .write_process_data_word(layout, tie_process, "PD", next_table_pointer)?;
+        self.memory
+            .write_process_byte(layout, tie_process, "PTIME", 6)
+    }
+
+    fn toggle_trace_power_on_sleep(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        process_address: u16,
+    ) -> Result<(), String> {
+        let current = self
+            .memory
+            .read_process_byte(layout, process_address, "PTIME")?;
+        let next = if current == 1 { 2 } else { 1 };
+        self.memory
+            .write_process_byte(layout, process_address, "PTIME", next)
     }
 
     fn step_red_label_live_attract_process(&mut self) -> Result<bool, String> {
@@ -26045,7 +26245,7 @@ impl ArcadeMachine {
             .scan_translated_player_switches(start_input.defender_input_ports())?;
         self.memory.dispatch_switch_processes()?;
 
-        let Some(dispatch) = self.step_red_label_translated_process()? else {
+        let Some(dispatch) = self.step_red_label_live_start_switch_process()? else {
             return Ok(LiveStartSwitchOutcome::default());
         };
         Ok(LiveStartSwitchOutcome {
@@ -26073,6 +26273,16 @@ impl ArcadeMachine {
         Ok(())
     }
 
+    fn step_red_label_live_start_switch_process(
+        &mut self,
+    ) -> Result<Option<RedLabelProcessDispatch>, String> {
+        let routines = [
+            red_label_routine_address("ST1")?,
+            red_label_routine_address("ST2")?,
+        ];
+        self.step_red_label_trace_prioritized_live_process(&routines)
+    }
+
     fn step_red_label_live_coin_door_switches(
         &mut self,
         input: CabinetInput,
@@ -26096,7 +26306,7 @@ impl ArcadeMachine {
             return Ok(LiveCoinDoorSwitchOutcome::default());
         }
 
-        let Some(dispatch) = self.step_red_label_translated_process()? else {
+        let Some(dispatch) = self.step_red_label_live_coin_door_process()? else {
             return Ok(LiveCoinDoorSwitchOutcome::default());
         };
         let mut outcome = live_coin_door_switch_outcome(&dispatch);
@@ -26126,15 +26336,15 @@ impl ArcadeMachine {
     }
 
     fn red_label_live_coin_door_process_active(&self) -> Result<bool, String> {
-        let routines = [
-            red_label_routine_address("LCOIN")?,
-            red_label_routine_address("RCOIN")?,
-            red_label_routine_address("CCOIN")?,
-            red_label_routine_address("CN1")?,
-            red_label_routine_address("ADVSW")?,
-            red_label_routine_address("HSRES")?,
-        ];
+        let routines = red_label_live_coin_door_process_routines()?;
         self.memory.active_process_has_routine(&routines)
+    }
+
+    fn step_red_label_live_coin_door_process(
+        &mut self,
+    ) -> Result<Option<RedLabelProcessDispatch>, String> {
+        let routines = red_label_live_coin_door_process_routines()?;
+        self.step_red_label_trace_prioritized_live_process(&routines)
     }
 
     fn red_label_live_game_over_attract_process_active(&self) -> Result<bool, String> {
@@ -26347,7 +26557,7 @@ impl ArcadeMachine {
             .red_label_live_player_start_process_active()
             .expect("embedded red-label player-start process labels are valid");
         let process_dispatch = if player_start_active {
-            self.step_red_label_translated_process()
+            self.step_red_label_live_player_start_process()
                 .expect("live player start creates only translated red-label processes")
         } else {
             let mut translated_input = CabinetInput::NONE;
@@ -26383,6 +26593,19 @@ impl ArcadeMachine {
         }
     }
 
+    fn step_red_label_live_player_start_process(
+        &mut self,
+    ) -> Result<Option<RedLabelProcessDispatch>, String> {
+        let routines = [
+            red_label_routine_address("PLSTRT")?,
+            red_label_routine_address("PLST1A")?,
+            red_label_routine_address("PLSTR3")?,
+            red_label_routine_address("PLS01")?,
+            red_label_routine_address("PLS1")?,
+        ];
+        self.step_red_label_trace_prioritized_live_process(&routines)
+    }
+
     fn red_label_live_player_start_process_active(&self) -> Result<bool, String> {
         let routines = [
             red_label_routine_address("PLSTRT")?,
@@ -26392,6 +26615,34 @@ impl ArcadeMachine {
             red_label_routine_address("PLS1")?,
         ];
         self.memory.active_process_has_routine(&routines)
+    }
+
+    fn step_red_label_trace_prioritized_live_process(
+        &mut self,
+        routine_addresses: &[u16],
+    ) -> Result<Option<RedLabelProcessDispatch>, String> {
+        if self.trace_power_up_ram_fill.is_none()
+            || self.frame < RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME
+        {
+            return self.step_red_label_translated_process();
+        }
+
+        let Some(link_address) = self
+            .memory
+            .active_process_link_before_routine(routine_addresses)?
+        else {
+            return Ok(None);
+        };
+        let Some(scheduled) = self
+            .memory
+            .step_single_process_scheduler_from_link(link_address)?
+        else {
+            return Ok(None);
+        };
+        let dispatch = self.dispatch_red_label_scheduled_process(scheduled)?;
+        self.apply_process_dispatch_state(&dispatch)?;
+        self.sync_scores_from_red_label_memory()?;
+        Ok(Some(dispatch))
     }
 
     fn sync_scores_from_red_label_memory(&mut self) -> Result<(), String> {
@@ -26513,6 +26764,17 @@ fn live_coin_door_switch_outcome(dispatch: &RedLabelProcessDispatch) -> LiveCoin
         },
         _ => LiveCoinDoorSwitchOutcome::default(),
     }
+}
+
+fn red_label_live_coin_door_process_routines() -> Result<[u16; 6], String> {
+    Ok([
+        red_label_routine_address("LCOIN")?,
+        red_label_routine_address("RCOIN")?,
+        red_label_routine_address("CCOIN")?,
+        red_label_routine_address("CN1")?,
+        red_label_routine_address("ADVSW")?,
+        red_label_routine_address("HSRES")?,
+    ])
 }
 
 #[cfg(test)]
@@ -28177,6 +28439,38 @@ mod tests {
                 ])
                 .expect("query TIECOL process")
         );
+
+        for expected_frame in 740..=745 {
+            let frame = machine.step(CabinetInput::NONE);
+            assert_eq!(frame.snapshot.frame, expected_frame);
+            assert_eq!(machine.red_label_process_table_crc32(), 0xE215_5086);
+        }
+
+        for (expected_frame, expected_crc) in [
+            (746, 0xF987_8193),
+            (747, 0xB9E3_1218),
+            (748, 0x3CF4_E011),
+            (749, 0x7C90_739A),
+            (750, 0x7FDA_3F6F),
+            (751, 0x9F1B_8B3B),
+            (752, 0x9C51_C7CE),
+            (753, 0xDC35_5445),
+            (754, 0x5922_A64C),
+            (755, 0x1946_35C7),
+            (756, 0x1A0C_7932),
+            (757, 0xDEFE_9590),
+            (758, 0xDDB4_D965),
+            (759, 0x9DD0_4AEE),
+            (760, 0x18C7_B8E7),
+            (761, 0x58A3_2B6C),
+            (762, 0x5BE9_6799),
+            (763, 0xFACD_CD66),
+            (764, 0xF987_8193),
+        ] {
+            let frame = machine.step(CabinetInput::NONE);
+            assert_eq!(frame.snapshot.frame, expected_frame);
+            assert_eq!(machine.red_label_process_table_crc32(), expected_crc);
+        }
     }
 
     #[test]
@@ -28214,6 +28508,76 @@ mod tests {
         not_attr
             .finish_trace_power_on_williams_screen_clear()
             .expect("non-ATTR current process is a no-op");
+
+        let mut wrong_tie = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..739 {
+            wrong_tie.step(CabinetInput::NONE);
+        }
+        wrong_tie
+            .memory
+            .write_process_word(
+                &red_label_ram_layout().expect("layout"),
+                0xAAE3,
+                "PADDR",
+                red_label_routine_address("LOGO").expect("LOGO address"),
+            )
+            .expect("corrupt TIECOL routine");
+        let error = wrong_tie
+            .step_trace_power_on_color_executive_slice()
+            .expect_err("wrong intermediate process should be rejected");
+        assert!(error.contains("expected TIECOL before COLR"));
+
+        let mut wrong_color = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..739 {
+            wrong_color.step(CabinetInput::NONE);
+        }
+        wrong_color
+            .memory
+            .write_process_word(
+                &red_label_ram_layout().expect("layout"),
+                0xAAD4,
+                "PADDR",
+                red_label_routine_address("LOGO").expect("LOGO address"),
+            )
+            .expect("corrupt COLR routine");
+        let error = wrong_color
+            .step_trace_power_on_color_executive_slice()
+            .expect_err("wrong color process should be rejected");
+        assert!(error.contains("expected COLR/COLRLP"));
+
+        let mut bad_tie_pointer = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..746 {
+            bad_tie_pointer.step(CabinetInput::NONE);
+        }
+        let layout = red_label_ram_layout().expect("layout");
+        bad_tie_pointer
+            .memory
+            .write_process_byte(&layout, 0xAAE3, "PTIME", 1)
+            .expect("force TIECL due");
+        bad_tie_pointer
+            .memory
+            .write_process_data_word(&layout, 0xAAE3, "PD", 0xF45A)
+            .expect("corrupt TIECL pointer");
+        let error = bad_tie_pointer
+            .step_trace_power_on_color_executive_slice()
+            .expect_err("bad TIECL pointer should be rejected");
+        assert!(error.contains("precedes TCTAB"));
+    }
+
+    #[test]
+    fn trace_prioritized_live_process_reports_none_without_matching_routine() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..746 {
+            machine.step(CabinetInput::NONE);
+        }
+
+        let dispatch = machine
+            .step_red_label_trace_prioritized_live_process(&[
+                red_label_routine_address("LCOIN").expect("LCOIN address")
+            ])
+            .expect("prioritized live process");
+
+        assert_eq!(dispatch, None);
     }
 
     #[test]
@@ -38006,6 +38370,22 @@ mod tests {
             Some(&[0xAA, 0xC5][..])
         );
         assert_eq!(machine.red_label_ram_range(0xAAC9..0xAACA), Some(&[0][..]));
+    }
+
+    #[test]
+    fn single_process_scheduler_reports_none_for_empty_link() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .write_word(0xA05F, 0)
+            .expect("clear active-process head");
+
+        let scheduled = machine
+            .memory
+            .step_single_process_scheduler_from_link(0xA05F)
+            .expect("single-process scheduler step");
+
+        assert_eq!(scheduled, None);
     }
 
     #[test]

@@ -959,7 +959,7 @@ mod tests {
         let frame_1027 = trace.lines().nth(1027).expect("frame 1027");
 
         assert!(frame_1026.ends_with("\t-\t-"));
-        assert!(frame_1027.contains("\tplaying\t0\t0\t1\t3\t3\t0x44\t0xE2\t0x2F\t"));
+        assert!(frame_1027.contains("\tplaying\t0\t0\t1\t3\t3\t0xD2\t0xAB\t0x88\t"));
         assert!(frame_1027.ends_with("\t0xF5\tgame_started"));
     }
 
