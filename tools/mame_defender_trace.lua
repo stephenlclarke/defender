@@ -20,6 +20,11 @@ local DEFENDER_BANK_SELECT_REGISTER_START = 0xd000
 local DEFENDER_BANK_SELECT_REGISTER_END = 0xdfff
 local CREDIT_ADDED_SOUND_COMMAND = 0xe6
 local ONE_PLAYER_START_SOUND_COMMAND = 0xf5
+local WILLIAMS_VIDEO_PAIR_STRIDE = 256
+local DEFENDER_VISIBLE_WIDTH = 292
+local DEFENDER_VISIBLE_HEIGHT = 240
+local DEFENDER_VISIBLE_X_START = 12
+local DEFENDER_VISIBLE_Y_START = 7
 
 local function read_all(path)
     local handle = assert(io.open(path, "r"))
@@ -157,6 +162,43 @@ local function input_ports_from_reader(read_port)
     }
 end
 
+local function crc32(bytes)
+    local crc = 0xffffffff
+    for _, byte in ipairs(bytes) do
+        crc = crc ~ byte
+        for _ = 1, 8 do
+            local mask = -(crc & 1)
+            crc = (crc >> 1) ~ (0xedb88320 & mask)
+        end
+    end
+    return (~crc) & 0xffffffff
+end
+
+local function williams_screen_byte_offset(screen_x, screen_y)
+    return screen_y + ((screen_x >> 1) * WILLIAMS_VIDEO_PAIR_STRIDE)
+end
+
+local function visible_pixel_nibbles_from_reader(read_byte)
+    local nibbles = {}
+    for visible_y = 0, DEFENDER_VISIBLE_HEIGHT - 1 do
+        local screen_y = DEFENDER_VISIBLE_Y_START + visible_y
+        for visible_x = 0, DEFENDER_VISIBLE_WIDTH - 1 do
+            local screen_x = DEFENDER_VISIBLE_X_START + visible_x
+            local byte = read_byte(williams_screen_byte_offset(screen_x, screen_y)) & 0xff
+            if (screen_x & 1) == 0 then
+                nibbles[#nibbles + 1] = (byte >> 4) & 0x0f
+            else
+                nibbles[#nibbles + 1] = byte & 0x0f
+            end
+        end
+    end
+    return nibbles
+end
+
+local function visible_video_crc32_from_reader(read_byte)
+    return crc32(visible_pixel_nibbles_from_reader(read_byte))
+end
+
 local function install_sound_command_tap(program, commands)
     local port_b_data_selected = false
     return program:install_write_tap(
@@ -264,6 +306,26 @@ local function run_self_test()
     assert_equal(input_ports.IN0, 0x20, "debug IN0 read is byte-sized")
     assert_equal(input_ports.IN1, 0x01, "debug IN1 read is byte-sized")
     assert_equal(input_ports.IN2, 0x10, "debug IN2 read is byte-sized")
+
+    local video_ram = {}
+    video_ram[williams_screen_byte_offset(12, 7)] = 0xab
+    video_ram[williams_screen_byte_offset(14, 7)] = 0xcd
+    video_ram[williams_screen_byte_offset(303, 246)] = 0xef
+    local function read_video(address)
+        return video_ram[address] or 0
+    end
+    local visible_nibbles = visible_pixel_nibbles_from_reader(read_video)
+    assert_equal(#visible_nibbles, DEFENDER_VISIBLE_WIDTH * DEFENDER_VISIBLE_HEIGHT, "visible pixel count")
+    assert_equal(visible_nibbles[1], 0x0a, "top-left high nibble")
+    assert_equal(visible_nibbles[2], 0x0b, "top-left low nibble")
+    assert_equal(visible_nibbles[3], 0x0c, "next visible pair high nibble")
+    assert_equal(visible_nibbles[4], 0x0d, "next visible pair low nibble")
+    assert_equal(visible_nibbles[#visible_nibbles], 0x0f, "bottom-right low nibble")
+    assert_equal(
+        visible_video_crc32_from_reader(read_video),
+        crc32(visible_nibbles),
+        "visible video CRC uses decoded pixel nibbles"
+    )
     print("mame_defender_trace.lua self-test ok")
 end
 
@@ -391,18 +453,6 @@ local function read_u8(address)
     return program:read_u8(address) & 0xff
 end
 
-local function crc32(bytes)
-    local crc = 0xffffffff
-    for _, byte in ipairs(bytes) do
-        crc = crc ~ byte
-        for _ = 1, 8 do
-            local mask = -(crc & 1)
-            crc = (crc >> 1) ~ (0xedb88320 & mask)
-        end
-    end
-    return (~crc) & 0xffffffff
-end
-
 local function crc_range(start_address, length)
     local bytes = {}
     for index = 0, length - 1 do
@@ -437,9 +487,10 @@ for frame_number, frame_text in ipairs(input_frames) do
     local frame_sound_commands = copy_commands(sound_commands)
     local sound_command_text = take_commands(sound_commands)
     local event_text = format_events(events_for_commands(frame_sound_commands))
+    local visible_video_crc32 = visible_video_crc32_from_reader(read_u8)
 
     output:write(string.format(
-        "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t%s\t%d\t%d\t%d\t%d\t%d\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\t0x%08X\t0x%08X\t-\t%s\t%s\n",
+        "%d\t0x%04X\t0x%02X\t0x%02X\t0x%02X\t%s\t%d\t%d\t%d\t%d\t%d\t0x%02X\t0x%02X\t0x%02X\t0x%08X\t0x%08X\t0x%08X\t0x%08X\t0x%08X\t%s\t%s\n",
         frame_number,
         input_bits,
         input_ports.IN0,
@@ -458,6 +509,7 @@ for frame_number, frame_text in ipairs(input_frames) do
         crc_range(0xAAC5, 0x0F * 75),
         crc_range(0xAF2A, 0x17 * 5),
         crc_range(0xA06D, 2),
+        visible_video_crc32,
         sound_command_text,
         event_text
     ))

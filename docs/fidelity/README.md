@@ -33,6 +33,12 @@ Current trace format:
   live/test constructor remains pre-initialized for translated routine unit
   tests. Golden equivalence for those columns still depends on local
   MAME/source expected traces.
+- The local MAME reference exporter now computes `video_crc32` with the same
+  visible pixel-nibble convention: Williams two-pixels-per-byte video RAM,
+  Defender visible origin `(12, 7)`, visible size `292x240`, and CRC-32 over
+  one decoded nibble per visible pixel. Regenerate local reference traces after
+  this exporter change before treating old `video_crc32=-` fixtures as pixel
+  evidence.
 - `defender --fidelity-trace 300` emits deterministic Rust trace rows for local
   fixture work. It is not a substitute for MAME/source-derived golden traces.
 - `defender --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'` emits
@@ -99,9 +105,12 @@ MAME runner is `tools/generate_reference_traces.py`; it invokes
 The Lua exporter records per-frame main-board sound commands by write-tapping
 the MAME main CPU program space at PIA1 port B/control, suppressing the idle
 byte and emitting the asserted raw command bytes into the existing trace
-schema. The exporter also maps the MAME-observed credited-start sound commands
-`0xE6` and `0xF5` to `credit_added` and `game_started` trace events so
-reference fixtures prove the source `CSCAN` / `SSCAN` / `ST1` path.
+schema. It also decodes the MAME-visible Defender pixel nibbles from main RAM
+and emits their CRC-32 into `video_crc32`, so trace fixtures can carry
+MAME-derived pixel evidence without storing screenshots or ROM payloads. The
+exporter also maps the MAME-observed credited-start sound commands `0xE6` and
+`0xF5` to `credit_added` and `game_started` trace events so reference fixtures
+prove the source `CSCAN` / `SSCAN` / `ST1` path.
 Each generated scenario uses an isolated, freshly cleared MAME state directory
 under `docs/fidelity/fixtures/local/reference/mame-state/<scenario>/` so
 NVRAM/config state cannot leak between local reference traces. The generator

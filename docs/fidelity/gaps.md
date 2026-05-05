@@ -737,11 +737,17 @@ This file records behavior that must not be guessed in arcade-core code.
   refresh paths, and a live IRQ scanline frame. Source-native video fixture
   coverage now also locks exact pixel checksums and coarse visible-shape
   signatures for boot, attract, start, gameplay, death, high-score, and
-  operator/AUDITG frames. A `2026-05-05` live title-screen capture shows the
-  `DEFENDER` wordmark/title graphic corrupted into large red/purple blocky
-  bands; source-native checksums are therefore not enough to close title-screen
-  fidelity until a MAME-derived title/logo pixel fixture proves the decode,
-  plot, color, copy, and presentation cadence. The same live-review pass
+  operator/AUDITG frames. `DC-20.1` added MAME-derived visible pixel-nibble CRC
+  capture to the local reference exporter, using the same `292x240` Defender
+  visible window and high/low nibble order as Rust. A regenerated local
+  `attract_boot` smoke fixture now fills `video_crc32` and first catches pixel
+  drift at line 4/frame 3, expected `0xAD56B94F`, actual `0x157E98C7`, with
+  655 video-CRC mismatches across 900 frames. A `2026-05-05` live title-screen
+  capture shows the `DEFENDER` wordmark/title graphic corrupted into large
+  red/purple blocky bands; source-native checksums are therefore not enough to
+  close title-screen fidelity until a MAME-derived title/logo pixel fixture
+  proves the decode, plot, color, copy, and presentation cadence. The same
+  live-review pass
   reported that the app did not advance beyond the initial Williams/`DEFENDER`
   screen; `DC-16.5` adds core-level coverage proving idle live attract reaches
   later attract processes, accepts credit, and starts play. Visual terminal

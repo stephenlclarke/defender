@@ -1233,11 +1233,15 @@ Additional gaps and corrections found during this review:
 - Source-native native-video fixtures now lock exact pixel checksums and coarse
   visible-shape signatures for boot, attract, start, gameplay, death,
   high-score, and operator/AUDITG frames. There are still no object-table,
-  shell-table, or pixel-frame golden tests against MAME attract/gameplay
-  references, though the trace format can carry raw table and native frame
-  CRC-32 values. The observed corrupted title-screen `DEFENDER` graphic remains
-  open until a MAME-derived title/logo pixel fixture fails on the current
-  output and passes after the corrected source-backed implementation. The
+  shell-table, or passing pixel-frame golden tests against MAME
+  attract/gameplay references. `DC-20.1` added MAME-derived visible
+  pixel-nibble CRC capture to the local reference exporter so regenerated
+  traces now populate `video_crc32`. A local `attract_boot` smoke comparison
+  now catches real pixel drift at line 4/frame 3, expected `0xAD56B94F`,
+  actual `0x157E98C7`, with 655 video-CRC mismatches across 900 frames. The
+  observed corrupted title-screen `DEFENDER` graphic remains open until a
+  MAME-derived title/logo pixel fixture passes after the corrected
+  source-backed implementation. The
   previously observed failure to progress beyond the initial Williams/`DEFENDER`
   screen now has core-level coverage proving forward progress into later
   attract, credit, and start-ready states; visual terminal proof still belongs

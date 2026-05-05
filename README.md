@@ -256,8 +256,10 @@ compatibility behavior.
   the title graphic is corrupted into large red/purple blocky bands. `DC-16.5`
   now has a core smoke test proving live attract progresses into later attract,
   credit, and start-ready states. The title corruption and terminal/pixel proof
-  remain tracked in `SPEC.md`, `docs/fidelity/gaps.md`, and `PLAN.md` until
-  MAME-derived pixel fixtures prove the visible output.
+  remain tracked in `SPEC.md`, `docs/fidelity/gaps.md`, and `PLAN.md`.
+  `DC-20.1` added MAME-derived visible pixel-nibble CRC capture to local
+  reference traces; regenerated fixtures now detect the attract/title pixel
+  drift instead of carrying `video_crc32=-`.
 - `ArcadeMachine::step` returns post-frame main-board and sound-board snapshots
   on `FrameOutput`. Tests now lock the input-port bytes, main RAM/CMOS CRCs,
   palette RAM, hardware map, watchdog count, video-counter sample, sound latch,
@@ -904,7 +906,9 @@ The runtime no longer embeds any `assets/arcade/*.png` file. The live renderer
 no longer uses a temporary scaffold frame; it scales native red-label video RAM
 directly, and source-backed score/replay, attract-logo, boot, start, gameplay,
 death, high-score, and operator/AUDITG frames now have native video fixture
-signatures.
+signatures. Newly regenerated local MAME reference traces also populate
+`video_crc32` with the visible pixel-nibble CRC so those source-native
+signatures can be checked against MAME-derived pixel evidence.
 
 ## Platform Support
 

@@ -742,3 +742,55 @@ Interpretation:
   currently covered by source-native mutation fixtures. End-to-end MAME golden
   traces for those paths remain absent and are carried as explicit pre-refactor
   fidelity gaps until local references can be generated and promoted.
+
+## 2026-05-05 `DC-20.1` MAME Visible Pixel CRC Smoke Test
+
+Scenario:
+
+- `attract_boot`
+
+Purpose: prove the local MAME exporter can populate the existing `video_crc32`
+trace column with a MAME-derived visible pixel-nibble CRC rather than the old
+placeholder `-`.
+
+Commands:
+
+```sh
+DEFENDER_TRACE_SELF_TEST=1 lua tools/mame_defender_trace.lua
+python3 tools/generate_reference_traces.py \
+  --scenario attract_boot \
+  --out-dir /tmp/defender-dc20-reference \
+  --rom-dir assets/roms
+cargo run --quiet -- \
+  --fidelity-trace-inputs-file \
+  /tmp/defender-dc20-reference/attract_boot.inputs.txt
+cargo run --quiet -- \
+  --fidelity-check-trace \
+  /tmp/defender-dc20-reference/attract_boot.inputs.txt \
+  /tmp/defender-dc20-reference/attract_boot.expected.tsv
+```
+
+Result:
+
+- The Lua self-test passed and now covers the Williams video byte-offset,
+  high/low pixel-nibble decode, visible `292x240` pixel count, and CRC helper.
+- The generated MAME `attract_boot.expected.tsv` populated `video_crc32`
+  starting at frame 1. Frame 1 and frame 2 both produced `0x157E98C7`, matching
+  current Rust's cold visible frame.
+- Exact Rust-vs-MAME comparison now fails on real pixel evidence at line
+  4/frame 3: expected `video_crc32=0xAD56B94F`, actual `0x157E98C7`.
+- Across the 900-frame smoke fixture, `video_crc32` differs on 655 frames.
+  Non-video columns retain the prior `attract_boot` status.
+
+Interpretation:
+
+- The old structural blocker where local references carried `video_crc32=-` is
+  fixed for newly regenerated MAME references.
+- The current title/attract visible-output gap is now executable: the MAME
+  pixel CRC changes during the early boot/attract window while Rust remains on
+  the previous visible frame. The previously observed corrupted `DEFENDER`
+  wordmark remains an open renderer/source-cadence defect until a regenerated
+  title/logo fixture passes.
+- Generated pixel-bearing reference TSVs remain ignored local artifacts under
+  `docs/fidelity/fixtures/local/` or `/tmp`; only findings and tooling belong
+  in the checked-in repository.

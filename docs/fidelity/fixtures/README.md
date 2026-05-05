@@ -26,7 +26,11 @@ Example pair:
 
 The expected TSV header must match `assets/red-label/trace-schema.tsv`. Trace
 rows should contain only observable numeric state, checksums, event values, and
-CRC values needed to compare behavior. Do not store ROM bytes in fixtures.
+CRC values needed to compare behavior. `video_crc32` is the MAME/Rust-visible
+Defender pixel-nibble CRC convention: decode the visible `292x240` cabinet
+window from Williams video RAM, store one 4-bit palette nibble per visible
+pixel, and CRC those nibble bytes. Do not store ROM bytes, screenshots, or raw
+pixel dumps in checked-in fixtures.
 
 Run local fixture checks with:
 

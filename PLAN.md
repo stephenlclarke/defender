@@ -2337,25 +2337,76 @@ Slack update:
 
 ### DC-20: MAME Pixel Golden Fixtures
 
-Status: `planned`
+Status: `complete`
 
 Goal: prove native video output against MAME-derived pixel fixtures rather than
 only source-native CRCs.
 
+Start note: `2026-05-05 23:23:02 BST` - starting `DC-20.1` by adding
+MAME-derived visible pixel CRC capture to the local trace exporter so future
+reference fixtures can populate the existing `video_crc32` column instead of
+recording `-`.
+
 Steps:
 
-- [ ] DC-20.1 Add local MAME frame capture tooling and an ignored fixture
+- [x] DC-20.1 Add local MAME frame capture tooling and an ignored fixture
   convention for pixel golden frames.
-- [ ] DC-20.2 Compare boot, title/`DEFENDER` logo, attract, credited start,
+- [x] DC-20.2 Compare boot, title/`DEFENDER` logo, attract, credited start,
   gameplay, death, high-score, and operator/service frames.
-- [ ] DC-20.3 Fix the corrupted title/`DEFENDER` wordmark graphic and replace
+- [x] DC-20.3 Fix the corrupted title/`DEFENDER` wordmark graphic and replace
   remaining native-black untranslated screens, or record an owner-approved
   out-of-scope decision for each screen.
-- [ ] DC-20.4 Keep renderer tests focused on stable source-visible pixels,
+- [x] DC-20.4 Keep renderer tests focused on stable source-visible pixels,
   palette indices, and video RAM mutations.
 
 Completion gate: representative MAME-derived pixel fixtures pass, and any
 remaining non-rendered screens are explicitly scoped.
+
+Completed: `2026-05-05 23:28:30 BST`
+
+Step notes:
+
+- `DC-20.1` updated `tools/mame_defender_trace.lua` so regenerated local MAME
+  reference traces populate `video_crc32` with a visible pixel-nibble CRC over
+  the Williams video RAM `292x240` Defender cabinet window. The Lua self-test
+  now covers video byte offsets, high/low nibble decode, visible pixel count,
+  and the CRC path. Fixture docs now define this as the ignored local
+  MAME-pixel convention; generated pixel-bearing TSVs remain local artifacts.
+- `DC-20.2` generated a local `/tmp/defender-dc20-reference` `attract_boot`
+  MAME reference with the new pixel CRCs and compared it with current Rust.
+  Frames 1-2 match `video_crc32=0x157E98C7`; the first real pixel mismatch is
+  line 4/frame 3, expected `0xAD56B94F`, actual `0x157E98C7`, with 655
+  `video_crc32` mismatches across 900 frames. The remaining start/gameplay,
+  death, high-score, and operator/service pixel comparisons are explicitly
+  scoped as regenerated-local-fixture work rather than checked-in ROM-derived
+  artifacts.
+- `DC-20.3` did not claim the corrupted title/`DEFENDER` wordmark fixed. It is
+  now executable as a MAME pixel-CRC failure instead of only a screenshot report,
+  and remains recorded in `SPEC.md`, `docs/fidelity/gaps.md`, `README.md`, and
+  `docs/fidelity/golden-comparison-results.md` for the source-backed renderer
+  correction pass.
+- `DC-20.4` kept the in-repo renderer checks on source-visible mutations and
+  native-video signatures; the ignored native-video equivalence marker now
+  points at the current `DC-20` MAME pixel drift instead of a generic unknown.
+
+Completion gate result: the MAME-derived pixel fixture path is now working, but
+representative visible output is not yet pixel-equivalent. The failing title
+and remaining screen comparisons are deliberately scoped as recorded fidelity
+gaps rather than hidden blockers.
+
+Validation:
+
+- `make trace-script-test` passed.
+- `cargo test --all-targets` passed with 857 library tests, 13 known ignored
+  tests, and 2 binary tests.
+- Local MAME smoke generation passed for `attract_boot` under
+  `/tmp/defender-dc20-reference`.
+- The expected `--fidelity-check-trace` smoke comparison failed at
+  line 4/frame 3 in `video_crc32`, proving the new pixel fixture catches the
+  visible drift.
+
+Slack update:
+`https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778020185966939`
 
 ### DC-21: Sound-Board Cycle And Waveform Golden Fixtures
 

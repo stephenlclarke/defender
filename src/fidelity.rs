@@ -594,7 +594,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known unknown: unignore when cabinet video golden frames exist"]
+    #[ignore = "known DC-20 gap: regenerated MAME video CRC fixtures catch attract/title drift"]
     fn known_unknown_native_video_trace_equivalence() {
         panic!("native video frame CRCs must match red-label golden traces");
     }
