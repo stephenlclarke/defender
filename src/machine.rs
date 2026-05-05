@@ -24404,7 +24404,7 @@ impl ArcadeMachine {
     fn advance_trace_power_up_ram_fill(
         &mut self,
         sound_commands: &mut Vec<SoundCommand>,
-        live_process_ran: bool,
+        start_ready_rand_already_advanced: bool,
     ) {
         let Some(fill) = &mut self.trace_power_up_ram_fill else {
             return;
@@ -24430,7 +24430,7 @@ impl ArcadeMachine {
         {
             self.phase = GamePhase::GameOver;
         }
-        self.apply_power_on_frame_handoff(model, sound_commands, live_process_ran)
+        self.apply_power_on_frame_handoff(model, sound_commands, start_ready_rand_already_advanced)
             .expect("embedded red-label cold-boot handoff trace is valid");
     }
 
@@ -24438,17 +24438,17 @@ impl ArcadeMachine {
     fn apply_trace_power_up_handoff(
         &mut self,
         sound_commands: &mut Vec<SoundCommand>,
-        live_process_ran: bool,
+        start_ready_rand_already_advanced: bool,
     ) -> Result<(), String> {
         let model = red_label_power_on_frame_model(self.frame)?;
-        self.apply_power_on_frame_handoff(model, sound_commands, live_process_ran)
+        self.apply_power_on_frame_handoff(model, sound_commands, start_ready_rand_already_advanced)
     }
 
     fn apply_power_on_frame_handoff(
         &mut self,
         model: RedLabelPowerOnFrameModel,
         sound_commands: &mut Vec<SoundCommand>,
-        live_process_ran: bool,
+        start_ready_rand_already_advanced: bool,
     ) -> Result<(), String> {
         let layout = red_label_ram_layout()?;
         if let Some(target) = model.sinit_clear_target {
@@ -24493,7 +24493,7 @@ impl ArcadeMachine {
             self.phase = phase;
         }
 
-        if model.start_ready && !live_process_ran {
+        if model.start_ready && !start_ready_rand_already_advanced {
             let state = self.memory.advance_red_label_rand(&layout)?;
             self.rng = state;
         }
@@ -25791,7 +25791,7 @@ impl ArcadeMachine {
 
         let mut events = Vec::new();
         let mut sound_commands = Vec::new();
-        let mut live_process_ran = false;
+        let mut start_ready_rand_already_advanced = false;
         if !self.trace_power_up_blocks_live_io() {
             if let Some(command) = self
                 .memory
@@ -25816,11 +25816,15 @@ impl ArcadeMachine {
             if feed_high_score_entry {
                 self.step_live_high_score_entry(typed_chars, &mut events);
             } else if !game_over_handoff_active {
-                live_process_ran = self.step_live_non_high_score_input(input, &mut events);
+                start_ready_rand_already_advanced =
+                    self.step_live_non_high_score_input(input, &mut events);
             }
         }
 
-        self.advance_trace_power_up_ram_fill(&mut sound_commands, live_process_ran);
+        self.advance_trace_power_up_ram_fill(
+            &mut sound_commands,
+            start_ready_rand_already_advanced,
+        );
         self.record_sound_board_frame_commands(&sound_commands);
 
         FrameOutput::new(
@@ -25911,11 +25915,10 @@ impl ArcadeMachine {
         events: &mut Vec<MachineEvent>,
     ) -> bool {
         let mut started_this_frame = false;
-        let mut live_process_ran = false;
+        let mut start_ready_rand_already_advanced = false;
         let coin_door_outcome = self
             .step_red_label_live_coin_door_switches(input)
             .expect("live coin/admin switch creates only translated red-label processes");
-        live_process_ran |= coin_door_outcome.process_ran;
         if coin_door_outcome.credit_added && self.trace_power_up_ram_fill.is_none() {
             events.push(MachineEvent::CreditAdded);
         }
@@ -25941,7 +25944,6 @@ impl ArcadeMachine {
             let start_outcome = self
                 .step_red_label_live_start_switch(input)
                 .expect("live start switch creates only translated red-label processes");
-            live_process_ran |= start_outcome.process_ran;
             if start_outcome.game_started && self.trace_power_up_ram_fill.is_some() {
                 // MAME reaches the first visible `PLSTRT` object mutation 50
                 // sampled frames later than the coarse live loop. Hold the
@@ -25955,18 +25957,15 @@ impl ArcadeMachine {
             started_this_frame = start_outcome.game_started;
         }
 
-        if self.phase == GamePhase::Playing && !started_this_frame {
-            if self
+        if self.phase == GamePhase::Playing
+            && !started_this_frame
+            && self
                 .trace_player_start_release_frame
-                .is_some_and(|frame| self.frame < frame)
-            {
-                live_process_ran = true;
-            } else {
-                let switch_outcome = self.step_red_label_live_player_switches(input);
-                live_process_ran |= switch_outcome.player_start_active;
-                if !switch_outcome.player_start_active {
-                    self.step_player_controls(input, events, switch_outcome);
-                }
+                .is_none_or(|frame| self.frame >= frame)
+        {
+            let switch_outcome = self.step_red_label_live_player_switches(input);
+            if !switch_outcome.player_start_active {
+                self.step_player_controls(input, events, switch_outcome);
             }
         }
         let cold_boot_game_over_attract_active = self.phase == GamePhase::GameOver
@@ -25981,7 +25980,7 @@ impl ArcadeMachine {
                 .red_label_live_coin_door_process_active()
                 .expect("live coin/admin process labels are valid")
         {
-            live_process_ran |= self
+            start_ready_rand_already_advanced |= self
                 .step_red_label_trace_game_over_attract_process()
                 .expect("trace game-over attract process is source-shaped");
         } else if self.phase == GamePhase::Attract
@@ -25991,11 +25990,10 @@ impl ArcadeMachine {
                 .red_label_live_coin_door_process_active()
                 .expect("live coin/admin process labels are valid")
         {
-            live_process_ran |= self
-                .step_red_label_live_attract_process()
+            self.step_red_label_live_attract_process()
                 .expect("live attract process creates only translated red-label work");
         }
-        live_process_ran
+        start_ready_rand_already_advanced
     }
 
     fn step_red_label_trace_game_over_attract_process(&mut self) -> Result<bool, String> {

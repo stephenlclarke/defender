@@ -2149,10 +2149,12 @@ Steps:
 - [x] DC-18.1 Recompare `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, and `hyperspace` after `DC-16` and `DC-17`.
   Completed: `2026-05-05 21:57:20 BST`
-- [ ] DC-18.2 Close credited-start transition timing, player setup, and RNG
-  call-order drift.
-- [ ] DC-18.3 Close post-start object/process scheduler drift for firing,
-  thrust, reverse, smart bomb, and hyperspace paths.
+- [x] DC-18.2 Close credited-start RNG call-order drift and narrow
+  transition/player setup timing blockers.
+  Completed: `2026-05-05 22:16:07 BST`
+- [ ] DC-18.3 Close remaining credited-start process/player setup timing and
+  post-start object/process scheduler drift for firing, thrust, reverse, smart
+  bomb, and hyperspace paths.
 - [ ] DC-18.4 Unignore passing gameplay local-reference tests and update
   `SPEC.md` / `docs/fidelity/gaps.md` with remaining exact mismatches.
 
@@ -2190,6 +2192,45 @@ Work log:
   LLVM coverage, and new-code coverage with `0/0` added executable Rust lines.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778015138997059`
+- `2026-05-05 22:06:08 BST` Started `DC-18.2`: investigating the
+  frame-901 credited-start drift by comparing `start_game` reference and Rust
+  rows around the first RNG mismatch, then tracing the start-button hold/release
+  scheduler path that owns player setup and RNG call order.
+- `2026-05-05 22:16:07 BST` Completed `DC-18.2`: fixed the first
+  credited-input RNG call-order drift by changing the power-on handoff so
+  coin, start, and held player-start work no longer suppress the frame-level
+  start-ready `RAND` advance; only the cold-boot attract executive slice does,
+  because it already runs `EXEC`/`RAND`. Added
+  `trace_text_advances_rand_on_first_credited_coin_frame`, narrowed the
+  debounced-start test to the source-observed `0xF5` / `game_started` boundary,
+  and updated the ignored local-reference reasons plus `SPEC.md`,
+  `docs/fidelity/gaps.md`, and `docs/fidelity/golden-comparison-results.md`.
+  The five focused gameplay traces now match RNG on frame 901; the first
+  non-video mismatch is process-table CRC at line 902/frame 901, first
+  remaining RNG drift is line 1019/frame 1018, and first player setup/phase
+  drift is line 1027/frame 1026. Remaining process/player setup timing moves
+  into `DC-18.3`. Validation passed with `cargo fmt --check`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/gaps.md
+  docs/fidelity/golden-comparison-results.md`, `git diff --check`,
+  `cargo test trace_text_advances_rand_on_first_credited_coin_frame
+  --all-targets`, `cargo test
+  trace_text_aligns_delayed_coin_credit_event_with_source_sound_command
+  --all-targets`, `cargo test
+  trace_text_aligns_debounced_start_event_with_source_sound_command
+  --all-targets`, `cargo test local_reference_ --all-targets`,
+  `cargo run --quiet -- --fidelity-check-reference-trace-dir
+  docs/fidelity/fixtures/local/reference`, refreshed ignored local
+  Rust-current fixtures, `make trace-fixtures` with 10 fixture pairs / 15,452
+  frames, and `make fidelity` with 856 passed Rust library tests, 13 known
+  ignored tests, two binary tests, clippy, Lua/Python trace-tool tests, LLVM
+  coverage, and new-code coverage with 31/31 added executable Rust lines.
+  The expected-failing exact `cargo run --quiet -- --fidelity-check-trace
+  docs/fidelity/fixtures/local/reference/start_game.inputs.txt
+  docs/fidelity/fixtures/local/reference/start_game.expected.tsv` still fails
+  first at line 2 because the local reference fixture has `video_crc32=-` while
+  Rust emits `0x157E98C7`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778016890322059`
 
 ### DC-19: Death, Wave, Session, And Operator Trace Closure
 

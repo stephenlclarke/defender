@@ -149,6 +149,14 @@ This file records behavior that must not be guessed in arcade-core code.
   process-table CRC on 325 frames; each player-action slice differs on 425
   process-table frames. Inputs, scores, super-process CRC, shell CRC, sound
   commands, and events match for the five focused gameplay slices.
+- `DC-18.2` fixed the first credited coin/start RNG call-order drift. The
+  power-on handoff no longer treats coin, start, or held player-start work as
+  if it already ran the frame's `EXEC`/`RAND` advance; only the attract
+  executive slice suppresses the extra start-ready `RAND`. The first coin frame
+  901 now matches reference RNG (`0x81/0x8E/0x51`). Remaining drift starts with
+  `process_table_crc32` on frame 901, then RNG again at frame 1018 and
+  player setup/phase at frame 1026 because Rust applies `START` setup earlier
+  than the local reference.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process

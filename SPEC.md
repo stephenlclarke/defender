@@ -1171,6 +1171,17 @@ Additional gaps and corrections found during this review:
   423/425/424 frames, object-table CRC on 155 frames, and process-table CRC on
   425 frames. Inputs, scores, super-process CRC, shell CRC, sound commands, and
   events match for those five slices.
+- `DC-18.2` fixed the first credited coin/start RNG call-order drift: the
+  cold-boot trace handoff now suppresses the frame-level start-ready `RAND`
+  advance only when the attract executive slice already ran `EXEC` and advanced
+  `RAND`. The five focused gameplay traces now match RNG through the first coin
+  frame 901; the first non-video mismatch is `process_table_crc32` on
+  line 902/frame 901. The first remaining RNG mismatch is line 1019/frame 1018,
+  and the first player setup/phase mismatch is line 1027/frame 1026 when Rust
+  applies the `START` player setup earlier than the local reference.
+  `start_game` now differs in RNG fields on 211/210/210 frames; the four
+  player-action slices each differ on 311/310/310 RNG frames. Remaining
+  process/player setup timing is carried into the scheduler drift closure step.
 - `DC-04.2` exact-compared the focused `start_game`, `firing`,
   `thrust_reverse`, `smart_bomb`, `hyperspace`, `death`, and `wave_advance`
   local references. All seven failed first on the same line 2 boot

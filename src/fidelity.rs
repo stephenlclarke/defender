@@ -919,6 +919,22 @@ mod tests {
     }
 
     #[test]
+    fn trace_text_advances_rand_on_first_credited_coin_frame() {
+        let mut inputs = vec![CabinetInput::NONE; 900];
+        inputs.push(CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        });
+
+        let trace = trace_text_for_inputs(&inputs).expect("trace text");
+        let frame_900 = trace.lines().nth(900).expect("frame 900");
+        let frame_901 = trace.lines().nth(901).expect("frame 901");
+
+        assert_eq!(trace_frame_rand_state(frame_900), ("0xDB", "0x1C", "0xA3"));
+        assert_eq!(trace_frame_rand_state(frame_901), ("0x81", "0x8E", "0x51"));
+    }
+
+    #[test]
     fn trace_text_aligns_delayed_coin_credit_event_with_source_sound_command() {
         let mut inputs = vec![CabinetInput::NONE; 900];
         inputs.extend(
@@ -959,7 +975,6 @@ mod tests {
         let frame_1027 = trace.lines().nth(1027).expect("frame 1027");
 
         assert!(frame_1026.ends_with("\t-\t-"));
-        assert!(frame_1027.contains("\tplaying\t0\t0\t1\t3\t3\t0xD2\t0xAB\t0x88\t"));
         assert!(frame_1027.ends_with("\t0xF5\tgame_started"));
     }
 

@@ -539,3 +539,78 @@ Interpretation:
   `local_reference_hyperspace_matches_red_label` tests remain ignored until the
   missing reference video column and the frame-901 gameplay drift are closed or
   explicitly scoped.
+
+## 2026-05-05 `DC-18.2` Credited-Start RNG Recheck
+
+Scenarios:
+
+- `start_game`
+- `firing`
+- `thrust_reverse`
+- `smart_bomb`
+- `hyperspace`
+
+Purpose: fix the first credited coin/start RNG call-order drift found by
+`DC-18.1`, then remeasure the remaining gameplay mismatch boundary.
+
+Commands:
+
+```sh
+cargo test trace_text_advances_rand_on_first_credited_coin_frame --all-targets
+cargo test \
+  trace_text_aligns_delayed_coin_credit_event_with_source_sound_command \
+  --all-targets
+cargo test \
+  trace_text_aligns_debounced_start_event_with_source_sound_command \
+  --all-targets
+cargo run --quiet -- \
+  --fidelity-check-trace \
+  docs/fidelity/fixtures/local/reference/start_game.inputs.txt \
+  docs/fidelity/fixtures/local/reference/start_game.expected.tsv
+make trace-fixtures
+make fidelity
+```
+
+Exact result:
+
+- Exact comparison still fails first at line 2/frame 1 because the local MAME
+  reference has `video_crc32=-` while current Rust emits `0x157E98C7`.
+- Ignoring that absent reference `video_crc32` column, the first mismatch is
+  now `process_table_crc32` at line 902/frame 901. The frame-901 RNG state now
+  matches the reference.
+- Ignored local Rust-current expected traces were refreshed from current Rust
+  output after the RNG fix. `make trace-fixtures` matched 10 fixture pairs and
+  15,452 frames; `make fidelity` passed with 31/31 added executable Rust lines
+  covered.
+
+Column summary:
+
+- `start_game`: `video_crc32` differs on all 1,228 frames; `phase`, `wave`,
+  `lives`, and `smart_bombs` differ on 203 frames; `seed`, `hseed`, and
+  `lseed` differ on 211, 210, and 210 frames; `object_table_crc32` differs on
+  55 frames; `process_table_crc32` differs on 325 frames.
+- `firing`, `thrust_reverse`, `smart_bomb`, and `hyperspace`: `video_crc32`
+  differs on all 1,328 frames; `phase`, `wave`, `lives`, and `smart_bombs`
+  differ on 303 frames; `seed`, `hseed`, and `lseed` differ on 311, 310, and
+  310 frames; `object_table_crc32` differs on 155 frames;
+  `process_table_crc32` differs on 425 frames.
+
+First remaining non-video mismatches:
+
+- `process_table_crc32`: line 902/frame 901, expected `0xDEFE9590`, actual
+  `0x640191A2`.
+- `seed`/`hseed`/`lseed`: line 1019/frame 1018, expected
+  `0x44/0xE2/0x2F`, actual `0x65/0x71/0x17`.
+- `phase`: line 1027/frame 1026, expected `game_over`, actual `playing`.
+- `object_table_crc32`: line 1175/frame 1174, expected `0x81575057`, actual
+  `0xD4938A5C`.
+
+Interpretation:
+
+- The first coin frame no longer skips the frame-level `RAND` advance. The
+  power-on handoff now suppresses that advance only when the attract executive
+  slice already ran `EXEC`/`RAND`.
+- The remaining gameplay blocker is scheduler/state timing rather than the
+  first credited input RNG call order: process-table cadence diverges when coin
+  input interrupts the attract process, and Rust applies `START` player setup
+  earlier than the local reference.
