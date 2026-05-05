@@ -588,7 +588,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known unknown: unignore when object/process scheduler golden traces exist"]
+    #[ignore = "known DC-22 gap: object/process scheduler golden traces and callbacks remain incomplete"]
     fn known_unknown_object_and_process_trace_equivalence() {
         panic!("object/process table CRCs must match red-label golden traces");
     }
@@ -606,7 +606,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known unknown: unignore when player/world routines are translated"]
+    #[ignore = "known DC-22 gap: player/world exact trace equivalence still has untranslated tails"]
     fn known_unknown_player_world_trace_equivalence() {
         panic!("player, enemy, terrain, and collision state must match red-label golden traces");
     }

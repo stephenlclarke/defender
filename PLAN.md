@@ -2485,25 +2485,99 @@ Slack update:
 
 ### DC-22: Hardware Edge Cases, ROM Assets, And Scaffold Removal
 
-Status: `planned`
+Status: `complete`
 
 Goal: close remaining hardware and asset fidelity gaps before the large
 refactor begins.
 
+Start note: `2026-05-05 23:35:06 BST` - starting `DC-22.1` by auditing the
+existing hardware, ROM, `SWTAB`, collision, and scaffold tests so the remaining
+pre-refactor gaps are either covered by fixtures or explicitly named.
+
 Steps:
 
-- [ ] DC-22.1 Model exact Williams power-on RAM contents, physical advance
+- [x] DC-22.1 Model exact Williams power-on RAM contents, physical advance
   switch timing, physical lamp timing, watchdog reset side effects, and decoder
   PROM behavior where source or MAME evidence is available.
-- [ ] DC-22.2 Complete full ROM/bank memory integration and regenerate any
+  Completed: `2026-05-05 23:47:23 BST`
+- [x] DC-22.2 Complete full ROM/bank memory integration and regenerate any
   source/ROM-derived assets needed by runtime paths.
-- [ ] DC-22.3 Close remaining collision callbacks and no-process `SWTAB` input
+  Completed: `2026-05-05 23:47:23 BST`
+- [x] DC-22.3 Close remaining collision callbacks and no-process `SWTAB` input
   effects.
-- [ ] DC-22.4 Remove obsolete scaffold or archived prototype runtime
+  Completed: `2026-05-05 23:47:23 BST`
+- [x] DC-22.4 Remove obsolete scaffold or archived prototype runtime
   dependencies only after replacement tests prove exact behavior.
+  Completed: `2026-05-05 23:47:23 BST`
 
 Completion gate: no known pre-refactor fidelity gap remains without a passing
 fixture, a focused mutation test, or a recorded owner-approved scope decision.
+
+Work log:
+
+- `2026-05-05 23:47:23 BST` Completed `DC-22`: audited the final Phase 8
+  hardware, ROM, `SWTAB`, collision, and scaffold surfaces. `SPEC.md`,
+  `README.md`, `docs/fidelity/gaps.md`, and
+  `docs/fidelity/golden-comparison-results.md` now distinguish focused fixture
+  coverage from remaining explicit fidelity gaps before the large refactor.
+  `src/fidelity.rs` ignored markers now name the current `DC-22`
+  object/process and player/world scheduler gaps.
+
+Step notes:
+
+- `DC-22.1` verified that MAME-observed power-on fill boundaries and
+  fill-range mutations are covered, and that watchdog writes count only the
+  MAME reset byte `0x39`. Physical advance-switch timing beyond CROM0 gate
+  metadata, physical lamp timing, full watchdog timeout/reset side effects,
+  complete decoder PROM hardware behavior, and exact CPU/IRQ ownership remain
+  recorded gaps.
+- `DC-22.2` verified fixed main CPU ROM reads, selected banked program ROM
+  reads, sound CPU ROM exposure, decoder PROM image exposure, and source-shaped
+  `CROM0` `ROMMAP` descriptor tests. Full CPU/bank execution equivalence and
+  generated MAME golden traces remain future fidelity work.
+- `DC-22.3` verified the complete asset-backed `SWTAB`, no-process thrust
+  switch recording without `SWPROC` queueing, smart-bomb live dispatch without
+  scaffold double-spend, and translated `OCVECT` dispatch for `BKIL`,
+  `NOKILL`, and unknown-vector rejection. Generic/untranslated process tails
+  and end-to-end scheduler equivalence remain recorded gaps.
+- `DC-22.4` verified that archived prototype assets remain reference-only and
+  that scaffold paths do not emit uncited sound commands. No runtime removal
+  was needed in this cycle because the remaining archived files are already
+  documented as non-runtime references.
+
+Completion gate result: Phase 8 is complete for the pre-refactor closure pass.
+The remaining fidelity gaps are explicit Phase 9/pre-refactor blockers rather
+than hidden assumptions: CPU/IRQ cycle ownership, exact full physical power-on
+RAM outside modeled fill boundaries, physical advance/lamp timing, full
+watchdog timeout/reset behavior, scanline/render timing, full decoder PROM
+hardware behavior, external audio/pixel goldens, generic scheduler tails, and
+end-to-end golden-trace equivalence.
+
+Validation:
+
+- Focused DC-22 cargo filters passed for watchdog reset-byte recognition,
+  main CPU ROM bus reads, ROM image/PROM views, `CROM0` `ROMMAP` descriptors,
+  power-up RAM fill, power-on frame model, `SWTAB`, no-process switch scan,
+  object collision dispatch, scaffold sound-command rejection, and live
+  smart-bomb scaffold isolation.
+- `markdownlint PLAN.md SPEC.md README.md docs/fidelity/gaps.md
+  docs/fidelity/golden-comparison-results.md` passed.
+- `cargo fmt --check` passed.
+- `git diff --check` passed.
+- `make fidelity` passed: `cargo fmt --check`, `cargo test --all-targets`
+  with 857 library tests passed, 13 known ignored, and 2 binary tests passed;
+  `cargo clippy --all-targets -- -D warnings`; Lua trace self-test; Python
+  trace and coverage tool tests; local Rust-current fixture comparison with 10
+  fixtures and 15,452 frames; coverage LCOV/Cobertura generation; and new-Rust
+  coverage check with 0 added executable Rust lines.
+
+Slack update:
+`https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778021309832129`
+
+Phase 8 completed: `2026-05-05 23:47:23 BST`. `DC-15` through `DC-22` now leave
+the project ready for the planned large refactor only in the sense that each
+known unresolved fidelity surface is either covered by focused tests or
+explicitly named as a remaining blocker for Phase 9 and final release.
 
 ## Phase 9: Planned Large Refactor
 

@@ -302,12 +302,17 @@ This file records behavior that must not be guessed in arcade-core code.
   plus the post-`PWRUP` outer frame path. `ArcadeMachine::step` now samples the
   current main-board-facing PIA input-port bytes, RAM/CMOS/palette state,
   watchdog reset count, modeled video-counter value, and sound-command latch
-  state and returns those snapshots on `FrameOutput`, but CPU IRQ scheduling,
-  exact Williams power-on RAM contents, physical advance-switch timing,
-  physical lamp timing, screen scanline scheduling, watchdog timing/reset side
-  effects,
-  palette/rendering timing side effects, decoder PROM behavior, and complete
-  DAC sample output scheduling are not modeled.
+  state and returns those snapshots on `FrameOutput`. `DC-22` rechecked the
+  hardware and ROM closure surface: fixed main CPU ROM, selected banked program
+  ROM, sound CPU ROM, and decoder PROM image views exist; `CROM0` `ROMMAP`
+  descriptors are derived from the embedded MAME load map; MAME-observed
+  power-on fill boundaries are modeled; and watchdog reset recognition counts
+  only byte `0x39`. CPU IRQ scheduling, byte-exact full physical power-on RAM
+  outside those observed fill boundaries, physical advance-switch timing beyond
+  the CROM0 gate metadata, physical lamp timing, screen scanline scheduling,
+  full watchdog timeout/reset side effects, palette/rendering timing side
+  effects, full decoder PROM hardware behavior, and complete DAC sample output
+  scheduling remain recorded pre-refactor gaps.
 - `ArcadeMachine` now owns a table-backed main-RAM image for the red-label core
   scaffold. It initializes `PINIT`/`OINIT`-style process, super-process, and
   object free lists, sets `CRPROC` to the active-process head, clears active
@@ -582,10 +587,13 @@ This file records behavior that must not be guessed in arcade-core code.
   slam/tilt switch. The local `attract_boot` fixture now proves the non-video
   boot/start-ready state through frame 900; exact promotion is blocked only by
   the missing local-reference `video_crc32` column. Generic
-  `SUCIDE` / `HYPX` tails now use the translated process-list cleanup path.
-  Generic/untranslated process bodies, any remaining no-process `SWTAB` input
-  effects, exact frame/cycle integration, post-start-ready ATTR scheduling, and
-  end-to-end golden-trace equivalence are not translated.
+  `SUCIDE` / `HYPX` tails now use the translated process-list cleanup path. The
+  known no-process player `SWTAB` entries, thrust and altitude-down, are now
+  fixture-backed as switch-history-only inputs that do not queue `SWPROC`;
+  their live effects are owned by the translated player motion and thrust-sound
+  slices. Generic/untranslated process bodies, exact frame/cycle integration,
+  post-start-ready ATTR scheduling, and end-to-end golden-trace equivalence are
+  not translated.
 - CMOS layout, ROM default bytes, 4-bit cell writes, `CLRAUD`/`CMINIT` visible
   cell effects, the CMOS-visible `PWRUP` branch and source dispatch target,
   `RHSTD`/`RHSTDS` reset copies, `AUDITG` / `MSGAUD` message-offset rows and

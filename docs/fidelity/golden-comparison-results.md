@@ -839,3 +839,36 @@ Interpretation:
 - The timed sound IRQ model remains source-visible, not cycle-accurate: DAC
   ticks count translated DAC writes and do not yet model independent 6808 CPU
   cycles or hardware sample spacing.
+
+## 2026-05-05 `DC-22` Hardware, ROM, And Scaffold Closure Review
+
+Purpose: finish the Phase 8 pre-refactor audit by separating edge cases already
+covered by focused fixtures from fidelity gaps that must remain explicit before
+the large refactor begins.
+
+Checked surfaces:
+
+- Hardware and ROM: watchdog reset-byte recognition, fixed main CPU ROM reads,
+  selected banked ROM reads, decoder PROM image exposure, and source-shaped
+  `CROM0` `ROMMAP` descriptors.
+- Power-on state: MAME-observed RAM-fill frame boundaries, fill-range
+  mutations, and the shared power-on frame model for `SINIT`, `INIT20`, and
+  cold-boot attract process boundaries.
+- Switches and collision dispatch: complete asset-backed `SWTAB`, no-process
+  thrust switch recording without `SWPROC` queueing, and translated `OCVECT`
+  dispatch for `BKIL`, `NOKILL`, and unknown-vector rejection.
+- Scaffold and archived assets: runtime paths do not use archived prototype
+  visual/sound assets, and scaffold sound commands without source evidence are
+  rejected by tests.
+
+Interpretation:
+
+- DC-22 does not claim the hardware layer is cycle-exact. It records the tested
+  source/MAME-backed surfaces that can safely enter the large refactor.
+- Remaining pre-refactor gaps are now named rather than implicit: CPU/IRQ
+  cycle ownership, byte-exact full physical power-on RAM outside the observed
+  fill boundaries, physical advance-switch timing beyond CROM0 gate metadata,
+  physical lamp timing, screen scanline scheduling, full watchdog timeout/reset
+  side effects, palette/rendering timing side effects, full decoder PROM
+  hardware behavior, complete DAC sample output scheduling, generic scheduler
+  tails, and end-to-end golden-trace equivalence.

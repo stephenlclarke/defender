@@ -260,6 +260,15 @@ compatibility behavior.
   `DC-20.1` added MAME-derived visible pixel-nibble CRC capture to local
   reference traces; regenerated fixtures now detect the attract/title pixel
   drift instead of carrying `video_crc32=-`.
+- `DC-22` closes the pre-refactor hardware/asset audit by naming which edge
+  cases are fixture-backed versus deferred. Fixed main CPU ROM, selected
+  banked program ROM, sound CPU ROM, decoder PROM image views, `CROM0`
+  `ROMMAP` descriptors, MAME-observed power-on fill boundaries, watchdog
+  reset-byte recognition, no-process `SWTAB` entries, translated collision
+  dispatch, and archived prototype asset isolation all have focused tests.
+  CPU/IRQ cycle ownership, physical advance/lamp timing, full watchdog timeout
+  side effects, complete decoder PROM hardware behavior, and remaining
+  scheduler/golden-trace equivalence are still explicit fidelity gaps.
 - `ArcadeMachine::step` returns post-frame main-board and sound-board snapshots
   on `FrameOutput`. Tests now lock the input-port bytes, main RAM/CMOS CRCs,
   palette RAM, hardware map, watchdog count, video-counter sample, sound latch,

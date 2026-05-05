@@ -807,16 +807,21 @@ Additional gaps and corrections found during this review:
   `PLAYB` pulse, skip-sound table, BCD sound-number display, CROM0
   switch-test heading/display table/PIA scan, CROM0 monitor-test
   heading/crosshatch/RGB-field/color-bar pattern displays, monitor-to-`AUDITG`
-  entry transfer, and `AUDITG` title/prompt/row text transfers. CPU interrupt
-  scheduling, physical lamp timing, and cycle-accurate sound sample scheduling
-  remain gaps.
+  entry transfer, and `AUDITG` title/prompt/row text transfers. ROM views now
+  cover fixed main CPU ROM, selected banked program ROM, sound CPU ROM, and
+  decoder PROM bytes for verification and source-table extraction. The
+  watchdog surface counts only the MAME-observed reset byte. CPU interrupt
+  scheduling, exact physical lamp timing, full decoder PROM hardware behavior,
+  and cycle-accurate sound sample scheduling remain gaps.
   Sound-board PIA IC4 data/control behavior exists for port-B command reads and
   port-A DAC writes, and command CB1 updates the PIA IRQ state. There is still
-  no exact power-on RAM state, physical advance-switch timing, physical lamp
-  timing, screen scanline scheduler, watchdog timing/reset side effects,
-  rendering timing side effects, decoder PROM behavior, complete DAC sample
-  output, CPU IRQ scheduling, or all translated `VSNDRM1.SRC` waveform
-  routines.
+  no byte-exact full physical power-on RAM state outside the modeled
+  MAME-observed power-on fill boundaries, no physical advance-switch timing
+  beyond the source-visible CROM0 gate metadata, no physical lamp timing, no
+  screen scanline scheduler, no full watchdog timeout/reset side effects, no
+  rendering timing side effects, no full decoder PROM hardware behavior, no
+  complete DAC sample output, no CPU IRQ scheduling, and not all
+  `VSNDRM1.SRC` waveform routines are translated.
 
 ### Player And Controls
 
@@ -836,10 +841,13 @@ Additional gaps and corrections found during this review:
   player frames. The `SBOMB` switch
   process also enters through `SWTAB`/`SSCAN`/`SWPROC`/`SWP`. The scanner now
   records fire, thrust, smart bomb, hyperspace, start-one, start-two, reverse,
-  and altitude-down bits from the source table, but only fully translated
-  live-safe `LFIRE`, `SBOMB`, `HYPER`, and `REV` routine bodies are queued. The
-  `PLAYER` IRQ motion slice consumes the recorded thrust and altitude bits for
-  source-shaped movement and scroll updates. The `HYPER`
+  and altitude-down bits from the source table. The no-process `SWTAB` entries
+  for thrust and altitude-down update switch history without queueing
+  `SWPROC`, and their live effects are owned by the translated player motion
+  and thrust-sound slices. Only fully translated live-safe `LFIRE`, `SBOMB`,
+  `HYPER`, and `REV` routine bodies are queued. The `PLAYER` IRQ motion slice
+  consumes the recorded thrust and altitude bits for source-shaped movement and
+  scroll updates. The `HYPER`
   entry guard/status/`SCLR1`/sleep sequence and visible `HYP02`/`HYP2`
   rematerialization tail are translated for direct process dispatch, and
   `EXPU` now reaches translated `EWRITE` video writes. `KILOFF` object unlink
