@@ -269,6 +269,11 @@ compatibility behavior.
   CPU/IRQ cycle ownership, physical advance/lamp timing, full watchdog timeout
   side effects, complete decoder PROM hardware behavior, and remaining
   scheduler/golden-trace equivalence are still explicit fidelity gaps.
+- `DC-23` freezes the pre-refactor API and validation contract in
+  `docs/fidelity/refactor-freeze.md`. `ArcadeMachine` now explicitly exposes
+  `new`, `reset`, `step`, `snapshot`, `restore`, and full `save_state` /
+  `restore_state` behavior for the large refactor, with a focused reset/API
+  unit test proving reset returns to the same observable state as `new`.
 - `ArcadeMachine::step` returns post-frame main-board and sound-board snapshots
   on `FrameOutput`. Tests now lock the input-port bytes, main RAM/CMOS CRCs,
   palette RAM, hardware map, watchdog count, video-counter sample, sound latch,

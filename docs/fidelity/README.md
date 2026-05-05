@@ -13,6 +13,9 @@ Rules:
   binary must remain self-contained.
 - Characterization tests follow `characterization-tests.md` so later refactors
   preserve source-visible mutations, not only returned values.
+- The large-refactor freeze contract is recorded in `refactor-freeze.md`; keep
+  its validation suite, API contract, module boundaries, and byte-compatible
+  surface list current before moving code.
 - Golden-trace fixes follow the `characterization-tests.md` golden-fix workflow:
   exact TSV comparison first, then narrow source-visible mutation tests for the
   responsible routine.

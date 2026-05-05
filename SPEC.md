@@ -1339,13 +1339,25 @@ It should model:
 - Sound command output.
 - Video/sprite/palette output state.
 
-The core should expose a small public API:
+The pre-refactor core exposes a small public API through `ArcadeMachine`; a
+later module split may wrap or rename it, but it must preserve the same
+observable contract:
 
-- `ArcadeCore::new(config)`.
-- `ArcadeCore::reset()`.
-- `ArcadeCore::step(input_bits) -> FrameOutputs`.
-- `ArcadeCore::snapshot()`.
-- `ArcadeCore::restore(snapshot)`.
+- `ArcadeMachine::new()`.
+- `ArcadeMachine::try_new_with_cmos(cmos)`.
+- `ArcadeMachine::new_cold_boot_trace()`.
+- `ArcadeMachine::reset()`.
+- `ArcadeMachine::step(input_bits) -> FrameOutput`.
+- `ArcadeMachine::step_with_typed_chars(input_bits, typed_chars) ->
+  FrameOutput`.
+- `ArcadeMachine::snapshot()`.
+- `ArcadeMachine::restore(snapshot)`.
+- `ArcadeMachine::save_state()`.
+- `ArcadeMachine::restore_state(state)`.
+
+`docs/fidelity/refactor-freeze.md` owns the `DC-23` refactor-freeze contract:
+the validation suite, module boundaries, and byte-compatible surfaces that must
+remain stable during the large refactor.
 
 ### Compatibility Layer
 

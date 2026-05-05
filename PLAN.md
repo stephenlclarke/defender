@@ -2583,23 +2583,88 @@ explicitly named as a remaining blocker for Phase 9 and final release.
 
 ### DC-23: Refactor Freeze And API Shape
 
-Status: `planned`
+Status: `complete`
 
 Goal: prepare for the large refactor only after behavior is well characterized.
 
+Start note: `2026-05-05 23:50:19 BST` - starting `DC-23.1` by auditing the
+current characterization suite, public machine API, module ownership boundaries,
+and byte-compatible behavior list before adding the missing narrow API contract
+and freeze documentation.
+
 Steps:
 
-- [ ] DC-23.1 Freeze a full characterization suite covering traces, mutation
+- [x] DC-23.1 Freeze a full characterization suite covering traces, mutation
   tests, pixel fixtures, audio fixtures, and live/session edge cases.
-- [ ] DC-23.2 Define the public arcade API: `new`, `reset`, `step`,
+  Completed: `2026-05-06 00:00:42 BST`
+- [x] DC-23.2 Define the public arcade API: `new`, `reset`, `step`,
   `snapshot`, and `restore`.
-- [ ] DC-23.3 Identify module boundaries for CPU/board, scheduler, memory,
+  Completed: `2026-05-06 00:00:42 BST`
+- [x] DC-23.3 Identify module boundaries for CPU/board, scheduler, memory,
   video, sound, input/session, compatibility, and assets.
-- [ ] DC-23.4 Document every behavior that must remain byte-for-byte compatible
+  Completed: `2026-05-06 00:00:42 BST`
+- [x] DC-23.4 Document every behavior that must remain byte-for-byte compatible
   during the refactor.
+  Completed: `2026-05-06 00:00:42 BST`
 
 Completion gate: the refactor has a test-backed API contract and no major
 untested mutation surfaces.
+
+Work log:
+
+- `2026-05-06 00:00:42 BST` Completed `DC-23`: added the explicit
+  `ArcadeMachine::reset()` API and a focused
+  `public_arcade_api_reset_matches_new_machine_contract` test proving reset
+  returns a mutated machine to the same observable state and replay output as
+  `ArcadeMachine::new()`. Added `docs/fidelity/refactor-freeze.md` as the
+  pre-refactor contract for validation commands, focused filters, API behavior,
+  module ownership boundaries, and byte-compatible surfaces. Updated
+  `SPEC.md`, `README.md`, and `docs/fidelity/README.md` to point at that
+  contract and to document the actual pre-refactor `ArcadeMachine` API.
+
+Step notes:
+
+- `DC-23.1` froze `make fidelity` as the broad suite and documented focused
+  filters for API, snapshot/restore, trace, video, sound, live, session,
+  collision, and `SWTAB` refactor slices.
+- `DC-23.2` froze the pre-refactor API around `ArcadeMachine::new`,
+  `try_new_with_cmos`, `new_cold_boot_trace`, `reset`, `step`,
+  `step_with_typed_chars`, `snapshot`, `restore`, `save_state`, and
+  `restore_state`.
+- `DC-23.3` documented target ownership boundaries for CPU/board, scheduler,
+  memory/source assets, video, sound, input/session, compatibility, and
+  assets/tooling.
+- `DC-23.4` documented the byte-compatible surfaces that must survive the
+  large refactor: trace rows, `FrameOutput`, public snapshots, save-state
+  replay, source-owned RAM/CMOS/palette/hardware/input/watchdog/video/sound
+  surfaces, process/object/shell/switch/player bytes, native video signatures,
+  sound fixtures, session/operator behavior, and disabled-`xyzzy` equivalence.
+
+Completion gate result: the refactor now has a checked-in API/freeze contract
+and a focused reset API test. No major known mutation surface is hidden from
+the refactor plan; remaining unresolved fidelity issues stay recorded as
+Phase 9/Phase 10 blockers rather than refactor assumptions.
+
+Validation:
+
+- Focused DC-23 filters passed: `public_arcade_api`, `snapshot_restore`,
+  `save_state_restore`, `trace_text_`, `native_video_fixture`, `sound_`,
+  `live_`, `session_`, `object_collision_dispatch`, and
+  `switch_scan_records_no_process_swtab_entries_without_queueing`.
+- `cargo fmt --check` passed.
+- `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/characterization-tests.md`
+  passed.
+- `git diff --check` passed.
+- `make fidelity` passed: `cargo fmt --check`, `cargo test --all-targets`
+  with 858 library tests passed, 13 known ignored, and 2 binary tests passed;
+  `cargo clippy --all-targets -- -D warnings`; Lua trace self-test; Python
+  trace and coverage tool tests; local Rust-current fixture comparison with 10
+  fixtures and 15,452 frames; coverage LCOV/Cobertura generation; and new-Rust
+  coverage check with 2 of 2 added executable Rust lines covered.
+
+Slack update:
+`https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778022101667069`
 
 ### DC-24: Module Split And Behavior Preservation
 

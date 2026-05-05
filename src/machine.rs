@@ -24039,6 +24039,10 @@ impl ArcadeMachine {
         Ok(machine)
     }
 
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
+
     pub fn new_cold_boot_trace() -> Self {
         let mut machine = Self::with_memory(
             RedLabelRuntimeMemory::new_cold_boot()
@@ -26822,13 +26826,14 @@ mod tests {
         fidelity::TraceFrame,
         input::{CabinetInput, DefenderInputPorts},
         machine::{
-            ArcadeMachine, GamePhase, MachineEvent, RED_LABEL_ATTRACT_PROCESS_TYPE,
-            RED_LABEL_COIN_PROCESS_TYPE, RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS,
-            RED_LABEL_INVERTED_IRQ_LIVE_VERTCT, RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT,
-            RED_LABEL_INVERTED_WATCHDOG_DATA, RED_LABEL_IRQ_ADDRESS, RED_LABEL_IRQ_JUMP_OPCODE,
-            RED_LABEL_IRQB_ADDRESS, RED_LABEL_NORMAL_IRQ_LIVE_VERTCT,
-            RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT, RED_LABEL_NORMAL_WATCHDOG_DATA,
-            RED_LABEL_P1SW_PIA3_CONTROL, RED_LABEL_P2SW_PIA3_CONTROL, RED_LABEL_PIA3_COCKTAIL_BIT,
+            ArcadeMachine, CompatibilityState, GamePhase, MachineEvent,
+            RED_LABEL_ATTRACT_PROCESS_TYPE, RED_LABEL_COIN_PROCESS_TYPE,
+            RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS, RED_LABEL_INVERTED_IRQ_LIVE_VERTCT,
+            RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT, RED_LABEL_INVERTED_WATCHDOG_DATA,
+            RED_LABEL_IRQ_ADDRESS, RED_LABEL_IRQ_JUMP_OPCODE, RED_LABEL_IRQB_ADDRESS,
+            RED_LABEL_NORMAL_IRQ_LIVE_VERTCT, RED_LABEL_NORMAL_IRQ_PALETTE_COPY_LIMIT,
+            RED_LABEL_NORMAL_WATCHDOG_DATA, RED_LABEL_P1SW_PIA3_CONTROL,
+            RED_LABEL_P2SW_PIA3_CONTROL, RED_LABEL_PIA3_COCKTAIL_BIT,
             RED_LABEL_PLS1_ENTRY_B_REGISTER, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelAdminSwitch,
             RedLabelAdvanceSwitchTarget, RedLabelAltitudeTableInit, RedLabelAppearanceStart,
             RedLabelAstronautDirection, RedLabelAstronautKill, RedLabelAstronautProcessStep,
@@ -57950,6 +57955,57 @@ mod tests {
 
         assert_eq!(after.frame, before.frame + 1);
         assert_ne!(after.rng, before.rng);
+    }
+
+    #[test]
+    fn public_arcade_api_reset_matches_new_machine_contract() {
+        let mut machine = ArcadeMachine::new();
+        start_one_player_game_for_test(&mut machine);
+        machine.set_compatibility(CompatibilityState {
+            xyzzy_active: true,
+            xyzzy_invincible: true,
+            xyzzy_auto_fire: true,
+        });
+        machine.step(CabinetInput {
+            coin: true,
+            start_one: true,
+            thrust: true,
+            fire: true,
+            ..CabinetInput::NONE
+        });
+
+        let fresh = ArcadeMachine::new();
+        machine.reset();
+
+        assert_eq!(machine.snapshot(), fresh.snapshot());
+        assert_eq!(
+            machine.red_label_main_board_snapshot(),
+            fresh.red_label_main_board_snapshot()
+        );
+        assert_eq!(
+            machine.red_label_sound_board_snapshot(),
+            fresh.red_label_sound_board_snapshot()
+        );
+        assert_eq!(machine.red_label_ram(), fresh.red_label_ram());
+        assert_eq!(machine.red_label_cmos_ram(), fresh.red_label_cmos_ram());
+        assert_eq!(
+            machine.red_label_palette_ram(),
+            fresh.red_label_palette_ram()
+        );
+        assert_eq!(
+            machine.red_label_hardware_map(),
+            fresh.red_label_hardware_map()
+        );
+
+        let input = CabinetInput::NONE;
+        let reset_output = machine.step(input);
+        let mut fresh_replay = ArcadeMachine::new();
+        let fresh_output = fresh_replay.step(input);
+        assert_eq!(reset_output, fresh_output);
+        assert_eq!(
+            TraceFrame::from_output(input, &reset_output).to_tsv_line(),
+            TraceFrame::from_output(input, &fresh_output).to_tsv_line()
+        );
     }
 
     #[test]
