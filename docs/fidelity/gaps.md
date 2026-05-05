@@ -134,6 +134,12 @@ This file records behavior that must not be guessed in arcade-core code.
   `INIT20`, `EXEC`, live-input holdoff, start-ready, and attract handoff
   decisions instead of keeping a separate frame-number switch in the attract
   scheduler.
+- `DC-17.4` kept the trace schema unchanged because the new board snapshots
+  are already public `FrameOutput` state. A save/restore replay mutation test
+  now dirties RAM, CMOS, palette, hardware-map, input-port, watchdog,
+  video-counter, sound-latch, and power-on scheduler state, restores the saved
+  machine, and requires the replayed cold-boot sound-handoff `FrameOutput` to
+  match byte-for-byte.
 - `DC-04.2` compared the focused `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` local references.
   Each exact comparison failed first on the same line 2 boot process/super-process

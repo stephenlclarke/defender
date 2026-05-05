@@ -2009,7 +2009,7 @@ Work log:
 
 ### DC-17: Full Frame And CPU/IRQ Ownership
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: replace frame-model shortcuts with source-shaped board, CPU, IRQ, and
 scanline ownership wherever current proof still depends on scaffolding.
@@ -2026,8 +2026,9 @@ Steps:
 - [x] DC-17.3 Replace trace-only scheduling shortcuts with source-shaped
   execution for reset, boot, attract, and gameplay frame boundaries.
   Completed: `2026-05-05 21:40:13 BST`
-- [ ] DC-17.4 Add trace columns or mutation tests only where they expose
+- [x] DC-17.4 Add trace columns or mutation tests only where they expose
   source-visible state needed for equivalence.
+  Completed: `2026-05-05 21:52:02 BST`
 
 Completion gate: frame stepping has explicit ownership for CPU, IRQ, video,
 watchdog, palette, and sound-board handoff behavior, with characterization tests
@@ -2111,6 +2112,30 @@ Work log:
   Rust lines covered.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778013648095269`
+- `2026-05-05 21:42:53 BST` Started `DC-17.4`: checking whether the
+  newly surfaced frame-output board snapshots need additional trace columns or
+  whether mutation/replay tests provide the same refactor-safety signal without
+  fixture schema churn.
+- `2026-05-05 21:52:02 BST` Completed `DC-17.4`: kept the trace schema
+  unchanged because main-board and sound-board snapshots are already
+  source-visible `FrameOutput` state, then added
+  `save_state_restore_replays_frame_output_board_and_sound_surfaces` to mutate
+  RAM, CMOS, palette, hardware-map, input-port, watchdog, video-counter,
+  sound-latch, and power-on scheduler state after save, restore the saved
+  machine, and require the replayed cold-boot sound-handoff `FrameOutput` to
+  match byte-for-byte. Updated `README.md`, `SPEC.md`, and
+  `docs/fidelity/gaps.md` with the no-new-trace-columns decision and the new
+  refactor-safety coverage. Validation passed with `cargo fmt --check`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/gaps.md
+  docs/fidelity/golden-comparison-results.md`, `git diff --check`, focused
+  `cargo test
+  save_state_restore_replays_frame_output_board_and_sound_surfaces
+  --all-targets`, and `make fidelity`, including `855` passed Rust library
+  tests, `13` known ignored tests, two binary tests, clippy, Lua/Python
+  trace-tool tests, 10 Rust-current fixture pairs / 15,452 frames, LLVM
+  coverage, and new-code coverage with `0/0` added executable Rust lines.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778014362338469`
 
 ### DC-18: Gameplay Golden Trace Closure
 

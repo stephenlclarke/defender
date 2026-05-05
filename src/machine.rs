@@ -58046,6 +58046,50 @@ mod tests {
     }
 
     #[test]
+    fn save_state_restore_replays_frame_output_board_and_sound_surfaces() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..730 {
+            machine.step(CabinetInput::NONE);
+        }
+        let saved_state = machine.save_state();
+        let mut expected = machine.clone();
+
+        let expected_output = expected.step(CabinetInput::NONE);
+        assert_eq!(
+            expected_output
+                .sound_commands()
+                .map(|command| command.raw())
+                .collect::<Vec<_>>(),
+            vec![0xC0]
+        );
+
+        machine.memory.write_byte(0xA123, 0xA5).expect("mutate RAM");
+        machine.memory.cmos[0x7D] = 0xF0;
+        machine.memory.palette_ram[5] = 0x00;
+        machine.memory.hardware_map = 2;
+        machine.main_board_input_ports = DefenderInputPorts {
+            in0: 0x02,
+            in1: 0x40,
+            in2: 0x08,
+        };
+        machine.main_board_watchdog_reset_count = 99;
+        machine.main_board_video_counter_vpos = 0x00A8;
+        machine.sound_board_last_command_latch =
+            Some(SoundCommandLatch::from_main_board_pia_port_b(0x3F));
+        machine.sound_board_latch_write_count = 99;
+        machine.trace_power_up_ram_fill = None;
+        machine.frame = 99;
+        machine.phase = GamePhase::Playing;
+
+        machine.restore_state(saved_state);
+        let replay_output = machine.step(CabinetInput::NONE);
+
+        assert_eq!(replay_output.main_board, expected_output.main_board);
+        assert_eq!(replay_output.sound_board, expected_output.sound_board);
+        assert_eq!(replay_output, expected_output);
+    }
+
+    #[test]
     fn restore_snapshot_writes_table_backed_red_label_state() {
         let mut machine = ArcadeMachine::new();
         let mut snapshot = machine.snapshot();

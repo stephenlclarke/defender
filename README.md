@@ -261,7 +261,9 @@ compatibility behavior.
 - `ArcadeMachine::step` returns post-frame main-board and sound-board snapshots
   on `FrameOutput`. Tests now lock the input-port bytes, main RAM/CMOS CRCs,
   palette RAM, hardware map, watchdog count, video-counter sample, sound latch,
-  CB1 IRQ state, and latch write count at the frame boundary.
+  CB1 IRQ state, and latch write count at the frame boundary. A save/restore
+  replay test also proves those frame-output surfaces survive dirty
+  intermediate mutations without needing additional trace TSV columns.
 - The runtime embeds red-label defaults, score values, high-score seeds, CMOS
   layout/default metadata, input port metadata, RAM table metadata, ROM
   metadata, ROM-region/load maps with derived `CROM0` `ROMMAP` descriptors and
