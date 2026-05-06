@@ -251,17 +251,16 @@ compatibility behavior.
   is derived from the core red-label `FRAME_RATE_MILLIHZ` constant, advances any
   due core frames before each terminal draw, and no longer lets terminal draw
   cadence decide core frame count.
-- Known live fidelity gap: a `2026-05-05` live-review pass reported that the
-  app did not advance beyond the initial Williams/`DEFENDER` screen, and that
-  the title graphic is corrupted into large red/purple blocky bands. `DC-16.5`
-  now has a core smoke test proving live attract progresses into later attract,
-  credit, and start-ready states. The title corruption and terminal/pixel proof
-  remain tracked in `SPEC.md`, `docs/fidelity/gaps.md`, and `PLAN.md`.
-  `DC-20.1` added MAME-derived visible pixel-nibble CRC capture to local
-  reference traces; regenerated fixtures now detect the attract/title pixel
-  drift instead of carrying `video_crc32=-`. `DC-24` tightened the reference
-  fixture check so stale required cells fail before exact comparison; the active
-  blocker is now real frame-3 title/attract video drift.
+- Known live fidelity gap history: a `2026-05-05` live-review pass reported
+  that the app did not advance beyond the initial Williams/`DEFENDER` screen,
+  and that the title graphic was corrupted into large red/purple blocky bands.
+  `DC-16.5` added a core smoke test proving live attract progresses into later
+  attract, credit, and start-ready states. `DC-20.1` added MAME-derived visible
+  pixel-nibble CRC capture to local reference traces, `DC-24` made stale
+  `video_crc32=-` fixtures fail before exact comparison, and `DC-25` fixed the
+  MAME-derived cold-boot/title/initial-attract pixel drift enough to promote
+  `local_reference_attract_boot_matches_red_label` as a normal passing test.
+  Full terminal screenshot proof remains tracked in `DC-30`.
 - `DC-22` closes the hardware/asset audit by naming which edge
   cases are fixture-backed versus deferred. Fixed main CPU ROM, selected
   banked program ROM, sound CPU ROM, decoder PROM image views, `CROM0`

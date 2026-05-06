@@ -1717,49 +1717,48 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known DC-25 mismatch: regenerated local reference first differs at frame 3 video CRC"]
     fn local_reference_attract_boot_matches_red_label() {
         assert_local_reference_trace_matches("attract_boot");
     }
 
     #[test]
-    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes credited-start scheduler/player drift"]
+    #[ignore = "known DC-26 mismatch: credited-start scheduler/player drift after promoted boot/attract pixels"]
     fn local_reference_start_game_matches_red_label() {
         assert_local_reference_trace_matches("start_game");
     }
 
     #[test]
-    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes gameplay scheduler/player drift"]
+    #[ignore = "known DC-26 mismatch: gameplay scheduler/player drift after promoted boot/attract pixels"]
     fn local_reference_firing_matches_red_label() {
         assert_local_reference_trace_matches("firing");
     }
 
     #[test]
-    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes gameplay scheduler/player drift"]
+    #[ignore = "known DC-26 mismatch: gameplay scheduler/player drift after promoted boot/attract pixels"]
     fn local_reference_thrust_reverse_matches_red_label() {
         assert_local_reference_trace_matches("thrust_reverse");
     }
 
     #[test]
-    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes gameplay scheduler/player drift"]
+    #[ignore = "known DC-26 mismatch: gameplay scheduler/player drift after promoted boot/attract pixels"]
     fn local_reference_smart_bomb_matches_red_label() {
         assert_local_reference_trace_matches("smart_bomb");
     }
 
     #[test]
-    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes gameplay scheduler/player drift"]
+    #[ignore = "known DC-26 mismatch: gameplay scheduler/player drift after promoted boot/attract pixels"]
     fn local_reference_hyperspace_matches_red_label() {
         assert_local_reference_trace_matches("hyperspace");
     }
 
     #[test]
-    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes credited-start scheduler/death drift"]
+    #[ignore = "known DC-26 mismatch: credited-start scheduler/death drift after promoted boot/attract pixels"]
     fn local_reference_death_matches_red_label() {
         assert_local_reference_trace_matches("death");
     }
 
     #[test]
-    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes credited-start scheduler/wave drift"]
+    #[ignore = "known DC-26 mismatch: credited-start scheduler/wave drift after promoted boot/attract pixels"]
     fn local_reference_wave_advance_matches_red_label() {
         assert_local_reference_trace_matches("wave_advance");
     }

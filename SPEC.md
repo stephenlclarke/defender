@@ -424,17 +424,16 @@ Additional gaps and corrections found during this review:
   acceptance, and the refactor must wait until the ROM-complete playable game
   is finished.
 - The live path now feeds translated video RAM into `render_cabinet_frame`.
-  Remaining video risk is fixture proof for exact frame/cycle timing, pixel
-  golden coverage, and intentionally native-black untranslated screens. A live
-  title-screen capture reported on `2026-05-05` shows the `DEFENDER`
-  wordmark/title graphic corrupted into large red/purple blocky bands; that is
-  a named video fidelity gap until a MAME-derived pixel fixture proves the
-  title/logo decode, plot, color, copy, and presentation cadence match
-  red-label output. The same live-review pass also reported that the app did
-  not advance beyond the initial Williams/`DEFENDER` screen. `DC-16.5` now
-  adds a core smoke test proving idle live attract reaches later attract
-  processes, accepts credit, and starts play; terminal/pixel proof remains with
-  the MAME-derived pixel fixture work.
+  Remaining video risk is fixture proof for exact frame/cycle timing, broader
+  pixel golden coverage, and intentionally native-black untranslated screens.
+  A live title-screen capture reported on `2026-05-05` showed the `DEFENDER`
+  wordmark/title graphic corrupted into large red/purple blocky bands, and the
+  same live-review pass reported that the app did not advance beyond the
+  initial Williams/`DEFENDER` screen. `DC-16.5` adds a core smoke test proving
+  idle live attract reaches later attract processes, accepts credit, and starts
+  play. `DC-25` closes the MAME-derived cold-boot/title/initial-attract pixel
+  blocker by promoting `local_reference_attract_boot_matches_red_label`; full
+  terminal screenshot proof remains part of `DC-30`.
 - The trace schema can record object CRCs, process CRCs, super-process CRCs,
   shell CRCs, sound commands, and optional video CRCs, but CMOS-specific trace
   columns, pixel golden fixtures, and external audio waveform golden fixtures
@@ -449,12 +448,12 @@ Additional gaps and corrections found during this review:
 - Local MAME reference traces are intentionally ignored artifacts. The checked
   in code can validate local fixture presence and shape, but the repo still
   depends on user-supplied ROMs and local MAME to prove golden equivalence.
-- Remaining open gaps include exact `attract_boot` promotion after the local
-  reference fixture gains video CRCs, full frame/cycle integration, end-to-end
-  golden-trace proof for translated session/operator paths, MAME-derived pixel
-  golden fixtures, cycle-accurate sound-board CPU cadence and waveform spacing,
-  external waveform fixtures, and removal or regeneration of archived prototype
-  visual/audio assets.
+- Remaining open gaps include exact gameplay scenario promotion after the
+  shared line 902/frame 901 credited-start handoff mismatch, full frame/cycle
+  integration, end-to-end golden-trace proof for translated session/operator
+  paths, broader MAME-derived pixel golden fixtures, cycle-accurate sound-board
+  CPU cadence and waveform spacing, external waveform fixtures, and removal or
+  regeneration of archived prototype visual/audio assets.
 - The prior local implementation notes listed "Fix Mutant score to `150`" as
   future work even though `assets/red-label/scores.tsv` and unit tests already
   enforce it. The current contract is to keep that regression covered through
@@ -1191,11 +1190,19 @@ Additional gaps and corrections found during this review:
   stale required cells fail before exact Rust comparison. The old
   line-2/frame-1 `video_crc32=-` blocker is gone; the reference-fixtures check
   now validates 12 complete fixtures and 22,308
-  frames with populated state, RNG, table CRC, and video CRC cells. The exact
-  `local_reference_*_matches_red_label` tests now fail first at line 4/frame 3
-  on real early video drift, expected `0xAD56B94F`, actual `0x157E98C7`. This
-  is the active `DC-25` title/attract pixel-fidelity blocker before
-  `attract_boot` can be promoted.
+  frames with populated state, RNG, table CRC, and video CRC cells. At the end
+  of `DC-24`, the exact `local_reference_*_matches_red_label` tests failed
+  first at line 4/frame 3 on real early video drift, expected `0xAD56B94F`,
+  actual `0x157E98C7`; `DC-25` supersedes that blocker for `attract_boot`.
+- `DC-25` fixed that early MAME-derived boot/title/initial-attract pixel drift.
+  The cold-boot trace now models MAME-observed power-up RAM fill boundaries
+  from frame 3, the initial diagnostics `UNIT OK` text and high-to-low clears,
+  and the first LOGO slices during the ATTR/COLR/TIECL handoff.
+  `local_reference_attract_boot_matches_red_label` is now a normal passing
+  exact test. The seven remaining ignored gameplay reference tests fail first
+  at line 902/frame 901 with `process_table_crc32` expected `0xDEFE9590`,
+  actual `0x640191A2`, and `video_crc32` expected `0x2ABF7D7D`, actual
+  `0x11AAD5E1`; that credited-start handoff is owned by `DC-26`.
 - `DC-18.2` fixed the first credited coin/start RNG call-order drift: the
   cold-boot trace handoff now suppresses the frame-level start-ready `RAND`
   advance only when the attract executive slice already ran `EXEC` and advanced
@@ -1261,16 +1268,14 @@ Additional gaps and corrections found during this review:
   shell-table, or passing pixel-frame golden tests against MAME
   attract/gameplay references. `DC-20.1` added MAME-derived visible
   pixel-nibble CRC capture to the local reference exporter so regenerated
-  traces now populate `video_crc32`. A local `attract_boot` smoke comparison
-  now catches real pixel drift at line 4/frame 3, expected `0xAD56B94F`,
-  actual `0x157E98C7`, with 655 video-CRC mismatches across 900 frames. The
-  observed corrupted title-screen `DEFENDER` graphic remains open until a
-  MAME-derived title/logo pixel fixture passes after the corrected
-  source-backed implementation. The
+  traces now populate `video_crc32`. `DC-25` fixed the early
+  boot/title/initial-attract pixel drift caught by the regenerated
+  `attract_boot` smoke fixture; the exact 900-frame local `attract_boot`
+  reference test now passes unignored with populated `video_crc32`. The
   previously observed failure to progress beyond the initial Williams/`DEFENDER`
   screen now has core-level coverage proving forward progress into later
   attract, credit, and start-ready states; visual terminal proof still belongs
-  with the pixel fixture work.
+  with `DC-30` live playability evidence.
 - There are source-derived command-sequence fixtures and local MAME
   credited-start command evidence, but no external audio waveform golden tests.
 - There is no end-to-end MAME golden regression suite for two-player state,

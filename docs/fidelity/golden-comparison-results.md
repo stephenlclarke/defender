@@ -4,6 +4,45 @@ This file records local Rust-vs-reference trace comparisons. The reference
 fixtures remain ignored local artifacts; only the comparison findings are
 checked in.
 
+## 2026-05-06 `DC-25` Title And Initial Attract Pixel Fidelity
+
+Scenario:
+
+- `attract_boot`
+- Remaining ignored gameplay references:
+  `start_game`, `firing`, `thrust_reverse`, `smart_bomb`, `hyperspace`,
+  `death`, and `wave_advance`
+
+Purpose: close the MAME-derived cold-boot/title/initial-attract pixel drift
+exposed by `DC-24` and make `attract_boot` a normal passing exact fixture.
+
+Commands:
+
+```sh
+cargo test local_reference_attract_boot_matches_red_label --all-targets
+cargo test local_reference_ --all-targets -- --ignored
+```
+
+Result:
+
+- `local_reference_attract_boot_matches_red_label` now passes unignored against
+  the 900-frame local MAME reference with populated `video_crc32`.
+- The fixed evidence includes the early power-up fill frame that previously
+  failed at frame 3 (`0xAD56B94F`), the diagnostic `UNIT OK` screen and clear
+  frames, and the initial LOGO slices beginning at frame 746 (`0xB08FFE8A`).
+- The seven remaining ignored gameplay tests now fail first at line 902/frame
+  901. The common expected row has
+  `process_table_crc32=0xDEFE9590` and `video_crc32=0x2ABF7D7D`; Rust currently
+  emits `process_table_crc32=0x640191A2` and `video_crc32=0x11AAD5E1`.
+
+Interpretation:
+
+- The prior frame-3 title/attract pixel blocker is closed for the exact
+  `attract_boot` reference gate.
+- The next Phase 10 blocker is the shared credited-start handoff at frame 901,
+  owned by `DC-26`.
+- Full live terminal screenshot evidence is still tracked under `DC-30`.
+
 ## 2026-05-04 `DC-04.1` Attract Boot
 
 Scenario: `attract_boot`

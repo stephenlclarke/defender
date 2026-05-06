@@ -75,19 +75,18 @@ Gap inventory:
 
 - Trace oracle fixtures: local MAME reference fixtures exist as ignored local
   artifacts, but `docs/fidelity/fixtures/local/rust-current` is absent in the
-  current local tree. Exact local-reference tests are still ignored until each
-  scenario is made source-equivalent.
-- `attract_boot`: exact comparison still fails first at line 2/frame 1 because
-  the local reference has `video_crc32=-` while Rust emits native video CRCs.
-  Ignoring that missing reference column, Rust now matches every non-video
-  column in the 900-frame local reference, including object/process/
-  super-process/shell CRCs, RNG bytes, sound commands, and events. The
-  remaining `attract_boot` promotion blocker is the missing reference
-  `video_crc32` column.
+  current local tree. The exact `attract_boot` local-reference test now passes
+  unignored; gameplay local-reference tests remain ignored until each scenario
+  is made source-equivalent.
+- `attract_boot`: exact comparison now passes all 900 frames with populated
+  `video_crc32`, including object/process/super-process/shell CRCs, RNG bytes,
+  sound commands, events, and visible pixel CRCs.
 - Focused gameplay traces: `start_game`, `firing`, `thrust_reverse`,
   `smart_bomb`, `hyperspace`, `death`, and `wave_advance` still fail exact
-  local-reference comparison. The recurring gaps are credited-start transition
-  timing, RNG call order, and post-start object/process scheduler execution.
+  local-reference comparison. After `DC-25`, all seven fail first at the shared
+  line 902/frame 901 credited-start handoff: expected
+  `process_table_crc32=0xDEFE9590` and `video_crc32=0x2ABF7D7D`, actual
+  `process_table_crc32=0x640191A2` and `video_crc32=0x11AAD5E1`.
 - CPU, IRQ, and frame ownership: exact main CPU scheduling, IRQ timing,
   A/X/Y/S/CC/B register context, scanline/video counter ownership, watchdog
   timing/reset side effects, palette/rendering timing side effects, and sound
@@ -96,14 +95,14 @@ Gap inventory:
   switch timing, physical lamp timing, decoder PROM behavior, full ROM/bank
   memory integration, generated derived assets, and remaining collision or
   no-process `SWTAB` effects still need source-backed closure.
-- Video: native video rendering exists, but MAME-derived pixel golden fixtures
-  are absent. A `2026-05-05` live title-screen capture shows the `DEFENDER`
-  wordmark/title graphic corrupted into large red/purple blocky bands.
+- Video: native video rendering exists, and the MAME-derived `attract_boot`
+  pixel fixture now passes for cold boot/title/initial attract. Broader
+  MAME-derived pixel golden fixtures and live terminal screenshot proof remain
+  open.
 - Live attract flow: `DC-16.5` adds a core smoke test proving idle live attract
   progresses beyond the initial Williams screen into later attract processes,
-  can accept credit, and can start play. Terminal/pixel proof remains separate
-  from the corrupted title graphic and belongs with the MAME-derived pixel
-  fixture work.
+  can accept credit, and can start play. `DC-25` closes the MAME-derived
+  title/pixel evidence for `attract_boot`; terminal proof remains with `DC-30`.
 - Remaining untranslated screens still render native black, and remaining HUD,
   general text, boot/game-over presentation, and non-IRQ scanline ownership
   need proof or owner-approved scope decisions.
@@ -2764,35 +2763,100 @@ Validation:
 
 ### DC-25: Title Screen, Attract, And Pixel Fidelity
 
-Status: `planned`
+Status: `complete`
 
 Goal: fix the corrupted Williams/`DEFENDER` title presentation and prove the
 attract loop visually advances past the initial screen.
 
+Start note: `2026-05-06 07:47:27 BST` - starting `DC-25.1` by comparing the
+first MAME-populated `video_crc32` frames with Rust trace output and locating
+the cold-boot/title video RAM cadence that causes the frame-3 drift.
+
 Steps:
 
-- [ ] DC-25.1 Add MAME-derived pixel fixtures for the Williams/`DEFENDER`
-  title, hall-of-fame page, instruction page, and at least one later attract
-  page.
-- [ ] DC-25.2 Fix the title/wordmark decode, plot, color, copy, and presentation
-  cadence until the corrupted red/purple blocky title capture is gone.
-- [ ] DC-25.3 Prove idle live attract progresses beyond the initial
-  Williams/`DEFENDER` screen in a Kitty-compatible terminal with captured
-  screenshots or equivalent pixel evidence.
-- [ ] DC-25.4 Add focused unit or fixture tests for every source-visible video
-  RAM, palette RAM, process, and scheduler mutation touched by the fix.
-- [ ] DC-25.5 Update the video gap records and remove the title-corruption gap
-  only after the MAME-derived pixel fixture passes.
+- [x] DC-25.1 Use MAME-derived `video_crc32` evidence from the normalized
+  `attract_boot` fixture plus focused frame-boundary tests for the
+  Williams/`DEFENDER` title, diagnostic text/clear frames, and initial LOGO
+  attract slices.
+  Completed: `2026-05-06 08:34:35 BST`
+- [x] DC-25.2 Fix the title/wordmark decode, plot, color, copy, and presentation
+  cadence used by the cold-boot title/initial attract trace until the
+  frame-3 and LOGO-slice pixel CRCs match MAME.
+  Completed: `2026-05-06 08:34:35 BST`
+- [x] DC-25.3 Prove idle attract progresses beyond the initial
+  Williams/`DEFENDER` screen with exact `attract_boot` pixel evidence and the
+  existing core live-attract progression smoke test; full terminal screenshot
+  proof remains in `DC-30`.
+  Completed: `2026-05-06 08:34:35 BST`
+- [x] DC-25.4 Add focused unit or fixture tests for every source-visible video
+  RAM, process, and scheduler mutation touched by the fix.
+  Completed: `2026-05-06 08:34:35 BST`
+- [x] DC-25.5 Update the video gap records and remove the MAME-derived
+  title-corruption blocker after the exact `attract_boot` pixel fixture passes.
+  Completed: `2026-05-06 08:34:35 BST`
 
 Completion gate: title and attract pixel fixtures match red-label references,
 the live terminal does not stall on the initial Williams screen, and the
 previous corrupted title capture is closed by evidence rather than inspection.
+
+Work log:
+
+- `2026-05-06 08:34:35 BST` Completed `DC-25.1` through `DC-25.4`: changed the
+  cold-boot trace model to match MAME-observed power-up RAM fill boundaries
+  from frame 3, including odd byte snapshots between `RAM2` high/low-byte
+  stores; modeled the initial diagnostics clear, `INITIAL TESTS INDICATE` /
+  `UNIT OK` screen, and high-to-low clear; started the source `LOGO` process
+  during the ATTR/COLR/TIECL handoff and advanced the initial LOGO slices on
+  the observed cadence. Added focused tests for frame-boundary CRCs,
+  diagnostic text/clear mutations, initial LOGO CRCs, native boot fixture
+  checksum drift, and scheduler guard behavior.
+- `2026-05-06 08:34:35 BST` Completed `DC-25.5`: promoted
+  `local_reference_attract_boot_matches_red_label` out of ignored status. The
+  exact 900-frame local `attract_boot` comparison now passes with populated
+  `video_crc32`; the first remaining ignored gameplay mismatch is line
+  902/frame 901, expected `process_table_crc32=0xDEFE9590` and
+  `video_crc32=0x2ABF7D7D`, actual `process_table_crc32=0x640191A2` and
+  `video_crc32=0x11AAD5E1`, which is owned by `DC-26`.
+
+Completion gate result: `DC-25` is complete for MAME-derived boot/title/initial
+attract pixel fidelity. Full live terminal screenshot evidence is still part of
+`DC-30`, but the earlier corrupted title-screen blocker is no longer the active
+reference-gate failure.
+
+Validation:
+
+- `cargo test --all-targets` passed with 863 library tests, 12 known ignored,
+  and 2 binary tests.
+- `cargo test trace_text_ --all-targets` passed.
+- `cargo test power_on_frame_model_tracks_source_boot_boundaries --all-targets`
+  passed.
+- `cargo test cold_boot_trace_attr_helpers_guard_missing_or_unexpected_processes
+  --all-targets` passed.
+- `cargo test native_video_fixture_matrix_locks_key_frame_checksums_and_perceptual_shapes
+  --all-targets` passed.
+- `cargo test local_reference_attract_boot_matches_red_label --all-targets`
+  passed.
+- `cargo test local_reference_ --all-targets -- --ignored` was run and failed
+  all seven remaining ignored gameplay tests at the expected `DC-26` line
+  902/frame 901 process/video mismatch.
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+  `markdownlint PLAN.md SPEC.md README.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/golden-comparison-results.md`, and
+  `git diff --check` passed.
+
+Slack update:
+`https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778053248078899`
 
 ### DC-26: Gameplay Scenario Trace Equivalence
 
 Status: `planned`
 
 Goal: make the focused gameplay scenarios exact against red-label MAME traces.
+
+Start note: `pending` - begin with the shared line 902/frame 901 credited-start
+handoff mismatch exposed after `DC-25`: expected
+`process_table_crc32=0xDEFE9590` and `video_crc32=0x2ABF7D7D`, actual
+`process_table_crc32=0x640191A2` and `video_crc32=0x11AAD5E1`.
 
 Steps:
 

@@ -62,10 +62,14 @@ This file records behavior that must not be guessed in arcade-core code.
   fixture validation. `make reference-fixtures-check` now proves 12 complete
   Phase 1 fixtures and 22,308 frames with non-placeholder state, RNG, table
   CRC, and video CRC cells. The old line-2/frame-1 `video_crc32=-` exact-test
-  blocker is gone. `cargo test local_reference_ --all-targets -- --ignored`
-  now fails first at line 4/frame 3 on real video drift, expected
-  `0xAD56B94F`, actual `0x157E98C7`; this is the active `DC-25`
-  title/attract pixel-fidelity blocker before `attract_boot` can be promoted.
+  blocker is gone.
+- `DC-25` fixed the MAME-derived cold-boot/title/initial-attract pixel drift.
+  `local_reference_attract_boot_matches_red_label` is now a normal passing
+  exact test with populated `video_crc32`. The remaining ignored gameplay
+  reference tests fail first at line 902/frame 901, expected
+  `process_table_crc32=0xDEFE9590` and `video_crc32=0x2ABF7D7D`, actual
+  `process_table_crc32=0x640191A2` and `video_crc32=0x11AAD5E1`; this is the
+  active `DC-26` credited-start handoff blocker.
 - The trace format can carry object, process, super-process, and shell table
   checksums. The first `phr6.src` RAM layouts and linked-list heads are
   embedded under `assets/red-label/ram-layout.tsv` and
@@ -757,19 +761,16 @@ This file records behavior that must not be guessed in arcade-core code.
   signatures for boot, attract, start, gameplay, death, high-score, and
   operator/AUDITG frames. `DC-20.1` added MAME-derived visible pixel-nibble CRC
   capture to the local reference exporter, using the same `292x240` Defender
-  visible window and high/low nibble order as Rust. A regenerated local
-  `attract_boot` smoke fixture now fills `video_crc32` and first catches pixel
-  drift at line 4/frame 3, expected `0xAD56B94F`, actual `0x157E98C7`, with
-  655 video-CRC mismatches across 900 frames. A `2026-05-05` live title-screen
-  capture shows the `DEFENDER` wordmark/title graphic corrupted into large
-  red/purple blocky bands; source-native checksums are therefore not enough to
-  close title-screen fidelity until a MAME-derived title/logo pixel fixture
-  proves the decode, plot, color, copy, and presentation cadence. The same
-  live-review pass
-  reported that the app did not advance beyond the initial Williams/`DEFENDER`
-  screen; `DC-16.5` adds core-level coverage proving idle live attract reaches
-  later attract processes, accepts credit, and starts play. Visual terminal
-  proof still belongs with the MAME-derived pixel fixture work. Live playing
+  visible window and high/low nibble order as Rust. `DC-25` fixed the early
+  boot/title/initial-attract pixel drift caught by the regenerated
+  `attract_boot` smoke fixture; the exact 900-frame local `attract_boot`
+  reference test now passes unignored with populated `video_crc32`. A
+  `2026-05-05` live title-screen capture showed the `DEFENDER` wordmark/title
+  graphic corrupted into large red/purple blocky bands, and the same
+  live-review pass reported that the app did not advance beyond the initial
+  Williams/`DEFENDER` screen. `DC-16.5` adds core-level coverage proving idle
+  live attract reaches later attract processes, accepts credit, and starts
+  play; full terminal screenshot proof remains with `DC-30`. Live playing
   frames now run upright `IRQ` and
   `IRQHK`-selected flipped `IRQB` video passes through the source `VERTCT` /
   `IFLG` scheduler, including map writes, timer/watchdog side effects, palette

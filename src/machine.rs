@@ -3908,7 +3908,258 @@ struct RedLabelPowerUpRamFillTarget {
     target_address: u16,
 }
 
-const RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 7] = [
+// MAME frame snapshots can land between `RAM2`'s high-byte and low-byte
+// stores. Odd targets mean the high byte has been committed and the low byte is
+// still pending for the next modeled frame.
+const RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 69] = [
+    RedLabelPowerUpRamFillTarget {
+        frame: 3,
+        target_address: 0x0716,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 4,
+        target_address: 0x097A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 5,
+        target_address: 0x0BDE,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 6,
+        target_address: 0x0E40,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 7,
+        target_address: 0x10A2,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 8,
+        target_address: 0x12F7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 9,
+        target_address: 0x1568,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 10,
+        target_address: 0x17CC,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 11,
+        target_address: 0x1A30,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 12,
+        target_address: 0x1C94,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 13,
+        target_address: 0x1EF7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 14,
+        target_address: 0x215B,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 15,
+        target_address: 0x23BE,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 16,
+        target_address: 0x2620,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 17,
+        target_address: 0x2884,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 18,
+        target_address: 0x2AEA,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 19,
+        target_address: 0x2D4A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 20,
+        target_address: 0x2FAE,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 21,
+        target_address: 0x3212,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 22,
+        target_address: 0x3476,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 23,
+        target_address: 0x36DA,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 24,
+        target_address: 0x393C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 25,
+        target_address: 0x3B9E,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 26,
+        target_address: 0x3DF7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 27,
+        target_address: 0x4066,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 28,
+        target_address: 0x42CC,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 29,
+        target_address: 0x4530,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 30,
+        target_address: 0x4792,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 31,
+        target_address: 0x49F7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 32,
+        target_address: 0x4C5A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 33,
+        target_address: 0x4EBC,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 34,
+        target_address: 0x511E,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 35,
+        target_address: 0x5384,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 36,
+        target_address: 0x55E6,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 37,
+        target_address: 0x584A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 38,
+        target_address: 0x5AAE,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 39,
+        target_address: 0x5D10,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 40,
+        target_address: 0x5F74,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 41,
+        target_address: 0x61D6,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 42,
+        target_address: 0x643A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 43,
+        target_address: 0x669E,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 44,
+        target_address: 0x68F7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 45,
+        target_address: 0x6B66,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 46,
+        target_address: 0x6DC8,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 47,
+        target_address: 0x702C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 48,
+        target_address: 0x7290,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 49,
+        target_address: 0x74F4,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 50,
+        target_address: 0x7756,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 51,
+        target_address: 0x79BC,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 52,
+        target_address: 0x7C1E,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 53,
+        target_address: 0x7E82,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 54,
+        target_address: 0x80E4,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 55,
+        target_address: 0x8348,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 56,
+        target_address: 0x85AA,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 57,
+        target_address: 0x880C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 58,
+        target_address: 0x8A6E,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 59,
+        target_address: 0x8CD6,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 60,
+        target_address: 0x8F40,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 61,
+        target_address: 0x91A6,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 62,
+        target_address: 0x940A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 63,
+        target_address: 0x9672,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 64,
+        target_address: 0x97F7,
+    },
     RedLabelPowerUpRamFillTarget {
         frame: 68,
         target_address: 0xA26A,
@@ -3939,7 +4190,255 @@ const RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS: [RedLabelPowerUpRamFillTar
     },
 ];
 
-const RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 8] = [
+const RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS: [RedLabelPowerUpRamFillTarget; 70] = [
+    RedLabelPowerUpRamFillTarget {
+        frame: 176,
+        target_address: 0x07F2,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 177,
+        target_address: 0x0A56,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 178,
+        target_address: 0x0CBC,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 179,
+        target_address: 0x0F1C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 180,
+        target_address: 0x1183,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 181,
+        target_address: 0x13E8,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 182,
+        target_address: 0x164A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 183,
+        target_address: 0x18AC,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 184,
+        target_address: 0x1B10,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 185,
+        target_address: 0x1D72,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 186,
+        target_address: 0x1FD8,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 187,
+        target_address: 0x223A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 188,
+        target_address: 0x249C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 189,
+        target_address: 0x26F7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 190,
+        target_address: 0x2962,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 191,
+        target_address: 0x2BCA,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 192,
+        target_address: 0x2E2C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 193,
+        target_address: 0x3090,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 194,
+        target_address: 0x32F4,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 195,
+        target_address: 0x3558,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 196,
+        target_address: 0x37BD,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 197,
+        target_address: 0x3A1E,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 198,
+        target_address: 0x3C84,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 199,
+        target_address: 0x3EEA,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 200,
+        target_address: 0x414C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 201,
+        target_address: 0x43B0,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 202,
+        target_address: 0x4613,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 203,
+        target_address: 0x4878,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 204,
+        target_address: 0x4ADC,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 205,
+        target_address: 0x4D3E,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 206,
+        target_address: 0x4FA2,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 207,
+        target_address: 0x51F7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 208,
+        target_address: 0x5468,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 209,
+        target_address: 0x56CE,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 210,
+        target_address: 0x5932,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 211,
+        target_address: 0x5B96,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 212,
+        target_address: 0x5DF7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 213,
+        target_address: 0x605C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 214,
+        target_address: 0x62C2,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 215,
+        target_address: 0x6524,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 216,
+        target_address: 0x6788,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 217,
+        target_address: 0x69EC,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 218,
+        target_address: 0x6C4E,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 219,
+        target_address: 0x6EB2,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 220,
+        target_address: 0x7114,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 221,
+        target_address: 0x737A,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 222,
+        target_address: 0x75DE,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 223,
+        target_address: 0x7840,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 224,
+        target_address: 0x7AA4,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 225,
+        target_address: 0x7CF7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 226,
+        target_address: 0x7F6C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 227,
+        target_address: 0x81CE,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 228,
+        target_address: 0x8430,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 229,
+        target_address: 0x8696,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 230,
+        target_address: 0x88F7,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 231,
+        target_address: 0x8B5E,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 232,
+        target_address: 0x8DC0,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 233,
+        target_address: 0x9022,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 234,
+        target_address: 0x9286,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 235,
+        target_address: 0x94EA,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 236,
+        target_address: 0x974C,
+    },
+    RedLabelPowerUpRamFillTarget {
+        frame: 237,
+        target_address: 0x97F7,
+    },
     RedLabelPowerUpRamFillTarget {
         frame: 240,
         target_address: 0xA070,
@@ -3984,6 +4483,21 @@ const RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME: u64 = 746;
 const RED_LABEL_TRACE_INIT20_SOUND_COMMAND_PORT_B: u8 = 0x00;
 const RED_LABEL_TRACE_CREDIT_SOUND_COMMAND_RAW: u8 = 0xE6;
 const RED_LABEL_TRACE_START_SOUND_COMMAND_RAW: u8 = 0xF5;
+const RED_LABEL_TRACE_RAM_TEST_CLEAR_BYTES: [(u64, u16); 6] = [
+    (368, 0x04C5),
+    (369, 0x227E),
+    (370, 0x4034),
+    (371, 0x5DEA),
+    (372, 0x7BA0),
+    (373, 0x95F9),
+];
+const RED_LABEL_TRACE_INITIAL_TESTS_LINE_ADDRESS: u16 = 0x2870;
+const RED_LABEL_TRACE_INITIAL_TESTS_UNIT_OK_ADDRESS: u16 = 0x4090;
+const RED_LABEL_TRACE_INITIAL_TESTS_LINE_TEXT: &[u8] = b"INITIAL TESTS INDICATE ";
+const RED_LABEL_TRACE_INITIAL_TESTS_UNIT_PARTIAL_TEXT: &[u8] = b"UNIT ";
+const RED_LABEL_TRACE_INITIAL_TESTS_UNIT_OK_TEXT: &[u8] = b"UNIT OK ";
+const RED_LABEL_TRACE_INITIAL_TESTS_CLEAR_BYTES: [(u64, u16); 3] =
+    [(715, 0x3F90), (716, 0x5E90), (717, 0x7390)];
 const RED_LABEL_TRACE_SINIT_RAM_CLEAR_START: u16 = 0x9C00;
 const RED_LABEL_TRACE_SINIT_RAM_CLEAR_END: u16 = 0xC000;
 const RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME: u64 = 725;
@@ -4086,16 +4600,18 @@ impl RedLabelPowerUpRamFill {
 
 fn red_label_trace_power_up_ram_fill_target(frame: u64) -> u16 {
     match frame {
-        0..=67 => 0x0000,
-        68..=74 => red_label_power_up_ram_fill_target_for_frame(
+        0..=2 => 0x0000,
+        3..=64 | 68..=74 => red_label_power_up_ram_fill_target_for_frame(
             frame,
             &RED_LABEL_POWER_UP_RAM_FILL_FIRST_PASS_TARGETS,
         ),
-        75..=239 => 0xC000,
-        240..=247 => red_label_power_up_ram_fill_target_for_frame(
+        65..=67 => 0x97F7,
+        75..=175 => 0xC000,
+        176..=237 | 240..=247 => red_label_power_up_ram_fill_target_for_frame(
             frame,
             &RED_LABEL_POWER_UP_RAM_FILL_SECOND_PASS_TARGETS,
         ),
+        238..=239 => 0x97F7,
         _ => 0xC000,
     }
 }
@@ -4123,10 +4639,10 @@ pub fn red_label_power_on_frame_model(frame: u64) -> Result<RedLabelPowerOnFrame
     let mut model = RedLabelPowerOnFrameModel {
         frame,
         stage: match frame {
-            0..=67 => RedLabelPowerOnStage::ResetHold,
-            68..=74 => RedLabelPowerOnStage::RamTestFirstPass,
-            75..=239 => RedLabelPowerOnStage::RamTestBetweenPasses,
-            240..=247 => RedLabelPowerOnStage::RamTestSecondPass,
+            0..=2 => RedLabelPowerOnStage::ResetHold,
+            3..=74 => RedLabelPowerOnStage::RamTestFirstPass,
+            75..=175 => RedLabelPowerOnStage::RamTestBetweenPasses,
+            176..=247 => RedLabelPowerOnStage::RamTestSecondPass,
             248..=719 => RedLabelPowerOnStage::RamTestComplete,
             RED_LABEL_TRACE_SINIT_ZERO_SEED_FRAME => RedLabelPowerOnStage::SinitZeroSeed,
             RED_LABEL_TRACE_SINIT_CLEAR_PLAYER_FRAME => RedLabelPowerOnStage::SinitClearPlayer,
@@ -4645,20 +5161,25 @@ impl RedLabelRuntimeMemory {
         fill: &mut RedLabelPowerUpRamFill,
         target_address: u16,
     ) -> Result<(), String> {
-        if target_address > MAIN_CPU_RAM_SIZE as u16 || !target_address.is_multiple_of(2) {
+        if target_address > MAIN_CPU_RAM_SIZE as u16 {
             return Err(format!(
                 "red-label power-up RAM-fill target 0x{target_address:04X} is invalid"
             ));
         }
 
         while fill.next_address < target_address {
-            let [a, b] = red_label_crom0_ram_test_next_word(u16::from_be_bytes([fill.a, fill.b]))
-                .to_be_bytes();
-            fill.a = a;
-            fill.b = b;
-            self.write_byte(fill.next_address, a)?;
-            self.write_byte(fill.next_address + 1, b)?;
-            fill.next_address = fill.next_address.wrapping_add(2);
+            let value = if fill.next_address.is_multiple_of(2) {
+                let [a, b] =
+                    red_label_crom0_ram_test_next_word(u16::from_be_bytes([fill.a, fill.b]))
+                        .to_be_bytes();
+                fill.a = a;
+                fill.b = b;
+                a
+            } else {
+                fill.b
+            };
+            self.write_byte(fill.next_address, value)?;
+            fill.next_address = fill.next_address.wrapping_add(1);
         }
 
         Ok(())
@@ -20776,6 +21297,37 @@ impl RedLabelRuntimeMemory {
         })
     }
 
+    fn clear_screen_ram_from_high_address_down(
+        &mut self,
+        bytes_cleared: u16,
+    ) -> Result<(), String> {
+        if bytes_cleared > RED_LABEL_SCREEN_CLEAR_END {
+            return Err(format!(
+                "red-label reverse screen clear byte count 0x{bytes_cleared:04X} exceeds screen RAM"
+            ));
+        }
+        let start = RED_LABEL_SCREEN_CLEAR_END - bytes_cleared;
+        self.clear_range(start..RED_LABEL_SCREEN_CLEAR_END)
+    }
+
+    fn write_trace_text_bytes(&mut self, screen_address: u16, bytes: &[u8]) -> Result<u16, String> {
+        let mut cursor = screen_address;
+        for byte in bytes {
+            cursor = self.write_text_byte(cursor, *byte)?;
+        }
+        Ok(cursor)
+    }
+
+    fn write_trace_initial_tests_ok_screen(&mut self, unit_ok_text: &[u8]) -> Result<(), String> {
+        self.clear_screen_ram()?;
+        self.write_trace_text_bytes(
+            RED_LABEL_TRACE_INITIAL_TESTS_LINE_ADDRESS,
+            RED_LABEL_TRACE_INITIAL_TESTS_LINE_TEXT,
+        )?;
+        self.write_trace_text_bytes(RED_LABEL_TRACE_INITIAL_TESTS_UNIT_OK_ADDRESS, unit_ok_text)?;
+        Ok(())
+    }
+
     fn clear_active_screen_ram(&mut self) -> Result<RedLabelScreenClear, String> {
         for page in 0..(RED_LABEL_SCREEN_CLEAR_END >> 8) {
             let page_start = page << 8;
@@ -24405,6 +24957,42 @@ impl ArcadeMachine {
         self.memory.trace_state()
     }
 
+    fn apply_trace_power_on_diagnostic_video(&mut self) -> Result<(), String> {
+        if let Some((_, bytes_cleared)) = RED_LABEL_TRACE_RAM_TEST_CLEAR_BYTES
+            .iter()
+            .find(|(frame, _)| *frame == self.frame)
+        {
+            return self
+                .memory
+                .clear_screen_ram_from_high_address_down(*bytes_cleared);
+        }
+
+        match self.frame {
+            374 => {
+                return self.memory.write_trace_initial_tests_ok_screen(
+                    RED_LABEL_TRACE_INITIAL_TESTS_UNIT_PARTIAL_TEXT,
+                );
+            }
+            375 => {
+                return self.memory.write_trace_initial_tests_ok_screen(
+                    RED_LABEL_TRACE_INITIAL_TESTS_UNIT_OK_TEXT,
+                );
+            }
+            _ => {}
+        }
+
+        if let Some((_, bytes_cleared)) = RED_LABEL_TRACE_INITIAL_TESTS_CLEAR_BYTES
+            .iter()
+            .find(|(frame, _)| *frame == self.frame)
+        {
+            return self
+                .memory
+                .clear_screen_ram_from_high_address_down(*bytes_cleared);
+        }
+
+        Ok(())
+    }
+
     fn advance_trace_power_up_ram_fill(
         &mut self,
         sound_commands: &mut Vec<SoundCommand>,
@@ -24414,9 +25002,9 @@ impl ArcadeMachine {
             return;
         };
         // `RAM17` repeats the RAM test with the first pass's final random word
-        // saved as the next `RAM2` seed; MAME reaches the second visible fill at
-        // frame 240 for the local 0.287 red-label trace.
-        if self.frame == 240 && fill.next_address == 0xC000 {
+        // saved as the next `RAM2` seed; local 0.287 MAME snapshots show the
+        // second pass entering visible RAM at frame 176.
+        if self.frame == 176 && fill.next_address == 0xC000 {
             *fill = RedLabelPowerUpRamFill::from_seed(0xCE, 0x5C);
         }
         let model = red_label_power_on_frame_model(self.frame)
@@ -24425,6 +25013,8 @@ impl ArcadeMachine {
         self.memory
             .advance_power_up_ram_fill_to(fill, target_address)
             .expect("embedded red-label power-up RAM-fill frame target is valid");
+        self.apply_trace_power_on_diagnostic_video()
+            .expect("embedded red-label power-on diagnostic video model is valid");
         if self
             .memory
             .read_byte(0xA0BA)
@@ -26069,26 +26659,33 @@ impl ArcadeMachine {
         let lists = red_label_linked_lists()?;
         let active_head = linked_list(&lists, "active_process")?.head_address;
         let attr_process = self.memory.read_word(active_head)?;
-        let tie_process = self
+        let tiecol = red_label_routine_address("TIECOL")?;
+        let tiecl = red_label_routine_address("TIECL")?;
+        let tie_link = self
             .memory
-            .read_process_word(&layout, attr_process, "PLINK")?;
+            .active_process_link_before_routine(&[tiecol, tiecl])?
+            .ok_or_else(|| {
+                format!(
+                    "red-label trace power-on expected TIECOL/TIECL at frame {}",
+                    self.frame
+                )
+            })?;
+        let tie_process = self.memory.read_word(tie_link)?;
         let tie_routine = self
             .memory
             .read_process_word(&layout, tie_process, "PADDR")?;
-        let tiecol = red_label_routine_address("TIECOL")?;
-        let tiecl = red_label_routine_address("TIECL")?;
-        if tie_routine != tiecol && tie_routine != tiecl {
-            return Err(format!(
-                "red-label trace power-on expected TIECOL before COLR at frame {}, got 0x{tie_routine:04X}",
-                self.frame
-            ));
-        }
-        let tie_table = process_table_for_address(&layout, tie_process)?;
-        let color_link_address =
-            process_field_range_for_address(&layout, tie_table, tie_process, "PLINK")?.start;
-        let color_process = self.memory.read_word(color_link_address)?;
         let colr = red_label_routine_address("COLR")?;
         let colrlp = red_label_routine_address("COLRLP")?;
+        let color_link_address = self
+            .memory
+            .active_process_link_before_routine(&[colr, colrlp])?
+            .ok_or_else(|| {
+                format!(
+                    "red-label trace power-on expected COLR/COLRLP at frame {}",
+                    self.frame
+                )
+            })?;
+        let color_process = self.memory.read_word(color_link_address)?;
         let color_routine = self
             .memory
             .read_process_word(&layout, color_process, "PADDR")?;
@@ -26124,6 +26721,7 @@ impl ArcadeMachine {
         tie_process: u16,
         color_process: u16,
     ) -> Result<(), String> {
+        self.memory.start_attract_logo_current_process()?;
         self.memory.write_process_word(
             layout,
             attr_process,
@@ -26177,9 +26775,9 @@ impl ArcadeMachine {
             .memory
             .read_process_byte(layout, tie_process, "PTIME")?;
         if tie_time > 1 {
-            return self
-                .memory
-                .write_process_byte(layout, tie_process, "PTIME", tie_time - 1);
+            self.memory
+                .write_process_byte(layout, tie_process, "PTIME", tie_time - 1)?;
+            return self.step_trace_power_on_logo_slice_if_due(layout, attr_process);
         }
 
         let table = red_label_color_cycle_table("TCTAB")?;
@@ -26200,7 +26798,27 @@ impl ArcadeMachine {
         self.memory
             .write_process_data_word(layout, tie_process, "PD", next_table_pointer)?;
         self.memory
-            .write_process_byte(layout, tie_process, "PTIME", 6)
+            .write_process_byte(layout, tie_process, "PTIME", 6)?;
+
+        self.step_trace_power_on_logo_slice_if_due(layout, attr_process)
+    }
+
+    fn step_trace_power_on_logo_slice_if_due(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        attr_process: u16,
+    ) -> Result<(), String> {
+        if self.frame.is_multiple_of(2) {
+            return Ok(());
+        }
+
+        self.memory.step_attract_logo_table_current_process()?;
+        self.memory.write_process_word(
+            layout,
+            attr_process,
+            "PADDR",
+            RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN,
+        )
     }
 
     fn toggle_trace_power_on_sleep(
@@ -27720,7 +28338,12 @@ mod tests {
     #[test]
     fn power_up_ram_fill_trace_targets_capture_mame_observed_frame_boundaries() {
         assert_eq!(red_label_trace_power_up_ram_fill_target(1), 0x0000);
-        assert_eq!(red_label_trace_power_up_ram_fill_target(67), 0x0000);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(2), 0x0000);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(3), 0x0716);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(8), 0x12F7);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(14), 0x215B);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(64), 0x97F7);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(67), 0x97F7);
         assert_eq!(red_label_trace_power_up_ram_fill_target(68), 0xA26A);
         assert_eq!(red_label_trace_power_up_ram_fill_target(69), 0xA4CE);
         assert_eq!(red_label_trace_power_up_ram_fill_target(70), 0xA730);
@@ -27728,7 +28351,12 @@ mod tests {
         assert_eq!(red_label_trace_power_up_ram_fill_target(72), 0xABF8);
         assert_eq!(red_label_trace_power_up_ram_fill_target(73), 0xAE5C);
         assert_eq!(red_label_trace_power_up_ram_fill_target(74), 0xC000);
-        assert_eq!(red_label_trace_power_up_ram_fill_target(239), 0xC000);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(175), 0xC000);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(176), 0x07F2);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(180), 0x1183);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(196), 0x37BD);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(237), 0x97F7);
+        assert_eq!(red_label_trace_power_up_ram_fill_target(239), 0x97F7);
         assert_eq!(red_label_trace_power_up_ram_fill_target(240), 0xA070);
         assert_eq!(red_label_trace_power_up_ram_fill_target(241), 0xA340);
         assert_eq!(red_label_trace_power_up_ram_fill_target(242), 0xA5A4);
@@ -27737,6 +28365,146 @@ mod tests {
         assert_eq!(red_label_trace_power_up_ram_fill_target(245), 0xACCE);
         assert_eq!(red_label_trace_power_up_ram_fill_target(246), 0xAF34);
         assert_eq!(red_label_trace_power_up_ram_fill_target(247), 0xC000);
+    }
+
+    #[test]
+    fn power_up_ram_fill_visible_crc_matches_mame_frame_boundaries() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        let expected = [
+            (1, 0x157E_98C7),
+            (2, 0x157E_98C7),
+            (3, 0xAD56_B94F),
+            (8, 0x5627_7201),
+            (14, 0x2DFD_B5FE),
+            (64, 0x9067_8703),
+            (68, 0x9067_8703),
+            (176, 0x29C4_32BC),
+            (180, 0x8DB2_27CC),
+            (196, 0x2F0D_88BB),
+            (237, 0xF94A_A4FF),
+            (240, 0xF94A_A4FF),
+            (368, 0xE1A7_C83E),
+            (373, 0x157E_98C7),
+            (374, 0x3FEB_EE73),
+            (375, 0x9AB6_D5AD),
+            (715, 0x09B9_A780),
+            (716, 0xEC9D_64A2),
+            (717, 0x157E_98C7),
+        ];
+        let mut expected_index = 0;
+
+        for frame in 1..=717 {
+            machine.step(CabinetInput::NONE);
+            if expected_index < expected.len() && expected[expected_index].0 == frame {
+                assert_eq!(
+                    machine.red_label_visible_video_crc32(),
+                    Some(expected[expected_index].1),
+                    "visible CRC drifted at cold-boot frame {frame}"
+                );
+                expected_index += 1;
+            }
+        }
+
+        assert_eq!(expected_index, expected.len());
+    }
+
+    #[test]
+    fn power_on_initial_tests_ok_screen_matches_mame_partial_and_clear_frames() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+
+        for _ in 0..374 {
+            machine.step(CabinetInput::NONE);
+        }
+        assert_eq!(machine.red_label_visible_video_crc32(), Some(0x3FEB_EE73));
+        assert_message_glyph_first_column(
+            &machine,
+            super::RED_LABEL_TRACE_INITIAL_TESTS_LINE_ADDRESS,
+            'I',
+        );
+        assert_message_glyph_first_column(
+            &machine,
+            super::RED_LABEL_TRACE_INITIAL_TESTS_UNIT_OK_ADDRESS,
+            'U',
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x5590..0x5598),
+            Some(&[0; 8][..]),
+            "frame 374 should not have written the `OK` glyphs yet"
+        );
+
+        machine.step(CabinetInput::NONE);
+        assert_eq!(machine.red_label_visible_video_crc32(), Some(0x9AB6_D5AD));
+        assert_message_glyph_first_column(&machine, 0x5590, 'O');
+
+        for _ in 376..=715 {
+            machine.step(CabinetInput::NONE);
+        }
+        assert_eq!(machine.red_label_visible_video_crc32(), Some(0x09B9_A780));
+        assert_message_glyph_first_column(
+            &machine,
+            super::RED_LABEL_TRACE_INITIAL_TESTS_LINE_ADDRESS,
+            'I',
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0x5D90..0x5D98),
+            Some(&[0; 8][..]),
+            "frame 715 should have cleared the high-address tail of `UNIT OK`"
+        );
+
+        machine.step(CabinetInput::NONE);
+        assert_eq!(machine.red_label_visible_video_crc32(), Some(0xEC9D_64A2));
+        assert_eq!(
+            machine
+                .red_label_ram_range(super::RED_LABEL_TRACE_INITIAL_TESTS_UNIT_OK_ADDRESS..0x4098),
+            Some(&[0; 8][..]),
+            "frame 716 should have cleared the second line"
+        );
+
+        machine.step(CabinetInput::NONE);
+        assert_eq!(machine.red_label_visible_video_crc32(), Some(0x157E_98C7));
+        assert_eq!(
+            machine.red_label_ram_range(super::RED_LABEL_TRACE_INITIAL_TESTS_LINE_ADDRESS..0x2878),
+            Some(&[0; 8][..]),
+            "frame 717 should have cleared the first line"
+        );
+    }
+
+    #[test]
+    fn power_on_attract_logo_crc_matches_mame_initial_slices() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        let expected = [
+            (746, 0xB08F_FE8A),
+            (747, 0x3ED6_7559),
+            (748, 0x3ED6_7559),
+            (749, 0xCC0F_5378),
+            (750, 0xCC0F_5378),
+            (791, 0x7222_41A6),
+            (792, 0x7222_41A6),
+            (819, 0x5878_6CA5),
+            (820, 0x5878_6CA5),
+        ];
+        let mut expected_index = 0;
+
+        for frame in 1..=820 {
+            machine.step(CabinetInput::NONE);
+            if expected_index < expected.len() && expected[expected_index].0 == frame {
+                assert_eq!(
+                    machine.red_label_visible_video_crc32(),
+                    Some(expected[expected_index].1),
+                    "attract logo visible CRC drifted at frame {frame}"
+                );
+                expected_index += 1;
+            }
+        }
+
+        assert_eq!(expected_index, expected.len());
+        assert_ne!(
+            machine.red_label_ram_range(
+                RED_LABEL_ATTRACT_LOGO_CURSOR_RAM..RED_LABEL_ATTRACT_LOGO_CURSOR_RAM + 2
+            ),
+            Some(&[0; 2][..]),
+            "LOGO should have advanced the source cursor state"
+        );
     }
 
     #[test]
@@ -27766,9 +28534,16 @@ mod tests {
     fn power_on_frame_model_tracks_source_boot_boundaries() {
         let cases = [
             (
+                3,
+                super::RedLabelPowerOnStage::RamTestFirstPass,
+                0x0716,
+                true,
+                false,
+            ),
+            (
                 67,
-                super::RedLabelPowerOnStage::ResetHold,
-                0x0000,
+                super::RedLabelPowerOnStage::RamTestFirstPass,
+                0x97F7,
                 true,
                 false,
             ),
@@ -27783,6 +28558,13 @@ mod tests {
                 75,
                 super::RedLabelPowerOnStage::RamTestBetweenPasses,
                 0xC000,
+                true,
+                false,
+            ),
+            (
+                176,
+                super::RedLabelPowerOnStage::RamTestSecondPass,
+                0x07F2,
                 true,
                 false,
             ),
@@ -28594,7 +29376,7 @@ mod tests {
         let error = wrong_tie
             .step_trace_power_on_color_executive_slice()
             .expect_err("wrong intermediate process should be rejected");
-        assert!(error.contains("expected TIECOL before COLR"));
+        assert!(error.contains("expected TIECOL/TIECL"));
 
         let mut wrong_color = ArcadeMachine::new_cold_boot_trace();
         for _ in 0..739 {
@@ -58072,7 +58854,7 @@ mod tests {
     #[test]
     fn save_state_restore_replays_cold_boot_trace_row_and_ram_fill() {
         let mut machine = ArcadeMachine::new_cold_boot_trace();
-        for _ in 0..67 {
+        for _ in 0..2 {
             machine.step(CabinetInput::NONE);
         }
         let saved_state = machine.save_state();
@@ -58440,14 +59222,14 @@ mod tests {
                 (
                     "boot",
                     NativeVideoFixtureSignature {
-                        pixel_nibbles_crc32: 0x9067_8703,
-                        rgba_crc32: 0x294B_1DDA,
-                        perceptual_crc32: 0x1C4B_9B58,
-                        nonzero_nibbles: 65_627,
+                        pixel_nibbles_crc32: 0xAD56_B94F,
+                        rgba_crc32: 0x926E_A52A,
+                        perceptual_crc32: 0x0F27_1D2C,
+                        nonzero_nibbles: 480,
                         bounds: Some(NativeVideoBounds {
                             min_x: 0,
                             min_y: 0,
-                            max_x: 291,
+                            max_x: 3,
                             max_y: 239,
                         }),
                     },
