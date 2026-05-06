@@ -1,14 +1,15 @@
 # Refactor Freeze
 
-This file is the `DC-23` pre-refactor contract. The large refactor may move
-code between modules, but it must not change the observable red-label behavior
-listed here unless `SPEC.md`, `PLAN.md`, and the relevant fidelity gap record
-are updated first.
+This file is the `DC-23` future-refactor contract. The large refactor is
+deferred until the game is fully ROM-complete and playable. After that
+acceptance gate, the refactor may move code between modules, but it must not
+change the observable red-label behavior listed here unless `SPEC.md`,
+`PLAN.md`, and the relevant fidelity gap record are updated first.
 
 ## Frozen Validation Suite
 
-Run this suite before the first refactor slice and after every meaningful
-module split:
+After final acceptance is complete, run this suite before the first refactor
+slice and after every meaningful module split:
 
 ```sh
 make fidelity
@@ -46,8 +47,9 @@ permission to change behavior. Keep their ignored reasons current.
 
 ## Public API Contract
 
-The pre-refactor arcade-core API is `ArcadeMachine` in `src/machine.rs`.
-Refactor work may wrap or move this type later, but these behaviors are frozen:
+The completion-phase arcade-core API is `ArcadeMachine` in `src/machine.rs`.
+Post-completion refactor work may wrap or move this type later, but these
+behaviors are frozen:
 
 - `ArcadeMachine::new()` creates the deterministic initialized red-label core
   used by normal tests and live mode.

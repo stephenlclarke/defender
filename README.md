@@ -260,7 +260,7 @@ compatibility behavior.
   `DC-20.1` added MAME-derived visible pixel-nibble CRC capture to local
   reference traces; regenerated fixtures now detect the attract/title pixel
   drift instead of carrying `video_crc32=-`.
-- `DC-22` closes the pre-refactor hardware/asset audit by naming which edge
+- `DC-22` closes the hardware/asset audit by naming which edge
   cases are fixture-backed versus deferred. Fixed main CPU ROM, selected
   banked program ROM, sound CPU ROM, decoder PROM image views, `CROM0`
   `ROMMAP` descriptors, MAME-observed power-on fill boundaries, watchdog
@@ -269,11 +269,13 @@ compatibility behavior.
   CPU/IRQ cycle ownership, physical advance/lamp timing, full watchdog timeout
   side effects, complete decoder PROM hardware behavior, and remaining
   scheduler/golden-trace equivalence are still explicit fidelity gaps.
-- `DC-23` freezes the pre-refactor API and validation contract in
-  `docs/fidelity/refactor-freeze.md`. `ArcadeMachine` now explicitly exposes
-  `new`, `reset`, `step`, `snapshot`, `restore`, and full `save_state` /
-  `restore_state` behavior for the large refactor, with a focused reset/API
-  unit test proving reset returns to the same observable state as `new`.
+- `DC-23` freezes the API and future-refactor validation contract in
+  `docs/fidelity/refactor-freeze.md`. The large module-split refactor is
+  deferred until the game is fully ROM-complete and playable. `ArcadeMachine`
+  now explicitly exposes `new`, `reset`, `step`, `snapshot`, `restore`, and
+  full `save_state` / `restore_state` behavior for that later refactor, with a
+  focused reset/API unit test proving reset returns to the same observable
+  state as `new`.
 - `ArcadeMachine::step` returns post-frame main-board and sound-board snapshots
   on `FrameOutput`. Tests now lock the input-port bytes, main RAM/CMOS CRCs,
   palette RAM, hardware map, watchdog count, video-counter sample, sound latch,

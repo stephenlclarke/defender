@@ -1,6 +1,6 @@
 # Defender Completion Plan
 
-Last reviewed: `2026-05-05 00:12:36 BST`
+Last reviewed: `2026-05-06 07:28:40 BST`
 
 ## Purpose
 
@@ -32,6 +32,10 @@ the communication protocol for each completed step.
   only returned values. RAM, CMOS, video RAM, palette RAM, process-list,
   object-list, shell-list, sound-command, scheduler, and snapshot mutations
   should be checked with before/after assertions or golden traces.
+- The large refactor must not start until final ROM-complete playable
+  acceptance is complete. The refactor freeze created in `DC-23` remains a
+  contract for later work, not permission to begin module splitting while
+  fidelity gaps remain open.
 - Keep `make fidelity` as the broad local gate when practical. If only a
   narrower command is run, record why in the work log.
 - Do not check generated ROM payloads or MAME-derived golden traces into the
@@ -53,10 +57,11 @@ Status values:
   MAME memory/input metadata, and local MAME reference trace generation.
 - `SPEC.md` now records the 2026-05-04 review findings and the refactor-safety
   testing rule.
-- The major gaps are still source-exact hardware/frame scheduling, full
-  frame/cycle integration, golden-trace proof for translated gameplay/session
-  paths, pixel/audio golden fixtures, cycle-scheduled sound-board execution,
-  and the later large refactor.
+- The major gaps are still ROM-complete playable acceptance: source-exact
+  hardware/frame scheduling, full frame/cycle integration, golden-trace proof
+  for translated gameplay/session paths, pixel/audio golden fixtures,
+  cycle-scheduled sound-board execution, live terminal proof, and final release
+  documentation. The large refactor is deferred until those gaps are closed.
 
 ### Fidelity Gap Review 2026-05-05
 
@@ -2575,17 +2580,18 @@ Slack update:
 `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778021309832129`
 
 Phase 8 completed: `2026-05-05 23:47:23 BST`. `DC-15` through `DC-22` now leave
-the project ready for the planned large refactor only in the sense that each
-known unresolved fidelity surface is either covered by focused tests or
-explicitly named as a remaining blocker for Phase 9 and final release.
+the project with each known unresolved fidelity surface either covered by
+focused tests or explicitly named as a completion blocker. The project is not
+ready for the large refactor until final ROM-complete playable acceptance is
+complete.
 
-## Phase 9: Planned Large Refactor
+## Phase 9: Future Refactor Freeze Contract
 
 ### DC-23: Refactor Freeze And API Shape
 
 Status: `complete`
 
-Goal: prepare for the large refactor only after behavior is well characterized.
+Goal: record the future refactor contract without starting module splitting.
 
 Start note: `2026-05-05 23:50:19 BST` - starting `DC-23.1` by auditing the
 current characterization suite, public machine API, module ownership boundaries,
@@ -2617,17 +2623,17 @@ Work log:
   `public_arcade_api_reset_matches_new_machine_contract` test proving reset
   returns a mutated machine to the same observable state and replay output as
   `ArcadeMachine::new()`. Added `docs/fidelity/refactor-freeze.md` as the
-  pre-refactor contract for validation commands, focused filters, API behavior,
-  module ownership boundaries, and byte-compatible surfaces. Updated
+  future-refactor contract for validation commands, focused filters, API
+  behavior, module ownership boundaries, and byte-compatible surfaces. Updated
   `SPEC.md`, `README.md`, and `docs/fidelity/README.md` to point at that
-  contract and to document the actual pre-refactor `ArcadeMachine` API.
+  contract and to document the actual completion-phase `ArcadeMachine` API.
 
 Step notes:
 
 - `DC-23.1` froze `make fidelity` as the broad suite and documented focused
   filters for API, snapshot/restore, trace, video, sound, live, session,
   collision, and `SWTAB` refactor slices.
-- `DC-23.2` froze the pre-refactor API around `ArcadeMachine::new`,
+- `DC-23.2` froze the completion-phase API around `ArcadeMachine::new`,
   `try_new_with_cmos`, `new_cold_boot_trace`, `reset`, `step`,
   `step_with_typed_chars`, `snapshot`, `restore`, `save_state`, and
   `restore_state`.
@@ -2640,10 +2646,11 @@ Step notes:
   surfaces, process/object/shell/switch/player bytes, native video signatures,
   sound fixtures, session/operator behavior, and disabled-`xyzzy` equivalence.
 
-Completion gate result: the refactor now has a checked-in API/freeze contract
-and a focused reset API test. No major known mutation surface is hidden from
-the refactor plan; remaining unresolved fidelity issues stay recorded as
-Phase 9/Phase 10 blockers rather than refactor assumptions.
+Completion gate result: the later refactor now has a checked-in API/freeze
+contract and a focused reset API test. This is only a future safety contract;
+module splitting remains blocked until the game reaches final ROM-complete
+playable acceptance. Remaining unresolved fidelity issues stay recorded as
+completion blockers rather than refactor assumptions.
 
 Validation:
 
@@ -2666,48 +2673,251 @@ Validation:
 Slack update:
 `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778022101667069`
 
-### DC-24: Module Split And Behavior Preservation
+## Phase 10: ROM-Complete Playability Closure
+
+This phase owns the remaining work required before the project can be called a
+complete red-label playable game. No module-split refactor work may start in
+this phase unless it is the smallest necessary change to close a fidelity bug
+and is covered by source-visible mutation tests.
+
+Replan note: `2026-05-06 07:28:40 BST` - the project owner clarified that the
+large refactor will not take place until the game is 100% complete. Replaced
+the planned `DC-24` module-split cycle with completion-first fidelity,
+playability, and acceptance cycles. The `DC-23` freeze remains useful only as a
+post-completion behavior contract.
+
+### DC-24: Reference Fixture Normalization And Gate Promotion
 
 Status: `planned`
 
-Goal: split the large core safely without changing behavior.
+Goal: make local red-label reference fixtures a passing, actionable gate rather
+than an ignored or schema-skewed signal.
 
 Steps:
 
-- [ ] DC-24.1 Move code in small ownership-based slices with no unrelated
+- [ ] DC-24.1 Regenerate or normalize the local MAME reference fixtures so every
+  required scenario has populated `video_crc32`, sound-command, event, object,
+  process, shell, RNG, and state columns.
+- [ ] DC-24.2 Fix the current line-2/frame-1 local-reference mismatch caused by
+  reference `video_crc32=-` versus Rust `0x157E98C7` without weakening exact
+  trace comparison.
+- [ ] DC-24.3 Promote `attract_boot` to a non-ignored exact local-reference
+  test once the fixture schema and first-frame comparison are valid.
+- [ ] DC-24.4 Add a fixture freshness check that fails when a required local
+  reference scenario is missing required columns or stale headers.
+- [ ] DC-24.5 Update `SPEC.md`, `README.md`, and `docs/fidelity/` with the
+  exact local-reference gate and remaining scenario failures.
+
+Completion gate: `cargo test local_reference_attract_boot_matches_red_label
+--all-targets -- --ignored` either passes and is unignored, or the failure is a
+real behavior mismatch with a focused follow-up in this plan.
+
+### DC-25: Title Screen, Attract, And Pixel Fidelity
+
+Status: `planned`
+
+Goal: fix the corrupted Williams/`DEFENDER` title presentation and prove the
+attract loop visually advances past the initial screen.
+
+Steps:
+
+- [ ] DC-25.1 Add MAME-derived pixel fixtures for the Williams/`DEFENDER`
+  title, hall-of-fame page, instruction page, and at least one later attract
+  page.
+- [ ] DC-25.2 Fix the title/wordmark decode, plot, color, copy, and presentation
+  cadence until the corrupted red/purple blocky title capture is gone.
+- [ ] DC-25.3 Prove idle live attract progresses beyond the initial
+  Williams/`DEFENDER` screen in a Kitty-compatible terminal with captured
+  screenshots or equivalent pixel evidence.
+- [ ] DC-25.4 Add focused unit or fixture tests for every source-visible video
+  RAM, palette RAM, process, and scheduler mutation touched by the fix.
+- [ ] DC-25.5 Update the video gap records and remove the title-corruption gap
+  only after the MAME-derived pixel fixture passes.
+
+Completion gate: title and attract pixel fixtures match red-label references,
+the live terminal does not stall on the initial Williams screen, and the
+previous corrupted title capture is closed by evidence rather than inspection.
+
+### DC-26: Gameplay Scenario Trace Equivalence
+
+Status: `planned`
+
+Goal: make the focused gameplay scenarios exact against red-label MAME traces.
+
+Steps:
+
+- [ ] DC-26.1 Promote `start_game` by closing credited-start transition timing,
+  RNG order, scheduler, object, and process-list drift.
+- [ ] DC-26.2 Promote `firing` and `thrust_reverse` by closing player-control,
+  shell, laser, inertia, and visible-state drift.
+- [ ] DC-26.3 Promote `smart_bomb` and `hyperspace` by closing command,
+  object-kill, score, randomness, and mutation drift.
+- [ ] DC-26.4 Promote `death` and `wave_advance` by closing death, respawn,
+  bonus, wave-clear, player-state, and next-wave setup drift.
+- [ ] DC-26.5 Unignore each exact local-reference test only after that scenario
+  passes with no masked columns or owner-approved exclusions.
+
+Completion gate: all required Phase 1 local-reference gameplay tests pass
+unignored against red-label fixtures.
+
+### DC-27: CPU, IRQ, Frame, And Hardware Exactness
+
+Status: `planned`
+
+Goal: close the hardware and timing gaps that can invalidate trace or video
+equivalence even when high-level routines appear correct.
+
+Steps:
+
+- [ ] DC-27.1 Model main-CPU frame ownership, IRQ timing, A/X/Y/S/CC/B context,
+  scanline/video-counter reads, and frame-to-frame process cadence from MAME or
+  ROM evidence.
+- [ ] DC-27.2 Close watchdog timeout/reset behavior, power-on RAM boundaries,
+  physical advance switch timing, lamp timing, decoder PROM behavior, and
+  ROM/bank execution equivalence where observable.
+- [ ] DC-27.3 Replace remaining generic scheduler tails and untranslated
+  process-body dispatches that affect gameplay, attract, video, sound, or
+  cabinet state.
+- [ ] DC-27.4 Add mutation tests for every hardware register, RAM byte,
+  process-list, super-process, object-list, shell-list, palette, and video side
+  effect changed in this cycle.
+- [ ] DC-27.5 Re-run promoted local-reference scenarios and document any
+  remaining owner-approved hardware tolerances.
+
+Completion gate: no open hardware/timing gap remains that can change exact
+red-label gameplay, visible video, sound commands, input handling, or cabinet
+state.
+
+### DC-28: Sound Board And Audio Fidelity
+
+Status: `planned`
+
+Goal: prove sound-board command timing and generated audio against red-label
+behavior.
+
+Steps:
+
+- [ ] DC-28.1 Generate broader MAME command-sequence fixtures for attract,
+  start, thrust, fire, smart bomb, hyperspace, death, wave advance, and
+  high-score/operator flows.
+- [ ] DC-28.2 Implement or correct remaining Williams sound-board routines,
+  IRQ cadence, latch handling, DAC spacing, and waveform tails from
+  `VSNDRM1.SRC` or MAME evidence.
+- [ ] DC-28.3 Add external waveform golden fixtures or documented tolerances for
+  representative DAC buffers.
+- [ ] DC-28.4 Cover every changed sound path with source-visible command,
+  latch, IRQ, and buffer mutation tests.
+- [ ] DC-28.5 Confirm mute and live playback paths preserve arcade-core command
+  behavior.
+
+Completion gate: sound command traces and representative audio buffers match
+red-label evidence within the documented tolerance, with no uncited scaffold
+sound paths remaining.
+
+### DC-29: Cabinet, Session, Operator, And Long-Run Proof
+
+Status: `planned`
+
+Goal: prove the complete cabinet game loop, not only isolated unit routines.
+
+Steps:
+
+- [ ] DC-29.1 Add end-to-end one-player and two-player MAME trace fixtures for
+  coin, start, scoring, death, alternating turns, game over, high-score entry,
+  and return to attract.
+- [ ] DC-29.2 Add operator/service-mode fixtures for audits, adjustments, free
+  play, coinage, advance, bookkeeping, reset, and CMOS persistence.
+- [ ] DC-29.3 Add cabinet profile fixtures for upright, cocktail, Planetoid
+  mapping, and disabled/enabled `xyzzy` overlay isolation.
+- [ ] DC-29.4 Fix any state-machine, CMOS, input, high-score, or presentation
+  drift found by those fixtures.
+- [ ] DC-29.5 Run long deterministic sessions to catch scheduler leaks,
+  process-list corruption, object/shell leaks, stuck sound commands, and
+  impossible cabinet states.
+
+Completion gate: cabinet sessions can start, play, score, die, continue through
+turns, enter high scores, use operator flows, and return to attract with
+red-label-equivalent traces.
+
+### DC-30: Live Playability, Packaging, And Runtime Evidence
+
+Status: `planned`
+
+Goal: prove a user can run and play the game from the built binary without
+local development fixtures.
+
+Steps:
+
+- [ ] DC-30.1 Perform live smoke tests in Kitty-compatible terminals, preferring
+  Ghostty and Warp when available, and record rendering, input, sound, mute,
+  pause/quit, and process lifetime behavior.
+- [ ] DC-30.2 Verify keyboard/controller profiles, coin/start flow, thrust,
+  reverse, fire, smart bomb, hyperspace, player death, high-score initials, and
+  operator access in live mode.
+- [ ] DC-30.3 Confirm release binaries have no runtime dependency on local ROM
+  files, generated fixture directories, MAME, archived prototype assets, or the
+  repo checkout.
+- [ ] DC-30.4 Verify `--rom-report`, `--verify-roms`, trace tooling, CMOS path
+  handling, install instructions, and failure messages on a clean environment.
+- [ ] DC-30.5 Update screenshots, animated media, README run/install guidance,
+  and troubleshooting notes from the live evidence.
+
+Completion gate: a clean built binary can be installed, launched, played,
+muted, quit cleanly, and verified with ROM tooling while preserving exact
+arcade-core behavior.
+
+## Phase 11: Final Acceptance Before Refactor
+
+### DC-31: ROM-Complete Final Acceptance And Documentation
+
+Status: `planned`
+
+Goal: certify the project as a complete exact red-label implementation with
+supported compatibility overlays before any large refactor starts.
+
+Steps:
+
+- [ ] DC-31.1 Run `make fidelity`, all promoted local reference fixtures, pixel
+  fixtures, audio fixtures, live terminal smoke tests, packaging checks, and
+  CI/Sonar gates.
+- [ ] DC-31.2 Confirm every acceptance item in `SPEC.md` is satisfied by a
+  passing test, fixture, source citation, or explicit owner-approved scope
+  decision.
+- [ ] DC-31.3 Close or move every entry in `docs/fidelity/gaps.md`; no known
+  ROM-complete/playability gap may remain undocumented.
+- [ ] DC-31.4 Update `README.md`, `SPEC.md`, `docs/fidelity/`, installation
+  instructions, controls, ROM verification docs, and release notes to match the
+  final behavior.
+- [ ] DC-31.5 Push the final completion commit to `red-label` and post the
+  complete acceptance summary to `xyzzytools.slack.com#codex`.
+
+Completion gate: the project owner can reasonably call the game fully
+ROM-complete and playable: exact red-label behavior is proven or explicitly
+scoped, live play is verified, documentation matches the build, and no blocking
+fidelity gap remains.
+
+## Phase 12: Post-Completion Large Refactor
+
+### DC-32: Module Split And Behavior Preservation
+
+Status: `blocked`
+
+Blocker: `DC-31` must be complete. The large refactor does not begin until the
+game is fully ROM-complete and playable.
+
+Goal: split the large core safely without changing completed behavior.
+
+Steps:
+
+- [ ] DC-32.1 Move code in small ownership-based slices with no unrelated
   rewrites.
-- [ ] DC-24.2 Run the full characterization gate after every slice.
-- [ ] DC-24.3 Keep public surfaces narrow and source-cited.
-- [ ] DC-24.4 Remove dead scaffold paths only after tests prove exact
+- [ ] DC-32.2 Run the full characterization and final acceptance gates after
+  every slice.
+- [ ] DC-32.3 Keep public surfaces narrow and source-cited.
+- [ ] DC-32.4 Remove dead scaffold paths only after tests prove exact
   replacements.
-- [ ] DC-24.5 Update docs after each module boundary becomes stable.
+- [ ] DC-32.5 Update docs after each module boundary becomes stable.
 
 Completion gate: the refactored code produces the same traces, byte mutations,
-pixel fixtures, audio fixtures, and live/session behavior as the pre-refactor
-implementation.
-
-## Phase 10: Release Readiness
-
-### DC-25: Final Acceptance And Documentation
-
-Status: `planned`
-
-Goal: prepare the project as a complete exact red-label implementation with
-supported compatibility overlays.
-
-Steps:
-
-- [ ] DC-25.1 Run `make fidelity`, local reference fixtures, pixel fixtures,
-  audio fixtures, and any CI/Sonar gates.
-- [ ] DC-25.2 Perform live terminal smoke tests in Kitty-compatible terminals
-  and record rendering, input, sound, and quit behavior.
-- [ ] DC-25.3 Update `README.md`, `SPEC.md`, `docs/fidelity/`, and install/run
-  documentation to match final behavior.
-- [ ] DC-25.4 Confirm no runtime dependency on local ROMs or generated fixture
-  files.
-- [ ] DC-25.5 Confirm `xyzzy` disabled is red-label equivalent and `xyzzy`
-  enabled differs only through documented overlay hooks.
-- [ ] DC-25.6 Close remaining gap entries or explicitly mark them out of scope.
-
-Completion gate: every acceptance item in `SPEC.md` is satisfied or explicitly
-documented as out of scope by project owner decision.
+pixel fixtures, audio fixtures, live/session behavior, and release evidence as
+the `DC-31` completed implementation.

@@ -84,6 +84,8 @@ wave, attract, high-score, and cabinet-state behavior:
   lists, object lists, or scheduler state, tests must prove those byte-level
   mutations so the later large refactor can be checked against the original
   behavior;
+- do not begin the large module-split refactor until the game is fully
+  ROM-complete and playable under the final acceptance plan in `PLAN.md`;
 - add golden-trace, pixel, waveform, or command-sequence tests for every
   translated subsystem where possible;
 - keep the binary self-contained: no runtime dependency on local ROMs or assets
@@ -418,8 +420,9 @@ Additional gaps and corrections found during this review:
   spec remains the behavior contract and gap register.
 - `src/machine.rs` is large enough that the eventual module split must be
   treated as a planned refactor, not incidental cleanup. New code must keep
-  adding mutation-preserving unit and characterization tests before the refactor
-  starts.
+  adding mutation-preserving unit and characterization tests before final
+  acceptance, and the refactor must wait until the ROM-complete playable game
+  is finished.
 - The live path now feeds translated video RAM into `render_cabinet_frame`.
   Remaining video risk is fixture proof for exact frame/cycle timing, pixel
   golden coverage, and intentionally native-black untranslated screens. A live
@@ -1339,9 +1342,9 @@ It should model:
 - Sound command output.
 - Video/sprite/palette output state.
 
-The pre-refactor core exposes a small public API through `ArcadeMachine`; a
-later module split may wrap or rename it, but it must preserve the same
-observable contract:
+The completion-phase core exposes a small public API through `ArcadeMachine`; a
+later post-completion module split may wrap or rename it, but it must preserve
+the same observable contract:
 
 - `ArcadeMachine::new()`.
 - `ArcadeMachine::try_new_with_cmos(cmos)`.
@@ -1355,9 +1358,9 @@ observable contract:
 - `ArcadeMachine::save_state()`.
 - `ArcadeMachine::restore_state(state)`.
 
-`docs/fidelity/refactor-freeze.md` owns the `DC-23` refactor-freeze contract:
+`docs/fidelity/refactor-freeze.md` owns the `DC-23` future-refactor contract:
 the validation suite, module boundaries, and byte-compatible surfaces that must
-remain stable during the large refactor.
+remain stable during the large refactor after final acceptance is complete.
 
 ### Compatibility Layer
 
