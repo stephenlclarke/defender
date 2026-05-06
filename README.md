@@ -259,7 +259,9 @@ compatibility behavior.
   remain tracked in `SPEC.md`, `docs/fidelity/gaps.md`, and `PLAN.md`.
   `DC-20.1` added MAME-derived visible pixel-nibble CRC capture to local
   reference traces; regenerated fixtures now detect the attract/title pixel
-  drift instead of carrying `video_crc32=-`.
+  drift instead of carrying `video_crc32=-`. `DC-24` tightened the reference
+  fixture check so stale required cells fail before exact comparison; the active
+  blocker is now real frame-3 title/attract video drift.
 - `DC-22` closes the hardware/asset audit by naming which edge
   cases are fixture-backed versus deferred. Fixed main CPU ROM, selected
   banked program ROM, sound CPU ROM, decoder PROM image views, `CROM0`

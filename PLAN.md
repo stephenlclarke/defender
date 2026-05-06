@@ -2688,29 +2688,79 @@ post-completion behavior contract.
 
 ### DC-24: Reference Fixture Normalization And Gate Promotion
 
-Status: `planned`
+Status: `complete`
 
 Goal: make local red-label reference fixtures a passing, actionable gate rather
 than an ignored or schema-skewed signal.
 
+Start note: `2026-05-06 07:33:39 BST` - starting `DC-24.1` by regenerating the
+ignored local MAME reference fixtures and tightening the reference-fixture gate
+so stale `video_crc32=-` traces fail before exact Rust comparison.
+
 Steps:
 
-- [ ] DC-24.1 Regenerate or normalize the local MAME reference fixtures so every
+- [x] DC-24.1 Regenerate or normalize the local MAME reference fixtures so every
   required scenario has populated `video_crc32`, sound-command, event, object,
   process, shell, RNG, and state columns.
-- [ ] DC-24.2 Fix the current line-2/frame-1 local-reference mismatch caused by
+  Completed: `2026-05-06 07:42:41 BST`
+- [x] DC-24.2 Fix the current line-2/frame-1 local-reference mismatch caused by
   reference `video_crc32=-` versus Rust `0x157E98C7` without weakening exact
   trace comparison.
-- [ ] DC-24.3 Promote `attract_boot` to a non-ignored exact local-reference
-  test once the fixture schema and first-frame comparison are valid.
-- [ ] DC-24.4 Add a fixture freshness check that fails when a required local
+  Completed: `2026-05-06 07:42:41 BST`
+- [x] DC-24.3 Evaluate `attract_boot` promotion after fixture normalization and
+  leave it ignored only because exact comparison now fails on real frame-3
+  video drift owned by `DC-25`.
+  Completed: `2026-05-06 07:42:41 BST`
+- [x] DC-24.4 Add a fixture freshness check that fails when a required local
   reference scenario is missing required columns or stale headers.
-- [ ] DC-24.5 Update `SPEC.md`, `README.md`, and `docs/fidelity/` with the
+  Completed: `2026-05-06 07:42:41 BST`
+- [x] DC-24.5 Update `SPEC.md`, `README.md`, and `docs/fidelity/` with the
   exact local-reference gate and remaining scenario failures.
+  Completed: `2026-05-06 07:44:37 BST`
 
-Completion gate: `cargo test local_reference_attract_boot_matches_red_label
---all-targets -- --ignored` either passes and is unignored, or the failure is a
-real behavior mismatch with a focused follow-up in this plan.
+Completion gate: the ignored `local_reference_attract_boot_matches_red_label`
+test either passes and is unignored, or the failure is a real behavior mismatch
+with a focused follow-up in this plan.
+
+Work log:
+
+- `2026-05-06 07:42:41 BST` Completed `DC-24.1` through `DC-24.4`: regenerated
+  all 12 ignored local MAME reference traces with Homebrew MAME `0.287`; the
+  fixtures now populate `video_crc32` from frame 1 and pass
+  `make reference-fixtures-check` with 22,308 frames. The previous line-2/frame-1
+  structural mismatch is gone. The ignored local-reference test sweep now fails
+  first at line 4/frame 3 with real video drift, expected
+  `0xAD56B94F`, actual `0x157E98C7`, so `attract_boot` remains ignored until
+  `DC-25` fixes title/attract pixel fidelity. Added a Rust reference-fixture
+  freshness check that rejects missing required state, RNG, CRC, and
+  `video_crc32` cells before exact Rust comparison.
+- `2026-05-06 07:44:37 BST` Completed `DC-24.5`: updated `SPEC.md`,
+  `README.md`, `docs/fidelity/README.md`,
+  `docs/fidelity/golden-comparison-results.md`, and
+  `docs/fidelity/gaps.md` so the active gap is the real frame-3 video drift,
+  not stale reference `video_crc32=-` data.
+
+Completion gate result: `DC-24` is complete. `attract_boot` was not unignored
+because the normalized fixture now exposes a real `DC-25` pixel-fidelity
+failure at line 4/frame 3, expected `0xAD56B94F`, actual `0x157E98C7`.
+
+Validation:
+
+- `make trace-script-test` passed.
+- `make reference-traces` regenerated 12 ignored local MAME reference fixtures.
+- `make reference-fixtures-check` passed with 12 fixtures and 22,308 frames.
+- `cargo test reference_trace --all-targets` passed.
+- `cargo test --all-targets` passed with 859 library tests, 13 known ignored,
+  and 2 binary tests.
+- `cargo test local_reference_ --all-targets -- --ignored` was run and failed
+  all eight ignored tests at the expected real video drift: line 4/frame 3,
+  expected `0xAD56B94F`, actual `0x157E98C7`.
+- `cargo fmt --check`, `markdownlint PLAN.md SPEC.md README.md
+  docs/fidelity/README.md docs/fidelity/gaps.md
+  docs/fidelity/golden-comparison-results.md`, and `git diff --check` passed.
+- `make fidelity` was not run for `DC-24`; the cycle used the narrower
+  reference-fixture, full cargo test, formatting, and Markdown gates because
+  the change was limited to reference-fixture validation and documentation.
 
 ### DC-25: Title Screen, Attract, And Pixel Fidelity
 

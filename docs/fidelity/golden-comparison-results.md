@@ -795,6 +795,48 @@ Interpretation:
   `docs/fidelity/fixtures/local/` or `/tmp`; only findings and tooling belong
   in the checked-in repository.
 
+## 2026-05-06 `DC-24` Reference Fixture Normalization
+
+Scenario:
+
+- All 12 Phase 1 reference scenarios under
+  `docs/fidelity/fixtures/local/reference`.
+
+Purpose: regenerate the ignored local MAME reference traces with populated
+`video_crc32` values and confirm the exact-test blocker is now real video drift
+rather than stale reference schema data.
+
+Commands:
+
+```sh
+make trace-script-test
+make reference-traces
+make reference-fixtures-check
+cargo test local_reference_ --all-targets -- --ignored
+```
+
+Result:
+
+- `make trace-script-test` passed.
+- `make reference-traces` regenerated 12 ignored local MAME traces with
+  Homebrew MAME `0.287`.
+- `make reference-fixtures-check` passed with 12 complete fixtures and 22,308
+  frames.
+- The old line-2/frame-1 `video_crc32=-` blocker is gone. Regenerated
+  references have `video_crc32=0x157E98C7` for frames 1 and 2.
+- `cargo test local_reference_ --all-targets -- --ignored` still fails all
+  eight exact-reference tests, but now the first failure is real pixel drift at
+  line 4/frame 3: expected `video_crc32=0xAD56B94F`, actual `0x157E98C7`.
+
+Interpretation:
+
+- Local reference fixtures are fresh enough to act as exact evidence again.
+- `attract_boot` cannot be unignored until `DC-25` fixes the early
+  title/attract video cadence or rendering path.
+- The exact gameplay scenarios remain blocked behind the shared frame-3 video
+  drift before later `DC-26` gameplay scheduler and session mismatches can be
+  observed directly.
+
 ## 2026-05-05 `DC-21.2` Sound Command Fixture Recheck
 
 Scenario:

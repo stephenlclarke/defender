@@ -342,6 +342,7 @@ fn fidelity_check_reference_trace_dir_text(path: &Path) -> Result<String> {
                 scenario.frames
             );
         }
+        check_reference_trace_required_cells(&expected_path, &lines)?;
         if let Some(requirement) = requirements.get(&scenario.scenario) {
             let input_frames = actual_inputs.trim_end().split(';').collect::<Vec<_>>();
             check_reference_trace_evidence(&expected_path, &lines, requirement, &input_frames)?;
@@ -427,6 +428,62 @@ fn validate_trace_requirements_reference_known_scenarios(
             bail!("trace requirement references unknown scenario {scenario}");
         }
     }
+    Ok(())
+}
+
+fn check_reference_trace_required_cells(expected_path: &Path, lines: &[&str]) -> Result<()> {
+    let header = lines.first().copied().unwrap_or_default();
+    let columns = header.split('\t').collect::<Vec<_>>();
+    let required_columns = [
+        "frame",
+        "input_bits",
+        "input_in0",
+        "input_in1",
+        "input_in2",
+        "phase",
+        "p1_score",
+        "p2_score",
+        "wave",
+        "lives",
+        "smart_bombs",
+        "seed",
+        "hseed",
+        "lseed",
+        "object_table_crc32",
+        "process_table_crc32",
+        "super_process_table_crc32",
+        "shell_table_crc32",
+        "video_crc32",
+    ];
+    let required_indexes = required_columns
+        .iter()
+        .map(|column| trace_column_index(&columns, column).map(|index| (column, index)))
+        .collect::<Result<Vec<_>>>()?;
+
+    for (index, line) in lines.iter().copied().enumerate().skip(1) {
+        let fields = line.split('\t').collect::<Vec<_>>();
+        if fields.len() != columns.len() {
+            bail!(
+                "reference trace fixture {} line {} has {} columns, expected {}",
+                expected_path.display(),
+                index + 1,
+                fields.len(),
+                columns.len()
+            );
+        }
+        for (column, field_index) in &required_indexes {
+            let value = fields[*field_index].trim();
+            if value.is_empty() || value == "-" {
+                bail!(
+                    "reference trace fixture {} line {} column {} is missing required value",
+                    expected_path.display(),
+                    index + 1,
+                    column
+                );
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -819,11 +876,11 @@ mod tests {
 
     use super::{
         Command, TraceRequirement, check_reference_trace_evidence,
-        fidelity_check_reference_trace_dir_text, fidelity_check_trace_dir_text,
-        fidelity_check_trace_text, fidelity_list_scenarios_text, fidelity_trace_input_file_text,
-        fidelity_trace_input_text, fidelity_trace_text, fidelity_write_scenario_inputs_text,
-        help_text, parse_args, parse_requirement_values, parse_trace_requirements,
-        rom_listing_text, rom_report_text, trace_cell_values,
+        check_reference_trace_required_cells, fidelity_check_reference_trace_dir_text,
+        fidelity_check_trace_dir_text, fidelity_check_trace_text, fidelity_list_scenarios_text,
+        fidelity_trace_input_file_text, fidelity_trace_input_text, fidelity_trace_text,
+        fidelity_write_scenario_inputs_text, help_text, parse_args, parse_requirement_values,
+        parse_trace_requirements, rom_listing_text, rom_report_text, trace_cell_values,
         validate_trace_requirements_reference_known_scenarios,
     };
     use crate::fidelity::{expanded_trace_input_text, trace_header};
@@ -845,7 +902,7 @@ mod tests {
                 ("-", "-")
             };
             expected.push_str(&format!(
-                "{frame}\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\t{sound_commands}\t{events}\n"
+                "{frame}\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t0xE15D8394\t0xC4C53DA1\t0x05B7E865\t0x41D912FF\t0x157E98C7\t{sound_commands}\t{events}\n"
             ));
         }
         fs::write(path.join(format!("{stem}.expected.tsv")), expected)
@@ -1486,6 +1543,26 @@ mod tests {
     }
 
     #[test]
+    fn check_reference_trace_required_cells_rejects_stale_video_crc() {
+        let lines = [
+            trace_header(),
+            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t0xE15D8394\t0xC4C53DA1\t0x05B7E865\t0x41D912FF\t-\t-\t-",
+        ];
+
+        let error = check_reference_trace_required_cells(
+            &PathBuf::from("/tmp/attract_boot.expected.tsv"),
+            &lines,
+        )
+        .expect_err("stale video CRC");
+
+        assert!(
+            error
+                .to_string()
+                .contains("column video_crc32 is missing required value")
+        );
+    }
+
+    #[test]
     fn check_reference_trace_evidence_rejects_missing_required_event() {
         let lines = [
             trace_header(),
@@ -1640,49 +1717,49 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known DC-17 mismatch: local reference fixture is missing video CRCs"]
+    #[ignore = "known DC-25 mismatch: regenerated local reference first differs at frame 3 video CRC"]
     fn local_reference_attract_boot_matches_red_label() {
         assert_local_reference_trace_matches("attract_boot");
     }
 
     #[test]
-    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus credited-start scheduler/player setup drift"]
+    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes credited-start scheduler/player drift"]
     fn local_reference_start_game_matches_red_label() {
         assert_local_reference_trace_matches("start_game");
     }
 
     #[test]
-    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus gameplay scheduler/player setup drift"]
+    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes gameplay scheduler/player drift"]
     fn local_reference_firing_matches_red_label() {
         assert_local_reference_trace_matches("firing");
     }
 
     #[test]
-    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus gameplay scheduler/player setup drift"]
+    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes gameplay scheduler/player drift"]
     fn local_reference_thrust_reverse_matches_red_label() {
         assert_local_reference_trace_matches("thrust_reverse");
     }
 
     #[test]
-    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus gameplay scheduler/player setup drift"]
+    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes gameplay scheduler/player drift"]
     fn local_reference_smart_bomb_matches_red_label() {
         assert_local_reference_trace_matches("smart_bomb");
     }
 
     #[test]
-    #[ignore = "known DC-18.3 mismatch: missing reference video CRC plus gameplay scheduler/player setup drift"]
+    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes gameplay scheduler/player drift"]
     fn local_reference_hyperspace_matches_red_label() {
         assert_local_reference_trace_matches("hyperspace");
     }
 
     #[test]
-    #[ignore = "known DC-19 mismatch: missing reference video CRC plus credited-start scheduler/death drift"]
+    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes credited-start scheduler/death drift"]
     fn local_reference_death_matches_red_label() {
         assert_local_reference_trace_matches("death");
     }
 
     #[test]
-    #[ignore = "known DC-19 mismatch: missing reference video CRC plus credited-start scheduler/wave drift"]
+    #[ignore = "known DC-25/DC-26 mismatch: frame 3 video CRC drift precedes credited-start scheduler/wave drift"]
     fn local_reference_wave_advance_matches_red_label() {
         assert_local_reference_trace_matches("wave_advance");
     }

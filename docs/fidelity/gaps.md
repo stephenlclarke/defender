@@ -56,6 +56,16 @@ This file records behavior that must not be guessed in arcade-core code.
 - `assets/red-label/trace-schema.tsv` is the single checked-in trace schema
   source. The old duplicate `docs/fidelity/trace-schema.tsv` was removed to
   prevent fixture documentation drift.
+- `DC-24` regenerated all 12 ignored local MAME reference fixtures with
+  populated `video_crc32` values and tightened
+  `--fidelity-check-reference-trace-dir` so stale required cells fail during
+  fixture validation. `make reference-fixtures-check` now proves 12 complete
+  Phase 1 fixtures and 22,308 frames with non-placeholder state, RNG, table
+  CRC, and video CRC cells. The old line-2/frame-1 `video_crc32=-` exact-test
+  blocker is gone. `cargo test local_reference_ --all-targets -- --ignored`
+  now fails first at line 4/frame 3 on real video drift, expected
+  `0xAD56B94F`, actual `0x157E98C7`; this is the active `DC-25`
+  title/attract pixel-fidelity blocker before `attract_boot` can be promoted.
 - The trace format can carry object, process, super-process, and shell table
   checksums. The first `phr6.src` RAM layouts and linked-list heads are
   embedded under `assets/red-label/ram-layout.tsv` and

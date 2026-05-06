@@ -1186,6 +1186,16 @@ Additional gaps and corrections found during this review:
   423/425/424 frames, object-table CRC on 155 frames, and process-table CRC on
   425 frames. Inputs, scores, super-process CRC, shell CRC, sound commands, and
   events match for those five slices.
+- `DC-24` regenerated all 12 ignored local MAME reference fixtures with
+  populated `video_crc32` values and tightened the reference fixture checker so
+  stale required cells fail before exact Rust comparison. The old
+  line-2/frame-1 `video_crc32=-` blocker is gone; the reference-fixtures check
+  now validates 12 complete fixtures and 22,308
+  frames with populated state, RNG, table CRC, and video CRC cells. The exact
+  `local_reference_*_matches_red_label` tests now fail first at line 4/frame 3
+  on real early video drift, expected `0xAD56B94F`, actual `0x157E98C7`. This
+  is the active `DC-25` title/attract pixel-fidelity blocker before
+  `attract_boot` can be promoted.
 - `DC-18.2` fixed the first credited coin/start RNG call-order drift: the
   cold-boot trace handoff now suppresses the frame-level start-ready `RAND`
   advance only when the attract executive slice already ran `EXEC` and advanced

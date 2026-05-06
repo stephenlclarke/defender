@@ -40,9 +40,9 @@ Current trace format:
 - The local MAME reference exporter now computes `video_crc32` with the same
   visible pixel-nibble convention: Williams two-pixels-per-byte video RAM,
   Defender visible origin `(12, 7)`, visible size `292x240`, and CRC-32 over
-  one decoded nibble per visible pixel. Regenerate local reference traces after
-  this exporter change before treating old `video_crc32=-` fixtures as pixel
-  evidence.
+  one decoded nibble per visible pixel. The reference fixture checker now
+  rejects stale required cells such as `video_crc32=-`; regenerate local
+  reference traces before treating them as pixel evidence.
 - `defender --fidelity-trace 300` emits deterministic Rust trace rows for local
   fixture work. It is not a substitute for MAME/source-derived golden traces.
 - `defender --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'` emits
