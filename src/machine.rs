@@ -32835,6 +32835,13 @@ impl RedLabelRuntimeMemory {
         let status = self.write_terrain_status(&layout, 0)?;
         let pdf_flag_before = self.read_field_byte(&layout, "base_page", "PDFLG")?;
         self.write_field_byte(&layout, "base_page", "PDFLG", 0)?;
+        self.write_process_word(
+            &layout,
+            process_address,
+            "PADDR",
+            red_label_routine_address("GEXEC")?,
+        )?;
+        self.write_process_byte(&layout, process_address, "PTIME", 1)?;
         Ok(RedLabelPlayerStart::GameExecReady {
             process_address,
             restore,
@@ -49134,7 +49141,9 @@ impl RedLabelRuntimeMemory {
             return Ok(None);
         }
         let target_object_address = self.read_process_data_word(layout, process_address, "PD2")?;
-        object_table_for_address(layout, target_object_address)?;
+        if object_table_for_address(layout, target_object_address).is_err() {
+            return Ok(None);
+        }
         let target_collision = self.read_object_word(layout, target_object_address, "OCVECT")?;
         if target_collision.to_be_bytes()[1]
             != red_label_routine_address("ASTKIL")?.to_be_bytes()[1]
@@ -49168,7 +49177,9 @@ impl RedLabelRuntimeMemory {
             }
             let target_object_address = self.read_word(cursor)?;
             if target_object_address != 0 {
-                object_table_for_address(layout, target_object_address)?;
+                if object_table_for_address(layout, target_object_address).is_err() {
+                    continue;
+                }
                 self.write_field_word(layout, "base_page", "TPTR", cursor)?;
                 self.write_process_data_word(
                     layout,
@@ -55493,7 +55504,14 @@ impl ArcadeMachine {
         let Some(scheduled) = self.memory.step_process_scheduler()? else {
             return Ok(None);
         };
-        let dispatch = self.dispatch_red_label_scheduled_process(scheduled)?;
+        let dispatch = self
+            .dispatch_red_label_scheduled_process(scheduled)
+            .map_err(|error| {
+                format!(
+                    "{error} while dispatching process 0x{:04X} routine 0x{:04X}",
+                    scheduled.process_address, scheduled.routine_address
+                )
+            })?;
         self.apply_process_dispatch_state(&dispatch)?;
         self.sync_scores_from_red_label_memory()?;
         Ok(Some(dispatch))
@@ -76524,6 +76542,10 @@ mod tests {
             machine.red_label_ram_range(0xA112..0xA11A),
             Some(&[0; 8][..])
         );
+        assert_eq!(
+            machine.red_label_ram_range(process + 0x02..process + 0x05),
+            Some(&[0xDC, 0xD9, 0x01][..])
+        );
     }
 
     #[test]
@@ -80115,6 +80137,70 @@ mod tests {
                     expected_shot_timer,
                 ][..]
             )
+        );
+    }
+
+    #[test]
+    fn landst_skips_invalid_fizzle_words_when_gtarg_wraps_past_target_list() {
+        let mut machine = ArcadeMachine::new();
+        let astro_process = machine
+            .red_label_make_process(
+                red_label_routine_address("ASTRO").expect("ASTRO address"),
+                RED_LABEL_SYSTEM_PROCESS_TYPE,
+            )
+            .expect("make ASTRO process")
+            .process_address;
+        let astronaut = machine
+            .red_label_init_object_cell(
+                astro_process,
+                RedLabelObjectDescriptor {
+                    picture_address: red_label_object_picture_address("ASTP1")
+                        .expect("ASTP1 address"),
+                    collision_vector_address: red_label_routine_address("ASTKIL")
+                        .expect("ASTKIL address"),
+                    scanner_color: 0x1111,
+                },
+            )
+            .expect("init astronaut")
+            .object_address;
+        machine
+            .red_label_activate_object_cell(astronaut)
+            .expect("activate astronaut");
+        machine
+            .memory
+            .write_word(0xA11A, astronaut)
+            .expect("set first TLIST slot");
+        machine
+            .memory
+            .write_word(0xA142, 0x0111)
+            .expect("seed source FISTAB word");
+        machine
+            .memory
+            .write_word(0xA09B, 0xA140)
+            .expect("set TPTR before source GTARG overrun window");
+        machine.memory.write_byte(0xA0FA, 1).expect("set ASTCNT");
+        write_ram_bytes(&mut machine, 0xA0DF, &[0x00, 0x00, 0x10]);
+        machine.memory.write_word(0xA020, 0).expect("set BGL");
+        machine.memory.write_byte(0xA102, 8).expect("set LNDXV");
+        machine
+            .memory
+            .write_word(0xA103, 0x0100)
+            .expect("set LNDYV");
+        machine.memory.write_byte(0xA105, 0x20).expect("set LDSTIM");
+
+        let start = machine.red_label_start_lander_processes(1).expect("LANDST");
+
+        assert_eq!(start.landers.len(), 1);
+        assert_eq!(
+            start.landers[0].target,
+            Some(RedLabelLanderTarget {
+                target_slot_address: 0xA11A,
+                target_object_address: astronaut,
+            })
+        );
+        assert_eq!(
+            machine.red_label_ram_range(0xA142..0xA144),
+            Some(&[0x01, 0x11][..])
         );
     }
 

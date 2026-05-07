@@ -792,10 +792,18 @@ acceptance is completed.
   two-player start buttons now scan `SWTAB`, dispatch `ST1`/`ST2`, and consume
   credits through the translated `START2` tail. Live player controls stay gated
   while the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1` start handoff
-  advances.
-  The board harness can now read/write packed CMOS/SRAM bytes and words using
-  the documented most-significant-nibble-first order, can apply the ROM-derived
-  CMOS defaults to its CMOS cell array through the visible `CMINIT` clear/copy
+  advances, then the `PLS1` tail schedules `GEXEC` so live terrain/ground
+  output and enemy object/appearance rendering resume through the native
+  cabinet frame path. The translated lander target picker skips source `GTARG`
+  overrun words from `FISTAB` that are not object-table pointers, matching the
+  hardware-visible behavior of treating those reads as non-astronaut targets
+  instead of crashing the live loop. Live attract rendering is
+  regression-covered through visible post-title frame changes before start, and
+  live reverse pulses are covered by the credited gameplay terrain/enemy
+  regression. The board harness can now read/write packed CMOS/SRAM bytes and
+  words using the documented most-significant-nibble-first order, can apply the
+  ROM-derived CMOS defaults to its CMOS cell array through the visible `CMINIT`
+  clear/copy
   sequence, can model the visible `CLRAUD` packed zero writes, can route the
   CMOS-visible `PWRUP` branch around `CMOSCK`/`DIPFLG`/`DIPSW`, can run the
   visible `RHSTD` / `RHSTDS` all-time and today's high-score reset copy, can
@@ -1636,6 +1644,12 @@ machine-level `INIT20` `CRINIT` / `FISS` / `STINIT` / `OINIT` / `FBINIT` /
 `RSW0` phony-object placement, source `PLS1` entry B=`0x07` for targetless
 reserve restore, B-register `OX16` low-byte flow through target-list restore,
 `MMSW` batches of six, `SWMRES` decrement, and `OFREE` return/reuse path.
+The live `PLS1` tail now hands the active start process to `GEXEC`, matching
+the source jump so credited live starts release the gameplay frame path and
+render both lower terrain/ground and visible enemy object/appearance state.
+The live `GTARG` translation now ignores non-object words encountered when the
+source scan runs from `TLIST` into `FISTAB`, preventing release-run crashes from
+fizzle-table bytes while preserving the underlying source memory contents.
 Broader process body coverage, full hardware IRQ scanline/frame integration,
 and MAME golden-trace equivalence remain tracked by the later gameplay, video,
 and fidelity phases.

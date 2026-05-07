@@ -3579,9 +3579,50 @@ Steps:
   between frame uploads, and proving the live presenter keeps an already
   visible frame on screen while the next frame is transmitted.
   Completed: `2026-05-07 07:38:39 BST`
+- [x] DC-30.9 Repair the reported live gameplay visibility gap where aliens
+  and terrain/ground do not appear after starting a game, proving the credited
+  live start path renders both world terrain and active enemy objects through
+  the native cabinet frame, keeps running without process/object pointer
+  corruption, preserves reverse without visible screen corruption, and leaves
+  the attract loop visibly progressing before start.
+  Completed: `2026-05-07 18:31:55 BST`
 
 Work log:
 
+- `2026-05-07 07:42:11 BST` Started `DC-30.9` after the owner reported that
+  aliens do not appear and neither does the ground. The investigation will
+  focus on the live credited-start gameplay render path, not the terminal
+  presentation layer, and will add a regression that starts a live game and
+  asserts terrain/ground and active enemy pixels become visible through the
+  native cabinet frame.
+- `2026-05-07 18:18:12 BST` Expanded `DC-30.9` after owner release-run
+  feedback: only the player ship and HUD are visible, the game is confusing
+  and difficult to start, the app eventually crashes, visible screen corruption
+  appears and may be tied to reversing, and the attract screen does not appear
+  to run. The completion proof must now cover visible attract progress,
+  credited start clarity, post-start terrain/enemy rendering, reverse without
+  display corruption, and a longer gameplay run without process/object pointer
+  corruption.
+- `2026-05-07 18:31:55 BST` Completed `DC-30.9`: matched the red-label
+  `PLS1` tail by scheduling the active player-start process into `GEXEC`, so a
+  credited live start releases the gameplay frame path instead of rendering
+  only the player ship and HUD. The release crash was traced to the translated
+  `GTARG` path scanning from `TLIST` into source `FISTAB`; `FISS` fizzle bytes
+  can form non-object words such as `0x0111`, so the lander target selection
+  now treats those reads as non-targets and preserves the underlying `FISTAB`
+  bytes instead of crashing. Added a long credited live regression that renders
+  native and presented terrain/ground, sees active enemy object/appearance
+  state, sends reverse pulses, validates target-list pointers, and keeps
+  running for 1,200 frames. Added a rendered attract regression proving the
+  title page visibly advances before start, and clarified the release start
+  flow in README as `5` for credit followed by `1` for one-player start.
+  Validation passed with `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`,
+  focused live regressions for credited gameplay and rendered attract,
+  `markdownlint README.md PLAN.md SPEC.md`, `git diff --check`, and a forced
+  Kitty-compatible release PTY smoke that sent credit, one-player start,
+  reverse, and quit inputs and exited with status 0 without panic/error
+  signatures.
 - `2026-05-07 07:33:43 BST` Started `DC-30.8` after the owner reported that
   the screen flickers a lot. Initial audit found the live core render tests
   already prove red-label video RAM does not blank through the Williams color
@@ -3657,11 +3698,15 @@ Work log:
   the recorded evidence is the PTY Kitty stream plus core live render/input
   regressions rather than a terminal screenshot artifact.
 
-Completion gate result: `DC-30` is complete as of `2026-05-07 07:38:39 BST`.
-`DC-30.6` fixed dropped live input pulses, and `DC-30.7` fixed the later
+Completion gate result: `DC-30` is complete as of `2026-05-07 18:31:55 BST`.
+`DC-30.6` fixed dropped live input pulses, `DC-30.7` fixed the later
 live-attract handoff after the Williams/title sequence without corrupting
-high-score state. `DC-30.8` removed live Kitty per-frame terminal blanking and
-keeps one frame visible while the replacement frame is transmitted.
+high-score state, `DC-30.8` removed live Kitty per-frame terminal blanking, and
+`DC-30.9` fixed the owner-visible release blockers where attract did not appear
+to progress, start flow was unclear, terrain/ground and enemies were missing
+after start, reverse could coincide with screen corruption, and the release
+game eventually crashed. Phase 10 live playability acceptance is complete once
+this `DC-30.9` update is committed and pushed to `red-label`.
 
 Slack updates:
 
@@ -3673,6 +3718,8 @@ Slack updates:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778135427882469`
 - `DC-30.8`:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778136028385079`
+- `DC-30.9`:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778175278467879`
 
 ## Phase 11: Final Acceptance Before Refactor
 
@@ -3681,7 +3728,8 @@ Slack updates:
 Status: `ready`
 
 Readiness note: Phase 10 live playability is complete as of
-`2026-05-07 07:38:39 BST`; `DC-31` may now start.
+`2026-05-07 18:31:55 BST` once the `DC-30.9` commit is pushed and reported.
+`DC-31` may then start as the final acceptance pass before any large refactor.
 
 Goal: certify the project as a complete exact red-label implementation with
 supported compatibility overlays before any large refactor starts.

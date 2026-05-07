@@ -292,6 +292,7 @@ mod tests {
     use crate::input::CabinetInput;
     use crate::machine::{
         ArcadeMachine, FRAME_RATE_MILLIHZ, GamePhase, MachineEvent, RedLabelSoundBoardSnapshot,
+        VISIBLE_WIDTH,
     };
     use crate::rom::crc32;
     use crate::sound::SoundCommandLatch;
@@ -495,12 +496,246 @@ mod tests {
     }
 
     #[test]
+    fn live_credited_start_renders_terrain_and_enemy_objects() {
+        let mut machine = ArcadeMachine::new();
+        let mut renderer = Renderer::with_size(292, 240);
+
+        start_live_one_player_game(&mut machine, &mut renderer);
+
+        let mut saw_terrain = false;
+        let mut saw_rendered_terrain = false;
+        let mut saw_enemy_object = false;
+        let mut saw_post_reverse_rendered_terrain = false;
+        for frame in 0..1_200 {
+            assert_live_target_list_valid(&machine);
+            let input = if matches!(frame, 360 | 720) {
+                CabinetInput {
+                    reverse: true,
+                    ..CabinetInput::NONE
+                }
+            } else {
+                CabinetInput::NONE
+            };
+            machine.step(input);
+            assert_live_target_list_valid(&machine);
+            let image =
+                render_live_machine_frame(&mut renderer, &mut machine).expect("render gameplay");
+            saw_terrain |= native_nonzero_pixels_in_band(&machine, 180..240) >= 100;
+            let rendered_terrain = rendered_nonblack_pixels_in_band(image, 180..240) >= 100;
+            saw_rendered_terrain |= rendered_terrain;
+            saw_post_reverse_rendered_terrain |= frame > 720 && rendered_terrain;
+            saw_enemy_object |= live_visible_enemy_object_count(&machine) > 0
+                || live_visible_enemy_appearance_count(&machine) > 0;
+
+            // Keep running after the first good world frame. The release
+            // build was able to show player/HUD/world briefly and then crash
+            // from later process/object corruption.
+        }
+
+        assert!(
+            saw_terrain,
+            "credited live start did not render terrain/ground pixels"
+        );
+        assert!(
+            saw_rendered_terrain,
+            "credited live start did not present terrain/ground pixels in the rendered cabinet frame"
+        );
+        assert!(
+            saw_enemy_object,
+            "credited live start did not render visible active enemy/object pixels"
+        );
+        assert!(
+            saw_post_reverse_rendered_terrain,
+            "credited live reverse path did not preserve rendered terrain/ground pixels"
+        );
+    }
+
+    #[test]
+    fn rendered_live_attract_visibly_advances_after_title_page() {
+        let mut machine = ArcadeMachine::new();
+        let mut renderer = Renderer::with_size(292, 240);
+        let mut title_render_crc = None;
+        let mut saw_post_title_render = false;
+
+        for tick in 1..=6_000 {
+            let output = machine.step(CabinetInput::NONE);
+            assert_eq!(output.snapshot.phase, GamePhase::Attract);
+            if tick == 900 || tick > 900 && tick % 30 == 0 {
+                let image =
+                    render_live_machine_frame(&mut renderer, &mut machine).expect("render attract");
+                let render_crc = crc32(&image.pixels);
+                if tick == 900 {
+                    title_render_crc = Some(render_crc);
+                }
+                if let Some(title_render_crc) = title_render_crc {
+                    saw_post_title_render |= tick > 900 && render_crc != title_render_crc;
+                }
+            }
+            if saw_post_title_render {
+                return;
+            }
+        }
+
+        assert!(
+            saw_post_title_render,
+            "rendered live attract did not visibly leave the title page"
+        );
+    }
+
+    #[test]
     fn frame_duration_tracks_cabinet_refresh_not_old_ninety_ms_tick() {
         assert_eq!(
             FRAME_DURATION.as_micros(),
             u128::from(cabinet_frame_duration_micros(FRAME_RATE_MILLIHZ))
         );
         assert_eq!(FRAME_DURATION.as_micros(), 16_639);
+    }
+
+    fn start_live_one_player_game(machine: &mut ArcadeMachine, renderer: &mut Renderer) {
+        let _ = machine.step(CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        });
+        let _ = render_live_machine_frame(renderer, machine).expect("render coin press");
+        let mut credit_added = false;
+        for _ in 0..32 {
+            let output = machine.step(CabinetInput::NONE);
+            let _ = render_live_machine_frame(renderer, machine).expect("render credit");
+            credit_added |= output
+                .events()
+                .any(|event| event == MachineEvent::CreditAdded);
+            if credit_added {
+                break;
+            }
+        }
+        assert!(credit_added);
+
+        let mut game_started = false;
+        for _ in 0..16 {
+            let output = machine.step(CabinetInput {
+                start_one: true,
+                ..CabinetInput::NONE
+            });
+            let _ = render_live_machine_frame(renderer, machine).expect("render start");
+            game_started |= output
+                .events()
+                .any(|event| event == MachineEvent::GameStarted);
+            if game_started {
+                break;
+            }
+        }
+        assert!(game_started);
+        assert_eq!(machine.snapshot().phase, GamePhase::Playing);
+    }
+
+    fn native_nonzero_pixels_in_band(
+        machine: &ArcadeMachine,
+        y_range: std::ops::Range<usize>,
+    ) -> usize {
+        let nibbles = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("native visible pixel nibbles");
+        let width = usize::from(VISIBLE_WIDTH);
+        y_range
+            .flat_map(|y| {
+                let row = y * width;
+                nibbles[row..row + width].iter()
+            })
+            .filter(|nibble| **nibble != 0)
+            .count()
+    }
+
+    fn rendered_nonblack_pixels_in_band(
+        image: &RenderedImage,
+        y_range: std::ops::Range<usize>,
+    ) -> usize {
+        let width = image.width as usize;
+        y_range
+            .flat_map(|y| {
+                let row = y * width * 4;
+                image.pixels[row..row + width * 4].chunks_exact(4)
+            })
+            .filter(|pixel| *pixel != [0, 0, 0, 255])
+            .count()
+    }
+
+    fn live_visible_enemy_object_count(machine: &ArcadeMachine) -> usize {
+        let mut count = 0;
+        let mut object_address = read_word(machine, 0xA065).expect("active object head");
+        for _ in 0..95 {
+            if object_address == 0 {
+                break;
+            }
+            if !live_object_address_is_valid(object_address) {
+                break;
+            }
+
+            let next_object = read_word(machine, object_address).expect("active object link word");
+            let picture = read_word(machine, object_address + 0x02).expect("object OPICT");
+            let screen = read_word(machine, object_address + 0x04).expect("object screen");
+            let collision_vector =
+                read_word(machine, object_address + 0x08).expect("object OCVECT");
+            if screen != 0 && picture != 0xF8EC && live_enemy_collision_vector(collision_vector) {
+                count += 1;
+            }
+            object_address = next_object;
+        }
+        count
+    }
+
+    fn assert_live_target_list_valid(machine: &ArcadeMachine) {
+        let target_pointer = read_word(machine, 0xA09B).expect("TPTR");
+        if target_pointer == 0 {
+            return;
+        }
+        assert!(
+            (0xA11A..0xA142).contains(&target_pointer)
+                && (target_pointer - 0xA11A).is_multiple_of(2),
+            "live target cursor drifted outside TLIST: 0x{target_pointer:04X}"
+        );
+        for slot_address in (0xA11A..0xA142).step_by(2) {
+            let object_address = read_word(machine, slot_address).expect("TLIST slot");
+            assert!(
+                object_address == 0 || live_object_address_is_valid(object_address),
+                "live TLIST slot 0x{slot_address:04X} points outside object table: 0x{object_address:04X}"
+            );
+        }
+    }
+
+    fn live_visible_enemy_appearance_count(machine: &ArcadeMachine) -> usize {
+        let mut count = 0;
+        for slot in 0..16 {
+            let slot_address = 0x9C00 + slot * 0x40;
+            let size = read_word(machine, slot_address).expect("appearance RSIZE");
+            if size == 0 {
+                continue;
+            }
+            let object_address =
+                read_word(machine, slot_address + 0x0A).expect("appearance OBJPTR");
+            if !live_object_address_is_valid(object_address) {
+                continue;
+            }
+            let collision_vector =
+                read_word(machine, object_address + 0x08).expect("appearance object OCVECT");
+            if live_enemy_collision_vector(collision_vector) {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    fn live_object_address_is_valid(object_address: u16) -> bool {
+        (0xA23C..0xA23C + 95 * 0x17).contains(&object_address)
+            && (object_address - 0xA23C).is_multiple_of(0x17)
+    }
+
+    fn live_enemy_collision_vector(collision_vector: u16) -> bool {
+        matches!(collision_vector, 0xEB2B | 0xEBE9 | 0xEF6D | 0xF20B)
+    }
+
+    fn read_word(machine: &ArcadeMachine, address: u16) -> Option<u16> {
+        let bytes = machine.red_label_ram_range(address..address + 2)?;
+        Some(u16::from_be_bytes([bytes[0], bytes[1]]))
     }
 
     #[test]

@@ -185,13 +185,14 @@ Letter-key controls accept either upper- or lower-case input.
 
 After the Williams logo page, the source attract loop should continue
 automatically into the later Defender, instruction, and hall-of-fame screens;
-no keyboard input is required to advance attract mode.
+no keyboard input is required to advance attract mode. A fresh release run may
+start on the Williams/Defender title page, but it is already in attract mode.
 
 To start a normal one-player game from a fresh live session, press `5` to add a
-credit, then press `ENTER` or `1`. The red-label start path intentionally blocks
-no-credit starts unless the cabinet is configured for free play. `ENTER` also
-maps to fire while a game is already in progress, so `1` is the least ambiguous
-one-player start key after a credit has been added.
+credit, then press `1`. `ENTER` also starts a one-player game in the default
+`planetoid` profile, but it maps to fire after play begins, so `1` is the least
+ambiguous start key. The red-label start path intentionally blocks no-credit
+starts unless the cabinet is configured for free play.
 
 The live key layout is currently modelled on the BBC Micro `Planetoid`
 control scheme from Acornsoft's 1982 release of its `Defender` variant.
@@ -441,6 +442,13 @@ compatibility behavior.
   return/reuse path. Live playing frames now schedule translated
   `BGOUT` with the source-derived IRQ stack pointer, so the cabinet terrain
   screen table and video RAM advance through the red-label terrain output path.
+  The live `PLS1` tail now hands the active start process to `GEXEC`, matching
+  the source jump so credited starts release the gameplay frame path and render
+  both lower terrain/ground and visible enemy object/appearance state. The
+  translated lander target picker now skips source `GTARG` overrun words from
+  `FISTAB` that are not object-table pointers, matching the hardware behavior
+  of treating those reads as non-astronaut targets instead of crashing the live
+  loop; reverse pulses are covered by the same live terrain/enemy regression.
   DC-08 proof fixtures now cover reverse rendering, laser lifecycle,
   smart-bomb world effects, hyperspace branches, human rescue, and
   death/respawn/wave/game-over branch decisions.
@@ -594,7 +602,10 @@ compatibility behavior.
   enter translated `ST1` and die at the source credit gate instead of using the
   old compatibility shortcut. After a translated start, live player controls
   stay gated while the active `PLSTRT` / `PLSTR3` / `PLS01` / `PLS1`
-  player-start handoff advances.
+  player-start handoff advances, then the `PLS1` tail schedules `GEXEC` so
+  live terrain/ground output and enemy object/appearance rendering resume from
+  the native cabinet frame path. Live attract rendering is regression-covered
+  through visible post-title frame changes before start.
   `REV` sets
   `REVFLG`, negates `PLADIR` into `NPLAD`, debounces `PIA21`, clears the flag,
   and returns the process to the free list.
