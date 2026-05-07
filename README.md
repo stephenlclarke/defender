@@ -631,10 +631,12 @@ compatibility behavior.
   reference scenarios now pass as normal `local_reference_*_matches_red_label`
   tests when the local fixture directory is present; `cargo test --all-targets
   -- --ignored` should report zero ignored tests.
-- Phase 10 ROM-complete playability is closed again for the accepted red-label
-  target after the `DC-30.12` Williams wordmark repair. The remaining
-  pre-refactor obligation is Phase 11 final acceptance in `PLAN.md`, not
-  additional module-split work.
+- Phase 11 final acceptance has passed for the accepted red-label target: the
+  full fidelity gate, all promoted local reference fixtures, README media
+  generation, release build, ROM report/verification, short fidelity trace, and
+  forced Kitty-compatible live smoke all pass. The next planned work is the
+  post-acceptance `wgpu` presentation backend; the broad module-split refactor
+  stays deferred until after that renderer path is accepted.
 
 ## SonarQube
 

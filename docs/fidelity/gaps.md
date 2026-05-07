@@ -2,6 +2,12 @@
 
 This file records behavior that must not be guessed in arcade-core code.
 
+Status as of `2026-05-07 22:51:20 BST`: no active ROM-complete/playability
+blocker remains open for the accepted red-label target. The entries below are
+closed fidelity history, local-reference/tooling notes, archived prototype
+cleanup, or post-acceptance validation records; new behavior gaps must be added
+here before changing source-shaped arcade-core behavior.
+
 ## Live Visual Fidelity
 
 - `2026-05-07`: owner screenshots reopened Phase 10 live playability after

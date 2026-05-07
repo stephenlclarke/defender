@@ -494,8 +494,20 @@ valid:
   macOS lock-screen image rather than terminal contents, so terminal-image
   screenshot evidence is not checked in.
 
-The large module-split refactor remains prohibited until Phase 11 final
-acceptance is completed.
+### Phase 11 Final Acceptance Addendum 2026-05-07
+
+Phase 11 final acceptance has passed for the accepted red-label scope. The
+acceptance sweep covered `make fidelity`, all promoted local Phase 1 reference
+fixtures, current README media generation, release build, embedded ROM report,
+local ROM verification, short fidelity trace generation, and forced
+Kitty-compatible live smoke with boot, credit, one-player start, movement,
+fire, smart bomb, hyperspace, and clean quit. No active ROM-complete or
+playability blocker remains open.
+
+The next planned work is a post-acceptance `wgpu` presentation backend behind
+a stable native-frame/input boundary. The large module-split refactor remains
+prohibited until both Phase 11 final acceptance and the `wgpu` presentation
+backend acceptance are complete.
 
 ### Drift And Cleanup Items
 

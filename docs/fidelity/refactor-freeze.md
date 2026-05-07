@@ -1,15 +1,17 @@
 # Refactor Freeze
 
-This file is the `DC-23` future-refactor contract. The large refactor is
-deferred until the game is fully ROM-complete and playable. After that
-acceptance gate, the refactor may move code between modules, but it must not
+This file is the `DC-23` future-refactor contract. The broad module-split
+refactor is deferred until the game is fully ROM-complete and playable and the
+post-acceptance `wgpu` presentation backend has been accepted. After those
+acceptance gates, the refactor may move code between modules, but it must not
 change the observable red-label behavior listed here unless `SPEC.md`,
 `PLAN.md`, and the relevant fidelity gap record are updated first.
 
 ## Frozen Validation Suite
 
-After final acceptance is complete, run this suite before the first refactor
-slice and after every meaningful module split:
+After final acceptance is complete, run this suite before the `wgpu`
+presentation backend, before the first refactor slice, and after every
+meaningful module split:
 
 ```sh
 make fidelity

@@ -3539,7 +3539,7 @@ documented compatibility overlays.
 
 ### DC-30: Live Playability, Packaging, And Runtime Evidence
 
-Status: `in_progress`
+Status: `complete`
 
 Goal: prove a user can run and play the game from the built binary without
 local development fixtures.
@@ -3606,6 +3606,10 @@ Steps:
 
 Work log:
 
+- `2026-05-07 22:23:01 BST` Corrected the `DC-30` status from
+  `in_progress` to `complete`; all `DC-30.1` through `DC-30.12` steps were
+  already marked complete and the completion gate was already closed after
+  `DC-30.12`.
 - `2026-05-07 07:42:11 BST` Started `DC-30.9` after the owner reported that
   aliens do not appear and neither does the ground. The investigation will
   focus on the live credited-start gameplay render path, not the terminal
@@ -3824,14 +3828,17 @@ Slack updates:
 
 ### DC-31: ROM-Complete Final Acceptance And Documentation
 
-Status: `pending`
+Status: `in_progress`
 
 Readiness note: Phase 10 live playability was reopened on
 `2026-05-07 20:03:41 BST` after owner visual-corruption and laser-fidelity
 reports, reclosed by `DC-30.11` on `2026-05-07 21:36:27 BST`, then briefly
 reopened for the Williams `DEFENDER` wordmark blink and reclosed by `DC-30.12`
 on `2026-05-07 21:53:55 BST`. `DC-31` is the next final-acceptance cycle
-before any large refactor.
+before post-acceptance presentation or large-refactor work. On
+`2026-05-07 22:21:42 BST`, the plan was updated so a `wgpu` presentation
+backend happens after final acceptance and before the broad idiomatic
+source-tree refactor.
 
 Goal: certify the project as a complete exact red-label implementation with
 supported compatibility overlays before any large refactor starts.
@@ -3843,17 +3850,21 @@ Steps:
   Williams hold, an eight-second hall-of-fame hold, and a shortened full
   attract sequence; wire `make readme-media` to regenerate it.
   Completed: `2026-05-07 22:16:30 BST`
-- [ ] DC-31.1 Run `make fidelity`, all promoted local reference fixtures, pixel
+- [x] DC-31.1 Run `make fidelity`, all promoted local reference fixtures, pixel
   fixtures, audio fixtures, live terminal smoke tests, packaging checks, and
   CI/Sonar gates.
-- [ ] DC-31.2 Confirm every acceptance item in `SPEC.md` is satisfied by a
+  Completed: `2026-05-07 22:51:20 BST`
+- [x] DC-31.2 Confirm every acceptance item in `SPEC.md` is satisfied by a
   passing test, fixture, source citation, or explicit owner-approved scope
   decision.
-- [ ] DC-31.3 Close or move every entry in `docs/fidelity/gaps.md`; no known
+  Completed: `2026-05-07 22:51:20 BST`
+- [x] DC-31.3 Close or move every entry in `docs/fidelity/gaps.md`; no known
   ROM-complete/playability gap may remain undocumented.
-- [ ] DC-31.4 Update `README.md`, `SPEC.md`, `docs/fidelity/`, installation
+  Completed: `2026-05-07 22:51:20 BST`
+- [x] DC-31.4 Update `README.md`, `SPEC.md`, `docs/fidelity/`, installation
   instructions, controls, ROM verification docs, and release notes to match the
   final behavior.
+  Completed: `2026-05-07 22:51:20 BST`
 - [ ] DC-31.5 Push the final completion commit to `red-label` and post the
   complete acceptance summary to `xyzzytools.slack.com#codex`.
 
@@ -3880,6 +3891,41 @@ Work log:
   `cargo test --example generate_readme_media`, `cargo test --all-targets`,
   `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`,
   `markdownlint README.md PLAN.md`, and `git diff --check`.
+- `2026-05-07 22:21:42 BST` Updated post-acceptance sequencing before starting
+  the Phase 11 completion run: keep the translated red-label core unchanged
+  through final acceptance, migrate presentation to `wgpu` behind a stable
+  native-frame boundary next, and defer the broad idiomatic/threaded refactor
+  until after the `wgpu` backend is accepted.
+- `2026-05-07 22:22:26 BST` Started `DC-31.1`: running the final acceptance
+  validation sweep before any presentation migration or broad refactor work.
+  The sweep covers `make fidelity`, promoted local reference fixtures,
+  generated README media, package/runtime commands, and a forced
+  Kitty-compatible live smoke.
+- `2026-05-07 22:51:20 BST` Completed `DC-31.1`: final validation passed with
+  `make fidelity`, `make reference-fixtures-check`, `make readme-media`,
+  `cargo build --release`, `target/release/defender --rom-report`,
+  `target/release/defender --verify-roms assets/roms/defender`,
+  `target/release/defender --fidelity-trace 3`, and a forced
+  Kitty-compatible live smoke using the release binary with boot, coin, start,
+  movement, fire, smart bomb, hyperspace, and quit inputs. The first
+  `make fidelity` attempt found stale ignored local Rust-current fixtures
+  after the accepted live/title renderer changes; those ignored local
+  fixtures were regenerated and the full gate then passed.
+- `2026-05-07 22:51:20 BST` Completed `DC-31.2`: every active acceptance item
+  in `SPEC.md` is covered by passing source-shaped tests, promoted local
+  reference fixtures, exact trace/sound/video checks, release-runtime probes,
+  or explicit Phase 10/Phase 11 scope decisions. External MAME reference
+  fixtures remain local evidence rather than checked-in golden data.
+- `2026-05-07 22:51:20 BST` Completed `DC-31.3`: no active
+  ROM-complete/playability blocker remains open in `docs/fidelity/gaps.md`.
+  The prior owner-reported live visual issues are documented as closed by
+  `DC-30.10`, `DC-30.11`, and `DC-30.12`; remaining notes are historical,
+  tooling, archive, or post-acceptance validation records.
+- `2026-05-07 22:51:20 BST` Completed `DC-31.4`: updated
+  `README.md`, `SPEC.md`, `docs/fidelity/gaps.md`, and
+  `docs/fidelity/refactor-freeze.md` so docs state that Phase 11 final
+  acceptance is complete except for the required final push/Slack report, and
+  that `wgpu` presentation migration comes before the later broad refactor.
 - `2026-05-06 19:34:34 BST` Phase 11 completion requested and checked against
   the plan gates. `DC-31` remains blocked because all seven gameplay
   local-reference tests still fail, `DC-26` is incomplete, and `DC-27` through
@@ -3915,28 +3961,66 @@ Slack updates:
 - `DC-31.0`:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778188682048429`
 
-## Phase 12: Post-Completion Large Refactor
+## Phase 12: Post-Acceptance `wgpu` Presentation Backend
 
-### DC-32: Module Split And Behavior Preservation
+### DC-32: Windowed `wgpu` Renderer And Input Shell
 
 Status: `blocked`
 
-Blocker: `DC-31` must be complete. The large refactor does not begin until the
-game is fully ROM-complete and playable.
+Blocker: `DC-31` must be complete. Presentation migration must not change the
+accepted red-label core behavior.
 
-Goal: split the large core safely without changing completed behavior.
+Goal: add a normal windowed `wgpu` presentation backend while keeping the core
+frame, input, sound, trace, and save-state contracts byte-for-byte equivalent
+to the Phase 11 accepted implementation.
 
 Steps:
 
-- [ ] DC-32.1 Move code in small ownership-based slices with no unrelated
+- [ ] DC-32.1 Define a stable presentation boundary around native cabinet RGBA
+  frames and cabinet-input events; keep Kitty and README media generation on
+  that boundary.
+- [ ] DC-32.2 Add a `wgpu` window backend that uploads each native frame as a
+  texture, preserves aspect-ratio scaling, and maps keyboard input through the
+  existing cabinet/input-profile layer.
+- [ ] DC-32.3 Keep Kitty graphics as a compatibility backend until the `wgpu`
+  path has live-smoke evidence and README/docs coverage.
+- [ ] DC-32.4 Add focused tests for backend-independent frame production,
+  input projection, and presentation-boundary invariants; run the full Phase 11
+  acceptance gates after each slice.
+- [ ] DC-32.5 Update `README.md`, CLI/help text, Makefile targets, screenshots,
+  and release notes so the default user path is the accepted `wgpu` backend and
+  Kitty is documented as compatibility or removed by explicit decision.
+
+Completion gate: the `wgpu` backend is the preferred playable UI, the accepted
+red-label core traces/fixtures/mutations still match Phase 11, and live smoke
+evidence proves window creation, scaling, input, attract, credited start,
+gameplay, and clean quit.
+
+## Phase 13: Post-`wgpu` Large Refactor
+
+### DC-33: Module Split And Behavior Preservation
+
+Status: `blocked`
+
+Blocker: `DC-31` and `DC-32` must be complete. The large refactor does not
+begin until the game is fully ROM-complete/playable and the presentation
+backend migration is accepted.
+
+Goal: split the large translated core safely without changing completed
+behavior.
+
+Steps:
+
+- [ ] DC-33.1 Move code in small ownership-based slices with no unrelated
   rewrites.
-- [ ] DC-32.2 Run the full characterization and final acceptance gates after
+- [ ] DC-33.2 Run the full characterization and final acceptance gates after
   every slice.
-- [ ] DC-32.3 Keep public surfaces narrow and source-cited.
-- [ ] DC-32.4 Remove dead scaffold paths only after tests prove exact
+- [ ] DC-33.3 Keep public surfaces narrow and source-cited.
+- [ ] DC-33.4 Remove dead scaffold paths only after tests prove exact
   replacements.
-- [ ] DC-32.5 Update docs after each module boundary becomes stable.
+- [ ] DC-33.5 Update docs after each module boundary becomes stable.
 
 Completion gate: the refactored code produces the same traces, byte mutations,
 pixel fixtures, audio fixtures, live/session behavior, and release evidence as
-the `DC-31` completed implementation.
+the `DC-31` completed implementation and the `DC-32` accepted `wgpu`
+presentation backend.
