@@ -102,6 +102,9 @@ const RED_LABEL_HOF_PLAYER_NUMBER_RAM: u16 = RED_LABEL_HOF_INITS_RAM + 6;
 const RED_LABEL_HOF_TABLE_INITIALS_RAM: u16 = RED_LABEL_HOF_PLAYER_NUMBER_RAM + 2;
 const RED_LABEL_HOF_TABLE_SCORE_RAM: u16 = RED_LABEL_HOF_TABLE_INITIALS_RAM + 4;
 const RED_LABEL_HOF_RESET_FLAG_RAM: u16 = 0xA162;
+// Source SAMRAM starts at THTAB/HSRFLG. THSTAB at 0xB260 is today's
+// high-score table and must not be used for attract scratch state.
+const RED_LABEL_ATTRACT_SAMRAM_START: u16 = RED_LABEL_HOF_RESET_FLAG_RAM;
 const RED_LABEL_ATTRACT_ENTRY_FLAG_RAM: u16 = 0xA178;
 const RED_LABEL_HOF_STALL_TIMER_RAM: u16 = 0xA17D;
 const RED_LABEL_HOF_INITIAL_DIRECTION_RAM: u16 = 0xA179;
@@ -156,18 +159,18 @@ const RED_LABEL_ATTRACT_VECTOR_ADDRESS: u16 = 0xC000;
 const RED_LABEL_ATTRACT_CREDITS_SCREEN: u16 = 0x28E5;
 const RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN: u16 = 0x48E5;
 const RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS: u8 = 16;
-const RED_LABEL_ATTRACT_OLD_CREDIT_RAM: u16 = RED_LABEL_THSTAB_START + 33;
-const RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM: u16 = RED_LABEL_THSTAB_START + 34;
+const RED_LABEL_ATTRACT_OLD_CREDIT_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 33;
+const RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 34;
 const RED_LABEL_ATTRACT_MESSAGE_POINTER_RAM: u16 = 0xA052;
 const RED_LABEL_ATTRACT_NUMBER_RAM: u16 = 0xA059;
 const RED_LABEL_ATTRACT_WILLIAMS_STATUS: u8 = 0xFB;
 const RED_LABEL_ATTRACT_WILLIAMS_LOGO_COLOR: u8 = 0x3F;
-const RED_LABEL_ATTRACT_LOGO_TEMP_A_RAM: u16 = RED_LABEL_THSTAB_START;
-const RED_LABEL_ATTRACT_LOGO_TEMP_B_RAM: u16 = RED_LABEL_THSTAB_START + 1;
-const RED_LABEL_ATTRACT_LOGO_CURSOR_RAM: u16 = RED_LABEL_THSTAB_START + 4;
-const RED_LABEL_ATTRACT_LOGO_CURSOR_END_RAM: u16 = RED_LABEL_THSTAB_START + 6;
-const RED_LABEL_ATTRACT_LOGO_FLAG_RAM: u16 = RED_LABEL_THSTAB_START + 8;
-const RED_LABEL_ATTRACT_LOGO_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 9;
+const RED_LABEL_ATTRACT_LOGO_TEMP_A_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START;
+const RED_LABEL_ATTRACT_LOGO_TEMP_B_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 1;
+const RED_LABEL_ATTRACT_LOGO_CURSOR_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 4;
+const RED_LABEL_ATTRACT_LOGO_CURSOR_END_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 6;
+const RED_LABEL_ATTRACT_LOGO_FLAG_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 8;
+const RED_LABEL_ATTRACT_LOGO_POINTER_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 9;
 const RED_LABEL_ATTRACT_LOGO_TABLE_ADDRESS: u16 = 0xC941;
 const RED_LABEL_ATTRACT_LOGO_INITIAL_BYTES_PER_SLICE: u8 = 3;
 const RED_LABEL_ATTRACT_LOGO_FAST_BYTES_PER_SLICE: u8 = 10;
@@ -180,10 +183,11 @@ const RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR: u16 = 0xB300;
 const RED_LABEL_ATTRACT_DEFENDER_OBJECTS: u16 = 0xB304;
 const RED_LABEL_ATTRACT_DEFENDER_PICTURES: u16 = 0xB3D6;
 const RED_LABEL_ATTRACT_DEFENDER_DATA: u16 = RED_LABEL_HALL_OF_FAME_LOGO_DATA_RAM;
-const RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 0x0B;
-const RED_LABEL_ATTRACT_DEFENDER_DATA_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 0x0D;
-const RED_LABEL_ATTRACT_DEFENDER_X_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 0x0F;
-const RED_LABEL_ATTRACT_DEFENDER_OBJECT_POINTER_RAM: u16 = RED_LABEL_THSTAB_START + 0x11;
+const RED_LABEL_ATTRACT_DEFENDER_DESCRIPTOR_POINTER_RAM: u16 =
+    RED_LABEL_ATTRACT_SAMRAM_START + 0x0B;
+const RED_LABEL_ATTRACT_DEFENDER_DATA_POINTER_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 0x0D;
+const RED_LABEL_ATTRACT_DEFENDER_X_POINTER_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 0x0F;
+const RED_LABEL_ATTRACT_DEFENDER_OBJECT_POINTER_RAM: u16 = RED_LABEL_ATTRACT_SAMRAM_START + 0x11;
 const RED_LABEL_ATTRACT_DEFENDER_OBJECT_BYTES: u16 = 14;
 const RED_LABEL_ATTRACT_DEFENDER_OBJECT_COUNT: u8 = 15;
 const RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET: u16 = 0x02;
@@ -1526,6 +1530,7 @@ pub struct RedLabelHallOfFameEntry {
 pub struct RedLabelAttractSceneInit {
     pub initial_status: u8,
     pub screen_clear: RedLabelScreenClear,
+    pub altitude_table: RedLabelAltitudeTableInit,
     pub background: RedLabelBackgroundInit,
     pub color_ram: RedLabelColorRamInit,
     pub final_status: u8,
@@ -34937,8 +34942,9 @@ impl RedLabelRuntimeMemory {
     }
 
     /// Source-shaped `SCINIT`: prepare the attract instruction-page world by
-    /// resetting objects, clearing video RAM, zeroing terrain scroll, running
-    /// `BGI`, reloading `CRTAB`, and centering the scanner player blip.
+    /// resetting objects, clearing video RAM, zeroing terrain scroll, refreshing
+    /// the `ALINIT` terrain stream for `BGI`, reloading `CRTAB`, and centering
+    /// the scanner player blip.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L525-L540>.
     pub fn initialize_attract_scene_from_scinit(
         &mut self,
@@ -34951,6 +34957,7 @@ impl RedLabelRuntimeMemory {
         let screen_clear = self.clear_screen_ram()?;
         self.write_field_word(&layout, "base_page", "BGL", 0)?;
         self.write_field_word(&layout, "base_page", "BGLX", 0)?;
+        let altitude_table = self.initialize_altitude_table_from_tdata()?;
         let background = self.initialize_background_from_bgi()?;
         let color_ram = self.initialize_color_ram_from_crtab()?;
         let final_status = 0xDB;
@@ -34961,6 +34968,7 @@ impl RedLabelRuntimeMemory {
         Ok(RedLabelAttractSceneInit {
             initial_status,
             screen_clear,
+            altitude_table,
             background,
             color_ram,
             final_status,
@@ -40540,7 +40548,7 @@ impl RedLabelRuntimeMemory {
         self.write_field_byte(&layout, "base_page", "MAPCR", map_after)?;
         let defaults = red_label_cmos_defaults()?;
         self.apply_todays_high_score_defaults(&defaults)?;
-        let hsrflg_address = RED_LABEL_THSTAB_START;
+        let hsrflg_address = RED_LABEL_HOF_RESET_FLAG_RAM;
         let hsrflg_before = self.read_byte(hsrflg_address)?;
         let hsrflg_after = hsrflg_before.wrapping_add(1);
         self.write_byte(hsrflg_address, hsrflg_after)?;
@@ -61528,6 +61536,65 @@ mod tests {
     }
 
     #[test]
+    fn live_attract_idle_advances_past_title_without_corrupting_high_scores() {
+        let mut machine = ArcadeMachine::new();
+        let todays_end = RED_LABEL_THSTAB_START
+            + u16::try_from(RED_LABEL_HIGH_SCORE_ENTRIES * RED_LABEL_HIGH_SCORE_ENTRY_CELLS)
+                .expect("today's high-score table length fits in u16");
+        let todays_before = machine
+            .red_label_ram_range(RED_LABEL_THSTAB_START..todays_end)
+            .expect("today's high-score table is available")
+            .to_vec();
+        let instruction_scene_routines = [
+            red_label_routine_address("AMODE1").expect("AMODE1 address"),
+            red_label_routine_address("AMODE2").expect("AMODE2 address"),
+            red_label_routine_address("TEXTP").expect("TEXTP address"),
+            red_label_routine_address("SCPROC").expect("SCPROC address"),
+        ];
+        let mut title_video_crc = None;
+        let mut saw_post_title_video = false;
+        let mut saw_instruction_scene_process = false;
+
+        for tick in 1..=6_000 {
+            machine
+                .step_red_label_live_attract_process()
+                .expect("live attract process remains translated");
+
+            if tick == 900 || tick > 900 && tick % 30 == 0 {
+                let video_crc = machine
+                    .red_label_visible_video_crc32()
+                    .expect("video CRC remains available");
+                if tick == 900 {
+                    title_video_crc = Some(video_crc);
+                }
+                if let Some(title_video_crc) = title_video_crc {
+                    saw_post_title_video |= tick > 900 && video_crc != title_video_crc;
+                }
+            }
+            saw_instruction_scene_process |= machine
+                .memory
+                .active_process_has_routine(&instruction_scene_routines)
+                .expect("query instruction scene processes");
+            if saw_post_title_video && saw_instruction_scene_process {
+                break;
+            }
+        }
+
+        assert!(
+            saw_post_title_video,
+            "live attract did not visibly leave the title page"
+        );
+        assert!(
+            saw_instruction_scene_process,
+            "live attract did not schedule the instruction scene"
+        );
+        assert_eq!(
+            machine.red_label_ram_range(RED_LABEL_THSTAB_START..todays_end),
+            Some(todays_before.as_slice())
+        );
+    }
+
+    #[test]
     fn cold_boot_game_over_attr_row_runs_williams_page_handoff() {
         let mut machine = ArcadeMachine::new_cold_boot_trace();
         for _ in 0..732 {
@@ -63797,8 +63864,8 @@ mod tests {
         let mut machine = ArcadeMachine::new();
         machine
             .memory
-            .initialize_altitude_table_from_tdata()
-            .expect("LEDRET SCINIT BGI precondition");
+            .write_word(0xA00B, 0x2F20)
+            .expect("dirty RTPTR");
         let hald4_address = red_label_routine_address("HALD4").expect("HALD4 address");
         let amode1_address = red_label_routine_address("AMODE1").expect("AMODE1 address");
         let process_address = machine
@@ -64101,8 +64168,8 @@ mod tests {
         let layout = red_label_ram_layout().expect("RAM layout");
         machine
             .memory
-            .initialize_altitude_table_from_tdata()
-            .expect("LEDRET SCINIT BGI precondition");
+            .write_word(0xA00B, 0x2F20)
+            .expect("dirty RTPTR");
         let extra_process = machine
             .red_label_make_process(0x2222, RED_LABEL_SYSTEM_PROCESS_TYPE)
             .expect("make process killed by GNCIDE")
@@ -64153,6 +64220,7 @@ mod tests {
                 scene: RedLabelAttractSceneInit {
                     initial_status: 0xFF,
                     screen_clear: started.scene.screen_clear,
+                    altitude_table: expected_alinit(),
                     background: started.scene.background,
                     color_ram: started.scene.color_ram.clone(),
                     final_status: 0xDB,
@@ -66609,17 +66677,20 @@ mod tests {
         let mut machine = ArcadeMachine::new();
         machine
             .memory
-            .write_byte(RED_LABEL_THSTAB_START, 0x7E)
+            .write_byte(RED_LABEL_HOF_RESET_FLAG_RAM, 0x7E)
             .expect("dirty HSRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START, 0x7D)
+            .expect("dirty today's high-score table");
         machine
             .memory
             .write_byte(RED_LABEL_THSTAB_START + 1, 0x7D)
             .expect("dirty today's high-score table");
 
         let defaults = super::red_label_cmos_defaults().expect("CMOS defaults");
-        let mut expected =
+        let expected =
             super::red_label_high_score_default_cells(&defaults).expect("high-score defaults");
-        expected[0] = expected[0].wrapping_add(1);
         let output = machine.step(CabinetInput {
             high_score_reset: true,
             ..CabinetInput::NONE
@@ -66633,6 +66704,12 @@ mod tests {
         assert_eq!(
             machine.red_label_ram_range(RED_LABEL_THSTAB_START..todays_end),
             Some(expected.as_slice())
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_RESET_FLAG_RAM..RED_LABEL_HOF_RESET_FLAG_RAM + 1
+            ),
+            Some(&[0x7F][..])
         );
         assert_eq!(
             machine.red_label_ram_range(0xA082..0xA086),
@@ -66773,16 +66850,19 @@ mod tests {
         let mut reset = ArcadeMachine::new();
         reset
             .memory
-            .write_byte(RED_LABEL_THSTAB_START, 0x7E)
+            .write_byte(RED_LABEL_HOF_RESET_FLAG_RAM, 0x7E)
             .expect("dirty HSRFLG");
+        reset
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START, 0x7D)
+            .expect("dirty today's high-score table");
         reset
             .memory
             .write_byte(RED_LABEL_THSTAB_START + 1, 0x7D)
             .expect("dirty today's high-score table");
         let defaults = super::red_label_cmos_defaults().expect("CMOS defaults");
-        let mut expected =
+        let expected =
             super::red_label_high_score_default_cells(&defaults).expect("high-score defaults");
-        expected[0] = expected[0].wrapping_add(1);
 
         let reset_output = reset.step(CabinetInput {
             high_score_reset: true,
@@ -66800,6 +66880,12 @@ mod tests {
         assert_eq!(
             reset.red_label_ram_range(RED_LABEL_THSTAB_START..todays_end),
             Some(expected.as_slice())
+        );
+        assert_eq!(
+            reset.red_label_ram_range(
+                RED_LABEL_HOF_RESET_FLAG_RAM..RED_LABEL_HOF_RESET_FLAG_RAM + 1
+            ),
+            Some(&[0x7F][..])
         );
         assert_eq!(
             reset.red_label_ram_range(0xA082..0xA086),
@@ -68048,10 +68134,6 @@ mod tests {
     #[test]
     fn scinit_prepares_attract_scene_world_and_video_state() {
         let mut machine = ArcadeMachine::new();
-        machine
-            .memory
-            .initialize_altitude_table_from_tdata()
-            .expect("SCINIT BGI precondition");
         let allocated_object = machine
             .memory
             .get_object_cell()
@@ -68078,6 +68160,10 @@ mod tests {
             .expect("dirty BGLX");
         machine
             .memory
+            .write_word(0xA00B, 0x2F20)
+            .expect("dirty RTPTR");
+        machine
+            .memory
             .write_byte(0xA026, 0xEE)
             .expect("dirty PCRAM");
         machine
@@ -68102,6 +68188,7 @@ mod tests {
             RedLabelAttractSceneInit {
                 initial_status: 0xFF,
                 screen_clear: screen_clear(),
+                altitude_table: expected_alinit(),
                 background: RedLabelBackgroundInit {
                     bgi_address: red_label_routine_address("BGI").expect("BGI address"),
                     selected_map: 7,
@@ -72396,18 +72483,22 @@ mod tests {
         machine.memory.write_byte(0xA0BA, 0xFF).expect("set STATUS");
         machine
             .memory
-            .write_byte(RED_LABEL_THSTAB_START, 0x7E)
+            .write_byte(RED_LABEL_HOF_RESET_FLAG_RAM, 0x7E)
             .expect("dirty HSRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START, 0x7D)
+            .expect("dirty today's high score table");
         machine
             .memory
             .write_byte(RED_LABEL_THSTAB_START + 1, 0x7D)
             .expect("dirty today's high score table");
 
         let defaults = super::red_label_cmos_defaults().expect("CMOS defaults");
-        let mut expected =
+        let expected =
             super::red_label_high_score_default_cells(&defaults).expect("high-score defaults");
-        let hsrflg_before = expected[0];
-        expected[0] = hsrflg_before.wrapping_add(1);
+        let hsrflg_before = 0x7E_u8;
+        let hsrflg_after = hsrflg_before.wrapping_add(1);
         let dispatch = machine
             .red_label_dispatch_translated_process_routine(
                 red_label_routine_address("HSRES").expect("HSRES address"),
@@ -72420,7 +72511,7 @@ mod tests {
                 status: 0xFF,
                 map_after: 3,
                 hsrflg_before,
-                hsrflg_after: expected[0],
+                hsrflg_after,
                 killed_process: RedLabelKilledProcess {
                     killed_process_address: process,
                     previous_link_address: 0xA05F,
@@ -72432,6 +72523,12 @@ mod tests {
         assert_eq!(
             machine.red_label_ram_range(RED_LABEL_THSTAB_START..todays_end),
             Some(expected.as_slice())
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_RESET_FLAG_RAM..RED_LABEL_HOF_RESET_FLAG_RAM + 1
+            ),
+            Some(&[hsrflg_after][..])
         );
         assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[3][..]));
         assert_eq!(
@@ -72448,8 +72545,12 @@ mod tests {
         machine.memory.write_byte(0xA0BA, 0x7F).expect("set STATUS");
         machine
             .memory
-            .write_byte(RED_LABEL_THSTAB_START, 0x55)
+            .write_byte(RED_LABEL_HOF_RESET_FLAG_RAM, 0x55)
             .expect("dirty HSRFLG");
+        machine
+            .memory
+            .write_byte(RED_LABEL_THSTAB_START, 0x44)
+            .expect("dirty today's high score table");
         machine
             .memory
             .write_byte(RED_LABEL_THSTAB_START + 1, 0x66)
@@ -72475,7 +72576,13 @@ mod tests {
         );
         assert_eq!(
             machine.red_label_ram_range(RED_LABEL_THSTAB_START..RED_LABEL_THSTAB_START + 2),
-            Some(&[0x55, 0x66][..])
+            Some(&[0x44, 0x66][..])
+        );
+        assert_eq!(
+            machine.red_label_ram_range(
+                RED_LABEL_HOF_RESET_FLAG_RAM..RED_LABEL_HOF_RESET_FLAG_RAM + 1
+            ),
+            Some(&[0x55][..])
         );
         assert_eq!(machine.red_label_ram_range(0xA036..0xA037), Some(&[7][..]));
     }

@@ -3568,9 +3568,35 @@ Steps:
   preserving one-frame terminal input pulses until a core frame consumes them,
   and document the exact keyboard sequence for attract and one-player start.
   Completed: `2026-05-07 06:50:38 BST`
+- [x] DC-30.7 Repair the reported live attract handoff stall after the Williams
+  title sequence by keeping attract scratch RAM out of the today's high-score
+  table, proving the title screen can advance into later attract work, and
+  verifying that today's high-score cells stay valid for the later hall/table
+  display path.
+  Completed: `2026-05-07 07:29:12 BST`
 
 Work log:
 
+- `2026-05-07 07:10:22 BST` Started `DC-30.7` after the owner reported that
+  attract mode does not start after the Williams screen. Local investigation
+  reproduced a live attract panic before later attract pages because the title
+  routines were using today's high-score table RAM as source-style attract
+  scratch space; the fix will remap that scratch area, correct the `HSRFLG`
+  high-score reset alias, and add regression coverage for the full title-to-
+  later-attract handoff before `DC-30` is marked complete again.
+- `2026-05-07 07:29:12 BST` Completed `DC-30.7`: moved live attract scratch
+  RAM out of today's high-score table and back onto the source `SAMRAM`/
+  `HSRFLG` cell at `0xA162`, corrected the high-score reset alias so today's
+  high-score rows remain dedicated table storage, and refreshed `ALINIT`
+  terrain state during `SCINIT`/`LEDRET` so later attract pages cannot inherit
+  a stale terrain pointer after the title color cycle. Added regression
+  coverage proving live idle advances past the Williams/title page, reaches
+  later attract routines, and leaves today's high-score cells unchanged.
+  Validation passed with `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`,
+  `markdownlint README.md PLAN.md`, `git diff --check`, and a forced
+  Kitty-compatible PTY smoke run that stayed alive for 70 seconds past the
+  Williams sequence, accepted `q`, and exited with code 0.
 - `2026-05-07 06:50:38 BST` Started and completed a `DC-30.6` live-input
   repair after the owner reported that attract did not advance after the
   Williams screen and that pressing `5` or `1` froze the game. The pure core
@@ -3601,11 +3627,10 @@ Work log:
   the recorded evidence is the PTY Kitty stream plus core live render/input
   regressions rather than a terminal screenshot artifact.
 
-Completion gate result: `DC-30` is complete for Phase 10 acceptance as of
-`2026-05-07 06:50:38 BST`. A clean built binary launches, emits Kitty frames,
-can be muted, quits cleanly, accepts the documented `5` then `1` start path,
-and passes ROM/report/trace tooling checks while preserving exact arcade-core
-behavior.
+Completion gate result: `DC-30` is complete as of `2026-05-07 07:29:12 BST`.
+`DC-30.6` fixed dropped live input pulses, and `DC-30.7` fixed the later
+live-attract handoff after the Williams/title sequence without corrupting
+high-score state.
 
 Slack updates:
 
@@ -3620,9 +3645,9 @@ Slack updates:
 
 Status: `ready`
 
-Readiness note: Phase 10 is complete as of `2026-05-07 06:50:38 BST`.
-`DC-31` may now perform the final acceptance/documentation pass before any
-large refactor starts.
+Readiness note: Phase 10 live playability is complete as of
+`2026-05-07 07:29:12 BST`; `DC-31` may start after the `DC-30.7` fix is
+committed, pushed, and reported.
 
 Goal: certify the project as a complete exact red-label implementation with
 supported compatibility overlays before any large refactor starts.
