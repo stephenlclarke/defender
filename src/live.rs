@@ -84,6 +84,7 @@ pub fn run_live(
         .map(|storage| storage as &dyn CmosStorage);
     let mut machine = live_machine_from_cmos_storage(storage)?;
     let mut core_clock = LiveCoreClock::new(Instant::now());
+    let mut pending_cabinet_input = CabinetInput::NONE;
     let mut pending_typed_chars = Vec::new();
 
     loop {
@@ -102,13 +103,20 @@ pub fn run_live(
             xyzzy_auto_fire: xyzzy.auto_fire(),
         });
         let core_steps = core_clock.steps_due(Instant::now());
-        step_live_core_frames(
-            &mut machine,
+        let held_input = input_mapper.held_cabinet_input();
+        if let Some(frame_inputs) = live_frame_inputs(
+            &mut pending_cabinet_input,
             input.cabinet,
-            &pending_typed_chars,
+            held_input,
             core_steps,
-        );
-        if core_steps != 0 {
+        ) {
+            step_live_core_frames(
+                &mut machine,
+                frame_inputs.first,
+                frame_inputs.catch_up,
+                &pending_typed_chars,
+                core_steps,
+            );
             pending_typed_chars.clear();
         }
 
@@ -164,7 +172,8 @@ fn render_live_frame(renderer: &mut Renderer, native_frame: RenderedImage) -> &R
 
 fn step_live_core_frames(
     machine: &mut ArcadeMachine,
-    input: CabinetInput,
+    first_input: CabinetInput,
+    catch_up_input: CabinetInput,
     typed_chars: &[char],
     frames: u32,
 ) {
@@ -172,10 +181,37 @@ fn step_live_core_frames(
         return;
     }
 
-    machine.step_with_typed_chars(input, typed_chars);
+    machine.step_with_typed_chars(first_input, typed_chars);
     for _ in 1..frames {
-        machine.step(input);
+        machine.step(catch_up_input);
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LiveFrameInputs {
+    first: CabinetInput,
+    catch_up: CabinetInput,
+}
+
+fn live_frame_inputs(
+    pending_pulses: &mut CabinetInput,
+    polled_pulses: CabinetInput,
+    held_input: CabinetInput,
+    frames: u32,
+) -> Option<LiveFrameInputs> {
+    pending_pulses.merge(polled_pulses);
+    if frames == 0 {
+        return None;
+    }
+
+    let mut first = *pending_pulses;
+    first.merge(held_input);
+    *pending_pulses = CabinetInput::NONE;
+
+    Some(LiveFrameInputs {
+        first,
+        catch_up: held_input,
+    })
 }
 
 #[cfg(not(test))]
@@ -239,7 +275,6 @@ fn poll_input(input_mapper: &mut InputMapper) -> Result<PolledInput> {
             input_mapper.handle_key_event(key_event, &mut input);
         }
     }
-    input_mapper.apply_held(&mut input);
     Ok(input)
 }
 
@@ -263,7 +298,7 @@ mod tests {
     use crate::video::{RenderedImage, Renderer, defender_visible_byte_offset};
 
     use super::{
-        FRAME_DURATION, LiveCoreClock, cabinet_frame_duration_micros,
+        FRAME_DURATION, LiveCoreClock, cabinet_frame_duration_micros, live_frame_inputs,
         live_machine_from_cmos_storage, render_live_frame, render_live_machine_frame,
         save_live_cmos, step_live_core_frames, validate_interactive_terminal,
     };
@@ -496,7 +531,13 @@ mod tests {
             .red_label_begin_live_high_score_entry(50_000)
             .expect("high score table should be valid");
 
-        step_live_core_frames(&mut machine, CabinetInput::NONE, &['a'], 3);
+        step_live_core_frames(
+            &mut machine,
+            CabinetInput::NONE,
+            CabinetInput::NONE,
+            &['a'],
+            3,
+        );
 
         let snapshot = machine.snapshot();
         assert_eq!(snapshot.frame, 3);
@@ -510,12 +551,69 @@ mod tests {
     }
 
     #[test]
+    fn live_frame_inputs_buffer_pulse_inputs_until_a_core_frame_is_due() {
+        let mut pending = CabinetInput::NONE;
+        let polled = CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        };
+
+        assert_eq!(
+            live_frame_inputs(&mut pending, polled, CabinetInput::NONE, 0),
+            None
+        );
+        assert!(pending.coin);
+
+        let frame_inputs =
+            live_frame_inputs(&mut pending, CabinetInput::NONE, CabinetInput::NONE, 1)
+                .expect("buffered coin should be consumed on the next core frame");
+
+        assert!(frame_inputs.first.coin);
+        assert!(!frame_inputs.catch_up.coin);
+        assert_eq!(pending, CabinetInput::NONE);
+    }
+
+    #[test]
+    fn live_frame_inputs_do_not_replay_pulses_across_catch_up_frames() {
+        let mut pending = CabinetInput::NONE;
+        let polled = CabinetInput {
+            start_one: true,
+            ..CabinetInput::NONE
+        };
+        let held = CabinetInput {
+            thrust: true,
+            ..CabinetInput::NONE
+        };
+
+        let frame_inputs =
+            live_frame_inputs(&mut pending, polled, held, 3).expect("frames are due");
+
+        assert!(frame_inputs.first.start_one);
+        assert!(frame_inputs.first.thrust);
+        assert!(!frame_inputs.catch_up.start_one);
+        assert!(frame_inputs.catch_up.thrust);
+        assert_eq!(pending, CabinetInput::NONE);
+    }
+
+    #[test]
     fn live_core_sound_state_is_independent_of_audio_output_mode() {
         let mut audible_core = ArcadeMachine::new_cold_boot_trace();
         let mut muted_core = ArcadeMachine::new_cold_boot_trace();
 
-        step_live_core_frames(&mut audible_core, CabinetInput::NONE, &[], 731);
-        step_live_core_frames(&mut muted_core, CabinetInput::NONE, &[], 731);
+        step_live_core_frames(
+            &mut audible_core,
+            CabinetInput::NONE,
+            CabinetInput::NONE,
+            &[],
+            731,
+        );
+        step_live_core_frames(
+            &mut muted_core,
+            CabinetInput::NONE,
+            CabinetInput::NONE,
+            &[],
+            731,
+        );
 
         let expected = RedLabelSoundBoardSnapshot {
             last_command_latch: Some(SoundCommandLatch::from_main_board_pia_port_b(0xC0)),

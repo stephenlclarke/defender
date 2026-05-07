@@ -3564,9 +3564,29 @@ Steps:
 - [x] DC-30.5 Update screenshots, animated media, README run/install guidance,
   and troubleshooting notes from the live evidence.
   Completed: `2026-05-07 04:33:10 BST`
+- [x] DC-30.6 Repair the reported live post-Williams coin/start freeze by
+  preserving one-frame terminal input pulses until a core frame consumes them,
+  and document the exact keyboard sequence for attract and one-player start.
+  Completed: `2026-05-07 06:50:38 BST`
 
 Work log:
 
+- `2026-05-07 06:50:38 BST` Started and completed a `DC-30.6` live-input
+  repair after the owner reported that attract did not advance after the
+  Williams screen and that pressing `5` or `1` froze the game. The pure core
+  attract/render regressions and a real PTY smoke test still progressed and
+  accepted `q`, but the live loop could drop one-frame cabinet pulses when a
+  key was polled between due core frames and could replay a pulse across
+  catch-up frames. The live runner now buffers polled pulse inputs until the
+  next core frame consumes them, applies held inputs separately, and uses only
+  held inputs for catch-up frames. README controls now explicitly state that
+  attract should continue after the Williams page, and that a normal
+  one-player start is `5` for credit followed by `ENTER` or `1` in the default
+  `planetoid` profile. Validation passed with `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`,
+  `markdownlint README.md PLAN.md`, `git diff --check`, and a forced
+  Kitty-compatible PTY run that accepted `5`, accepted `1`, then accepted `q`
+  and exited with code 0.
 - `2026-05-07 04:33:10 BST` Completed `DC-30.1` through `DC-30.5`: built the
   release binary and verified `--rom-report`, `--verify-roms`, and
   `--fidelity-trace` from `/tmp` using `target/release/defender`, confirming
@@ -3581,9 +3601,10 @@ Work log:
   the recorded evidence is the PTY Kitty stream plus core live render/input
   regressions rather than a terminal screenshot artifact.
 
-Completion gate result: `DC-30` is complete for Phase 10 acceptance. A clean
-built binary launches, emits Kitty frames, can be muted, quits cleanly, and
-passes ROM/report/trace tooling checks while preserving exact arcade-core
+Completion gate result: `DC-30` is complete for Phase 10 acceptance as of
+`2026-05-07 06:50:38 BST`. A clean built binary launches, emits Kitty frames,
+can be muted, quits cleanly, accepts the documented `5` then `1` start path,
+and passes ROM/report/trace tooling checks while preserving exact arcade-core
 behavior.
 
 Slack update:
@@ -3595,7 +3616,7 @@ Slack update:
 
 Status: `ready`
 
-Readiness note: Phase 10 is complete as of `2026-05-07 04:33:10 BST`.
+Readiness note: Phase 10 is complete as of `2026-05-07 06:50:38 BST`.
 `DC-31` may now perform the final acceptance/documentation pass before any
 large refactor starts.
 

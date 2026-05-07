@@ -265,10 +265,17 @@ impl InputMapper {
     }
 
     pub fn apply_held(&self, input: &mut PolledInput) {
-        input.cabinet.altitude_up |= self.held.altitude_up;
-        input.cabinet.altitude_down |= self.held.altitude_down;
-        input.cabinet.thrust |= self.held.thrust;
-        input.cabinet.auto_up_manual_down |= self.held.auto_up_manual_down;
+        input.cabinet.merge(self.held_cabinet_input());
+    }
+
+    pub fn held_cabinet_input(&self) -> CabinetInput {
+        CabinetInput {
+            altitude_up: self.held.altitude_up,
+            altitude_down: self.held.altitude_down,
+            thrust: self.held.thrust,
+            auto_up_manual_down: self.held.auto_up_manual_down,
+            ..CabinetInput::NONE
+        }
     }
 
     fn map_profile_key(&mut self, key_event: KeyEvent, input: &mut PolledInput) {

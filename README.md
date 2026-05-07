@@ -181,11 +181,23 @@ Current live controls with the default `planetoid` input profile:
 
 Letter-key controls accept either upper- or lower-case input.
 
+After the Williams logo page, the source attract loop should continue
+automatically into the later Defender, instruction, and hall-of-fame screens;
+no keyboard input is required to advance attract mode.
+
+To start a normal one-player game from a fresh live session, press `5` to add a
+credit, then press `ENTER` or `1`. The red-label start path intentionally blocks
+no-credit starts unless the cabinet is configured for free play. `ENTER` also
+maps to fire while a game is already in progress, so `1` is the least ambiguous
+one-player start key after a credit has been added.
+
 The live key layout is currently modelled on the BBC Micro `Planetoid`
 control scheme from Acornsoft's 1982 release of its `Defender` variant.
 That layout is an input profile only: terminal keys are translated into
 Defender cabinet actions before they reach the arcade core. Use
-`--input-profile cabinet` for a MAME-style keyboard profile.
+`--input-profile cabinet` for a MAME-style keyboard profile. In the `cabinet`
+profile, `5` inserts a left-slot coin and `1` starts a one-player game; `ENTER`
+is not a start key in that profile.
 
 ## XYZZY Overlay
 
