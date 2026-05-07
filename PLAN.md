@@ -3638,6 +3638,8 @@ Slack updates:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778125415052949`
 - `DC-30.6`:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778133575663359`
+- `DC-30.7`:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778135427882469`
 
 ## Phase 11: Final Acceptance Before Refactor
 
@@ -3646,8 +3648,7 @@ Slack updates:
 Status: `ready`
 
 Readiness note: Phase 10 live playability is complete as of
-`2026-05-07 07:29:12 BST`; `DC-31` may start after the `DC-30.7` fix is
-committed, pushed, and reported.
+`2026-05-07 07:29:12 BST`; `DC-31` may now start.
 
 Goal: certify the project as a complete exact red-label implementation with
 supported compatibility overlays before any large refactor starts.
