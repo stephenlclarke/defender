@@ -3979,10 +3979,12 @@ Slack updates:
 
 ### DC-32: Windowed `wgpu` Renderer And Input Shell
 
-Status: `blocked`
+Status: `in_progress`
 
-Blocker: `DC-31` must be complete. Presentation migration must not change the
-accepted red-label core behavior.
+Branch: `red-label-wgpu`, created from `red-label` after the `DC-31`
+screenshot evidence commit was pushed. For this phase, completed `DC-32` work
+is pushed to `red-label-wgpu`; the accepted red-label core behavior must not
+change.
 
 Goal: add a normal windowed `wgpu` presentation backend while keeping the core
 frame, input, sound, trace, and save-state contracts byte-for-byte equivalent
@@ -3990,12 +3992,15 @@ to the Phase 11 accepted implementation.
 
 Steps:
 
-- [ ] DC-32.1 Define a stable presentation boundary around native cabinet RGBA
+- [x] DC-32.1 Define a stable presentation boundary around native cabinet RGBA
   frames and cabinet-input events; keep Kitty and README media generation on
   that boundary.
-- [ ] DC-32.2 Add a `wgpu` window backend that uploads each native frame as a
-  texture, preserves aspect-ratio scaling, and maps keyboard input through the
+  Completed: `2026-05-07 23:22:21 BST`
+- [x] DC-32.2 Add an initial `wgpu` window backend that uploads the shared
+  cabinet presentation frame as a texture, preserves the existing aspect-ratio
+  scaling path for Kitty/wgpu comparison, and maps keyboard input through the
   existing cabinet/input-profile layer.
+  Completed: `2026-05-07 23:22:21 BST`
 - [ ] DC-32.3 Keep Kitty graphics as a compatibility backend until the `wgpu`
   path has live-smoke evidence and README/docs coverage.
 - [ ] DC-32.4 Add focused tests for backend-independent frame production,
@@ -4009,6 +4014,22 @@ Completion gate: the `wgpu` backend is the preferred playable UI, the accepted
 red-label core traces/fixtures/mutations still match Phase 11, and live smoke
 evidence proves window creation, scaling, input, attract, credited start,
 gameplay, and clean quit.
+
+Work log:
+
+- `2026-05-07 23:22:21 BST` Started `DC-32` on `red-label-wgpu`: pushed all
+  previous screenshot evidence to `red-label`, created the `red-label-wgpu`
+  branch, added `wgpu`/`winit`/`pollster`, introduced `PresentationBackend`,
+  shared backend-neutral input events, dispatched live mode between Kitty and
+  `wgpu`, and added the first windowed `wgpu` presenter using the same rendered
+  cabinet RGBA frame path as Kitty for easier side-by-side verification. README
+  and Makefile now document `--renderer wgpu` / `make run-wgpu`. Validation at
+  `2026-05-07 23:26:27 BST`: `cargo fmt --check`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, and `cargo run -- --help` all
+  passed. Live window smoke for `--renderer wgpu` remains pending under
+  `DC-32.3`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778192851259819`
 
 ## Phase 13: Post-`wgpu` Large Refactor
 

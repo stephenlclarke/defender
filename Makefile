@@ -1,4 +1,4 @@
-.PHONY: fmt test clippy fidelity ci trace-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check coverage coverage-new-code sq sq-ci sonar run run-muted live live-muted readme-media
+.PHONY: fmt test clippy fidelity ci trace-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check coverage coverage-new-code sq sq-ci sonar run run-muted run-wgpu run-wgpu-muted live live-muted live-wgpu live-wgpu-muted readme-media
 
 SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
@@ -89,9 +89,19 @@ run:
 run-muted:
 	cargo run -- --mute
 
+run-wgpu:
+	cargo run -- --renderer wgpu
+
+run-wgpu-muted:
+	cargo run -- --renderer wgpu --mute
+
 live: run
 
 live-muted: run-muted
+
+live-wgpu: run-wgpu
+
+live-wgpu-muted: run-wgpu-muted
 
 readme-media:
 	cargo run --quiet --example generate_readme_media -- "$(README_START_SEQUENCE_GIF)"

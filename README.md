@@ -15,8 +15,9 @@
 
 ---
 
-This repository is a native Rust reimplementation of Williams' `Defender`,
-rendered through the Kitty graphics protocol.
+This repository is a native Rust reimplementation of Williams' `Defender`.
+Live play currently supports the original Kitty graphics terminal backend and
+an experimental windowed `wgpu` backend.
 
 The project is now being rewritten from a clean slate as an exact red-label
 arcade implementation. The previous prototype source has been moved to
@@ -49,6 +50,8 @@ Run targets:
 
 - `cargo run`
 - `cargo run -- --mute`
+- `cargo run -- --renderer kitty`
+- `cargo run -- --renderer wgpu`
 - `cargo run -- --rom-report`
 - `cargo run -- --rom-report /path/to/roms`
 - `cargo run -- --verify-roms /path/to/roms`
@@ -62,6 +65,10 @@ Run targets:
 - `cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference`
 - `make run`
 - `make run-muted`
+- `make run-wgpu`
+- `make run-wgpu-muted`
+- `make live-wgpu`
+- `make live-wgpu-muted`
 - `make trace-script-test`
 - `make trace-fixtures`
 - `make reference-inputs`
@@ -77,13 +84,15 @@ Run targets:
 - `make sq`
 - `make readme-media`
 
-Run the live game inside `kitty`, `ghostty`, `warp`, or another terminal that
-supports the Kitty graphics protocol. `--rom-report` remains non-interactive,
-validates red-label file sizes and CRC-32 values, and does not require a
-compatible graphics terminal. `--verify-roms` performs the same validation and
-then checks that the ROM files map into the embedded MAME red-label regions.
-`--fidelity-trace` emits deterministic TSV frames from the current Rust core
-for local trace fixture work. `--fidelity-trace-inputs` does the same with a
+By default, live play uses the Kitty graphics protocol. Run `cargo run` inside
+`kitty`, `ghostty`, `warp`, or another compatible graphics terminal, or use
+`cargo run -- --renderer wgpu` / `make run-wgpu` to open the experimental
+windowed backend. `--rom-report` remains non-interactive, validates red-label
+file sizes and CRC-32 values, and does not require a compatible graphics
+terminal. `--verify-roms` performs the same validation and then checks that the
+ROM files map into the embedded MAME red-label regions. `--fidelity-trace`
+emits deterministic TSV frames from the current Rust core for local trace
+fixture work. `--fidelity-trace-inputs` does the same with a
 semicolon-separated per-frame cabinet input script. Use
 `--fidelity-trace-inputs-file` to read the same script format from a local
 fixture file. `--fidelity-check-trace` reads that input script, generates the
@@ -113,6 +122,8 @@ After installation, run the clean-slate runtime and tooling with:
 
 - `defender`
 - `defender --mute`
+- `defender --renderer kitty`
+- `defender --renderer wgpu`
 - `defender --cmos-path ~/.local/state/defender/red-label-cmos.bin`
 - `defender --rom-report`
 - `defender --rom-report /path/to/roms`
@@ -128,8 +139,9 @@ After installation, run the clean-slate runtime and tooling with:
 
 Notes:
 
-- Run `defender` inside `kitty`, `ghostty`, `warp`, or another terminal that
-  supports the Kitty graphics protocol.
+- `defender` defaults to the Kitty graphics protocol, so run it inside `kitty`,
+  `ghostty`, `warp`, or another compatible terminal. Use
+  `defender --renderer wgpu` to launch the experimental windowed backend.
 - Live CMOS persistence is explicit opt-in. Running without `--cmos-path` uses
   embedded red-label defaults for the session and does not create or update a
   platform default CMOS file. Provide `--cmos-path <file>` when high scores,

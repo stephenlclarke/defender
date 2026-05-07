@@ -20,6 +20,7 @@ use crate::{
     cmos_storage::CmosStorage,
     input::{CabinetInput, InputProfile},
     machine::{ArcadeMachine, FRAME_RATE_MILLIHZ},
+    presentation::PresentationBackend,
     video::{RenderedImage, Renderer},
 };
 #[cfg(not(test))]
@@ -31,24 +32,24 @@ use crate::{
     terminal::{TerminalSession, geometry},
 };
 
-const FRAME_DURATION: Duration =
+pub(crate) const FRAME_DURATION: Duration =
     Duration::from_micros(cabinet_frame_duration_micros(FRAME_RATE_MILLIHZ));
 
-const fn cabinet_frame_duration_micros(frame_rate_millihz: u32) -> u64 {
+pub(crate) const fn cabinet_frame_duration_micros(frame_rate_millihz: u32) -> u64 {
     let rate = frame_rate_millihz as u64;
     (1_000_000_000 + (rate / 2)) / rate
 }
 
-struct LiveCoreClock {
+pub(crate) struct LiveCoreClock {
     next_step: Instant,
 }
 
 impl LiveCoreClock {
-    fn new(now: Instant) -> Self {
+    pub(crate) fn new(now: Instant) -> Self {
         Self { next_step: now }
     }
 
-    fn steps_due(&mut self, now: Instant) -> u32 {
+    pub(crate) fn steps_due(&mut self, now: Instant) -> u32 {
         let mut steps = 0;
         while now >= self.next_step {
             steps += 1;
@@ -57,7 +58,7 @@ impl LiveCoreClock {
         steps
     }
 
-    fn sleep_until_next_step(&self, now: Instant) -> Duration {
+    pub(crate) fn sleep_until_next_step(&self, now: Instant) -> Duration {
         self.next_step.saturating_duration_since(now)
     }
 }
@@ -66,8 +67,17 @@ impl LiveCoreClock {
 pub fn run_live(
     _play_audio: bool,
     input_profile: InputProfile,
+    presentation_backend: PresentationBackend,
     cmos_path: Option<&Path>,
 ) -> Result<()> {
+    match presentation_backend {
+        PresentationBackend::Kitty => run_kitty_live(input_profile, cmos_path),
+        PresentationBackend::Wgpu => crate::wgpu_presenter::run_wgpu_live(input_profile, cmos_path),
+    }
+}
+
+#[cfg(all(not(test), not(coverage)))]
+fn run_kitty_live(input_profile: InputProfile, cmos_path: Option<&Path>) -> Result<()> {
     ensure_interactive_terminal()?;
     KittyGraphics::ensure_supported()?;
 
@@ -148,12 +158,13 @@ pub fn run_live(
 pub fn run_live(
     _play_audio: bool,
     _input_profile: InputProfile,
+    _presentation_backend: PresentationBackend,
     _cmos_path: Option<&Path>,
 ) -> Result<()> {
     Ok(())
 }
 
-fn render_live_machine_frame<'a>(
+pub(crate) fn render_live_machine_frame<'a>(
     renderer: &'a mut Renderer,
     machine: &mut ArcadeMachine,
 ) -> Result<&'a RenderedImage> {
@@ -170,7 +181,7 @@ fn render_live_frame(renderer: &mut Renderer, native_frame: RenderedImage) -> &R
     renderer.render_cabinet_frame(&native_frame)
 }
 
-fn step_live_core_frames(
+pub(crate) fn step_live_core_frames(
     machine: &mut ArcadeMachine,
     first_input: CabinetInput,
     catch_up_input: CabinetInput,
@@ -188,12 +199,12 @@ fn step_live_core_frames(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct LiveFrameInputs {
-    first: CabinetInput,
-    catch_up: CabinetInput,
+pub(crate) struct LiveFrameInputs {
+    pub(crate) first: CabinetInput,
+    pub(crate) catch_up: CabinetInput,
 }
 
-fn live_frame_inputs(
+pub(crate) fn live_frame_inputs(
     pending_pulses: &mut CabinetInput,
     polled_pulses: CabinetInput,
     held_input: CabinetInput,
@@ -229,7 +240,9 @@ fn validate_interactive_terminal(stdin_is_terminal: bool, stdout_is_terminal: bo
     }
 }
 
-fn live_machine_from_cmos_storage(storage: Option<&dyn CmosStorage>) -> Result<ArcadeMachine> {
+pub(crate) fn live_machine_from_cmos_storage(
+    storage: Option<&dyn CmosStorage>,
+) -> Result<ArcadeMachine> {
     let Some(storage) = storage else {
         return Ok(ArcadeMachine::new());
     };
@@ -242,7 +255,10 @@ fn live_machine_from_cmos_storage(storage: Option<&dyn CmosStorage>) -> Result<A
         .map_err(|error| anyhow!("loading persisted CMOS RAM into arcade core: {error}"))
 }
 
-fn save_live_cmos(storage: Option<&dyn CmosStorage>, machine: &ArcadeMachine) -> Result<()> {
+pub(crate) fn save_live_cmos(
+    storage: Option<&dyn CmosStorage>,
+    machine: &ArcadeMachine,
+) -> Result<()> {
     let Some(storage) = storage else {
         return Ok(());
     };

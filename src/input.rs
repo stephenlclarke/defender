@@ -228,6 +228,52 @@ pub struct PolledInput {
     pub quit_requested: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputEventKind {
+    Press,
+    Repeat,
+    Release,
+}
+
+impl InputEventKind {
+    pub const fn is_pressed(self) -> bool {
+        matches!(self, Self::Press | Self::Repeat)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputKey {
+    Char(char),
+    Enter,
+    Backspace,
+    Escape,
+    Tab,
+    Up,
+    Down,
+    F(u8),
+    LeftShift,
+    RightShift,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InputEvent {
+    pub key: InputKey,
+    pub kind: InputEventKind,
+}
+
+impl InputEvent {
+    pub const fn new(key: InputKey, kind: InputEventKind) -> Self {
+        Self { key, kind }
+    }
+
+    fn from_crossterm(key_event: KeyEvent) -> Option<Self> {
+        Some(Self {
+            key: input_key_from_crossterm(key_event.code)?,
+            kind: input_event_kind_from_crossterm(key_event.kind),
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InputMapper {
     profile: InputProfile,
@@ -247,20 +293,28 @@ impl InputMapper {
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent, input: &mut PolledInput) {
-        let pressed = !matches!(key_event.kind, KeyEventKind::Release);
-        if matches!(key_event.kind, KeyEventKind::Press)
-            && let KeyCode::Char(character) = key_event.code
+        if let Some(input_event) = InputEvent::from_crossterm(key_event) {
+            self.handle_input_event(input_event, input);
+        }
+    }
+
+    pub fn handle_input_event(&mut self, input_event: InputEvent, input: &mut PolledInput) {
+        let pressed = input_event.kind.is_pressed();
+        if matches!(input_event.kind, InputEventKind::Press)
+            && let InputKey::Char(character) = input_event.key
         {
             input.typed_chars.push(character.to_ascii_lowercase());
         }
-        if matches!(key_event.kind, KeyEventKind::Press) && key_event.code == KeyCode::Backspace {
+        if matches!(input_event.kind, InputEventKind::Press)
+            && input_event.key == InputKey::Backspace
+        {
             input.typed_chars.push('\u{8}');
         }
 
-        match key_event.code {
-            KeyCode::Esc if pressed => input.quit_requested = true,
-            KeyCode::Char('q') | KeyCode::Char('Q') if pressed => input.quit_requested = true,
-            _ => self.map_profile_key(key_event, input),
+        match input_event.key {
+            InputKey::Escape if pressed => input.quit_requested = true,
+            InputKey::Char('q') | InputKey::Char('Q') if pressed => input.quit_requested = true,
+            _ => self.map_profile_key(input_event, input),
         }
     }
 
@@ -278,7 +332,7 @@ impl InputMapper {
         }
     }
 
-    fn map_profile_key(&mut self, key_event: KeyEvent, input: &mut PolledInput) {
+    fn map_profile_key(&mut self, key_event: InputEvent, input: &mut PolledInput) {
         match self.profile {
             InputProfile::Planetoid => self.map_planetoid_key(key_event, input),
             InputProfile::Cabinet => self.map_cabinet_key(key_event, input),
@@ -286,99 +340,122 @@ impl InputMapper {
         }
     }
 
-    fn map_planetoid_key(&mut self, key_event: KeyEvent, input: &mut PolledInput) {
-        let pressed = !matches!(key_event.kind, KeyEventKind::Release);
-        match key_event.code {
-            KeyCode::Enter if pressed => {
+    fn map_planetoid_key(&mut self, key_event: InputEvent, input: &mut PolledInput) {
+        let pressed = key_event.kind.is_pressed();
+        match key_event.key {
+            InputKey::Enter if pressed => {
                 input.cabinet.start_one = true;
                 input.cabinet.fire = true;
             }
-            KeyCode::Char('1') if pressed => input.cabinet.start_one = true,
-            KeyCode::Char('5') if pressed => input.cabinet.coin = true,
-            KeyCode::Char('6') if pressed => input.cabinet.coin_two = true,
-            KeyCode::Char('7') if pressed => input.cabinet.coin_three = true,
-            KeyCode::Char('a') | KeyCode::Char('A') => set_held_flag(
+            InputKey::Char('1') if pressed => input.cabinet.start_one = true,
+            InputKey::Char('5') if pressed => input.cabinet.coin = true,
+            InputKey::Char('6') if pressed => input.cabinet.coin_two = true,
+            InputKey::Char('7') if pressed => input.cabinet.coin_three = true,
+            InputKey::Char('a') | InputKey::Char('A') => set_held_flag(
                 &mut self.held.altitude_up,
                 key_event.kind,
                 &mut input.cabinet.altitude_up,
             ),
-            KeyCode::Char('z') | KeyCode::Char('Z') => set_held_flag(
+            InputKey::Char('z') | InputKey::Char('Z') => set_held_flag(
                 &mut self.held.altitude_down,
                 key_event.kind,
                 &mut input.cabinet.altitude_down,
             ),
-            KeyCode::Modifier(ModifierKeyCode::LeftShift)
-            | KeyCode::Modifier(ModifierKeyCode::RightShift) => set_held_flag(
+            InputKey::LeftShift | InputKey::RightShift => set_held_flag(
                 &mut self.held.thrust,
                 key_event.kind,
                 &mut input.cabinet.thrust,
             ),
-            KeyCode::Char(' ') if pressed => input.cabinet.reverse = true,
-            KeyCode::Tab if pressed => input.cabinet.smart_bomb = true,
-            KeyCode::Char('h') | KeyCode::Char('H') if pressed => input.cabinet.hyperspace = true,
-            KeyCode::F(2) if pressed => input.cabinet.service_advance = true,
-            KeyCode::F(3) if pressed => input.cabinet.high_score_reset = true,
-            KeyCode::F(4) => set_held_flag(
+            InputKey::Char(' ') if pressed => input.cabinet.reverse = true,
+            InputKey::Tab if pressed => input.cabinet.smart_bomb = true,
+            InputKey::Char('h') | InputKey::Char('H') if pressed => input.cabinet.hyperspace = true,
+            InputKey::F(2) if pressed => input.cabinet.service_advance = true,
+            InputKey::F(3) if pressed => input.cabinet.high_score_reset = true,
+            InputKey::F(4) => set_held_flag(
                 &mut self.held.auto_up_manual_down,
                 key_event.kind,
                 &mut input.cabinet.auto_up_manual_down,
             ),
-            KeyCode::F(5) if pressed => input.cabinet.tilt = true,
+            InputKey::F(5) if pressed => input.cabinet.tilt = true,
             _ => {}
         }
     }
 
-    fn map_cabinet_key(&mut self, key_event: KeyEvent, input: &mut PolledInput) {
-        let pressed = !matches!(key_event.kind, KeyEventKind::Release);
-        match key_event.code {
-            KeyCode::Char('5') if pressed => input.cabinet.coin = true,
-            KeyCode::Char('6') if pressed => input.cabinet.coin_two = true,
-            KeyCode::Char('7') if pressed => input.cabinet.coin_three = true,
-            KeyCode::Char('1') if pressed => input.cabinet.start_one = true,
-            KeyCode::Char('2') if pressed => input.cabinet.start_two = true,
-            KeyCode::Up => set_held_flag(
+    fn map_cabinet_key(&mut self, key_event: InputEvent, input: &mut PolledInput) {
+        let pressed = key_event.kind.is_pressed();
+        match key_event.key {
+            InputKey::Char('5') if pressed => input.cabinet.coin = true,
+            InputKey::Char('6') if pressed => input.cabinet.coin_two = true,
+            InputKey::Char('7') if pressed => input.cabinet.coin_three = true,
+            InputKey::Char('1') if pressed => input.cabinet.start_one = true,
+            InputKey::Char('2') if pressed => input.cabinet.start_two = true,
+            InputKey::Up => set_held_flag(
                 &mut self.held.altitude_up,
                 key_event.kind,
                 &mut input.cabinet.altitude_up,
             ),
-            KeyCode::Down => set_held_flag(
+            InputKey::Down => set_held_flag(
                 &mut self.held.altitude_down,
                 key_event.kind,
                 &mut input.cabinet.altitude_down,
             ),
-            KeyCode::Char('r') | KeyCode::Char('R') if pressed => input.cabinet.reverse = true,
-            KeyCode::Char('t') | KeyCode::Char('T') => set_held_flag(
+            InputKey::Char('r') | InputKey::Char('R') if pressed => input.cabinet.reverse = true,
+            InputKey::Char('t') | InputKey::Char('T') => set_held_flag(
                 &mut self.held.thrust,
                 key_event.kind,
                 &mut input.cabinet.thrust,
             ),
-            KeyCode::Char('f') | KeyCode::Char('F') if pressed => input.cabinet.fire = true,
-            KeyCode::Char('b') | KeyCode::Char('B') if pressed => input.cabinet.smart_bomb = true,
-            KeyCode::Char('h') | KeyCode::Char('H') if pressed => input.cabinet.hyperspace = true,
-            KeyCode::F(2) if pressed => input.cabinet.service_advance = true,
-            KeyCode::F(3) if pressed => input.cabinet.high_score_reset = true,
-            KeyCode::F(4) => set_held_flag(
+            InputKey::Char('f') | InputKey::Char('F') if pressed => input.cabinet.fire = true,
+            InputKey::Char('b') | InputKey::Char('B') if pressed => input.cabinet.smart_bomb = true,
+            InputKey::Char('h') | InputKey::Char('H') if pressed => input.cabinet.hyperspace = true,
+            InputKey::F(2) if pressed => input.cabinet.service_advance = true,
+            InputKey::F(3) if pressed => input.cabinet.high_score_reset = true,
+            InputKey::F(4) => set_held_flag(
                 &mut self.held.auto_up_manual_down,
                 key_event.kind,
                 &mut input.cabinet.auto_up_manual_down,
             ),
-            KeyCode::F(5) if pressed => input.cabinet.tilt = true,
+            InputKey::F(5) if pressed => input.cabinet.tilt = true,
             _ => {}
         }
     }
 
-    fn map_test_key(&mut self, key_event: KeyEvent, input: &mut PolledInput) {
+    fn map_test_key(&mut self, key_event: InputEvent, input: &mut PolledInput) {
         self.map_cabinet_key(key_event, input);
     }
 }
 
-fn set_held_flag(held: &mut bool, kind: KeyEventKind, output: &mut bool) {
+fn input_event_kind_from_crossterm(kind: KeyEventKind) -> InputEventKind {
     match kind {
-        KeyEventKind::Press | KeyEventKind::Repeat => {
+        KeyEventKind::Press => InputEventKind::Press,
+        KeyEventKind::Repeat => InputEventKind::Repeat,
+        KeyEventKind::Release => InputEventKind::Release,
+    }
+}
+
+fn input_key_from_crossterm(code: KeyCode) -> Option<InputKey> {
+    match code {
+        KeyCode::Char(character) => Some(InputKey::Char(character)),
+        KeyCode::Enter => Some(InputKey::Enter),
+        KeyCode::Backspace => Some(InputKey::Backspace),
+        KeyCode::Esc => Some(InputKey::Escape),
+        KeyCode::Tab => Some(InputKey::Tab),
+        KeyCode::Up => Some(InputKey::Up),
+        KeyCode::Down => Some(InputKey::Down),
+        KeyCode::F(index) => Some(InputKey::F(index)),
+        KeyCode::Modifier(ModifierKeyCode::LeftShift) => Some(InputKey::LeftShift),
+        KeyCode::Modifier(ModifierKeyCode::RightShift) => Some(InputKey::RightShift),
+        _ => None,
+    }
+}
+
+fn set_held_flag(held: &mut bool, kind: InputEventKind, output: &mut bool) {
+    match kind {
+        InputEventKind::Press | InputEventKind::Repeat => {
             *held = true;
             *output = true;
         }
-        KeyEventKind::Release => *held = false,
+        InputEventKind::Release => *held = false,
     }
 }
 

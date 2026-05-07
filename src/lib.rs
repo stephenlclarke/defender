@@ -15,6 +15,7 @@ pub mod kitty;
 pub mod live;
 pub mod machine;
 pub mod pia;
+pub mod presentation;
 pub mod red_label;
 pub mod red_label_memory;
 pub mod red_label_message;
@@ -24,6 +25,7 @@ pub mod rom;
 pub mod sound;
 pub mod terminal;
 pub mod video;
+pub mod wgpu_presenter;
 
 #[cfg(test)]
 pub(crate) mod test_support;
