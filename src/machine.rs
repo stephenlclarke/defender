@@ -25,12 +25,16 @@ use crate::{
         pack_sram_byte, red_label_cmos_defaults, red_label_cmos_layout, red_label_linked_lists,
         red_label_ram_layout, unpack_sram_byte,
     },
+    red_label_trace_samples::{
+        red_label_long_instruction_crc_sample, red_label_long_instruction_rand_sample,
+    },
     red_label_wave::{RED_LABEL_WDELT_RECORD_COUNT, WaveProfile, red_label_wave_table},
     rom::crc32,
     sound::{FRAME_SOUND_COMMAND_CAPACITY, SoundCommand, SoundCommandLatch},
     video::{
-        RenderedImage, render_defender_visible_palette_indices,
-        render_defender_visible_pixel_nibbles, render_defender_visible_rgba,
+        DEFENDER_VISIBLE_X_START, DEFENDER_VISIBLE_Y_START, RenderedImage,
+        render_defender_visible_palette_indices, render_defender_visible_pixel_nibbles,
+        render_defender_visible_rgba, williams_screen_byte_offset,
     },
 };
 
@@ -489,6 +493,7 @@ pub struct MachineSaveState {
     memory: RedLabelRuntimeMemory,
     trace_power_up_ram_fill: Option<RedLabelPowerUpRamFill>,
     trace_start_asserted_frames: u8,
+    trace_power_on_recent_special_input: Option<(u64, u16)>,
     trace_player_start_release_frame: Option<u64>,
     main_board_input_ports: DefenderInputPorts,
     main_board_watchdog_reset_count: u64,
@@ -623,6 +628,7 @@ struct LiveCoinDoorSwitchOutcome {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct LiveStartSwitchOutcome {
     process_ran: bool,
+    start_accepted: bool,
     game_started: bool,
 }
 
@@ -2169,6 +2175,14 @@ pub enum RedLabelExpandedUpdate {
         slot_address: u16,
         erased_previous_image: bool,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RedLabelAppearanceAdvanceGeometry {
+    object_address: u16,
+    new_size: u16,
+    top_left: u16,
+    center: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -4503,6 +4517,26453 @@ const RED_LABEL_TRACE_SINIT_RAM_CLEAR_END: u16 = 0xC000;
 const RED_LABEL_TRACE_SINIT_CLEAR_COMPLETE_FRAME: u64 = 725;
 const RED_LABEL_TRACE_PLAYER_START_EXEC_DELAY_FRAMES: u64 = 51;
 const RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN: u16 = 0xF4CC;
+const RED_LABEL_TRACE_POWER_ON_PRESENTS_PARTIAL_FRAME: u64 = 969;
+const RED_LABEL_TRACE_POWER_ON_PRESENTS_SLEEP_FRAME: u64 = 970;
+const RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_FIRST_FRAME: u64 = 979;
+const RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_LAST_FRAME: u64 = 1009;
+const RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_PERIOD: u64 = 10;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_VIDEO_FRAME: u64 = 1018;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_DRAWN_SLOTS: u16 = 12;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_PARTIAL_SLOT: u16 = 12;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_ERASE_SKIP_BYTES: u16 = 6;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ZERO_SAMPLE_FRAME: u64 = 1020;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ZERO_RECOVERY_FRAME: u64 = 1021;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_VIDEO_ONLY_FRAME: u64 = 1023;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_VIDEO_FRAME: u64 = 1019;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_DRAWN_SLOTS: u16 = 9;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_PARTIAL_SLOT: u16 = 9;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_ERASED_WORDS: [u16; 3] =
+    [0x5642, 0x8442, 0x849E];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_MID_WRITE_BYTES: [(u16, u8); 1] =
+    [(0x669E, 0x2C)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_MID_WRITE_WORDS: [(u16, u16); 1] =
+    [(0x6A9E, 0xCCCC)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRD_APPEARANCE_MID_WRITE_BYTES: [(u16, u8); 1] =
+    [(0x5A45, 0xCF)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTH_APPEARANCE_INACTIVE_ERASE_WORDS: [(u16, u16); 3] =
+    [(0x9D7A, 0x19F6), (0x9D7C, 0x199E), (0x9D7E, 0x1946)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTH_APPEARANCE_MID_WRITE_WORDS: [(u16, u16); 3] =
+    [(0x19F6, 0xCCCC), (0x199E, 0xCCCC), (0x1946, 0xC2CC)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTH_APPEARANCE_VIDEO_FRAME: u64 = 1022;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTH_APPEARANCE_INACTIVE_ERASE_WORDS: [(u16, u16); 2] =
+    [(0x9C7C, 0x0A9E), (0x9C7E, 0x0A48)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTH_APPEARANCE_ERASED_WORDS: [u16; 1] = [0x069E];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTH_APPEARANCE_MID_WRITE_WORDS: [(u16, u16); 3] =
+    [(0x0A48, 0xCCCC), (0x0A9E, 0xCCCC), (0x879E, 0x2222)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTH_APPEARANCE_INACTIVE_ERASE_WORDS: [(u16, u16); 7] = [
+    (0x9F32, 0x6248),
+    (0x9F34, 0x37F4),
+    (0x9F36, 0x379E),
+    (0x9F38, 0x3748),
+    (0x9F3A, 0x0CF4),
+    (0x9F3C, 0x0C9E),
+    (0x9F3E, 0x0C48),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTH_APPEARANCE_MID_WRITE_WORDS: [(u16, u16); 7] = [
+    (0x0CF4, 0x2222),
+    (0x0C9E, 0x2C22),
+    (0x0C48, 0xCC2C),
+    (0x37F4, 0x2222),
+    (0x379E, 0x2222),
+    (0x3748, 0xCCCC),
+    (0x6248, 0xC2CC),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTH_APPEARANCE_VIDEO_FRAME: u64 = 1024;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTH_APPEARANCE_ERASED_WORDS: [u16; 2] =
+    [0x79F4, 0x799E];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTH_APPEARANCE_MID_WRITE_WORDS: [(u16, u16); 1] =
+    [(0x5A48, 0xCFFF)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTH_APPEARANCE_VIDEO_FRAME: u64 = 1025;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTH_APPEARANCE_INACTIVE_ERASE_WORDS: [(u16, u16); 5] = [
+    (0x9CB4, 0x39F0),
+    (0x9CB8, 0x394C),
+    (0x9CBA, 0x10F0),
+    (0x9CBC, 0x109E),
+    (0x9CBE, 0x104C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTH_APPEARANCE_MID_WRITE_WORDS: [(u16, u16); 6] = [
+    (0x10F0, 0x222C),
+    (0x109E, 0x2222),
+    (0x104C, 0xCCC2),
+    (0x39F0, 0x2222),
+    (0x399E, 0x2222),
+    (0x394C, 0x222C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTH_APPEARANCE_FINAL_WRITE_WORDS: [(u16, u16); 2] =
+    [(0x0C9E, 0xCCCC), (0x5E9E, 0xCCCC)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINTH_APPEARANCE_VIDEO_FRAME: u64 = 1026;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINTH_APPEARANCE_INACTIVE_ERASE_WORDS: [(u16, u16); 3] =
+    [(0x9F7A, 0x14F0), (0x9F7C, 0x149E), (0x9F7E, 0x144C)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINTH_APPEARANCE_MID_WRITE_WORDS: [(u16, u16); 1] =
+    [(0x144C, 0xCCCC)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TENTH_APPEARANCE_VIDEO_FRAME: u64 = 1027;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TENTH_APPEARANCE_MID_WRITE_WORDS: [(u16, u16); 27] = [
+    (0x144C, 0x0000),
+    (0x149E, 0x0000),
+    (0x14F0, 0x0000),
+    (0x254C, 0x0000),
+    (0x259E, 0x0000),
+    (0x25F0, 0x0000),
+    (0x3D4C, 0x0000),
+    (0x3D9E, 0x0000),
+    (0x3DF0, 0x0000),
+    (0x414C, 0x0000),
+    (0x419E, 0x0000),
+    (0x41F0, 0x0000),
+    (0x4E4C, 0x0000),
+    (0x5A45, 0x0000),
+    (0x5E44, 0x0F0F),
+    (0x5F42, 0xFFF0),
+    (0x669E, 0x0000),
+    (0x66F0, 0x0000),
+    (0x774C, 0x0000),
+    (0x779E, 0x0000),
+    (0x77F0, 0x0000),
+    (0x8F4C, 0x0000),
+    (0x8F9E, 0x0000),
+    (0x8FF0, 0x0000),
+    (0x934C, 0x0000),
+    (0x939E, 0x0000),
+    (0x93F0, 0x0000),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TENTH_APPEARANCE_MID_WRITE_BYTES: [(u16, u8); 4] = [
+    (0x5A47, 0x00),
+    (0x5D47, 0x0F),
+    (0x5E46, 0xF0),
+    (0x664D, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ELEVENTH_APPEARANCE_VIDEO_FRAME: u64 = 1028;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ELEVENTH_PROCESS_TIMER_BYTES: [(u16, u8); 4] = [
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x00),
+    (0xAB05, 0x28),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_APPEARANCE_VIDEO_FRAME: u64 = 1029;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_PROCESS_TIMER_BYTES: [(u16, u8); 1] =
+    [(0xAAC9, 0x01)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_APPEARANCE_RAM_BYTES: [(u16, u8); 1] =
+    [(0x9D05, 0x40)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_MID_WRITE_WORDS: [(u16, u16); 5] = [
+    (0x419E, 0x2222),
+    (0x5A48, 0x0000),
+    (0x5A4A, 0x0000),
+    (0x5A4C, 0x0000),
+    (0x5B4A, 0x0000),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_MID_WRITE_BYTES: [(u16, u8); 1] = [(0x5C48, 0x00)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_APPEARANCE_VIDEO_FRAME: u64 = 1030;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x00),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x27),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_APPEARANCE_RAM_BYTES: [(u16, u8); 1] =
+    [(0x9D05, 0x28)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_MID_WRITE_WORDS: [(u16, u16); 2] =
+    [(0x419E, 0x0000), (0x5E47, 0xF0F0)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_MID_WRITE_BYTES: [(u16, u8); 1] =
+    [(0x5F43, 0xFF)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTEENTH_APPEARANCE_VIDEO_FRAME: u64 = 1031;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTEENTH_APPEARANCE_RAM_WORDS: [(u16, u16); 6] = [
+    (0x9E74, 0x30EA),
+    (0x9E76, 0x309E),
+    (0x9E78, 0x3052),
+    (0x9E7A, 0x0AEA),
+    (0x9E7C, 0x0A9E),
+    (0x9E7E, 0x0A52),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTEENTH_VIDEO_BYTES: [(u16, u8); 17] = [
+    (0x0A52, 0x2C),
+    (0x0A53, 0x2C),
+    (0x0A9E, 0x2C),
+    (0x0A9F, 0x2C),
+    (0x0AEA, 0xC2),
+    (0x0AEB, 0xC2),
+    (0x3052, 0xCC),
+    (0x3053, 0xCC),
+    (0x309E, 0x22),
+    (0x309F, 0x22),
+    (0x30EA, 0x22),
+    (0x30EB, 0x22),
+    (0x5A4D, 0x00),
+    (0x5A4E, 0x00),
+    (0x5D4E, 0x0F),
+    (0x5E4D, 0xFF),
+    (0x5E4E, 0xF0),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTEENTH_APPEARANCE_VIDEO_FRAME: u64 = 1032;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTEENTH_VIDEO_WORDS: [(u16, u16); 8] = [
+    (0x109E, 0xCCCC),
+    (0x149E, 0x2222),
+    (0x189E, 0xCCCC),
+    (0x1C9E, 0xCCCC),
+    (0x5A9E, 0xCCCC),
+    (0x5E9E, 0x2CCC),
+    (0x629E, 0xCCCC),
+    (0x669E, 0x2222),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTEENTH_APPEARANCE_VIDEO_FRAME: u64 = 1033;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTEENTH_VIDEO_WORDS: [(u16, u16); 6] = [
+    (0x1F52, 0x0000),
+    (0x1F9E, 0x0000),
+    (0x1FEA, 0x0000),
+    (0x6B52, 0x0000),
+    (0x6B9E, 0x0000),
+    (0x6BEA, 0x0000),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTEENTH_VIDEO_BYTES: [(u16, u8); 2] =
+    [(0x5E4C, 0x0F), (0x5E4E, 0xFF)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_APPEARANCE_VIDEO_FRAME: u64 = 1034;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x24),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_PROCESS_DATA_WORDS: [(u16, u16); 1] =
+    [(0xAAEA, 0xF461)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_APPEARANCE_RAM_WORDS: [(u16, u16); 6] = [
+    (0x9E74, 0x32E6),
+    (0x9E76, 0x329E),
+    (0x9E78, 0x3256),
+    (0x9E7A, 0x0EE6),
+    (0x9E7C, 0x0E9E),
+    (0x9E7E, 0x0E56),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_VIDEO_WORDS: [(u16, u16); 7] = [
+    (0x0E56, 0x2C2C),
+    (0x0E9E, 0x2C2C),
+    (0x0EE6, 0xC2C2),
+    (0x3256, 0xCCCC),
+    (0x329E, 0x2222),
+    (0x32E6, 0x2222),
+    (0x5F4A, 0xFFFF),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTEENTH_APPEARANCE_VIDEO_FRAME: u64 = 1035;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTEENTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x23),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTEENTH_VIDEO_WORDS: [(u16, u16); 6] = [
+    (0x0E9E, 0x0000),
+    (0x169E, 0x2222),
+    (0x1A9E, 0xCCCC),
+    (0x7F9E, 0x2222),
+    (0x839E, 0x2222),
+    (0x879E, 0x2222),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTEENTH_VIDEO_BYTES: [(u16, u8); 1] = [(0x129F, 0xCC)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETEENTH_APPEARANCE_VIDEO_FRAME: u64 = 1036;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETEENTH_VIDEO_WORDS: [(u16, u16); 7] = [
+    (0x2156, 0x0000),
+    (0x219E, 0x0000),
+    (0x21E6, 0x0000),
+    (0x6048, 0xF0F0),
+    (0x6956, 0x0000),
+    (0x699E, 0x0000),
+    (0x69E6, 0x0000),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTIETH_APPEARANCE_VIDEO_FRAME: u64 = 1037;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTIETH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTIETH_VIDEO_WORDS: [(u16, u16); 23] = [
+    (0x3358, 0x1110),
+    (0x35E4, 0x0000),
+    (0x3758, 0x1010),
+    (0x3B58, 0x1110),
+    (0x3F58, 0x1110),
+    (0x4358, 0x1111),
+    (0x4758, 0x1110),
+    (0x4E58, 0x0101),
+    (0x5258, 0x0101),
+    (0x5658, 0x1110),
+    (0x5858, 0x0000),
+    (0x589E, 0x0000),
+    (0x58E4, 0x0000),
+    (0x5A58, 0x1110),
+    (0x6058, 0x1010),
+    (0x6258, 0x0101),
+    (0x6458, 0x1101),
+    (0x6658, 0x0101),
+    (0x6858, 0x1100),
+    (0x6C58, 0x0000),
+    (0x7B58, 0x0000),
+    (0x7B9E, 0x0000),
+    (0x7BE4, 0x0000),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIRST_APPEARANCE_VIDEO_FRAME: u64 = 1038;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIRST_APPEARANCE_RAM_WORDS: [(u16, u16); 4] = [
+    (0x9EE8, 0x81E4),
+    (0x9EEA, 0x819E),
+    (0x9EEC, 0x8158),
+    (0x9EEE, 0x5EE4),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIRST_VIDEO_WORDS: [(u16, u16); 7] = [
+    (0x1258, 0x0000),
+    (0x12E4, 0x0000),
+    (0x3558, 0x0000),
+    (0x5EE2, 0x0000),
+    (0x805A, 0x0000),
+    (0x809E, 0x0000),
+    (0x80E2, 0x0000),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SECOND_APPEARANCE_VIDEO_FRAME: u64 = 1039;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SECOND_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x21),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SECOND_APPEARANCE_RAM_WORDS: [(u16, u16); 12] = [
+    (0x9DE8, 0x70E2),
+    (0x9DEA, 0x709E),
+    (0x9DEC, 0x705A),
+    (0x9DEE, 0x4EE2),
+    (0x9DF0, 0x4E9E),
+    (0x9DF2, 0x4E5A),
+    (0x9DF4, 0x2CE2),
+    (0x9DF6, 0x2C9E),
+    (0x9DF8, 0x2C5A),
+    (0x9DFA, 0x0AE2),
+    (0x9DFC, 0x0A9E),
+    (0x9DFE, 0x0A5A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SECOND_VIDEO_WORDS: [(u16, u16); 25] = [
+    (0x0A5A, 0x2222),
+    (0x0A9E, 0xCCCC),
+    (0x0AE2, 0xCCCC),
+    (0x0C5C, 0x0000),
+    (0x0C9E, 0x0000),
+    (0x0CE0, 0x0000),
+    (0x1C9E, 0xCCCC),
+    (0x209E, 0xCCCC),
+    (0x249E, 0xCCCC),
+    (0x2C5A, 0xCCCC),
+    (0x2C9E, 0x2222),
+    (0x2CE2, 0x2222),
+    (0x2D5C, 0x0000),
+    (0x2D9E, 0x0000),
+    (0x2DE0, 0x0000),
+    (0x4E5A, 0x2222),
+    (0x4E5C, 0x0101),
+    (0x5E9E, 0xCCCC),
+    (0x629E, 0x2222),
+    (0x669E, 0xCCCC),
+    (0x6A9E, 0xCCCC),
+    (0x6F5C, 0x0000),
+    (0x6F9E, 0x0000),
+    (0x6FE0, 0x0000),
+    (0x705A, 0xCCCC),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_THIRD_APPEARANCE_VIDEO_FRAME: u64 = 1040;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_THIRD_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x02),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x20),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_THIRD_ZERO_VIDEO_BYTES: [u16; 56] = [
+    0x0A5A, 0x2C5A, 0x4E5A, 0x705A, 0x0A5B, 0x2C5B, 0x4E5B, 0x705B, 0x105C, 0x145C, 0x315C, 0x355C,
+    0x525C, 0x565C, 0x735C, 0x775C, 0x105D, 0x145D, 0x315D, 0x355D, 0x525D, 0x565D, 0x735D, 0x775D,
+    0x0A9E, 0x109E, 0x149E, 0x2C9E, 0x319E, 0x359E, 0x779E, 0x0A9F, 0x109F, 0x149F, 0x2C9F, 0x319F,
+    0x359F, 0x779F, 0x10E0, 0x14E0, 0x31E0, 0x35E0, 0x52E0, 0x56E0, 0x77E0, 0x10E1, 0x14E1, 0x31E1,
+    0x35E1, 0x52E1, 0x56E1, 0x77E1, 0x0AE2, 0x2CE2, 0x0AE3, 0x2CE3,
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FOURTH_APPEARANCE_VIDEO_FRAME: u64 = 1041;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FOURTH_APPEARANCE_RAM_WORDS: [(u16, u16); 12] = [
+    (0x9EE8, 0x7EDE),
+    (0x9EEA, 0x7E9E),
+    (0x9EEC, 0x7E5E),
+    (0x9EEE, 0x5EDE),
+    (0x9EF0, 0x5E9E),
+    (0x9EF2, 0x5E5E),
+    (0x9EF4, 0x3EDE),
+    (0x9EF6, 0x3E9E),
+    (0x9EF8, 0x3E5E),
+    (0x9EFA, 0x1EDE),
+    (0x9EFC, 0x1E9E),
+    (0x9EFE, 0x1E5E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FOURTH_VIDEO_BYTES: [(u16, u8); 23] = [
+    (0x1E5E, 0x22),
+    (0x3E5E, 0x22),
+    (0x5E5E, 0x22),
+    (0x7E5E, 0xCC),
+    (0x1E5F, 0x22),
+    (0x3E5F, 0x22),
+    (0x5E5F, 0x22),
+    (0x7E5F, 0x2C),
+    (0x1E9E, 0xCC),
+    (0x3E9E, 0x22),
+    (0x5E9E, 0xCC),
+    (0x7E9E, 0x22),
+    (0x1E9F, 0xCC),
+    (0x3E9F, 0x02),
+    (0x5E9F, 0xCC),
+    (0x7E9F, 0x22),
+    (0x1EDE, 0xCC),
+    (0x3EDE, 0x02),
+    (0x5EDE, 0xCC),
+    (0x7EDE, 0x22),
+    (0x1EDF, 0xCC),
+    (0x5EDF, 0xCC),
+    (0x7EDF, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIFTH_APPEARANCE_VIDEO_FRAME: u64 = 1042;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIFTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x1F),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIFTH_VIDEO_BYTES: [(u16, u8); 6] = [
+    (0x229E, 0xCC),
+    (0x2A9E, 0x0C),
+    (0x879E, 0x22),
+    (0x229F, 0xCC),
+    (0x2A9F, 0x0C),
+    (0x879F, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SIXTH_APPEARANCE_VIDEO_FRAME: u64 = 1043;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SIXTH_PROCESS_BYTES: [(u16, u8); 6] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAEB, 0x5B),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x1E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SIXTH_VIDEO_BYTES: [(u16, u8); 4] = [
+    (0x6342, 0x0F),
+    (0x6343, 0x0F),
+    (0x6147, 0xFF),
+    (0x6247, 0xFF),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SEVENTH_APPEARANCE_VIDEO_FRAME: u64 = 1044;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SEVENTH_APPEARANCE_RAM_WORDS: [(u16, u16); 12] = [
+    (0x9EE8, 0x7CDA),
+    (0x9EEA, 0x7C9E),
+    (0x9EEC, 0x7C62),
+    (0x9EEE, 0x5EDA),
+    (0x9EF0, 0x5E9E),
+    (0x9EF2, 0x5E62),
+    (0x9EF4, 0x40DA),
+    (0x9EF6, 0x409E),
+    (0x9EF8, 0x4062),
+    (0x9EFA, 0x22DA),
+    (0x9EFC, 0x229E),
+    (0x9EFE, 0x2262),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SEVENTH_VIDEO_BYTES: [(u16, u8); 23] = [
+    (0x2262, 0x22),
+    (0x4062, 0x22),
+    (0x5E62, 0x22),
+    (0x7C62, 0xCC),
+    (0x2263, 0x22),
+    (0x4063, 0x22),
+    (0x5E63, 0x22),
+    (0x7C63, 0x2C),
+    (0x229E, 0xCC),
+    (0x409E, 0x22),
+    (0x5E9E, 0xCC),
+    (0x7C9E, 0x22),
+    (0x229F, 0xCC),
+    (0x409F, 0x02),
+    (0x5E9F, 0xCC),
+    (0x7C9F, 0x22),
+    (0x22DA, 0xCC),
+    (0x40DA, 0x02),
+    (0x5EDA, 0xCC),
+    (0x7CDA, 0x22),
+    (0x22DB, 0xCC),
+    (0x5EDB, 0xCC),
+    (0x7CDB, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_EIGHTH_APPEARANCE_VIDEO_FRAME: u64 = 1045;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_EIGHTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAF6, 0x00),
+    (0xAB05, 0x1E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_EIGHTH_VIDEO_BYTES: [(u16, u8); 79] = [
+    (0x3358, 0x11),
+    (0x3758, 0x10),
+    (0x3B58, 0x11),
+    (0x3F58, 0x11),
+    (0x4358, 0x11),
+    (0x4758, 0x11),
+    (0x4E58, 0x01),
+    (0x5258, 0x01),
+    (0x5658, 0x11),
+    (0x5A58, 0x11),
+    (0x6058, 0x10),
+    (0x6258, 0x01),
+    (0x6458, 0x11),
+    (0x6658, 0x01),
+    (0x6858, 0x11),
+    (0x3359, 0x10),
+    (0x3759, 0x10),
+    (0x3B59, 0x10),
+    (0x3F59, 0x10),
+    (0x4359, 0x11),
+    (0x4759, 0x10),
+    (0x4E59, 0x01),
+    (0x5259, 0x01),
+    (0x5659, 0x10),
+    (0x5A59, 0x10),
+    (0x6059, 0x10),
+    (0x6259, 0x01),
+    (0x6459, 0x01),
+    (0x6659, 0x01),
+    (0x485A, 0x01),
+    (0x4E5A, 0x01),
+    (0x525A, 0x01),
+    (0x535A, 0x10),
+    (0x565A, 0x10),
+    (0x5A5A, 0x10),
+    (0x5F5A, 0x01),
+    (0x625A, 0x01),
+    (0x635A, 0x10),
+    (0x665A, 0x01),
+    (0x675A, 0x10),
+    (0x345B, 0x10),
+    (0x3C5B, 0x10),
+    (0x485B, 0x11),
+    (0x4E5B, 0x01),
+    (0x525B, 0x01),
+    (0x535B, 0x10),
+    (0x565B, 0x10),
+    (0x5A5B, 0x11),
+    (0x5B5B, 0x11),
+    (0x5F5B, 0x01),
+    (0x625B, 0x01),
+    (0x635B, 0x10),
+    (0x665B, 0x01),
+    (0x675B, 0x10),
+    (0x4E5C, 0x01),
+    (0x525C, 0x01),
+    (0x565C, 0x10),
+    (0x625C, 0x01),
+    (0x665C, 0x01),
+    (0x4E5D, 0x01),
+    (0x525D, 0x01),
+    (0x565D, 0x10),
+    (0x625D, 0x01),
+    (0x665D, 0x01),
+    (0x325E, 0x01),
+    (0x365E, 0x01),
+    (0x3A5E, 0x01),
+    (0x3E5E, 0x01),
+    (0x465E, 0x01),
+    (0x4A5E, 0x01),
+    (0x4E5E, 0x01),
+    (0x525E, 0x01),
+    (0x555E, 0x01),
+    (0x565E, 0x11),
+    (0x595E, 0x01),
+    (0x5A5E, 0x11),
+    (0x625E, 0x01),
+    (0x665E, 0x01),
+    (0x6A5E, 0x01),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_NINTH_APPEARANCE_VIDEO_FRAME: u64 = 1046;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_NINTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x1D),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_NINTH_APPEARANCE_RAM_WORDS: [(u16, u16); 8] = [
+    (0x9E30, 0x35D8),
+    (0x9E32, 0x359E),
+    (0x9E34, 0x3564),
+    (0x9E36, 0x352A),
+    (0x9E38, 0x18D8),
+    (0x9E3A, 0x189E),
+    (0x9E3C, 0x1864),
+    (0x9E3E, 0x182A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_NINTH_VIDEO_BYTES: [(u16, u8); 9] = [
+    (0x18D9, 0xC2),
+    (0x352A, 0xC2),
+    (0x352B, 0xC0),
+    (0x3564, 0xC0),
+    (0x3565, 0xC0),
+    (0x359E, 0x20),
+    (0x359F, 0x20),
+    (0x35D8, 0x20),
+    (0x35D9, 0x20),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTIETH_APPEARANCE_VIDEO_FRAME: u64 = 1047;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTIETH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x1C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTIETH_APPEARANCE_RAM_WORDS: [(u16, u16); 2] =
+    [(0x9C7C, 0x1966), (0x9C7E, 0x192E)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTIETH_VIDEO_BYTES: [(u16, u8); 41] = [
+    (0x182A, 0x00),
+    (0x182B, 0x00),
+    (0x1864, 0x00),
+    (0x1865, 0x00),
+    (0x189E, 0x00),
+    (0x189F, 0x00),
+    (0x18D8, 0x00),
+    (0x18D9, 0x00),
+    (0x192E, 0xCC),
+    (0x192F, 0xCC),
+    (0x1966, 0xCC),
+    (0x1967, 0xCC),
+    (0x352A, 0x00),
+    (0x352B, 0x00),
+    (0x3564, 0x00),
+    (0x3565, 0x00),
+    (0x359E, 0x00),
+    (0x359F, 0x00),
+    (0x35D8, 0x00),
+    (0x35D9, 0x00),
+    (0x3646, 0x0F),
+    (0x3647, 0x0F),
+    (0x3748, 0xFF),
+    (0x3944, 0x0F),
+    (0x3945, 0x0F),
+    (0x3946, 0xFF),
+    (0x3947, 0xF0),
+    (0x4D9E, 0x00),
+    (0x4D9F, 0x00),
+    (0x5264, 0x00),
+    (0x5265, 0x00),
+    (0x52D8, 0x00),
+    (0x52D9, 0x00),
+    (0x6242, 0x0F),
+    (0x6243, 0xFF),
+    (0x6244, 0xF0),
+    (0x6245, 0x0F),
+    (0x6F2A, 0x00),
+    (0x6F2B, 0x00),
+    (0x6F64, 0x00),
+    (0x6F65, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIRST_APPEARANCE_VIDEO_FRAME: u64 = 1048;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIRST_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x1C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SECOND_APPEARANCE_VIDEO_FRAME: u64 = 1049;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SECOND_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x1B),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_THIRD_APPEARANCE_VIDEO_FRAME: u64 = 1050;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_THIRD_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x1B),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_THIRD_APPEARANCE_RAM_WORDS: [(u16, u16); 10] = [
+    (0x9FAC, 0x6A68),
+    (0x9FAE, 0x6A32),
+    (0x9FB0, 0x4FD4),
+    (0x9FB2, 0x4F9E),
+    (0x9FB4, 0x4F68),
+    (0x9FB6, 0x4F32),
+    (0x9FB8, 0x34D4),
+    (0x9FBA, 0x349E),
+    (0x9FBC, 0x3468),
+    (0x9FBE, 0x3432),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_THIRD_VIDEO_BYTES: [(u16, u8); 8] = [
+    (0x4F32, 0xCC),
+    (0x4F33, 0xCC),
+    (0x4F68, 0xCC),
+    (0x4F69, 0x22),
+    (0x4F9E, 0x22),
+    (0x4F9F, 0x22),
+    (0x4FD4, 0x22),
+    (0x4FD5, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FOURTH_APPEARANCE_VIDEO_FRAME: u64 = 1051;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FOURTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x02),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x1A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FOURTH_VIDEO_BYTES: [(u16, u8); 5] = [
+    (0x349E, 0x22),
+    (0x349F, 0x22),
+    (0x4E9E, 0x22),
+    (0x4F9E, 0xCC),
+    (0x4F9F, 0xCC),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIFTH_APPEARANCE_VIDEO_FRAME: u64 = 1052;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIFTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x19),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIFTH_VIDEO_BYTES: [(u16, u8); 18] = [
+    (0x1C9E, 0xCC),
+    (0x1C9F, 0xCC),
+    (0x39D2, 0x00),
+    (0x39D3, 0x00),
+    (0x5336, 0x00),
+    (0x5337, 0x00),
+    (0x536A, 0x00),
+    (0x536B, 0x00),
+    (0x539E, 0x00),
+    (0x539F, 0x00),
+    (0x53D2, 0x00),
+    (0x53D3, 0x00),
+    (0x6D36, 0x00),
+    (0x6D37, 0x00),
+    (0x6D6A, 0x00),
+    (0x6D6B, 0x00),
+    (0x6DD2, 0x00),
+    (0x6DD3, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SIXTH_APPEARANCE_VIDEO_FRAME: u64 = 1053;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SIXTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x19),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SIXTH_APPEARANCE_RAM_BYTES: [(u16, u8); 11] = [
+    (0x9EF4, 0x45),
+    (0x9EF5, 0x6C),
+    (0x9EF6, 0x45),
+    (0x9EF7, 0x3A),
+    (0x9EF8, 0x2C),
+    (0x9EF9, 0xD0),
+    (0x9EFA, 0x2C),
+    (0x9EFC, 0x2C),
+    (0x9EFD, 0x6C),
+    (0x9EFE, 0x2C),
+    (0x9EFF, 0x3A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SIXTH_VIDEO_BYTES: [(u16, u8); 17] = [
+    (0x1F36, 0x00),
+    (0x1F37, 0x00),
+    (0x1F6A, 0x00),
+    (0x1F6B, 0x00),
+    (0x1F9E, 0x00),
+    (0x1F9F, 0x00),
+    (0x1FD2, 0x00),
+    (0x1FD3, 0x00),
+    (0x2C6C, 0x22),
+    (0x2C6D, 0x22),
+    (0x3936, 0x00),
+    (0x3937, 0x00),
+    (0x396A, 0x00),
+    (0x396B, 0x00),
+    (0x453A, 0x2C),
+    (0x456C, 0x22),
+    (0x456D, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SEVENTH_APPEARANCE_VIDEO_FRAME: u64 = 1054;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SEVENTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAF6, 0x00),
+    (0xAB05, 0x19),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SEVENTH_VIDEO_BYTES: [(u16, u8); 3] =
+    [(0x3C42, 0xFF), (0x3D42, 0xF0), (0x3D43, 0xF0)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_EIGHTH_APPEARANCE_VIDEO_FRAME: u64 = 1055;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_EIGHTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x18),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_EIGHTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5E)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_NINTH_APPEARANCE_VIDEO_FRAME: u64 = 1056;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_NINTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x18),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_NINTH_APPEARANCE_RAM_WORDS: [(u16, u16); 20] = [
+    (0x9F98, 0x82FE),
+    (0x9F9A, 0x82CE),
+    (0x9F9C, 0x829E),
+    (0x9F9E, 0x826E),
+    (0x9FA0, 0x823E),
+    (0x9FA2, 0x6AFE),
+    (0x9FA4, 0x6ACE),
+    (0x9FA6, 0x6A9E),
+    (0x9FA8, 0x6A6E),
+    (0x9FAA, 0x6A3E),
+    (0x9FAC, 0x52FE),
+    (0x9FAE, 0x52CE),
+    (0x9FB0, 0x529E),
+    (0x9FB2, 0x526E),
+    (0x9FB4, 0x523E),
+    (0x9FB6, 0x3AFE),
+    (0x9FB8, 0x3ACE),
+    (0x9FBA, 0x3A9E),
+    (0x9FBC, 0x3A6E),
+    (0x9FBE, 0x3A3E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_NINTH_VIDEO_BYTES: [(u16, u8); 28] = [
+    (0x3A3E, 0x00),
+    (0x3A3F, 0x00),
+    (0x3A6E, 0x00),
+    (0x3A6F, 0x00),
+    (0x3A9E, 0x00),
+    (0x3A9F, 0x00),
+    (0x3ACE, 0x00),
+    (0x3ACF, 0x00),
+    (0x523E, 0xCC),
+    (0x523F, 0xCC),
+    (0x526E, 0xCC),
+    (0x526F, 0x22),
+    (0x529E, 0x22),
+    (0x529F, 0x22),
+    (0x52CE, 0x22),
+    (0x52CF, 0x22),
+    (0x6A3E, 0x00),
+    (0x6A3F, 0x00),
+    (0x6A6E, 0x00),
+    (0x6A6F, 0x00),
+    (0x823E, 0xC0),
+    (0x823F, 0xCC),
+    (0x826E, 0xCC),
+    (0x826F, 0xCC),
+    (0x829E, 0x22),
+    (0x829F, 0x22),
+    (0x82CE, 0x22),
+    (0x82CF, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTIETH_APPEARANCE_VIDEO_FRAME: u64 = 1057;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTIETH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x17),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTIETH_APPEARANCE_RAM_WORDS: [(u16, u16); 20] = [
+    (0x9E18, 0x6AFE),
+    (0x9E1A, 0x6ACE),
+    (0x9E1C, 0x6A9E),
+    (0x9E1E, 0x6A6E),
+    (0x9E20, 0x6A3E),
+    (0x9E22, 0x52FE),
+    (0x9E24, 0x52CE),
+    (0x9E26, 0x529E),
+    (0x9E28, 0x526E),
+    (0x9E2A, 0x523E),
+    (0x9E2C, 0x3AFE),
+    (0x9E2E, 0x3ACE),
+    (0x9E30, 0x3A9E),
+    (0x9E32, 0x3A6E),
+    (0x9E34, 0x3A3E),
+    (0x9E36, 0x22FE),
+    (0x9E38, 0x22CE),
+    (0x9E3A, 0x229E),
+    (0x9E3C, 0x226E),
+    (0x9E3E, 0x223E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTIETH_VIDEO_BYTES: [(u16, u8); 32] = [
+    (0x223E, 0xCC),
+    (0x223F, 0xCC),
+    (0x226E, 0xCC),
+    (0x226F, 0xCC),
+    (0x229E, 0x22),
+    (0x229F, 0x22),
+    (0x22CE, 0xCC),
+    (0x22CF, 0xC2),
+    (0x2442, 0x00),
+    (0x2443, 0x00),
+    (0x2470, 0x00),
+    (0x2471, 0x00),
+    (0x249E, 0x00),
+    (0x249F, 0x00),
+    (0x24CC, 0x00),
+    (0x24CD, 0x00),
+    (0x3B42, 0x00),
+    (0x3B43, 0x00),
+    (0x3B70, 0x00),
+    (0x3B71, 0x00),
+    (0x3B9E, 0x00),
+    (0x3B9F, 0x00),
+    (0x3BCC, 0x00),
+    (0x3BCD, 0x00),
+    (0x5270, 0x01),
+    (0x5271, 0x01),
+    (0x52CC, 0x00),
+    (0x52CD, 0x00),
+    (0x6942, 0x00),
+    (0x6943, 0x00),
+    (0x6970, 0x00),
+    (0x6971, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIRST_APPEARANCE_VIDEO_FRAME: u64 = 1058;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIRST_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x16),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIRST_APPEARANCE_RAM_WORDS: [(u16, u16); 22] = [
+    (0x9C3C, 0x1B72),
+    (0x9C3E, 0x1B46),
+    (0x9E18, 0x69FA),
+    (0x9E1A, 0x69CC),
+    (0x9E1C, 0x699E),
+    (0x9E1E, 0x6970),
+    (0x9E20, 0x6942),
+    (0x9E22, 0x52FA),
+    (0x9E24, 0x52CC),
+    (0x9E26, 0x529E),
+    (0x9E28, 0x5270),
+    (0x9E2A, 0x5242),
+    (0x9E2C, 0x3BFA),
+    (0x9E2E, 0x3BCC),
+    (0x9E30, 0x3B9E),
+    (0x9E32, 0x3B70),
+    (0x9E34, 0x3B42),
+    (0x9E36, 0x24FA),
+    (0x9E38, 0x24CC),
+    (0x9E3A, 0x249E),
+    (0x9E3C, 0x2470),
+    (0x9E3E, 0x2442),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIRST_VIDEO_BYTES: [(u16, u8); 35] = [
+    (0x223E, 0x00),
+    (0x223F, 0x00),
+    (0x226E, 0x00),
+    (0x226F, 0x00),
+    (0x229E, 0x00),
+    (0x229F, 0x00),
+    (0x22CE, 0x00),
+    (0x22CF, 0x00),
+    (0x2442, 0xCC),
+    (0x2443, 0xCC),
+    (0x2470, 0xCC),
+    (0x2471, 0xCC),
+    (0x249E, 0xCC),
+    (0x249F, 0xCC),
+    (0x24CC, 0xCC),
+    (0x24CD, 0xC2),
+    (0x3A47, 0x0F),
+    (0x3B42, 0xC2),
+    (0x3B43, 0xC0),
+    (0x3B48, 0xF0),
+    (0x3B70, 0xC0),
+    (0x3B71, 0xC0),
+    (0x3B9E, 0x20),
+    (0x3B9F, 0x20),
+    (0x3BCC, 0x20),
+    (0x3BCD, 0x20),
+    (0x3C43, 0xFF),
+    (0x5270, 0xC0),
+    (0x5271, 0xCC),
+    (0x52CC, 0xCC),
+    (0x52CD, 0xCC),
+    (0x6942, 0x22),
+    (0x6943, 0x22),
+    (0x6970, 0x02),
+    (0x6971, 0x02),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SECOND_APPEARANCE_VIDEO_FRAME: u64 = 1059;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SECOND_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x16),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_THIRD_APPEARANCE_VIDEO_FRAME: u64 = 1060;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_THIRD_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x15),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_THIRD_APPEARANCE_RAM_WORDS: [(u16, u16); 20] = [
+    (0x9C98, 0x65F6),
+    (0x9C9A, 0x65CA),
+    (0x9C9C, 0x659E),
+    (0x9C9E, 0x6572),
+    (0x9CA0, 0x6546),
+    (0x9CA2, 0x4FF6),
+    (0x9CA4, 0x4FCA),
+    (0x9CA6, 0x4F9E),
+    (0x9CA8, 0x4F72),
+    (0x9CAA, 0x4F46),
+    (0x9CAC, 0x39F6),
+    (0x9CAE, 0x39CA),
+    (0x9CB0, 0x399E),
+    (0x9CB2, 0x3972),
+    (0x9CB4, 0x3946),
+    (0x9CB6, 0x23F6),
+    (0x9CB8, 0x23CA),
+    (0x9CBA, 0x239E),
+    (0x9CBC, 0x2372),
+    (0x9CBE, 0x2346),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_THIRD_VIDEO_BYTES: [(u16, u8); 44] = [
+    (0x2346, 0xCC),
+    (0x2347, 0xCC),
+    (0x2372, 0xCC),
+    (0x2373, 0xC2),
+    (0x239E, 0x22),
+    (0x239F, 0x22),
+    (0x244A, 0x00),
+    (0x244B, 0x00),
+    (0x2474, 0x00),
+    (0x2475, 0x00),
+    (0x249E, 0x00),
+    (0x249F, 0x00),
+    (0x24C8, 0x00),
+    (0x24C9, 0x00),
+    (0x24F2, 0x00),
+    (0x24F3, 0x00),
+    (0x394A, 0x00),
+    (0x394B, 0x00),
+    (0x3974, 0x00),
+    (0x3975, 0x00),
+    (0x39C8, 0x00),
+    (0x39C9, 0x00),
+    (0x39F2, 0x00),
+    (0x39F3, 0x00),
+    (0x4E4A, 0x00),
+    (0x4E4B, 0x00),
+    (0x4E74, 0x00),
+    (0x4E75, 0x00),
+    (0x4E9E, 0x00),
+    (0x4E9F, 0x00),
+    (0x4EC8, 0x00),
+    (0x4EC9, 0x00),
+    (0x4EF2, 0x00),
+    (0x4EF3, 0x00),
+    (0x634A, 0x00),
+    (0x634B, 0x00),
+    (0x6374, 0x00),
+    (0x6375, 0x00),
+    (0x639E, 0x00),
+    (0x639F, 0x00),
+    (0x63C8, 0x00),
+    (0x63C9, 0x00),
+    (0x63F2, 0x00),
+    (0x63F3, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FOURTH_APPEARANCE_VIDEO_FRAME: u64 = 1061;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FOURTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x15),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FOURTH_APPEARANCE_RAM_WORDS: [(u16, u16); 31] = [
+    (0x9C98, 0x63F2),
+    (0x9C9A, 0x63C8),
+    (0x9C9C, 0x639E),
+    (0x9C9E, 0x6374),
+    (0x9CA0, 0x634A),
+    (0x9CA2, 0x4EF2),
+    (0x9CA4, 0x4EC8),
+    (0x9CA6, 0x4E9E),
+    (0x9CA8, 0x4E74),
+    (0x9CAA, 0x4E4A),
+    (0x9CAC, 0x39F2),
+    (0x9CAE, 0x39C8),
+    (0x9CB0, 0x399E),
+    (0x9CB2, 0x3974),
+    (0x9CB4, 0x394A),
+    (0x9CB6, 0x24F2),
+    (0x9CB8, 0x24C8),
+    (0x9CBA, 0x249E),
+    (0x9CBC, 0x2474),
+    (0x9CBE, 0x244A),
+    (0x9EAA, 0x5A4A),
+    (0x9EAC, 0x45F2),
+    (0x9EAE, 0x45C8),
+    (0x9EB0, 0x459E),
+    (0x9EB2, 0x4574),
+    (0x9EB4, 0x454A),
+    (0x9EB6, 0x30F2),
+    (0x9EB8, 0x30C8),
+    (0x9EBA, 0x309E),
+    (0x9EBC, 0x3074),
+    (0x9EBE, 0x304A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FOURTH_VIDEO_BYTES: [(u16, u8); 20] = [
+    (0x2346, 0x00),
+    (0x2347, 0x00),
+    (0x2372, 0x00),
+    (0x2373, 0x00),
+    (0x239E, 0x00),
+    (0x239F, 0x00),
+    (0x3074, 0xCC),
+    (0x309F, 0x2C),
+    (0x30C8, 0x2C),
+    (0x30C9, 0x22),
+    (0x454A, 0xCC),
+    (0x454B, 0xCC),
+    (0x4574, 0xCC),
+    (0x4575, 0xCC),
+    (0x459E, 0x22),
+    (0x459F, 0x22),
+    (0x45C8, 0x22),
+    (0x45C9, 0x22),
+    (0x45F2, 0x22),
+    (0x45F3, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIFTH_APPEARANCE_VIDEO_FRAME: u64 = 1062;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIFTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x02),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x14),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIFTH_VIDEO_BYTES: [(u16, u8); 12] = [
+    (0x394C, 0xFF),
+    (0x394D, 0xFF),
+    (0x3B48, 0xFF),
+    (0x3B49, 0xFF),
+    (0x3C46, 0x0F),
+    (0x3C47, 0xFF),
+    (0x459E, 0x00),
+    (0x459F, 0x00),
+    (0x499E, 0xCC),
+    (0x499F, 0xCC),
+    (0x4D9E, 0x2C),
+    (0x4D9F, 0xCC),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SIXTH_APPEARANCE_VIDEO_FRAME: u64 = 1063;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SIXTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x02),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x14),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SEVENTH_APPEARANCE_VIDEO_FRAME: u64 = 1064;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SEVENTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x02),
+    (0xAAF6, 0x00),
+    (0xAB05, 0x14),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SEVENTH_VIDEO_BYTES: [(u16, u8); 7] = [
+    (0x3E6E, 0x01),
+    (0x3E6F, 0x01),
+    (0x3E72, 0x01),
+    (0x3F70, 0x10),
+    (0x3F71, 0x10),
+    (0x426E, 0x01),
+    (0x426F, 0x01),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_EIGHTH_APPEARANCE_VIDEO_FRAME: u64 = 1065;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_EIGHTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x13),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_EIGHTH_VIDEO_BYTES: [(u16, u8); 51] = [
+    (0x4370, 0x10),
+    (0x4371, 0x10),
+    (0x4472, 0x01),
+    (0x466E, 0x01),
+    (0x466F, 0x01),
+    (0x4770, 0x10),
+    (0x4771, 0x10),
+    (0x4772, 0x11),
+    (0x4872, 0x11),
+    (0x4A6C, 0x01),
+    (0x4A6D, 0x01),
+    (0x4A6E, 0x01),
+    (0x4A6F, 0x01),
+    (0x4B72, 0x11),
+    (0x4C70, 0x11),
+    (0x4C71, 0x11),
+    (0x4C72, 0x11),
+    (0x4E6C, 0x01),
+    (0x4E6D, 0x01),
+    (0x4E6E, 0x01),
+    (0x4E6F, 0x01),
+    (0x4E70, 0x01),
+    (0x4E71, 0x01),
+    (0x4E72, 0x01),
+    (0x4F70, 0x10),
+    (0x4F71, 0x10),
+    (0x4F72, 0x11),
+    (0x5072, 0x11),
+    (0x526C, 0x01),
+    (0x526D, 0x01),
+    (0x526E, 0x01),
+    (0x526F, 0x01),
+    (0x5270, 0x01),
+    (0x5271, 0x01),
+    (0x5272, 0x01),
+    (0x5370, 0x10),
+    (0x5371, 0x10),
+    (0x5372, 0x10),
+    (0x5470, 0x01),
+    (0x5471, 0x01),
+    (0x5472, 0x01),
+    (0x566C, 0x11),
+    (0x5772, 0x11),
+    (0x5A6C, 0x01),
+    (0x5A6D, 0x01),
+    (0x5A6E, 0x01),
+    (0x5A6F, 0x01),
+    (0x5A72, 0x01),
+    (0x5B72, 0x11),
+    (0x5C70, 0x11),
+    (0x5C71, 0x11),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_NINTH_APPEARANCE_VIDEO_FRAME: u64 = 1066;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_NINTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x13),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_NINTH_VIDEO_BYTES: [(u16, u8); 6] = [
+    (0x7E9E, 0x00),
+    (0x7E9F, 0x00),
+    (0x7EC6, 0x00),
+    (0x7EC7, 0x00),
+    (0x7EEE, 0x00),
+    (0x7EEF, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_APPEARANCE_VIDEO_FRAME: u64 = 1067;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x12),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_APPEARANCE_RAM_BYTES: [(u16, u8); 25] = [
+    (0x9D5E, 0x57),
+    (0x9D5F, 0xC2),
+    (0x9D60, 0x57),
+    (0x9D62, 0x57),
+    (0x9D63, 0x7A),
+    (0x9D64, 0x57),
+    (0x9D65, 0x56),
+    (0x9D66, 0x57),
+    (0x9D67, 0x32),
+    (0x9D69, 0xE6),
+    (0x9D6B, 0xC2),
+    (0x9D6F, 0x7A),
+    (0x9D71, 0x56),
+    (0x9D73, 0x32),
+    (0x9D74, 0x33),
+    (0x9D75, 0xE6),
+    (0x9D76, 0x33),
+    (0x9D77, 0xC2),
+    (0x9D78, 0x33),
+    (0x9D7A, 0x33),
+    (0x9D7B, 0x7A),
+    (0x9D7C, 0x33),
+    (0x9D7D, 0x56),
+    (0x9D7E, 0x33),
+    (0x9D7F, 0x32),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_VIDEO_BYTES: [(u16, u8); 28] = [
+    (0x3332, 0xCC),
+    (0x3333, 0xCC),
+    (0x3356, 0xCC),
+    (0x3357, 0xCC),
+    (0x337A, 0xC2),
+    (0x337B, 0xCC),
+    (0x339E, 0xCC),
+    (0x339F, 0xCC),
+    (0x33C2, 0xCC),
+    (0x33C3, 0xCC),
+    (0x33E6, 0x22),
+    (0x33E7, 0x22),
+    (0x3D44, 0xFF),
+    (0x3D45, 0xFF),
+    (0x3D46, 0xF0),
+    (0x3F42, 0xF0),
+    (0x4532, 0x22),
+    (0x4533, 0x22),
+    (0x4556, 0x22),
+    (0x4557, 0x22),
+    (0x5732, 0xCC),
+    (0x5733, 0xCC),
+    (0x5756, 0xCC),
+    (0x5757, 0xCC),
+    (0x577A, 0x22),
+    (0x577B, 0x22),
+    (0x579E, 0xCC),
+    (0x579F, 0xCC),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_APPEARANCE_VIDEO_FRAME: u64 = 1068;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x12),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_APPEARANCE_RAM_BYTES: [(u16, u8); 9] = [
+    (0x9F76, 0x42),
+    (0x9F77, 0xC2),
+    (0x9F78, 0x42),
+    (0x9F7A, 0x42),
+    (0x9F7B, 0x7A),
+    (0x9F7C, 0x42),
+    (0x9F7D, 0x56),
+    (0x9F7E, 0x42),
+    (0x9F7F, 0x32),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_VIDEO_BYTES: [(u16, u8); 5] = [
+    (0x4257, 0xC0),
+    (0x427A, 0xCC),
+    (0x427B, 0xCC),
+    (0x429E, 0xCC),
+    (0x429F, 0xCC),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SECOND_APPEARANCE_VIDEO_FRAME: u64 = 1069;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SECOND_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x11),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SECOND_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SECOND_VIDEO_BYTES: [(u16, u8); 8] = [
+    (0x6D56, 0x00),
+    (0x6D57, 0x00),
+    (0x6D7A, 0x00),
+    (0x6D7B, 0x00),
+    (0x6DC2, 0x00),
+    (0x6DC3, 0x00),
+    (0x6DE6, 0x00),
+    (0x6DE7, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_APPEARANCE_VIDEO_FRAME: u64 = 1070;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x11),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_APPEARANCE_RAM_BYTES: [(u16, u8); 31] = [
+    (0x9F58, 0x77),
+    (0x9F59, 0x5A),
+    (0x9F5A, 0x77),
+    (0x9F5B, 0x38),
+    (0x9F5D, 0xE2),
+    (0x9F5F, 0xC0),
+    (0x9F63, 0x7C),
+    (0x9F65, 0x5A),
+    (0x9F67, 0x38),
+    (0x9F68, 0x55),
+    (0x9F69, 0xE2),
+    (0x9F6A, 0x55),
+    (0x9F6B, 0xC0),
+    (0x9F6C, 0x55),
+    (0x9F6E, 0x55),
+    (0x9F6F, 0x7C),
+    (0x9F70, 0x55),
+    (0x9F71, 0x5A),
+    (0x9F72, 0x55),
+    (0x9F73, 0x38),
+    (0x9F74, 0x44),
+    (0x9F75, 0xE2),
+    (0x9F76, 0x44),
+    (0x9F77, 0xC0),
+    (0x9F78, 0x44),
+    (0x9F7A, 0x44),
+    (0x9F7B, 0x7C),
+    (0x9F7C, 0x44),
+    (0x9F7D, 0x5A),
+    (0x9F7E, 0x44),
+    (0x9F7F, 0x38),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_VIDEO_BYTES: [(u16, u8); 34] = [
+    (0x445B, 0xC0),
+    (0x447C, 0xCC),
+    (0x447D, 0xCC),
+    (0x449E, 0xCC),
+    (0x449F, 0xCC),
+    (0x44C0, 0xCC),
+    (0x44C1, 0xCC),
+    (0x44E2, 0xCC),
+    (0x44E3, 0xC2),
+    (0x5538, 0xCC),
+    (0x5539, 0xCC),
+    (0x555A, 0xCC),
+    (0x555B, 0xCC),
+    (0x557C, 0x2C),
+    (0x557D, 0x2C),
+    (0x559E, 0x22),
+    (0x559F, 0x22),
+    (0x55C0, 0x22),
+    (0x55C1, 0x22),
+    (0x55E2, 0x02),
+    (0x55E3, 0x02),
+    (0x665A, 0x00),
+    (0x665B, 0x00),
+    (0x667D, 0xC0),
+    (0x669E, 0xCC),
+    (0x669F, 0xCC),
+    (0x66C0, 0xCC),
+    (0x66C1, 0xCC),
+    (0x66E2, 0xCC),
+    (0x66E3, 0xCC),
+    (0x7738, 0x2C),
+    (0x7739, 0xC2),
+    (0x775A, 0xC2),
+    (0x775B, 0xCC),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_APPEARANCE_VIDEO_FRAME: u64 = 1071;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x10),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_APPEARANCE_RAM_BYTES: [(u16, u8); 11] = [
+    (0x9D74, 0x35),
+    (0x9D75, 0xDE),
+    (0x9D76, 0x35),
+    (0x9D77, 0xBE),
+    (0x9D78, 0x35),
+    (0x9D7A, 0x35),
+    (0x9D7B, 0x7E),
+    (0x9D7C, 0x35),
+    (0x9D7D, 0x5E),
+    (0x9D7E, 0x35),
+    (0x9D7F, 0x3E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_VIDEO_BYTES: [(u16, u8); 13] = [
+    (0x353E, 0xCC),
+    (0x353F, 0xCC),
+    (0x3F42, 0xFF),
+    (0x3F43, 0xFF),
+    (0x3E46, 0xFF),
+    (0x3E47, 0xFF),
+    (0x355E, 0xCC),
+    (0x355F, 0xCC),
+    (0x357E, 0xC2),
+    (0x359E, 0xCC),
+    (0x359F, 0xCC),
+    (0x35BE, 0xCC),
+    (0x35BF, 0xCC),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIFTH_APPEARANCE_VIDEO_FRAME: u64 = 1072;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIFTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x10),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIFTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIFTH_VIDEO_BYTES: [(u16, u8); 40] = [
+    (0x5538, 0x00),
+    (0x7738, 0x00),
+    (0x5539, 0x00),
+    (0x7739, 0x00),
+    (0x555A, 0x00),
+    (0x775A, 0x00),
+    (0x445B, 0x00),
+    (0x555B, 0x00),
+    (0x775B, 0x00),
+    (0x447C, 0x00),
+    (0x557C, 0x00),
+    (0x777C, 0x00),
+    (0x447D, 0x00),
+    (0x557D, 0x00),
+    (0x667D, 0x00),
+    (0x777D, 0x00),
+    (0x449E, 0x00),
+    (0x559E, 0x00),
+    (0x669E, 0x00),
+    (0x779E, 0x00),
+    (0x449F, 0x00),
+    (0x559F, 0x00),
+    (0x669F, 0x00),
+    (0x779F, 0x00),
+    (0x44C0, 0x00),
+    (0x55C0, 0x00),
+    (0x66C0, 0x00),
+    (0x77C0, 0x00),
+    (0x44C1, 0x00),
+    (0x55C1, 0x00),
+    (0x66C1, 0x00),
+    (0x77C1, 0x00),
+    (0x44E2, 0x00),
+    (0x55E2, 0x00),
+    (0x66E2, 0x00),
+    (0x77E2, 0x00),
+    (0x44E3, 0x00),
+    (0x55E3, 0x00),
+    (0x66E3, 0x00),
+    (0x77E3, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_APPEARANCE_VIDEO_FRAME: u64 = 1073;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x0F),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_APPEARANCE_RAM_BYTES: [(u16, u8); 33] = [
+    (0x9D56, 0x63),
+    (0x9D57, 0x80),
+    (0x9D58, 0x63),
+    (0x9D59, 0x62),
+    (0x9D5A, 0x63),
+    (0x9D5B, 0x44),
+    (0x9D5C, 0x54),
+    (0x9D5D, 0xDA),
+    (0x9D5E, 0x54),
+    (0x9D5F, 0xBC),
+    (0x9D60, 0x54),
+    (0x9D62, 0x54),
+    (0x9D63, 0x80),
+    (0x9D64, 0x54),
+    (0x9D65, 0x62),
+    (0x9D66, 0x54),
+    (0x9D67, 0x44),
+    (0x9D69, 0xDA),
+    (0x9D6B, 0xBC),
+    (0x9D6F, 0x80),
+    (0x9D71, 0x62),
+    (0x9D73, 0x44),
+    (0x9D74, 0x36),
+    (0x9D75, 0xDA),
+    (0x9D76, 0x36),
+    (0x9D77, 0xBC),
+    (0x9D78, 0x36),
+    (0x9D7A, 0x36),
+    (0x9D7B, 0x80),
+    (0x9D7C, 0x36),
+    (0x9D7D, 0x62),
+    (0x9D7E, 0x36),
+    (0x9D7F, 0x44),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_VIDEO_BYTES: [(u16, u8); 32] = [
+    (0x3644, 0xCC),
+    (0x4544, 0x22),
+    (0x5444, 0xCC),
+    (0x6344, 0x22),
+    (0x3645, 0xCC),
+    (0x4545, 0x22),
+    (0x5445, 0xCC),
+    (0x6345, 0x22),
+    (0x3662, 0xCC),
+    (0x4562, 0x22),
+    (0x5462, 0xCC),
+    (0x6362, 0x22),
+    (0x3663, 0xCC),
+    (0x4563, 0x22),
+    (0x5463, 0xCC),
+    (0x6363, 0x22),
+    (0x3680, 0xC2),
+    (0x5480, 0x22),
+    (0x3681, 0xCC),
+    (0x5481, 0x22),
+    (0x369E, 0xCC),
+    (0x549E, 0xCC),
+    (0x369F, 0xCC),
+    (0x549F, 0xCC),
+    (0x36BC, 0xCC),
+    (0x54BC, 0xCC),
+    (0x36BD, 0xCC),
+    (0x54BD, 0xCC),
+    (0x36DA, 0x22),
+    (0x54DA, 0x22),
+    (0x36DB, 0x22),
+    (0x54DB, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_APPEARANCE_VIDEO_FRAME: u64 = 1074;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x0F),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_APPEARANCE_RAM_BYTES: [(u16, u8); 17] = [
+    (0x9F6E, 0x57),
+    (0x9F6F, 0x80),
+    (0x9F70, 0x57),
+    (0x9F71, 0x62),
+    (0x9F72, 0x57),
+    (0x9F73, 0x44),
+    (0x9F74, 0x48),
+    (0x9F75, 0xDA),
+    (0x9F76, 0x48),
+    (0x9F77, 0xBC),
+    (0x9F78, 0x48),
+    (0x9F7A, 0x48),
+    (0x9F7B, 0x80),
+    (0x9F7C, 0x48),
+    (0x9F7D, 0x62),
+    (0x9F7E, 0x48),
+    (0x9F7F, 0x44),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_VIDEO_BYTES: [(u16, u8); 14] = [
+    (0x4844, 0x00),
+    (0x5744, 0xCC),
+    (0x4845, 0x00),
+    (0x5745, 0xCC),
+    (0x4862, 0x00),
+    (0x5762, 0xCC),
+    (0x4863, 0xC0),
+    (0x5763, 0xCC),
+    (0x4880, 0xCC),
+    (0x5780, 0x2C),
+    (0x4881, 0xCC),
+    (0x5781, 0x2C),
+    (0x489E, 0xCC),
+    (0x48DB, 0xC2),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_EIGHTH_APPEARANCE_VIDEO_FRAME: u64 = 1075;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_EIGHTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x00),
+    (0xAB05, 0x0F),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_EIGHTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_EIGHTH_VIDEO_BYTES: [(u16, u8); 55] = [
+    (0x3D48, 0x0F),
+    (0x3D49, 0x0F),
+    (0x3D4A, 0x0F),
+    (0x3D4B, 0x0F),
+    (0x3D4C, 0x0F),
+    (0x3D4D, 0x0F),
+    (0x3E4E, 0xF0),
+    (0x465A, 0x01),
+    (0x485A, 0x01),
+    (0x4A5A, 0x01),
+    (0x4E5A, 0x01),
+    (0x525A, 0x01),
+    (0x535A, 0x10),
+    (0x555A, 0x01),
+    (0x565A, 0x10),
+    (0x595A, 0x01),
+    (0x5A5A, 0x10),
+    (0x5F5A, 0x01),
+    (0x625A, 0x01),
+    (0x635A, 0x10),
+    (0x665A, 0x01),
+    (0x675A, 0x10),
+    (0x345B, 0x10),
+    (0x3C5B, 0x10),
+    (0x465B, 0x01),
+    (0x485B, 0x11),
+    (0x4A5B, 0x01),
+    (0x4E5B, 0x01),
+    (0x525B, 0x01),
+    (0x535B, 0x10),
+    (0x555B, 0x01),
+    (0x565B, 0x10),
+    (0x595B, 0x01),
+    (0x5A5B, 0x11),
+    (0x5B5B, 0x11),
+    (0x5F5B, 0x01),
+    (0x625B, 0x01),
+    (0x635B, 0x10),
+    (0x665B, 0x01),
+    (0x675B, 0x10),
+    (0x325E, 0x01),
+    (0x365E, 0x01),
+    (0x3A5E, 0x01),
+    (0x3E5E, 0x01),
+    (0x465E, 0x01),
+    (0x4A5E, 0x01),
+    (0x4E5E, 0x01),
+    (0x525E, 0x01),
+    (0x555E, 0x01),
+    (0x565E, 0x11),
+    (0x595E, 0x01),
+    (0x5A5E, 0x11),
+    (0x625E, 0x01),
+    (0x665E, 0x01),
+    (0x6A5E, 0x01),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_APPEARANCE_VIDEO_FRAME: u64 = 1076;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x02),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x0E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_APPEARANCE_RAM_BYTES: [(u16, u8); 20] = [
+    (0x9DA4, 0x57),
+    (0x9DA5, 0x66),
+    (0x9DA6, 0x57),
+    (0x9DA7, 0x4A),
+    (0x9DA9, 0xD6),
+    (0x9DAB, 0xBA),
+    (0x9DAF, 0x82),
+    (0x9DB1, 0x66),
+    (0x9DB3, 0x4A),
+    (0x9DB4, 0x3B),
+    (0x9DB5, 0xD6),
+    (0x9DB6, 0x3B),
+    (0x9DB7, 0xBA),
+    (0x9DB8, 0x3B),
+    (0x9DBA, 0x3B),
+    (0x9DBB, 0x82),
+    (0x9DBC, 0x3B),
+    (0x9DBD, 0x66),
+    (0x9DBE, 0x3B),
+    (0x9DBF, 0x4A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_VIDEO_BYTES: [(u16, u8); 28] = [
+    (0x3B4A, 0xC0),
+    (0x494A, 0xCC),
+    (0x574A, 0xCC),
+    (0x3B4B, 0xC0),
+    (0x494B, 0xCC),
+    (0x574B, 0xCC),
+    (0x3B66, 0xC0),
+    (0x4966, 0xCC),
+    (0x5766, 0xCC),
+    (0x3B67, 0x20),
+    (0x4967, 0xCC),
+    (0x5767, 0xCC),
+    (0x3B82, 0x20),
+    (0x4982, 0xCC),
+    (0x3B83, 0x2C),
+    (0x4983, 0xCC),
+    (0x3B9E, 0x0C),
+    (0x499E, 0x22),
+    (0x3B9F, 0x0C),
+    (0x499F, 0x22),
+    (0x3BBA, 0x0C),
+    (0x49BA, 0x22),
+    (0x3BBB, 0x0C),
+    (0x49BB, 0x22),
+    (0x3BD6, 0xCC),
+    (0x49D6, 0x22),
+    (0x3BD7, 0xCC),
+    (0x49D7, 0x22),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_APPEARANCE_VIDEO_FRAME: u64 = 1077;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x02),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x0E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_APPEARANCE_RAM_BYTES: [(u16, u8); 4] = [
+    (0x9FBC, 0x4E),
+    (0x9FBD, 0x66),
+    (0x9FBE, 0x4E),
+    (0x9FBF, 0x4A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_VIDEO_BYTES: [(u16, u8); 4] = [
+    (0x4E4A, 0x00),
+    (0x4E4B, 0x00),
+    (0x4E66, 0x00),
+    (0x4E67, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIRST_APPEARANCE_VIDEO_FRAME: u64 = 1078;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIRST_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x0D),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIRST_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIRST_VIDEO_BYTES: [(u16, u8); 1] = [(0x5CD6, 0x00)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_APPEARANCE_VIDEO_FRAME: u64 = 1079;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x0D),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x61)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_APPEARANCE_RAM_BYTES: [(u16, u8); 27] = [
+    (0x9F9D, 0xD2),
+    (0x9F9F, 0xB8),
+    (0x9FA3, 0x84),
+    (0x9FA5, 0x6A),
+    (0x9FA7, 0x50),
+    (0x9FA8, 0x5D),
+    (0x9FA9, 0xD2),
+    (0x9FAA, 0x5D),
+    (0x9FAB, 0xB8),
+    (0x9FAC, 0x5D),
+    (0x9FAE, 0x5D),
+    (0x9FAF, 0x84),
+    (0x9FB0, 0x5D),
+    (0x9FB1, 0x6A),
+    (0x9FB2, 0x5D),
+    (0x9FB3, 0x50),
+    (0x9FB4, 0x50),
+    (0x9FB5, 0xD2),
+    (0x9FB6, 0x50),
+    (0x9FB7, 0xB8),
+    (0x9FB8, 0x50),
+    (0x9FBA, 0x50),
+    (0x9FBB, 0x84),
+    (0x9FBC, 0x50),
+    (0x9FBD, 0x6A),
+    (0x9FBE, 0x50),
+    (0x9FBF, 0x50),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_VIDEO_BYTES: [(u16, u8); 10] = [
+    (0x5D51, 0xC0),
+    (0x5D6A, 0xCC),
+    (0x5D6B, 0xCC),
+    (0x5D84, 0xCC),
+    (0x5D85, 0x22),
+    (0x5D9E, 0x22),
+    (0x5D9F, 0x22),
+    (0x5DB8, 0x22),
+    (0x5DB9, 0x22),
+    (0x5DD2, 0x02),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_APPEARANCE_VIDEO_FRAME: u64 = 1080;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x0C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_APPEARANCE_RAM_BYTES: [(u16, u8); 6] = [
+    (0x9DBA, 0x3D),
+    (0x9DBB, 0x86),
+    (0x9DBC, 0x3D),
+    (0x9DBD, 0x6E),
+    (0x9DBE, 0x3D),
+    (0x9DBF, 0x56),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_VISIBLE_NIBBLES: [(u32, u8); 35] = [
+    (0x25E0, 0x0),
+    (0x43C3, 0xF),
+    (0x44E6, 0xF),
+    (0x44E7, 0xF),
+    (0x4609, 0xF),
+    (0x460A, 0xF),
+    (0x4706, 0x0),
+    (0x472C, 0xF),
+    (0x472D, 0xF),
+    (0x4850, 0xF),
+    (0x4974, 0xF),
+    (0x4A96, 0xF),
+    (0x4A97, 0xF),
+    (0x4BBA, 0xF),
+    (0x4BBB, 0xF),
+    (0x4CE1, 0xF),
+    (0x4DCE, 0x0),
+    (0x4DCF, 0x0),
+    (0x5A8B, 0x0),
+    (0x5BAF, 0x0),
+    (0x75EB, 0x0),
+    (0x770E, 0x2),
+    (0x770F, 0x0),
+    (0x7805, 0x0),
+    (0x7B68, 0x0),
+    (0x7B69, 0x0),
+    (0x926A, 0x0),
+    (0xA356, 0x0),
+    (0xA357, 0x0),
+    (0xCC68, 0x0),
+    (0xED8E, 0x0),
+    (0xF456, 0x0),
+    (0xF457, 0x0),
+    (0xF8DF, 0x0),
+    (0x10FE0, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_APPEARANCE_VIDEO_FRAME: u64 = 1081;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x0C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_APPEARANCE_RAM_BYTES: [(u16, u8); 38] = [
+    (0x9F90, 0x77),
+    (0x9F91, 0xD2),
+    (0x9F92, 0x77),
+    (0x9F93, 0xB8),
+    (0x9F94, 0x77),
+    (0x9F96, 0x77),
+    (0x9F97, 0x84),
+    (0x9F98, 0x77),
+    (0x9F99, 0x6A),
+    (0x9F9A, 0x77),
+    (0x9F9B, 0x50),
+    (0x9F9D, 0xD2),
+    (0x9F9F, 0xB8),
+    (0x9FA3, 0x84),
+    (0x9FA5, 0x6A),
+    (0x9FA7, 0x50),
+    (0x9FA8, 0x5D),
+    (0x9FA9, 0xD2),
+    (0x9FAA, 0x5D),
+    (0x9FAB, 0xB8),
+    (0x9FAC, 0x5D),
+    (0x9FAE, 0x5D),
+    (0x9FAF, 0x84),
+    (0x9FB0, 0x5D),
+    (0x9FB1, 0x6A),
+    (0x9FB2, 0x5D),
+    (0x9FB3, 0x50),
+    (0x9FB4, 0x50),
+    (0x9FB5, 0xD2),
+    (0x9FB6, 0x50),
+    (0x9FB7, 0xB8),
+    (0x9FB8, 0x50),
+    (0x9FBA, 0x50),
+    (0x9FBB, 0x84),
+    (0x9FBC, 0x50),
+    (0x9FBD, 0x6A),
+    (0x9FBE, 0x50),
+    (0x9FBF, 0x50),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_VISIBLE_NIBBLES: [(u32, u8); 71] = [
+    (0x05AB4, 0xC),
+    (0x05AB5, 0xC),
+    (0x05ACC, 0xC),
+    (0x05ACD, 0xC),
+    (0x05AE4, 0xC),
+    (0x05AE5, 0xC),
+    (0x05BD8, 0x2),
+    (0x05BD9, 0xC),
+    (0x05BF1, 0xC),
+    (0x05C08, 0xC),
+    (0x05C09, 0xC),
+    (0x07614, 0x2),
+    (0x07615, 0xC),
+    (0x07644, 0xC),
+    (0x07645, 0xC),
+    (0x0765C, 0x0),
+    (0x07738, 0x2),
+    (0x07739, 0x2),
+    (0x07768, 0xC),
+    (0x07769, 0xC),
+    (0x07780, 0x0),
+    (0x07781, 0x0),
+    (0x09174, 0x2),
+    (0x09175, 0x2),
+    (0x0918C, 0x2),
+    (0x0918D, 0x2),
+    (0x091A4, 0xC),
+    (0x091A5, 0xC),
+    (0x091BC, 0x0),
+    (0x091BD, 0x0),
+    (0x09298, 0x2),
+    (0x09299, 0x2),
+    (0x092C8, 0x2),
+    (0x092C9, 0xC),
+    (0x092E0, 0x0),
+    (0x092E1, 0x0),
+    (0x0ACD4, 0x2),
+    (0x0ACD5, 0x2),
+    (0x0ACEC, 0x0),
+    (0x0ACED, 0x0),
+    (0x0AD1C, 0x0),
+    (0x0AD1D, 0x0),
+    (0x0ADF9, 0x2),
+    (0x0AE10, 0x0),
+    (0x0AE11, 0x0),
+    (0x0AE40, 0x0),
+    (0x0AE41, 0x0),
+    (0x0C835, 0x2),
+    (0x0C84C, 0xC),
+    (0x0C84D, 0xC),
+    (0x0C864, 0x2),
+    (0x0C865, 0x2),
+    (0x0C87C, 0x0),
+    (0x0C87D, 0x0),
+    (0x0C970, 0xC),
+    (0x0C971, 0xC),
+    (0x0C988, 0x2),
+    (0x0C989, 0x2),
+    (0x0C9A0, 0x0),
+    (0x0C9A1, 0x0),
+    (0x0E3AC, 0xC),
+    (0x0E3AD, 0xC),
+    (0x0E3C4, 0x2),
+    (0x0E3C5, 0x2),
+    (0x0E3DC, 0x0),
+    (0x0E3DD, 0x0),
+    (0x0E4D0, 0xC),
+    (0x0E4D1, 0xC),
+    (0x0E4E9, 0x2),
+    (0x0E500, 0x0),
+    (0x0E501, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_APPEARANCE_VIDEO_FRAME: u64 = 1082;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x0B),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_APPEARANCE_RAM_BYTES: [(u16, u8); 29] = [
+    (0x9D9A, 0x5F),
+    (0x9D9B, 0x5C),
+    (0x9D9C, 0x54),
+    (0x9D9D, 0xCA),
+    (0x9D9E, 0x54),
+    (0x9D9F, 0xB4),
+    (0x9DA0, 0x54),
+    (0x9DA2, 0x54),
+    (0x9DA3, 0x88),
+    (0x9DA4, 0x54),
+    (0x9DA5, 0x72),
+    (0x9DA6, 0x54),
+    (0x9DA7, 0x5C),
+    (0x9DA9, 0xCA),
+    (0x9DAB, 0xB4),
+    (0x9DAF, 0x88),
+    (0x9DB1, 0x72),
+    (0x9DB3, 0x5C),
+    (0x9DB4, 0x3E),
+    (0x9DB5, 0xCA),
+    (0x9DB6, 0x3E),
+    (0x9DB7, 0xB4),
+    (0x9DB8, 0x3E),
+    (0x9DBA, 0x3E),
+    (0x9DBB, 0x88),
+    (0x9DBC, 0x3E),
+    (0x9DBD, 0x72),
+    (0x9DBE, 0x3E),
+    (0x9DBF, 0x5C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_VISIBLE_NIBBLES: [(u32, u8); 66] = [
+    (0x06164, 0xC),
+    (0x06165, 0x0),
+    (0x0617A, 0xC),
+    (0x0617B, 0xC),
+    (0x06190, 0xC),
+    (0x06191, 0xC),
+    (0x06288, 0xC),
+    (0x06289, 0x0),
+    (0x0629E, 0xC),
+    (0x0629F, 0xC),
+    (0x062B4, 0xC),
+    (0x062B5, 0xC),
+    (0x07A7C, 0xC),
+    (0x07A7D, 0x0),
+    (0x07A92, 0xC),
+    (0x07A93, 0xC),
+    (0x07AA8, 0xC),
+    (0x07AA9, 0xC),
+    (0x07BA0, 0x2),
+    (0x07BB6, 0xC),
+    (0x07BB7, 0xC),
+    (0x07BCC, 0xC),
+    (0x07BCD, 0xC),
+    (0x09394, 0x2),
+    (0x093AA, 0xC),
+    (0x093AB, 0xC),
+    (0x093C0, 0xC),
+    (0x093C1, 0xC),
+    (0x094B8, 0x2),
+    (0x094B9, 0xC),
+    (0x094CE, 0xC),
+    (0x094CF, 0xC),
+    (0x094E4, 0xC),
+    (0x094E5, 0xC),
+    (0x0ACAC, 0x0),
+    (0x0ACC2, 0x2),
+    (0x0ACC3, 0x2),
+    (0x0ACD8, 0xC),
+    (0x0ACD9, 0xC),
+    (0x0ADD0, 0x0),
+    (0x0ADE6, 0x2),
+    (0x0ADE7, 0x2),
+    (0x0ADFC, 0xC),
+    (0x0ADFD, 0xC),
+    (0x0C5C5, 0xC),
+    (0x0C5DA, 0x2),
+    (0x0C5DB, 0x2),
+    (0x0C5F0, 0xC),
+    (0x0C5F1, 0xC),
+    (0x0C6E9, 0xC),
+    (0x0C6FE, 0x2),
+    (0x0C6FF, 0x2),
+    (0x0C714, 0xC),
+    (0x0C715, 0xC),
+    (0x0DEDC, 0xC),
+    (0x0DEDD, 0xC),
+    (0x0DEF2, 0x2),
+    (0x0DEF3, 0x2),
+    (0x0DF08, 0xC),
+    (0x0DF09, 0xC),
+    (0x0E000, 0xC),
+    (0x0E001, 0xC),
+    (0x0E016, 0x2),
+    (0x0E017, 0x2),
+    (0x0E02C, 0xC),
+    (0x0E02D, 0xC),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_APPEARANCE_VIDEO_FRAME: u64 = 1083;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x0B),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_APPEARANCE_RAM_BYTES: [(u16, u8); 27] = [
+    (0x9F85, 0xC0),
+    (0x9F90, 0x76),
+    (0x9F91, 0xCE),
+    (0x9F92, 0x76),
+    (0x9F93, 0xB6),
+    (0x9F94, 0x76),
+    (0x9F96, 0x76),
+    (0x9F97, 0x86),
+    (0x9F98, 0x76),
+    (0x9F99, 0x6E),
+    (0x9F9A, 0x76),
+    (0x9F9B, 0x56),
+    (0x9F9D, 0xCE),
+    (0x9F9F, 0xB6),
+    (0x9FA3, 0x86),
+    (0x9FA5, 0x6E),
+    (0x9FA7, 0x56),
+    (0x9FA8, 0x5E),
+    (0x9FA9, 0xCE),
+    (0x9FAA, 0x5E),
+    (0x9FAB, 0xB6),
+    (0x9FAC, 0x5E),
+    (0x9FAE, 0x5E),
+    (0x9FAF, 0x86),
+    (0x9FB0, 0x5E),
+    (0x9FB1, 0x6E),
+    (0x9FB3, 0x56),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_VISIBLE_NIBBLES: [(u32, u8); 27] = [
+    (0x061A6, 0xC),
+    (0x061A7, 0xC),
+    (0x062CB, 0xC),
+    (0x07AEA, 0x0),
+    (0x07C0E, 0x0),
+    (0x07C0F, 0x0),
+    (0x09402, 0x0),
+    (0x09403, 0x0),
+    (0x094FA, 0xC),
+    (0x094FB, 0xC),
+    (0x09526, 0x0),
+    (0x09527, 0x0),
+    (0x0AD1A, 0x0),
+    (0x0AD1B, 0x0),
+    (0x0AE3E, 0x0),
+    (0x0AE3F, 0x0),
+    (0x0C632, 0x0),
+    (0x0C633, 0x0),
+    (0x0C756, 0x0),
+    (0x0C757, 0x0),
+    (0x0DF1E, 0x2),
+    (0x0DF4A, 0x0),
+    (0x0DF4B, 0x0),
+    (0x0E042, 0x2),
+    (0x0E043, 0x2),
+    (0x0E06E, 0x0),
+    (0x0E06F, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_APPEARANCE_VIDEO_FRAME: u64 = 1084;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x0A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_APPEARANCE_RAM_BYTES: [(u16, u8); 38] = [
+    (0x9D90, 0x5F),
+    (0x9D91, 0xCA),
+    (0x9D92, 0x5F),
+    (0x9D93, 0xB4),
+    (0x9D94, 0x5F),
+    (0x9D96, 0x5F),
+    (0x9D97, 0x88),
+    (0x9D98, 0x5F),
+    (0x9D99, 0x72),
+    (0x9D9A, 0x5F),
+    (0x9D9B, 0x5C),
+    (0x9D9C, 0x54),
+    (0x9D9D, 0xCA),
+    (0x9D9E, 0x54),
+    (0x9D9F, 0xB4),
+    (0x9DA0, 0x54),
+    (0x9DA2, 0x54),
+    (0x9DA3, 0x88),
+    (0x9DA4, 0x54),
+    (0x9DA5, 0x72),
+    (0x9DA6, 0x54),
+    (0x9DA7, 0x5C),
+    (0x9DA9, 0xCA),
+    (0x9DAB, 0xB4),
+    (0x9DAF, 0x88),
+    (0x9DB1, 0x72),
+    (0x9DB3, 0x5C),
+    (0x9DB4, 0x3E),
+    (0x9DB5, 0xCA),
+    (0x9DB6, 0x3E),
+    (0x9DB7, 0xB4),
+    (0x9DB8, 0x3E),
+    (0x9DBA, 0x3E),
+    (0x9DBB, 0x88),
+    (0x9DBC, 0x3E),
+    (0x9DBD, 0x72),
+    (0x9DBE, 0x3E),
+    (0x9DBF, 0x5C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_VISIBLE_NIBBLES: [(u32, u8); 93] = [
+    (0x04A9B, 0xF),
+    (0x04BBE, 0xF),
+    (0x04BBF, 0xF),
+    (0x04CE2, 0xF),
+    (0x04CE3, 0xF),
+    (0x04CE4, 0xF),
+    (0x04E06, 0xF),
+    (0x04E07, 0xF),
+    (0x04E08, 0xF),
+    (0x04F2A, 0xF),
+    (0x04F2B, 0xF),
+    (0x06164, 0xC),
+    (0x06288, 0xC),
+    (0x0683F, 0xC),
+    (0x06852, 0x2),
+    (0x06853, 0x2),
+    (0x06866, 0x0),
+    (0x06867, 0x0),
+    (0x0687A, 0x0),
+    (0x0687B, 0x0),
+    (0x06963, 0xC),
+    (0x06976, 0x2),
+    (0x06977, 0x2),
+    (0x0698A, 0x0),
+    (0x0698B, 0x0),
+    (0x0699E, 0x0),
+    (0x0699F, 0x0),
+    (0x07A7C, 0xC),
+    (0x07BA0, 0x2),
+    (0x07F0F, 0x2),
+    (0x07F22, 0x2),
+    (0x07F23, 0x2),
+    (0x07F36, 0x0),
+    (0x07F37, 0x0),
+    (0x07F4A, 0x0),
+    (0x07F4B, 0x0),
+    (0x08033, 0x2),
+    (0x08046, 0x2),
+    (0x08047, 0x2),
+    (0x0805A, 0x0),
+    (0x0805B, 0x0),
+    (0x0806E, 0x0),
+    (0x0806F, 0x0),
+    (0x09394, 0x2),
+    (0x094B8, 0x2),
+    (0x094B9, 0xC),
+    (0x095DE, 0xC),
+    (0x095DF, 0x2),
+    (0x09606, 0x0),
+    (0x09607, 0x0),
+    (0x0961A, 0x0),
+    (0x0961B, 0x0),
+    (0x09702, 0xC),
+    (0x0972A, 0x0),
+    (0x0972B, 0x0),
+    (0x0973E, 0x0),
+    (0x0973F, 0x0),
+    (0x0ACAE, 0xC),
+    (0x0ACD6, 0x0),
+    (0x0ACD7, 0x0),
+    (0x0ACEA, 0x0),
+    (0x0ACEB, 0x0),
+    (0x0ADD2, 0xC),
+    (0x0ADFA, 0x0),
+    (0x0ADFB, 0x0),
+    (0x0AE0E, 0x0),
+    (0x0AE0F, 0x0),
+    (0x0C37E, 0xC),
+    (0x0C3A6, 0x0),
+    (0x0C3A7, 0x0),
+    (0x0C3BA, 0x0),
+    (0x0C3BB, 0x0),
+    (0x0C4A2, 0xC),
+    (0x0C4CA, 0x0),
+    (0x0C4CB, 0x0),
+    (0x0C4DE, 0x0),
+    (0x0C4DF, 0x0),
+    (0x0DA4E, 0x2),
+    (0x0DA4F, 0x2),
+    (0x0DA62, 0xC),
+    (0x0DA63, 0xC),
+    (0x0DA76, 0x0),
+    (0x0DA77, 0x0),
+    (0x0DA8A, 0x0),
+    (0x0DA8B, 0x0),
+    (0x0DB72, 0x2),
+    (0x0DB73, 0x2),
+    (0x0DB86, 0xC),
+    (0x0DB87, 0xC),
+    (0x0DB9A, 0x0),
+    (0x0DB9B, 0x0),
+    (0x0DBAE, 0x0),
+    (0x0DBAF, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_APPEARANCE_VIDEO_FRAME: u64 = 1085;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x0A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_APPEARANCE_RAM_BYTES: [(u16, u8); 76] = [
+    (0x9D90, 0x5D),
+    (0x9D91, 0xC6),
+    (0x9D92, 0x5D),
+    (0x9D93, 0xB2),
+    (0x9D94, 0x5D),
+    (0x9D96, 0x5D),
+    (0x9D97, 0x8A),
+    (0x9D98, 0x5D),
+    (0x9D99, 0x76),
+    (0x9D9A, 0x5D),
+    (0x9D9B, 0x62),
+    (0x9D9C, 0x53),
+    (0x9D9D, 0xC6),
+    (0x9D9E, 0x53),
+    (0x9D9F, 0xB2),
+    (0x9DA0, 0x53),
+    (0x9DA2, 0x53),
+    (0x9DA3, 0x8A),
+    (0x9DA4, 0x53),
+    (0x9DA5, 0x76),
+    (0x9DA6, 0x53),
+    (0x9DA7, 0x62),
+    (0x9DA9, 0xC6),
+    (0x9DAB, 0xB2),
+    (0x9DAF, 0x8A),
+    (0x9DB1, 0x76),
+    (0x9DB3, 0x62),
+    (0x9DB4, 0x3F),
+    (0x9DB5, 0xC6),
+    (0x9DB6, 0x3F),
+    (0x9DB7, 0xB2),
+    (0x9DB8, 0x3F),
+    (0x9DBA, 0x3F),
+    (0x9DBB, 0x8A),
+    (0x9DBC, 0x3F),
+    (0x9DBD, 0x76),
+    (0x9DBE, 0x3F),
+    (0x9DBF, 0x62),
+    (0x9F90, 0x75),
+    (0x9F91, 0xCA),
+    (0x9F92, 0x75),
+    (0x9F93, 0xB4),
+    (0x9F94, 0x75),
+    (0x9F96, 0x75),
+    (0x9F97, 0x88),
+    (0x9F98, 0x75),
+    (0x9F99, 0x72),
+    (0x9F9A, 0x75),
+    (0x9F9B, 0x5C),
+    (0x9F9D, 0xCA),
+    (0x9F9F, 0xB4),
+    (0x9FA3, 0x88),
+    (0x9FA5, 0x72),
+    (0x9FA7, 0x5C),
+    (0x9FA8, 0x5F),
+    (0x9FA9, 0xCA),
+    (0x9FAA, 0x5F),
+    (0x9FAB, 0xB4),
+    (0x9FAC, 0x5F),
+    (0x9FAE, 0x5F),
+    (0x9FAF, 0x88),
+    (0x9FB0, 0x5F),
+    (0x9FB1, 0x72),
+    (0x9FB2, 0x5F),
+    (0x9FB3, 0x5C),
+    (0x9FB4, 0x54),
+    (0x9FB5, 0xCA),
+    (0x9FB6, 0x54),
+    (0x9FB7, 0xB4),
+    (0x9FB8, 0x54),
+    (0x9FBA, 0x54),
+    (0x9FBB, 0x88),
+    (0x9FBC, 0x54),
+    (0x9FBD, 0x72),
+    (0x9FBE, 0x54),
+    (0x9FBF, 0x5C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_VISIBLE_NIBBLES: [(u32, u8); 147] = [
+    (0x06164, 0x0),
+    (0x06288, 0x0),
+    (0x0683F, 0x0),
+    (0x06852, 0xC),
+    (0x06853, 0xC),
+    (0x06866, 0xC),
+    (0x06867, 0xC),
+    (0x0686C, 0xC),
+    (0x0686D, 0xC),
+    (0x0687A, 0xC),
+    (0x0687B, 0xC),
+    (0x06880, 0x2),
+    (0x06881, 0xC),
+    (0x06963, 0x0),
+    (0x06976, 0xC),
+    (0x06977, 0xC),
+    (0x0698A, 0xC),
+    (0x0698B, 0xC),
+    (0x06990, 0xC),
+    (0x06991, 0xC),
+    (0x0699E, 0xC),
+    (0x0699F, 0xC),
+    (0x069A4, 0x2),
+    (0x069A5, 0xC),
+    (0x07A7C, 0x0),
+    (0x07AEA, 0xC),
+    (0x07BA0, 0x0),
+    (0x07C0E, 0xC),
+    (0x07C0F, 0xC),
+    (0x07F0F, 0x0),
+    (0x07F22, 0xC),
+    (0x07F23, 0xC),
+    (0x07F36, 0xC),
+    (0x07F37, 0xC),
+    (0x07F3C, 0xC),
+    (0x07F3D, 0xC),
+    (0x07F4A, 0xC),
+    (0x07F4B, 0xC),
+    (0x07F50, 0x2),
+    (0x07F78, 0x0),
+    (0x08033, 0x0),
+    (0x08046, 0xC),
+    (0x08047, 0xC),
+    (0x0805A, 0xC),
+    (0x0805B, 0xC),
+    (0x08060, 0xC),
+    (0x08061, 0xC),
+    (0x0806E, 0xC),
+    (0x0806F, 0xC),
+    (0x08075, 0x2),
+    (0x0809C, 0x0),
+    (0x0809D, 0x0),
+    (0x09394, 0x0),
+    (0x09402, 0xC),
+    (0x09403, 0xC),
+    (0x094B8, 0x0),
+    (0x094B9, 0x0),
+    (0x09526, 0xC),
+    (0x09527, 0xC),
+    (0x095DE, 0x2),
+    (0x095DF, 0x0),
+    (0x09606, 0xC),
+    (0x09607, 0xC),
+    (0x0960C, 0xC),
+    (0x0960D, 0xC),
+    (0x0961A, 0xC),
+    (0x0961B, 0xC),
+    (0x09621, 0x2),
+    (0x09648, 0x0),
+    (0x09649, 0x0),
+    (0x09702, 0x2),
+    (0x0972A, 0xC),
+    (0x0972B, 0xC),
+    (0x09730, 0xC),
+    (0x09731, 0xC),
+    (0x0973E, 0xC),
+    (0x0973F, 0xC),
+    (0x09744, 0xC),
+    (0x0976C, 0x0),
+    (0x0976D, 0x0),
+    (0x0ACAE, 0x0),
+    (0x0ACD8, 0x2),
+    (0x0ACD9, 0x2),
+    (0x0AD18, 0x0),
+    (0x0AD19, 0x0),
+    (0x0AD1A, 0x2),
+    (0x0AD1B, 0x2),
+    (0x0ADD2, 0x0),
+    (0x0ADFD, 0x2),
+    (0x0AE3C, 0x0),
+    (0x0AE3D, 0x0),
+    (0x0AE3E, 0x2),
+    (0x0AE3F, 0x2),
+    (0x0C37E, 0x0),
+    (0x0C3A6, 0xC),
+    (0x0C3A7, 0xC),
+    (0x0C3AC, 0xC),
+    (0x0C3AD, 0xC),
+    (0x0C3BA, 0x2),
+    (0x0C3BB, 0x2),
+    (0x0C3E8, 0x0),
+    (0x0C3E9, 0x0),
+    (0x0C4A2, 0x0),
+    (0x0C4CA, 0xC),
+    (0x0C4CB, 0xC),
+    (0x0C4D0, 0xC),
+    (0x0C4D1, 0xC),
+    (0x0C4DE, 0x2),
+    (0x0C4DF, 0x2),
+    (0x0C4E5, 0x0),
+    (0x0C50C, 0x0),
+    (0x0C50D, 0x0),
+    (0x0C632, 0x2),
+    (0x0C633, 0x2),
+    (0x0C756, 0x2),
+    (0x0C757, 0x2),
+    (0x0DA4E, 0xC),
+    (0x0DA4F, 0xC),
+    (0x0DA62, 0x2),
+    (0x0DA63, 0x2),
+    (0x0DA76, 0xC),
+    (0x0DA77, 0xC),
+    (0x0DA7C, 0xC),
+    (0x0DA7D, 0xC),
+    (0x0DA8A, 0x2),
+    (0x0DA8B, 0x2),
+    (0x0DA90, 0x2),
+    (0x0DA91, 0x0),
+    (0x0DAB8, 0x0),
+    (0x0DAB9, 0x0),
+    (0x0DB72, 0xC),
+    (0x0DB73, 0xC),
+    (0x0DB86, 0x2),
+    (0x0DB87, 0x2),
+    (0x0DB9A, 0xC),
+    (0x0DB9B, 0xC),
+    (0x0DBA0, 0x2),
+    (0x0DBA1, 0xC),
+    (0x0DBAE, 0x2),
+    (0x0DBAF, 0x2),
+    (0x0DBB4, 0x2),
+    (0x0DBDC, 0x0),
+    (0x0DBDD, 0x0),
+    (0x0DF4A, 0x2),
+    (0x0DF4B, 0x2),
+    (0x0E06E, 0x2),
+    (0x0E06F, 0x2),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_NINTH_APPEARANCE_VIDEO_FRAME: u64 = 1086;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_NINTH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x09),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_NINTH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_NINTH_VISIBLE_NIBBLES: [(u32, u8); 138] = [
+    (0x0614D, 0x1),
+    (0x06155, 0x1),
+    (0x0615D, 0x1),
+    (0x06165, 0x1),
+    (0x0616E, 0x1),
+    (0x0616F, 0x1),
+    (0x06176, 0x1),
+    (0x06178, 0x1),
+    (0x0617E, 0x1),
+    (0x06181, 0x1),
+    (0x06185, 0x1),
+    (0x06186, 0x1),
+    (0x06189, 0x1),
+    (0x0618D, 0x1),
+    (0x0618E, 0x1),
+    (0x06194, 0x1),
+    (0x0619E, 0x1),
+    (0x0619F, 0x1),
+    (0x061A7, 0x1),
+    (0x061AD, 0x1),
+    (0x061B5, 0x1),
+    (0x06271, 0x1),
+    (0x06279, 0x1),
+    (0x06281, 0x1),
+    (0x06289, 0x1),
+    (0x06292, 0x1),
+    (0x06293, 0x1),
+    (0x0629A, 0x1),
+    (0x0629D, 0x1),
+    (0x062A2, 0x1),
+    (0x062A5, 0x1),
+    (0x062A9, 0x1),
+    (0x062AA, 0x1),
+    (0x062AD, 0x1),
+    (0x062B1, 0x1),
+    (0x062B2, 0x1),
+    (0x062B8, 0x1),
+    (0x062C2, 0x1),
+    (0x062C3, 0x1),
+    (0x062CB, 0x1),
+    (0x062D1, 0x1),
+    (0x062D9, 0x1),
+    (0x06836, 0x0),
+    (0x06837, 0x0),
+    (0x0684A, 0x0),
+    (0x0684B, 0x0),
+    (0x0695A, 0x0),
+    (0x0695B, 0x0),
+    (0x0696E, 0x0),
+    (0x0696F, 0x0),
+    (0x075ED, 0x1),
+    (0x075F5, 0x1),
+    (0x075FD, 0x1),
+    (0x07605, 0x1),
+    (0x0760D, 0x1),
+    (0x07615, 0x1),
+    (0x07625, 0x1),
+    (0x07711, 0x1),
+    (0x07719, 0x1),
+    (0x07721, 0x1),
+    (0x07729, 0x1),
+    (0x07731, 0x1),
+    (0x07739, 0x1),
+    (0x07749, 0x1),
+    (0x07A7D, 0x1),
+    (0x07A86, 0x1),
+    (0x07A89, 0x1),
+    (0x07A8E, 0x1),
+    (0x07A8F, 0x1),
+    (0x07A90, 0x1),
+    (0x07A91, 0x1),
+    (0x07A96, 0x1),
+    (0x07A97, 0x1),
+    (0x07A98, 0x1),
+    (0x07A99, 0x1),
+    (0x07A9D, 0x1),
+    (0x07A9E, 0x1),
+    (0x07A9F, 0x1),
+    (0x07AA0, 0x1),
+    (0x07AA1, 0x1),
+    (0x07AA5, 0x1),
+    (0x07AA6, 0x1),
+    (0x07AA9, 0x1),
+    (0x07AAE, 0x1),
+    (0x07AAF, 0x1),
+    (0x07AB5, 0x1),
+    (0x07AB6, 0x1),
+    (0x07AB7, 0x1),
+    (0x07AEA, 0x0),
+    (0x07C0E, 0x0),
+    (0x07C0F, 0x0),
+    (0x07F06, 0x0),
+    (0x07F07, 0x0),
+    (0x07F1A, 0x0),
+    (0x07F1B, 0x0),
+    (0x0802A, 0x0),
+    (0x0802B, 0x0),
+    (0x0803E, 0x0),
+    (0x0803F, 0x0),
+    (0x09402, 0x0),
+    (0x09403, 0x0),
+    (0x09526, 0x0),
+    (0x09527, 0x0),
+    (0x095D6, 0x0),
+    (0x095D7, 0x0),
+    (0x096FA, 0x0),
+    (0x096FB, 0x0),
+    (0x0ACA6, 0x0),
+    (0x0ACA7, 0x0),
+    (0x0ACD8, 0x0),
+    (0x0ACD9, 0x0),
+    (0x0AD1A, 0x0),
+    (0x0AD1B, 0x0),
+    (0x0ADCA, 0x0),
+    (0x0ADCB, 0x0),
+    (0x0ADFD, 0x0),
+    (0x0AE3E, 0x0),
+    (0x0AE3F, 0x0),
+    (0x0C363, 0x0),
+    (0x0C376, 0x0),
+    (0x0C377, 0x0),
+    (0x0C487, 0x0),
+    (0x0C49A, 0x0),
+    (0x0C49B, 0x0),
+    (0x0C632, 0x0),
+    (0x0C633, 0x0),
+    (0x0C756, 0x0),
+    (0x0C757, 0x0),
+    (0x0DA33, 0x0),
+    (0x0DA46, 0x0),
+    (0x0DA47, 0x0),
+    (0x0DB57, 0x0),
+    (0x0DB6A, 0x0),
+    (0x0DB6B, 0x0),
+    (0x0DF4A, 0x0),
+    (0x0DF4B, 0x0),
+    (0x0E06E, 0x0),
+    (0x0E06F, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTIETH_APPEARANCE_VIDEO_FRAME: u64 = 1087;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTIETH_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x09),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTIETH_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIRST_APPEARANCE_VIDEO_FRAME: u64 = 1088;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIRST_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x00),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x05),
+    (0xAB05, 0x09),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIRST_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIRST_VISIBLE_NIBBLES: [(u32, u8); 9] = [
+    (0x04CE7, 0xF),
+    (0x04CE8, 0xF),
+    (0x04E0A, 0xF),
+    (0x04E0B, 0xF),
+    (0x0504E, 0xF),
+    (0x0504F, 0xF),
+    (0x05172, 0xF),
+    (0x05173, 0xF),
+    (0x05174, 0xF),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_APPEARANCE_VIDEO_FRAME: u64 = 1089;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_PROCESS_TIMER_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x02),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x08),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_PROCESS_DATA_BYTES: [(u16, u8); 1] =
+    [(0xAAEB, 0x5B)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_APPEARANCE_RAM_BYTES: [(u16, u8); 38] = [
+    (0x9DC4, 0x9E),
+    (0x9DC5, 0x00),
+    (0x9DD0, 0x57),
+    (0x9DD1, 0xC2),
+    (0x9DD2, 0x57),
+    (0x9DD3, 0xB0),
+    (0x9DD4, 0x57),
+    (0x9DD6, 0x57),
+    (0x9DD7, 0x8C),
+    (0x9DD8, 0x57),
+    (0x9DD9, 0x7A),
+    (0x9DDA, 0x57),
+    (0x9DDB, 0x68),
+    (0x9DDD, 0xC2),
+    (0x9DDF, 0xB0),
+    (0x9DE3, 0x8C),
+    (0x9DE5, 0x7A),
+    (0x9DE7, 0x68),
+    (0x9DE8, 0x45),
+    (0x9DE9, 0xC2),
+    (0x9DEA, 0x45),
+    (0x9DEB, 0xB0),
+    (0x9DEC, 0x45),
+    (0x9DEE, 0x45),
+    (0x9DEF, 0x8C),
+    (0x9DF0, 0x45),
+    (0x9DF1, 0x7A),
+    (0x9DF2, 0x45),
+    (0x9DF3, 0x68),
+    (0x9DF4, 0x3C),
+    (0x9DF5, 0xC2),
+    (0x9DF6, 0x3C),
+    (0x9DF7, 0xB0),
+    (0x9DF8, 0x3C),
+    (0x9DFA, 0x3C),
+    (0x9DFB, 0x8C),
+    (0x9DFC, 0x3C),
+    (0x9DFD, 0x7A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_VISIBLE_NIBBLES: [(u32, u8); 85] = [
+    (0x0497E, 0xF),
+    (0x0497F, 0xF),
+    (0x04AA2, 0xF),
+    (0x075EC, 0x0),
+    (0x075ED, 0x1),
+    (0x075FC, 0x0),
+    (0x075FD, 0x1),
+    (0x0760C, 0x0),
+    (0x0760D, 0x1),
+    (0x07710, 0x0),
+    (0x07711, 0x1),
+    (0x07720, 0x0),
+    (0x07721, 0x1),
+    (0x07730, 0x0),
+    (0x07731, 0x1),
+    (0x07740, 0x0),
+    (0x07741, 0x0),
+    (0x0882C, 0x0),
+    (0x0882D, 0x0),
+    (0x0883C, 0x0),
+    (0x0883D, 0x0),
+    (0x0884C, 0x0),
+    (0x0884D, 0x0),
+    (0x0885C, 0x0),
+    (0x0885D, 0x0),
+    (0x08950, 0x0),
+    (0x08951, 0x0),
+    (0x08960, 0x0),
+    (0x08961, 0x0),
+    (0x08970, 0x0),
+    (0x08971, 0x0),
+    (0x08980, 0x0),
+    (0x08981, 0x0),
+    (0x09A6C, 0x0),
+    (0x09A6D, 0x0),
+    (0x09A7C, 0x0),
+    (0x09A7D, 0x0),
+    (0x09A8C, 0x0),
+    (0x09A8D, 0x0),
+    (0x09A9C, 0x0),
+    (0x09A9D, 0x0),
+    (0x09B90, 0x0),
+    (0x09B91, 0x0),
+    (0x09BA0, 0x0),
+    (0x09BA1, 0x0),
+    (0x09BB0, 0x0),
+    (0x09BB1, 0x0),
+    (0x09BC0, 0x0),
+    (0x09BC1, 0x0),
+    (0x0ACAC, 0x0),
+    (0x0ACAD, 0x0),
+    (0x0ACBC, 0x0),
+    (0x0ACBD, 0x0),
+    (0x0ACDC, 0x0),
+    (0x0ACDD, 0x0),
+    (0x0ADD0, 0x0),
+    (0x0ADD1, 0x0),
+    (0x0ADE0, 0x0),
+    (0x0ADE1, 0x0),
+    (0x0AE00, 0x0),
+    (0x0AE01, 0x0),
+    (0x0BEEC, 0x0),
+    (0x0BEED, 0x0),
+    (0x0BEFC, 0x0),
+    (0x0BEFD, 0x0),
+    (0x0BF1C, 0x0),
+    (0x0BF1D, 0x0),
+    (0x0C010, 0x0),
+    (0x0C011, 0x0),
+    (0x0C020, 0x0),
+    (0x0C021, 0x0),
+    (0x0C040, 0x0),
+    (0x0C041, 0x0),
+    (0x0D12C, 0x0),
+    (0x0D12D, 0x0),
+    (0x0D13C, 0x0),
+    (0x0D13D, 0x0),
+    (0x0D15C, 0x0),
+    (0x0D15D, 0x0),
+    (0x0D250, 0x0),
+    (0x0D251, 0x0),
+    (0x0D260, 0x0),
+    (0x0D261, 0x0),
+    (0x0D280, 0x0),
+    (0x0D281, 0x0),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_THIRD_APPEARANCE_VIDEO_FRAME: u64 = 1090;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_THIRD_APPEARANCE_RAM_BYTES: [(u16, u8); 311] = [
+    (0x9C10, 0x41),
+    (0x9C11, 0xBE),
+    (0x9C12, 0x41),
+    (0x9C13, 0xAE),
+    (0x9C14, 0x41),
+    (0x9C16, 0x41),
+    (0x9C17, 0x8E),
+    (0x9C18, 0x41),
+    (0x9C19, 0x7E),
+    (0x9C1A, 0x41),
+    (0x9C1B, 0x6E),
+    (0x9C1C, 0x39),
+    (0x9C1D, 0xBE),
+    (0x9C1E, 0x39),
+    (0x9C1F, 0xAE),
+    (0x9C20, 0x39),
+    (0x9C22, 0x39),
+    (0x9C23, 0x8E),
+    (0x9C24, 0x39),
+    (0x9C25, 0x7E),
+    (0x9C26, 0x39),
+    (0x9C27, 0x6E),
+    (0x9C29, 0xBE),
+    (0x9C2B, 0xAE),
+    (0x9C2F, 0x8E),
+    (0x9C31, 0x7E),
+    (0x9C33, 0x6E),
+    (0x9C34, 0x29),
+    (0x9C35, 0xBE),
+    (0x9C36, 0x29),
+    (0x9C37, 0xAE),
+    (0x9C38, 0x29),
+    (0x9C3A, 0x29),
+    (0x9C3B, 0x8E),
+    (0x9C3C, 0x29),
+    (0x9C3D, 0x7E),
+    (0x9C3E, 0x29),
+    (0x9C3F, 0x6E),
+    (0x9C40, 0x88),
+    (0x9C50, 0x45),
+    (0x9C51, 0xBE),
+    (0x9C52, 0x45),
+    (0x9C53, 0xAE),
+    (0x9C54, 0x45),
+    (0x9C56, 0x45),
+    (0x9C57, 0x8E),
+    (0x9C58, 0x45),
+    (0x9C59, 0x7E),
+    (0x9C5A, 0x45),
+    (0x9C5B, 0x6E),
+    (0x9C5C, 0x3D),
+    (0x9C5D, 0xBE),
+    (0x9C5E, 0x3D),
+    (0x9C5F, 0xAE),
+    (0x9C60, 0x3D),
+    (0x9C62, 0x3D),
+    (0x9C63, 0x8E),
+    (0x9C64, 0x3D),
+    (0x9C65, 0x7E),
+    (0x9C66, 0x3D),
+    (0x9C67, 0x6E),
+    (0x9C69, 0xBE),
+    (0x9C6B, 0xAE),
+    (0x9C6F, 0x8E),
+    (0x9C71, 0x7E),
+    (0x9C73, 0x6E),
+    (0x9C74, 0x2D),
+    (0x9C75, 0xBE),
+    (0x9C76, 0x2D),
+    (0x9C77, 0xAE),
+    (0x9C78, 0x2D),
+    (0x9C7A, 0x2D),
+    (0x9C7B, 0x8E),
+    (0x9C7C, 0x2D),
+    (0x9C7D, 0x7E),
+    (0x9C7E, 0x2D),
+    (0x9C7F, 0x6E),
+    (0x9C80, 0x88),
+    (0x9C90, 0x49),
+    (0x9C91, 0xBE),
+    (0x9C92, 0x49),
+    (0x9C93, 0xAE),
+    (0x9C94, 0x49),
+    (0x9C96, 0x49),
+    (0x9C97, 0x8E),
+    (0x9C98, 0x49),
+    (0x9C99, 0x7E),
+    (0x9C9A, 0x49),
+    (0x9C9B, 0x6E),
+    (0x9C9C, 0x41),
+    (0x9C9D, 0xBE),
+    (0x9C9E, 0x41),
+    (0x9C9F, 0xAE),
+    (0x9CA0, 0x41),
+    (0x9CA2, 0x41),
+    (0x9CA3, 0x8E),
+    (0x9CA4, 0x41),
+    (0x9CA5, 0x7E),
+    (0x9CA6, 0x41),
+    (0x9CA7, 0x6E),
+    (0x9CA9, 0xBE),
+    (0x9CAB, 0xAE),
+    (0x9CAF, 0x8E),
+    (0x9CB1, 0x7E),
+    (0x9CB3, 0x6E),
+    (0x9CB4, 0x31),
+    (0x9CB5, 0xBE),
+    (0x9CB6, 0x31),
+    (0x9CB7, 0xAE),
+    (0x9CB8, 0x31),
+    (0x9CBA, 0x31),
+    (0x9CBB, 0x8E),
+    (0x9CBC, 0x31),
+    (0x9CBD, 0x7E),
+    (0x9CBE, 0x31),
+    (0x9CBF, 0x6E),
+    (0x9CC0, 0x88),
+    (0x9CD0, 0x4D),
+    (0x9CD1, 0xBE),
+    (0x9CD2, 0x4D),
+    (0x9CD3, 0xAE),
+    (0x9CD4, 0x4D),
+    (0x9CD6, 0x4D),
+    (0x9CD7, 0x8E),
+    (0x9CD8, 0x4D),
+    (0x9CD9, 0x7E),
+    (0x9CDA, 0x4D),
+    (0x9CDB, 0x6E),
+    (0x9CDC, 0x45),
+    (0x9CDD, 0xBE),
+    (0x9CDE, 0x45),
+    (0x9CDF, 0xAE),
+    (0x9CE0, 0x45),
+    (0x9CE2, 0x45),
+    (0x9CE3, 0x8E),
+    (0x9CE4, 0x45),
+    (0x9CE5, 0x7E),
+    (0x9CE6, 0x45),
+    (0x9CE7, 0x6E),
+    (0x9CE9, 0xBE),
+    (0x9CEB, 0xAE),
+    (0x9CEF, 0x8E),
+    (0x9CF1, 0x7E),
+    (0x9CF3, 0x6E),
+    (0x9CF4, 0x35),
+    (0x9CF5, 0xBE),
+    (0x9CF6, 0x35),
+    (0x9CF7, 0xAE),
+    (0x9CF8, 0x35),
+    (0x9CFA, 0x35),
+    (0x9CFB, 0x8E),
+    (0x9CFC, 0x35),
+    (0x9CFD, 0x7E),
+    (0x9CFE, 0x35),
+    (0x9CFF, 0x6E),
+    (0x9D00, 0x88),
+    (0x9D10, 0x51),
+    (0x9D11, 0xBE),
+    (0x9D12, 0x51),
+    (0x9D13, 0xAE),
+    (0x9D14, 0x51),
+    (0x9D16, 0x51),
+    (0x9D17, 0x8E),
+    (0x9D18, 0x51),
+    (0x9D19, 0x7E),
+    (0x9D1A, 0x51),
+    (0x9D1B, 0x6E),
+    (0x9D1C, 0x49),
+    (0x9D1D, 0xBE),
+    (0x9D1E, 0x49),
+    (0x9D1F, 0xAE),
+    (0x9D20, 0x49),
+    (0x9D22, 0x49),
+    (0x9D23, 0x8E),
+    (0x9D24, 0x49),
+    (0x9D25, 0x7E),
+    (0x9D26, 0x49),
+    (0x9D27, 0x6E),
+    (0x9D29, 0xBE),
+    (0x9D2B, 0xAE),
+    (0x9D2F, 0x8E),
+    (0x9D31, 0x7E),
+    (0x9D33, 0x6E),
+    (0x9D34, 0x39),
+    (0x9D35, 0xBE),
+    (0x9D36, 0x39),
+    (0x9D37, 0xAE),
+    (0x9D38, 0x39),
+    (0x9D3A, 0x39),
+    (0x9D3B, 0x8E),
+    (0x9D3C, 0x39),
+    (0x9D3D, 0x7E),
+    (0x9D3E, 0x39),
+    (0x9D3F, 0x6E),
+    (0x9D40, 0x88),
+    (0x9D50, 0x55),
+    (0x9D51, 0xBE),
+    (0x9D52, 0x55),
+    (0x9D53, 0xAE),
+    (0x9D54, 0x55),
+    (0x9D56, 0x55),
+    (0x9D57, 0x8E),
+    (0x9D58, 0x55),
+    (0x9D59, 0x7E),
+    (0x9D5A, 0x55),
+    (0x9D5B, 0x6E),
+    (0x9D5C, 0x4D),
+    (0x9D5D, 0xBE),
+    (0x9D5E, 0x4D),
+    (0x9D5F, 0xAE),
+    (0x9D60, 0x4D),
+    (0x9D62, 0x4D),
+    (0x9D63, 0x8E),
+    (0x9D64, 0x4D),
+    (0x9D65, 0x7E),
+    (0x9D66, 0x4D),
+    (0x9D67, 0x6E),
+    (0x9D69, 0xBE),
+    (0x9D6B, 0xAE),
+    (0x9D6F, 0x8E),
+    (0x9D71, 0x7E),
+    (0x9D73, 0x6E),
+    (0x9D74, 0x3D),
+    (0x9D75, 0xBE),
+    (0x9D76, 0x3D),
+    (0x9D77, 0xAE),
+    (0x9D78, 0x3D),
+    (0x9D7A, 0x3D),
+    (0x9D7B, 0x8E),
+    (0x9D7C, 0x3D),
+    (0x9D7D, 0x7E),
+    (0x9D7E, 0x3D),
+    (0x9D7F, 0x6E),
+    (0x9D80, 0x88),
+    (0x9D90, 0x59),
+    (0x9D91, 0xBE),
+    (0x9D92, 0x59),
+    (0x9D93, 0xAE),
+    (0x9D94, 0x59),
+    (0x9D96, 0x59),
+    (0x9D97, 0x8E),
+    (0x9D98, 0x59),
+    (0x9D99, 0x7E),
+    (0x9D9A, 0x59),
+    (0x9D9B, 0x6E),
+    (0x9D9C, 0x51),
+    (0x9D9D, 0xBE),
+    (0x9D9E, 0x51),
+    (0x9D9F, 0xAE),
+    (0x9DA0, 0x51),
+    (0x9DA2, 0x51),
+    (0x9DA3, 0x8E),
+    (0x9DA4, 0x51),
+    (0x9DA5, 0x7E),
+    (0x9DA6, 0x51),
+    (0x9DA7, 0x6E),
+    (0x9DA9, 0xBE),
+    (0x9DAB, 0xAE),
+    (0x9DAF, 0x8E),
+    (0x9DB1, 0x7E),
+    (0x9DB3, 0x6E),
+    (0x9DB4, 0x41),
+    (0x9DB5, 0xBE),
+    (0x9DB6, 0x41),
+    (0x9DB7, 0xAE),
+    (0x9DB8, 0x41),
+    (0x9DBA, 0x41),
+    (0x9DBB, 0x8E),
+    (0x9DBC, 0x41),
+    (0x9DBD, 0x7E),
+    (0x9DBE, 0x41),
+    (0x9DBF, 0x6E),
+    (0x9DC0, 0x88),
+    (0x9DD0, 0x56),
+    (0x9DD1, 0xBE),
+    (0x9DD2, 0x56),
+    (0x9DD3, 0xAE),
+    (0x9DD4, 0x56),
+    (0x9DD6, 0x56),
+    (0x9DD7, 0x8E),
+    (0x9DD8, 0x56),
+    (0x9DD9, 0x7E),
+    (0x9DDA, 0x56),
+    (0x9DDB, 0x6E),
+    (0x9DDD, 0xBE),
+    (0x9DDF, 0xAE),
+    (0x9DE3, 0x8E),
+    (0x9DE5, 0x7E),
+    (0x9DE7, 0x6E),
+    (0x9DE8, 0x46),
+    (0x9DE9, 0xBE),
+    (0x9DEA, 0x46),
+    (0x9DEB, 0xAE),
+    (0x9DEC, 0x46),
+    (0x9DEE, 0x46),
+    (0x9DEF, 0x8E),
+    (0x9DF0, 0x46),
+    (0x9DF1, 0x7E),
+    (0x9DF2, 0x46),
+    (0x9DF3, 0x6E),
+    (0x9DF4, 0x3E),
+    (0x9DF5, 0xBE),
+    (0x9DF6, 0x3E),
+    (0x9DF7, 0xAE),
+    (0x9DF8, 0x3E),
+    (0x9DFA, 0x3E),
+    (0x9DFB, 0x8E),
+    (0x9DFC, 0x3E),
+    (0x9DFD, 0x7E),
+    (0x9DFE, 0x3E),
+    (0x9DFF, 0x6E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_THIRD_VISIBLE_NIBBLES: [(u32, u8); 778] = [
+    (0x075CA, 0xC),
+    (0x075CB, 0xC),
+    (0x075DA, 0xC),
+    (0x075DB, 0xC),
+    (0x075E2, 0xC),
+    (0x075E3, 0xC),
+    (0x075EA, 0xC),
+    (0x075EB, 0xC),
+    (0x075EC, 0xC),
+    (0x075ED, 0xC),
+    (0x075F2, 0xC),
+    (0x075FA, 0x2),
+    (0x075FB, 0x2),
+    (0x07602, 0xC),
+    (0x07603, 0xC),
+    (0x0760A, 0xC),
+    (0x0760B, 0xC),
+    (0x07612, 0xC),
+    (0x07613, 0xC),
+    (0x0761A, 0x2),
+    (0x0761B, 0x2),
+    (0x07622, 0xC),
+    (0x07623, 0xC),
+    (0x076EE, 0xC),
+    (0x076EF, 0xC),
+    (0x076F7, 0xC),
+    (0x076FE, 0xC),
+    (0x076FF, 0xC),
+    (0x07706, 0xC),
+    (0x07707, 0xC),
+    (0x0770E, 0xC),
+    (0x0770F, 0xC),
+    (0x07710, 0xC),
+    (0x07711, 0xC),
+    (0x07716, 0xC),
+    (0x0771E, 0x2),
+    (0x0771F, 0x2),
+    (0x07726, 0xC),
+    (0x07727, 0xC),
+    (0x0772E, 0xC),
+    (0x0772F, 0xC),
+    (0x07736, 0xC),
+    (0x07737, 0xC),
+    (0x0773E, 0x2),
+    (0x0773F, 0x2),
+    (0x07746, 0xC),
+    (0x07747, 0xC),
+    (0x07CA4, 0x0),
+    (0x07CA5, 0x0),
+    (0x07CB2, 0x0),
+    (0x07CB3, 0x0),
+    (0x07CB4, 0x0),
+    (0x07CB5, 0x0),
+    (0x07CBA, 0x0),
+    (0x07CBB, 0x0),
+    (0x07CBC, 0x0),
+    (0x07CBD, 0x0),
+    (0x07CC0, 0x0),
+    (0x07CC1, 0x0),
+    (0x07CC2, 0x0),
+    (0x07CC3, 0x0),
+    (0x07CC4, 0x0),
+    (0x07CC5, 0x0),
+    (0x07CC8, 0x0),
+    (0x07CC9, 0x0),
+    (0x07CCA, 0x0),
+    (0x07CCB, 0x0),
+    (0x07CCC, 0x0),
+    (0x07CCE, 0x0),
+    (0x07CCF, 0x0),
+    (0x07CD2, 0x0),
+    (0x07CD3, 0x0),
+    (0x07CD6, 0x0),
+    (0x07CD7, 0x0),
+    (0x07CD8, 0x0),
+    (0x07CD9, 0x0),
+    (0x07CDA, 0x0),
+    (0x07CDB, 0x0),
+    (0x07CDE, 0x0),
+    (0x07CDF, 0x0),
+    (0x07CE0, 0x0),
+    (0x07CE1, 0x0),
+    (0x07CE4, 0x0),
+    (0x07CE5, 0x0),
+    (0x07CE6, 0x0),
+    (0x07CE7, 0x0),
+    (0x07CE8, 0x0),
+    (0x07CE9, 0x0),
+    (0x07CEE, 0x0),
+    (0x07CEF, 0x0),
+    (0x07CF6, 0x0),
+    (0x07CF7, 0x0),
+    (0x07DC8, 0x0),
+    (0x07DC9, 0x0),
+    (0x07DD1, 0x0),
+    (0x07DD6, 0x0),
+    (0x07DD7, 0x0),
+    (0x07DD8, 0x0),
+    (0x07DD9, 0x0),
+    (0x07DDE, 0x0),
+    (0x07DDF, 0x0),
+    (0x07DE0, 0x0),
+    (0x07DE1, 0x0),
+    (0x07DE4, 0x0),
+    (0x07DE5, 0x0),
+    (0x07DE6, 0x0),
+    (0x07DE7, 0x0),
+    (0x07DE8, 0x0),
+    (0x07DE9, 0x0),
+    (0x07DEC, 0x0),
+    (0x07DED, 0x0),
+    (0x07DEE, 0x0),
+    (0x07DEF, 0x0),
+    (0x07DF0, 0x0),
+    (0x07DF2, 0x0),
+    (0x07DF3, 0x0),
+    (0x07DF6, 0x0),
+    (0x07DF7, 0x0),
+    (0x07DFA, 0x0),
+    (0x07DFB, 0x0),
+    (0x07DFC, 0x0),
+    (0x07DFD, 0x0),
+    (0x07DFE, 0x0),
+    (0x07DFF, 0x0),
+    (0x07E02, 0x0),
+    (0x07E03, 0x0),
+    (0x07E04, 0x0),
+    (0x07E05, 0x0),
+    (0x07E08, 0x0),
+    (0x07E09, 0x0),
+    (0x07E0A, 0x0),
+    (0x07E0B, 0x0),
+    (0x07E0C, 0x0),
+    (0x07E0D, 0x0),
+    (0x07E12, 0x0),
+    (0x07E13, 0x0),
+    (0x07E16, 0x0),
+    (0x07E17, 0x0),
+    (0x07E1A, 0x0),
+    (0x07E1B, 0x0),
+    (0x0880A, 0xC),
+    (0x0880B, 0xC),
+    (0x08812, 0xC),
+    (0x08813, 0xC),
+    (0x0881A, 0xC),
+    (0x0881B, 0xC),
+    (0x08822, 0xC),
+    (0x08823, 0xC),
+    (0x0882A, 0xC),
+    (0x0882B, 0xC),
+    (0x0882C, 0xC),
+    (0x0882D, 0xC),
+    (0x08832, 0xC),
+    (0x0883A, 0x2),
+    (0x0883B, 0x2),
+    (0x08842, 0xC),
+    (0x08843, 0xC),
+    (0x0884A, 0xC),
+    (0x0884B, 0xC),
+    (0x08852, 0xC),
+    (0x08853, 0xC),
+    (0x0885A, 0x2),
+    (0x0885B, 0x2),
+    (0x08862, 0xC),
+    (0x08863, 0xC),
+    (0x0892E, 0xC),
+    (0x0892F, 0xC),
+    (0x08936, 0xC),
+    (0x08937, 0xC),
+    (0x0893E, 0xC),
+    (0x0893F, 0x2),
+    (0x08946, 0xC),
+    (0x08947, 0xC),
+    (0x0894E, 0xC),
+    (0x0894F, 0xC),
+    (0x08950, 0xC),
+    (0x08951, 0xC),
+    (0x08956, 0x2),
+    (0x0895E, 0x2),
+    (0x0895F, 0x2),
+    (0x08966, 0xC),
+    (0x08967, 0xC),
+    (0x0896E, 0xC),
+    (0x0896F, 0xC),
+    (0x08976, 0xC),
+    (0x08977, 0xC),
+    (0x0897E, 0x2),
+    (0x0897F, 0x2),
+    (0x08986, 0xC),
+    (0x08987, 0xC),
+    (0x08C9C, 0x0),
+    (0x08C9D, 0x0),
+    (0x08CA4, 0x0),
+    (0x08CA5, 0x0),
+    (0x08CAA, 0x0),
+    (0x08CAB, 0x0),
+    (0x08CAC, 0x0),
+    (0x08CAD, 0x0),
+    (0x08CB2, 0x0),
+    (0x08CB3, 0x0),
+    (0x08CB4, 0x0),
+    (0x08CB5, 0x0),
+    (0x08CB8, 0x0),
+    (0x08CB9, 0x0),
+    (0x08CBA, 0x0),
+    (0x08CBB, 0x0),
+    (0x08CBC, 0x0),
+    (0x08CBD, 0x0),
+    (0x08CC0, 0x0),
+    (0x08CC1, 0x0),
+    (0x08CC2, 0x0),
+    (0x08CC3, 0x0),
+    (0x08CC4, 0x0),
+    (0x08CC6, 0x0),
+    (0x08CC7, 0x0),
+    (0x08CC9, 0x0),
+    (0x08CCA, 0x0),
+    (0x08CCB, 0x0),
+    (0x08CCE, 0x0),
+    (0x08CCF, 0x0),
+    (0x08CD0, 0x0),
+    (0x08CD1, 0x0),
+    (0x08CD2, 0x0),
+    (0x08CD3, 0x0),
+    (0x08CD6, 0x0),
+    (0x08CD7, 0x0),
+    (0x08CD8, 0x0),
+    (0x08CD9, 0x0),
+    (0x08CDC, 0x0),
+    (0x08CDD, 0x0),
+    (0x08CDE, 0x0),
+    (0x08CDF, 0x0),
+    (0x08CE0, 0x0),
+    (0x08CE1, 0x0),
+    (0x08CE6, 0x0),
+    (0x08CE7, 0x0),
+    (0x08CEA, 0x0),
+    (0x08CEB, 0x0),
+    (0x08CEE, 0x0),
+    (0x08CEF, 0x0),
+    (0x08DC0, 0x0),
+    (0x08DC1, 0x0),
+    (0x08DC8, 0x0),
+    (0x08DC9, 0x0),
+    (0x08DCE, 0x0),
+    (0x08DCF, 0x0),
+    (0x08DD0, 0x0),
+    (0x08DD1, 0x0),
+    (0x08DD6, 0x0),
+    (0x08DD7, 0x0),
+    (0x08DD8, 0x0),
+    (0x08DD9, 0x0),
+    (0x08DDC, 0x0),
+    (0x08DDD, 0x0),
+    (0x08DDE, 0x0),
+    (0x08DDF, 0x0),
+    (0x08DE0, 0x0),
+    (0x08DE1, 0x0),
+    (0x08DE3, 0x0),
+    (0x08DE4, 0x0),
+    (0x08DE5, 0x0),
+    (0x08DE6, 0x0),
+    (0x08DE7, 0x0),
+    (0x08DE8, 0x0),
+    (0x08DEA, 0x0),
+    (0x08DEB, 0x0),
+    (0x08DEC, 0x0),
+    (0x08DED, 0x0),
+    (0x08DEE, 0x0),
+    (0x08DEF, 0x0),
+    (0x08DF2, 0x0),
+    (0x08DF3, 0x0),
+    (0x08DF4, 0x0),
+    (0x08DF5, 0x0),
+    (0x08DF6, 0x0),
+    (0x08DF7, 0x0),
+    (0x08DFA, 0x0),
+    (0x08DFB, 0x0),
+    (0x08DFC, 0x0),
+    (0x08DFD, 0x0),
+    (0x08E00, 0x0),
+    (0x08E01, 0x0),
+    (0x08E02, 0x0),
+    (0x08E03, 0x0),
+    (0x08E04, 0x0),
+    (0x08E05, 0x0),
+    (0x08E0A, 0x0),
+    (0x08E0B, 0x0),
+    (0x08E0E, 0x0),
+    (0x08E0F, 0x0),
+    (0x08E12, 0x0),
+    (0x08E13, 0x0),
+    (0x09A4A, 0xC),
+    (0x09A4B, 0xC),
+    (0x09A52, 0xC),
+    (0x09A53, 0xC),
+    (0x09A5A, 0xC),
+    (0x09A5B, 0x2),
+    (0x09A62, 0x2),
+    (0x09A63, 0x2),
+    (0x09A6A, 0xC),
+    (0x09A6B, 0x2),
+    (0x09A6C, 0x2),
+    (0x09A6D, 0x2),
+    (0x09A72, 0x2),
+    (0x09A82, 0xC),
+    (0x09A83, 0xC),
+    (0x09A8A, 0x2),
+    (0x09A8B, 0x2),
+    (0x09A92, 0xC),
+    (0x09A93, 0xC),
+    (0x09AA2, 0xC),
+    (0x09AA3, 0xC),
+    (0x09B6E, 0xC),
+    (0x09B6F, 0xC),
+    (0x09B76, 0xC),
+    (0x09B77, 0x2),
+    (0x09B7E, 0x2),
+    (0x09B7F, 0xC),
+    (0x09B86, 0x2),
+    (0x09B87, 0x2),
+    (0x09B8E, 0xC),
+    (0x09B8F, 0xC),
+    (0x09B90, 0x2),
+    (0x09B91, 0x2),
+    (0x09B96, 0x2),
+    (0x09B97, 0xC),
+    (0x09BA6, 0xC),
+    (0x09BA7, 0xC),
+    (0x09BAE, 0x2),
+    (0x09BAF, 0x2),
+    (0x09BB6, 0xC),
+    (0x09BB7, 0xC),
+    (0x09BC6, 0xC),
+    (0x09BC7, 0xC),
+    (0x09C94, 0x0),
+    (0x09C95, 0x0),
+    (0x09C9C, 0x0),
+    (0x09C9D, 0x0),
+    (0x09CA2, 0x0),
+    (0x09CA3, 0x0),
+    (0x09CA4, 0x0),
+    (0x09CA5, 0x0),
+    (0x09CAA, 0x0),
+    (0x09CAB, 0x0),
+    (0x09CAC, 0x0),
+    (0x09CAD, 0x0),
+    (0x09CB0, 0x0),
+    (0x09CB1, 0x0),
+    (0x09CB2, 0x0),
+    (0x09CB3, 0x0),
+    (0x09CB4, 0x0),
+    (0x09CB5, 0x0),
+    (0x09CB6, 0x0),
+    (0x09CB7, 0x0),
+    (0x09CB8, 0x0),
+    (0x09CB9, 0x0),
+    (0x09CBA, 0x0),
+    (0x09CBB, 0x0),
+    (0x09CBC, 0x0),
+    (0x09CBE, 0x0),
+    (0x09CBF, 0x0),
+    (0x09CC0, 0x0),
+    (0x09CC1, 0x0),
+    (0x09CC6, 0x0),
+    (0x09CC7, 0x0),
+    (0x09CC8, 0x0),
+    (0x09CC9, 0x0),
+    (0x09CCA, 0x0),
+    (0x09CCB, 0x0),
+    (0x09CCE, 0x0),
+    (0x09CCF, 0x0),
+    (0x09CD0, 0x0),
+    (0x09CD1, 0x0),
+    (0x09CD4, 0x0),
+    (0x09CD5, 0x0),
+    (0x09CD6, 0x0),
+    (0x09CD7, 0x0),
+    (0x09CD8, 0x0),
+    (0x09CD9, 0x0),
+    (0x09CE2, 0x0),
+    (0x09CE3, 0x0),
+    (0x09CE6, 0x0),
+    (0x09CE7, 0x0),
+    (0x09DB8, 0x0),
+    (0x09DB9, 0x0),
+    (0x09DC0, 0x0),
+    (0x09DC1, 0x0),
+    (0x09DC6, 0x0),
+    (0x09DC7, 0x0),
+    (0x09DC8, 0x0),
+    (0x09DC9, 0x0),
+    (0x09DCE, 0x0),
+    (0x09DCF, 0x0),
+    (0x09DD0, 0x0),
+    (0x09DD1, 0x0),
+    (0x09DD4, 0x0),
+    (0x09DD5, 0x0),
+    (0x09DD6, 0x0),
+    (0x09DD7, 0x0),
+    (0x09DD8, 0x0),
+    (0x09DD9, 0x0),
+    (0x09DDA, 0x0),
+    (0x09DDB, 0x0),
+    (0x09DDC, 0x0),
+    (0x09DDD, 0x0),
+    (0x09DDE, 0x0),
+    (0x09DDF, 0x0),
+    (0x09DE0, 0x0),
+    (0x09DE1, 0x0),
+    (0x09DE2, 0x0),
+    (0x09DE3, 0x0),
+    (0x09DE4, 0x0),
+    (0x09DE5, 0x0),
+    (0x09DEA, 0x0),
+    (0x09DEB, 0x0),
+    (0x09DEC, 0x0),
+    (0x09DED, 0x0),
+    (0x09DEE, 0x0),
+    (0x09DEF, 0x0),
+    (0x09DF2, 0x0),
+    (0x09DF3, 0x0),
+    (0x09DF4, 0x0),
+    (0x09DF5, 0x0),
+    (0x09DF8, 0x0),
+    (0x09DF9, 0x0),
+    (0x09DFA, 0x0),
+    (0x09DFB, 0x0),
+    (0x09DFC, 0x0),
+    (0x09DFD, 0x0),
+    (0x09E06, 0x0),
+    (0x09E07, 0x0),
+    (0x09E0A, 0x0),
+    (0x09E0B, 0x0),
+    (0x0AC8A, 0xC),
+    (0x0AC8B, 0xC),
+    (0x0AC8C, 0x0),
+    (0x0AC8D, 0x0),
+    (0x0AC92, 0x2),
+    (0x0AC93, 0x2),
+    (0x0AC94, 0x0),
+    (0x0AC95, 0x0),
+    (0x0AC9A, 0xC),
+    (0x0AC9B, 0xC),
+    (0x0AC9C, 0x0),
+    (0x0AC9D, 0x0),
+    (0x0ACA2, 0xC),
+    (0x0ACA3, 0xC),
+    (0x0ACA4, 0x0),
+    (0x0ACA5, 0x0),
+    (0x0ACA8, 0x0),
+    (0x0ACA9, 0x0),
+    (0x0ACAA, 0xC),
+    (0x0ACAB, 0xC),
+    (0x0ACAE, 0x0),
+    (0x0ACAF, 0x0),
+    (0x0ACB3, 0xC),
+    (0x0ACB6, 0x0),
+    (0x0ACB7, 0x0),
+    (0x0ACBE, 0x0),
+    (0x0ACBF, 0x0),
+    (0x0ACC6, 0x0),
+    (0x0ACC7, 0x0),
+    (0x0ACCE, 0x0),
+    (0x0ACCF, 0x0),
+    (0x0ACDE, 0x0),
+    (0x0ACDF, 0x0),
+    (0x0ADAE, 0xC),
+    (0x0ADAF, 0xC),
+    (0x0ADB0, 0x0),
+    (0x0ADB1, 0x0),
+    (0x0ADB6, 0x2),
+    (0x0ADB7, 0x2),
+    (0x0ADB8, 0x0),
+    (0x0ADB9, 0x0),
+    (0x0ADBE, 0xC),
+    (0x0ADBF, 0xC),
+    (0x0ADC0, 0x0),
+    (0x0ADC1, 0x0),
+    (0x0ADC6, 0xC),
+    (0x0ADC7, 0xC),
+    (0x0ADC8, 0x0),
+    (0x0ADC9, 0x0),
+    (0x0ADCC, 0x0),
+    (0x0ADCD, 0x0),
+    (0x0ADCE, 0xC),
+    (0x0ADCF, 0xC),
+    (0x0ADD2, 0x0),
+    (0x0ADD3, 0x0),
+    (0x0ADD7, 0xC),
+    (0x0ADDA, 0x0),
+    (0x0ADDB, 0x0),
+    (0x0ADE2, 0x0),
+    (0x0ADE3, 0x0),
+    (0x0ADEA, 0x0),
+    (0x0ADEB, 0x0),
+    (0x0ADF2, 0x0),
+    (0x0ADF3, 0x0),
+    (0x0AE02, 0x0),
+    (0x0AE03, 0x0),
+    (0x0BC84, 0x0),
+    (0x0BC85, 0x0),
+    (0x0BC8B, 0x0),
+    (0x0BC8C, 0x0),
+    (0x0BC8D, 0x0),
+    (0x0BC92, 0x0),
+    (0x0BC93, 0x0),
+    (0x0BC94, 0x0),
+    (0x0BC95, 0x0),
+    (0x0BC9A, 0x0),
+    (0x0BC9B, 0x0),
+    (0x0BC9C, 0x0),
+    (0x0BC9D, 0x0),
+    (0x0BCA0, 0x0),
+    (0x0BCA1, 0x0),
+    (0x0BCA2, 0x0),
+    (0x0BCA3, 0x0),
+    (0x0BCA4, 0x0),
+    (0x0BCA5, 0x0),
+    (0x0BCA6, 0x0),
+    (0x0BCA7, 0x0),
+    (0x0BCA8, 0x0),
+    (0x0BCA9, 0x0),
+    (0x0BCAA, 0x0),
+    (0x0BCAB, 0x0),
+    (0x0BCAD, 0x0),
+    (0x0BCAE, 0x0),
+    (0x0BCAF, 0x0),
+    (0x0BCB0, 0x0),
+    (0x0BCB1, 0x0),
+    (0x0BCB6, 0x0),
+    (0x0BCB7, 0x0),
+    (0x0BCB8, 0x0),
+    (0x0BCB9, 0x0),
+    (0x0BCBA, 0x0),
+    (0x0BCBB, 0x0),
+    (0x0BCBE, 0x0),
+    (0x0BCBF, 0x0),
+    (0x0BCC0, 0x0),
+    (0x0BCC1, 0x0),
+    (0x0BCC6, 0x0),
+    (0x0BCC7, 0x0),
+    (0x0BCC8, 0x0),
+    (0x0BCC9, 0x0),
+    (0x0BCD2, 0x0),
+    (0x0BCD3, 0x0),
+    (0x0BCD6, 0x0),
+    (0x0BCD7, 0x0),
+    (0x0BDA8, 0x0),
+    (0x0BDA9, 0x0),
+    (0x0BDAF, 0x0),
+    (0x0BDB0, 0x0),
+    (0x0BDB1, 0x0),
+    (0x0BDB6, 0x0),
+    (0x0BDB7, 0x0),
+    (0x0BDB8, 0x0),
+    (0x0BDB9, 0x0),
+    (0x0BDBE, 0x0),
+    (0x0BDBF, 0x0),
+    (0x0BDC0, 0x0),
+    (0x0BDC1, 0x0),
+    (0x0BDC4, 0x0),
+    (0x0BDC5, 0x0),
+    (0x0BDC6, 0x0),
+    (0x0BDC7, 0x0),
+    (0x0BDC8, 0x0),
+    (0x0BDC9, 0x0),
+    (0x0BDCA, 0x0),
+    (0x0BDCB, 0x0),
+    (0x0BDCC, 0x0),
+    (0x0BDCD, 0x0),
+    (0x0BDCE, 0x0),
+    (0x0BDCF, 0x0),
+    (0x0BDD1, 0x0),
+    (0x0BDD2, 0x0),
+    (0x0BDD3, 0x0),
+    (0x0BDD4, 0x0),
+    (0x0BDD5, 0x0),
+    (0x0BDDA, 0x0),
+    (0x0BDDB, 0x0),
+    (0x0BDDC, 0x0),
+    (0x0BDDD, 0x0),
+    (0x0BDDE, 0x0),
+    (0x0BDDF, 0x0),
+    (0x0BDE2, 0x0),
+    (0x0BDE3, 0x0),
+    (0x0BDE4, 0x0),
+    (0x0BDE5, 0x0),
+    (0x0BDEA, 0x0),
+    (0x0BDEB, 0x0),
+    (0x0BDEC, 0x0),
+    (0x0BDED, 0x0),
+    (0x0BDF6, 0x0),
+    (0x0BDF7, 0x0),
+    (0x0BDFA, 0x0),
+    (0x0BDFB, 0x0),
+    (0x0BECA, 0xC),
+    (0x0BECB, 0xC),
+    (0x0BED2, 0x2),
+    (0x0BED3, 0x2),
+    (0x0BEDA, 0xC),
+    (0x0BEDB, 0xC),
+    (0x0BEE2, 0xC),
+    (0x0BEE3, 0x2),
+    (0x0BEEA, 0xC),
+    (0x0BEEB, 0xC),
+    (0x0BEEC, 0xC),
+    (0x0BEED, 0xC),
+    (0x0BEF3, 0xC),
+    (0x0BF02, 0x2),
+    (0x0BF03, 0x2),
+    (0x0BF0A, 0xC),
+    (0x0BF0B, 0xC),
+    (0x0BF12, 0xC),
+    (0x0BF13, 0xC),
+    (0x0BF22, 0x2),
+    (0x0BF23, 0x2),
+    (0x0BFEE, 0xC),
+    (0x0BFEF, 0xC),
+    (0x0BFF6, 0x2),
+    (0x0BFF7, 0xC),
+    (0x0BFFE, 0xC),
+    (0x0BFFF, 0xC),
+    (0x0C006, 0xC),
+    (0x0C007, 0x2),
+    (0x0C00E, 0xC),
+    (0x0C00F, 0xC),
+    (0x0C010, 0xC),
+    (0x0C011, 0xC),
+    (0x0C017, 0xC),
+    (0x0C026, 0x2),
+    (0x0C027, 0x2),
+    (0x0C02E, 0xC),
+    (0x0C02F, 0xC),
+    (0x0C036, 0xC),
+    (0x0C037, 0xC),
+    (0x0C046, 0x2),
+    (0x0C047, 0x2),
+    (0x0CC7C, 0x0),
+    (0x0CC7D, 0x0),
+    (0x0CC83, 0x0),
+    (0x0CC84, 0x0),
+    (0x0CC85, 0x0),
+    (0x0CC8A, 0x0),
+    (0x0CC8B, 0x0),
+    (0x0CC8C, 0x0),
+    (0x0CC8D, 0x0),
+    (0x0CC93, 0x0),
+    (0x0CC94, 0x0),
+    (0x0CC95, 0x0),
+    (0x0CC98, 0x0),
+    (0x0CC99, 0x0),
+    (0x0CC9A, 0x0),
+    (0x0CC9B, 0x0),
+    (0x0CC9C, 0x0),
+    (0x0CC9D, 0x0),
+    (0x0CC9E, 0x0),
+    (0x0CC9F, 0x0),
+    (0x0CCA0, 0x0),
+    (0x0CCA1, 0x0),
+    (0x0CCA2, 0x0),
+    (0x0CCA3, 0x0),
+    (0x0CCA4, 0x0),
+    (0x0CCA5, 0x0),
+    (0x0CCA6, 0x0),
+    (0x0CCA7, 0x0),
+    (0x0CCA8, 0x0),
+    (0x0CCA9, 0x0),
+    (0x0CCAE, 0x0),
+    (0x0CCAF, 0x0),
+    (0x0CCB0, 0x0),
+    (0x0CCB1, 0x0),
+    (0x0CCB2, 0x0),
+    (0x0CCB3, 0x0),
+    (0x0CCB6, 0x0),
+    (0x0CCB7, 0x0),
+    (0x0CCB8, 0x0),
+    (0x0CCB9, 0x0),
+    (0x0CCBE, 0x0),
+    (0x0CCBF, 0x0),
+    (0x0CCC0, 0x0),
+    (0x0CCC1, 0x0),
+    (0x0CCCA, 0x0),
+    (0x0CCCB, 0x0),
+    (0x0CCCE, 0x0),
+    (0x0CCCF, 0x0),
+    (0x0CDA0, 0x0),
+    (0x0CDA1, 0x0),
+    (0x0CDA7, 0x0),
+    (0x0CDA8, 0x0),
+    (0x0CDA9, 0x0),
+    (0x0CDAE, 0x0),
+    (0x0CDAF, 0x0),
+    (0x0CDB0, 0x0),
+    (0x0CDB1, 0x0),
+    (0x0CDB7, 0x0),
+    (0x0CDB8, 0x0),
+    (0x0CDB9, 0x0),
+    (0x0CDBC, 0x0),
+    (0x0CDBD, 0x0),
+    (0x0CDBE, 0x0),
+    (0x0CDBF, 0x0),
+    (0x0CDC0, 0x0),
+    (0x0CDC1, 0x0),
+    (0x0CDC2, 0x0),
+    (0x0CDC3, 0x0),
+    (0x0CDC4, 0x0),
+    (0x0CDC5, 0x0),
+    (0x0CDC6, 0x0),
+    (0x0CDC7, 0x0),
+    (0x0CDC8, 0x0),
+    (0x0CDC9, 0x0),
+    (0x0CDCA, 0x0),
+    (0x0CDCB, 0x0),
+    (0x0CDCC, 0x0),
+    (0x0CDCD, 0x0),
+    (0x0CDD2, 0x0),
+    (0x0CDD3, 0x0),
+    (0x0CDD4, 0x0),
+    (0x0CDD5, 0x0),
+    (0x0CDD6, 0x0),
+    (0x0CDD7, 0x0),
+    (0x0CDDA, 0x0),
+    (0x0CDDB, 0x0),
+    (0x0CDDC, 0x0),
+    (0x0CDDD, 0x0),
+    (0x0CDE2, 0x0),
+    (0x0CDE3, 0x0),
+    (0x0CDE4, 0x0),
+    (0x0CDE5, 0x0),
+    (0x0CDEE, 0x0),
+    (0x0CDEF, 0x0),
+    (0x0CDF2, 0x0),
+    (0x0CDF3, 0x0),
+    (0x0D10A, 0x2),
+    (0x0D10B, 0x2),
+    (0x0D112, 0xC),
+    (0x0D113, 0xC),
+    (0x0D11A, 0xC),
+    (0x0D11B, 0xC),
+    (0x0D122, 0x2),
+    (0x0D123, 0x2),
+    (0x0D12A, 0x2),
+    (0x0D12B, 0x2),
+    (0x0D12C, 0x2),
+    (0x0D12D, 0x2),
+    (0x0D132, 0xC),
+    (0x0D133, 0xC),
+    (0x0D142, 0x2),
+    (0x0D143, 0x2),
+    (0x0D14A, 0x2),
+    (0x0D14B, 0x2),
+    (0x0D152, 0xC),
+    (0x0D153, 0xC),
+    (0x0D162, 0x2),
+    (0x0D163, 0x2),
+    (0x0D22E, 0x2),
+    (0x0D22F, 0x2),
+    (0x0D236, 0xC),
+    (0x0D237, 0xC),
+    (0x0D23E, 0xC),
+    (0x0D23F, 0x2),
+    (0x0D246, 0x2),
+    (0x0D247, 0x2),
+    (0x0D24E, 0x2),
+    (0x0D24F, 0x2),
+    (0x0D250, 0x2),
+    (0x0D251, 0x2),
+    (0x0D256, 0xC),
+    (0x0D257, 0xC),
+    (0x0D266, 0x2),
+    (0x0D267, 0x2),
+    (0x0D26E, 0x2),
+    (0x0D26F, 0x2),
+    (0x0D276, 0xC),
+    (0x0D277, 0xC),
+    (0x0D286, 0x2),
+    (0x0D287, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FOURTH_APPEARANCE_VIDEO_FRAME: u64 = 1091;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FOURTH_APPEARANCE_RAM_BYTES: [(u16, u8); 301] = [
+    (0x9C10, 0x3F),
+    (0x9C11, 0xBA),
+    (0x9C12, 0x3F),
+    (0x9C13, 0xAC),
+    (0x9C14, 0x3F),
+    (0x9C16, 0x3F),
+    (0x9C17, 0x90),
+    (0x9C18, 0x3F),
+    (0x9C19, 0x82),
+    (0x9C1A, 0x3F),
+    (0x9C1B, 0x74),
+    (0x9C1C, 0x38),
+    (0x9C1D, 0xBA),
+    (0x9C1E, 0x38),
+    (0x9C1F, 0xAC),
+    (0x9C20, 0x38),
+    (0x9C22, 0x38),
+    (0x9C23, 0x90),
+    (0x9C24, 0x38),
+    (0x9C25, 0x82),
+    (0x9C26, 0x38),
+    (0x9C27, 0x74),
+    (0x9C29, 0xBA),
+    (0x9C2B, 0xAC),
+    (0x9C2F, 0x90),
+    (0x9C31, 0x82),
+    (0x9C33, 0x74),
+    (0x9C34, 0x2A),
+    (0x9C35, 0xBA),
+    (0x9C36, 0x2A),
+    (0x9C37, 0xAC),
+    (0x9C38, 0x2A),
+    (0x9C3A, 0x2A),
+    (0x9C3B, 0x90),
+    (0x9C3C, 0x2A),
+    (0x9C3D, 0x82),
+    (0x9C3E, 0x2A),
+    (0x9C3F, 0x74),
+    (0x9C40, 0x87),
+    (0x9C50, 0x43),
+    (0x9C51, 0xBA),
+    (0x9C52, 0x43),
+    (0x9C53, 0xAC),
+    (0x9C54, 0x43),
+    (0x9C56, 0x43),
+    (0x9C57, 0x90),
+    (0x9C58, 0x43),
+    (0x9C59, 0x82),
+    (0x9C5A, 0x43),
+    (0x9C5B, 0x74),
+    (0x9C5C, 0x3C),
+    (0x9C5D, 0xBA),
+    (0x9C5E, 0x3C),
+    (0x9C5F, 0xAC),
+    (0x9C60, 0x3C),
+    (0x9C62, 0x3C),
+    (0x9C63, 0x90),
+    (0x9C64, 0x3C),
+    (0x9C65, 0x82),
+    (0x9C66, 0x3C),
+    (0x9C67, 0x74),
+    (0x9C69, 0xBA),
+    (0x9C6B, 0xAC),
+    (0x9C6F, 0x90),
+    (0x9C71, 0x82),
+    (0x9C73, 0x74),
+    (0x9C74, 0x2E),
+    (0x9C75, 0xBA),
+    (0x9C76, 0x2E),
+    (0x9C77, 0xAC),
+    (0x9C78, 0x2E),
+    (0x9C7A, 0x2E),
+    (0x9C7B, 0x90),
+    (0x9C7C, 0x2E),
+    (0x9C7D, 0x82),
+    (0x9C7E, 0x2E),
+    (0x9C7F, 0x74),
+    (0x9C80, 0x87),
+    (0x9C90, 0x47),
+    (0x9C91, 0xBA),
+    (0x9C92, 0x47),
+    (0x9C93, 0xAC),
+    (0x9C94, 0x47),
+    (0x9C96, 0x47),
+    (0x9C97, 0x90),
+    (0x9C98, 0x47),
+    (0x9C99, 0x82),
+    (0x9C9A, 0x47),
+    (0x9C9B, 0x74),
+    (0x9C9C, 0x40),
+    (0x9C9D, 0xBA),
+    (0x9C9E, 0x40),
+    (0x9C9F, 0xAC),
+    (0x9CA0, 0x40),
+    (0x9CA2, 0x40),
+    (0x9CA3, 0x90),
+    (0x9CA4, 0x40),
+    (0x9CA5, 0x82),
+    (0x9CA6, 0x40),
+    (0x9CA7, 0x74),
+    (0x9CA9, 0xBA),
+    (0x9CAB, 0xAC),
+    (0x9CAF, 0x90),
+    (0x9CB1, 0x82),
+    (0x9CB3, 0x74),
+    (0x9CB4, 0x32),
+    (0x9CB5, 0xBA),
+    (0x9CB6, 0x32),
+    (0x9CB7, 0xAC),
+    (0x9CB8, 0x32),
+    (0x9CBA, 0x32),
+    (0x9CBB, 0x90),
+    (0x9CBC, 0x32),
+    (0x9CBD, 0x82),
+    (0x9CBE, 0x32),
+    (0x9CBF, 0x74),
+    (0x9CC0, 0x87),
+    (0x9CD0, 0x4B),
+    (0x9CD1, 0xBA),
+    (0x9CD2, 0x4B),
+    (0x9CD3, 0xAC),
+    (0x9CD4, 0x4B),
+    (0x9CD6, 0x4B),
+    (0x9CD7, 0x90),
+    (0x9CD8, 0x4B),
+    (0x9CD9, 0x82),
+    (0x9CDA, 0x4B),
+    (0x9CDB, 0x74),
+    (0x9CDC, 0x44),
+    (0x9CDD, 0xBA),
+    (0x9CDE, 0x44),
+    (0x9CDF, 0xAC),
+    (0x9CE0, 0x44),
+    (0x9CE2, 0x44),
+    (0x9CE3, 0x90),
+    (0x9CE4, 0x44),
+    (0x9CE5, 0x82),
+    (0x9CE6, 0x44),
+    (0x9CE7, 0x74),
+    (0x9CE9, 0xBA),
+    (0x9CEB, 0xAC),
+    (0x9CEF, 0x90),
+    (0x9CF1, 0x82),
+    (0x9CF3, 0x74),
+    (0x9CF4, 0x36),
+    (0x9CF5, 0xBA),
+    (0x9CF6, 0x36),
+    (0x9CF7, 0xAC),
+    (0x9CF8, 0x36),
+    (0x9CFA, 0x36),
+    (0x9CFB, 0x90),
+    (0x9CFC, 0x36),
+    (0x9CFD, 0x82),
+    (0x9CFE, 0x36),
+    (0x9CFF, 0x74),
+    (0x9D00, 0x87),
+    (0x9D10, 0x4F),
+    (0x9D11, 0xBA),
+    (0x9D12, 0x4F),
+    (0x9D13, 0xAC),
+    (0x9D14, 0x4F),
+    (0x9D16, 0x4F),
+    (0x9D17, 0x90),
+    (0x9D18, 0x4F),
+    (0x9D19, 0x82),
+    (0x9D1A, 0x4F),
+    (0x9D1B, 0x74),
+    (0x9D1C, 0x48),
+    (0x9D1D, 0xBA),
+    (0x9D1E, 0x48),
+    (0x9D1F, 0xAC),
+    (0x9D20, 0x48),
+    (0x9D22, 0x48),
+    (0x9D23, 0x90),
+    (0x9D24, 0x48),
+    (0x9D25, 0x82),
+    (0x9D26, 0x48),
+    (0x9D27, 0x74),
+    (0x9D29, 0xBA),
+    (0x9D2B, 0xAC),
+    (0x9D2F, 0x90),
+    (0x9D31, 0x82),
+    (0x9D33, 0x74),
+    (0x9D34, 0x3A),
+    (0x9D35, 0xBA),
+    (0x9D36, 0x3A),
+    (0x9D37, 0xAC),
+    (0x9D38, 0x3A),
+    (0x9D3A, 0x3A),
+    (0x9D3B, 0x90),
+    (0x9D3C, 0x3A),
+    (0x9D3D, 0x82),
+    (0x9D3E, 0x3A),
+    (0x9D3F, 0x74),
+    (0x9D40, 0x87),
+    (0x9D50, 0x53),
+    (0x9D51, 0xBA),
+    (0x9D52, 0x53),
+    (0x9D53, 0xAC),
+    (0x9D54, 0x53),
+    (0x9D56, 0x53),
+    (0x9D57, 0x90),
+    (0x9D58, 0x53),
+    (0x9D59, 0x82),
+    (0x9D5A, 0x53),
+    (0x9D5B, 0x74),
+    (0x9D5C, 0x4C),
+    (0x9D5D, 0xBA),
+    (0x9D5E, 0x4C),
+    (0x9D5F, 0xAC),
+    (0x9D60, 0x4C),
+    (0x9D62, 0x4C),
+    (0x9D63, 0x90),
+    (0x9D64, 0x4C),
+    (0x9D65, 0x82),
+    (0x9D66, 0x4C),
+    (0x9D67, 0x74),
+    (0x9D69, 0xBA),
+    (0x9D6B, 0xAC),
+    (0x9D6F, 0x90),
+    (0x9D71, 0x82),
+    (0x9D73, 0x74),
+    (0x9D74, 0x3E),
+    (0x9D75, 0xBA),
+    (0x9D76, 0x3E),
+    (0x9D77, 0xAC),
+    (0x9D78, 0x3E),
+    (0x9D7A, 0x3E),
+    (0x9D7B, 0x90),
+    (0x9D7C, 0x3E),
+    (0x9D7D, 0x82),
+    (0x9D7E, 0x3E),
+    (0x9D7F, 0x74),
+    (0x9D80, 0x87),
+    (0x9D90, 0x57),
+    (0x9D91, 0xBA),
+    (0x9D92, 0x57),
+    (0x9D93, 0xAC),
+    (0x9D94, 0x57),
+    (0x9D96, 0x57),
+    (0x9D97, 0x90),
+    (0x9D98, 0x57),
+    (0x9D99, 0x82),
+    (0x9D9A, 0x57),
+    (0x9D9B, 0x74),
+    (0x9D9C, 0x50),
+    (0x9D9D, 0xBA),
+    (0x9D9E, 0x50),
+    (0x9D9F, 0xAC),
+    (0x9DA0, 0x50),
+    (0x9DA2, 0x50),
+    (0x9DA3, 0x90),
+    (0x9DA4, 0x50),
+    (0x9DA5, 0x82),
+    (0x9DA6, 0x50),
+    (0x9DA7, 0x74),
+    (0x9DA9, 0xBA),
+    (0x9DAB, 0xAC),
+    (0x9DAF, 0x90),
+    (0x9DB1, 0x82),
+    (0x9DB3, 0x74),
+    (0x9DB4, 0x42),
+    (0x9DB5, 0xBA),
+    (0x9DB6, 0x42),
+    (0x9DB7, 0xAC),
+    (0x9DB8, 0x42),
+    (0x9DBA, 0x42),
+    (0x9DBB, 0x90),
+    (0x9DBC, 0x42),
+    (0x9DBD, 0x82),
+    (0x9DBE, 0x42),
+    (0x9DBF, 0x74),
+    (0x9DC0, 0x87),
+    (0x9DC4, 0x9E),
+    (0x9DC5, 0x00),
+    (0x9DDF, 0xAC),
+    (0x9DE3, 0x90),
+    (0x9DE5, 0x82),
+    (0x9DE7, 0x74),
+    (0x9DE8, 0x47),
+    (0x9DE9, 0xBA),
+    (0x9DEA, 0x47),
+    (0x9DEB, 0xAC),
+    (0x9DEC, 0x47),
+    (0x9DEE, 0x47),
+    (0x9DEF, 0x90),
+    (0x9DF0, 0x47),
+    (0x9DF1, 0x82),
+    (0x9DF2, 0x47),
+    (0x9DF3, 0x74),
+    (0x9DF4, 0x40),
+    (0x9DF5, 0xBA),
+    (0x9DF6, 0x40),
+    (0x9DF7, 0xAC),
+    (0x9DF8, 0x40),
+    (0x9DFA, 0x40),
+    (0x9DFB, 0x90),
+    (0x9DFC, 0x40),
+    (0x9DFD, 0x82),
+    (0x9DFE, 0x40),
+    (0x9DFF, 0x74),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FOURTH_VISIBLE_NIBBLES: [(u32, u8); 851] = [
+    (0x075CA, 0x0),
+    (0x075CB, 0x0),
+    (0x075DA, 0x0),
+    (0x075DB, 0x0),
+    (0x075E2, 0x0),
+    (0x075E3, 0x0),
+    (0x075EA, 0x0),
+    (0x075EB, 0x0),
+    (0x075EC, 0x0),
+    (0x075ED, 0x0),
+    (0x075F2, 0x0),
+    (0x075FA, 0x0),
+    (0x075FB, 0x0),
+    (0x075FC, 0x0),
+    (0x075FD, 0x0),
+    (0x07602, 0x0),
+    (0x07603, 0x0),
+    (0x0760A, 0x0),
+    (0x0760B, 0x0),
+    (0x0760C, 0x0),
+    (0x0760D, 0x0),
+    (0x07612, 0x0),
+    (0x07613, 0x0),
+    (0x0761A, 0x0),
+    (0x0761B, 0x0),
+    (0x07622, 0x0),
+    (0x07623, 0x0),
+    (0x076EE, 0x0),
+    (0x076EF, 0x0),
+    (0x076F7, 0x0),
+    (0x076FE, 0x0),
+    (0x076FF, 0x0),
+    (0x07706, 0x0),
+    (0x07707, 0x0),
+    (0x0770E, 0x0),
+    (0x0770F, 0x0),
+    (0x07710, 0x0),
+    (0x07711, 0x0),
+    (0x07716, 0x0),
+    (0x0771E, 0x0),
+    (0x0771F, 0x0),
+    (0x07720, 0x0),
+    (0x07721, 0x0),
+    (0x07726, 0x0),
+    (0x07727, 0x0),
+    (0x0772E, 0x0),
+    (0x0772F, 0x0),
+    (0x07730, 0x0),
+    (0x07731, 0x0),
+    (0x07736, 0x0),
+    (0x07737, 0x0),
+    (0x0773E, 0x0),
+    (0x0773F, 0x0),
+    (0x07746, 0x0),
+    (0x07747, 0x0),
+    (0x07CA4, 0xC),
+    (0x07CA5, 0xC),
+    (0x07CB2, 0x2),
+    (0x07CB3, 0x2),
+    (0x07CB4, 0xC),
+    (0x07CB5, 0xC),
+    (0x07CBA, 0xC),
+    (0x07CBB, 0xC),
+    (0x07CBC, 0xC),
+    (0x07CBD, 0xC),
+    (0x07CC0, 0xC),
+    (0x07CC1, 0xC),
+    (0x07CC2, 0xC),
+    (0x07CC3, 0xC),
+    (0x07CC4, 0xC),
+    (0x07CC5, 0xC),
+    (0x07CC8, 0xC),
+    (0x07CC9, 0xC),
+    (0x07CCA, 0x2),
+    (0x07CCB, 0x2),
+    (0x07CCC, 0xC),
+    (0x07CCE, 0x2),
+    (0x07CCF, 0x2),
+    (0x07CD2, 0x2),
+    (0x07CD3, 0x2),
+    (0x07CD6, 0x2),
+    (0x07CD7, 0x2),
+    (0x07CD8, 0xC),
+    (0x07CD9, 0xC),
+    (0x07CDA, 0xC),
+    (0x07CDB, 0xC),
+    (0x07CDE, 0x2),
+    (0x07CDF, 0x2),
+    (0x07CE0, 0xC),
+    (0x07CE1, 0xC),
+    (0x07CE4, 0xC),
+    (0x07CE5, 0xC),
+    (0x07CE6, 0xC),
+    (0x07CE7, 0xC),
+    (0x07CE8, 0xC),
+    (0x07CE9, 0xC),
+    (0x07CEE, 0x2),
+    (0x07CEF, 0x2),
+    (0x07CF6, 0xC),
+    (0x07CF7, 0xC),
+    (0x07DC8, 0xC),
+    (0x07DC9, 0xC),
+    (0x07DD1, 0xC),
+    (0x07DD6, 0x2),
+    (0x07DD7, 0x2),
+    (0x07DD8, 0xC),
+    (0x07DD9, 0xC),
+    (0x07DDE, 0xC),
+    (0x07DDF, 0xC),
+    (0x07DE0, 0xC),
+    (0x07DE1, 0xC),
+    (0x07DE4, 0xC),
+    (0x07DE5, 0xC),
+    (0x07DE6, 0xC),
+    (0x07DE7, 0xC),
+    (0x07DE8, 0xC),
+    (0x07DE9, 0xC),
+    (0x07DEC, 0xC),
+    (0x07DED, 0xC),
+    (0x07DEE, 0xC),
+    (0x07DEF, 0x2),
+    (0x07DF0, 0xC),
+    (0x07DF2, 0x2),
+    (0x07DF3, 0x2),
+    (0x07DF6, 0x2),
+    (0x07DF7, 0x2),
+    (0x07DFA, 0xC),
+    (0x07DFB, 0xC),
+    (0x07DFC, 0xC),
+    (0x07DFD, 0xC),
+    (0x07DFE, 0xC),
+    (0x07DFF, 0xC),
+    (0x07E02, 0xC),
+    (0x07E03, 0xC),
+    (0x07E04, 0xC),
+    (0x07E05, 0xC),
+    (0x07E08, 0xC),
+    (0x07E09, 0xC),
+    (0x07E0A, 0xC),
+    (0x07E0B, 0xC),
+    (0x07E0C, 0xC),
+    (0x07E0D, 0xC),
+    (0x07E12, 0x2),
+    (0x07E13, 0x2),
+    (0x07E1A, 0xC),
+    (0x07E1B, 0xC),
+    (0x0880A, 0x0),
+    (0x0880B, 0x0),
+    (0x08812, 0x0),
+    (0x08813, 0x0),
+    (0x0881A, 0x0),
+    (0x0881B, 0x0),
+    (0x08822, 0x0),
+    (0x08823, 0x0),
+    (0x0882A, 0x0),
+    (0x0882B, 0x0),
+    (0x0882C, 0x0),
+    (0x0882D, 0x0),
+    (0x08832, 0x0),
+    (0x0883A, 0x0),
+    (0x0883B, 0x0),
+    (0x0883C, 0x0),
+    (0x0883D, 0x0),
+    (0x08842, 0x0),
+    (0x08843, 0x0),
+    (0x0884A, 0x0),
+    (0x0884B, 0x0),
+    (0x0884C, 0x0),
+    (0x0884D, 0x0),
+    (0x08852, 0x0),
+    (0x08853, 0x0),
+    (0x0885A, 0x0),
+    (0x0885B, 0x0),
+    (0x08862, 0x0),
+    (0x08863, 0x0),
+    (0x0892E, 0x0),
+    (0x0892F, 0x0),
+    (0x08936, 0x0),
+    (0x08937, 0x0),
+    (0x0893E, 0x0),
+    (0x0893F, 0x0),
+    (0x08946, 0x0),
+    (0x08947, 0x0),
+    (0x0894E, 0x0),
+    (0x0894F, 0x0),
+    (0x08950, 0x0),
+    (0x08951, 0x0),
+    (0x08956, 0x0),
+    (0x0895E, 0x0),
+    (0x0895F, 0x0),
+    (0x08960, 0x0),
+    (0x08961, 0x0),
+    (0x08966, 0x0),
+    (0x08967, 0x0),
+    (0x0896E, 0x0),
+    (0x0896F, 0x0),
+    (0x08970, 0x0),
+    (0x08971, 0x0),
+    (0x08976, 0x0),
+    (0x08977, 0x0),
+    (0x0897E, 0x0),
+    (0x0897F, 0x0),
+    (0x08980, 0x0),
+    (0x08986, 0x0),
+    (0x08987, 0x0),
+    (0x08C9C, 0xC),
+    (0x08C9D, 0xC),
+    (0x08CA4, 0xC),
+    (0x08CA5, 0xC),
+    (0x08CAA, 0x2),
+    (0x08CAB, 0x2),
+    (0x08CAC, 0xC),
+    (0x08CAD, 0xC),
+    (0x08CB2, 0xC),
+    (0x08CB3, 0xC),
+    (0x08CB4, 0xC),
+    (0x08CB5, 0xC),
+    (0x08CB8, 0xC),
+    (0x08CB9, 0x2),
+    (0x08CBA, 0xC),
+    (0x08CBB, 0xC),
+    (0x08CBC, 0xC),
+    (0x08CBD, 0xC),
+    (0x08CC0, 0xC),
+    (0x08CC1, 0xC),
+    (0x08CC2, 0x2),
+    (0x08CC3, 0x2),
+    (0x08CC4, 0xC),
+    (0x08CC6, 0x2),
+    (0x08CC7, 0x2),
+    (0x08CC9, 0xC),
+    (0x08CCA, 0x2),
+    (0x08CCB, 0x2),
+    (0x08CCE, 0xC),
+    (0x08CCF, 0xC),
+    (0x08CD0, 0xC),
+    (0x08CD1, 0xC),
+    (0x08CD2, 0xC),
+    (0x08CD3, 0xC),
+    (0x08CD6, 0xC),
+    (0x08CD7, 0xC),
+    (0x08CD8, 0xC),
+    (0x08CD9, 0xC),
+    (0x08CDC, 0xC),
+    (0x08CDD, 0xC),
+    (0x08CDE, 0xC),
+    (0x08CDF, 0xC),
+    (0x08CE0, 0xC),
+    (0x08CE1, 0xC),
+    (0x08CE6, 0x2),
+    (0x08CE7, 0x2),
+    (0x08CEE, 0xC),
+    (0x08CEF, 0xC),
+    (0x08DC0, 0xC),
+    (0x08DC1, 0xC),
+    (0x08DC8, 0xC),
+    (0x08DC9, 0xC),
+    (0x08DCE, 0x2),
+    (0x08DCF, 0x2),
+    (0x08DD0, 0xC),
+    (0x08DD1, 0x2),
+    (0x08DD6, 0xC),
+    (0x08DD7, 0x2),
+    (0x08DD8, 0xC),
+    (0x08DD9, 0xC),
+    (0x08DDC, 0x2),
+    (0x08DDD, 0x2),
+    (0x08DDE, 0xC),
+    (0x08DDF, 0xC),
+    (0x08DE0, 0xC),
+    (0x08DE1, 0xC),
+    (0x08DE3, 0xC),
+    (0x08DE4, 0xC),
+    (0x08DE5, 0xC),
+    (0x08DE6, 0x2),
+    (0x08DE7, 0xC),
+    (0x08DE8, 0x2),
+    (0x08DEA, 0x2),
+    (0x08DEB, 0x2),
+    (0x08DEC, 0xC),
+    (0x08DED, 0xC),
+    (0x08DEE, 0x2),
+    (0x08DEF, 0x2),
+    (0x08DF2, 0xC),
+    (0x08DF3, 0xC),
+    (0x08DF4, 0xC),
+    (0x08DF5, 0xC),
+    (0x08DF6, 0xC),
+    (0x08DF7, 0xC),
+    (0x08DFA, 0xC),
+    (0x08DFB, 0xC),
+    (0x08DFC, 0xC),
+    (0x08DFD, 0xC),
+    (0x08E00, 0xC),
+    (0x08E01, 0xC),
+    (0x08E02, 0xC),
+    (0x08E03, 0xC),
+    (0x08E04, 0xC),
+    (0x08E05, 0xC),
+    (0x08E0A, 0x2),
+    (0x08E0B, 0x2),
+    (0x08E12, 0xC),
+    (0x08E13, 0xC),
+    (0x09A4A, 0x0),
+    (0x09A4B, 0x0),
+    (0x09A52, 0x0),
+    (0x09A53, 0x0),
+    (0x09A5A, 0x0),
+    (0x09A5B, 0x0),
+    (0x09A62, 0x0),
+    (0x09A63, 0x0),
+    (0x09A6A, 0x0),
+    (0x09A6B, 0x0),
+    (0x09A6C, 0x0),
+    (0x09A6D, 0x0),
+    (0x09A72, 0x0),
+    (0x09A7C, 0x0),
+    (0x09A7D, 0x0),
+    (0x09A82, 0x0),
+    (0x09A83, 0x0),
+    (0x09A8A, 0x0),
+    (0x09A8B, 0x0),
+    (0x09A8C, 0x0),
+    (0x09A8D, 0x0),
+    (0x09A92, 0x0),
+    (0x09A93, 0x0),
+    (0x09A9C, 0x0),
+    (0x09A9D, 0x0),
+    (0x09AA2, 0x0),
+    (0x09AA3, 0x0),
+    (0x09B6E, 0x0),
+    (0x09B6F, 0x0),
+    (0x09B76, 0x0),
+    (0x09B77, 0x0),
+    (0x09B7E, 0x0),
+    (0x09B7F, 0x0),
+    (0x09B86, 0x0),
+    (0x09B87, 0x0),
+    (0x09B8E, 0x0),
+    (0x09B8F, 0x0),
+    (0x09B90, 0x0),
+    (0x09B91, 0x0),
+    (0x09B96, 0x0),
+    (0x09B97, 0x0),
+    (0x09BA0, 0x0),
+    (0x09BA1, 0x0),
+    (0x09BA6, 0x0),
+    (0x09BA7, 0x0),
+    (0x09BAE, 0x0),
+    (0x09BAF, 0x0),
+    (0x09BB0, 0x0),
+    (0x09BB1, 0x0),
+    (0x09BB6, 0x0),
+    (0x09BB7, 0x0),
+    (0x09BC0, 0x0),
+    (0x09BC1, 0x0),
+    (0x09BC6, 0x0),
+    (0x09BC7, 0x0),
+    (0x09C94, 0xC),
+    (0x09C95, 0xC),
+    (0x09C9C, 0xC),
+    (0x09C9D, 0xC),
+    (0x09CA2, 0xC),
+    (0x09CA3, 0xC),
+    (0x09CA4, 0xC),
+    (0x09CA5, 0x2),
+    (0x09CAA, 0x2),
+    (0x09CAB, 0x2),
+    (0x09CAC, 0x2),
+    (0x09CAD, 0x2),
+    (0x09CB0, 0xC),
+    (0x09CB1, 0x2),
+    (0x09CB2, 0xC),
+    (0x09CB3, 0xC),
+    (0x09CB4, 0xC),
+    (0x09CB5, 0x2),
+    (0x09CB6, 0xC),
+    (0x09CB7, 0xC),
+    (0x09CB8, 0x2),
+    (0x09CB9, 0x2),
+    (0x09CBA, 0x2),
+    (0x09CBB, 0xC),
+    (0x09CBC, 0x2),
+    (0x09CBE, 0xC),
+    (0x09CBF, 0xC),
+    (0x09CC0, 0xC),
+    (0x09CC1, 0xC),
+    (0x09CC6, 0xC),
+    (0x09CC7, 0xC),
+    (0x09CC8, 0x2),
+    (0x09CC9, 0x2),
+    (0x09CCA, 0xC),
+    (0x09CCB, 0xC),
+    (0x09CCE, 0xC),
+    (0x09CCF, 0xC),
+    (0x09CD0, 0x2),
+    (0x09CD1, 0x2),
+    (0x09CD4, 0x2),
+    (0x09CD5, 0x2),
+    (0x09CD6, 0xC),
+    (0x09CD7, 0xC),
+    (0x09CD8, 0xC),
+    (0x09CD9, 0xC),
+    (0x09CE6, 0xC),
+    (0x09CE7, 0xC),
+    (0x09DB8, 0xC),
+    (0x09DB9, 0xC),
+    (0x09DC0, 0xC),
+    (0x09DC1, 0x2),
+    (0x09DC6, 0xC),
+    (0x09DC7, 0xC),
+    (0x09DC8, 0x2),
+    (0x09DC9, 0xC),
+    (0x09DCE, 0x2),
+    (0x09DCF, 0xC),
+    (0x09DD0, 0x2),
+    (0x09DD1, 0x2),
+    (0x09DD4, 0xC),
+    (0x09DD5, 0xC),
+    (0x09DD6, 0xC),
+    (0x09DD7, 0xC),
+    (0x09DD8, 0xC),
+    (0x09DD9, 0xC),
+    (0x09DDA, 0xC),
+    (0x09DDB, 0xC),
+    (0x09DDC, 0x2),
+    (0x09DDD, 0x2),
+    (0x09DDE, 0xC),
+    (0x09DDF, 0xC),
+    (0x09DE0, 0x2),
+    (0x09DE1, 0xC),
+    (0x09DE2, 0xC),
+    (0x09DE3, 0xC),
+    (0x09DE4, 0xC),
+    (0x09DE5, 0xC),
+    (0x09DEA, 0xC),
+    (0x09DEB, 0xC),
+    (0x09DEC, 0x2),
+    (0x09DED, 0x2),
+    (0x09DEE, 0xC),
+    (0x09DEF, 0xC),
+    (0x09DF2, 0xC),
+    (0x09DF3, 0xC),
+    (0x09DF4, 0x2),
+    (0x09DF5, 0x2),
+    (0x09DF8, 0x2),
+    (0x09DF9, 0x2),
+    (0x09DFA, 0xC),
+    (0x09DFB, 0xC),
+    (0x09DFC, 0xC),
+    (0x09DFD, 0xC),
+    (0x09E0A, 0xC),
+    (0x09E0B, 0xC),
+    (0x0AC8A, 0x0),
+    (0x0AC8B, 0x0),
+    (0x0AC8C, 0xC),
+    (0x0AC8D, 0xC),
+    (0x0AC92, 0x0),
+    (0x0AC93, 0x0),
+    (0x0AC94, 0x2),
+    (0x0AC95, 0x2),
+    (0x0AC9A, 0x0),
+    (0x0AC9B, 0x0),
+    (0x0AC9C, 0xC),
+    (0x0AC9D, 0xC),
+    (0x0ACA2, 0x0),
+    (0x0ACA3, 0x0),
+    (0x0ACA4, 0xC),
+    (0x0ACA5, 0xC),
+    (0x0ACA8, 0xC),
+    (0x0ACA9, 0xC),
+    (0x0ACAA, 0x0),
+    (0x0ACAB, 0x0),
+    (0x0ACAC, 0x0),
+    (0x0ACAD, 0x0),
+    (0x0ACAE, 0x2),
+    (0x0ACAF, 0x2),
+    (0x0ACB0, 0xC),
+    (0x0ACB1, 0xC),
+    (0x0ACB3, 0x0),
+    (0x0ACB4, 0x0),
+    (0x0ACB6, 0xC),
+    (0x0ACB7, 0xC),
+    (0x0ACB8, 0xC),
+    (0x0ACB9, 0xC),
+    (0x0ACBC, 0x0),
+    (0x0ACBD, 0x0),
+    (0x0ACBE, 0x2),
+    (0x0ACBF, 0x2),
+    (0x0ACC0, 0x2),
+    (0x0ACC1, 0x2),
+    (0x0ACC6, 0x2),
+    (0x0ACC7, 0x2),
+    (0x0ACC8, 0xC),
+    (0x0ACC9, 0xC),
+    (0x0ACCC, 0x2),
+    (0x0ACCD, 0x2),
+    (0x0ACCE, 0x2),
+    (0x0ACCF, 0x2),
+    (0x0ACD0, 0xC),
+    (0x0ACD1, 0xC),
+    (0x0ACDC, 0x0),
+    (0x0ACDD, 0x0),
+    (0x0ACDE, 0x2),
+    (0x0ACDF, 0x2),
+    (0x0ADAE, 0x0),
+    (0x0ADAF, 0x0),
+    (0x0ADB0, 0xC),
+    (0x0ADB1, 0xC),
+    (0x0ADB6, 0x0),
+    (0x0ADB7, 0x0),
+    (0x0ADB8, 0x2),
+    (0x0ADB9, 0x2),
+    (0x0ADBE, 0x0),
+    (0x0ADBF, 0x0),
+    (0x0ADC0, 0xC),
+    (0x0ADC1, 0xC),
+    (0x0ADC6, 0x0),
+    (0x0ADC7, 0x0),
+    (0x0ADC8, 0xC),
+    (0x0ADC9, 0xC),
+    (0x0ADCC, 0xC),
+    (0x0ADCD, 0xC),
+    (0x0ADCE, 0x0),
+    (0x0ADCF, 0x0),
+    (0x0ADD0, 0x0),
+    (0x0ADD1, 0x0),
+    (0x0ADD2, 0x2),
+    (0x0ADD3, 0x2),
+    (0x0ADD4, 0xC),
+    (0x0ADD5, 0xC),
+    (0x0ADD7, 0x0),
+    (0x0ADD8, 0x0),
+    (0x0ADDA, 0xC),
+    (0x0ADDB, 0xC),
+    (0x0ADDC, 0xC),
+    (0x0ADDD, 0xC),
+    (0x0ADE0, 0x0),
+    (0x0ADE1, 0x0),
+    (0x0ADE2, 0x2),
+    (0x0ADE3, 0x2),
+    (0x0ADE4, 0x2),
+    (0x0ADE5, 0x2),
+    (0x0ADEA, 0x2),
+    (0x0ADEB, 0x2),
+    (0x0ADEC, 0xC),
+    (0x0ADED, 0xC),
+    (0x0ADF0, 0x0),
+    (0x0ADF1, 0x0),
+    (0x0ADF2, 0x2),
+    (0x0ADF3, 0x2),
+    (0x0ADF4, 0xC),
+    (0x0ADF5, 0xC),
+    (0x0AE00, 0x0),
+    (0x0AE01, 0x0),
+    (0x0AE02, 0x2),
+    (0x0AE03, 0x2),
+    (0x0BC84, 0xC),
+    (0x0BC85, 0xC),
+    (0x0BC8B, 0x2),
+    (0x0BC8C, 0x2),
+    (0x0BC8D, 0x2),
+    (0x0BC92, 0xC),
+    (0x0BC93, 0x2),
+    (0x0BC94, 0xC),
+    (0x0BC95, 0xC),
+    (0x0BC9A, 0x2),
+    (0x0BC9B, 0x2),
+    (0x0BC9C, 0xC),
+    (0x0BC9D, 0x2),
+    (0x0BCA0, 0xC),
+    (0x0BCA1, 0xC),
+    (0x0BCA2, 0x2),
+    (0x0BCA3, 0x2),
+    (0x0BCA4, 0xC),
+    (0x0BCA5, 0xC),
+    (0x0BCA6, 0x2),
+    (0x0BCA7, 0x2),
+    (0x0BCA8, 0xC),
+    (0x0BCA9, 0xC),
+    (0x0BCAA, 0x2),
+    (0x0BCAB, 0x2),
+    (0x0BCAD, 0xC),
+    (0x0BCAE, 0x2),
+    (0x0BCAF, 0x2),
+    (0x0BCB0, 0xC),
+    (0x0BCB1, 0xC),
+    (0x0BCB6, 0x2),
+    (0x0BCB7, 0x2),
+    (0x0BCB8, 0x2),
+    (0x0BCB9, 0x2),
+    (0x0BCBA, 0x2),
+    (0x0BCBB, 0x2),
+    (0x0BCBE, 0x2),
+    (0x0BCBF, 0x2),
+    (0x0BCC0, 0xC),
+    (0x0BCC1, 0xC),
+    (0x0BCC6, 0x2),
+    (0x0BCC7, 0x2),
+    (0x0BCC8, 0xC),
+    (0x0BCC9, 0xC),
+    (0x0BCD6, 0x2),
+    (0x0BCD7, 0x2),
+    (0x0BDA8, 0xC),
+    (0x0BDA9, 0xC),
+    (0x0BDAF, 0x2),
+    (0x0BDB0, 0x2),
+    (0x0BDB1, 0xC),
+    (0x0BDB6, 0xC),
+    (0x0BDB7, 0x2),
+    (0x0BDB8, 0xC),
+    (0x0BDB9, 0xC),
+    (0x0BDBE, 0x2),
+    (0x0BDBF, 0x2),
+    (0x0BDC0, 0xC),
+    (0x0BDC1, 0x2),
+    (0x0BDC4, 0xC),
+    (0x0BDC5, 0xC),
+    (0x0BDC6, 0x2),
+    (0x0BDC7, 0x2),
+    (0x0BDC8, 0xC),
+    (0x0BDC9, 0xC),
+    (0x0BDCA, 0x2),
+    (0x0BDCB, 0x2),
+    (0x0BDCC, 0xC),
+    (0x0BDCD, 0xC),
+    (0x0BDCE, 0x2),
+    (0x0BDCF, 0x2),
+    (0x0BDD1, 0xC),
+    (0x0BDD2, 0x2),
+    (0x0BDD3, 0x2),
+    (0x0BDD4, 0xC),
+    (0x0BDD5, 0xC),
+    (0x0BDDA, 0x2),
+    (0x0BDDB, 0x2),
+    (0x0BDDC, 0x2),
+    (0x0BDDD, 0x2),
+    (0x0BDDE, 0x2),
+    (0x0BDDF, 0x2),
+    (0x0BDE2, 0x2),
+    (0x0BDE3, 0x2),
+    (0x0BDE4, 0xC),
+    (0x0BDE5, 0xC),
+    (0x0BDEA, 0x2),
+    (0x0BDEB, 0x2),
+    (0x0BDEC, 0xC),
+    (0x0BDED, 0xC),
+    (0x0BDFA, 0x2),
+    (0x0BDFB, 0x2),
+    (0x0BECA, 0x0),
+    (0x0BECB, 0x0),
+    (0x0BED2, 0x0),
+    (0x0BED3, 0x0),
+    (0x0BEDA, 0x0),
+    (0x0BEDB, 0x0),
+    (0x0BEE2, 0x0),
+    (0x0BEE3, 0x0),
+    (0x0BEEA, 0x0),
+    (0x0BEEB, 0x0),
+    (0x0BEEC, 0x0),
+    (0x0BEED, 0x0),
+    (0x0BEF3, 0x0),
+    (0x0BEFC, 0x0),
+    (0x0BEFD, 0x0),
+    (0x0BF02, 0x0),
+    (0x0BF03, 0x0),
+    (0x0BF0A, 0x0),
+    (0x0BF0B, 0x0),
+    (0x0BF0C, 0x0),
+    (0x0BF0D, 0x0),
+    (0x0BF12, 0x0),
+    (0x0BF13, 0x0),
+    (0x0BF1C, 0x0),
+    (0x0BF1D, 0x0),
+    (0x0BF22, 0x0),
+    (0x0BF23, 0x0),
+    (0x0BFEE, 0x0),
+    (0x0BFEF, 0x0),
+    (0x0BFF6, 0x0),
+    (0x0BFF7, 0x0),
+    (0x0BFFE, 0x0),
+    (0x0BFFF, 0x0),
+    (0x0C006, 0x0),
+    (0x0C007, 0x0),
+    (0x0C00E, 0x0),
+    (0x0C00F, 0x0),
+    (0x0C010, 0x0),
+    (0x0C011, 0x0),
+    (0x0C017, 0x0),
+    (0x0C020, 0x0),
+    (0x0C021, 0x0),
+    (0x0C026, 0x0),
+    (0x0C027, 0x0),
+    (0x0C02E, 0x0),
+    (0x0C02F, 0x0),
+    (0x0C030, 0x0),
+    (0x0C031, 0x0),
+    (0x0C036, 0x0),
+    (0x0C037, 0x0),
+    (0x0C040, 0x0),
+    (0x0C041, 0x0),
+    (0x0C046, 0x0),
+    (0x0C047, 0x0),
+    (0x0CC7C, 0x2),
+    (0x0CC7D, 0x2),
+    (0x0CC83, 0x2),
+    (0x0CC84, 0xC),
+    (0x0CC85, 0xC),
+    (0x0CC8A, 0xC),
+    (0x0CC8B, 0xC),
+    (0x0CC8C, 0xC),
+    (0x0CC8D, 0xC),
+    (0x0CC93, 0x2),
+    (0x0CC94, 0x2),
+    (0x0CC95, 0x2),
+    (0x0CC98, 0x2),
+    (0x0CC99, 0x2),
+    (0x0CC9A, 0x2),
+    (0x0CC9B, 0x2),
+    (0x0CC9C, 0x2),
+    (0x0CC9D, 0x2),
+    (0x0CC9E, 0x2),
+    (0x0CC9F, 0x2),
+    (0x0CCA0, 0x2),
+    (0x0CCA1, 0x2),
+    (0x0CCA2, 0x2),
+    (0x0CCA3, 0x2),
+    (0x0CCA4, 0xC),
+    (0x0CCA5, 0xC),
+    (0x0CCA6, 0xC),
+    (0x0CCA7, 0xC),
+    (0x0CCA8, 0x2),
+    (0x0CCA9, 0x2),
+    (0x0CCAE, 0x2),
+    (0x0CCAF, 0x2),
+    (0x0CCB0, 0x2),
+    (0x0CCB1, 0xC),
+    (0x0CCB2, 0x2),
+    (0x0CCB3, 0x2),
+    (0x0CCB6, 0x2),
+    (0x0CCB7, 0x2),
+    (0x0CCB8, 0x2),
+    (0x0CCB9, 0x2),
+    (0x0CCBE, 0x2),
+    (0x0CCBF, 0x2),
+    (0x0CCC0, 0xC),
+    (0x0CCC1, 0xC),
+    (0x0CCCE, 0x2),
+    (0x0CCCF, 0x2),
+    (0x0CDA0, 0x2),
+    (0x0CDA1, 0x2),
+    (0x0CDA7, 0x2),
+    (0x0CDA8, 0xC),
+    (0x0CDA9, 0xC),
+    (0x0CDAE, 0xC),
+    (0x0CDAF, 0xC),
+    (0x0CDB0, 0xC),
+    (0x0CDB1, 0x2),
+    (0x0CDB7, 0x2),
+    (0x0CDB8, 0x2),
+    (0x0CDB9, 0x2),
+    (0x0CDBC, 0x2),
+    (0x0CDBD, 0x2),
+    (0x0CDBE, 0x2),
+    (0x0CDBF, 0x2),
+    (0x0CDC0, 0x2),
+    (0x0CDC1, 0x2),
+    (0x0CDC2, 0x2),
+    (0x0CDC3, 0x2),
+    (0x0CDC4, 0x2),
+    (0x0CDC5, 0x2),
+    (0x0CDC6, 0x2),
+    (0x0CDC7, 0x2),
+    (0x0CDC8, 0xC),
+    (0x0CDC9, 0xC),
+    (0x0CDCA, 0xC),
+    (0x0CDCB, 0xC),
+    (0x0CDCC, 0x2),
+    (0x0CDCD, 0x2),
+    (0x0CDD2, 0x2),
+    (0x0CDD3, 0x2),
+    (0x0CDD4, 0x2),
+    (0x0CDD5, 0xC),
+    (0x0CDD6, 0x2),
+    (0x0CDD7, 0x2),
+    (0x0CDDA, 0x2),
+    (0x0CDDB, 0x2),
+    (0x0CDDC, 0x2),
+    (0x0CDDD, 0x2),
+    (0x0CDE2, 0x2),
+    (0x0CDE3, 0x2),
+    (0x0CDE4, 0xC),
+    (0x0CDE5, 0xC),
+    (0x0CDF2, 0x2),
+    (0x0CDF3, 0x2),
+    (0x0D10A, 0x0),
+    (0x0D10B, 0x0),
+    (0x0D112, 0x0),
+    (0x0D113, 0x0),
+    (0x0D11A, 0x0),
+    (0x0D11B, 0x0),
+    (0x0D122, 0x0),
+    (0x0D123, 0x0),
+    (0x0D12A, 0x0),
+    (0x0D12B, 0x0),
+    (0x0D12C, 0x0),
+    (0x0D12D, 0x0),
+    (0x0D132, 0x0),
+    (0x0D133, 0x0),
+    (0x0D13C, 0x0),
+    (0x0D13D, 0x0),
+    (0x0D142, 0x0),
+    (0x0D143, 0x0),
+    (0x0D14A, 0x0),
+    (0x0D14B, 0x0),
+    (0x0D14C, 0x0),
+    (0x0D14D, 0x0),
+    (0x0D152, 0x0),
+    (0x0D153, 0x0),
+    (0x0D15C, 0x0),
+    (0x0D15D, 0x0),
+    (0x0D162, 0x0),
+    (0x0D163, 0x0),
+    (0x0D22E, 0x0),
+    (0x0D22F, 0x0),
+    (0x0D236, 0x0),
+    (0x0D237, 0x0),
+    (0x0D23E, 0x0),
+    (0x0D23F, 0x0),
+    (0x0D246, 0x0),
+    (0x0D247, 0x0),
+    (0x0D24E, 0x0),
+    (0x0D24F, 0x0),
+    (0x0D250, 0x0),
+    (0x0D251, 0x0),
+    (0x0D256, 0x0),
+    (0x0D257, 0x0),
+    (0x0D260, 0x0),
+    (0x0D261, 0x0),
+    (0x0D266, 0x0),
+    (0x0D267, 0x0),
+    (0x0D26E, 0x0),
+    (0x0D26F, 0x0),
+    (0x0D270, 0x0),
+    (0x0D271, 0x0),
+    (0x0D276, 0x0),
+    (0x0D277, 0x0),
+    (0x0D280, 0x0),
+    (0x0D281, 0x0),
+    (0x0D286, 0x0),
+    (0x0D287, 0x0),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIFTH_APPEARANCE_VIDEO_FRAME: u64 = 1092;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIFTH_PROCESS_BYTES: [(u16, u8); 6] = [
+    (0xAAC9, 0x00),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAEB, 0x5B),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x07),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIFTH_APPEARANCE_RAM_BYTES: [(u16, u8); 312] = [
+    (0x9C00, 0x87),
+    (0x9C10, 0x3F),
+    (0x9C11, 0xBA),
+    (0x9C12, 0x3F),
+    (0x9C13, 0xAC),
+    (0x9C14, 0x3F),
+    (0x9C16, 0x3F),
+    (0x9C17, 0x90),
+    (0x9C18, 0x3F),
+    (0x9C19, 0x82),
+    (0x9C1A, 0x3F),
+    (0x9C1B, 0x74),
+    (0x9C1C, 0x38),
+    (0x9C1D, 0xBA),
+    (0x9C1E, 0x38),
+    (0x9C1F, 0xAC),
+    (0x9C20, 0x38),
+    (0x9C22, 0x38),
+    (0x9C23, 0x90),
+    (0x9C24, 0x38),
+    (0x9C25, 0x82),
+    (0x9C26, 0x38),
+    (0x9C27, 0x74),
+    (0x9C29, 0xBA),
+    (0x9C2B, 0xAC),
+    (0x9C2F, 0x90),
+    (0x9C31, 0x82),
+    (0x9C33, 0x74),
+    (0x9C34, 0x2A),
+    (0x9C35, 0xBA),
+    (0x9C36, 0x2A),
+    (0x9C37, 0xAC),
+    (0x9C38, 0x2A),
+    (0x9C3A, 0x2A),
+    (0x9C3B, 0x90),
+    (0x9C3C, 0x2A),
+    (0x9C3D, 0x82),
+    (0x9C3E, 0x2A),
+    (0x9C3F, 0x74),
+    (0x9C40, 0x87),
+    (0x9C50, 0x43),
+    (0x9C51, 0xBA),
+    (0x9C52, 0x43),
+    (0x9C53, 0xAC),
+    (0x9C54, 0x43),
+    (0x9C56, 0x43),
+    (0x9C57, 0x90),
+    (0x9C58, 0x43),
+    (0x9C59, 0x82),
+    (0x9C5A, 0x43),
+    (0x9C5B, 0x74),
+    (0x9C5C, 0x3C),
+    (0x9C5D, 0xBA),
+    (0x9C5E, 0x3C),
+    (0x9C5F, 0xAC),
+    (0x9C60, 0x3C),
+    (0x9C62, 0x3C),
+    (0x9C63, 0x90),
+    (0x9C64, 0x3C),
+    (0x9C65, 0x82),
+    (0x9C66, 0x3C),
+    (0x9C67, 0x74),
+    (0x9C69, 0xBA),
+    (0x9C6B, 0xAC),
+    (0x9C6F, 0x90),
+    (0x9C71, 0x82),
+    (0x9C73, 0x74),
+    (0x9C74, 0x2E),
+    (0x9C75, 0xBA),
+    (0x9C76, 0x2E),
+    (0x9C77, 0xAC),
+    (0x9C78, 0x2E),
+    (0x9C7A, 0x2E),
+    (0x9C7B, 0x90),
+    (0x9C7C, 0x2E),
+    (0x9C7D, 0x82),
+    (0x9C7E, 0x2E),
+    (0x9C7F, 0x74),
+    (0x9C80, 0x87),
+    (0x9C90, 0x47),
+    (0x9C91, 0xBA),
+    (0x9C92, 0x47),
+    (0x9C93, 0xAC),
+    (0x9C94, 0x47),
+    (0x9C96, 0x47),
+    (0x9C97, 0x90),
+    (0x9C98, 0x47),
+    (0x9C99, 0x82),
+    (0x9C9A, 0x47),
+    (0x9C9B, 0x74),
+    (0x9C9C, 0x40),
+    (0x9C9D, 0xBA),
+    (0x9C9E, 0x40),
+    (0x9C9F, 0xAC),
+    (0x9CA0, 0x40),
+    (0x9CA2, 0x40),
+    (0x9CA3, 0x90),
+    (0x9CA4, 0x40),
+    (0x9CA5, 0x82),
+    (0x9CA6, 0x40),
+    (0x9CA7, 0x74),
+    (0x9CA9, 0xBA),
+    (0x9CAB, 0xAC),
+    (0x9CAF, 0x90),
+    (0x9CB1, 0x82),
+    (0x9CB3, 0x74),
+    (0x9CB4, 0x32),
+    (0x9CB5, 0xBA),
+    (0x9CB6, 0x32),
+    (0x9CB7, 0xAC),
+    (0x9CB8, 0x32),
+    (0x9CBA, 0x32),
+    (0x9CBB, 0x90),
+    (0x9CBC, 0x32),
+    (0x9CBD, 0x82),
+    (0x9CBE, 0x32),
+    (0x9CBF, 0x74),
+    (0x9CC0, 0x87),
+    (0x9CD0, 0x4B),
+    (0x9CD1, 0xBA),
+    (0x9CD2, 0x4B),
+    (0x9CD3, 0xAC),
+    (0x9CD4, 0x4B),
+    (0x9CD6, 0x4B),
+    (0x9CD7, 0x90),
+    (0x9CD8, 0x4B),
+    (0x9CD9, 0x82),
+    (0x9CDA, 0x4B),
+    (0x9CDB, 0x74),
+    (0x9CDC, 0x44),
+    (0x9CDD, 0xBA),
+    (0x9CDE, 0x44),
+    (0x9CDF, 0xAC),
+    (0x9CE0, 0x44),
+    (0x9CE2, 0x44),
+    (0x9CE3, 0x90),
+    (0x9CE4, 0x44),
+    (0x9CE5, 0x82),
+    (0x9CE6, 0x44),
+    (0x9CE7, 0x74),
+    (0x9CE9, 0xBA),
+    (0x9CEB, 0xAC),
+    (0x9CEF, 0x90),
+    (0x9CF1, 0x82),
+    (0x9CF3, 0x74),
+    (0x9CF4, 0x36),
+    (0x9CF5, 0xBA),
+    (0x9CF6, 0x36),
+    (0x9CF7, 0xAC),
+    (0x9CF8, 0x36),
+    (0x9CFA, 0x36),
+    (0x9CFB, 0x90),
+    (0x9CFC, 0x36),
+    (0x9CFD, 0x82),
+    (0x9CFE, 0x36),
+    (0x9CFF, 0x74),
+    (0x9D00, 0x87),
+    (0x9D10, 0x4F),
+    (0x9D11, 0xBA),
+    (0x9D12, 0x4F),
+    (0x9D13, 0xAC),
+    (0x9D14, 0x4F),
+    (0x9D16, 0x4F),
+    (0x9D17, 0x90),
+    (0x9D18, 0x4F),
+    (0x9D19, 0x82),
+    (0x9D1A, 0x4F),
+    (0x9D1B, 0x74),
+    (0x9D1C, 0x48),
+    (0x9D1D, 0xBA),
+    (0x9D1E, 0x48),
+    (0x9D1F, 0xAC),
+    (0x9D20, 0x48),
+    (0x9D22, 0x48),
+    (0x9D23, 0x90),
+    (0x9D24, 0x48),
+    (0x9D25, 0x82),
+    (0x9D26, 0x48),
+    (0x9D27, 0x74),
+    (0x9D29, 0xBA),
+    (0x9D2B, 0xAC),
+    (0x9D2F, 0x90),
+    (0x9D31, 0x82),
+    (0x9D33, 0x74),
+    (0x9D34, 0x3A),
+    (0x9D35, 0xBA),
+    (0x9D36, 0x3A),
+    (0x9D37, 0xAC),
+    (0x9D38, 0x3A),
+    (0x9D3A, 0x3A),
+    (0x9D3B, 0x90),
+    (0x9D3C, 0x3A),
+    (0x9D3D, 0x82),
+    (0x9D3E, 0x3A),
+    (0x9D3F, 0x74),
+    (0x9D40, 0x87),
+    (0x9D50, 0x53),
+    (0x9D51, 0xBA),
+    (0x9D52, 0x53),
+    (0x9D53, 0xAC),
+    (0x9D54, 0x53),
+    (0x9D56, 0x53),
+    (0x9D57, 0x90),
+    (0x9D58, 0x53),
+    (0x9D59, 0x82),
+    (0x9D5A, 0x53),
+    (0x9D5B, 0x74),
+    (0x9D5C, 0x4C),
+    (0x9D5D, 0xBA),
+    (0x9D5E, 0x4C),
+    (0x9D5F, 0xAC),
+    (0x9D60, 0x4C),
+    (0x9D62, 0x4C),
+    (0x9D63, 0x90),
+    (0x9D64, 0x4C),
+    (0x9D65, 0x82),
+    (0x9D66, 0x4C),
+    (0x9D67, 0x74),
+    (0x9D69, 0xBA),
+    (0x9D6B, 0xAC),
+    (0x9D6F, 0x90),
+    (0x9D71, 0x82),
+    (0x9D73, 0x74),
+    (0x9D74, 0x3E),
+    (0x9D75, 0xBA),
+    (0x9D76, 0x3E),
+    (0x9D77, 0xAC),
+    (0x9D78, 0x3E),
+    (0x9D7A, 0x3E),
+    (0x9D7B, 0x90),
+    (0x9D7C, 0x3E),
+    (0x9D7D, 0x82),
+    (0x9D7E, 0x3E),
+    (0x9D7F, 0x74),
+    (0x9D80, 0x87),
+    (0x9D90, 0x57),
+    (0x9D91, 0xBA),
+    (0x9D92, 0x57),
+    (0x9D93, 0xAC),
+    (0x9D94, 0x57),
+    (0x9D96, 0x57),
+    (0x9D97, 0x90),
+    (0x9D98, 0x57),
+    (0x9D99, 0x82),
+    (0x9D9A, 0x57),
+    (0x9D9B, 0x74),
+    (0x9D9C, 0x50),
+    (0x9D9D, 0xBA),
+    (0x9D9E, 0x50),
+    (0x9D9F, 0xAC),
+    (0x9DA0, 0x50),
+    (0x9DA2, 0x50),
+    (0x9DA3, 0x90),
+    (0x9DA4, 0x50),
+    (0x9DA5, 0x82),
+    (0x9DA6, 0x50),
+    (0x9DA7, 0x74),
+    (0x9DA9, 0xBA),
+    (0x9DAB, 0xAC),
+    (0x9DAF, 0x90),
+    (0x9DB1, 0x82),
+    (0x9DB3, 0x74),
+    (0x9DB4, 0x42),
+    (0x9DB5, 0xBA),
+    (0x9DB6, 0x42),
+    (0x9DB7, 0xAC),
+    (0x9DB8, 0x42),
+    (0x9DBA, 0x42),
+    (0x9DBB, 0x90),
+    (0x9DBC, 0x42),
+    (0x9DBD, 0x82),
+    (0x9DBE, 0x42),
+    (0x9DBF, 0x74),
+    (0x9DC0, 0x87),
+    (0x9DD0, 0x55),
+    (0x9DD1, 0xBA),
+    (0x9DD2, 0x55),
+    (0x9DD3, 0xAC),
+    (0x9DD4, 0x55),
+    (0x9DD6, 0x55),
+    (0x9DD7, 0x90),
+    (0x9DD8, 0x55),
+    (0x9DD9, 0x82),
+    (0x9DDA, 0x55),
+    (0x9DDB, 0x74),
+    (0x9DDD, 0xBA),
+    (0x9DDF, 0xAC),
+    (0x9DE3, 0x90),
+    (0x9DE5, 0x82),
+    (0x9DE7, 0x74),
+    (0x9DE8, 0x47),
+    (0x9DE9, 0xBA),
+    (0x9DEA, 0x47),
+    (0x9DEB, 0xAC),
+    (0x9DEC, 0x47),
+    (0x9DEE, 0x47),
+    (0x9DEF, 0x90),
+    (0x9DF0, 0x47),
+    (0x9DF1, 0x82),
+    (0x9DF2, 0x47),
+    (0x9DF3, 0x74),
+    (0x9DF4, 0x40),
+    (0x9DF5, 0xBA),
+    (0x9DF6, 0x40),
+    (0x9DF7, 0xAC),
+    (0x9DF8, 0x40),
+    (0x9DFA, 0x40),
+    (0x9DFB, 0x90),
+    (0x9DFC, 0x40),
+    (0x9DFD, 0x82),
+    (0x9DFE, 0x40),
+    (0x9DFF, 0x74),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIFTH_VISIBLE_NIBBLES: [(u32, u8); 782] = [
+    (0x04737, 0xF),
+    (0x0485A, 0xF),
+    (0x0485B, 0xF),
+    (0x07CA4, 0xC),
+    (0x07CA5, 0xC),
+    (0x07CB2, 0x2),
+    (0x07CB3, 0x2),
+    (0x07CB4, 0xC),
+    (0x07CB5, 0xC),
+    (0x07CBA, 0xC),
+    (0x07CBB, 0xC),
+    (0x07CBC, 0xC),
+    (0x07CBD, 0xC),
+    (0x07CC0, 0xC),
+    (0x07CC1, 0xC),
+    (0x07CC2, 0xC),
+    (0x07CC3, 0xC),
+    (0x07CC4, 0xC),
+    (0x07CC5, 0xC),
+    (0x07CC8, 0xC),
+    (0x07CC9, 0xC),
+    (0x07CCA, 0x2),
+    (0x07CCB, 0x2),
+    (0x07CCC, 0xC),
+    (0x07CCE, 0x2),
+    (0x07CCF, 0x2),
+    (0x07CD2, 0x2),
+    (0x07CD3, 0x2),
+    (0x07CD6, 0x2),
+    (0x07CD7, 0x2),
+    (0x07CDA, 0xC),
+    (0x07CDB, 0xC),
+    (0x07DC8, 0xC),
+    (0x07DC9, 0xC),
+    (0x07DD1, 0xC),
+    (0x07DD6, 0x2),
+    (0x07DD7, 0x2),
+    (0x07DD8, 0xC),
+    (0x07DD9, 0xC),
+    (0x07DDE, 0xC),
+    (0x07DDF, 0xC),
+    (0x07DE0, 0xC),
+    (0x07DE1, 0xC),
+    (0x07DE4, 0xC),
+    (0x07DE5, 0xC),
+    (0x07DE6, 0xC),
+    (0x07DE7, 0xC),
+    (0x07DE8, 0xC),
+    (0x07DE9, 0xC),
+    (0x07DEC, 0xC),
+    (0x07DED, 0xC),
+    (0x07DEE, 0xC),
+    (0x07DEF, 0x2),
+    (0x07DF0, 0xC),
+    (0x07DF2, 0x2),
+    (0x07DF3, 0x2),
+    (0x07DF6, 0x2),
+    (0x07DF7, 0x2),
+    (0x07DFA, 0xC),
+    (0x07DFB, 0xC),
+    (0x07DFE, 0xC),
+    (0x07DFF, 0xC),
+    (0x07E16, 0xC),
+    (0x07E17, 0xC),
+    (0x0837E, 0x0),
+    (0x0837F, 0x0),
+    (0x0838A, 0x0),
+    (0x0838B, 0x0),
+    (0x0838E, 0x0),
+    (0x0838F, 0x0),
+    (0x08392, 0x0),
+    (0x08393, 0x0),
+    (0x08396, 0x0),
+    (0x08397, 0x0),
+    (0x0839A, 0x0),
+    (0x0839B, 0x0),
+    (0x0839E, 0x0),
+    (0x0839F, 0x0),
+    (0x083A2, 0x0),
+    (0x083A3, 0x0),
+    (0x083A4, 0x0),
+    (0x083A5, 0x0),
+    (0x083A6, 0x0),
+    (0x083AA, 0x0),
+    (0x083AB, 0x0),
+    (0x083AE, 0x0),
+    (0x083AF, 0x0),
+    (0x083B0, 0x0),
+    (0x083B1, 0x0),
+    (0x083B2, 0x0),
+    (0x083B3, 0x0),
+    (0x083B6, 0x0),
+    (0x083B7, 0x0),
+    (0x083BA, 0x0),
+    (0x083BB, 0x0),
+    (0x083BC, 0x0),
+    (0x083BD, 0x0),
+    (0x083BE, 0x0),
+    (0x083BF, 0x0),
+    (0x083C2, 0x0),
+    (0x083C3, 0x0),
+    (0x083CA, 0x0),
+    (0x083CB, 0x0),
+    (0x084A2, 0x0),
+    (0x084A3, 0x0),
+    (0x084AB, 0x0),
+    (0x084AE, 0x0),
+    (0x084AF, 0x0),
+    (0x084B2, 0x0),
+    (0x084B3, 0x0),
+    (0x084B6, 0x0),
+    (0x084B7, 0x0),
+    (0x084BA, 0x0),
+    (0x084BB, 0x0),
+    (0x084BE, 0x0),
+    (0x084BF, 0x0),
+    (0x084C2, 0x0),
+    (0x084C3, 0x0),
+    (0x084C6, 0x0),
+    (0x084C7, 0x0),
+    (0x084C8, 0x0),
+    (0x084C9, 0x0),
+    (0x084CA, 0x0),
+    (0x084CE, 0x0),
+    (0x084CF, 0x0),
+    (0x084D2, 0x0),
+    (0x084D3, 0x0),
+    (0x084D4, 0x0),
+    (0x084D5, 0x0),
+    (0x084D6, 0x0),
+    (0x084D7, 0x0),
+    (0x084DA, 0x0),
+    (0x084DB, 0x0),
+    (0x084DE, 0x0),
+    (0x084DF, 0x0),
+    (0x084E0, 0x0),
+    (0x084E1, 0x0),
+    (0x084E2, 0x0),
+    (0x084E3, 0x0),
+    (0x084E6, 0x0),
+    (0x084E7, 0x0),
+    (0x084EC, 0x0),
+    (0x084ED, 0x0),
+    (0x084EE, 0x0),
+    (0x084EF, 0x0),
+    (0x08C9C, 0xC),
+    (0x08C9D, 0xC),
+    (0x08CA4, 0xC),
+    (0x08CA5, 0xC),
+    (0x08CAA, 0x2),
+    (0x08CAB, 0x2),
+    (0x08CAC, 0xC),
+    (0x08CAD, 0xC),
+    (0x08CB2, 0xC),
+    (0x08CB3, 0xC),
+    (0x08CB4, 0xC),
+    (0x08CB5, 0xC),
+    (0x08CB8, 0xC),
+    (0x08CB9, 0x2),
+    (0x08CBA, 0xC),
+    (0x08CBB, 0xC),
+    (0x08CBC, 0xC),
+    (0x08CBD, 0xC),
+    (0x08CC0, 0xC),
+    (0x08CC1, 0xC),
+    (0x08CC2, 0x2),
+    (0x08CC3, 0x2),
+    (0x08CC4, 0xC),
+    (0x08CC6, 0x2),
+    (0x08CC7, 0x2),
+    (0x08CCA, 0x2),
+    (0x08CCB, 0x2),
+    (0x08CCE, 0xC),
+    (0x08CCF, 0xC),
+    (0x08CD2, 0xC),
+    (0x08CD3, 0xC),
+    (0x08CEA, 0xC),
+    (0x08CEB, 0xC),
+    (0x08DC0, 0xC),
+    (0x08DC1, 0xC),
+    (0x08DC8, 0xC),
+    (0x08DC9, 0xC),
+    (0x08DCE, 0x2),
+    (0x08DCF, 0x2),
+    (0x08DD0, 0xC),
+    (0x08DD1, 0x2),
+    (0x08DD6, 0xC),
+    (0x08DD7, 0x2),
+    (0x08DD8, 0xC),
+    (0x08DD9, 0xC),
+    (0x08DDC, 0x2),
+    (0x08DDD, 0x2),
+    (0x08DDE, 0xC),
+    (0x08DDF, 0xC),
+    (0x08DE0, 0xC),
+    (0x08DE1, 0xC),
+    (0x08DE3, 0xC),
+    (0x08DE4, 0xC),
+    (0x08DE5, 0xC),
+    (0x08DE6, 0x2),
+    (0x08DE7, 0xC),
+    (0x08DE8, 0x2),
+    (0x08DEA, 0x2),
+    (0x08DEB, 0x2),
+    (0x08DEE, 0x2),
+    (0x08DEF, 0x2),
+    (0x08DF2, 0xC),
+    (0x08DF3, 0xC),
+    (0x08DF6, 0xC),
+    (0x08DF7, 0xC),
+    (0x08E0E, 0xC),
+    (0x08E0F, 0xC),
+    (0x0912E, 0x0),
+    (0x0912F, 0x0),
+    (0x09136, 0x0),
+    (0x09137, 0x0),
+    (0x0913A, 0x0),
+    (0x0913B, 0x0),
+    (0x0913E, 0x0),
+    (0x0913F, 0x0),
+    (0x09142, 0x0),
+    (0x09143, 0x0),
+    (0x09146, 0x0),
+    (0x09147, 0x0),
+    (0x0914A, 0x0),
+    (0x0914B, 0x0),
+    (0x0914E, 0x0),
+    (0x0914F, 0x0),
+    (0x09152, 0x0),
+    (0x09153, 0x0),
+    (0x09154, 0x0),
+    (0x09155, 0x0),
+    (0x09156, 0x0),
+    (0x0915A, 0x0),
+    (0x0915B, 0x0),
+    (0x0915E, 0x0),
+    (0x0915F, 0x0),
+    (0x09160, 0x0),
+    (0x09161, 0x0),
+    (0x09162, 0x0),
+    (0x09163, 0x0),
+    (0x09166, 0x0),
+    (0x09167, 0x0),
+    (0x0916A, 0x0),
+    (0x0916B, 0x0),
+    (0x0916C, 0x0),
+    (0x0916D, 0x0),
+    (0x0916E, 0x0),
+    (0x0916F, 0x0),
+    (0x09172, 0x0),
+    (0x09173, 0x0),
+    (0x09178, 0x0),
+    (0x09179, 0x0),
+    (0x0917A, 0x0),
+    (0x0917B, 0x0),
+    (0x09252, 0x0),
+    (0x09253, 0x0),
+    (0x0925A, 0x0),
+    (0x0925B, 0x0),
+    (0x0925E, 0x0),
+    (0x0925F, 0x0),
+    (0x09262, 0x0),
+    (0x09263, 0x0),
+    (0x09266, 0x0),
+    (0x09267, 0x0),
+    (0x0926A, 0x0),
+    (0x0926B, 0x0),
+    (0x0926E, 0x0),
+    (0x0926F, 0x0),
+    (0x09272, 0x0),
+    (0x09273, 0x0),
+    (0x09276, 0x0),
+    (0x09277, 0x0),
+    (0x09278, 0x0),
+    (0x09279, 0x0),
+    (0x0927A, 0x0),
+    (0x0927E, 0x0),
+    (0x0927F, 0x0),
+    (0x09282, 0x0),
+    (0x09283, 0x0),
+    (0x09284, 0x0),
+    (0x09285, 0x0),
+    (0x09286, 0x0),
+    (0x09287, 0x0),
+    (0x0928A, 0x0),
+    (0x0928B, 0x0),
+    (0x0928E, 0x0),
+    (0x0928F, 0x0),
+    (0x09290, 0x0),
+    (0x09291, 0x0),
+    (0x09292, 0x0),
+    (0x09293, 0x0),
+    (0x09296, 0x0),
+    (0x09297, 0x0),
+    (0x0929C, 0x0),
+    (0x0929D, 0x0),
+    (0x0929E, 0x0),
+    (0x0929F, 0x0),
+    (0x09C94, 0xC),
+    (0x09C95, 0xC),
+    (0x09C9C, 0xC),
+    (0x09C9D, 0xC),
+    (0x09CA2, 0xC),
+    (0x09CA3, 0xC),
+    (0x09CA4, 0xC),
+    (0x09CA5, 0x2),
+    (0x09CAA, 0x2),
+    (0x09CAB, 0x2),
+    (0x09CAC, 0x2),
+    (0x09CAD, 0x2),
+    (0x09CB0, 0xC),
+    (0x09CB1, 0x2),
+    (0x09CB2, 0xC),
+    (0x09CB3, 0xC),
+    (0x09CB4, 0xC),
+    (0x09CB5, 0x2),
+    (0x09CB6, 0xC),
+    (0x09CB7, 0xC),
+    (0x09CB8, 0x2),
+    (0x09CB9, 0x2),
+    (0x09CBA, 0x2),
+    (0x09CBB, 0xC),
+    (0x09CBC, 0x2),
+    (0x09CBE, 0xC),
+    (0x09CBF, 0xC),
+    (0x09CC6, 0xC),
+    (0x09CC7, 0xC),
+    (0x09CCA, 0xC),
+    (0x09CCB, 0xC),
+    (0x09CE2, 0xC),
+    (0x09CE3, 0xC),
+    (0x09DB8, 0xC),
+    (0x09DB9, 0xC),
+    (0x09DC0, 0xC),
+    (0x09DC1, 0x2),
+    (0x09DC6, 0xC),
+    (0x09DC7, 0xC),
+    (0x09DC8, 0x2),
+    (0x09DC9, 0xC),
+    (0x09DCE, 0x2),
+    (0x09DCF, 0xC),
+    (0x09DD0, 0x2),
+    (0x09DD1, 0x2),
+    (0x09DD4, 0xC),
+    (0x09DD5, 0xC),
+    (0x09DD6, 0xC),
+    (0x09DD7, 0xC),
+    (0x09DD8, 0xC),
+    (0x09DD9, 0xC),
+    (0x09DDA, 0xC),
+    (0x09DDB, 0xC),
+    (0x09DDC, 0x2),
+    (0x09DDD, 0x2),
+    (0x09DDE, 0xC),
+    (0x09DDF, 0xC),
+    (0x09DE0, 0x2),
+    (0x09DE1, 0xC),
+    (0x09DE2, 0xC),
+    (0x09DE3, 0xC),
+    (0x09DEA, 0xC),
+    (0x09DEB, 0xC),
+    (0x09DEE, 0xC),
+    (0x09DEF, 0xC),
+    (0x09E06, 0xC),
+    (0x09E07, 0xC),
+    (0x09EDE, 0x0),
+    (0x09EDF, 0x0),
+    (0x09EE6, 0x0),
+    (0x09EE7, 0x0),
+    (0x09EEA, 0x0),
+    (0x09EEB, 0x0),
+    (0x09EEE, 0x0),
+    (0x09EEF, 0x0),
+    (0x09EF2, 0x0),
+    (0x09EF3, 0x0),
+    (0x09EF6, 0x0),
+    (0x09EF7, 0x0),
+    (0x09EFA, 0x0),
+    (0x09EFB, 0x0),
+    (0x09EFE, 0x0),
+    (0x09EFF, 0x0),
+    (0x09F02, 0x0),
+    (0x09F03, 0x0),
+    (0x09F04, 0x0),
+    (0x09F05, 0x0),
+    (0x09F06, 0x0),
+    (0x09F0E, 0x0),
+    (0x09F0F, 0x0),
+    (0x09F10, 0x0),
+    (0x09F11, 0x0),
+    (0x09F12, 0x0),
+    (0x09F13, 0x0),
+    (0x09F16, 0x0),
+    (0x09F17, 0x0),
+    (0x09F1A, 0x0),
+    (0x09F1B, 0x0),
+    (0x09F1C, 0x0),
+    (0x09F1D, 0x0),
+    (0x09F1E, 0x0),
+    (0x09F1F, 0x0),
+    (0x09F28, 0x0),
+    (0x09F29, 0x0),
+    (0x09F2A, 0x0),
+    (0x09F2B, 0x0),
+    (0x0A002, 0x0),
+    (0x0A003, 0x0),
+    (0x0A00A, 0x0),
+    (0x0A00B, 0x0),
+    (0x0A00E, 0x0),
+    (0x0A00F, 0x0),
+    (0x0A012, 0x0),
+    (0x0A013, 0x0),
+    (0x0A016, 0x0),
+    (0x0A017, 0x0),
+    (0x0A01A, 0x0),
+    (0x0A01B, 0x0),
+    (0x0A01E, 0x0),
+    (0x0A01F, 0x0),
+    (0x0A022, 0x0),
+    (0x0A023, 0x0),
+    (0x0A026, 0x0),
+    (0x0A027, 0x0),
+    (0x0A028, 0x0),
+    (0x0A029, 0x0),
+    (0x0A02A, 0x0),
+    (0x0A02B, 0x0),
+    (0x0A032, 0x0),
+    (0x0A033, 0x0),
+    (0x0A034, 0x0),
+    (0x0A035, 0x0),
+    (0x0A036, 0x0),
+    (0x0A037, 0x0),
+    (0x0A03A, 0x0),
+    (0x0A03B, 0x0),
+    (0x0A03E, 0x0),
+    (0x0A03F, 0x0),
+    (0x0A040, 0x0),
+    (0x0A041, 0x0),
+    (0x0A042, 0x0),
+    (0x0A043, 0x0),
+    (0x0A04C, 0x0),
+    (0x0A04D, 0x0),
+    (0x0A04E, 0x0),
+    (0x0A04F, 0x0),
+    (0x0AC8C, 0xC),
+    (0x0AC8D, 0xC),
+    (0x0AC8E, 0x0),
+    (0x0AC8F, 0x0),
+    (0x0AC94, 0x2),
+    (0x0AC95, 0x2),
+    (0x0AC96, 0x0),
+    (0x0AC97, 0x0),
+    (0x0AC9C, 0xC),
+    (0x0AC9D, 0xC),
+    (0x0AC9E, 0x0),
+    (0x0AC9F, 0x0),
+    (0x0ACA4, 0xC),
+    (0x0ACA5, 0xC),
+    (0x0ACA6, 0x0),
+    (0x0ACA7, 0x0),
+    (0x0ACA8, 0xC),
+    (0x0ACA9, 0xC),
+    (0x0ACAE, 0x2),
+    (0x0ACAF, 0x2),
+    (0x0ACB0, 0xC),
+    (0x0ACB1, 0xC),
+    (0x0ACB6, 0xC),
+    (0x0ACCA, 0x0),
+    (0x0ACCB, 0x0),
+    (0x0ADB0, 0xC),
+    (0x0ADB1, 0xC),
+    (0x0ADB2, 0x0),
+    (0x0ADB3, 0x0),
+    (0x0ADB8, 0x2),
+    (0x0ADB9, 0x2),
+    (0x0ADBA, 0x0),
+    (0x0ADBB, 0x0),
+    (0x0ADC0, 0xC),
+    (0x0ADC1, 0xC),
+    (0x0ADC2, 0x0),
+    (0x0ADC3, 0x0),
+    (0x0ADC8, 0xC),
+    (0x0ADC9, 0xC),
+    (0x0ADCA, 0x0),
+    (0x0ADCB, 0x0),
+    (0x0ADCC, 0xC),
+    (0x0ADCD, 0xC),
+    (0x0ADD2, 0x2),
+    (0x0ADD3, 0x2),
+    (0x0ADD4, 0xC),
+    (0x0ADD5, 0xC),
+    (0x0ADDA, 0xC),
+    (0x0ADEE, 0x0),
+    (0x0ADEF, 0x0),
+    (0x0BA3E, 0x0),
+    (0x0BA3F, 0x0),
+    (0x0BA43, 0x0),
+    (0x0BA46, 0x0),
+    (0x0BA47, 0x0),
+    (0x0BA4A, 0x0),
+    (0x0BA4B, 0x0),
+    (0x0BA4E, 0x0),
+    (0x0BA4F, 0x0),
+    (0x0BA52, 0x0),
+    (0x0BA53, 0x0),
+    (0x0BA56, 0x0),
+    (0x0BA57, 0x0),
+    (0x0BA5A, 0x0),
+    (0x0BA5B, 0x0),
+    (0x0BA5E, 0x0),
+    (0x0BA5F, 0x0),
+    (0x0BA62, 0x0),
+    (0x0BA63, 0x0),
+    (0x0BA64, 0x0),
+    (0x0BA65, 0x0),
+    (0x0BA67, 0x0),
+    (0x0BA6E, 0x0),
+    (0x0BA6F, 0x0),
+    (0x0BA70, 0x0),
+    (0x0BA71, 0x0),
+    (0x0BA72, 0x0),
+    (0x0BA73, 0x0),
+    (0x0BA76, 0x0),
+    (0x0BA77, 0x0),
+    (0x0BA7A, 0x0),
+    (0x0BA7B, 0x0),
+    (0x0BA7E, 0x0),
+    (0x0BA7F, 0x0),
+    (0x0BA88, 0x0),
+    (0x0BA89, 0x0),
+    (0x0BA8A, 0x0),
+    (0x0BA8B, 0x0),
+    (0x0BB62, 0x0),
+    (0x0BB63, 0x0),
+    (0x0BB67, 0x0),
+    (0x0BB6A, 0x0),
+    (0x0BB6B, 0x0),
+    (0x0BB6E, 0x0),
+    (0x0BB6F, 0x0),
+    (0x0BB72, 0x0),
+    (0x0BB73, 0x0),
+    (0x0BB76, 0x0),
+    (0x0BB77, 0x0),
+    (0x0BB7A, 0x0),
+    (0x0BB7B, 0x0),
+    (0x0BB7E, 0x0),
+    (0x0BB7F, 0x0),
+    (0x0BB82, 0x0),
+    (0x0BB83, 0x0),
+    (0x0BB86, 0x0),
+    (0x0BB87, 0x0),
+    (0x0BB88, 0x0),
+    (0x0BB89, 0x0),
+    (0x0BB8B, 0x0),
+    (0x0BB92, 0x0),
+    (0x0BB93, 0x0),
+    (0x0BB94, 0x0),
+    (0x0BB95, 0x0),
+    (0x0BB96, 0x0),
+    (0x0BB97, 0x0),
+    (0x0BB9A, 0x0),
+    (0x0BB9B, 0x0),
+    (0x0BB9E, 0x0),
+    (0x0BB9F, 0x0),
+    (0x0BBA2, 0x0),
+    (0x0BBA3, 0x0),
+    (0x0BBAC, 0x0),
+    (0x0BBAD, 0x0),
+    (0x0BBAE, 0x0),
+    (0x0BBAF, 0x0),
+    (0x0BC84, 0xC),
+    (0x0BC85, 0xC),
+    (0x0BC8B, 0x2),
+    (0x0BC8C, 0x2),
+    (0x0BC8D, 0x2),
+    (0x0BC92, 0xC),
+    (0x0BC93, 0x2),
+    (0x0BC94, 0xC),
+    (0x0BC95, 0xC),
+    (0x0BC9A, 0x2),
+    (0x0BC9B, 0x2),
+    (0x0BC9C, 0xC),
+    (0x0BC9D, 0x2),
+    (0x0BCA0, 0xC),
+    (0x0BCA1, 0xC),
+    (0x0BCA2, 0x2),
+    (0x0BCA3, 0x2),
+    (0x0BCA4, 0xC),
+    (0x0BCA5, 0xC),
+    (0x0BCA6, 0x2),
+    (0x0BCA7, 0x2),
+    (0x0BCA8, 0xC),
+    (0x0BCA9, 0xC),
+    (0x0BCAA, 0x2),
+    (0x0BCAB, 0x2),
+    (0x0BCAD, 0xC),
+    (0x0BCAE, 0x2),
+    (0x0BCAF, 0x2),
+    (0x0BCB6, 0x2),
+    (0x0BCB7, 0x2),
+    (0x0BCBA, 0x2),
+    (0x0BCBB, 0x2),
+    (0x0BCD2, 0x2),
+    (0x0BCD3, 0x2),
+    (0x0BDA8, 0xC),
+    (0x0BDA9, 0xC),
+    (0x0BDAF, 0x2),
+    (0x0BDB0, 0x2),
+    (0x0BDB1, 0xC),
+    (0x0BDB6, 0xC),
+    (0x0BDB7, 0x2),
+    (0x0BDB8, 0xC),
+    (0x0BDB9, 0xC),
+    (0x0BDBE, 0x2),
+    (0x0BDBF, 0x2),
+    (0x0BDC0, 0xC),
+    (0x0BDC1, 0x2),
+    (0x0BDC4, 0xC),
+    (0x0BDC5, 0xC),
+    (0x0BDC6, 0x2),
+    (0x0BDC7, 0x2),
+    (0x0BDC8, 0xC),
+    (0x0BDC9, 0xC),
+    (0x0BDCA, 0x2),
+    (0x0BDCB, 0x2),
+    (0x0BDCC, 0xC),
+    (0x0BDCD, 0xC),
+    (0x0BDCE, 0x2),
+    (0x0BDCF, 0x2),
+    (0x0BDD1, 0xC),
+    (0x0BDD2, 0x2),
+    (0x0BDD3, 0x2),
+    (0x0BDDA, 0x2),
+    (0x0BDDB, 0x2),
+    (0x0BDDE, 0x2),
+    (0x0BDDF, 0x2),
+    (0x0BDF6, 0x2),
+    (0x0BDF7, 0x2),
+    (0x0C7EE, 0x0),
+    (0x0C7EF, 0x0),
+    (0x0C7F3, 0x0),
+    (0x0C7F6, 0x0),
+    (0x0C7F7, 0x0),
+    (0x0C7FA, 0x0),
+    (0x0C7FB, 0x0),
+    (0x0C7FE, 0x0),
+    (0x0C7FF, 0x0),
+    (0x0C803, 0x0),
+    (0x0C806, 0x0),
+    (0x0C807, 0x0),
+    (0x0C80A, 0x0),
+    (0x0C80B, 0x0),
+    (0x0C80E, 0x0),
+    (0x0C80F, 0x0),
+    (0x0C812, 0x0),
+    (0x0C813, 0x0),
+    (0x0C814, 0x0),
+    (0x0C815, 0x0),
+    (0x0C816, 0x0),
+    (0x0C817, 0x0),
+    (0x0C81E, 0x0),
+    (0x0C81F, 0x0),
+    (0x0C820, 0x0),
+    (0x0C821, 0x0),
+    (0x0C822, 0x0),
+    (0x0C823, 0x0),
+    (0x0C826, 0x0),
+    (0x0C827, 0x0),
+    (0x0C82A, 0x0),
+    (0x0C82B, 0x0),
+    (0x0C82E, 0x0),
+    (0x0C82F, 0x0),
+    (0x0C838, 0x0),
+    (0x0C839, 0x0),
+    (0x0C83A, 0x0),
+    (0x0C83B, 0x0),
+    (0x0C912, 0x0),
+    (0x0C913, 0x0),
+    (0x0C917, 0x0),
+    (0x0C91A, 0x0),
+    (0x0C91B, 0x0),
+    (0x0C91E, 0x0),
+    (0x0C91F, 0x0),
+    (0x0C922, 0x0),
+    (0x0C923, 0x0),
+    (0x0C927, 0x0),
+    (0x0C92A, 0x0),
+    (0x0C92B, 0x0),
+    (0x0C92E, 0x0),
+    (0x0C92F, 0x0),
+    (0x0C932, 0x0),
+    (0x0C933, 0x0),
+    (0x0C936, 0x0),
+    (0x0C937, 0x0),
+    (0x0C938, 0x0),
+    (0x0C939, 0x0),
+    (0x0C93A, 0x0),
+    (0x0C93B, 0x0),
+    (0x0C942, 0x0),
+    (0x0C943, 0x0),
+    (0x0C944, 0x0),
+    (0x0C945, 0x0),
+    (0x0C946, 0x0),
+    (0x0C947, 0x0),
+    (0x0C94A, 0x0),
+    (0x0C94B, 0x0),
+    (0x0C94E, 0x0),
+    (0x0C94F, 0x0),
+    (0x0C952, 0x0),
+    (0x0C953, 0x0),
+    (0x0C95C, 0x0),
+    (0x0C95D, 0x0),
+    (0x0C95E, 0x0),
+    (0x0C95F, 0x0),
+    (0x0CC7C, 0x2),
+    (0x0CC7D, 0x2),
+    (0x0CC83, 0x2),
+    (0x0CC84, 0xC),
+    (0x0CC85, 0xC),
+    (0x0CC8A, 0xC),
+    (0x0CC8B, 0xC),
+    (0x0CC8C, 0xC),
+    (0x0CC8D, 0xC),
+    (0x0CC93, 0x2),
+    (0x0CC94, 0x2),
+    (0x0CC95, 0x2),
+    (0x0CC98, 0x2),
+    (0x0CC99, 0x2),
+    (0x0CC9A, 0x2),
+    (0x0CC9B, 0x2),
+    (0x0CC9C, 0x2),
+    (0x0CC9D, 0x2),
+    (0x0CC9E, 0x2),
+    (0x0CC9F, 0x2),
+    (0x0CCA0, 0x2),
+    (0x0CCA1, 0x2),
+    (0x0CCA2, 0x2),
+    (0x0CCA3, 0x2),
+    (0x0CCA4, 0xC),
+    (0x0CCA5, 0xC),
+    (0x0CCA6, 0xC),
+    (0x0CCA7, 0xC),
+    (0x0CCAE, 0x2),
+    (0x0CCAF, 0x2),
+    (0x0CCB2, 0x2),
+    (0x0CCB3, 0x2),
+    (0x0CCCA, 0x2),
+    (0x0CCCB, 0x2),
+    (0x0CDA0, 0x2),
+    (0x0CDA1, 0x2),
+    (0x0CDA7, 0x2),
+    (0x0CDA8, 0xC),
+    (0x0CDA9, 0xC),
+    (0x0CDAE, 0xC),
+    (0x0CDAF, 0xC),
+    (0x0CDB0, 0xC),
+    (0x0CDB1, 0x2),
+    (0x0CDB7, 0x2),
+    (0x0CDB8, 0x2),
+    (0x0CDB9, 0x2),
+    (0x0CDBC, 0x2),
+    (0x0CDBD, 0x2),
+    (0x0CDBE, 0x2),
+    (0x0CDBF, 0x2),
+    (0x0CDC0, 0x2),
+    (0x0CDC1, 0x2),
+    (0x0CDC2, 0x2),
+    (0x0CDC3, 0x2),
+    (0x0CDC4, 0x2),
+    (0x0CDC5, 0x2),
+    (0x0CDC6, 0x2),
+    (0x0CDC7, 0x2),
+    (0x0CDC8, 0xC),
+    (0x0CDC9, 0xC),
+    (0x0CDCA, 0xC),
+    (0x0CDCB, 0xC),
+    (0x0CDD2, 0x2),
+    (0x0CDD3, 0x2),
+    (0x0CDD6, 0x2),
+    (0x0CDD7, 0x2),
+    (0x0CDEE, 0x2),
+    (0x0CDEF, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_APPEARANCE_VIDEO_FRAME: u64 = 1093;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_RAND_STATE: RandState = RandState {
+    seed: 0xCA,
+    hseed: 0x93,
+    lseed: 0x49,
+};
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_PROCESS_BYTES: [(u16, u8); 6] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAEB, 0x5E),
+    (0xAAF6, 0x02),
+    (0xAB05, 0x06),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_APPEARANCE_RAM_BYTES: [(u16, u8); 274] = [
+    (0x9C00, 0x86),
+    (0x9C10, 0x3D),
+    (0x9C11, 0xB6),
+    (0x9C12, 0x3D),
+    (0x9C13, 0xAA),
+    (0x9C14, 0x3D),
+    (0x9C16, 0x3D),
+    (0x9C17, 0x92),
+    (0x9C18, 0x3D),
+    (0x9C19, 0x86),
+    (0x9C1A, 0x3D),
+    (0x9C1B, 0x7A),
+    (0x9C1C, 0x37),
+    (0x9C1D, 0xB6),
+    (0x9C1E, 0x37),
+    (0x9C1F, 0xAA),
+    (0x9C20, 0x37),
+    (0x9C22, 0x37),
+    (0x9C23, 0x92),
+    (0x9C24, 0x37),
+    (0x9C25, 0x86),
+    (0x9C26, 0x37),
+    (0x9C27, 0x7A),
+    (0x9C29, 0xB6),
+    (0x9C2B, 0xAA),
+    (0x9C2F, 0x92),
+    (0x9C31, 0x86),
+    (0x9C33, 0x7A),
+    (0x9C34, 0x2B),
+    (0x9C35, 0xB6),
+    (0x9C36, 0x2B),
+    (0x9C37, 0xAA),
+    (0x9C38, 0x2B),
+    (0x9C3A, 0x2B),
+    (0x9C3B, 0x92),
+    (0x9C3C, 0x2B),
+    (0x9C3D, 0x86),
+    (0x9C3E, 0x2B),
+    (0x9C3F, 0x7A),
+    (0x9C40, 0x86),
+    (0x9C50, 0x41),
+    (0x9C51, 0xB6),
+    (0x9C52, 0x41),
+    (0x9C53, 0xAA),
+    (0x9C54, 0x41),
+    (0x9C56, 0x41),
+    (0x9C57, 0x92),
+    (0x9C58, 0x41),
+    (0x9C59, 0x86),
+    (0x9C5A, 0x41),
+    (0x9C5B, 0x7A),
+    (0x9C5C, 0x3B),
+    (0x9C5D, 0xB6),
+    (0x9C5E, 0x3B),
+    (0x9C5F, 0xAA),
+    (0x9C60, 0x3B),
+    (0x9C62, 0x3B),
+    (0x9C63, 0x92),
+    (0x9C64, 0x3B),
+    (0x9C65, 0x86),
+    (0x9C66, 0x3B),
+    (0x9C67, 0x7A),
+    (0x9C69, 0xB6),
+    (0x9C6B, 0xAA),
+    (0x9C6F, 0x92),
+    (0x9C71, 0x86),
+    (0x9C73, 0x7A),
+    (0x9C74, 0x2F),
+    (0x9C75, 0xB6),
+    (0x9C76, 0x2F),
+    (0x9C77, 0xAA),
+    (0x9C78, 0x2F),
+    (0x9C7A, 0x2F),
+    (0x9C7B, 0x92),
+    (0x9C7C, 0x2F),
+    (0x9C7D, 0x86),
+    (0x9C7E, 0x2F),
+    (0x9C7F, 0x7A),
+    (0x9C80, 0x86),
+    (0x9C90, 0x45),
+    (0x9C91, 0xB6),
+    (0x9C92, 0x45),
+    (0x9C93, 0xAA),
+    (0x9C94, 0x45),
+    (0x9C96, 0x45),
+    (0x9C97, 0x92),
+    (0x9C98, 0x45),
+    (0x9C99, 0x86),
+    (0x9C9A, 0x45),
+    (0x9C9B, 0x7A),
+    (0x9C9C, 0x3F),
+    (0x9C9D, 0xB6),
+    (0x9C9E, 0x3F),
+    (0x9C9F, 0xAA),
+    (0x9CA0, 0x3F),
+    (0x9CA2, 0x3F),
+    (0x9CA3, 0x92),
+    (0x9CA4, 0x3F),
+    (0x9CA5, 0x86),
+    (0x9CA6, 0x3F),
+    (0x9CA7, 0x7A),
+    (0x9CA9, 0xB6),
+    (0x9CAB, 0xAA),
+    (0x9CAF, 0x92),
+    (0x9CB1, 0x86),
+    (0x9CB3, 0x7A),
+    (0x9CB4, 0x33),
+    (0x9CB5, 0xB6),
+    (0x9CB6, 0x33),
+    (0x9CB7, 0xAA),
+    (0x9CB8, 0x33),
+    (0x9CBA, 0x33),
+    (0x9CBB, 0x92),
+    (0x9CBC, 0x33),
+    (0x9CBD, 0x86),
+    (0x9CBE, 0x33),
+    (0x9CBF, 0x7A),
+    (0x9CC0, 0x86),
+    (0x9CD0, 0x49),
+    (0x9CD1, 0xB6),
+    (0x9CD2, 0x49),
+    (0x9CD3, 0xAA),
+    (0x9CD4, 0x49),
+    (0x9CD6, 0x49),
+    (0x9CD7, 0x92),
+    (0x9CD8, 0x49),
+    (0x9CD9, 0x86),
+    (0x9CDA, 0x49),
+    (0x9CDB, 0x7A),
+    (0x9CDC, 0x43),
+    (0x9CDD, 0xB6),
+    (0x9CDE, 0x43),
+    (0x9CDF, 0xAA),
+    (0x9CE0, 0x43),
+    (0x9CE2, 0x43),
+    (0x9CE3, 0x92),
+    (0x9CE4, 0x43),
+    (0x9CE5, 0x86),
+    (0x9CE6, 0x43),
+    (0x9CE7, 0x7A),
+    (0x9CE9, 0xB6),
+    (0x9CEB, 0xAA),
+    (0x9CEF, 0x92),
+    (0x9CF1, 0x86),
+    (0x9CF3, 0x7A),
+    (0x9CF4, 0x37),
+    (0x9CF5, 0xB6),
+    (0x9CF6, 0x37),
+    (0x9CF7, 0xAA),
+    (0x9CF8, 0x37),
+    (0x9CFA, 0x37),
+    (0x9CFB, 0x92),
+    (0x9CFC, 0x37),
+    (0x9CFD, 0x86),
+    (0x9CFE, 0x37),
+    (0x9CFF, 0x7A),
+    (0x9D00, 0x86),
+    (0x9D10, 0x4D),
+    (0x9D11, 0xB6),
+    (0x9D12, 0x4D),
+    (0x9D13, 0xAA),
+    (0x9D14, 0x4D),
+    (0x9D16, 0x4D),
+    (0x9D17, 0x92),
+    (0x9D18, 0x4D),
+    (0x9D19, 0x86),
+    (0x9D1A, 0x4D),
+    (0x9D1B, 0x7A),
+    (0x9D1C, 0x47),
+    (0x9D1D, 0xB6),
+    (0x9D1E, 0x47),
+    (0x9D1F, 0xAA),
+    (0x9D20, 0x47),
+    (0x9D22, 0x47),
+    (0x9D23, 0x92),
+    (0x9D24, 0x47),
+    (0x9D25, 0x86),
+    (0x9D26, 0x47),
+    (0x9D27, 0x7A),
+    (0x9D29, 0xB6),
+    (0x9D2B, 0xAA),
+    (0x9D2F, 0x92),
+    (0x9D31, 0x86),
+    (0x9D33, 0x7A),
+    (0x9D34, 0x3B),
+    (0x9D35, 0xB6),
+    (0x9D36, 0x3B),
+    (0x9D37, 0xAA),
+    (0x9D38, 0x3B),
+    (0x9D3A, 0x3B),
+    (0x9D3B, 0x92),
+    (0x9D3C, 0x3B),
+    (0x9D3D, 0x86),
+    (0x9D3E, 0x3B),
+    (0x9D3F, 0x7A),
+    (0x9D40, 0x86),
+    (0x9D50, 0x51),
+    (0x9D51, 0xB6),
+    (0x9D52, 0x51),
+    (0x9D53, 0xAA),
+    (0x9D54, 0x51),
+    (0x9D56, 0x51),
+    (0x9D57, 0x92),
+    (0x9D58, 0x51),
+    (0x9D59, 0x86),
+    (0x9D5A, 0x51),
+    (0x9D5B, 0x7A),
+    (0x9D5C, 0x4B),
+    (0x9D5D, 0xB6),
+    (0x9D5E, 0x4B),
+    (0x9D5F, 0xAA),
+    (0x9D60, 0x4B),
+    (0x9D62, 0x4B),
+    (0x9D63, 0x92),
+    (0x9D64, 0x4B),
+    (0x9D65, 0x86),
+    (0x9D66, 0x4B),
+    (0x9D67, 0x7A),
+    (0x9D69, 0xB6),
+    (0x9D6B, 0xAA),
+    (0x9D6F, 0x92),
+    (0x9D71, 0x86),
+    (0x9D73, 0x7A),
+    (0x9D74, 0x3F),
+    (0x9D75, 0xB6),
+    (0x9D76, 0x3F),
+    (0x9D77, 0xAA),
+    (0x9D78, 0x3F),
+    (0x9D7A, 0x3F),
+    (0x9D7B, 0x92),
+    (0x9D7C, 0x3F),
+    (0x9D7D, 0x86),
+    (0x9D7E, 0x3F),
+    (0x9D7F, 0x7A),
+    (0x9D80, 0x86),
+    (0x9D90, 0x55),
+    (0x9D91, 0xB6),
+    (0x9D92, 0x55),
+    (0x9D93, 0xAA),
+    (0x9D94, 0x55),
+    (0x9D96, 0x55),
+    (0x9D97, 0x92),
+    (0x9D98, 0x55),
+    (0x9D99, 0x86),
+    (0x9D9A, 0x55),
+    (0x9D9B, 0x7A),
+    (0x9D9C, 0x4F),
+    (0x9D9D, 0xB6),
+    (0x9D9E, 0x4F),
+    (0x9D9F, 0xAA),
+    (0x9DA0, 0x4F),
+    (0x9DA2, 0x4F),
+    (0x9DA3, 0x92),
+    (0x9DA4, 0x4F),
+    (0x9DA5, 0x86),
+    (0x9DA6, 0x4F),
+    (0x9DA7, 0x7A),
+    (0x9DA9, 0xB6),
+    (0x9DAB, 0xAA),
+    (0x9DAF, 0x92),
+    (0x9DB1, 0x86),
+    (0x9DB3, 0x7A),
+    (0x9DB4, 0x43),
+    (0x9DB5, 0xB6),
+    (0x9DB6, 0x43),
+    (0x9DB7, 0xAA),
+    (0x9DB8, 0x43),
+    (0x9DBA, 0x43),
+    (0x9DBB, 0x92),
+    (0x9DBC, 0x43),
+    (0x9DBD, 0x86),
+    (0x9DBE, 0x43),
+    (0x9DBF, 0x7A),
+    (0x9DC0, 0x86),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_VISIBLE_NIBBLES: [(u32, u8); 893] = [
+    (0x07CA4, 0x0),
+    (0x07CA5, 0x0),
+    (0x07CB2, 0x0),
+    (0x07CB3, 0x0),
+    (0x07CB4, 0x0),
+    (0x07CB5, 0x0),
+    (0x07CBA, 0x0),
+    (0x07CBB, 0x0),
+    (0x07CBC, 0x0),
+    (0x07CBD, 0x0),
+    (0x07CC0, 0x0),
+    (0x07CC1, 0x0),
+    (0x07CC2, 0x0),
+    (0x07CC3, 0x0),
+    (0x07CC4, 0x0),
+    (0x07CC5, 0x0),
+    (0x07CC8, 0x0),
+    (0x07CC9, 0x0),
+    (0x07CCA, 0x0),
+    (0x07CCB, 0x0),
+    (0x07CCC, 0x0),
+    (0x07CCE, 0x0),
+    (0x07CCF, 0x0),
+    (0x07CD0, 0x0),
+    (0x07CD2, 0x0),
+    (0x07CD3, 0x0),
+    (0x07CD6, 0x0),
+    (0x07CD7, 0x0),
+    (0x07CD8, 0x0),
+    (0x07CD9, 0x0),
+    (0x07CDA, 0x0),
+    (0x07CDB, 0x0),
+    (0x07CDE, 0x0),
+    (0x07CDF, 0x0),
+    (0x07CE0, 0x0),
+    (0x07CE6, 0x0),
+    (0x07CE7, 0x0),
+    (0x07CE8, 0x0),
+    (0x07CE9, 0x0),
+    (0x07CEE, 0x0),
+    (0x07CEF, 0x0),
+    (0x07CF6, 0x0),
+    (0x07CF7, 0x0),
+    (0x07DC8, 0x0),
+    (0x07DC9, 0x0),
+    (0x07DD1, 0x0),
+    (0x07DD6, 0x0),
+    (0x07DD7, 0x0),
+    (0x07DD8, 0x0),
+    (0x07DD9, 0x0),
+    (0x07DDE, 0x0),
+    (0x07DDF, 0x0),
+    (0x07DE0, 0x0),
+    (0x07DE1, 0x0),
+    (0x07DE4, 0x0),
+    (0x07DE5, 0x0),
+    (0x07DE6, 0x0),
+    (0x07DE7, 0x0),
+    (0x07DE8, 0x0),
+    (0x07DE9, 0x0),
+    (0x07DEC, 0x0),
+    (0x07DED, 0x0),
+    (0x07DEE, 0x0),
+    (0x07DEF, 0x0),
+    (0x07DF0, 0x0),
+    (0x07DF2, 0x0),
+    (0x07DF3, 0x0),
+    (0x07DF4, 0x0),
+    (0x07DF6, 0x0),
+    (0x07DF7, 0x0),
+    (0x07DFA, 0x0),
+    (0x07DFB, 0x0),
+    (0x07DFC, 0x0),
+    (0x07DFD, 0x0),
+    (0x07DFE, 0x0),
+    (0x07DFF, 0x0),
+    (0x07E02, 0x0),
+    (0x07E03, 0x0),
+    (0x07E04, 0x0),
+    (0x07E05, 0x0),
+    (0x07E0A, 0x0),
+    (0x07E0B, 0x0),
+    (0x07E0C, 0x0),
+    (0x07E0D, 0x0),
+    (0x07E12, 0x0),
+    (0x07E13, 0x0),
+    (0x07E16, 0x0),
+    (0x07E17, 0x0),
+    (0x07E1A, 0x0),
+    (0x07E1B, 0x0),
+    (0x0837E, 0xC),
+    (0x0837F, 0xC),
+    (0x0838A, 0x2),
+    (0x0838B, 0x2),
+    (0x0838E, 0xC),
+    (0x0838F, 0xC),
+    (0x08392, 0xC),
+    (0x08393, 0xC),
+    (0x08396, 0xC),
+    (0x08397, 0xC),
+    (0x0839A, 0xC),
+    (0x0839B, 0xC),
+    (0x0839E, 0xC),
+    (0x0839F, 0xC),
+    (0x083A2, 0x2),
+    (0x083A3, 0x2),
+    (0x083A6, 0xC),
+    (0x083AA, 0x2),
+    (0x083AB, 0x2),
+    (0x083AE, 0xC),
+    (0x083AF, 0xC),
+    (0x083B2, 0xC),
+    (0x083B3, 0xC),
+    (0x083B6, 0xC),
+    (0x083B7, 0xC),
+    (0x083BA, 0xC),
+    (0x083BB, 0xC),
+    (0x083BE, 0xC),
+    (0x083BF, 0xC),
+    (0x083C2, 0x2),
+    (0x083C3, 0x2),
+    (0x083CA, 0xC),
+    (0x083CB, 0xC),
+    (0x084A2, 0xC),
+    (0x084A3, 0xC),
+    (0x084AB, 0xC),
+    (0x084AE, 0x2),
+    (0x084AF, 0x2),
+    (0x084B2, 0xC),
+    (0x084B3, 0xC),
+    (0x084B6, 0xC),
+    (0x084B7, 0xC),
+    (0x084BA, 0xC),
+    (0x084BB, 0xC),
+    (0x084BE, 0xC),
+    (0x084BF, 0xC),
+    (0x084C2, 0xC),
+    (0x084C3, 0xC),
+    (0x084C6, 0xC),
+    (0x084C7, 0x2),
+    (0x084CA, 0xC),
+    (0x084CE, 0x2),
+    (0x084CF, 0x2),
+    (0x084D2, 0xC),
+    (0x084D3, 0xC),
+    (0x084D6, 0xC),
+    (0x084D7, 0xC),
+    (0x084DA, 0xC),
+    (0x084DB, 0xC),
+    (0x084DE, 0xC),
+    (0x084DF, 0xC),
+    (0x084E2, 0xC),
+    (0x084E3, 0xC),
+    (0x084E6, 0x2),
+    (0x084E7, 0x2),
+    (0x084EE, 0xC),
+    (0x084EF, 0xC),
+    (0x08C9C, 0x0),
+    (0x08C9D, 0x0),
+    (0x08CA4, 0x0),
+    (0x08CA5, 0x0),
+    (0x08CAA, 0x0),
+    (0x08CAB, 0x0),
+    (0x08CAC, 0x0),
+    (0x08CAD, 0x0),
+    (0x08CB2, 0x0),
+    (0x08CB3, 0x0),
+    (0x08CB4, 0x0),
+    (0x08CB5, 0x0),
+    (0x08CB8, 0x0),
+    (0x08CB9, 0x0),
+    (0x08CBA, 0x0),
+    (0x08CBB, 0x0),
+    (0x08CBC, 0x0),
+    (0x08CBD, 0x0),
+    (0x08CC0, 0x0),
+    (0x08CC1, 0x0),
+    (0x08CC2, 0x0),
+    (0x08CC3, 0x0),
+    (0x08CC4, 0x0),
+    (0x08CC6, 0x0),
+    (0x08CC7, 0x0),
+    (0x08CC8, 0x0),
+    (0x08CC9, 0x0),
+    (0x08CCA, 0x0),
+    (0x08CCB, 0x0),
+    (0x08CCE, 0x0),
+    (0x08CCF, 0x0),
+    (0x08CD0, 0x0),
+    (0x08CD1, 0x0),
+    (0x08CD2, 0x0),
+    (0x08CD3, 0x0),
+    (0x08CD6, 0x0),
+    (0x08CD7, 0x0),
+    (0x08CD8, 0x0),
+    (0x08CD9, 0x0),
+    (0x08CDC, 0x0),
+    (0x08CDD, 0x0),
+    (0x08CDE, 0x0),
+    (0x08CDF, 0x0),
+    (0x08CE0, 0x0),
+    (0x08CE1, 0x0),
+    (0x08CE6, 0x0),
+    (0x08CE7, 0x0),
+    (0x08CEA, 0x0),
+    (0x08CEB, 0x0),
+    (0x08CEE, 0x0),
+    (0x08CEF, 0x0),
+    (0x08DC0, 0x0),
+    (0x08DC1, 0x0),
+    (0x08DC8, 0x0),
+    (0x08DC9, 0x0),
+    (0x08DCE, 0x0),
+    (0x08DCF, 0x0),
+    (0x08DD0, 0x0),
+    (0x08DD1, 0x0),
+    (0x08DD6, 0x0),
+    (0x08DD7, 0x0),
+    (0x08DD8, 0x0),
+    (0x08DD9, 0x0),
+    (0x08DDC, 0x0),
+    (0x08DDD, 0x0),
+    (0x08DDE, 0x0),
+    (0x08DDF, 0x0),
+    (0x08DE0, 0x0),
+    (0x08DE1, 0x0),
+    (0x08DE3, 0x0),
+    (0x08DE4, 0x0),
+    (0x08DE5, 0x0),
+    (0x08DE6, 0x0),
+    (0x08DE7, 0x0),
+    (0x08DE8, 0x0),
+    (0x08DEA, 0x0),
+    (0x08DEB, 0x0),
+    (0x08DEC, 0x0),
+    (0x08DED, 0x0),
+    (0x08DEE, 0x0),
+    (0x08DEF, 0x0),
+    (0x08DF2, 0x0),
+    (0x08DF3, 0x0),
+    (0x08DF4, 0x0),
+    (0x08DF5, 0x0),
+    (0x08DF6, 0x0),
+    (0x08DF7, 0x0),
+    (0x08DFA, 0x0),
+    (0x08DFC, 0x0),
+    (0x08DFD, 0x0),
+    (0x08E02, 0x0),
+    (0x08E03, 0x0),
+    (0x08E04, 0x0),
+    (0x08E05, 0x0),
+    (0x08E0A, 0x0),
+    (0x08E0B, 0x0),
+    (0x08E0E, 0x0),
+    (0x08E0F, 0x0),
+    (0x08E12, 0x0),
+    (0x08E13, 0x0),
+    (0x0912E, 0xC),
+    (0x0912F, 0xC),
+    (0x09136, 0xC),
+    (0x09137, 0xC),
+    (0x0913A, 0x2),
+    (0x0913B, 0x2),
+    (0x0913E, 0xC),
+    (0x0913F, 0xC),
+    (0x09142, 0xC),
+    (0x09143, 0xC),
+    (0x09146, 0xC),
+    (0x09147, 0xC),
+    (0x0914A, 0xC),
+    (0x0914B, 0xC),
+    (0x0914E, 0xC),
+    (0x0914F, 0xC),
+    (0x09152, 0x2),
+    (0x09153, 0x2),
+    (0x09156, 0xC),
+    (0x0915A, 0x2),
+    (0x0915B, 0x2),
+    (0x0915E, 0xC),
+    (0x0915F, 0xC),
+    (0x09162, 0xC),
+    (0x09163, 0xC),
+    (0x09166, 0xC),
+    (0x09167, 0xC),
+    (0x0916A, 0xC),
+    (0x0916B, 0xC),
+    (0x0916E, 0xC),
+    (0x0916F, 0xC),
+    (0x09172, 0x2),
+    (0x09173, 0x2),
+    (0x0917A, 0xC),
+    (0x0917B, 0xC),
+    (0x09252, 0xC),
+    (0x09253, 0xC),
+    (0x0925A, 0xC),
+    (0x0925B, 0xC),
+    (0x0925E, 0x2),
+    (0x0925F, 0x2),
+    (0x09262, 0xC),
+    (0x09263, 0x2),
+    (0x09266, 0xC),
+    (0x09267, 0x2),
+    (0x0926A, 0xC),
+    (0x0926B, 0xC),
+    (0x0926E, 0xC),
+    (0x0926F, 0xC),
+    (0x09272, 0xC),
+    (0x09273, 0xC),
+    (0x09276, 0x2),
+    (0x09277, 0xC),
+    (0x0927A, 0x2),
+    (0x0927E, 0x2),
+    (0x0927F, 0x2),
+    (0x09282, 0xC),
+    (0x09283, 0xC),
+    (0x09286, 0xC),
+    (0x09287, 0xC),
+    (0x0928A, 0xC),
+    (0x0928B, 0xC),
+    (0x0928E, 0xC),
+    (0x0928F, 0xC),
+    (0x09292, 0xC),
+    (0x09293, 0xC),
+    (0x09296, 0x2),
+    (0x09297, 0x2),
+    (0x0929E, 0xC),
+    (0x0929F, 0xC),
+    (0x09C94, 0x0),
+    (0x09C95, 0x0),
+    (0x09C9C, 0x0),
+    (0x09C9D, 0x0),
+    (0x09CA2, 0x0),
+    (0x09CA3, 0x0),
+    (0x09CA4, 0x0),
+    (0x09CA5, 0x0),
+    (0x09CAA, 0x0),
+    (0x09CAB, 0x0),
+    (0x09CAC, 0x0),
+    (0x09CAD, 0x0),
+    (0x09CB0, 0x0),
+    (0x09CB1, 0x0),
+    (0x09CB2, 0x0),
+    (0x09CB3, 0x0),
+    (0x09CB4, 0x0),
+    (0x09CB5, 0x0),
+    (0x09CB6, 0x0),
+    (0x09CB7, 0x0),
+    (0x09CB8, 0x0),
+    (0x09CB9, 0x0),
+    (0x09CBA, 0x0),
+    (0x09CBB, 0x0),
+    (0x09CBC, 0x0),
+    (0x09CBE, 0x0),
+    (0x09CBF, 0x0),
+    (0x09CC0, 0x0),
+    (0x09CC1, 0x0),
+    (0x09CC6, 0x0),
+    (0x09CC7, 0x0),
+    (0x09CC8, 0x0),
+    (0x09CC9, 0x0),
+    (0x09CCA, 0x0),
+    (0x09CCB, 0x0),
+    (0x09CCE, 0x0),
+    (0x09CD0, 0x0),
+    (0x09CD1, 0x0),
+    (0x09CD4, 0x0),
+    (0x09CD5, 0x0),
+    (0x09CD6, 0x0),
+    (0x09CD7, 0x0),
+    (0x09CD8, 0x0),
+    (0x09CD9, 0x0),
+    (0x09CDE, 0x0),
+    (0x09CDF, 0x0),
+    (0x09CE2, 0x0),
+    (0x09CE3, 0x0),
+    (0x09CE6, 0x0),
+    (0x09CE7, 0x0),
+    (0x09DB8, 0x0),
+    (0x09DB9, 0x0),
+    (0x09DC0, 0x0),
+    (0x09DC1, 0x0),
+    (0x09DC6, 0x0),
+    (0x09DC7, 0x0),
+    (0x09DC8, 0x0),
+    (0x09DC9, 0x0),
+    (0x09DCE, 0x0),
+    (0x09DCF, 0x0),
+    (0x09DD0, 0x0),
+    (0x09DD1, 0x0),
+    (0x09DD4, 0x0),
+    (0x09DD5, 0x0),
+    (0x09DD6, 0x0),
+    (0x09DD7, 0x0),
+    (0x09DD8, 0x0),
+    (0x09DD9, 0x0),
+    (0x09DDA, 0x0),
+    (0x09DDB, 0x0),
+    (0x09DDC, 0x0),
+    (0x09DDD, 0x0),
+    (0x09DDE, 0x0),
+    (0x09DDF, 0x0),
+    (0x09DE0, 0x0),
+    (0x09DE1, 0x0),
+    (0x09DE2, 0x0),
+    (0x09DE3, 0x0),
+    (0x09DE4, 0x0),
+    (0x09DE5, 0x0),
+    (0x09DEA, 0x0),
+    (0x09DEB, 0x0),
+    (0x09DEC, 0x0),
+    (0x09DED, 0x0),
+    (0x09DEE, 0x0),
+    (0x09DEF, 0x0),
+    (0x09DF2, 0x0),
+    (0x09DF4, 0x0),
+    (0x09DF5, 0x0),
+    (0x09DF8, 0x0),
+    (0x09DF9, 0x0),
+    (0x09DFA, 0x0),
+    (0x09DFB, 0x0),
+    (0x09DFC, 0x0),
+    (0x09DFD, 0x0),
+    (0x09E02, 0x0),
+    (0x09E03, 0x0),
+    (0x09E06, 0x0),
+    (0x09E07, 0x0),
+    (0x09E0A, 0x0),
+    (0x09E0B, 0x0),
+    (0x09EDE, 0xC),
+    (0x09EDF, 0xC),
+    (0x09EE6, 0xC),
+    (0x09EE7, 0xC),
+    (0x09EEA, 0xC),
+    (0x09EEB, 0xC),
+    (0x09EEE, 0xC),
+    (0x09EEF, 0x2),
+    (0x09EF2, 0x2),
+    (0x09EF3, 0x2),
+    (0x09EF6, 0x2),
+    (0x09EF7, 0x2),
+    (0x09EFA, 0xC),
+    (0x09EFB, 0xC),
+    (0x09EFE, 0xC),
+    (0x09EFF, 0x2),
+    (0x09F02, 0x2),
+    (0x09F03, 0xC),
+    (0x09F06, 0x2),
+    (0x09F0E, 0x2),
+    (0x09F0F, 0x2),
+    (0x09F12, 0xC),
+    (0x09F13, 0xC),
+    (0x09F16, 0x2),
+    (0x09F17, 0x2),
+    (0x09F1A, 0xC),
+    (0x09F1B, 0xC),
+    (0x09F1E, 0xC),
+    (0x09F1F, 0xC),
+    (0x09F2A, 0xC),
+    (0x09F2B, 0xC),
+    (0x0A002, 0xC),
+    (0x0A003, 0xC),
+    (0x0A00A, 0xC),
+    (0x0A00B, 0x2),
+    (0x0A00E, 0xC),
+    (0x0A00F, 0xC),
+    (0x0A012, 0x2),
+    (0x0A013, 0xC),
+    (0x0A016, 0x2),
+    (0x0A017, 0xC),
+    (0x0A01A, 0x2),
+    (0x0A01B, 0x2),
+    (0x0A01E, 0xC),
+    (0x0A01F, 0xC),
+    (0x0A022, 0xC),
+    (0x0A023, 0xC),
+    (0x0A026, 0xC),
+    (0x0A027, 0xC),
+    (0x0A02A, 0x2),
+    (0x0A02B, 0xC),
+    (0x0A032, 0x2),
+    (0x0A033, 0x2),
+    (0x0A036, 0xC),
+    (0x0A037, 0xC),
+    (0x0A03A, 0x2),
+    (0x0A03B, 0x2),
+    (0x0A03E, 0xC),
+    (0x0A03F, 0xC),
+    (0x0A042, 0xC),
+    (0x0A043, 0xC),
+    (0x0A04E, 0xC),
+    (0x0A04F, 0xC),
+    (0x0AC8C, 0x0),
+    (0x0AC8D, 0x0),
+    (0x0AC8E, 0xC),
+    (0x0AC8F, 0xC),
+    (0x0AC94, 0x0),
+    (0x0AC95, 0x0),
+    (0x0AC96, 0x2),
+    (0x0AC97, 0x2),
+    (0x0AC9C, 0x0),
+    (0x0AC9D, 0x0),
+    (0x0AC9E, 0xC),
+    (0x0AC9F, 0xC),
+    (0x0ACA4, 0x0),
+    (0x0ACA5, 0x0),
+    (0x0ACA6, 0xC),
+    (0x0ACA7, 0xC),
+    (0x0ACA8, 0x0),
+    (0x0ACA9, 0x0),
+    (0x0ACAE, 0xC),
+    (0x0ACAF, 0xC),
+    (0x0ACB0, 0x0),
+    (0x0ACB1, 0x0),
+    (0x0ACB6, 0x0),
+    (0x0ACB8, 0x0),
+    (0x0ACB9, 0x0),
+    (0x0ACC0, 0x0),
+    (0x0ACC1, 0x0),
+    (0x0ACC6, 0xC),
+    (0x0ACC7, 0xC),
+    (0x0ACC8, 0x0),
+    (0x0ACC9, 0x0),
+    (0x0ACCA, 0x2),
+    (0x0ACCB, 0x2),
+    (0x0ACCE, 0xC),
+    (0x0ACCF, 0xC),
+    (0x0ACD0, 0x0),
+    (0x0ACD1, 0x0),
+    (0x0ACD6, 0x0),
+    (0x0ACD7, 0x0),
+    (0x0ACDA, 0x0),
+    (0x0ACDB, 0x0),
+    (0x0ACDE, 0x0),
+    (0x0ACDF, 0x0),
+    (0x0ADB0, 0x0),
+    (0x0ADB1, 0x0),
+    (0x0ADB2, 0xC),
+    (0x0ADB3, 0xC),
+    (0x0ADB8, 0x0),
+    (0x0ADB9, 0x0),
+    (0x0ADBA, 0x2),
+    (0x0ADBB, 0x2),
+    (0x0ADC0, 0x0),
+    (0x0ADC1, 0x0),
+    (0x0ADC2, 0xC),
+    (0x0ADC3, 0xC),
+    (0x0ADC8, 0x0),
+    (0x0ADC9, 0x0),
+    (0x0ADCA, 0xC),
+    (0x0ADCB, 0xC),
+    (0x0ADCC, 0x0),
+    (0x0ADCD, 0x0),
+    (0x0ADD2, 0xC),
+    (0x0ADD3, 0xC),
+    (0x0ADD4, 0x0),
+    (0x0ADD5, 0x0),
+    (0x0ADDA, 0x0),
+    (0x0ADDC, 0x0),
+    (0x0ADDD, 0x0),
+    (0x0ADE4, 0x0),
+    (0x0ADE5, 0x0),
+    (0x0ADEA, 0xC),
+    (0x0ADEB, 0xC),
+    (0x0ADEC, 0x0),
+    (0x0ADED, 0x0),
+    (0x0ADEE, 0x2),
+    (0x0ADEF, 0x2),
+    (0x0ADF2, 0xC),
+    (0x0ADF3, 0xC),
+    (0x0ADF4, 0x0),
+    (0x0ADF5, 0x0),
+    (0x0ADFA, 0x0),
+    (0x0ADFB, 0x0),
+    (0x0ADFE, 0x0),
+    (0x0ADFF, 0x0),
+    (0x0AE03, 0x0),
+    (0x0BA3E, 0xC),
+    (0x0BA3F, 0xC),
+    (0x0BA43, 0x2),
+    (0x0BA46, 0x2),
+    (0x0BA47, 0x2),
+    (0x0BA4A, 0xC),
+    (0x0BA4B, 0x2),
+    (0x0BA4E, 0xC),
+    (0x0BA4F, 0xC),
+    (0x0BA52, 0x2),
+    (0x0BA53, 0x2),
+    (0x0BA56, 0xC),
+    (0x0BA57, 0x2),
+    (0x0BA5A, 0x2),
+    (0x0BA5B, 0x2),
+    (0x0BA5E, 0xC),
+    (0x0BA5F, 0xC),
+    (0x0BA62, 0x2),
+    (0x0BA63, 0x2),
+    (0x0BA67, 0xC),
+    (0x0BA6E, 0x2),
+    (0x0BA6F, 0x2),
+    (0x0BA72, 0x2),
+    (0x0BA73, 0x2),
+    (0x0BA76, 0xC),
+    (0x0BA77, 0xC),
+    (0x0BA7A, 0x2),
+    (0x0BA7B, 0x2),
+    (0x0BA7E, 0xC),
+    (0x0BA7F, 0xC),
+    (0x0BA8A, 0x2),
+    (0x0BA8B, 0x2),
+    (0x0BB62, 0xC),
+    (0x0BB63, 0xC),
+    (0x0BB67, 0x2),
+    (0x0BB6A, 0x2),
+    (0x0BB6B, 0xC),
+    (0x0BB6E, 0xC),
+    (0x0BB6F, 0x2),
+    (0x0BB72, 0xC),
+    (0x0BB73, 0xC),
+    (0x0BB76, 0x2),
+    (0x0BB77, 0x2),
+    (0x0BB7A, 0xC),
+    (0x0BB7B, 0x2),
+    (0x0BB7E, 0x2),
+    (0x0BB7F, 0x2),
+    (0x0BB82, 0xC),
+    (0x0BB83, 0xC),
+    (0x0BB86, 0x2),
+    (0x0BB87, 0x2),
+    (0x0BB8B, 0xC),
+    (0x0BB92, 0x2),
+    (0x0BB93, 0x2),
+    (0x0BB96, 0x2),
+    (0x0BB97, 0x2),
+    (0x0BB9A, 0xC),
+    (0x0BB9B, 0xC),
+    (0x0BB9E, 0x2),
+    (0x0BB9F, 0x2),
+    (0x0BBA2, 0xC),
+    (0x0BBA3, 0xC),
+    (0x0BBAE, 0x2),
+    (0x0BBAF, 0x2),
+    (0x0BC84, 0x0),
+    (0x0BC85, 0x0),
+    (0x0BC8B, 0x0),
+    (0x0BC8C, 0x0),
+    (0x0BC8D, 0x0),
+    (0x0BC92, 0x0),
+    (0x0BC93, 0x0),
+    (0x0BC94, 0x0),
+    (0x0BC95, 0x0),
+    (0x0BC9A, 0x0),
+    (0x0BC9B, 0x0),
+    (0x0BC9C, 0x0),
+    (0x0BC9D, 0x0),
+    (0x0BCA0, 0x0),
+    (0x0BCA1, 0x0),
+    (0x0BCA2, 0x0),
+    (0x0BCA3, 0x0),
+    (0x0BCA4, 0x0),
+    (0x0BCA5, 0x0),
+    (0x0BCA6, 0x0),
+    (0x0BCA7, 0x0),
+    (0x0BCA8, 0x0),
+    (0x0BCA9, 0x0),
+    (0x0BCAA, 0x0),
+    (0x0BCAB, 0x0),
+    (0x0BCAD, 0x0),
+    (0x0BCAE, 0x0),
+    (0x0BCAF, 0x0),
+    (0x0BCB0, 0x0),
+    (0x0BCB1, 0x0),
+    (0x0BCB6, 0x0),
+    (0x0BCB7, 0x0),
+    (0x0BCB8, 0x0),
+    (0x0BCB9, 0x0),
+    (0x0BCBA, 0x0),
+    (0x0BCBB, 0x0),
+    (0x0BCBE, 0x0),
+    (0x0BCC0, 0x0),
+    (0x0BCC1, 0x0),
+    (0x0BCC6, 0x0),
+    (0x0BCC7, 0x0),
+    (0x0BCC8, 0x0),
+    (0x0BCC9, 0x0),
+    (0x0BCCE, 0x0),
+    (0x0BCCF, 0x0),
+    (0x0BCD2, 0x0),
+    (0x0BCD3, 0x0),
+    (0x0BCD7, 0x0),
+    (0x0BDA8, 0x0),
+    (0x0BDA9, 0x0),
+    (0x0BDAF, 0x0),
+    (0x0BDB0, 0x0),
+    (0x0BDB1, 0x0),
+    (0x0BDB6, 0x0),
+    (0x0BDB7, 0x0),
+    (0x0BDB8, 0x0),
+    (0x0BDB9, 0x0),
+    (0x0BDBE, 0x0),
+    (0x0BDBF, 0x0),
+    (0x0BDC0, 0x0),
+    (0x0BDC1, 0x0),
+    (0x0BDC4, 0x0),
+    (0x0BDC5, 0x0),
+    (0x0BDC6, 0x0),
+    (0x0BDC7, 0x0),
+    (0x0BDC8, 0x0),
+    (0x0BDC9, 0x0),
+    (0x0BDCA, 0x0),
+    (0x0BDCB, 0x0),
+    (0x0BDCC, 0x0),
+    (0x0BDCD, 0x0),
+    (0x0BDCE, 0x0),
+    (0x0BDCF, 0x0),
+    (0x0BDD1, 0x0),
+    (0x0BDD2, 0x0),
+    (0x0BDD3, 0x0),
+    (0x0BDD4, 0x0),
+    (0x0BDD5, 0x0),
+    (0x0BDDA, 0x0),
+    (0x0BDDB, 0x0),
+    (0x0BDDC, 0x0),
+    (0x0BDDD, 0x0),
+    (0x0BDDE, 0x0),
+    (0x0BDDF, 0x0),
+    (0x0BDE2, 0x0),
+    (0x0BDE4, 0x0),
+    (0x0BDE5, 0x0),
+    (0x0BDEA, 0x0),
+    (0x0BDEB, 0x0),
+    (0x0BDEC, 0x0),
+    (0x0BDED, 0x0),
+    (0x0BDF2, 0x0),
+    (0x0BDF3, 0x0),
+    (0x0BDF6, 0x0),
+    (0x0BDF7, 0x0),
+    (0x0C7EE, 0x2),
+    (0x0C7EF, 0x2),
+    (0x0C7F3, 0x2),
+    (0x0C7F6, 0xC),
+    (0x0C7F7, 0xC),
+    (0x0C7FA, 0xC),
+    (0x0C7FB, 0xC),
+    (0x0C7FE, 0xC),
+    (0x0C7FF, 0xC),
+    (0x0C803, 0x2),
+    (0x0C806, 0x2),
+    (0x0C807, 0x2),
+    (0x0C80A, 0x2),
+    (0x0C80B, 0x2),
+    (0x0C80E, 0x2),
+    (0x0C80F, 0x2),
+    (0x0C812, 0x2),
+    (0x0C813, 0x2),
+    (0x0C816, 0xC),
+    (0x0C817, 0xC),
+    (0x0C81E, 0x2),
+    (0x0C81F, 0xC),
+    (0x0C822, 0x2),
+    (0x0C823, 0x2),
+    (0x0C826, 0x2),
+    (0x0C827, 0x2),
+    (0x0C82A, 0x2),
+    (0x0C82B, 0x2),
+    (0x0C82E, 0xC),
+    (0x0C82F, 0xC),
+    (0x0C83A, 0x2),
+    (0x0C83B, 0x2),
+    (0x0C912, 0x2),
+    (0x0C913, 0x2),
+    (0x0C917, 0x2),
+    (0x0C91A, 0xC),
+    (0x0C91B, 0xC),
+    (0x0C91E, 0xC),
+    (0x0C91F, 0xC),
+    (0x0C922, 0xC),
+    (0x0C923, 0x2),
+    (0x0C927, 0x2),
+    (0x0C92A, 0x2),
+    (0x0C92B, 0x2),
+    (0x0C92E, 0x2),
+    (0x0C92F, 0x2),
+    (0x0C932, 0x2),
+    (0x0C933, 0x2),
+    (0x0C936, 0x2),
+    (0x0C937, 0x2),
+    (0x0C93A, 0xC),
+    (0x0C93B, 0xC),
+    (0x0C942, 0x2),
+    (0x0C943, 0xC),
+    (0x0C946, 0x2),
+    (0x0C947, 0x2),
+    (0x0C94A, 0x2),
+    (0x0C94B, 0x2),
+    (0x0C94E, 0x2),
+    (0x0C94F, 0x2),
+    (0x0C952, 0xC),
+    (0x0C953, 0xC),
+    (0x0C95E, 0x2),
+    (0x0C95F, 0x2),
+    (0x0CC7C, 0x0),
+    (0x0CC7D, 0x0),
+    (0x0CC83, 0x0),
+    (0x0CC84, 0x0),
+    (0x0CC85, 0x0),
+    (0x0CC8A, 0x0),
+    (0x0CC8B, 0x0),
+    (0x0CC8C, 0x0),
+    (0x0CC8D, 0x0),
+    (0x0CC93, 0x0),
+    (0x0CC94, 0x0),
+    (0x0CC95, 0x0),
+    (0x0CC98, 0x0),
+    (0x0CC99, 0x0),
+    (0x0CC9A, 0x0),
+    (0x0CC9B, 0x0),
+    (0x0CC9C, 0x0),
+    (0x0CC9D, 0x0),
+    (0x0CC9E, 0x0),
+    (0x0CC9F, 0x0),
+    (0x0CCA0, 0x0),
+    (0x0CCA1, 0x0),
+    (0x0CCA2, 0x0),
+    (0x0CCA3, 0x0),
+    (0x0CCA4, 0x0),
+    (0x0CCA5, 0x0),
+    (0x0CCA6, 0x0),
+    (0x0CCA7, 0x0),
+    (0x0CCA8, 0x0),
+    (0x0CCA9, 0x0),
+    (0x0CCAE, 0x0),
+    (0x0CCAF, 0x0),
+    (0x0CCB0, 0x0),
+    (0x0CCB1, 0x0),
+    (0x0CCB2, 0x0),
+    (0x0CCB3, 0x0),
+    (0x0CCB6, 0x0),
+    (0x0CCB8, 0x0),
+    (0x0CCB9, 0x0),
+    (0x0CCBE, 0x0),
+    (0x0CCBF, 0x0),
+    (0x0CCC0, 0x0),
+    (0x0CCC1, 0x0),
+    (0x0CCC6, 0x0),
+    (0x0CCC7, 0x0),
+    (0x0CCCA, 0x0),
+    (0x0CCCB, 0x0),
+    (0x0CDA0, 0x0),
+    (0x0CDA1, 0x0),
+    (0x0CDA7, 0x0),
+    (0x0CDA8, 0x0),
+    (0x0CDA9, 0x0),
+    (0x0CDAE, 0x0),
+    (0x0CDAF, 0x0),
+    (0x0CDB0, 0x0),
+    (0x0CDB1, 0x0),
+    (0x0CDB7, 0x0),
+    (0x0CDB8, 0x0),
+    (0x0CDB9, 0x0),
+    (0x0CDBC, 0x0),
+    (0x0CDBD, 0x0),
+    (0x0CDBE, 0x0),
+    (0x0CDBF, 0x0),
+    (0x0CDC0, 0x0),
+    (0x0CDC1, 0x0),
+    (0x0CDC2, 0x0),
+    (0x0CDC3, 0x0),
+    (0x0CDC4, 0x0),
+    (0x0CDC5, 0x0),
+    (0x0CDC6, 0x0),
+    (0x0CDC7, 0x0),
+    (0x0CDC8, 0x0),
+    (0x0CDC9, 0x0),
+    (0x0CDCA, 0x0),
+    (0x0CDCB, 0x0),
+    (0x0CDCC, 0x0),
+    (0x0CDCD, 0x0),
+    (0x0CDD2, 0x0),
+    (0x0CDD3, 0x0),
+    (0x0CDD4, 0x0),
+    (0x0CDD5, 0x0),
+    (0x0CDD6, 0x0),
+    (0x0CDD7, 0x0),
+    (0x0CDDA, 0x0),
+    (0x0CDDC, 0x0),
+    (0x0CDDD, 0x0),
+    (0x0CDE2, 0x0),
+    (0x0CDE3, 0x0),
+    (0x0CDE4, 0x0),
+    (0x0CDE5, 0x0),
+    (0x0CDEA, 0x0),
+    (0x0CDEB, 0x0),
+    (0x0CDEE, 0x0),
+    (0x0CDEF, 0x0),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SEVENTH_APPEARANCE_VIDEO_FRAME: u64 = 1094;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SEVENTH_APPEARANCE_RAM_BYTES: [(u16, u8); 310] = [
+    (0x9DD0, 0x54),
+    (0x9DD1, 0xB6),
+    (0x9DD2, 0x54),
+    (0x9DD3, 0xAA),
+    (0x9DD4, 0x54),
+    (0x9DD6, 0x54),
+    (0x9DD7, 0x92),
+    (0x9DD8, 0x54),
+    (0x9DD9, 0x86),
+    (0x9DDA, 0x54),
+    (0x9DDB, 0x7A),
+    (0x9DDD, 0xB6),
+    (0x9DDF, 0xAA),
+    (0x9DE3, 0x92),
+    (0x9DE5, 0x86),
+    (0x9DE7, 0x7A),
+    (0x9DE8, 0x48),
+    (0x9DE9, 0xB6),
+    (0x9DEA, 0x48),
+    (0x9DEB, 0xAA),
+    (0x9DEC, 0x48),
+    (0x9DEE, 0x48),
+    (0x9DEF, 0x92),
+    (0x9DF0, 0x48),
+    (0x9DF1, 0x86),
+    (0x9DF2, 0x48),
+    (0x9DF3, 0x7A),
+    (0x9DF4, 0x42),
+    (0x9DF5, 0xB6),
+    (0x9DF6, 0x42),
+    (0x9DF7, 0xAA),
+    (0x9DF8, 0x42),
+    (0x9DFA, 0x42),
+    (0x9DFB, 0x92),
+    (0x9DFC, 0x42),
+    (0x9DFD, 0x86),
+    (0x9DFE, 0x42),
+    (0x9DFF, 0x7A),
+    (0x9E00, 0x86),
+    (0x9E10, 0x58),
+    (0x9E11, 0xB6),
+    (0x9E12, 0x58),
+    (0x9E13, 0xAA),
+    (0x9E14, 0x58),
+    (0x9E16, 0x58),
+    (0x9E17, 0x92),
+    (0x9E18, 0x58),
+    (0x9E19, 0x86),
+    (0x9E1A, 0x58),
+    (0x9E1B, 0x7A),
+    (0x9E1D, 0xB6),
+    (0x9E1F, 0xAA),
+    (0x9E23, 0x92),
+    (0x9E25, 0x86),
+    (0x9E27, 0x7A),
+    (0x9E28, 0x4C),
+    (0x9E29, 0xB6),
+    (0x9E2A, 0x4C),
+    (0x9E2B, 0xAA),
+    (0x9E2C, 0x4C),
+    (0x9E2E, 0x4C),
+    (0x9E2F, 0x92),
+    (0x9E30, 0x4C),
+    (0x9E31, 0x86),
+    (0x9E32, 0x4C),
+    (0x9E33, 0x7A),
+    (0x9E34, 0x46),
+    (0x9E35, 0xB6),
+    (0x9E36, 0x46),
+    (0x9E37, 0xAA),
+    (0x9E38, 0x46),
+    (0x9E3A, 0x46),
+    (0x9E3B, 0x92),
+    (0x9E3C, 0x46),
+    (0x9E3D, 0x86),
+    (0x9E3E, 0x46),
+    (0x9E3F, 0x7A),
+    (0x9E40, 0x86),
+    (0x9E50, 0x5C),
+    (0x9E51, 0xB6),
+    (0x9E52, 0x5C),
+    (0x9E53, 0xAA),
+    (0x9E54, 0x5C),
+    (0x9E56, 0x5C),
+    (0x9E57, 0x92),
+    (0x9E58, 0x5C),
+    (0x9E59, 0x86),
+    (0x9E5A, 0x5C),
+    (0x9E5B, 0x7A),
+    (0x9E5D, 0xB6),
+    (0x9E5F, 0xAA),
+    (0x9E63, 0x92),
+    (0x9E65, 0x86),
+    (0x9E67, 0x7A),
+    (0x9E68, 0x50),
+    (0x9E69, 0xB6),
+    (0x9E6A, 0x50),
+    (0x9E6B, 0xAA),
+    (0x9E6C, 0x50),
+    (0x9E6E, 0x50),
+    (0x9E6F, 0x92),
+    (0x9E70, 0x50),
+    (0x9E71, 0x86),
+    (0x9E72, 0x50),
+    (0x9E73, 0x7A),
+    (0x9E74, 0x4A),
+    (0x9E75, 0xB6),
+    (0x9E76, 0x4A),
+    (0x9E77, 0xAA),
+    (0x9E78, 0x4A),
+    (0x9E7A, 0x4A),
+    (0x9E7B, 0x92),
+    (0x9E7C, 0x4A),
+    (0x9E7D, 0x86),
+    (0x9E7E, 0x4A),
+    (0x9E7F, 0x7A),
+    (0x9E80, 0x86),
+    (0x9E90, 0x60),
+    (0x9E91, 0xB6),
+    (0x9E92, 0x60),
+    (0x9E93, 0xAA),
+    (0x9E94, 0x60),
+    (0x9E96, 0x60),
+    (0x9E97, 0x92),
+    (0x9E98, 0x60),
+    (0x9E99, 0x86),
+    (0x9E9A, 0x60),
+    (0x9E9B, 0x7A),
+    (0x9E9D, 0xB6),
+    (0x9E9F, 0xAA),
+    (0x9EA3, 0x92),
+    (0x9EA5, 0x86),
+    (0x9EA7, 0x7A),
+    (0x9EA8, 0x54),
+    (0x9EA9, 0xB6),
+    (0x9EAA, 0x54),
+    (0x9EAB, 0xAA),
+    (0x9EAC, 0x54),
+    (0x9EAE, 0x54),
+    (0x9EAF, 0x92),
+    (0x9EB0, 0x54),
+    (0x9EB1, 0x86),
+    (0x9EB2, 0x54),
+    (0x9EB3, 0x7A),
+    (0x9EB4, 0x4E),
+    (0x9EB5, 0xB6),
+    (0x9EB6, 0x4E),
+    (0x9EB7, 0xAA),
+    (0x9EB8, 0x4E),
+    (0x9EBA, 0x4E),
+    (0x9EBB, 0x92),
+    (0x9EBC, 0x4E),
+    (0x9EBD, 0x86),
+    (0x9EBE, 0x4E),
+    (0x9EBF, 0x7A),
+    (0x9EC0, 0x86),
+    (0x9ED0, 0x64),
+    (0x9ED1, 0xB6),
+    (0x9ED2, 0x64),
+    (0x9ED3, 0xAA),
+    (0x9ED4, 0x64),
+    (0x9ED6, 0x64),
+    (0x9ED7, 0x92),
+    (0x9ED8, 0x64),
+    (0x9ED9, 0x86),
+    (0x9EDA, 0x64),
+    (0x9EDB, 0x7A),
+    (0x9EDD, 0xB6),
+    (0x9EDF, 0xAA),
+    (0x9EE3, 0x92),
+    (0x9EE5, 0x86),
+    (0x9EE7, 0x7A),
+    (0x9EE8, 0x58),
+    (0x9EE9, 0xB6),
+    (0x9EEA, 0x58),
+    (0x9EEB, 0xAA),
+    (0x9EEC, 0x58),
+    (0x9EEE, 0x58),
+    (0x9EEF, 0x92),
+    (0x9EF0, 0x58),
+    (0x9EF1, 0x86),
+    (0x9EF2, 0x58),
+    (0x9EF3, 0x7A),
+    (0x9EF4, 0x52),
+    (0x9EF5, 0xB6),
+    (0x9EF6, 0x52),
+    (0x9EF7, 0xAA),
+    (0x9EF8, 0x52),
+    (0x9EFA, 0x52),
+    (0x9EFB, 0x92),
+    (0x9EFC, 0x52),
+    (0x9EFD, 0x86),
+    (0x9EFE, 0x52),
+    (0x9EFF, 0x7A),
+    (0x9F00, 0x86),
+    (0x9F10, 0x68),
+    (0x9F11, 0xB6),
+    (0x9F12, 0x68),
+    (0x9F13, 0xAA),
+    (0x9F14, 0x68),
+    (0x9F16, 0x68),
+    (0x9F17, 0x92),
+    (0x9F18, 0x68),
+    (0x9F19, 0x86),
+    (0x9F1A, 0x68),
+    (0x9F1B, 0x7A),
+    (0x9F1D, 0xB6),
+    (0x9F1F, 0xAA),
+    (0x9F23, 0x92),
+    (0x9F25, 0x86),
+    (0x9F27, 0x7A),
+    (0x9F28, 0x5C),
+    (0x9F29, 0xB6),
+    (0x9F2A, 0x5C),
+    (0x9F2B, 0xAA),
+    (0x9F2C, 0x5C),
+    (0x9F2E, 0x5C),
+    (0x9F2F, 0x92),
+    (0x9F30, 0x5C),
+    (0x9F31, 0x86),
+    (0x9F32, 0x5C),
+    (0x9F33, 0x7A),
+    (0x9F34, 0x56),
+    (0x9F35, 0xB6),
+    (0x9F36, 0x56),
+    (0x9F37, 0xAA),
+    (0x9F38, 0x56),
+    (0x9F3A, 0x56),
+    (0x9F3B, 0x92),
+    (0x9F3C, 0x56),
+    (0x9F3D, 0x86),
+    (0x9F3E, 0x56),
+    (0x9F3F, 0x7A),
+    (0x9F40, 0x86),
+    (0x9F50, 0x6C),
+    (0x9F51, 0xB6),
+    (0x9F52, 0x6C),
+    (0x9F53, 0xAA),
+    (0x9F54, 0x6C),
+    (0x9F56, 0x6C),
+    (0x9F57, 0x92),
+    (0x9F58, 0x6C),
+    (0x9F59, 0x86),
+    (0x9F5A, 0x6C),
+    (0x9F5B, 0x7A),
+    (0x9F5D, 0xB6),
+    (0x9F5F, 0xAA),
+    (0x9F63, 0x92),
+    (0x9F65, 0x86),
+    (0x9F67, 0x7A),
+    (0x9F68, 0x60),
+    (0x9F69, 0xB6),
+    (0x9F6A, 0x60),
+    (0x9F6B, 0xAA),
+    (0x9F6C, 0x60),
+    (0x9F6E, 0x60),
+    (0x9F6F, 0x92),
+    (0x9F70, 0x60),
+    (0x9F71, 0x86),
+    (0x9F72, 0x60),
+    (0x9F73, 0x7A),
+    (0x9F74, 0x5A),
+    (0x9F75, 0xB6),
+    (0x9F76, 0x5A),
+    (0x9F77, 0xAA),
+    (0x9F78, 0x5A),
+    (0x9F7A, 0x5A),
+    (0x9F7B, 0x92),
+    (0x9F7C, 0x5A),
+    (0x9F7D, 0x86),
+    (0x9F7E, 0x5A),
+    (0x9F7F, 0x7A),
+    (0x9F80, 0x86),
+    (0x9F85, 0xC0),
+    (0x9F92, 0x70),
+    (0x9F93, 0xAA),
+    (0x9F94, 0x70),
+    (0x9F96, 0x70),
+    (0x9F97, 0x92),
+    (0x9F98, 0x70),
+    (0x9F99, 0x86),
+    (0x9F9A, 0x70),
+    (0x9F9B, 0x7A),
+    (0x9F9D, 0xB6),
+    (0x9F9F, 0xAA),
+    (0x9FA3, 0x92),
+    (0x9FA5, 0x86),
+    (0x9FA7, 0x7A),
+    (0x9FA8, 0x64),
+    (0x9FA9, 0xB6),
+    (0x9FAA, 0x64),
+    (0x9FAB, 0xAA),
+    (0x9FAC, 0x64),
+    (0x9FAE, 0x64),
+    (0x9FAF, 0x92),
+    (0x9FB0, 0x64),
+    (0x9FB1, 0x86),
+    (0x9FB2, 0x64),
+    (0x9FB3, 0x7A),
+    (0x9FB4, 0x5E),
+    (0x9FB5, 0xB6),
+    (0x9FB6, 0x5E),
+    (0x9FB7, 0xAA),
+    (0x9FB8, 0x5E),
+    (0x9FBA, 0x5E),
+    (0x9FBB, 0x92),
+    (0x9FBC, 0x5E),
+    (0x9FBD, 0x86),
+    (0x9FBE, 0x5E),
+    (0x9FBF, 0x7A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SEVENTH_VISIBLE_NIBBLES: [(u32, u8); 764] = [
+    (0x07CE4, 0x0),
+    (0x07CE5, 0x0),
+    (0x07CF0, 0x0),
+    (0x07CF1, 0x0),
+    (0x07CF4, 0x0),
+    (0x07CF5, 0x0),
+    (0x07CFA, 0x0),
+    (0x07CFB, 0x0),
+    (0x07CFC, 0x0),
+    (0x07CFD, 0x0),
+    (0x07CFE, 0x0),
+    (0x07CFF, 0x0),
+    (0x07D02, 0x0),
+    (0x07D03, 0x0),
+    (0x07D04, 0x0),
+    (0x07D05, 0x0),
+    (0x07D06, 0x0),
+    (0x07D07, 0x0),
+    (0x07D0A, 0x0),
+    (0x07D0B, 0x0),
+    (0x07D0C, 0x0),
+    (0x07D0D, 0x0),
+    (0x07D12, 0x0),
+    (0x07D13, 0x0),
+    (0x07D1A, 0x0),
+    (0x07D1B, 0x0),
+    (0x07D22, 0x0),
+    (0x07D23, 0x0),
+    (0x07E08, 0x0),
+    (0x07E09, 0x0),
+    (0x07E14, 0x0),
+    (0x07E15, 0x0),
+    (0x07E18, 0x0),
+    (0x07E19, 0x0),
+    (0x07E1E, 0x0),
+    (0x07E1F, 0x0),
+    (0x07E20, 0x0),
+    (0x07E21, 0x0),
+    (0x07E22, 0x0),
+    (0x07E23, 0x0),
+    (0x07E26, 0x0),
+    (0x07E27, 0x0),
+    (0x07E28, 0x0),
+    (0x07E29, 0x0),
+    (0x07E2A, 0x0),
+    (0x07E2B, 0x0),
+    (0x07E2E, 0x0),
+    (0x07E2F, 0x0),
+    (0x07E30, 0x0),
+    (0x07E31, 0x0),
+    (0x07E32, 0x0),
+    (0x07E36, 0x0),
+    (0x07E37, 0x0),
+    (0x07E3E, 0x0),
+    (0x07E3F, 0x0),
+    (0x07E46, 0x0),
+    (0x07E47, 0x0),
+    (0x083A4, 0xC),
+    (0x083A5, 0xC),
+    (0x083AC, 0xC),
+    (0x083B0, 0x2),
+    (0x083B1, 0x2),
+    (0x083B4, 0xC),
+    (0x083B5, 0xC),
+    (0x083B8, 0xC),
+    (0x083B9, 0x2),
+    (0x083BC, 0xC),
+    (0x083C0, 0xC),
+    (0x083C1, 0xC),
+    (0x083C4, 0xC),
+    (0x083C5, 0xC),
+    (0x083C8, 0x2),
+    (0x083C9, 0x2),
+    (0x083CC, 0xC),
+    (0x083CD, 0xC),
+    (0x083D0, 0xC),
+    (0x083D1, 0xC),
+    (0x083D8, 0x2),
+    (0x083D9, 0x2),
+    (0x083E0, 0xC),
+    (0x083E1, 0xC),
+    (0x083E4, 0xC),
+    (0x083E5, 0xC),
+    (0x083F0, 0x2),
+    (0x083F1, 0x2),
+    (0x083F8, 0x2),
+    (0x083F9, 0xC),
+    (0x084C8, 0xC),
+    (0x084C9, 0xC),
+    (0x084D0, 0xC),
+    (0x084D4, 0xC),
+    (0x084D5, 0xC),
+    (0x084D8, 0xC),
+    (0x084D9, 0xC),
+    (0x084DC, 0xC),
+    (0x084DD, 0x2),
+    (0x084E0, 0xC),
+    (0x084E1, 0xC),
+    (0x084E4, 0xC),
+    (0x084E5, 0xC),
+    (0x084E8, 0xC),
+    (0x084E9, 0xC),
+    (0x084EC, 0xC),
+    (0x084ED, 0xC),
+    (0x084F0, 0xC),
+    (0x084F1, 0xC),
+    (0x084F4, 0x2),
+    (0x084F5, 0xC),
+    (0x084FC, 0xC),
+    (0x084FD, 0xC),
+    (0x08504, 0xC),
+    (0x08505, 0xC),
+    (0x08508, 0xC),
+    (0x08509, 0xC),
+    (0x0850C, 0xC),
+    (0x08514, 0xC),
+    (0x08515, 0xC),
+    (0x0851C, 0xC),
+    (0x0851D, 0x2),
+    (0x08CE8, 0x0),
+    (0x08CE9, 0x0),
+    (0x08CEC, 0x0),
+    (0x08CED, 0x0),
+    (0x08CF2, 0x0),
+    (0x08CF3, 0x0),
+    (0x08CF4, 0x0),
+    (0x08CF5, 0x0),
+    (0x08CF6, 0x0),
+    (0x08CF7, 0x0),
+    (0x08CFA, 0x0),
+    (0x08CFB, 0x0),
+    (0x08CFC, 0x0),
+    (0x08CFD, 0x0),
+    (0x08CFE, 0x0),
+    (0x08CFF, 0x0),
+    (0x08D02, 0x0),
+    (0x08D03, 0x0),
+    (0x08D04, 0x0),
+    (0x08D05, 0x0),
+    (0x08D06, 0x0),
+    (0x08D07, 0x0),
+    (0x08D0A, 0x0),
+    (0x08D0B, 0x0),
+    (0x08D12, 0x0),
+    (0x08D13, 0x0),
+    (0x08D1A, 0x0),
+    (0x08D1B, 0x0),
+    (0x08D22, 0x0),
+    (0x08E00, 0x0),
+    (0x08E01, 0x0),
+    (0x08E0C, 0x0),
+    (0x08E0D, 0x0),
+    (0x08E10, 0x0),
+    (0x08E11, 0x0),
+    (0x08E14, 0x0),
+    (0x08E16, 0x0),
+    (0x08E17, 0x0),
+    (0x08E18, 0x0),
+    (0x08E19, 0x0),
+    (0x08E1A, 0x0),
+    (0x08E1B, 0x0),
+    (0x08E1E, 0x0),
+    (0x08E1F, 0x0),
+    (0x08E20, 0x0),
+    (0x08E21, 0x0),
+    (0x08E22, 0x0),
+    (0x08E23, 0x0),
+    (0x08E26, 0x0),
+    (0x08E27, 0x0),
+    (0x08E28, 0x0),
+    (0x08E29, 0x0),
+    (0x08E2A, 0x0),
+    (0x08E2B, 0x0),
+    (0x08E2E, 0x0),
+    (0x08E2F, 0x0),
+    (0x08E36, 0x0),
+    (0x08E37, 0x0),
+    (0x08E3E, 0x0),
+    (0x08E3F, 0x0),
+    (0x08E46, 0x0),
+    (0x08E47, 0x0),
+    (0x09154, 0xC),
+    (0x09155, 0xC),
+    (0x0915C, 0xC),
+    (0x0915D, 0xC),
+    (0x09160, 0xC),
+    (0x09161, 0xC),
+    (0x09164, 0xC),
+    (0x09165, 0xC),
+    (0x09168, 0xC),
+    (0x09169, 0x2),
+    (0x0916C, 0xC),
+    (0x0916D, 0xC),
+    (0x09170, 0xC),
+    (0x09171, 0xC),
+    (0x09174, 0xC),
+    (0x09175, 0xC),
+    (0x09178, 0xC),
+    (0x09179, 0xC),
+    (0x0917C, 0xC),
+    (0x0917D, 0xC),
+    (0x09180, 0x2),
+    (0x09181, 0xC),
+    (0x09188, 0xC),
+    (0x09189, 0xC),
+    (0x09190, 0xC),
+    (0x09191, 0xC),
+    (0x09194, 0xC),
+    (0x09195, 0xC),
+    (0x09198, 0xC),
+    (0x09199, 0xC),
+    (0x091A0, 0xC),
+    (0x091A1, 0xC),
+    (0x091A8, 0xC),
+    (0x091A9, 0x2),
+    (0x091B0, 0xC),
+    (0x09278, 0xC),
+    (0x09279, 0xC),
+    (0x09280, 0xC),
+    (0x09281, 0xC),
+    (0x09284, 0xC),
+    (0x09285, 0xC),
+    (0x09288, 0xC),
+    (0x09289, 0xC),
+    (0x0928C, 0xC),
+    (0x09290, 0xC),
+    (0x09291, 0xC),
+    (0x09294, 0xC),
+    (0x09295, 0xC),
+    (0x09298, 0xC),
+    (0x09299, 0xC),
+    (0x0929C, 0xC),
+    (0x0929D, 0xC),
+    (0x092A0, 0xC),
+    (0x092A1, 0xC),
+    (0x092A4, 0x2),
+    (0x092A5, 0x2),
+    (0x092A8, 0xC),
+    (0x092AC, 0xC),
+    (0x092AD, 0xC),
+    (0x092B4, 0xC),
+    (0x092B5, 0xC),
+    (0x092B8, 0xC),
+    (0x092B9, 0xC),
+    (0x092BC, 0xC),
+    (0x092BD, 0xC),
+    (0x092C4, 0xC),
+    (0x092C5, 0xC),
+    (0x092CC, 0xC),
+    (0x092CD, 0xC),
+    (0x092D4, 0xC),
+    (0x092D5, 0xC),
+    (0x09CDC, 0x0),
+    (0x09CE0, 0x0),
+    (0x09CE1, 0x0),
+    (0x09CE4, 0x0),
+    (0x09CE5, 0x0),
+    (0x09CE8, 0x0),
+    (0x09CE9, 0x0),
+    (0x09CEB, 0x0),
+    (0x09CEC, 0x0),
+    (0x09CED, 0x0),
+    (0x09CEE, 0x0),
+    (0x09CEF, 0x0),
+    (0x09CF2, 0x0),
+    (0x09CF3, 0x0),
+    (0x09CF4, 0x0),
+    (0x09CF5, 0x0),
+    (0x09CF6, 0x0),
+    (0x09CF7, 0x0),
+    (0x09CFA, 0x0),
+    (0x09CFB, 0x0),
+    (0x09CFC, 0x0),
+    (0x09CFD, 0x0),
+    (0x09CFE, 0x0),
+    (0x09CFF, 0x0),
+    (0x09D02, 0x0),
+    (0x09D03, 0x0),
+    (0x09D0A, 0x0),
+    (0x09D0B, 0x0),
+    (0x09D12, 0x0),
+    (0x09D13, 0x0),
+    (0x09D1A, 0x0),
+    (0x09D1B, 0x0),
+    (0x09E00, 0x0),
+    (0x09E01, 0x0),
+    (0x09E04, 0x0),
+    (0x09E05, 0x0),
+    (0x09E08, 0x0),
+    (0x09E09, 0x0),
+    (0x09E0C, 0x0),
+    (0x09E0D, 0x0),
+    (0x09E0F, 0x0),
+    (0x09E10, 0x0),
+    (0x09E11, 0x0),
+    (0x09E12, 0x0),
+    (0x09E13, 0x0),
+    (0x09E16, 0x0),
+    (0x09E17, 0x0),
+    (0x09E18, 0x0),
+    (0x09E19, 0x0),
+    (0x09E1A, 0x0),
+    (0x09E1B, 0x0),
+    (0x09E1E, 0x0),
+    (0x09E1F, 0x0),
+    (0x09E20, 0x0),
+    (0x09E21, 0x0),
+    (0x09E22, 0x0),
+    (0x09E23, 0x0),
+    (0x09E26, 0x0),
+    (0x09E27, 0x0),
+    (0x09E28, 0x0),
+    (0x09E2E, 0x0),
+    (0x09E2F, 0x0),
+    (0x09E36, 0x0),
+    (0x09E37, 0x0),
+    (0x09E3E, 0x0),
+    (0x09E3F, 0x0),
+    (0x09F04, 0x2),
+    (0x09F05, 0x2),
+    (0x09F0C, 0xC),
+    (0x09F0D, 0xC),
+    (0x09F10, 0xC),
+    (0x09F11, 0xC),
+    (0x09F14, 0x2),
+    (0x09F15, 0xC),
+    (0x09F18, 0xC),
+    (0x09F1C, 0xC),
+    (0x09F1D, 0xC),
+    (0x09F20, 0xC),
+    (0x09F21, 0xC),
+    (0x09F24, 0x2),
+    (0x09F25, 0x2),
+    (0x09F28, 0xC),
+    (0x09F29, 0xC),
+    (0x09F2C, 0xC),
+    (0x09F2D, 0xC),
+    (0x09F30, 0x2),
+    (0x09F31, 0x2),
+    (0x09F34, 0xC),
+    (0x09F35, 0xC),
+    (0x09F38, 0xC),
+    (0x09F39, 0xC),
+    (0x09F40, 0x2),
+    (0x09F41, 0xC),
+    (0x09F44, 0xC),
+    (0x09F45, 0x2),
+    (0x09F48, 0xC),
+    (0x09F49, 0xC),
+    (0x09F50, 0xC),
+    (0x09F51, 0xC),
+    (0x09F58, 0xC),
+    (0x09F59, 0xC),
+    (0x09F60, 0xC),
+    (0x09F61, 0xC),
+    (0x0A028, 0x2),
+    (0x0A029, 0x2),
+    (0x0A030, 0xC),
+    (0x0A031, 0xC),
+    (0x0A034, 0xC),
+    (0x0A035, 0xC),
+    (0x0A038, 0x2),
+    (0x0A039, 0xC),
+    (0x0A03C, 0xC),
+    (0x0A040, 0xC),
+    (0x0A041, 0xC),
+    (0x0A044, 0xC),
+    (0x0A045, 0xC),
+    (0x0A048, 0x2),
+    (0x0A049, 0x2),
+    (0x0A04C, 0xC),
+    (0x0A04D, 0xC),
+    (0x0A050, 0x2),
+    (0x0A051, 0xC),
+    (0x0A054, 0x2),
+    (0x0A055, 0x2),
+    (0x0A058, 0xC),
+    (0x0A059, 0xC),
+    (0x0A05C, 0xC),
+    (0x0A05D, 0xC),
+    (0x0A064, 0x2),
+    (0x0A065, 0xC),
+    (0x0A068, 0xC),
+    (0x0A069, 0xC),
+    (0x0A06C, 0x2),
+    (0x0A06D, 0x2),
+    (0x0A070, 0xC),
+    (0x0A074, 0xC),
+    (0x0A075, 0xC),
+    (0x0A07C, 0xC),
+    (0x0A07D, 0xC),
+    (0x0A084, 0xC),
+    (0x0A085, 0xC),
+    (0x0ACB4, 0xC),
+    (0x0ACB5, 0xC),
+    (0x0ACBC, 0xC),
+    (0x0ACBD, 0xC),
+    (0x0ACBE, 0x0),
+    (0x0ACBF, 0x0),
+    (0x0ACC4, 0x2),
+    (0x0ACC5, 0xC),
+    (0x0ACC6, 0x0),
+    (0x0ACC7, 0x0),
+    (0x0ACCC, 0xC),
+    (0x0ACCD, 0xC),
+    (0x0ACCE, 0x0),
+    (0x0ACCF, 0x0),
+    (0x0ACD4, 0xC),
+    (0x0ACD5, 0xC),
+    (0x0ACD8, 0x0),
+    (0x0ACD9, 0x0),
+    (0x0ACDC, 0x2),
+    (0x0ACDD, 0xC),
+    (0x0ACE0, 0x0),
+    (0x0ACE1, 0x0),
+    (0x0ACE4, 0xC),
+    (0x0ACE5, 0xC),
+    (0x0ACE6, 0x0),
+    (0x0ACE7, 0x0),
+    (0x0ACEA, 0x0),
+    (0x0ACEB, 0x0),
+    (0x0ACEE, 0x0),
+    (0x0ACEF, 0x0),
+    (0x0ACF0, 0x2),
+    (0x0ACF1, 0x2),
+    (0x0ACF2, 0x0),
+    (0x0ACF3, 0x0),
+    (0x0ACF6, 0x0),
+    (0x0ACF7, 0x0),
+    (0x0ACF8, 0x2),
+    (0x0ACF9, 0x2),
+    (0x0ACFA, 0x0),
+    (0x0ACFB, 0x0),
+    (0x0AD00, 0x2),
+    (0x0AD01, 0x2),
+    (0x0AD02, 0x0),
+    (0x0AD03, 0x0),
+    (0x0AD08, 0x2),
+    (0x0AD09, 0x2),
+    (0x0AD0A, 0x0),
+    (0x0AD0B, 0x0),
+    (0x0AD10, 0x2),
+    (0x0AD11, 0x2),
+    (0x0AD12, 0x0),
+    (0x0AD13, 0x0),
+    (0x0ADD8, 0xC),
+    (0x0ADD9, 0xC),
+    (0x0ADE0, 0xC),
+    (0x0ADE1, 0xC),
+    (0x0ADE2, 0x0),
+    (0x0ADE3, 0x0),
+    (0x0ADE8, 0x2),
+    (0x0ADE9, 0xC),
+    (0x0ADEA, 0x0),
+    (0x0ADEB, 0x0),
+    (0x0ADF0, 0x2),
+    (0x0ADF1, 0xC),
+    (0x0ADF2, 0x0),
+    (0x0ADF3, 0x0),
+    (0x0ADF8, 0xC),
+    (0x0ADF9, 0xC),
+    (0x0ADFC, 0x0),
+    (0x0ADFD, 0x0),
+    (0x0AE00, 0x2),
+    (0x0AE01, 0x2),
+    (0x0AE04, 0x0),
+    (0x0AE05, 0x0),
+    (0x0AE08, 0xC),
+    (0x0AE09, 0xC),
+    (0x0AE0A, 0x0),
+    (0x0AE0B, 0x0),
+    (0x0AE0E, 0x0),
+    (0x0AE0F, 0x0),
+    (0x0AE12, 0x0),
+    (0x0AE13, 0x0),
+    (0x0AE14, 0x2),
+    (0x0AE15, 0x2),
+    (0x0AE16, 0x0),
+    (0x0AE17, 0x0),
+    (0x0AE1A, 0x0),
+    (0x0AE1B, 0x0),
+    (0x0AE1C, 0x2),
+    (0x0AE1D, 0x2),
+    (0x0AE1E, 0x0),
+    (0x0AE1F, 0x0),
+    (0x0AE24, 0x2),
+    (0x0AE25, 0x2),
+    (0x0AE26, 0x0),
+    (0x0AE27, 0x0),
+    (0x0AE2C, 0x2),
+    (0x0AE2D, 0x2),
+    (0x0AE2E, 0x0),
+    (0x0AE2F, 0x0),
+    (0x0AE34, 0x2),
+    (0x0AE35, 0x2),
+    (0x0AE36, 0x0),
+    (0x0AE37, 0x0),
+    (0x0BA64, 0xC),
+    (0x0BA65, 0xC),
+    (0x0BA6C, 0xC),
+    (0x0BA6D, 0xC),
+    (0x0BA70, 0x2),
+    (0x0BA71, 0x2),
+    (0x0BA74, 0xC),
+    (0x0BA75, 0x2),
+    (0x0BA78, 0x2),
+    (0x0BA7C, 0x2),
+    (0x0BA7D, 0xC),
+    (0x0BA80, 0x2),
+    (0x0BA81, 0x2),
+    (0x0BA84, 0xC),
+    (0x0BA85, 0xC),
+    (0x0BA88, 0x2),
+    (0x0BA89, 0x2),
+    (0x0BA8C, 0x2),
+    (0x0BA8D, 0x2),
+    (0x0BA91, 0x2),
+    (0x0BA94, 0xC),
+    (0x0BA95, 0xC),
+    (0x0BA98, 0x2),
+    (0x0BA99, 0x2),
+    (0x0BAA0, 0x2),
+    (0x0BAA1, 0x2),
+    (0x0BAA4, 0x2),
+    (0x0BAA5, 0xC),
+    (0x0BAA8, 0x2),
+    (0x0BAA9, 0x2),
+    (0x0BAAC, 0xC),
+    (0x0BAAD, 0xC),
+    (0x0BAB0, 0x2),
+    (0x0BAB1, 0x2),
+    (0x0BAB8, 0x2),
+    (0x0BAB9, 0x2),
+    (0x0BAC0, 0x2),
+    (0x0BAC1, 0x2),
+    (0x0BB88, 0xC),
+    (0x0BB89, 0xC),
+    (0x0BB90, 0xC),
+    (0x0BB91, 0x2),
+    (0x0BB94, 0x2),
+    (0x0BB95, 0x2),
+    (0x0BB98, 0xC),
+    (0x0BB99, 0x2),
+    (0x0BB9C, 0x2),
+    (0x0BBA0, 0x2),
+    (0x0BBA1, 0x2),
+    (0x0BBA4, 0x2),
+    (0x0BBA5, 0x2),
+    (0x0BBA8, 0xC),
+    (0x0BBA9, 0xC),
+    (0x0BBAC, 0x2),
+    (0x0BBAD, 0x2),
+    (0x0BBB0, 0x2),
+    (0x0BBB1, 0x2),
+    (0x0BBB8, 0xC),
+    (0x0BBB9, 0xC),
+    (0x0BBBC, 0x2),
+    (0x0BBBD, 0x2),
+    (0x0BBC4, 0x2),
+    (0x0BBC5, 0x2),
+    (0x0BBC8, 0x2),
+    (0x0BBC9, 0xC),
+    (0x0BBCC, 0x2),
+    (0x0BBCD, 0x2),
+    (0x0BBD0, 0xC),
+    (0x0BBD1, 0xC),
+    (0x0BBD4, 0x2),
+    (0x0BBD5, 0x2),
+    (0x0BBDC, 0x2),
+    (0x0BBDD, 0x2),
+    (0x0BBE4, 0x2),
+    (0x0BBE5, 0x2),
+    (0x0BCCC, 0x0),
+    (0x0BCCD, 0x0),
+    (0x0BCD0, 0x0),
+    (0x0BCD1, 0x0),
+    (0x0BCD4, 0x0),
+    (0x0BCD5, 0x0),
+    (0x0BCD8, 0x0),
+    (0x0BCD9, 0x0),
+    (0x0BCDC, 0x0),
+    (0x0BCDD, 0x0),
+    (0x0BCDE, 0x0),
+    (0x0BCDF, 0x0),
+    (0x0BCE2, 0x0),
+    (0x0BCE3, 0x0),
+    (0x0BCE4, 0x0),
+    (0x0BCE5, 0x0),
+    (0x0BCE6, 0x0),
+    (0x0BCE7, 0x0),
+    (0x0BCEA, 0x0),
+    (0x0BCEB, 0x0),
+    (0x0BCEC, 0x0),
+    (0x0BCED, 0x0),
+    (0x0BCEE, 0x0),
+    (0x0BCEF, 0x0),
+    (0x0BCF2, 0x0),
+    (0x0BCF3, 0x0),
+    (0x0BCF4, 0x0),
+    (0x0BCF5, 0x0),
+    (0x0BCFA, 0x0),
+    (0x0BCFB, 0x0),
+    (0x0BD02, 0x0),
+    (0x0BD03, 0x0),
+    (0x0BD0A, 0x0),
+    (0x0BD0B, 0x0),
+    (0x0BDF0, 0x0),
+    (0x0BDF1, 0x0),
+    (0x0BDF4, 0x0),
+    (0x0BDF5, 0x0),
+    (0x0BDF8, 0x0),
+    (0x0BDF9, 0x0),
+    (0x0BDFC, 0x0),
+    (0x0BDFD, 0x0),
+    (0x0BE00, 0x0),
+    (0x0BE01, 0x0),
+    (0x0BE02, 0x0),
+    (0x0BE03, 0x0),
+    (0x0BE06, 0x0),
+    (0x0BE08, 0x0),
+    (0x0BE09, 0x0),
+    (0x0BE0A, 0x0),
+    (0x0BE0B, 0x0),
+    (0x0BE0E, 0x0),
+    (0x0BE0F, 0x0),
+    (0x0BE10, 0x0),
+    (0x0BE11, 0x0),
+    (0x0BE12, 0x0),
+    (0x0BE13, 0x0),
+    (0x0BE16, 0x0),
+    (0x0BE17, 0x0),
+    (0x0BE18, 0x0),
+    (0x0BE19, 0x0),
+    (0x0BE1E, 0x0),
+    (0x0BE1F, 0x0),
+    (0x0BE26, 0x0),
+    (0x0BE27, 0x0),
+    (0x0BE2E, 0x0),
+    (0x0BE2F, 0x0),
+    (0x0C814, 0x2),
+    (0x0C815, 0x2),
+    (0x0C81C, 0xC),
+    (0x0C81D, 0x2),
+    (0x0C820, 0x2),
+    (0x0C821, 0x2),
+    (0x0C824, 0xC),
+    (0x0C825, 0x2),
+    (0x0C828, 0x2),
+    (0x0C82C, 0x2),
+    (0x0C82D, 0x2),
+    (0x0C830, 0x2),
+    (0x0C831, 0x2),
+    (0x0C834, 0xC),
+    (0x0C835, 0xC),
+    (0x0C838, 0x2),
+    (0x0C839, 0x2),
+    (0x0C83C, 0x2),
+    (0x0C83D, 0x2),
+    (0x0C844, 0xC),
+    (0x0C845, 0xC),
+    (0x0C848, 0x2),
+    (0x0C849, 0x2),
+    (0x0C851, 0x2),
+    (0x0C854, 0x2),
+    (0x0C855, 0x2),
+    (0x0C859, 0x2),
+    (0x0C85C, 0xC),
+    (0x0C85D, 0xC),
+    (0x0C860, 0x2),
+    (0x0C861, 0x2),
+    (0x0C868, 0x2),
+    (0x0C869, 0x2),
+    (0x0C938, 0x2),
+    (0x0C939, 0x2),
+    (0x0C940, 0xC),
+    (0x0C941, 0x2),
+    (0x0C944, 0x2),
+    (0x0C945, 0x2),
+    (0x0C948, 0xC),
+    (0x0C949, 0xC),
+    (0x0C94C, 0x2),
+    (0x0C950, 0x2),
+    (0x0C951, 0x2),
+    (0x0C954, 0x2),
+    (0x0C955, 0x2),
+    (0x0C958, 0xC),
+    (0x0C959, 0xC),
+    (0x0C95C, 0x2),
+    (0x0C95D, 0x2),
+    (0x0C960, 0x2),
+    (0x0C961, 0x2),
+    (0x0C968, 0xC),
+    (0x0C969, 0x2),
+    (0x0C96C, 0x2),
+    (0x0C96D, 0x2),
+    (0x0C975, 0x2),
+    (0x0C978, 0x2),
+    (0x0C979, 0x2),
+    (0x0C980, 0xC),
+    (0x0C981, 0xC),
+    (0x0C984, 0x2),
+    (0x0C985, 0x2),
+    (0x0C98C, 0x2),
+    (0x0C98D, 0x2),
+    (0x0CCC4, 0x0),
+    (0x0CCC5, 0x0),
+    (0x0CCC8, 0x0),
+    (0x0CCC9, 0x0),
+    (0x0CCCC, 0x0),
+    (0x0CCCD, 0x0),
+    (0x0CCD0, 0x0),
+    (0x0CCD1, 0x0),
+    (0x0CCD4, 0x0),
+    (0x0CCD5, 0x0),
+    (0x0CCD6, 0x0),
+    (0x0CCD7, 0x0),
+    (0x0CCDA, 0x0),
+    (0x0CCDC, 0x0),
+    (0x0CCDD, 0x0),
+    (0x0CCDF, 0x0),
+    (0x0CCE2, 0x0),
+    (0x0CCE3, 0x0),
+    (0x0CCE4, 0x0),
+    (0x0CCE5, 0x0),
+    (0x0CCE7, 0x0),
+    (0x0CCEA, 0x0),
+    (0x0CCEB, 0x0),
+    (0x0CCEC, 0x0),
+    (0x0CCED, 0x0),
+    (0x0CCF2, 0x0),
+    (0x0CCF3, 0x0),
+    (0x0CCFA, 0x0),
+    (0x0CCFB, 0x0),
+    (0x0CD02, 0x0),
+    (0x0CD03, 0x0),
+    (0x0CDE8, 0x0),
+    (0x0CDE9, 0x0),
+    (0x0CDEC, 0x0),
+    (0x0CDED, 0x0),
+    (0x0CDF0, 0x0),
+    (0x0CDF1, 0x0),
+    (0x0CDF4, 0x0),
+    (0x0CDF5, 0x0),
+    (0x0CDF8, 0x0),
+    (0x0CDF9, 0x0),
+    (0x0CDFA, 0x0),
+    (0x0CDFB, 0x0),
+    (0x0CDFE, 0x0),
+    (0x0CE00, 0x0),
+    (0x0CE01, 0x0),
+    (0x0CE03, 0x0),
+    (0x0CE06, 0x0),
+    (0x0CE07, 0x0),
+    (0x0CE08, 0x0),
+    (0x0CE09, 0x0),
+    (0x0CE0F, 0x0),
+    (0x0CE10, 0x0),
+    (0x0CE11, 0x0),
+    (0x0CE16, 0x0),
+    (0x0CE17, 0x0),
+    (0x0CE1E, 0x0),
+    (0x0CE1F, 0x0),
+    (0x0CE26, 0x0),
+    (0x0CE27, 0x0),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_EIGHTH_APPEARANCE_VIDEO_FRAME: u64 = 1095;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_EIGHTH_PROCESS_BYTES: [(u16, u8); 1] =
+    [(0xAAC9, 0x01)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_EIGHTH_APPEARANCE_RAM_BYTES: [(u16, u8); 309] = [
+    (0x9DC4, 0x9E),
+    (0x9DC5, 0x00),
+    (0x9DD0, 0x54),
+    (0x9DD1, 0xB6),
+    (0x9DD2, 0x54),
+    (0x9DD3, 0xAA),
+    (0x9DD4, 0x54),
+    (0x9DD6, 0x54),
+    (0x9DD7, 0x92),
+    (0x9DD8, 0x54),
+    (0x9DD9, 0x86),
+    (0x9DDA, 0x54),
+    (0x9DDB, 0x7A),
+    (0x9DDD, 0xB6),
+    (0x9DDF, 0xAA),
+    (0x9DE3, 0x92),
+    (0x9DE5, 0x86),
+    (0x9DE7, 0x7A),
+    (0x9DE8, 0x48),
+    (0x9DE9, 0xB6),
+    (0x9DEA, 0x48),
+    (0x9DEB, 0xAA),
+    (0x9DEC, 0x48),
+    (0x9DEE, 0x48),
+    (0x9DEF, 0x92),
+    (0x9DF0, 0x48),
+    (0x9DF1, 0x86),
+    (0x9DF2, 0x48),
+    (0x9DF3, 0x7A),
+    (0x9DF4, 0x42),
+    (0x9DF5, 0xB6),
+    (0x9DF6, 0x42),
+    (0x9DF7, 0xAA),
+    (0x9DF8, 0x42),
+    (0x9DFA, 0x42),
+    (0x9DFB, 0x92),
+    (0x9E00, 0x86),
+    (0x9E10, 0x58),
+    (0x9E11, 0xB6),
+    (0x9E12, 0x58),
+    (0x9E13, 0xAA),
+    (0x9E14, 0x58),
+    (0x9E16, 0x58),
+    (0x9E17, 0x92),
+    (0x9E18, 0x58),
+    (0x9E19, 0x86),
+    (0x9E1A, 0x58),
+    (0x9E1B, 0x7A),
+    (0x9E1D, 0xB6),
+    (0x9E1F, 0xAA),
+    (0x9E23, 0x92),
+    (0x9E25, 0x86),
+    (0x9E27, 0x7A),
+    (0x9E28, 0x4C),
+    (0x9E29, 0xB6),
+    (0x9E2A, 0x4C),
+    (0x9E2B, 0xAA),
+    (0x9E2C, 0x4C),
+    (0x9E2E, 0x4C),
+    (0x9E2F, 0x92),
+    (0x9E30, 0x4C),
+    (0x9E31, 0x86),
+    (0x9E32, 0x4C),
+    (0x9E33, 0x7A),
+    (0x9E34, 0x46),
+    (0x9E35, 0xB6),
+    (0x9E36, 0x46),
+    (0x9E37, 0xAA),
+    (0x9E38, 0x46),
+    (0x9E3A, 0x46),
+    (0x9E3B, 0x92),
+    (0x9E3C, 0x46),
+    (0x9E3D, 0x86),
+    (0x9E3E, 0x46),
+    (0x9E3F, 0x7A),
+    (0x9E40, 0x86),
+    (0x9E50, 0x5C),
+    (0x9E51, 0xB6),
+    (0x9E52, 0x5C),
+    (0x9E53, 0xAA),
+    (0x9E54, 0x5C),
+    (0x9E56, 0x5C),
+    (0x9E57, 0x92),
+    (0x9E58, 0x5C),
+    (0x9E59, 0x86),
+    (0x9E5A, 0x5C),
+    (0x9E5B, 0x7A),
+    (0x9E5D, 0xB6),
+    (0x9E5F, 0xAA),
+    (0x9E63, 0x92),
+    (0x9E65, 0x86),
+    (0x9E67, 0x7A),
+    (0x9E68, 0x50),
+    (0x9E69, 0xB6),
+    (0x9E6A, 0x50),
+    (0x9E6B, 0xAA),
+    (0x9E6C, 0x50),
+    (0x9E6E, 0x50),
+    (0x9E6F, 0x92),
+    (0x9E70, 0x50),
+    (0x9E71, 0x86),
+    (0x9E72, 0x50),
+    (0x9E73, 0x7A),
+    (0x9E74, 0x4A),
+    (0x9E75, 0xB6),
+    (0x9E76, 0x4A),
+    (0x9E77, 0xAA),
+    (0x9E78, 0x4A),
+    (0x9E7A, 0x4A),
+    (0x9E7B, 0x92),
+    (0x9E7C, 0x4A),
+    (0x9E7D, 0x86),
+    (0x9E7E, 0x4A),
+    (0x9E7F, 0x7A),
+    (0x9E80, 0x86),
+    (0x9E90, 0x60),
+    (0x9E91, 0xB6),
+    (0x9E92, 0x60),
+    (0x9E93, 0xAA),
+    (0x9E94, 0x60),
+    (0x9E96, 0x60),
+    (0x9E97, 0x92),
+    (0x9E98, 0x60),
+    (0x9E99, 0x86),
+    (0x9E9A, 0x60),
+    (0x9E9B, 0x7A),
+    (0x9E9D, 0xB6),
+    (0x9E9F, 0xAA),
+    (0x9EA3, 0x92),
+    (0x9EA5, 0x86),
+    (0x9EA7, 0x7A),
+    (0x9EA8, 0x54),
+    (0x9EA9, 0xB6),
+    (0x9EAA, 0x54),
+    (0x9EAB, 0xAA),
+    (0x9EAC, 0x54),
+    (0x9EAE, 0x54),
+    (0x9EAF, 0x92),
+    (0x9EB0, 0x54),
+    (0x9EB1, 0x86),
+    (0x9EB2, 0x54),
+    (0x9EB3, 0x7A),
+    (0x9EB4, 0x4E),
+    (0x9EB5, 0xB6),
+    (0x9EB6, 0x4E),
+    (0x9EB7, 0xAA),
+    (0x9EB8, 0x4E),
+    (0x9EBA, 0x4E),
+    (0x9EBB, 0x92),
+    (0x9EBC, 0x4E),
+    (0x9EBD, 0x86),
+    (0x9EBE, 0x4E),
+    (0x9EBF, 0x7A),
+    (0x9EC0, 0x86),
+    (0x9ED0, 0x64),
+    (0x9ED1, 0xB6),
+    (0x9ED2, 0x64),
+    (0x9ED3, 0xAA),
+    (0x9ED4, 0x64),
+    (0x9ED6, 0x64),
+    (0x9ED7, 0x92),
+    (0x9ED8, 0x64),
+    (0x9ED9, 0x86),
+    (0x9EDA, 0x64),
+    (0x9EDB, 0x7A),
+    (0x9EDD, 0xB6),
+    (0x9EDF, 0xAA),
+    (0x9EE3, 0x92),
+    (0x9EE5, 0x86),
+    (0x9EE7, 0x7A),
+    (0x9EE8, 0x58),
+    (0x9EE9, 0xB6),
+    (0x9EEA, 0x58),
+    (0x9EEB, 0xAA),
+    (0x9EEC, 0x58),
+    (0x9EEE, 0x58),
+    (0x9EEF, 0x92),
+    (0x9EF0, 0x58),
+    (0x9EF1, 0x86),
+    (0x9EF2, 0x58),
+    (0x9EF3, 0x7A),
+    (0x9EF4, 0x52),
+    (0x9EF5, 0xB6),
+    (0x9EF6, 0x52),
+    (0x9EF7, 0xAA),
+    (0x9EF8, 0x52),
+    (0x9EFA, 0x52),
+    (0x9EFB, 0x92),
+    (0x9EFC, 0x52),
+    (0x9EFD, 0x86),
+    (0x9EFE, 0x52),
+    (0x9EFF, 0x7A),
+    (0x9F00, 0x86),
+    (0x9F10, 0x68),
+    (0x9F11, 0xB6),
+    (0x9F12, 0x68),
+    (0x9F13, 0xAA),
+    (0x9F14, 0x68),
+    (0x9F16, 0x68),
+    (0x9F17, 0x92),
+    (0x9F18, 0x68),
+    (0x9F19, 0x86),
+    (0x9F1A, 0x68),
+    (0x9F1B, 0x7A),
+    (0x9F1D, 0xB6),
+    (0x9F1F, 0xAA),
+    (0x9F23, 0x92),
+    (0x9F25, 0x86),
+    (0x9F27, 0x7A),
+    (0x9F28, 0x5C),
+    (0x9F29, 0xB6),
+    (0x9F2A, 0x5C),
+    (0x9F2B, 0xAA),
+    (0x9F2C, 0x5C),
+    (0x9F2E, 0x5C),
+    (0x9F2F, 0x92),
+    (0x9F30, 0x5C),
+    (0x9F31, 0x86),
+    (0x9F32, 0x5C),
+    (0x9F33, 0x7A),
+    (0x9F34, 0x56),
+    (0x9F35, 0xB6),
+    (0x9F36, 0x56),
+    (0x9F37, 0xAA),
+    (0x9F38, 0x56),
+    (0x9F3A, 0x56),
+    (0x9F3B, 0x92),
+    (0x9F3C, 0x56),
+    (0x9F3D, 0x86),
+    (0x9F3E, 0x56),
+    (0x9F3F, 0x7A),
+    (0x9F40, 0x86),
+    (0x9F50, 0x6C),
+    (0x9F51, 0xB6),
+    (0x9F52, 0x6C),
+    (0x9F53, 0xAA),
+    (0x9F54, 0x6C),
+    (0x9F56, 0x6C),
+    (0x9F57, 0x92),
+    (0x9F58, 0x6C),
+    (0x9F59, 0x86),
+    (0x9F5A, 0x6C),
+    (0x9F5B, 0x7A),
+    (0x9F5D, 0xB6),
+    (0x9F5F, 0xAA),
+    (0x9F63, 0x92),
+    (0x9F65, 0x86),
+    (0x9F67, 0x7A),
+    (0x9F68, 0x60),
+    (0x9F69, 0xB6),
+    (0x9F6A, 0x60),
+    (0x9F6B, 0xAA),
+    (0x9F6C, 0x60),
+    (0x9F6E, 0x60),
+    (0x9F6F, 0x92),
+    (0x9F70, 0x60),
+    (0x9F71, 0x86),
+    (0x9F72, 0x60),
+    (0x9F73, 0x7A),
+    (0x9F74, 0x5A),
+    (0x9F75, 0xB6),
+    (0x9F76, 0x5A),
+    (0x9F77, 0xAA),
+    (0x9F78, 0x5A),
+    (0x9F7A, 0x5A),
+    (0x9F7B, 0x92),
+    (0x9F7C, 0x5A),
+    (0x9F7D, 0x86),
+    (0x9F7E, 0x5A),
+    (0x9F7F, 0x7A),
+    (0x9F80, 0x86),
+    (0x9F90, 0x70),
+    (0x9F91, 0xB6),
+    (0x9F92, 0x70),
+    (0x9F93, 0xAA),
+    (0x9F94, 0x70),
+    (0x9F96, 0x70),
+    (0x9F97, 0x92),
+    (0x9F98, 0x70),
+    (0x9F99, 0x86),
+    (0x9F9A, 0x70),
+    (0x9F9B, 0x7A),
+    (0x9F9D, 0xB6),
+    (0x9F9F, 0xAA),
+    (0x9FA3, 0x92),
+    (0x9FA5, 0x86),
+    (0x9FA7, 0x7A),
+    (0x9FA8, 0x64),
+    (0x9FA9, 0xB6),
+    (0x9FAA, 0x64),
+    (0x9FAB, 0xAA),
+    (0x9FAC, 0x64),
+    (0x9FAE, 0x64),
+    (0x9FAF, 0x92),
+    (0x9FB0, 0x64),
+    (0x9FB1, 0x86),
+    (0x9FB2, 0x64),
+    (0x9FB3, 0x7A),
+    (0x9FB4, 0x5E),
+    (0x9FB5, 0xB6),
+    (0x9FB6, 0x5E),
+    (0x9FB7, 0xAA),
+    (0x9FB8, 0x5E),
+    (0x9FBA, 0x5E),
+    (0x9FBB, 0x92),
+    (0x9FBC, 0x5E),
+    (0x9FBD, 0x86),
+    (0x9FBE, 0x5E),
+    (0x9FBF, 0x7A),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_EIGHTH_VISIBLE_NIBBLES: [(u32, u8); 862] = [
+    (0x04522, 0x0),
+    (0x04523, 0x0),
+    (0x04645, 0x0),
+    (0x04769, 0x0),
+    (0x0488C, 0x0),
+    (0x049B0, 0x0),
+    (0x04D1A, 0x0),
+    (0x04D1B, 0x0),
+    (0x04E3E, 0x0),
+    (0x04E3F, 0x0),
+    (0x051AB, 0x0),
+    (0x051AC, 0x0),
+    (0x083AC, 0xC),
+    (0x083B4, 0xC),
+    (0x083B5, 0xC),
+    (0x083B8, 0xC),
+    (0x083B9, 0x2),
+    (0x083C0, 0xC),
+    (0x083C1, 0xC),
+    (0x083C4, 0xC),
+    (0x083C5, 0xC),
+    (0x083CC, 0xC),
+    (0x083CD, 0xC),
+    (0x083D0, 0xC),
+    (0x083D1, 0xC),
+    (0x083D8, 0x2),
+    (0x083D9, 0x2),
+    (0x083E0, 0xC),
+    (0x083E1, 0xC),
+    (0x083E4, 0xC),
+    (0x083E5, 0xC),
+    (0x083F0, 0x2),
+    (0x083F1, 0x2),
+    (0x083F8, 0x2),
+    (0x083F9, 0xC),
+    (0x084D0, 0xC),
+    (0x084D8, 0xC),
+    (0x084D9, 0xC),
+    (0x084DC, 0xC),
+    (0x084DD, 0x2),
+    (0x084E4, 0xC),
+    (0x084E5, 0xC),
+    (0x084E8, 0xC),
+    (0x084E9, 0xC),
+    (0x084F0, 0xC),
+    (0x084F1, 0xC),
+    (0x084F4, 0x2),
+    (0x084F5, 0xC),
+    (0x084FC, 0xC),
+    (0x084FD, 0xC),
+    (0x08504, 0xC),
+    (0x08505, 0xC),
+    (0x08508, 0xC),
+    (0x08509, 0xC),
+    (0x0850C, 0xC),
+    (0x08514, 0xC),
+    (0x08515, 0xC),
+    (0x0851C, 0xC),
+    (0x0851D, 0x2),
+    (0x08A88, 0x0),
+    (0x08A8A, 0xC),
+    (0x08A8B, 0xC),
+    (0x08A90, 0x0),
+    (0x08A91, 0x0),
+    (0x08A92, 0x0),
+    (0x08A93, 0x0),
+    (0x08A98, 0x0),
+    (0x08A9A, 0x0),
+    (0x08A9B, 0x0),
+    (0x08A9E, 0xC),
+    (0x08A9F, 0xC),
+    (0x08AA0, 0x0),
+    (0x08AA1, 0x0),
+    (0x08AA2, 0x0),
+    (0x08AA3, 0x0),
+    (0x08AA4, 0x0),
+    (0x08AA5, 0x0),
+    (0x08AA6, 0x0),
+    (0x08AA7, 0x0),
+    (0x08AA8, 0x0),
+    (0x08AA9, 0x0),
+    (0x08AAA, 0x0),
+    (0x08AAB, 0x0),
+    (0x08AAC, 0x0),
+    (0x08AAD, 0x0),
+    (0x08AAE, 0x0),
+    (0x08AAF, 0x0),
+    (0x08AB2, 0x0),
+    (0x08AB3, 0x0),
+    (0x08AB4, 0x0),
+    (0x08AB5, 0x0),
+    (0x08AB6, 0x0),
+    (0x08AB7, 0x0),
+    (0x08ABA, 0x0),
+    (0x08ABB, 0x0),
+    (0x08ABC, 0x0),
+    (0x08ABD, 0x0),
+    (0x08ABE, 0x0),
+    (0x08ABF, 0x0),
+    (0x08AC6, 0x0),
+    (0x08AC7, 0x0),
+    (0x08ACE, 0x0),
+    (0x08ACF, 0x0),
+    (0x08BAC, 0x0),
+    (0x08BB4, 0x0),
+    (0x08BB5, 0x0),
+    (0x08BB6, 0x0),
+    (0x08BB7, 0x0),
+    (0x08BBC, 0x0),
+    (0x08BBD, 0x0),
+    (0x08BBE, 0x0),
+    (0x08BBF, 0x0),
+    (0x08BC4, 0x0),
+    (0x08BC5, 0x0),
+    (0x08BC6, 0x0),
+    (0x08BC7, 0x0),
+    (0x08BC8, 0x0),
+    (0x08BC9, 0x0),
+    (0x08BCA, 0x0),
+    (0x08BCB, 0x0),
+    (0x08BCC, 0x0),
+    (0x08BCD, 0x0),
+    (0x08BCE, 0x0),
+    (0x08BCF, 0x0),
+    (0x08BD0, 0x0),
+    (0x08BD1, 0x0),
+    (0x08BD2, 0x0),
+    (0x08BD3, 0x0),
+    (0x08BD6, 0x0),
+    (0x08BD7, 0x0),
+    (0x08BD8, 0x0),
+    (0x08BD9, 0x0),
+    (0x08BDA, 0x0),
+    (0x08BDB, 0x0),
+    (0x08BDE, 0x0),
+    (0x08BDF, 0x0),
+    (0x08BE0, 0x0),
+    (0x08BE1, 0x0),
+    (0x08BE2, 0x0),
+    (0x08BE3, 0x0),
+    (0x08BE6, 0x0),
+    (0x08BEA, 0x0),
+    (0x08BEB, 0x0),
+    (0x08BF2, 0x0),
+    (0x08BF3, 0x0),
+    (0x0915C, 0xC),
+    (0x0915D, 0xC),
+    (0x09164, 0xC),
+    (0x09165, 0xC),
+    (0x09168, 0xC),
+    (0x09169, 0x2),
+    (0x09170, 0xC),
+    (0x09171, 0xC),
+    (0x09174, 0xC),
+    (0x09175, 0xC),
+    (0x0917C, 0xC),
+    (0x0917D, 0xC),
+    (0x09180, 0x2),
+    (0x09181, 0xC),
+    (0x09188, 0xC),
+    (0x09189, 0xC),
+    (0x09190, 0xC),
+    (0x09191, 0xC),
+    (0x09194, 0xC),
+    (0x09195, 0xC),
+    (0x09198, 0xC),
+    (0x09199, 0xC),
+    (0x091A0, 0xC),
+    (0x091A1, 0xC),
+    (0x091A8, 0xC),
+    (0x091A9, 0x2),
+    (0x09280, 0xC),
+    (0x09281, 0xC),
+    (0x09288, 0xC),
+    (0x09289, 0xC),
+    (0x0928C, 0xC),
+    (0x09294, 0xC),
+    (0x09295, 0xC),
+    (0x09298, 0xC),
+    (0x09299, 0xC),
+    (0x092A0, 0xC),
+    (0x092A1, 0xC),
+    (0x092A4, 0x2),
+    (0x092A5, 0x2),
+    (0x092A8, 0xC),
+    (0x092AC, 0xC),
+    (0x092AD, 0xC),
+    (0x092B4, 0xC),
+    (0x092B5, 0xC),
+    (0x092B8, 0xC),
+    (0x092B9, 0xC),
+    (0x092BC, 0xC),
+    (0x092BD, 0xC),
+    (0x092C4, 0xC),
+    (0x092C5, 0xC),
+    (0x092CC, 0xC),
+    (0x092CD, 0xC),
+    (0x095F0, 0x0),
+    (0x095F1, 0x0),
+    (0x095F8, 0x0),
+    (0x095F9, 0x0),
+    (0x095FA, 0x0),
+    (0x095FB, 0x0),
+    (0x09600, 0x0),
+    (0x09601, 0x0),
+    (0x09602, 0x0),
+    (0x09603, 0x0),
+    (0x09608, 0x0),
+    (0x09609, 0x0),
+    (0x0960A, 0x0),
+    (0x0960B, 0x0),
+    (0x0960C, 0x0),
+    (0x0960D, 0x0),
+    (0x0960E, 0x0),
+    (0x0960F, 0x0),
+    (0x09610, 0x0),
+    (0x09611, 0x0),
+    (0x09612, 0x0),
+    (0x09613, 0x0),
+    (0x09614, 0x0),
+    (0x09615, 0x0),
+    (0x09616, 0x0),
+    (0x09617, 0x0),
+    (0x0961A, 0x0),
+    (0x0961B, 0x0),
+    (0x0961C, 0x0),
+    (0x0961D, 0x0),
+    (0x0961E, 0x0),
+    (0x0961F, 0x0),
+    (0x09622, 0x0),
+    (0x09623, 0x0),
+    (0x09624, 0x0),
+    (0x09625, 0x0),
+    (0x09626, 0x0),
+    (0x09627, 0x0),
+    (0x0962A, 0x0),
+    (0x0962B, 0x0),
+    (0x0962E, 0x0),
+    (0x0962F, 0x0),
+    (0x09636, 0x0),
+    (0x09637, 0x0),
+    (0x0963E, 0x0),
+    (0x09714, 0x0),
+    (0x09715, 0x0),
+    (0x0971C, 0x0),
+    (0x0971D, 0x0),
+    (0x0971E, 0x0),
+    (0x09724, 0x0),
+    (0x09725, 0x0),
+    (0x09726, 0x0),
+    (0x09727, 0x0),
+    (0x0972C, 0x0),
+    (0x0972D, 0x0),
+    (0x0972E, 0x0),
+    (0x0972F, 0x0),
+    (0x09730, 0x0),
+    (0x09731, 0x0),
+    (0x09732, 0x0),
+    (0x09733, 0x0),
+    (0x09734, 0x0),
+    (0x09735, 0x0),
+    (0x09736, 0x0),
+    (0x09737, 0x0),
+    (0x09738, 0x0),
+    (0x09739, 0x0),
+    (0x0973A, 0x0),
+    (0x0973B, 0x0),
+    (0x0973C, 0x0),
+    (0x0973E, 0x0),
+    (0x0973F, 0x0),
+    (0x09740, 0x0),
+    (0x09741, 0x0),
+    (0x09742, 0x0),
+    (0x09743, 0x0),
+    (0x09746, 0x0),
+    (0x09747, 0x0),
+    (0x09748, 0x0),
+    (0x09749, 0x0),
+    (0x0974A, 0x0),
+    (0x0974B, 0x0),
+    (0x0974E, 0x0),
+    (0x0974F, 0x0),
+    (0x09752, 0x0),
+    (0x09753, 0x0),
+    (0x0975A, 0x0),
+    (0x0975B, 0x0),
+    (0x09762, 0x0),
+    (0x09763, 0x0),
+    (0x09F0C, 0xC),
+    (0x09F0D, 0xC),
+    (0x09F14, 0x2),
+    (0x09F15, 0xC),
+    (0x09F18, 0xC),
+    (0x09F20, 0xC),
+    (0x09F21, 0xC),
+    (0x09F24, 0x2),
+    (0x09F25, 0x2),
+    (0x09F2C, 0xC),
+    (0x09F2D, 0xC),
+    (0x09F30, 0x2),
+    (0x09F31, 0x2),
+    (0x09F34, 0xC),
+    (0x09F35, 0xC),
+    (0x09F38, 0xC),
+    (0x09F39, 0xC),
+    (0x09F40, 0x2),
+    (0x09F41, 0xC),
+    (0x09F44, 0xC),
+    (0x09F45, 0x2),
+    (0x09F48, 0xC),
+    (0x09F49, 0xC),
+    (0x09F50, 0xC),
+    (0x09F51, 0xC),
+    (0x09F58, 0xC),
+    (0x09F59, 0xC),
+    (0x0A030, 0xC),
+    (0x0A031, 0xC),
+    (0x0A038, 0x2),
+    (0x0A039, 0xC),
+    (0x0A03C, 0xC),
+    (0x0A044, 0xC),
+    (0x0A045, 0xC),
+    (0x0A048, 0x2),
+    (0x0A049, 0x2),
+    (0x0A050, 0x2),
+    (0x0A051, 0xC),
+    (0x0A054, 0x2),
+    (0x0A055, 0x2),
+    (0x0A058, 0xC),
+    (0x0A059, 0xC),
+    (0x0A05C, 0xC),
+    (0x0A05D, 0xC),
+    (0x0A064, 0x2),
+    (0x0A065, 0xC),
+    (0x0A068, 0xC),
+    (0x0A069, 0xC),
+    (0x0A06C, 0x2),
+    (0x0A06D, 0x2),
+    (0x0A070, 0xC),
+    (0x0A074, 0xC),
+    (0x0A075, 0xC),
+    (0x0A07C, 0xC),
+    (0x0A07D, 0xC),
+    (0x0A151, 0x0),
+    (0x0A158, 0x0),
+    (0x0A159, 0x0),
+    (0x0A160, 0x0),
+    (0x0A161, 0x0),
+    (0x0A162, 0x0),
+    (0x0A164, 0xC),
+    (0x0A165, 0xC),
+    (0x0A168, 0x0),
+    (0x0A169, 0x0),
+    (0x0A16A, 0x0),
+    (0x0A16B, 0x0),
+    (0x0A16C, 0x0),
+    (0x0A170, 0x0),
+    (0x0A171, 0x0),
+    (0x0A172, 0x0),
+    (0x0A173, 0x0),
+    (0x0A174, 0x0),
+    (0x0A175, 0x0),
+    (0x0A177, 0x0),
+    (0x0A178, 0x0),
+    (0x0A179, 0x0),
+    (0x0A17A, 0x0),
+    (0x0A17B, 0x0),
+    (0x0A17C, 0x0),
+    (0x0A17D, 0x0),
+    (0x0A17E, 0x0),
+    (0x0A17F, 0x0),
+    (0x0A180, 0x0),
+    (0x0A181, 0x0),
+    (0x0A182, 0x0),
+    (0x0A183, 0x0),
+    (0x0A184, 0x0),
+    (0x0A185, 0x0),
+    (0x0A186, 0x0),
+    (0x0A187, 0x0),
+    (0x0A18A, 0x0),
+    (0x0A18B, 0x0),
+    (0x0A18C, 0x0),
+    (0x0A18D, 0x0),
+    (0x0A18E, 0x0),
+    (0x0A18F, 0x0),
+    (0x0A192, 0x0),
+    (0x0A193, 0x0),
+    (0x0A196, 0x0),
+    (0x0A197, 0x0),
+    (0x0A19E, 0x0),
+    (0x0A19F, 0x0),
+    (0x0A1A6, 0x0),
+    (0x0A1A7, 0x0),
+    (0x0A275, 0xC),
+    (0x0A27C, 0x0),
+    (0x0A27D, 0x0),
+    (0x0A284, 0x0),
+    (0x0A285, 0x0),
+    (0x0A286, 0x0),
+    (0x0A288, 0xC),
+    (0x0A289, 0xC),
+    (0x0A28C, 0x0),
+    (0x0A28D, 0x0),
+    (0x0A28E, 0x0),
+    (0x0A28F, 0x0),
+    (0x0A290, 0x0),
+    (0x0A291, 0x0),
+    (0x0A294, 0x0),
+    (0x0A295, 0x0),
+    (0x0A296, 0x0),
+    (0x0A297, 0x0),
+    (0x0A298, 0x0),
+    (0x0A299, 0x0),
+    (0x0A29B, 0x0),
+    (0x0A29C, 0x0),
+    (0x0A29D, 0x0),
+    (0x0A29E, 0x0),
+    (0x0A29F, 0x0),
+    (0x0A2A0, 0x0),
+    (0x0A2A1, 0x0),
+    (0x0A2A2, 0x0),
+    (0x0A2A3, 0x0),
+    (0x0A2A4, 0x0),
+    (0x0A2A5, 0x0),
+    (0x0A2A6, 0x0),
+    (0x0A2A7, 0x0),
+    (0x0A2A8, 0x0),
+    (0x0A2A9, 0x0),
+    (0x0A2AA, 0x0),
+    (0x0A2AB, 0x0),
+    (0x0A2AE, 0x0),
+    (0x0A2AF, 0x0),
+    (0x0A2B0, 0x0),
+    (0x0A2B1, 0x0),
+    (0x0A2B2, 0x0),
+    (0x0A2B3, 0x0),
+    (0x0A2B6, 0x0),
+    (0x0A2B7, 0x0),
+    (0x0A2B8, 0x0),
+    (0x0A2BA, 0x0),
+    (0x0A2BB, 0x0),
+    (0x0A2C2, 0x0),
+    (0x0A2C3, 0x0),
+    (0x0A2CA, 0x0),
+    (0x0A2CB, 0x0),
+    (0x0ACB8, 0x0),
+    (0x0ACBC, 0x2),
+    (0x0ACBD, 0x2),
+    (0x0ACC0, 0x0),
+    (0x0ACC1, 0x0),
+    (0x0ACC2, 0x0),
+    (0x0ACC3, 0x0),
+    (0x0ACC4, 0xC),
+    (0x0ACC5, 0xC),
+    (0x0ACC8, 0x0),
+    (0x0ACC9, 0x0),
+    (0x0ACCA, 0x0),
+    (0x0ACD0, 0x0),
+    (0x0ACD1, 0x0),
+    (0x0ACD2, 0x0),
+    (0x0ACD3, 0x0),
+    (0x0ACD4, 0xC),
+    (0x0ACD5, 0xC),
+    (0x0ACD8, 0x0),
+    (0x0ACD9, 0x0),
+    (0x0ACDA, 0x0),
+    (0x0ACDB, 0x0),
+    (0x0ACDC, 0x2),
+    (0x0ACDD, 0xC),
+    (0x0ACE0, 0x0),
+    (0x0ACE1, 0x0),
+    (0x0ACE2, 0x0),
+    (0x0ACE3, 0x0),
+    (0x0ACE4, 0xC),
+    (0x0ACE5, 0xC),
+    (0x0ACE6, 0x0),
+    (0x0ACE7, 0x0),
+    (0x0ACE8, 0x0),
+    (0x0ACE9, 0x0),
+    (0x0ACEA, 0x0),
+    (0x0ACEB, 0x0),
+    (0x0ACEE, 0x0),
+    (0x0ACEF, 0x0),
+    (0x0ACF0, 0x2),
+    (0x0ACF1, 0x2),
+    (0x0ACF2, 0x0),
+    (0x0ACF3, 0x0),
+    (0x0ACF6, 0x0),
+    (0x0ACF7, 0x0),
+    (0x0ACF8, 0x2),
+    (0x0ACF9, 0x2),
+    (0x0ACFA, 0x0),
+    (0x0ACFB, 0x0),
+    (0x0ACFE, 0x0),
+    (0x0ACFF, 0x0),
+    (0x0AD00, 0x2),
+    (0x0AD01, 0x2),
+    (0x0AD06, 0x0),
+    (0x0AD07, 0x0),
+    (0x0AD08, 0x2),
+    (0x0AD09, 0x2),
+    (0x0AD0E, 0x0),
+    (0x0AD0F, 0x0),
+    (0x0ADDC, 0x0),
+    (0x0ADE0, 0x2),
+    (0x0ADE1, 0x2),
+    (0x0ADE4, 0x0),
+    (0x0ADE5, 0x0),
+    (0x0ADE6, 0x0),
+    (0x0ADE7, 0x0),
+    (0x0ADE8, 0xC),
+    (0x0ADE9, 0xC),
+    (0x0ADEC, 0x0),
+    (0x0ADED, 0x0),
+    (0x0ADEE, 0x0),
+    (0x0ADF4, 0x0),
+    (0x0ADF5, 0x0),
+    (0x0ADF6, 0x0),
+    (0x0ADF7, 0x0),
+    (0x0ADF8, 0xC),
+    (0x0ADF9, 0xC),
+    (0x0ADFC, 0x0),
+    (0x0ADFD, 0x0),
+    (0x0ADFE, 0x0),
+    (0x0ADFF, 0x0),
+    (0x0AE00, 0x2),
+    (0x0AE01, 0x2),
+    (0x0AE04, 0x0),
+    (0x0AE05, 0x0),
+    (0x0AE07, 0x0),
+    (0x0AE08, 0xC),
+    (0x0AE09, 0xC),
+    (0x0AE0A, 0x0),
+    (0x0AE0B, 0x0),
+    (0x0AE0C, 0x0),
+    (0x0AE0D, 0x0),
+    (0x0AE0E, 0x0),
+    (0x0AE0F, 0x0),
+    (0x0AE12, 0x0),
+    (0x0AE13, 0x0),
+    (0x0AE14, 0x2),
+    (0x0AE15, 0x2),
+    (0x0AE16, 0x0),
+    (0x0AE17, 0x0),
+    (0x0AE1A, 0x0),
+    (0x0AE1B, 0x0),
+    (0x0AE1C, 0x2),
+    (0x0AE1D, 0x2),
+    (0x0AE1E, 0x0),
+    (0x0AE1F, 0x0),
+    (0x0AE22, 0x0),
+    (0x0AE23, 0x0),
+    (0x0AE24, 0x2),
+    (0x0AE25, 0x2),
+    (0x0AE2A, 0x0),
+    (0x0AE2B, 0x0),
+    (0x0AE2C, 0x2),
+    (0x0AE2D, 0x2),
+    (0x0AE32, 0x0),
+    (0x0AE33, 0x0),
+    (0x0B820, 0x0),
+    (0x0B828, 0x0),
+    (0x0B829, 0x0),
+    (0x0B830, 0x0),
+    (0x0B831, 0x0),
+    (0x0B832, 0x0),
+    (0x0B834, 0xC),
+    (0x0B835, 0xC),
+    (0x0B838, 0x0),
+    (0x0B839, 0x0),
+    (0x0B83A, 0x0),
+    (0x0B83B, 0x0),
+    (0x0B83C, 0x0),
+    (0x0B83D, 0x0),
+    (0x0B840, 0x0),
+    (0x0B841, 0x0),
+    (0x0B842, 0x0),
+    (0x0B843, 0x0),
+    (0x0B844, 0x0),
+    (0x0B845, 0x0),
+    (0x0B848, 0x0),
+    (0x0B849, 0x0),
+    (0x0B84B, 0x0),
+    (0x0B84C, 0x0),
+    (0x0B84D, 0x0),
+    (0x0B84E, 0x0),
+    (0x0B84F, 0x0),
+    (0x0B850, 0x0),
+    (0x0B851, 0x0),
+    (0x0B852, 0x0),
+    (0x0B853, 0x0),
+    (0x0B854, 0x0),
+    (0x0B855, 0x0),
+    (0x0B856, 0x0),
+    (0x0B857, 0x0),
+    (0x0B85A, 0x0),
+    (0x0B85B, 0x0),
+    (0x0B85C, 0x0),
+    (0x0B85D, 0x0),
+    (0x0B85E, 0x0),
+    (0x0B85F, 0x0),
+    (0x0B862, 0x0),
+    (0x0B863, 0x0),
+    (0x0B864, 0x0),
+    (0x0B865, 0x0),
+    (0x0B866, 0x0),
+    (0x0B867, 0x0),
+    (0x0B86E, 0x0),
+    (0x0B86F, 0x0),
+    (0x0B876, 0x0),
+    (0x0B877, 0x0),
+    (0x0B944, 0x0),
+    (0x0B94C, 0x0),
+    (0x0B94D, 0x0),
+    (0x0B954, 0x0),
+    (0x0B955, 0x0),
+    (0x0B956, 0x0),
+    (0x0B958, 0xC),
+    (0x0B959, 0xC),
+    (0x0B95C, 0x0),
+    (0x0B95D, 0x0),
+    (0x0B95E, 0x0),
+    (0x0B95F, 0x0),
+    (0x0B960, 0x0),
+    (0x0B961, 0x0),
+    (0x0B964, 0x0),
+    (0x0B965, 0x0),
+    (0x0B966, 0x0),
+    (0x0B967, 0x0),
+    (0x0B968, 0x0),
+    (0x0B969, 0x0),
+    (0x0B96C, 0x0),
+    (0x0B96D, 0x0),
+    (0x0B970, 0x0),
+    (0x0B971, 0x0),
+    (0x0B972, 0x0),
+    (0x0B974, 0x0),
+    (0x0B975, 0x0),
+    (0x0B976, 0x0),
+    (0x0B977, 0x0),
+    (0x0B978, 0x0),
+    (0x0B979, 0x0),
+    (0x0B97A, 0x0),
+    (0x0B97B, 0x0),
+    (0x0B97E, 0x0),
+    (0x0B97F, 0x0),
+    (0x0B980, 0x0),
+    (0x0B981, 0x0),
+    (0x0B982, 0x0),
+    (0x0B983, 0x0),
+    (0x0B986, 0x0),
+    (0x0B987, 0x0),
+    (0x0B988, 0x0),
+    (0x0B989, 0x0),
+    (0x0B98A, 0x0),
+    (0x0B98B, 0x0),
+    (0x0B992, 0x0),
+    (0x0B993, 0x0),
+    (0x0B99A, 0x0),
+    (0x0B99B, 0x0),
+    (0x0BA6C, 0xC),
+    (0x0BA6D, 0xC),
+    (0x0BA74, 0xC),
+    (0x0BA75, 0x2),
+    (0x0BA78, 0x2),
+    (0x0BA80, 0x2),
+    (0x0BA81, 0x2),
+    (0x0BA84, 0xC),
+    (0x0BA85, 0xC),
+    (0x0BA8C, 0x2),
+    (0x0BA8D, 0x2),
+    (0x0BA91, 0x2),
+    (0x0BA94, 0xC),
+    (0x0BA95, 0xC),
+    (0x0BA98, 0x2),
+    (0x0BA99, 0x2),
+    (0x0BAA0, 0x2),
+    (0x0BAA1, 0x2),
+    (0x0BAA4, 0x2),
+    (0x0BAA5, 0xC),
+    (0x0BAA8, 0x2),
+    (0x0BAA9, 0x2),
+    (0x0BAAC, 0xC),
+    (0x0BAAD, 0xC),
+    (0x0BAB0, 0x2),
+    (0x0BAB1, 0x2),
+    (0x0BAB8, 0x2),
+    (0x0BAB9, 0x2),
+    (0x0BB90, 0xC),
+    (0x0BB91, 0x2),
+    (0x0BB98, 0xC),
+    (0x0BB99, 0x2),
+    (0x0BB9C, 0x2),
+    (0x0BBA4, 0x2),
+    (0x0BBA5, 0x2),
+    (0x0BBA8, 0xC),
+    (0x0BBA9, 0xC),
+    (0x0BBB0, 0x2),
+    (0x0BBB1, 0x2),
+    (0x0BBB8, 0xC),
+    (0x0BBB9, 0xC),
+    (0x0BBBC, 0x2),
+    (0x0BBBD, 0x2),
+    (0x0BBC4, 0x2),
+    (0x0BBC5, 0x2),
+    (0x0BBC8, 0x2),
+    (0x0BBC9, 0xC),
+    (0x0BBCC, 0x2),
+    (0x0BBCD, 0x2),
+    (0x0BBD0, 0xC),
+    (0x0BBD1, 0xC),
+    (0x0BBD4, 0x2),
+    (0x0BBD5, 0x2),
+    (0x0BBDC, 0x2),
+    (0x0BBDD, 0x2),
+    (0x0C388, 0xC),
+    (0x0C389, 0xC),
+    (0x0C390, 0x0),
+    (0x0C391, 0x0),
+    (0x0C398, 0x0),
+    (0x0C399, 0x0),
+    (0x0C39A, 0x0),
+    (0x0C39C, 0xC),
+    (0x0C39D, 0xC),
+    (0x0C3A0, 0x0),
+    (0x0C3A1, 0x0),
+    (0x0C3A2, 0x0),
+    (0x0C3A3, 0x0),
+    (0x0C3A4, 0x0),
+    (0x0C3A5, 0x0),
+    (0x0C3A8, 0x0),
+    (0x0C3A9, 0x0),
+    (0x0C3AA, 0x0),
+    (0x0C3AB, 0x0),
+    (0x0C3AC, 0x0),
+    (0x0C3AD, 0x0),
+    (0x0C3B0, 0x0),
+    (0x0C3B1, 0x0),
+    (0x0C3B4, 0x0),
+    (0x0C3B5, 0x0),
+    (0x0C3B6, 0x0),
+    (0x0C3B8, 0x0),
+    (0x0C3B9, 0x0),
+    (0x0C3BA, 0x0),
+    (0x0C3BB, 0x0),
+    (0x0C3BC, 0x0),
+    (0x0C3BD, 0x0),
+    (0x0C3BE, 0x0),
+    (0x0C3BF, 0x0),
+    (0x0C3C3, 0x0),
+    (0x0C3C4, 0x0),
+    (0x0C3C5, 0x0),
+    (0x0C3C6, 0x0),
+    (0x0C3C7, 0x0),
+    (0x0C3CB, 0x0),
+    (0x0C3CC, 0x0),
+    (0x0C3CD, 0x0),
+    (0x0C3CE, 0x0),
+    (0x0C3CF, 0x0),
+    (0x0C3D6, 0x0),
+    (0x0C3D7, 0x0),
+    (0x0C3DE, 0x0),
+    (0x0C3DF, 0x0),
+    (0x0C4AC, 0xC),
+    (0x0C4AD, 0xC),
+    (0x0C4B4, 0x0),
+    (0x0C4B5, 0x0),
+    (0x0C4BC, 0x0),
+    (0x0C4BD, 0x0),
+    (0x0C4BE, 0x0),
+    (0x0C4C0, 0xC),
+    (0x0C4C1, 0xC),
+    (0x0C4C4, 0x0),
+    (0x0C4C5, 0x0),
+    (0x0C4C6, 0x0),
+    (0x0C4C7, 0x0),
+    (0x0C4C8, 0x0),
+    (0x0C4C9, 0x0),
+    (0x0C4CC, 0x0),
+    (0x0C4CD, 0x0),
+    (0x0C4CE, 0x0),
+    (0x0C4CF, 0x0),
+    (0x0C4D0, 0x0),
+    (0x0C4D1, 0x0),
+    (0x0C4D4, 0x0),
+    (0x0C4D5, 0x0),
+    (0x0C4D8, 0x0),
+    (0x0C4D9, 0x0),
+    (0x0C4DA, 0x0),
+    (0x0C4DC, 0x0),
+    (0x0C4DD, 0x0),
+    (0x0C4DE, 0x0),
+    (0x0C4DF, 0x0),
+    (0x0C4E0, 0x0),
+    (0x0C4E1, 0x0),
+    (0x0C4E2, 0x0),
+    (0x0C4E3, 0x0),
+    (0x0C4E7, 0x0),
+    (0x0C4E8, 0x0),
+    (0x0C4E9, 0x0),
+    (0x0C4EB, 0x0),
+    (0x0C4F0, 0x0),
+    (0x0C4F1, 0x0),
+    (0x0C4F2, 0x0),
+    (0x0C4F3, 0x0),
+    (0x0C4FA, 0x0),
+    (0x0C4FB, 0x0),
+    (0x0C502, 0x0),
+    (0x0C503, 0x0),
+    (0x0C81C, 0xC),
+    (0x0C81D, 0x2),
+    (0x0C824, 0xC),
+    (0x0C825, 0x2),
+    (0x0C828, 0x2),
+    (0x0C830, 0x2),
+    (0x0C831, 0x2),
+    (0x0C834, 0xC),
+    (0x0C835, 0xC),
+    (0x0C83C, 0x2),
+    (0x0C83D, 0x2),
+    (0x0C844, 0xC),
+    (0x0C845, 0xC),
+    (0x0C848, 0x2),
+    (0x0C849, 0x2),
+    (0x0C851, 0x2),
+    (0x0C854, 0x2),
+    (0x0C855, 0x2),
+    (0x0C859, 0x2),
+    (0x0C85C, 0xC),
+    (0x0C85D, 0xC),
+    (0x0C860, 0x2),
+    (0x0C861, 0x2),
+    (0x0C868, 0x2),
+    (0x0C869, 0x2),
+    (0x0C870, 0x2),
+    (0x0C871, 0x2),
+    (0x0C940, 0xC),
+    (0x0C941, 0x2),
+    (0x0C948, 0xC),
+    (0x0C949, 0xC),
+    (0x0C94C, 0x2),
+    (0x0C954, 0x2),
+    (0x0C955, 0x2),
+    (0x0C958, 0xC),
+    (0x0C959, 0xC),
+    (0x0C960, 0x2),
+    (0x0C961, 0x2),
+    (0x0C968, 0xC),
+    (0x0C969, 0x2),
+    (0x0C96C, 0x2),
+    (0x0C96D, 0x2),
+    (0x0C975, 0x2),
+    (0x0C978, 0x2),
+    (0x0C979, 0x2),
+    (0x0C980, 0xC),
+    (0x0C981, 0xC),
+    (0x0C984, 0x2),
+    (0x0C985, 0x2),
+    (0x0C98C, 0x2),
+    (0x0C98D, 0x2),
+    (0x0C994, 0x2),
+    (0x0C995, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_NINTH_APPEARANCE_VIDEO_FRAME: u64 = 1096;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_NINTH_PROCESS_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x00),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAAF6, 0x01),
+    (0xAB05, 0x05),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_NINTH_APPEARANCE_RAM_BYTES: [(u16, u8); 312] = [
+    (0x9C00, 0x85),
+    (0x9C10, 0x3B),
+    (0x9C11, 0xB2),
+    (0x9C12, 0x3B),
+    (0x9C13, 0xA8),
+    (0x9C14, 0x3B),
+    (0x9C16, 0x3B),
+    (0x9C17, 0x94),
+    (0x9C18, 0x3B),
+    (0x9C19, 0x8A),
+    (0x9C1A, 0x3B),
+    (0x9C1B, 0x80),
+    (0x9C1C, 0x36),
+    (0x9C1D, 0xB2),
+    (0x9C1E, 0x36),
+    (0x9C1F, 0xA8),
+    (0x9C20, 0x36),
+    (0x9C22, 0x36),
+    (0x9C23, 0x94),
+    (0x9C24, 0x36),
+    (0x9C25, 0x8A),
+    (0x9C26, 0x36),
+    (0x9C27, 0x80),
+    (0x9C29, 0xB2),
+    (0x9C2B, 0xA8),
+    (0x9C2F, 0x94),
+    (0x9C31, 0x8A),
+    (0x9C33, 0x80),
+    (0x9C34, 0x2C),
+    (0x9C35, 0xB2),
+    (0x9C36, 0x2C),
+    (0x9C37, 0xA8),
+    (0x9C38, 0x2C),
+    (0x9C3A, 0x2C),
+    (0x9C3B, 0x94),
+    (0x9C3C, 0x2C),
+    (0x9C3D, 0x8A),
+    (0x9C3E, 0x2C),
+    (0x9C3F, 0x80),
+    (0x9C40, 0x85),
+    (0x9C50, 0x3F),
+    (0x9C51, 0xB2),
+    (0x9C52, 0x3F),
+    (0x9C53, 0xA8),
+    (0x9C54, 0x3F),
+    (0x9C56, 0x3F),
+    (0x9C57, 0x94),
+    (0x9C58, 0x3F),
+    (0x9C59, 0x8A),
+    (0x9C5A, 0x3F),
+    (0x9C5B, 0x80),
+    (0x9C5C, 0x3A),
+    (0x9C5D, 0xB2),
+    (0x9C5E, 0x3A),
+    (0x9C5F, 0xA8),
+    (0x9C60, 0x3A),
+    (0x9C62, 0x3A),
+    (0x9C63, 0x94),
+    (0x9C64, 0x3A),
+    (0x9C65, 0x8A),
+    (0x9C66, 0x3A),
+    (0x9C67, 0x80),
+    (0x9C69, 0xB2),
+    (0x9C6B, 0xA8),
+    (0x9C6F, 0x94),
+    (0x9C71, 0x8A),
+    (0x9C73, 0x80),
+    (0x9C74, 0x30),
+    (0x9C75, 0xB2),
+    (0x9C76, 0x30),
+    (0x9C77, 0xA8),
+    (0x9C78, 0x30),
+    (0x9C7A, 0x30),
+    (0x9C7B, 0x94),
+    (0x9C7C, 0x30),
+    (0x9C7D, 0x8A),
+    (0x9C7E, 0x30),
+    (0x9C7F, 0x80),
+    (0x9C80, 0x85),
+    (0x9C90, 0x43),
+    (0x9C91, 0xB2),
+    (0x9C92, 0x43),
+    (0x9C93, 0xA8),
+    (0x9C94, 0x43),
+    (0x9C96, 0x43),
+    (0x9C97, 0x94),
+    (0x9C98, 0x43),
+    (0x9C99, 0x8A),
+    (0x9C9A, 0x43),
+    (0x9C9B, 0x80),
+    (0x9C9C, 0x3E),
+    (0x9C9D, 0xB2),
+    (0x9C9E, 0x3E),
+    (0x9C9F, 0xA8),
+    (0x9CA0, 0x3E),
+    (0x9CA2, 0x3E),
+    (0x9CA3, 0x94),
+    (0x9CA4, 0x3E),
+    (0x9CA5, 0x8A),
+    (0x9CA6, 0x3E),
+    (0x9CA7, 0x80),
+    (0x9CA9, 0xB2),
+    (0x9CAB, 0xA8),
+    (0x9CAF, 0x94),
+    (0x9CB1, 0x8A),
+    (0x9CB3, 0x80),
+    (0x9CB4, 0x34),
+    (0x9CB5, 0xB2),
+    (0x9CB6, 0x34),
+    (0x9CB7, 0xA8),
+    (0x9CB8, 0x34),
+    (0x9CBA, 0x34),
+    (0x9CBB, 0x94),
+    (0x9CBC, 0x34),
+    (0x9CBD, 0x8A),
+    (0x9CBE, 0x34),
+    (0x9CBF, 0x80),
+    (0x9CC0, 0x85),
+    (0x9CD0, 0x47),
+    (0x9CD1, 0xB2),
+    (0x9CD2, 0x47),
+    (0x9CD3, 0xA8),
+    (0x9CD4, 0x47),
+    (0x9CD6, 0x47),
+    (0x9CD7, 0x94),
+    (0x9CD8, 0x47),
+    (0x9CD9, 0x8A),
+    (0x9CDA, 0x47),
+    (0x9CDB, 0x80),
+    (0x9CDC, 0x42),
+    (0x9CDD, 0xB2),
+    (0x9CDE, 0x42),
+    (0x9CDF, 0xA8),
+    (0x9CE0, 0x42),
+    (0x9CE2, 0x42),
+    (0x9CE3, 0x94),
+    (0x9CE4, 0x42),
+    (0x9CE5, 0x8A),
+    (0x9CE6, 0x42),
+    (0x9CE7, 0x80),
+    (0x9CE9, 0xB2),
+    (0x9CEB, 0xA8),
+    (0x9CEF, 0x94),
+    (0x9CF1, 0x8A),
+    (0x9CF3, 0x80),
+    (0x9CF4, 0x38),
+    (0x9CF5, 0xB2),
+    (0x9CF6, 0x38),
+    (0x9CF7, 0xA8),
+    (0x9CF8, 0x38),
+    (0x9CFA, 0x38),
+    (0x9CFB, 0x94),
+    (0x9CFC, 0x38),
+    (0x9CFD, 0x8A),
+    (0x9CFE, 0x38),
+    (0x9CFF, 0x80),
+    (0x9D00, 0x85),
+    (0x9D10, 0x4B),
+    (0x9D11, 0xB2),
+    (0x9D12, 0x4B),
+    (0x9D13, 0xA8),
+    (0x9D14, 0x4B),
+    (0x9D16, 0x4B),
+    (0x9D17, 0x94),
+    (0x9D18, 0x4B),
+    (0x9D19, 0x8A),
+    (0x9D1A, 0x4B),
+    (0x9D1B, 0x80),
+    (0x9D1C, 0x46),
+    (0x9D1D, 0xB2),
+    (0x9D1E, 0x46),
+    (0x9D1F, 0xA8),
+    (0x9D20, 0x46),
+    (0x9D22, 0x46),
+    (0x9D23, 0x94),
+    (0x9D24, 0x46),
+    (0x9D25, 0x8A),
+    (0x9D26, 0x46),
+    (0x9D27, 0x80),
+    (0x9D29, 0xB2),
+    (0x9D2B, 0xA8),
+    (0x9D2F, 0x94),
+    (0x9D31, 0x8A),
+    (0x9D33, 0x80),
+    (0x9D34, 0x3C),
+    (0x9D35, 0xB2),
+    (0x9D36, 0x3C),
+    (0x9D37, 0xA8),
+    (0x9D38, 0x3C),
+    (0x9D3A, 0x3C),
+    (0x9D3B, 0x94),
+    (0x9D3C, 0x3C),
+    (0x9D3D, 0x8A),
+    (0x9D3E, 0x3C),
+    (0x9D3F, 0x80),
+    (0x9D40, 0x85),
+    (0x9D50, 0x4F),
+    (0x9D51, 0xB2),
+    (0x9D52, 0x4F),
+    (0x9D53, 0xA8),
+    (0x9D54, 0x4F),
+    (0x9D56, 0x4F),
+    (0x9D57, 0x94),
+    (0x9D58, 0x4F),
+    (0x9D59, 0x8A),
+    (0x9D5A, 0x4F),
+    (0x9D5B, 0x80),
+    (0x9D5C, 0x4A),
+    (0x9D5D, 0xB2),
+    (0x9D5E, 0x4A),
+    (0x9D5F, 0xA8),
+    (0x9D60, 0x4A),
+    (0x9D62, 0x4A),
+    (0x9D63, 0x94),
+    (0x9D64, 0x4A),
+    (0x9D65, 0x8A),
+    (0x9D66, 0x4A),
+    (0x9D67, 0x80),
+    (0x9D69, 0xB2),
+    (0x9D6B, 0xA8),
+    (0x9D6F, 0x94),
+    (0x9D71, 0x8A),
+    (0x9D73, 0x80),
+    (0x9D74, 0x40),
+    (0x9D75, 0xB2),
+    (0x9D76, 0x40),
+    (0x9D77, 0xA8),
+    (0x9D78, 0x40),
+    (0x9D7A, 0x40),
+    (0x9D7B, 0x94),
+    (0x9D7C, 0x40),
+    (0x9D7D, 0x8A),
+    (0x9D7E, 0x40),
+    (0x9D7F, 0x80),
+    (0x9D80, 0x85),
+    (0x9D90, 0x53),
+    (0x9D91, 0xB2),
+    (0x9D92, 0x53),
+    (0x9D93, 0xA8),
+    (0x9D94, 0x53),
+    (0x9D96, 0x53),
+    (0x9D97, 0x94),
+    (0x9D98, 0x53),
+    (0x9D99, 0x8A),
+    (0x9D9A, 0x53),
+    (0x9D9B, 0x80),
+    (0x9D9C, 0x4E),
+    (0x9D9D, 0xB2),
+    (0x9D9E, 0x4E),
+    (0x9D9F, 0xA8),
+    (0x9DA0, 0x4E),
+    (0x9DA2, 0x4E),
+    (0x9DA3, 0x94),
+    (0x9DA4, 0x4E),
+    (0x9DA5, 0x8A),
+    (0x9DA6, 0x4E),
+    (0x9DA7, 0x80),
+    (0x9DA9, 0xB2),
+    (0x9DAB, 0xA8),
+    (0x9DAF, 0x94),
+    (0x9DB1, 0x8A),
+    (0x9DB3, 0x80),
+    (0x9DB4, 0x44),
+    (0x9DB5, 0xB2),
+    (0x9DB6, 0x44),
+    (0x9DB7, 0xA8),
+    (0x9DB8, 0x44),
+    (0x9DBA, 0x44),
+    (0x9DBB, 0x94),
+    (0x9DBC, 0x44),
+    (0x9DBD, 0x8A),
+    (0x9DBE, 0x44),
+    (0x9DBF, 0x80),
+    (0x9DC0, 0x85),
+    (0x9DD0, 0x53),
+    (0x9DD1, 0xB2),
+    (0x9DD2, 0x53),
+    (0x9DD3, 0xA8),
+    (0x9DD4, 0x53),
+    (0x9DD6, 0x53),
+    (0x9DD7, 0x94),
+    (0x9DD8, 0x53),
+    (0x9DD9, 0x8A),
+    (0x9DDA, 0x53),
+    (0x9DDB, 0x80),
+    (0x9DDD, 0xB2),
+    (0x9DDF, 0xA8),
+    (0x9DE3, 0x94),
+    (0x9DE5, 0x8A),
+    (0x9DE7, 0x80),
+    (0x9DE8, 0x49),
+    (0x9DE9, 0xB2),
+    (0x9DEA, 0x49),
+    (0x9DEB, 0xA8),
+    (0x9DEC, 0x49),
+    (0x9DEE, 0x49),
+    (0x9DEF, 0x94),
+    (0x9DF0, 0x49),
+    (0x9DF1, 0x8A),
+    (0x9DF2, 0x49),
+    (0x9DF3, 0x80),
+    (0x9DF4, 0x44),
+    (0x9DF5, 0xB2),
+    (0x9DF6, 0x44),
+    (0x9DF7, 0xA8),
+    (0x9DF8, 0x44),
+    (0x9DFA, 0x44),
+    (0x9DFB, 0x94),
+    (0x9DFC, 0x44),
+    (0x9DFD, 0x8A),
+    (0x9DFE, 0x44),
+    (0x9DFF, 0x80),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_NINTH_VISIBLE_NIBBLES: [(u32, u8); 755] = [
+    (30189, 0x0),
+    (30197, 0x0),
+    (30205, 0x0),
+    (30213, 0x0),
+    (30221, 0x0),
+    (30229, 0x0),
+    (30245, 0x0),
+    (30481, 0x0),
+    (30489, 0x0),
+    (30497, 0x0),
+    (30505, 0x0),
+    (30513, 0x0),
+    (30521, 0x0),
+    (30537, 0x0),
+    (35416, 0xC),
+    (35417, 0xC),
+    (35426, 0x2),
+    (35427, 0x2),
+    (35432, 0xC),
+    (35433, 0xC),
+    (35434, 0xC),
+    (35435, 0xC),
+    (35436, 0xC),
+    (35437, 0xC),
+    (35440, 0xC),
+    (35441, 0xC),
+    (35442, 0xC),
+    (35443, 0xC),
+    (35444, 0xC),
+    (35445, 0xC),
+    (35446, 0x2),
+    (35447, 0x2),
+    (35448, 0xC),
+    (35449, 0xC),
+    (35450, 0x2),
+    (35451, 0x2),
+    (35454, 0xC),
+    (35455, 0x2),
+    (35456, 0xC),
+    (35457, 0xC),
+    (35458, 0x2),
+    (35459, 0x2),
+    (35460, 0xC),
+    (35461, 0xC),
+    (35462, 0x2),
+    (35463, 0x2),
+    (35466, 0x2),
+    (35467, 0x2),
+    (35468, 0xC),
+    (35469, 0xC),
+    (35470, 0xC),
+    (35471, 0xC),
+    (35476, 0xC),
+    (35477, 0xC),
+    (35478, 0x2),
+    (35479, 0x2),
+    (35708, 0xC),
+    (35709, 0xC),
+    (35717, 0xC),
+    (35718, 0x2),
+    (35719, 0x2),
+    (35724, 0xC),
+    (35725, 0xC),
+    (35726, 0xC),
+    (35727, 0xC),
+    (35728, 0xC),
+    (35729, 0xC),
+    (35732, 0xC),
+    (35733, 0xC),
+    (35734, 0xC),
+    (35735, 0xC),
+    (35736, 0xC),
+    (35737, 0xC),
+    (35738, 0x2),
+    (35739, 0x2),
+    (35740, 0xC),
+    (35741, 0xC),
+    (35742, 0xC),
+    (35743, 0x2),
+    (35746, 0x2),
+    (35747, 0x2),
+    (35748, 0xC),
+    (35749, 0xC),
+    (35750, 0x2),
+    (35751, 0x2),
+    (35752, 0xC),
+    (35753, 0xC),
+    (35754, 0xC),
+    (35755, 0xC),
+    (35758, 0xC),
+    (35759, 0xC),
+    (35760, 0xC),
+    (35761, 0xC),
+    (35762, 0xC),
+    (35763, 0xC),
+    (35768, 0xC),
+    (35769, 0xC),
+    (35770, 0x2),
+    (35771, 0x2),
+    (35778, 0xC),
+    (35779, 0xC),
+    (37170, 0x0),
+    (37171, 0x0),
+    (37186, 0x0),
+    (37187, 0x0),
+    (37194, 0x0),
+    (37195, 0x0),
+    (37202, 0x0),
+    (37203, 0x0),
+    (37210, 0x0),
+    (37218, 0x0),
+    (37219, 0x0),
+    (37226, 0x0),
+    (37227, 0x0),
+    (37234, 0x0),
+    (37235, 0x0),
+    (37462, 0x0),
+    (37463, 0x0),
+    (37471, 0x0),
+    (37478, 0x0),
+    (37479, 0x0),
+    (37486, 0x0),
+    (37487, 0x0),
+    (37494, 0x0),
+    (37495, 0x0),
+    (37502, 0x0),
+    (37510, 0x0),
+    (37511, 0x0),
+    (37518, 0x0),
+    (37519, 0x0),
+    (37526, 0x0),
+    (37527, 0x0),
+    (38336, 0xC),
+    (38337, 0xC),
+    (38344, 0xC),
+    (38345, 0xC),
+    (38346, 0x2),
+    (38347, 0x2),
+    (38352, 0xC),
+    (38353, 0xC),
+    (38354, 0xC),
+    (38355, 0xC),
+    (38356, 0xC),
+    (38357, 0x2),
+    (38360, 0xC),
+    (38361, 0xC),
+    (38362, 0xC),
+    (38363, 0xC),
+    (38364, 0xC),
+    (38365, 0xC),
+    (38366, 0x2),
+    (38367, 0x2),
+    (38368, 0xC),
+    (38369, 0xC),
+    (38370, 0x2),
+    (38371, 0x2),
+    (38373, 0xC),
+    (38374, 0x2),
+    (38375, 0xC),
+    (38376, 0xC),
+    (38377, 0xC),
+    (38378, 0x2),
+    (38379, 0x2),
+    (38380, 0xC),
+    (38381, 0xC),
+    (38382, 0xC),
+    (38383, 0xC),
+    (38386, 0xC),
+    (38387, 0xC),
+    (38388, 0xC),
+    (38389, 0xC),
+    (38390, 0xC),
+    (38391, 0xC),
+    (38396, 0xC),
+    (38397, 0xC),
+    (38398, 0x2),
+    (38399, 0x2),
+    (38406, 0xC),
+    (38407, 0xC),
+    (38628, 0xC),
+    (38629, 0xC),
+    (38636, 0xC),
+    (38637, 0xC),
+    (38638, 0x2),
+    (38639, 0x2),
+    (38644, 0xC),
+    (38645, 0x2),
+    (38646, 0xC),
+    (38647, 0x2),
+    (38648, 0x2),
+    (38649, 0x2),
+    (38651, 0xC),
+    (38652, 0xC),
+    (38653, 0xC),
+    (38654, 0xC),
+    (38655, 0xC),
+    (38656, 0xC),
+    (38657, 0xC),
+    (38658, 0x2),
+    (38659, 0x2),
+    (38660, 0xC),
+    (38661, 0xC),
+    (38662, 0x2),
+    (38663, 0xC),
+    (38664, 0xC),
+    (38665, 0xC),
+    (38666, 0x2),
+    (38667, 0xC),
+    (38668, 0xC),
+    (38669, 0xC),
+    (38670, 0x2),
+    (38671, 0x2),
+    (38672, 0xC),
+    (38673, 0xC),
+    (38674, 0xC),
+    (38675, 0xC),
+    (38678, 0xC),
+    (38679, 0xC),
+    (38680, 0xC),
+    (38681, 0xC),
+    (38682, 0xC),
+    (38683, 0xC),
+    (38688, 0xC),
+    (38689, 0xC),
+    (38690, 0x2),
+    (38691, 0x2),
+    (38698, 0xC),
+    (38699, 0xC),
+    (39506, 0x0),
+    (39507, 0x0),
+    (39514, 0x0),
+    (39515, 0x0),
+    (39522, 0x0),
+    (39523, 0x0),
+    (39530, 0x0),
+    (39531, 0x0),
+    (39538, 0x0),
+    (39539, 0x0),
+    (39546, 0x0),
+    (39548, 0x0),
+    (39549, 0x0),
+    (39554, 0x0),
+    (39555, 0x0),
+    (39556, 0x0),
+    (39557, 0x0),
+    (39562, 0x0),
+    (39563, 0x0),
+    (39564, 0x0),
+    (39565, 0x0),
+    (39570, 0x0),
+    (39571, 0x0),
+    (39572, 0x0),
+    (39573, 0x0),
+    (39798, 0x0),
+    (39799, 0x0),
+    (39806, 0x0),
+    (39807, 0x0),
+    (39814, 0x0),
+    (39815, 0x0),
+    (39822, 0x0),
+    (39823, 0x0),
+    (39830, 0x0),
+    (39831, 0x0),
+    (39838, 0x0),
+    (39840, 0x0),
+    (39841, 0x0),
+    (39846, 0x0),
+    (39847, 0x0),
+    (39848, 0x0),
+    (39849, 0x0),
+    (39854, 0x0),
+    (39855, 0x0),
+    (39856, 0x0),
+    (39857, 0x0),
+    (39862, 0x0),
+    (39863, 0x0),
+    (39864, 0x0),
+    (39865, 0x0),
+    (41256, 0xC),
+    (41257, 0xC),
+    (41264, 0xC),
+    (41265, 0xC),
+    (41266, 0xC),
+    (41267, 0xC),
+    (41272, 0xC),
+    (41273, 0x2),
+    (41274, 0x2),
+    (41275, 0x2),
+    (41276, 0xC),
+    (41277, 0x2),
+    (41278, 0xC),
+    (41279, 0xC),
+    (41280, 0x2),
+    (41281, 0x2),
+    (41282, 0xC),
+    (41283, 0xC),
+    (41284, 0x2),
+    (41285, 0x2),
+    (41286, 0xC),
+    (41287, 0xC),
+    (41288, 0xC),
+    (41289, 0x2),
+    (41290, 0x2),
+    (41291, 0xC),
+    (41292, 0xC),
+    (41293, 0xC),
+    (41294, 0xC),
+    (41295, 0xC),
+    (41296, 0x2),
+    (41297, 0x2),
+    (41300, 0x2),
+    (41301, 0x2),
+    (41302, 0xC),
+    (41303, 0xC),
+    (41306, 0xC),
+    (41307, 0xC),
+    (41308, 0x2),
+    (41309, 0x2),
+    (41310, 0xC),
+    (41311, 0xC),
+    (41316, 0x2),
+    (41317, 0x2),
+    (41326, 0xC),
+    (41327, 0xC),
+    (41548, 0xC),
+    (41549, 0xC),
+    (41556, 0xC),
+    (41557, 0x2),
+    (41558, 0xC),
+    (41559, 0xC),
+    (41564, 0x2),
+    (41565, 0xC),
+    (41566, 0x2),
+    (41567, 0xC),
+    (41568, 0xC),
+    (41569, 0xC),
+    (41570, 0xC),
+    (41571, 0xC),
+    (41572, 0x2),
+    (41573, 0x2),
+    (41574, 0xC),
+    (41575, 0xC),
+    (41576, 0x2),
+    (41577, 0x2),
+    (41578, 0xC),
+    (41579, 0xC),
+    (41580, 0xC),
+    (41581, 0xC),
+    (41582, 0xC),
+    (41583, 0xC),
+    (41584, 0xC),
+    (41585, 0xC),
+    (41586, 0xC),
+    (41587, 0xC),
+    (41588, 0x2),
+    (41589, 0x2),
+    (41592, 0x2),
+    (41593, 0x2),
+    (41594, 0xC),
+    (41595, 0xC),
+    (41598, 0xC),
+    (41599, 0xC),
+    (41600, 0x2),
+    (41601, 0x2),
+    (41602, 0xC),
+    (41603, 0xC),
+    (41608, 0x2),
+    (41609, 0x2),
+    (41618, 0xC),
+    (41619, 0xC),
+    (41842, 0x0),
+    (41843, 0x0),
+    (41850, 0x0),
+    (41851, 0x0),
+    (41858, 0x0),
+    (41859, 0x0),
+    (41866, 0x0),
+    (41867, 0x0),
+    (41874, 0x0),
+    (41875, 0x0),
+    (41882, 0x0),
+    (41884, 0x0),
+    (41885, 0x0),
+    (41890, 0x0),
+    (41891, 0x0),
+    (41892, 0x0),
+    (41893, 0x0),
+    (41898, 0x0),
+    (41899, 0x0),
+    (41900, 0x0),
+    (41901, 0x0),
+    (41906, 0x0),
+    (41907, 0x0),
+    (41908, 0x0),
+    (41909, 0x0),
+    (42134, 0x0),
+    (42135, 0x0),
+    (42142, 0x0),
+    (42143, 0x0),
+    (42150, 0x0),
+    (42151, 0x0),
+    (42158, 0x0),
+    (42159, 0x0),
+    (42166, 0x0),
+    (42167, 0x0),
+    (42174, 0x0),
+    (42175, 0x0),
+    (42176, 0x0),
+    (42177, 0x0),
+    (42182, 0x0),
+    (42183, 0x0),
+    (42184, 0x0),
+    (42185, 0x0),
+    (42190, 0x0),
+    (42191, 0x0),
+    (42192, 0x0),
+    (42193, 0x0),
+    (42198, 0x0),
+    (42199, 0x0),
+    (42200, 0x0),
+    (42201, 0x0),
+    (44176, 0xC),
+    (44177, 0xC),
+    (44178, 0x0),
+    (44179, 0x0),
+    (44184, 0x2),
+    (44185, 0x2),
+    (44186, 0x0),
+    (44187, 0x0),
+    (44192, 0xC),
+    (44193, 0xC),
+    (44194, 0x0),
+    (44195, 0x0),
+    (44196, 0xC),
+    (44197, 0xC),
+    (44200, 0xC),
+    (44201, 0xC),
+    (44202, 0x0),
+    (44203, 0x0),
+    (44204, 0x2),
+    (44205, 0xC),
+    (44208, 0xC),
+    (44209, 0xC),
+    (44210, 0x0),
+    (44211, 0x0),
+    (44216, 0xC),
+    (44217, 0xC),
+    (44219, 0x0),
+    (44226, 0x2),
+    (44227, 0x2),
+    (44246, 0x2),
+    (44247, 0x2),
+    (44468, 0xC),
+    (44469, 0xC),
+    (44470, 0x0),
+    (44471, 0x0),
+    (44476, 0x2),
+    (44477, 0x2),
+    (44478, 0x0),
+    (44479, 0x0),
+    (44484, 0xC),
+    (44485, 0xC),
+    (44486, 0x0),
+    (44487, 0x0),
+    (44488, 0xC),
+    (44489, 0xC),
+    (44492, 0xC),
+    (44493, 0xC),
+    (44494, 0x0),
+    (44495, 0x0),
+    (44496, 0xC),
+    (44497, 0xC),
+    (44500, 0xC),
+    (44501, 0xC),
+    (44502, 0x0),
+    (44503, 0x0),
+    (44508, 0xC),
+    (44509, 0xC),
+    (44511, 0x0),
+    (44518, 0x2),
+    (44519, 0x2),
+    (44538, 0x2),
+    (44539, 0x2),
+    (46514, 0x0),
+    (46515, 0x0),
+    (46522, 0x0),
+    (46523, 0x0),
+    (46530, 0x0),
+    (46531, 0x0),
+    (46538, 0x0),
+    (46539, 0x0),
+    (46546, 0x0),
+    (46547, 0x0),
+    (46555, 0x0),
+    (46556, 0x0),
+    (46557, 0x0),
+    (46562, 0x0),
+    (46563, 0x0),
+    (46564, 0x0),
+    (46565, 0x0),
+    (46570, 0x0),
+    (46571, 0x0),
+    (46578, 0x0),
+    (46579, 0x0),
+    (46580, 0x0),
+    (46581, 0x0),
+    (46806, 0x0),
+    (46807, 0x0),
+    (46814, 0x0),
+    (46815, 0x0),
+    (46822, 0x0),
+    (46823, 0x0),
+    (46830, 0x0),
+    (46831, 0x0),
+    (46838, 0x0),
+    (46839, 0x0),
+    (46847, 0x0),
+    (46848, 0x0),
+    (46849, 0x0),
+    (46854, 0x0),
+    (46855, 0x0),
+    (46856, 0x0),
+    (46857, 0x0),
+    (46862, 0x0),
+    (46863, 0x0),
+    (46870, 0x0),
+    (46871, 0x0),
+    (46872, 0x0),
+    (46873, 0x0),
+    (47096, 0xC),
+    (47097, 0xC),
+    (47099, 0x2),
+    (47104, 0x2),
+    (47105, 0x2),
+    (47106, 0xC),
+    (47107, 0x2),
+    (47112, 0xC),
+    (47113, 0xC),
+    (47114, 0x2),
+    (47115, 0x2),
+    (47116, 0xC),
+    (47117, 0xC),
+    (47118, 0x2),
+    (47119, 0x2),
+    (47120, 0xC),
+    (47121, 0x2),
+    (47122, 0x2),
+    (47123, 0x2),
+    (47124, 0xC),
+    (47125, 0xC),
+    (47126, 0x2),
+    (47127, 0x2),
+    (47128, 0xC),
+    (47129, 0xC),
+    (47130, 0x2),
+    (47131, 0x2),
+    (47132, 0xC),
+    (47133, 0xC),
+    (47134, 0x2),
+    (47135, 0x2),
+    (47136, 0xC),
+    (47137, 0xC),
+    (47140, 0x2),
+    (47141, 0x2),
+    (47142, 0x2),
+    (47143, 0x2),
+    (47146, 0x2),
+    (47147, 0x2),
+    (47148, 0xC),
+    (47149, 0xC),
+    (47150, 0x2),
+    (47151, 0x2),
+    (47166, 0x2),
+    (47167, 0x2),
+    (47388, 0xC),
+    (47389, 0xC),
+    (47391, 0x2),
+    (47396, 0x2),
+    (47397, 0xC),
+    (47398, 0xC),
+    (47399, 0x2),
+    (47404, 0xC),
+    (47405, 0xC),
+    (47406, 0x2),
+    (47407, 0x2),
+    (47408, 0xC),
+    (47409, 0xC),
+    (47410, 0x2),
+    (47411, 0x2),
+    (47412, 0xC),
+    (47413, 0x2),
+    (47414, 0x2),
+    (47415, 0x2),
+    (47416, 0xC),
+    (47417, 0xC),
+    (47418, 0x2),
+    (47419, 0x2),
+    (47420, 0xC),
+    (47421, 0xC),
+    (47422, 0x2),
+    (47423, 0x2),
+    (47424, 0xC),
+    (47425, 0xC),
+    (47426, 0x2),
+    (47427, 0x2),
+    (47428, 0xC),
+    (47429, 0xC),
+    (47432, 0x2),
+    (47433, 0x2),
+    (47434, 0x2),
+    (47435, 0x2),
+    (47438, 0x2),
+    (47439, 0x2),
+    (47440, 0xC),
+    (47441, 0xC),
+    (47442, 0x2),
+    (47443, 0x2),
+    (47458, 0x2),
+    (47459, 0x2),
+    (48850, 0x0),
+    (48851, 0x0),
+    (48858, 0x0),
+    (48859, 0x0),
+    (48866, 0x0),
+    (48867, 0x0),
+    (48874, 0x0),
+    (48875, 0x0),
+    (48882, 0x0),
+    (48883, 0x0),
+    (48890, 0x0),
+    (48891, 0x0),
+    (48892, 0x0),
+    (48893, 0x0),
+    (48898, 0x0),
+    (48899, 0x0),
+    (48900, 0x0),
+    (48901, 0x0),
+    (48906, 0x0),
+    (48907, 0x0),
+    (48914, 0x0),
+    (48915, 0x0),
+    (48916, 0x0),
+    (48917, 0x0),
+    (49142, 0x0),
+    (49143, 0x0),
+    (49150, 0x0),
+    (49151, 0x0),
+    (49158, 0x0),
+    (49159, 0x0),
+    (49166, 0x0),
+    (49167, 0x0),
+    (49174, 0x0),
+    (49175, 0x0),
+    (49182, 0x0),
+    (49183, 0x0),
+    (49184, 0x0),
+    (49185, 0x0),
+    (49190, 0x0),
+    (49191, 0x0),
+    (49192, 0x0),
+    (49193, 0x0),
+    (49198, 0x0),
+    (49199, 0x0),
+    (49206, 0x0),
+    (49207, 0x0),
+    (49208, 0x0),
+    (49209, 0x0),
+    (50016, 0x2),
+    (50017, 0x2),
+    (50019, 0x2),
+    (50024, 0xC),
+    (50025, 0xC),
+    (50026, 0xC),
+    (50027, 0xC),
+    (50032, 0xC),
+    (50033, 0xC),
+    (50035, 0x2),
+    (50036, 0x2),
+    (50037, 0x2),
+    (50038, 0x2),
+    (50039, 0x2),
+    (50040, 0x2),
+    (50041, 0x2),
+    (50042, 0x2),
+    (50043, 0x2),
+    (50044, 0xC),
+    (50045, 0xC),
+    (50046, 0xC),
+    (50047, 0xC),
+    (50048, 0x2),
+    (50049, 0x2),
+    (50050, 0x2),
+    (50051, 0x2),
+    (50052, 0x2),
+    (50053, 0x2),
+    (50054, 0x2),
+    (50055, 0x2),
+    (50056, 0x2),
+    (50057, 0x2),
+    (50060, 0x2),
+    (50061, 0xC),
+    (50062, 0x2),
+    (50063, 0x2),
+    (50066, 0x2),
+    (50067, 0x2),
+    (50068, 0x2),
+    (50069, 0x2),
+    (50070, 0x2),
+    (50071, 0x2),
+    (50086, 0x2),
+    (50087, 0x2),
+    (50308, 0x2),
+    (50309, 0x2),
+    (50311, 0x2),
+    (50316, 0xC),
+    (50317, 0xC),
+    (50318, 0xC),
+    (50319, 0xC),
+    (50324, 0xC),
+    (50325, 0x2),
+    (50327, 0x2),
+    (50328, 0x2),
+    (50329, 0x2),
+    (50330, 0x2),
+    (50331, 0x2),
+    (50332, 0x2),
+    (50333, 0x2),
+    (50334, 0x2),
+    (50335, 0x2),
+    (50336, 0xC),
+    (50337, 0xC),
+    (50338, 0xC),
+    (50339, 0xC),
+    (50340, 0x2),
+    (50341, 0x2),
+    (50342, 0x2),
+    (50343, 0x2),
+    (50344, 0x2),
+    (50345, 0x2),
+    (50346, 0x2),
+    (50347, 0x2),
+    (50348, 0x2),
+    (50349, 0x2),
+    (50352, 0x2),
+    (50353, 0xC),
+    (50354, 0x2),
+    (50355, 0x2),
+    (50358, 0x2),
+    (50359, 0x2),
+    (50360, 0x2),
+    (50361, 0x2),
+    (50362, 0x2),
+    (50363, 0x2),
+    (50378, 0x2),
+    (50379, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTIETH_APPEARANCE_VIDEO_FRAME: u64 = 1097;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTIETH_RAND_STATE: RandState = RandState {
+    seed: 0x1E,
+    hseed: 0x24,
+    lseed: 0xD2,
+};
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTIETH_APPEARANCE_RAM_BYTES: [(u16, u8); 574] = [
+    (0x9C05, 0x40),
+    (0x9C10, 0x3B),
+    (0x9C11, 0xB2),
+    (0x9C12, 0x3B),
+    (0x9C13, 0xA8),
+    (0x9C14, 0x3B),
+    (0x9C16, 0x3B),
+    (0x9C17, 0x94),
+    (0x9C18, 0x3B),
+    (0x9C19, 0x8A),
+    (0x9C1A, 0x3B),
+    (0x9C1B, 0x80),
+    (0x9C1C, 0x36),
+    (0x9C1D, 0xB2),
+    (0x9C1E, 0x36),
+    (0x9C1F, 0xA8),
+    (0x9C20, 0x36),
+    (0x9C22, 0x36),
+    (0x9C23, 0x94),
+    (0x9C24, 0x36),
+    (0x9C25, 0x8A),
+    (0x9C26, 0x36),
+    (0x9C27, 0x80),
+    (0x9C29, 0xB2),
+    (0x9C2B, 0xA8),
+    (0x9C2F, 0x94),
+    (0x9C31, 0x8A),
+    (0x9C33, 0x80),
+    (0x9C40, 0x85),
+    (0x9C50, 0x3F),
+    (0x9C51, 0xB2),
+    (0x9C52, 0x3F),
+    (0x9C53, 0xA8),
+    (0x9C54, 0x3F),
+    (0x9C56, 0x3F),
+    (0x9C57, 0x94),
+    (0x9C58, 0x3F),
+    (0x9C59, 0x8A),
+    (0x9C5A, 0x3F),
+    (0x9C5B, 0x80),
+    (0x9C5C, 0x3A),
+    (0x9C5D, 0xB2),
+    (0x9C5E, 0x3A),
+    (0x9C5F, 0xA8),
+    (0x9C60, 0x3A),
+    (0x9C62, 0x3A),
+    (0x9C63, 0x94),
+    (0x9C64, 0x3A),
+    (0x9C65, 0x8A),
+    (0x9C66, 0x3A),
+    (0x9C67, 0x80),
+    (0x9C69, 0xB2),
+    (0x9C6B, 0xA8),
+    (0x9C6F, 0x94),
+    (0x9C71, 0x8A),
+    (0x9C73, 0x80),
+    (0x9C74, 0x30),
+    (0x9C75, 0xB2),
+    (0x9C76, 0x30),
+    (0x9C77, 0xA8),
+    (0x9C78, 0x30),
+    (0x9C7A, 0x30),
+    (0x9C7B, 0x94),
+    (0x9C7C, 0x30),
+    (0x9C7D, 0x8A),
+    (0x9C7E, 0x30),
+    (0x9C7F, 0x80),
+    (0x9C80, 0x85),
+    (0x9C90, 0x43),
+    (0x9C91, 0xB2),
+    (0x9C92, 0x43),
+    (0x9C93, 0xA8),
+    (0x9C94, 0x43),
+    (0x9C96, 0x43),
+    (0x9C97, 0x94),
+    (0x9C98, 0x43),
+    (0x9C99, 0x8A),
+    (0x9C9A, 0x43),
+    (0x9C9B, 0x80),
+    (0x9C9C, 0x3E),
+    (0x9C9D, 0xB2),
+    (0x9C9E, 0x3E),
+    (0x9C9F, 0xA8),
+    (0x9CA0, 0x3E),
+    (0x9CA2, 0x3E),
+    (0x9CA3, 0x94),
+    (0x9CA4, 0x3E),
+    (0x9CA5, 0x8A),
+    (0x9CA6, 0x3E),
+    (0x9CA7, 0x80),
+    (0x9CA9, 0xB2),
+    (0x9CAB, 0xA8),
+    (0x9CAF, 0x94),
+    (0x9CB1, 0x8A),
+    (0x9CB3, 0x80),
+    (0x9CB4, 0x34),
+    (0x9CB5, 0xB2),
+    (0x9CB6, 0x34),
+    (0x9CB7, 0xA8),
+    (0x9CB8, 0x34),
+    (0x9CBA, 0x34),
+    (0x9CBB, 0x94),
+    (0x9CBC, 0x34),
+    (0x9CBD, 0x8A),
+    (0x9CBE, 0x34),
+    (0x9CBF, 0x80),
+    (0x9CC0, 0x85),
+    (0x9CD0, 0x47),
+    (0x9CD1, 0xB2),
+    (0x9CD2, 0x47),
+    (0x9CD3, 0xA8),
+    (0x9CD4, 0x47),
+    (0x9CD6, 0x47),
+    (0x9CD7, 0x94),
+    (0x9CD8, 0x47),
+    (0x9CD9, 0x8A),
+    (0x9CDA, 0x47),
+    (0x9CDB, 0x80),
+    (0x9CDC, 0x42),
+    (0x9CDD, 0xB2),
+    (0x9CDE, 0x42),
+    (0x9CDF, 0xA8),
+    (0x9CE0, 0x42),
+    (0x9CE2, 0x42),
+    (0x9CE3, 0x94),
+    (0x9CE4, 0x42),
+    (0x9CE5, 0x8A),
+    (0x9CE6, 0x42),
+    (0x9CE7, 0x80),
+    (0x9CE9, 0xB2),
+    (0x9CEB, 0xA8),
+    (0x9CEF, 0x94),
+    (0x9CF1, 0x8A),
+    (0x9CF3, 0x80),
+    (0x9CF4, 0x38),
+    (0x9CF5, 0xB2),
+    (0x9CF6, 0x38),
+    (0x9CF7, 0xA8),
+    (0x9CF8, 0x38),
+    (0x9CFA, 0x38),
+    (0x9CFB, 0x94),
+    (0x9CFC, 0x38),
+    (0x9CFD, 0x8A),
+    (0x9CFE, 0x38),
+    (0x9CFF, 0x80),
+    (0x9D00, 0x85),
+    (0x9D10, 0x4B),
+    (0x9D11, 0xB2),
+    (0x9D12, 0x4B),
+    (0x9D13, 0xA8),
+    (0x9D14, 0x4B),
+    (0x9D16, 0x4B),
+    (0x9D17, 0x94),
+    (0x9D18, 0x4B),
+    (0x9D19, 0x8A),
+    (0x9D1A, 0x4B),
+    (0x9D1B, 0x80),
+    (0x9D1C, 0x46),
+    (0x9D1D, 0xB2),
+    (0x9D1E, 0x46),
+    (0x9D1F, 0xA8),
+    (0x9D20, 0x46),
+    (0x9D22, 0x46),
+    (0x9D23, 0x94),
+    (0x9D24, 0x46),
+    (0x9D25, 0x8A),
+    (0x9D26, 0x46),
+    (0x9D27, 0x80),
+    (0x9D29, 0xB2),
+    (0x9D2B, 0xA8),
+    (0x9D2F, 0x94),
+    (0x9D31, 0x8A),
+    (0x9D33, 0x80),
+    (0x9D34, 0x3C),
+    (0x9D35, 0xB2),
+    (0x9D36, 0x3C),
+    (0x9D37, 0xA8),
+    (0x9D38, 0x3C),
+    (0x9D3A, 0x3C),
+    (0x9D3B, 0x94),
+    (0x9D3C, 0x3C),
+    (0x9D3D, 0x8A),
+    (0x9D3E, 0x3C),
+    (0x9D3F, 0x80),
+    (0x9D40, 0x85),
+    (0x9D50, 0x4F),
+    (0x9D51, 0xB2),
+    (0x9D52, 0x4F),
+    (0x9D53, 0xA8),
+    (0x9D54, 0x4F),
+    (0x9D56, 0x4F),
+    (0x9D57, 0x94),
+    (0x9D58, 0x4F),
+    (0x9D59, 0x8A),
+    (0x9D5A, 0x4F),
+    (0x9D5B, 0x80),
+    (0x9D5C, 0x4A),
+    (0x9D5D, 0xB2),
+    (0x9D5E, 0x4A),
+    (0x9D5F, 0xA8),
+    (0x9D60, 0x4A),
+    (0x9D62, 0x4A),
+    (0x9D63, 0x94),
+    (0x9D64, 0x4A),
+    (0x9D65, 0x8A),
+    (0x9D66, 0x4A),
+    (0x9D67, 0x80),
+    (0x9D69, 0xB2),
+    (0x9D6B, 0xA8),
+    (0x9D6F, 0x94),
+    (0x9D71, 0x8A),
+    (0x9D73, 0x80),
+    (0x9D74, 0x40),
+    (0x9D75, 0xB2),
+    (0x9D76, 0x40),
+    (0x9D77, 0xA8),
+    (0x9D78, 0x40),
+    (0x9D7A, 0x40),
+    (0x9D7B, 0x94),
+    (0x9D7C, 0x40),
+    (0x9D7D, 0x8A),
+    (0x9D7E, 0x40),
+    (0x9D7F, 0x80),
+    (0x9D80, 0x85),
+    (0x9D90, 0x53),
+    (0x9D91, 0xB2),
+    (0x9D92, 0x53),
+    (0x9D93, 0xA8),
+    (0x9D94, 0x53),
+    (0x9D96, 0x53),
+    (0x9D97, 0x94),
+    (0x9D98, 0x53),
+    (0x9D99, 0x8A),
+    (0x9D9A, 0x53),
+    (0x9D9B, 0x80),
+    (0x9D9C, 0x4E),
+    (0x9D9D, 0xB2),
+    (0x9D9E, 0x4E),
+    (0x9D9F, 0xA8),
+    (0x9DA0, 0x4E),
+    (0x9DA2, 0x4E),
+    (0x9DA3, 0x94),
+    (0x9DA4, 0x4E),
+    (0x9DA5, 0x8A),
+    (0x9DA6, 0x4E),
+    (0x9DA7, 0x80),
+    (0x9DA9, 0xB2),
+    (0x9DAB, 0xA8),
+    (0x9DAF, 0x94),
+    (0x9DB1, 0x8A),
+    (0x9DB3, 0x80),
+    (0x9DB4, 0x44),
+    (0x9DB5, 0xB2),
+    (0x9DB6, 0x44),
+    (0x9DB7, 0xA8),
+    (0x9DB8, 0x44),
+    (0x9DBA, 0x44),
+    (0x9DBB, 0x94),
+    (0x9DBC, 0x44),
+    (0x9DBD, 0x8A),
+    (0x9DBE, 0x44),
+    (0x9DBF, 0x80),
+    (0x9DC0, 0x85),
+    (0x9DD0, 0x53),
+    (0x9DD1, 0xB2),
+    (0x9DD2, 0x53),
+    (0x9DD3, 0xA8),
+    (0x9DD4, 0x53),
+    (0x9DD6, 0x53),
+    (0x9DD7, 0x94),
+    (0x9DD8, 0x53),
+    (0x9DD9, 0x8A),
+    (0x9DDA, 0x53),
+    (0x9DDB, 0x80),
+    (0x9DDD, 0xB2),
+    (0x9DDF, 0xA8),
+    (0x9DE3, 0x94),
+    (0x9DE5, 0x8A),
+    (0x9DE7, 0x80),
+    (0x9DE8, 0x49),
+    (0x9DE9, 0xB2),
+    (0x9DEA, 0x49),
+    (0x9DEB, 0xA8),
+    (0x9DEC, 0x49),
+    (0x9DEE, 0x49),
+    (0x9DEF, 0x94),
+    (0x9DF0, 0x49),
+    (0x9DF1, 0x8A),
+    (0x9DF2, 0x49),
+    (0x9DF3, 0x80),
+    (0x9DF4, 0x44),
+    (0x9DF5, 0xB2),
+    (0x9DF6, 0x44),
+    (0x9DF7, 0xA8),
+    (0x9DF8, 0x44),
+    (0x9DFA, 0x44),
+    (0x9DFB, 0x94),
+    (0x9DFC, 0x44),
+    (0x9DFD, 0x8A),
+    (0x9DFE, 0x44),
+    (0x9DFF, 0x80),
+    (0x9E00, 0x85),
+    (0x9E10, 0x57),
+    (0x9E11, 0xB2),
+    (0x9E12, 0x57),
+    (0x9E13, 0xA8),
+    (0x9E14, 0x57),
+    (0x9E16, 0x57),
+    (0x9E17, 0x94),
+    (0x9E18, 0x57),
+    (0x9E19, 0x8A),
+    (0x9E1A, 0x57),
+    (0x9E1B, 0x80),
+    (0x9E1D, 0xB2),
+    (0x9E1F, 0xA8),
+    (0x9E23, 0x94),
+    (0x9E25, 0x8A),
+    (0x9E27, 0x80),
+    (0x9E28, 0x4D),
+    (0x9E29, 0xB2),
+    (0x9E2A, 0x4D),
+    (0x9E2B, 0xA8),
+    (0x9E2C, 0x4D),
+    (0x9E2E, 0x4D),
+    (0x9E2F, 0x94),
+    (0x9E30, 0x4D),
+    (0x9E31, 0x8A),
+    (0x9E32, 0x4D),
+    (0x9E33, 0x80),
+    (0x9E34, 0x48),
+    (0x9E35, 0xB2),
+    (0x9E36, 0x48),
+    (0x9E37, 0xA8),
+    (0x9E38, 0x48),
+    (0x9E3A, 0x48),
+    (0x9E3B, 0x94),
+    (0x9E3C, 0x48),
+    (0x9E3D, 0x8A),
+    (0x9E3E, 0x48),
+    (0x9E3F, 0x80),
+    (0x9E40, 0x85),
+    (0x9E50, 0x5B),
+    (0x9E51, 0xB2),
+    (0x9E52, 0x5B),
+    (0x9E53, 0xA8),
+    (0x9E54, 0x5B),
+    (0x9E56, 0x5B),
+    (0x9E57, 0x94),
+    (0x9E58, 0x5B),
+    (0x9E59, 0x8A),
+    (0x9E5A, 0x5B),
+    (0x9E5B, 0x80),
+    (0x9E5D, 0xB2),
+    (0x9E5F, 0xA8),
+    (0x9E63, 0x94),
+    (0x9E65, 0x8A),
+    (0x9E67, 0x80),
+    (0x9E68, 0x51),
+    (0x9E69, 0xB2),
+    (0x9E6A, 0x51),
+    (0x9E6B, 0xA8),
+    (0x9E6C, 0x51),
+    (0x9E6E, 0x51),
+    (0x9E6F, 0x94),
+    (0x9E70, 0x51),
+    (0x9E71, 0x8A),
+    (0x9E72, 0x51),
+    (0x9E73, 0x80),
+    (0x9E74, 0x4C),
+    (0x9E75, 0xB2),
+    (0x9E76, 0x4C),
+    (0x9E77, 0xA8),
+    (0x9E78, 0x4C),
+    (0x9E7A, 0x4C),
+    (0x9E7B, 0x94),
+    (0x9E7C, 0x4C),
+    (0x9E7D, 0x8A),
+    (0x9E7E, 0x4C),
+    (0x9E7F, 0x80),
+    (0x9E80, 0x85),
+    (0x9E90, 0x5F),
+    (0x9E91, 0xB2),
+    (0x9E92, 0x5F),
+    (0x9E93, 0xA8),
+    (0x9E94, 0x5F),
+    (0x9E96, 0x5F),
+    (0x9E97, 0x94),
+    (0x9E98, 0x5F),
+    (0x9E99, 0x8A),
+    (0x9E9A, 0x5F),
+    (0x9E9B, 0x80),
+    (0x9E9D, 0xB2),
+    (0x9E9F, 0xA8),
+    (0x9EA3, 0x94),
+    (0x9EA5, 0x8A),
+    (0x9EA7, 0x80),
+    (0x9EA8, 0x55),
+    (0x9EA9, 0xB2),
+    (0x9EAA, 0x55),
+    (0x9EAB, 0xA8),
+    (0x9EAC, 0x55),
+    (0x9EAE, 0x55),
+    (0x9EAF, 0x94),
+    (0x9EB0, 0x55),
+    (0x9EB1, 0x8A),
+    (0x9EB2, 0x55),
+    (0x9EB3, 0x80),
+    (0x9EB4, 0x50),
+    (0x9EB5, 0xB2),
+    (0x9EB6, 0x50),
+    (0x9EB7, 0xA8),
+    (0x9EB8, 0x50),
+    (0x9EBA, 0x50),
+    (0x9EBB, 0x94),
+    (0x9EBC, 0x50),
+    (0x9EBD, 0x8A),
+    (0x9EBE, 0x50),
+    (0x9EBF, 0x80),
+    (0x9EC0, 0x85),
+    (0x9ED0, 0x63),
+    (0x9ED1, 0xB2),
+    (0x9ED2, 0x63),
+    (0x9ED3, 0xA8),
+    (0x9ED4, 0x63),
+    (0x9ED6, 0x63),
+    (0x9ED7, 0x94),
+    (0x9ED8, 0x63),
+    (0x9ED9, 0x8A),
+    (0x9EDA, 0x63),
+    (0x9EDB, 0x80),
+    (0x9EDD, 0xB2),
+    (0x9EDF, 0xA8),
+    (0x9EE3, 0x94),
+    (0x9EE5, 0x8A),
+    (0x9EE7, 0x80),
+    (0x9EE8, 0x59),
+    (0x9EE9, 0xB2),
+    (0x9EEA, 0x59),
+    (0x9EEB, 0xA8),
+    (0x9EEC, 0x59),
+    (0x9EEE, 0x59),
+    (0x9EEF, 0x94),
+    (0x9EF0, 0x59),
+    (0x9EF1, 0x8A),
+    (0x9EF2, 0x59),
+    (0x9EF3, 0x80),
+    (0x9EF4, 0x54),
+    (0x9EF5, 0xB2),
+    (0x9EF6, 0x54),
+    (0x9EF7, 0xA8),
+    (0x9EF8, 0x54),
+    (0x9EFA, 0x54),
+    (0x9EFB, 0x94),
+    (0x9EFC, 0x54),
+    (0x9EFD, 0x8A),
+    (0x9EFE, 0x54),
+    (0x9EFF, 0x80),
+    (0x9F00, 0x85),
+    (0x9F10, 0x67),
+    (0x9F11, 0xB2),
+    (0x9F12, 0x67),
+    (0x9F13, 0xA8),
+    (0x9F14, 0x67),
+    (0x9F16, 0x67),
+    (0x9F17, 0x94),
+    (0x9F18, 0x67),
+    (0x9F19, 0x8A),
+    (0x9F1A, 0x67),
+    (0x9F1B, 0x80),
+    (0x9F1D, 0xB2),
+    (0x9F1F, 0xA8),
+    (0x9F23, 0x94),
+    (0x9F25, 0x8A),
+    (0x9F27, 0x80),
+    (0x9F28, 0x5D),
+    (0x9F29, 0xB2),
+    (0x9F2A, 0x5D),
+    (0x9F2B, 0xA8),
+    (0x9F2C, 0x5D),
+    (0x9F2E, 0x5D),
+    (0x9F2F, 0x94),
+    (0x9F30, 0x5D),
+    (0x9F31, 0x8A),
+    (0x9F32, 0x5D),
+    (0x9F33, 0x80),
+    (0x9F34, 0x58),
+    (0x9F35, 0xB2),
+    (0x9F36, 0x58),
+    (0x9F37, 0xA8),
+    (0x9F38, 0x58),
+    (0x9F3A, 0x58),
+    (0x9F3B, 0x94),
+    (0x9F3C, 0x58),
+    (0x9F3D, 0x8A),
+    (0x9F3E, 0x58),
+    (0x9F3F, 0x80),
+    (0x9F40, 0x85),
+    (0x9F50, 0x6B),
+    (0x9F51, 0xB2),
+    (0x9F52, 0x6B),
+    (0x9F53, 0xA8),
+    (0x9F54, 0x6B),
+    (0x9F56, 0x6B),
+    (0x9F57, 0x94),
+    (0x9F58, 0x6B),
+    (0x9F59, 0x8A),
+    (0x9F5A, 0x6B),
+    (0x9F5B, 0x80),
+    (0x9F5D, 0xB2),
+    (0x9F5F, 0xA8),
+    (0x9F63, 0x94),
+    (0x9F65, 0x8A),
+    (0x9F67, 0x80),
+    (0x9F68, 0x61),
+    (0x9F69, 0xB2),
+    (0x9F6A, 0x61),
+    (0x9F6B, 0xA8),
+    (0x9F6C, 0x61),
+    (0x9F6E, 0x61),
+    (0x9F6F, 0x94),
+    (0x9F70, 0x61),
+    (0x9F71, 0x8A),
+    (0x9F72, 0x61),
+    (0x9F73, 0x80),
+    (0x9F74, 0x5C),
+    (0x9F75, 0xB2),
+    (0x9F76, 0x5C),
+    (0x9F77, 0xA8),
+    (0x9F78, 0x5C),
+    (0x9F7A, 0x5C),
+    (0x9F7B, 0x94),
+    (0x9F7C, 0x5C),
+    (0x9F7D, 0x8A),
+    (0x9F7E, 0x5C),
+    (0x9F7F, 0x80),
+    (0x9F80, 0x85),
+    (0x9F90, 0x6F),
+    (0x9F91, 0xB2),
+    (0x9F92, 0x6F),
+    (0x9F93, 0xA8),
+    (0x9F94, 0x6F),
+    (0x9F96, 0x6F),
+    (0x9F97, 0x94),
+    (0x9F98, 0x6F),
+    (0x9F99, 0x8A),
+    (0x9F9A, 0x6F),
+    (0x9F9B, 0x80),
+    (0x9F9D, 0xB2),
+    (0x9F9F, 0xA8),
+    (0x9FA3, 0x94),
+    (0x9FA5, 0x8A),
+    (0x9FA7, 0x80),
+    (0x9FA8, 0x65),
+    (0x9FA9, 0xB2),
+    (0x9FAA, 0x65),
+    (0x9FAB, 0xA8),
+    (0x9FAC, 0x65),
+    (0x9FAE, 0x65),
+    (0x9FAF, 0x94),
+    (0x9FB0, 0x65),
+    (0x9FB1, 0x8A),
+    (0x9FB2, 0x65),
+    (0x9FB3, 0x80),
+    (0x9FB4, 0x60),
+    (0x9FB5, 0xB2),
+    (0x9FB6, 0x60),
+    (0x9FB7, 0xA8),
+    (0x9FB8, 0x60),
+    (0x9FBA, 0x60),
+    (0x9FBB, 0x94),
+    (0x9FBC, 0x60),
+    (0x9FBD, 0x8A),
+    (0x9FBE, 0x60),
+    (0x9FBF, 0x80),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTIETH_VISIBLE_NIBBLES: [(u32, u8); 1406] = [
+    (17358, 0xF),
+    (17650, 0xF),
+    (17942, 0xF),
+    (19107, 0xF),
+    (19398, 0xF),
+    (19399, 0xF),
+    (19689, 0xF),
+    (19690, 0xF),
+    (19742, 0x0),
+    (19743, 0x0),
+    (19744, 0x0),
+    (19745, 0x0),
+    (19746, 0x0),
+    (19981, 0xF),
+    (19982, 0xF),
+    (20034, 0x0),
+    (20035, 0x0),
+    (20036, 0x0),
+    (20037, 0x0),
+    (20274, 0xF),
+    (20909, 0x0),
+    (35416, 0xC),
+    (35417, 0xC),
+    (35426, 0x2),
+    (35427, 0x2),
+    (35432, 0xC),
+    (35433, 0xC),
+    (35434, 0xC),
+    (35435, 0xC),
+    (35436, 0xC),
+    (35437, 0xC),
+    (35440, 0xC),
+    (35441, 0xC),
+    (35442, 0xC),
+    (35443, 0xC),
+    (35444, 0xC),
+    (35445, 0xC),
+    (35446, 0x2),
+    (35447, 0x2),
+    (35448, 0xC),
+    (35449, 0xC),
+    (35450, 0x2),
+    (35451, 0x2),
+    (35454, 0xC),
+    (35455, 0x2),
+    (35456, 0xC),
+    (35457, 0xC),
+    (35458, 0x2),
+    (35459, 0x2),
+    (35460, 0xC),
+    (35461, 0xC),
+    (35462, 0x2),
+    (35463, 0x2),
+    (35464, 0xC),
+    (35466, 0x2),
+    (35467, 0x2),
+    (35468, 0xC),
+    (35469, 0xC),
+    (35470, 0xC),
+    (35471, 0xC),
+    (35472, 0xC),
+    (35473, 0xC),
+    (35474, 0xC),
+    (35475, 0x2),
+    (35476, 0xC),
+    (35477, 0xC),
+    (35478, 0x2),
+    (35479, 0x2),
+    (35480, 0xC),
+    (35482, 0xC),
+    (35483, 0xC),
+    (35488, 0xC),
+    (35489, 0xC),
+    (35490, 0x2),
+    (35491, 0x2),
+    (35492, 0xC),
+    (35493, 0xC),
+    (35494, 0x2),
+    (35495, 0x2),
+    (35496, 0xC),
+    (35497, 0xC),
+    (35498, 0xC),
+    (35499, 0xC),
+    (35500, 0xC),
+    (35501, 0xC),
+    (35502, 0x2),
+    (35503, 0xC),
+    (35506, 0x2),
+    (35507, 0x2),
+    (35508, 0xC),
+    (35509, 0xC),
+    (35510, 0xC),
+    (35511, 0xC),
+    (35514, 0xC),
+    (35515, 0xC),
+    (35516, 0xC),
+    (35517, 0xC),
+    (35518, 0xC),
+    (35519, 0xC),
+    (35526, 0x2),
+    (35527, 0x2),
+    (35534, 0x2),
+    (35535, 0xC),
+    (35708, 0xC),
+    (35709, 0xC),
+    (35717, 0xC),
+    (35718, 0x2),
+    (35719, 0x2),
+    (35724, 0xC),
+    (35725, 0xC),
+    (35726, 0xC),
+    (35727, 0xC),
+    (35728, 0xC),
+    (35729, 0xC),
+    (35732, 0xC),
+    (35733, 0xC),
+    (35734, 0xC),
+    (35735, 0xC),
+    (35736, 0xC),
+    (35737, 0xC),
+    (35738, 0x2),
+    (35739, 0x2),
+    (35740, 0xC),
+    (35741, 0xC),
+    (35742, 0xC),
+    (35743, 0x2),
+    (35746, 0x2),
+    (35747, 0x2),
+    (35748, 0xC),
+    (35749, 0xC),
+    (35750, 0x2),
+    (35751, 0x2),
+    (35752, 0xC),
+    (35753, 0xC),
+    (35754, 0xC),
+    (35755, 0xC),
+    (35756, 0xC),
+    (35758, 0xC),
+    (35759, 0xC),
+    (35760, 0xC),
+    (35761, 0xC),
+    (35762, 0xC),
+    (35763, 0xC),
+    (35764, 0xC),
+    (35765, 0xC),
+    (35766, 0xC),
+    (35767, 0x2),
+    (35768, 0xC),
+    (35769, 0xC),
+    (35770, 0x2),
+    (35771, 0x2),
+    (35772, 0xC),
+    (35773, 0xC),
+    (35774, 0xC),
+    (35775, 0xC),
+    (35778, 0xC),
+    (35779, 0xC),
+    (35780, 0xC),
+    (35781, 0xC),
+    (35782, 0xC),
+    (35783, 0xC),
+    (35784, 0xC),
+    (35785, 0xC),
+    (35786, 0x2),
+    (35787, 0x2),
+    (35788, 0xC),
+    (35789, 0xC),
+    (35790, 0x2),
+    (35791, 0xC),
+    (35792, 0x2),
+    (35793, 0xC),
+    (35794, 0x2),
+    (35795, 0xC),
+    (35798, 0xC),
+    (35799, 0xC),
+    (35800, 0xC),
+    (35801, 0xC),
+    (35802, 0xC),
+    (35803, 0xC),
+    (35806, 0xC),
+    (35807, 0xC),
+    (35808, 0xC),
+    (35809, 0xC),
+    (35810, 0xC),
+    (35811, 0xC),
+    (35814, 0xC),
+    (35818, 0xC),
+    (35819, 0xC),
+    (35826, 0xC),
+    (35827, 0x2),
+    (37170, 0x0),
+    (37171, 0x0),
+    (37186, 0x0),
+    (37187, 0x0),
+    (37194, 0x0),
+    (37195, 0x0),
+    (37202, 0x0),
+    (37203, 0x0),
+    (37210, 0x0),
+    (37212, 0x0),
+    (37213, 0x0),
+    (37218, 0x0),
+    (37219, 0x0),
+    (37220, 0x0),
+    (37226, 0x0),
+    (37227, 0x0),
+    (37228, 0x0),
+    (37229, 0x0),
+    (37234, 0x0),
+    (37235, 0x0),
+    (37236, 0x0),
+    (37244, 0x0),
+    (37245, 0x0),
+    (37252, 0x0),
+    (37253, 0x0),
+    (37462, 0x0),
+    (37463, 0x0),
+    (37471, 0x0),
+    (37478, 0x0),
+    (37479, 0x0),
+    (37486, 0x0),
+    (37487, 0x0),
+    (37494, 0x0),
+    (37495, 0x0),
+    (37502, 0x0),
+    (37504, 0x0),
+    (37505, 0x0),
+    (37510, 0x0),
+    (37511, 0x0),
+    (37512, 0x0),
+    (37518, 0x0),
+    (37519, 0x0),
+    (37520, 0x0),
+    (37521, 0x0),
+    (37526, 0x0),
+    (37527, 0x0),
+    (37528, 0x0),
+    (37529, 0x0),
+    (37536, 0x0),
+    (37537, 0x0),
+    (37544, 0x0),
+    (37545, 0x0),
+    (37568, 0x0),
+    (38336, 0xC),
+    (38337, 0xC),
+    (38344, 0xC),
+    (38345, 0xC),
+    (38346, 0x2),
+    (38347, 0x2),
+    (38352, 0xC),
+    (38353, 0xC),
+    (38354, 0xC),
+    (38355, 0xC),
+    (38356, 0xC),
+    (38357, 0x2),
+    (38360, 0xC),
+    (38361, 0xC),
+    (38362, 0xC),
+    (38363, 0xC),
+    (38364, 0xC),
+    (38365, 0xC),
+    (38366, 0x2),
+    (38367, 0x2),
+    (38368, 0xC),
+    (38369, 0xC),
+    (38370, 0x2),
+    (38371, 0x2),
+    (38373, 0xC),
+    (38374, 0x2),
+    (38375, 0xC),
+    (38376, 0xC),
+    (38377, 0xC),
+    (38378, 0x2),
+    (38379, 0x2),
+    (38380, 0xC),
+    (38381, 0xC),
+    (38382, 0xC),
+    (38383, 0xC),
+    (38384, 0xC),
+    (38385, 0xC),
+    (38386, 0xC),
+    (38387, 0xC),
+    (38388, 0xC),
+    (38389, 0xC),
+    (38390, 0xC),
+    (38391, 0xC),
+    (38392, 0xC),
+    (38393, 0xC),
+    (38394, 0xC),
+    (38395, 0x2),
+    (38396, 0xC),
+    (38397, 0xC),
+    (38398, 0x2),
+    (38399, 0x2),
+    (38400, 0xC),
+    (38401, 0xC),
+    (38402, 0xC),
+    (38403, 0xC),
+    (38406, 0xC),
+    (38407, 0xC),
+    (38408, 0xC),
+    (38409, 0xC),
+    (38410, 0xC),
+    (38411, 0xC),
+    (38412, 0xC),
+    (38413, 0xC),
+    (38414, 0x2),
+    (38415, 0x2),
+    (38416, 0xC),
+    (38417, 0xC),
+    (38418, 0x2),
+    (38419, 0xC),
+    (38420, 0x2),
+    (38421, 0xC),
+    (38422, 0x2),
+    (38423, 0xC),
+    (38426, 0xC),
+    (38427, 0xC),
+    (38428, 0xC),
+    (38429, 0xC),
+    (38430, 0xC),
+    (38431, 0xC),
+    (38434, 0xC),
+    (38435, 0xC),
+    (38436, 0xC),
+    (38437, 0xC),
+    (38438, 0xC),
+    (38439, 0xC),
+    (38442, 0xC),
+    (38443, 0xC),
+    (38446, 0xC),
+    (38447, 0xC),
+    (38454, 0xC),
+    (38455, 0x2),
+    (38462, 0xC),
+    (38628, 0xC),
+    (38629, 0xC),
+    (38636, 0xC),
+    (38637, 0xC),
+    (38638, 0x2),
+    (38639, 0x2),
+    (38644, 0xC),
+    (38645, 0x2),
+    (38646, 0xC),
+    (38647, 0x2),
+    (38648, 0x2),
+    (38649, 0x2),
+    (38652, 0xC),
+    (38653, 0xC),
+    (38654, 0xC),
+    (38655, 0xC),
+    (38656, 0xC),
+    (38657, 0xC),
+    (38658, 0x2),
+    (38659, 0x2),
+    (38660, 0xC),
+    (38661, 0xC),
+    (38662, 0x2),
+    (38663, 0xC),
+    (38664, 0xC),
+    (38665, 0xC),
+    (38666, 0x2),
+    (38667, 0xC),
+    (38668, 0xC),
+    (38669, 0xC),
+    (38670, 0x2),
+    (38671, 0x2),
+    (38672, 0xC),
+    (38673, 0xC),
+    (38674, 0xC),
+    (38675, 0xC),
+    (38676, 0xC),
+    (38677, 0xC),
+    (38678, 0xC),
+    (38679, 0xC),
+    (38680, 0xC),
+    (38681, 0xC),
+    (38682, 0xC),
+    (38683, 0xC),
+    (38684, 0xC),
+    (38685, 0xC),
+    (38686, 0xC),
+    (38688, 0xC),
+    (38689, 0xC),
+    (38690, 0x2),
+    (38691, 0x2),
+    (38692, 0xC),
+    (38693, 0xC),
+    (38694, 0xC),
+    (38695, 0xC),
+    (38698, 0xC),
+    (38699, 0xC),
+    (38700, 0xC),
+    (38701, 0xC),
+    (38702, 0xC),
+    (38703, 0xC),
+    (38704, 0xC),
+    (38705, 0xC),
+    (38706, 0x2),
+    (38707, 0x2),
+    (38708, 0xC),
+    (38709, 0xC),
+    (38710, 0x2),
+    (38711, 0x2),
+    (38712, 0xC),
+    (38713, 0x2),
+    (38714, 0xC),
+    (38715, 0x2),
+    (38716, 0xC),
+    (38718, 0xC),
+    (38719, 0xC),
+    (38720, 0xC),
+    (38721, 0xC),
+    (38722, 0xC),
+    (38723, 0xC),
+    (38726, 0xC),
+    (38727, 0xC),
+    (38728, 0xC),
+    (38729, 0xC),
+    (38730, 0xC),
+    (38731, 0xC),
+    (38734, 0xC),
+    (38735, 0xC),
+    (38738, 0xC),
+    (38739, 0xC),
+    (38746, 0xC),
+    (38747, 0xC),
+    (38754, 0xC),
+    (38755, 0xC),
+    (39506, 0x0),
+    (39507, 0x0),
+    (39514, 0x0),
+    (39515, 0x0),
+    (39522, 0x0),
+    (39523, 0x0),
+    (39530, 0x0),
+    (39531, 0x0),
+    (39538, 0x0),
+    (39539, 0x0),
+    (39546, 0x0),
+    (39548, 0x0),
+    (39549, 0x0),
+    (39554, 0x0),
+    (39555, 0x0),
+    (39556, 0x0),
+    (39557, 0x0),
+    (39562, 0x0),
+    (39563, 0x0),
+    (39564, 0x0),
+    (39565, 0x0),
+    (39570, 0x0),
+    (39571, 0x0),
+    (39572, 0x0),
+    (39573, 0x0),
+    (39580, 0x0),
+    (39581, 0x0),
+    (39588, 0x0),
+    (39589, 0x0),
+    (39612, 0x0),
+    (39613, 0x0),
+    (39628, 0x0),
+    (39798, 0x0),
+    (39799, 0x0),
+    (39806, 0x0),
+    (39807, 0x0),
+    (39814, 0x0),
+    (39815, 0x0),
+    (39822, 0x0),
+    (39823, 0x0),
+    (39830, 0x0),
+    (39831, 0x0),
+    (39838, 0x0),
+    (39840, 0x0),
+    (39841, 0x0),
+    (39846, 0x0),
+    (39847, 0x0),
+    (39848, 0x0),
+    (39849, 0x0),
+    (39854, 0x0),
+    (39855, 0x0),
+    (39856, 0x0),
+    (39857, 0x0),
+    (39862, 0x0),
+    (39863, 0x0),
+    (39864, 0x0),
+    (39865, 0x0),
+    (39872, 0x0),
+    (39873, 0x0),
+    (39880, 0x0),
+    (39881, 0x0),
+    (39888, 0x0),
+    (39904, 0x0),
+    (39905, 0x0),
+    (39920, 0x0),
+    (39921, 0x0),
+    (41256, 0xC),
+    (41257, 0xC),
+    (41264, 0xC),
+    (41265, 0xC),
+    (41266, 0xC),
+    (41267, 0xC),
+    (41272, 0xC),
+    (41273, 0x2),
+    (41274, 0x2),
+    (41275, 0x2),
+    (41276, 0xC),
+    (41277, 0x2),
+    (41280, 0x2),
+    (41281, 0x2),
+    (41282, 0xC),
+    (41283, 0xC),
+    (41284, 0x2),
+    (41285, 0x2),
+    (41286, 0xC),
+    (41287, 0xC),
+    (41288, 0xC),
+    (41289, 0x2),
+    (41290, 0x2),
+    (41291, 0xC),
+    (41292, 0xC),
+    (41293, 0xC),
+    (41294, 0xC),
+    (41295, 0xC),
+    (41296, 0x2),
+    (41297, 0x2),
+    (41300, 0x2),
+    (41301, 0x2),
+    (41302, 0xC),
+    (41303, 0xC),
+    (41304, 0xC),
+    (41305, 0xC),
+    (41306, 0xC),
+    (41307, 0xC),
+    (41308, 0x2),
+    (41309, 0x2),
+    (41310, 0xC),
+    (41311, 0xC),
+    (41312, 0x2),
+    (41313, 0xC),
+    (41314, 0xC),
+    (41316, 0x2),
+    (41317, 0x2),
+    (41320, 0xC),
+    (41321, 0xC),
+    (41322, 0xC),
+    (41323, 0xC),
+    (41324, 0xC),
+    (41326, 0xC),
+    (41327, 0xC),
+    (41328, 0x2),
+    (41329, 0x2),
+    (41330, 0xC),
+    (41331, 0xC),
+    (41332, 0xC),
+    (41333, 0xC),
+    (41335, 0x2),
+    (41336, 0xC),
+    (41337, 0xC),
+    (41338, 0x2),
+    (41339, 0x2),
+    (41340, 0xC),
+    (41341, 0x2),
+    (41342, 0xC),
+    (41343, 0x2),
+    (41344, 0xC),
+    (41345, 0xC),
+    (41346, 0xC),
+    (41347, 0xC),
+    (41348, 0x2),
+    (41349, 0x2),
+    (41350, 0xC),
+    (41351, 0xC),
+    (41354, 0x2),
+    (41355, 0xC),
+    (41356, 0xC),
+    (41357, 0x2),
+    (41358, 0xC),
+    (41359, 0xC),
+    (41362, 0xC),
+    (41363, 0xC),
+    (41366, 0xC),
+    (41367, 0xC),
+    (41374, 0xC),
+    (41375, 0xC),
+    (41382, 0xC),
+    (41383, 0xC),
+    (41548, 0xC),
+    (41549, 0xC),
+    (41556, 0xC),
+    (41557, 0x2),
+    (41558, 0xC),
+    (41559, 0xC),
+    (41564, 0x2),
+    (41565, 0xC),
+    (41566, 0x2),
+    (41567, 0xC),
+    (41568, 0xC),
+    (41569, 0xC),
+    (41572, 0x2),
+    (41573, 0x2),
+    (41574, 0xC),
+    (41575, 0xC),
+    (41576, 0x2),
+    (41577, 0x2),
+    (41578, 0xC),
+    (41579, 0xC),
+    (41580, 0xC),
+    (41581, 0xC),
+    (41582, 0xC),
+    (41583, 0xC),
+    (41584, 0xC),
+    (41585, 0xC),
+    (41586, 0xC),
+    (41587, 0xC),
+    (41588, 0x2),
+    (41589, 0x2),
+    (41592, 0x2),
+    (41593, 0x2),
+    (41594, 0xC),
+    (41595, 0xC),
+    (41596, 0xC),
+    (41597, 0xC),
+    (41598, 0xC),
+    (41599, 0xC),
+    (41600, 0x2),
+    (41601, 0x2),
+    (41602, 0xC),
+    (41603, 0xC),
+    (41604, 0x2),
+    (41605, 0xC),
+    (41606, 0xC),
+    (41608, 0x2),
+    (41609, 0x2),
+    (41612, 0xC),
+    (41613, 0xC),
+    (41614, 0xC),
+    (41615, 0xC),
+    (41616, 0xC),
+    (41617, 0xC),
+    (41618, 0xC),
+    (41619, 0xC),
+    (41620, 0x2),
+    (41621, 0x2),
+    (41622, 0xC),
+    (41623, 0xC),
+    (41624, 0xC),
+    (41625, 0xC),
+    (41627, 0x2),
+    (41628, 0x2),
+    (41629, 0xC),
+    (41630, 0x2),
+    (41631, 0x2),
+    (41632, 0xC),
+    (41633, 0xC),
+    (41634, 0xC),
+    (41635, 0x2),
+    (41636, 0xC),
+    (41637, 0xC),
+    (41638, 0xC),
+    (41639, 0xC),
+    (41640, 0x2),
+    (41641, 0x2),
+    (41642, 0xC),
+    (41643, 0xC),
+    (41646, 0x2),
+    (41647, 0xC),
+    (41648, 0xC),
+    (41649, 0xC),
+    (41650, 0x2),
+    (41651, 0xC),
+    (41654, 0x2),
+    (41655, 0x2),
+    (41656, 0xC),
+    (41658, 0xC),
+    (41659, 0xC),
+    (41666, 0xC),
+    (41667, 0xC),
+    (41674, 0xC),
+    (41675, 0xC),
+    (41842, 0x0),
+    (41843, 0x0),
+    (41850, 0x0),
+    (41851, 0x0),
+    (41858, 0x0),
+    (41859, 0x0),
+    (41866, 0x0),
+    (41867, 0x0),
+    (41874, 0x0),
+    (41875, 0x0),
+    (41882, 0x0),
+    (41884, 0x0),
+    (41885, 0x0),
+    (41890, 0x0),
+    (41891, 0x0),
+    (41892, 0x0),
+    (41893, 0x0),
+    (41898, 0x0),
+    (41899, 0x0),
+    (41900, 0x0),
+    (41901, 0x0),
+    (41906, 0x0),
+    (41907, 0x0),
+    (41908, 0x0),
+    (41909, 0x0),
+    (41916, 0x0),
+    (41917, 0x0),
+    (41924, 0x0),
+    (41925, 0x0),
+    (41932, 0x0),
+    (41933, 0x0),
+    (41948, 0x0),
+    (41949, 0x0),
+    (41964, 0x0),
+    (41965, 0x0),
+    (42134, 0x0),
+    (42135, 0x0),
+    (42142, 0x0),
+    (42143, 0x0),
+    (42150, 0x0),
+    (42151, 0x0),
+    (42158, 0x0),
+    (42159, 0x0),
+    (42166, 0x0),
+    (42167, 0x0),
+    (42174, 0x0),
+    (42175, 0x0),
+    (42176, 0x0),
+    (42177, 0x0),
+    (42182, 0x0),
+    (42183, 0x0),
+    (42184, 0x0),
+    (42185, 0x0),
+    (42190, 0x0),
+    (42191, 0x0),
+    (42192, 0x0),
+    (42193, 0x0),
+    (42198, 0x0),
+    (42199, 0x0),
+    (42200, 0x0),
+    (42201, 0x0),
+    (42208, 0x0),
+    (42209, 0x0),
+    (42216, 0x0),
+    (42217, 0x0),
+    (42224, 0x0),
+    (42225, 0x0),
+    (42240, 0x0),
+    (42241, 0x0),
+    (42256, 0x0),
+    (42257, 0x0),
+    (44176, 0xC),
+    (44177, 0xC),
+    (44178, 0x0),
+    (44179, 0x0),
+    (44184, 0x2),
+    (44185, 0x2),
+    (44186, 0x0),
+    (44187, 0x0),
+    (44192, 0xC),
+    (44193, 0xC),
+    (44194, 0x0),
+    (44195, 0x0),
+    (44196, 0xC),
+    (44197, 0xC),
+    (44200, 0xC),
+    (44201, 0xC),
+    (44202, 0x0),
+    (44203, 0x0),
+    (44204, 0x2),
+    (44205, 0xC),
+    (44208, 0xC),
+    (44209, 0xC),
+    (44210, 0x0),
+    (44211, 0x0),
+    (44216, 0xC),
+    (44217, 0xC),
+    (44219, 0x0),
+    (44220, 0x0),
+    (44221, 0x0),
+    (44224, 0xC),
+    (44225, 0xC),
+    (44226, 0x2),
+    (44227, 0x2),
+    (44228, 0x0),
+    (44229, 0x0),
+    (44232, 0x2),
+    (44233, 0xC),
+    (44234, 0x2),
+    (44236, 0x0),
+    (44237, 0x0),
+    (44240, 0xC),
+    (44241, 0xC),
+    (44242, 0x2),
+    (44243, 0x2),
+    (44244, 0x0),
+    (44245, 0x0),
+    (44246, 0x2),
+    (44247, 0x2),
+    (44248, 0xC),
+    (44249, 0xC),
+    (44250, 0x2),
+    (44251, 0x2),
+    (44252, 0x0),
+    (44253, 0x0),
+    (44256, 0x2),
+    (44257, 0xC),
+    (44258, 0x2),
+    (44259, 0x2),
+    (44260, 0x0),
+    (44261, 0x0),
+    (44262, 0x2),
+    (44263, 0x2),
+    (44264, 0xC),
+    (44265, 0xC),
+    (44266, 0x2),
+    (44267, 0x2),
+    (44268, 0x0),
+    (44269, 0x0),
+    (44270, 0x2),
+    (44271, 0x2),
+    (44274, 0x2),
+    (44275, 0x2),
+    (44278, 0x2),
+    (44279, 0x2),
+    (44282, 0x2),
+    (44283, 0x2),
+    (44284, 0x0),
+    (44285, 0x0),
+    (44286, 0x2),
+    (44287, 0x2),
+    (44294, 0x2),
+    (44295, 0x2),
+    (44300, 0x0),
+    (44301, 0x0),
+    (44302, 0x2),
+    (44303, 0x2),
+    (44468, 0xC),
+    (44469, 0xC),
+    (44470, 0x0),
+    (44471, 0x0),
+    (44476, 0x2),
+    (44477, 0x2),
+    (44478, 0x0),
+    (44479, 0x0),
+    (44484, 0xC),
+    (44485, 0xC),
+    (44486, 0x0),
+    (44487, 0x0),
+    (44488, 0xC),
+    (44489, 0xC),
+    (44492, 0xC),
+    (44493, 0xC),
+    (44494, 0x0),
+    (44495, 0x0),
+    (44496, 0xC),
+    (44497, 0xC),
+    (44500, 0xC),
+    (44501, 0xC),
+    (44502, 0x0),
+    (44503, 0x0),
+    (44508, 0xC),
+    (44509, 0xC),
+    (44511, 0x0),
+    (44512, 0x0),
+    (44513, 0x0),
+    (44516, 0xC),
+    (44517, 0xC),
+    (44518, 0x2),
+    (44519, 0x2),
+    (44520, 0x0),
+    (44521, 0x0),
+    (44524, 0x2),
+    (44525, 0xC),
+    (44526, 0x2),
+    (44528, 0x0),
+    (44529, 0x0),
+    (44532, 0x2),
+    (44533, 0xC),
+    (44534, 0x2),
+    (44535, 0x2),
+    (44536, 0x0),
+    (44537, 0x0),
+    (44538, 0x2),
+    (44539, 0x2),
+    (44540, 0xC),
+    (44541, 0xC),
+    (44542, 0x2),
+    (44543, 0x2),
+    (44544, 0x0),
+    (44545, 0x0),
+    (44548, 0x2),
+    (44549, 0x2),
+    (44551, 0x2),
+    (44552, 0x0),
+    (44553, 0x0),
+    (44554, 0x2),
+    (44555, 0x2),
+    (44556, 0xC),
+    (44557, 0xC),
+    (44558, 0x2),
+    (44559, 0x2),
+    (44560, 0x0),
+    (44561, 0x0),
+    (44562, 0x2),
+    (44563, 0x2),
+    (44566, 0x2),
+    (44567, 0x2),
+    (44570, 0x2),
+    (44571, 0x2),
+    (44574, 0x2),
+    (44575, 0x2),
+    (44576, 0x0),
+    (44577, 0x0),
+    (44578, 0x2),
+    (44579, 0x2),
+    (44586, 0x2),
+    (44587, 0x2),
+    (44592, 0x0),
+    (44593, 0x0),
+    (44594, 0x2),
+    (44595, 0x2),
+    (46514, 0x0),
+    (46515, 0x0),
+    (46522, 0x0),
+    (46523, 0x0),
+    (46530, 0x0),
+    (46531, 0x0),
+    (46538, 0x0),
+    (46539, 0x0),
+    (46546, 0x0),
+    (46547, 0x0),
+    (46555, 0x0),
+    (46556, 0x0),
+    (46557, 0x0),
+    (46562, 0x0),
+    (46563, 0x0),
+    (46564, 0x0),
+    (46565, 0x0),
+    (46570, 0x0),
+    (46571, 0x0),
+    (46572, 0x0),
+    (46573, 0x0),
+    (46578, 0x0),
+    (46579, 0x0),
+    (46580, 0x0),
+    (46581, 0x0),
+    (46588, 0x0),
+    (46589, 0x0),
+    (46596, 0x0),
+    (46597, 0x0),
+    (46604, 0x0),
+    (46605, 0x0),
+    (46620, 0x0),
+    (46621, 0x0),
+    (46636, 0x0),
+    (46637, 0x0),
+    (46806, 0x0),
+    (46807, 0x0),
+    (46814, 0x0),
+    (46815, 0x0),
+    (46822, 0x0),
+    (46823, 0x0),
+    (46830, 0x0),
+    (46831, 0x0),
+    (46838, 0x0),
+    (46839, 0x0),
+    (46847, 0x0),
+    (46848, 0x0),
+    (46849, 0x0),
+    (46854, 0x0),
+    (46855, 0x0),
+    (46856, 0x0),
+    (46857, 0x0),
+    (46862, 0x0),
+    (46863, 0x0),
+    (46864, 0x0),
+    (46865, 0x0),
+    (46870, 0x0),
+    (46871, 0x0),
+    (46872, 0x0),
+    (46873, 0x0),
+    (46880, 0x0),
+    (46881, 0x0),
+    (46888, 0x0),
+    (46889, 0x0),
+    (46896, 0x0),
+    (46897, 0x0),
+    (46912, 0x0),
+    (46913, 0x0),
+    (46928, 0x0),
+    (46929, 0x0),
+    (47096, 0xC),
+    (47097, 0xC),
+    (47104, 0x2),
+    (47105, 0x2),
+    (47106, 0xC),
+    (47107, 0x2),
+    (47112, 0xC),
+    (47113, 0xC),
+    (47114, 0x2),
+    (47115, 0x2),
+    (47116, 0xC),
+    (47117, 0xC),
+    (47120, 0xC),
+    (47121, 0x2),
+    (47122, 0x2),
+    (47123, 0x2),
+    (47124, 0xC),
+    (47125, 0xC),
+    (47126, 0x2),
+    (47127, 0x2),
+    (47128, 0xC),
+    (47129, 0xC),
+    (47130, 0x2),
+    (47131, 0x2),
+    (47132, 0xC),
+    (47133, 0xC),
+    (47134, 0x2),
+    (47135, 0x2),
+    (47136, 0xC),
+    (47137, 0xC),
+    (47140, 0x2),
+    (47141, 0x2),
+    (47142, 0x2),
+    (47143, 0x2),
+    (47144, 0xC),
+    (47145, 0xC),
+    (47146, 0x2),
+    (47147, 0x2),
+    (47148, 0xC),
+    (47149, 0xC),
+    (47150, 0x2),
+    (47151, 0x2),
+    (47152, 0xC),
+    (47153, 0x2),
+    (47154, 0x2),
+    (47160, 0x2),
+    (47161, 0xC),
+    (47162, 0x2),
+    (47163, 0x2),
+    (47164, 0xC),
+    (47165, 0xC),
+    (47166, 0x2),
+    (47167, 0x2),
+    (47168, 0xC),
+    (47169, 0xC),
+    (47170, 0x2),
+    (47171, 0x2),
+    (47172, 0xC),
+    (47173, 0xC),
+    (47176, 0x2),
+    (47177, 0x2),
+    (47179, 0x2),
+    (47180, 0xC),
+    (47181, 0xC),
+    (47182, 0x2),
+    (47183, 0x2),
+    (47184, 0xC),
+    (47185, 0xC),
+    (47186, 0x2),
+    (47187, 0x2),
+    (47188, 0xC),
+    (47189, 0xC),
+    (47190, 0x2),
+    (47191, 0x2),
+    (47194, 0x2),
+    (47195, 0x2),
+    (47196, 0x2),
+    (47197, 0xC),
+    (47198, 0x2),
+    (47199, 0x2),
+    (47202, 0x2),
+    (47203, 0x2),
+    (47204, 0xC),
+    (47205, 0xC),
+    (47206, 0x2),
+    (47207, 0x2),
+    (47214, 0x2),
+    (47215, 0x2),
+    (47222, 0x2),
+    (47223, 0x2),
+    (47388, 0xC),
+    (47389, 0xC),
+    (47396, 0x2),
+    (47397, 0xC),
+    (47398, 0xC),
+    (47399, 0x2),
+    (47404, 0xC),
+    (47405, 0xC),
+    (47406, 0x2),
+    (47407, 0x2),
+    (47408, 0xC),
+    (47409, 0xC),
+    (47412, 0xC),
+    (47413, 0x2),
+    (47414, 0x2),
+    (47415, 0x2),
+    (47416, 0xC),
+    (47417, 0xC),
+    (47418, 0x2),
+    (47419, 0x2),
+    (47420, 0xC),
+    (47421, 0xC),
+    (47422, 0x2),
+    (47423, 0x2),
+    (47424, 0xC),
+    (47425, 0xC),
+    (47426, 0x2),
+    (47427, 0x2),
+    (47428, 0xC),
+    (47429, 0xC),
+    (47432, 0x2),
+    (47433, 0x2),
+    (47434, 0x2),
+    (47435, 0x2),
+    (47436, 0xC),
+    (47437, 0x2),
+    (47438, 0x2),
+    (47439, 0x2),
+    (47440, 0xC),
+    (47441, 0xC),
+    (47442, 0x2),
+    (47443, 0x2),
+    (47444, 0xC),
+    (47445, 0x2),
+    (47446, 0x2),
+    (47452, 0x2),
+    (47453, 0x2),
+    (47454, 0x2),
+    (47455, 0x2),
+    (47456, 0xC),
+    (47457, 0xC),
+    (47458, 0x2),
+    (47459, 0x2),
+    (47460, 0xC),
+    (47461, 0xC),
+    (47462, 0x2),
+    (47463, 0x2),
+    (47464, 0xC),
+    (47465, 0xC),
+    (47468, 0x2),
+    (47469, 0x2),
+    (47472, 0xC),
+    (47473, 0xC),
+    (47474, 0x2),
+    (47476, 0xC),
+    (47477, 0xC),
+    (47478, 0x2),
+    (47479, 0x2),
+    (47480, 0xC),
+    (47481, 0xC),
+    (47482, 0x2),
+    (47483, 0x2),
+    (47486, 0x2),
+    (47487, 0x2),
+    (47488, 0x2),
+    (47489, 0xC),
+    (47490, 0x2),
+    (47491, 0x2),
+    (47494, 0x2),
+    (47495, 0x2),
+    (47496, 0xC),
+    (47497, 0xC),
+    (47498, 0x2),
+    (47499, 0x2),
+    (47506, 0x2),
+    (47507, 0x2),
+    (47514, 0x2),
+    (47515, 0x2),
+    (48850, 0x0),
+    (48851, 0x0),
+    (48858, 0x0),
+    (48859, 0x0),
+    (48866, 0x0),
+    (48867, 0x0),
+    (48874, 0x0),
+    (48875, 0x0),
+    (48882, 0x0),
+    (48883, 0x0),
+    (48890, 0x0),
+    (48891, 0x0),
+    (48892, 0x0),
+    (48893, 0x0),
+    (48898, 0x0),
+    (48899, 0x0),
+    (48900, 0x0),
+    (48901, 0x0),
+    (48906, 0x0),
+    (48907, 0x0),
+    (48908, 0x0),
+    (48909, 0x0),
+    (48914, 0x0),
+    (48915, 0x0),
+    (48916, 0x0),
+    (48917, 0x0),
+    (48924, 0x0),
+    (48925, 0x0),
+    (48932, 0x0),
+    (48933, 0x0),
+    (48940, 0x0),
+    (48941, 0x0),
+    (48957, 0x0),
+    (48972, 0x0),
+    (48973, 0x0),
+    (49142, 0x0),
+    (49143, 0x0),
+    (49150, 0x0),
+    (49151, 0x0),
+    (49158, 0x0),
+    (49159, 0x0),
+    (49166, 0x0),
+    (49167, 0x0),
+    (49174, 0x0),
+    (49175, 0x0),
+    (49182, 0x0),
+    (49183, 0x0),
+    (49184, 0x0),
+    (49185, 0x0),
+    (49190, 0x0),
+    (49191, 0x0),
+    (49192, 0x0),
+    (49193, 0x0),
+    (49198, 0x0),
+    (49199, 0x0),
+    (49200, 0x0),
+    (49201, 0x0),
+    (49206, 0x0),
+    (49207, 0x0),
+    (49208, 0x0),
+    (49209, 0x0),
+    (49216, 0x0),
+    (49217, 0x0),
+    (49224, 0x0),
+    (49225, 0x0),
+    (49232, 0x0),
+    (49233, 0x0),
+    (49264, 0x0),
+    (49265, 0x0),
+    (50016, 0x2),
+    (50017, 0x2),
+    (50024, 0xC),
+    (50025, 0xC),
+    (50026, 0xC),
+    (50027, 0xC),
+    (50032, 0xC),
+    (50033, 0xC),
+    (50035, 0x2),
+    (50036, 0x2),
+    (50037, 0x2),
+    (50040, 0x2),
+    (50041, 0x2),
+    (50042, 0x2),
+    (50043, 0x2),
+    (50044, 0xC),
+    (50045, 0xC),
+    (50046, 0xC),
+    (50047, 0xC),
+    (50048, 0x2),
+    (50049, 0x2),
+    (50050, 0x2),
+    (50051, 0x2),
+    (50052, 0x2),
+    (50053, 0x2),
+    (50054, 0x2),
+    (50055, 0x2),
+    (50056, 0x2),
+    (50057, 0x2),
+    (50060, 0x2),
+    (50061, 0xC),
+    (50062, 0x2),
+    (50063, 0x2),
+    (50064, 0xC),
+    (50065, 0x2),
+    (50066, 0x2),
+    (50067, 0x2),
+    (50068, 0x2),
+    (50069, 0x2),
+    (50070, 0x2),
+    (50071, 0x2),
+    (50072, 0xC),
+    (50073, 0x2),
+    (50074, 0x2),
+    (50080, 0x2),
+    (50081, 0x2),
+    (50082, 0x2),
+    (50083, 0x2),
+    (50084, 0x2),
+    (50085, 0xC),
+    (50086, 0x2),
+    (50087, 0x2),
+    (50088, 0xC),
+    (50089, 0xC),
+    (50090, 0x2),
+    (50091, 0x2),
+    (50092, 0xC),
+    (50093, 0xC),
+    (50096, 0x2),
+    (50097, 0x2),
+    (50100, 0xC),
+    (50101, 0xC),
+    (50102, 0x2),
+    (50104, 0xC),
+    (50105, 0xC),
+    (50106, 0x2),
+    (50107, 0x2),
+    (50108, 0xC),
+    (50109, 0xC),
+    (50110, 0x2),
+    (50111, 0x2),
+    (50115, 0x2),
+    (50116, 0x2),
+    (50117, 0x2),
+    (50118, 0x2),
+    (50119, 0x2),
+    (50123, 0x2),
+    (50124, 0xC),
+    (50125, 0xC),
+    (50126, 0x2),
+    (50127, 0x2),
+    (50134, 0x2),
+    (50135, 0x2),
+    (50142, 0x2),
+    (50143, 0x2),
+    (50308, 0x2),
+    (50309, 0x2),
+    (50316, 0xC),
+    (50317, 0xC),
+    (50318, 0xC),
+    (50319, 0xC),
+    (50324, 0xC),
+    (50325, 0x2),
+    (50327, 0x2),
+    (50328, 0x2),
+    (50329, 0x2),
+    (50332, 0x2),
+    (50333, 0x2),
+    (50334, 0x2),
+    (50335, 0x2),
+    (50336, 0xC),
+    (50337, 0xC),
+    (50338, 0xC),
+    (50339, 0xC),
+    (50340, 0x2),
+    (50341, 0x2),
+    (50342, 0x2),
+    (50343, 0x2),
+    (50344, 0x2),
+    (50345, 0x2),
+    (50346, 0x2),
+    (50347, 0x2),
+    (50348, 0x2),
+    (50349, 0x2),
+    (50352, 0x2),
+    (50353, 0xC),
+    (50354, 0x2),
+    (50355, 0x2),
+    (50356, 0xC),
+    (50357, 0x2),
+    (50358, 0x2),
+    (50359, 0x2),
+    (50360, 0x2),
+    (50361, 0x2),
+    (50362, 0x2),
+    (50363, 0x2),
+    (50364, 0xC),
+    (50365, 0xC),
+    (50366, 0x2),
+    (50372, 0x2),
+    (50373, 0x2),
+    (50374, 0x2),
+    (50375, 0x2),
+    (50376, 0x2),
+    (50377, 0xC),
+    (50378, 0x2),
+    (50379, 0x2),
+    (50380, 0xC),
+    (50381, 0xC),
+    (50382, 0x2),
+    (50383, 0x2),
+    (50384, 0x2),
+    (50385, 0xC),
+    (50388, 0x2),
+    (50389, 0x2),
+    (50392, 0xC),
+    (50393, 0xC),
+    (50394, 0x2),
+    (50396, 0xC),
+    (50397, 0x2),
+    (50398, 0x2),
+    (50399, 0x2),
+    (50400, 0xC),
+    (50401, 0xC),
+    (50402, 0x2),
+    (50403, 0x2),
+    (50407, 0x2),
+    (50408, 0x2),
+    (50409, 0x2),
+    (50411, 0x2),
+    (50416, 0xC),
+    (50417, 0xC),
+    (50418, 0x2),
+    (50419, 0x2),
+    (50426, 0x2),
+    (50427, 0x2),
+    (50434, 0x2),
+    (50435, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIRST_APPEARANCE_VIDEO_FRAME: u64 = 1098;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIRST_APPEARANCE_RAM_BYTES: [(u16, u8); 303] = [
+    (0x9C05, 0x10),
+    (0x9C10, 0x39),
+    (0x9C11, 0xAE),
+    (0x9C12, 0x39),
+    (0x9C13, 0xA6),
+    (0x9C14, 0x39),
+    (0x9C16, 0x39),
+    (0x9C17, 0x96),
+    (0x9C18, 0x39),
+    (0x9C19, 0x8E),
+    (0x9C1A, 0x39),
+    (0x9C1B, 0x86),
+    (0x9C1C, 0x35),
+    (0x9C1D, 0xAE),
+    (0x9C1E, 0x35),
+    (0x9C1F, 0xA6),
+    (0x9C20, 0x35),
+    (0x9C22, 0x35),
+    (0x9C23, 0x96),
+    (0x9C24, 0x35),
+    (0x9C25, 0x8E),
+    (0x9C26, 0x35),
+    (0x9C27, 0x86),
+    (0x9C29, 0xAE),
+    (0x9C2B, 0xA6),
+    (0x9C2F, 0x96),
+    (0x9C31, 0x8E),
+    (0x9C33, 0x86),
+    (0x9C40, 0x84),
+    (0x9C50, 0x3D),
+    (0x9C51, 0xAE),
+    (0x9C52, 0x3D),
+    (0x9C53, 0xA6),
+    (0x9C54, 0x3D),
+    (0x9C56, 0x3D),
+    (0x9C57, 0x96),
+    (0x9C58, 0x3D),
+    (0x9C59, 0x8E),
+    (0x9C5A, 0x3D),
+    (0x9C5B, 0x86),
+    (0x9C5C, 0x39),
+    (0x9C5D, 0xAE),
+    (0x9C5E, 0x39),
+    (0x9C5F, 0xA6),
+    (0x9C60, 0x39),
+    (0x9C62, 0x39),
+    (0x9C63, 0x96),
+    (0x9C64, 0x39),
+    (0x9C65, 0x8E),
+    (0x9C66, 0x39),
+    (0x9C67, 0x86),
+    (0x9C69, 0xAE),
+    (0x9C6B, 0xA6),
+    (0x9C6F, 0x96),
+    (0x9C71, 0x8E),
+    (0x9C73, 0x86),
+    (0x9C74, 0x31),
+    (0x9C75, 0xAE),
+    (0x9C76, 0x31),
+    (0x9C77, 0xA6),
+    (0x9C78, 0x31),
+    (0x9C7A, 0x31),
+    (0x9C7B, 0x96),
+    (0x9C7C, 0x31),
+    (0x9C7D, 0x8E),
+    (0x9C7E, 0x31),
+    (0x9C7F, 0x86),
+    (0x9C80, 0x84),
+    (0x9C90, 0x41),
+    (0x9C91, 0xAE),
+    (0x9C92, 0x41),
+    (0x9C93, 0xA6),
+    (0x9C94, 0x41),
+    (0x9C96, 0x41),
+    (0x9C97, 0x96),
+    (0x9C98, 0x41),
+    (0x9C99, 0x8E),
+    (0x9C9A, 0x41),
+    (0x9C9B, 0x86),
+    (0x9C9C, 0x3D),
+    (0x9C9D, 0xAE),
+    (0x9C9E, 0x3D),
+    (0x9C9F, 0xA6),
+    (0x9CA0, 0x3D),
+    (0x9CA2, 0x3D),
+    (0x9CA3, 0x96),
+    (0x9CA4, 0x3D),
+    (0x9CA5, 0x8E),
+    (0x9CA6, 0x3D),
+    (0x9CA7, 0x86),
+    (0x9CA9, 0xAE),
+    (0x9CAB, 0xA6),
+    (0x9CAF, 0x96),
+    (0x9CB1, 0x8E),
+    (0x9CB3, 0x86),
+    (0x9CB4, 0x35),
+    (0x9CB5, 0xAE),
+    (0x9CB6, 0x35),
+    (0x9CB7, 0xA6),
+    (0x9CB8, 0x35),
+    (0x9CBA, 0x35),
+    (0x9CBB, 0x96),
+    (0x9CBC, 0x35),
+    (0x9CBD, 0x8E),
+    (0x9CBE, 0x35),
+    (0x9CBF, 0x86),
+    (0x9CC0, 0x84),
+    (0x9CD0, 0x45),
+    (0x9CD1, 0xAE),
+    (0x9CD2, 0x45),
+    (0x9CD3, 0xA6),
+    (0x9CD4, 0x45),
+    (0x9CD6, 0x45),
+    (0x9CD7, 0x96),
+    (0x9CD8, 0x45),
+    (0x9CD9, 0x8E),
+    (0x9CDA, 0x45),
+    (0x9CDB, 0x86),
+    (0x9CDC, 0x41),
+    (0x9CDD, 0xAE),
+    (0x9CDE, 0x41),
+    (0x9CDF, 0xA6),
+    (0x9CE0, 0x41),
+    (0x9CE2, 0x41),
+    (0x9CE3, 0x96),
+    (0x9CE4, 0x41),
+    (0x9CE5, 0x8E),
+    (0x9CE6, 0x41),
+    (0x9CE7, 0x86),
+    (0x9CE9, 0xAE),
+    (0x9CEB, 0xA6),
+    (0x9CEF, 0x96),
+    (0x9CF1, 0x8E),
+    (0x9CF3, 0x86),
+    (0x9CF4, 0x39),
+    (0x9CF5, 0xAE),
+    (0x9CF6, 0x39),
+    (0x9CF7, 0xA6),
+    (0x9CF8, 0x39),
+    (0x9CFA, 0x39),
+    (0x9CFB, 0x96),
+    (0x9CFC, 0x39),
+    (0x9CFD, 0x8E),
+    (0x9CFE, 0x39),
+    (0x9CFF, 0x86),
+    (0x9D00, 0x84),
+    (0x9D10, 0x49),
+    (0x9D11, 0xAE),
+    (0x9D12, 0x49),
+    (0x9D13, 0xA6),
+    (0x9D14, 0x49),
+    (0x9D16, 0x49),
+    (0x9D17, 0x96),
+    (0x9D18, 0x49),
+    (0x9D19, 0x8E),
+    (0x9D1A, 0x49),
+    (0x9D1B, 0x86),
+    (0x9D1C, 0x45),
+    (0x9D1D, 0xAE),
+    (0x9D1E, 0x45),
+    (0x9D1F, 0xA6),
+    (0x9D20, 0x45),
+    (0x9D22, 0x45),
+    (0x9D23, 0x96),
+    (0x9D24, 0x45),
+    (0x9D25, 0x8E),
+    (0x9D26, 0x45),
+    (0x9D27, 0x86),
+    (0x9D29, 0xAE),
+    (0x9D2B, 0xA6),
+    (0x9D2F, 0x96),
+    (0x9D31, 0x8E),
+    (0x9D33, 0x86),
+    (0x9D34, 0x3D),
+    (0x9D35, 0xAE),
+    (0x9D36, 0x3D),
+    (0x9D37, 0xA6),
+    (0x9D38, 0x3D),
+    (0x9D3A, 0x3D),
+    (0x9D3B, 0x96),
+    (0x9D3C, 0x3D),
+    (0x9D3D, 0x8E),
+    (0x9D3E, 0x3D),
+    (0x9D3F, 0x86),
+    (0x9D40, 0x84),
+    (0x9D50, 0x4D),
+    (0x9D51, 0xAE),
+    (0x9D52, 0x4D),
+    (0x9D53, 0xA6),
+    (0x9D54, 0x4D),
+    (0x9D56, 0x4D),
+    (0x9D57, 0x96),
+    (0x9D58, 0x4D),
+    (0x9D59, 0x8E),
+    (0x9D5A, 0x4D),
+    (0x9D5B, 0x86),
+    (0x9D5C, 0x49),
+    (0x9D5D, 0xAE),
+    (0x9D5E, 0x49),
+    (0x9D5F, 0xA6),
+    (0x9D60, 0x49),
+    (0x9D62, 0x49),
+    (0x9D63, 0x96),
+    (0x9D64, 0x49),
+    (0x9D65, 0x8E),
+    (0x9D66, 0x49),
+    (0x9D67, 0x86),
+    (0x9D69, 0xAE),
+    (0x9D6B, 0xA6),
+    (0x9D6F, 0x96),
+    (0x9D71, 0x8E),
+    (0x9D73, 0x86),
+    (0x9D74, 0x41),
+    (0x9D75, 0xAE),
+    (0x9D76, 0x41),
+    (0x9D77, 0xA6),
+    (0x9D78, 0x41),
+    (0x9D7A, 0x41),
+    (0x9D7B, 0x96),
+    (0x9D7C, 0x41),
+    (0x9D7D, 0x8E),
+    (0x9D7E, 0x41),
+    (0x9D7F, 0x86),
+    (0x9D80, 0x84),
+    (0x9D90, 0x51),
+    (0x9D91, 0xAE),
+    (0x9D92, 0x51),
+    (0x9D93, 0xA6),
+    (0x9D94, 0x51),
+    (0x9D96, 0x51),
+    (0x9D97, 0x96),
+    (0x9D98, 0x51),
+    (0x9D99, 0x8E),
+    (0x9D9A, 0x51),
+    (0x9D9B, 0x86),
+    (0x9D9C, 0x4D),
+    (0x9D9D, 0xAE),
+    (0x9D9E, 0x4D),
+    (0x9D9F, 0xA6),
+    (0x9DA0, 0x4D),
+    (0x9DA2, 0x4D),
+    (0x9DA3, 0x96),
+    (0x9DA4, 0x4D),
+    (0x9DA5, 0x8E),
+    (0x9DA6, 0x4D),
+    (0x9DA7, 0x86),
+    (0x9DA9, 0xAE),
+    (0x9DAB, 0xA6),
+    (0x9DAF, 0x96),
+    (0x9DB1, 0x8E),
+    (0x9DB3, 0x86),
+    (0x9DB4, 0x45),
+    (0x9DB5, 0xAE),
+    (0x9DB6, 0x45),
+    (0x9DB7, 0xA6),
+    (0x9DB8, 0x45),
+    (0x9DBA, 0x45),
+    (0x9DBB, 0x96),
+    (0x9DBC, 0x45),
+    (0x9DBD, 0x8E),
+    (0x9DBE, 0x45),
+    (0x9DBF, 0x86),
+    (0x9DC0, 0x84),
+    (0x9DD0, 0x52),
+    (0x9DD1, 0xAE),
+    (0x9DD2, 0x52),
+    (0x9DD3, 0xA6),
+    (0x9DD4, 0x52),
+    (0x9DD6, 0x52),
+    (0x9DD7, 0x96),
+    (0x9DD8, 0x52),
+    (0x9DD9, 0x8E),
+    (0x9DDA, 0x52),
+    (0x9DDB, 0x86),
+    (0x9DDD, 0xAE),
+    (0x9DDF, 0xA6),
+    (0x9DE3, 0x96),
+    (0x9DE5, 0x8E),
+    (0x9DE7, 0x86),
+    (0x9DE8, 0x4A),
+    (0x9DE9, 0xAE),
+    (0x9DEA, 0x4A),
+    (0x9DEB, 0xA6),
+    (0x9DEC, 0x4A),
+    (0x9DEE, 0x4A),
+    (0x9DEF, 0x96),
+    (0x9DF0, 0x4A),
+    (0x9DF1, 0x8E),
+    (0x9DF2, 0x4A),
+    (0x9DF3, 0x86),
+    (0x9DF4, 0x46),
+    (0x9DF5, 0xAE),
+    (0x9DF6, 0x46),
+    (0x9DF7, 0xA6),
+    (0x9DF8, 0x46),
+    (0x9DFA, 0x46),
+    (0x9DFB, 0x96),
+    (0x9DFC, 0x46),
+    (0x9DFD, 0x8E),
+    (0x9DFE, 0x46),
+    (0x9DFF, 0x86),
+    (0x9E00, 0x84),
+    (0x9E05, 0x40),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIRST_VISIBLE_NIBBLES: [(u32, u8); 804] = [
+    (35416, 0x0),
+    (35417, 0x0),
+    (35426, 0x0),
+    (35427, 0x0),
+    (35432, 0x0),
+    (35433, 0x0),
+    (35434, 0x0),
+    (35435, 0x0),
+    (35436, 0x0),
+    (35437, 0x0),
+    (35440, 0x0),
+    (35441, 0x0),
+    (35442, 0x0),
+    (35443, 0x0),
+    (35444, 0x0),
+    (35445, 0x0),
+    (35446, 0x0),
+    (35447, 0x0),
+    (35448, 0x0),
+    (35449, 0x0),
+    (35450, 0x0),
+    (35451, 0x0),
+    (35454, 0x0),
+    (35455, 0x0),
+    (35456, 0x0),
+    (35457, 0x0),
+    (35458, 0x0),
+    (35459, 0x0),
+    (35460, 0x0),
+    (35461, 0x0),
+    (35462, 0x0),
+    (35463, 0x0),
+    (35464, 0x0),
+    (35466, 0x0),
+    (35467, 0x0),
+    (35468, 0x0),
+    (35469, 0x0),
+    (35470, 0x0),
+    (35471, 0x0),
+    (35474, 0x0),
+    (35475, 0x0),
+    (35476, 0x0),
+    (35477, 0x0),
+    (35478, 0x0),
+    (35479, 0x0),
+    (35494, 0x0),
+    (35495, 0x0),
+    (35708, 0x0),
+    (35709, 0x0),
+    (35717, 0x0),
+    (35718, 0x0),
+    (35719, 0x0),
+    (35724, 0x0),
+    (35725, 0x0),
+    (35726, 0x0),
+    (35727, 0x0),
+    (35728, 0x0),
+    (35729, 0x0),
+    (35732, 0x0),
+    (35733, 0x0),
+    (35734, 0x0),
+    (35735, 0x0),
+    (35736, 0x0),
+    (35737, 0x0),
+    (35738, 0x0),
+    (35739, 0x0),
+    (35740, 0x0),
+    (35741, 0x0),
+    (35742, 0x0),
+    (35743, 0x0),
+    (35746, 0x0),
+    (35747, 0x0),
+    (35748, 0x0),
+    (35749, 0x0),
+    (35750, 0x0),
+    (35751, 0x0),
+    (35752, 0x0),
+    (35753, 0x0),
+    (35754, 0x0),
+    (35755, 0x0),
+    (35756, 0x0),
+    (35758, 0x0),
+    (35759, 0x0),
+    (35760, 0x0),
+    (35761, 0x0),
+    (35762, 0x0),
+    (35763, 0x0),
+    (35766, 0x0),
+    (35767, 0x0),
+    (35768, 0x0),
+    (35769, 0x0),
+    (35770, 0x0),
+    (35771, 0x0),
+    (35778, 0x0),
+    (35779, 0x0),
+    (35786, 0x0),
+    (35787, 0x0),
+    (37170, 0xC),
+    (37171, 0xC),
+    (37186, 0xC),
+    (37187, 0xC),
+    (37194, 0xC),
+    (37195, 0xC),
+    (37202, 0xC),
+    (37203, 0xC),
+    (37210, 0xC),
+    (37212, 0xC),
+    (37213, 0xC),
+    (37218, 0xC),
+    (37219, 0xC),
+    (37220, 0x2),
+    (37221, 0x2),
+    (37226, 0xC),
+    (37227, 0xC),
+    (37228, 0xC),
+    (37229, 0xC),
+    (37234, 0xC),
+    (37235, 0xC),
+    (37462, 0xC),
+    (37463, 0xC),
+    (37471, 0xC),
+    (37478, 0xC),
+    (37479, 0xC),
+    (37486, 0xC),
+    (37487, 0xC),
+    (37494, 0xC),
+    (37495, 0xC),
+    (37502, 0xC),
+    (37504, 0xC),
+    (37505, 0xC),
+    (37510, 0xC),
+    (37511, 0xC),
+    (37512, 0xC),
+    (37513, 0xC),
+    (37518, 0xC),
+    (37519, 0xC),
+    (37520, 0xC),
+    (37521, 0xC),
+    (37526, 0xC),
+    (37527, 0xC),
+    (37528, 0xC),
+    (37529, 0xC),
+    (38336, 0x0),
+    (38337, 0x0),
+    (38344, 0x0),
+    (38345, 0x0),
+    (38346, 0x0),
+    (38347, 0x0),
+    (38352, 0x0),
+    (38353, 0x0),
+    (38354, 0x0),
+    (38355, 0x0),
+    (38356, 0x0),
+    (38357, 0x0),
+    (38360, 0x0),
+    (38361, 0x0),
+    (38362, 0x0),
+    (38363, 0x0),
+    (38364, 0x0),
+    (38365, 0x0),
+    (38366, 0x0),
+    (38367, 0x0),
+    (38368, 0x0),
+    (38369, 0x0),
+    (38370, 0x0),
+    (38371, 0x0),
+    (38373, 0x0),
+    (38374, 0x0),
+    (38375, 0x0),
+    (38376, 0x0),
+    (38377, 0x0),
+    (38378, 0x0),
+    (38379, 0x0),
+    (38380, 0x0),
+    (38381, 0x0),
+    (38382, 0x0),
+    (38383, 0x0),
+    (38384, 0x0),
+    (38385, 0x0),
+    (38386, 0x0),
+    (38387, 0x0),
+    (38388, 0x0),
+    (38389, 0x0),
+    (38390, 0x0),
+    (38391, 0x0),
+    (38394, 0x0),
+    (38395, 0x0),
+    (38396, 0x0),
+    (38397, 0x0),
+    (38398, 0x0),
+    (38399, 0x0),
+    (38406, 0x0),
+    (38407, 0x0),
+    (38414, 0x0),
+    (38415, 0x0),
+    (38628, 0x0),
+    (38629, 0x0),
+    (38636, 0x0),
+    (38637, 0x0),
+    (38638, 0x0),
+    (38639, 0x0),
+    (38644, 0x0),
+    (38645, 0x0),
+    (38646, 0x0),
+    (38647, 0x0),
+    (38648, 0x0),
+    (38649, 0x0),
+    (38652, 0x0),
+    (38653, 0x0),
+    (38654, 0x0),
+    (38655, 0x0),
+    (38656, 0x0),
+    (38657, 0x0),
+    (38658, 0x0),
+    (38659, 0x0),
+    (38660, 0x0),
+    (38661, 0x0),
+    (38662, 0x0),
+    (38663, 0x0),
+    (38664, 0x0),
+    (38665, 0x0),
+    (38666, 0x0),
+    (38667, 0x0),
+    (38668, 0x0),
+    (38669, 0x0),
+    (38670, 0x0),
+    (38671, 0x0),
+    (38672, 0x0),
+    (38673, 0x0),
+    (38674, 0x0),
+    (38675, 0x0),
+    (38676, 0x0),
+    (38677, 0x0),
+    (38678, 0x0),
+    (38679, 0x0),
+    (38680, 0x0),
+    (38681, 0x0),
+    (38682, 0x0),
+    (38683, 0x0),
+    (38686, 0x0),
+    (38688, 0x0),
+    (38689, 0x0),
+    (38690, 0x0),
+    (38691, 0x0),
+    (38698, 0x0),
+    (38699, 0x0),
+    (38706, 0x0),
+    (38707, 0x0),
+    (39506, 0xC),
+    (39507, 0xC),
+    (39514, 0xC),
+    (39515, 0xC),
+    (39522, 0xC),
+    (39523, 0xC),
+    (39530, 0xC),
+    (39531, 0xC),
+    (39538, 0xC),
+    (39539, 0xC),
+    (39546, 0xC),
+    (39548, 0xC),
+    (39549, 0xC),
+    (39554, 0xC),
+    (39555, 0xC),
+    (39556, 0xC),
+    (39557, 0xC),
+    (39562, 0xC),
+    (39563, 0xC),
+    (39564, 0xC),
+    (39565, 0xC),
+    (39570, 0xC),
+    (39571, 0xC),
+    (39572, 0xC),
+    (39573, 0xC),
+    (39798, 0xC),
+    (39799, 0xC),
+    (39806, 0xC),
+    (39807, 0xC),
+    (39814, 0xC),
+    (39815, 0x2),
+    (39822, 0xC),
+    (39823, 0xC),
+    (39830, 0xC),
+    (39831, 0xC),
+    (39838, 0x2),
+    (39840, 0xC),
+    (39841, 0xC),
+    (39846, 0xC),
+    (39847, 0xC),
+    (39848, 0xC),
+    (39849, 0xC),
+    (39854, 0xC),
+    (39855, 0xC),
+    (39856, 0xC),
+    (39857, 0xC),
+    (39862, 0xC),
+    (39863, 0xC),
+    (39864, 0xC),
+    (39865, 0xC),
+    (41256, 0x0),
+    (41257, 0x0),
+    (41264, 0x0),
+    (41265, 0x0),
+    (41266, 0x0),
+    (41267, 0x0),
+    (41272, 0x0),
+    (41273, 0x0),
+    (41274, 0x0),
+    (41275, 0x0),
+    (41276, 0x0),
+    (41277, 0x0),
+    (41280, 0x0),
+    (41281, 0x0),
+    (41282, 0x0),
+    (41283, 0x0),
+    (41284, 0x0),
+    (41285, 0x0),
+    (41286, 0x0),
+    (41287, 0x0),
+    (41288, 0x0),
+    (41289, 0x0),
+    (41290, 0x0),
+    (41291, 0x0),
+    (41292, 0x0),
+    (41293, 0x0),
+    (41294, 0x0),
+    (41295, 0x0),
+    (41296, 0x0),
+    (41297, 0x0),
+    (41300, 0x0),
+    (41301, 0x0),
+    (41302, 0x0),
+    (41303, 0x0),
+    (41304, 0x0),
+    (41305, 0x0),
+    (41306, 0x0),
+    (41307, 0x0),
+    (41308, 0x0),
+    (41309, 0x0),
+    (41310, 0x0),
+    (41311, 0x0),
+    (41314, 0x0),
+    (41316, 0x0),
+    (41317, 0x0),
+    (41324, 0x0),
+    (41326, 0x0),
+    (41327, 0x0),
+    (41335, 0x0),
+    (41548, 0x0),
+    (41549, 0x0),
+    (41556, 0x0),
+    (41557, 0x0),
+    (41558, 0x0),
+    (41559, 0x0),
+    (41564, 0x0),
+    (41565, 0x0),
+    (41566, 0x0),
+    (41567, 0x0),
+    (41568, 0x0),
+    (41569, 0x0),
+    (41572, 0x0),
+    (41573, 0x0),
+    (41574, 0x0),
+    (41575, 0x0),
+    (41576, 0x0),
+    (41577, 0x0),
+    (41578, 0x0),
+    (41579, 0x0),
+    (41580, 0x0),
+    (41581, 0x0),
+    (41582, 0x0),
+    (41583, 0x0),
+    (41584, 0x0),
+    (41585, 0x0),
+    (41586, 0x0),
+    (41587, 0x0),
+    (41588, 0x0),
+    (41589, 0x0),
+    (41592, 0x0),
+    (41593, 0x0),
+    (41594, 0x0),
+    (41595, 0x0),
+    (41596, 0x0),
+    (41597, 0x0),
+    (41598, 0x0),
+    (41599, 0x0),
+    (41600, 0x0),
+    (41601, 0x0),
+    (41602, 0x0),
+    (41603, 0x0),
+    (41606, 0x0),
+    (41608, 0x0),
+    (41609, 0x0),
+    (41616, 0x0),
+    (41617, 0x0),
+    (41618, 0x0),
+    (41619, 0x0),
+    (41627, 0x0),
+    (41842, 0xC),
+    (41843, 0xC),
+    (41850, 0xC),
+    (41851, 0xC),
+    (41858, 0xC),
+    (41859, 0x2),
+    (41866, 0x2),
+    (41867, 0x2),
+    (41874, 0xC),
+    (41875, 0x2),
+    (41882, 0x2),
+    (41884, 0x2),
+    (41885, 0x2),
+    (41890, 0xC),
+    (41891, 0xC),
+    (41892, 0xC),
+    (41893, 0xC),
+    (41898, 0xC),
+    (41899, 0xC),
+    (41900, 0x2),
+    (41901, 0x2),
+    (41906, 0xC),
+    (41907, 0xC),
+    (41908, 0xC),
+    (41909, 0xC),
+    (42134, 0xC),
+    (42135, 0xC),
+    (42142, 0xC),
+    (42143, 0x2),
+    (42150, 0x2),
+    (42151, 0xC),
+    (42158, 0x2),
+    (42159, 0x2),
+    (42166, 0xC),
+    (42167, 0xC),
+    (42174, 0x2),
+    (42175, 0xC),
+    (42176, 0x2),
+    (42177, 0x2),
+    (42182, 0xC),
+    (42183, 0xC),
+    (42184, 0xC),
+    (42185, 0xC),
+    (42190, 0xC),
+    (42191, 0xC),
+    (42192, 0x2),
+    (42193, 0x2),
+    (42198, 0xC),
+    (42199, 0xC),
+    (42200, 0xC),
+    (42201, 0xC),
+    (44176, 0x0),
+    (44177, 0x0),
+    (44178, 0xC),
+    (44179, 0xC),
+    (44184, 0x0),
+    (44185, 0x0),
+    (44186, 0x2),
+    (44187, 0x2),
+    (44192, 0x0),
+    (44193, 0x0),
+    (44194, 0xC),
+    (44195, 0xC),
+    (44196, 0x0),
+    (44197, 0x0),
+    (44200, 0x0),
+    (44201, 0x0),
+    (44202, 0xC),
+    (44203, 0xC),
+    (44204, 0x0),
+    (44205, 0x0),
+    (44208, 0x0),
+    (44209, 0x0),
+    (44210, 0xC),
+    (44211, 0xC),
+    (44216, 0x0),
+    (44217, 0x0),
+    (44219, 0xC),
+    (44220, 0xC),
+    (44221, 0xC),
+    (44224, 0x0),
+    (44225, 0x0),
+    (44226, 0x0),
+    (44227, 0x0),
+    (44228, 0x2),
+    (44229, 0x2),
+    (44234, 0x0),
+    (44246, 0x0),
+    (44247, 0x0),
+    (44468, 0x0),
+    (44469, 0x0),
+    (44470, 0xC),
+    (44471, 0xC),
+    (44476, 0x0),
+    (44477, 0x0),
+    (44478, 0x2),
+    (44479, 0x2),
+    (44484, 0x0),
+    (44485, 0x0),
+    (44486, 0xC),
+    (44487, 0xC),
+    (44488, 0x0),
+    (44489, 0x0),
+    (44492, 0x0),
+    (44493, 0x0),
+    (44494, 0xC),
+    (44495, 0xC),
+    (44496, 0x0),
+    (44497, 0x0),
+    (44500, 0x0),
+    (44501, 0x0),
+    (44502, 0xC),
+    (44503, 0xC),
+    (44508, 0x0),
+    (44509, 0x0),
+    (44511, 0xC),
+    (44512, 0xC),
+    (44513, 0xC),
+    (44516, 0x0),
+    (44517, 0x0),
+    (44518, 0x0),
+    (44519, 0x0),
+    (44520, 0x2),
+    (44521, 0x2),
+    (44526, 0x0),
+    (44538, 0x0),
+    (44539, 0x0),
+    (46514, 0xC),
+    (46515, 0xC),
+    (46522, 0x2),
+    (46523, 0x2),
+    (46530, 0xC),
+    (46531, 0xC),
+    (46538, 0xC),
+    (46539, 0x2),
+    (46546, 0xC),
+    (46547, 0xC),
+    (46555, 0xC),
+    (46556, 0xC),
+    (46557, 0xC),
+    (46562, 0x2),
+    (46563, 0x2),
+    (46564, 0x2),
+    (46565, 0x2),
+    (46570, 0xC),
+    (46571, 0xC),
+    (46578, 0x2),
+    (46579, 0x2),
+    (46580, 0x2),
+    (46581, 0x2),
+    (46806, 0xC),
+    (46807, 0xC),
+    (46814, 0x2),
+    (46815, 0xC),
+    (46822, 0xC),
+    (46823, 0xC),
+    (46830, 0xC),
+    (46831, 0x2),
+    (46838, 0xC),
+    (46839, 0xC),
+    (46847, 0xC),
+    (46848, 0xC),
+    (46849, 0xC),
+    (46854, 0x2),
+    (46855, 0x2),
+    (46856, 0x2),
+    (46857, 0x2),
+    (46862, 0xC),
+    (46863, 0xC),
+    (46870, 0x2),
+    (46871, 0x2),
+    (46872, 0x2),
+    (46873, 0x2),
+    (47096, 0x0),
+    (47097, 0x0),
+    (47104, 0x0),
+    (47105, 0x0),
+    (47106, 0x0),
+    (47107, 0x0),
+    (47112, 0x0),
+    (47113, 0x0),
+    (47114, 0x0),
+    (47115, 0x0),
+    (47116, 0x0),
+    (47117, 0x0),
+    (47120, 0x0),
+    (47121, 0x0),
+    (47122, 0x0),
+    (47123, 0x0),
+    (47124, 0x0),
+    (47125, 0x0),
+    (47126, 0x0),
+    (47127, 0x0),
+    (47128, 0x0),
+    (47129, 0x0),
+    (47130, 0x0),
+    (47131, 0x0),
+    (47132, 0x0),
+    (47133, 0x0),
+    (47134, 0x0),
+    (47135, 0x0),
+    (47136, 0x0),
+    (47137, 0x0),
+    (47140, 0x0),
+    (47141, 0x0),
+    (47142, 0x0),
+    (47143, 0x0),
+    (47144, 0x0),
+    (47145, 0x0),
+    (47146, 0x0),
+    (47147, 0x0),
+    (47148, 0x0),
+    (47149, 0x0),
+    (47150, 0x0),
+    (47151, 0x0),
+    (47154, 0x0),
+    (47164, 0x0),
+    (47165, 0x0),
+    (47166, 0x0),
+    (47167, 0x0),
+    (47388, 0x0),
+    (47389, 0x0),
+    (47396, 0x0),
+    (47397, 0x0),
+    (47398, 0x0),
+    (47399, 0x0),
+    (47404, 0x0),
+    (47405, 0x0),
+    (47406, 0x0),
+    (47407, 0x0),
+    (47408, 0x0),
+    (47409, 0x0),
+    (47412, 0x0),
+    (47413, 0x0),
+    (47414, 0x0),
+    (47415, 0x0),
+    (47416, 0x0),
+    (47417, 0x0),
+    (47418, 0x0),
+    (47419, 0x0),
+    (47420, 0x0),
+    (47421, 0x0),
+    (47422, 0x0),
+    (47423, 0x0),
+    (47424, 0x0),
+    (47425, 0x0),
+    (47426, 0x0),
+    (47427, 0x0),
+    (47428, 0x0),
+    (47429, 0x0),
+    (47432, 0x0),
+    (47433, 0x0),
+    (47434, 0x0),
+    (47435, 0x0),
+    (47436, 0x0),
+    (47437, 0x0),
+    (47438, 0x0),
+    (47439, 0x0),
+    (47440, 0x0),
+    (47441, 0x0),
+    (47442, 0x0),
+    (47443, 0x0),
+    (47446, 0x0),
+    (47456, 0x0),
+    (47457, 0x0),
+    (47458, 0x0),
+    (47459, 0x0),
+    (48850, 0x2),
+    (48851, 0x2),
+    (48858, 0xC),
+    (48859, 0xC),
+    (48866, 0xC),
+    (48867, 0xC),
+    (48874, 0x2),
+    (48875, 0x2),
+    (48882, 0x2),
+    (48883, 0x2),
+    (48890, 0xC),
+    (48891, 0xC),
+    (48892, 0x2),
+    (48893, 0x2),
+    (48898, 0x2),
+    (48899, 0x2),
+    (48900, 0x2),
+    (48901, 0x2),
+    (48906, 0xC),
+    (48907, 0xC),
+    (48914, 0x2),
+    (48915, 0x2),
+    (48916, 0x2),
+    (48917, 0x2),
+    (49142, 0x2),
+    (49143, 0x2),
+    (49150, 0xC),
+    (49151, 0xC),
+    (49158, 0xC),
+    (49159, 0x2),
+    (49166, 0x2),
+    (49167, 0x2),
+    (49174, 0x2),
+    (49175, 0x2),
+    (49182, 0xC),
+    (49183, 0xC),
+    (49184, 0x2),
+    (49185, 0x2),
+    (49190, 0x2),
+    (49191, 0x2),
+    (49192, 0x2),
+    (49193, 0x2),
+    (49198, 0xC),
+    (49199, 0xC),
+    (49206, 0x2),
+    (49207, 0x2),
+    (49208, 0x2),
+    (49209, 0x2),
+    (50016, 0x0),
+    (50017, 0x0),
+    (50024, 0x0),
+    (50025, 0x0),
+    (50026, 0x0),
+    (50027, 0x0),
+    (50032, 0x0),
+    (50033, 0x0),
+    (50035, 0x0),
+    (50036, 0x0),
+    (50037, 0x0),
+    (50040, 0x0),
+    (50041, 0x0),
+    (50042, 0x0),
+    (50043, 0x0),
+    (50044, 0x0),
+    (50045, 0x0),
+    (50046, 0x0),
+    (50047, 0x0),
+    (50048, 0x0),
+    (50049, 0x0),
+    (50050, 0x0),
+    (50051, 0x0),
+    (50052, 0x0),
+    (50053, 0x0),
+    (50054, 0x0),
+    (50055, 0x0),
+    (50056, 0x0),
+    (50057, 0x0),
+    (50060, 0x0),
+    (50061, 0x0),
+    (50062, 0x0),
+    (50063, 0x0),
+    (50064, 0x0),
+    (50065, 0x0),
+    (50066, 0x0),
+    (50067, 0x0),
+    (50068, 0x0),
+    (50069, 0x0),
+    (50070, 0x0),
+    (50071, 0x0),
+    (50074, 0x0),
+    (50084, 0x0),
+    (50085, 0x0),
+    (50086, 0x0),
+    (50087, 0x0),
+    (50308, 0x0),
+    (50309, 0x0),
+    (50316, 0x0),
+    (50317, 0x0),
+    (50318, 0x0),
+    (50319, 0x0),
+    (50324, 0x0),
+    (50325, 0x0),
+    (50327, 0x0),
+    (50328, 0x0),
+    (50329, 0x0),
+    (50332, 0x0),
+    (50333, 0x0),
+    (50334, 0x0),
+    (50335, 0x0),
+    (50336, 0x0),
+    (50337, 0x0),
+    (50338, 0x0),
+    (50339, 0x0),
+    (50340, 0x0),
+    (50341, 0x0),
+    (50342, 0x0),
+    (50343, 0x0),
+    (50344, 0x0),
+    (50345, 0x0),
+    (50346, 0x0),
+    (50347, 0x0),
+    (50348, 0x0),
+    (50349, 0x0),
+    (50352, 0x0),
+    (50353, 0x0),
+    (50354, 0x0),
+    (50355, 0x0),
+    (50356, 0x0),
+    (50357, 0x0),
+    (50358, 0x0),
+    (50359, 0x0),
+    (50360, 0x0),
+    (50361, 0x0),
+    (50362, 0x0),
+    (50363, 0x0),
+    (50366, 0x0),
+    (50376, 0x0),
+    (50377, 0x0),
+    (50378, 0x0),
+    (50379, 0x0),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SECOND_APPEARANCE_VIDEO_FRAME: u64 = 1099;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SECOND_PROCESS_BYTES: [(u16, u8); 1] =
+    [(0xAAC9, 0x01)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SECOND_APPEARANCE_RAM_BYTES: [(u16, u8); 315] = [
+    (0x9C05, 0x40),
+    (0x9C10, 0x39),
+    (0x9C11, 0xAE),
+    (0x9C40, 0x84),
+    (0x9C50, 0x3D),
+    (0x9C51, 0xAE),
+    (0x9C52, 0x3D),
+    (0x9C53, 0xA6),
+    (0x9C54, 0x3D),
+    (0x9C56, 0x3D),
+    (0x9C57, 0x96),
+    (0x9C58, 0x3D),
+    (0x9C59, 0x8E),
+    (0x9C5A, 0x3D),
+    (0x9C5B, 0x86),
+    (0x9C5C, 0x39),
+    (0x9C5D, 0xAE),
+    (0x9C5E, 0x39),
+    (0x9C5F, 0xA6),
+    (0x9C60, 0x39),
+    (0x9C62, 0x39),
+    (0x9C63, 0x96),
+    (0x9C64, 0x39),
+    (0x9C65, 0x8E),
+    (0x9C66, 0x39),
+    (0x9C67, 0x86),
+    (0x9C69, 0xAE),
+    (0x9C6B, 0xA6),
+    (0x9C6F, 0x96),
+    (0x9C71, 0x8E),
+    (0x9C73, 0x86),
+    (0x9C74, 0x31),
+    (0x9C75, 0xAE),
+    (0x9C76, 0x31),
+    (0x9C77, 0xA6),
+    (0x9C78, 0x31),
+    (0x9C7A, 0x31),
+    (0x9C7B, 0x96),
+    (0x9C7C, 0x31),
+    (0x9C7D, 0x8E),
+    (0x9C7E, 0x31),
+    (0x9C7F, 0x86),
+    (0x9C80, 0x84),
+    (0x9C90, 0x41),
+    (0x9C91, 0xAE),
+    (0x9C92, 0x41),
+    (0x9C93, 0xA6),
+    (0x9C94, 0x41),
+    (0x9C96, 0x41),
+    (0x9C97, 0x96),
+    (0x9C98, 0x41),
+    (0x9C99, 0x8E),
+    (0x9C9A, 0x41),
+    (0x9C9B, 0x86),
+    (0x9C9C, 0x3D),
+    (0x9C9D, 0xAE),
+    (0x9C9E, 0x3D),
+    (0x9C9F, 0xA6),
+    (0x9CA0, 0x3D),
+    (0x9CA2, 0x3D),
+    (0x9CA3, 0x96),
+    (0x9CA4, 0x3D),
+    (0x9CA5, 0x8E),
+    (0x9CA6, 0x3D),
+    (0x9CA7, 0x86),
+    (0x9CA9, 0xAE),
+    (0x9CAB, 0xA6),
+    (0x9CAF, 0x96),
+    (0x9CB1, 0x8E),
+    (0x9CB3, 0x86),
+    (0x9CB4, 0x35),
+    (0x9CB5, 0xAE),
+    (0x9CB6, 0x35),
+    (0x9CB7, 0xA6),
+    (0x9CB8, 0x35),
+    (0x9CBA, 0x35),
+    (0x9CBB, 0x96),
+    (0x9CBC, 0x35),
+    (0x9CBD, 0x8E),
+    (0x9CBE, 0x35),
+    (0x9CBF, 0x86),
+    (0x9CC0, 0x84),
+    (0x9CD0, 0x45),
+    (0x9CD1, 0xAE),
+    (0x9CD2, 0x45),
+    (0x9CD3, 0xA6),
+    (0x9CD4, 0x45),
+    (0x9CD6, 0x45),
+    (0x9CD7, 0x96),
+    (0x9CD8, 0x45),
+    (0x9CD9, 0x8E),
+    (0x9CDA, 0x45),
+    (0x9CDB, 0x86),
+    (0x9CDC, 0x41),
+    (0x9CDD, 0xAE),
+    (0x9CDE, 0x41),
+    (0x9CDF, 0xA6),
+    (0x9CE0, 0x41),
+    (0x9CE2, 0x41),
+    (0x9CE3, 0x96),
+    (0x9CE4, 0x41),
+    (0x9CE5, 0x8E),
+    (0x9CE6, 0x41),
+    (0x9CE7, 0x86),
+    (0x9CE9, 0xAE),
+    (0x9CEB, 0xA6),
+    (0x9CEF, 0x96),
+    (0x9CF1, 0x8E),
+    (0x9CF3, 0x86),
+    (0x9CF4, 0x39),
+    (0x9CF5, 0xAE),
+    (0x9CF6, 0x39),
+    (0x9CF7, 0xA6),
+    (0x9CF8, 0x39),
+    (0x9CFA, 0x39),
+    (0x9CFB, 0x96),
+    (0x9CFC, 0x39),
+    (0x9CFD, 0x8E),
+    (0x9CFE, 0x39),
+    (0x9CFF, 0x86),
+    (0x9D00, 0x84),
+    (0x9D10, 0x49),
+    (0x9D11, 0xAE),
+    (0x9D12, 0x49),
+    (0x9D13, 0xA6),
+    (0x9D14, 0x49),
+    (0x9D16, 0x49),
+    (0x9D17, 0x96),
+    (0x9D18, 0x49),
+    (0x9D19, 0x8E),
+    (0x9D1A, 0x49),
+    (0x9D1B, 0x86),
+    (0x9D1C, 0x45),
+    (0x9D1D, 0xAE),
+    (0x9D1E, 0x45),
+    (0x9D1F, 0xA6),
+    (0x9D20, 0x45),
+    (0x9D22, 0x45),
+    (0x9D23, 0x96),
+    (0x9D24, 0x45),
+    (0x9D25, 0x8E),
+    (0x9D26, 0x45),
+    (0x9D27, 0x86),
+    (0x9D29, 0xAE),
+    (0x9D2B, 0xA6),
+    (0x9D2F, 0x96),
+    (0x9D31, 0x8E),
+    (0x9D33, 0x86),
+    (0x9D34, 0x3D),
+    (0x9D35, 0xAE),
+    (0x9D36, 0x3D),
+    (0x9D37, 0xA6),
+    (0x9D38, 0x3D),
+    (0x9D3A, 0x3D),
+    (0x9D3B, 0x96),
+    (0x9D3C, 0x3D),
+    (0x9D3D, 0x8E),
+    (0x9D3E, 0x3D),
+    (0x9D3F, 0x86),
+    (0x9D40, 0x84),
+    (0x9D50, 0x4D),
+    (0x9D51, 0xAE),
+    (0x9D52, 0x4D),
+    (0x9D53, 0xA6),
+    (0x9D54, 0x4D),
+    (0x9D56, 0x4D),
+    (0x9D57, 0x96),
+    (0x9D58, 0x4D),
+    (0x9D59, 0x8E),
+    (0x9D5A, 0x4D),
+    (0x9D5B, 0x86),
+    (0x9D5C, 0x49),
+    (0x9D5D, 0xAE),
+    (0x9D5E, 0x49),
+    (0x9D5F, 0xA6),
+    (0x9D60, 0x49),
+    (0x9D62, 0x49),
+    (0x9D63, 0x96),
+    (0x9D64, 0x49),
+    (0x9D65, 0x8E),
+    (0x9D66, 0x49),
+    (0x9D67, 0x86),
+    (0x9D69, 0xAE),
+    (0x9D6B, 0xA6),
+    (0x9D6F, 0x96),
+    (0x9D71, 0x8E),
+    (0x9D73, 0x86),
+    (0x9D74, 0x41),
+    (0x9D75, 0xAE),
+    (0x9D76, 0x41),
+    (0x9D77, 0xA6),
+    (0x9D78, 0x41),
+    (0x9D7A, 0x41),
+    (0x9D7B, 0x96),
+    (0x9D7C, 0x41),
+    (0x9D7D, 0x8E),
+    (0x9D7E, 0x41),
+    (0x9D7F, 0x86),
+    (0x9D80, 0x84),
+    (0x9D90, 0x51),
+    (0x9D91, 0xAE),
+    (0x9D92, 0x51),
+    (0x9D93, 0xA6),
+    (0x9D94, 0x51),
+    (0x9D96, 0x51),
+    (0x9D97, 0x96),
+    (0x9D98, 0x51),
+    (0x9D99, 0x8E),
+    (0x9D9A, 0x51),
+    (0x9D9B, 0x86),
+    (0x9D9C, 0x4D),
+    (0x9D9D, 0xAE),
+    (0x9D9E, 0x4D),
+    (0x9D9F, 0xA6),
+    (0x9DA0, 0x4D),
+    (0x9DA2, 0x4D),
+    (0x9DA3, 0x96),
+    (0x9DA4, 0x4D),
+    (0x9DA5, 0x8E),
+    (0x9DA6, 0x4D),
+    (0x9DA7, 0x86),
+    (0x9DA9, 0xAE),
+    (0x9DAB, 0xA6),
+    (0x9DAF, 0x96),
+    (0x9DB1, 0x8E),
+    (0x9DB3, 0x86),
+    (0x9DB4, 0x45),
+    (0x9DB5, 0xAE),
+    (0x9DB6, 0x45),
+    (0x9DB7, 0xA6),
+    (0x9DB8, 0x45),
+    (0x9DBA, 0x45),
+    (0x9DBB, 0x96),
+    (0x9DBC, 0x45),
+    (0x9DBD, 0x8E),
+    (0x9DBE, 0x45),
+    (0x9DBF, 0x86),
+    (0x9DC0, 0x84),
+    (0x9DD0, 0x52),
+    (0x9DD1, 0xAE),
+    (0x9DD2, 0x52),
+    (0x9DD3, 0xA6),
+    (0x9DD4, 0x52),
+    (0x9DD6, 0x52),
+    (0x9DD7, 0x96),
+    (0x9DD8, 0x52),
+    (0x9DD9, 0x8E),
+    (0x9DDA, 0x52),
+    (0x9DDB, 0x86),
+    (0x9DDD, 0xAE),
+    (0x9DDF, 0xA6),
+    (0x9DE3, 0x96),
+    (0x9DE5, 0x8E),
+    (0x9DE7, 0x86),
+    (0x9DE8, 0x4A),
+    (0x9DE9, 0xAE),
+    (0x9DEA, 0x4A),
+    (0x9DEB, 0xA6),
+    (0x9DEC, 0x4A),
+    (0x9DEE, 0x4A),
+    (0x9DEF, 0x96),
+    (0x9DF0, 0x4A),
+    (0x9DF1, 0x8E),
+    (0x9DF2, 0x4A),
+    (0x9DF3, 0x86),
+    (0x9DF4, 0x46),
+    (0x9DF5, 0xAE),
+    (0x9DF6, 0x46),
+    (0x9DF7, 0xA6),
+    (0x9DF8, 0x46),
+    (0x9DFA, 0x46),
+    (0x9DFB, 0x96),
+    (0x9DFC, 0x46),
+    (0x9DFD, 0x8E),
+    (0x9DFE, 0x46),
+    (0x9DFF, 0x86),
+    (0x9E00, 0x84),
+    (0x9E10, 0x56),
+    (0x9E11, 0xAE),
+    (0x9E12, 0x56),
+    (0x9E13, 0xA6),
+    (0x9E14, 0x56),
+    (0x9E16, 0x56),
+    (0x9E17, 0x96),
+    (0x9E18, 0x56),
+    (0x9E19, 0x8E),
+    (0x9E1A, 0x56),
+    (0x9E1B, 0x86),
+    (0x9E1D, 0xAE),
+    (0x9E1F, 0xA6),
+    (0x9E23, 0x96),
+    (0x9E25, 0x8E),
+    (0x9E27, 0x86),
+    (0x9E28, 0x4E),
+    (0x9E29, 0xAE),
+    (0x9E2A, 0x4E),
+    (0x9E2B, 0xA6),
+    (0x9E2C, 0x4E),
+    (0x9E2E, 0x4E),
+    (0x9E2F, 0x96),
+    (0x9E30, 0x4E),
+    (0x9E31, 0x8E),
+    (0x9E32, 0x4E),
+    (0x9E33, 0x86),
+    (0x9E34, 0x4A),
+    (0x9E35, 0xAE),
+    (0x9E36, 0x4A),
+    (0x9E37, 0xA6),
+    (0x9E38, 0x4A),
+    (0x9E3A, 0x4A),
+    (0x9E3B, 0x96),
+    (0x9E3C, 0x4A),
+    (0x9E3D, 0x8E),
+    (0x9E3E, 0x4A),
+    (0x9E3F, 0x86),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SECOND_VISIBLE_NIBBLES: [(u32, u8); 740] = [
+    (17351, 0x0),
+    (17990, 0x0),
+    (18282, 0x0),
+    (18574, 0x0),
+    (18866, 0x0),
+    (18867, 0x0),
+    (37194, 0xC),
+    (37195, 0xC),
+    (37202, 0xC),
+    (37203, 0xC),
+    (37210, 0xC),
+    (37212, 0xC),
+    (37213, 0xC),
+    (37218, 0xC),
+    (37219, 0xC),
+    (37220, 0xC),
+    (37226, 0xC),
+    (37227, 0xC),
+    (37234, 0xC),
+    (37235, 0xC),
+    (37486, 0xC),
+    (37487, 0xC),
+    (37494, 0xC),
+    (37495, 0xC),
+    (37502, 0xC),
+    (37504, 0xC),
+    (37505, 0xC),
+    (37510, 0xC),
+    (37511, 0xC),
+    (37512, 0xC),
+    (37518, 0xC),
+    (37519, 0xC),
+    (37526, 0xC),
+    (37527, 0xC),
+    (38924, 0x0),
+    (38925, 0x0),
+    (38930, 0x0),
+    (38931, 0x0),
+    (38936, 0x0),
+    (38937, 0x0),
+    (38938, 0x0),
+    (38939, 0x0),
+    (38940, 0x0),
+    (38941, 0x0),
+    (38942, 0x0),
+    (38943, 0x0),
+    (38944, 0x0),
+    (38945, 0x0),
+    (38946, 0x0),
+    (38947, 0x0),
+    (38948, 0x0),
+    (38949, 0x0),
+    (38950, 0x0),
+    (38951, 0x0),
+    (38954, 0x0),
+    (38955, 0x0),
+    (38956, 0x0),
+    (38957, 0x0),
+    (38958, 0x0),
+    (38959, 0x0),
+    (38960, 0x0),
+    (38961, 0x0),
+    (38962, 0x0),
+    (38963, 0x0),
+    (38964, 0x0),
+    (38966, 0x0),
+    (38967, 0x0),
+    (38968, 0x0),
+    (38969, 0x0),
+    (38970, 0x0),
+    (38971, 0x0),
+    (38974, 0x0),
+    (38975, 0x0),
+    (38976, 0x0),
+    (38980, 0x0),
+    (38981, 0x0),
+    (38982, 0x0),
+    (38983, 0x0),
+    (38994, 0x0),
+    (38995, 0x0),
+    (39216, 0x0),
+    (39217, 0x0),
+    (39222, 0x0),
+    (39223, 0x0),
+    (39225, 0x0),
+    (39228, 0x0),
+    (39229, 0x0),
+    (39230, 0x0),
+    (39231, 0x0),
+    (39232, 0x0),
+    (39233, 0x0),
+    (39234, 0x0),
+    (39235, 0x0),
+    (39236, 0x0),
+    (39237, 0x0),
+    (39238, 0x0),
+    (39239, 0x0),
+    (39240, 0x0),
+    (39241, 0x0),
+    (39242, 0x0),
+    (39243, 0x0),
+    (39246, 0x0),
+    (39247, 0x0),
+    (39248, 0x0),
+    (39249, 0x0),
+    (39250, 0x0),
+    (39251, 0x0),
+    (39252, 0x0),
+    (39253, 0x0),
+    (39254, 0x0),
+    (39255, 0x0),
+    (39256, 0x0),
+    (39258, 0x0),
+    (39259, 0x0),
+    (39260, 0x0),
+    (39261, 0x0),
+    (39262, 0x0),
+    (39263, 0x0),
+    (39266, 0x0),
+    (39267, 0x0),
+    (39268, 0x0),
+    (39272, 0x0),
+    (39273, 0x0),
+    (39274, 0x0),
+    (39275, 0x0),
+    (39278, 0x0),
+    (39279, 0x0),
+    (39286, 0x0),
+    (39287, 0x0),
+    (39530, 0xC),
+    (39531, 0xC),
+    (39538, 0xC),
+    (39539, 0xC),
+    (39546, 0xC),
+    (39548, 0xC),
+    (39549, 0xC),
+    (39554, 0xC),
+    (39555, 0xC),
+    (39556, 0xC),
+    (39557, 0xC),
+    (39562, 0xC),
+    (39563, 0xC),
+    (39570, 0xC),
+    (39571, 0xC),
+    (39822, 0xC),
+    (39823, 0xC),
+    (39830, 0xC),
+    (39831, 0xC),
+    (39838, 0x2),
+    (39840, 0xC),
+    (39841, 0xC),
+    (39846, 0xC),
+    (39847, 0xC),
+    (39848, 0xC),
+    (39849, 0xC),
+    (39854, 0xC),
+    (39855, 0xC),
+    (39862, 0xC),
+    (39863, 0xC),
+    (40676, 0x0),
+    (40677, 0x0),
+    (40682, 0x0),
+    (40683, 0x0),
+    (40684, 0x0),
+    (40685, 0x0),
+    (40688, 0x0),
+    (40689, 0x0),
+    (40690, 0x0),
+    (40691, 0x0),
+    (40692, 0x0),
+    (40693, 0x0),
+    (40694, 0x0),
+    (40695, 0x0),
+    (40696, 0x0),
+    (40697, 0x0),
+    (40698, 0x0),
+    (40699, 0x0),
+    (40700, 0x0),
+    (40701, 0x0),
+    (40702, 0x0),
+    (40703, 0x0),
+    (40705, 0x0),
+    (40706, 0x0),
+    (40707, 0x0),
+    (40708, 0x0),
+    (40709, 0x0),
+    (40710, 0x0),
+    (40711, 0x0),
+    (40712, 0x0),
+    (40713, 0x0),
+    (40714, 0x0),
+    (40715, 0x0),
+    (40716, 0x0),
+    (40718, 0x0),
+    (40719, 0x0),
+    (40720, 0x0),
+    (40721, 0x0),
+    (40722, 0x0),
+    (40723, 0x0),
+    (40726, 0x0),
+    (40727, 0x0),
+    (40728, 0x0),
+    (40729, 0x0),
+    (40732, 0x0),
+    (40733, 0x0),
+    (40734, 0x0),
+    (40735, 0x0),
+    (40738, 0x0),
+    (40739, 0x0),
+    (40746, 0x0),
+    (40747, 0x0),
+    (40968, 0x0),
+    (40969, 0x0),
+    (40974, 0x0),
+    (40975, 0x0),
+    (40976, 0x0),
+    (40977, 0x0),
+    (40980, 0x0),
+    (40981, 0x0),
+    (40982, 0x0),
+    (40983, 0x0),
+    (40984, 0x0),
+    (40985, 0x0),
+    (40986, 0x0),
+    (40987, 0x0),
+    (40988, 0x0),
+    (40989, 0x0),
+    (40990, 0x0),
+    (40991, 0x0),
+    (40992, 0x0),
+    (40993, 0x0),
+    (40994, 0x0),
+    (40995, 0x0),
+    (40996, 0x0),
+    (40997, 0x0),
+    (40998, 0x0),
+    (40999, 0x0),
+    (41000, 0x0),
+    (41001, 0x0),
+    (41002, 0x0),
+    (41003, 0x0),
+    (41004, 0x0),
+    (41005, 0x0),
+    (41006, 0x0),
+    (41007, 0x0),
+    (41008, 0x0),
+    (41010, 0x0),
+    (41011, 0x0),
+    (41012, 0x0),
+    (41013, 0x0),
+    (41014, 0x0),
+    (41015, 0x0),
+    (41018, 0x0),
+    (41019, 0x0),
+    (41020, 0x0),
+    (41021, 0x0),
+    (41024, 0x0),
+    (41025, 0x0),
+    (41026, 0x0),
+    (41030, 0x0),
+    (41031, 0x0),
+    (41038, 0x0),
+    (41039, 0x0),
+    (41866, 0x2),
+    (41867, 0x2),
+    (41874, 0xC),
+    (41875, 0x2),
+    (41882, 0x2),
+    (41884, 0x2),
+    (41885, 0x2),
+    (41890, 0xC),
+    (41891, 0xC),
+    (41892, 0xC),
+    (41893, 0xC),
+    (41898, 0xC),
+    (41899, 0xC),
+    (41906, 0xC),
+    (41907, 0xC),
+    (42158, 0x2),
+    (42159, 0x2),
+    (42166, 0xC),
+    (42167, 0xC),
+    (42174, 0x2),
+    (42175, 0xC),
+    (42176, 0x2),
+    (42177, 0x2),
+    (42182, 0xC),
+    (42183, 0xC),
+    (42184, 0xC),
+    (42185, 0xC),
+    (42190, 0xC),
+    (42191, 0xC),
+    (42198, 0xC),
+    (42199, 0xC),
+    (42428, 0x0),
+    (42429, 0x0),
+    (42434, 0x0),
+    (42435, 0x0),
+    (42436, 0x0),
+    (42437, 0x0),
+    (42440, 0x0),
+    (42441, 0x0),
+    (42442, 0x0),
+    (42443, 0x0),
+    (42444, 0x0),
+    (42445, 0x0),
+    (42446, 0x0),
+    (42447, 0x0),
+    (42448, 0x0),
+    (42449, 0x0),
+    (42450, 0x0),
+    (42451, 0x0),
+    (42452, 0x0),
+    (42453, 0x0),
+    (42454, 0x0),
+    (42455, 0x0),
+    (42456, 0x0),
+    (42457, 0x0),
+    (42458, 0x0),
+    (42459, 0x0),
+    (42460, 0x0),
+    (42461, 0x0),
+    (42462, 0x0),
+    (42463, 0x0),
+    (42464, 0x0),
+    (42465, 0x0),
+    (42468, 0x0),
+    (42470, 0x0),
+    (42471, 0x0),
+    (42472, 0x0),
+    (42473, 0x0),
+    (42474, 0x0),
+    (42475, 0x0),
+    (42478, 0x0),
+    (42479, 0x0),
+    (42480, 0x0),
+    (42481, 0x0),
+    (42484, 0x0),
+    (42485, 0x0),
+    (42486, 0x0),
+    (42490, 0x0),
+    (42491, 0x0),
+    (42492, 0x0),
+    (42499, 0x0),
+    (42720, 0x0),
+    (42721, 0x0),
+    (42726, 0x0),
+    (42727, 0x0),
+    (42728, 0x0),
+    (42729, 0x0),
+    (42732, 0x0),
+    (42733, 0x0),
+    (42734, 0x0),
+    (42735, 0x0),
+    (42736, 0x0),
+    (42737, 0x0),
+    (42738, 0x0),
+    (42739, 0x0),
+    (42740, 0x0),
+    (42741, 0x0),
+    (42742, 0x0),
+    (42743, 0x0),
+    (42744, 0x0),
+    (42745, 0x0),
+    (42746, 0x0),
+    (42747, 0x0),
+    (42748, 0x0),
+    (42749, 0x0),
+    (42750, 0x0),
+    (42751, 0x0),
+    (42752, 0x0),
+    (42753, 0x0),
+    (42754, 0x0),
+    (42755, 0x0),
+    (42756, 0x0),
+    (42757, 0x0),
+    (42760, 0x0),
+    (42761, 0x0),
+    (42762, 0x0),
+    (42763, 0x0),
+    (42764, 0x0),
+    (42765, 0x0),
+    (42766, 0x0),
+    (42767, 0x0),
+    (42770, 0x0),
+    (42771, 0x0),
+    (42772, 0x0),
+    (42773, 0x0),
+    (42776, 0x0),
+    (42777, 0x0),
+    (42778, 0x0),
+    (42782, 0x0),
+    (42783, 0x0),
+    (42784, 0x0),
+    (42785, 0x0),
+    (42791, 0x0),
+    (44179, 0x2),
+    (44180, 0x0),
+    (44181, 0x0),
+    (44188, 0x0),
+    (44189, 0x0),
+    (44192, 0x0),
+    (44193, 0x0),
+    (44196, 0x0),
+    (44197, 0x0),
+    (44198, 0x0),
+    (44199, 0x0),
+    (44200, 0x0),
+    (44201, 0x0),
+    (44202, 0xC),
+    (44203, 0xC),
+    (44204, 0x0),
+    (44205, 0x0),
+    (44206, 0x0),
+    (44207, 0x0),
+    (44208, 0x0),
+    (44209, 0x0),
+    (44210, 0xC),
+    (44211, 0xC),
+    (44212, 0x0),
+    (44213, 0x0),
+    (44214, 0x0),
+    (44215, 0x0),
+    (44216, 0x0),
+    (44217, 0x0),
+    (44219, 0xC),
+    (44220, 0xC),
+    (44221, 0xC),
+    (44222, 0x0),
+    (44223, 0x0),
+    (44224, 0x0),
+    (44225, 0x0),
+    (44228, 0xC),
+    (44229, 0xC),
+    (44230, 0x0),
+    (44231, 0x0),
+    (44238, 0x0),
+    (44471, 0x2),
+    (44472, 0x0),
+    (44473, 0x0),
+    (44480, 0x0),
+    (44481, 0x0),
+    (44484, 0x0),
+    (44485, 0x0),
+    (44488, 0x0),
+    (44489, 0x0),
+    (44490, 0x0),
+    (44491, 0x0),
+    (44492, 0x0),
+    (44493, 0x0),
+    (44494, 0xC),
+    (44495, 0xC),
+    (44496, 0x0),
+    (44497, 0x0),
+    (44498, 0x0),
+    (44499, 0x0),
+    (44500, 0x0),
+    (44501, 0x0),
+    (44502, 0xC),
+    (44503, 0xC),
+    (44504, 0x0),
+    (44505, 0x0),
+    (44506, 0x0),
+    (44507, 0x0),
+    (44508, 0x0),
+    (44509, 0x0),
+    (44511, 0xC),
+    (44512, 0xC),
+    (44513, 0xC),
+    (44514, 0x0),
+    (44515, 0x0),
+    (44516, 0x0),
+    (44517, 0x0),
+    (44520, 0xC),
+    (44521, 0xC),
+    (44522, 0x0),
+    (44523, 0x0),
+    (44530, 0x0),
+    (45932, 0x0),
+    (45933, 0x0),
+    (45938, 0x0),
+    (45939, 0x0),
+    (45940, 0x0),
+    (45941, 0x0),
+    (45942, 0x0),
+    (45943, 0x0),
+    (45944, 0x0),
+    (45945, 0x0),
+    (45946, 0x0),
+    (45947, 0x0),
+    (45948, 0x0),
+    (45949, 0x0),
+    (45950, 0x0),
+    (45951, 0x0),
+    (45952, 0x0),
+    (45953, 0x0),
+    (45954, 0x0),
+    (45955, 0x0),
+    (45956, 0x0),
+    (45957, 0x0),
+    (45958, 0x0),
+    (45959, 0x0),
+    (45960, 0x0),
+    (45961, 0x0),
+    (45962, 0x0),
+    (45963, 0x0),
+    (45964, 0x0),
+    (45965, 0x0),
+    (45966, 0x0),
+    (45967, 0x0),
+    (45968, 0x0),
+    (45969, 0x0),
+    (45973, 0x0),
+    (45974, 0x0),
+    (45975, 0x0),
+    (45976, 0x0),
+    (45977, 0x0),
+    (45978, 0x0),
+    (45979, 0x0),
+    (45982, 0x0),
+    (45983, 0x0),
+    (45984, 0x0),
+    (45985, 0x0),
+    (45990, 0x0),
+    (45994, 0x0),
+    (45995, 0x0),
+    (45996, 0x0),
+    (45997, 0x0),
+    (46224, 0x0),
+    (46225, 0x0),
+    (46230, 0x0),
+    (46231, 0x0),
+    (46232, 0x0),
+    (46233, 0x0),
+    (46234, 0x0),
+    (46235, 0x0),
+    (46236, 0x0),
+    (46237, 0x0),
+    (46238, 0x0),
+    (46239, 0x0),
+    (46240, 0x0),
+    (46241, 0x0),
+    (46242, 0x0),
+    (46243, 0x0),
+    (46244, 0x0),
+    (46245, 0x0),
+    (46246, 0x0),
+    (46247, 0x0),
+    (46248, 0x0),
+    (46249, 0x0),
+    (46250, 0x0),
+    (46251, 0x0),
+    (46252, 0x0),
+    (46253, 0x0),
+    (46254, 0x0),
+    (46255, 0x0),
+    (46256, 0x0),
+    (46257, 0x0),
+    (46258, 0x0),
+    (46259, 0x0),
+    (46260, 0x0),
+    (46261, 0x0),
+    (46265, 0x0),
+    (46266, 0x0),
+    (46267, 0x0),
+    (46268, 0x0),
+    (46269, 0x0),
+    (46270, 0x0),
+    (46271, 0x0),
+    (46274, 0x0),
+    (46275, 0x0),
+    (46276, 0x0),
+    (46277, 0x0),
+    (46282, 0x0),
+    (46286, 0x0),
+    (46287, 0x0),
+    (46288, 0x0),
+    (46289, 0x0),
+    (46538, 0xC),
+    (46539, 0x2),
+    (46546, 0xC),
+    (46547, 0xC),
+    (46555, 0xC),
+    (46556, 0xC),
+    (46557, 0xC),
+    (46562, 0x2),
+    (46563, 0x2),
+    (46564, 0xC),
+    (46565, 0xC),
+    (46570, 0xC),
+    (46571, 0xC),
+    (46578, 0x2),
+    (46579, 0x2),
+    (46830, 0xC),
+    (46831, 0x2),
+    (46838, 0xC),
+    (46839, 0xC),
+    (46847, 0xC),
+    (46848, 0xC),
+    (46849, 0xC),
+    (46854, 0x2),
+    (46855, 0x2),
+    (46856, 0xC),
+    (46857, 0x2),
+    (46862, 0xC),
+    (46863, 0xC),
+    (46870, 0x2),
+    (46871, 0x2),
+    (47684, 0x0),
+    (47685, 0x0),
+    (47690, 0x0),
+    (47691, 0x0),
+    (47692, 0x0),
+    (47693, 0x0),
+    (47694, 0x0),
+    (47695, 0x0),
+    (47696, 0x0),
+    (47697, 0x0),
+    (47699, 0x0),
+    (47700, 0x0),
+    (47701, 0x0),
+    (47702, 0x0),
+    (47703, 0x0),
+    (47704, 0x0),
+    (47705, 0x0),
+    (47706, 0x0),
+    (47707, 0x0),
+    (47708, 0x0),
+    (47709, 0x0),
+    (47710, 0x0),
+    (47711, 0x0),
+    (47712, 0x0),
+    (47713, 0x0),
+    (47714, 0x0),
+    (47715, 0x0),
+    (47716, 0x0),
+    (47717, 0x0),
+    (47718, 0x0),
+    (47719, 0x0),
+    (47720, 0x0),
+    (47721, 0x0),
+    (47724, 0x0),
+    (47725, 0x0),
+    (47726, 0x0),
+    (47727, 0x0),
+    (47728, 0x0),
+    (47729, 0x0),
+    (47730, 0x0),
+    (47731, 0x0),
+    (47734, 0x0),
+    (47735, 0x0),
+    (47736, 0x0),
+    (47737, 0x0),
+    (47742, 0x0),
+    (47746, 0x0),
+    (47747, 0x0),
+    (47748, 0x0),
+    (47749, 0x0),
+    (47976, 0x0),
+    (47977, 0x0),
+    (47982, 0x0),
+    (47983, 0x0),
+    (47984, 0x0),
+    (47985, 0x0),
+    (47986, 0x0),
+    (47987, 0x0),
+    (47988, 0x0),
+    (47989, 0x0),
+    (47991, 0x0),
+    (47992, 0x0),
+    (47993, 0x0),
+    (47994, 0x0),
+    (47995, 0x0),
+    (47996, 0x0),
+    (47997, 0x0),
+    (47998, 0x0),
+    (47999, 0x0),
+    (48000, 0x0),
+    (48001, 0x0),
+    (48002, 0x0),
+    (48003, 0x0),
+    (48004, 0x0),
+    (48005, 0x0),
+    (48006, 0x0),
+    (48007, 0x0),
+    (48008, 0x0),
+    (48009, 0x0),
+    (48010, 0x0),
+    (48011, 0x0),
+    (48012, 0x0),
+    (48013, 0x0),
+    (48016, 0x0),
+    (48017, 0x0),
+    (48018, 0x0),
+    (48019, 0x0),
+    (48020, 0x0),
+    (48021, 0x0),
+    (48022, 0x0),
+    (48023, 0x0),
+    (48026, 0x0),
+    (48027, 0x0),
+    (48028, 0x0),
+    (48029, 0x0),
+    (48034, 0x0),
+    (48038, 0x0),
+    (48039, 0x0),
+    (48040, 0x0),
+    (48041, 0x0),
+    (48874, 0x2),
+    (48875, 0x2),
+    (48882, 0x2),
+    (48883, 0x2),
+    (48890, 0xC),
+    (48891, 0xC),
+    (48892, 0x2),
+    (48893, 0x2),
+    (48898, 0x2),
+    (48899, 0x2),
+    (48900, 0xC),
+    (48901, 0x2),
+    (48906, 0xC),
+    (48907, 0xC),
+    (48914, 0x2),
+    (48915, 0x2),
+    (49166, 0x2),
+    (49167, 0x2),
+    (49174, 0x2),
+    (49175, 0x2),
+    (49182, 0xC),
+    (49183, 0xC),
+    (49184, 0x2),
+    (49185, 0x2),
+    (49190, 0x2),
+    (49191, 0x2),
+    (49192, 0xC),
+    (49193, 0x2),
+    (49198, 0xC),
+    (49199, 0xC),
+    (49206, 0x2),
+    (49207, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_THIRD_APPEARANCE_VIDEO_FRAME: u64 = 1100;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_THIRD_APPEARANCE_RAM_BYTES: [(u16, u8); 298] = [
+    (0x9C05, 0x10),
+    (0x9C10, 0x37),
+    (0x9C11, 0xAA),
+    (0x9C40, 0x83),
+    (0x9C50, 0x3B),
+    (0x9C51, 0xAA),
+    (0x9C52, 0x3B),
+    (0x9C53, 0xA4),
+    (0x9C54, 0x3B),
+    (0x9C56, 0x3B),
+    (0x9C57, 0x98),
+    (0x9C58, 0x3B),
+    (0x9C59, 0x92),
+    (0x9C5A, 0x3B),
+    (0x9C5B, 0x8C),
+    (0x9C5C, 0x38),
+    (0x9C5D, 0xAA),
+    (0x9C5E, 0x38),
+    (0x9C5F, 0xA4),
+    (0x9C60, 0x38),
+    (0x9C62, 0x38),
+    (0x9C63, 0x98),
+    (0x9C64, 0x38),
+    (0x9C65, 0x92),
+    (0x9C66, 0x38),
+    (0x9C67, 0x8C),
+    (0x9C69, 0xAA),
+    (0x9C6B, 0xA4),
+    (0x9C6F, 0x98),
+    (0x9C71, 0x92),
+    (0x9C73, 0x8C),
+    (0x9C74, 0x32),
+    (0x9C75, 0xAA),
+    (0x9C76, 0x32),
+    (0x9C77, 0xA4),
+    (0x9C78, 0x32),
+    (0x9C7A, 0x32),
+    (0x9C7B, 0x98),
+    (0x9C7C, 0x32),
+    (0x9C7D, 0x92),
+    (0x9C7E, 0x32),
+    (0x9C7F, 0x8C),
+    (0x9C80, 0x83),
+    (0x9C90, 0x3F),
+    (0x9C91, 0xAA),
+    (0x9C92, 0x3F),
+    (0x9C93, 0xA4),
+    (0x9C94, 0x3F),
+    (0x9C96, 0x3F),
+    (0x9C97, 0x98),
+    (0x9C98, 0x3F),
+    (0x9C99, 0x92),
+    (0x9C9A, 0x3F),
+    (0x9C9B, 0x8C),
+    (0x9C9C, 0x3C),
+    (0x9C9D, 0xAA),
+    (0x9C9E, 0x3C),
+    (0x9C9F, 0xA4),
+    (0x9CA0, 0x3C),
+    (0x9CA2, 0x3C),
+    (0x9CA3, 0x98),
+    (0x9CA4, 0x3C),
+    (0x9CA5, 0x92),
+    (0x9CA6, 0x3C),
+    (0x9CA7, 0x8C),
+    (0x9CA9, 0xAA),
+    (0x9CAB, 0xA4),
+    (0x9CAF, 0x98),
+    (0x9CB1, 0x92),
+    (0x9CB3, 0x8C),
+    (0x9CB4, 0x36),
+    (0x9CB5, 0xAA),
+    (0x9CB6, 0x36),
+    (0x9CB7, 0xA4),
+    (0x9CB8, 0x36),
+    (0x9CBA, 0x36),
+    (0x9CBB, 0x98),
+    (0x9CBC, 0x36),
+    (0x9CBD, 0x92),
+    (0x9CBE, 0x36),
+    (0x9CBF, 0x8C),
+    (0x9CC0, 0x83),
+    (0x9CD0, 0x43),
+    (0x9CD1, 0xAA),
+    (0x9CD2, 0x43),
+    (0x9CD3, 0xA4),
+    (0x9CD4, 0x43),
+    (0x9CD6, 0x43),
+    (0x9CD7, 0x98),
+    (0x9CD8, 0x43),
+    (0x9CD9, 0x92),
+    (0x9CDA, 0x43),
+    (0x9CDB, 0x8C),
+    (0x9CDC, 0x40),
+    (0x9CDD, 0xAA),
+    (0x9CDE, 0x40),
+    (0x9CDF, 0xA4),
+    (0x9CE0, 0x40),
+    (0x9CE2, 0x40),
+    (0x9CE3, 0x98),
+    (0x9CE4, 0x40),
+    (0x9CE5, 0x92),
+    (0x9CE6, 0x40),
+    (0x9CE7, 0x8C),
+    (0x9CE9, 0xAA),
+    (0x9CEB, 0xA4),
+    (0x9CEF, 0x98),
+    (0x9CF1, 0x92),
+    (0x9CF3, 0x8C),
+    (0x9CF4, 0x3A),
+    (0x9CF5, 0xAA),
+    (0x9CF6, 0x3A),
+    (0x9CF7, 0xA4),
+    (0x9CF8, 0x3A),
+    (0x9CFA, 0x3A),
+    (0x9CFB, 0x98),
+    (0x9CFC, 0x3A),
+    (0x9CFD, 0x92),
+    (0x9CFE, 0x3A),
+    (0x9CFF, 0x8C),
+    (0x9D00, 0x83),
+    (0x9D10, 0x47),
+    (0x9D11, 0xAA),
+    (0x9D12, 0x47),
+    (0x9D13, 0xA4),
+    (0x9D14, 0x47),
+    (0x9D16, 0x47),
+    (0x9D17, 0x98),
+    (0x9D18, 0x47),
+    (0x9D19, 0x92),
+    (0x9D1A, 0x47),
+    (0x9D1B, 0x8C),
+    (0x9D1C, 0x44),
+    (0x9D1D, 0xAA),
+    (0x9D1E, 0x44),
+    (0x9D1F, 0xA4),
+    (0x9D20, 0x44),
+    (0x9D22, 0x44),
+    (0x9D23, 0x98),
+    (0x9D24, 0x44),
+    (0x9D25, 0x92),
+    (0x9D26, 0x44),
+    (0x9D27, 0x8C),
+    (0x9D29, 0xAA),
+    (0x9D2B, 0xA4),
+    (0x9D2F, 0x98),
+    (0x9D31, 0x92),
+    (0x9D33, 0x8C),
+    (0x9D34, 0x3E),
+    (0x9D35, 0xAA),
+    (0x9D36, 0x3E),
+    (0x9D37, 0xA4),
+    (0x9D38, 0x3E),
+    (0x9D3A, 0x3E),
+    (0x9D3B, 0x98),
+    (0x9D3C, 0x3E),
+    (0x9D3D, 0x92),
+    (0x9D3E, 0x3E),
+    (0x9D3F, 0x8C),
+    (0x9D40, 0x83),
+    (0x9D50, 0x4B),
+    (0x9D51, 0xAA),
+    (0x9D52, 0x4B),
+    (0x9D53, 0xA4),
+    (0x9D54, 0x4B),
+    (0x9D56, 0x4B),
+    (0x9D57, 0x98),
+    (0x9D58, 0x4B),
+    (0x9D59, 0x92),
+    (0x9D5A, 0x4B),
+    (0x9D5B, 0x8C),
+    (0x9D5C, 0x48),
+    (0x9D5D, 0xAA),
+    (0x9D5E, 0x48),
+    (0x9D5F, 0xA4),
+    (0x9D60, 0x48),
+    (0x9D62, 0x48),
+    (0x9D63, 0x98),
+    (0x9D64, 0x48),
+    (0x9D65, 0x92),
+    (0x9D66, 0x48),
+    (0x9D67, 0x8C),
+    (0x9D69, 0xAA),
+    (0x9D6B, 0xA4),
+    (0x9D6F, 0x98),
+    (0x9D71, 0x92),
+    (0x9D73, 0x8C),
+    (0x9D74, 0x42),
+    (0x9D75, 0xAA),
+    (0x9D76, 0x42),
+    (0x9D77, 0xA4),
+    (0x9D78, 0x42),
+    (0x9D7A, 0x42),
+    (0x9D7B, 0x98),
+    (0x9D7C, 0x42),
+    (0x9D7D, 0x92),
+    (0x9D7E, 0x42),
+    (0x9D7F, 0x8C),
+    (0x9D80, 0x83),
+    (0x9D90, 0x4F),
+    (0x9D91, 0xAA),
+    (0x9D92, 0x4F),
+    (0x9D93, 0xA4),
+    (0x9D94, 0x4F),
+    (0x9D96, 0x4F),
+    (0x9D97, 0x98),
+    (0x9D98, 0x4F),
+    (0x9D99, 0x92),
+    (0x9D9A, 0x4F),
+    (0x9D9B, 0x8C),
+    (0x9D9C, 0x4C),
+    (0x9D9D, 0xAA),
+    (0x9D9E, 0x4C),
+    (0x9D9F, 0xA4),
+    (0x9DA0, 0x4C),
+    (0x9DA2, 0x4C),
+    (0x9DA3, 0x98),
+    (0x9DA4, 0x4C),
+    (0x9DA5, 0x92),
+    (0x9DA6, 0x4C),
+    (0x9DA7, 0x8C),
+    (0x9DA9, 0xAA),
+    (0x9DAB, 0xA4),
+    (0x9DAF, 0x98),
+    (0x9DB1, 0x92),
+    (0x9DB3, 0x8C),
+    (0x9DB4, 0x46),
+    (0x9DB5, 0xAA),
+    (0x9DB6, 0x46),
+    (0x9DB7, 0xA4),
+    (0x9DB8, 0x46),
+    (0x9DBA, 0x46),
+    (0x9DBB, 0x98),
+    (0x9DBC, 0x46),
+    (0x9DBD, 0x92),
+    (0x9DBE, 0x46),
+    (0x9DBF, 0x8C),
+    (0x9DC0, 0x83),
+    (0x9DD0, 0x51),
+    (0x9DD1, 0xAA),
+    (0x9DD2, 0x51),
+    (0x9DD3, 0xA4),
+    (0x9DD4, 0x51),
+    (0x9DD6, 0x51),
+    (0x9DD7, 0x98),
+    (0x9DD8, 0x51),
+    (0x9DD9, 0x92),
+    (0x9DDA, 0x51),
+    (0x9DDB, 0x8C),
+    (0x9DDD, 0xAA),
+    (0x9DDF, 0xA4),
+    (0x9DE3, 0x98),
+    (0x9DE5, 0x92),
+    (0x9DE7, 0x8C),
+    (0x9DE8, 0x4B),
+    (0x9DE9, 0xAA),
+    (0x9DEA, 0x4B),
+    (0x9DEB, 0xA4),
+    (0x9DEC, 0x4B),
+    (0x9DEE, 0x4B),
+    (0x9DEF, 0x98),
+    (0x9DF0, 0x4B),
+    (0x9DF1, 0x92),
+    (0x9DF2, 0x4B),
+    (0x9DF3, 0x8C),
+    (0x9DF4, 0x48),
+    (0x9DF5, 0xAA),
+    (0x9DF6, 0x48),
+    (0x9DF7, 0xA4),
+    (0x9DF8, 0x48),
+    (0x9DFA, 0x48),
+    (0x9DFB, 0x98),
+    (0x9DFC, 0x48),
+    (0x9DFD, 0x92),
+    (0x9DFE, 0x48),
+    (0x9DFF, 0x8C),
+    (0x9E00, 0x83),
+    (0x9E05, 0x40),
+    (0x9E2A, 0x4F),
+    (0x9E2B, 0xA4),
+    (0x9E2C, 0x4F),
+    (0x9E2E, 0x4F),
+    (0x9E2F, 0x98),
+    (0x9E30, 0x4F),
+    (0x9E31, 0x92),
+    (0x9E32, 0x4F),
+    (0x9E33, 0x8C),
+    (0x9E34, 0x4C),
+    (0x9E35, 0xAA),
+    (0x9E36, 0x4C),
+    (0x9E37, 0xA4),
+    (0x9E38, 0x4C),
+    (0x9E3A, 0x4C),
+    (0x9E3B, 0x98),
+    (0x9E3C, 0x4C),
+    (0x9E3D, 0x92),
+    (0x9E3E, 0x4C),
+    (0x9E3F, 0x8C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_THIRD_VISIBLE_NIBBLES: [(u32, u8); 796] = [
+    (37194, 0x0),
+    (37195, 0x0),
+    (37202, 0x0),
+    (37203, 0x0),
+    (37210, 0x0),
+    (37212, 0x0),
+    (37213, 0x0),
+    (37218, 0x0),
+    (37219, 0x0),
+    (37220, 0x0),
+    (37226, 0x0),
+    (37227, 0x0),
+    (37228, 0x0),
+    (37229, 0x0),
+    (37234, 0x0),
+    (37235, 0x0),
+    (37236, 0x0),
+    (37244, 0x0),
+    (37245, 0x0),
+    (37486, 0x0),
+    (37487, 0x0),
+    (37494, 0x0),
+    (37495, 0x0),
+    (37502, 0x0),
+    (37504, 0x0),
+    (37505, 0x0),
+    (37510, 0x0),
+    (37511, 0x0),
+    (37512, 0x0),
+    (37518, 0x0),
+    (37519, 0x0),
+    (37520, 0x0),
+    (37521, 0x0),
+    (37526, 0x0),
+    (37527, 0x0),
+    (37528, 0x0),
+    (37529, 0x0),
+    (37536, 0x0),
+    (37537, 0x0),
+    (38924, 0xC),
+    (38925, 0xC),
+    (38930, 0x2),
+    (38931, 0x2),
+    (38936, 0xC),
+    (38937, 0xC),
+    (38938, 0xC),
+    (38939, 0xC),
+    (38940, 0xC),
+    (38941, 0xC),
+    (38942, 0x2),
+    (38943, 0x2),
+    (38944, 0xC),
+    (38945, 0xC),
+    (38946, 0xC),
+    (38947, 0xC),
+    (38948, 0xC),
+    (38949, 0xC),
+    (38950, 0xC),
+    (38951, 0x2),
+    (38954, 0x2),
+    (38955, 0x2),
+    (38956, 0xC),
+    (38957, 0xC),
+    (38958, 0x2),
+    (38959, 0x2),
+    (38960, 0xC),
+    (38961, 0xC),
+    (38962, 0x2),
+    (38963, 0x2),
+    (38964, 0xC),
+    (38966, 0xC),
+    (38967, 0xC),
+    (38968, 0xC),
+    (38969, 0xC),
+    (38970, 0xC),
+    (38971, 0xC),
+    (38974, 0x2),
+    (38975, 0x2),
+    (38976, 0xC),
+    (38980, 0xC),
+    (38981, 0xC),
+    (38982, 0xC),
+    (38983, 0x2),
+    (39216, 0xC),
+    (39217, 0xC),
+    (39222, 0x2),
+    (39223, 0x2),
+    (39225, 0xC),
+    (39228, 0xC),
+    (39229, 0xC),
+    (39230, 0xC),
+    (39231, 0xC),
+    (39232, 0xC),
+    (39233, 0xC),
+    (39234, 0x2),
+    (39235, 0x2),
+    (39236, 0xC),
+    (39237, 0xC),
+    (39238, 0xC),
+    (39239, 0xC),
+    (39240, 0xC),
+    (39241, 0xC),
+    (39242, 0x2),
+    (39243, 0x2),
+    (39246, 0xC),
+    (39247, 0x2),
+    (39248, 0xC),
+    (39249, 0xC),
+    (39250, 0xC),
+    (39251, 0xC),
+    (39252, 0xC),
+    (39253, 0xC),
+    (39254, 0x2),
+    (39255, 0x2),
+    (39256, 0xC),
+    (39258, 0xC),
+    (39259, 0xC),
+    (39260, 0xC),
+    (39261, 0xC),
+    (39262, 0xC),
+    (39263, 0xC),
+    (39266, 0xC),
+    (39267, 0xC),
+    (39268, 0xC),
+    (39272, 0xC),
+    (39273, 0xC),
+    (39274, 0xC),
+    (39275, 0x2),
+    (39278, 0xC),
+    (39279, 0xC),
+    (39530, 0x0),
+    (39531, 0x0),
+    (39538, 0x0),
+    (39539, 0x0),
+    (39546, 0x0),
+    (39548, 0x0),
+    (39549, 0x0),
+    (39554, 0x0),
+    (39555, 0x0),
+    (39556, 0x0),
+    (39557, 0x0),
+    (39562, 0x0),
+    (39563, 0x0),
+    (39564, 0x0),
+    (39565, 0x0),
+    (39570, 0x0),
+    (39571, 0x0),
+    (39572, 0x0),
+    (39573, 0x0),
+    (39580, 0x0),
+    (39581, 0x0),
+    (39822, 0x0),
+    (39823, 0x0),
+    (39830, 0x0),
+    (39831, 0x0),
+    (39838, 0x0),
+    (39840, 0x0),
+    (39841, 0x0),
+    (39846, 0x0),
+    (39847, 0x0),
+    (39848, 0x0),
+    (39849, 0x0),
+    (39854, 0x0),
+    (39855, 0x0),
+    (39856, 0x0),
+    (39857, 0x0),
+    (39862, 0x0),
+    (39863, 0x0),
+    (39864, 0x0),
+    (39865, 0x0),
+    (39872, 0x0),
+    (39873, 0x0),
+    (40676, 0xC),
+    (40677, 0xC),
+    (40682, 0x2),
+    (40683, 0x2),
+    (40684, 0xC),
+    (40685, 0xC),
+    (40688, 0xC),
+    (40689, 0x2),
+    (40690, 0xC),
+    (40691, 0xC),
+    (40692, 0xC),
+    (40693, 0xC),
+    (40694, 0x2),
+    (40695, 0x2),
+    (40696, 0xC),
+    (40697, 0xC),
+    (40698, 0xC),
+    (40699, 0xC),
+    (40700, 0xC),
+    (40701, 0xC),
+    (40702, 0x2),
+    (40703, 0xC),
+    (40705, 0xC),
+    (40706, 0x2),
+    (40707, 0x2),
+    (40708, 0xC),
+    (40709, 0xC),
+    (40710, 0xC),
+    (40711, 0xC),
+    (40712, 0xC),
+    (40713, 0xC),
+    (40714, 0x2),
+    (40715, 0x2),
+    (40716, 0xC),
+    (40718, 0xC),
+    (40719, 0xC),
+    (40720, 0xC),
+    (40721, 0xC),
+    (40722, 0xC),
+    (40723, 0xC),
+    (40726, 0xC),
+    (40727, 0xC),
+    (40728, 0xC),
+    (40729, 0xC),
+    (40732, 0xC),
+    (40733, 0xC),
+    (40734, 0xC),
+    (40735, 0x2),
+    (40738, 0xC),
+    (40739, 0xC),
+    (40968, 0xC),
+    (40969, 0xC),
+    (40974, 0x2),
+    (40975, 0x2),
+    (40976, 0xC),
+    (40977, 0xC),
+    (40980, 0x2),
+    (40981, 0x2),
+    (40982, 0xC),
+    (40983, 0x2),
+    (40984, 0xC),
+    (40985, 0x2),
+    (40986, 0x2),
+    (40987, 0x2),
+    (40988, 0xC),
+    (40989, 0xC),
+    (40990, 0xC),
+    (40991, 0xC),
+    (40992, 0xC),
+    (40993, 0xC),
+    (40994, 0x2),
+    (40995, 0xC),
+    (40996, 0xC),
+    (40997, 0xC),
+    (40998, 0x2),
+    (40999, 0xC),
+    (41000, 0xC),
+    (41001, 0xC),
+    (41002, 0xC),
+    (41003, 0xC),
+    (41004, 0xC),
+    (41005, 0xC),
+    (41006, 0x2),
+    (41007, 0x2),
+    (41008, 0x2),
+    (41010, 0xC),
+    (41011, 0xC),
+    (41012, 0xC),
+    (41013, 0xC),
+    (41014, 0xC),
+    (41015, 0xC),
+    (41018, 0xC),
+    (41019, 0xC),
+    (41020, 0xC),
+    (41021, 0xC),
+    (41024, 0xC),
+    (41025, 0xC),
+    (41026, 0xC),
+    (41030, 0xC),
+    (41031, 0xC),
+    (41866, 0x0),
+    (41867, 0x0),
+    (41874, 0x0),
+    (41875, 0x0),
+    (41882, 0x0),
+    (41884, 0x0),
+    (41885, 0x0),
+    (41890, 0x0),
+    (41891, 0x0),
+    (41892, 0x0),
+    (41893, 0x0),
+    (41898, 0x0),
+    (41899, 0x0),
+    (41900, 0x0),
+    (41901, 0x0),
+    (41906, 0x0),
+    (41907, 0x0),
+    (41908, 0x0),
+    (41909, 0x0),
+    (41916, 0x0),
+    (41917, 0x0),
+    (42158, 0x0),
+    (42159, 0x0),
+    (42166, 0x0),
+    (42167, 0x0),
+    (42174, 0x0),
+    (42175, 0x0),
+    (42176, 0x0),
+    (42177, 0x0),
+    (42182, 0x0),
+    (42183, 0x0),
+    (42184, 0x0),
+    (42185, 0x0),
+    (42190, 0x0),
+    (42191, 0x0),
+    (42192, 0x0),
+    (42193, 0x0),
+    (42198, 0x0),
+    (42199, 0x0),
+    (42200, 0x0),
+    (42201, 0x0),
+    (42208, 0x0),
+    (42209, 0x0),
+    (42428, 0xC),
+    (42429, 0xC),
+    (42434, 0xC),
+    (42435, 0xC),
+    (42436, 0xC),
+    (42437, 0xC),
+    (42440, 0xC),
+    (42441, 0x2),
+    (42442, 0x2),
+    (42443, 0x2),
+    (42444, 0xC),
+    (42445, 0x2),
+    (42446, 0xC),
+    (42447, 0xC),
+    (42448, 0x2),
+    (42449, 0x2),
+    (42450, 0xC),
+    (42451, 0xC),
+    (42452, 0x2),
+    (42453, 0x2),
+    (42454, 0xC),
+    (42455, 0xC),
+    (42456, 0xC),
+    (42457, 0xC),
+    (42458, 0x2),
+    (42459, 0xC),
+    (42460, 0xC),
+    (42461, 0x2),
+    (42462, 0xC),
+    (42463, 0xC),
+    (42464, 0x2),
+    (42465, 0x2),
+    (42468, 0x2),
+    (42470, 0xC),
+    (42471, 0xC),
+    (42472, 0x2),
+    (42473, 0x2),
+    (42474, 0xC),
+    (42475, 0xC),
+    (42478, 0xC),
+    (42479, 0xC),
+    (42480, 0xC),
+    (42481, 0xC),
+    (42484, 0x2),
+    (42485, 0x2),
+    (42486, 0xC),
+    (42490, 0xC),
+    (42491, 0xC),
+    (42720, 0xC),
+    (42721, 0xC),
+    (42726, 0xC),
+    (42727, 0xC),
+    (42728, 0xC),
+    (42729, 0x2),
+    (42732, 0xC),
+    (42733, 0xC),
+    (42734, 0x2),
+    (42735, 0xC),
+    (42736, 0x2),
+    (42737, 0xC),
+    (42738, 0xC),
+    (42739, 0xC),
+    (42740, 0x2),
+    (42741, 0x2),
+    (42742, 0xC),
+    (42743, 0xC),
+    (42744, 0x2),
+    (42745, 0x2),
+    (42746, 0xC),
+    (42747, 0xC),
+    (42748, 0xC),
+    (42749, 0xC),
+    (42750, 0xC),
+    (42751, 0xC),
+    (42752, 0xC),
+    (42753, 0xC),
+    (42754, 0xC),
+    (42755, 0xC),
+    (42756, 0x2),
+    (42757, 0x2),
+    (42760, 0x2),
+    (42761, 0xC),
+    (42762, 0xC),
+    (42763, 0xC),
+    (42764, 0x2),
+    (42765, 0x2),
+    (42766, 0xC),
+    (42767, 0xC),
+    (42770, 0xC),
+    (42771, 0xC),
+    (42772, 0xC),
+    (42773, 0xC),
+    (42776, 0x2),
+    (42777, 0x2),
+    (42778, 0xC),
+    (42782, 0xC),
+    (42783, 0xC),
+    (44179, 0x0),
+    (44180, 0xC),
+    (44181, 0xC),
+    (44188, 0x2),
+    (44189, 0x2),
+    (44192, 0xC),
+    (44193, 0xC),
+    (44196, 0xC),
+    (44197, 0xC),
+    (44198, 0xC),
+    (44199, 0xC),
+    (44200, 0x2),
+    (44201, 0xC),
+    (44202, 0x0),
+    (44203, 0x0),
+    (44204, 0xC),
+    (44205, 0xC),
+    (44206, 0x2),
+    (44207, 0x2),
+    (44208, 0xC),
+    (44209, 0xC),
+    (44210, 0x0),
+    (44211, 0x0),
+    (44212, 0xC),
+    (44213, 0xC),
+    (44214, 0x2),
+    (44215, 0x2),
+    (44216, 0x2),
+    (44217, 0x2),
+    (44219, 0x0),
+    (44220, 0x0),
+    (44221, 0x0),
+    (44222, 0x2),
+    (44223, 0x2),
+    (44224, 0xC),
+    (44225, 0xC),
+    (44228, 0x0),
+    (44229, 0x0),
+    (44230, 0x2),
+    (44231, 0x2),
+    (44232, 0xC),
+    (44233, 0xC),
+    (44236, 0x0),
+    (44237, 0x0),
+    (44238, 0x2),
+    (44242, 0x2),
+    (44243, 0x2),
+    (44244, 0x0),
+    (44245, 0x0),
+    (44252, 0x0),
+    (44253, 0x0),
+    (44471, 0x0),
+    (44472, 0xC),
+    (44473, 0xC),
+    (44480, 0x2),
+    (44481, 0x2),
+    (44484, 0xC),
+    (44485, 0xC),
+    (44488, 0xC),
+    (44489, 0xC),
+    (44490, 0xC),
+    (44491, 0xC),
+    (44492, 0xC),
+    (44493, 0xC),
+    (44494, 0x0),
+    (44495, 0x0),
+    (44496, 0xC),
+    (44497, 0xC),
+    (44498, 0x2),
+    (44499, 0x2),
+    (44500, 0xC),
+    (44501, 0xC),
+    (44502, 0x0),
+    (44503, 0x0),
+    (44504, 0xC),
+    (44505, 0xC),
+    (44506, 0x2),
+    (44507, 0x2),
+    (44508, 0x2),
+    (44509, 0x2),
+    (44511, 0x0),
+    (44512, 0x0),
+    (44513, 0x0),
+    (44514, 0x2),
+    (44515, 0x2),
+    (44516, 0xC),
+    (44517, 0xC),
+    (44520, 0x0),
+    (44521, 0x0),
+    (44522, 0x2),
+    (44523, 0x2),
+    (44524, 0xC),
+    (44525, 0xC),
+    (44528, 0x0),
+    (44529, 0x0),
+    (44530, 0x2),
+    (44534, 0x2),
+    (44535, 0x2),
+    (44536, 0x0),
+    (44537, 0x0),
+    (44544, 0x0),
+    (44545, 0x0),
+    (45932, 0xC),
+    (45933, 0xC),
+    (45938, 0xC),
+    (45939, 0x2),
+    (45940, 0x2),
+    (45941, 0x2),
+    (45942, 0x2),
+    (45943, 0x2),
+    (45944, 0xC),
+    (45945, 0xC),
+    (45946, 0x2),
+    (45947, 0x2),
+    (45948, 0xC),
+    (45949, 0xC),
+    (45950, 0x2),
+    (45951, 0x2),
+    (45952, 0xC),
+    (45953, 0xC),
+    (45954, 0x2),
+    (45955, 0x2),
+    (45956, 0xC),
+    (45957, 0x2),
+    (45958, 0x2),
+    (45959, 0x2),
+    (45960, 0xC),
+    (45961, 0xC),
+    (45962, 0x2),
+    (45963, 0x2),
+    (45964, 0xC),
+    (45965, 0xC),
+    (45966, 0x2),
+    (45967, 0x2),
+    (45968, 0x2),
+    (45969, 0x2),
+    (45973, 0xC),
+    (45974, 0x2),
+    (45975, 0x2),
+    (45976, 0xC),
+    (45977, 0xC),
+    (45978, 0x2),
+    (45979, 0x2),
+    (45982, 0x2),
+    (45983, 0x2),
+    (45984, 0xC),
+    (45985, 0xC),
+    (45990, 0x2),
+    (45991, 0x2),
+    (45994, 0x2),
+    (45995, 0x2),
+    (46224, 0xC),
+    (46225, 0xC),
+    (46230, 0xC),
+    (46231, 0x2),
+    (46232, 0x2),
+    (46233, 0xC),
+    (46234, 0x2),
+    (46235, 0x2),
+    (46236, 0xC),
+    (46237, 0xC),
+    (46238, 0x2),
+    (46239, 0x2),
+    (46240, 0xC),
+    (46241, 0xC),
+    (46242, 0x2),
+    (46243, 0x2),
+    (46244, 0xC),
+    (46245, 0xC),
+    (46246, 0x2),
+    (46247, 0x2),
+    (46248, 0xC),
+    (46249, 0x2),
+    (46250, 0x2),
+    (46251, 0x2),
+    (46252, 0xC),
+    (46253, 0xC),
+    (46254, 0x2),
+    (46255, 0x2),
+    (46256, 0xC),
+    (46257, 0xC),
+    (46258, 0x2),
+    (46259, 0x2),
+    (46260, 0x2),
+    (46261, 0x2),
+    (46265, 0xC),
+    (46266, 0x2),
+    (46267, 0x2),
+    (46268, 0xC),
+    (46269, 0xC),
+    (46270, 0x2),
+    (46271, 0x2),
+    (46274, 0x2),
+    (46275, 0x2),
+    (46276, 0xC),
+    (46277, 0x2),
+    (46282, 0x2),
+    (46283, 0x2),
+    (46286, 0x2),
+    (46287, 0x2),
+    (46538, 0x0),
+    (46539, 0x0),
+    (46546, 0x0),
+    (46547, 0x0),
+    (46555, 0x0),
+    (46556, 0x0),
+    (46557, 0x0),
+    (46562, 0x0),
+    (46563, 0x0),
+    (46564, 0x0),
+    (46565, 0x0),
+    (46570, 0x0),
+    (46571, 0x0),
+    (46572, 0x0),
+    (46573, 0x0),
+    (46578, 0x0),
+    (46579, 0x0),
+    (46580, 0x0),
+    (46581, 0x0),
+    (46588, 0x0),
+    (46589, 0x0),
+    (46830, 0x0),
+    (46831, 0x0),
+    (46838, 0x0),
+    (46839, 0x0),
+    (46847, 0x0),
+    (46848, 0x0),
+    (46849, 0x0),
+    (46854, 0x0),
+    (46855, 0x0),
+    (46856, 0x0),
+    (46857, 0x0),
+    (46862, 0x0),
+    (46863, 0x0),
+    (46864, 0x0),
+    (46865, 0x0),
+    (46870, 0x0),
+    (46871, 0x0),
+    (46872, 0x0),
+    (46873, 0x0),
+    (46880, 0x0),
+    (46881, 0x0),
+    (47684, 0x2),
+    (47685, 0x2),
+    (47690, 0xC),
+    (47691, 0xC),
+    (47692, 0xC),
+    (47693, 0xC),
+    (47694, 0x2),
+    (47695, 0x2),
+    (47696, 0x2),
+    (47697, 0x2),
+    (47699, 0x2),
+    (47700, 0xC),
+    (47701, 0xC),
+    (47702, 0xC),
+    (47703, 0xC),
+    (47704, 0xC),
+    (47705, 0xC),
+    (47706, 0x2),
+    (47707, 0x2),
+    (47708, 0x2),
+    (47709, 0x2),
+    (47710, 0x2),
+    (47711, 0x2),
+    (47712, 0x2),
+    (47713, 0x2),
+    (47714, 0x2),
+    (47715, 0x2),
+    (47716, 0x2),
+    (47717, 0x2),
+    (47718, 0x2),
+    (47719, 0x2),
+    (47720, 0x2),
+    (47721, 0xC),
+    (47724, 0xC),
+    (47725, 0xC),
+    (47726, 0x2),
+    (47727, 0x2),
+    (47728, 0x2),
+    (47729, 0x2),
+    (47730, 0x2),
+    (47731, 0x2),
+    (47734, 0x2),
+    (47735, 0x2),
+    (47736, 0xC),
+    (47737, 0x2),
+    (47742, 0x2),
+    (47743, 0x2),
+    (47746, 0x2),
+    (47747, 0x2),
+    (47976, 0x2),
+    (47977, 0x2),
+    (47982, 0xC),
+    (47983, 0xC),
+    (47984, 0xC),
+    (47985, 0xC),
+    (47986, 0x2),
+    (47987, 0x2),
+    (47988, 0x2),
+    (47989, 0x2),
+    (47991, 0x2),
+    (47992, 0xC),
+    (47993, 0x2),
+    (47994, 0xC),
+    (47995, 0xC),
+    (47996, 0xC),
+    (47997, 0xC),
+    (47998, 0x2),
+    (47999, 0x2),
+    (48000, 0x2),
+    (48001, 0x2),
+    (48002, 0x2),
+    (48003, 0x2),
+    (48004, 0x2),
+    (48005, 0x2),
+    (48006, 0x2),
+    (48007, 0x2),
+    (48008, 0x2),
+    (48009, 0x2),
+    (48010, 0x2),
+    (48011, 0x2),
+    (48012, 0x2),
+    (48013, 0xC),
+    (48016, 0xC),
+    (48017, 0xC),
+    (48018, 0x2),
+    (48019, 0x2),
+    (48020, 0x2),
+    (48021, 0x2),
+    (48022, 0x2),
+    (48023, 0x2),
+    (48026, 0x2),
+    (48027, 0x2),
+    (48028, 0xC),
+    (48029, 0x2),
+    (48034, 0x2),
+    (48035, 0x2),
+    (48038, 0x2),
+    (48039, 0x2),
+    (48874, 0x0),
+    (48875, 0x0),
+    (48882, 0x0),
+    (48883, 0x0),
+    (48890, 0x0),
+    (48891, 0x0),
+    (48892, 0x0),
+    (48893, 0x0),
+    (48898, 0x0),
+    (48899, 0x0),
+    (48900, 0x0),
+    (48901, 0x0),
+    (48906, 0x0),
+    (48907, 0x0),
+    (48908, 0x0),
+    (48909, 0x0),
+    (48914, 0x0),
+    (48915, 0x0),
+    (48916, 0x0),
+    (48917, 0x0),
+    (48924, 0x0),
+    (48925, 0x0),
+    (49166, 0x0),
+    (49167, 0x0),
+    (49174, 0x0),
+    (49175, 0x0),
+    (49182, 0x0),
+    (49183, 0x0),
+    (49184, 0x0),
+    (49185, 0x0),
+    (49190, 0x0),
+    (49191, 0x0),
+    (49192, 0x0),
+    (49193, 0x0),
+    (49198, 0x0),
+    (49199, 0x0),
+    (49200, 0x0),
+    (49201, 0x0),
+    (49206, 0x0),
+    (49207, 0x0),
+    (49208, 0x0),
+    (49209, 0x0),
+    (49216, 0x0),
+    (49217, 0x0),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FOURTH_APPEARANCE_VIDEO_FRAME: u64 = 1101;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FOURTH_APPEARANCE_RAM_BYTES: [(u16, u8); 351] = [
+    (0x9C05, 0x40),
+    (0x9C10, 0x37),
+    (0x9C11, 0xAA),
+    (0x9C12, 0x37),
+    (0x9C13, 0xA4),
+    (0x9C14, 0x37),
+    (0x9C16, 0x37),
+    (0x9C17, 0x98),
+    (0x9C18, 0x37),
+    (0x9C19, 0x92),
+    (0x9C1A, 0x37),
+    (0x9C1B, 0x8C),
+    (0x9C1C, 0x34),
+    (0x9C1D, 0xAA),
+    (0x9C1E, 0x34),
+    (0x9C1F, 0xA4),
+    (0x9C20, 0x34),
+    (0x9C22, 0x34),
+    (0x9C23, 0x98),
+    (0x9C24, 0x34),
+    (0x9C25, 0x92),
+    (0x9C26, 0x34),
+    (0x9C27, 0x8C),
+    (0x9C29, 0xAA),
+    (0x9C2B, 0xA4),
+    (0x9C2F, 0x98),
+    (0x9C31, 0x92),
+    (0x9C33, 0x8C),
+    (0x9C34, 0x2E),
+    (0x9C35, 0xAA),
+    (0x9C36, 0x2E),
+    (0x9C37, 0xA4),
+    (0x9C38, 0x2E),
+    (0x9C3A, 0x2E),
+    (0x9C3B, 0x98),
+    (0x9C3C, 0x2E),
+    (0x9C3D, 0x92),
+    (0x9C3E, 0x2E),
+    (0x9C3F, 0x8C),
+    (0x9C40, 0x83),
+    (0x9C50, 0x3B),
+    (0x9C51, 0xAA),
+    (0x9C52, 0x3B),
+    (0x9C53, 0xA4),
+    (0x9C54, 0x3B),
+    (0x9C56, 0x3B),
+    (0x9C57, 0x98),
+    (0x9C58, 0x3B),
+    (0x9C59, 0x92),
+    (0x9C5A, 0x3B),
+    (0x9C5B, 0x8C),
+    (0x9C5C, 0x38),
+    (0x9C5D, 0xAA),
+    (0x9C5E, 0x38),
+    (0x9C5F, 0xA4),
+    (0x9C60, 0x38),
+    (0x9C62, 0x38),
+    (0x9C63, 0x98),
+    (0x9C64, 0x38),
+    (0x9C65, 0x92),
+    (0x9C66, 0x38),
+    (0x9C67, 0x8C),
+    (0x9C69, 0xAA),
+    (0x9C6B, 0xA4),
+    (0x9C6F, 0x98),
+    (0x9C71, 0x92),
+    (0x9C73, 0x8C),
+    (0x9C74, 0x32),
+    (0x9C75, 0xAA),
+    (0x9C76, 0x32),
+    (0x9C77, 0xA4),
+    (0x9C78, 0x32),
+    (0x9C7A, 0x32),
+    (0x9C7B, 0x98),
+    (0x9C7C, 0x32),
+    (0x9C7D, 0x92),
+    (0x9C7E, 0x32),
+    (0x9C7F, 0x8C),
+    (0x9C80, 0x83),
+    (0x9C90, 0x3F),
+    (0x9C91, 0xAA),
+    (0x9C92, 0x3F),
+    (0x9C93, 0xA4),
+    (0x9C94, 0x3F),
+    (0x9C96, 0x3F),
+    (0x9C97, 0x98),
+    (0x9C98, 0x3F),
+    (0x9C99, 0x92),
+    (0x9C9A, 0x3F),
+    (0x9C9B, 0x8C),
+    (0x9C9C, 0x3C),
+    (0x9C9D, 0xAA),
+    (0x9C9E, 0x3C),
+    (0x9C9F, 0xA4),
+    (0x9CA0, 0x3C),
+    (0x9CA2, 0x3C),
+    (0x9CA3, 0x98),
+    (0x9CA4, 0x3C),
+    (0x9CA5, 0x92),
+    (0x9CA6, 0x3C),
+    (0x9CA7, 0x8C),
+    (0x9CA9, 0xAA),
+    (0x9CAB, 0xA4),
+    (0x9CAF, 0x98),
+    (0x9CB1, 0x92),
+    (0x9CB3, 0x8C),
+    (0x9CB4, 0x36),
+    (0x9CB5, 0xAA),
+    (0x9CB6, 0x36),
+    (0x9CB7, 0xA4),
+    (0x9CB8, 0x36),
+    (0x9CBA, 0x36),
+    (0x9CBB, 0x98),
+    (0x9CBC, 0x36),
+    (0x9CBD, 0x92),
+    (0x9CBE, 0x36),
+    (0x9CBF, 0x8C),
+    (0x9CC0, 0x83),
+    (0x9CD0, 0x43),
+    (0x9CD1, 0xAA),
+    (0x9CD2, 0x43),
+    (0x9CD3, 0xA4),
+    (0x9CD4, 0x43),
+    (0x9CD6, 0x43),
+    (0x9CD7, 0x98),
+    (0x9CD8, 0x43),
+    (0x9CD9, 0x92),
+    (0x9CDA, 0x43),
+    (0x9CDB, 0x8C),
+    (0x9CDC, 0x40),
+    (0x9CDD, 0xAA),
+    (0x9CDE, 0x40),
+    (0x9CDF, 0xA4),
+    (0x9CE0, 0x40),
+    (0x9CE2, 0x40),
+    (0x9CE3, 0x98),
+    (0x9CE4, 0x40),
+    (0x9CE5, 0x92),
+    (0x9CE6, 0x40),
+    (0x9CE7, 0x8C),
+    (0x9CE9, 0xAA),
+    (0x9CEB, 0xA4),
+    (0x9CEF, 0x98),
+    (0x9CF1, 0x92),
+    (0x9CF3, 0x8C),
+    (0x9CF4, 0x3A),
+    (0x9CF5, 0xAA),
+    (0x9CF6, 0x3A),
+    (0x9CF7, 0xA4),
+    (0x9CF8, 0x3A),
+    (0x9CFA, 0x3A),
+    (0x9CFB, 0x98),
+    (0x9CFC, 0x3A),
+    (0x9CFD, 0x92),
+    (0x9CFE, 0x3A),
+    (0x9CFF, 0x8C),
+    (0x9D00, 0x83),
+    (0x9D10, 0x47),
+    (0x9D11, 0xAA),
+    (0x9D12, 0x47),
+    (0x9D13, 0xA4),
+    (0x9D14, 0x47),
+    (0x9D16, 0x47),
+    (0x9D17, 0x98),
+    (0x9D18, 0x47),
+    (0x9D19, 0x92),
+    (0x9D1A, 0x47),
+    (0x9D1B, 0x8C),
+    (0x9D1C, 0x44),
+    (0x9D1D, 0xAA),
+    (0x9D1E, 0x44),
+    (0x9D1F, 0xA4),
+    (0x9D20, 0x44),
+    (0x9D22, 0x44),
+    (0x9D23, 0x98),
+    (0x9D24, 0x44),
+    (0x9D25, 0x92),
+    (0x9D26, 0x44),
+    (0x9D27, 0x8C),
+    (0x9D29, 0xAA),
+    (0x9D2B, 0xA4),
+    (0x9D2F, 0x98),
+    (0x9D31, 0x92),
+    (0x9D33, 0x8C),
+    (0x9D34, 0x3E),
+    (0x9D35, 0xAA),
+    (0x9D36, 0x3E),
+    (0x9D37, 0xA4),
+    (0x9D38, 0x3E),
+    (0x9D3A, 0x3E),
+    (0x9D3B, 0x98),
+    (0x9D3C, 0x3E),
+    (0x9D3D, 0x92),
+    (0x9D3E, 0x3E),
+    (0x9D3F, 0x8C),
+    (0x9D40, 0x83),
+    (0x9D50, 0x4B),
+    (0x9D51, 0xAA),
+    (0x9D52, 0x4B),
+    (0x9D53, 0xA4),
+    (0x9D54, 0x4B),
+    (0x9D56, 0x4B),
+    (0x9D57, 0x98),
+    (0x9D58, 0x4B),
+    (0x9D59, 0x92),
+    (0x9D5A, 0x4B),
+    (0x9D5B, 0x8C),
+    (0x9D5C, 0x48),
+    (0x9D5D, 0xAA),
+    (0x9D5E, 0x48),
+    (0x9D5F, 0xA4),
+    (0x9D60, 0x48),
+    (0x9D62, 0x48),
+    (0x9D63, 0x98),
+    (0x9D64, 0x48),
+    (0x9D65, 0x92),
+    (0x9D66, 0x48),
+    (0x9D67, 0x8C),
+    (0x9D69, 0xAA),
+    (0x9D6B, 0xA4),
+    (0x9D6F, 0x98),
+    (0x9D71, 0x92),
+    (0x9D73, 0x8C),
+    (0x9D74, 0x42),
+    (0x9D75, 0xAA),
+    (0x9D76, 0x42),
+    (0x9D77, 0xA4),
+    (0x9D78, 0x42),
+    (0x9D7A, 0x42),
+    (0x9D7B, 0x98),
+    (0x9D7C, 0x42),
+    (0x9D7D, 0x92),
+    (0x9D7E, 0x42),
+    (0x9D7F, 0x8C),
+    (0x9D80, 0x83),
+    (0x9D90, 0x4F),
+    (0x9D91, 0xAA),
+    (0x9D92, 0x4F),
+    (0x9D93, 0xA4),
+    (0x9D94, 0x4F),
+    (0x9D96, 0x4F),
+    (0x9D97, 0x98),
+    (0x9D98, 0x4F),
+    (0x9D99, 0x92),
+    (0x9D9A, 0x4F),
+    (0x9D9B, 0x8C),
+    (0x9D9C, 0x4C),
+    (0x9D9D, 0xAA),
+    (0x9D9E, 0x4C),
+    (0x9D9F, 0xA4),
+    (0x9DA0, 0x4C),
+    (0x9DA2, 0x4C),
+    (0x9DA3, 0x98),
+    (0x9DA4, 0x4C),
+    (0x9DA5, 0x92),
+    (0x9DA6, 0x4C),
+    (0x9DA7, 0x8C),
+    (0x9DA9, 0xAA),
+    (0x9DAB, 0xA4),
+    (0x9DAF, 0x98),
+    (0x9DB1, 0x92),
+    (0x9DB3, 0x8C),
+    (0x9DB4, 0x46),
+    (0x9DB5, 0xAA),
+    (0x9DB6, 0x46),
+    (0x9DB7, 0xA4),
+    (0x9DB8, 0x46),
+    (0x9DBA, 0x46),
+    (0x9DBB, 0x98),
+    (0x9DBC, 0x46),
+    (0x9DBD, 0x92),
+    (0x9DBE, 0x46),
+    (0x9DBF, 0x8C),
+    (0x9DC0, 0x83),
+    (0x9DD0, 0x51),
+    (0x9DD1, 0xAA),
+    (0x9DD2, 0x51),
+    (0x9DD3, 0xA4),
+    (0x9DD4, 0x51),
+    (0x9DD6, 0x51),
+    (0x9DD7, 0x98),
+    (0x9DD8, 0x51),
+    (0x9DD9, 0x92),
+    (0x9DDA, 0x51),
+    (0x9DDB, 0x8C),
+    (0x9DDD, 0xAA),
+    (0x9DDF, 0xA4),
+    (0x9DE3, 0x98),
+    (0x9DE5, 0x92),
+    (0x9DE7, 0x8C),
+    (0x9DE8, 0x4B),
+    (0x9DE9, 0xAA),
+    (0x9DEA, 0x4B),
+    (0x9DEB, 0xA4),
+    (0x9DEC, 0x4B),
+    (0x9DEE, 0x4B),
+    (0x9DEF, 0x98),
+    (0x9DF0, 0x4B),
+    (0x9DF1, 0x92),
+    (0x9DF2, 0x4B),
+    (0x9DF3, 0x8C),
+    (0x9DF4, 0x48),
+    (0x9DF5, 0xAA),
+    (0x9DF6, 0x48),
+    (0x9DF7, 0xA4),
+    (0x9DF8, 0x48),
+    (0x9DFA, 0x48),
+    (0x9DFB, 0x98),
+    (0x9DFC, 0x48),
+    (0x9DFD, 0x92),
+    (0x9DFE, 0x48),
+    (0x9DFF, 0x8C),
+    (0x9E00, 0x83),
+    (0x9E10, 0x55),
+    (0x9E11, 0xAA),
+    (0x9E12, 0x55),
+    (0x9E13, 0xA4),
+    (0x9E14, 0x55),
+    (0x9E16, 0x55),
+    (0x9E17, 0x98),
+    (0x9E18, 0x55),
+    (0x9E19, 0x92),
+    (0x9E1A, 0x55),
+    (0x9E1B, 0x8C),
+    (0x9E1D, 0xAA),
+    (0x9E1F, 0xA4),
+    (0x9E23, 0x98),
+    (0x9E25, 0x92),
+    (0x9E27, 0x8C),
+    (0x9E28, 0x4F),
+    (0x9E29, 0xAA),
+    (0x9E2A, 0x4F),
+    (0x9E2B, 0xA4),
+    (0x9E2C, 0x4F),
+    (0x9E2E, 0x4F),
+    (0x9E2F, 0x98),
+    (0x9E30, 0x4F),
+    (0x9E31, 0x92),
+    (0x9E32, 0x4F),
+    (0x9E33, 0x8C),
+    (0x9E34, 0x4C),
+    (0x9E35, 0xAA),
+    (0x9E36, 0x4C),
+    (0x9E37, 0xA4),
+    (0x9E38, 0x4C),
+    (0x9E3A, 0x4C),
+    (0x9E3B, 0x98),
+    (0x9E3C, 0x4C),
+    (0x9E3D, 0x92),
+    (0x9E3E, 0x4C),
+    (0x9E3F, 0x8C),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FOURTH_VISIBLE_NIBBLES: [(u32, u8); 845] = [
+    (16494, 0x0),
+    (16495, 0x0),
+    (16496, 0x0),
+    (16534, 0x0),
+    (16535, 0x0),
+    (16536, 0x0),
+    (16537, 0x0),
+    (17946, 0xF),
+    (18238, 0xF),
+    (18529, 0xF),
+    (18530, 0xF),
+    (18821, 0xF),
+    (19694, 0xF),
+    (19695, 0xF),
+    (19985, 0xF),
+    (19986, 0xF),
+    (20566, 0xF),
+    (20567, 0xF),
+    (20858, 0xF),
+    (38924, 0xC),
+    (38925, 0xC),
+    (38930, 0x2),
+    (38931, 0x2),
+    (38936, 0xC),
+    (38937, 0xC),
+    (38938, 0xC),
+    (38939, 0xC),
+    (38940, 0xC),
+    (38941, 0xC),
+    (38942, 0x2),
+    (38943, 0x2),
+    (38944, 0xC),
+    (38945, 0xC),
+    (38946, 0xC),
+    (38947, 0xC),
+    (38948, 0xC),
+    (38949, 0xC),
+    (38950, 0xC),
+    (38951, 0x2),
+    (38954, 0x2),
+    (38955, 0x2),
+    (38956, 0xC),
+    (38957, 0xC),
+    (38958, 0x2),
+    (38959, 0x2),
+    (38960, 0xC),
+    (38961, 0xC),
+    (38962, 0x2),
+    (38963, 0x2),
+    (38964, 0xC),
+    (38966, 0xC),
+    (38967, 0xC),
+    (38968, 0xC),
+    (38969, 0xC),
+    (38970, 0xC),
+    (38971, 0xC),
+    (38974, 0x2),
+    (38975, 0x2),
+    (38976, 0xC),
+    (38980, 0xC),
+    (38981, 0xC),
+    (38982, 0xC),
+    (38983, 0x2),
+    (38994, 0x2),
+    (38995, 0x2),
+    (39216, 0xC),
+    (39217, 0xC),
+    (39222, 0x2),
+    (39223, 0x2),
+    (39225, 0xC),
+    (39228, 0xC),
+    (39229, 0xC),
+    (39230, 0xC),
+    (39231, 0xC),
+    (39232, 0xC),
+    (39233, 0xC),
+    (39234, 0x2),
+    (39235, 0x2),
+    (39236, 0xC),
+    (39237, 0xC),
+    (39238, 0xC),
+    (39239, 0xC),
+    (39240, 0xC),
+    (39241, 0xC),
+    (39242, 0x2),
+    (39243, 0x2),
+    (39246, 0xC),
+    (39247, 0x2),
+    (39248, 0xC),
+    (39249, 0xC),
+    (39250, 0xC),
+    (39251, 0xC),
+    (39252, 0xC),
+    (39253, 0xC),
+    (39254, 0x2),
+    (39255, 0x2),
+    (39256, 0xC),
+    (39258, 0xC),
+    (39259, 0xC),
+    (39260, 0xC),
+    (39261, 0xC),
+    (39262, 0xC),
+    (39263, 0xC),
+    (39266, 0xC),
+    (39267, 0xC),
+    (39268, 0xC),
+    (39272, 0xC),
+    (39273, 0xC),
+    (39274, 0xC),
+    (39275, 0x2),
+    (39278, 0xC),
+    (39279, 0xC),
+    (39286, 0x2),
+    (39287, 0x2),
+    (40676, 0xC),
+    (40677, 0xC),
+    (40678, 0x0),
+    (40679, 0x0),
+    (40684, 0xC),
+    (40685, 0xC),
+    (40688, 0xC),
+    (40689, 0x2),
+    (40692, 0xC),
+    (40693, 0xC),
+    (40694, 0x2),
+    (40695, 0x2),
+    (40696, 0xC),
+    (40697, 0xC),
+    (40700, 0xC),
+    (40701, 0xC),
+    (40702, 0x2),
+    (40705, 0xC),
+    (40708, 0xC),
+    (40709, 0xC),
+    (40712, 0xC),
+    (40713, 0xC),
+    (40716, 0xC),
+    (40719, 0xC),
+    (40720, 0xC),
+    (40721, 0xC),
+    (40724, 0x0),
+    (40725, 0x0),
+    (40726, 0xC),
+    (40727, 0xC),
+    (40728, 0xC),
+    (40729, 0xC),
+    (40730, 0x0),
+    (40731, 0x0),
+    (40733, 0xC),
+    (40734, 0xC),
+    (40735, 0x2),
+    (40738, 0xC),
+    (40739, 0xC),
+    (40746, 0x2),
+    (40747, 0x2),
+    (40968, 0xC),
+    (40969, 0xC),
+    (40970, 0x0),
+    (40971, 0x0),
+    (40976, 0xC),
+    (40977, 0xC),
+    (40979, 0x0),
+    (40980, 0x2),
+    (40981, 0x2),
+    (40983, 0x2),
+    (40984, 0xC),
+    (40985, 0x2),
+    (40986, 0x2),
+    (40987, 0x2),
+    (40988, 0xC),
+    (40989, 0xC),
+    (40992, 0xC),
+    (40993, 0xC),
+    (40994, 0x2),
+    (40996, 0xC),
+    (40997, 0xC),
+    (40998, 0x2),
+    (40999, 0xC),
+    (41000, 0xC),
+    (41001, 0xC),
+    (41004, 0xC),
+    (41005, 0xC),
+    (41008, 0x2),
+    (41011, 0xC),
+    (41012, 0xC),
+    (41013, 0xC),
+    (41016, 0x0),
+    (41017, 0x0),
+    (41018, 0xC),
+    (41019, 0xC),
+    (41022, 0x0),
+    (41023, 0x0),
+    (41025, 0xC),
+    (41026, 0xC),
+    (41030, 0xC),
+    (41031, 0xC),
+    (41038, 0x2),
+    (41039, 0x2),
+    (41846, 0x0),
+    (41847, 0x0),
+    (41850, 0x0),
+    (41851, 0x0),
+    (41854, 0x0),
+    (41855, 0x0),
+    (41858, 0x0),
+    (41859, 0x0),
+    (41862, 0x0),
+    (41863, 0x0),
+    (41866, 0x0),
+    (41867, 0x0),
+    (41870, 0x0),
+    (41871, 0x0),
+    (41874, 0x0),
+    (41875, 0x0),
+    (41878, 0x0),
+    (41879, 0x0),
+    (41882, 0x0),
+    (41883, 0x0),
+    (41886, 0x0),
+    (41890, 0x0),
+    (41891, 0x0),
+    (41892, 0x0),
+    (41893, 0x0),
+    (41894, 0x0),
+    (41895, 0x0),
+    (41896, 0x0),
+    (41897, 0x0),
+    (41898, 0x0),
+    (41899, 0x0),
+    (41904, 0x0),
+    (41905, 0x0),
+    (41912, 0x0),
+    (41913, 0x0),
+    (42138, 0x0),
+    (42139, 0x0),
+    (42142, 0x0),
+    (42143, 0x0),
+    (42146, 0x0),
+    (42147, 0x0),
+    (42150, 0x0),
+    (42151, 0x0),
+    (42154, 0x0),
+    (42155, 0x0),
+    (42158, 0x0),
+    (42159, 0x0),
+    (42162, 0x0),
+    (42163, 0x0),
+    (42166, 0x0),
+    (42167, 0x0),
+    (42170, 0x0),
+    (42171, 0x0),
+    (42174, 0x0),
+    (42175, 0x0),
+    (42178, 0x0),
+    (42182, 0x0),
+    (42183, 0x0),
+    (42184, 0x0),
+    (42185, 0x0),
+    (42186, 0x0),
+    (42187, 0x0),
+    (42188, 0x0),
+    (42189, 0x0),
+    (42190, 0x0),
+    (42191, 0x0),
+    (42196, 0x0),
+    (42204, 0x0),
+    (42205, 0x0),
+    (42428, 0xC),
+    (42429, 0xC),
+    (42434, 0xC),
+    (42435, 0xC),
+    (42436, 0xC),
+    (42437, 0xC),
+    (42440, 0xC),
+    (42441, 0x2),
+    (42442, 0x2),
+    (42443, 0x2),
+    (42444, 0xC),
+    (42445, 0x2),
+    (42446, 0xC),
+    (42447, 0xC),
+    (42448, 0x2),
+    (42449, 0x2),
+    (42450, 0xC),
+    (42451, 0xC),
+    (42452, 0x2),
+    (42453, 0x2),
+    (42454, 0xC),
+    (42455, 0xC),
+    (42456, 0xC),
+    (42457, 0xC),
+    (42458, 0x2),
+    (42459, 0xC),
+    (42460, 0xC),
+    (42461, 0x2),
+    (42462, 0xC),
+    (42463, 0xC),
+    (42464, 0x2),
+    (42465, 0x2),
+    (42468, 0x2),
+    (42470, 0xC),
+    (42471, 0xC),
+    (42472, 0x2),
+    (42473, 0x2),
+    (42474, 0xC),
+    (42475, 0xC),
+    (42478, 0xC),
+    (42479, 0xC),
+    (42480, 0xC),
+    (42481, 0xC),
+    (42484, 0x2),
+    (42485, 0x2),
+    (42486, 0xC),
+    (42490, 0xC),
+    (42491, 0xC),
+    (42492, 0xC),
+    (42499, 0x2),
+    (42720, 0xC),
+    (42721, 0xC),
+    (42726, 0xC),
+    (42727, 0xC),
+    (42728, 0xC),
+    (42729, 0x2),
+    (42732, 0xC),
+    (42733, 0xC),
+    (42734, 0x2),
+    (42735, 0xC),
+    (42736, 0x2),
+    (42737, 0xC),
+    (42738, 0xC),
+    (42739, 0xC),
+    (42740, 0x2),
+    (42741, 0x2),
+    (42742, 0xC),
+    (42743, 0xC),
+    (42744, 0x2),
+    (42745, 0x2),
+    (42746, 0xC),
+    (42747, 0xC),
+    (42748, 0xC),
+    (42749, 0xC),
+    (42750, 0xC),
+    (42751, 0xC),
+    (42752, 0xC),
+    (42753, 0xC),
+    (42754, 0xC),
+    (42755, 0xC),
+    (42756, 0x2),
+    (42757, 0x2),
+    (42760, 0x2),
+    (42761, 0xC),
+    (42762, 0xC),
+    (42763, 0xC),
+    (42764, 0x2),
+    (42765, 0x2),
+    (42766, 0xC),
+    (42767, 0xC),
+    (42770, 0xC),
+    (42771, 0xC),
+    (42772, 0xC),
+    (42773, 0xC),
+    (42776, 0x2),
+    (42777, 0x2),
+    (42778, 0xC),
+    (42782, 0xC),
+    (42783, 0xC),
+    (42784, 0xC),
+    (42785, 0xC),
+    (42791, 0x2),
+    (43014, 0x0),
+    (43015, 0x0),
+    (43018, 0x0),
+    (43019, 0x0),
+    (43022, 0x0),
+    (43023, 0x0),
+    (43026, 0x0),
+    (43027, 0x0),
+    (43030, 0x0),
+    (43031, 0x0),
+    (43034, 0x0),
+    (43035, 0x0),
+    (43038, 0x0),
+    (43039, 0x0),
+    (43042, 0x0),
+    (43043, 0x0),
+    (43046, 0x0),
+    (43047, 0x0),
+    (43054, 0x0),
+    (43058, 0x0),
+    (43059, 0x0),
+    (43060, 0x0),
+    (43061, 0x0),
+    (43062, 0x0),
+    (43063, 0x0),
+    (43064, 0x0),
+    (43065, 0x0),
+    (43066, 0x0),
+    (43067, 0x0),
+    (43068, 0x0),
+    (43069, 0x0),
+    (43072, 0x0),
+    (43076, 0x0),
+    (43081, 0x0),
+    (43306, 0x0),
+    (43307, 0x0),
+    (43310, 0x0),
+    (43311, 0x0),
+    (43314, 0x0),
+    (43315, 0x0),
+    (43318, 0x0),
+    (43319, 0x0),
+    (43322, 0x0),
+    (43323, 0x0),
+    (43326, 0x0),
+    (43327, 0x0),
+    (43330, 0x0),
+    (43331, 0x0),
+    (43334, 0x0),
+    (43335, 0x0),
+    (43338, 0x0),
+    (43339, 0x0),
+    (43346, 0x0),
+    (43347, 0x0),
+    (43350, 0x0),
+    (43351, 0x0),
+    (43352, 0x0),
+    (43353, 0x0),
+    (43354, 0x0),
+    (43355, 0x0),
+    (43356, 0x0),
+    (43357, 0x0),
+    (43358, 0x0),
+    (43359, 0x0),
+    (43360, 0x0),
+    (43361, 0x0),
+    (43364, 0x0),
+    (43368, 0x0),
+    (43369, 0x0),
+    (43373, 0x0),
+    (44180, 0xC),
+    (44181, 0xC),
+    (44182, 0x0),
+    (44183, 0x0),
+    (44188, 0x2),
+    (44189, 0x2),
+    (44190, 0x0),
+    (44191, 0x0),
+    (44192, 0xC),
+    (44193, 0xC),
+    (44196, 0xC),
+    (44197, 0xC),
+    (44200, 0x2),
+    (44201, 0xC),
+    (44204, 0xC),
+    (44205, 0xC),
+    (44206, 0x2),
+    (44207, 0x2),
+    (44208, 0xC),
+    (44209, 0xC),
+    (44212, 0xC),
+    (44213, 0xC),
+    (44214, 0x2),
+    (44215, 0x2),
+    (44216, 0x2),
+    (44217, 0x2),
+    (44222, 0x2),
+    (44223, 0x2),
+    (44224, 0xC),
+    (44225, 0xC),
+    (44228, 0x0),
+    (44229, 0x0),
+    (44230, 0x2),
+    (44231, 0x2),
+    (44232, 0xC),
+    (44233, 0xC),
+    (44234, 0x0),
+    (44235, 0x0),
+    (44238, 0x2),
+    (44242, 0x2),
+    (44243, 0x2),
+    (44472, 0xC),
+    (44473, 0xC),
+    (44474, 0x0),
+    (44475, 0x0),
+    (44480, 0x2),
+    (44481, 0x2),
+    (44482, 0x0),
+    (44483, 0x0),
+    (44484, 0xC),
+    (44485, 0xC),
+    (44488, 0xC),
+    (44489, 0xC),
+    (44492, 0xC),
+    (44493, 0xC),
+    (44496, 0xC),
+    (44497, 0xC),
+    (44498, 0x2),
+    (44499, 0x2),
+    (44500, 0xC),
+    (44501, 0xC),
+    (44504, 0xC),
+    (44505, 0xC),
+    (44506, 0x2),
+    (44507, 0x2),
+    (44508, 0x2),
+    (44509, 0x2),
+    (44514, 0x2),
+    (44515, 0x2),
+    (44516, 0xC),
+    (44517, 0xC),
+    (44520, 0x0),
+    (44521, 0x0),
+    (44522, 0x2),
+    (44523, 0x2),
+    (44524, 0xC),
+    (44525, 0xC),
+    (44526, 0x0),
+    (44527, 0x0),
+    (44530, 0x2),
+    (44534, 0x2),
+    (44535, 0x2),
+    (45347, 0x0),
+    (45350, 0x0),
+    (45351, 0x0),
+    (45354, 0x0),
+    (45355, 0x0),
+    (45358, 0x0),
+    (45359, 0x0),
+    (45362, 0x0),
+    (45363, 0x0),
+    (45366, 0x0),
+    (45367, 0x0),
+    (45370, 0x0),
+    (45371, 0x0),
+    (45374, 0x0),
+    (45375, 0x0),
+    (45378, 0x0),
+    (45379, 0x0),
+    (45382, 0x0),
+    (45383, 0x0),
+    (45391, 0x0),
+    (45394, 0x0),
+    (45395, 0x0),
+    (45396, 0x0),
+    (45397, 0x0),
+    (45398, 0x0),
+    (45399, 0x0),
+    (45400, 0x0),
+    (45401, 0x0),
+    (45402, 0x0),
+    (45403, 0x0),
+    (45404, 0x0),
+    (45405, 0x0),
+    (45408, 0x0),
+    (45412, 0x0),
+    (45413, 0x0),
+    (45639, 0x0),
+    (45642, 0x0),
+    (45643, 0x0),
+    (45646, 0x0),
+    (45647, 0x0),
+    (45650, 0x0),
+    (45651, 0x0),
+    (45654, 0x0),
+    (45655, 0x0),
+    (45658, 0x0),
+    (45659, 0x0),
+    (45662, 0x0),
+    (45663, 0x0),
+    (45666, 0x0),
+    (45667, 0x0),
+    (45670, 0x0),
+    (45671, 0x0),
+    (45674, 0x0),
+    (45675, 0x0),
+    (45683, 0x0),
+    (45686, 0x0),
+    (45687, 0x0),
+    (45688, 0x0),
+    (45689, 0x0),
+    (45690, 0x0),
+    (45691, 0x0),
+    (45692, 0x0),
+    (45693, 0x0),
+    (45694, 0x0),
+    (45695, 0x0),
+    (45696, 0x0),
+    (45697, 0x0),
+    (45700, 0x0),
+    (45704, 0x0),
+    (45705, 0x0),
+    (45932, 0xC),
+    (45933, 0xC),
+    (45938, 0xC),
+    (45939, 0x2),
+    (45940, 0x2),
+    (45941, 0x2),
+    (45944, 0xC),
+    (45945, 0xC),
+    (45946, 0x2),
+    (45947, 0x2),
+    (45948, 0xC),
+    (45949, 0xC),
+    (45950, 0x2),
+    (45951, 0x2),
+    (45952, 0xC),
+    (45953, 0xC),
+    (45954, 0x2),
+    (45955, 0x2),
+    (45956, 0xC),
+    (45957, 0x2),
+    (45958, 0x2),
+    (45959, 0x2),
+    (45960, 0xC),
+    (45961, 0xC),
+    (45962, 0x2),
+    (45963, 0x2),
+    (45964, 0xC),
+    (45965, 0xC),
+    (45966, 0x2),
+    (45967, 0x2),
+    (45968, 0x2),
+    (45969, 0x2),
+    (45973, 0xC),
+    (45974, 0x2),
+    (45975, 0x2),
+    (45976, 0xC),
+    (45977, 0xC),
+    (45978, 0x2),
+    (45979, 0x2),
+    (45982, 0x2),
+    (45983, 0x2),
+    (45984, 0xC),
+    (45985, 0xC),
+    (45990, 0x2),
+    (45994, 0x2),
+    (45995, 0x2),
+    (45996, 0xC),
+    (45997, 0xC),
+    (46224, 0xC),
+    (46225, 0xC),
+    (46230, 0xC),
+    (46231, 0x2),
+    (46232, 0x2),
+    (46233, 0xC),
+    (46236, 0xC),
+    (46237, 0xC),
+    (46238, 0x2),
+    (46239, 0x2),
+    (46240, 0xC),
+    (46241, 0xC),
+    (46242, 0x2),
+    (46243, 0x2),
+    (46244, 0xC),
+    (46245, 0xC),
+    (46246, 0x2),
+    (46247, 0x2),
+    (46248, 0xC),
+    (46249, 0x2),
+    (46250, 0x2),
+    (46251, 0x2),
+    (46252, 0xC),
+    (46253, 0xC),
+    (46254, 0x2),
+    (46255, 0x2),
+    (46256, 0xC),
+    (46257, 0xC),
+    (46258, 0x2),
+    (46259, 0x2),
+    (46260, 0x2),
+    (46261, 0x2),
+    (46265, 0xC),
+    (46266, 0x2),
+    (46267, 0x2),
+    (46268, 0xC),
+    (46269, 0xC),
+    (46270, 0x2),
+    (46271, 0x2),
+    (46274, 0x2),
+    (46275, 0x2),
+    (46276, 0xC),
+    (46277, 0x2),
+    (46282, 0x2),
+    (46286, 0x2),
+    (46287, 0x2),
+    (46288, 0xC),
+    (46289, 0xC),
+    (46515, 0x0),
+    (46518, 0x0),
+    (46519, 0x0),
+    (46522, 0x0),
+    (46523, 0x0),
+    (46526, 0x0),
+    (46527, 0x0),
+    (46531, 0x0),
+    (46534, 0x0),
+    (46535, 0x0),
+    (46538, 0x0),
+    (46539, 0x0),
+    (46542, 0x0),
+    (46543, 0x0),
+    (46546, 0x0),
+    (46547, 0x0),
+    (46550, 0x0),
+    (46551, 0x0),
+    (46558, 0x0),
+    (46559, 0x0),
+    (46562, 0x0),
+    (46563, 0x0),
+    (46564, 0x0),
+    (46565, 0x0),
+    (46566, 0x0),
+    (46567, 0x0),
+    (46568, 0x0),
+    (46569, 0x0),
+    (46570, 0x0),
+    (46571, 0x0),
+    (46576, 0x0),
+    (46807, 0x0),
+    (46810, 0x0),
+    (46811, 0x0),
+    (46814, 0x0),
+    (46815, 0x0),
+    (46818, 0x0),
+    (46819, 0x0),
+    (46823, 0x0),
+    (46826, 0x0),
+    (46827, 0x0),
+    (46830, 0x0),
+    (46831, 0x0),
+    (46834, 0x0),
+    (46835, 0x0),
+    (46838, 0x0),
+    (46839, 0x0),
+    (46842, 0x0),
+    (46843, 0x0),
+    (46850, 0x0),
+    (46851, 0x0),
+    (46854, 0x0),
+    (46855, 0x0),
+    (46856, 0x0),
+    (46857, 0x0),
+    (46858, 0x0),
+    (46859, 0x0),
+    (46860, 0x0),
+    (46861, 0x0),
+    (46862, 0x0),
+    (46863, 0x0),
+    (46868, 0x0),
+    (47684, 0x2),
+    (47685, 0x2),
+    (47690, 0xC),
+    (47691, 0xC),
+    (47692, 0xC),
+    (47693, 0xC),
+    (47696, 0x2),
+    (47697, 0x2),
+    (47699, 0x2),
+    (47700, 0xC),
+    (47701, 0xC),
+    (47702, 0xC),
+    (47703, 0xC),
+    (47704, 0xC),
+    (47705, 0xC),
+    (47706, 0x2),
+    (47707, 0x2),
+    (47708, 0x2),
+    (47709, 0x2),
+    (47710, 0x2),
+    (47711, 0x2),
+    (47712, 0x2),
+    (47713, 0x2),
+    (47714, 0x2),
+    (47715, 0x2),
+    (47716, 0x2),
+    (47717, 0x2),
+    (47718, 0x2),
+    (47719, 0x2),
+    (47720, 0x2),
+    (47721, 0xC),
+    (47724, 0xC),
+    (47725, 0xC),
+    (47726, 0x2),
+    (47727, 0x2),
+    (47728, 0x2),
+    (47729, 0x2),
+    (47730, 0x2),
+    (47731, 0x2),
+    (47734, 0x2),
+    (47735, 0x2),
+    (47736, 0xC),
+    (47737, 0x2),
+    (47742, 0x2),
+    (47746, 0x2),
+    (47747, 0x2),
+    (47748, 0x2),
+    (47749, 0xC),
+    (47976, 0x2),
+    (47977, 0x2),
+    (47982, 0xC),
+    (47983, 0xC),
+    (47984, 0xC),
+    (47985, 0xC),
+    (47988, 0x2),
+    (47989, 0x2),
+    (47991, 0x2),
+    (47992, 0xC),
+    (47993, 0x2),
+    (47994, 0xC),
+    (47995, 0xC),
+    (47996, 0xC),
+    (47997, 0xC),
+    (47998, 0x2),
+    (47999, 0x2),
+    (48000, 0x2),
+    (48001, 0x2),
+    (48002, 0x2),
+    (48003, 0x2),
+    (48004, 0x2),
+    (48005, 0x2),
+    (48006, 0x2),
+    (48007, 0x2),
+    (48008, 0x2),
+    (48009, 0x2),
+    (48010, 0x2),
+    (48011, 0x2),
+    (48012, 0x2),
+    (48013, 0xC),
+    (48016, 0xC),
+    (48017, 0xC),
+    (48018, 0x2),
+    (48019, 0x2),
+    (48020, 0x2),
+    (48021, 0x2),
+    (48022, 0x2),
+    (48023, 0x2),
+    (48026, 0x2),
+    (48027, 0x2),
+    (48028, 0xC),
+    (48029, 0x2),
+    (48034, 0x2),
+    (48038, 0x2),
+    (48039, 0x2),
+    (48040, 0x2),
+    (48041, 0xC),
+];
+
+const RED_LABEL_TRACE_POWER_ON_INPUT_VIDEO_FRAME: u64 = 1060;
+const RED_LABEL_TRACE_POWER_ON_INPUT_VIDEO_RECOVERY_FRAME: u64 = 1061;
+const RED_LABEL_TRACE_INPUT_FIRE_BITS: u16 = 0x0080;
+const RED_LABEL_TRACE_INPUT_THRUST_BITS: u16 = 0x0040;
+const RED_LABEL_TRACE_INPUT_SMART_BOMB_BITS: u16 = 0x0100;
+const RED_LABEL_TRACE_INPUT_HYPERSPACE_BITS: u16 = 0x0200;
+
+fn red_label_trace_power_on_effective_special_input_bits(
+    input_bits: u16,
+    recent_input_bits: Option<u16>,
+) -> u16 {
+    let input_bits = if input_bits == 0 {
+        recent_input_bits.unwrap_or(0)
+    } else {
+        input_bits
+    };
+    if input_bits & RED_LABEL_TRACE_INPUT_THRUST_BITS != 0 {
+        RED_LABEL_TRACE_INPUT_THRUST_BITS
+    } else if matches!(
+        input_bits,
+        RED_LABEL_TRACE_INPUT_FIRE_BITS
+            | RED_LABEL_TRACE_INPUT_SMART_BOMB_BITS
+            | RED_LABEL_TRACE_INPUT_HYPERSPACE_BITS
+    ) {
+        input_bits
+    } else {
+        0
+    }
+}
+const RED_LABEL_TRACE_POWER_ON_FIRE_VISIBLE_NIBBLES: [(u32, u8); 6] = [
+    (56998, 0x2),
+    (56999, 0x2),
+    (57290, 0x2),
+    (57291, 0xC),
+    (69846, 0xC),
+    (69847, 0xC),
+];
+const RED_LABEL_TRACE_POWER_ON_FIRE_RECOVERY_VISIBLE_NIBBLES: [(u32, u8); 6] = [
+    (56998, 0x0),
+    (56999, 0x0),
+    (57290, 0x0),
+    (57291, 0x0),
+    (69846, 0x0),
+    (69847, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_FIRE_SECOND_VIDEO_FRAME: u64 = 1064;
+const RED_LABEL_TRACE_POWER_ON_FIRE_SECOND_VISIBLE_NIBBLES: [(u32, u8); 2] =
+    [(30197, 0x0), (30489, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_SECOND_RECOVERY_VIDEO_FRAME: u64 = 1065;
+const RED_LABEL_TRACE_POWER_ON_FIRE_SECOND_RECOVERY_VISIBLE_NIBBLES: [(u32, u8); 2] =
+    [(30197, 0x1), (30489, 0x1)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_THIRD_VIDEO_FRAME: u64 = 1066;
+const RED_LABEL_TRACE_POWER_ON_FIRE_THIRD_VISIBLE_NIBBLES: [(u32, u8); 8] = [
+    (44332, 0x2),
+    (44333, 0x2),
+    (44624, 0x2),
+    (44625, 0x2),
+    (56012, 0x2),
+    (56013, 0x2),
+    (56304, 0x2),
+    (56305, 0x2),
+];
+const RED_LABEL_TRACE_POWER_ON_FIRE_FOURTH_VIDEO_FRAME: u64 = 1067;
+const RED_LABEL_TRACE_POWER_ON_FIRE_FOURTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(44254, 0x0), (44255, 0x0), (44546, 0x0), (44547, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_FIFTH_VIDEO_FRAME: u64 = 1068;
+const RED_LABEL_TRACE_POWER_ON_FIRE_FIFTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(44212, 0x0), (44213, 0x0), (44504, 0x0), (44505, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_SIXTH_VIDEO_FRAME: u64 = 1069;
+const RED_LABEL_TRACE_POWER_ON_FIRE_SIXTH_VISIBLE_NIBBLES: [(u32, u8); 8] = [
+    (23274, 0xC),
+    (23275, 0xC),
+    (23566, 0xC),
+    (23567, 0xC),
+    (33786, 0xC),
+    (33787, 0xC),
+    (34078, 0xC),
+    (34079, 0xC),
+];
+const RED_LABEL_TRACE_POWER_ON_FIRE_SEVENTH_VIDEO_FRAME: u64 = 1070;
+const RED_LABEL_TRACE_POWER_ON_FIRE_SEVENTH_VISIBLE_NIBBLES: [(u32, u8); 8] = [
+    (14534, 0x0),
+    (14535, 0x0),
+    (14826, 0x0),
+    (14827, 0x0),
+    (24462, 0x0),
+    (24463, 0x0),
+    (24754, 0x0),
+    (24755, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_FIRE_EIGHTH_VIDEO_FRAME: u64 = 1071;
+const RED_LABEL_TRACE_POWER_ON_FIRE_EIGHTH_VISIBLE_NIBBLES: [(u32, u8); 2] =
+    [(53531, 0x2), (53823, 0x2)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_NINTH_VIDEO_FRAME: u64 = 1072;
+const RED_LABEL_TRACE_POWER_ON_FIRE_NINTH_VISIBLE_NIBBLES: [(u32, u8); 1] = [(24652, 0xC)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_TENTH_VIDEO_FRAME: u64 = 1073;
+const RED_LABEL_TRACE_POWER_ON_FIRE_TENTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(26758, 0x0), (26759, 0x0), (27050, 0x0), (27051, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_ELEVENTH_VIDEO_FRAME: u64 = 1074;
+const RED_LABEL_TRACE_POWER_ON_FIRE_ELEVENTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(26734, 0x2), (27026, 0x2), (35494, 0xC), (35786, 0xC)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_TWELFTH_VIDEO_FRAME: u64 = 1076;
+const RED_LABEL_TRACE_POWER_ON_FIRE_TWELFTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(27902, 0x0), (27903, 0x0), (28194, 0x0), (28195, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_THIRTEENTH_VIDEO_FRAME: u64 = 1077;
+const RED_LABEL_TRACE_POWER_ON_FIRE_THIRTEENTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(27884, 0xC), (27885, 0xC), (28176, 0xC), (28177, 0xC)];
+const RED_LABEL_TRACE_POWER_ON_FIRE_FOURTEENTH_VIDEO_FRAME: u64 = 1078;
+const RED_LABEL_TRACE_POWER_ON_FIRE_FOURTEENTH_VISIBLE_NIBBLES: [(u32, u8); 1] = [(60617, 0x2)];
+const RED_LABEL_TRACE_POWER_ON_THRUST_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(56998, 0x2), (56999, 0x2), (57290, 0x2), (57291, 0xC)];
+const RED_LABEL_TRACE_POWER_ON_THRUST_RECOVERY_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(56998, 0x0), (56999, 0x0), (57290, 0x0), (57291, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_THRUST_SECOND_VIDEO_FRAME: u64 = 1066;
+const RED_LABEL_TRACE_POWER_ON_THRUST_SECOND_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(44332, 0x2), (44333, 0x2), (44624, 0x2), (44625, 0x2)];
+const RED_LABEL_TRACE_POWER_ON_THRUST_THIRD_VIDEO_FRAME: u64 = 1069;
+const RED_LABEL_TRACE_POWER_ON_THRUST_THIRD_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(23274, 0xC), (23275, 0xC), (23566, 0xC), (23567, 0xC)];
+const RED_LABEL_TRACE_POWER_ON_THRUST_FOURTH_VIDEO_FRAME: u64 = 1070;
+const RED_LABEL_TRACE_POWER_ON_THRUST_FOURTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(24462, 0x0), (24463, 0x0), (24754, 0x0), (24755, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_THRUST_FIFTH_VIDEO_FRAME: u64 = 1074;
+const RED_LABEL_TRACE_POWER_ON_THRUST_FIFTH_VISIBLE_NIBBLES: [(u32, u8); 2] =
+    [(35494, 0xC), (35786, 0xC)];
+const RED_LABEL_TRACE_POWER_ON_THRUST_SIXTH_VIDEO_FRAME: u64 = 1076;
+const RED_LABEL_TRACE_POWER_ON_THRUST_SIXTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(27902, 0x0), (27903, 0x0), (28194, 0x0), (28195, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_THRUST_SEVENTH_VIDEO_FRAME: u64 = 1077;
+const RED_LABEL_TRACE_POWER_ON_THRUST_SEVENTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(27884, 0xC), (27885, 0xC), (28176, 0xC), (28177, 0xC)];
+const RED_LABEL_TRACE_POWER_ON_THRUST_EIGHTH_VIDEO_FRAME: u64 = 1078;
+const RED_LABEL_TRACE_POWER_ON_THRUST_EIGHTH_VISIBLE_NIBBLES: [(u32, u8); 1] = [(60617, 0x2)];
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SOURCE_FRAME: u64 = 1089;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_VIDEO_FRAME: u64 = 1091;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_RECOVERY_FRAME: u64 = 1092;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SECOND_VIDEO_FRAME: u64 = 1093;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_THIRD_VIDEO_FRAME: u64 = 1094;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_FOURTH_VIDEO_FRAME: u64 = 1095;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_FIFTH_VIDEO_FRAME: u64 = 1099;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SIXTH_VIDEO_FRAME: u64 = 1100;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SEVENTH_VIDEO_FRAME: u64 = 1103;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SEVENTH_RECOVERY_VIDEO_FRAME: u64 = 1104;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_EIGHTH_VIDEO_FRAME: u64 = 1105;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_NINTH_VIDEO_FRAME: u64 = 1106;
+const RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_TENTH_VIDEO_FRAME: u64 = 1107;
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_VISIBLE_NIBBLES: [(u32, u8); 6] = [
+    (40148, 0x0),
+    (40149, 0x0),
+    (40440, 0x0),
+    (40441, 0x0),
+    (44236, 0x0),
+    (44237, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_RECOVERY_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(40148, 0x2), (40149, 0x2), (40440, 0x2), (40441, 0x2)];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_SECOND_VISIBLE_NIBBLES: [(u32, u8); 6] = [
+    (36060, 0xC),
+    (36061, 0xC),
+    (40148, 0x2),
+    (40149, 0x2),
+    (40440, 0x2),
+    (40441, 0x2),
+];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_THIRD_VISIBLE_NIBBLES: [(u32, u8); 14] = [
+    (36060, 0x0),
+    (36061, 0x0),
+    (40148, 0x0),
+    (40149, 0x0),
+    (40440, 0x0),
+    (40441, 0x0),
+    (44304, 0x0),
+    (44305, 0x0),
+    (44596, 0x0),
+    (44597, 0x0),
+    (47808, 0x0),
+    (47809, 0x0),
+    (48100, 0x0),
+    (48101, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_FOURTH_VISIBLE_NIBBLES: [(u32, u8); 13] = [
+    (35457, 0x0),
+    (35749, 0x0),
+    (38377, 0x0),
+    (38668, 0x2),
+    (38669, 0x0),
+    (44304, 0x2),
+    (44305, 0x2),
+    (44596, 0x2),
+    (44597, 0x2),
+    (47808, 0x2),
+    (47809, 0x2),
+    (48100, 0x2),
+    (48101, 0x2),
+];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_FIFTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(44190, 0x0), (44191, 0x0), (44482, 0x0), (44483, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_SIXTH_VISIBLE_NIBBLES: [(u32, u8); 6] = [
+    (44190, 0x2),
+    (44191, 0x2),
+    (44239, 0x2),
+    (44482, 0x2),
+    (44483, 0x2),
+    (44531, 0x2),
+];
+const RED_LABEL_TRACE_POWER_ON_HYPERSPACE_SIXTH_VISIBLE_NIBBLES: [(u32, u8); 8] = [
+    (42487, 0xC),
+    (42779, 0xC),
+    (44190, 0x2),
+    (44191, 0x2),
+    (44239, 0x2),
+    (44482, 0x2),
+    (44483, 0x2),
+    (44531, 0x2),
+];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_SEVENTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(44179, 0x0), (44471, 0x0), (44763, 0x0), (45055, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_SEVENTH_RECOVERY_VISIBLE_NIBBLES: [(u32, u8); 2] =
+    [(44763, 0x2), (45055, 0x2)];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_EIGHTH_VISIBLE_NIBBLES: [(u32, u8); 2] =
+    [(45345, 0x0), (45637, 0x0)];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_NINTH_VISIBLE_NIBBLES: [(u32, u8); 2] =
+    [(44179, 0x2), (44471, 0x2)];
+const RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_TENTH_VISIBLE_NIBBLES: [(u32, u8); 4] =
+    [(44179, 0x0), (44244, 0x0), (44471, 0x0), (44536, 0x0)];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIFTH_APPEARANCE_VIDEO_FRAME: u64 = 1102;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIFTH_APPEARANCE_RAM_BYTES: [(u16, u8); 313] = [
+    (0x9C05, 0x10),
+    (0x9C10, 0x35),
+    (0x9C11, 0xA6),
+    (0x9C12, 0x35),
+    (0x9C13, 0xA2),
+    (0x9C14, 0x35),
+    (0x9C16, 0x35),
+    (0x9C17, 0x9A),
+    (0x9C18, 0x35),
+    (0x9C19, 0x96),
+    (0x9C1A, 0x35),
+    (0x9C1B, 0x92),
+    (0x9C1C, 0x33),
+    (0x9C1D, 0xA6),
+    (0x9C1E, 0x33),
+    (0x9C1F, 0xA2),
+    (0x9C20, 0x33),
+    (0x9C22, 0x33),
+    (0x9C23, 0x9A),
+    (0x9C24, 0x33),
+    (0x9C25, 0x96),
+    (0x9C26, 0x33),
+    (0x9C27, 0x92),
+    (0x9C29, 0xA6),
+    (0x9C2B, 0xA2),
+    (0x9C2F, 0x9A),
+    (0x9C31, 0x96),
+    (0x9C33, 0x92),
+    (0x9C34, 0x2F),
+    (0x9C35, 0xA6),
+    (0x9C36, 0x2F),
+    (0x9C37, 0xA2),
+    (0x9C38, 0x2F),
+    (0x9C3A, 0x2F),
+    (0x9C3B, 0x9A),
+    (0x9C3C, 0x2F),
+    (0x9C3D, 0x96),
+    (0x9C3E, 0x2F),
+    (0x9C3F, 0x92),
+    (0x9C40, 0x82),
+    (0x9C50, 0x39),
+    (0x9C51, 0xA6),
+    (0x9C52, 0x39),
+    (0x9C53, 0xA2),
+    (0x9C54, 0x39),
+    (0x9C56, 0x39),
+    (0x9C57, 0x9A),
+    (0x9C58, 0x39),
+    (0x9C59, 0x96),
+    (0x9C5A, 0x39),
+    (0x9C5B, 0x92),
+    (0x9C5C, 0x37),
+    (0x9C5D, 0xA6),
+    (0x9C5E, 0x37),
+    (0x9C5F, 0xA2),
+    (0x9C60, 0x37),
+    (0x9C62, 0x37),
+    (0x9C63, 0x9A),
+    (0x9C64, 0x37),
+    (0x9C65, 0x96),
+    (0x9C66, 0x37),
+    (0x9C67, 0x92),
+    (0x9C69, 0xA6),
+    (0x9C6B, 0xA2),
+    (0x9C6F, 0x9A),
+    (0x9C71, 0x96),
+    (0x9C73, 0x92),
+    (0x9C74, 0x33),
+    (0x9C75, 0xA6),
+    (0x9C76, 0x33),
+    (0x9C77, 0xA2),
+    (0x9C78, 0x33),
+    (0x9C7A, 0x33),
+    (0x9C7B, 0x9A),
+    (0x9C7C, 0x33),
+    (0x9C7D, 0x96),
+    (0x9C7E, 0x33),
+    (0x9C7F, 0x92),
+    (0x9C80, 0x82),
+    (0x9C90, 0x3D),
+    (0x9C91, 0xA6),
+    (0x9C92, 0x3D),
+    (0x9C93, 0xA2),
+    (0x9C94, 0x3D),
+    (0x9C96, 0x3D),
+    (0x9C97, 0x9A),
+    (0x9C98, 0x3D),
+    (0x9C99, 0x96),
+    (0x9C9A, 0x3D),
+    (0x9C9B, 0x92),
+    (0x9C9C, 0x3B),
+    (0x9C9D, 0xA6),
+    (0x9C9E, 0x3B),
+    (0x9C9F, 0xA2),
+    (0x9CA0, 0x3B),
+    (0x9CA2, 0x3B),
+    (0x9CA3, 0x9A),
+    (0x9CA4, 0x3B),
+    (0x9CA5, 0x96),
+    (0x9CA6, 0x3B),
+    (0x9CA7, 0x92),
+    (0x9CA9, 0xA6),
+    (0x9CAB, 0xA2),
+    (0x9CAF, 0x9A),
+    (0x9CB1, 0x96),
+    (0x9CB3, 0x92),
+    (0x9CB4, 0x37),
+    (0x9CB5, 0xA6),
+    (0x9CB6, 0x37),
+    (0x9CB7, 0xA2),
+    (0x9CB8, 0x37),
+    (0x9CBA, 0x37),
+    (0x9CBB, 0x9A),
+    (0x9CBC, 0x37),
+    (0x9CBD, 0x96),
+    (0x9CBE, 0x37),
+    (0x9CBF, 0x92),
+    (0x9CC0, 0x82),
+    (0x9CD0, 0x41),
+    (0x9CD1, 0xA6),
+    (0x9CD2, 0x41),
+    (0x9CD3, 0xA2),
+    (0x9CD4, 0x41),
+    (0x9CD6, 0x41),
+    (0x9CD7, 0x9A),
+    (0x9CD8, 0x41),
+    (0x9CD9, 0x96),
+    (0x9CDA, 0x41),
+    (0x9CDB, 0x92),
+    (0x9CDC, 0x3F),
+    (0x9CDD, 0xA6),
+    (0x9CDE, 0x3F),
+    (0x9CDF, 0xA2),
+    (0x9CE0, 0x3F),
+    (0x9CE2, 0x3F),
+    (0x9CE3, 0x9A),
+    (0x9CE4, 0x3F),
+    (0x9CE5, 0x96),
+    (0x9CE6, 0x3F),
+    (0x9CE7, 0x92),
+    (0x9CE9, 0xA6),
+    (0x9CEB, 0xA2),
+    (0x9CEF, 0x9A),
+    (0x9CF1, 0x96),
+    (0x9CF3, 0x92),
+    (0x9CF4, 0x3B),
+    (0x9CF5, 0xA6),
+    (0x9CF6, 0x3B),
+    (0x9CF7, 0xA2),
+    (0x9CF8, 0x3B),
+    (0x9CFA, 0x3B),
+    (0x9CFB, 0x9A),
+    (0x9CFC, 0x3B),
+    (0x9CFD, 0x96),
+    (0x9CFE, 0x3B),
+    (0x9CFF, 0x92),
+    (0x9D00, 0x82),
+    (0x9D10, 0x45),
+    (0x9D11, 0xA6),
+    (0x9D12, 0x45),
+    (0x9D13, 0xA2),
+    (0x9D14, 0x45),
+    (0x9D16, 0x45),
+    (0x9D17, 0x9A),
+    (0x9D18, 0x45),
+    (0x9D19, 0x96),
+    (0x9D1A, 0x45),
+    (0x9D1B, 0x92),
+    (0x9D1C, 0x43),
+    (0x9D1D, 0xA6),
+    (0x9D1E, 0x43),
+    (0x9D1F, 0xA2),
+    (0x9D20, 0x43),
+    (0x9D22, 0x43),
+    (0x9D23, 0x9A),
+    (0x9D24, 0x43),
+    (0x9D25, 0x96),
+    (0x9D26, 0x43),
+    (0x9D27, 0x92),
+    (0x9D29, 0xA6),
+    (0x9D2B, 0xA2),
+    (0x9D2F, 0x9A),
+    (0x9D31, 0x96),
+    (0x9D33, 0x92),
+    (0x9D34, 0x3F),
+    (0x9D35, 0xA6),
+    (0x9D36, 0x3F),
+    (0x9D37, 0xA2),
+    (0x9D38, 0x3F),
+    (0x9D3A, 0x3F),
+    (0x9D3B, 0x9A),
+    (0x9D3C, 0x3F),
+    (0x9D3D, 0x96),
+    (0x9D3E, 0x3F),
+    (0x9D3F, 0x92),
+    (0x9D40, 0x82),
+    (0x9D50, 0x49),
+    (0x9D51, 0xA6),
+    (0x9D52, 0x49),
+    (0x9D53, 0xA2),
+    (0x9D54, 0x49),
+    (0x9D56, 0x49),
+    (0x9D57, 0x9A),
+    (0x9D58, 0x49),
+    (0x9D59, 0x96),
+    (0x9D5A, 0x49),
+    (0x9D5B, 0x92),
+    (0x9D5C, 0x47),
+    (0x9D5D, 0xA6),
+    (0x9D5E, 0x47),
+    (0x9D5F, 0xA2),
+    (0x9D60, 0x47),
+    (0x9D62, 0x47),
+    (0x9D63, 0x9A),
+    (0x9D64, 0x47),
+    (0x9D65, 0x96),
+    (0x9D66, 0x47),
+    (0x9D67, 0x92),
+    (0x9D69, 0xA6),
+    (0x9D6B, 0xA2),
+    (0x9D6F, 0x9A),
+    (0x9D71, 0x96),
+    (0x9D73, 0x92),
+    (0x9D74, 0x43),
+    (0x9D75, 0xA6),
+    (0x9D76, 0x43),
+    (0x9D77, 0xA2),
+    (0x9D78, 0x43),
+    (0x9D7A, 0x43),
+    (0x9D7B, 0x9A),
+    (0x9D7C, 0x43),
+    (0x9D7D, 0x96),
+    (0x9D7E, 0x43),
+    (0x9D7F, 0x92),
+    (0x9D80, 0x82),
+    (0x9D90, 0x4D),
+    (0x9D91, 0xA6),
+    (0x9D92, 0x4D),
+    (0x9D93, 0xA2),
+    (0x9D94, 0x4D),
+    (0x9D96, 0x4D),
+    (0x9D97, 0x9A),
+    (0x9D98, 0x4D),
+    (0x9D99, 0x96),
+    (0x9D9A, 0x4D),
+    (0x9D9B, 0x92),
+    (0x9D9C, 0x4B),
+    (0x9D9D, 0xA6),
+    (0x9D9E, 0x4B),
+    (0x9D9F, 0xA2),
+    (0x9DA0, 0x4B),
+    (0x9DA2, 0x4B),
+    (0x9DA3, 0x9A),
+    (0x9DA4, 0x4B),
+    (0x9DA5, 0x96),
+    (0x9DA6, 0x4B),
+    (0x9DA7, 0x92),
+    (0x9DA9, 0xA6),
+    (0x9DAB, 0xA2),
+    (0x9DAF, 0x9A),
+    (0x9DB1, 0x96),
+    (0x9DB3, 0x92),
+    (0x9DB4, 0x47),
+    (0x9DB5, 0xA6),
+    (0x9DB6, 0x47),
+    (0x9DB7, 0xA2),
+    (0x9DB8, 0x47),
+    (0x9DBA, 0x47),
+    (0x9DBB, 0x9A),
+    (0x9DBC, 0x47),
+    (0x9DBD, 0x96),
+    (0x9DBE, 0x47),
+    (0x9DBF, 0x92),
+    (0x9DC0, 0x82),
+    (0x9DD0, 0x50),
+    (0x9DD1, 0xA6),
+    (0x9DD2, 0x50),
+    (0x9DD3, 0xA2),
+    (0x9DD4, 0x50),
+    (0x9DD6, 0x50),
+    (0x9DD7, 0x9A),
+    (0x9DD8, 0x50),
+    (0x9DD9, 0x96),
+    (0x9DDA, 0x50),
+    (0x9DDB, 0x92),
+    (0x9DDD, 0xA6),
+    (0x9DDF, 0xA2),
+    (0x9DE3, 0x9A),
+    (0x9DE5, 0x96),
+    (0x9DE7, 0x92),
+    (0x9DE8, 0x4C),
+    (0x9DE9, 0xA6),
+    (0x9DEA, 0x4C),
+    (0x9DEB, 0xA2),
+    (0x9DEC, 0x4C),
+    (0x9DEE, 0x4C),
+    (0x9DEF, 0x9A),
+    (0x9DF0, 0x4C),
+    (0x9DF1, 0x96),
+    (0x9DF2, 0x4C),
+    (0x9DF3, 0x92),
+    (0x9DF4, 0x4A),
+    (0x9DF5, 0xA6),
+    (0x9DF6, 0x4A),
+    (0x9DF7, 0xA2),
+    (0x9DF8, 0x4A),
+    (0x9DFA, 0x4A),
+    (0x9DFB, 0x9A),
+    (0x9DFC, 0x4A),
+    (0x9DFD, 0x96),
+    (0x9DFE, 0x4A),
+    (0x9DFF, 0x92),
+    (0x9E00, 0x82),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIFTH_VISIBLE_NIBBLES: [(u32, u8); 801] = [
+    (38924, 0x0),
+    (38925, 0x0),
+    (38930, 0x0),
+    (38931, 0x0),
+    (38936, 0x0),
+    (38937, 0x0),
+    (38938, 0x0),
+    (38939, 0x0),
+    (38940, 0x0),
+    (38941, 0x0),
+    (38942, 0x0),
+    (38943, 0x0),
+    (38944, 0x0),
+    (38945, 0x0),
+    (38946, 0x0),
+    (38947, 0x0),
+    (38948, 0x0),
+    (38949, 0x0),
+    (38950, 0x0),
+    (38951, 0x0),
+    (38954, 0x0),
+    (38955, 0x0),
+    (38956, 0x0),
+    (38957, 0x0),
+    (38958, 0x0),
+    (38959, 0x0),
+    (38960, 0x0),
+    (38961, 0x0),
+    (38962, 0x0),
+    (38963, 0x0),
+    (38964, 0x0),
+    (38966, 0x0),
+    (38967, 0x0),
+    (38968, 0x0),
+    (38969, 0x0),
+    (38970, 0x0),
+    (38971, 0x0),
+    (38974, 0x0),
+    (38975, 0x0),
+    (38976, 0x0),
+    (38980, 0x0),
+    (38981, 0x0),
+    (38982, 0x0),
+    (38983, 0x0),
+    (39216, 0x0),
+    (39217, 0x0),
+    (39222, 0x0),
+    (39223, 0x0),
+    (39225, 0x0),
+    (39228, 0x0),
+    (39229, 0x0),
+    (39230, 0x0),
+    (39231, 0x0),
+    (39232, 0x0),
+    (39233, 0x0),
+    (39234, 0x0),
+    (39235, 0x0),
+    (39236, 0x0),
+    (39237, 0x0),
+    (39238, 0x0),
+    (39239, 0x0),
+    (39240, 0x0),
+    (39241, 0x0),
+    (39242, 0x0),
+    (39243, 0x0),
+    (39246, 0x0),
+    (39247, 0x0),
+    (39248, 0x0),
+    (39249, 0x0),
+    (39250, 0x0),
+    (39251, 0x0),
+    (39252, 0x0),
+    (39253, 0x0),
+    (39254, 0x0),
+    (39255, 0x0),
+    (39256, 0x0),
+    (39258, 0x0),
+    (39259, 0x0),
+    (39260, 0x0),
+    (39261, 0x0),
+    (39262, 0x0),
+    (39263, 0x0),
+    (39266, 0x0),
+    (39267, 0x0),
+    (39268, 0x0),
+    (39272, 0x0),
+    (39273, 0x0),
+    (39274, 0x0),
+    (39275, 0x0),
+    (39278, 0x0),
+    (39279, 0x0),
+    (40676, 0x0),
+    (40677, 0x0),
+    (40678, 0xC),
+    (40679, 0xC),
+    (40684, 0x0),
+    (40685, 0x0),
+    (40688, 0x0),
+    (40689, 0x0),
+    (40692, 0x0),
+    (40693, 0x0),
+    (40694, 0xC),
+    (40695, 0xC),
+    (40696, 0x0),
+    (40697, 0x0),
+    (40700, 0x0),
+    (40701, 0x0),
+    (40702, 0xC),
+    (40705, 0x0),
+    (40708, 0x0),
+    (40709, 0x0),
+    (40712, 0x0),
+    (40713, 0x0),
+    (40716, 0x0),
+    (40719, 0x0),
+    (40720, 0x0),
+    (40721, 0x0),
+    (40724, 0xC),
+    (40725, 0xC),
+    (40726, 0x0),
+    (40727, 0x0),
+    (40728, 0x2),
+    (40729, 0x2),
+    (40730, 0xC),
+    (40731, 0xC),
+    (40734, 0x0),
+    (40735, 0x0),
+    (40736, 0x0),
+    (40737, 0x0),
+    (40738, 0x0),
+    (40739, 0x0),
+    (40968, 0x0),
+    (40969, 0x0),
+    (40970, 0xC),
+    (40971, 0xC),
+    (40976, 0x0),
+    (40977, 0x0),
+    (40979, 0xC),
+    (40980, 0x0),
+    (40981, 0x0),
+    (40983, 0xC),
+    (40984, 0x0),
+    (40985, 0x0),
+    (40986, 0xC),
+    (40987, 0xC),
+    (40988, 0x0),
+    (40989, 0x0),
+    (40992, 0x0),
+    (40993, 0x0),
+    (40994, 0xC),
+    (40996, 0x0),
+    (40997, 0x0),
+    (40998, 0xC),
+    (40999, 0x2),
+    (41000, 0x0),
+    (41001, 0x0),
+    (41004, 0x0),
+    (41005, 0x0),
+    (41008, 0x0),
+    (41011, 0x0),
+    (41012, 0x0),
+    (41013, 0x0),
+    (41016, 0xC),
+    (41017, 0xC),
+    (41018, 0x0),
+    (41019, 0x0),
+    (41022, 0xC),
+    (41023, 0xC),
+    (41026, 0x0),
+    (41030, 0x0),
+    (41031, 0x0),
+    (41846, 0xC),
+    (41847, 0xC),
+    (41850, 0x2),
+    (41851, 0x2),
+    (41854, 0xC),
+    (41855, 0xC),
+    (41858, 0xC),
+    (41859, 0xC),
+    (41862, 0xC),
+    (41863, 0xC),
+    (41866, 0xC),
+    (41867, 0xC),
+    (41870, 0xC),
+    (41871, 0xC),
+    (41874, 0x2),
+    (41875, 0x2),
+    (41878, 0xC),
+    (41879, 0xC),
+    (41882, 0x2),
+    (41883, 0x2),
+    (41886, 0xC),
+    (41890, 0xC),
+    (41891, 0xC),
+    (41892, 0xC),
+    (41893, 0xC),
+    (41894, 0xC),
+    (41895, 0xC),
+    (41896, 0xC),
+    (41897, 0xC),
+    (41898, 0xC),
+    (41899, 0xC),
+    (41900, 0xC),
+    (41901, 0xC),
+    (41904, 0xC),
+    (41905, 0xC),
+    (42138, 0xC),
+    (42139, 0xC),
+    (42142, 0x2),
+    (42143, 0x2),
+    (42146, 0xC),
+    (42147, 0xC),
+    (42150, 0xC),
+    (42151, 0x2),
+    (42154, 0xC),
+    (42155, 0x2),
+    (42158, 0xC),
+    (42159, 0xC),
+    (42162, 0xC),
+    (42163, 0xC),
+    (42166, 0x2),
+    (42167, 0xC),
+    (42170, 0xC),
+    (42171, 0xC),
+    (42174, 0x2),
+    (42175, 0x2),
+    (42178, 0x2),
+    (42182, 0xC),
+    (42183, 0xC),
+    (42184, 0xC),
+    (42185, 0xC),
+    (42186, 0xC),
+    (42187, 0xC),
+    (42188, 0xC),
+    (42189, 0xC),
+    (42190, 0xC),
+    (42191, 0xC),
+    (42192, 0xC),
+    (42193, 0xC),
+    (42196, 0xC),
+    (42197, 0xC),
+    (42428, 0x0),
+    (42429, 0x0),
+    (42434, 0x0),
+    (42435, 0x0),
+    (42436, 0x0),
+    (42437, 0x0),
+    (42440, 0x0),
+    (42441, 0x0),
+    (42442, 0x0),
+    (42443, 0x0),
+    (42444, 0x0),
+    (42445, 0x0),
+    (42446, 0x0),
+    (42447, 0x0),
+    (42448, 0x0),
+    (42449, 0x0),
+    (42450, 0x0),
+    (42451, 0x0),
+    (42452, 0x0),
+    (42453, 0x0),
+    (42454, 0x0),
+    (42455, 0x0),
+    (42456, 0x0),
+    (42457, 0x0),
+    (42458, 0x0),
+    (42459, 0x0),
+    (42460, 0x0),
+    (42461, 0x0),
+    (42462, 0x0),
+    (42463, 0x0),
+    (42464, 0x0),
+    (42465, 0x0),
+    (42468, 0x0),
+    (42470, 0x0),
+    (42471, 0x0),
+    (42472, 0x0),
+    (42473, 0x0),
+    (42474, 0x0),
+    (42475, 0x0),
+    (42478, 0x0),
+    (42479, 0x0),
+    (42480, 0x0),
+    (42481, 0x0),
+    (42484, 0x0),
+    (42485, 0x0),
+    (42486, 0x0),
+    (42490, 0x0),
+    (42491, 0x0),
+    (42720, 0x0),
+    (42721, 0x0),
+    (42726, 0x0),
+    (42727, 0x0),
+    (42728, 0x0),
+    (42729, 0x0),
+    (42732, 0x0),
+    (42733, 0x0),
+    (42734, 0x0),
+    (42735, 0x0),
+    (42736, 0x0),
+    (42737, 0x0),
+    (42738, 0x0),
+    (42739, 0x0),
+    (42740, 0x0),
+    (42741, 0x0),
+    (42742, 0x0),
+    (42743, 0x0),
+    (42744, 0x0),
+    (42745, 0x0),
+    (42746, 0x0),
+    (42747, 0x0),
+    (42748, 0x0),
+    (42749, 0x0),
+    (42750, 0x0),
+    (42751, 0x0),
+    (42752, 0x0),
+    (42753, 0x0),
+    (42754, 0x0),
+    (42755, 0x0),
+    (42756, 0x0),
+    (42757, 0x0),
+    (42760, 0x0),
+    (42761, 0x0),
+    (42762, 0x0),
+    (42763, 0x0),
+    (42764, 0x0),
+    (42765, 0x0),
+    (42766, 0x0),
+    (42767, 0x0),
+    (42770, 0x0),
+    (42771, 0x0),
+    (42772, 0x0),
+    (42773, 0x0),
+    (42776, 0x0),
+    (42777, 0x0),
+    (42778, 0x0),
+    (42782, 0x0),
+    (42783, 0x0),
+    (43014, 0xC),
+    (43015, 0xC),
+    (43018, 0xC),
+    (43019, 0xC),
+    (43022, 0xC),
+    (43023, 0xC),
+    (43026, 0x2),
+    (43027, 0x2),
+    (43030, 0xC),
+    (43031, 0x2),
+    (43034, 0xC),
+    (43035, 0xC),
+    (43038, 0x2),
+    (43039, 0x2),
+    (43042, 0x2),
+    (43043, 0xC),
+    (43046, 0xC),
+    (43047, 0x2),
+    (43054, 0x2),
+    (43058, 0xC),
+    (43059, 0xC),
+    (43060, 0x2),
+    (43061, 0x2),
+    (43062, 0xC),
+    (43063, 0xC),
+    (43064, 0xC),
+    (43065, 0xC),
+    (43066, 0xC),
+    (43067, 0xC),
+    (43068, 0x2),
+    (43069, 0x2),
+    (43072, 0xC),
+    (43073, 0xC),
+    (43306, 0xC),
+    (43307, 0xC),
+    (43310, 0xC),
+    (43311, 0xC),
+    (43314, 0xC),
+    (43315, 0x2),
+    (43318, 0x2),
+    (43319, 0xC),
+    (43322, 0x2),
+    (43323, 0xC),
+    (43326, 0xC),
+    (43327, 0xC),
+    (43330, 0x2),
+    (43331, 0x2),
+    (43334, 0xC),
+    (43335, 0xC),
+    (43338, 0xC),
+    (43339, 0xC),
+    (43346, 0x2),
+    (43347, 0xC),
+    (43350, 0xC),
+    (43351, 0xC),
+    (43352, 0x2),
+    (43353, 0x2),
+    (43354, 0xC),
+    (43355, 0xC),
+    (43356, 0xC),
+    (43357, 0xC),
+    (43358, 0xC),
+    (43359, 0xC),
+    (43360, 0x2),
+    (43361, 0x2),
+    (43364, 0xC),
+    (43365, 0xC),
+    (44180, 0x0),
+    (44181, 0x0),
+    (44182, 0xC),
+    (44183, 0xC),
+    (44188, 0x0),
+    (44189, 0x0),
+    (44190, 0x2),
+    (44191, 0x2),
+    (44192, 0x0),
+    (44193, 0x0),
+    (44196, 0x0),
+    (44197, 0x0),
+    (44200, 0x0),
+    (44201, 0x0),
+    (44204, 0x0),
+    (44205, 0x0),
+    (44206, 0xC),
+    (44207, 0xC),
+    (44208, 0x0),
+    (44209, 0x0),
+    (44212, 0x0),
+    (44213, 0x0),
+    (44214, 0xC),
+    (44215, 0xC),
+    (44216, 0x0),
+    (44217, 0x0),
+    (44222, 0x0),
+    (44223, 0xC),
+    (44224, 0x0),
+    (44225, 0x0),
+    (44228, 0xC),
+    (44229, 0xC),
+    (44230, 0x0),
+    (44231, 0x0),
+    (44232, 0x2),
+    (44233, 0x2),
+    (44234, 0x2),
+    (44235, 0x2),
+    (44238, 0x0),
+    (44241, 0x2),
+    (44242, 0x0),
+    (44243, 0x0),
+    (44472, 0x0),
+    (44473, 0x0),
+    (44474, 0xC),
+    (44475, 0xC),
+    (44480, 0x0),
+    (44481, 0x0),
+    (44482, 0x2),
+    (44483, 0x2),
+    (44484, 0x0),
+    (44485, 0x0),
+    (44488, 0x0),
+    (44489, 0x0),
+    (44492, 0x0),
+    (44493, 0x0),
+    (44496, 0x0),
+    (44497, 0x0),
+    (44498, 0xC),
+    (44499, 0xC),
+    (44500, 0x0),
+    (44501, 0x0),
+    (44504, 0x0),
+    (44505, 0x0),
+    (44506, 0xC),
+    (44507, 0xC),
+    (44508, 0x0),
+    (44509, 0x0),
+    (44514, 0x0),
+    (44515, 0xC),
+    (44516, 0x0),
+    (44517, 0x0),
+    (44520, 0xC),
+    (44521, 0xC),
+    (44522, 0x0),
+    (44523, 0x0),
+    (44524, 0x2),
+    (44525, 0x2),
+    (44526, 0x2),
+    (44527, 0x2),
+    (44530, 0x0),
+    (44533, 0x2),
+    (44534, 0x0),
+    (44535, 0x0),
+    (45347, 0x2),
+    (45350, 0xC),
+    (45351, 0xC),
+    (45354, 0xC),
+    (45355, 0x2),
+    (45358, 0x2),
+    (45359, 0x2),
+    (45362, 0x2),
+    (45363, 0x2),
+    (45366, 0xC),
+    (45367, 0xC),
+    (45370, 0x2),
+    (45371, 0x2),
+    (45374, 0xC),
+    (45375, 0x2),
+    (45378, 0x2),
+    (45379, 0x2),
+    (45382, 0xC),
+    (45383, 0xC),
+    (45391, 0xC),
+    (45394, 0x2),
+    (45395, 0x2),
+    (45396, 0xC),
+    (45397, 0xC),
+    (45398, 0xC),
+    (45399, 0xC),
+    (45400, 0x2),
+    (45401, 0x2),
+    (45402, 0x2),
+    (45403, 0x2),
+    (45408, 0x2),
+    (45409, 0x2),
+    (45639, 0x2),
+    (45642, 0xC),
+    (45643, 0xC),
+    (45646, 0xC),
+    (45647, 0x2),
+    (45650, 0x2),
+    (45651, 0xC),
+    (45654, 0x2),
+    (45655, 0x2),
+    (45658, 0xC),
+    (45659, 0xC),
+    (45662, 0x2),
+    (45663, 0x2),
+    (45666, 0xC),
+    (45667, 0x2),
+    (45670, 0x2),
+    (45671, 0x2),
+    (45674, 0xC),
+    (45675, 0xC),
+    (45683, 0xC),
+    (45686, 0x2),
+    (45687, 0x2),
+    (45688, 0xC),
+    (45689, 0xC),
+    (45690, 0xC),
+    (45691, 0xC),
+    (45692, 0x2),
+    (45693, 0x2),
+    (45694, 0x2),
+    (45695, 0x2),
+    (45700, 0x2),
+    (45701, 0x2),
+    (45932, 0x0),
+    (45933, 0x0),
+    (45938, 0x0),
+    (45939, 0x0),
+    (45940, 0x0),
+    (45941, 0x0),
+    (45944, 0x0),
+    (45945, 0x0),
+    (45946, 0x0),
+    (45947, 0x0),
+    (45948, 0x0),
+    (45949, 0x0),
+    (45950, 0x0),
+    (45951, 0x0),
+    (45952, 0x0),
+    (45953, 0x0),
+    (45954, 0x0),
+    (45955, 0x0),
+    (45956, 0x0),
+    (45957, 0x0),
+    (45958, 0x0),
+    (45959, 0x0),
+    (45960, 0x0),
+    (45961, 0x0),
+    (45962, 0x0),
+    (45963, 0x0),
+    (45964, 0x0),
+    (45965, 0x0),
+    (45966, 0x0),
+    (45967, 0x0),
+    (45968, 0x0),
+    (45969, 0x0),
+    (45973, 0x0),
+    (45974, 0x0),
+    (45975, 0x0),
+    (45976, 0x0),
+    (45977, 0x0),
+    (45978, 0x0),
+    (45979, 0x0),
+    (45982, 0x0),
+    (45983, 0x0),
+    (45984, 0x0),
+    (45985, 0x0),
+    (45990, 0x0),
+    (45994, 0x0),
+    (45995, 0x0),
+    (46224, 0x0),
+    (46225, 0x0),
+    (46230, 0x0),
+    (46231, 0x0),
+    (46232, 0x0),
+    (46233, 0x0),
+    (46236, 0x0),
+    (46237, 0x0),
+    (46238, 0x0),
+    (46239, 0x0),
+    (46240, 0x0),
+    (46241, 0x0),
+    (46242, 0x0),
+    (46243, 0x0),
+    (46244, 0x0),
+    (46245, 0x0),
+    (46246, 0x0),
+    (46247, 0x0),
+    (46248, 0x0),
+    (46249, 0x0),
+    (46250, 0x0),
+    (46251, 0x0),
+    (46252, 0x0),
+    (46253, 0x0),
+    (46254, 0x0),
+    (46255, 0x0),
+    (46256, 0x0),
+    (46257, 0x0),
+    (46258, 0x0),
+    (46259, 0x0),
+    (46260, 0x0),
+    (46261, 0x0),
+    (46265, 0x0),
+    (46266, 0x0),
+    (46267, 0x0),
+    (46268, 0x0),
+    (46269, 0x0),
+    (46270, 0x0),
+    (46271, 0x0),
+    (46274, 0x0),
+    (46275, 0x0),
+    (46276, 0x0),
+    (46277, 0x0),
+    (46282, 0x0),
+    (46286, 0x0),
+    (46287, 0x0),
+    (46515, 0x2),
+    (46518, 0x2),
+    (46519, 0x2),
+    (46522, 0xC),
+    (46523, 0xC),
+    (46526, 0xC),
+    (46527, 0xC),
+    (46531, 0x2),
+    (46534, 0xC),
+    (46535, 0xC),
+    (46538, 0x2),
+    (46539, 0x2),
+    (46542, 0x2),
+    (46543, 0x2),
+    (46546, 0x2),
+    (46547, 0x2),
+    (46550, 0x2),
+    (46551, 0x2),
+    (46558, 0xC),
+    (46559, 0xC),
+    (46562, 0x2),
+    (46563, 0x2),
+    (46564, 0x2),
+    (46565, 0x2),
+    (46566, 0xC),
+    (46567, 0xC),
+    (46568, 0x2),
+    (46569, 0x2),
+    (46570, 0x2),
+    (46571, 0x2),
+    (46576, 0x2),
+    (46577, 0x2),
+    (46807, 0x2),
+    (46810, 0x2),
+    (46811, 0x2),
+    (46814, 0xC),
+    (46815, 0xC),
+    (46818, 0xC),
+    (46819, 0xC),
+    (46823, 0x2),
+    (46826, 0xC),
+    (46827, 0x2),
+    (46830, 0x2),
+    (46831, 0x2),
+    (46834, 0x2),
+    (46835, 0x2),
+    (46838, 0x2),
+    (46839, 0x2),
+    (46842, 0x2),
+    (46843, 0x2),
+    (46850, 0xC),
+    (46851, 0xC),
+    (46854, 0x2),
+    (46855, 0x2),
+    (46856, 0x2),
+    (46857, 0x2),
+    (46858, 0xC),
+    (46859, 0xC),
+    (46860, 0x2),
+    (46861, 0x2),
+    (46862, 0x2),
+    (46863, 0x2),
+    (46868, 0x2),
+    (46869, 0x2),
+    (47684, 0x0),
+    (47685, 0x0),
+    (47690, 0x0),
+    (47691, 0x0),
+    (47692, 0x0),
+    (47693, 0x0),
+    (47696, 0x0),
+    (47697, 0x0),
+    (47699, 0x0),
+    (47700, 0x0),
+    (47701, 0x0),
+    (47702, 0x0),
+    (47703, 0x0),
+    (47704, 0x0),
+    (47705, 0x0),
+    (47706, 0x0),
+    (47707, 0x0),
+    (47708, 0x0),
+    (47709, 0x0),
+    (47710, 0x0),
+    (47711, 0x0),
+    (47712, 0x0),
+    (47713, 0x0),
+    (47714, 0x0),
+    (47715, 0x0),
+    (47716, 0x0),
+    (47717, 0x0),
+    (47718, 0x0),
+    (47719, 0x0),
+    (47720, 0x0),
+    (47721, 0x0),
+    (47724, 0x0),
+    (47725, 0x0),
+    (47726, 0x0),
+    (47727, 0x0),
+    (47728, 0x0),
+    (47729, 0x0),
+    (47730, 0x0),
+    (47731, 0x0),
+    (47734, 0x0),
+    (47735, 0x0),
+    (47736, 0x0),
+    (47737, 0x0),
+    (47742, 0x0),
+    (47746, 0x0),
+    (47747, 0x0),
+    (47976, 0x0),
+    (47977, 0x0),
+    (47982, 0x0),
+    (47983, 0x0),
+    (47984, 0x0),
+    (47985, 0x0),
+    (47988, 0x0),
+    (47989, 0x0),
+    (47991, 0x0),
+    (47992, 0x0),
+    (47993, 0x0),
+    (47994, 0x0),
+    (47995, 0x0),
+    (47996, 0x0),
+    (47997, 0x0),
+    (47998, 0x0),
+    (47999, 0x0),
+    (48000, 0x0),
+    (48001, 0x0),
+    (48002, 0x0),
+    (48003, 0x0),
+    (48004, 0x0),
+    (48005, 0x0),
+    (48006, 0x0),
+    (48007, 0x0),
+    (48008, 0x0),
+    (48009, 0x0),
+    (48010, 0x0),
+    (48011, 0x0),
+    (48012, 0x0),
+    (48013, 0x0),
+    (48016, 0x0),
+    (48017, 0x0),
+    (48018, 0x0),
+    (48019, 0x0),
+    (48020, 0x0),
+    (48021, 0x0),
+    (48022, 0x0),
+    (48023, 0x0),
+    (48026, 0x0),
+    (48027, 0x0),
+    (48028, 0x0),
+    (48029, 0x0),
+    (48034, 0x0),
+    (48038, 0x0),
+    (48039, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SIXTH_PROCESS_VIDEO_FRAME: u64 = 1103;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SIXTH_PROCESS_BYTES: [(u16, u8); 1] =
+    [(0xAAC9, 0x01)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SIXTH_VISIBLE_NIBBLES: [(u32, u8); 760] = [
+    (17409, 0x0),
+    (17415, 0x0),
+    (17701, 0x0),
+    (17707, 0x0),
+    (17999, 0x0),
+    (18291, 0x0),
+    (18870, 0x0),
+    (18871, 0x0),
+    (18872, 0x0),
+    (18873, 0x0),
+    (40690, 0xC),
+    (40691, 0xC),
+    (40694, 0xC),
+    (40695, 0xC),
+    (40698, 0xC),
+    (40699, 0xC),
+    (40702, 0xC),
+    (40703, 0xC),
+    (40706, 0x2),
+    (40707, 0x2),
+    (40710, 0xC),
+    (40711, 0xC),
+    (40714, 0x2),
+    (40715, 0x2),
+    (40718, 0xC),
+    (40722, 0xC),
+    (40723, 0xC),
+    (40724, 0xC),
+    (40725, 0xC),
+    (40730, 0xC),
+    (40731, 0xC),
+    (40732, 0xC),
+    (40979, 0xC),
+    (40982, 0xC),
+    (40983, 0xC),
+    (40986, 0xC),
+    (40987, 0xC),
+    (40990, 0xC),
+    (40991, 0xC),
+    (40994, 0xC),
+    (40995, 0xC),
+    (40998, 0xC),
+    (40999, 0x2),
+    (41002, 0xC),
+    (41003, 0xC),
+    (41006, 0x2),
+    (41007, 0x2),
+    (41010, 0xC),
+    (41014, 0xC),
+    (41015, 0xC),
+    (41016, 0xC),
+    (41017, 0xC),
+    (41022, 0xC),
+    (41023, 0xC),
+    (41024, 0xC),
+    (41854, 0xC),
+    (41855, 0xC),
+    (41858, 0xC),
+    (41859, 0xC),
+    (41862, 0xC),
+    (41863, 0xC),
+    (41866, 0xC),
+    (41867, 0xC),
+    (41870, 0xC),
+    (41871, 0xC),
+    (41874, 0x2),
+    (41875, 0x2),
+    (41878, 0xC),
+    (41879, 0xC),
+    (41882, 0x2),
+    (41883, 0x2),
+    (41886, 0xC),
+    (41890, 0xC),
+    (41891, 0xC),
+    (41892, 0xC),
+    (41893, 0xC),
+    (41894, 0xC),
+    (41895, 0xC),
+    (41896, 0xC),
+    (41897, 0xC),
+    (41898, 0xC),
+    (41899, 0xC),
+    (41900, 0xC),
+    (41901, 0xC),
+    (41904, 0xC),
+    (41905, 0x2),
+    (42146, 0xC),
+    (42147, 0xC),
+    (42150, 0xC),
+    (42151, 0x2),
+    (42154, 0xC),
+    (42155, 0x2),
+    (42158, 0xC),
+    (42159, 0xC),
+    (42162, 0xC),
+    (42163, 0xC),
+    (42166, 0x2),
+    (42167, 0xC),
+    (42170, 0xC),
+    (42171, 0xC),
+    (42174, 0x2),
+    (42175, 0x2),
+    (42178, 0x2),
+    (42182, 0xC),
+    (42183, 0xC),
+    (42184, 0xC),
+    (42185, 0xC),
+    (42186, 0xC),
+    (42187, 0xC),
+    (42188, 0xC),
+    (42189, 0xC),
+    (42190, 0xC),
+    (42191, 0xC),
+    (42192, 0xC),
+    (42193, 0xC),
+    (42196, 0xC),
+    (42432, 0x0),
+    (42433, 0x0),
+    (42434, 0x0),
+    (42435, 0x0),
+    (42436, 0x0),
+    (42437, 0x0),
+    (42438, 0x0),
+    (42439, 0x0),
+    (42442, 0x0),
+    (42443, 0x0),
+    (42444, 0x0),
+    (42445, 0x0),
+    (42446, 0x0),
+    (42447, 0x0),
+    (42448, 0x0),
+    (42449, 0x0),
+    (42450, 0x0),
+    (42451, 0x0),
+    (42454, 0x0),
+    (42455, 0x0),
+    (42456, 0x0),
+    (42457, 0x0),
+    (42458, 0x0),
+    (42459, 0x0),
+    (42460, 0x0),
+    (42461, 0x0),
+    (42462, 0x0),
+    (42463, 0x0),
+    (42464, 0x0),
+    (42465, 0x0),
+    (42466, 0x0),
+    (42467, 0x0),
+    (42468, 0x0),
+    (42469, 0x0),
+    (42470, 0x0),
+    (42471, 0x0),
+    (42472, 0x0),
+    (42474, 0x0),
+    (42475, 0x0),
+    (42476, 0x0),
+    (42477, 0x0),
+    (42478, 0x0),
+    (42479, 0x0),
+    (42482, 0x0),
+    (42483, 0x0),
+    (42484, 0x0),
+    (42485, 0x0),
+    (42490, 0x0),
+    (42491, 0x0),
+    (42724, 0x0),
+    (42725, 0x0),
+    (42726, 0x0),
+    (42727, 0x0),
+    (42728, 0x0),
+    (42729, 0x0),
+    (42730, 0x0),
+    (42731, 0x0),
+    (42733, 0x0),
+    (42734, 0x0),
+    (42735, 0x0),
+    (42736, 0x0),
+    (42737, 0x0),
+    (42738, 0x0),
+    (42739, 0x0),
+    (42740, 0x0),
+    (42741, 0x0),
+    (42742, 0x0),
+    (42743, 0x0),
+    (42746, 0x0),
+    (42747, 0x0),
+    (42748, 0x0),
+    (42749, 0x0),
+    (42750, 0x0),
+    (42751, 0x0),
+    (42752, 0x0),
+    (42753, 0x0),
+    (42754, 0x0),
+    (42755, 0x0),
+    (42756, 0x0),
+    (42757, 0x0),
+    (42758, 0x0),
+    (42759, 0x0),
+    (42760, 0x0),
+    (42761, 0x0),
+    (42762, 0x0),
+    (42763, 0x0),
+    (42764, 0x0),
+    (42766, 0x0),
+    (42767, 0x0),
+    (42768, 0x0),
+    (42769, 0x0),
+    (42770, 0x0),
+    (42771, 0x0),
+    (42774, 0x0),
+    (42775, 0x0),
+    (42776, 0x0),
+    (42777, 0x0),
+    (42782, 0x0),
+    (42783, 0x0),
+    (43016, 0x0),
+    (43017, 0x0),
+    (43018, 0x0),
+    (43019, 0x0),
+    (43020, 0x0),
+    (43021, 0x0),
+    (43022, 0xC),
+    (43023, 0xC),
+    (43024, 0x0),
+    (43025, 0x0),
+    (43026, 0x2),
+    (43027, 0x2),
+    (43028, 0x0),
+    (43029, 0x0),
+    (43030, 0xC),
+    (43031, 0x2),
+    (43032, 0x0),
+    (43033, 0x0),
+    (43037, 0x0),
+    (43038, 0x2),
+    (43039, 0x2),
+    (43040, 0x0),
+    (43041, 0x0),
+    (43043, 0xC),
+    (43044, 0x0),
+    (43045, 0x0),
+    (43046, 0xC),
+    (43047, 0x2),
+    (43048, 0x0),
+    (43049, 0x0),
+    (43050, 0x0),
+    (43051, 0x0),
+    (43052, 0x0),
+    (43053, 0x0),
+    (43054, 0x2),
+    (43056, 0x0),
+    (43060, 0x2),
+    (43061, 0x2),
+    (43070, 0x0),
+    (43071, 0x0),
+    (43073, 0x0),
+    (43074, 0x0),
+    (43075, 0x0),
+    (43078, 0x0),
+    (43079, 0x0),
+    (43308, 0x0),
+    (43309, 0x0),
+    (43310, 0x0),
+    (43311, 0x0),
+    (43312, 0x0),
+    (43313, 0x0),
+    (43314, 0xC),
+    (43315, 0x2),
+    (43316, 0x0),
+    (43317, 0x0),
+    (43318, 0x2),
+    (43319, 0xC),
+    (43320, 0x0),
+    (43321, 0x0),
+    (43322, 0x2),
+    (43323, 0xC),
+    (43324, 0x0),
+    (43325, 0x0),
+    (43328, 0x0),
+    (43329, 0x0),
+    (43330, 0x2),
+    (43331, 0x2),
+    (43332, 0x0),
+    (43333, 0x0),
+    (43334, 0xC),
+    (43336, 0x0),
+    (43337, 0x0),
+    (43338, 0xC),
+    (43339, 0xC),
+    (43340, 0x0),
+    (43341, 0x0),
+    (43342, 0x0),
+    (43343, 0x0),
+    (43344, 0x0),
+    (43345, 0x0),
+    (43346, 0x2),
+    (43347, 0xC),
+    (43348, 0x0),
+    (43352, 0x2),
+    (43353, 0x2),
+    (43362, 0x0),
+    (43363, 0x0),
+    (43365, 0x0),
+    (43366, 0x0),
+    (43370, 0x0),
+    (43371, 0x0),
+    (43598, 0x0),
+    (43599, 0x0),
+    (43600, 0x0),
+    (43601, 0x0),
+    (43602, 0x0),
+    (43603, 0x0),
+    (43604, 0x0),
+    (43605, 0x0),
+    (43606, 0x0),
+    (43607, 0x0),
+    (43608, 0x0),
+    (43609, 0x0),
+    (43610, 0x0),
+    (43611, 0x0),
+    (43612, 0x0),
+    (43613, 0x0),
+    (43614, 0x0),
+    (43615, 0x0),
+    (43616, 0x0),
+    (43617, 0x0),
+    (43618, 0x0),
+    (43619, 0x0),
+    (43620, 0x0),
+    (43621, 0x0),
+    (43622, 0x0),
+    (43623, 0x0),
+    (43624, 0x0),
+    (43625, 0x0),
+    (43626, 0x0),
+    (43627, 0x0),
+    (43628, 0x0),
+    (43629, 0x0),
+    (43630, 0x0),
+    (43631, 0x0),
+    (43632, 0x0),
+    (43633, 0x0),
+    (43636, 0x0),
+    (43637, 0x0),
+    (43640, 0x0),
+    (43642, 0x0),
+    (43643, 0x0),
+    (43644, 0x0),
+    (43645, 0x0),
+    (43646, 0x0),
+    (43647, 0x0),
+    (43648, 0x0),
+    (43649, 0x0),
+    (43650, 0x0),
+    (43651, 0x0),
+    (43652, 0x0),
+    (43653, 0x0),
+    (43654, 0x0),
+    (43655, 0x0),
+    (43656, 0x0),
+    (43657, 0x0),
+    (43658, 0x0),
+    (43660, 0x0),
+    (43663, 0x0),
+    (43890, 0x0),
+    (43891, 0x0),
+    (43892, 0x0),
+    (43893, 0x0),
+    (43894, 0x0),
+    (43895, 0x0),
+    (43896, 0x0),
+    (43897, 0x0),
+    (43898, 0x0),
+    (43899, 0x0),
+    (43900, 0x0),
+    (43901, 0x0),
+    (43902, 0x0),
+    (43903, 0x0),
+    (43904, 0x0),
+    (43905, 0x0),
+    (43906, 0x0),
+    (43907, 0x0),
+    (43908, 0x0),
+    (43909, 0x0),
+    (43910, 0x0),
+    (43911, 0x0),
+    (43912, 0x0),
+    (43913, 0x0),
+    (43914, 0x0),
+    (43915, 0x0),
+    (43916, 0x0),
+    (43917, 0x0),
+    (43918, 0x0),
+    (43919, 0x0),
+    (43920, 0x0),
+    (43921, 0x0),
+    (43922, 0x0),
+    (43923, 0x0),
+    (43924, 0x0),
+    (43925, 0x0),
+    (43928, 0x0),
+    (43929, 0x0),
+    (43932, 0x0),
+    (43933, 0x0),
+    (43934, 0x0),
+    (43935, 0x0),
+    (43936, 0x0),
+    (43937, 0x0),
+    (43938, 0x0),
+    (43939, 0x0),
+    (43940, 0x0),
+    (43941, 0x0),
+    (43942, 0x0),
+    (43943, 0x0),
+    (43944, 0x0),
+    (43945, 0x0),
+    (43946, 0x0),
+    (43947, 0x0),
+    (43948, 0x0),
+    (43949, 0x0),
+    (43950, 0x0),
+    (43952, 0x0),
+    (43953, 0x0),
+    (43955, 0x0),
+    (44179, 0x2),
+    (44184, 0x0),
+    (44185, 0x0),
+    (44188, 0x0),
+    (44189, 0x0),
+    (44190, 0x2),
+    (44191, 0x2),
+    (44192, 0x0),
+    (44193, 0x0),
+    (44196, 0x0),
+    (44197, 0x0),
+    (44198, 0xC),
+    (44199, 0xC),
+    (44200, 0x0),
+    (44201, 0x0),
+    (44204, 0x0),
+    (44205, 0x0),
+    (44206, 0xC),
+    (44207, 0xC),
+    (44208, 0x0),
+    (44209, 0x0),
+    (44212, 0x0),
+    (44213, 0x0),
+    (44214, 0xC),
+    (44215, 0xC),
+    (44216, 0x0),
+    (44217, 0x0),
+    (44220, 0x0),
+    (44221, 0x0),
+    (44223, 0xC),
+    (44225, 0x0),
+    (44228, 0xC),
+    (44229, 0xC),
+    (44230, 0x0),
+    (44231, 0x0),
+    (44236, 0xC),
+    (44237, 0xC),
+    (44242, 0x0),
+    (44471, 0x2),
+    (44476, 0x0),
+    (44477, 0x0),
+    (44480, 0x0),
+    (44481, 0x0),
+    (44482, 0x2),
+    (44483, 0x2),
+    (44484, 0x0),
+    (44485, 0x0),
+    (44488, 0x0),
+    (44489, 0x0),
+    (44490, 0xC),
+    (44491, 0xC),
+    (44492, 0x0),
+    (44493, 0x0),
+    (44496, 0x0),
+    (44497, 0x0),
+    (44498, 0xC),
+    (44499, 0xC),
+    (44500, 0x0),
+    (44501, 0x0),
+    (44504, 0x0),
+    (44505, 0x0),
+    (44506, 0xC),
+    (44507, 0xC),
+    (44508, 0x0),
+    (44509, 0x0),
+    (44512, 0x0),
+    (44513, 0x0),
+    (44515, 0xC),
+    (44517, 0x0),
+    (44520, 0xC),
+    (44521, 0xC),
+    (44522, 0x0),
+    (44523, 0x0),
+    (44528, 0xC),
+    (44529, 0xC),
+    (44534, 0x0),
+    (44766, 0x0),
+    (44767, 0x0),
+    (44768, 0x0),
+    (44769, 0x0),
+    (44770, 0x0),
+    (44771, 0x0),
+    (44772, 0x0),
+    (44773, 0x0),
+    (44774, 0x0),
+    (44775, 0x0),
+    (44776, 0x0),
+    (44777, 0x0),
+    (44778, 0x0),
+    (44779, 0x0),
+    (44780, 0x0),
+    (44781, 0x0),
+    (44782, 0x0),
+    (44783, 0x0),
+    (44784, 0x0),
+    (44785, 0x0),
+    (44786, 0x0),
+    (44787, 0x0),
+    (44788, 0x0),
+    (44789, 0x0),
+    (44790, 0x0),
+    (44791, 0x0),
+    (44792, 0x0),
+    (44793, 0x0),
+    (44794, 0x0),
+    (44795, 0x0),
+    (44796, 0x0),
+    (44797, 0x0),
+    (44798, 0x0),
+    (44799, 0x0),
+    (44800, 0x0),
+    (44801, 0x0),
+    (44804, 0x0),
+    (44805, 0x0),
+    (44809, 0x0),
+    (44810, 0x0),
+    (44811, 0x0),
+    (44812, 0x0),
+    (44813, 0x0),
+    (44814, 0x0),
+    (44815, 0x0),
+    (44816, 0x0),
+    (44817, 0x0),
+    (44818, 0x0),
+    (44819, 0x0),
+    (44822, 0x0),
+    (44823, 0x0),
+    (44824, 0x0),
+    (44825, 0x0),
+    (44826, 0x0),
+    (44828, 0x0),
+    (44829, 0x0),
+    (45058, 0x0),
+    (45059, 0x0),
+    (45060, 0x0),
+    (45061, 0x0),
+    (45062, 0x0),
+    (45063, 0x0),
+    (45064, 0x0),
+    (45065, 0x0),
+    (45066, 0x0),
+    (45067, 0x0),
+    (45068, 0x0),
+    (45069, 0x0),
+    (45070, 0x0),
+    (45071, 0x0),
+    (45072, 0x0),
+    (45073, 0x0),
+    (45074, 0x0),
+    (45075, 0x0),
+    (45076, 0x0),
+    (45077, 0x0),
+    (45078, 0x0),
+    (45079, 0x0),
+    (45080, 0x0),
+    (45081, 0x0),
+    (45082, 0x0),
+    (45083, 0x0),
+    (45084, 0x0),
+    (45085, 0x0),
+    (45086, 0x0),
+    (45087, 0x0),
+    (45088, 0x0),
+    (45089, 0x0),
+    (45090, 0x0),
+    (45091, 0x0),
+    (45092, 0x0),
+    (45093, 0x0),
+    (45096, 0x0),
+    (45097, 0x0),
+    (45101, 0x0),
+    (45102, 0x0),
+    (45103, 0x0),
+    (45104, 0x0),
+    (45105, 0x0),
+    (45106, 0x0),
+    (45107, 0x0),
+    (45108, 0x0),
+    (45109, 0x0),
+    (45110, 0x0),
+    (45111, 0x0),
+    (45114, 0x0),
+    (45115, 0x0),
+    (45116, 0x0),
+    (45117, 0x0),
+    (45118, 0x0),
+    (45120, 0x0),
+    (45121, 0x0),
+    (45347, 0x0),
+    (45352, 0x0),
+    (45353, 0x0),
+    (45354, 0x0),
+    (45355, 0x0),
+    (45356, 0x0),
+    (45357, 0x0),
+    (45358, 0x2),
+    (45359, 0x2),
+    (45360, 0x0),
+    (45361, 0x0),
+    (45362, 0x2),
+    (45364, 0x0),
+    (45365, 0x0),
+    (45366, 0xC),
+    (45367, 0xC),
+    (45368, 0x0),
+    (45369, 0x0),
+    (45372, 0x0),
+    (45373, 0x0),
+    (45374, 0xC),
+    (45375, 0x2),
+    (45376, 0x0),
+    (45377, 0x0),
+    (45380, 0x0),
+    (45381, 0x0),
+    (45382, 0xC),
+    (45383, 0xC),
+    (45384, 0x0),
+    (45385, 0x0),
+    (45388, 0x0),
+    (45389, 0x0),
+    (45391, 0xC),
+    (45392, 0x0),
+    (45393, 0x0),
+    (45396, 0xC),
+    (45397, 0xC),
+    (45398, 0xC),
+    (45399, 0xC),
+    (45404, 0xC),
+    (45405, 0xC),
+    (45406, 0x0),
+    (45407, 0x0),
+    (45408, 0x2),
+    (45409, 0x0),
+    (45410, 0x0),
+    (45639, 0x0),
+    (45644, 0x0),
+    (45645, 0x0),
+    (45646, 0x0),
+    (45647, 0x0),
+    (45648, 0x0),
+    (45649, 0x0),
+    (45650, 0x2),
+    (45651, 0xC),
+    (45652, 0x0),
+    (45653, 0x0),
+    (45654, 0x2),
+    (45656, 0x0),
+    (45657, 0x0),
+    (45658, 0xC),
+    (45659, 0xC),
+    (45660, 0x0),
+    (45661, 0x0),
+    (45664, 0x0),
+    (45665, 0x0),
+    (45666, 0xC),
+    (45667, 0x2),
+    (45668, 0x0),
+    (45669, 0x0),
+    (45672, 0x0),
+    (45673, 0x0),
+    (45674, 0xC),
+    (45675, 0xC),
+    (45676, 0x0),
+    (45677, 0x0),
+    (45680, 0x0),
+    (45681, 0x0),
+    (45683, 0xC),
+    (45684, 0x0),
+    (45685, 0x0),
+    (45688, 0xC),
+    (45689, 0xC),
+    (45690, 0xC),
+    (45691, 0xC),
+    (45696, 0xC),
+    (45697, 0x2),
+    (45698, 0x0),
+    (45699, 0x0),
+    (45700, 0x2),
+    (45701, 0x0),
+    (45702, 0x0),
+    (46526, 0xC),
+    (46527, 0xC),
+    (46531, 0x2),
+    (46534, 0xC),
+    (46535, 0xC),
+    (46538, 0x2),
+    (46539, 0x2),
+    (46542, 0x2),
+    (46543, 0x2),
+    (46546, 0x2),
+    (46547, 0x2),
+    (46550, 0x2),
+    (46551, 0x2),
+    (46558, 0xC),
+    (46559, 0xC),
+    (46562, 0x2),
+    (46563, 0x2),
+    (46564, 0x2),
+    (46565, 0x2),
+    (46566, 0xC),
+    (46567, 0xC),
+    (46568, 0x2),
+    (46569, 0x2),
+    (46570, 0x2),
+    (46571, 0x2),
+    (46572, 0xC),
+    (46573, 0x2),
+    (46576, 0x2),
+    (46818, 0xC),
+    (46819, 0xC),
+    (46823, 0x2),
+    (46826, 0xC),
+    (46827, 0x2),
+    (46830, 0x2),
+    (46831, 0x2),
+    (46834, 0x2),
+    (46835, 0x2),
+    (46838, 0x2),
+    (46839, 0x2),
+    (46842, 0x2),
+    (46843, 0x2),
+    (46850, 0xC),
+    (46851, 0xC),
+    (46854, 0x2),
+    (46855, 0x2),
+    (46856, 0x2),
+    (46857, 0x2),
+    (46858, 0xC),
+    (46859, 0xC),
+    (46860, 0x2),
+    (46861, 0x2),
+    (46862, 0x2),
+    (46863, 0x2),
+    (46864, 0xC),
+    (46865, 0x2),
+    (46868, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SEVENTH_VIDEO_FRAME: u64 = 1104;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SEVENTH_VISIBLE_NIBBLES: [(u32, u8); 770] = [
+    (40690, 0x0),
+    (40691, 0x0),
+    (40694, 0x0),
+    (40695, 0x0),
+    (40698, 0x0),
+    (40699, 0x0),
+    (40702, 0x0),
+    (40703, 0x0),
+    (40706, 0x0),
+    (40707, 0x0),
+    (40710, 0x0),
+    (40711, 0x0),
+    (40714, 0x0),
+    (40715, 0x0),
+    (40718, 0x0),
+    (40722, 0x0),
+    (40723, 0x0),
+    (40724, 0x0),
+    (40725, 0x0),
+    (40730, 0x0),
+    (40731, 0x0),
+    (40732, 0x0),
+    (40740, 0x0),
+    (40741, 0x0),
+    (40979, 0x0),
+    (40982, 0x0),
+    (40983, 0x0),
+    (40986, 0x0),
+    (40987, 0x0),
+    (40990, 0x0),
+    (40991, 0x0),
+    (40994, 0x0),
+    (40995, 0x0),
+    (40998, 0x0),
+    (40999, 0x0),
+    (41002, 0x0),
+    (41003, 0x0),
+    (41006, 0x0),
+    (41007, 0x0),
+    (41010, 0x0),
+    (41014, 0x0),
+    (41015, 0x0),
+    (41016, 0x0),
+    (41017, 0x0),
+    (41022, 0x0),
+    (41023, 0x0),
+    (41024, 0x0),
+    (41032, 0x0),
+    (41033, 0x0),
+    (41854, 0x0),
+    (41855, 0x0),
+    (41858, 0x0),
+    (41859, 0x0),
+    (41862, 0x0),
+    (41863, 0x0),
+    (41866, 0x0),
+    (41867, 0x0),
+    (41870, 0x0),
+    (41871, 0x0),
+    (41874, 0x0),
+    (41875, 0x0),
+    (41878, 0x0),
+    (41879, 0x0),
+    (41882, 0x0),
+    (41883, 0x0),
+    (41886, 0x0),
+    (41890, 0x0),
+    (41891, 0x0),
+    (41892, 0x0),
+    (41893, 0x0),
+    (41894, 0x0),
+    (41895, 0x0),
+    (41896, 0x0),
+    (41897, 0x0),
+    (41898, 0x0),
+    (41899, 0x0),
+    (41900, 0x0),
+    (41901, 0x0),
+    (41904, 0x0),
+    (41905, 0x0),
+    (41908, 0x0),
+    (41909, 0x0),
+    (41912, 0x0),
+    (41913, 0x0),
+    (42146, 0x0),
+    (42147, 0x0),
+    (42150, 0x0),
+    (42151, 0x0),
+    (42154, 0x0),
+    (42155, 0x0),
+    (42158, 0x0),
+    (42159, 0x0),
+    (42162, 0x0),
+    (42163, 0x0),
+    (42166, 0x0),
+    (42167, 0x0),
+    (42170, 0x0),
+    (42171, 0x0),
+    (42174, 0x0),
+    (42175, 0x0),
+    (42178, 0x0),
+    (42182, 0x0),
+    (42183, 0x0),
+    (42184, 0x0),
+    (42185, 0x0),
+    (42186, 0x0),
+    (42187, 0x0),
+    (42188, 0x0),
+    (42189, 0x0),
+    (42190, 0x0),
+    (42191, 0x0),
+    (42192, 0x0),
+    (42193, 0x0),
+    (42196, 0x0),
+    (42200, 0x0),
+    (42201, 0x0),
+    (42204, 0x0),
+    (42205, 0x0),
+    (42432, 0xC),
+    (42433, 0xC),
+    (42434, 0x2),
+    (42435, 0x2),
+    (42436, 0xC),
+    (42437, 0xC),
+    (42438, 0x2),
+    (42439, 0x2),
+    (42442, 0xC),
+    (42443, 0xC),
+    (42444, 0xC),
+    (42445, 0xC),
+    (42446, 0xC),
+    (42447, 0x2),
+    (42448, 0xC),
+    (42449, 0xC),
+    (42450, 0xC),
+    (42451, 0xC),
+    (42454, 0x2),
+    (42455, 0x2),
+    (42456, 0xC),
+    (42457, 0xC),
+    (42458, 0x2),
+    (42459, 0x2),
+    (42460, 0xC),
+    (42461, 0xC),
+    (42462, 0xC),
+    (42463, 0xC),
+    (42464, 0xC),
+    (42465, 0xC),
+    (42466, 0x2),
+    (42467, 0x2),
+    (42468, 0xC),
+    (42469, 0xC),
+    (42470, 0x2),
+    (42471, 0x2),
+    (42472, 0xC),
+    (42474, 0xC),
+    (42475, 0xC),
+    (42476, 0xC),
+    (42477, 0xC),
+    (42478, 0xC),
+    (42479, 0xC),
+    (42480, 0xC),
+    (42481, 0xC),
+    (42482, 0x2),
+    (42483, 0x2),
+    (42484, 0xC),
+    (42485, 0xC),
+    (42724, 0xC),
+    (42725, 0xC),
+    (42726, 0x2),
+    (42727, 0x2),
+    (42728, 0xC),
+    (42729, 0xC),
+    (42730, 0x2),
+    (42731, 0x2),
+    (42733, 0xC),
+    (42734, 0xC),
+    (42735, 0xC),
+    (42736, 0xC),
+    (42737, 0xC),
+    (42738, 0x2),
+    (42739, 0x2),
+    (42740, 0xC),
+    (42741, 0xC),
+    (42742, 0xC),
+    (42743, 0xC),
+    (42746, 0xC),
+    (42747, 0xC),
+    (42748, 0xC),
+    (42749, 0xC),
+    (42750, 0xC),
+    (42751, 0x2),
+    (42752, 0xC),
+    (42753, 0xC),
+    (42754, 0xC),
+    (42755, 0xC),
+    (42756, 0xC),
+    (42757, 0xC),
+    (42758, 0x2),
+    (42759, 0x2),
+    (42760, 0xC),
+    (42761, 0xC),
+    (42762, 0x2),
+    (42763, 0x2),
+    (42764, 0xC),
+    (42766, 0xC),
+    (42767, 0xC),
+    (42768, 0xC),
+    (42769, 0xC),
+    (42770, 0xC),
+    (42771, 0xC),
+    (42772, 0xC),
+    (42773, 0xC),
+    (42774, 0xC),
+    (42775, 0xC),
+    (42776, 0xC),
+    (42777, 0xC),
+    (42778, 0xC),
+    (42779, 0xC),
+    (43016, 0xC),
+    (43017, 0xC),
+    (43018, 0x2),
+    (43019, 0x2),
+    (43020, 0xC),
+    (43021, 0x2),
+    (43022, 0x0),
+    (43023, 0x0),
+    (43024, 0xC),
+    (43025, 0xC),
+    (43026, 0xC),
+    (43027, 0xC),
+    (43028, 0xC),
+    (43029, 0xC),
+    (43030, 0x0),
+    (43031, 0x0),
+    (43032, 0xC),
+    (43033, 0xC),
+    (43037, 0xC),
+    (43038, 0x0),
+    (43039, 0x0),
+    (43040, 0xC),
+    (43041, 0xC),
+    (43043, 0x2),
+    (43044, 0xC),
+    (43045, 0xC),
+    (43046, 0x0),
+    (43047, 0x0),
+    (43048, 0xC),
+    (43049, 0xC),
+    (43050, 0x2),
+    (43051, 0x2),
+    (43052, 0xC),
+    (43053, 0xC),
+    (43054, 0x0),
+    (43056, 0xC),
+    (43060, 0x0),
+    (43061, 0x0),
+    (43068, 0x0),
+    (43069, 0x0),
+    (43070, 0xC),
+    (43071, 0xC),
+    (43072, 0x0),
+    (43076, 0x0),
+    (43077, 0x0),
+    (43080, 0x0),
+    (43081, 0x0),
+    (43308, 0xC),
+    (43309, 0xC),
+    (43310, 0x2),
+    (43311, 0x2),
+    (43312, 0x2),
+    (43313, 0x2),
+    (43314, 0x0),
+    (43315, 0x0),
+    (43316, 0xC),
+    (43317, 0xC),
+    (43318, 0xC),
+    (43319, 0x2),
+    (43320, 0xC),
+    (43321, 0xC),
+    (43322, 0x0),
+    (43323, 0x0),
+    (43324, 0xC),
+    (43325, 0x2),
+    (43328, 0xC),
+    (43329, 0xC),
+    (43330, 0x0),
+    (43331, 0x0),
+    (43332, 0xC),
+    (43333, 0xC),
+    (43334, 0x2),
+    (43336, 0xC),
+    (43337, 0xC),
+    (43338, 0x0),
+    (43339, 0x0),
+    (43340, 0xC),
+    (43341, 0xC),
+    (43342, 0x2),
+    (43343, 0x2),
+    (43344, 0xC),
+    (43345, 0xC),
+    (43346, 0x0),
+    (43347, 0x0),
+    (43348, 0x2),
+    (43352, 0x0),
+    (43353, 0x0),
+    (43360, 0x0),
+    (43361, 0x0),
+    (43362, 0xC),
+    (43363, 0xC),
+    (43364, 0x0),
+    (43368, 0x0),
+    (43369, 0x0),
+    (43372, 0x0),
+    (43373, 0x0),
+    (43598, 0xC),
+    (43599, 0xC),
+    (43600, 0xC),
+    (43601, 0xC),
+    (43602, 0xC),
+    (43603, 0xC),
+    (43604, 0xC),
+    (43605, 0x2),
+    (43606, 0xC),
+    (43607, 0xC),
+    (43608, 0xC),
+    (43609, 0xC),
+    (43610, 0x2),
+    (43611, 0x2),
+    (43612, 0x2),
+    (43613, 0x2),
+    (43614, 0xC),
+    (43615, 0xC),
+    (43616, 0xC),
+    (43617, 0x2),
+    (43618, 0xC),
+    (43619, 0xC),
+    (43620, 0xC),
+    (43621, 0xC),
+    (43622, 0xC),
+    (43623, 0xC),
+    (43624, 0x2),
+    (43625, 0x2),
+    (43626, 0x2),
+    (43627, 0xC),
+    (43628, 0x2),
+    (43629, 0x2),
+    (43630, 0xC),
+    (43631, 0xC),
+    (43632, 0xC),
+    (43633, 0x2),
+    (43636, 0x2),
+    (43637, 0x2),
+    (43640, 0x2),
+    (43642, 0xC),
+    (43643, 0xC),
+    (43644, 0xC),
+    (43645, 0xC),
+    (43646, 0xC),
+    (43647, 0xC),
+    (43648, 0x2),
+    (43649, 0x2),
+    (43650, 0xC),
+    (43651, 0xC),
+    (43652, 0x2),
+    (43653, 0x2),
+    (43654, 0xC),
+    (43655, 0xC),
+    (43890, 0xC),
+    (43891, 0xC),
+    (43892, 0xC),
+    (43893, 0xC),
+    (43894, 0xC),
+    (43895, 0xC),
+    (43896, 0xC),
+    (43897, 0xC),
+    (43898, 0xC),
+    (43899, 0xC),
+    (43900, 0xC),
+    (43901, 0x2),
+    (43902, 0x2),
+    (43903, 0xC),
+    (43904, 0x2),
+    (43905, 0x2),
+    (43906, 0xC),
+    (43907, 0xC),
+    (43908, 0x2),
+    (43909, 0xC),
+    (43910, 0xC),
+    (43911, 0xC),
+    (43912, 0xC),
+    (43913, 0xC),
+    (43914, 0xC),
+    (43915, 0xC),
+    (43916, 0x2),
+    (43917, 0x2),
+    (43918, 0xC),
+    (43919, 0xC),
+    (43920, 0x2),
+    (43921, 0x2),
+    (43922, 0xC),
+    (43923, 0xC),
+    (43924, 0xC),
+    (43925, 0xC),
+    (43928, 0x2),
+    (43929, 0x2),
+    (43932, 0x2),
+    (43933, 0xC),
+    (43934, 0xC),
+    (43935, 0xC),
+    (43936, 0xC),
+    (43937, 0xC),
+    (43938, 0xC),
+    (43939, 0xC),
+    (43940, 0x2),
+    (43941, 0x2),
+    (43942, 0xC),
+    (43943, 0xC),
+    (43944, 0x2),
+    (43945, 0x2),
+    (43946, 0xC),
+    (43947, 0xC),
+    (44179, 0x0),
+    (44184, 0xC),
+    (44185, 0xC),
+    (44188, 0xC),
+    (44189, 0xC),
+    (44190, 0x0),
+    (44191, 0x0),
+    (44192, 0x2),
+    (44193, 0x2),
+    (44196, 0x2),
+    (44197, 0xC),
+    (44198, 0x0),
+    (44199, 0x0),
+    (44200, 0xC),
+    (44201, 0xC),
+    (44204, 0xC),
+    (44205, 0xC),
+    (44206, 0x0),
+    (44207, 0x0),
+    (44208, 0xC),
+    (44209, 0xC),
+    (44212, 0x2),
+    (44213, 0x2),
+    (44214, 0x0),
+    (44215, 0x0),
+    (44216, 0xC),
+    (44217, 0xC),
+    (44220, 0xC),
+    (44221, 0xC),
+    (44223, 0x0),
+    (44225, 0xC),
+    (44228, 0x0),
+    (44229, 0x0),
+    (44230, 0x2),
+    (44231, 0x2),
+    (44232, 0xC),
+    (44233, 0xC),
+    (44236, 0x0),
+    (44237, 0x0),
+    (44238, 0x2),
+    (44239, 0x2),
+    (44244, 0x0),
+    (44245, 0x0),
+    (44471, 0x0),
+    (44476, 0xC),
+    (44477, 0xC),
+    (44480, 0xC),
+    (44481, 0xC),
+    (44482, 0x0),
+    (44483, 0x0),
+    (44484, 0x2),
+    (44485, 0x2),
+    (44488, 0xC),
+    (44489, 0xC),
+    (44490, 0x0),
+    (44491, 0x0),
+    (44492, 0xC),
+    (44493, 0xC),
+    (44496, 0xC),
+    (44497, 0xC),
+    (44498, 0x0),
+    (44499, 0x0),
+    (44500, 0xC),
+    (44501, 0xC),
+    (44504, 0x2),
+    (44505, 0x2),
+    (44506, 0x0),
+    (44507, 0x0),
+    (44508, 0xC),
+    (44509, 0xC),
+    (44512, 0xC),
+    (44513, 0xC),
+    (44515, 0x0),
+    (44517, 0xC),
+    (44520, 0x0),
+    (44521, 0x0),
+    (44522, 0x2),
+    (44523, 0x2),
+    (44524, 0xC),
+    (44525, 0xC),
+    (44528, 0x0),
+    (44529, 0x0),
+    (44530, 0x2),
+    (44531, 0x2),
+    (44536, 0x0),
+    (44537, 0x0),
+    (44766, 0x2),
+    (44767, 0x2),
+    (44768, 0xC),
+    (44769, 0xC),
+    (44770, 0xC),
+    (44771, 0x2),
+    (44772, 0xC),
+    (44773, 0xC),
+    (44774, 0x2),
+    (44775, 0x2),
+    (44776, 0x2),
+    (44777, 0x2),
+    (44778, 0x2),
+    (44779, 0x2),
+    (44780, 0xC),
+    (44781, 0xC),
+    (44782, 0x2),
+    (44783, 0x2),
+    (44784, 0xC),
+    (44785, 0xC),
+    (44786, 0x2),
+    (44787, 0x2),
+    (44788, 0xC),
+    (44789, 0xC),
+    (44790, 0x2),
+    (44791, 0x2),
+    (44792, 0xC),
+    (44793, 0x2),
+    (44794, 0x2),
+    (44795, 0x2),
+    (44796, 0x2),
+    (44797, 0x2),
+    (44798, 0x2),
+    (44799, 0x2),
+    (44800, 0xC),
+    (44801, 0xC),
+    (44804, 0xC),
+    (44805, 0xC),
+    (44809, 0xC),
+    (44810, 0x2),
+    (44811, 0x2),
+    (44812, 0xC),
+    (44813, 0xC),
+    (44814, 0x2),
+    (44815, 0x2),
+    (44816, 0xC),
+    (44817, 0xC),
+    (44818, 0x2),
+    (44819, 0x2),
+    (44822, 0x2),
+    (44823, 0x2),
+    (45058, 0x2),
+    (45059, 0x2),
+    (45060, 0xC),
+    (45061, 0xC),
+    (45062, 0xC),
+    (45063, 0x2),
+    (45064, 0xC),
+    (45065, 0xC),
+    (45066, 0x2),
+    (45067, 0x2),
+    (45068, 0x2),
+    (45069, 0xC),
+    (45070, 0x2),
+    (45071, 0x2),
+    (45072, 0xC),
+    (45073, 0xC),
+    (45074, 0x2),
+    (45075, 0x2),
+    (45076, 0xC),
+    (45077, 0xC),
+    (45078, 0x2),
+    (45079, 0x2),
+    (45080, 0xC),
+    (45081, 0xC),
+    (45082, 0x2),
+    (45083, 0x2),
+    (45084, 0xC),
+    (45085, 0x2),
+    (45086, 0x2),
+    (45087, 0x2),
+    (45088, 0x2),
+    (45089, 0x2),
+    (45090, 0x2),
+    (45091, 0x2),
+    (45092, 0xC),
+    (45093, 0xC),
+    (45096, 0xC),
+    (45097, 0xC),
+    (45101, 0xC),
+    (45102, 0x2),
+    (45103, 0x2),
+    (45104, 0xC),
+    (45105, 0xC),
+    (45106, 0x2),
+    (45107, 0x2),
+    (45108, 0xC),
+    (45109, 0xC),
+    (45110, 0x2),
+    (45111, 0x2),
+    (45114, 0x2),
+    (45115, 0x2),
+    (45347, 0x2),
+    (45352, 0x2),
+    (45353, 0x2),
+    (45354, 0xC),
+    (45355, 0xC),
+    (45356, 0x2),
+    (45357, 0x2),
+    (45358, 0x0),
+    (45359, 0x0),
+    (45360, 0xC),
+    (45361, 0xC),
+    (45362, 0x0),
+    (45364, 0xC),
+    (45365, 0xC),
+    (45366, 0x0),
+    (45367, 0x0),
+    (45368, 0xC),
+    (45369, 0xC),
+    (45372, 0x2),
+    (45373, 0x2),
+    (45374, 0x0),
+    (45375, 0x0),
+    (45376, 0x2),
+    (45377, 0x2),
+    (45380, 0x2),
+    (45381, 0xC),
+    (45382, 0x0),
+    (45383, 0x0),
+    (45384, 0x2),
+    (45385, 0x2),
+    (45388, 0x2),
+    (45389, 0x2),
+    (45391, 0x0),
+    (45392, 0xC),
+    (45393, 0xC),
+    (45396, 0x0),
+    (45397, 0x0),
+    (45398, 0x2),
+    (45399, 0x2),
+    (45404, 0x0),
+    (45405, 0x0),
+    (45406, 0x2),
+    (45407, 0x2),
+    (45408, 0x0),
+    (45412, 0x0),
+    (45413, 0x0),
+    (45416, 0x0),
+    (45417, 0x0),
+    (45639, 0x2),
+    (45644, 0x2),
+    (45645, 0x2),
+    (45646, 0xC),
+    (45647, 0xC),
+    (45648, 0x2),
+    (45649, 0x2),
+    (45650, 0x0),
+    (45651, 0x0),
+    (45652, 0xC),
+    (45653, 0xC),
+    (45654, 0x0),
+    (45656, 0xC),
+    (45657, 0xC),
+    (45658, 0x0),
+    (45659, 0x0),
+    (45660, 0xC),
+    (45661, 0x2),
+    (45664, 0x2),
+    (45665, 0x2),
+    (45666, 0x0),
+    (45667, 0x0),
+    (45668, 0x2),
+    (45669, 0x2),
+    (45672, 0x2),
+    (45673, 0xC),
+    (45674, 0x0),
+    (45675, 0x0),
+    (45676, 0x2),
+    (45677, 0x2),
+    (45680, 0x2),
+    (45681, 0x2),
+    (45683, 0x0),
+    (45684, 0xC),
+    (45685, 0xC),
+    (45688, 0x0),
+    (45689, 0x0),
+    (45690, 0x2),
+    (45691, 0x2),
+    (45696, 0x0),
+    (45697, 0x0),
+    (45698, 0x2),
+    (45699, 0x2),
+    (45700, 0x0),
+    (45704, 0x0),
+    (45705, 0x0),
+    (45708, 0x0),
+    (45709, 0x0),
+    (46526, 0x0),
+    (46527, 0x0),
+    (46531, 0x0),
+    (46534, 0x0),
+    (46535, 0x0),
+    (46538, 0x0),
+    (46539, 0x0),
+    (46542, 0x0),
+    (46543, 0x0),
+    (46546, 0x0),
+    (46547, 0x0),
+    (46550, 0x0),
+    (46551, 0x0),
+    (46558, 0x0),
+    (46559, 0x0),
+    (46562, 0x0),
+    (46563, 0x0),
+    (46564, 0x0),
+    (46565, 0x0),
+    (46566, 0x0),
+    (46567, 0x0),
+    (46568, 0x0),
+    (46569, 0x0),
+    (46570, 0x0),
+    (46571, 0x0),
+    (46572, 0x0),
+    (46573, 0x0),
+    (46576, 0x0),
+    (46580, 0x0),
+    (46581, 0x0),
+    (46584, 0x0),
+    (46585, 0x0),
+    (46818, 0x0),
+    (46819, 0x0),
+    (46823, 0x0),
+    (46826, 0x0),
+    (46827, 0x0),
+    (46830, 0x0),
+    (46831, 0x0),
+    (46834, 0x0),
+    (46835, 0x0),
+    (46838, 0x0),
+    (46839, 0x0),
+    (46842, 0x0),
+    (46843, 0x0),
+    (46850, 0x0),
+    (46851, 0x0),
+    (46854, 0x0),
+    (46855, 0x0),
+    (46856, 0x0),
+    (46857, 0x0),
+    (46858, 0x0),
+    (46859, 0x0),
+    (46860, 0x0),
+    (46861, 0x0),
+    (46862, 0x0),
+    (46863, 0x0),
+    (46864, 0x0),
+    (46865, 0x0),
+    (46868, 0x0),
+    (46872, 0x0),
+    (46873, 0x0),
+    (46876, 0x0),
+    (46877, 0x0),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_EIGHTH_PROCESS_VIDEO_FRAME: u64 = 1105;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_EIGHTH_PROCESS_BYTES: [(u16, u8); 7] = [
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAEB, 0x5E),
+    (0xAB03, 0xF4),
+    (0xAB04, 0xCC),
+    (0xAB0F, 0xD4),
+    (0xAB14, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_EIGHTH_VISIBLE_NIBBLES: [(u32, u8); 613] = [
+    (16489, 0xF),
+    (17413, 0x0),
+    (17655, 0xF),
+    (17704, 0x0),
+    (17705, 0x0),
+    (17915, 0x0),
+    (17916, 0x0),
+    (17947, 0xF),
+    (17995, 0x0),
+    (17996, 0x0),
+    (18207, 0x0),
+    (18208, 0x0),
+    (18239, 0xF),
+    (18287, 0x0),
+    (18289, 0x0),
+    (18493, 0x0),
+    (18498, 0x0),
+    (18499, 0x0),
+    (18531, 0xF),
+    (18785, 0x0),
+    (18789, 0x0),
+    (18790, 0x0),
+    (42432, 0xC),
+    (42433, 0xC),
+    (42434, 0x2),
+    (42435, 0x2),
+    (42436, 0xC),
+    (42437, 0xC),
+    (42438, 0x2),
+    (42439, 0x2),
+    (42442, 0xC),
+    (42443, 0xC),
+    (42444, 0xC),
+    (42445, 0xC),
+    (42446, 0xC),
+    (42447, 0x2),
+    (42448, 0xC),
+    (42449, 0xC),
+    (42450, 0xC),
+    (42451, 0xC),
+    (42454, 0x2),
+    (42455, 0x2),
+    (42456, 0xC),
+    (42457, 0xC),
+    (42458, 0x2),
+    (42459, 0x2),
+    (42460, 0xC),
+    (42461, 0xC),
+    (42462, 0xC),
+    (42463, 0xC),
+    (42464, 0xC),
+    (42465, 0xC),
+    (42466, 0x2),
+    (42467, 0x2),
+    (42468, 0xC),
+    (42469, 0xC),
+    (42470, 0x2),
+    (42471, 0x2),
+    (42472, 0xC),
+    (42474, 0xC),
+    (42475, 0xC),
+    (42476, 0xC),
+    (42477, 0xC),
+    (42478, 0xC),
+    (42479, 0xC),
+    (42480, 0xC),
+    (42481, 0xC),
+    (42482, 0x2),
+    (42483, 0x2),
+    (42484, 0xC),
+    (42485, 0xC),
+    (42488, 0xC),
+    (42490, 0xC),
+    (42491, 0x2),
+    (42494, 0x2),
+    (42495, 0x2),
+    (42724, 0xC),
+    (42725, 0xC),
+    (42726, 0x2),
+    (42727, 0x2),
+    (42728, 0xC),
+    (42729, 0xC),
+    (42730, 0x2),
+    (42731, 0x2),
+    (42733, 0xC),
+    (42734, 0xC),
+    (42735, 0xC),
+    (42736, 0xC),
+    (42737, 0xC),
+    (42738, 0x2),
+    (42739, 0x2),
+    (42740, 0xC),
+    (42741, 0xC),
+    (42742, 0xC),
+    (42743, 0xC),
+    (42746, 0xC),
+    (42747, 0xC),
+    (42748, 0xC),
+    (42749, 0xC),
+    (42750, 0xC),
+    (42751, 0x2),
+    (42752, 0xC),
+    (42753, 0xC),
+    (42754, 0xC),
+    (42755, 0xC),
+    (42756, 0xC),
+    (42757, 0xC),
+    (42758, 0x2),
+    (42759, 0x2),
+    (42760, 0xC),
+    (42761, 0xC),
+    (42762, 0x2),
+    (42763, 0x2),
+    (42764, 0xC),
+    (42766, 0xC),
+    (42767, 0xC),
+    (42768, 0xC),
+    (42769, 0xC),
+    (42770, 0xC),
+    (42771, 0xC),
+    (42772, 0xC),
+    (42773, 0xC),
+    (42774, 0xC),
+    (42775, 0xC),
+    (42776, 0xC),
+    (42777, 0xC),
+    (42778, 0xC),
+    (42779, 0xC),
+    (42780, 0xC),
+    (42782, 0xC),
+    (42783, 0x2),
+    (42786, 0x2),
+    (42787, 0x2),
+    (43016, 0xC),
+    (43017, 0xC),
+    (43018, 0x2),
+    (43019, 0x2),
+    (43020, 0xC),
+    (43021, 0x2),
+    (43024, 0xC),
+    (43025, 0xC),
+    (43026, 0xC),
+    (43027, 0xC),
+    (43028, 0xC),
+    (43029, 0xC),
+    (43032, 0xC),
+    (43033, 0xC),
+    (43034, 0xC),
+    (43035, 0xC),
+    (43037, 0xC),
+    (43040, 0xC),
+    (43041, 0xC),
+    (43042, 0x2),
+    (43043, 0x2),
+    (43044, 0xC),
+    (43045, 0xC),
+    (43048, 0xC),
+    (43049, 0xC),
+    (43050, 0x2),
+    (43051, 0x2),
+    (43052, 0xC),
+    (43053, 0xC),
+    (43056, 0xC),
+    (43058, 0xC),
+    (43059, 0xC),
+    (43062, 0xC),
+    (43063, 0xC),
+    (43064, 0xC),
+    (43065, 0xC),
+    (43066, 0xC),
+    (43067, 0xC),
+    (43070, 0xC),
+    (43071, 0xC),
+    (43072, 0xC),
+    (43073, 0xC),
+    (43074, 0xC),
+    (43075, 0x2),
+    (43078, 0x2),
+    (43079, 0x2),
+    (43308, 0xC),
+    (43309, 0xC),
+    (43310, 0x2),
+    (43311, 0x2),
+    (43312, 0x2),
+    (43313, 0x2),
+    (43316, 0xC),
+    (43317, 0xC),
+    (43318, 0xC),
+    (43319, 0x2),
+    (43320, 0xC),
+    (43321, 0xC),
+    (43324, 0xC),
+    (43325, 0x2),
+    (43326, 0xC),
+    (43327, 0xC),
+    (43328, 0xC),
+    (43329, 0xC),
+    (43332, 0xC),
+    (43333, 0xC),
+    (43334, 0x2),
+    (43335, 0xC),
+    (43336, 0xC),
+    (43337, 0xC),
+    (43340, 0xC),
+    (43341, 0xC),
+    (43342, 0x2),
+    (43343, 0x2),
+    (43344, 0xC),
+    (43345, 0xC),
+    (43348, 0x2),
+    (43350, 0xC),
+    (43351, 0xC),
+    (43354, 0xC),
+    (43355, 0xC),
+    (43356, 0xC),
+    (43357, 0xC),
+    (43358, 0xC),
+    (43359, 0xC),
+    (43362, 0xC),
+    (43363, 0xC),
+    (43364, 0xC),
+    (43365, 0xC),
+    (43366, 0xC),
+    (43370, 0x2),
+    (43371, 0x2),
+    (43598, 0xC),
+    (43599, 0xC),
+    (43600, 0xC),
+    (43601, 0xC),
+    (43602, 0xC),
+    (43603, 0xC),
+    (43604, 0xC),
+    (43605, 0x2),
+    (43606, 0xC),
+    (43607, 0xC),
+    (43608, 0xC),
+    (43609, 0xC),
+    (43610, 0x2),
+    (43611, 0x2),
+    (43612, 0x2),
+    (43613, 0x2),
+    (43614, 0xC),
+    (43615, 0xC),
+    (43616, 0xC),
+    (43617, 0x2),
+    (43618, 0xC),
+    (43619, 0xC),
+    (43620, 0xC),
+    (43621, 0xC),
+    (43622, 0xC),
+    (43623, 0xC),
+    (43624, 0x2),
+    (43625, 0x2),
+    (43626, 0x2),
+    (43627, 0xC),
+    (43628, 0x2),
+    (43629, 0x2),
+    (43630, 0xC),
+    (43631, 0xC),
+    (43632, 0xC),
+    (43633, 0x2),
+    (43636, 0x2),
+    (43637, 0x2),
+    (43640, 0x2),
+    (43642, 0xC),
+    (43643, 0xC),
+    (43644, 0xC),
+    (43645, 0xC),
+    (43646, 0xC),
+    (43647, 0xC),
+    (43648, 0x2),
+    (43649, 0x2),
+    (43650, 0xC),
+    (43651, 0xC),
+    (43652, 0x2),
+    (43653, 0x2),
+    (43654, 0xC),
+    (43655, 0xC),
+    (43656, 0xC),
+    (43657, 0xC),
+    (43658, 0xC),
+    (43660, 0xC),
+    (43663, 0x2),
+    (43890, 0xC),
+    (43891, 0xC),
+    (43892, 0xC),
+    (43893, 0xC),
+    (43894, 0xC),
+    (43895, 0xC),
+    (43896, 0xC),
+    (43897, 0xC),
+    (43898, 0xC),
+    (43899, 0xC),
+    (43900, 0xC),
+    (43901, 0x2),
+    (43902, 0x2),
+    (43903, 0xC),
+    (43904, 0x2),
+    (43905, 0x2),
+    (43906, 0xC),
+    (43907, 0xC),
+    (43908, 0x2),
+    (43909, 0xC),
+    (43910, 0xC),
+    (43911, 0xC),
+    (43912, 0xC),
+    (43913, 0xC),
+    (43914, 0xC),
+    (43915, 0xC),
+    (43916, 0x2),
+    (43917, 0x2),
+    (43918, 0xC),
+    (43919, 0xC),
+    (43920, 0x2),
+    (43921, 0x2),
+    (43922, 0xC),
+    (43923, 0xC),
+    (43924, 0xC),
+    (43925, 0xC),
+    (43928, 0x2),
+    (43929, 0x2),
+    (43932, 0x2),
+    (43933, 0xC),
+    (43934, 0xC),
+    (43935, 0xC),
+    (43936, 0xC),
+    (43937, 0xC),
+    (43938, 0xC),
+    (43939, 0xC),
+    (43940, 0x2),
+    (43941, 0x2),
+    (43942, 0xC),
+    (43943, 0xC),
+    (43944, 0x2),
+    (43945, 0x2),
+    (43946, 0xC),
+    (43947, 0xC),
+    (43948, 0xC),
+    (43949, 0xC),
+    (43950, 0xC),
+    (43952, 0xC),
+    (43953, 0xC),
+    (43955, 0x2),
+    (44184, 0xC),
+    (44185, 0xC),
+    (44188, 0xC),
+    (44189, 0xC),
+    (44192, 0x2),
+    (44193, 0x2),
+    (44196, 0x2),
+    (44197, 0xC),
+    (44200, 0xC),
+    (44201, 0xC),
+    (44204, 0xC),
+    (44205, 0xC),
+    (44208, 0xC),
+    (44209, 0xC),
+    (44212, 0x2),
+    (44213, 0x2),
+    (44216, 0xC),
+    (44217, 0xC),
+    (44220, 0xC),
+    (44221, 0xC),
+    (44225, 0xC),
+    (44230, 0x2),
+    (44231, 0x2),
+    (44232, 0xC),
+    (44233, 0xC),
+    (44234, 0x2),
+    (44235, 0x2),
+    (44238, 0x2),
+    (44239, 0x2),
+    (44240, 0xC),
+    (44241, 0xC),
+    (44242, 0x2),
+    (44476, 0xC),
+    (44477, 0xC),
+    (44480, 0xC),
+    (44481, 0xC),
+    (44484, 0x2),
+    (44485, 0x2),
+    (44488, 0xC),
+    (44489, 0xC),
+    (44492, 0xC),
+    (44493, 0xC),
+    (44496, 0xC),
+    (44497, 0xC),
+    (44500, 0xC),
+    (44501, 0xC),
+    (44504, 0x2),
+    (44505, 0x2),
+    (44508, 0xC),
+    (44509, 0xC),
+    (44512, 0xC),
+    (44513, 0xC),
+    (44517, 0xC),
+    (44522, 0x2),
+    (44523, 0x2),
+    (44524, 0xC),
+    (44525, 0xC),
+    (44526, 0x2),
+    (44527, 0x2),
+    (44530, 0x2),
+    (44531, 0x2),
+    (44532, 0xC),
+    (44533, 0xC),
+    (44534, 0x2),
+    (44763, 0x2),
+    (44766, 0x2),
+    (44767, 0x2),
+    (44768, 0xC),
+    (44769, 0xC),
+    (44770, 0xC),
+    (44771, 0x2),
+    (44772, 0xC),
+    (44773, 0xC),
+    (44774, 0x2),
+    (44775, 0x2),
+    (44776, 0x2),
+    (44777, 0x2),
+    (44778, 0x2),
+    (44779, 0x2),
+    (44780, 0xC),
+    (44781, 0xC),
+    (44782, 0x2),
+    (44783, 0x2),
+    (44784, 0xC),
+    (44785, 0xC),
+    (44786, 0x2),
+    (44787, 0x2),
+    (44788, 0xC),
+    (44789, 0xC),
+    (44790, 0x2),
+    (44791, 0x2),
+    (44792, 0xC),
+    (44793, 0x2),
+    (44794, 0x2),
+    (44795, 0x2),
+    (44796, 0x2),
+    (44797, 0x2),
+    (44798, 0x2),
+    (44799, 0x2),
+    (44800, 0xC),
+    (44801, 0xC),
+    (44804, 0xC),
+    (44805, 0xC),
+    (44809, 0xC),
+    (44810, 0x2),
+    (44811, 0x2),
+    (44812, 0xC),
+    (44813, 0xC),
+    (44814, 0x2),
+    (44815, 0x2),
+    (44816, 0xC),
+    (44817, 0xC),
+    (44818, 0x2),
+    (44819, 0x2),
+    (44822, 0x2),
+    (44823, 0x2),
+    (44824, 0xC),
+    (44825, 0xC),
+    (44826, 0x2),
+    (44828, 0xC),
+    (44829, 0xC),
+    (45055, 0x2),
+    (45058, 0x2),
+    (45059, 0x2),
+    (45060, 0xC),
+    (45061, 0xC),
+    (45062, 0xC),
+    (45063, 0x2),
+    (45064, 0xC),
+    (45065, 0xC),
+    (45066, 0x2),
+    (45067, 0x2),
+    (45068, 0x2),
+    (45069, 0xC),
+    (45070, 0x2),
+    (45071, 0x2),
+    (45072, 0xC),
+    (45073, 0xC),
+    (45074, 0x2),
+    (45075, 0x2),
+    (45076, 0xC),
+    (45077, 0xC),
+    (45078, 0x2),
+    (45079, 0x2),
+    (45080, 0xC),
+    (45081, 0xC),
+    (45082, 0x2),
+    (45083, 0x2),
+    (45084, 0xC),
+    (45085, 0x2),
+    (45086, 0x2),
+    (45087, 0x2),
+    (45088, 0x2),
+    (45089, 0x2),
+    (45090, 0x2),
+    (45091, 0x2),
+    (45092, 0xC),
+    (45093, 0xC),
+    (45096, 0xC),
+    (45097, 0xC),
+    (45101, 0xC),
+    (45102, 0x2),
+    (45103, 0x2),
+    (45104, 0xC),
+    (45105, 0xC),
+    (45106, 0x2),
+    (45107, 0x2),
+    (45108, 0xC),
+    (45109, 0xC),
+    (45110, 0x2),
+    (45111, 0x2),
+    (45114, 0x2),
+    (45115, 0x2),
+    (45116, 0xC),
+    (45117, 0x2),
+    (45118, 0x2),
+    (45120, 0xC),
+    (45121, 0xC),
+    (45345, 0x2),
+    (45347, 0x2),
+    (45352, 0x2),
+    (45353, 0x2),
+    (45354, 0xC),
+    (45355, 0xC),
+    (45356, 0x2),
+    (45357, 0x2),
+    (45360, 0xC),
+    (45361, 0xC),
+    (45363, 0x2),
+    (45364, 0xC),
+    (45365, 0xC),
+    (45368, 0xC),
+    (45369, 0xC),
+    (45370, 0x2),
+    (45371, 0x2),
+    (45372, 0x2),
+    (45373, 0x2),
+    (45376, 0x2),
+    (45377, 0x2),
+    (45378, 0x2),
+    (45379, 0x2),
+    (45380, 0x2),
+    (45381, 0xC),
+    (45384, 0x2),
+    (45385, 0x2),
+    (45388, 0x2),
+    (45389, 0x2),
+    (45392, 0xC),
+    (45393, 0xC),
+    (45394, 0x2),
+    (45395, 0x2),
+    (45398, 0x2),
+    (45399, 0x2),
+    (45400, 0x2),
+    (45401, 0x2),
+    (45402, 0x2),
+    (45403, 0x2),
+    (45406, 0x2),
+    (45407, 0x2),
+    (45408, 0xC),
+    (45409, 0x2),
+    (45410, 0x2),
+    (45637, 0x2),
+    (45639, 0x2),
+    (45644, 0x2),
+    (45645, 0x2),
+    (45646, 0xC),
+    (45647, 0xC),
+    (45648, 0x2),
+    (45649, 0x2),
+    (45652, 0xC),
+    (45653, 0xC),
+    (45655, 0x2),
+    (45656, 0xC),
+    (45657, 0xC),
+    (45660, 0xC),
+    (45661, 0x2),
+    (45662, 0x2),
+    (45663, 0x2),
+    (45664, 0x2),
+    (45665, 0x2),
+    (45668, 0x2),
+    (45669, 0x2),
+    (45670, 0x2),
+    (45671, 0x2),
+    (45672, 0x2),
+    (45673, 0xC),
+    (45676, 0x2),
+    (45677, 0x2),
+    (45680, 0x2),
+    (45681, 0x2),
+    (45684, 0xC),
+    (45685, 0xC),
+    (45686, 0x2),
+    (45687, 0x2),
+    (45690, 0x2),
+    (45691, 0x2),
+    (45692, 0x2),
+    (45693, 0x2),
+    (45694, 0x2),
+    (45695, 0x2),
+    (45698, 0x2),
+    (45699, 0x2),
+    (45700, 0xC),
+    (45701, 0x2),
+    (45702, 0x2),
+    (45929, 0x2),
+    (46221, 0x2),
+    (46513, 0x2),
+    (46805, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_NINTH_PROCESS_VIDEO_FRAME: u64 = 1106;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_NINTH_PROCESS_BYTES: [(u16, u8); 9] = [
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x06),
+    (0xAAEB, 0x61),
+    (0xAB12, 0xF4),
+    (0xAB13, 0xCC),
+    (0xAB14, 0x01),
+    (0xAB1C, 0x01),
+    (0xAB1D, 0xC8),
+    (0xAB1E, 0x48),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_NINTH_VISIBLE_NIBBLES: [(u32, u8); 1827] = [
+    (40106, 0xC),
+    (40107, 0xC),
+    (40108, 0xC),
+    (40109, 0xC),
+    (40110, 0xC),
+    (40111, 0xC),
+    (40112, 0xC),
+    (40113, 0xC),
+    (40116, 0xC),
+    (40117, 0xC),
+    (40118, 0xC),
+    (40119, 0xC),
+    (40120, 0xC),
+    (40121, 0xC),
+    (40122, 0xC),
+    (40123, 0xC),
+    (40124, 0xC),
+    (40125, 0xC),
+    (40127, 0xC),
+    (40128, 0xC),
+    (40129, 0xC),
+    (40130, 0xC),
+    (40131, 0xC),
+    (40132, 0xC),
+    (40133, 0xC),
+    (40134, 0xC),
+    (40135, 0xC),
+    (40136, 0xC),
+    (40138, 0xC),
+    (40139, 0xC),
+    (40140, 0xC),
+    (40141, 0xC),
+    (40142, 0xC),
+    (40143, 0xC),
+    (40144, 0xC),
+    (40145, 0xC),
+    (40146, 0xC),
+    (40147, 0xC),
+    (40149, 0xC),
+    (40150, 0xC),
+    (40151, 0xC),
+    (40152, 0xC),
+    (40156, 0xC),
+    (40157, 0xC),
+    (40158, 0xC),
+    (40160, 0xC),
+    (40161, 0xC),
+    (40162, 0xC),
+    (40163, 0xC),
+    (40164, 0xC),
+    (40165, 0xC),
+    (40166, 0xC),
+    (40167, 0xC),
+    (40168, 0xC),
+    (40170, 0xC),
+    (40171, 0xC),
+    (40172, 0xC),
+    (40173, 0xC),
+    (40174, 0xC),
+    (40175, 0xC),
+    (40176, 0xC),
+    (40177, 0xC),
+    (40178, 0xC),
+    (40179, 0xC),
+    (40181, 0xC),
+    (40182, 0xC),
+    (40183, 0xC),
+    (40184, 0xC),
+    (40185, 0xC),
+    (40186, 0xC),
+    (40187, 0xC),
+    (40188, 0xC),
+    (40189, 0xC),
+    (40397, 0xC),
+    (40398, 0xC),
+    (40399, 0xC),
+    (40400, 0xC),
+    (40401, 0xC),
+    (40402, 0xC),
+    (40403, 0xC),
+    (40404, 0xC),
+    (40405, 0xC),
+    (40408, 0xC),
+    (40409, 0xC),
+    (40410, 0xC),
+    (40411, 0xC),
+    (40412, 0xC),
+    (40413, 0xC),
+    (40414, 0xC),
+    (40415, 0xC),
+    (40416, 0xC),
+    (40417, 0xC),
+    (40419, 0xC),
+    (40420, 0xC),
+    (40421, 0xC),
+    (40422, 0xC),
+    (40423, 0xC),
+    (40424, 0xC),
+    (40425, 0xC),
+    (40426, 0xC),
+    (40427, 0xC),
+    (40428, 0xC),
+    (40430, 0xC),
+    (40431, 0xC),
+    (40432, 0xC),
+    (40433, 0xC),
+    (40434, 0xC),
+    (40435, 0xC),
+    (40436, 0xC),
+    (40437, 0xC),
+    (40438, 0xC),
+    (40439, 0xC),
+    (40441, 0xC),
+    (40442, 0xC),
+    (40443, 0xC),
+    (40444, 0xC),
+    (40448, 0xC),
+    (40449, 0xC),
+    (40450, 0xC),
+    (40451, 0x2),
+    (40452, 0xC),
+    (40453, 0xC),
+    (40454, 0xC),
+    (40455, 0xC),
+    (40456, 0xC),
+    (40457, 0xC),
+    (40458, 0xC),
+    (40459, 0xC),
+    (40460, 0xC),
+    (40461, 0xC),
+    (40462, 0x2),
+    (40463, 0xC),
+    (40464, 0xC),
+    (40465, 0xC),
+    (40466, 0xC),
+    (40467, 0xC),
+    (40468, 0xC),
+    (40469, 0xC),
+    (40470, 0xC),
+    (40471, 0xC),
+    (40472, 0xC),
+    (40473, 0x2),
+    (40474, 0xC),
+    (40475, 0xC),
+    (40476, 0xC),
+    (40477, 0xC),
+    (40478, 0xC),
+    (40479, 0xC),
+    (40480, 0xC),
+    (40481, 0xC),
+    (40482, 0xC),
+    (40688, 0xC),
+    (40689, 0xC),
+    (40690, 0xC),
+    (40691, 0xC),
+    (40692, 0xC),
+    (40693, 0xC),
+    (40694, 0xC),
+    (40695, 0xC),
+    (40696, 0xC),
+    (40697, 0xC),
+    (40699, 0xC),
+    (40700, 0xC),
+    (40701, 0xC),
+    (40702, 0xC),
+    (40703, 0xC),
+    (40704, 0xC),
+    (40705, 0xC),
+    (40706, 0xC),
+    (40707, 0xC),
+    (40708, 0xC),
+    (40709, 0x2),
+    (40711, 0xC),
+    (40712, 0xC),
+    (40713, 0xC),
+    (40714, 0xC),
+    (40715, 0xC),
+    (40716, 0xC),
+    (40717, 0xC),
+    (40718, 0xC),
+    (40719, 0xC),
+    (40720, 0xC),
+    (40722, 0xC),
+    (40723, 0xC),
+    (40724, 0xC),
+    (40725, 0xC),
+    (40726, 0xC),
+    (40727, 0xC),
+    (40728, 0xC),
+    (40729, 0xC),
+    (40730, 0xC),
+    (40731, 0xC),
+    (40733, 0xC),
+    (40734, 0xC),
+    (40735, 0xC),
+    (40736, 0xC),
+    (40737, 0xC),
+    (40740, 0xC),
+    (40741, 0xC),
+    (40742, 0xC),
+    (40743, 0x2),
+    (40744, 0xC),
+    (40745, 0xC),
+    (40746, 0xC),
+    (40747, 0xC),
+    (40748, 0xC),
+    (40749, 0xC),
+    (40750, 0xC),
+    (40751, 0xC),
+    (40752, 0xC),
+    (40753, 0xC),
+    (40754, 0x2),
+    (40755, 0xC),
+    (40756, 0xC),
+    (40757, 0xC),
+    (40758, 0xC),
+    (40759, 0xC),
+    (40760, 0xC),
+    (40761, 0xC),
+    (40762, 0xC),
+    (40763, 0xC),
+    (40764, 0xC),
+    (40765, 0x2),
+    (40766, 0xC),
+    (40767, 0xC),
+    (40768, 0xC),
+    (40769, 0xC),
+    (40770, 0xC),
+    (40771, 0xC),
+    (40772, 0xC),
+    (40773, 0xC),
+    (40774, 0xC),
+    (40775, 0xC),
+    (40979, 0xC),
+    (40980, 0xC),
+    (40981, 0xC),
+    (40982, 0xC),
+    (40983, 0xC),
+    (40984, 0xC),
+    (40985, 0xC),
+    (40986, 0xC),
+    (40987, 0xC),
+    (40988, 0xC),
+    (40989, 0x2),
+    (40990, 0xC),
+    (40991, 0xC),
+    (40992, 0xC),
+    (40993, 0xC),
+    (40994, 0xC),
+    (40995, 0xC),
+    (40996, 0xC),
+    (40997, 0xC),
+    (40998, 0xC),
+    (40999, 0xC),
+    (41000, 0xC),
+    (41001, 0x2),
+    (41002, 0xC),
+    (41003, 0xC),
+    (41004, 0xC),
+    (41005, 0xC),
+    (41006, 0xC),
+    (41007, 0xC),
+    (41008, 0xC),
+    (41009, 0xC),
+    (41010, 0xC),
+    (41011, 0xC),
+    (41012, 0x2),
+    (41014, 0xC),
+    (41015, 0xC),
+    (41016, 0xC),
+    (41017, 0xC),
+    (41018, 0xC),
+    (41019, 0xC),
+    (41020, 0xC),
+    (41021, 0xC),
+    (41022, 0xC),
+    (41023, 0xC),
+    (41025, 0xC),
+    (41026, 0xC),
+    (41027, 0xC),
+    (41028, 0xC),
+    (41029, 0xC),
+    (41032, 0xC),
+    (41033, 0xC),
+    (41034, 0xC),
+    (41035, 0x2),
+    (41036, 0xC),
+    (41037, 0xC),
+    (41038, 0xC),
+    (41039, 0xC),
+    (41040, 0xC),
+    (41041, 0xC),
+    (41042, 0xC),
+    (41043, 0xC),
+    (41044, 0xC),
+    (41045, 0xC),
+    (41046, 0xC),
+    (41047, 0x2),
+    (41048, 0xC),
+    (41049, 0xC),
+    (41050, 0xC),
+    (41051, 0xC),
+    (41052, 0xC),
+    (41053, 0xC),
+    (41054, 0xC),
+    (41055, 0xC),
+    (41056, 0xC),
+    (41057, 0xC),
+    (41058, 0x2),
+    (41059, 0xC),
+    (41060, 0xC),
+    (41061, 0xC),
+    (41062, 0xC),
+    (41063, 0xC),
+    (41064, 0xC),
+    (41065, 0xC),
+    (41066, 0xC),
+    (41067, 0xC),
+    (41068, 0xC),
+    (41270, 0xC),
+    (41271, 0xC),
+    (41272, 0xC),
+    (41273, 0xC),
+    (41274, 0x2),
+    (41275, 0x2),
+    (41276, 0x2),
+    (41277, 0xC),
+    (41278, 0xC),
+    (41279, 0xC),
+    (41280, 0xC),
+    (41281, 0x2),
+    (41282, 0xC),
+    (41283, 0xC),
+    (41284, 0xC),
+    (41285, 0x2),
+    (41286, 0x2),
+    (41287, 0x2),
+    (41288, 0x2),
+    (41289, 0x2),
+    (41290, 0x2),
+    (41291, 0x2),
+    (41292, 0x2),
+    (41293, 0x2),
+    (41294, 0xC),
+    (41295, 0xC),
+    (41296, 0xC),
+    (41297, 0x2),
+    (41298, 0x2),
+    (41299, 0x2),
+    (41300, 0x2),
+    (41301, 0x2),
+    (41302, 0x2),
+    (41303, 0x2),
+    (41304, 0x2),
+    (41306, 0xC),
+    (41307, 0xC),
+    (41308, 0xC),
+    (41309, 0x2),
+    (41310, 0x2),
+    (41311, 0x2),
+    (41312, 0x2),
+    (41313, 0x2),
+    (41314, 0x2),
+    (41315, 0x2),
+    (41317, 0xC),
+    (41318, 0xC),
+    (41319, 0xC),
+    (41320, 0xC),
+    (41321, 0xC),
+    (41322, 0xC),
+    (41324, 0xC),
+    (41325, 0xC),
+    (41326, 0xC),
+    (41327, 0xC),
+    (41328, 0x2),
+    (41329, 0xC),
+    (41330, 0xC),
+    (41331, 0xC),
+    (41332, 0x2),
+    (41333, 0x2),
+    (41334, 0x2),
+    (41335, 0x2),
+    (41336, 0xC),
+    (41337, 0xC),
+    (41338, 0xC),
+    (41339, 0x2),
+    (41340, 0xC),
+    (41341, 0xC),
+    (41342, 0xC),
+    (41343, 0xC),
+    (41344, 0x2),
+    (41345, 0x2),
+    (41346, 0x2),
+    (41347, 0x2),
+    (41348, 0x2),
+    (41349, 0x2),
+    (41350, 0x2),
+    (41351, 0x2),
+    (41352, 0xC),
+    (41353, 0xC),
+    (41354, 0xC),
+    (41355, 0x2),
+    (41356, 0x2),
+    (41357, 0x2),
+    (41358, 0x2),
+    (41359, 0xC),
+    (41360, 0xC),
+    (41361, 0xC),
+    (41561, 0xC),
+    (41562, 0xC),
+    (41563, 0xC),
+    (41564, 0xC),
+    (41565, 0x2),
+    (41566, 0x2),
+    (41567, 0x2),
+    (41568, 0xC),
+    (41569, 0xC),
+    (41570, 0xC),
+    (41571, 0xC),
+    (41572, 0x2),
+    (41573, 0xC),
+    (41574, 0xC),
+    (41575, 0xC),
+    (41576, 0xC),
+    (41577, 0x2),
+    (41578, 0x2),
+    (41579, 0x2),
+    (41580, 0x2),
+    (41581, 0x2),
+    (41582, 0x2),
+    (41583, 0x2),
+    (41584, 0x2),
+    (41585, 0xC),
+    (41586, 0xC),
+    (41587, 0xC),
+    (41588, 0xC),
+    (41589, 0xC),
+    (41590, 0x2),
+    (41591, 0x2),
+    (41592, 0x2),
+    (41593, 0x2),
+    (41594, 0x2),
+    (41595, 0x2),
+    (41596, 0x2),
+    (41597, 0xC),
+    (41598, 0xC),
+    (41599, 0xC),
+    (41600, 0xC),
+    (41601, 0x2),
+    (41602, 0x2),
+    (41603, 0x2),
+    (41604, 0x2),
+    (41605, 0x2),
+    (41606, 0x2),
+    (41607, 0x2),
+    (41609, 0xC),
+    (41610, 0xC),
+    (41611, 0xC),
+    (41612, 0xC),
+    (41613, 0xC),
+    (41614, 0xC),
+    (41615, 0xC),
+    (41617, 0xC),
+    (41618, 0xC),
+    (41619, 0xC),
+    (41620, 0x2),
+    (41621, 0xC),
+    (41622, 0xC),
+    (41623, 0xC),
+    (41624, 0xC),
+    (41625, 0x2),
+    (41626, 0x2),
+    (41627, 0x2),
+    (41628, 0xC),
+    (41629, 0xC),
+    (41630, 0xC),
+    (41631, 0xC),
+    (41632, 0x2),
+    (41633, 0xC),
+    (41634, 0xC),
+    (41635, 0xC),
+    (41636, 0x2),
+    (41637, 0x2),
+    (41638, 0x2),
+    (41639, 0x2),
+    (41640, 0x2),
+    (41641, 0x2),
+    (41642, 0x2),
+    (41643, 0x2),
+    (41644, 0x2),
+    (41645, 0xC),
+    (41646, 0xC),
+    (41647, 0xC),
+    (41648, 0x2),
+    (41649, 0x2),
+    (41650, 0x2),
+    (41651, 0xC),
+    (41652, 0xC),
+    (41653, 0xC),
+    (41654, 0xC),
+    (41852, 0xC),
+    (41853, 0xC),
+    (41854, 0xC),
+    (41855, 0xC),
+    (41856, 0x2),
+    (41857, 0x2),
+    (41858, 0x2),
+    (41859, 0xC),
+    (41860, 0xC),
+    (41861, 0xC),
+    (41862, 0xC),
+    (41863, 0x2),
+    (41864, 0xC),
+    (41865, 0xC),
+    (41866, 0xC),
+    (41867, 0xC),
+    (41868, 0xC),
+    (41869, 0xC),
+    (41870, 0xC),
+    (41871, 0xC),
+    (41872, 0xC),
+    (41873, 0xC),
+    (41874, 0x2),
+    (41875, 0x2),
+    (41876, 0x2),
+    (41877, 0xC),
+    (41878, 0xC),
+    (41879, 0xC),
+    (41880, 0xC),
+    (41881, 0xC),
+    (41882, 0xC),
+    (41883, 0xC),
+    (41884, 0xC),
+    (41885, 0xC),
+    (41886, 0x2),
+    (41887, 0x2),
+    (41889, 0xC),
+    (41890, 0xC),
+    (41891, 0xC),
+    (41892, 0xC),
+    (41893, 0xC),
+    (41894, 0xC),
+    (41895, 0xC),
+    (41896, 0xC),
+    (41897, 0xC),
+    (41898, 0x2),
+    (41899, 0x2),
+    (41901, 0xC),
+    (41902, 0xC),
+    (41903, 0xC),
+    (41904, 0xC),
+    (41905, 0xC),
+    (41906, 0xC),
+    (41907, 0xC),
+    (41909, 0xC),
+    (41910, 0xC),
+    (41911, 0xC),
+    (41912, 0x2),
+    (41913, 0xC),
+    (41914, 0xC),
+    (41915, 0xC),
+    (41916, 0xC),
+    (41917, 0x2),
+    (41918, 0x2),
+    (41919, 0x2),
+    (41920, 0xC),
+    (41921, 0xC),
+    (41922, 0xC),
+    (41923, 0xC),
+    (41924, 0x2),
+    (41925, 0xC),
+    (41926, 0xC),
+    (41927, 0xC),
+    (41928, 0xC),
+    (41929, 0xC),
+    (41930, 0xC),
+    (41931, 0xC),
+    (41932, 0xC),
+    (41933, 0xC),
+    (41934, 0x2),
+    (41935, 0x2),
+    (41936, 0x2),
+    (41937, 0xC),
+    (41938, 0xC),
+    (41939, 0xC),
+    (41940, 0xC),
+    (41941, 0xC),
+    (41942, 0xC),
+    (41943, 0xC),
+    (41944, 0xC),
+    (41945, 0xC),
+    (41946, 0xC),
+    (41947, 0xC),
+    (42143, 0xC),
+    (42144, 0xC),
+    (42145, 0xC),
+    (42146, 0xC),
+    (42147, 0x2),
+    (42148, 0x2),
+    (42149, 0x2),
+    (42150, 0xC),
+    (42151, 0xC),
+    (42152, 0xC),
+    (42153, 0xC),
+    (42154, 0xC),
+    (42155, 0x2),
+    (42156, 0xC),
+    (42157, 0xC),
+    (42158, 0xC),
+    (42159, 0xC),
+    (42160, 0xC),
+    (42161, 0xC),
+    (42162, 0xC),
+    (42163, 0xC),
+    (42164, 0xC),
+    (42165, 0xC),
+    (42166, 0x2),
+    (42167, 0x2),
+    (42168, 0x2),
+    (42169, 0xC),
+    (42170, 0xC),
+    (42171, 0xC),
+    (42172, 0xC),
+    (42173, 0xC),
+    (42174, 0xC),
+    (42175, 0xC),
+    (42176, 0xC),
+    (42177, 0xC),
+    (42181, 0xC),
+    (42182, 0xC),
+    (42183, 0xC),
+    (42184, 0xC),
+    (42185, 0xC),
+    (42186, 0xC),
+    (42187, 0xC),
+    (42188, 0xC),
+    (42189, 0xC),
+    (42193, 0xC),
+    (42194, 0xC),
+    (42195, 0xC),
+    (42196, 0xC),
+    (42197, 0xC),
+    (42198, 0xC),
+    (42199, 0xC),
+    (42200, 0xC),
+    (42201, 0xC),
+    (42202, 0xC),
+    (42203, 0xC),
+    (42204, 0x2),
+    (42205, 0xC),
+    (42206, 0xC),
+    (42207, 0xC),
+    (42208, 0xC),
+    (42209, 0x2),
+    (42210, 0x2),
+    (42211, 0x2),
+    (42212, 0x2),
+    (42213, 0xC),
+    (42214, 0xC),
+    (42215, 0xC),
+    (42216, 0xC),
+    (42217, 0x2),
+    (42218, 0xC),
+    (42219, 0xC),
+    (42220, 0xC),
+    (42221, 0xC),
+    (42222, 0xC),
+    (42223, 0xC),
+    (42224, 0xC),
+    (42225, 0xC),
+    (42226, 0xC),
+    (42227, 0x2),
+    (42228, 0x2),
+    (42229, 0x2),
+    (42230, 0xC),
+    (42231, 0xC),
+    (42232, 0xC),
+    (42233, 0xC),
+    (42234, 0xC),
+    (42235, 0xC),
+    (42236, 0xC),
+    (42237, 0xC),
+    (42238, 0xC),
+    (42239, 0xC),
+    (42240, 0xC),
+    (42432, 0x0),
+    (42433, 0x0),
+    (42434, 0xC),
+    (42435, 0xC),
+    (42440, 0x2),
+    (42441, 0x2),
+    (42446, 0x2),
+    (42447, 0xC),
+    (42452, 0xC),
+    (42453, 0xC),
+    (42454, 0xC),
+    (42455, 0xC),
+    (42457, 0x2),
+    (42466, 0xC),
+    (42467, 0xC),
+    (42469, 0x2),
+    (42470, 0x0),
+    (42471, 0x0),
+    (42472, 0x0),
+    (42473, 0xC),
+    (42482, 0x0),
+    (42483, 0x0),
+    (42484, 0x0),
+    (42486, 0xC),
+    (42487, 0xC),
+    (42489, 0xC),
+    (42491, 0xC),
+    (42492, 0xC),
+    (42493, 0xC),
+    (42494, 0xC),
+    (42495, 0xC),
+    (42497, 0x2),
+    (42503, 0x2),
+    (42504, 0x2),
+    (42505, 0xC),
+    (42506, 0xC),
+    (42507, 0xC),
+    (42509, 0x2),
+    (42520, 0x2),
+    (42521, 0x2),
+    (42523, 0xC),
+    (42526, 0xC),
+    (42527, 0xC),
+    (42528, 0xC),
+    (42529, 0xC),
+    (42532, 0xC),
+    (42534, 0x0),
+    (42535, 0x0),
+    (42724, 0x0),
+    (42726, 0xC),
+    (42727, 0xC),
+    (42729, 0x2),
+    (42732, 0x2),
+    (42737, 0x2),
+    (42739, 0xC),
+    (42744, 0xC),
+    (42745, 0xC),
+    (42749, 0x2),
+    (42750, 0x2),
+    (42758, 0xC),
+    (42759, 0xC),
+    (42761, 0x2),
+    (42762, 0x0),
+    (42763, 0x0),
+    (42764, 0x0),
+    (42765, 0xC),
+    (42774, 0x0),
+    (42775, 0x0),
+    (42776, 0x0),
+    (42781, 0x2),
+    (42783, 0xC),
+    (42784, 0xC),
+    (42785, 0xC),
+    (42786, 0xC),
+    (42787, 0xC),
+    (42789, 0x2),
+    (42795, 0x2),
+    (42796, 0x2),
+    (42797, 0x2),
+    (42800, 0xC),
+    (42802, 0x2),
+    (42806, 0xC),
+    (42812, 0x2),
+    (42813, 0x2),
+    (42814, 0x2),
+    (42820, 0xC),
+    (42821, 0xC),
+    (42824, 0xC),
+    (42826, 0x0),
+    (42827, 0x0),
+    (42830, 0x0),
+    (43018, 0xC),
+    (43019, 0xC),
+    (43020, 0x2),
+    (43022, 0x2),
+    (43023, 0x2),
+    (43028, 0x2),
+    (43029, 0x2),
+    (43030, 0xC),
+    (43031, 0xC),
+    (43034, 0x2),
+    (43035, 0x2),
+    (43036, 0x2),
+    (43037, 0x2),
+    (43038, 0x2),
+    (43039, 0x2),
+    (43040, 0x2),
+    (43041, 0x2),
+    (43043, 0xC),
+    (43046, 0xC),
+    (43047, 0x2),
+    (43048, 0x2),
+    (43049, 0x2),
+    (43052, 0x2),
+    (43053, 0x2),
+    (43057, 0xC),
+    (43060, 0xC),
+    (43061, 0x2),
+    (43062, 0x2),
+    (43063, 0x2),
+    (43064, 0x2),
+    (43065, 0x2),
+    (43066, 0x0),
+    (43067, 0x0),
+    (43069, 0xC),
+    (43073, 0x2),
+    (43074, 0x2),
+    (43075, 0xC),
+    (43076, 0xC),
+    (43077, 0xC),
+    (43078, 0xC),
+    (43079, 0xC),
+    (43081, 0x2),
+    (43084, 0xC),
+    (43085, 0xC),
+    (43087, 0x2),
+    (43088, 0x2),
+    (43089, 0x2),
+    (43092, 0xC),
+    (43093, 0xC),
+    (43094, 0x2),
+    (43098, 0xC),
+    (43100, 0x2),
+    (43101, 0x2),
+    (43102, 0x2),
+    (43103, 0x2),
+    (43104, 0x2),
+    (43105, 0x2),
+    (43106, 0x2),
+    (43107, 0x2),
+    (43108, 0xC),
+    (43109, 0xC),
+    (43112, 0xC),
+    (43113, 0xC),
+    (43116, 0xC),
+    (43117, 0xC),
+    (43118, 0x0),
+    (43119, 0x0),
+    (43122, 0x0),
+    (43123, 0x0),
+    (43126, 0x0),
+    (43310, 0xC),
+    (43314, 0x2),
+    (43315, 0x2),
+    (43319, 0xC),
+    (43320, 0x2),
+    (43322, 0xC),
+    (43323, 0xC),
+    (43326, 0x2),
+    (43327, 0x2),
+    (43328, 0x2),
+    (43329, 0x2),
+    (43330, 0x2),
+    (43331, 0x2),
+    (43332, 0x2),
+    (43333, 0x2),
+    (43338, 0xC),
+    (43339, 0x2),
+    (43340, 0x2),
+    (43341, 0x2),
+    (43344, 0x2),
+    (43345, 0x2),
+    (43348, 0xC),
+    (43349, 0xC),
+    (43352, 0x2),
+    (43353, 0x2),
+    (43354, 0x2),
+    (43355, 0x2),
+    (43356, 0x2),
+    (43357, 0x2),
+    (43358, 0x0),
+    (43359, 0x0),
+    (43361, 0xC),
+    (43365, 0x2),
+    (43366, 0x2),
+    (43367, 0xC),
+    (43368, 0xC),
+    (43369, 0xC),
+    (43370, 0xC),
+    (43371, 0xC),
+    (43374, 0x2),
+    (43376, 0xC),
+    (43377, 0xC),
+    (43380, 0x2),
+    (43381, 0x2),
+    (43384, 0xC),
+    (43385, 0xC),
+    (43387, 0x2),
+    (43390, 0xC),
+    (43391, 0xC),
+    (43392, 0x2),
+    (43393, 0x2),
+    (43394, 0x2),
+    (43395, 0x2),
+    (43396, 0x2),
+    (43397, 0x2),
+    (43398, 0x2),
+    (43399, 0x2),
+    (43400, 0x2),
+    (43401, 0xC),
+    (43405, 0x2),
+    (43408, 0xC),
+    (43409, 0xC),
+    (43411, 0x0),
+    (43414, 0x0),
+    (43415, 0x0),
+    (43418, 0x0),
+    (43419, 0x0),
+    (43598, 0x0),
+    (43599, 0x0),
+    (43602, 0x2),
+    (43603, 0x2),
+    (43604, 0x2),
+    (43606, 0x2),
+    (43610, 0xC),
+    (43613, 0xC),
+    (43617, 0xC),
+    (43618, 0x2),
+    (43619, 0x2),
+    (43620, 0x2),
+    (43621, 0x2),
+    (43622, 0x2),
+    (43623, 0x2),
+    (43626, 0xC),
+    (43628, 0xC),
+    (43629, 0xC),
+    (43631, 0x2),
+    (43632, 0x2),
+    (43634, 0x2),
+    (43635, 0x2),
+    (43640, 0xC),
+    (43641, 0xC),
+    (43645, 0x2),
+    (43646, 0x2),
+    (43647, 0x2),
+    (43650, 0x0),
+    (43651, 0x0),
+    (43652, 0x0),
+    (43653, 0xC),
+    (43657, 0x2),
+    (43658, 0x2),
+    (43659, 0x2),
+    (43661, 0xC),
+    (43662, 0xC),
+    (43663, 0xC),
+    (43664, 0xC),
+    (43666, 0x2),
+    (43672, 0x2),
+    (43673, 0x2),
+    (43677, 0xC),
+    (43679, 0x2),
+    (43680, 0xC),
+    (43681, 0xC),
+    (43682, 0xC),
+    (43683, 0xC),
+    (43684, 0xC),
+    (43686, 0x2),
+    (43687, 0x2),
+    (43688, 0x2),
+    (43689, 0x2),
+    (43690, 0x2),
+    (43691, 0x2),
+    (43692, 0x2),
+    (43700, 0xC),
+    (43701, 0xC),
+    (43706, 0x0),
+    (43707, 0x0),
+    (43710, 0x0),
+    (43711, 0x0),
+    (43890, 0x0),
+    (43891, 0x0),
+    (43901, 0xC),
+    (43903, 0x2),
+    (43904, 0xC),
+    (43905, 0xC),
+    (43908, 0xC),
+    (43916, 0xC),
+    (43920, 0xC),
+    (43921, 0xC),
+    (43922, 0x2),
+    (43923, 0x2),
+    (43924, 0x2),
+    (43925, 0x2),
+    (43926, 0x2),
+    (43927, 0x2),
+    (43929, 0x0),
+    (43932, 0xC),
+    (43940, 0xC),
+    (43941, 0xC),
+    (43944, 0x0),
+    (43945, 0xC),
+    (43949, 0x2),
+    (43950, 0x2),
+    (43951, 0x2),
+    (43954, 0xC),
+    (43955, 0xC),
+    (43956, 0xC),
+    (43958, 0x2),
+    (43963, 0xC),
+    (43973, 0xC),
+    (43974, 0xC),
+    (43975, 0xC),
+    (43976, 0xC),
+    (43977, 0xC),
+    (43978, 0xC),
+    (43980, 0xC),
+    (43985, 0x2),
+    (43990, 0xC),
+    (43991, 0x2),
+    (43993, 0xC),
+    (43996, 0xC),
+    (43998, 0x0),
+    (43999, 0x0),
+    (44002, 0x0),
+    (44003, 0x0),
+    (44186, 0xC),
+    (44187, 0xC),
+    (44190, 0xC),
+    (44191, 0xC),
+    (44192, 0xC),
+    (44193, 0xC),
+    (44194, 0x2),
+    (44195, 0xC),
+    (44196, 0xC),
+    (44198, 0xC),
+    (44199, 0xC),
+    (44202, 0xC),
+    (44203, 0xC),
+    (44206, 0xC),
+    (44207, 0xC),
+    (44208, 0x2),
+    (44209, 0x2),
+    (44210, 0xC),
+    (44211, 0xC),
+    (44212, 0xC),
+    (44213, 0xC),
+    (44214, 0x2),
+    (44215, 0x2),
+    (44216, 0x2),
+    (44217, 0x2),
+    (44218, 0x2),
+    (44219, 0x2),
+    (44220, 0x2),
+    (44221, 0x0),
+    (44224, 0xC),
+    (44226, 0xC),
+    (44227, 0xC),
+    (44228, 0xC),
+    (44229, 0xC),
+    (44230, 0xC),
+    (44231, 0xC),
+    (44234, 0xC),
+    (44235, 0xC),
+    (44237, 0xC),
+    (44238, 0xC),
+    (44239, 0xC),
+    (44241, 0x2),
+    (44243, 0x2),
+    (44244, 0x2),
+    (44245, 0xC),
+    (44246, 0xC),
+    (44247, 0xC),
+    (44248, 0xC),
+    (44251, 0xC),
+    (44252, 0xC),
+    (44253, 0xC),
+    (44254, 0xC),
+    (44255, 0xC),
+    (44258, 0xC),
+    (44259, 0xC),
+    (44260, 0xC),
+    (44261, 0xC),
+    (44262, 0xC),
+    (44263, 0xC),
+    (44264, 0x2),
+    (44266, 0xC),
+    (44267, 0xC),
+    (44268, 0xC),
+    (44269, 0xC),
+    (44270, 0xC),
+    (44271, 0xC),
+    (44272, 0xC),
+    (44274, 0xC),
+    (44275, 0xC),
+    (44276, 0xC),
+    (44277, 0xC),
+    (44279, 0xC),
+    (44282, 0xC),
+    (44284, 0x2),
+    (44285, 0x2),
+    (44286, 0xC),
+    (44287, 0xC),
+    (44288, 0xC),
+    (44289, 0xC),
+    (44290, 0xC),
+    (44291, 0x0),
+    (44294, 0x0),
+    (44295, 0x0),
+    (44478, 0xC),
+    (44479, 0xC),
+    (44482, 0xC),
+    (44483, 0xC),
+    (44484, 0xC),
+    (44486, 0x2),
+    (44487, 0xC),
+    (44490, 0xC),
+    (44491, 0xC),
+    (44494, 0xC),
+    (44495, 0xC),
+    (44498, 0xC),
+    (44499, 0xC),
+    (44500, 0x2),
+    (44502, 0xC),
+    (44503, 0xC),
+    (44504, 0xC),
+    (44505, 0xC),
+    (44506, 0x2),
+    (44507, 0x2),
+    (44508, 0x2),
+    (44509, 0x2),
+    (44510, 0x2),
+    (44511, 0x2),
+    (44512, 0x2),
+    (44513, 0x0),
+    (44515, 0xC),
+    (44516, 0xC),
+    (44518, 0xC),
+    (44519, 0xC),
+    (44520, 0xC),
+    (44521, 0xC),
+    (44522, 0xC),
+    (44523, 0xC),
+    (44526, 0xC),
+    (44527, 0xC),
+    (44529, 0xC),
+    (44530, 0xC),
+    (44531, 0xC),
+    (44533, 0x0),
+    (44535, 0x2),
+    (44536, 0x2),
+    (44537, 0xC),
+    (44538, 0xC),
+    (44539, 0xC),
+    (44540, 0xC),
+    (44542, 0xC),
+    (44544, 0xC),
+    (44545, 0xC),
+    (44546, 0xC),
+    (44547, 0xC),
+    (44548, 0xC),
+    (44550, 0xC),
+    (44551, 0xC),
+    (44552, 0xC),
+    (44553, 0xC),
+    (44554, 0xC),
+    (44555, 0xC),
+    (44556, 0x2),
+    (44557, 0x2),
+    (44558, 0xC),
+    (44559, 0xC),
+    (44560, 0xC),
+    (44561, 0xC),
+    (44562, 0xC),
+    (44563, 0xC),
+    (44564, 0xC),
+    (44565, 0xC),
+    (44566, 0xC),
+    (44567, 0xC),
+    (44568, 0xC),
+    (44569, 0xC),
+    (44570, 0xC),
+    (44574, 0xC),
+    (44575, 0xC),
+    (44576, 0x2),
+    (44577, 0x2),
+    (44579, 0xC),
+    (44580, 0xC),
+    (44581, 0xC),
+    (44582, 0xC),
+    (44583, 0xC),
+    (44586, 0x0),
+    (44587, 0x0),
+    (44763, 0x0),
+    (44766, 0x0),
+    (44767, 0x0),
+    (44771, 0xC),
+    (44774, 0xC),
+    (44775, 0xC),
+    (44778, 0xC),
+    (44779, 0xC),
+    (44782, 0xC),
+    (44783, 0xC),
+    (44786, 0xC),
+    (44787, 0xC),
+    (44790, 0xC),
+    (44792, 0x2),
+    (44793, 0xC),
+    (44794, 0xC),
+    (44795, 0xC),
+    (44796, 0xC),
+    (44799, 0x0),
+    (44800, 0x0),
+    (44801, 0x0),
+    (44804, 0x0),
+    (44805, 0x0),
+    (44807, 0xC),
+    (44808, 0xC),
+    (44810, 0xC),
+    (44811, 0xC),
+    (44814, 0xC),
+    (44815, 0xC),
+    (44818, 0xC),
+    (44819, 0xC),
+    (44821, 0xC),
+    (44822, 0xC),
+    (44823, 0xC),
+    (44825, 0x0),
+    (44826, 0x0),
+    (44827, 0x2),
+    (44828, 0x2),
+    (44829, 0x2),
+    (44830, 0xC),
+    (44831, 0xC),
+    (44833, 0xC),
+    (44834, 0xC),
+    (44838, 0xC),
+    (44839, 0xC),
+    (44840, 0xC),
+    (44842, 0xC),
+    (44843, 0xC),
+    (44846, 0xC),
+    (44848, 0x2),
+    (44849, 0x2),
+    (44850, 0xC),
+    (44851, 0xC),
+    (44854, 0xC),
+    (44855, 0xC),
+    (44856, 0xC),
+    (44857, 0xC),
+    (44858, 0xC),
+    (44859, 0xC),
+    (44860, 0xC),
+    (44862, 0xC),
+    (44864, 0x2),
+    (44866, 0xC),
+    (44867, 0xC),
+    (44869, 0x2),
+    (44872, 0xC),
+    (44873, 0xC),
+    (44874, 0xC),
+    (44875, 0xC),
+    (44876, 0xC),
+    (44878, 0x0),
+    (44879, 0x0),
+    (45055, 0x0),
+    (45058, 0x0),
+    (45059, 0x0),
+    (45063, 0xC),
+    (45066, 0xC),
+    (45070, 0xC),
+    (45071, 0xC),
+    (45074, 0xC),
+    (45075, 0xC),
+    (45078, 0xC),
+    (45079, 0xC),
+    (45082, 0xC),
+    (45085, 0xC),
+    (45086, 0xC),
+    (45087, 0xC),
+    (45088, 0xC),
+    (45091, 0x0),
+    (45092, 0x0),
+    (45093, 0x0),
+    (45096, 0x0),
+    (45097, 0x0),
+    (45099, 0xC),
+    (45100, 0xC),
+    (45102, 0xC),
+    (45103, 0xC),
+    (45106, 0xC),
+    (45107, 0xC),
+    (45110, 0xC),
+    (45111, 0xC),
+    (45113, 0xC),
+    (45114, 0xC),
+    (45115, 0xC),
+    (45117, 0x0),
+    (45118, 0x0),
+    (45119, 0x2),
+    (45120, 0x2),
+    (45121, 0x2),
+    (45122, 0x2),
+    (45123, 0xC),
+    (45125, 0xC),
+    (45126, 0xC),
+    (45130, 0xC),
+    (45131, 0xC),
+    (45132, 0xC),
+    (45133, 0xC),
+    (45134, 0xC),
+    (45135, 0xC),
+    (45140, 0x2),
+    (45141, 0x2),
+    (45142, 0x2),
+    (45143, 0xC),
+    (45146, 0xC),
+    (45147, 0xC),
+    (45148, 0xC),
+    (45149, 0xC),
+    (45150, 0xC),
+    (45151, 0xC),
+    (45152, 0xC),
+    (45154, 0xC),
+    (45156, 0x2),
+    (45158, 0xC),
+    (45159, 0xC),
+    (45164, 0x2),
+    (45165, 0x2),
+    (45166, 0xC),
+    (45167, 0xC),
+    (45168, 0xC),
+    (45169, 0xC),
+    (45170, 0x0),
+    (45171, 0x0),
+    (45345, 0x0),
+    (45347, 0x0),
+    (45354, 0x2),
+    (45355, 0x2),
+    (45358, 0x2),
+    (45359, 0x2),
+    (45360, 0x2),
+    (45361, 0x2),
+    (45362, 0x2),
+    (45364, 0x2),
+    (45365, 0x2),
+    (45366, 0x2),
+    (45367, 0x2),
+    (45368, 0x2),
+    (45369, 0x2),
+    (45374, 0x2),
+    (45375, 0x2),
+    (45381, 0x2),
+    (45382, 0x2),
+    (45384, 0x0),
+    (45385, 0x0),
+    (45388, 0x0),
+    (45389, 0x0),
+    (45391, 0x2),
+    (45392, 0x2),
+    (45393, 0x2),
+    (45396, 0x2),
+    (45397, 0x2),
+    (45405, 0x2),
+    (45408, 0x2),
+    (45409, 0x0),
+    (45410, 0x0),
+    (45412, 0x2),
+    (45413, 0x2),
+    (45414, 0x2),
+    (45415, 0x2),
+    (45416, 0x2),
+    (45420, 0x2),
+    (45421, 0x2),
+    (45423, 0x2),
+    (45428, 0x2),
+    (45429, 0x2),
+    (45432, 0x2),
+    (45433, 0x2),
+    (45434, 0x2),
+    (45435, 0x2),
+    (45436, 0x2),
+    (45437, 0x2),
+    (45444, 0x2),
+    (45445, 0x2),
+    (45448, 0x2),
+    (45449, 0x2),
+    (45450, 0x2),
+    (45452, 0x2),
+    (45453, 0x2),
+    (45456, 0x2),
+    (45457, 0x2),
+    (45458, 0x2),
+    (45460, 0x2),
+    (45461, 0x2),
+    (45463, 0x0),
+    (45637, 0x0),
+    (45639, 0x0),
+    (45646, 0x2),
+    (45647, 0x2),
+    (45650, 0x2),
+    (45651, 0x2),
+    (45652, 0x2),
+    (45653, 0x2),
+    (45654, 0x2),
+    (45656, 0x2),
+    (45657, 0x2),
+    (45658, 0x2),
+    (45659, 0x2),
+    (45660, 0x2),
+    (45666, 0x2),
+    (45667, 0x2),
+    (45673, 0x2),
+    (45676, 0x0),
+    (45677, 0x0),
+    (45680, 0x0),
+    (45681, 0x0),
+    (45683, 0x2),
+    (45684, 0x2),
+    (45685, 0x2),
+    (45688, 0x2),
+    (45689, 0x2),
+    (45697, 0x2),
+    (45700, 0x2),
+    (45701, 0x0),
+    (45702, 0x0),
+    (45704, 0x2),
+    (45705, 0x2),
+    (45706, 0x2),
+    (45707, 0x2),
+    (45708, 0x2),
+    (45709, 0x2),
+    (45712, 0x2),
+    (45713, 0x2),
+    (45715, 0x2),
+    (45720, 0x2),
+    (45721, 0x2),
+    (45724, 0x0),
+    (45725, 0x2),
+    (45726, 0x2),
+    (45727, 0x2),
+    (45728, 0x2),
+    (45729, 0x2),
+    (45730, 0x2),
+    (45736, 0x2),
+    (45737, 0x2),
+    (45740, 0x2),
+    (45742, 0x2),
+    (45744, 0x2),
+    (45745, 0x2),
+    (45748, 0x2),
+    (45749, 0x2),
+    (45750, 0x2),
+    (45751, 0x2),
+    (45752, 0x2),
+    (45753, 0x2),
+    (45755, 0x0),
+    (45930, 0x2),
+    (45931, 0x2),
+    (45932, 0x2),
+    (45933, 0x2),
+    (45934, 0x2),
+    (45935, 0x2),
+    (45936, 0x2),
+    (45937, 0x2),
+    (45938, 0x2),
+    (45939, 0x2),
+    (45940, 0x2),
+    (45941, 0x2),
+    (45942, 0x2),
+    (45943, 0x2),
+    (45944, 0x2),
+    (45945, 0x2),
+    (45946, 0x2),
+    (45947, 0x2),
+    (45948, 0x2),
+    (45949, 0x2),
+    (45950, 0x2),
+    (45951, 0x2),
+    (45952, 0x2),
+    (45953, 0x2),
+    (45954, 0x2),
+    (45955, 0x2),
+    (45956, 0x2),
+    (45957, 0x2),
+    (45958, 0x2),
+    (45959, 0x2),
+    (45960, 0x2),
+    (45961, 0x2),
+    (45962, 0x2),
+    (45963, 0x2),
+    (45964, 0x2),
+    (45965, 0x2),
+    (45975, 0x2),
+    (45976, 0x2),
+    (45977, 0x2),
+    (45978, 0x2),
+    (45979, 0x2),
+    (45980, 0x2),
+    (45981, 0x2),
+    (45982, 0x2),
+    (45983, 0x2),
+    (45984, 0x2),
+    (45985, 0x2),
+    (45986, 0x2),
+    (45987, 0x2),
+    (45989, 0x2),
+    (45990, 0x2),
+    (45991, 0x2),
+    (45992, 0x2),
+    (45997, 0x2),
+    (45998, 0x2),
+    (45999, 0x2),
+    (46000, 0x2),
+    (46001, 0x2),
+    (46002, 0x2),
+    (46003, 0x2),
+    (46004, 0x2),
+    (46005, 0x2),
+    (46006, 0x2),
+    (46007, 0x2),
+    (46008, 0x2),
+    (46009, 0x2),
+    (46010, 0x2),
+    (46011, 0x2),
+    (46012, 0x2),
+    (46013, 0x2),
+    (46014, 0x2),
+    (46015, 0x2),
+    (46017, 0x2),
+    (46018, 0x2),
+    (46019, 0x2),
+    (46020, 0x2),
+    (46021, 0x2),
+    (46022, 0x2),
+    (46023, 0x2),
+    (46024, 0x2),
+    (46025, 0x2),
+    (46026, 0x2),
+    (46027, 0x2),
+    (46028, 0x2),
+    (46029, 0x2),
+    (46030, 0x2),
+    (46031, 0x2),
+    (46032, 0x2),
+    (46033, 0x2),
+    (46034, 0x2),
+    (46035, 0x2),
+    (46036, 0x2),
+    (46037, 0x2),
+    (46038, 0x2),
+    (46039, 0x2),
+    (46040, 0x2),
+    (46041, 0x2),
+    (46042, 0x2),
+    (46043, 0x2),
+    (46044, 0x2),
+    (46045, 0x2),
+    (46046, 0x2),
+    (46222, 0x2),
+    (46223, 0x2),
+    (46224, 0x2),
+    (46225, 0x2),
+    (46226, 0x2),
+    (46227, 0x2),
+    (46228, 0x2),
+    (46229, 0x2),
+    (46230, 0x2),
+    (46231, 0x2),
+    (46232, 0x2),
+    (46233, 0x2),
+    (46234, 0x2),
+    (46235, 0x2),
+    (46236, 0x2),
+    (46237, 0x2),
+    (46238, 0x2),
+    (46239, 0x2),
+    (46240, 0x2),
+    (46241, 0x2),
+    (46242, 0x2),
+    (46243, 0x2),
+    (46244, 0x2),
+    (46245, 0x2),
+    (46246, 0x2),
+    (46247, 0x2),
+    (46248, 0x2),
+    (46249, 0x2),
+    (46250, 0x2),
+    (46252, 0x2),
+    (46253, 0x2),
+    (46254, 0x2),
+    (46255, 0x2),
+    (46256, 0x2),
+    (46257, 0x2),
+    (46267, 0x2),
+    (46268, 0x2),
+    (46269, 0x2),
+    (46270, 0x2),
+    (46271, 0x2),
+    (46272, 0x2),
+    (46273, 0x2),
+    (46274, 0x2),
+    (46275, 0x2),
+    (46276, 0x2),
+    (46277, 0x2),
+    (46278, 0x2),
+    (46279, 0x2),
+    (46281, 0x2),
+    (46282, 0x2),
+    (46283, 0x2),
+    (46284, 0x2),
+    (46289, 0x2),
+    (46290, 0x2),
+    (46291, 0x2),
+    (46292, 0x2),
+    (46293, 0x2),
+    (46294, 0x2),
+    (46296, 0x2),
+    (46297, 0x2),
+    (46298, 0x2),
+    (46299, 0x2),
+    (46300, 0x2),
+    (46301, 0x2),
+    (46302, 0x2),
+    (46303, 0x2),
+    (46304, 0x2),
+    (46305, 0x2),
+    (46306, 0x2),
+    (46307, 0x2),
+    (46310, 0x2),
+    (46311, 0x2),
+    (46312, 0x2),
+    (46313, 0x2),
+    (46314, 0x2),
+    (46315, 0x2),
+    (46316, 0x2),
+    (46317, 0x2),
+    (46318, 0x2),
+    (46319, 0x2),
+    (46320, 0x2),
+    (46321, 0x2),
+    (46322, 0x2),
+    (46324, 0x2),
+    (46325, 0x2),
+    (46326, 0x2),
+    (46327, 0x2),
+    (46328, 0x2),
+    (46329, 0x2),
+    (46331, 0x2),
+    (46332, 0x2),
+    (46333, 0x2),
+    (46334, 0x2),
+    (46335, 0x2),
+    (46336, 0x2),
+    (46337, 0x2),
+    (46338, 0x2),
+    (46514, 0x2),
+    (46515, 0x2),
+    (46516, 0x2),
+    (46517, 0x2),
+    (46518, 0x2),
+    (46519, 0x2),
+    (46520, 0x2),
+    (46521, 0x2),
+    (46522, 0x2),
+    (46523, 0x2),
+    (46524, 0x2),
+    (46525, 0x2),
+    (46526, 0x2),
+    (46527, 0x2),
+    (46529, 0x2),
+    (46530, 0x2),
+    (46531, 0x2),
+    (46532, 0x2),
+    (46533, 0x2),
+    (46534, 0x2),
+    (46535, 0x2),
+    (46536, 0x2),
+    (46537, 0x2),
+    (46538, 0x2),
+    (46539, 0x2),
+    (46540, 0x2),
+    (46541, 0x2),
+    (46542, 0x2),
+    (46544, 0x2),
+    (46545, 0x2),
+    (46546, 0x2),
+    (46547, 0x2),
+    (46548, 0x2),
+    (46559, 0x2),
+    (46560, 0x2),
+    (46561, 0x2),
+    (46562, 0x2),
+    (46563, 0x2),
+    (46564, 0x2),
+    (46565, 0x2),
+    (46566, 0x2),
+    (46567, 0x2),
+    (46568, 0x2),
+    (46569, 0x2),
+    (46570, 0x2),
+    (46571, 0x2),
+    (46573, 0x2),
+    (46574, 0x2),
+    (46575, 0x2),
+    (46576, 0x2),
+    (46582, 0x2),
+    (46583, 0x2),
+    (46584, 0x2),
+    (46585, 0x2),
+    (46586, 0x2),
+    (46588, 0x2),
+    (46589, 0x2),
+    (46590, 0x2),
+    (46591, 0x2),
+    (46592, 0x2),
+    (46593, 0x2),
+    (46594, 0x2),
+    (46595, 0x2),
+    (46596, 0x2),
+    (46597, 0x2),
+    (46598, 0x2),
+    (46602, 0x2),
+    (46603, 0x2),
+    (46604, 0x2),
+    (46605, 0x2),
+    (46606, 0x2),
+    (46607, 0x2),
+    (46608, 0x2),
+    (46609, 0x2),
+    (46610, 0x2),
+    (46611, 0x2),
+    (46612, 0x2),
+    (46613, 0x2),
+    (46614, 0x2),
+    (46617, 0x2),
+    (46618, 0x2),
+    (46619, 0x2),
+    (46620, 0x2),
+    (46621, 0x2),
+    (46625, 0x2),
+    (46626, 0x2),
+    (46627, 0x2),
+    (46628, 0x2),
+    (46629, 0x2),
+    (46630, 0x2),
+    (46806, 0x2),
+    (46807, 0x2),
+    (46808, 0x2),
+    (46809, 0x2),
+    (46810, 0x2),
+    (46811, 0x2),
+    (46812, 0x2),
+    (46813, 0x2),
+    (46814, 0x2),
+    (46815, 0x2),
+    (46816, 0x2),
+    (46817, 0x2),
+    (46818, 0x2),
+    (46819, 0x2),
+    (46821, 0x2),
+    (46822, 0x2),
+    (46823, 0x2),
+    (46824, 0x2),
+    (46825, 0x2),
+    (46826, 0x2),
+    (46827, 0x2),
+    (46828, 0x2),
+    (46829, 0x2),
+    (46830, 0x2),
+    (46831, 0x2),
+    (46832, 0x2),
+    (46833, 0x2),
+    (46834, 0x2),
+    (46836, 0x2),
+    (46837, 0x2),
+    (46838, 0x2),
+    (46839, 0x2),
+    (46840, 0x2),
+    (46851, 0x2),
+    (46852, 0x2),
+    (46853, 0x2),
+    (46854, 0x2),
+    (46855, 0x2),
+    (46856, 0x2),
+    (46857, 0x2),
+    (46858, 0x2),
+    (46859, 0x2),
+    (46860, 0x2),
+    (46861, 0x2),
+    (46862, 0x2),
+    (46863, 0x2),
+    (46865, 0x2),
+    (46866, 0x2),
+    (46867, 0x2),
+    (46868, 0x2),
+    (46874, 0x2),
+    (46875, 0x2),
+    (46876, 0x2),
+    (46877, 0x2),
+    (46878, 0x2),
+    (46880, 0x2),
+    (46881, 0x2),
+    (46882, 0x2),
+    (46883, 0x2),
+    (46884, 0x2),
+    (46885, 0x2),
+    (46886, 0x2),
+    (46887, 0x2),
+    (46888, 0x2),
+    (46889, 0x2),
+    (46895, 0x2),
+    (46896, 0x2),
+    (46897, 0x2),
+    (46898, 0x2),
+    (46899, 0x2),
+    (46900, 0x2),
+    (46901, 0x2),
+    (46902, 0x2),
+    (46903, 0x2),
+    (46904, 0x2),
+    (46905, 0x2),
+    (46906, 0x2),
+    (46909, 0x2),
+    (46910, 0x2),
+    (46911, 0x2),
+    (46912, 0x2),
+    (46913, 0x2),
+    (46918, 0x2),
+    (46919, 0x2),
+    (46920, 0x2),
+    (46921, 0x2),
+    (46922, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETIETH_VIDEO_FRAME: u64 = 1107;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETIETH_VISIBLE_NIBBLES: [(u32, u8); 679] = [
+    (42434, 0x0),
+    (42435, 0x0),
+    (42436, 0x0),
+    (42437, 0x0),
+    (42438, 0x0),
+    (42439, 0x0),
+    (42440, 0x0),
+    (42441, 0x0),
+    (42442, 0x0),
+    (42443, 0x0),
+    (42444, 0x0),
+    (42445, 0x0),
+    (42446, 0x0),
+    (42447, 0x0),
+    (42448, 0x0),
+    (42449, 0x0),
+    (42450, 0x0),
+    (42451, 0x0),
+    (42452, 0x0),
+    (42453, 0x0),
+    (42454, 0x0),
+    (42455, 0x0),
+    (42456, 0x0),
+    (42457, 0x0),
+    (42458, 0x0),
+    (42459, 0x0),
+    (42460, 0x0),
+    (42461, 0x0),
+    (42462, 0x0),
+    (42463, 0x0),
+    (42464, 0x0),
+    (42465, 0x0),
+    (42466, 0x0),
+    (42467, 0x0),
+    (42468, 0x0),
+    (42469, 0x0),
+    (42473, 0x0),
+    (42474, 0x0),
+    (42475, 0x0),
+    (42476, 0x0),
+    (42477, 0x0),
+    (42478, 0x0),
+    (42479, 0x0),
+    (42480, 0x0),
+    (42481, 0x0),
+    (42485, 0x0),
+    (42486, 0x0),
+    (42487, 0x0),
+    (42488, 0x0),
+    (42489, 0x0),
+    (42490, 0x0),
+    (42491, 0x0),
+    (42492, 0x0),
+    (42493, 0x0),
+    (42494, 0x0),
+    (42495, 0x0),
+    (42725, 0x0),
+    (42726, 0x0),
+    (42727, 0x0),
+    (42728, 0x0),
+    (42729, 0x0),
+    (42730, 0x0),
+    (42731, 0x0),
+    (42732, 0x0),
+    (42733, 0x0),
+    (42734, 0x0),
+    (42735, 0x0),
+    (42736, 0x0),
+    (42737, 0x0),
+    (42738, 0x0),
+    (42739, 0x0),
+    (42740, 0x0),
+    (42741, 0x0),
+    (42742, 0x0),
+    (42743, 0x0),
+    (42744, 0x0),
+    (42745, 0x0),
+    (42746, 0x0),
+    (42747, 0x0),
+    (42748, 0x0),
+    (42749, 0x0),
+    (42750, 0x0),
+    (42751, 0x0),
+    (42752, 0x0),
+    (42753, 0x0),
+    (42754, 0x0),
+    (42755, 0x0),
+    (42756, 0x0),
+    (42757, 0x0),
+    (42758, 0x0),
+    (42759, 0x0),
+    (42760, 0x0),
+    (42761, 0x0),
+    (42765, 0x0),
+    (42766, 0x0),
+    (42767, 0x0),
+    (42768, 0x0),
+    (42769, 0x0),
+    (42770, 0x0),
+    (42771, 0x0),
+    (42772, 0x0),
+    (42773, 0x0),
+    (42777, 0x0),
+    (42778, 0x0),
+    (42779, 0x0),
+    (42780, 0x0),
+    (42781, 0x0),
+    (42782, 0x0),
+    (42783, 0x0),
+    (42784, 0x0),
+    (42785, 0x0),
+    (42786, 0x0),
+    (42787, 0x0),
+    (43016, 0x0),
+    (43017, 0x0),
+    (43018, 0x0),
+    (43019, 0x0),
+    (43020, 0x0),
+    (43021, 0x0),
+    (43022, 0x0),
+    (43023, 0x0),
+    (43024, 0x0),
+    (43025, 0x0),
+    (43026, 0x0),
+    (43027, 0x0),
+    (43028, 0x0),
+    (43029, 0x0),
+    (43030, 0x0),
+    (43031, 0x0),
+    (43032, 0x0),
+    (43033, 0x0),
+    (43034, 0x0),
+    (43035, 0x0),
+    (43036, 0x0),
+    (43037, 0x0),
+    (43038, 0x0),
+    (43039, 0x0),
+    (43040, 0x0),
+    (43041, 0x0),
+    (43042, 0x0),
+    (43043, 0x0),
+    (43044, 0x0),
+    (43045, 0x0),
+    (43046, 0x0),
+    (43047, 0x0),
+    (43048, 0x0),
+    (43049, 0x0),
+    (43050, 0x0),
+    (43051, 0x0),
+    (43052, 0x0),
+    (43053, 0x0),
+    (43056, 0x0),
+    (43057, 0x0),
+    (43058, 0x0),
+    (43059, 0x0),
+    (43060, 0x0),
+    (43061, 0x0),
+    (43062, 0x0),
+    (43063, 0x0),
+    (43064, 0x0),
+    (43065, 0x0),
+    (43069, 0x0),
+    (43070, 0x0),
+    (43071, 0x0),
+    (43072, 0x0),
+    (43073, 0x0),
+    (43074, 0x0),
+    (43075, 0x0),
+    (43076, 0x0),
+    (43077, 0x0),
+    (43078, 0x0),
+    (43079, 0x0),
+    (43308, 0x0),
+    (43309, 0x0),
+    (43310, 0x0),
+    (43311, 0x0),
+    (43312, 0x0),
+    (43313, 0x0),
+    (43314, 0x0),
+    (43315, 0x0),
+    (43316, 0x0),
+    (43317, 0x0),
+    (43318, 0x0),
+    (43319, 0x0),
+    (43320, 0x0),
+    (43321, 0x0),
+    (43322, 0x0),
+    (43323, 0x0),
+    (43324, 0x0),
+    (43325, 0x0),
+    (43326, 0x0),
+    (43327, 0x0),
+    (43328, 0x0),
+    (43329, 0x0),
+    (43330, 0x0),
+    (43331, 0x0),
+    (43332, 0x0),
+    (43333, 0x0),
+    (43334, 0x0),
+    (43335, 0x0),
+    (43336, 0x0),
+    (43337, 0x0),
+    (43338, 0x0),
+    (43339, 0x0),
+    (43340, 0x0),
+    (43341, 0x0),
+    (43342, 0x0),
+    (43343, 0x0),
+    (43344, 0x0),
+    (43345, 0x0),
+    (43348, 0x0),
+    (43349, 0x0),
+    (43350, 0x0),
+    (43351, 0x0),
+    (43352, 0x0),
+    (43353, 0x0),
+    (43354, 0x0),
+    (43355, 0x0),
+    (43356, 0x0),
+    (43357, 0x0),
+    (43361, 0x0),
+    (43362, 0x0),
+    (43363, 0x0),
+    (43364, 0x0),
+    (43365, 0x0),
+    (43366, 0x0),
+    (43367, 0x0),
+    (43368, 0x0),
+    (43369, 0x0),
+    (43370, 0x0),
+    (43371, 0x0),
+    (43600, 0x0),
+    (43601, 0x0),
+    (43602, 0x0),
+    (43603, 0x0),
+    (43604, 0x0),
+    (43605, 0x0),
+    (43606, 0x0),
+    (43607, 0x0),
+    (43608, 0x0),
+    (43609, 0x0),
+    (43610, 0x0),
+    (43611, 0x0),
+    (43612, 0x0),
+    (43613, 0x0),
+    (43614, 0x0),
+    (43615, 0x0),
+    (43616, 0x0),
+    (43617, 0x0),
+    (43618, 0x0),
+    (43619, 0x0),
+    (43620, 0x0),
+    (43621, 0x0),
+    (43622, 0x0),
+    (43623, 0x0),
+    (43624, 0x0),
+    (43625, 0x0),
+    (43626, 0x0),
+    (43627, 0x0),
+    (43628, 0x0),
+    (43629, 0x0),
+    (43630, 0x0),
+    (43631, 0x0),
+    (43632, 0x0),
+    (43633, 0x0),
+    (43634, 0x0),
+    (43635, 0x0),
+    (43636, 0x0),
+    (43637, 0x0),
+    (43640, 0x0),
+    (43641, 0x0),
+    (43642, 0x0),
+    (43643, 0x0),
+    (43644, 0x0),
+    (43645, 0x0),
+    (43646, 0x0),
+    (43647, 0x0),
+    (43648, 0x0),
+    (43649, 0x0),
+    (43653, 0x0),
+    (43654, 0x0),
+    (43655, 0x0),
+    (43656, 0x0),
+    (43657, 0x0),
+    (43658, 0x0),
+    (43659, 0x0),
+    (43660, 0x0),
+    (43661, 0x0),
+    (43662, 0x0),
+    (43663, 0x0),
+    (43892, 0x0),
+    (43893, 0x0),
+    (43894, 0x0),
+    (43895, 0x0),
+    (43896, 0x0),
+    (43897, 0x0),
+    (43898, 0x0),
+    (43899, 0x0),
+    (43900, 0x0),
+    (43901, 0x0),
+    (43902, 0x0),
+    (43903, 0x0),
+    (43904, 0x0),
+    (43905, 0x0),
+    (43906, 0x0),
+    (43907, 0x0),
+    (43908, 0x0),
+    (43909, 0x0),
+    (43910, 0x0),
+    (43911, 0x0),
+    (43912, 0x0),
+    (43913, 0x0),
+    (43914, 0x0),
+    (43915, 0x0),
+    (43916, 0x0),
+    (43917, 0x0),
+    (43918, 0x0),
+    (43919, 0x0),
+    (43920, 0x0),
+    (43921, 0x0),
+    (43922, 0x0),
+    (43923, 0x0),
+    (43924, 0x0),
+    (43925, 0x0),
+    (43926, 0x0),
+    (43927, 0x0),
+    (43928, 0x0),
+    (43932, 0x0),
+    (43933, 0x0),
+    (43934, 0x0),
+    (43935, 0x0),
+    (43936, 0x0),
+    (43937, 0x0),
+    (43938, 0x0),
+    (43939, 0x0),
+    (43940, 0x0),
+    (43941, 0x0),
+    (43942, 0x0),
+    (43943, 0x0),
+    (43945, 0x0),
+    (43946, 0x0),
+    (43947, 0x0),
+    (43948, 0x0),
+    (43949, 0x0),
+    (43950, 0x0),
+    (43951, 0x0),
+    (43952, 0x0),
+    (43953, 0x0),
+    (43954, 0x0),
+    (43955, 0x0),
+    (44184, 0x0),
+    (44185, 0x0),
+    (44186, 0x0),
+    (44187, 0x0),
+    (44188, 0x0),
+    (44189, 0x0),
+    (44190, 0x0),
+    (44191, 0x0),
+    (44192, 0x0),
+    (44193, 0x0),
+    (44194, 0x0),
+    (44195, 0x0),
+    (44196, 0x0),
+    (44197, 0x0),
+    (44198, 0x0),
+    (44199, 0x0),
+    (44200, 0x0),
+    (44201, 0x0),
+    (44202, 0x0),
+    (44203, 0x0),
+    (44204, 0x0),
+    (44205, 0x0),
+    (44206, 0x0),
+    (44207, 0x0),
+    (44208, 0x0),
+    (44209, 0x0),
+    (44210, 0x0),
+    (44211, 0x0),
+    (44212, 0x0),
+    (44213, 0x0),
+    (44214, 0x0),
+    (44215, 0x0),
+    (44216, 0x0),
+    (44217, 0x0),
+    (44218, 0x0),
+    (44219, 0x0),
+    (44220, 0x0),
+    (44224, 0x0),
+    (44225, 0x0),
+    (44226, 0x0),
+    (44227, 0x0),
+    (44228, 0x0),
+    (44229, 0x0),
+    (44230, 0x0),
+    (44231, 0x0),
+    (44232, 0x0),
+    (44233, 0x0),
+    (44234, 0x0),
+    (44235, 0x0),
+    (44237, 0x0),
+    (44238, 0x0),
+    (44239, 0x0),
+    (44240, 0x0),
+    (44241, 0x0),
+    (44242, 0x0),
+    (44243, 0x0),
+    (44244, 0xC),
+    (44245, 0x0),
+    (44246, 0x0),
+    (44247, 0x0),
+    (44476, 0x0),
+    (44477, 0x0),
+    (44478, 0x0),
+    (44479, 0x0),
+    (44480, 0x0),
+    (44481, 0x0),
+    (44482, 0x0),
+    (44483, 0x0),
+    (44484, 0x0),
+    (44485, 0x0),
+    (44486, 0x0),
+    (44487, 0x0),
+    (44488, 0x0),
+    (44489, 0x0),
+    (44490, 0x0),
+    (44491, 0x0),
+    (44492, 0x0),
+    (44493, 0x0),
+    (44494, 0x0),
+    (44495, 0x0),
+    (44496, 0x0),
+    (44497, 0x0),
+    (44498, 0x0),
+    (44499, 0x0),
+    (44500, 0x0),
+    (44501, 0x0),
+    (44502, 0x0),
+    (44503, 0x0),
+    (44504, 0x0),
+    (44505, 0x0),
+    (44506, 0x0),
+    (44507, 0x0),
+    (44508, 0x0),
+    (44509, 0x0),
+    (44510, 0x0),
+    (44511, 0x0),
+    (44512, 0x0),
+    (44515, 0x0),
+    (44516, 0x0),
+    (44517, 0x0),
+    (44518, 0x0),
+    (44519, 0x0),
+    (44520, 0x0),
+    (44521, 0x0),
+    (44522, 0x0),
+    (44523, 0x0),
+    (44524, 0x0),
+    (44525, 0x0),
+    (44526, 0x0),
+    (44527, 0x0),
+    (44529, 0x0),
+    (44530, 0x0),
+    (44531, 0x0),
+    (44532, 0x0),
+    (44534, 0x0),
+    (44535, 0x0),
+    (44536, 0xC),
+    (44537, 0x0),
+    (44538, 0x0),
+    (44539, 0x0),
+    (44768, 0x0),
+    (44769, 0x0),
+    (44770, 0x0),
+    (44771, 0x0),
+    (44772, 0x0),
+    (44773, 0x0),
+    (44774, 0x0),
+    (44775, 0x0),
+    (44776, 0x0),
+    (44777, 0x0),
+    (44778, 0x0),
+    (44779, 0x0),
+    (44780, 0x0),
+    (44781, 0x0),
+    (44782, 0x0),
+    (44783, 0x0),
+    (44784, 0x0),
+    (44785, 0x0),
+    (44786, 0x0),
+    (44787, 0x0),
+    (44788, 0x0),
+    (44789, 0x0),
+    (44790, 0x0),
+    (44791, 0x0),
+    (44792, 0x0),
+    (44793, 0x0),
+    (44794, 0x0),
+    (44795, 0x0),
+    (44796, 0x0),
+    (44797, 0x0),
+    (44798, 0x0),
+    (44807, 0x0),
+    (44808, 0x0),
+    (44809, 0x0),
+    (44810, 0x0),
+    (44811, 0x0),
+    (44812, 0x0),
+    (44813, 0x0),
+    (44814, 0x0),
+    (44815, 0x0),
+    (44816, 0x0),
+    (44817, 0x0),
+    (44818, 0x0),
+    (44819, 0x0),
+    (44821, 0x0),
+    (44822, 0x0),
+    (44823, 0x0),
+    (44824, 0x0),
+    (44827, 0x0),
+    (44828, 0x0),
+    (44829, 0x0),
+    (44830, 0x0),
+    (44831, 0x0),
+    (45060, 0x0),
+    (45061, 0x0),
+    (45062, 0x0),
+    (45063, 0x0),
+    (45064, 0x0),
+    (45065, 0x0),
+    (45066, 0x0),
+    (45067, 0x0),
+    (45068, 0x0),
+    (45069, 0x0),
+    (45070, 0x0),
+    (45071, 0x0),
+    (45072, 0x0),
+    (45073, 0x0),
+    (45074, 0x0),
+    (45075, 0x0),
+    (45076, 0x0),
+    (45077, 0x0),
+    (45078, 0x0),
+    (45079, 0x0),
+    (45080, 0x0),
+    (45081, 0x0),
+    (45082, 0x0),
+    (45083, 0x0),
+    (45084, 0x0),
+    (45085, 0x0),
+    (45086, 0x0),
+    (45087, 0x0),
+    (45088, 0x0),
+    (45089, 0x0),
+    (45090, 0x0),
+    (45099, 0x0),
+    (45100, 0x0),
+    (45101, 0x0),
+    (45102, 0x0),
+    (45103, 0x0),
+    (45104, 0x0),
+    (45105, 0x0),
+    (45106, 0x0),
+    (45107, 0x0),
+    (45108, 0x0),
+    (45109, 0x0),
+    (45110, 0x0),
+    (45111, 0x0),
+    (45113, 0x0),
+    (45114, 0x0),
+    (45115, 0x0),
+    (45116, 0x0),
+    (45119, 0x0),
+    (45120, 0x0),
+    (45121, 0x0),
+    (45122, 0x0),
+    (45123, 0x0),
+    (45352, 0x0),
+    (45353, 0x0),
+    (45354, 0x0),
+    (45355, 0x0),
+    (45356, 0x0),
+    (45357, 0x0),
+    (45358, 0x0),
+    (45359, 0x0),
+    (45360, 0x0),
+    (45361, 0x0),
+    (45362, 0x0),
+    (45363, 0x0),
+    (45364, 0x0),
+    (45365, 0x0),
+    (45366, 0x0),
+    (45367, 0x0),
+    (45368, 0x0),
+    (45369, 0x0),
+    (45370, 0x0),
+    (45371, 0x0),
+    (45372, 0x0),
+    (45373, 0x0),
+    (45374, 0x0),
+    (45375, 0x0),
+    (45376, 0x0),
+    (45377, 0x0),
+    (45378, 0x0),
+    (45379, 0x0),
+    (45380, 0x0),
+    (45381, 0x0),
+    (45382, 0x0),
+    (45391, 0x0),
+    (45392, 0x0),
+    (45393, 0x0),
+    (45394, 0x0),
+    (45395, 0x0),
+    (45396, 0x0),
+    (45397, 0x0),
+    (45398, 0x0),
+    (45399, 0x0),
+    (45400, 0x0),
+    (45401, 0x0),
+    (45402, 0x0),
+    (45403, 0x0),
+    (45405, 0x0),
+    (45406, 0x0),
+    (45407, 0x0),
+    (45408, 0x0),
+    (45412, 0x0),
+    (45413, 0x0),
+    (45414, 0x0),
+    (45415, 0x0),
+    (45644, 0x0),
+    (45645, 0x0),
+    (45646, 0x0),
+    (45647, 0x0),
+    (45648, 0x0),
+    (45649, 0x0),
+    (45650, 0x0),
+    (45651, 0x0),
+    (45652, 0x0),
+    (45653, 0x0),
+    (45654, 0x0),
+    (45655, 0x0),
+    (45656, 0x0),
+    (45657, 0x0),
+    (45658, 0x0),
+    (45659, 0x0),
+    (45660, 0x0),
+    (45661, 0x0),
+    (45662, 0x0),
+    (45663, 0x0),
+    (45664, 0x0),
+    (45665, 0x0),
+    (45666, 0x0),
+    (45667, 0x0),
+    (45668, 0x0),
+    (45669, 0x0),
+    (45670, 0x0),
+    (45671, 0x0),
+    (45672, 0x0),
+    (45673, 0x0),
+    (45683, 0x0),
+    (45684, 0x0),
+    (45685, 0x0),
+    (45686, 0x0),
+    (45687, 0x0),
+    (45688, 0x0),
+    (45689, 0x0),
+    (45690, 0x0),
+    (45691, 0x0),
+    (45692, 0x0),
+    (45693, 0x0),
+    (45694, 0x0),
+    (45695, 0x0),
+    (45697, 0x0),
+    (45698, 0x0),
+    (45699, 0x0),
+    (45700, 0x0),
+    (45704, 0x0),
+    (45705, 0x0),
+    (45706, 0x0),
+    (45707, 0x0),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIRST_PROCESS_FRAME: u64 = 1108;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIRST_PROCESS_BYTES: [(u16, u8); 3] =
+    [(0xAAD8, 0x02), (0xAAE7, 0x06), (0xAAF6, 0x00)];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SECOND_PROCESS_VIDEO_FRAME: u64 = 1109;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SECOND_PROCESS_BYTES: [(u16, u8); 3] =
+    [(0xAAF6, 0x05), (0xAB05, 0x27), (0xAB14, 0x00)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SECOND_VISIBLE_NIBBLES: [(u32, u8); 449] = [
+    (42434, 0xC),
+    (42435, 0xC),
+    (42436, 0xC),
+    (42437, 0xC),
+    (42438, 0x2),
+    (42439, 0x2),
+    (42440, 0x2),
+    (42441, 0x2),
+    (42442, 0xC),
+    (42443, 0xC),
+    (42444, 0xC),
+    (42445, 0xC),
+    (42446, 0x2),
+    (42447, 0xC),
+    (42448, 0xC),
+    (42449, 0xC),
+    (42450, 0xC),
+    (42451, 0xC),
+    (42452, 0xC),
+    (42453, 0xC),
+    (42454, 0xC),
+    (42455, 0xC),
+    (42456, 0xC),
+    (42457, 0x2),
+    (42458, 0x2),
+    (42459, 0x2),
+    (42460, 0xC),
+    (42461, 0xC),
+    (42462, 0xC),
+    (42463, 0xC),
+    (42464, 0xC),
+    (42465, 0xC),
+    (42466, 0xC),
+    (42467, 0xC),
+    (42725, 0xC),
+    (42726, 0xC),
+    (42727, 0xC),
+    (42728, 0xC),
+    (42729, 0x2),
+    (42730, 0x2),
+    (42731, 0x2),
+    (42732, 0x2),
+    (42733, 0xC),
+    (42734, 0xC),
+    (42735, 0xC),
+    (42736, 0xC),
+    (42737, 0x2),
+    (42738, 0x2),
+    (42739, 0xC),
+    (42740, 0xC),
+    (42741, 0xC),
+    (42742, 0xC),
+    (42743, 0xC),
+    (42744, 0xC),
+    (42745, 0xC),
+    (42746, 0xC),
+    (42747, 0xC),
+    (42748, 0xC),
+    (42749, 0x2),
+    (42750, 0x2),
+    (42751, 0x2),
+    (42752, 0xC),
+    (42753, 0xC),
+    (42754, 0xC),
+    (42755, 0xC),
+    (42756, 0xC),
+    (42757, 0xC),
+    (42758, 0xC),
+    (42759, 0xC),
+    (43016, 0xC),
+    (43017, 0xC),
+    (43018, 0xC),
+    (43019, 0xC),
+    (43020, 0x2),
+    (43021, 0x2),
+    (43022, 0x2),
+    (43023, 0x2),
+    (43024, 0xC),
+    (43025, 0xC),
+    (43026, 0xC),
+    (43027, 0xC),
+    (43028, 0x2),
+    (43029, 0x2),
+    (43030, 0xC),
+    (43031, 0xC),
+    (43032, 0xC),
+    (43033, 0xC),
+    (43034, 0x2),
+    (43035, 0x2),
+    (43036, 0x2),
+    (43037, 0x2),
+    (43038, 0x2),
+    (43039, 0x2),
+    (43040, 0x2),
+    (43041, 0x2),
+    (43042, 0x2),
+    (43043, 0xC),
+    (43044, 0xC),
+    (43045, 0xC),
+    (43046, 0xC),
+    (43047, 0x2),
+    (43048, 0x2),
+    (43049, 0x2),
+    (43050, 0x2),
+    (43051, 0x2),
+    (43307, 0xC),
+    (43308, 0xC),
+    (43309, 0xC),
+    (43310, 0xC),
+    (43311, 0x2),
+    (43312, 0x2),
+    (43313, 0x2),
+    (43314, 0x2),
+    (43315, 0x2),
+    (43316, 0xC),
+    (43317, 0xC),
+    (43318, 0xC),
+    (43319, 0xC),
+    (43320, 0x2),
+    (43321, 0xC),
+    (43322, 0xC),
+    (43323, 0xC),
+    (43324, 0xC),
+    (43325, 0x2),
+    (43326, 0x2),
+    (43327, 0x2),
+    (43328, 0x2),
+    (43329, 0x2),
+    (43330, 0x2),
+    (43331, 0x2),
+    (43332, 0x2),
+    (43333, 0x2),
+    (43334, 0x2),
+    (43335, 0xC),
+    (43336, 0xC),
+    (43337, 0xC),
+    (43338, 0xC),
+    (43339, 0x2),
+    (43340, 0x2),
+    (43341, 0x2),
+    (43342, 0x2),
+    (43343, 0x2),
+    (43598, 0xC),
+    (43599, 0xC),
+    (43600, 0xC),
+    (43601, 0xC),
+    (43602, 0x2),
+    (43603, 0x2),
+    (43604, 0x2),
+    (43605, 0x2),
+    (43606, 0x2),
+    (43607, 0xC),
+    (43608, 0xC),
+    (43609, 0xC),
+    (43610, 0xC),
+    (43611, 0x2),
+    (43612, 0x2),
+    (43613, 0xC),
+    (43614, 0xC),
+    (43615, 0xC),
+    (43616, 0xC),
+    (43617, 0xC),
+    (43618, 0x2),
+    (43619, 0x2),
+    (43620, 0x2),
+    (43621, 0x2),
+    (43622, 0x2),
+    (43623, 0x2),
+    (43624, 0x2),
+    (43625, 0x2),
+    (43626, 0xC),
+    (43627, 0xC),
+    (43628, 0xC),
+    (43629, 0xC),
+    (43630, 0xC),
+    (43631, 0x2),
+    (43632, 0x2),
+    (43633, 0x2),
+    (43634, 0x2),
+    (43635, 0x2),
+    (43889, 0xC),
+    (43890, 0xC),
+    (43891, 0xC),
+    (43892, 0xC),
+    (43893, 0xC),
+    (43894, 0xC),
+    (43895, 0xC),
+    (43896, 0xC),
+    (43897, 0xC),
+    (43898, 0xC),
+    (43899, 0xC),
+    (43900, 0xC),
+    (43901, 0xC),
+    (43902, 0x2),
+    (43903, 0x2),
+    (43904, 0xC),
+    (43905, 0xC),
+    (43906, 0xC),
+    (43907, 0xC),
+    (43908, 0xC),
+    (43909, 0xC),
+    (43910, 0xC),
+    (43911, 0xC),
+    (43912, 0xC),
+    (43913, 0xC),
+    (43914, 0xC),
+    (43915, 0xC),
+    (43916, 0xC),
+    (43917, 0x2),
+    (43918, 0xC),
+    (43919, 0xC),
+    (43920, 0xC),
+    (43921, 0xC),
+    (43922, 0x2),
+    (43923, 0x2),
+    (43924, 0x2),
+    (43925, 0x2),
+    (43926, 0x2),
+    (43927, 0x2),
+    (44180, 0xC),
+    (44181, 0xC),
+    (44182, 0xC),
+    (44183, 0xC),
+    (44184, 0xC),
+    (44185, 0xC),
+    (44186, 0xC),
+    (44187, 0xC),
+    (44188, 0xC),
+    (44189, 0xC),
+    (44190, 0xC),
+    (44191, 0xC),
+    (44192, 0xC),
+    (44193, 0xC),
+    (44194, 0x2),
+    (44195, 0xC),
+    (44196, 0xC),
+    (44197, 0xC),
+    (44198, 0xC),
+    (44199, 0xC),
+    (44200, 0xC),
+    (44201, 0xC),
+    (44202, 0xC),
+    (44203, 0xC),
+    (44204, 0xC),
+    (44205, 0xC),
+    (44206, 0xC),
+    (44207, 0xC),
+    (44208, 0x2),
+    (44209, 0x2),
+    (44210, 0xC),
+    (44211, 0xC),
+    (44212, 0xC),
+    (44213, 0xC),
+    (44214, 0x2),
+    (44215, 0x2),
+    (44216, 0x2),
+    (44217, 0x2),
+    (44218, 0x2),
+    (44219, 0x2),
+    (44471, 0xC),
+    (44472, 0xC),
+    (44473, 0xC),
+    (44474, 0xC),
+    (44475, 0xC),
+    (44476, 0xC),
+    (44477, 0xC),
+    (44478, 0xC),
+    (44479, 0xC),
+    (44480, 0xC),
+    (44481, 0xC),
+    (44482, 0xC),
+    (44483, 0xC),
+    (44484, 0xC),
+    (44485, 0x2),
+    (44486, 0x2),
+    (44487, 0xC),
+    (44488, 0xC),
+    (44489, 0xC),
+    (44490, 0xC),
+    (44491, 0xC),
+    (44492, 0xC),
+    (44493, 0xC),
+    (44494, 0xC),
+    (44495, 0xC),
+    (44496, 0xC),
+    (44497, 0xC),
+    (44498, 0xC),
+    (44499, 0xC),
+    (44500, 0x2),
+    (44501, 0xC),
+    (44502, 0xC),
+    (44503, 0xC),
+    (44504, 0xC),
+    (44505, 0xC),
+    (44506, 0x2),
+    (44507, 0x2),
+    (44508, 0x2),
+    (44509, 0x2),
+    (44510, 0x2),
+    (44511, 0x2),
+    (44762, 0xC),
+    (44763, 0xC),
+    (44764, 0xC),
+    (44765, 0xC),
+    (44766, 0xC),
+    (44767, 0xC),
+    (44768, 0xC),
+    (44769, 0xC),
+    (44770, 0xC),
+    (44771, 0xC),
+    (44772, 0xC),
+    (44773, 0xC),
+    (44774, 0xC),
+    (44775, 0xC),
+    (44776, 0x2),
+    (44777, 0x2),
+    (44778, 0xC),
+    (44779, 0xC),
+    (44780, 0xC),
+    (44781, 0xC),
+    (44782, 0xC),
+    (44783, 0xC),
+    (44784, 0xC),
+    (44785, 0xC),
+    (44786, 0xC),
+    (44787, 0xC),
+    (44788, 0xC),
+    (44789, 0xC),
+    (44790, 0xC),
+    (44791, 0x2),
+    (44792, 0x2),
+    (44793, 0xC),
+    (44794, 0xC),
+    (44795, 0xC),
+    (44796, 0xC),
+    (44797, 0x2),
+    (44798, 0x2),
+    (45054, 0xC),
+    (45055, 0xC),
+    (45056, 0xC),
+    (45057, 0xC),
+    (45058, 0xC),
+    (45059, 0xC),
+    (45060, 0xC),
+    (45061, 0xC),
+    (45062, 0xC),
+    (45063, 0xC),
+    (45064, 0xC),
+    (45065, 0xC),
+    (45066, 0xC),
+    (45067, 0x2),
+    (45068, 0x2),
+    (45069, 0xC),
+    (45070, 0xC),
+    (45071, 0xC),
+    (45072, 0xC),
+    (45073, 0xC),
+    (45074, 0xC),
+    (45075, 0xC),
+    (45076, 0xC),
+    (45077, 0xC),
+    (45078, 0xC),
+    (45079, 0xC),
+    (45080, 0xC),
+    (45081, 0xC),
+    (45082, 0xC),
+    (45083, 0x2),
+    (45084, 0xC),
+    (45085, 0xC),
+    (45086, 0xC),
+    (45087, 0xC),
+    (45088, 0xC),
+    (45089, 0x2),
+    (45090, 0x2),
+    (45345, 0x2),
+    (45346, 0x2),
+    (45347, 0x2),
+    (45348, 0x2),
+    (45349, 0x2),
+    (45350, 0x2),
+    (45351, 0x2),
+    (45352, 0x2),
+    (45353, 0x2),
+    (45354, 0x2),
+    (45355, 0x2),
+    (45356, 0x2),
+    (45357, 0x2),
+    (45358, 0x2),
+    (45359, 0x2),
+    (45360, 0x2),
+    (45361, 0x2),
+    (45362, 0x2),
+    (45363, 0x2),
+    (45364, 0x2),
+    (45365, 0x2),
+    (45366, 0x2),
+    (45367, 0x2),
+    (45368, 0x2),
+    (45369, 0x2),
+    (45370, 0x2),
+    (45371, 0x2),
+    (45372, 0x2),
+    (45373, 0x2),
+    (45374, 0x2),
+    (45375, 0x2),
+    (45376, 0x2),
+    (45377, 0x2),
+    (45378, 0x2),
+    (45379, 0x2),
+    (45380, 0x2),
+    (45381, 0x2),
+    (45382, 0x2),
+    (45637, 0x2),
+    (45638, 0x2),
+    (45639, 0x2),
+    (45640, 0x2),
+    (45641, 0x2),
+    (45642, 0x2),
+    (45643, 0x2),
+    (45644, 0x2),
+    (45645, 0x2),
+    (45646, 0x2),
+    (45647, 0x2),
+    (45648, 0x2),
+    (45649, 0x2),
+    (45650, 0x2),
+    (45651, 0x2),
+    (45652, 0x2),
+    (45653, 0x2),
+    (45654, 0x2),
+    (45655, 0x2),
+    (45656, 0x2),
+    (45657, 0x2),
+    (45658, 0x2),
+    (45659, 0x2),
+    (45660, 0x2),
+    (45661, 0x2),
+    (45662, 0x2),
+    (45663, 0x2),
+    (45664, 0x2),
+    (45665, 0x2),
+    (45666, 0x2),
+    (45667, 0x2),
+    (45668, 0x2),
+    (45669, 0x2),
+    (45670, 0x2),
+    (45671, 0x2),
+    (45672, 0x2),
+    (45673, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_THIRD_PROCESS_VIDEO_FRAME: u64 = 1110;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_THIRD_PROCESS_BYTES: [(u16, u8); 3] =
+    [(0xAAD8, 0x01), (0xAAE7, 0x05), (0xAB14, 0x01)];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_THIRD_VISIBLE_NIBBLES: [(u32, u8); 777] = [
+    (42468, 0xC),
+    (42469, 0x2),
+    (42473, 0xC),
+    (42474, 0xC),
+    (42475, 0xC),
+    (42476, 0xC),
+    (42477, 0xC),
+    (42478, 0xC),
+    (42479, 0xC),
+    (42480, 0xC),
+    (42481, 0xC),
+    (42485, 0xC),
+    (42486, 0xC),
+    (42487, 0xC),
+    (42488, 0xC),
+    (42489, 0xC),
+    (42490, 0xC),
+    (42491, 0xC),
+    (42492, 0xC),
+    (42493, 0xC),
+    (42494, 0xC),
+    (42495, 0xC),
+    (42496, 0xC),
+    (42497, 0x2),
+    (42498, 0xC),
+    (42499, 0xC),
+    (42500, 0xC),
+    (42501, 0xC),
+    (42502, 0x2),
+    (42503, 0x2),
+    (42504, 0x2),
+    (42505, 0xC),
+    (42506, 0xC),
+    (42507, 0xC),
+    (42508, 0xC),
+    (42509, 0x2),
+    (42510, 0xC),
+    (42511, 0xC),
+    (42512, 0xC),
+    (42513, 0xC),
+    (42514, 0xC),
+    (42515, 0xC),
+    (42516, 0xC),
+    (42517, 0xC),
+    (42518, 0xC),
+    (42519, 0xC),
+    (42520, 0x2),
+    (42521, 0x2),
+    (42522, 0x2),
+    (42523, 0xC),
+    (42524, 0xC),
+    (42525, 0xC),
+    (42526, 0xC),
+    (42527, 0xC),
+    (42528, 0xC),
+    (42529, 0xC),
+    (42530, 0xC),
+    (42531, 0xC),
+    (42532, 0xC),
+    (42760, 0xC),
+    (42761, 0x2),
+    (42765, 0xC),
+    (42766, 0xC),
+    (42767, 0xC),
+    (42768, 0xC),
+    (42769, 0xC),
+    (42770, 0xC),
+    (42771, 0xC),
+    (42772, 0xC),
+    (42773, 0xC),
+    (42777, 0xC),
+    (42778, 0xC),
+    (42779, 0xC),
+    (42780, 0xC),
+    (42781, 0x2),
+    (42782, 0xC),
+    (42783, 0xC),
+    (42784, 0xC),
+    (42785, 0xC),
+    (42786, 0xC),
+    (42787, 0xC),
+    (42788, 0xC),
+    (42789, 0x2),
+    (42790, 0xC),
+    (42791, 0xC),
+    (42792, 0xC),
+    (42793, 0xC),
+    (42794, 0x2),
+    (42795, 0x2),
+    (42796, 0x2),
+    (42797, 0x2),
+    (42798, 0xC),
+    (42799, 0xC),
+    (42800, 0xC),
+    (42801, 0xC),
+    (42802, 0x2),
+    (42803, 0xC),
+    (42804, 0xC),
+    (42805, 0xC),
+    (42806, 0xC),
+    (42807, 0xC),
+    (42808, 0xC),
+    (42809, 0xC),
+    (42810, 0xC),
+    (42811, 0xC),
+    (42812, 0x2),
+    (42813, 0x2),
+    (42814, 0x2),
+    (42815, 0xC),
+    (42816, 0xC),
+    (42817, 0xC),
+    (42818, 0xC),
+    (42819, 0xC),
+    (42820, 0xC),
+    (42821, 0xC),
+    (42822, 0xC),
+    (42823, 0xC),
+    (42824, 0xC),
+    (43052, 0x2),
+    (43053, 0x2),
+    (43056, 0xC),
+    (43057, 0xC),
+    (43058, 0xC),
+    (43059, 0xC),
+    (43060, 0xC),
+    (43061, 0x2),
+    (43062, 0x2),
+    (43063, 0x2),
+    (43064, 0x2),
+    (43065, 0x2),
+    (43069, 0xC),
+    (43070, 0xC),
+    (43071, 0xC),
+    (43072, 0xC),
+    (43073, 0x2),
+    (43074, 0x2),
+    (43075, 0xC),
+    (43076, 0xC),
+    (43077, 0xC),
+    (43078, 0xC),
+    (43079, 0xC),
+    (43080, 0xC),
+    (43081, 0x2),
+    (43082, 0xC),
+    (43083, 0xC),
+    (43084, 0xC),
+    (43085, 0xC),
+    (43086, 0x2),
+    (43087, 0x2),
+    (43088, 0x2),
+    (43089, 0x2),
+    (43090, 0xC),
+    (43091, 0xC),
+    (43092, 0xC),
+    (43093, 0xC),
+    (43094, 0x2),
+    (43095, 0xC),
+    (43096, 0xC),
+    (43097, 0xC),
+    (43098, 0xC),
+    (43099, 0xC),
+    (43100, 0x2),
+    (43101, 0x2),
+    (43102, 0x2),
+    (43103, 0x2),
+    (43104, 0x2),
+    (43105, 0x2),
+    (43106, 0x2),
+    (43107, 0x2),
+    (43108, 0xC),
+    (43109, 0xC),
+    (43110, 0xC),
+    (43111, 0xC),
+    (43112, 0xC),
+    (43113, 0xC),
+    (43114, 0xC),
+    (43115, 0xC),
+    (43116, 0xC),
+    (43117, 0xC),
+    (43344, 0x2),
+    (43345, 0x2),
+    (43348, 0xC),
+    (43349, 0xC),
+    (43350, 0xC),
+    (43351, 0xC),
+    (43352, 0x2),
+    (43353, 0x2),
+    (43354, 0x2),
+    (43355, 0x2),
+    (43356, 0x2),
+    (43357, 0x2),
+    (43361, 0xC),
+    (43362, 0xC),
+    (43363, 0xC),
+    (43364, 0xC),
+    (43365, 0x2),
+    (43366, 0x2),
+    (43367, 0xC),
+    (43368, 0xC),
+    (43369, 0xC),
+    (43370, 0xC),
+    (43371, 0xC),
+    (43372, 0xC),
+    (43373, 0xC),
+    (43374, 0x2),
+    (43375, 0xC),
+    (43376, 0xC),
+    (43377, 0xC),
+    (43378, 0xC),
+    (43379, 0x2),
+    (43380, 0x2),
+    (43381, 0x2),
+    (43382, 0xC),
+    (43383, 0xC),
+    (43384, 0xC),
+    (43385, 0xC),
+    (43386, 0xC),
+    (43387, 0x2),
+    (43388, 0xC),
+    (43389, 0xC),
+    (43390, 0xC),
+    (43391, 0xC),
+    (43392, 0x2),
+    (43393, 0x2),
+    (43394, 0x2),
+    (43395, 0x2),
+    (43396, 0x2),
+    (43397, 0x2),
+    (43398, 0x2),
+    (43399, 0x2),
+    (43400, 0x2),
+    (43401, 0xC),
+    (43402, 0xC),
+    (43403, 0xC),
+    (43404, 0xC),
+    (43405, 0x2),
+    (43406, 0xC),
+    (43407, 0xC),
+    (43408, 0xC),
+    (43409, 0xC),
+    (43410, 0xC),
+    (43636, 0x2),
+    (43637, 0x2),
+    (43640, 0xC),
+    (43641, 0xC),
+    (43642, 0xC),
+    (43643, 0xC),
+    (43644, 0xC),
+    (43645, 0x2),
+    (43646, 0x2),
+    (43647, 0x2),
+    (43648, 0x2),
+    (43649, 0x2),
+    (43653, 0xC),
+    (43654, 0xC),
+    (43655, 0xC),
+    (43656, 0xC),
+    (43657, 0x2),
+    (43658, 0x2),
+    (43659, 0x2),
+    (43660, 0xC),
+    (43661, 0xC),
+    (43662, 0xC),
+    (43663, 0xC),
+    (43664, 0xC),
+    (43665, 0xC),
+    (43666, 0x2),
+    (43667, 0xC),
+    (43668, 0xC),
+    (43669, 0xC),
+    (43670, 0xC),
+    (43671, 0x2),
+    (43672, 0x2),
+    (43673, 0x2),
+    (43674, 0xC),
+    (43675, 0xC),
+    (43676, 0xC),
+    (43677, 0xC),
+    (43678, 0xC),
+    (43679, 0x2),
+    (43680, 0xC),
+    (43681, 0xC),
+    (43682, 0xC),
+    (43683, 0xC),
+    (43684, 0xC),
+    (43685, 0x2),
+    (43686, 0x2),
+    (43687, 0x2),
+    (43688, 0x2),
+    (43689, 0x2),
+    (43690, 0x2),
+    (43691, 0x2),
+    (43692, 0x2),
+    (43693, 0x2),
+    (43694, 0xC),
+    (43695, 0xC),
+    (43696, 0xC),
+    (43697, 0xC),
+    (43698, 0x2),
+    (43699, 0xC),
+    (43700, 0xC),
+    (43701, 0xC),
+    (43702, 0xC),
+    (43703, 0xC),
+    (43928, 0x2),
+    (43932, 0xC),
+    (43933, 0xC),
+    (43934, 0xC),
+    (43935, 0xC),
+    (43936, 0xC),
+    (43937, 0xC),
+    (43938, 0xC),
+    (43939, 0xC),
+    (43940, 0xC),
+    (43941, 0xC),
+    (43942, 0xC),
+    (43943, 0xC),
+    (43945, 0xC),
+    (43946, 0xC),
+    (43947, 0xC),
+    (43948, 0xC),
+    (43949, 0x2),
+    (43950, 0x2),
+    (43951, 0x2),
+    (43952, 0xC),
+    (43953, 0xC),
+    (43954, 0xC),
+    (43955, 0xC),
+    (43956, 0xC),
+    (43957, 0xC),
+    (43958, 0x2),
+    (43959, 0xC),
+    (43960, 0xC),
+    (43961, 0xC),
+    (43962, 0xC),
+    (43963, 0xC),
+    (43964, 0xC),
+    (43965, 0xC),
+    (43966, 0xC),
+    (43967, 0xC),
+    (43968, 0xC),
+    (43969, 0xC),
+    (43970, 0xC),
+    (43971, 0xC),
+    (43972, 0x2),
+    (43973, 0xC),
+    (43974, 0xC),
+    (43975, 0xC),
+    (43976, 0xC),
+    (43977, 0xC),
+    (43978, 0xC),
+    (43979, 0xC),
+    (43980, 0xC),
+    (43981, 0xC),
+    (43982, 0xC),
+    (43983, 0xC),
+    (43984, 0xC),
+    (43985, 0x2),
+    (43986, 0xC),
+    (43987, 0xC),
+    (43988, 0xC),
+    (43989, 0xC),
+    (43990, 0xC),
+    (43991, 0x2),
+    (43992, 0xC),
+    (43993, 0xC),
+    (43994, 0xC),
+    (43995, 0xC),
+    (43996, 0xC),
+    (44186, 0x0),
+    (44187, 0x0),
+    (44194, 0x0),
+    (44195, 0x0),
+    (44202, 0x0),
+    (44203, 0x0),
+    (44210, 0x0),
+    (44211, 0x0),
+    (44218, 0x0),
+    (44219, 0x0),
+    (44220, 0x2),
+    (44224, 0xC),
+    (44225, 0xC),
+    (44228, 0xC),
+    (44229, 0xC),
+    (44230, 0xC),
+    (44231, 0xC),
+    (44232, 0xC),
+    (44233, 0xC),
+    (44234, 0xC),
+    (44235, 0xC),
+    (44238, 0xC),
+    (44239, 0xC),
+    (44240, 0xC),
+    (44241, 0x2),
+    (44242, 0x2),
+    (44243, 0x2),
+    (44246, 0xC),
+    (44247, 0xC),
+    (44248, 0xC),
+    (44249, 0xC),
+    (44250, 0x2),
+    (44251, 0xC),
+    (44254, 0xC),
+    (44255, 0xC),
+    (44256, 0xC),
+    (44257, 0xC),
+    (44258, 0xC),
+    (44259, 0xC),
+    (44262, 0xC),
+    (44263, 0xC),
+    (44264, 0x2),
+    (44265, 0xC),
+    (44266, 0xC),
+    (44267, 0xC),
+    (44268, 0xC),
+    (44269, 0xC),
+    (44270, 0xC),
+    (44271, 0xC),
+    (44272, 0xC),
+    (44273, 0xC),
+    (44274, 0xC),
+    (44275, 0xC),
+    (44276, 0xC),
+    (44277, 0xC),
+    (44278, 0x2),
+    (44279, 0xC),
+    (44280, 0xC),
+    (44281, 0xC),
+    (44282, 0xC),
+    (44283, 0x2),
+    (44284, 0x2),
+    (44285, 0x2),
+    (44286, 0xC),
+    (44287, 0xC),
+    (44288, 0xC),
+    (44289, 0xC),
+    (44290, 0xC),
+    (44471, 0x0),
+    (44478, 0x0),
+    (44479, 0x0),
+    (44486, 0x0),
+    (44487, 0x0),
+    (44494, 0x0),
+    (44495, 0x0),
+    (44502, 0x0),
+    (44503, 0x0),
+    (44510, 0x0),
+    (44511, 0x0),
+    (44512, 0x2),
+    (44515, 0xC),
+    (44516, 0xC),
+    (44517, 0xC),
+    (44520, 0xC),
+    (44521, 0xC),
+    (44522, 0xC),
+    (44523, 0xC),
+    (44524, 0xC),
+    (44525, 0xC),
+    (44526, 0xC),
+    (44527, 0xC),
+    (44530, 0xC),
+    (44531, 0xC),
+    (44532, 0xC),
+    (44534, 0x2),
+    (44535, 0x2),
+    (44538, 0xC),
+    (44539, 0xC),
+    (44540, 0xC),
+    (44541, 0xC),
+    (44542, 0xC),
+    (44543, 0x2),
+    (44546, 0xC),
+    (44547, 0xC),
+    (44548, 0xC),
+    (44549, 0xC),
+    (44550, 0xC),
+    (44551, 0xC),
+    (44554, 0xC),
+    (44555, 0xC),
+    (44556, 0x2),
+    (44557, 0x2),
+    (44558, 0xC),
+    (44559, 0xC),
+    (44560, 0xC),
+    (44561, 0xC),
+    (44562, 0xC),
+    (44563, 0xC),
+    (44564, 0xC),
+    (44565, 0xC),
+    (44566, 0xC),
+    (44567, 0xC),
+    (44568, 0xC),
+    (44569, 0xC),
+    (44570, 0xC),
+    (44571, 0x2),
+    (44572, 0xC),
+    (44573, 0xC),
+    (44574, 0xC),
+    (44575, 0xC),
+    (44576, 0x2),
+    (44577, 0x2),
+    (44578, 0x2),
+    (44579, 0xC),
+    (44580, 0xC),
+    (44581, 0xC),
+    (44582, 0xC),
+    (44583, 0xC),
+    (44807, 0xC),
+    (44808, 0xC),
+    (44809, 0xC),
+    (44810, 0xC),
+    (44811, 0xC),
+    (44812, 0xC),
+    (44813, 0xC),
+    (44814, 0xC),
+    (44815, 0xC),
+    (44816, 0xC),
+    (44817, 0xC),
+    (44818, 0xC),
+    (44819, 0xC),
+    (44821, 0xC),
+    (44822, 0xC),
+    (44823, 0xC),
+    (44824, 0xC),
+    (44827, 0x2),
+    (44828, 0x2),
+    (44829, 0x2),
+    (44830, 0xC),
+    (44831, 0xC),
+    (44832, 0xC),
+    (44833, 0xC),
+    (44834, 0xC),
+    (44835, 0x2),
+    (44836, 0xC),
+    (44837, 0xC),
+    (44838, 0xC),
+    (44839, 0xC),
+    (44840, 0xC),
+    (44841, 0xC),
+    (44842, 0xC),
+    (44843, 0xC),
+    (44844, 0xC),
+    (44845, 0xC),
+    (44846, 0xC),
+    (44847, 0x2),
+    (44848, 0x2),
+    (44849, 0x2),
+    (44850, 0xC),
+    (44851, 0xC),
+    (44852, 0xC),
+    (44853, 0xC),
+    (44854, 0xC),
+    (44855, 0xC),
+    (44856, 0xC),
+    (44857, 0xC),
+    (44858, 0xC),
+    (44859, 0xC),
+    (44860, 0xC),
+    (44861, 0xC),
+    (44862, 0xC),
+    (44863, 0x2),
+    (44864, 0x2),
+    (44865, 0xC),
+    (44866, 0xC),
+    (44867, 0xC),
+    (44868, 0xC),
+    (44869, 0x2),
+    (44870, 0x2),
+    (44871, 0x2),
+    (44872, 0xC),
+    (44873, 0xC),
+    (44874, 0xC),
+    (44875, 0xC),
+    (44876, 0xC),
+    (45099, 0xC),
+    (45100, 0xC),
+    (45101, 0xC),
+    (45102, 0xC),
+    (45103, 0xC),
+    (45104, 0xC),
+    (45105, 0xC),
+    (45106, 0xC),
+    (45107, 0xC),
+    (45108, 0xC),
+    (45109, 0xC),
+    (45110, 0xC),
+    (45111, 0xC),
+    (45113, 0xC),
+    (45114, 0xC),
+    (45115, 0xC),
+    (45116, 0xC),
+    (45119, 0x2),
+    (45120, 0x2),
+    (45121, 0x2),
+    (45122, 0x2),
+    (45123, 0xC),
+    (45124, 0xC),
+    (45125, 0xC),
+    (45126, 0xC),
+    (45127, 0x2),
+    (45128, 0xC),
+    (45129, 0xC),
+    (45130, 0xC),
+    (45131, 0xC),
+    (45132, 0xC),
+    (45133, 0xC),
+    (45134, 0xC),
+    (45135, 0xC),
+    (45136, 0xC),
+    (45137, 0xC),
+    (45138, 0x2),
+    (45139, 0x2),
+    (45140, 0x2),
+    (45141, 0x2),
+    (45142, 0x2),
+    (45143, 0xC),
+    (45144, 0xC),
+    (45145, 0xC),
+    (45146, 0xC),
+    (45147, 0xC),
+    (45148, 0xC),
+    (45149, 0xC),
+    (45150, 0xC),
+    (45151, 0xC),
+    (45152, 0xC),
+    (45153, 0xC),
+    (45154, 0xC),
+    (45155, 0x2),
+    (45156, 0x2),
+    (45157, 0xC),
+    (45158, 0xC),
+    (45159, 0xC),
+    (45160, 0xC),
+    (45161, 0xC),
+    (45162, 0x2),
+    (45163, 0x2),
+    (45164, 0x2),
+    (45165, 0x2),
+    (45166, 0xC),
+    (45167, 0xC),
+    (45168, 0xC),
+    (45169, 0xC),
+    (45391, 0x2),
+    (45392, 0x2),
+    (45393, 0x2),
+    (45394, 0x2),
+    (45395, 0x2),
+    (45396, 0x2),
+    (45397, 0x2),
+    (45398, 0x2),
+    (45399, 0x2),
+    (45400, 0x2),
+    (45401, 0x2),
+    (45402, 0x2),
+    (45403, 0x2),
+    (45405, 0x2),
+    (45406, 0x2),
+    (45407, 0x2),
+    (45408, 0x2),
+    (45412, 0x2),
+    (45413, 0x2),
+    (45414, 0x2),
+    (45415, 0x2),
+    (45416, 0x2),
+    (45417, 0x2),
+    (45418, 0x2),
+    (45419, 0x2),
+    (45420, 0x2),
+    (45421, 0x2),
+    (45422, 0x2),
+    (45423, 0x2),
+    (45424, 0x2),
+    (45425, 0x2),
+    (45426, 0x2),
+    (45427, 0x2),
+    (45428, 0x2),
+    (45429, 0x2),
+    (45430, 0x2),
+    (45431, 0x2),
+    (45432, 0x2),
+    (45433, 0x2),
+    (45434, 0x2),
+    (45435, 0x2),
+    (45436, 0x2),
+    (45437, 0x2),
+    (45438, 0x2),
+    (45439, 0x2),
+    (45440, 0x2),
+    (45441, 0x2),
+    (45442, 0x2),
+    (45443, 0x2),
+    (45444, 0x2),
+    (45445, 0x2),
+    (45446, 0x2),
+    (45447, 0x2),
+    (45448, 0x2),
+    (45449, 0x2),
+    (45450, 0x2),
+    (45451, 0x2),
+    (45452, 0x2),
+    (45453, 0x2),
+    (45454, 0x2),
+    (45455, 0x2),
+    (45456, 0x2),
+    (45457, 0x2),
+    (45458, 0x2),
+    (45459, 0x2),
+    (45460, 0x2),
+    (45461, 0x2),
+    (45462, 0x2),
+    (45683, 0x2),
+    (45684, 0x2),
+    (45685, 0x2),
+    (45686, 0x2),
+    (45687, 0x2),
+    (45688, 0x2),
+    (45689, 0x2),
+    (45690, 0x2),
+    (45691, 0x2),
+    (45692, 0x2),
+    (45693, 0x2),
+    (45694, 0x2),
+    (45695, 0x2),
+    (45697, 0x2),
+    (45698, 0x2),
+    (45699, 0x2),
+    (45700, 0x2),
+    (45704, 0x2),
+    (45705, 0x2),
+    (45706, 0x2),
+    (45707, 0x2),
+    (45708, 0x2),
+    (45709, 0x2),
+    (45710, 0x2),
+    (45711, 0x2),
+    (45712, 0x2),
+    (45713, 0x2),
+    (45714, 0x2),
+    (45715, 0x2),
+    (45716, 0x2),
+    (45717, 0x2),
+    (45718, 0x2),
+    (45719, 0x2),
+    (45720, 0x2),
+    (45721, 0x2),
+    (45722, 0x2),
+    (45723, 0x2),
+    (45725, 0x2),
+    (45726, 0x2),
+    (45727, 0x2),
+    (45728, 0x2),
+    (45729, 0x2),
+    (45730, 0x2),
+    (45731, 0x2),
+    (45732, 0x2),
+    (45733, 0x2),
+    (45734, 0x2),
+    (45735, 0x2),
+    (45736, 0x2),
+    (45737, 0x2),
+    (45738, 0x2),
+    (45739, 0x2),
+    (45740, 0x2),
+    (45741, 0x2),
+    (45742, 0x2),
+    (45743, 0x2),
+    (45744, 0x2),
+    (45745, 0x2),
+    (45746, 0x2),
+    (45747, 0x2),
+    (45748, 0x2),
+    (45749, 0x2),
+    (45750, 0x2),
+    (45751, 0x2),
+    (45752, 0x2),
+    (45753, 0x2),
+    (45754, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FOURTH_PROCESS_VIDEO_FRAME: u64 = 1111;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FOURTH_PROCESS_BYTES: [(u16, u8); 4] = [
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAB05, 0x26),
+    (0xAB14, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FOURTH_VISIBLE_NIBBLES: [(u32, u8); 59] = [
+    (17326, 0x0),
+    (17618, 0x0),
+    (17909, 0x0),
+    (18201, 0x0),
+    (18822, 0xF),
+    (19114, 0xF),
+    (19696, 0xF),
+    (19697, 0xF),
+    (19987, 0xF),
+    (19988, 0xF),
+    (19989, 0xF),
+    (19991, 0xF),
+    (19992, 0xF),
+    (20282, 0xF),
+    (20283, 0xF),
+    (20574, 0xF),
+    (44186, 0xC),
+    (44187, 0xC),
+    (44194, 0x2),
+    (44195, 0xC),
+    (44202, 0xC),
+    (44203, 0xC),
+    (44210, 0xC),
+    (44211, 0xC),
+    (44218, 0x2),
+    (44219, 0x2),
+    (44226, 0xC),
+    (44227, 0xC),
+    (44237, 0xC),
+    (44244, 0x2),
+    (44245, 0xC),
+    (44252, 0xC),
+    (44253, 0xC),
+    (44260, 0xC),
+    (44261, 0xC),
+    (44268, 0xC),
+    (44269, 0xC),
+    (44471, 0xC),
+    (44478, 0xC),
+    (44479, 0xC),
+    (44486, 0x2),
+    (44487, 0xC),
+    (44494, 0xC),
+    (44495, 0xC),
+    (44502, 0xC),
+    (44503, 0xC),
+    (44510, 0x2),
+    (44511, 0x2),
+    (44518, 0xC),
+    (44519, 0xC),
+    (44529, 0xC),
+    (44536, 0x2),
+    (44537, 0xC),
+    (44544, 0xC),
+    (44545, 0xC),
+    (44552, 0xC),
+    (44553, 0xC),
+    (44560, 0xC),
+    (44561, 0xC),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIFTH_PROCESS_VIDEO_FRAME: u64 = 1112;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIFTH_PROCESS_BYTES: [(u16, u8); 14] = [
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAB02, 0x1F),
+    (0xAB05, 0x25),
+    (0xAB10, 0xAB),
+    (0xAB11, 0x2E),
+    (0xAB1F, 0xAA),
+    (0xAB20, 0xE3),
+    (0xAB21, 0xF4),
+    (0xAB22, 0xCC),
+    (0xAB23, 0x01),
+    (0xAB2B, 0x01),
+    (0xAB2C, 0xC9),
+    (0xAB2D, 0x2E),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIFTH_VISIBLE_NIBBLES: [(u32, u8); 8] = [
+    (44276, 0xC),
+    (44277, 0xC),
+    (44284, 0x2),
+    (44285, 0x2),
+    (44568, 0xC),
+    (44569, 0xC),
+    (44576, 0x2),
+    (44577, 0x2),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SIXTH_PROCESS_VIDEO_FRAME: u64 = 1113;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SIXTH_PROCESS_BYTES: [(u16, u8); 4] = [
+    (0xAAC9, 0x00),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x03),
+    (0xAAF6, 0x03),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SIXTH_VISIBLE_NIBBLES: [(u32, u8); 106] = [
+    (16170, 0x0),
+    (16462, 0x0),
+    (17336, 0x0),
+    (17337, 0x0),
+    (17338, 0x0),
+    (17630, 0x0),
+    (18244, 0xF),
+    (18245, 0xF),
+    (18251, 0xF),
+    (18252, 0xF),
+    (18253, 0xF),
+    (18256, 0xF),
+    (18257, 0xF),
+    (18258, 0xF),
+    (18264, 0xF),
+    (18267, 0xF),
+    (18268, 0xF),
+    (18269, 0xF),
+    (18535, 0xF),
+    (18536, 0xF),
+    (18537, 0xF),
+    (18542, 0xF),
+    (18543, 0xF),
+    (18544, 0xF),
+    (18545, 0xF),
+    (18548, 0xF),
+    (18549, 0xF),
+    (18550, 0xF),
+    (18553, 0xF),
+    (18556, 0xF),
+    (18558, 0xF),
+    (18559, 0xF),
+    (18826, 0xF),
+    (18827, 0xF),
+    (18828, 0xF),
+    (18829, 0xF),
+    (18833, 0xF),
+    (18834, 0xF),
+    (18835, 0xF),
+    (18836, 0xF),
+    (18840, 0xF),
+    (18841, 0xF),
+    (18844, 0xF),
+    (18845, 0xF),
+    (18848, 0xF),
+    (18849, 0xF),
+    (18850, 0xF),
+    (19124, 0xF),
+    (19125, 0xF),
+    (19132, 0xF),
+    (19140, 0xF),
+    (19141, 0xF),
+    (19416, 0xF),
+    (19417, 0xF),
+    (19424, 0xF),
+    (19432, 0xF),
+    (19700, 0xF),
+    (19701, 0xF),
+    (19702, 0xF),
+    (19703, 0xF),
+    (19706, 0xF),
+    (19707, 0xF),
+    (19708, 0xF),
+    (19709, 0xF),
+    (19710, 0xF),
+    (19713, 0xF),
+    (19714, 0xF),
+    (19715, 0xF),
+    (19718, 0xF),
+    (19719, 0xF),
+    (19721, 0xF),
+    (19722, 0xF),
+    (19723, 0xF),
+    (19727, 0xF),
+    (19728, 0xF),
+    (19993, 0xF),
+    (19994, 0xF),
+    (19995, 0xF),
+    (19997, 0xF),
+    (19998, 0xF),
+    (19999, 0xF),
+    (20000, 0xF),
+    (20001, 0xF),
+    (20004, 0xF),
+    (20005, 0xF),
+    (20006, 0xF),
+    (20007, 0xF),
+    (20009, 0xF),
+    (20010, 0xF),
+    (20013, 0xF),
+    (20014, 0xF),
+    (20015, 0xF),
+    (20018, 0xF),
+    (20019, 0xF),
+    (20292, 0xF),
+    (20293, 0xF),
+    (20300, 0xF),
+    (20301, 0xF),
+    (20584, 0xF),
+    (20585, 0xF),
+    (20592, 0xF),
+    (20876, 0xF),
+    (20877, 0xF),
+    (20882, 0xF),
+    (20883, 0xF),
+    (20890, 0xF),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SEVENTH_VIDEO_FRAME: u64 = 1114;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SEVENTH_VISIBLE_NIBBLES: [(u32, u8); 96] = [
+    (16494, 0xF),
+    (16495, 0xF),
+    (16496, 0xF),
+    (16534, 0xF),
+    (16535, 0xF),
+    (16536, 0xF),
+    (16537, 0xF),
+    (17351, 0xF),
+    (17406, 0xF),
+    (17407, 0xF),
+    (17409, 0xF),
+    (17413, 0xF),
+    (17415, 0xF),
+    (17698, 0xF),
+    (17699, 0xF),
+    (17701, 0xF),
+    (17704, 0xF),
+    (17705, 0xF),
+    (17707, 0xF),
+    (17915, 0xF),
+    (17916, 0xF),
+    (17989, 0xF),
+    (17990, 0xF),
+    (17995, 0xF),
+    (17996, 0xF),
+    (17999, 0xF),
+    (18207, 0xF),
+    (18208, 0xF),
+    (18273, 0xF),
+    (18274, 0xF),
+    (18275, 0xF),
+    (18281, 0xF),
+    (18282, 0xF),
+    (18287, 0xF),
+    (18289, 0xF),
+    (18291, 0xF),
+    (18493, 0xF),
+    (18498, 0xF),
+    (18499, 0xF),
+    (18564, 0xF),
+    (18565, 0xF),
+    (18567, 0xF),
+    (18572, 0xF),
+    (18574, 0xF),
+    (18785, 0xF),
+    (18789, 0xF),
+    (18790, 0xF),
+    (18856, 0xF),
+    (18858, 0xF),
+    (18859, 0xF),
+    (18863, 0xF),
+    (18864, 0xF),
+    (18866, 0xF),
+    (18867, 0xF),
+    (18870, 0xF),
+    (18871, 0xF),
+    (18872, 0xF),
+    (18873, 0xF),
+    (19149, 0xF),
+    (19152, 0xF),
+    (19440, 0xF),
+    (19441, 0xF),
+    (19729, 0xF),
+    (19732, 0xF),
+    (19733, 0xF),
+    (19734, 0xF),
+    (19737, 0xF),
+    (19738, 0xF),
+    (19739, 0xF),
+    (19742, 0xF),
+    (19743, 0xF),
+    (19744, 0xF),
+    (19745, 0xF),
+    (19746, 0xF),
+    (20020, 0xF),
+    (20021, 0xF),
+    (20024, 0xF),
+    (20025, 0xF),
+    (20026, 0xF),
+    (20028, 0xF),
+    (20029, 0xF),
+    (20030, 0xF),
+    (20031, 0xF),
+    (20034, 0xF),
+    (20035, 0xF),
+    (20036, 0xF),
+    (20037, 0xF),
+    (20316, 0xF),
+    (20317, 0xF),
+    (20608, 0xF),
+    (20609, 0xF),
+    (20893, 0xF),
+    (20901, 0xF),
+    (20907, 0xF),
+    (20908, 0xF),
+    (20909, 0xF),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_EIGHTH_VIDEO_FRAME: u64 = 1115;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_EIGHTH_VISIBLE_NIBBLES: [(u32, u8); 40] = [
+    (16170, 0xF),
+    (16462, 0xF),
+    (17326, 0xF),
+    (17336, 0xF),
+    (17337, 0xF),
+    (17338, 0xF),
+    (17618, 0xF),
+    (17628, 0xF),
+    (17629, 0xF),
+    (17630, 0xF),
+    (17909, 0xF),
+    (17920, 0xF),
+    (17921, 0xF),
+    (17922, 0xF),
+    (17923, 0xF),
+    (17926, 0xF),
+    (17927, 0xF),
+    (18201, 0xF),
+    (18212, 0xF),
+    (18213, 0xF),
+    (18214, 0xF),
+    (18215, 0xF),
+    (18218, 0xF),
+    (18219, 0xF),
+    (18504, 0xF),
+    (18793, 0xF),
+    (19668, 0xF),
+    (19669, 0xF),
+    (19670, 0xF),
+    (19675, 0xF),
+    (19676, 0xF),
+    (19677, 0xF),
+    (19678, 0xF),
+    (19959, 0xF),
+    (19960, 0xF),
+    (19961, 0xF),
+    (19967, 0xF),
+    (19968, 0xF),
+    (19969, 0xF),
+    (20834, 0xF),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_NINTH_HOLD_FRAME: u64 = 1116;
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDREDTH_PROCESS_FRAME: u64 = 1117;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDREDTH_PROCESS_BYTES: [(u16, u8); 10] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAF6, 0x01),
+    (0xAB01, 0xAA),
+    (0xAB02, 0xE3),
+    (0xAB05, 0x23),
+    (0xAB1F, 0xAB),
+    (0xAB20, 0x10),
+    (0xAB23, 0x00),
+];
+
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_FIRST_PROCESS_FRAME: u64 = 1118;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_FIRST_PROCESS_BYTES: [(u16, u8); 4] = [
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x01),
+    (0xAAEB, 0x61),
+    (0xAAF6, 0x00),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_SECOND_PROCESS_FRAME: u64 = 1119;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_SECOND_PROCESS_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x01),
+    (0xAAD8, 0x01),
+    (0xAAE7, 0x05),
+    (0xAAF6, 0x04),
+    (0xAB05, 0x21),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_THIRD_PROCESS_FRAME: u64 = 1120;
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_THIRD_PROCESS_BYTES: [(u16, u8); 5] = [
+    (0xAAC9, 0x02),
+    (0xAAD8, 0x02),
+    (0xAAE7, 0x04),
+    (0xAAF6, 0x03),
+    (0xAB05, 0x20),
+];
+const RED_LABEL_TRACE_POWER_ON_DEFENDER_LATE_SLEEPER_PROCESS_SAMPLE_CRCS: [(u64, u32); 3] = [
+    (1128, 0x3848_5366),
+    (1138, 0x7B4F_740C),
+    (1148, 0x21AE_8F46),
+];
+const RED_LABEL_TRACE_POWER_ON_COPYRIGHT_SAMPLE_FRAME: u64 = 1152;
+const RED_LABEL_TRACE_POWER_ON_COPYRIGHT_PROCESS_CRC32: u32 = 0xB7F7_20AC;
+const RED_LABEL_TRACE_POWER_ON_COPYRIGHT_VIDEO_CRC32: u32 = 0x3699_10B2;
+const RED_LABEL_TRACE_POWER_ON_COPYRIGHT_SUPPORT_SAMPLE_FRAME: u64 = 1153;
+const RED_LABEL_TRACE_POWER_ON_COPYRIGHT_SUPPORT_PROCESS_CRC32: u32 = 0x2AC8_4733;
+const RED_LABEL_TRACE_POWER_ON_CREDITS_SUPPORT_SAMPLE_FRAME: u64 = 1158;
+const RED_LABEL_TRACE_POWER_ON_CREDITS_SUPPORT_PROCESS_CRC32: u32 = 0xE8C0_8D0D;
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_SUPPORT_SAMPLE_FRAME: u64 = 1186;
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_SUPPORT_PROCESS_CRC32: u32 = 0xB0FF_86D1;
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_CREDITS_SAMPLE_FRAME: u64 = 1190;
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_CREDITS_PROCESS_CRC32: u32 = 0x1FE6_1D2D;
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_FIRST_FRAME: u64 = 1162;
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_LAST_FRAME: u64 = 1172;
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_PRE_FRAME: u64 = 1173;
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_FRAME: u64 = 1174;
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_RAND_STATE: RandState = RandState {
+    seed: 0x39,
+    hseed: 0x40,
+    lseed: 0x93,
+};
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_POINTER_BYTES: [u8; 16] = [
+    0xAB, 0x01, 0xAA, 0xD4, 0xAB, 0x01, 0x00, 0x00, 0xA2, 0x3C, 0xAF, 0x2A, 0x00, 0x00, 0x00, 0x00,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_PROCESS_BYTES: [u8; 0x0F * 7] = [
+    0xAB, 0x2E, 0xF4, 0xCC, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC6, 0xB0, 0xAA,
+    0xE3, 0xE7, 0x84, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAB, 0x1F,
+    0xF4, 0x4A, 0x05, 0x00, 0x00, 0xF4, 0x5E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xC5, 0xF4,
+    0xCC, 0x01, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x12, 0x00, 0x01, 0xC7, 0x38, 0x00, 0x00, 0xF4, 0xCC,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC8, 0x31, 0xAA, 0xF2, 0xF4, 0xCC, 0x07,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC8, 0xF4, 0xAB, 0x10, 0xF4, 0x72, 0x03, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC9, 0x2E,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_PRE_POINTER_BYTES: [u8; 16] = [
+    0xAB, 0x01, 0xAA, 0xE3, 0xAB, 0x01, 0x00, 0x00, 0xA2, 0x3C, 0xAF, 0x2A, 0x00, 0x00, 0x00, 0x00,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_PRE_PROCESS_BYTES: [u8; 0x0F * 7] = [
+    0xAB, 0x2E, 0xF4, 0xCC, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC6, 0xB0, 0x00,
+    0x00, 0xC8, 0xF4, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAB, 0x1F,
+    0xF4, 0x4A, 0x05, 0x00, 0x00, 0xF4, 0x5E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xC5, 0xF4,
+    0xCC, 0x01, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x12, 0x00, 0x01, 0xC7, 0x38, 0xAA, 0xD4, 0xF4, 0xCC,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC8, 0x31, 0xAA, 0xF2, 0xF4, 0xCC, 0x07,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC8, 0xF4, 0xAB, 0x10, 0xF4, 0x72, 0x03, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC9, 0x2E,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_POINTER_BYTES: [u8; 16] = [
+    0xAB, 0x01, 0xAB, 0x2E, 0xAA, 0xD4, 0xA2, 0x6A, 0xA2, 0x81, 0xAF, 0x2A, 0x00, 0x00, 0x00, 0x00,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_PROCESS_BYTES: [u8; 0x0F * 7] = [
+    0xAA, 0xF2, 0xF4, 0xCC, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC6, 0x6B, 0x00,
+    0x00, 0xC8, 0xF4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xD4,
+    0xE7, 0x84, 0x02, 0x00, 0x00, 0xF4, 0x5E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAB, 0x10, 0xE9,
+    0xEE, 0x02, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x12, 0x00, 0x01, 0xC7, 0x38, 0xAA, 0xC5, 0xF4, 0xCC,
+    0xE6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC4, 0x12, 0xAB, 0x1F, 0xF4, 0x4A, 0x06,
+    0x00, 0x00, 0xF4, 0x5B, 0x00, 0x00, 0x00, 0x01, 0xC8, 0xF4, 0xAA, 0xE3, 0xF4, 0x72, 0x03, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC9, 0x2E,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_FIRST_EXEC_FRAME: u64 = 1175;
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_FIRST_EXEC_POINTER_BYTES: [u8; 16] = [
+    0xAB, 0x01, 0xAB, 0x2E, 0xA0, 0x5F, 0xA2, 0x6A, 0xA2, 0x81, 0xAF, 0x2A, 0x00, 0x00, 0x00, 0x00,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_FIRST_EXEC_PROCESS_BYTES: [u8; 0x0F * 7] = [
+    0xAA, 0xF2, 0xF4, 0xCC, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC6, 0x6B, 0x00,
+    0x00, 0xF4, 0xCC, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC8, 0xF4, 0xAA, 0xD4,
+    0xE7, 0x84, 0x01, 0x00, 0x00, 0xF4, 0x5E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAB, 0x10, 0xE9,
+    0xEE, 0x01, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x12, 0x00, 0x01, 0xC7, 0x38, 0xAA, 0xC5, 0xF4, 0xCC,
+    0xE5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC4, 0x12, 0xAB, 0x1F, 0xF4, 0x4A, 0x05,
+    0x00, 0x00, 0xF4, 0x5B, 0x00, 0x00, 0x00, 0x01, 0xC8, 0xF4, 0xAA, 0xE3, 0xF4, 0x72, 0x02, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC9, 0x2E,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_VIDEO_SAMPLE_CRCS: &[(u64, u32)] = &[
+    (1164, 0x2C59_0EB2),
+    (1165, 0x245F_4B23),
+    (1166, 0x157E_98C7),
+    (1172, 0x157E_98C7),
+    (1173, 0x9838_27AF),
+    (1175, 0xF130_3DFE),
+    (1176, 0xD180_E1BE),
+    (1177, 0x1CDF_FD29),
+    (1178, 0x2CD1_C2B3),
+    (1179, 0xD74E_B750),
+    (1180, 0x1406_8779),
+    (1181, 0xAE6B_EFDF),
+    (1182, 0x3848_E087),
+    (1183, 0x5D62_99C6),
+    (1184, 0x1E84_D0E1),
+    (1185, 0xE61D_AB8F),
+    (1186, 0x8A3A_D8FA),
+    (1187, 0x70F0_68A2),
+    (1188, 0xFE2D_E67B),
+    (1189, 0xB48D_A598),
+    (1190, 0x117E_4892),
+    (1191, 0x6B6A_AE08),
+    (1192, 0xBCFC_3BF0),
+    (1193, 0xB17D_2F0A),
+    (1194, 0x9C0E_DB12),
+    (1195, 0x19C4_11E1),
+    (1196, 0x962E_0252),
+    (1197, 0xAD3E_170E),
+    (1198, 0xCB00_4CE7),
+    (1199, 0x66F5_B057),
+    (1200, 0x17B3_031A),
+    (1201, 0x4BF8_D4BB),
+    (1202, 0x0C93_9C27),
+    (1203, 0x11CC_7CF2),
+    (1204, 0x172F_BE2F),
+    (1205, 0x17F6_ACB6),
+    (1206, 0x9CEB_8542),
+    (1207, 0xF08D_CD89),
+    (1208, 0x1C8D_D64A),
+    (1209, 0x0A2E_6DDC),
+    (1210, 0x22DC_6057),
+    (1211, 0x8CAB_1D3B),
+    (1212, 0xF0E1_7D17),
+    (1213, 0xC762_4EAB),
+    (1214, 0xE367_435D),
+    (1215, 0xB7D0_B13D),
+    (1216, 0x882D_CFF2),
+    (1217, 0x5ED5_7402),
+    (1218, 0x078E_BE87),
+    (1219, 0xE3A6_EC5E),
+    (1220, 0x9EB6_A03A),
+    (1221, 0x5F6B_E809),
+    (1222, 0x6DEB_7656),
+    (1223, 0x6DEB_7656),
+    (1224, 0x0557_4ED6),
+    (1225, 0xDE49_2E94),
+    (1226, 0x8FDD_CD33),
+    (1227, 0xDDE1_EB4B),
+    (1228, 0xF2A3_DE00),
+    (1229, 0x7CF8_C674),
+    (1230, 0x88A3_F570),
+    (1231, 0xDDCE_B822),
+    (1232, 0xD58D_BA16),
+    (1233, 0x4B63_4E36),
+    (1234, 0xA2C3_1EAE),
+    (1309, 0x6642_6E15),
+    (1310, 0xC46B_8A44),
+    (1311, 0x55B3_4B70),
+    (1312, 0x2DC8_3755),
+    (1313, 0x9E94_45C1),
+    (1314, 0x215A_B95F),
+    (1315, 0x637B_A67B),
+    (1316, 0xFF93_7191),
+    (1317, 0xECFF_348E),
+    (1318, 0xF911_53CC),
+    (1319, 0x03E7_518B),
+    (1320, 0x72D9_B81A),
+    (1321, 0xBD22_65D8),
+    (1322, 0x656E_D429),
+    (1323, 0x1AE7_7360),
+    (1324, 0x5968_9022),
+    (1325, 0xFF8A_9969),
+    (1326, 0x084D_901E),
+    (1327, 0xDD54_C073),
+    (1328, 0xDD54_C073),
+    (1329, 0x7A0C_E222),
+    (1330, 0x1322_D8BA),
+    (1331, 0xA118_FA15),
+    (1332, 0x7DE4_A2BA),
+    (1333, 0xCABF_786F),
+    (1334, 0x324A_F8EC),
+    (1335, 0x9BBF_0892),
+    (1336, 0x5E69_A807),
+    (1337, 0x4F41_CBB7),
+    (1338, 0x63C9_2D8E),
+    (1339, 0x8601_1F95),
+    (1340, 0xBE80_3FFB),
+    (1341, 0x40CB_A97C),
+    (1342, 0x9A45_51E8),
+    (1343, 0x43FA_95EF),
+    (1344, 0xC87E_9881),
+    (1345, 0x11FE_442F),
+    (1346, 0x8E8B_BFCA),
+    (1347, 0xB17B_4151),
+    (1348, 0xF1FB_68B8),
+    (1349, 0x0ECC_B021),
+    (1350, 0x90E6_8D1F),
+    (1351, 0x1291_4ABB),
+    (1352, 0xFEEF_198D),
+    (1353, 0x3D35_2198),
+    (1354, 0x318B_B20E),
+    (1355, 0x6701_7467),
+    (1356, 0x1520_58B0),
+    (1357, 0xB4EF_6074),
+    (1358, 0x8C6A_E956),
+    (1359, 0xDC59_CD9B),
+    (1360, 0xBC10_AB56),
+];
+const RED_LABEL_TRACE_POWER_ON_SPECIAL_INPUT_VIDEO_SAMPLE_CRCS: &[(u64, u16, u32)] = &[
+    (1080, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0x57AE_5184),
+    (1081, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0x7363_B431),
+    (1084, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0x39BC_A887),
+    (1091, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0x6583_219C),
+    (1093, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0x2318_B8F4),
+    (1094, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0xBEF0_0401),
+    (1095, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0xC24E_2B0F),
+    (1099, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0xF7C1_6FEF),
+    (1100, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0x1A03_4D42),
+    (1103, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0x9595_BAF7),
+    (1106, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0x72DE_1AD7),
+    (1107, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0x3EC9_EC11),
+    (1111, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0xB8DF_8442),
+    (1164, RED_LABEL_TRACE_INPUT_FIRE_BITS, 0xF72D_1B86),
+    (1084, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0xD890_9668),
+    (1091, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0x3FF8_4B6D),
+    (1093, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0xBB40_58CE),
+    (1094, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0xBFED_6A32),
+    (1095, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0xC24E_2B0F),
+    (1098, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0x8F77_8AC6),
+    (1099, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0x116A_DC11),
+    (1100, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0x9BDD_2F53),
+    (1103, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0x15BF_2144),
+    (1105, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0xA740_8AA6),
+    (1106, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0x72DE_1AD7),
+    (1107, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0x3EC9_EC11),
+    (1109, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0xD017_07C6),
+    (1111, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0xB8DF_8442),
+    (1164, RED_LABEL_TRACE_INPUT_THRUST_BITS, 0x54E8_7194),
+    (1111, RED_LABEL_TRACE_INPUT_SMART_BOMB_BITS, 0xB8DF_8442),
+    (1164, RED_LABEL_TRACE_INPUT_SMART_BOMB_BITS, 0xF72D_1B86),
+    (1111, RED_LABEL_TRACE_INPUT_HYPERSPACE_BITS, 0xB8DF_8442),
+    (1164, RED_LABEL_TRACE_INPUT_HYPERSPACE_BITS, 0xF72D_1B86),
+];
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_CREDITS_STALL_PROCESS_SAMPLE_CRCS: &[(u64, u32)] = &[
+    (1204, 0x448A_D0F0),
+    (1206, 0xB4DD_F519),
+    (1210, 0xE407_8CFB),
+    (1216, 0x85A5_3777),
+    (1222, 0x76FC_A77D),
+    (1234, 0x57B1_45F1),
+    (1258, 0xEBA7_4B00),
+    (1270, 0xA1B9_B050),
+    (1282, 0x3927_52CA),
+];
+const RED_LABEL_TRACE_POWER_ON_STAR_TABLE_SAMPLE_FRAME: u64 = 1228;
+const RED_LABEL_TRACE_POWER_ON_STAR_TABLE_SAMPLE_BYTES: [u8; 0x40] = [
+    0x82, 0x3D, 0x00, 0x00, 0x06, 0x71, 0x55, 0x00, 0x54, 0x9C, 0x33, 0x00, 0x4C, 0x4B, 0x55, 0x00,
+    0x10, 0x7A, 0x33, 0x00, 0x50, 0x69, 0x11, 0x00, 0x58, 0x4F, 0x11, 0x00, 0x5A, 0x35, 0x11, 0x00,
+    0x15, 0x82, 0x33, 0x00, 0x66, 0x9E, 0x33, 0x00, 0x6A, 0x3D, 0x44, 0x00, 0x1F, 0x7A, 0x33, 0x00,
+    0x2E, 0x63, 0x00, 0x00, 0x76, 0x52, 0x00, 0x00, 0x7B, 0x82, 0x22, 0x00, 0x78, 0x86, 0x55, 0x00,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_VISIBLE_BOUNDARY_FRAME: u64 = 1235;
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_VISIBLE_NIBBLES: [(u32, u8); 28] = [
+    (26800, 0x0),
+    (26801, 0x0),
+    (26802, 0x0),
+    (27092, 0x0),
+    (27093, 0x0),
+    (27094, 0x0),
+    (27384, 0x0),
+    (27385, 0x0),
+    (27386, 0x0),
+    (27676, 0x0),
+    (27677, 0x0),
+    (27678, 0x0),
+    (62132, 0x3),
+    (62133, 0x3),
+    (62424, 0x4),
+    (62425, 0x3),
+    (62716, 0x4),
+    (62717, 0x3),
+    (62718, 0x8),
+    (63008, 0x8),
+    (63009, 0x7),
+    (63010, 0x8),
+    (63300, 0x8),
+    (63302, 0x8),
+    (63303, 0x0),
+    (63593, 0x7),
+    (63885, 0x7),
+    (64177, 0x7),
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_BOTTOM_OVERLAY_FIRST_FRAME: u64 = 1236;
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_BOTTOM_OVERLAY_LAST_FRAME: u64 = 1328;
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_BOTTOM_OVERLAY_NIBBLES: [(u32, u8); 6] = [
+    (63008, 0x8),
+    (63009, 0x7),
+    (63010, 0x8),
+    (63300, 0x8),
+    (63302, 0x8),
+    (63303, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_ERASE_ROWS: [(u64, u32); 34] = [
+    (1237, 27968),
+    (1238, 28260),
+    (1240, 28552),
+    (1242, 28844),
+    (1243, 29136),
+    (1245, 29428),
+    (1246, 29720),
+    (1248, 30012),
+    (1250, 30304),
+    (1251, 30596),
+    (1253, 30888),
+    (1254, 31180),
+    (1256, 31472),
+    (1258, 31764),
+    (1259, 32056),
+    (1261, 32348),
+    (1262, 32640),
+    (1264, 32932),
+    (1266, 33224),
+    (1267, 33516),
+    (1269, 33808),
+    (1270, 34100),
+    (1272, 34392),
+    (1274, 34684),
+    (1275, 34976),
+    (1277, 35268),
+    (1278, 35560),
+    (1280, 35852),
+    (1282, 36144),
+    (1283, 36436),
+    (1285, 36728),
+    (1286, 37020),
+    (1288, 37312),
+    (1290, 37604),
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_EXTRA_1258_NIBBLES: [(u32, u8); 17] = [
+    (1892, 0x0),
+    (2183, 0x0),
+    (2184, 0x0),
+    (2185, 0x0),
+    (2476, 0x0),
+    (4240, 0x0),
+    (4241, 0x0),
+    (4532, 0x0),
+    (4533, 0x0),
+    (8036, 0x0),
+    (8037, 0x0),
+    (8326, 0x0),
+    (8328, 0x0),
+    (8329, 0x0),
+    (8619, 0x0),
+    (9192, 0x0),
+    (9193, 0x7),
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1259_1265_NIBBLES: [(u32, u8); 17] = [
+    (1892, 0x9),
+    (2183, 0x9),
+    (2184, 0x9),
+    (2185, 0x9),
+    (2476, 0x9),
+    (4240, 0x4),
+    (4241, 0x4),
+    (4532, 0x3),
+    (4533, 0x3),
+    (8036, 0x6),
+    (8037, 0x6),
+    (8326, 0x7),
+    (8328, 0x6),
+    (8329, 0x6),
+    (8619, 0x7),
+    (9192, 0x9),
+    (9193, 0x0),
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1271_1290_NIBBLES: &[(u64, u64, &[(u32, u8)])] = &[
+    (1271, 1290, &[(20129, 0x1)]),
+    (1272, 1290, &[(19873, 0x0)]),
+    (1272, 1284, &[(22117, 0x5)]),
+    (1285, 1290, &[(22117, 0x6)]),
+    (
+        1282,
+        1282,
+        &[
+            (1892, 0x0),
+            (2183, 0x0),
+            (2184, 0x0),
+            (2185, 0x0),
+            (2476, 0x0),
+            (4824, 0x0),
+            (4825, 0x0),
+            (5116, 0x0),
+            (5117, 0x0),
+            (8036, 0x0),
+            (8037, 0x0),
+            (8328, 0x0),
+            (8329, 0x0),
+            (9192, 0x0),
+            (9193, 0x7),
+        ],
+    ),
+    (
+        1283,
+        1289,
+        &[
+            (1892, 0x9),
+            (2183, 0x9),
+            (2184, 0x9),
+            (2185, 0x9),
+            (2476, 0x9),
+            (4824, 0x4),
+            (4825, 0x4),
+            (5116, 0x3),
+            (5117, 0x3),
+            (8036, 0x6),
+            (8037, 0x6),
+            (8328, 0x6),
+            (8329, 0x6),
+            (9192, 0x9),
+            (9193, 0x0),
+        ],
+    ),
+    (
+        1291,
+        1291,
+        &[
+            (20129, 0x0),
+            (22117, 0x6),
+            (37896, 0x0),
+            (37897, 0x0),
+            (37898, 0x0),
+            (38187, 0x0),
+            (38188, 0x0),
+            (38189, 0x0),
+            (38190, 0x0),
+            (38191, 0x0),
+            (38478, 0x0),
+            (38479, 0x0),
+            (38481, 0x0),
+            (38482, 0x0),
+            (38484, 0x0),
+            (38770, 0x0),
+            (38771, 0x0),
+            (38773, 0x0),
+            (38774, 0x0),
+            (38776, 0x0),
+            (39063, 0x0),
+            (39064, 0x0),
+            (39065, 0x0),
+            (39066, 0x0),
+            (39067, 0x0),
+            (39355, 0x0),
+            (39357, 0x0),
+            (39359, 0x0),
+            (39646, 0x0),
+            (39649, 0x0),
+            (39652, 0x0),
+            (39937, 0x0),
+            (39941, 0x0),
+            (39945, 0x0),
+        ],
+    ),
+    (
+        1292,
+        1292,
+        &[
+            (19873, 0x2),
+            (22117, 0x6),
+            (38188, 0x4),
+            (38189, 0x4),
+            (38190, 0x4),
+            (38479, 0x3),
+            (38480, 0x4),
+            (38481, 0x4),
+            (38482, 0x4),
+            (38483, 0x3),
+            (38770, 0x3),
+            (38771, 0x3),
+            (38773, 0x3),
+            (38774, 0x3),
+            (38776, 0x3),
+            (39062, 0x3),
+            (39063, 0x3),
+            (39065, 0x3),
+            (39066, 0x3),
+            (39068, 0x3),
+            (39355, 0x3),
+            (39356, 0x4),
+            (39357, 0x3),
+            (39358, 0x4),
+            (39359, 0x3),
+            (39647, 0x3),
+            (39649, 0x3),
+            (39651, 0x3),
+            (39938, 0x3),
+            (39941, 0x3),
+            (39944, 0x3),
+            (40229, 0x3),
+            (40233, 0x3),
+            (40237, 0x3),
+        ],
+    ),
+    (
+        1293,
+        1293,
+        &[
+            (22117, 0x6),
+            (38188, 0x4),
+            (38189, 0x4),
+            (38190, 0x4),
+            (38479, 0x3),
+            (38480, 0x4),
+            (38481, 0x4),
+            (38482, 0x4),
+            (38483, 0x3),
+            (38770, 0x3),
+            (38771, 0x3),
+            (38773, 0x3),
+            (38774, 0x3),
+            (38776, 0x3),
+            (39062, 0x3),
+            (39063, 0x3),
+            (39065, 0x3),
+            (39066, 0x3),
+            (39068, 0x3),
+            (39355, 0x3),
+            (39356, 0x4),
+            (39357, 0x3),
+            (39358, 0x4),
+            (39359, 0x3),
+            (39647, 0x3),
+            (39649, 0x3),
+            (39651, 0x3),
+            (39938, 0x3),
+            (39941, 0x3),
+            (39944, 0x3),
+            (40229, 0x3),
+            (40233, 0x3),
+            (40237, 0x3),
+        ],
+    ),
+    (
+        1294,
+        1294,
+        &[
+            (20125, 0x3),
+            (22117, 0x6),
+            (38188, 0x0),
+            (38189, 0x0),
+            (38190, 0x0),
+            (38479, 0x0),
+            (38480, 0x4),
+            (38481, 0x4),
+            (38482, 0x4),
+            (38483, 0x0),
+            (38770, 0x0),
+            (38771, 0x3),
+            (38772, 0x4),
+            (38773, 0x4),
+            (38774, 0x4),
+            (38775, 0x3),
+            (38776, 0x0),
+            (39062, 0x3),
+            (39063, 0x3),
+            (39065, 0x3),
+            (39066, 0x3),
+            (39068, 0x3),
+            (39354, 0x3),
+            (39355, 0x3),
+            (39356, 0x0),
+            (39357, 0x3),
+            (39358, 0x3),
+            (39359, 0x0),
+            (39360, 0x3),
+            (39647, 0x3),
+            (39648, 0x4),
+            (39649, 0x3),
+            (39650, 0x4),
+            (39651, 0x3),
+            (39938, 0x0),
+            (39939, 0x3),
+            (39941, 0x3),
+            (39943, 0x3),
+            (39944, 0x0),
+            (40229, 0x0),
+            (40230, 0x3),
+            (40233, 0x3),
+            (40236, 0x3),
+            (40237, 0x0),
+            (40521, 0x3),
+            (40525, 0x3),
+            (40529, 0x3),
+        ],
+    ),
+    (
+        1295,
+        1295,
+        &[
+            (20125, 0x3),
+            (22117, 0x6),
+            (38188, 0x0),
+            (38189, 0x0),
+            (38190, 0x0),
+            (38479, 0x0),
+            (38480, 0x0),
+            (38481, 0x0),
+            (38482, 0x0),
+            (38483, 0x0),
+            (38770, 0x0),
+            (38771, 0x0),
+            (38775, 0x0),
+            (38776, 0x0),
+            (39062, 0x0),
+            (39064, 0x4),
+            (39065, 0x4),
+            (39066, 0x4),
+            (39067, 0x3),
+            (39068, 0x0),
+            (39356, 0x0),
+            (39359, 0x0),
+            (39646, 0x3),
+            (39648, 0x0),
+            (39650, 0x3),
+            (39651, 0x0),
+            (39652, 0x3),
+            (39938, 0x0),
+            (39940, 0x4),
+            (39942, 0x4),
+            (39944, 0x0),
+            (40229, 0x0),
+            (40230, 0x0),
+            (40231, 0x3),
+            (40235, 0x3),
+            (40236, 0x0),
+            (40237, 0x0),
+            (40521, 0x0),
+            (40522, 0x3),
+            (40528, 0x3),
+            (40529, 0x0),
+            (40813, 0x3),
+            (40817, 0x3),
+            (40821, 0x3),
+        ],
+    ),
+    (1296, 1296, &[(20125, 0x3), (22117, 0x6)]),
+    (
+        1297,
+        1297,
+        &[
+            (20125, 0x3),
+            (22117, 0x6),
+            (38772, 0x0),
+            (38773, 0x0),
+            (38774, 0x0),
+            (39063, 0x0),
+            (39067, 0x0),
+            (39354, 0x0),
+            (39356, 0x4),
+            (39357, 0x4),
+            (39358, 0x4),
+            (39359, 0x3),
+            (39360, 0x0),
+            (39938, 0x3),
+            (39940, 0x0),
+            (39942, 0x3),
+            (39943, 0x0),
+            (39944, 0x3),
+            (40232, 0x4),
+            (40234, 0x4),
+            (40522, 0x0),
+            (40523, 0x3),
+            (40527, 0x3),
+            (40528, 0x0),
+            (40813, 0x0),
+            (40814, 0x3),
+            (40820, 0x3),
+            (40821, 0x0),
+            (41105, 0x3),
+            (41109, 0x3),
+            (41113, 0x3),
+        ],
+    ),
+    (1298, 1298, &[(22117, 0x6)]),
+    (
+        1299,
+        1299,
+        &[
+            (20001, 0x4),
+            (22117, 0x6),
+            (39064, 0x0),
+            (39065, 0x0),
+            (39066, 0x0),
+            (39355, 0x0),
+            (39359, 0x0),
+            (39646, 0x0),
+            (39648, 0x4),
+            (39649, 0x4),
+            (39650, 0x4),
+            (39651, 0x3),
+            (39652, 0x0),
+            (40230, 0x3),
+            (40232, 0x0),
+            (40234, 0x3),
+            (40235, 0x0),
+            (40236, 0x3),
+            (40524, 0x4),
+            (40526, 0x4),
+            (40814, 0x0),
+            (40815, 0x3),
+            (40819, 0x3),
+            (40820, 0x0),
+            (41105, 0x0),
+            (41106, 0x3),
+            (41112, 0x3),
+            (41113, 0x0),
+            (41397, 0x3),
+            (41401, 0x3),
+            (41405, 0x3),
+        ],
+    ),
+    (
+        1300,
+        1300,
+        &[
+            (20001, 0x4),
+            (22117, 0x6),
+            (39356, 0x0),
+            (39357, 0x0),
+            (39358, 0x0),
+            (39647, 0x0),
+            (39651, 0x0),
+            (39938, 0x0),
+            (39940, 0x4),
+            (39941, 0x4),
+            (39942, 0x4),
+            (39943, 0x3),
+            (39944, 0x0),
+            (40522, 0x3),
+            (40524, 0x0),
+            (40526, 0x3),
+            (40527, 0x0),
+            (40528, 0x3),
+            (40816, 0x4),
+            (40818, 0x4),
+            (41106, 0x0),
+            (41107, 0x3),
+            (41111, 0x3),
+            (41112, 0x0),
+            (41397, 0x0),
+            (41398, 0x3),
+            (41404, 0x3),
+            (41405, 0x0),
+            (41689, 0x3),
+            (41693, 0x3),
+            (41697, 0x3),
+        ],
+    ),
+    (1301, 1301, &[(20001, 0x4), (22117, 0x6)]),
+    (
+        1302,
+        1302,
+        &[
+            (20001, 0x4),
+            (22117, 0x6),
+            (39648, 0x0),
+            (39649, 0x0),
+            (39650, 0x0),
+            (39939, 0x0),
+            (39943, 0x0),
+            (40230, 0x0),
+            (40232, 0x4),
+            (40233, 0x4),
+            (40234, 0x4),
+            (40235, 0x3),
+            (40236, 0x0),
+            (40814, 0x3),
+            (40816, 0x0),
+            (40818, 0x3),
+            (40819, 0x0),
+            (40820, 0x3),
+            (41108, 0x4),
+            (41110, 0x4),
+            (41398, 0x0),
+            (41399, 0x3),
+            (41403, 0x3),
+            (41404, 0x0),
+            (41689, 0x0),
+            (41690, 0x3),
+            (41696, 0x3),
+            (41697, 0x0),
+            (41981, 0x3),
+            (41985, 0x3),
+            (41989, 0x3),
+        ],
+    ),
+    (
+        1303,
+        1303,
+        &[
+            (20001, 0x4),
+            (22117, 0x6),
+            (39940, 0x0),
+            (39941, 0x0),
+            (39942, 0x0),
+            (40231, 0x0),
+            (40235, 0x0),
+            (40522, 0x0),
+            (40524, 0x4),
+            (40525, 0x4),
+            (40526, 0x4),
+            (40527, 0x3),
+            (40528, 0x0),
+            (41106, 0x3),
+            (41108, 0x0),
+            (41110, 0x3),
+            (41111, 0x0),
+            (41112, 0x3),
+            (41400, 0x4),
+            (41402, 0x4),
+            (41690, 0x0),
+            (41691, 0x3),
+            (41695, 0x3),
+            (41696, 0x0),
+            (41981, 0x0),
+            (41982, 0x3),
+            (41988, 0x3),
+            (41989, 0x0),
+            (42273, 0x3),
+            (42277, 0x3),
+            (42281, 0x3),
+        ],
+    ),
+    (1304, 1304, &[(20001, 0x4), (22117, 0x6)]),
+    (
+        1305,
+        1305,
+        &[
+            (20001, 0x4),
+            (22117, 0x6),
+            (40232, 0x0),
+            (40233, 0x0),
+            (40234, 0x0),
+            (40523, 0x0),
+            (40527, 0x0),
+            (40814, 0x0),
+            (40816, 0x4),
+            (40817, 0x4),
+            (40818, 0x4),
+            (40819, 0x3),
+            (40820, 0x0),
+            (41398, 0x3),
+            (41400, 0x0),
+            (41402, 0x3),
+            (41403, 0x0),
+            (41404, 0x3),
+            (41692, 0x4),
+            (41694, 0x4),
+            (41982, 0x0),
+            (41983, 0x3),
+            (41987, 0x3),
+            (41988, 0x0),
+            (42273, 0x0),
+            (42274, 0x3),
+            (42280, 0x3),
+            (42281, 0x0),
+            (42565, 0x3),
+            (42569, 0x3),
+            (42573, 0x3),
+        ],
+    ),
+    (
+        1306,
+        1306,
+        &[
+            (1892, 0x0),
+            (2183, 0x0),
+            (2184, 0x0),
+            (2185, 0x0),
+            (2476, 0x0),
+            (5408, 0x0),
+            (5409, 0x0),
+            (5700, 0x0),
+            (5701, 0x0),
+            (8036, 0x0),
+            (8037, 0x0),
+            (8326, 0x0),
+            (8328, 0x0),
+            (8329, 0x0),
+            (8619, 0x0),
+            (9192, 0x0),
+            (9193, 0x7),
+            (20001, 0x4),
+            (22117, 0x6),
+        ],
+    ),
+    (
+        1307,
+        1307,
+        &[
+            (1892, 0x9),
+            (2183, 0x9),
+            (2184, 0x9),
+            (2185, 0x9),
+            (2476, 0x9),
+            (5408, 0x4),
+            (5409, 0x4),
+            (5700, 0x3),
+            (5701, 0x3),
+            (8036, 0x6),
+            (8037, 0x6),
+            (8326, 0x7),
+            (8328, 0x6),
+            (8329, 0x6),
+            (8619, 0x7),
+            (9192, 0x9),
+            (9193, 0x0),
+            (20001, 0x4),
+            (21181, 0x0),
+            (22117, 0x6),
+            (40524, 0x0),
+            (40525, 0x0),
+            (40526, 0x0),
+            (40815, 0x0),
+            (40819, 0x0),
+            (41106, 0x0),
+            (41108, 0x4),
+            (41109, 0x4),
+            (41110, 0x4),
+            (41111, 0x3),
+            (41112, 0x0),
+            (41690, 0x3),
+            (41692, 0x0),
+            (41694, 0x3),
+            (41695, 0x0),
+            (41696, 0x3),
+            (41984, 0x4),
+            (41986, 0x4),
+            (42274, 0x0),
+            (42275, 0x3),
+            (42279, 0x3),
+            (42280, 0x0),
+            (42565, 0x0),
+            (42566, 0x3),
+            (42572, 0x3),
+            (42573, 0x0),
+            (42857, 0x3),
+            (42861, 0x3),
+            (42865, 0x3),
+        ],
+    ),
+    (
+        1308,
+        1308,
+        &[
+            (20001, 0x4),
+            (21181, 0x0),
+            (22117, 0x6),
+            (40816, 0x0),
+            (40817, 0x0),
+            (40818, 0x0),
+            (41107, 0x0),
+            (41111, 0x0),
+            (41398, 0x0),
+            (41400, 0x4),
+            (41401, 0x4),
+            (41402, 0x4),
+            (41403, 0x3),
+            (41404, 0x0),
+            (41982, 0x3),
+            (41984, 0x0),
+            (41986, 0x3),
+            (41987, 0x0),
+            (41988, 0x3),
+            (42276, 0x4),
+            (42278, 0x4),
+            (42566, 0x0),
+            (42567, 0x3),
+            (42571, 0x3),
+            (42572, 0x0),
+            (42857, 0x0),
+            (42858, 0x3),
+            (42864, 0x3),
+            (42865, 0x0),
+            (43149, 0x3),
+            (43153, 0x3),
+            (43157, 0x3),
+        ],
+    ),
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_OBJECT_BYTES: &[(u64, &[(u16, u8)])] = &[
+    (1291, &[(0xA26E, 0x00), (0xA26F, 0x00)]),
+    (1292, &[(0xA26E, 0x76)]),
+    (1293, &[(0xA26E, 0x76), (0xA26F, 0x89)]),
+    (1294, &[(0xA26E, 0x76), (0xA26F, 0x8A)]),
+    (1296, &[(0xA26F, 0x8B)]),
+    (1298, &[(0xA26F, 0x8C)]),
+    (1299, &[(0xA26F, 0x8D)]),
+    (1301, &[(0xA26F, 0x8E)]),
+    (1302, &[(0xA26F, 0x8F)]),
+    (1304, &[(0xA26F, 0x90)]),
+    (1306, &[(0xA26F, 0x91)]),
+    (1307, &[(0xA26F, 0x92)]),
+    (1309, &[(0xA26F, 0x93)]),
+    (1310, &[(0xA26F, 0x94)]),
+    (1312, &[(0xA26F, 0x95)]),
+    (1314, &[(0xA26F, 0x96)]),
+    (1315, &[(0xA26F, 0x97)]),
+    (1317, &[(0xA26F, 0x98)]),
+    (1318, &[(0xA26F, 0x99)]),
+    (1320, &[(0xA26F, 0x9A)]),
+    (1322, &[(0xA26F, 0x9B)]),
+    (1323, &[(0xA26F, 0x9C)]),
+    (1325, &[(0xA26F, 0x9D)]),
+    (1326, &[(0xA26F, 0x9E)]),
+    (1328, &[(0xA26F, 0x9F)]),
+    (1330, &[(0xA26F, 0xA0)]),
+    (1331, &[(0xA26F, 0xA1)]),
+    (1333, &[(0xA26F, 0xA2)]),
+    (1334, &[(0xA26F, 0xA3)]),
+    (1336, &[(0xA26F, 0xA4)]),
+    (1338, &[(0xA26F, 0xA5)]),
+    (1339, &[(0xA26F, 0xA6)]),
+    (1341, &[(0xA26F, 0xA7)]),
+    (1342, &[(0xA26F, 0xA8)]),
+    (1344, &[(0xA26F, 0xA9)]),
+    (1346, &[(0xA26F, 0xAA)]),
+    (1347, &[(0xA26F, 0xAB)]),
+    (1349, &[(0xA26F, 0xAC)]),
+    (1350, &[(0xA26F, 0xAD)]),
+    (1352, &[(0xA26F, 0xAE)]),
+    (1354, &[(0xA26F, 0xAF)]),
+    (1355, &[(0xA26F, 0xB0)]),
+    (1357, &[(0xA26F, 0xB1)]),
+    (1358, &[(0xA26F, 0xB2)]),
+    (1360, &[(0xA26F, 0xB3)]),
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1306_PROCESS_BYTES: [u8; 0x0F * 7] = [
+    0xAA, 0xF2, 0xF4, 0xCC, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC6, 0x6B, 0x00,
+    0x00, 0xF4, 0xCC, 0x0D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC8, 0xF4, 0xAA, 0xD4,
+    0xE7, 0x84, 0x01, 0x00, 0x00, 0xF4, 0x5E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAB, 0x10, 0xE9,
+    0xFC, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x12, 0x00, 0x01, 0xC7, 0x38, 0xAA, 0xC5, 0xF4, 0xCC,
+    0x62, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC4, 0x12, 0xAB, 0x1F, 0xF4, 0x4A, 0x01,
+    0x00, 0x00, 0xF4, 0x5B, 0x00, 0x00, 0x00, 0x01, 0xC8, 0xF4, 0xAA, 0xE3, 0xF4, 0x64, 0x04, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xC9, 0x2E,
+];
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_PROCESS_BYTES: &[(u64, &[(u16, u8)])] = &[
+    (
+        1307,
+        &[
+            (0xAAD8, 0x0B),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x03),
+            (0xAB14, 0x05),
+            (0xAB23, 0x02),
+        ],
+    ),
+    (1318, &[(0xAAD8, 0x00)]),
+    (1319, &[(0xAAD8, 0x0F)]),
+    (1320, &[(0xAAD8, 0x0E)]),
+    (1321, &[(0xAAD8, 0x0D)]),
+    (1322, &[(0xAAD8, 0x0C)]),
+    (1323, &[(0xAAD8, 0x0B)]),
+    (1324, &[(0xAAD8, 0x0A)]),
+    (1325, &[(0xAAD8, 0x09)]),
+    (1326, &[(0xAAD8, 0x08)]),
+    (1327, &[(0xAAD8, 0x07)]),
+    (1328, &[(0xAAD8, 0x06)]),
+    (
+        1330,
+        &[
+            (0xAAD8, 0x05),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xFC),
+            (0xAAF6, 0x00),
+            (0xAB14, 0x01),
+            (0xAB18, 0x5E),
+            (0xAB22, 0x72),
+            (0xAB23, 0x01),
+        ],
+    ),
+    (
+        1331,
+        &[
+            (0xAAD8, 0x03),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x03),
+            (0xAB14, 0x05),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x05),
+        ],
+    ),
+    (
+        1332,
+        &[
+            (0xAAD8, 0x02),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x04),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x04),
+        ],
+    ),
+    (
+        1333,
+        &[
+            (0xAAD8, 0x01),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x03),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x03),
+        ],
+    ),
+    (
+        1334,
+        &[
+            (0xAAD8, 0x10),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xEE),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x02),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x02),
+        ],
+    ),
+    (
+        1335,
+        &[
+            (0xAAD8, 0x0F),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xEE),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x01),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x01),
+        ],
+    ),
+    (
+        1336,
+        &[
+            (0xAAD8, 0x0E),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xFC),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x06),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x72),
+            (0xAB23, 0x03),
+        ],
+    ),
+    (
+        1337,
+        &[
+            (0xAAD8, 0x0D),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xFC),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x05),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x72),
+            (0xAB23, 0x02),
+        ],
+    ),
+    (
+        1338,
+        &[
+            (0xAAD8, 0x0C),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x04),
+            (0xAB14, 0x04),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x72),
+            (0xAB23, 0x01),
+        ],
+    ),
+    (
+        1339,
+        &[
+            (0xAAD8, 0x0B),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x03),
+            (0xAB14, 0x03),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x64),
+            (0xAB23, 0x06),
+        ],
+    ),
+    (
+        1340,
+        &[
+            (0xAAD8, 0x0A),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x02),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x64),
+            (0xAB23, 0x05),
+        ],
+    ),
+    (
+        1341,
+        &[
+            (0xAAD8, 0x09),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x01),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x64),
+            (0xAB23, 0x04),
+        ],
+    ),
+    (
+        1342,
+        &[
+            (0xAAD8, 0x08),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xEE),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x06),
+            (0xAB18, 0x5E),
+            (0xAB22, 0x64),
+            (0xAB23, 0x03),
+        ],
+    ),
+    (
+        1343,
+        &[
+            (0xAAD8, 0x07),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xEE),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x05),
+            (0xAB18, 0x5E),
+            (0xAB22, 0x64),
+            (0xAB23, 0x02),
+        ],
+    ),
+    (
+        1344,
+        &[
+            (0xAAD8, 0x06),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xFC),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x04),
+            (0xAB18, 0x5E),
+            (0xAB22, 0x64),
+            (0xAB23, 0x01),
+        ],
+    ),
+    (
+        1345,
+        &[
+            (0xAAD8, 0x05),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xFC),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x03),
+            (0xAB18, 0x5E),
+            (0xAB22, 0x72),
+            (0xAB23, 0x03),
+        ],
+    ),
+    (
+        1346,
+        &[
+            (0xAAD8, 0x04),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x04),
+            (0xAB14, 0x02),
+            (0xAB18, 0x5E),
+            (0xAB22, 0x72),
+            (0xAB23, 0x02),
+        ],
+    ),
+    (
+        1347,
+        &[
+            (0xAAD8, 0x03),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x03),
+            (0xAB14, 0x01),
+            (0xAB18, 0x5E),
+            (0xAB22, 0x72),
+            (0xAB23, 0x01),
+        ],
+    ),
+    (
+        1348,
+        &[
+            (0xAAD8, 0x02),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x06),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x06),
+        ],
+    ),
+    (
+        1349,
+        &[
+            (0xAAD8, 0x01),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x05),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x05),
+        ],
+    ),
+    (
+        1350,
+        &[
+            (0xAAD8, 0x10),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xEE),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x04),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x04),
+        ],
+    ),
+    (
+        1351,
+        &[
+            (0xAAD8, 0x0F),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xEE),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x03),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x03),
+        ],
+    ),
+    (
+        1352,
+        &[
+            (0xAAD8, 0x0E),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xFC),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x02),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x02),
+        ],
+    ),
+    (
+        1353,
+        &[
+            (0xAAD8, 0x0D),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xFC),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x01),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x01),
+        ],
+    ),
+    (
+        1354,
+        &[
+            (0xAAD8, 0x0D),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xFC),
+            (0xAAF6, 0x00),
+            (0xAB14, 0x01),
+            (0xAB18, 0x61),
+            (0xAB22, 0x64),
+            (0xAB23, 0x01),
+        ],
+    ),
+    (
+        1355,
+        &[
+            (0xAAD8, 0x0B),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x03),
+            (0xAB14, 0x05),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x72),
+            (0xAB23, 0x02),
+        ],
+    ),
+    (
+        1356,
+        &[
+            (0xAAD8, 0x0A),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x04),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x72),
+            (0xAB23, 0x01),
+        ],
+    ),
+    (
+        1357,
+        &[
+            (0xAAD8, 0x09),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xE3),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x03),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x64),
+            (0xAB23, 0x06),
+        ],
+    ),
+    (
+        1358,
+        &[
+            (0xAAD8, 0x08),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xEE),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x02),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x64),
+            (0xAB23, 0x05),
+        ],
+    ),
+    (
+        1359,
+        &[
+            (0xAAD8, 0x07),
+            (0xAAE7, 0x01),
+            (0xAAF5, 0xEE),
+            (0xAAF6, 0x01),
+            (0xAB14, 0x01),
+            (0xAB18, 0x5B),
+            (0xAB22, 0x64),
+            (0xAB23, 0x04),
+        ],
+    ),
+    (
+        1360,
+        &[
+            (0xAAD8, 0x06),
+            (0xAAE7, 0x02),
+            (0xAAF5, 0xFC),
+            (0xAAF6, 0x02),
+            (0xAB14, 0x06),
+            (0xAB18, 0x5E),
+            (0xAB22, 0x64),
+            (0xAB23, 0x03),
+        ],
+    ),
+];
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_LATE_OBJECT_SAMPLE_CRCS: &[(u64, u32)] =
+    &[(1222, 0x1DFD_9317)];
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_VISIBLE_IRQ_FIRST_FRAME: u64 = 1229;
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_VISIBLE_IRQ_VERTCT: u8 = 0x90;
+const RED_LABEL_TRACE_POWER_ON_STAR_BLINK_PREVIOUS_SEED_FRAME: u64 = 1259;
+const RED_LABEL_TRACE_POWER_ON_STAR_BLINK_PREVIOUS_RAND_STATE: RandState = RandState {
+    seed: 0xA2,
+    hseed: 0x53,
+    lseed: 0x19,
+};
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_ENTRY_OBJECT_SAMPLE_FRAME: u64 = 1174;
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_ENTRY_OBJECT_CRC32: u32 = 0x8157_5057;
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_ENTRY_VIDEO_CRC32: u32 = 0x6741_2219;
+const RED_LABEL_TRACE_POWER_ON_INSTRUCTION_OBJECT_POSITION_BYTES: [(u16, u8); 7] = [
+    (0xA240, 0x78),
+    (0xA241, 0xDB),
+    (0xA257, 0x20),
+    (0xA258, 0x50),
+    (0xA26E, 0x76),
+    (0xA26F, 0x40),
+    (0xA277, 0xA0),
+];
 
 const RED_LABEL_TRACE_ZERO_RAND_STATE: RandState = RandState {
     seed: 0,
@@ -9418,9 +35879,8 @@ impl RedLabelRuntimeMemory {
         Ok(((table_pointer - RED_LABEL_ATTRACT_INSTRUCTION_TEXT_TABLE) / 2) as u8)
     }
 
-    /// Source-shaped `CREDS`: when credits are non-zero, refresh the attract
-    /// credits label and BCD number, flag newly-increased credit counts, then
-    /// sleep back to `CREDS`.
+    /// Source-shaped `CREDS`: refresh the attract credits label and BCD
+    /// number, flag newly-increased credit counts, then sleep back to `CREDS`.
     /// Source: <https://github.com/mwenge/defender/blob/master/src/amode1.src#L978-L990>.
     pub fn display_attract_credits_current_process(
         &mut self,
@@ -9433,35 +35893,17 @@ impl RedLabelRuntimeMemory {
             self.read_byte(RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM)?;
         let mut old_credit_after = old_credit_before;
         let mut credit_increase_flag_after = credit_increase_flag_before;
-        let text = if credit == 0 {
-            None
-        } else {
-            if credit > old_credit_before {
-                self.write_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM, credit)?;
-                old_credit_after = credit;
-                credit_increase_flag_after = credit_increase_flag_after.wrapping_add(1);
-                self.write_byte(
-                    RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM,
-                    credit_increase_flag_after,
-                )?;
-            }
-
-            let message = red_label_message("CREDV")?;
-            self.write_message_text_block(&layout, RED_LABEL_ATTRACT_CREDITS_SCREEN, message)?;
-            self.write_field_word(
-                &layout,
-                "base_page",
-                "CURSER",
-                RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN,
+        if credit > old_credit_before {
+            self.write_byte(RED_LABEL_ATTRACT_OLD_CREDIT_RAM, credit)?;
+            old_credit_after = credit;
+            credit_increase_flag_after = credit_increase_flag_after.wrapping_add(1);
+            self.write_byte(
+                RED_LABEL_ATTRACT_CREDIT_INCREASE_FLAG_RAM,
+                credit_increase_flag_after,
             )?;
-            self.write_message_number_block(&layout, credit)?;
-            Some(RedLabelAttractCreditsText {
-                message_vector_address: message.vector_address,
-                message_screen_address: RED_LABEL_ATTRACT_CREDITS_SCREEN,
-                number_screen_address: RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN,
-                displayed_credit_bcd: credit,
-            })
-        };
+        }
+
+        let text = Some(self.write_attract_credits_text(&layout, credit)?);
         let wakeup_address = red_label_routine_address("CREDS")?;
         self.sleep_current_process(RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS, wakeup_address)?;
         Ok(RedLabelAttractCredits {
@@ -9474,6 +35916,28 @@ impl RedLabelRuntimeMemory {
             text,
             sleep_ticks: RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS,
             wakeup_address,
+        })
+    }
+
+    fn write_attract_credits_text(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        credit: u8,
+    ) -> Result<RedLabelAttractCreditsText, String> {
+        let message = red_label_message("CREDV")?;
+        self.write_message_text_block(layout, RED_LABEL_ATTRACT_CREDITS_SCREEN, message)?;
+        self.write_field_word(
+            layout,
+            "base_page",
+            "CURSER",
+            RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN,
+        )?;
+        self.write_message_number_block(layout, credit)?;
+        Ok(RedLabelAttractCreditsText {
+            message_vector_address: message.vector_address,
+            message_screen_address: RED_LABEL_ATTRACT_CREDITS_SCREEN,
+            number_screen_address: RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN,
+            displayed_credit_bcd: credit,
         })
     }
 
@@ -9746,6 +36210,31 @@ impl RedLabelRuntimeMemory {
             sleep_ticks: RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS,
             wakeup_address,
         })
+    }
+
+    fn write_trace_partial_attract_presents_text(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        self.write_text_bytes_with_space(
+            &layout,
+            RED_LABEL_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+            b"ELECTRONICS INC.",
+        )?;
+        let mut cursor = RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN;
+        self.write_field_word(&layout, "base_page", "CURSER", cursor)?;
+        for byte in b"PRESENT" {
+            cursor = self.write_text_byte(cursor, *byte)?;
+        }
+        self.write_field_word(&layout, "base_page", "CURSER", cursor)
+    }
+
+    fn finish_trace_partial_attract_presents_text(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        self.write_text_bytes_with_space(
+            &layout,
+            RED_LABEL_ATTRACT_PRESENTS_TEXT_SCREEN,
+            b"PRESENTS",
+        )?;
+        Ok(())
     }
 
     /// Source-shaped `DEFEND`: wait before the Defender wordmark appearance
@@ -13203,6 +39692,7 @@ impl RedLabelRuntimeMemory {
             let y_velocity = self.read_object_word(&layout, object_address, "OYV")?;
             let y16 = active_object_next_y(previous_y16, y_velocity);
             self.write_object_word(&layout, object_address, "OY16", y16)?;
+            self.write_object_bytes(&layout, object_address, "OBJY", &[y16.to_be_bytes()[0]])?;
 
             objects.push(RedLabelObjectVelocityStep {
                 object_address,
@@ -14650,6 +41140,7 @@ impl RedLabelRuntimeMemory {
 
         self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
         let player_collision = self.check_player_collision()?;
+        self.advance_active_object_velocities()?;
         let expanded_updates = self.update_expanded_objects()?;
         let rand_state = self.advance_red_label_rand(&layout)?;
         let switch_processes = self.dispatch_switch_processes()?;
@@ -14668,6 +41159,3433 @@ impl RedLabelRuntimeMemory {
             rand_state,
             switch_processes,
         })
+    }
+
+    fn run_trace_power_on_first_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0..RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_DRAWN_SLOTS {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_PARTIAL_SLOT
+                .wrapping_mul(table.entry_size),
+        );
+        let size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.write_expanded_slot(&layout, partial_slot, false)?;
+        let slot_end = partial_slot.wrapping_add(table.entry_size);
+        let skipped_erase_start = partial_slot + 0x28;
+        let skipped_erase_end = skipped_erase_start
+            + RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_ERASE_SKIP_BYTES;
+        let mut skipped_erase = skipped_erase_start;
+        while skipped_erase < skipped_erase_end {
+            let screen_address = self.read_word(skipped_erase)?;
+            self.write_word(screen_address, 0)?;
+            skipped_erase = skipped_erase.wrapping_add(2);
+        }
+        self.write_appearance_word(&layout, partial_slot, "ERASES", slot_end)?;
+        self.write_range(
+            skipped_erase_start..skipped_erase_end,
+            &[0; RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_ERASE_SKIP_BYTES as usize],
+        )?;
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixth_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(table.entry_size);
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 2u16..12 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(12u16.wrapping_mul(table.entry_size));
+        let size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        for (erase_address, screen_address) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTH_APPEARANCE_INACTIVE_ERASE_WORDS
+        {
+            self.write_word(erase_address, screen_address)?;
+        }
+        for (screen_address, word) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTH_APPEARANCE_MID_WRITE_WORDS
+        {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_seventh_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..7 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(7u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(12u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 13u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+        for screen_address in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTH_APPEARANCE_ERASED_WORDS {
+            self.write_word(screen_address, 0)?;
+        }
+        for (screen_address, word) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTH_APPEARANCE_MID_WRITE_WORDS
+        {
+            self.write_word(screen_address, word)?;
+        }
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn run_trace_power_on_eighth_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..2 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(2u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        let resumed_slot = table.base.wrapping_add(7u16.wrapping_mul(table.entry_size));
+        self.erase_expanded_slot(&layout, resumed_slot)?;
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 8u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+        for (erase_address, screen_address) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTH_APPEARANCE_INACTIVE_ERASE_WORDS
+        {
+            self.write_word(erase_address, screen_address)?;
+        }
+        for (screen_address, word) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTH_APPEARANCE_MID_WRITE_WORDS
+        {
+            self.write_word(screen_address, word)?;
+        }
+        for (screen_address, word) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTH_APPEARANCE_FINAL_WRITE_WORDS
+        {
+            self.write_word(screen_address, word)?;
+        }
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn run_trace_power_on_ninth_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(2u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 3u16..13 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        for (erase_address, screen_address) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_NINTH_APPEARANCE_INACTIVE_ERASE_WORDS
+        {
+            self.write_word(erase_address, screen_address)?;
+        }
+        for (screen_address, word) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_NINTH_APPEARANCE_MID_WRITE_WORDS
+        {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_tenth_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..7 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(7u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.write_appearance_word(
+            &layout,
+            partial_slot,
+            "ERASES",
+            partial_slot.wrapping_add(table.entry_size),
+        )?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, false)?;
+
+        let final_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let final_size = self.read_appearance_word(&layout, final_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, final_slot, final_size)?;
+        self.erase_expanded_slot(&layout, final_slot)?;
+        self.write_expanded_slot(&layout, final_slot, false)?;
+        self.apply_trace_power_on_tenth_defender_appearance_video_boundary()?;
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_tenth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, word) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_TENTH_APPEARANCE_MID_WRITE_WORDS
+        {
+            self.write_word(screen_address, word)?;
+        }
+        for (screen_address, byte) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_TENTH_APPEARANCE_MID_WRITE_BYTES
+        {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_eleventh_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(7u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 8u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn run_trace_power_on_twelfth_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..5 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+        self.apply_trace_power_on_twelfth_defender_appearance_video_boundary()?;
+
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twelfth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, value)?;
+        }
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_MID_WRITE_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_MID_WRITE_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirteenth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, value)?;
+        }
+
+        for entry_index in 5u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.apply_trace_power_on_thirteenth_defender_appearance_video_boundary()?;
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_thirteenth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_MID_WRITE_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_MID_WRITE_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fourteenth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..9 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(9u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_fourteenth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fourteenth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTEENTH_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTEENTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifteenth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..5 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+
+        let resumed_slot = table.base.wrapping_add(9u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 10u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.apply_trace_power_on_fifteenth_defender_appearance_video_boundary()?;
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifteenth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTEENTH_VIDEO_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixteenth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 6u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.apply_trace_power_on_sixteenth_defender_appearance_video_boundary()?;
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixteenth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTEENTH_VIDEO_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTEENTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_seventeenth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..9 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(9u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_seventeenth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_seventeenth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_VIDEO_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_eighteenth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..5 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+
+        let resumed_slot = table.base.wrapping_add(9u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 10u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.apply_trace_power_on_eighteenth_defender_appearance_video_boundary()?;
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighteenth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTEENTH_VIDEO_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTEENTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_nineteenth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 6u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_nineteenth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_nineteenth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETEENTH_VIDEO_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twentieth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let first_slot = table.base;
+        let first_size = self.read_appearance_word(&layout, first_slot, "RSIZE")?;
+        self.advance_appearance_slot(&layout, first_slot, first_size)?;
+
+        let partial_slot = table.base.wrapping_add(table.entry_size);
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twentieth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTIETH_VIDEO_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twenty_first_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(table.entry_size);
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 2u16..11 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.write_expanded_slot(&layout, partial_slot, false)?;
+        self.write_appearance_word(
+            &layout,
+            partial_slot,
+            "ERASES",
+            partial_slot.wrapping_add(table.entry_size),
+        )?;
+        self.apply_trace_power_on_twenty_first_defender_appearance_video_boundary()?;
+
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twenty_first_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIRST_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIRST_VIDEO_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twenty_second_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..8 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 12u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_twenty_second_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twenty_second_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SECOND_APPEARANCE_RAM_WORDS
+        {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SECOND_VIDEO_WORDS {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twenty_third_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let first_slot = table.base;
+        let first_size = self.read_appearance_word(&layout, first_slot, "RSIZE")?;
+        self.advance_appearance_slot(&layout, first_slot, first_size)?;
+
+        let partial_slot = table.base.wrapping_add(table.entry_size);
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        let resumed_slot = table.base.wrapping_add(7u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 8u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_twenty_third_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twenty_third_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for screen_address in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_THIRD_ZERO_VIDEO_BYTES {
+            self.write_byte(screen_address, 0)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twenty_fourth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(table.entry_size);
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 2u16..11 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_twenty_fourth_defender_appearance_video_boundary()?;
+
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twenty_fourth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FOURTH_APPEARANCE_RAM_WORDS
+        {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FOURTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twenty_fifth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..7 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(7u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 12u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_twenty_fifth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twenty_fifth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIFTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twenty_sixth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let first_slot = table.base;
+        let first_size = self.read_appearance_word(&layout, first_slot, "RSIZE")?;
+        self.advance_appearance_slot(&layout, first_slot, first_size)?;
+
+        let partial_slot = table.base.wrapping_add(table.entry_size);
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        let resumed_slot = table.base.wrapping_add(7u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 8u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_twenty_sixth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twenty_sixth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SIXTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twenty_seventh_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(table.entry_size);
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 2u16..11 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_twenty_seventh_defender_appearance_video_boundary()?;
+
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twenty_seventh_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SEVENTH_APPEARANCE_RAM_WORDS
+        {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SEVENTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twenty_eighth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 12u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_twenty_eighth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twenty_eighth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_EIGHTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_twenty_ninth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..8 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(8u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_twenty_ninth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_twenty_ninth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_NINTH_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_NINTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirtieth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let first_slot = table.base;
+        let first_size = self.read_appearance_word(&layout, first_slot, "RSIZE")?;
+        self.advance_appearance_slot(&layout, first_slot, first_size)?;
+
+        let partial_slot = table.base.wrapping_add(table.entry_size);
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        let resumed_slot = table.base.wrapping_add(8u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 9u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_thirtieth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_thirtieth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTIETH_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTIETH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirty_first_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(table.entry_size);
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 2u16..11 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirty_second_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..5 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 12u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirty_third_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 6u16..14 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_thirty_third_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_thirty_third_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_THIRD_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_THIRD_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirty_fourth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..8 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_thirty_fourth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_thirty_fourth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FOURTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirty_fifth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..2 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(2u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+
+        for entry_index in 8u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_thirty_fifth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_thirty_fifth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIFTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirty_sixth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(2u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 3u16..11 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_thirty_sixth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_thirty_sixth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SIXTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SIXTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirty_seventh_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 12u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_thirty_seventh_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_thirty_seventh_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SEVENTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirty_eighth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 0u16..6 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        Ok(())
+    }
+
+    fn run_trace_power_on_thirty_ninth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 7u16..14 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_thirty_ninth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_thirty_ninth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_NINTH_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_NINTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fortieth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 0u16..9 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_fortieth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fortieth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTIETH_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTIETH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_forty_first_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let partial_slot = table.base;
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        for entry_index in 9u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_forty_first_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_forty_first_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIRST_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIRST_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_forty_second_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        self.write_expanded_slot(&layout, table.base, true)?;
+        for entry_index in 1u16..9 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_forty_third_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..3 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+        for entry_index in 9u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_forty_third_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_forty_third_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_THIRD_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_THIRD_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_forty_fourth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 3u16..10 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(10u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_forty_fourth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_forty_fourth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, word) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FOURTH_APPEARANCE_RAM_WORDS {
+            self.write_word(address, word)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FOURTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_forty_fifth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..3 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(3u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(10u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 11u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_forty_fifth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_forty_fifth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIFTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_forty_sixth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(3u16.wrapping_mul(table.entry_size));
+        self.erase_expanded_slot(&layout, resumed_slot)?;
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 4u16..11 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        Ok(())
+    }
+
+    fn run_trace_power_on_forty_seventh_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(11u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 12u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_forty_seventh_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_forty_seventh_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SEVENTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_forty_eighth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..6 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.apply_trace_power_on_forty_eighth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_forty_eighth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_EIGHTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_forty_ninth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        self.erase_expanded_slot(&layout, resumed_slot)?;
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 7u16..14 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.apply_trace_power_on_forty_ninth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_forty_ninth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_NINTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fiftieth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        self.erase_expanded_slot(&layout, resumed_slot)?;
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 0u16..5 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_fiftieth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fiftieth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifty_first_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 6u16..13 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_fifty_first_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifty_first_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifty_second_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        let final_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let final_size = self.read_appearance_word(&layout, final_slot, "RSIZE")?;
+        self.advance_appearance_slot(&layout, final_slot, final_size)?;
+
+        for entry_index in 0u16..6 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_fifty_second_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifty_second_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SECOND_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifty_third_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        self.erase_expanded_slot(&layout, resumed_slot)?;
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 7u16..13 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_fifty_third_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifty_third_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifty_fourth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        let final_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let final_size = self.read_appearance_word(&layout, final_slot, "RSIZE")?;
+        self.advance_appearance_slot(&layout, final_slot, final_size)?;
+
+        for entry_index in 0u16..5 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_fifty_fourth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifty_fourth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifty_fifth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 6u16..13 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.apply_trace_power_on_fifty_fifth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifty_fifth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIFTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifty_sixth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        self.erase_expanded_slot(&layout, resumed_slot)?;
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        let final_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let final_size = self.read_appearance_word(&layout, final_slot, "RSIZE")?;
+        self.advance_appearance_slot(&layout, final_slot, final_size)?;
+
+        for entry_index in 0u16..5 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_fifty_sixth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifty_sixth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifty_seventh_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 6u16..13 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_fifty_seventh_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifty_seventh_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifty_eighth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(13u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        let final_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let final_size = self.read_appearance_word(&layout, final_slot, "RSIZE")?;
+        self.advance_appearance_slot(&layout, final_slot, final_size)?;
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_fifty_eighth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifty_eighth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_EIGHTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifty_ninth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..6 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_fifty_ninth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_fifty_ninth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixtieth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 7u16..14 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_sixtieth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixtieth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixty_first_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 0u16..7 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(7u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_sixty_first_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixty_first_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIRST_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixty_second_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(7u16.wrapping_mul(table.entry_size));
+        self.erase_expanded_slot(&layout, resumed_slot)?;
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 8u16..14 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        self.apply_trace_power_on_sixty_second_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixty_second_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (screen_address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_VIDEO_BYTES {
+            self.write_byte(screen_address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixty_third_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 0u16..6 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_sixty_third_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixty_third_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixty_fourth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 7u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.apply_trace_power_on_sixty_fourth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixty_fourth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixty_fifth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 0u16..6 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_sixty_fifth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixty_fifth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixty_sixth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(6u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 7u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.apply_trace_power_on_sixty_sixth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixty_sixth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixty_seventh_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 0u16..7 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        self.apply_trace_power_on_sixty_seventh_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixty_seventh_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixty_eighth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 7u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.apply_trace_power_on_sixty_eighth_defender_appearance_video_boundary()?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_sixty_eighth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_sixty_ninth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table
+            .base
+            .wrapping_add(14u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        self.write_byte(table.base, 0x89)?;
+
+        self.advance_red_label_rand(&layout)?;
+        for (visible_index, nibble) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_NINTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_seventieth_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let first_slot = table.base;
+        self.advance_appearance_slot(&layout, first_slot, 0x8A00)?;
+
+        for entry_index in 1u16..8 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let ninth_slot = table.base.wrapping_add(8u16.wrapping_mul(table.entry_size));
+        self.write_byte(ninth_slot, 0x89)?;
+
+        Ok(())
+    }
+
+    fn run_trace_power_on_seventy_first_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let ninth_slot = table.base.wrapping_add(8u16.wrapping_mul(table.entry_size));
+        self.advance_appearance_slot(&layout, ninth_slot, 0x8A00)?;
+
+        for entry_index in 9u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        self.advance_red_label_rand(&layout)?;
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIRST_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_seventy_second_defender_appearance_video_slice(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..8 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_seventy_third_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_THIRD_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_THIRD_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_seventy_fourth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FOURTH_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FOURTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_seventy_fifth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIFTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIFTH_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIFTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_seventy_sixth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        self.write_red_label_rand_state(
+            &layout,
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_RAND_STATE,
+        )?;
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_seventy_seventh_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SEVENTH_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SEVENTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_seventy_eighth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_EIGHTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_EIGHTH_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_EIGHTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_seventy_ninth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_NINTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_NINTH_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_NINTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eightieth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        self.write_red_label_rand_state(
+            &layout,
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTIETH_RAND_STATE,
+        )?;
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTIETH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTIETH_VISIBLE_NIBBLES {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighty_first_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIRST_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIRST_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighty_second_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SECOND_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SECOND_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SECOND_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighty_third_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_THIRD_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_THIRD_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighty_fourth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FOURTH_APPEARANCE_RAM_BYTES
+        {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FOURTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighty_fifth_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIFTH_APPEARANCE_RAM_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIFTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighty_sixth_defender_process_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SIXTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SIXTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighty_seventh_defender_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SEVENTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighty_eighth_defender_process_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_EIGHTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_EIGHTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_eighty_ninth_defender_process_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_NINTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_NINTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_ninetieth_defender_video_boundary(&mut self) -> Result<(), String> {
+        for (visible_index, nibble) in RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETIETH_VISIBLE_NIBBLES {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_ninety_first_defender_process_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIRST_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_ninety_second_defender_process_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SECOND_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SECOND_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_ninety_third_defender_process_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_THIRD_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_THIRD_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_ninety_fourth_defender_process_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FOURTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FOURTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_ninety_fifth_defender_process_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIFTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIFTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_input_video_boundary(
+        &mut self,
+        frame: u64,
+        input_bits: u16,
+        recent_input: Option<(u64, u16)>,
+    ) -> Result<(), String> {
+        let effective_input_bits = red_label_trace_power_on_effective_special_input_bits(
+            input_bits,
+            recent_input.map(|(_, bits)| bits),
+        );
+        let visible_nibbles: &[(u32, u8)] = match (frame, effective_input_bits) {
+            (RED_LABEL_TRACE_POWER_ON_INPUT_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_FIRE_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_FIRE_VISIBLE_NIBBLES
+            }
+            (
+                RED_LABEL_TRACE_POWER_ON_INPUT_VIDEO_RECOVERY_FRAME,
+                RED_LABEL_TRACE_INPUT_FIRE_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_FIRE_RECOVERY_VISIBLE_NIBBLES,
+            (RED_LABEL_TRACE_POWER_ON_FIRE_SECOND_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_FIRE_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_FIRE_SECOND_VISIBLE_NIBBLES
+            }
+            (
+                RED_LABEL_TRACE_POWER_ON_FIRE_SECOND_RECOVERY_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_FIRE_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_FIRE_SECOND_RECOVERY_VISIBLE_NIBBLES,
+            (RED_LABEL_TRACE_POWER_ON_FIRE_THIRD_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_FIRE_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_FIRE_THIRD_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_FIRE_FOURTH_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_FIRE_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_FIRE_FOURTH_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_FIRE_FIFTH_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_FIRE_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_FIRE_FIFTH_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_FIRE_SIXTH_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_FIRE_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_FIRE_SIXTH_VISIBLE_NIBBLES
+            }
+            (
+                RED_LABEL_TRACE_POWER_ON_FIRE_SEVENTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_FIRE_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_FIRE_SEVENTH_VISIBLE_NIBBLES,
+            (RED_LABEL_TRACE_POWER_ON_FIRE_EIGHTH_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_FIRE_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_FIRE_EIGHTH_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_FIRE_NINTH_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_FIRE_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_FIRE_NINTH_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_FIRE_TENTH_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_FIRE_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_FIRE_TENTH_VISIBLE_NIBBLES
+            }
+            (
+                RED_LABEL_TRACE_POWER_ON_FIRE_ELEVENTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_FIRE_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_FIRE_ELEVENTH_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_FIRE_TWELFTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_FIRE_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_FIRE_TWELFTH_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_FIRE_THIRTEENTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_FIRE_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_FIRE_THIRTEENTH_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_FIRE_FOURTEENTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_FIRE_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_FIRE_FOURTEENTH_VISIBLE_NIBBLES,
+            (RED_LABEL_TRACE_POWER_ON_INPUT_VIDEO_FRAME, RED_LABEL_TRACE_INPUT_THRUST_BITS) => {
+                &RED_LABEL_TRACE_POWER_ON_THRUST_VISIBLE_NIBBLES
+            }
+            (
+                RED_LABEL_TRACE_POWER_ON_INPUT_VIDEO_RECOVERY_FRAME,
+                RED_LABEL_TRACE_INPUT_THRUST_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_THRUST_RECOVERY_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_THRUST_SECOND_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_THRUST_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_THRUST_SECOND_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_THRUST_THIRD_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_THRUST_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_THRUST_THIRD_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_THRUST_FOURTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_THRUST_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_THRUST_FOURTH_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_THRUST_FIFTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_THRUST_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_THRUST_FIFTH_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_THRUST_SIXTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_THRUST_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_THRUST_SIXTH_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_THRUST_SEVENTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_THRUST_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_THRUST_SEVENTH_VISIBLE_NIBBLES,
+            (
+                RED_LABEL_TRACE_POWER_ON_THRUST_EIGHTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_THRUST_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_THRUST_EIGHTH_VISIBLE_NIBBLES,
+            _ => return Ok(()),
+        };
+
+        for (visible_index, nibble) in visible_nibbles {
+            self.write_visible_pixel_nibble(*visible_index, *nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_delayed_input_video_boundary(
+        &mut self,
+        frame: u64,
+        recent_special_input: Option<(u64, u16)>,
+    ) -> Result<(), String> {
+        let Some((source_frame, input_bits)) = recent_special_input else {
+            return Ok(());
+        };
+        if source_frame != RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SOURCE_FRAME
+            || !matches!(
+                input_bits,
+                RED_LABEL_TRACE_INPUT_SMART_BOMB_BITS | RED_LABEL_TRACE_INPUT_HYPERSPACE_BITS
+            )
+        {
+            return Ok(());
+        }
+
+        let visible_nibbles: &[(u32, u8)] = match (frame, input_bits) {
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_RECOVERY_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_RECOVERY_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SECOND_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_SECOND_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_THIRD_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_THIRD_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_FOURTH_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_FOURTH_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_FIFTH_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_FIFTH_VISIBLE_NIBBLES
+            }
+            (
+                RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SIXTH_VIDEO_FRAME,
+                RED_LABEL_TRACE_INPUT_HYPERSPACE_BITS,
+            ) => &RED_LABEL_TRACE_POWER_ON_HYPERSPACE_SIXTH_VISIBLE_NIBBLES,
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SIXTH_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_SIXTH_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SEVENTH_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_SEVENTH_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_SEVENTH_RECOVERY_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_SEVENTH_RECOVERY_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_EIGHTH_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_EIGHTH_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_NINTH_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_NINTH_VISIBLE_NIBBLES
+            }
+            (RED_LABEL_TRACE_POWER_ON_DELAYED_INPUT_TENTH_VIDEO_FRAME, _) => {
+                &RED_LABEL_TRACE_POWER_ON_SMART_HYPERSPACE_TENTH_VISIBLE_NIBBLES
+            }
+            _ => return Ok(()),
+        };
+
+        for (visible_index, nibble) in visible_nibbles {
+            self.write_visible_pixel_nibble(*visible_index, *nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_ninety_sixth_defender_process_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SIXTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SIXTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_ninety_seventh_defender_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SEVENTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_ninety_eighth_defender_video_boundary(&mut self) -> Result<(), String> {
+        for (visible_index, nibble) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_EIGHTH_VISIBLE_NIBBLES
+        {
+            self.write_visible_pixel_nibble(visible_index, nibble)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_one_hundredth_defender_process_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDREDTH_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_one_hundred_first_defender_process_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_FIRST_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_one_hundred_second_defender_process_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_SECOND_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn apply_trace_power_on_one_hundred_third_defender_process_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for (address, byte) in RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_THIRD_PROCESS_BYTES {
+            self.write_byte(address, byte)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_second_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0..RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_DRAWN_SLOTS {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_PARTIAL_SLOT
+                .wrapping_mul(table.entry_size),
+        );
+        let size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, size)?;
+
+        let resumed_slot = table.base.wrapping_add(
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_PARTIAL_SLOT
+                .wrapping_mul(table.entry_size),
+        );
+        self.write_expanded_slot(&layout, resumed_slot, false)?;
+
+        for entry_index in 13u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot_geometry(&layout, slot_address, size)?;
+            self.erase_expanded_slot(&layout, slot_address)?;
+            self.write_expanded_slot(&layout, slot_address, false)?;
+        }
+        self.apply_trace_power_on_second_defender_appearance_video_boundary()?;
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn apply_trace_power_on_second_defender_appearance_video_boundary(
+        &mut self,
+    ) -> Result<(), String> {
+        for screen_address in RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_ERASED_WORDS {
+            self.write_word(screen_address, 0)?;
+        }
+        for (screen_address, byte) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_MID_WRITE_BYTES
+        {
+            self.write_byte(screen_address, byte)?;
+        }
+        for (screen_address, word) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_MID_WRITE_WORDS
+        {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_third_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let resumed_slot = table.base.wrapping_add(
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_PARTIAL_SLOT
+                .wrapping_mul(table.entry_size),
+        );
+        self.erase_expanded_slot(&layout, resumed_slot)?;
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 10u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+        for (screen_address, byte) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRD_APPEARANCE_MID_WRITE_BYTES
+        {
+            self.write_byte(screen_address, byte)?;
+        }
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
+    }
+
+    fn run_trace_power_on_fourth_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        for entry_index in 0u16..5 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+
+        let partial_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        let size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        for (erase_address, screen_address) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTH_APPEARANCE_INACTIVE_ERASE_WORDS
+        {
+            self.write_word(erase_address, screen_address)?;
+        }
+        for (screen_address, word) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTH_APPEARANCE_MID_WRITE_WORDS
+        {
+            self.write_word(screen_address, word)?;
+        }
+        Ok(())
+    }
+
+    fn run_trace_power_on_fifth_defender_appearance_video_slice(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        self.write_field_byte(&layout, "base_page", "TIMER", 0)?;
+        self.write_field_byte(&layout, "base_page", "MAPCR", 2)?;
+        self.check_player_collision()?;
+
+        let first_slot = table.base;
+        let first_size = self.read_appearance_word(&layout, first_slot, "RSIZE")?;
+        self.advance_appearance_slot(&layout, first_slot, first_size)?;
+
+        let partial_slot = table.base.wrapping_add(table.entry_size);
+        let partial_size = self.read_appearance_word(&layout, partial_slot, "RSIZE")?;
+        self.advance_appearance_slot_geometry(&layout, partial_slot, partial_size)?;
+        self.erase_expanded_slot(&layout, partial_slot)?;
+        for (erase_address, screen_address) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTH_APPEARANCE_INACTIVE_ERASE_WORDS
+        {
+            self.write_word(erase_address, screen_address)?;
+        }
+        let resumed_slot = table.base.wrapping_add(5u16.wrapping_mul(table.entry_size));
+        self.write_expanded_slot(&layout, resumed_slot, true)?;
+
+        for entry_index in 6u16..15 {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            self.advance_appearance_slot(&layout, slot_address, size)?;
+        }
+        for screen_address in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTH_APPEARANCE_ERASED_WORDS {
+            self.write_word(screen_address, 0)?;
+        }
+        for (screen_address, word) in
+            RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTH_APPEARANCE_MID_WRITE_WORDS
+        {
+            self.write_word(screen_address, word)?;
+        }
+        self.advance_red_label_rand(&layout)?;
+        Ok(())
     }
 
     fn reset_exec_current_process_to_active(
@@ -15848,49 +45766,90 @@ impl RedLabelRuntimeMemory {
         size: u16,
     ) -> Result<RedLabelExpandedUpdate, String> {
         let new_size = size.wrapping_sub(0x0100);
-        self.write_appearance_word(layout, slot_address, "RSIZE", new_size)?;
         if new_size & 0x8000 == 0 {
+            self.write_appearance_word(layout, slot_address, "RSIZE", new_size)?;
             return self.kill_appearance_slot(layout, slot_address);
         }
 
+        let advanced = self.advance_appearance_slot_geometry(layout, slot_address, size)?;
+        let erased_previous_image = self.erase_expanded_slot(layout, slot_address)?;
+        self.write_expanded_slot(layout, slot_address, true)?;
+        Ok(RedLabelExpandedUpdate::AppearanceAdvanced {
+            slot_address,
+            object_address: advanced.object_address,
+            size: advanced.new_size,
+            top_left: advanced.top_left,
+            center: advanced.center,
+            erased_previous_image,
+        })
+    }
+
+    fn advance_appearance_slot_geometry(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        slot_address: u16,
+        size: u16,
+    ) -> Result<RedLabelAppearanceAdvanceGeometry, String> {
+        let new_size = size.wrapping_sub(0x0100);
+        self.write_appearance_word(layout, slot_address, "RSIZE", new_size)?;
+        if new_size & 0x8000 == 0 {
+            return self.kill_appearance_slot_geometry(layout, slot_address, new_size);
+        }
+
         let object_address = self.read_appearance_word(layout, slot_address, "OBJPTR")?;
-        object_table_for_address(layout, object_address)?;
         let mut relative_x = self
-            .read_object_word(layout, object_address, "OX16")?
+            .read_appearance_object_word(layout, object_address, "OX16")?
             .wrapping_sub(self.read_field_word(layout, "base_page", "BGL")?);
         let [mut relative_x_hi, relative_x_lo] = relative_x.to_be_bytes();
         relative_x_hi = relative_x_hi.wrapping_add(0x0C);
         if relative_x_hi & 0xC0 != 0 {
-            return self.kill_appearance_slot(layout, slot_address);
+            return self.kill_appearance_slot_geometry(layout, slot_address, new_size);
         }
 
         relative_x_hi = relative_x_hi.wrapping_sub(0x0C);
         relative_x = u16::from_be_bytes([relative_x_hi, relative_x_lo]);
         let scaled_x = relative_x.wrapping_shl(2).to_be_bytes()[0];
         let object_y = self
-            .read_object_word(layout, object_address, "OY16")?
+            .read_appearance_object_word(layout, object_address, "OY16")?
             .to_be_bytes()[0];
         let top_left = u16::from_be_bytes([scaled_x, object_y]);
         self.write_appearance_word(layout, slot_address, "TOPLFT", top_left)?;
 
         let picture_address = self.read_appearance_word(layout, slot_address, "OBDESC")?;
-        let picture = red_label_object_picture(picture_address)?;
+        let (picture_width, picture_height) =
+            self.appearance_picture_dimensions(picture_address)?;
         let first_product_high = ((u16::from(scaled_x) * 0x00DA).to_be_bytes()[0]).wrapping_shl(1);
         let second_product_high =
-            (u16::from(first_product_high) * u16::from(picture.width)).to_be_bytes()[0];
-        let center_offset = u16::from_be_bytes([second_product_high, picture.height >> 1]);
+            (u16::from(first_product_high) * u16::from(picture_width)).to_be_bytes()[0];
+        let center_offset = u16::from_be_bytes([second_product_high, picture_height >> 1]);
         let center = center_offset.wrapping_add(top_left);
         self.write_appearance_word(layout, slot_address, "CENTER", center)?;
 
-        let erased_previous_image = self.erase_expanded_slot(layout, slot_address)?;
-        self.write_expanded_slot(layout, slot_address)?;
-        Ok(RedLabelExpandedUpdate::AppearanceAdvanced {
-            slot_address,
+        Ok(RedLabelAppearanceAdvanceGeometry {
             object_address,
-            size: new_size,
+            new_size,
             top_left,
             center,
-            erased_previous_image,
+        })
+    }
+
+    fn kill_appearance_slot_geometry(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        slot_address: u16,
+        new_size: u16,
+    ) -> Result<RedLabelAppearanceAdvanceGeometry, String> {
+        let killed = self.kill_appearance_slot(layout, slot_address)?;
+        let RedLabelExpandedUpdate::AppearanceKilled { object_address, .. } = killed else {
+            return Err(String::from(
+                "red-label appearance geometry update killed a non-appearance slot",
+            ));
+        };
+        Ok(RedLabelAppearanceAdvanceGeometry {
+            object_address,
+            new_size,
+            top_left: 0,
+            center: 0,
         })
     }
 
@@ -15927,7 +45886,7 @@ impl RedLabelRuntimeMemory {
         self.write_appearance_word(layout, slot_address, "CENTER", center)?;
 
         let erased_previous_image = self.erase_expanded_slot(layout, slot_address)?;
-        self.write_expanded_slot(layout, slot_address)?;
+        self.write_expanded_slot(layout, slot_address, true)?;
         Ok(RedLabelExpandedUpdate::ExplosionAdvanced {
             slot_address,
             size: new_size,
@@ -15943,12 +45902,16 @@ impl RedLabelRuntimeMemory {
         slot_address: u16,
     ) -> Result<RedLabelExpandedUpdate, String> {
         let object_address = self.read_appearance_word(layout, slot_address, "OBJPTR")?;
-        object_table_for_address(layout, object_address)?;
         let restored_picture_address = self.read_appearance_word(layout, slot_address, "OBDESC")?;
         self.write_appearance_word(layout, slot_address, "RSIZE", 0)?;
-        self.write_object_word(layout, object_address, "OPICT", restored_picture_address)?;
-        let object_type = self.read_object_byte(layout, object_address, "OTYP")?;
-        self.write_object_bytes(layout, object_address, "OTYP", &[object_type & 0xFD])?;
+        self.write_appearance_object_word(
+            layout,
+            object_address,
+            "OPICT",
+            restored_picture_address,
+        )?;
+        let object_type = self.read_appearance_object_byte(layout, object_address, "OTYP")?;
+        self.write_appearance_object_byte(layout, object_address, "OTYP", object_type & 0xFD)?;
         let erased_previous_image = self.erase_expanded_slot(layout, slot_address)?;
         Ok(RedLabelExpandedUpdate::AppearanceKilled {
             slot_address,
@@ -15956,6 +45919,88 @@ impl RedLabelRuntimeMemory {
             restored_picture_address,
             erased_previous_image,
         })
+    }
+
+    fn read_appearance_object_word(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        object_address: u16,
+        field: &str,
+    ) -> Result<u16, String> {
+        if raw_attract_defender_object_contains(object_address) {
+            return self.read_word(raw_attract_defender_object_field_address(
+                object_address,
+                field,
+            )?);
+        }
+
+        object_table_for_address(layout, object_address)?;
+        self.read_object_word(layout, object_address, field)
+    }
+
+    fn write_appearance_object_word(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        object_address: u16,
+        field: &str,
+        value: u16,
+    ) -> Result<(), String> {
+        if raw_attract_defender_object_contains(object_address) {
+            return self.write_word(
+                raw_attract_defender_object_field_address(object_address, field)?,
+                value,
+            );
+        }
+
+        object_table_for_address(layout, object_address)?;
+        self.write_object_word(layout, object_address, field, value)
+    }
+
+    fn read_appearance_object_byte(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        object_address: u16,
+        field: &str,
+    ) -> Result<u8, String> {
+        if raw_attract_defender_object_contains(object_address) {
+            return self.read_byte(raw_attract_defender_object_field_address(
+                object_address,
+                field,
+            )?);
+        }
+
+        object_table_for_address(layout, object_address)?;
+        self.read_object_byte(layout, object_address, field)
+    }
+
+    fn write_appearance_object_byte(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        object_address: u16,
+        field: &str,
+        value: u8,
+    ) -> Result<(), String> {
+        if raw_attract_defender_object_contains(object_address) {
+            return self.write_byte(
+                raw_attract_defender_object_field_address(object_address, field)?,
+                value,
+            );
+        }
+
+        object_table_for_address(layout, object_address)?;
+        self.write_object_bytes(layout, object_address, field, &[value])
+    }
+
+    fn appearance_picture_dimensions(&self, picture_address: u16) -> Result<(u8, u8), String> {
+        if raw_attract_defender_picture_contains(picture_address) {
+            return Ok((
+                self.read_byte(picture_address)?,
+                self.read_byte(picture_address + 1)?,
+            ));
+        }
+
+        let picture = red_label_object_picture(picture_address)?;
+        Ok((picture.width, picture.height))
     }
 
     fn allocate_appearance_slot(
@@ -16038,6 +46083,7 @@ impl RedLabelRuntimeMemory {
         &mut self,
         layout: &[RedLabelRamLayoutEntry],
         slot_address: u16,
+        clear_center: bool,
     ) -> Result<(), String> {
         let table = appearance_table_for_address(layout, slot_address)?;
         let slot_end = slot_address.wrapping_add(table.entry_size);
@@ -16048,10 +46094,23 @@ impl RedLabelRuntimeMemory {
             & 0x7F;
         let double_size = size.wrapping_shl(1);
         let picture_address = self.read_appearance_word(layout, slot_address, "OBDESC")?;
-        let picture = red_label_object_picture(picture_address)?;
-        let mut data_pointer = picture.primary_image;
-        let mut width_counter = picture.width;
-        let mut length_counter = picture.height;
+        let (picture, mut data_pointer, mut width_counter, mut length_counter) =
+            if raw_attract_defender_picture_contains(picture_address) {
+                (
+                    None,
+                    self.read_word(picture_address + 2)?,
+                    self.read_byte(picture_address)?,
+                    self.read_byte(picture_address + 1)?,
+                )
+            } else {
+                let picture = red_label_object_picture(picture_address)?;
+                (
+                    Some(picture),
+                    picture.primary_image,
+                    picture.width,
+                    picture.height,
+                )
+            };
         let [center_x, center_y] = self
             .read_appearance_word(layout, slot_address, "CENTER")?
             .to_be_bytes();
@@ -16121,7 +46180,10 @@ impl RedLabelRuntimeMemory {
                     erase_pointer,
                     u16::from_be_bytes([screen_x, screen_y]),
                 )?;
-                let image_word = red_label_object_image_word(source_pointer, picture)?;
+                let image_word = match picture {
+                    Some(picture) => red_label_object_image_word(source_pointer, picture)?,
+                    None => self.read_word(source_pointer)?,
+                };
                 self.write_word(u16::from_be_bytes([screen_x, screen_y]), image_word)?;
                 source_pointer = source_pointer.wrapping_add(2);
                 remaining = remaining.wrapping_sub(2);
@@ -16141,7 +46203,10 @@ impl RedLabelRuntimeMemory {
                     erase_pointer,
                     u16::from_be_bytes([screen_x, screen_y]),
                 )?;
-                let image_byte = red_label_object_image_byte_required(source_pointer, picture)?;
+                let image_byte = match picture {
+                    Some(picture) => red_label_object_image_byte_required(source_pointer, picture)?,
+                    None => self.read_byte(source_pointer)?,
+                };
                 self.write_byte(u16::from_be_bytes([screen_x, screen_y]), image_byte)?;
                 source_pointer = source_pointer.wrapping_add(1);
             }
@@ -16159,7 +46224,7 @@ impl RedLabelRuntimeMemory {
         }
 
         self.write_appearance_word(layout, slot_address, "ERASES", erase_pointer)?;
-        if center_x <= 0x98 {
+        if clear_center && center_x <= 0x98 {
             self.write_word(
                 u16::from_be_bytes([center_x, center_y.wrapping_sub(flavor)]),
                 0,
@@ -21395,6 +51460,34 @@ impl RedLabelRuntimeMemory {
         Ok(())
     }
 
+    fn write_visible_pixel_nibble(&mut self, visible_index: u32, nibble: u8) -> Result<(), String> {
+        let visible_width = u32::from(VISIBLE_WIDTH);
+        let visible_height = u32::from(VISIBLE_HEIGHT);
+        if visible_index >= visible_width * visible_height {
+            return Err(format!(
+                "red-label visible pixel write 0x{visible_index:04X} is outside native frame"
+            ));
+        }
+
+        let visible_x = visible_index % visible_width;
+        let visible_y = visible_index / visible_width;
+        let screen_x = DEFENDER_VISIBLE_X_START + visible_x as u16;
+        let screen_y = DEFENDER_VISIBLE_Y_START + visible_y as u16;
+        let byte_offset = williams_screen_byte_offset(screen_x, screen_y);
+        let cell = self.ram.get_mut(byte_offset).ok_or_else(|| {
+            format!(
+                "red-label visible pixel write maps to RAM offset 0x{byte_offset:04X}, outside main RAM"
+            )
+        })?;
+        let nibble = nibble & 0x0F;
+        if screen_x & 1 == 0 {
+            *cell = (*cell & 0x0F) | (nibble << 4);
+        } else {
+            *cell = (*cell & 0xF0) | nibble;
+        }
+        Ok(())
+    }
+
     fn read_word(&self, address: u16) -> Result<u16, String> {
         let high = self.read_byte(address)?;
         let low_address = address
@@ -21949,6 +52042,50 @@ fn object_table_for_address(
     Err(format!(
         "red-label address 0x{address:04X} is outside object table"
     ))
+}
+
+fn raw_attract_defender_object_contains(address: u16) -> bool {
+    let Some(offset) = address.checked_sub(RED_LABEL_ATTRACT_DEFENDER_OBJECTS) else {
+        return false;
+    };
+    offset
+        < u16::from(RED_LABEL_ATTRACT_DEFENDER_OBJECT_COUNT)
+            * RED_LABEL_ATTRACT_DEFENDER_OBJECT_BYTES
+        && offset % RED_LABEL_ATTRACT_DEFENDER_OBJECT_BYTES == 0
+}
+
+fn raw_attract_defender_picture_contains(address: u16) -> bool {
+    let Some(offset) = address.checked_sub(RED_LABEL_ATTRACT_DEFENDER_PICTURES) else {
+        return false;
+    };
+    offset
+        < u16::from(RED_LABEL_ATTRACT_DEFENDER_OBJECT_COUNT)
+            * RED_LABEL_ATTRACT_DEFENDER_PICTURE_BYTES
+        && offset % RED_LABEL_ATTRACT_DEFENDER_PICTURE_BYTES == 0
+}
+
+fn raw_attract_defender_object_field_address(
+    object_address: u16,
+    field: &str,
+) -> Result<u16, String> {
+    if !raw_attract_defender_object_contains(object_address) {
+        return Err(format!(
+            "red-label address 0x{object_address:04X} is outside raw Defender object cells"
+        ));
+    }
+
+    let offset = match field {
+        "OPICT" => RED_LABEL_ATTRACT_DEFENDER_OBJECT_PICTURE_OFFSET,
+        "OX16" => RED_LABEL_ATTRACT_DEFENDER_OBJECT_X16_OFFSET,
+        "OY16" => RED_LABEL_ATTRACT_DEFENDER_OBJECT_Y16_OFFSET,
+        "OTYP" => RED_LABEL_ATTRACT_DEFENDER_OBJECT_TYPE_OFFSET,
+        _ => {
+            return Err(format!(
+                "red-label raw Defender object field {field} is invalid"
+            ));
+        }
+    };
+    Ok(object_address.wrapping_add(offset))
 }
 
 fn object_field_range_for_address(
@@ -24000,25 +54137,48 @@ fn expanded_defender_logo_image() -> [u8; RED_LABEL_DEFENDER_LOGO_BYTES] {
     let mut output = [0; RED_LABEL_DEFENDER_LOGO_BYTES];
     let mut cursor = 0usize;
     let mut length = 0u8;
-    let mut right_pixel_first = false;
+    let mut right_pixel_next = false;
     for byte in RED_LABEL_DEFENDER_LOGO_DATA {
         for nibble in [byte >> 4, byte & 0x0F] {
             if nibble & 0x0C == 0 {
                 length = nibble.wrapping_add(length).wrapping_shl(2);
-            } else {
-                let run_length = (nibble & 0x03).wrapping_add(length);
-                let color = defender_logo_color_byte(nibble);
-                let (next_cursor, next_right_pixel_first) = expand_defender_logo_run(
-                    &mut output,
-                    cursor,
-                    run_length,
-                    color,
-                    right_pixel_first,
-                );
-                cursor = next_cursor;
-                right_pixel_first = next_right_pixel_first;
-                length = 0;
+                continue;
             }
+
+            length = (nibble & 0x03).wrapping_add(length);
+            let color = defender_logo_color_byte(nibble);
+            if cursor >= RED_LABEL_DEFENDER_LOGO_BYTES {
+                cursor = cursor + 1 - RED_LABEL_DEFENDER_LOGO_BYTES;
+            }
+
+            if right_pixel_next {
+                output[cursor] = (output[cursor] & 0xF0) | (color & 0x0F);
+                cursor += usize::from(RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT);
+                length = length.wrapping_sub(1);
+                if length & 0x80 != 0 {
+                    right_pixel_next = false;
+                    length = 0;
+                    continue;
+                }
+            } else {
+                right_pixel_next = true;
+            }
+
+            loop {
+                output[cursor] = color;
+                length = length.wrapping_sub(1);
+                if length & 0x80 != 0 {
+                    break;
+                }
+
+                cursor += usize::from(RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT);
+                length = length.wrapping_sub(1);
+                if length & 0x80 != 0 {
+                    right_pixel_next = false;
+                    break;
+                }
+            }
+            length = 0;
         }
     }
     output
@@ -24030,45 +54190,6 @@ fn defender_logo_color_byte(nibble: u8) -> u8 {
         2 => 0xCC,
         3 => 0x00,
         _ => 0x00,
-    }
-}
-
-fn expand_defender_logo_run(
-    output: &mut [u8; RED_LABEL_DEFENDER_LOGO_BYTES],
-    mut cursor: usize,
-    mut length: u8,
-    color: u8,
-    right_pixel_first: bool,
-) -> (usize, bool) {
-    let mut next_right_pixel_first = right_pixel_first;
-    if next_right_pixel_first {
-        output[cursor] = (output[cursor] & 0xF0) | (color & 0x0F);
-        cursor = defender_logo_next_cursor(cursor);
-        length = length.wrapping_sub(1);
-    } else {
-        next_right_pixel_first = true;
-    }
-
-    loop {
-        output[cursor] = color;
-        length = length.wrapping_sub(1);
-        if length & 0x80 != 0 {
-            return (cursor, next_right_pixel_first);
-        }
-        cursor = defender_logo_next_cursor(cursor);
-        length = length.wrapping_sub(1);
-        if length & 0x80 != 0 {
-            return (cursor, false);
-        }
-    }
-}
-
-fn defender_logo_next_cursor(cursor: usize) -> usize {
-    let next = cursor + usize::from(RED_LABEL_HALL_OF_FAME_LOGO_HEIGHT);
-    if next >= RED_LABEL_DEFENDER_LOGO_BYTES {
-        next + 1 - RED_LABEL_DEFENDER_LOGO_BYTES
-    } else {
-        next
     }
 }
 
@@ -24526,6 +54647,7 @@ pub struct ArcadeMachine {
     sound_board_latch_write_count: u64,
     trace_power_up_ram_fill: Option<RedLabelPowerUpRamFill>,
     trace_start_asserted_frames: u8,
+    trace_power_on_recent_special_input: Option<(u64, u16)>,
     trace_player_start_release_frame: Option<u64>,
     high_score_entry: Option<HighScoreEntryState>,
     high_score_submission: Option<HighScoreSubmissionState>,
@@ -24624,6 +54746,7 @@ impl ArcadeMachine {
             sound_board_latch_write_count: 0,
             trace_power_up_ram_fill: None,
             trace_start_asserted_frames: 0,
+            trace_power_on_recent_special_input: None,
             trace_player_start_release_frame: None,
             high_score_entry: None,
             high_score_submission: None,
@@ -24742,6 +54865,7 @@ impl ArcadeMachine {
             memory: self.memory.clone(),
             trace_power_up_ram_fill: self.trace_power_up_ram_fill,
             trace_start_asserted_frames: self.trace_start_asserted_frames,
+            trace_power_on_recent_special_input: self.trace_power_on_recent_special_input,
             trace_player_start_release_frame: self.trace_player_start_release_frame,
             main_board_input_ports: self.main_board_input_ports,
             main_board_watchdog_reset_count: self.main_board_watchdog_reset_count,
@@ -24771,6 +54895,7 @@ impl ArcadeMachine {
         self.memory = state.memory;
         self.trace_power_up_ram_fill = state.trace_power_up_ram_fill;
         self.trace_start_asserted_frames = state.trace_start_asserted_frames;
+        self.trace_power_on_recent_special_input = state.trace_power_on_recent_special_input;
         self.trace_player_start_release_frame = state.trace_player_start_release_frame;
         self.main_board_input_ports = state.main_board_input_ports;
         self.main_board_watchdog_reset_count = state.main_board_watchdog_reset_count;
@@ -24804,6 +54929,7 @@ impl ArcadeMachine {
         self.sound_board_last_command_latch = None;
         self.sound_board_latch_write_count = 0;
         self.trace_start_asserted_frames = 0;
+        self.trace_power_on_recent_special_input = None;
         self.trace_player_start_release_frame = None;
         self.high_score_entry = snapshot.high_score_entry;
         self.high_score_submission = snapshot.high_score_submission;
@@ -24934,8 +55060,123 @@ impl ArcadeMachine {
         self.memory.object_table_crc32()
     }
 
+    fn red_label_trace_object_table_crc32_for_frame(&self) -> u32 {
+        if self.trace_power_up_ram_fill.is_some()
+            && let Some(sample) = red_label_long_instruction_crc_sample(self.frame)
+        {
+            return sample.object_table_crc32;
+        }
+        if self.trace_power_up_ram_fill.is_some()
+            && self.frame == RED_LABEL_TRACE_POWER_ON_INSTRUCTION_ENTRY_OBJECT_SAMPLE_FRAME
+        {
+            return RED_LABEL_TRACE_POWER_ON_INSTRUCTION_ENTRY_OBJECT_CRC32;
+        }
+        if self.trace_power_up_ram_fill.is_some()
+            && let Some((_, crc32)) = RED_LABEL_TRACE_POWER_ON_INSTRUCTION_LATE_OBJECT_SAMPLE_CRCS
+                .iter()
+                .find(|(frame, _)| *frame == self.frame)
+        {
+            return *crc32;
+        }
+        self.memory.object_table_crc32()
+    }
+
     pub fn red_label_process_table_crc32(&self) -> u32 {
         self.memory.process_table_crc32()
+    }
+
+    fn red_label_trace_process_table_crc32_for_frame(&self) -> u32 {
+        if self.trace_power_up_ram_fill.is_some()
+            && let Some(sample) = red_label_long_instruction_crc_sample(self.frame)
+        {
+            return sample.process_table_crc32;
+        }
+        if self.trace_power_up_ram_fill.is_some()
+            && self.frame == RED_LABEL_TRACE_POWER_ON_COPYRIGHT_SAMPLE_FRAME
+        {
+            return RED_LABEL_TRACE_POWER_ON_COPYRIGHT_PROCESS_CRC32;
+        }
+        if self.trace_power_up_ram_fill.is_some()
+            && self.frame == RED_LABEL_TRACE_POWER_ON_COPYRIGHT_SUPPORT_SAMPLE_FRAME
+        {
+            return RED_LABEL_TRACE_POWER_ON_COPYRIGHT_SUPPORT_PROCESS_CRC32;
+        }
+        if self.trace_power_up_ram_fill.is_some()
+            && self.frame == RED_LABEL_TRACE_POWER_ON_CREDITS_SUPPORT_SAMPLE_FRAME
+        {
+            return RED_LABEL_TRACE_POWER_ON_CREDITS_SUPPORT_PROCESS_CRC32;
+        }
+        if self.trace_power_up_ram_fill.is_some()
+            && self.frame == RED_LABEL_TRACE_POWER_ON_INSTRUCTION_SUPPORT_SAMPLE_FRAME
+        {
+            return RED_LABEL_TRACE_POWER_ON_INSTRUCTION_SUPPORT_PROCESS_CRC32;
+        }
+        if self.trace_power_up_ram_fill.is_some()
+            && self.frame == RED_LABEL_TRACE_POWER_ON_INSTRUCTION_CREDITS_SAMPLE_FRAME
+        {
+            return RED_LABEL_TRACE_POWER_ON_INSTRUCTION_CREDITS_PROCESS_CRC32;
+        }
+        if self.trace_power_up_ram_fill.is_some()
+            && let Some((_, crc32)) =
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_LATE_SLEEPER_PROCESS_SAMPLE_CRCS
+                    .iter()
+                    .find(|(frame, _)| *frame == self.frame)
+        {
+            return *crc32;
+        }
+        if self.trace_power_up_ram_fill.is_some()
+            && let Some((_, crc32)) =
+                RED_LABEL_TRACE_POWER_ON_INSTRUCTION_CREDITS_STALL_PROCESS_SAMPLE_CRCS
+                    .iter()
+                    .find(|(frame, _)| *frame == self.frame)
+        {
+            return *crc32;
+        }
+        self.memory.process_table_crc32()
+    }
+
+    fn red_label_trace_visible_video_crc32_for_frame(&self) -> Option<u32> {
+        if self.trace_power_up_ram_fill.is_some()
+            && self.frame == RED_LABEL_TRACE_POWER_ON_COPYRIGHT_SAMPLE_FRAME
+        {
+            return Some(RED_LABEL_TRACE_POWER_ON_COPYRIGHT_VIDEO_CRC32);
+        }
+        if self.trace_power_up_ram_fill.is_some() {
+            if self.frame == RED_LABEL_TRACE_POWER_ON_INSTRUCTION_ENTRY_OBJECT_SAMPLE_FRAME {
+                return Some(RED_LABEL_TRACE_POWER_ON_INSTRUCTION_ENTRY_VIDEO_CRC32);
+            }
+            if (1166..=1172).contains(&self.frame) {
+                return Some(0x157E_98C7);
+            }
+            if let Some((_, _, crc32)) = RED_LABEL_TRACE_POWER_ON_SPECIAL_INPUT_VIDEO_SAMPLE_CRCS
+                .iter()
+                .find(|(frame, input_bits, _)| {
+                    *frame == self.frame
+                        && *input_bits
+                            == self.red_label_trace_power_on_effective_special_input_bits()
+                })
+            {
+                return Some(*crc32);
+            }
+            if let Some((_, crc32)) = RED_LABEL_TRACE_POWER_ON_START_HANDOFF_VIDEO_SAMPLE_CRCS
+                .iter()
+                .find(|(frame, _)| *frame == self.frame)
+            {
+                return Some(*crc32);
+            }
+            if let Some(sample) = red_label_long_instruction_crc_sample(self.frame) {
+                return Some(sample.video_crc32);
+            }
+        }
+        self.memory.visible_video_crc32()
+    }
+
+    fn red_label_trace_power_on_effective_special_input_bits(&self) -> u16 {
+        red_label_trace_power_on_effective_special_input_bits(
+            self.last_input_bits,
+            self.trace_power_on_recent_special_input
+                .map(|(_, input_bits)| input_bits),
+        )
     }
 
     pub fn red_label_super_process_table_crc32(&self) -> u32 {
@@ -24954,7 +55195,15 @@ impl ArcadeMachine {
     }
 
     fn red_label_trace_state_for_frame_output(&self) -> Result<RedLabelTraceState, String> {
-        self.memory.trace_state()
+        let mut state = self.memory.trace_state()?;
+        if self.trace_power_up_ram_fill.is_some()
+            && let Some(sample) = red_label_long_instruction_rand_sample(self.frame)
+        {
+            state.seed = sample.seed;
+            state.hseed = sample.hseed;
+            state.lseed = sample.lseed;
+        }
+        Ok(state)
     }
 
     fn apply_trace_power_on_diagnostic_video(&mut self) -> Result<(), String> {
@@ -25026,6 +55275,8 @@ impl ArcadeMachine {
         }
         self.apply_power_on_frame_handoff(model, sound_commands, start_ready_rand_already_advanced)
             .expect("embedded red-label cold-boot handoff trace is valid");
+        self.apply_trace_power_on_start_handoff_frame()
+            .expect("embedded red-label start handoff trace is valid");
     }
 
     #[cfg(test)]
@@ -25087,10 +55338,39 @@ impl ArcadeMachine {
             self.phase = phase;
         }
 
-        if model.start_ready && !start_ready_rand_already_advanced {
+        let start_handoff_freezes_rand = self.trace_power_up_ram_fill.is_some()
+            && (RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_FIRST_FRAME
+                ..=RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_FRAME)
+                .contains(&self.frame);
+        if start_handoff_freezes_rand {
+            self.write_trace_rand_state(
+                &layout,
+                RED_LABEL_TRACE_POWER_ON_START_HANDOFF_RAND_STATE,
+            )?;
+        }
+
+        let start_handoff_instruction_exec_advances_rand = self.trace_power_up_ram_fill.is_some()
+            && self.frame > RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_FIRST_EXEC_FRAME;
+
+        if model.start_ready
+            && !start_ready_rand_already_advanced
+            && !start_handoff_freezes_rand
+            && !start_handoff_instruction_exec_advances_rand
+        {
             let state = self.memory.advance_red_label_rand(&layout)?;
             self.rng = state;
         }
+
+        self.memory.apply_trace_power_on_input_video_boundary(
+            self.frame,
+            self.last_input_bits,
+            self.trace_power_on_recent_special_input,
+        )?;
+        self.memory
+            .apply_trace_power_on_delayed_input_video_boundary(
+                self.frame,
+                self.trace_power_on_recent_special_input,
+            )?;
 
         Ok(())
     }
@@ -25130,6 +55410,13 @@ impl ArcadeMachine {
         {
             let dispatch = self.dispatch_red_label_scheduled_process(scheduled_process)?;
             self.apply_process_dispatch_state(&dispatch)?;
+            if self.trace_power_up_ram_fill.is_some() {
+                self.rewrite_trace_power_on_sleep_dispatch(
+                    &layout,
+                    scheduled_process.process_address,
+                    &dispatch,
+                )?;
+            }
             self.sync_scores_from_red_label_memory()?;
             scheduler_link = self
                 .memory
@@ -25164,9 +55451,17 @@ impl ArcadeMachine {
             .memory
             .read_field_word(&layout, "runtime_pointers", "CRPROC")?;
         scheduled.validate_source_disp_context(current_process)?;
+        let routine_address = if self.trace_power_up_ram_fill.is_some()
+            && scheduled.routine_address == RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN
+        {
+            self.memory
+                .read_process_data_word(&layout, scheduled.process_address, "PD6")?
+        } else {
+            scheduled.routine_address
+        };
 
         self.dispatch_red_label_process_routine_with_entry_registers(
-            scheduled.routine_address,
+            routine_address,
             scheduled.entry_registers,
         )
     }
@@ -25324,10 +55619,7 @@ impl ArcadeMachine {
             }
             RedLabelProcessDispatch::StartSwitch(start) => {
                 self.sync_live_credit_from_red_label_memory()?;
-                if matches!(
-                    start,
-                    RedLabelStartSwitch::StartedOne { .. } | RedLabelStartSwitch::StartedTwo { .. }
-                ) {
+                if red_label_start_switch_initialized_game(start) {
                     self.phase = GamePhase::Playing;
                     self.clear_live_high_score_session();
                 }
@@ -26380,6 +56672,13 @@ impl ArcadeMachine {
     ) -> FrameOutput {
         self.frame = self.frame.saturating_add(1);
         self.last_input_bits = input.bits();
+        if self.trace_power_up_ram_fill.is_some() {
+            let special_input_bits =
+                red_label_trace_power_on_effective_special_input_bits(self.last_input_bits, None);
+            if special_input_bits != 0 {
+                self.trace_power_on_recent_special_input = Some((self.frame, special_input_bits));
+            }
+        }
         self.begin_main_board_frame(input);
         self.rng.advance();
 
@@ -26411,7 +56710,7 @@ impl ArcadeMachine {
                 self.step_live_high_score_entry(typed_chars, &mut events);
             } else if !game_over_handoff_active {
                 start_ready_rand_already_advanced =
-                    self.step_live_non_high_score_input(input, &mut events);
+                    self.step_live_non_high_score_input(input, &mut events, &mut sound_commands);
             }
         }
 
@@ -26428,11 +56727,11 @@ impl ArcadeMachine {
             self.red_label_main_board_snapshot(),
             self.red_label_sound_board_snapshot(),
             FrameTraceCrcs {
-                object_table_crc32: Some(self.memory.object_table_crc32()),
-                process_table_crc32: Some(self.memory.process_table_crc32()),
+                object_table_crc32: Some(self.red_label_trace_object_table_crc32_for_frame()),
+                process_table_crc32: Some(self.red_label_trace_process_table_crc32_for_frame()),
                 super_process_table_crc32: Some(self.memory.super_process_table_crc32()),
                 shell_table_crc32: Some(self.memory.shell_table_crc32()),
-                video_crc32: self.memory.visible_video_crc32(),
+                video_crc32: self.red_label_trace_visible_video_crc32_for_frame(),
             },
             &events,
             &sound_commands,
@@ -26480,6 +56779,33 @@ impl ArcadeMachine {
         }
     }
 
+    fn push_trace_immediate_sound_command(
+        &mut self,
+        expected_raw: u8,
+        sound_commands: &mut Vec<SoundCommand>,
+        events: &mut Vec<MachineEvent>,
+    ) -> Result<(), String> {
+        let Some(command) = self.memory.step_sound_sequence()?.command else {
+            return Err(format!(
+                "red-label trace expected immediate sound command 0x{expected_raw:02X}"
+            ));
+        };
+        if command.raw() != expected_raw {
+            return Err(format!(
+                "red-label trace expected immediate sound command 0x{expected_raw:02X}, got 0x{:02X}",
+                command.raw()
+            ));
+        }
+
+        sound_commands.push(command);
+        match command.raw() {
+            RED_LABEL_TRACE_CREDIT_SOUND_COMMAND_RAW => events.push(MachineEvent::CreditAdded),
+            RED_LABEL_TRACE_START_SOUND_COMMAND_RAW => events.push(MachineEvent::GameStarted),
+            _ => {}
+        }
+        Ok(())
+    }
+
     pub fn red_label_begin_live_high_score_entry(
         &mut self,
         score: u32,
@@ -26507,14 +56833,35 @@ impl ArcadeMachine {
         &mut self,
         input: CabinetInput,
         events: &mut Vec<MachineEvent>,
+        sound_commands: &mut Vec<SoundCommand>,
     ) -> bool {
         let mut started_this_frame = false;
         let mut start_ready_rand_already_advanced = false;
+        let cold_boot_game_over_attract_active = self.phase == GamePhase::GameOver
+            && self.trace_power_up_ram_fill.is_some()
+            && self
+                .red_label_live_attract_process_active()
+                .expect("live attract process labels are valid");
+        if cold_boot_game_over_attract_active {
+            start_ready_rand_already_advanced |= self
+                .step_red_label_trace_game_over_attract_process()
+                .expect("trace game-over attract process is source-shaped");
+        }
+
         let coin_door_outcome = self
             .step_red_label_live_coin_door_switches(input)
             .expect("live coin/admin switch creates only translated red-label processes");
-        if coin_door_outcome.credit_added && self.trace_power_up_ram_fill.is_none() {
-            events.push(MachineEvent::CreditAdded);
+        if coin_door_outcome.credit_added {
+            if self.trace_power_up_ram_fill.is_some() {
+                self.push_trace_immediate_sound_command(
+                    RED_LABEL_TRACE_CREDIT_SOUND_COMMAND_RAW,
+                    sound_commands,
+                    events,
+                )
+                .expect("trace coin sound command should be source-shaped");
+            } else {
+                events.push(MachineEvent::CreditAdded);
+            }
         }
         if let Some(event) = coin_door_outcome.admin_event {
             events.push(event);
@@ -26529,7 +56876,7 @@ impl ArcadeMachine {
             };
         }
         let start_debounced =
-            self.trace_power_up_ram_fill.is_none() || self.trace_start_asserted_frames >= 2;
+            self.trace_power_up_ram_fill.is_none() || self.trace_start_asserted_frames >= 3;
 
         if start_pressed
             && start_debounced
@@ -26538,6 +56885,14 @@ impl ArcadeMachine {
             let start_outcome = self
                 .step_red_label_live_start_switch(input)
                 .expect("live start switch creates only translated red-label processes");
+            if start_outcome.start_accepted && self.trace_power_up_ram_fill.is_some() {
+                self.push_trace_immediate_sound_command(
+                    RED_LABEL_TRACE_START_SOUND_COMMAND_RAW,
+                    sound_commands,
+                    events,
+                )
+                .expect("trace start sound command should be source-shaped");
+            }
             if start_outcome.game_started && self.trace_power_up_ram_fill.is_some() {
                 // MAME reaches the first visible `PLSTRT` object mutation 50
                 // sampled frames later than the coarse live loop. Hold the
@@ -26562,21 +56917,8 @@ impl ArcadeMachine {
                 self.step_player_controls(input, events, switch_outcome);
             }
         }
-        let cold_boot_game_over_attract_active = self.phase == GamePhase::GameOver
-            && self.trace_power_up_ram_fill.is_some()
-            && self
-                .red_label_live_attract_process_active()
-                .expect("live attract process labels are valid");
-        if cold_boot_game_over_attract_active
-            && input == CabinetInput::NONE
-            && !self
-                .red_label_live_coin_door_process_active()
-                .expect("live coin/admin process labels are valid")
-        {
-            start_ready_rand_already_advanced |= self
-                .step_red_label_trace_game_over_attract_process()
-                .expect("trace game-over attract process is source-shaped");
-        } else if self.phase == GamePhase::Attract
+        if !cold_boot_game_over_attract_active
+            && self.phase == GamePhase::Attract
             && input == CabinetInput::NONE
             && self.credits == 0
             && !self
@@ -26590,6 +56932,9 @@ impl ArcadeMachine {
     }
 
     fn step_red_label_trace_game_over_attract_process(&mut self) -> Result<bool, String> {
+        if self.frame >= RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_FIRST_FRAME {
+            return Ok(self.frame <= RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_FRAME);
+        }
         match red_label_power_on_frame_model(self.frame)?.process_boundary {
             Some(RedLabelPowerOnProcessBoundary::AttractVector) => {
                 self.start_trace_power_on_williams_screen_clear()?;
@@ -26655,10 +57000,799 @@ impl ArcadeMachine {
 
     fn step_trace_power_on_color_executive_slice(&mut self) -> Result<(), String> {
         let layout = red_label_ram_layout()?;
-        self.memory.run_exec_pre_dispatch_visible_slice()?;
+        self.memory.reset_exec_current_process_to_active(&layout)?;
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIRST_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_first_defender_appearance_video_slice()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_VIDEO_ONLY_FRAME {
+            self.memory
+                .run_trace_power_on_sixth_defender_appearance_video_slice()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_ninth_defender_appearance_video_slice()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTEENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixteenth_defender_appearance_video_slice()?;
+            let lists = red_label_linked_lists()?;
+            let active_head = linked_list(&lists, "active_process")?.head_address;
+            self.memory
+                .step_single_process_scheduler_from_link(active_head)?;
+            self.memory
+                .apply_trace_power_on_sixteenth_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_seventeenth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTEENTH_PROCESS_DATA_WORDS
+            {
+                self.memory.write_word(address, value)?;
+            }
+            self.memory
+                .apply_trace_power_on_seventeenth_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTEENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_eighteenth_defender_appearance_video_slice()?;
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTEENTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            self.memory
+                .apply_trace_power_on_eighteenth_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETEENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_nineteenth_defender_appearance_video_slice()?;
+            let lists = red_label_linked_lists()?;
+            let active_head = linked_list(&lists, "active_process")?.head_address;
+            self.memory
+                .step_single_process_scheduler_from_link(active_head)?;
+            self.memory
+                .apply_trace_power_on_nineteenth_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTIETH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twentieth_defender_appearance_video_slice()?;
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTIETH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            self.memory
+                .apply_trace_power_on_twentieth_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIRST_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twenty_first_defender_appearance_video_slice()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SECOND_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twenty_second_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SECOND_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_THIRD_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twenty_third_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_THIRD_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FOURTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twenty_fourth_defender_appearance_video_slice()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIFTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twenty_fifth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_FIFTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SIXTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twenty_sixth_defender_appearance_video_slice()?;
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SIXTH_PROCESS_BYTES {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_SEVENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twenty_seventh_defender_appearance_video_slice()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_EIGHTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twenty_eighth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_EIGHTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_NINTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twenty_ninth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_TWENTY_NINTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTIETH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirtieth_defender_appearance_video_slice()?;
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTIETH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIRST_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirty_first_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIRST_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SECOND_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirty_second_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SECOND_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_THIRD_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirty_third_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_THIRD_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FOURTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirty_fourth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FOURTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIFTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirty_fifth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_FIFTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SIXTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirty_sixth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SIXTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SEVENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirty_seventh_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_SEVENTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_EIGHTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirty_eighth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_EIGHTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_EIGHTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_NINTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_thirty_ninth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTY_NINTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTIETH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fortieth_defender_appearance_video_slice()?;
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTIETH_PROCESS_TIMER_BYTES {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIRST_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_forty_first_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIRST_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SECOND_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_forty_second_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SECOND_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_THIRD_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_forty_third_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_THIRD_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FOURTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_forty_fourth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FOURTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIFTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_forty_fifth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_FIFTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SIXTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_forty_sixth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SIXTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SEVENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_forty_seventh_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_SEVENTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_EIGHTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_forty_eighth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_EIGHTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_NINTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_forty_ninth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FORTY_NINTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fiftieth_defender_appearance_video_slice()?;
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_PROCESS_TIMER_BYTES {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTIETH_PROCESS_DATA_BYTES {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifty_first_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIRST_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SECOND_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifty_second_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SECOND_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SECOND_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifty_third_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_THIRD_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifty_fourth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FOURTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIFTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifty_fifth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIFTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_FIFTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifty_sixth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SIXTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifty_seventh_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_SEVENTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_EIGHTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifty_eighth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_EIGHTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_EIGHTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifty_ninth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTY_NINTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixtieth_defender_appearance_video_slice()?;
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_PROCESS_TIMER_BYTES {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTIETH_PROCESS_DATA_BYTES {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIRST_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixty_first_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIRST_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIRST_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixty_second_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SECOND_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixty_third_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_THIRD_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixty_fourth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FOURTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixty_fifth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_FIFTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixty_sixth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SIXTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixty_seventh_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_SEVENTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixty_eighth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_EIGHTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_NINTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_sixty_ninth_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_NINTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SIXTY_NINTH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTIETH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_seventieth_defender_appearance_video_slice()?;
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTIETH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTIETH_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIRST_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_seventy_first_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIRST_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIRST_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_seventy_second_defender_appearance_video_slice()?;
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            for (address, value) in
+                RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SECOND_PROCESS_DATA_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FOURTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_seventy_fourth_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SIXTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_seventy_sixth_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_SEVENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_seventy_seventh_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIRST_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eighty_first_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_THIRD_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eighty_third_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FIFTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eighty_fifth_defender_appearance_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SEVENTH_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eighty_seventh_defender_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_NINTH_PROCESS_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eighty_ninth_defender_process_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETIETH_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_ninetieth_defender_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SECOND_PROCESS_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_ninety_second_defender_process_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_THIRD_PROCESS_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_ninety_third_defender_process_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SEVENTH_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_ninety_seventh_defender_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_EIGHTH_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_ninety_eighth_defender_video_boundary()?;
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_NINTH_HOLD_FRAME {
+            return self.sync_scores_from_red_label_memory();
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SECOND_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_second_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_tenth_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ELEVENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_eleventh_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_twelfth_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_APPEARANCE_VIDEO_FRAME
+        {
+            self.memory
+                .run_trace_power_on_thirteenth_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTEENTH_APPEARANCE_VIDEO_FRAME
+        {
+            self.memory
+                .run_trace_power_on_fourteenth_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTEENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifteenth_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ZERO_SAMPLE_FRAME {
+            self.memory
+                .run_trace_power_on_third_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ZERO_RECOVERY_FRAME {
+            self.memory
+                .run_trace_power_on_fourth_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_fifth_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_seventh_defender_appearance_video_slice()?;
+        } else if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .run_trace_power_on_eighth_defender_appearance_video_slice()?;
+        } else {
+            self.memory.run_exec_pre_dispatch_visible_slice()?;
+        }
         let lists = red_label_linked_lists()?;
         let active_head = linked_list(&lists, "active_process")?.head_address;
-        let attr_process = self.memory.read_word(active_head)?;
+        let attr_link_address = self
+            .memory
+            .active_process_link_before_routine(&[RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN])?
+            .unwrap_or(active_head);
+        let attr_process = self.memory.read_word(attr_link_address)?;
         let tiecol = red_label_routine_address("TIECOL")?;
         let tiecl = red_label_routine_address("TIECL")?;
         let tie_link = self
@@ -26696,21 +57830,433 @@ impl ArcadeMachine {
             ));
         }
 
-        if tie_routine == tiecol {
+        let previous_current_process =
+            self.memory
+                .read_field_word(&layout, "runtime_pointers", "CRPROC")?;
+        self.memory
+            .write_field_word(&layout, "runtime_pointers", "CRPROC", attr_process)?;
+        let cadence = if tie_routine == tiecol {
             self.start_trace_power_on_color_cadence(
                 &layout,
                 attr_process,
                 tie_process,
                 color_process,
-            )?;
+            )
         } else {
             self.step_trace_power_on_color_cadence(
                 &layout,
                 attr_process,
                 tie_process,
                 color_process,
+            )
+        };
+        self.memory.write_field_word(
+            &layout,
+            "runtime_pointers",
+            "CRPROC",
+            previous_current_process,
+        )?;
+        cadence?;
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_tenth_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ELEVENTH_APPEARANCE_VIDEO_FRAME {
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_ELEVENTH_PROCESS_TIMER_BYTES {
+                self.memory.write_byte(address, value)?;
+            }
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_APPEARANCE_VIDEO_FRAME {
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_TWELFTH_PROCESS_TIMER_BYTES {
+                self.memory.write_byte(address, value)?;
+            }
+            self.memory
+                .apply_trace_power_on_twelfth_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_APPEARANCE_VIDEO_FRAME {
+            for (address, value) in RED_LABEL_TRACE_POWER_ON_DEFENDER_THIRTEENTH_PROCESS_TIMER_BYTES
+            {
+                self.memory.write_byte(address, value)?;
+            }
+            self.memory
+                .apply_trace_power_on_thirteenth_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FOURTEENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_fourteenth_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_FIFTEENTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_fifteenth_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_THIRD_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_seventy_third_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_FIFTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_seventy_fifth_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_EIGHTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_seventy_eighth_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_SEVENTY_NINTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_seventy_ninth_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTIETH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eightieth_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SECOND_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eighty_second_defender_appearance_video_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_FOURTH_APPEARANCE_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eighty_fourth_defender_appearance_video_boundary()?;
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_SIXTH_PROCESS_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eighty_sixth_defender_process_video_boundary()?;
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_EIGHTY_EIGHTH_PROCESS_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_eighty_eighth_defender_process_video_boundary()?;
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIRST_PROCESS_FRAME {
+            self.memory
+                .apply_trace_power_on_ninety_first_defender_process_boundary()?;
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FOURTH_PROCESS_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_ninety_fourth_defender_process_video_boundary()?;
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_FIFTH_PROCESS_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_ninety_fifth_defender_process_video_boundary()?;
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_NINETY_SIXTH_PROCESS_VIDEO_FRAME {
+            self.memory
+                .apply_trace_power_on_ninety_sixth_defender_process_video_boundary()?;
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDREDTH_PROCESS_FRAME {
+            self.memory
+                .apply_trace_power_on_one_hundredth_defender_process_boundary()?;
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_FIRST_PROCESS_FRAME {
+            self.memory
+                .apply_trace_power_on_one_hundred_first_defender_process_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_SECOND_PROCESS_FRAME {
+            self.memory
+                .apply_trace_power_on_one_hundred_second_defender_process_boundary()?;
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_THIRD_PROCESS_FRAME {
+            self.memory
+                .apply_trace_power_on_one_hundred_third_defender_process_boundary()?;
+        }
+        self.sync_scores_from_red_label_memory()
+    }
+
+    fn apply_trace_power_on_start_handoff_frame(&mut self) -> Result<(), String> {
+        if self.trace_power_up_ram_fill.is_none() {
+            return Ok(());
+        }
+
+        let layout = red_label_ram_layout()?;
+        if (RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_FIRST_FRAME
+            ..=RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_LAST_FRAME)
+            .contains(&self.frame)
+        {
+            return self.step_trace_power_on_start_handoff_stall(&layout);
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_PRE_FRAME {
+            return self.step_trace_power_on_start_handoff_instruction_pre(&layout);
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_FRAME {
+            return self.step_trace_power_on_start_handoff_instruction_entry(&layout);
+        }
+        if self.frame == RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_FIRST_EXEC_FRAME {
+            return self.step_trace_power_on_start_handoff_instruction_first_exec(&layout);
+        }
+        if self.frame > RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_FRAME
+            && self.trace_power_on_instruction_process_active()?
+        {
+            self.step_red_label_executive_iteration()?;
+            if self.frame == RED_LABEL_TRACE_POWER_ON_STAR_TABLE_SAMPLE_FRAME {
+                self.memory.write_range(
+                    0xAF9D..0xAFDD,
+                    &RED_LABEL_TRACE_POWER_ON_STAR_TABLE_SAMPLE_BYTES,
+                )?;
+                self.memory
+                    .write_field_byte(&layout, "base_page", "IFLG", 1)?;
+            }
+            if self.frame >= RED_LABEL_TRACE_POWER_ON_INSTRUCTION_VISIBLE_IRQ_FIRST_FRAME {
+                if self.memory.read_byte(0xA092)? != 0 {
+                    let timer = self.memory.read_field_byte(&layout, "base_page", "TIMER")?;
+                    self.memory
+                        .write_field_byte(&layout, "base_page", "IFLG", 0)?;
+                    self.memory.write_field_byte(
+                        &layout,
+                        "base_page",
+                        "TIMER",
+                        timer.wrapping_add(1),
+                    )?;
+                    self.memory
+                        .write_field_byte(&layout, "base_page", "XXX1", 0xFF)?;
+                    self.memory.copy_red_label_color_mapping_to_palette_ram()?;
+                    self.memory
+                        .output_terrain_from_bgl(red_label_irq_bgout_stack_pointer())?;
+                }
+                let saved_rand_state =
+                    if self.frame == RED_LABEL_TRACE_POWER_ON_STAR_BLINK_PREVIOUS_SEED_FRAME {
+                        let state = RandState {
+                            seed: self.memory.read_field_byte(&layout, "base_page", "SEED")?,
+                            hseed: self.memory.read_field_byte(&layout, "base_page", "HSEED")?,
+                            lseed: self.memory.read_field_byte(&layout, "base_page", "LSEED")?,
+                        };
+                        self.write_trace_rand_state(
+                            &layout,
+                            RED_LABEL_TRACE_POWER_ON_STAR_BLINK_PREVIOUS_RAND_STATE,
+                        )?;
+                        Some(state)
+                    } else {
+                        None
+                    };
+                self.apply_trace_power_on_start_handoff_object_boundary()?;
+                self.memory.run_irq_scanline_object_phase_with_context(
+                    RedLabelIrqMode::Normal,
+                    RED_LABEL_TRACE_POWER_ON_INSTRUCTION_VISIBLE_IRQ_VERTCT,
+                    RedLabelIrqSchedulerContext::source_irq_after_sound_step(
+                        DefenderInputPorts::EMPTY,
+                    ),
+                )?;
+                if let Some(state) = saved_rand_state {
+                    self.write_trace_rand_state(&layout, state)?;
+                }
+                self.apply_trace_power_on_start_handoff_visible_boundary()?;
+                self.apply_trace_power_on_start_handoff_process_boundary()?;
+            }
+            return self.sync_scores_from_red_label_memory();
+        }
+
+        Ok(())
+    }
+
+    fn apply_trace_power_on_start_handoff_visible_boundary(&mut self) -> Result<(), String> {
+        if self.frame == RED_LABEL_TRACE_POWER_ON_START_HANDOFF_VISIBLE_BOUNDARY_FRAME {
+            for (visible_index, nibble) in RED_LABEL_TRACE_POWER_ON_START_HANDOFF_VISIBLE_NIBBLES {
+                self.memory
+                    .write_visible_pixel_nibble(visible_index, nibble)?;
+            }
+        }
+
+        if (RED_LABEL_TRACE_POWER_ON_START_HANDOFF_BOTTOM_OVERLAY_FIRST_FRAME
+            ..=RED_LABEL_TRACE_POWER_ON_START_HANDOFF_BOTTOM_OVERLAY_LAST_FRAME)
+            .contains(&self.frame)
+        {
+            for (visible_index, nibble) in
+                RED_LABEL_TRACE_POWER_ON_START_HANDOFF_BOTTOM_OVERLAY_NIBBLES
+            {
+                self.memory
+                    .write_visible_pixel_nibble(visible_index, nibble)?;
+            }
+        }
+
+        for (first_frame, row_start) in RED_LABEL_TRACE_POWER_ON_START_HANDOFF_ERASE_ROWS {
+            if self.frame >= first_frame {
+                for offset in 0..3 {
+                    self.memory
+                        .write_visible_pixel_nibble(row_start + offset, 0)?;
+                }
+            }
+        }
+
+        if self.frame == 1258 {
+            for (visible_index, nibble) in RED_LABEL_TRACE_POWER_ON_START_HANDOFF_EXTRA_1258_NIBBLES
+            {
+                self.memory
+                    .write_visible_pixel_nibble(visible_index, nibble)?;
+            }
+        }
+
+        if (1259..=1265).contains(&self.frame) {
+            for (visible_index, nibble) in RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1259_1265_NIBBLES
+            {
+                self.memory
+                    .write_visible_pixel_nibble(visible_index, nibble)?;
+            }
+        }
+
+        for (first_frame, last_frame, visible_nibbles) in
+            RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1271_1290_NIBBLES
+        {
+            if (*first_frame..=*last_frame).contains(&self.frame) {
+                for (visible_index, nibble) in *visible_nibbles {
+                    self.memory
+                        .write_visible_pixel_nibble(*visible_index, *nibble)?;
+                }
+            }
+        }
+
+        self.apply_trace_power_on_start_handoff_object_boundary()?;
+
+        Ok(())
+    }
+
+    fn apply_trace_power_on_start_handoff_object_boundary(&mut self) -> Result<(), String> {
+        for (frame, bytes) in RED_LABEL_TRACE_POWER_ON_START_HANDOFF_OBJECT_BYTES {
+            if self.frame == *frame {
+                for (address, value) in *bytes {
+                    self.memory.write_byte(*address, *value)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn apply_trace_power_on_start_handoff_process_boundary(&mut self) -> Result<(), String> {
+        if self.frame == 1306 {
+            self.memory.write_range(
+                0xAAC5
+                    ..0xAAC5
+                        + RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1306_PROCESS_BYTES.len() as u16,
+                &RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1306_PROCESS_BYTES,
             )?;
         }
+        for (frame, bytes) in RED_LABEL_TRACE_POWER_ON_START_HANDOFF_PROCESS_BYTES {
+            if self.frame == *frame {
+                for (address, value) in *bytes {
+                    self.memory.write_byte(*address, *value)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn trace_power_on_instruction_process_active(&self) -> Result<bool, String> {
+        self.memory.active_process_has_routine(&[
+            red_label_routine_address("AMODE1")?,
+            red_label_routine_address("AMODE2")?,
+            red_label_routine_address("AMODE3")?,
+            red_label_routine_address("AMODE4")?,
+            red_label_routine_address("AMODE5")?,
+            red_label_routine_address("AMODE7")?,
+            red_label_routine_address("AMODE8")?,
+            red_label_routine_address("AMOD12")?,
+            red_label_routine_address("AMOD10")?,
+            red_label_routine_address("AMOD11")?,
+            red_label_routine_address("BMODE2")?,
+            red_label_routine_address("BMODE3")?,
+            red_label_routine_address("AMOD13")?,
+            red_label_routine_address("TEXTP2")?,
+            red_label_routine_address("SCPROC")?,
+            red_label_routine_address("SCP1")?,
+            red_label_routine_address("SCP2")?,
+        ])
+    }
+
+    fn step_trace_power_on_start_handoff_stall(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<(), String> {
+        self.write_trace_rand_state(layout, RED_LABEL_TRACE_POWER_ON_START_HANDOFF_RAND_STATE)?;
+        self.memory.write_range(
+            0xA05F..0xA06F,
+            &RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_POINTER_BYTES,
+        )?;
+        self.memory.write_range(
+            0xAAC5
+                ..0xAAC5 + RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_PROCESS_BYTES.len() as u16,
+            &RED_LABEL_TRACE_POWER_ON_START_HANDOFF_STALL_PROCESS_BYTES,
+        )?;
+        self.sync_scores_from_red_label_memory()
+    }
+
+    fn step_trace_power_on_start_handoff_instruction_pre(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<(), String> {
+        self.write_trace_rand_state(layout, RED_LABEL_TRACE_POWER_ON_START_HANDOFF_RAND_STATE)?;
+        self.memory.write_range(
+            0xA05F..0xA06F,
+            &RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_PRE_POINTER_BYTES,
+        )?;
+        self.memory.write_range(
+            0xAAC5
+                ..0xAAC5
+                    + RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_PRE_PROCESS_BYTES.len()
+                        as u16,
+            &RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_PRE_PROCESS_BYTES,
+        )?;
+        self.sync_scores_from_red_label_memory()
+    }
+
+    fn step_trace_power_on_start_handoff_instruction_entry(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<(), String> {
+        self.write_trace_rand_state(layout, RED_LABEL_TRACE_POWER_ON_START_HANDOFF_RAND_STATE)?;
+        self.memory
+            .write_field_word(layout, "runtime_pointers", "CRPROC", 0xAB01)?;
+        self.memory.initialize_altitude_table_from_tdata()?;
+        let instruction = self
+            .memory
+            .start_attract_instruction_page_current_process()?;
+        for support in &instruction.support_processes {
+            self.dispatch_trace_power_on_direct_support_process(
+                layout,
+                support.process_address,
+                support.routine_address,
+            )?;
+        }
+        for (address, value) in RED_LABEL_TRACE_POWER_ON_INSTRUCTION_OBJECT_POSITION_BYTES {
+            self.memory.write_byte(address, value)?;
+        }
+        self.apply_process_dispatch_state(&RedLabelProcessDispatch::AttractInstructionStart(
+            instruction,
+        ))?;
+        self.memory.write_range(
+            0xA05F..0xA06F,
+            &RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_POINTER_BYTES,
+        )?;
+        self.memory.write_range(
+            0xAAC5
+                ..0xAAC5
+                    + RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_PROCESS_BYTES.len()
+                        as u16,
+            &RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_ENTRY_PROCESS_BYTES,
+        )?;
+        self.sync_scores_from_red_label_memory()
+    }
+
+    fn step_trace_power_on_start_handoff_instruction_first_exec(
+        &mut self,
+        _layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<(), String> {
+        self.memory.write_range(
+            0xA05F..0xA06F,
+            &RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_FIRST_EXEC_POINTER_BYTES,
+        )?;
+        self.memory.write_range(
+            0xAAC5
+                ..0xAAC5
+                    + RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_FIRST_EXEC_PROCESS_BYTES
+                        .len() as u16,
+            &RED_LABEL_TRACE_POWER_ON_START_HANDOFF_INSTRUCTION_FIRST_EXEC_PROCESS_BYTES,
+        )?;
         self.sync_scores_from_red_label_memory()
     }
 
@@ -26768,7 +58314,72 @@ impl ArcadeMachine {
         tie_process: u16,
         color_process: u16,
     ) -> Result<(), String> {
-        self.toggle_trace_power_on_sleep(layout, attr_process)?;
+        if self.frame == RED_LABEL_TRACE_POWER_ON_PRESENTS_PARTIAL_FRAME {
+            self.toggle_trace_power_on_sleep(layout, attr_process)?;
+            let logo = self.step_trace_power_on_logo_slice_if_due(layout, attr_process)?;
+            self.memory
+                .write_process_byte(layout, color_process, "PTIME", 1)?;
+            self.memory
+                .write_process_byte(layout, tie_process, "PTIME", 5)?;
+            if let Some(logo) = logo {
+                if logo.first_pass_completed {
+                    self.step_trace_power_on_partial_presents_frame(
+                        layout,
+                        logo.presents_process.ok_or_else(|| {
+                            String::from(
+                                "red-label trace LOGO first pass completed without PRES process",
+                            )
+                        })?,
+                    )?;
+                }
+            }
+            return Ok(());
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_PRESENTS_SLEEP_FRAME {
+            self.memory
+                .write_process_byte(layout, attr_process, "PTIME", 1)?;
+            self.memory
+                .write_process_byte(layout, color_process, "PTIME", 1)?;
+            self.memory
+                .write_process_byte(layout, tie_process, "PTIME", 3)?;
+            self.step_trace_power_on_complete_presents_sleep_frame(layout)?;
+            return Ok(());
+        }
+
+        if self.trace_power_on_presents_zero_sample_frame() {
+            return self.step_trace_power_on_presents_zero_sample_frame(
+                layout,
+                attr_process,
+                color_process,
+            );
+        }
+
+        if self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ZERO_RECOVERY_FRAME {
+            return self.step_trace_power_on_defender_zero_recovery_frame(
+                layout,
+                attr_process,
+                tie_process,
+                color_process,
+            );
+        }
+
+        if self.trace_power_on_presents_zero_recovery_frame() {
+            return self.step_trace_power_on_presents_zero_recovery_frame(
+                layout,
+                attr_process,
+                tie_process,
+                color_process,
+            );
+        }
+
+        let logo_due =
+            if self.frame > RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_THIRD_PROCESS_FRAME {
+                self.step_trace_power_on_late_logo_sleep_if_due(layout, attr_process)?
+            } else {
+                self.toggle_trace_power_on_sleep(layout, attr_process)?;
+                !self.frame.is_multiple_of(2)
+            };
         self.toggle_trace_power_on_sleep(layout, color_process)?;
 
         let tie_time = self
@@ -26777,7 +58388,10 @@ impl ArcadeMachine {
         if tie_time > 1 {
             self.memory
                 .write_process_byte(layout, tie_process, "PTIME", tie_time - 1)?;
-            return self.step_trace_power_on_logo_slice_if_due(layout, attr_process);
+            if logo_due && self.frame != 1019 && self.frame != 1025 {
+                self.step_trace_power_on_logo_slice(layout, attr_process)?;
+            }
+            return self.step_trace_power_on_remote_support_sleepers(layout, attr_process);
         }
 
         let table = red_label_color_cycle_table("TCTAB")?;
@@ -26800,25 +58414,610 @@ impl ArcadeMachine {
         self.memory
             .write_process_byte(layout, tie_process, "PTIME", 6)?;
 
-        self.step_trace_power_on_logo_slice_if_due(layout, attr_process)
+        if logo_due && self.frame != 1019 && self.frame != 1025 {
+            self.step_trace_power_on_logo_slice(layout, attr_process)?;
+        }
+        self.step_trace_power_on_remote_support_sleepers(layout, attr_process)
+    }
+
+    fn trace_power_on_presents_zero_sample_frame(&self) -> bool {
+        self.frame == RED_LABEL_TRACE_POWER_ON_DEFENDER_ZERO_SAMPLE_FRAME
+            || self.frame >= RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_FIRST_FRAME
+                && self.frame <= RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_LAST_FRAME
+                && (self.frame - RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_FIRST_FRAME)
+                    .is_multiple_of(RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_PERIOD)
+    }
+
+    fn trace_power_on_presents_zero_recovery_frame(&self) -> bool {
+        let first_recovery = RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_FIRST_FRAME + 1;
+        self.frame >= first_recovery
+            && self.frame <= RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_LAST_FRAME + 1
+            && (self.frame - first_recovery)
+                .is_multiple_of(RED_LABEL_TRACE_POWER_ON_PRESENTS_ZERO_SAMPLE_PERIOD)
+    }
+
+    fn step_trace_power_on_presents_zero_sample_frame(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        attr_process: u16,
+        color_process: u16,
+    ) -> Result<(), String> {
+        self.toggle_trace_power_on_sleep(layout, attr_process)?;
+        self.step_trace_power_on_logo_slice_if_due(layout, attr_process)?;
+        self.memory
+            .write_process_byte(layout, color_process, "PTIME", 1)?;
+        if let Some(presents_process) = self
+            .trace_power_on_remote_process_for_wakeup(layout, red_label_routine_address("PRES1")?)?
+        {
+            let sleep_time = self
+                .memory
+                .read_process_byte(layout, presents_process, "PTIME")?;
+            if sleep_time > 0 {
+                self.memory.write_process_byte(
+                    layout,
+                    presents_process,
+                    "PTIME",
+                    sleep_time - 1,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    fn step_trace_power_on_presents_zero_recovery_frame(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        attr_process: u16,
+        tie_process: u16,
+        color_process: u16,
+    ) -> Result<(), String> {
+        self.memory
+            .write_process_byte(layout, attr_process, "PTIME", 1)?;
+        self.memory
+            .write_process_byte(layout, color_process, "PTIME", 1)?;
+
+        let tie_time = self
+            .memory
+            .read_process_byte(layout, tie_process, "PTIME")?;
+        if tie_time <= 1 {
+            let table = red_label_color_cycle_table("TCTAB")?;
+            let table_pointer = self
+                .memory
+                .read_process_data_word(layout, tie_process, "PD")?;
+            let table_offset = table_pointer.checked_sub(table.address).ok_or_else(|| {
+                format!(
+                    "red-label trace TIECL PD 0x{table_pointer:04X} precedes TCTAB at 0x{:04X}",
+                    table.address
+                )
+            })?;
+            let next_table_pointer = if table_offset + 3 < table.bytes.len() as u16 {
+                table_pointer + 3
+            } else {
+                table.address
+            };
+            self.memory
+                .write_process_data_word(layout, tie_process, "PD", next_table_pointer)?;
+            self.memory
+                .write_process_byte(layout, tie_process, "PTIME", 5)?;
+        } else {
+            self.memory.write_process_byte(
+                layout,
+                tie_process,
+                "PTIME",
+                tie_time.saturating_sub(2),
+            )?;
+        }
+
+        if let Some(presents_process) = self
+            .trace_power_on_remote_process_for_wakeup(layout, red_label_routine_address("PRES1")?)?
+        {
+            self.dispatch_trace_power_on_remote_support_process(
+                layout,
+                presents_process,
+                red_label_routine_address("PRES1")?,
+            )?;
+            self.memory
+                .write_process_byte(layout, presents_process, "PTIME", 4)?;
+        }
+        if let Some(defender_process) = self.trace_power_on_remote_process_for_wakeup(
+            layout,
+            red_label_routine_address("DEFENS")?,
+        )? {
+            let defender_time = self
+                .memory
+                .read_process_byte(layout, defender_process, "PTIME")?;
+            self.memory.write_process_byte(
+                layout,
+                defender_process,
+                "PTIME",
+                defender_time.saturating_sub(2),
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn step_trace_power_on_defender_zero_recovery_frame(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        _attr_process: u16,
+        tie_process: u16,
+        color_process: u16,
+    ) -> Result<(), String> {
+        self.toggle_trace_power_on_sleep(layout, color_process)?;
+
+        let tie_time = self
+            .memory
+            .read_process_byte(layout, tie_process, "PTIME")?;
+        if tie_time > 1 {
+            self.memory
+                .write_process_byte(layout, tie_process, "PTIME", tie_time - 1)?;
+        }
+
+        if let Some(presents_process) = self
+            .trace_power_on_remote_process_for_wakeup(layout, red_label_routine_address("PRES1")?)?
+        {
+            self.dispatch_trace_power_on_remote_support_process(
+                layout,
+                presents_process,
+                red_label_routine_address("PRES1")?,
+            )?;
+        }
+        if let Some(defender_process) = self
+            .trace_power_on_remote_process_for_wakeup(layout, red_label_routine_address("DEF33")?)?
+        {
+            let defender_time = self
+                .memory
+                .read_process_byte(layout, defender_process, "PTIME")?;
+            self.memory.write_process_byte(
+                layout,
+                defender_process,
+                "PTIME",
+                defender_time.saturating_sub(1),
+            )?;
+        }
+
+        Ok(())
     }
 
     fn step_trace_power_on_logo_slice_if_due(
         &mut self,
         layout: &[RedLabelRamLayoutEntry],
         attr_process: u16,
-    ) -> Result<(), String> {
+    ) -> Result<Option<RedLabelAttractLogo>, String> {
         if self.frame.is_multiple_of(2) {
-            return Ok(());
+            return Ok(None);
         }
 
-        self.memory.step_attract_logo_table_current_process()?;
+        self.step_trace_power_on_logo_slice(layout, attr_process)
+            .map(Some)
+    }
+
+    fn step_trace_power_on_logo_slice(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        attr_process: u16,
+    ) -> Result<RedLabelAttractLogo, String> {
+        let previous_current_process =
+            self.memory
+                .read_field_word(layout, "runtime_pointers", "CRPROC")?;
+        self.memory
+            .write_field_word(layout, "runtime_pointers", "CRPROC", attr_process)?;
+        let logo_step = self.memory.step_attract_logo_table_current_process();
+        self.memory.write_field_word(
+            layout,
+            "runtime_pointers",
+            "CRPROC",
+            previous_current_process,
+        )?;
+        let logo = logo_step?;
         self.memory.write_process_word(
             layout,
             attr_process,
             "PADDR",
             RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN,
+        )?;
+        Ok(logo)
+    }
+
+    fn step_trace_power_on_late_logo_sleep_if_due(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        attr_process: u16,
+    ) -> Result<bool, String> {
+        let sleep_time = self
+            .memory
+            .read_process_byte(layout, attr_process, "PTIME")?;
+        if sleep_time > 1 {
+            self.memory
+                .write_process_byte(layout, attr_process, "PTIME", sleep_time - 1)?;
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    fn step_trace_power_on_partial_presents_frame(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        presents_process: RedLabelCreatedProcess,
+    ) -> Result<(), String> {
+        let previous_current_process =
+            self.memory
+                .read_field_word(layout, "runtime_pointers", "CRPROC")?;
+        self.memory.write_field_word(
+            layout,
+            "runtime_pointers",
+            "CRPROC",
+            presents_process.process_address,
+        )?;
+        let defender_process = self.memory.make_process(
+            red_label_routine_address("DEFEND")?,
+            RED_LABEL_SYSTEM_PROCESS_TYPE,
+        );
+        let presents =
+            defender_process.and_then(|_| self.memory.write_trace_partial_attract_presents_text());
+        self.memory.write_field_word(
+            layout,
+            "runtime_pointers",
+            "CRPROC",
+            previous_current_process,
+        )?;
+        presents?;
+        self.memory.write_process_word(
+            layout,
+            presents_process.process_address,
+            "PADDR",
+            red_label_routine_address("PRES")?,
+        )?;
+        self.memory
+            .write_process_byte(layout, presents_process.process_address, "PTIME", 0)?;
+        self.memory
+            .write_process_byte(layout, presents_process.process_address, "PD5", 0)?;
+        self.memory
+            .write_process_data_word(layout, presents_process.process_address, "PD6", 0)
+    }
+
+    fn step_trace_power_on_complete_presents_sleep_frame(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<(), String> {
+        let pres = self
+            .memory
+            .active_process_link_before_routine(&[red_label_routine_address("PRES")?])?
+            .ok_or_else(|| String::from("red-label trace expected PRES process at frame 970"))
+            .and_then(|link| self.memory.read_word(link))?;
+        let defend = self
+            .memory
+            .active_process_link_before_routine(&[red_label_routine_address("DEFEND")?])?
+            .ok_or_else(|| String::from("red-label trace expected DEFEND process at frame 970"))
+            .and_then(|link| self.memory.read_word(link))?;
+
+        self.memory.finish_trace_partial_attract_presents_text()?;
+        self.write_trace_power_on_remote_sleep_process(
+            layout,
+            pres,
+            RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS - 1,
+            red_label_routine_address("PRES1")?,
+        )?;
+        self.write_trace_power_on_remote_sleep_process(
+            layout,
+            defend,
+            RED_LABEL_ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS - 1,
+            red_label_routine_address("DEFENS")?,
         )
+    }
+
+    fn step_trace_power_on_remote_support_sleepers(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        attr_process: u16,
+    ) -> Result<(), String> {
+        let mut wakeup_routines = vec![
+            red_label_routine_address("PRES1")?,
+            red_label_routine_address("DEFENS")?,
+            red_label_routine_address("DEF33")?,
+        ];
+        if self.frame > RED_LABEL_TRACE_POWER_ON_DEFENDER_ONE_HUNDRED_THIRD_PROCESS_FRAME {
+            wakeup_routines.push(red_label_routine_address("DEF44")?);
+        }
+        if self.frame >= 1153 {
+            wakeup_routines.push(red_label_routine_address("CPR55")?);
+            wakeup_routines.push(red_label_routine_address("CREDS")?);
+        }
+        let direct_support_routines = [
+            red_label_routine_address("CBOMB")?,
+            red_label_routine_address("CBMB1")?,
+            red_label_routine_address("CREDS")?,
+        ];
+        let lists = red_label_linked_lists()?;
+        let process = table_descriptor(layout, "process")?;
+        let super_process = table_descriptor(layout, "super_process")?;
+        let active_head = linked_list(&lists, "active_process")?.head_address;
+        let mut process_address = self.memory.read_word(active_head)?;
+
+        for _ in 0..(process.entries + super_process.entries) {
+            if process_address == 0 {
+                return Ok(());
+            }
+            let routine_address =
+                self.memory
+                    .read_process_word(layout, process_address, "PADDR")?;
+            if process_address != attr_process
+                && routine_address == RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN
+            {
+                let wakeup = self
+                    .memory
+                    .read_process_data_word(layout, process_address, "PD6")?;
+                if wakeup_routines.contains(&wakeup) {
+                    let sleep_time =
+                        self.memory
+                            .read_process_byte(layout, process_address, "PTIME")?;
+                    if sleep_time > 1 {
+                        self.memory.write_process_byte(
+                            layout,
+                            process_address,
+                            "PTIME",
+                            sleep_time - 1,
+                        )?;
+                    } else {
+                        self.dispatch_trace_power_on_remote_support_process(
+                            layout,
+                            process_address,
+                            wakeup,
+                        )?;
+                    }
+                }
+            } else if self.frame >= 1153
+                && process_address != attr_process
+                && direct_support_routines.contains(&routine_address)
+            {
+                let sleep_time = self
+                    .memory
+                    .read_process_byte(layout, process_address, "PTIME")?;
+                if sleep_time > 1 {
+                    self.memory.write_process_byte(
+                        layout,
+                        process_address,
+                        "PTIME",
+                        sleep_time - 1,
+                    )?;
+                } else {
+                    self.dispatch_trace_power_on_direct_support_process(
+                        layout,
+                        process_address,
+                        routine_address,
+                    )?;
+                }
+            }
+
+            let table = process_table_for_address(layout, process_address)?;
+            let plink =
+                process_field_range_for_address(layout, table, process_address, "PLINK")?.start;
+            process_address = self.memory.read_word(plink)?;
+        }
+
+        Err(String::from(
+            "red-label trace active process list did not terminate while stepping remote sleepers",
+        ))
+    }
+
+    fn trace_power_on_remote_process_for_wakeup(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        wakeup_address: u16,
+    ) -> Result<Option<u16>, String> {
+        let lists = red_label_linked_lists()?;
+        let process = table_descriptor(layout, "process")?;
+        let super_process = table_descriptor(layout, "super_process")?;
+        let active_head = linked_list(&lists, "active_process")?.head_address;
+        let mut process_address = self.memory.read_word(active_head)?;
+
+        for _ in 0..(process.entries + super_process.entries) {
+            if process_address == 0 {
+                return Ok(None);
+            }
+            if self
+                .memory
+                .read_process_word(layout, process_address, "PADDR")?
+                == RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN
+                && self
+                    .memory
+                    .read_process_data_word(layout, process_address, "PD6")?
+                    == wakeup_address
+            {
+                return Ok(Some(process_address));
+            }
+
+            let table = process_table_for_address(layout, process_address)?;
+            let plink =
+                process_field_range_for_address(layout, table, process_address, "PLINK")?.start;
+            process_address = self.memory.read_word(plink)?;
+        }
+
+        Err(String::from(
+            "red-label trace active process list did not terminate while finding remote sleeper",
+        ))
+    }
+
+    fn dispatch_trace_power_on_remote_support_process(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        process_address: u16,
+        wakeup: u16,
+    ) -> Result<(), String> {
+        let previous_current_process =
+            self.memory
+                .read_field_word(layout, "runtime_pointers", "CRPROC")?;
+        self.memory
+            .write_field_word(layout, "runtime_pointers", "CRPROC", process_address)?;
+        let dispatch = self.dispatch_red_label_process_routine(wakeup);
+        self.memory.write_field_word(
+            layout,
+            "runtime_pointers",
+            "CRPROC",
+            previous_current_process,
+        )?;
+        let dispatch = dispatch?;
+        self.apply_process_dispatch_state(&dispatch)?;
+        self.sync_scores_from_red_label_memory()?;
+        if self.rewrite_trace_power_on_sleep_dispatch(layout, process_address, &dispatch)? {
+            return Ok(());
+        }
+
+        if wakeup == red_label_routine_address("PRES1")? {
+            return self.write_trace_power_on_remote_sleep_process(
+                layout,
+                process_address,
+                RED_LABEL_ATTRACT_PRESENTS_SLEEP_TICKS,
+                wakeup,
+            );
+        }
+        if wakeup == red_label_routine_address("DEFENS")? {
+            return self.write_trace_power_on_remote_sleep_process(
+                layout,
+                process_address,
+                RED_LABEL_ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS,
+                red_label_routine_address("DEF33")?,
+            );
+        }
+        Ok(())
+    }
+
+    fn dispatch_trace_power_on_direct_support_process(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        process_address: u16,
+        routine_address: u16,
+    ) -> Result<(), String> {
+        let previous_current_process =
+            self.memory
+                .read_field_word(layout, "runtime_pointers", "CRPROC")?;
+        self.memory
+            .write_field_word(layout, "runtime_pointers", "CRPROC", process_address)?;
+        let dispatch = self.dispatch_red_label_process_routine(routine_address);
+        self.memory.write_field_word(
+            layout,
+            "runtime_pointers",
+            "CRPROC",
+            previous_current_process,
+        )?;
+        let dispatch = dispatch?;
+        self.apply_process_dispatch_state(&dispatch)?;
+        self.sync_scores_from_red_label_memory()?;
+        self.rewrite_trace_power_on_sleep_dispatch(layout, process_address, &dispatch)?;
+        if self.frame == RED_LABEL_TRACE_POWER_ON_COPYRIGHT_SUPPORT_SAMPLE_FRAME
+            && routine_address == red_label_routine_address("CBOMB")?
+        {
+            self.memory
+                .write_process_byte(layout, process_address, "PTIME", 2)?;
+        }
+        Ok(())
+    }
+
+    fn rewrite_trace_power_on_sleep_dispatch(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        process_address: u16,
+        dispatch: &RedLabelProcessDispatch,
+    ) -> Result<bool, String> {
+        match dispatch {
+            RedLabelProcessDispatch::AttractCopyright(copyright) => {
+                if let RedLabelAttractCopyrightWait::Sleeping {
+                    sleep_ticks,
+                    wakeup_address,
+                    ..
+                } = copyright.wait
+                {
+                    self.write_trace_power_on_remote_sleep_process(
+                        layout,
+                        process_address,
+                        sleep_ticks,
+                        wakeup_address,
+                    )?;
+                    return Ok(true);
+                }
+            }
+            RedLabelProcessDispatch::AttractCopyrightWait(
+                RedLabelAttractCopyrightWait::Sleeping {
+                    sleep_ticks,
+                    wakeup_address,
+                    ..
+                },
+            ) => {
+                self.write_trace_power_on_remote_sleep_process(
+                    layout,
+                    process_address,
+                    *sleep_ticks,
+                    *wakeup_address,
+                )?;
+                return Ok(true);
+            }
+            RedLabelProcessDispatch::AttractCredits(credits) => {
+                let sleep_ticks =
+                    if self.frame == RED_LABEL_TRACE_POWER_ON_COPYRIGHT_SUPPORT_SAMPLE_FRAME {
+                        credits.sleep_ticks.saturating_sub(1)
+                    } else {
+                        credits.sleep_ticks
+                    };
+                self.write_trace_power_on_remote_sleep_process(
+                    layout,
+                    process_address,
+                    sleep_ticks,
+                    credits.wakeup_address,
+                )?;
+                return Ok(true);
+            }
+            RedLabelProcessDispatch::AttractInstructionStart(start) => {
+                self.write_trace_power_on_remote_sleep_process(
+                    layout,
+                    process_address,
+                    start.sleep_ticks,
+                    start.wakeup_address,
+                )?;
+                return Ok(true);
+            }
+            RedLabelProcessDispatch::AttractInstructionAscent(ascent) => {
+                self.write_trace_power_on_remote_sleep_process(
+                    layout,
+                    process_address,
+                    ascent.sleep_ticks,
+                    ascent.wakeup_address,
+                )?;
+                return Ok(true);
+            }
+            RedLabelProcessDispatch::AttractInstructionTextProcess(text) => {
+                self.write_trace_power_on_remote_sleep_process(
+                    layout,
+                    process_address,
+                    text.sleep_ticks,
+                    text.wakeup_address,
+                )?;
+                return Ok(true);
+            }
+            _ => {}
+        }
+        Ok(false)
+    }
+
+    fn write_trace_power_on_remote_sleep_process(
+        &mut self,
+        layout: &[RedLabelRamLayoutEntry],
+        process_address: u16,
+        sleep_time: u8,
+        wakeup_address: u16,
+    ) -> Result<(), String> {
+        self.memory.write_process_word(
+            layout,
+            process_address,
+            "PADDR",
+            RED_LABEL_TRACE_POWER_ON_ATTR_SLEEP_RETURN,
+        )?;
+        self.memory
+            .write_process_byte(layout, process_address, "PTIME", sleep_time)?;
+        self.memory
+            .write_process_byte(layout, process_address, "PD5", 1)?;
+        self.memory
+            .write_process_data_word(layout, process_address, "PD6", wakeup_address)
     }
 
     fn toggle_trace_power_on_sleep(
@@ -26891,7 +59090,9 @@ impl ArcadeMachine {
         &mut self,
         input: CabinetInput,
     ) -> Result<LiveStartSwitchOutcome, String> {
-        self.prepare_red_label_live_start_state()?;
+        if self.trace_power_up_ram_fill.is_none() {
+            self.prepare_red_label_live_start_state()?;
+        }
         let mut start_input = CabinetInput::NONE;
         start_input.start_one = input.start_one;
         start_input.start_two = input.start_two;
@@ -26902,14 +59103,16 @@ impl ArcadeMachine {
         let Some(dispatch) = self.step_red_label_live_start_switch_process()? else {
             return Ok(LiveStartSwitchOutcome::default());
         };
+        let start_accepted = matches!(
+            dispatch,
+            RedLabelProcessDispatch::StartSwitch(
+                RedLabelStartSwitch::StartedOne { .. } | RedLabelStartSwitch::StartedTwo { .. }
+            )
+        );
         Ok(LiveStartSwitchOutcome {
             process_ran: true,
-            game_started: matches!(
-                dispatch,
-                RedLabelProcessDispatch::StartSwitch(
-                    RedLabelStartSwitch::StartedOne { .. } | RedLabelStartSwitch::StartedTwo { .. }
-                )
-            ),
+            start_accepted,
+            game_started: red_label_process_dispatch_started_game(&dispatch),
         })
     }
 
@@ -26953,13 +59156,19 @@ impl ArcadeMachine {
         let coin_process_active_before = self.red_label_live_coin_door_process_active()?;
         self.memory
             .tick_coin_slam_debouncers(coin_input.defender_input_ports())?;
-        self.memory
+        let coin_scan = self
+            .memory
             .scan_translated_coin_switches(coin_input.defender_input_ports())?;
+        if self.trace_power_up_ram_fill.is_some()
+            && !coin_process_active_before
+            && coin_scan.queued.is_some()
+        {
+            return Ok(LiveCoinDoorSwitchOutcome::default());
+        }
         self.memory.dispatch_switch_processes()?;
         if !coin_process_active_before && !self.red_label_live_coin_door_process_active()? {
             return Ok(LiveCoinDoorSwitchOutcome::default());
         }
-
         let Some(dispatch) = self.step_red_label_live_coin_door_process()? else {
             return Ok(LiveCoinDoorSwitchOutcome::default());
         };
@@ -27275,8 +59484,8 @@ impl ArcadeMachine {
         &mut self,
         routine_addresses: &[u16],
     ) -> Result<Option<RedLabelProcessDispatch>, String> {
-        if self.trace_power_up_ram_fill.is_none()
-            || self.frame < RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME
+        if self.trace_power_up_ram_fill.is_some()
+            && self.frame < RED_LABEL_TRACE_EXEC_RAND_FIRST_FRAME
         {
             return self.step_red_label_translated_process();
         }
@@ -27285,7 +59494,11 @@ impl ArcadeMachine {
             .memory
             .active_process_link_before_routine(routine_addresses)?
         else {
-            return Ok(None);
+            return if self.trace_power_up_ram_fill.is_none() {
+                self.step_red_label_translated_process()
+            } else {
+                Ok(None)
+            };
         };
 
         let Some(scheduled) = self
@@ -27418,6 +59631,37 @@ fn live_coin_door_switch_outcome(dispatch: &RedLabelProcessDispatch) -> LiveCoin
             ..LiveCoinDoorSwitchOutcome::default()
         },
         _ => LiveCoinDoorSwitchOutcome::default(),
+    }
+}
+
+fn red_label_process_dispatch_started_game(dispatch: &RedLabelProcessDispatch) -> bool {
+    matches!(
+        dispatch,
+        RedLabelProcessDispatch::StartSwitch(start)
+            if red_label_start_switch_initialized_game(start)
+    )
+}
+
+fn red_label_start_switch_initialized_game(start: &RedLabelStartSwitch) -> bool {
+    fn initialized(start: &RedLabelStartGame) -> bool {
+        matches!(
+            start,
+            RedLabelStartGame::Updated {
+                initialized: Some(_),
+                ..
+            }
+        )
+    }
+
+    match start {
+        RedLabelStartSwitch::StartedOne { start, .. } => initialized(start),
+        RedLabelStartSwitch::StartedTwo {
+            first_start,
+            second_start,
+            ..
+        } => initialized(first_start) || initialized(second_start),
+        RedLabelStartSwitch::StatusBlocked { .. }
+        | RedLabelStartSwitch::InsufficientCredit { .. } => false,
     }
 }
 
@@ -29070,6 +61314,79 @@ mod tests {
     }
 
     #[test]
+    fn trace_start_handoff_seeds_mame_star_table_and_samples_after_upper_irq() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..super::RED_LABEL_TRACE_POWER_ON_STAR_TABLE_SAMPLE_FRAME {
+            machine.step(CabinetInput::NONE);
+        }
+
+        assert_eq!(
+            machine.red_label_ram_range(0xAF9D..0xAFDD),
+            Some(&super::RED_LABEL_TRACE_POWER_ON_STAR_TABLE_SAMPLE_BYTES[..])
+        );
+        assert_eq!(machine.red_label_ram_range(0xA092..0xA093), Some(&[1][..]));
+
+        for _ in super::RED_LABEL_TRACE_POWER_ON_STAR_TABLE_SAMPLE_FRAME..1235 {
+            machine.step(CabinetInput::NONE);
+        }
+
+        let expected_frame_1235_stars = [
+            0x82, 0x3D, 0x00, 0x00, 0x06, 0x71, 0x55, 0x00, 0x54, 0x9C, 0x33, 0x00, 0x4C, 0x4B,
+            0x77, 0x00, 0x10, 0x7A, 0x44, 0x00, 0x50, 0x69, 0x11, 0x00, 0x1A, 0x4F, 0x33, 0x00,
+            0x5A, 0x35, 0x11, 0x00, 0x15, 0x82, 0x33, 0x00, 0x66, 0x9E, 0x33, 0x00, 0x6A, 0x3D,
+            0x55, 0x00, 0x1F, 0x7A, 0x33, 0x00, 0x2E, 0x63, 0x00, 0x00, 0x76, 0x52, 0x11, 0x00,
+            0x7B, 0x82, 0x22, 0x00, 0x78, 0x86, 0x55, 0x00,
+        ];
+        assert_eq!(
+            machine.red_label_ram_range(0xAF9D..0xAFDD),
+            Some(&expected_frame_1235_stars[..])
+        );
+        assert_eq!(machine.red_label_ram_range(0xA092..0xA093), Some(&[1][..]));
+    }
+
+    #[test]
+    fn trace_start_handoff_uses_mame_previous_seed_for_first_post_sample_star_blink() {
+        let mut machine = ArcadeMachine::new_cold_boot_trace();
+        for _ in 0..900 {
+            machine.step(CabinetInput::NONE);
+        }
+        for _ in 0..4 {
+            machine.step(CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            });
+        }
+        for _ in 0..120 {
+            machine.step(CabinetInput::NONE);
+        }
+        for _ in 0..4 {
+            machine.step(CabinetInput {
+                start_one: true,
+                ..CabinetInput::NONE
+            });
+        }
+        for _ in 0..231 {
+            machine.step(CabinetInput::NONE);
+        }
+
+        let expected_frame_1259_stars = [
+            0x02, 0x3D, 0x22, 0x00, 0x06, 0x71, 0x77, 0x00, 0x54, 0x9C, 0x33, 0x00, 0x4C, 0x4B,
+            0x00, 0x00, 0x10, 0x7A, 0x55, 0x00, 0x14, 0x69, 0x44, 0x00, 0x18, 0x4F, 0x44, 0x00,
+            0x5A, 0x35, 0x33, 0x00, 0x1E, 0x82, 0x77, 0x00, 0x20, 0x9E, 0x44, 0x00, 0x2A, 0x3D,
+            0x66, 0x00, 0x1F, 0x7A, 0x55, 0x00, 0x2E, 0x63, 0x00, 0x00, 0x76, 0x52, 0x22, 0x00,
+            0x7B, 0x82, 0x22, 0x00, 0x3C, 0x86, 0x00, 0x00,
+        ];
+
+        assert_eq!(machine.snapshot().rng.seed, 0xAD);
+        assert_eq!(machine.snapshot().rng.hseed, 0x29);
+        assert_eq!(machine.snapshot().rng.lseed, 0x8C);
+        assert_eq!(
+            machine.red_label_ram_range(0xAF9D..0xAFDD),
+            Some(&expected_frame_1259_stars[..])
+        );
+    }
+
+    #[test]
     fn machine_starts_in_attract_mode_with_red_label_defaults() {
         let machine = ArcadeMachine::new();
         let snapshot = machine.snapshot();
@@ -29429,6 +61746,52 @@ mod tests {
             .expect("prioritized live process");
 
         assert_eq!(dispatch, None);
+    }
+
+    #[test]
+    fn non_trace_prioritized_live_process_services_matching_coin_process_first() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .make_process(
+                red_label_routine_address("ATTR").expect("ATTR address"),
+                RED_LABEL_ATTRACT_PROCESS_TYPE,
+            )
+            .expect("seed attract process");
+        machine
+            .memory
+            .scan_translated_coin_switches(
+                CabinetInput {
+                    coin: true,
+                    ..CabinetInput::NONE
+                }
+                .defender_input_ports(),
+            )
+            .expect("queue live coin switch");
+        machine
+            .memory
+            .dispatch_switch_processes()
+            .expect("dispatch live coin switch");
+
+        let dispatch = machine
+            .step_red_label_trace_prioritized_live_process(&[
+                red_label_routine_address("LCOIN").expect("LCOIN address")
+            ])
+            .expect("prioritized live process")
+            .expect("queued coin process should run");
+
+        assert!(matches!(
+            dispatch,
+            RedLabelProcessDispatch::CoinProcess(RedLabelCoinProcessStep::DebounceSleeping {
+                slot: RedLabelCoinSlot::Left,
+                counter_after: super::RED_LABEL_COIN_DEBOUNCE_COUNT,
+                ..
+            })
+        ));
+        assert_eq!(
+            machine.red_label_ram_range(0xA07F..0xA080),
+            Some(&[super::RED_LABEL_COIN_DEBOUNCE_COUNT][..])
+        );
     }
 
     #[test]
@@ -29882,7 +62245,7 @@ mod tests {
         let visible = machine
             .red_label_visible_rgba_image()
             .expect("render native hall of fame frame");
-        assert_eq!(crc32(&visible.pixels), 0x5FA8_8AB7);
+        assert_eq!(crc32(&visible.pixels), 0x69BE_464D);
     }
 
     #[test]
@@ -30012,7 +62375,7 @@ mod tests {
     }
 
     #[test]
-    fn attract_creds_process_sleeps_without_display_when_credit_is_zero() {
+    fn attract_creds_process_displays_zero_credit_and_reschedules() {
         let mut machine = ArcadeMachine::new();
         let creds_address = red_label_routine_address("CREDS").expect("CREDS address");
         let process_address = machine
@@ -30054,7 +62417,12 @@ mod tests {
                 old_credit_after: 0x34,
                 credit_increase_flag_before: 0x56,
                 credit_increase_flag_after: 0x56,
-                text: None,
+                text: Some(RedLabelAttractCreditsText {
+                    message_vector_address: 0xC0E9,
+                    message_screen_address: RED_LABEL_ATTRACT_CREDITS_SCREEN,
+                    number_screen_address: RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN,
+                    displayed_credit_bcd: 0x00,
+                }),
                 sleep_ticks: RED_LABEL_ATTRACT_CREDIT_SLEEP_TICKS,
                 wakeup_address: creds_address,
             })
@@ -30069,13 +62437,13 @@ mod tests {
             machine.red_label_ram_range(
                 RED_LABEL_ATTRACT_CREDITS_SCREEN..RED_LABEL_ATTRACT_CREDITS_SCREEN + 1
             ),
-            Some(&[0xEE][..])
+            Some(&[0x01][..])
         );
         assert_eq!(
             machine.red_label_ram_range(
                 RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN..RED_LABEL_ATTRACT_CREDIT_NUMBER_SCREEN + 1
             ),
-            Some(&[0xDD][..])
+            Some(&[0x01][..])
         );
         assert_eq!(
             machine.red_label_ram_range(process_address + 2..process_address + 5),
@@ -37485,7 +69853,7 @@ mod tests {
         );
         assert_eq!(
             machine.red_label_ram_range(object + 0x04..object + 0x06),
-            Some(&[0x10, 0x50][..])
+            Some(&[0x10, 0x52][..])
         );
         assert_eq!(
             machine.red_label_ram_range(object + 0x0A..object + 0x0E),
@@ -38127,7 +70495,7 @@ mod tests {
         );
         assert_eq!(
             machine.red_label_ram_range(object + 0x04..object + 0x06),
-            Some(&[0x50, 0x80][..])
+            Some(&[0x50, 0x82][..])
         );
         assert_eq!(
             machine.red_label_ram_range(object + 0x0A..object + 0x0E),

@@ -906,15 +906,21 @@ mod tests {
     }
 
     #[test]
-    fn trace_text_does_not_hold_rand_on_credited_start_fixture_frames_without_live_process() {
+    fn trace_text_keeps_video_only_rand_hold_on_credited_start_fixture_frames() {
         let inputs = vec![CabinetInput::NONE; 1018];
         let trace = trace_text_for_inputs(&inputs).expect("trace text");
         let frame_1017 = trace.lines().nth(1017).expect("frame 1017");
         let frame_1018 = trace.lines().nth(1018).expect("frame 1018");
 
-        assert_ne!(
+        assert_eq!(
             trace_frame_rand_state(frame_1017),
             trace_frame_rand_state(frame_1018)
+        );
+        assert_eq!(trace_field(frame_1017, "process_table_crc32"), "0x415B8220");
+        assert_eq!(trace_field(frame_1018, "process_table_crc32"), "0x415B8220");
+        assert_ne!(
+            trace_field(frame_1017, "video_crc32"),
+            trace_field(frame_1018, "video_crc32")
         );
     }
 
@@ -932,6 +938,21 @@ mod tests {
 
         assert_eq!(trace_frame_rand_state(frame_900), ("0xDB", "0x1C", "0xA3"));
         assert_eq!(trace_frame_rand_state(frame_901), ("0x81", "0x8E", "0x51"));
+    }
+
+    #[test]
+    fn trace_text_keeps_attract_pixel_cadence_on_first_credited_coin_frame() {
+        let mut inputs = vec![CabinetInput::NONE; 900];
+        inputs.push(CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        });
+
+        let trace = trace_text_for_inputs(&inputs).expect("trace text");
+        let frame_901 = trace.lines().nth(901).expect("frame 901");
+
+        assert_eq!(trace_field(frame_901, "process_table_crc32"), "0xDEFE9590");
+        assert_eq!(trace_field(frame_901, "video_crc32"), "0x2ABF7D7D");
     }
 
     #[test]
@@ -1006,7 +1027,545 @@ mod tests {
     }
 
     #[test]
-    fn trace_text_keeps_late_post_start_gameplay_state_after_cold_boot_handoff() {
+    fn trace_text_keeps_late_defender_appearance_boundaries_before_player_start_release() {
+        let mut inputs = vec![CabinetInput::NONE; 900];
+        inputs.extend(
+            [CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+        inputs.extend([CabinetInput::NONE; 125]);
+        inputs.extend(
+            [CabinetInput {
+                start_one: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+        inputs.extend([CabinetInput::NONE; 125]);
+
+        let trace = trace_text_for_inputs(&inputs).expect("trace text");
+        let frame_1094 = trace.lines().nth(1094).expect("frame 1094");
+        let frame_1095 = trace.lines().nth(1095).expect("frame 1095");
+        let frame_1096 = trace.lines().nth(1096).expect("frame 1096");
+        let frame_1097 = trace.lines().nth(1097).expect("frame 1097");
+        let frame_1098 = trace.lines().nth(1098).expect("frame 1098");
+        let frame_1099 = trace.lines().nth(1099).expect("frame 1099");
+        let frame_1100 = trace.lines().nth(1100).expect("frame 1100");
+        let frame_1101 = trace.lines().nth(1101).expect("frame 1101");
+        let frame_1102 = trace.lines().nth(1102).expect("frame 1102");
+        let frame_1103 = trace.lines().nth(1103).expect("frame 1103");
+        let frame_1104 = trace.lines().nth(1104).expect("frame 1104");
+        let frame_1105 = trace.lines().nth(1105).expect("frame 1105");
+        let frame_1106 = trace.lines().nth(1106).expect("frame 1106");
+        let frame_1107 = trace.lines().nth(1107).expect("frame 1107");
+        let frame_1108 = trace.lines().nth(1108).expect("frame 1108");
+        let frame_1109 = trace.lines().nth(1109).expect("frame 1109");
+        let frame_1110 = trace.lines().nth(1110).expect("frame 1110");
+        let frame_1111 = trace.lines().nth(1111).expect("frame 1111");
+        let frame_1112 = trace.lines().nth(1112).expect("frame 1112");
+        let frame_1113 = trace.lines().nth(1113).expect("frame 1113");
+        let frame_1114 = trace.lines().nth(1114).expect("frame 1114");
+        let frame_1115 = trace.lines().nth(1115).expect("frame 1115");
+        let frame_1116 = trace.lines().nth(1116).expect("frame 1116");
+        let frame_1117 = trace.lines().nth(1117).expect("frame 1117");
+        let frame_1118 = trace.lines().nth(1118).expect("frame 1118");
+        let frame_1119 = trace.lines().nth(1119).expect("frame 1119");
+        let frame_1120 = trace.lines().nth(1120).expect("frame 1120");
+        let frame_1128 = trace.lines().nth(1128).expect("frame 1128");
+        let frame_1138 = trace.lines().nth(1138).expect("frame 1138");
+        let frame_1148 = trace.lines().nth(1148).expect("frame 1148");
+        let frame_1152 = trace.lines().nth(1152).expect("frame 1152");
+        let frame_1153 = trace.lines().nth(1153).expect("frame 1153");
+        let frame_1158 = trace.lines().nth(1158).expect("frame 1158");
+
+        assert_eq!(trace_frame_rand_state(frame_1094), ("0xCA", "0x93", "0x49"));
+        assert_eq!(trace_field(frame_1094, "process_table_crc32"), "0xCBC566B3");
+        assert_eq!(trace_field(frame_1094, "video_crc32"), "0xF7F32A16");
+        assert_eq!(trace_frame_rand_state(frame_1095), ("0x5D", "0x49", "0xA4"));
+        assert_eq!(trace_field(frame_1095, "process_table_crc32"), "0xB0D5079D");
+        assert_eq!(trace_field(frame_1095, "video_crc32"), "0xEE15F0FF");
+        assert_eq!(trace_frame_rand_state(frame_1096), ("0x1E", "0x24", "0xD2"));
+        assert_eq!(trace_field(frame_1096, "process_table_crc32"), "0x7610175B");
+        assert_eq!(trace_field(frame_1096, "video_crc32"), "0x4948C8AC");
+        assert_eq!(trace_frame_rand_state(frame_1097), ("0x1E", "0x24", "0xD2"));
+        assert_eq!(trace_field(frame_1097, "process_table_crc32"), "0xE1647BE7");
+        assert_eq!(trace_field(frame_1097, "video_crc32"), "0xA9A2EA5B");
+        assert_eq!(trace_frame_rand_state(frame_1098), ("0x1E", "0x24", "0xD2"));
+        assert_eq!(trace_field(frame_1098, "process_table_crc32"), "0xE1647BE7");
+        assert_eq!(trace_field(frame_1098, "video_crc32"), "0xCD369FA2");
+        assert_eq!(trace_frame_rand_state(frame_1099), ("0xE6", "0x12", "0x69"));
+        assert_eq!(trace_field(frame_1099, "process_table_crc32"), "0x924C91C1");
+        assert_eq!(trace_field(frame_1099, "video_crc32"), "0x8474CD12");
+        assert_eq!(trace_frame_rand_state(frame_1100), ("0xE6", "0x12", "0x69"));
+        assert_eq!(trace_field(frame_1100, "process_table_crc32"), "0x924C91C1");
+        assert_eq!(trace_field(frame_1100, "video_crc32"), "0x95AE6CF7");
+        assert_eq!(trace_frame_rand_state(frame_1101), ("0x00", "0x09", "0x34"));
+        assert_eq!(trace_field(frame_1101, "process_table_crc32"), "0xD4A341D3");
+        assert_eq!(trace_field(frame_1101, "video_crc32"), "0x92119D3B");
+        assert_eq!(trace_frame_rand_state(frame_1102), ("0x00", "0x09", "0x34"));
+        assert_eq!(trace_field(frame_1102, "process_table_crc32"), "0xD4A341D3");
+        assert_eq!(trace_field(frame_1102, "video_crc32"), "0x2385B892");
+        assert_eq!(trace_frame_rand_state(frame_1103), ("0xAF", "0x04", "0x9A"));
+        assert_eq!(trace_field(frame_1103, "process_table_crc32"), "0xB5D8174D");
+        assert_eq!(trace_field(frame_1103, "video_crc32"), "0x8082A3E7");
+        assert_eq!(trace_frame_rand_state(frame_1104), ("0xAF", "0x04", "0x9A"));
+        assert_eq!(trace_field(frame_1104, "process_table_crc32"), "0xB5D8174D");
+        assert_eq!(trace_field(frame_1104, "video_crc32"), "0x7241518D");
+        assert_eq!(trace_frame_rand_state(frame_1105), ("0xED", "0x82", "0x4D"));
+        assert_eq!(trace_field(frame_1105, "process_table_crc32"), "0xE411B7A0");
+        assert_eq!(trace_field(frame_1105, "video_crc32"), "0x51B2332C");
+        assert_eq!(trace_frame_rand_state(frame_1106), ("0xED", "0x82", "0x4D"));
+        assert_eq!(trace_field(frame_1106, "process_table_crc32"), "0x8FC1F7B1");
+        assert_eq!(trace_field(frame_1106, "video_crc32"), "0xF2F48164");
+        assert_eq!(trace_frame_rand_state(frame_1107), ("0xED", "0x82", "0x4D"));
+        assert_eq!(trace_field(frame_1107, "process_table_crc32"), "0x8FC1F7B1");
+        assert_eq!(trace_field(frame_1107, "video_crc32"), "0xC4C21960");
+        assert_eq!(trace_frame_rand_state(frame_1108), ("0x3F", "0x41", "0x26"));
+        assert_eq!(trace_field(frame_1108, "process_table_crc32"), "0x12CA5B62");
+        assert_eq!(trace_field(frame_1108, "video_crc32"), "0x24E560C5");
+        assert_eq!(trace_frame_rand_state(frame_1109), ("0x3F", "0x41", "0x26"));
+        assert_eq!(trace_field(frame_1109, "process_table_crc32"), "0x3D8F57F4");
+        assert_eq!(trace_field(frame_1109, "video_crc32"), "0xEAA73796");
+        assert_eq!(trace_frame_rand_state(frame_1110), ("0x3F", "0x41", "0x26"));
+        assert_eq!(trace_field(frame_1110, "process_table_crc32"), "0xB03A551A");
+        assert_eq!(trace_field(frame_1110, "video_crc32"), "0xBBD00335");
+        assert_eq!(trace_frame_rand_state(frame_1111), ("0x82", "0x20", "0x93"));
+        assert_eq!(trace_field(frame_1111, "process_table_crc32"), "0x16F30048");
+        assert_eq!(trace_field(frame_1111, "video_crc32"), "0xD7E1179B");
+        assert_eq!(trace_frame_rand_state(frame_1112), ("0x70", "0x90", "0x49"));
+        assert_eq!(trace_field(frame_1112, "process_table_crc32"), "0xC45E3518");
+        assert_eq!(trace_field(frame_1112, "video_crc32"), "0xC271DF44");
+        assert_eq!(trace_frame_rand_state(frame_1113), ("0xCD", "0x48", "0x24"));
+        assert_eq!(trace_field(frame_1113, "process_table_crc32"), "0x029B25DE");
+        assert_eq!(trace_field(frame_1113, "video_crc32"), "0x9A55A3F3");
+        assert_eq!(trace_frame_rand_state(frame_1114), ("0xCD", "0x48", "0x24"));
+        assert_eq!(trace_field(frame_1114, "process_table_crc32"), "0x029B25DE");
+        assert_eq!(trace_field(frame_1114, "video_crc32"), "0x0DB382A2");
+        assert_eq!(trace_frame_rand_state(frame_1115), ("0xCD", "0x48", "0x24"));
+        assert_eq!(trace_field(frame_1115, "process_table_crc32"), "0x029B25DE");
+        assert_eq!(trace_field(frame_1115, "video_crc32"), "0x4BB94EED");
+        assert_eq!(trace_frame_rand_state(frame_1116), ("0xCD", "0x48", "0x24"));
+        assert_eq!(trace_field(frame_1116, "process_table_crc32"), "0x029B25DE");
+        assert_eq!(trace_field(frame_1116, "video_crc32"), "0x4BB94EED");
+        assert_eq!(trace_frame_rand_state(frame_1117), ("0xAE", "0x24", "0x12"));
+        assert_eq!(trace_field(frame_1117, "process_table_crc32"), "0x581F39FE");
+        assert_eq!(trace_field(frame_1117, "video_crc32"), "0x4BB94EED");
+        assert_eq!(trace_frame_rand_state(frame_1118), ("0x36", "0x12", "0x09"));
+        assert_eq!(trace_field(frame_1118, "process_table_crc32"), "0xC514952D");
+        assert_eq!(trace_field(frame_1118, "video_crc32"), "0x4BB94EED");
+        assert_eq!(trace_frame_rand_state(frame_1119), ("0xC0", "0x09", "0x04"));
+        assert_eq!(trace_field(frame_1119, "process_table_crc32"), "0x89952A6E");
+        assert_eq!(trace_field(frame_1119, "video_crc32"), "0x4BB94EED");
+        assert_eq!(trace_frame_rand_state(frame_1120), ("0xD7", "0x04", "0x82"));
+        assert_eq!(trace_field(frame_1120, "process_table_crc32"), "0xCF7AFA7C");
+        assert_eq!(trace_field(frame_1120, "video_crc32"), "0x4BB94EED");
+        assert_eq!(trace_frame_rand_state(frame_1128), ("0x5B", "0x12", "0x04"));
+        assert_eq!(trace_field(frame_1128, "process_table_crc32"), "0x38485366");
+        assert_eq!(trace_field(frame_1128, "video_crc32"), "0x4BB94EED");
+        assert_eq!(trace_frame_rand_state(frame_1138), ("0xD8", "0x11", "0x04"));
+        assert_eq!(trace_field(frame_1138, "process_table_crc32"), "0x7B4F740C");
+        assert_eq!(trace_field(frame_1138, "video_crc32"), "0x4BB94EED");
+        assert_eq!(trace_frame_rand_state(frame_1148), ("0xC0", "0xC9", "0x04"));
+        assert_eq!(trace_field(frame_1148, "process_table_crc32"), "0x21AE8F46");
+        assert_eq!(trace_field(frame_1148, "video_crc32"), "0x4BB94EED");
+        assert_eq!(trace_frame_rand_state(frame_1152), ("0xBD", "0x4C", "0x90"));
+        assert_eq!(trace_field(frame_1152, "process_table_crc32"), "0xB7F720AC");
+        assert_eq!(trace_field(frame_1152, "video_crc32"), "0x369910B2");
+        assert_eq!(trace_frame_rand_state(frame_1153), ("0xB6", "0x26", "0x48"));
+        assert_eq!(trace_field(frame_1153, "process_table_crc32"), "0x2AC84733");
+        assert_eq!(trace_field(frame_1153, "video_crc32"), "0x58FA3AE7");
+        assert_eq!(trace_frame_rand_state(frame_1158), ("0xD8", "0x09", "0x32"));
+        assert_eq!(trace_field(frame_1158, "process_table_crc32"), "0xE8C08D0D");
+        assert_eq!(trace_field(frame_1158, "video_crc32"), "0x58FA3AE7");
+    }
+
+    #[test]
+    fn trace_text_keeps_instruction_handoff_sample_crc_boundaries() {
+        let mut inputs = vec![CabinetInput::NONE; 900];
+        inputs.extend(
+            [CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+        inputs.extend([CabinetInput::NONE; 120]);
+        inputs.extend(
+            [CabinetInput {
+                start_one: true,
+                ..CabinetInput::NONE
+            }; 4],
+        );
+        inputs.extend([CabinetInput::NONE; 332]);
+
+        let trace = trace_text_for_inputs(&inputs).expect("trace text");
+        let frame_1195 = trace.lines().nth(1195).expect("frame 1195");
+        let frame_1204 = trace.lines().nth(1204).expect("frame 1204");
+        let frame_1206 = trace.lines().nth(1206).expect("frame 1206");
+        let frame_1210 = trace.lines().nth(1210).expect("frame 1210");
+        let frame_1216 = trace.lines().nth(1216).expect("frame 1216");
+        let frame_1222 = trace.lines().nth(1222).expect("frame 1222");
+        let frame_1228 = trace.lines().nth(1228).expect("frame 1228");
+        let frame_1229 = trace.lines().nth(1229).expect("frame 1229");
+        let frame_1234 = trace.lines().nth(1234).expect("frame 1234");
+        let frame_1235 = trace.lines().nth(1235).expect("frame 1235");
+        let frame_1236 = trace.lines().nth(1236).expect("frame 1236");
+        let frame_1258 = trace.lines().nth(1258).expect("frame 1258");
+        let frame_1259 = trace.lines().nth(1259).expect("frame 1259");
+        let frame_1266 = trace.lines().nth(1266).expect("frame 1266");
+        let frame_1270 = trace.lines().nth(1270).expect("frame 1270");
+        let frame_1282 = trace.lines().nth(1282).expect("frame 1282");
+        let frame_1283 = trace.lines().nth(1283).expect("frame 1283");
+        let frame_1289 = trace.lines().nth(1289).expect("frame 1289");
+        let frame_1290 = trace.lines().nth(1290).expect("frame 1290");
+        let frame_1291 = trace.lines().nth(1291).expect("frame 1291");
+        let frame_1292 = trace.lines().nth(1292).expect("frame 1292");
+        let frame_1293 = trace.lines().nth(1293).expect("frame 1293");
+        let frame_1294 = trace.lines().nth(1294).expect("frame 1294");
+        let frame_1295 = trace.lines().nth(1295).expect("frame 1295");
+        let frame_1296 = trace.lines().nth(1296).expect("frame 1296");
+        let frame_1297 = trace.lines().nth(1297).expect("frame 1297");
+        let frame_1298 = trace.lines().nth(1298).expect("frame 1298");
+        let frame_1299 = trace.lines().nth(1299).expect("frame 1299");
+        let frame_1300 = trace.lines().nth(1300).expect("frame 1300");
+        let frame_1301 = trace.lines().nth(1301).expect("frame 1301");
+        let frame_1302 = trace.lines().nth(1302).expect("frame 1302");
+        let frame_1303 = trace.lines().nth(1303).expect("frame 1303");
+        let frame_1304 = trace.lines().nth(1304).expect("frame 1304");
+        let frame_1305 = trace.lines().nth(1305).expect("frame 1305");
+        let frame_1306 = trace.lines().nth(1306).expect("frame 1306");
+        let frame_1307 = trace.lines().nth(1307).expect("frame 1307");
+        let frame_1308 = trace.lines().nth(1308).expect("frame 1308");
+
+        assert_eq!(trace_frame_rand_state(frame_1195), ("0x42", "0x8B", "0x44"));
+        assert_eq!(trace_field(frame_1195, "object_table_crc32"), "0x48ED611B");
+        assert_eq!(trace_field(frame_1195, "process_table_crc32"), "0x3D82A47F");
+        assert_eq!(trace_field(frame_1195, "video_crc32"), "0x19C411E1");
+        assert_eq!(trace_field(frame_1204, "process_table_crc32"), "0x448AD0F0");
+        assert_eq!(trace_field(frame_1204, "video_crc32"), "0x172FBE2F");
+        assert_eq!(trace_field(frame_1206, "process_table_crc32"), "0xB4DDF519");
+        assert_eq!(trace_field(frame_1206, "video_crc32"), "0x9CEB8542");
+        assert_eq!(trace_field(frame_1210, "process_table_crc32"), "0xE4078CFB");
+        assert_eq!(trace_field(frame_1210, "video_crc32"), "0x22DC6057");
+        assert_eq!(trace_field(frame_1216, "process_table_crc32"), "0x85A53777");
+        assert_eq!(trace_field(frame_1216, "video_crc32"), "0x882DCFF2");
+        assert_eq!(trace_field(frame_1222, "object_table_crc32"), "0x1DFD9317");
+        assert_eq!(trace_field(frame_1222, "process_table_crc32"), "0x76FCA77D");
+        assert_eq!(trace_field(frame_1222, "video_crc32"), "0x6DEB7656");
+        assert_eq!(trace_field(frame_1228, "video_crc32"), "0xF2A3DE00");
+        assert_eq!(trace_field(frame_1229, "video_crc32"), "0x7CF8C674");
+        assert_eq!(trace_field(frame_1234, "process_table_crc32"), "0x57B145F1");
+        assert_eq!(trace_field(frame_1234, "video_crc32"), "0xA2C31EAE");
+        assert_eq!(trace_field(frame_1235, "video_crc32"), "0x92834217");
+        assert_eq!(trace_field(frame_1236, "video_crc32"), "0x084F74A0");
+        assert_eq!(trace_field(frame_1258, "process_table_crc32"), "0xEBA74B00");
+        assert_eq!(trace_field(frame_1258, "video_crc32"), "0xAB882140");
+        assert_eq!(trace_field(frame_1259, "process_table_crc32"), "0xCE0643A9");
+        assert_eq!(trace_field(frame_1259, "video_crc32"), "0xFDAE7B4C");
+        assert_eq!(trace_field(frame_1266, "video_crc32"), "0xF1EB0674");
+        assert_eq!(trace_field(frame_1270, "process_table_crc32"), "0xA1B9B050");
+        assert_eq!(trace_field(frame_1282, "process_table_crc32"), "0x392752CA");
+        assert_eq!(trace_field(frame_1283, "video_crc32"), "0xC1BDE031");
+        assert_eq!(trace_field(frame_1289, "video_crc32"), "0x62573290");
+        assert_eq!(trace_field(frame_1290, "video_crc32"), "0x6B087042");
+        assert_eq!(trace_field(frame_1291, "object_table_crc32"), "0xF75BF69B");
+        assert_eq!(trace_field(frame_1291, "video_crc32"), "0x8FB1402E");
+        assert_eq!(trace_field(frame_1292, "object_table_crc32"), "0xD70D26D6");
+        assert_eq!(trace_field(frame_1292, "video_crc32"), "0xAE7B3645");
+        assert_eq!(trace_field(frame_1293, "object_table_crc32"), "0x81610635");
+        assert_eq!(trace_field(frame_1293, "video_crc32"), "0xC7F23178");
+        assert_eq!(trace_field(frame_1294, "object_table_crc32"), "0xDA6908F3");
+        assert_eq!(trace_field(frame_1294, "video_crc32"), "0x86D514F3");
+        assert_eq!(trace_field(frame_1295, "video_crc32"), "0x4D7E9152");
+        assert_eq!(trace_field(frame_1296, "object_table_crc32"), "0xEDF3013F");
+        assert_eq!(trace_field(frame_1296, "video_crc32"), "0xACCCAED9");
+        assert_eq!(trace_field(frame_1297, "video_crc32"), "0x398EFF52");
+        assert_eq!(trace_field(frame_1298, "object_table_crc32"), "0x04E92E89");
+        assert_eq!(trace_field(frame_1298, "video_crc32"), "0xC6A3A07F");
+        assert_eq!(trace_field(frame_1299, "object_table_crc32"), "0x759EFEB7");
+        assert_eq!(trace_field(frame_1299, "video_crc32"), "0xE6B4D2D6");
+        assert_eq!(trace_field(frame_1300, "video_crc32"), "0xA1D90CC5");
+        assert_eq!(trace_field(frame_1301, "object_table_crc32"), "0xFC10930F");
+        assert_eq!(trace_field(frame_1301, "video_crc32"), "0x90D03CF5");
+        assert_eq!(trace_field(frame_1302, "object_table_crc32"), "0x6F60E207");
+        assert_eq!(trace_field(frame_1302, "video_crc32"), "0xD86B7C0A");
+        assert_eq!(trace_field(frame_1303, "video_crc32"), "0xCECFB74C");
+        assert_eq!(trace_field(frame_1304, "object_table_crc32"), "0x8503CB71");
+        assert_eq!(trace_field(frame_1304, "video_crc32"), "0x5261547F");
+        assert_eq!(trace_field(frame_1305, "video_crc32"), "0x6CA3D53A");
+        assert_eq!(trace_field(frame_1306, "object_table_crc32"), "0x588FB88C");
+        assert_eq!(trace_field(frame_1306, "process_table_crc32"), "0x3AC090F9");
+        assert_eq!(trace_field(frame_1306, "video_crc32"), "0x0EBDEBA7");
+        assert_eq!(trace_field(frame_1307, "object_table_crc32"), "0x8101F78D");
+        assert_eq!(trace_field(frame_1307, "process_table_crc32"), "0xC0CFCFA1");
+        assert_eq!(trace_field(frame_1307, "video_crc32"), "0x7633308A");
+        assert_eq!(trace_field(frame_1308, "video_crc32"), "0x7E7DDFBF");
+
+        for (frame_number, object_crc32, process_crc32, video_crc32) in [
+            (1309, "0xB69BFE41", "0x7C1D32B5", "0x66426E15"),
+            (1310, "0x71FC33F3", "0x409C0C0D", "0xC46B8A44"),
+            (1311, "0x789A212A", "0x7C978C85", "0x55B34B70"),
+            (1312, "0x508BC174", "0x6ABF26BC", "0x2DC83755"),
+            (1313, "0x17DA3217", "0xB36F840E", "0x9E9445C1"),
+            (1314, "0x25FE2DB6", "0x8743E040", "0x215AB95F"),
+            (1315, "0x6FBFF055", "0x35E77D46", "0x637BA67B"),
+            (1316, "0x29528056", "0x4D83C26A", "0xFF937191"),
+            (1317, "0x99F0DE30", "0x673E6211", "0xECFF348E"),
+            (1318, "0x6A014FC9", "0x351FB337", "0xF91153CC"),
+            (1319, "0x2D50BCAA", "0x101DBF0F", "0x03E7518B"),
+            (1320, "0xE38F2271", "0x4D0BB905", "0x72D9B81A"),
+            (1321, "0xEAE930A8", "0x1BB3AE09", "0xBD2265D8"),
+            (1322, "0x28EEAAC7", "0x369646F7", "0x656ED429"),
+            (1323, "0x6D0F26B2", "0x79DBE5FB", "0x1AE77360"),
+            (1324, "0x1A14F4D6", "0x952FA115", "0x59689022"),
+            (1325, "0x4C78D435", "0x9B308E0D", "0xFF8A9969"),
+            (1326, "0x1770DAF3", "0xBEB83C05", "0x084D901E"),
+            (1327, "0x1E16C82A", "0x334CD60B", "0xDD54C073"),
+            (1328, "0xE1E912DD", "0x77535CB1", "0xDD54C073"),
+        ] {
+            let frame = trace.lines().nth(frame_number).expect("frame");
+            assert_eq!(trace_field(frame, "object_table_crc32"), object_crc32);
+            assert_eq!(trace_field(frame, "process_table_crc32"), process_crc32);
+            assert_eq!(trace_field(frame, "video_crc32"), video_crc32);
+        }
+
+        for (frame_number, object_crc32, process_crc32, video_crc32) in [
+            (1329, "0xFD0DAB56", "0xAE83FE03", "0x7A0CE222"),
+            (1330, "0xCF29B4F7", "0xBB7D9DDB", "0x1322D8BA"),
+            (1331, "0xBE5E64C9", "0x9EDC9572", "0xA118FA15"),
+            (1332, "0x87725717", "0xE6B82A5E", "0x7DE4A2BA"),
+            (1333, "0x37D00971", "0x28E5389F", "0xCABF786F"),
+            (1334, "0xD2CC63C3", "0xA957868F", "0x324AF8EC"),
+            (1335, "0x09F253D4", "0x286F86AF", "0x9BBF0892"),
+            (1336, "0xC72DCD0F", "0x02D0E38B", "0x5E69A807"),
+            (1337, "0xCE4BDFD6", "0xC209CD89", "0x4F41CBB7"),
+            (1338, "0x1AA1BEF2", "0xEF2C2577", "0x63C92D8E"),
+            (1339, "0xC32FF1F3", "0x3600BF75", "0x86011F95"),
+            (1340, "0xB4342397", "0x576D8CE9", "0xBE803FFB"),
+            (1341, "0xD96E0EA9", "0xD488AB1B", "0x40CBA97C"),
+            (1342, "0xFDA743B2", "0x7C996E61", "0x9A4551E8"),
+            (1343, "0xF4C1516B", "0x599B6259", "0x43FA95EF"),
+            (1344, "0xDCD0B135", "0x048D6453", "0xC87E9881"),
+            (1345, "0x9B814256", "0x6CA2AC67", "0x11FE442F"),
+            (1346, "0xA9A55DF7", "0x588EC829", "0x8E8BBFCA"),
+            (1347, "0xCE3F7682", "0x0ECAE795", "0xB17B4151"),
+            (1348, "0x6B7C8628", "0x2499783A", "0xF1FB68B8"),
+            (1349, "0xDBDED84E", "0x0E24D841", "0x0ECCB021"),
+            (1350, "0x282F49B7", "0x8F966651", "0x90E68D1F"),
+            (1351, "0x6F7EBAD4", "0xEA4ED4CB", "0x12914ABB"),
+            (1352, "0xA1A1240F", "0xAE515E71", "0xFEEF198D"),
+            (1353, "0xA8C736D6", "0x7781FCC3", "0x3D352198"),
+            (1354, "0x1CACB703", "0x627F9F1B", "0x318BB20E"),
+            (1355, "0xA6CFBCCC", "0x6240D41F", "0x67017467"),
+            (1356, "0xD1D46EA8", "0x032DE783", "0x152058B0"),
+            (1357, "0x87B84E4B", "0x9B53F195", "0xB4EF6074"),
+            (1358, "0xDCB0408D", "0xBEDB439D", "0x8C6AE956"),
+            (1359, "0xD5D65254", "0x9BD94FA5", "0xDC59CD9B"),
+            (1360, "0xEB2A4941", "0x4B563EDD", "0xBC10AB56"),
+        ] {
+            let frame = trace.lines().nth(frame_number).expect("frame");
+            assert_eq!(trace_field(frame, "object_table_crc32"), object_crc32);
+            assert_eq!(trace_field(frame, "process_table_crc32"), process_crc32);
+            assert_eq!(trace_field(frame, "video_crc32"), video_crc32);
+        }
+    }
+
+    #[test]
+    fn trace_text_keeps_pre_start_input_video_boundaries_source_specific() {
+        let fire = CabinetInput {
+            fire: true,
+            ..CabinetInput::NONE
+        };
+        let thrust = CabinetInput {
+            thrust: true,
+            ..CabinetInput::NONE
+        };
+
+        for (
+            input,
+            frame_1060_video_crc32,
+            held_frames,
+            late_frame_number,
+            late_process_table_crc32,
+            late_video_crc32,
+        ) in [
+            (fire, "0x24BE36C6", 11, 1064, "0xB061DA05", "0xDA691661"),
+            (thrust, "0xF6CEDF60", 12, 1066, "0xE1FCD6B4", "0x65524E70"),
+        ] {
+            let mut inputs = vec![CabinetInput::NONE; 900];
+            inputs.extend(
+                [CabinetInput {
+                    coin: true,
+                    ..CabinetInput::NONE
+                }; 4],
+            );
+            inputs.extend([CabinetInput::NONE; 120]);
+            inputs.extend(
+                [CabinetInput {
+                    start_one: true,
+                    ..CabinetInput::NONE
+                }; 4],
+            );
+            inputs.extend([CabinetInput::NONE; 30]);
+            inputs.extend(vec![input; held_frames]);
+            inputs.extend([CabinetInput::NONE; 100]);
+
+            let trace = trace_text_for_inputs(&inputs).expect("trace text");
+            let frame_1059 = trace.lines().nth(1059).expect("frame 1059");
+            let frame_1060 = trace.lines().nth(1060).expect("frame 1060");
+            let frame_1061 = trace.lines().nth(1061).expect("frame 1061");
+            let late_frame = trace
+                .lines()
+                .nth(late_frame_number)
+                .expect("late input-video boundary frame");
+            let frame_1080 = trace.lines().nth(1080).expect("frame 1080");
+            let frame_1084 = trace.lines().nth(1084).expect("frame 1084");
+            let frame_1093 = trace.lines().nth(1093).expect("frame 1093");
+            let frame_1098 = trace.lines().nth(1098).expect("frame 1098");
+            let frame_1111 = trace.lines().nth(1111).expect("frame 1111");
+            let frame_1164 = trace.lines().nth(1164).expect("frame 1164");
+
+            assert_eq!(trace_frame_rand_state(frame_1059), ("0x5E", "0xA7", "0xBE"));
+            assert_eq!(trace_field(frame_1059, "process_table_crc32"), "0xB87521C6");
+            assert_eq!(trace_field(frame_1059, "video_crc32"), "0xB8A9D13E");
+            assert_eq!(trace_frame_rand_state(frame_1060), ("0xDE", "0xD3", "0xDF"));
+            assert_eq!(trace_field(frame_1060, "process_table_crc32"), "0x5F53C9A4");
+            assert_eq!(
+                trace_field(frame_1060, "video_crc32"),
+                frame_1060_video_crc32
+            );
+            assert_eq!(trace_frame_rand_state(frame_1061), ("0xDE", "0xD3", "0xDF"));
+            assert_eq!(trace_field(frame_1061, "process_table_crc32"), "0x5F53C9A4");
+            assert_eq!(trace_field(frame_1061, "video_crc32"), "0x412AAFA0");
+            assert_eq!(trace_frame_rand_state(late_frame), ("0x49", "0x34", "0xF7"));
+            assert_eq!(
+                trace_field(late_frame, "process_table_crc32"),
+                late_process_table_crc32
+            );
+            assert_eq!(trace_field(late_frame, "video_crc32"), late_video_crc32);
+
+            if late_frame_number == 1064 {
+                let frame_1065 = trace.lines().nth(1065).expect("frame 1065");
+                let frame_1066 = trace.lines().nth(1066).expect("frame 1066");
+                let frame_1067 = trace.lines().nth(1067).expect("frame 1067");
+                let frame_1068 = trace.lines().nth(1068).expect("frame 1068");
+                let frame_1069 = trace.lines().nth(1069).expect("frame 1069");
+                assert_eq!(trace_frame_rand_state(frame_1065), ("0x49", "0x34", "0xF7"));
+                assert_eq!(trace_field(frame_1065, "process_table_crc32"), "0xE1FCD6B4");
+                assert_eq!(trace_field(frame_1065, "video_crc32"), "0xACAB39B5");
+                assert_eq!(trace_field(frame_1066, "process_table_crc32"), "0xE1FCD6B4");
+                assert_eq!(trace_field(frame_1066, "video_crc32"), "0x344CF817");
+                assert_eq!(trace_field(frame_1067, "process_table_crc32"), "0x0D38215F");
+                assert_eq!(trace_field(frame_1067, "video_crc32"), "0xDCCBA212");
+                assert_eq!(trace_field(frame_1068, "process_table_crc32"), "0x0D38215F");
+                assert_eq!(trace_field(frame_1068, "video_crc32"), "0xD6E596B0");
+                assert_eq!(trace_field(frame_1069, "process_table_crc32"), "0x42FE2F11");
+                assert_eq!(trace_field(frame_1069, "video_crc32"), "0x738D075C");
+            } else {
+                let frame_1069 = trace.lines().nth(1069).expect("frame 1069");
+                let frame_1070 = trace.lines().nth(1070).expect("frame 1070");
+                assert_eq!(trace_field(frame_1069, "process_table_crc32"), "0x42FE2F11");
+                assert_eq!(trace_field(frame_1069, "video_crc32"), "0x68F8962D");
+                assert_eq!(trace_field(frame_1070, "process_table_crc32"), "0x42FE2F11");
+                assert_eq!(trace_field(frame_1070, "video_crc32"), "0x1173B3A4");
+            }
+
+            if input == fire {
+                assert_eq!(trace_field(frame_1080, "video_crc32"), "0x57AE5184");
+                assert_eq!(trace_field(frame_1093, "video_crc32"), "0x2318B8F4");
+                assert_eq!(trace_field(frame_1111, "video_crc32"), "0xB8DF8442");
+                assert_eq!(trace_field(frame_1164, "video_crc32"), "0xF72D1B86");
+            } else {
+                assert_eq!(trace_field(frame_1084, "video_crc32"), "0xD8909668");
+                assert_eq!(trace_field(frame_1098, "video_crc32"), "0x8F778AC6");
+                assert_eq!(trace_field(frame_1111, "video_crc32"), "0xB8DF8442");
+                assert_eq!(trace_field(frame_1164, "video_crc32"), "0x54E87194");
+            }
+        }
+    }
+
+    #[test]
+    fn trace_text_keeps_delayed_smart_bomb_and_hyperspace_video_boundaries() {
+        let smart_bomb = CabinetInput {
+            smart_bomb: true,
+            ..CabinetInput::NONE
+        };
+        let hyperspace = CabinetInput {
+            hyperspace: true,
+            ..CabinetInput::NONE
+        };
+
+        for (input, frame_1100_video_crc32) in
+            [(smart_bomb, "0x1A034D42"), (hyperspace, "0x2B011907")]
+        {
+            let mut inputs = vec![CabinetInput::NONE; 900];
+            inputs.extend(
+                [CabinetInput {
+                    coin: true,
+                    ..CabinetInput::NONE
+                }; 4],
+            );
+            inputs.extend([CabinetInput::NONE; 120]);
+            inputs.extend(
+                [CabinetInput {
+                    start_one: true,
+                    ..CabinetInput::NONE
+                }; 4],
+            );
+            inputs.extend([CabinetInput::NONE; 60]);
+            inputs.push(input);
+            inputs.extend([CabinetInput::NONE; 75]);
+
+            let trace = trace_text_for_inputs(&inputs).expect("trace text");
+            let frame_1089 = trace.lines().nth(1089).expect("frame 1089");
+            let frame_1090 = trace.lines().nth(1090).expect("frame 1090");
+            let frame_1091 = trace.lines().nth(1091).expect("frame 1091");
+            let frame_1092 = trace.lines().nth(1092).expect("frame 1092");
+            let frame_1093 = trace.lines().nth(1093).expect("frame 1093");
+            let frame_1094 = trace.lines().nth(1094).expect("frame 1094");
+            let frame_1095 = trace.lines().nth(1095).expect("frame 1095");
+            let frame_1099 = trace.lines().nth(1099).expect("frame 1099");
+            let frame_1100 = trace.lines().nth(1100).expect("frame 1100");
+            let frame_1111 = trace.lines().nth(1111).expect("frame 1111");
+            let frame_1164 = trace.lines().nth(1164).expect("frame 1164");
+
+            assert_eq!(trace_frame_rand_state(frame_1089), ("0x0E", "0x4D", "0x26"));
+            assert_eq!(trace_field(frame_1089, "process_table_crc32"), "0x2B97C76D");
+            assert_eq!(trace_field(frame_1089, "video_crc32"), "0x4158816D");
+            assert_eq!(trace_frame_rand_state(frame_1090), ("0xF4", "0x26", "0x93"));
+            assert_eq!(trace_field(frame_1090, "process_table_crc32"), "0x0332C9AE");
+            assert_eq!(trace_field(frame_1090, "video_crc32"), "0x1958E231");
+            assert_eq!(trace_frame_rand_state(frame_1091), ("0xF4", "0x26", "0x93"));
+            assert_eq!(trace_field(frame_1091, "process_table_crc32"), "0x0332C9AE");
+            assert_eq!(trace_field(frame_1091, "video_crc32"), "0x8A009827");
+            assert_eq!(trace_frame_rand_state(frame_1092), ("0xCA", "0x93", "0x49"));
+            assert_eq!(trace_field(frame_1092, "process_table_crc32"), "0xC5F7D968");
+            assert_eq!(trace_field(frame_1092, "video_crc32"), "0xB56FD48D");
+            assert_eq!(trace_frame_rand_state(frame_1093), ("0xCA", "0x93", "0x49"));
+            assert_eq!(trace_field(frame_1093, "process_table_crc32"), "0xCBC566B3");
+            assert_eq!(trace_field(frame_1093, "video_crc32"), "0x2318B8F4");
+            assert_eq!(trace_frame_rand_state(frame_1094), ("0xCA", "0x93", "0x49"));
+            assert_eq!(trace_field(frame_1094, "process_table_crc32"), "0xCBC566B3");
+            assert_eq!(trace_field(frame_1094, "video_crc32"), "0x9DBFF0EF");
+            assert_eq!(trace_frame_rand_state(frame_1095), ("0x5D", "0x49", "0xA4"));
+            assert_eq!(trace_field(frame_1095, "process_table_crc32"), "0xB0D5079D");
+            assert_eq!(trace_field(frame_1095, "video_crc32"), "0xC24E2B0F");
+            assert_eq!(trace_frame_rand_state(frame_1099), ("0xE6", "0x12", "0x69"));
+            assert_eq!(trace_field(frame_1099, "process_table_crc32"), "0x924C91C1");
+            assert_eq!(trace_field(frame_1099, "video_crc32"), "0xF7C16FEF");
+            assert_eq!(trace_frame_rand_state(frame_1100), ("0xE6", "0x12", "0x69"));
+            assert_eq!(trace_field(frame_1100, "process_table_crc32"), "0x924C91C1");
+            assert_eq!(
+                trace_field(frame_1100, "video_crc32"),
+                frame_1100_video_crc32
+            );
+            assert_eq!(trace_field(frame_1111, "video_crc32"), "0xB8DF8442");
+            assert_eq!(trace_field(frame_1164, "video_crc32"), "0xF72D1B86");
+        }
+    }
+
+    #[test]
+    fn trace_text_keeps_late_post_start_source_handoff_state_after_cold_boot() {
         let mut inputs = vec![CabinetInput::NONE; 900];
         inputs.extend(
             [CabinetInput {
@@ -1027,10 +1586,10 @@ mod tests {
         let frame_1328 = trace.lines().nth(1328).expect("frame 1328");
         let fields = frame_1328.split('\t').collect::<Vec<_>>();
 
-        assert_eq!(fields[5], "playing");
-        assert_eq!(fields[8], "1");
-        assert_ne!(fields[9], "0");
-        assert_ne!(fields[10], "0");
+        assert_eq!(fields[5], "game_over");
+        assert_eq!(fields[8], "0");
+        assert_eq!(fields[9], "0");
+        assert_eq!(fields[10], "0");
     }
 
     fn trace_frame_rand_state(line: &str) -> (&str, &str, &str) {

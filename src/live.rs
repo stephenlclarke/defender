@@ -246,6 +246,7 @@ fn poll_input(input_mapper: &mut InputMapper) -> Result<PolledInput> {
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+    use std::collections::BTreeSet;
     use std::io;
     use std::time::Instant;
 
@@ -255,8 +256,9 @@ mod tests {
     use crate::cmos_storage::CmosStorage;
     use crate::input::CabinetInput;
     use crate::machine::{
-        ArcadeMachine, FRAME_RATE_MILLIHZ, GamePhase, RedLabelSoundBoardSnapshot,
+        ArcadeMachine, FRAME_RATE_MILLIHZ, GamePhase, MachineEvent, RedLabelSoundBoardSnapshot,
     };
+    use crate::rom::crc32;
     use crate::sound::SoundCommandLatch;
     use crate::video::{RenderedImage, Renderer, defender_visible_byte_offset};
 
@@ -343,6 +345,87 @@ mod tests {
         assert_eq!(machine.red_label_palette_ram()[0x0B], 0x29);
         assert_eq!(&image.pixels[0..4], &[217, 81, 255, 255]);
         assert_eq!(&image.pixels[4..8], &[38, 174, 0, 255]);
+    }
+
+    #[test]
+    fn render_live_machine_frame_survives_williams_handoff_and_remains_playable() {
+        let mut machine = ArcadeMachine::new();
+        let mut renderer = Renderer::with_size(292, 240);
+        let mut render_crcs = BTreeSet::new();
+        let mut saw_non_blank_frame = false;
+        let mut saw_post_williams_non_blank_frame = false;
+
+        for frame in 0..1_220 {
+            let output = machine.step(CabinetInput::NONE);
+            assert_eq!(
+                output.snapshot.phase,
+                GamePhase::Attract,
+                "unexpected phase while rendering idle live attract frame {frame}"
+            );
+            if frame < 700 && frame % 20 != 0 {
+                continue;
+            }
+            let (render_crc, non_blank) = {
+                let image =
+                    render_live_machine_frame(&mut renderer, &mut machine).expect("render frame");
+                (
+                    crc32(&image.pixels),
+                    image
+                        .pixels
+                        .chunks_exact(4)
+                        .any(|pixel| pixel != [0, 0, 0, 255].as_slice()),
+                )
+            };
+            render_crcs.insert(render_crc);
+            saw_non_blank_frame |= non_blank;
+            if frame >= 420 {
+                saw_post_williams_non_blank_frame |= non_blank;
+            }
+        }
+
+        assert!(saw_non_blank_frame);
+        assert!(saw_post_williams_non_blank_frame);
+        assert!(
+            render_crcs.len() > 8,
+            "expected animated rendered frames through Williams handoff, got {} distinct CRCs",
+            render_crcs.len()
+        );
+
+        let _ = machine.step(CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        });
+        let _ = render_live_machine_frame(&mut renderer, &mut machine).expect("render coin press");
+        let mut credit_added = false;
+        for _ in 0..32 {
+            let output = machine.step(CabinetInput::NONE);
+            let _ = render_live_machine_frame(&mut renderer, &mut machine).expect("render credit");
+            credit_added |= output
+                .events()
+                .any(|event| event == MachineEvent::CreditAdded);
+            if credit_added {
+                break;
+            }
+        }
+        assert!(credit_added);
+        assert!(machine.snapshot().credits > 0);
+
+        let mut game_started = false;
+        for _ in 0..16 {
+            let output = machine.step(CabinetInput {
+                start_one: true,
+                ..CabinetInput::NONE
+            });
+            let _ = render_live_machine_frame(&mut renderer, &mut machine).expect("render start");
+            game_started |= output
+                .events()
+                .any(|event| event == MachineEvent::GameStarted);
+            if game_started {
+                break;
+            }
+        }
+        assert!(game_started);
+        assert_eq!(machine.snapshot().phase, GamePhase::Playing);
     }
 
     #[test]
