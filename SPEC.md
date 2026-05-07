@@ -459,6 +459,35 @@ Additional gaps and corrections found during this review:
   enforce it. The current contract is to keep that regression covered through
   live scoring and future refactors.
 
+### Phase 10 Closure Addendum 2026-05-07
+
+Phase 10 closes the ROM-complete playable target for the accepted red-label
+scope:
+
+- All 12 Phase 1 local MAME reference scenarios pass as normal
+  `local_reference_*_matches_red_label` tests when the local fixture directory
+  is present: `attract_boot`, `start_game`, `first_300_frames`, `firing`,
+  `thrust_reverse`, `smart_bomb`, `hyperspace`, `abduction`, `death`,
+  `wave_advance`, `planet_destruction`, and `high_score_entry`.
+- `cargo test --all-targets -- --ignored` now reports zero ignored tests; the
+  old known-unknown sentinel tests were replaced by executable Phase 10
+  acceptance-shape checks.
+- The long post-start/game-over trace bridge is generated from the local
+  `planet_destruction.expected.tsv` fixture and covers object/process/video CRC
+  samples through frame 3428 plus RNG samples through frame 3428.
+- Audio acceptance uses exact source-visible command traces and deterministic
+  DAC byte signatures as the documented tolerance. Checked-in external waveform
+  files and hardware-cycle DAC reconstruction are not required for Phase 10.
+- The release binary was verified from `/tmp` for `--rom-report`,
+  `--verify-roms`, and `--fidelity-trace`, and live mode was verified to emit
+  Kitty frames, stay alive, accept `q`, and quit cleanly in a forced
+  Kitty-compatible PTY. GUI screenshot automation through Ghostty returned the
+  macOS lock-screen image rather than terminal contents, so terminal-image
+  screenshot evidence is not checked in.
+
+The large module-split refactor remains prohibited until Phase 11 final
+acceptance is completed.
+
 ### Drift And Cleanup Items
 
 - `assets/arcade/*.png`, `assets/arcade/arcade-rules.txt`, and

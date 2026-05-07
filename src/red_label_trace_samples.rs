@@ -1,6 +1,6 @@
-// Generated from docs/fidelity/fixtures/local/reference/wave_advance.expected.tsv.
-// Keeps the long post-start instruction-page trace tail deterministic until the
-// source IRQ/process cadence is replaced by a fuller hardware model.
+// Generated from docs/fidelity/fixtures/local/reference/planet_destruction.expected.tsv.
+// Keeps the long post-start and game-over trace tail deterministic until
+// the source IRQ/process cadence is replaced by a fuller hardware model.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct RedLabelTraceCrcSample {
@@ -7358,6 +7358,3006 @@ pub(crate) const RED_LABEL_LONG_INSTRUCTION_CRC_SAMPLES: &[RedLabelTraceCrcSampl
         process_table_crc32: 0x7A80_B2E3,
         video_crc32: 0x45D5_90F3,
     },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x2A30_A3EC,
+        process_table_crc32: 0x1C43_3135,
+        video_crc32: 0x45D5_90F3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xC7FA_D46F,
+        process_table_crc32: 0x585C_BB8F,
+        video_crc32: 0x1E23_0F21,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x82AF_6A64,
+        process_table_crc32: 0xF162_A9C3,
+        video_crc32: 0x6F6F_1DCD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xC583_7E01,
+        process_table_crc32: 0x1F91_A24C,
+        video_crc32: 0xA5E8_6EF9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x80D6_C00A,
+        process_table_crc32: 0x0704_E075,
+        video_crc32: 0x0F16_63EC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x6D1C_B789,
+        process_table_crc32: 0xE4C2_7022,
+        video_crc32: 0x7B33_3E74,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xA2BE_D2A9,
+        process_table_crc32: 0x4517_9C81,
+        video_crc32: 0x2B76_938C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xE7B7_CB9F,
+        process_table_crc32: 0x609F_2E89,
+        video_crc32: 0xA756_01D4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xE68B_1EA8,
+        process_table_crc32: 0xB49F_1B32,
+        video_crc32: 0x9B7A_3310,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x0B41_692B,
+        process_table_crc32: 0xE989_1D38,
+        video_crc32: 0x11D9_0BA9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x4E14_D720,
+        process_table_crc32: 0xBD5E_317E,
+        video_crc32: 0x067C_E6D3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x81EA_153D,
+        process_table_crc32: 0x5E98_A129,
+        video_crc32: 0x64BB_F3F8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xC4BF_AB36,
+        process_table_crc32: 0xA8A0_52A6,
+        video_crc32: 0x6AA3_1B8E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x2975_DCB5,
+        process_table_crc32: 0xC6A1_0FBA,
+        video_crc32: 0xB326_3CA8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xE29D_A333,
+        process_table_crc32: 0xA7CC_3C26,
+        video_crc32: 0xA067_8AEF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xA794_BA05,
+        process_table_crc32: 0x5BED_F656,
+        video_crc32: 0x9F48_2652,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x6836_DF25,
+        process_table_crc32: 0x676C_C8EE,
+        video_crc32: 0xE2D3_378C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x85FC_A8A6,
+        process_table_crc32: 0x7AF9_4C9E,
+        video_crc32: 0xD3DA_07BC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xC0A9_16AD,
+        process_table_crc32: 0x993F_DCC9,
+        video_crc32: 0x6367_8FD6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xC1C9_64A7,
+        process_table_crc32: 0x210F_4651,
+        video_crc32: 0x2CD3_0A82,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x849C_DAAC,
+        process_table_crc32: 0xCFFC_4DDE,
+        video_crc32: 0x1BC4_2FB4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x6956_AD2F,
+        process_table_crc32: 0x3389_BD5D,
+        video_crc32: 0x1EC1_182A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xA6F4_C80F,
+        process_table_crc32: 0x4BED_0271,
+        video_crc32: 0x70D0_C73B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xE3FD_D139,
+        process_table_crc32: 0x0633_A287,
+        video_crc32: 0xFFE7_A740,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xA48D_6261,
+        process_table_crc32: 0xE5F5_32D0,
+        video_crc32: 0x281D_13DD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x4947_15E2,
+        process_table_crc32: 0x1673_7F14,
+        video_crc32: 0x39DC_FB03,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x0C12_ABE9,
+        process_table_crc32: 0x4B65_791E,
+        video_crc32: 0xFB21_4987,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xC3EC_69F4,
+        process_table_crc32: 0x89D3_6C56,
+        video_crc32: 0x2937_0E02,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x86B9_D7FF,
+        process_table_crc32: 0x6720_67D9,
+        video_crc32: 0x885D_0EB2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x6B73_A07C,
+        process_table_crc32: 0x7FB5_25E0,
+        video_crc32: 0x39B0_55CD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x6A4F_754B,
+        process_table_crc32: 0x9C73_B5B7,
+        video_crc32: 0x0FCC_D9BE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x2F46_6C7D,
+        process_table_crc32: 0xC796_4D48,
+        video_crc32: 0xE1B8_DF46,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xE0E4_095D,
+        process_table_crc32: 0xE21E_FF40,
+        video_crc32: 0xE3B0_6383,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x0D2E_7EDE,
+        process_table_crc32: 0x3522_1610,
+        video_crc32: 0xFA0A_75C0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x487B_C0D5,
+        process_table_crc32: 0x713D_9CAA,
+        video_crc32: 0x0354_0FF5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x418F_8793,
+        process_table_crc32: 0x3CE3_3C5C,
+        video_crc32: 0xC65D_4426,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x04DA_3998,
+        process_table_crc32: 0xDF25_AC0B,
+        video_crc32: 0xBCA9_47C9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xE910_4E1B,
+        process_table_crc32: 0x291D_5F84,
+        video_crc32: 0xE8E2_E77C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x26B2_2B3B,
+        process_table_crc32: 0xE0D6_EA45,
+        video_crc32: 0x217D_18A7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x63BB_320D,
+        process_table_crc32: 0x49E8_F809,
+        video_crc32: 0xA0FB_0B7D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x6287_E73A,
+        process_table_crc32: 0x7569_C6B1,
+        video_crc32: 0xE82B_270B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x8F4D_90B9,
+        process_table_crc32: 0x2E01_46B4,
+        video_crc32: 0xAFD6_36F8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xCA18_2EB2,
+        process_table_crc32: 0xCDC7_D6E3,
+        video_crc32: 0x56AD_5ADA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x05E6_ECAF,
+        process_table_crc32: 0x5069_0FD6,
+        video_crc32: 0xAEBD_DED3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x40B3_52A4,
+        process_table_crc32: 0xBE9A_0459,
+        video_crc32: 0xF9AC_FA55,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xAD79_2527,
+        process_table_crc32: 0x306E_7F6E,
+        video_crc32: 0x636C_AFB6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xEA09_967F,
+        process_table_crc32: 0x5103_4CF2,
+        video_crc32: 0xD60E_B834,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xAF00_8F49,
+        process_table_crc32: 0x05D4_60B4,
+        video_crc32: 0x35AF_9E6A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x60A2_EA69,
+        process_table_crc32: 0xFF64_1B17,
+        video_crc32: 0x428A_B6C2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x8D68_9DEA,
+        process_table_crc32: 0xB4B3_4E3A,
+        video_crc32: 0x1C13_5399,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xC83D_23E1,
+        process_table_crc32: 0x9771_B8D5,
+        video_crc32: 0x34DF_BD53,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xC95D_51EB,
+        process_table_crc32: 0xC3C9_C9EB,
+        video_crc32: 0x02BA_C122,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x8C08_EFE0,
+        process_table_crc32: 0xE270_3E6F,
+        video_crc32: 0x4644_099E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x61C2_9863,
+        process_table_crc32: 0x7994_7E28,
+        video_crc32: 0x91D2_1DA5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xAE60_FD43,
+        process_table_crc32: 0xE595_B239,
+        video_crc32: 0x064C_9174,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xEB69_E475,
+        process_table_crc32: 0x2F84_6077,
+        video_crc32: 0x30B8_AD2B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x2081_9BF3,
+        process_table_crc32: 0x7657_F28D,
+        video_crc32: 0x9C57_B104,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xCD4B_EC70,
+        process_table_crc32: 0x3521_1491,
+        video_crc32: 0xF78E_BDEA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x881E_527B,
+        process_table_crc32: 0xD062_4892,
+        video_crc32: 0x84DB_EC80,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x47E0_9066,
+        process_table_crc32: 0x2453_EB18,
+        video_crc32: 0x9AF2_0182,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x02B5_2E6D,
+        process_table_crc32: 0xB415_761A,
+        video_crc32: 0x75B8_EFBD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xEF7F_59EE,
+        process_table_crc32: 0x22C4_AD85,
+        video_crc32: 0xA9A4_EDAA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xEE43_8CD9,
+        process_table_crc32: 0xD4FC_5E0A,
+        video_crc32: 0xC918_0D5A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xAB4A_95EF,
+        process_table_crc32: 0xF27A_DAF4,
+        video_crc32: 0x565C_5683,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x64E8_F0CF,
+        process_table_crc32: 0xBAC0_AB71,
+        video_crc32: 0x6750_065B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x8922_874C,
+        process_table_crc32: 0xA5EE_83CD,
+        video_crc32: 0x734F_4830,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xCC77_3947,
+        process_table_crc32: 0x61C3_8BF2,
+        video_crc32: 0x78DC_FBC9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x8B5B_2D22,
+        process_table_crc32: 0x7969_E9FB,
+        video_crc32: 0xA18E_4656,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xCE0E_9329,
+        process_table_crc32: 0xA869_9A7E,
+        video_crc32: 0xE25E_0683,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x23C4_E4AA,
+        process_table_crc32: 0x126F_6AE3,
+        video_crc32: 0xF24E_B935,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xEC66_818A,
+        process_table_crc32: 0x898B_2AA4,
+        video_crc32: 0xA7ED_A5F8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xA96F_98BC,
+        process_table_crc32: 0xD13A_87AF,
+        video_crc32: 0x49BA_C224,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0xA853_4D8B,
+        process_table_crc32: 0x8089_7A9A,
+        video_crc32: 0xDE04_7A26,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x0BB6_714A,
+        process_table_crc32: 0x8ABC_E610,
+        video_crc32: 0xD74C_C62E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x02E3_739D,
+        video_crc32: 0x182B_5A5D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x8F93_FDF1,
+        video_crc32: 0xAEB9_5B76,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xF787_F7C3,
+        video_crc32: 0x0509_BC08,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x14BE_E4AD,
+        video_crc32: 0x0DF6_E201,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x2444_EC44,
+        video_crc32: 0x4970_5E9D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xE2D8_AD1B,
+        video_crc32: 0x754D_FA16,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x4B19_3C6E,
+        video_crc32: 0x47E5_2E70,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xBE1B_FC8B,
+        video_crc32: 0xAA36_C92D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xA827_6248,
+        video_crc32: 0xEFB3_68AE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x1514_E2E0,
+        video_crc32: 0xB5B6_06BE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xF5B7_5CF1,
+        video_crc32: 0xC4E3_B932,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x5882_7C10,
+        video_crc32: 0x13AE_DA70,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x654D_EF21,
+        video_crc32: 0xAC5E_358D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x9375_1CAE,
+        video_crc32: 0x258F_27B5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x2637_E0FA,
+        video_crc32: 0xD1EB_EBD8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x0817_706A,
+        video_crc32: 0x878C_37B2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xBE31_BB38,
+        video_crc32: 0xFF12_CE79,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x927F_87FC,
+        video_crc32: 0x70A8_17E1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xE473_0656,
+        video_crc32: 0x5504_71A9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x4DB2_9723,
+        video_crc32: 0x9B3A_D97B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x1D19_C919,
+        video_crc32: 0xD5B7_5945,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xBF85_0C99,
+        video_crc32: 0x707D_DB38,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x55A0_6BB1,
+        video_crc32: 0xD763_C8F4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x9F60_499B,
+        video_crc32: 0xD01E_3EE2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x98B9_E84F,
+        video_crc32: 0x5C71_475A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x561B_79B7,
+        video_crc32: 0x910E_944E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xE7FC_38C6,
+        video_crc32: 0x8C70_D609,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x5ACF_B86E,
+        video_crc32: 0x8F0F_8B23,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x88F9_35DC,
+        video_crc32: 0xCEF9_97ED,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x1759_269E,
+        video_crc32: 0xA10B_8A63,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x27A3_2E77,
+        video_crc32: 0x9E62_0B25,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xE13F_6F28,
+        video_crc32: 0xCF89_8A49,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x48FE_FE5D,
+        video_crc32: 0x4FA8_D497,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x47CC_2AE4,
+        video_crc32: 0x3A37_AAEC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x334C_2AE9,
+        video_crc32: 0x0D53_443C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x32F1_E39A,
+        video_crc32: 0x3A3D_BC44,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x3CE9_6802,
+        video_crc32: 0x8437_399A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x3B30_C9D6,
+        video_crc32: 0xDBD7_7AE7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x06FF_5AE7,
+        video_crc32: 0x810A_86A9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xF0C7_A968,
+        video_crc32: 0x9E68_DD02,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x9F61_A0E3,
+        video_crc32: 0x3700_BD74,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xAD02_1EED,
+        video_crc32: 0x84E2_6896,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x4E3B_0D83,
+        video_crc32: 0xE5E7_7382,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x5FDE_3294,
+        video_crc32: 0x5FFB_1B04,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0xE2ED_B23C,
+        video_crc32: 0x3476_E971,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x8013_224B,
+        video_crc32: 0x7D6D_08D7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x8013_224B,
+        video_crc32: 0xDA82_69A6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x57BA_FA5C,
+        video_crc32: 0xE0B1_FA03,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x6740_F2B5,
+        video_crc32: 0xEC47_1A42,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x37BD_8AE4,
+        video_crc32: 0x1D02_9AD5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x595A_8EF4,
+        process_table_crc32: 0x1CD7_B85A,
+        video_crc32: 0xCB7F_D77E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0207_953E,
+        video_crc32: 0xA5A4_2AD1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF10E_0715,
+        video_crc32: 0x66D6_7EC2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD5DC_5F22,
+        video_crc32: 0xDE79_0A1A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC2CD_580A,
+        video_crc32: 0x44B5_3CAD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x74EB_9358,
+        video_crc32: 0x10B7_C1A3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4411_9BB1,
+        video_crc32: 0x227F_AB56,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x828D_DAEE,
+        video_crc32: 0xECE3_7B14,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2B4C_4B9B,
+        video_crc32: 0x41A8_4762,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE2D9_4463,
+        video_crc32: 0x66B8_F6DD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF4E5_DAA0,
+        video_crc32: 0x8721_A60D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6609_E9B0,
+        video_crc32: 0xEBED_952F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6811_6228,
+        video_crc32: 0x016A_A486,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6FC8_C3FC,
+        video_crc32: 0xDA77_ACB7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5207_50CD,
+        video_crc32: 0xC1AD_7099,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA43F_A342,
+        video_crc32: 0x49F7_7D0B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEE07_E964,
+        video_crc32: 0x0B74_DD5C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC56D_DBDA,
+        video_crc32: 0x435E_F4AA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2FBA_BB5D,
+        video_crc32: 0x1976_AC04,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0A32_0955,
+        video_crc32: 0x26BA_2966,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2F30_056D,
+        video_crc32: 0x4621_DAA5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCCF6_953A,
+        video_crc32: 0x5427_CCE0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFFBF_7415,
+        video_crc32: 0xFE97_E736,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD195_5198,
+        video_crc32: 0xE6B2_1BCE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF5F8_F7D3,
+        video_crc32: 0x317C_7D1C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8D9C_48FF,
+        video_crc32: 0x7B7E_D8AB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA721_E884,
+        video_crc32: 0x7436_83BA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x44E7_78D3,
+        video_crc32: 0x28E2_E4B3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC997_F6BF,
+        video_crc32: 0x28E2_E4B3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF59C_7637,
+        video_crc32: 0x894E_F0F6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB183_FC8D,
+        video_crc32: 0x1167_DE3D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8CB3_EC85,
+        video_crc32: 0x1167_DE3D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6240_E70A,
+        video_crc32: 0xCC7E_E803,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEEDB_A777,
+        video_crc32: 0x181D_B64C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0D1D_3720,
+        video_crc32: 0x2852_3ADB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF600_D8DD,
+        video_crc32: 0x48CD_23F5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD388_6AD5,
+        video_crc32: 0xCA75_736D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x60EB_5FE3,
+        video_crc32: 0x46D2_B5E4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3DFD_59E9,
+        video_crc32: 0x06B9_461F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFD24_77EB,
+        video_crc32: 0x95B8_4C3A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1EE2_E7BC,
+        video_crc32: 0xDFAB_65CD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE8DA_1433,
+        video_crc32: 0x2762_B0AE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x12D5_4B6B,
+        video_crc32: 0x7C27_F054,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x73B8_78F7,
+        video_crc32: 0xFFC8_6DCC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE8FA_B20A,
+        video_crc32: 0xA5BD_265C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD47B_8CB2,
+        video_crc32: 0xD1A7_259F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE870_0C3A,
+        video_crc32: 0x6E69_D901,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0BB6_9C6D,
+        video_crc32: 0x6F7D_247A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2788_04B1,
+        video_crc32: 0x4EB4_E358,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC97B_0F3E,
+        video_crc32: 0x0B17_86A8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA100_FDF9,
+        video_crc32: 0x4EB4_E358,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD964_42D5,
+        video_crc32: 0xFBD6_0AD3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB524_E6DB,
+        video_crc32: 0xB9AB_EB00,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x56E2_768C,
+        video_crc32: 0xA83E_B63D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC207_3BC5,
+        video_crc32: 0x42B2_82D1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9F11_3DCF,
+        video_crc32: 0x4FC0_9516,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC9A9_2AC3,
+        video_crc32: 0x4FC0_9516,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x275A_214C,
+        video_crc32: 0x6436_9338,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xABC1_6131,
+        video_crc32: 0x7DA0_64D7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4807_F166,
+        video_crc32: 0x9053_7E76,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7481_0914,
+        video_crc32: 0x9540_657B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5109_BB1C,
+        video_crc32: 0xA25A_4389,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDCFD_5112,
+        video_crc32: 0xD364_AA18,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x98E2_DBA8,
+        video_crc32: 0x6369_E7A0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4132_791A,
+        video_crc32: 0x2635_8FCD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA2F4_E94D,
+        video_crc32: 0xA95D_26CD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x54CC_1AC2,
+        video_crc32: 0x77ED_39AB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x716D_126B,
+        video_crc32: 0x69E1_32C0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0909_AD47,
+        video_crc32: 0x77EE_86C8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFAFF_BC55,
+        video_crc32: 0xAFD7_3819,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC67E_82ED,
+        video_crc32: 0xAF4F_0D4D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFA75_0265,
+        video_crc32: 0xB4EE_1171,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x19B3_9232,
+        video_crc32: 0x5351_43E4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1013_4943,
+        video_crc32: 0xEE95_3549,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFEE0_42CC,
+        video_crc32: 0xEE7C_A83A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE41A_3BBF,
+        video_crc32: 0x59D8_7F72,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8577_0823,
+        video_crc32: 0x4813_EDBA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB6C3_24E8,
+        video_crc32: 0xB560_FFB1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5505_B4BF,
+        video_crc32: 0x344D_B836,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1ED2_E192,
+        video_crc32: 0xC944_9AD9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3BD0_EDAA,
+        video_crc32: 0xC944_9AD9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x66C6_EBA0,
+        video_crc32: 0x8C0E_625A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0EE9_2394,
+        video_crc32: 0xC0BA_916B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE01A_281B,
+        video_crc32: 0x0E5A_CA6E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6C81_6866,
+        video_crc32: 0x876B_F397,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8F47_F831,
+        video_crc32: 0x1B44_D330,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDC3E_5C8B,
+        video_crc32: 0x2B0B_5FA7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE0BF_6233,
+        video_crc32: 0x521C_572E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3854_5001,
+        video_crc32: 0xAA3B_1B81,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7C4B_DABB,
+        video_crc32: 0xF23D_D549,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA59B_7809,
+        video_crc32: 0x1317_FC01,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x465D_E85E,
+        video_crc32: 0x5BF4_4C77,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFF17_F3D9,
+        video_crc32: 0x28A9_77B3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD137_6349,
+        video_crc32: 0x4D74_0572,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x74E2_768C,
+        video_crc32: 0x70A0_444F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x516A_C484,
+        video_crc32: 0x42E8_F3AB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7468_C8BC,
+        video_crc32: 0x42E8_F3AB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x97AE_58EB,
+        video_crc32: 0x3E35_A8D1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x643E_97C6,
+        video_crc32: 0x5312_E936,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8ACD_9C49,
+        video_crc32: 0x82D8_D3CC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xAEA0_3A02,
+        video_crc32: 0x1F05_CC26,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD6C4_852E,
+        video_crc32: 0x8C1A_241E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC1D2_2686,
+        video_crc32: 0xC55B_BB2E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2214_B6D1,
+        video_crc32: 0xE335_7A2F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x936F_B835,
+        video_crc32: 0x26A2_1521,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD770_328F,
+        video_crc32: 0x86CC_2548,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEA40_2287,
+        video_crc32: 0x949C_4284,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x04B3_2908,
+        video_crc32: 0x100E_8740,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8828_6975,
+        video_crc32: 0x367B_E15D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6BEE_F922,
+        video_crc32: 0x2DF6_F224,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xAD58_150C,
+        video_crc32: 0x468C_7B28,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x88D0_A704,
+        video_crc32: 0x80D6_9470,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3BB3_9232,
+        video_crc32: 0x80D6_9470,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x66A5_9438,
+        video_crc32: 0x48BD_703F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA67C_BA3A,
+        video_crc32: 0x48BD_703F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x45BA_2A6D,
+        video_crc32: 0x66AE_61BD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB382_D9E2,
+        video_crc32: 0xB0DD_11F8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x498D_86BA,
+        video_crc32: 0xF35F_A42C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x28E0_B526,
+        video_crc32: 0xC7A1_4AA6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF55F_7BAE,
+        video_crc32: 0x7B33_BF3F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC9DE_4516,
+        video_crc32: 0x02C0_A2E3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF5D5_C59E,
+        video_crc32: 0xDBCD_B570,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1613_55C9,
+        video_crc32: 0x255F_417F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3A2D_CD15,
+        video_crc32: 0x9273_7766,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD4DE_C69A,
+        video_crc32: 0x7F6B_0547,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBCA5_345D,
+        video_crc32: 0x3AC8_60B7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC4C1_8B71,
+        video_crc32: 0xA942_6F5A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEE7C_2B0A,
+        video_crc32: 0xA979_993C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0DBA_BB5D,
+        video_crc32: 0x515E_D593,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBC5D_FA2C,
+        video_crc32: 0xAD3B_CC08,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x016E_7A84,
+        video_crc32: 0xAD3B_CC08,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC449_F01E,
+        video_crc32: 0xAD3B_CC08,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x92F1_E712,
+        video_crc32: 0x684D_BB17,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7C02_EC9D,
+        video_crc32: 0x2E58_3DDA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF099_ACE0,
+        video_crc32: 0x684D_BB17,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x135F_3CB7,
+        video_crc32: 0x28EB_E979,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1272_C716,
+        video_crc32: 0x7F09_2D1C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x37FA_751E,
+        video_crc32: 0x03D4_7666,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBA0E_9F10,
+        video_crc32: 0x03D4_7666,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFE11_15AA,
+        video_crc32: 0x6D9C_C218,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x27C1_B718,
+        video_crc32: 0x438F_D39A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC407_274F,
+        video_crc32: 0x40F0_8EB0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x323F_D4C0,
+        video_crc32: 0x9DA2_5128,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x179E_DC69,
+        video_crc32: 0x1101_8CA0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6FFA_6345,
+        video_crc32: 0xB67B_DAA3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA1A7_7184,
+        video_crc32: 0xB3FA_3DDD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9D26_4F3C,
+        video_crc32: 0xCEE9_D79B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA12D_CFB4,
+        video_crc32: 0xD8D9_7848,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x42EB_5FE3,
+        video_crc32: 0xC6A5_BF3F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4B4B_8492,
+        video_crc32: 0xFCF4_4F4A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA5B8_8F1D,
+        video_crc32: 0x6FEB_339D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBF42_F66E,
+        video_crc32: 0xFB42_8C7D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDE2F_C5F2,
+        video_crc32: 0x4923_84D4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6BE3_FAD9,
+        video_crc32: 0x0109_AD22,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8825_6A8E,
+        video_crc32: 0x01AA_6E10,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE6F0_339B,
+        video_crc32: 0xB64A_81C7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBBE6_3591,
+        video_crc32: 0xD705_32C1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD3C9_FDA5,
+        video_crc32: 0xF86F_EB76,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3D3A_F62A,
+        video_crc32: 0x80D1_2FC9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB1A1_B657,
+        video_crc32: 0xCCDA_0D3C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5267_2600,
+        video_crc32: 0x14A4_7726,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB14F_8983,
+        video_crc32: 0x14A4_7726,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8DCE_B73B,
+        video_crc32: 0x0AD8_B051,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5525_8509,
+        video_crc32: 0xC0A1_C4DF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x113A_0FB3,
+        video_crc32: 0x888B_ED29,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC8EA_AD01,
+        video_crc32: 0xF934_87F0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2B2C_3D56,
+        video_crc32: 0xB3F8_7514,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDD14_CED9,
+        video_crc32: 0xAAC6_0C66,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBC46_B641,
+        video_crc32: 0x69A1_F347,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2438_A057,
+        video_crc32: 0x7F91_5C94,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x01B0_125F,
+        video_crc32: 0xAF37_D4CA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x24B2_1E67,
+        video_crc32: 0xD5E3_68E1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC774_8E30,
+        video_crc32: 0x7B57_96AF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x34E4_411D,
+        video_crc32: 0x5544_872D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDA17_4A92,
+        video_crc32: 0xE87E_41CF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFE7A_ECD9,
+        video_crc32: 0x7773_D9B2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x861E_53F5,
+        video_crc32: 0x8298_B653,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xACA3_F38E,
+        video_crc32: 0x5613_C906,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4F65_63D9,
+        video_crc32: 0x0CF9_F055,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC215_EDB5,
+        video_crc32: 0xE4CA_1584,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFE1E_6D3D,
+        video_crc32: 0x3908_2B08,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBA01_E787,
+        video_crc32: 0x5ACD_A472,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8731_F78F,
+        video_crc32: 0xF2AF_2F14,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x69C2_FC00,
+        video_crc32: 0xFCF3_FD23,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE559_BC7D,
+        video_crc32: 0x6BB3_F6F7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x069F_2C2A,
+        video_crc32: 0xF67E_C9C2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x86D4_C471,
+        video_crc32: 0xCAC1_DAFD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA35C_7679,
+        video_crc32: 0xB843_FEE1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x103F_434F,
+        video_crc32: 0x1047_9EF4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4D29_4545,
+        video_crc32: 0x2CF8_8DCB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8DF0_6B47,
+        video_crc32: 0x873E_8DF5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6E36_FB10,
+        video_crc32: 0x1A73_83EA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x980E_089F,
+        video_crc32: 0x3AC5_F5D1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6201_57C7,
+        video_crc32: 0xF595_CB14,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x036C_645B,
+        video_crc32: 0xAC87_D62D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x982E_AEA6,
+        video_crc32: 0x91FA_C5B2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA4AF_901E,
+        video_crc32: 0x0CB7_CBAD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x98A4_1096,
+        video_crc32: 0x9537_9332,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7B62_80C1,
+        video_crc32: 0x68A8_2476,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x575C_181D,
+        video_crc32: 0x825B_5346,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB9AF_1392,
+        video_crc32: 0xEC01_17D4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD1D4_E155,
+        video_crc32: 0xD9B5_3257,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA9B0_5E79,
+        video_crc32: 0xD9B5_3257,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBEA6_FDD1,
+        video_crc32: 0xD680_962C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5D60_6D86,
+        video_crc32: 0x9EAA_BFDA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC985_20CF,
+        video_crc32: 0x7BFE_4A63,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9493_26C5,
+        video_crc32: 0x2FA2_EC21,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC22B_31C9,
+        video_crc32: 0x41EA_585F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2CD8_3A46,
+        video_crc32: 0xF22C_0B6F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA043_7A3B,
+        video_crc32: 0x9446_7426,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4385_EA6C,
+        video_crc32: 0xB50A_8967,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7F03_121E,
+        video_crc32: 0x49EF_63A1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5A8B_A016,
+        video_crc32: 0x1E95_9290,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD77F_4A18,
+        video_crc32: 0x1E95_9290,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9360_C0A2,
+        video_crc32: 0x1E95_9290,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4AB0_6210,
+        video_crc32: 0xAD02_CFC2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA976_F247,
+        video_crc32: 0x7CDA_E0AE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5F4E_01C8,
+        video_crc32: 0xA6AD_E306,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7AEF_0961,
+        video_crc32: 0x73E9_ED33,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x028B_B64D,
+        video_crc32: 0x339E_13C0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7C87_AFB5,
+        video_crc32: 0x426F_FC20,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4006_910D,
+        video_crc32: 0xFDA1_00BE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7C0D_1185,
+        video_crc32: 0x9AE1_F0FF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9FCB_81D2,
+        video_crc32: 0x4396_C4B0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x966B_5AA3,
+        video_crc32: 0x5A46_200D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7898_512C,
+        video_crc32: 0x6066_14AA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6262_285F,
+        video_crc32: 0x1935_A818,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x030F_1BC3,
+        video_crc32: 0xF329_06B0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x30BB_3708,
+        video_crc32: 0x6AA9_5E2F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD37D_A75F,
+        video_crc32: 0x74D1_328E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x98AA_F272,
+        video_crc32: 0x4BCD_3A0C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBDA8_FE4A,
+        video_crc32: 0x566B_E143,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE0BE_F840,
+        video_crc32: 0x0237_4701,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8891_3074,
+        video_crc32: 0xFEE9_116C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6662_3BFB,
+        video_crc32: 0xA0C0_A383,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEAF9_7B86,
+        video_crc32: 0x6268_4F11,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x093F_EBD1,
+        video_crc32: 0xDB2A_F4CE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD7BC_4781,
+        video_crc32: 0x9C07_9585,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEB3D_7939,
+        video_crc32: 0xCCB5_2B66,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x33D6_4B0B,
+        video_crc32: 0xC275_E517,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x77C9_C1B1,
+        video_crc32: 0xFBA0_ACA5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xAE19_6303,
+        video_crc32: 0x0997_B94F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4DDF_F354,
+        video_crc32: 0x12B5_BAAC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBBE7_00DB,
+        video_crc32: 0x7D0B_9725,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBBD8_4BDF,
+        video_crc32: 0x519E_ACF4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDAB5_7843,
+        video_crc32: 0xF7F5_1F5C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7F60_6D86,
+        video_crc32: 0x2AB6_0926,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5AE8_DF8E,
+        video_crc32: 0x3366_ED9B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7FEA_D3B6,
+        video_crc32: 0x5DC7_66A6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9C2C_43E1,
+        video_crc32: 0xE2B0_472C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6FBC_8CCC,
+        video_crc32: 0xB0B1_60A8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x814F_8743,
+        video_crc32: 0xD5C6_C36D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA522_2108,
+        video_crc32: 0xFE2E_5279,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDD46_9E24,
+        video_crc32: 0x16A5_C859,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB106_3A2A,
+        video_crc32: 0x2753_33F9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x52C0_AA7D,
+        video_crc32: 0xEF6D_6E20,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE3BB_A499,
+        video_crc32: 0x58E6_54C6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA7A4_2E23,
+        video_crc32: 0x656D_118E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9A94_3E2B,
+        video_crc32: 0x42D0_AA5E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7467_35A4,
+        video_crc32: 0xB7F5_6357,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF8FC_75D9,
+        video_crc32: 0x2A92_743C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1B3A_E58E,
+        video_crc32: 0xFE98_9D1A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDD8C_09A0,
+        video_crc32: 0x3C96_8BBF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF804_BBA8,
+        video_crc32: 0xDCF7_61A4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4B67_8E9E,
+        video_crc32: 0xBB6E_BF81,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1671_8894,
+        video_crc32: 0x3A43_F806,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD6A8_A696,
+        video_crc32: 0xB457_5482,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x356E_36C1,
+        video_crc32: 0x7FC3_BF75,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7614_391A,
+        video_crc32: 0x0D2F_380B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5834_A98A,
+        video_crc32: 0xCD88_0BE7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFEDD_60A4,
+        video_crc32: 0xACC7_B8E1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC25C_5E1C,
+        video_crc32: 0xDA21_CD6E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFE57_DE94,
+        video_crc32: 0xF046_ECD4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1D91_4EC3,
+        video_crc32: 0xF046_ECD4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x31AF_D61F,
+        video_crc32: 0x22EC_0DB3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDF5C_DD90,
+        video_crc32: 0x0818_D0C4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB727_2F57,
+        video_crc32: 0x3B20_9745,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCF43_907B,
+        video_crc32: 0xCECB_F8A4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE5FE_3000,
+        video_crc32: 0xB483_5BB8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0638_A057,
+        video_crc32: 0xD4A7_95B6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB7DF_E126,
+        video_crc32: 0x696C_E42E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x92DD_ED1E,
+        video_crc32: 0x98D4_AAB8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCFCB_EB14,
+        video_crc32: 0x531A_8CDA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9973_FC18,
+        video_crc32: 0xB66C_195C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7780_F797,
+        video_crc32: 0x0743_6426,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFB1B_B7EA,
+        video_crc32: 0xB61C_9126,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x46CD_C52A,
+        video_crc32: 0xE24F_BDCE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x572F_3CF7,
+        video_crc32: 0xEB1A_20EE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x38A0_8FDD,
+        video_crc32: 0xF10A_B726,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFF53_64F1,
+        video_crc32: 0xC072_243B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6545_ED2D,
+        video_crc32: 0xC0B3_E2B8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x629C_4CF9,
+        video_crc32: 0x434E_D326,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCB5D_DD8C,
+        video_crc32: 0xAB3B_E3A8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3D65_2E03,
+        video_crc32: 0xE875_58B8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x52C3_2788,
+        video_crc32: 0x2805_0DD0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x07C3_990B,
+        video_crc32: 0x5D66_74D8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE4FA_8A65,
+        video_crc32: 0x0331_DA36,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x927C_B5FF,
+        video_crc32: 0x454A_0DEC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE470_3455,
+        video_crc32: 0x1933_7B99,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD9BF_A764,
+        video_crc32: 0x4645_2F7A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0E16_7F73,
+        video_crc32: 0x5839_E80D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xAAE2_75DE,
+        video_crc32: 0x143F_3682,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFA1F_0D8F,
+        video_crc32: 0xB935_65F4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8BBD_3C6F,
+        video_crc32: 0x6D36_6F83,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x956D_110B,
+        video_crc32: 0x007D_79A0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3CAC_807E,
+        video_crc32: 0xC238_498C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x187E_D849,
+        video_crc32: 0x3FAA_D928,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9B61_DD25,
+        video_crc32: 0xDFD8_32BB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2D47_1677,
+        video_crc32: 0xCDB5_552D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x89B3_1CDA,
+        video_crc32: 0x8816_30DD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4F2F_5D85,
+        video_crc32: 0xCDB5_552D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x818D_CC7D,
+        video_crc32: 0xE7AA_EF31,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4FC1_6251,
+        video_crc32: 0xC8EF_3532,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3947_5DCB,
+        video_crc32: 0x3E0B_D8A8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xABAB_6EDB,
+        video_crc32: 0x5A2F_375E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x31BD_E707,
+        video_crc32: 0x3303_7F02,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3664_46D3,
+        video_crc32: 0x2C8B_7672,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9FA5_D7A6,
+        video_crc32: 0x5653_1172,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x699D_2429,
+        video_crc32: 0x7AA7_D347,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x23A5_6E0F,
+        video_crc32: 0x8AD6_EEFC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2951_5849,
+        video_crc32: 0x52A8_94E6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA1E0_4C23,
+        video_crc32: 0x0BA5_69F8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCE6F_FF09,
+        video_crc32: 0x4EB4_023E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA16A_F213,
+        video_crc32: 0x1D92_00D1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9CA5_6122,
+        video_crc32: 0x0012_0AE7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB13C_AD69,
+        video_crc32: 0xB4B7_84E6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x15C8_A7C4,
+        video_crc32: 0xCF33_9945,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7BA2_00AD,
+        video_crc32: 0xDD7D_A441,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2EA2_BE2E,
+        video_crc32: 0x233E_DD5C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x297B_1FFA,
+        video_crc32: 0x6B27_6C9F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x80BA_8E8F,
+        video_crc32: 0x1A30_4242,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0DCA_00E3,
+        video_crc32: 0x011E_9E8D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7BC6_8149,
+        video_crc32: 0x011E_9E8D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE1D0_0895,
+        video_crc32: 0x4704_408F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x02E9_1BFB,
+        video_crc32: 0x2970_C453,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA61D_1156,
+        video_crc32: 0x813C_6336,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6081_5009,
+        video_crc32: 0xAC0A_0513,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9388_C222,
+        video_crc32: 0x2F07_2AFB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x785A_2FA3,
+        video_crc32: 0x2F07_2AFB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x17D5_9C89,
+        video_crc32: 0x02E4_5E1E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEEB1_A89D,
+        video_crc32: 0x0EA8_5EA0,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6DAE_ADF1,
+        video_crc32: 0xE6EC_39D4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x737E_8095,
+        video_crc32: 0x1E22_B679,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDABF_11E0,
+        video_crc32: 0xBA24_CFA7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2C87_E26F,
+        video_crc32: 0xFD34_6838,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD086_8E26,
+        video_crc32: 0x7AAB_5A19,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x66A0_4574,
+        video_crc32: 0x7AAB_5A19,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1026_7AEE,
+        video_crc32: 0x4A0C_839A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x662A_FB44,
+        video_crc32: 0xA82C_73A3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5BE5_6875,
+        video_crc32: 0xD264_D0BF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA9D2_F3CF,
+        video_crc32: 0x278F_BF5E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0D26_F962,
+        video_crc32: 0xE389_255F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2F5A_0A87,
+        video_crc32: 0x0ECA_DEAF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCA0B_BF3D,
+        video_crc32: 0x0ECA_DEAF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCDD2_1EE9,
+        video_crc32: 0xF17D_2889,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6413_8F9C,
+        video_crc32: 0xBCE4_1B7D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBAF1_C3F7,
+        video_crc32: 0x0C0B_D8E6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x39EE_C69B,
+        video_crc32: 0x80C2_4250,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB15F_D2F1,
+        video_crc32: 0x824E_8C9F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x15AB_D85C,
+        video_crc32: 0x7540_BF6C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD337_9903,
+        video_crc32: 0xA03E_A27F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1D95_08FB,
+        video_crc32: 0x4598_9367,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0C77_F126,
+        video_crc32: 0xD151_E18B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x63F8_420C,
+        video_crc32: 0x7F90_A59C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA40B_A920,
+        video_crc32: 0x726D_D134,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3E1D_20FC,
+        video_crc32: 0xF902_1A36,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x39C4_8128,
+        video_crc32: 0xA20E_ADF7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9005_105D,
+        video_crc32: 0xA235_5B91,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x663D_E3D2,
+        video_crc32: 0x109B_5D19,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x099B_EA59,
+        video_crc32: 0x14DF_DAB9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6130_5709,
+        video_crc32: 0x4ABB_9D4A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8209_4467,
+        video_crc32: 0x46A4_409F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF48F_7BFD,
+        video_crc32: 0xB7A1_9453,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8283_FA57,
+        video_crc32: 0xB7ED_8EF9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBF4C_6966,
+        video_crc32: 0x60C2_9D18,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x68E5_B171,
+        video_crc32: 0xC152_2A3C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCC11_BBDC,
+        video_crc32: 0xE7DE_A159,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9CEC_C38D,
+        video_crc32: 0xDBE0_3F6B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD0E5_F1BE,
+        video_crc32: 0xB82C_BB24,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCE35_DCDA,
+        video_crc32: 0x624A_4A3B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x67F4_4DAF,
+        video_crc32: 0x624A_4A3B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2C23_1882,
+        video_crc32: 0x2A14_87AD,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4326_1598,
+        video_crc32: 0x296B_DA87,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC039_10F4,
+        video_crc32: 0x2CEA_3DF9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x761F_DBA6,
+        video_crc32: 0x64C0_140F,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD2EB_D10B,
+        video_crc32: 0x7A54_3058,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1477_9054,
+        video_crc32: 0xFFCB_1CE5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9C28_05D9,
+        video_crc32: 0xFFCB_1CE5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5264_ABF5,
+        video_crc32: 0x9F36_BFC1,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x24E2_946F,
+        video_crc32: 0xF9EA_B8CE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB60E_A77F,
+        video_crc32: 0x92A9_6629,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2C18_2EA3,
+        video_crc32: 0x92A9_6629,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2BC1_8F77,
+        video_crc32: 0x8B88_7A98,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8200_1E02,
+        video_crc32: 0x88F7_27B2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7438_ED8D,
+        video_crc32: 0xBD78_03A5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3E00_A7AB,
+        video_crc32: 0xA8A4_0E85,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x7209_9598,
+        video_crc32: 0x6378_F57A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFAB8_81F2,
+        video_crc32: 0x65F2_EC8B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9537_32D8,
+        video_crc32: 0x032E_EB84,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFA32_3FC2,
+        video_crc32: 0xD35B_4D44,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC7FD_ACF3,
+        video_crc32: 0x0584_C813,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEA64_60B8,
+        video_crc32: 0xB7A7_50F7,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4E90_6A15,
+        video_crc32: 0xD98A_F8A9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x20FA_CD7C,
+        video_crc32: 0xF794_5436,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4851_702C,
+        video_crc32: 0x4F21_862B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4F88_D1F8,
+        video_crc32: 0xA76B_3D1B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE649_408D,
+        video_crc32: 0x40FE_1153,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1D35_4F4B,
+        video_crc32: 0x40FE_1153,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x8723_C697,
+        video_crc32: 0x0336_1C78,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x641A_D5F9,
+        video_crc32: 0x9E52_709A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC0EE_DF54,
+        video_crc32: 0x3299_2BDA,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0672_9E0B,
+        video_crc32: 0xF413_20A3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC8D0_0FF3,
+        video_crc32: 0xA579_B699,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2302_E272,
+        video_crc32: 0xEC2E_2F6C,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4C8D_5158,
+        video_crc32: 0x022E_647B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB5E9_654C,
+        video_crc32: 0x8B3A_D6CC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x36F6_6020,
+        video_crc32: 0xB33B_76CB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x2826_4D44,
+        video_crc32: 0xFB39_96C2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x81E7_DC31,
+        video_crc32: 0xF846_CBE8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x77DF_2FBE,
+        video_crc32: 0xAF9D_9603,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC7D7_71C4,
+        video_crc32: 0x4F18_D0E6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0DA6_5017,
+        video_crc32: 0x4078_5019,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBB80_9B45,
+        video_crc32: 0xF64C_8024,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xCD06_A4DF,
+        video_crc32: 0xF937_813E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBB0A_2575,
+        video_crc32: 0x70F1_5B53,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x86C5_B644,
+        video_crc32: 0xF301_D02D,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x74F2_2DFE,
+        video_crc32: 0x69CD_E69A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD006_2753,
+        video_crc32: 0xB8D2_09C2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF27A_D4B6,
+        video_crc32: 0x8E3C_E486,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA77A_6A35,
+        video_crc32: 0x1AC3_512A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA0A3_CBE1,
+        video_crc32: 0x2F1F_6C7B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0962_5A94,
+        video_crc32: 0xB996_F9F6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xB885_1BE5,
+        video_crc32: 0x2993_39E4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD780_16FF,
+        video_crc32: 0x2993_39E4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x549F_1393,
+        video_crc32: 0x2993_39E4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDC2E_07F9,
+        video_crc32: 0x2173_CD8B,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x78DA_0D54,
+        video_crc32: 0x8F00_59AE,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xBE46_4C0B,
+        video_crc32: 0x510C_8FEB,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4D4F_DE20,
+        video_crc32: 0x12EE_8E9E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5CAD_27FD,
+        video_crc32: 0x39D1_1181,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3322_94D7,
+        video_crc32: 0x7FCB_CF83,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF4D1_7FFB,
+        video_crc32: 0xC7BE_9186,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x6EC7_F627,
+        video_crc32: 0x60E9_4364,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x691E_57F3,
+        video_crc32: 0x8065_51F4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC0DF_C686,
+        video_crc32: 0x969E_5B68,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4502_121C,
+        video_crc32: 0x0CBD_B447,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0C41_8201,
+        video_crc32: 0x1A92_9125,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEF78_916F,
+        video_crc32: 0x30E0_6253,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x99FE_AEF5,
+        video_crc32: 0x2ACD_43CC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEFF2_2F5F,
+        video_crc32: 0x11C0_5C68,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xD23D_BC6E,
+        video_crc32: 0x118C_46C2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x0594_6479,
+        video_crc32: 0x7F5A_F9A8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xA160_6ED4,
+        video_crc32: 0x8EE4_80C5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF19D_1685,
+        video_crc32: 0x2815_90BC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xFB69_20C3,
+        video_crc32: 0xABEB_D4E6,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xE5B9_0DA7,
+        video_crc32: 0xAD54_5C87,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4C78_9CD2,
+        video_crc32: 0xD71E_FC0A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x68AA_C4E5,
+        video_crc32: 0xD2F2_CED3,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEBB5_C189,
+        video_crc32: 0xD2C9_38B5,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5D93_0ADB,
+        video_crc32: 0xC36B_11AC,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF967_0076,
+        video_crc32: 0x7D54_6C07,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3FFB_4129,
+        video_crc32: 0xB060_CAD4,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xF159_D0D1,
+        video_crc32: 0x7A4F_A8D2,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x3F15_7EFD,
+        video_crc32: 0xDE9A_F85A,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4993_4167,
+        video_crc32: 0x43FD_DCCF,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xDB7F_7277,
+        video_crc32: 0x2C09_7E06,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x4169_FBAB,
+        video_crc32: 0x7BEB_BA63,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x46B0_5A7F,
+        video_crc32: 0xBC5D_05B9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xEF71_CB0A,
+        video_crc32: 0x7E5F_A34E,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x1949_3885,
+        video_crc32: 0x1A44_56C9,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x5371_72A3,
+        video_crc32: 0x9A2A_B0E8,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x22D3_4343,
+        video_crc32: 0x268B_DF11,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xAA62_5729,
+        video_crc32: 0xF5D2_F184,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xC5ED_E403,
+        video_crc32: 0xF879_8784,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0xAAE8_E919,
+        video_crc32: 0x0632_1103,
+    },
+    RedLabelTraceCrcSample {
+        object_table_crc32: 0x65B1_5F89,
+        process_table_crc32: 0x9727_7A28,
+        video_crc32: 0xB466_EC8C,
+    },
 ];
 
 pub(crate) const RED_LABEL_LONG_INSTRUCTION_RAND_FIRST_FRAME: u64 = 1895;
@@ -12032,6 +15032,3006 @@ pub(crate) const RED_LABEL_LONG_INSTRUCTION_RAND_SAMPLES: &[RedLabelTraceRandSam
         hseed: 0xE5,
         lseed: 0x05,
     },
+    RedLabelTraceRandSample {
+        seed: 0xAB,
+        hseed: 0xF2,
+        lseed: 0x82,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCC,
+        hseed: 0x79,
+        lseed: 0x41,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD2,
+        hseed: 0xBC,
+        lseed: 0xA0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x35,
+        hseed: 0x5E,
+        lseed: 0x50,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x07,
+        hseed: 0x2F,
+        lseed: 0x28,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x51,
+        hseed: 0x97,
+        lseed: 0x94,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x19,
+        hseed: 0x4B,
+        lseed: 0xCA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE7,
+        hseed: 0xA5,
+        lseed: 0xE5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8B,
+        hseed: 0xD2,
+        lseed: 0xF2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x95,
+        hseed: 0x69,
+        lseed: 0x79,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC1,
+        hseed: 0x34,
+        lseed: 0xBC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4C,
+        hseed: 0x9A,
+        lseed: 0x5E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4C,
+        hseed: 0x9A,
+        lseed: 0x5E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF2,
+        hseed: 0xCD,
+        lseed: 0x2F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE5,
+        hseed: 0x66,
+        lseed: 0x97,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBF,
+        hseed: 0xB3,
+        lseed: 0x4B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4C,
+        hseed: 0x59,
+        lseed: 0xA5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x74,
+        hseed: 0xAC,
+        lseed: 0xD2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2C,
+        hseed: 0x56,
+        lseed: 0x69,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF4,
+        hseed: 0x2B,
+        lseed: 0x34,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9D,
+        hseed: 0x15,
+        lseed: 0x9A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x40,
+        hseed: 0x8A,
+        lseed: 0xCD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7D,
+        hseed: 0x45,
+        lseed: 0x66,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5E,
+        hseed: 0x22,
+        lseed: 0xB3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x15,
+        hseed: 0x91,
+        lseed: 0x59,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x44,
+        hseed: 0x48,
+        lseed: 0xAC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD8,
+        hseed: 0xA4,
+        lseed: 0x56,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x16,
+        hseed: 0x52,
+        lseed: 0x2B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x91,
+        hseed: 0x29,
+        lseed: 0x15,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE3,
+        hseed: 0x94,
+        lseed: 0x8A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC9,
+        hseed: 0xCA,
+        lseed: 0x45,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x73,
+        hseed: 0xE5,
+        lseed: 0x22,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6D,
+        hseed: 0x72,
+        lseed: 0x91,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x59,
+        hseed: 0xB9,
+        lseed: 0x48,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9C,
+        hseed: 0xDC,
+        lseed: 0xA4,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA6,
+        hseed: 0x6E,
+        lseed: 0x52,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x63,
+        hseed: 0x37,
+        lseed: 0x29,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x63,
+        hseed: 0x37,
+        lseed: 0x29,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA4,
+        hseed: 0x0D,
+        lseed: 0xCA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x69,
+        hseed: 0x86,
+        lseed: 0xE5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x81,
+        hseed: 0xC3,
+        lseed: 0x72,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAF,
+        hseed: 0x61,
+        lseed: 0xB9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2A,
+        hseed: 0x30,
+        lseed: 0xDC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x95,
+        hseed: 0x98,
+        lseed: 0x6E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD4,
+        hseed: 0xCC,
+        lseed: 0x37,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8E,
+        hseed: 0xE6,
+        lseed: 0x1B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3B,
+        hseed: 0x73,
+        lseed: 0x0D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x82,
+        hseed: 0x39,
+        lseed: 0x86,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x77,
+        hseed: 0x1C,
+        lseed: 0xC3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x77,
+        hseed: 0x1C,
+        lseed: 0xC3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x65,
+        hseed: 0x8E,
+        lseed: 0x61,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x37,
+        hseed: 0xC7,
+        lseed: 0x30,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB2,
+        hseed: 0x63,
+        lseed: 0x98,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA4,
+        hseed: 0xB1,
+        lseed: 0xCC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBC,
+        hseed: 0xD8,
+        lseed: 0xE6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x24,
+        hseed: 0x6C,
+        lseed: 0x73,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6C,
+        hseed: 0xB6,
+        lseed: 0x39,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCC,
+        hseed: 0x5B,
+        lseed: 0x1C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB1,
+        hseed: 0xAD,
+        lseed: 0x8E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC1,
+        hseed: 0xD6,
+        lseed: 0xC7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA2,
+        hseed: 0xEB,
+        lseed: 0x63,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9E,
+        hseed: 0xF5,
+        lseed: 0xB1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9E,
+        hseed: 0xF5,
+        lseed: 0xB1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBE,
+        hseed: 0xFA,
+        lseed: 0xD8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB4,
+        hseed: 0xFD,
+        lseed: 0x6C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE1,
+        hseed: 0xFE,
+        lseed: 0xB6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8F,
+        hseed: 0x7F,
+        lseed: 0x5B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAB,
+        hseed: 0x3F,
+        lseed: 0xAD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x07,
+        hseed: 0x1F,
+        lseed: 0xD6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x21,
+        hseed: 0x0F,
+        lseed: 0xEB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x71,
+        hseed: 0x07,
+        lseed: 0xF5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE2,
+        hseed: 0x83,
+        lseed: 0xFA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x76,
+        hseed: 0xC1,
+        lseed: 0xFD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD2,
+        hseed: 0x60,
+        lseed: 0xFE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB7,
+        hseed: 0xB0,
+        lseed: 0x7F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB7,
+        hseed: 0xB0,
+        lseed: 0x7F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC3,
+        hseed: 0x2C,
+        lseed: 0x1F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7F,
+        hseed: 0x16,
+        lseed: 0x0F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA0,
+        hseed: 0x0B,
+        lseed: 0x07,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFA,
+        hseed: 0x85,
+        lseed: 0x83,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x83,
+        hseed: 0xC2,
+        lseed: 0xC1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x83,
+        hseed: 0xC2,
+        lseed: 0xC1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC3,
+        hseed: 0x70,
+        lseed: 0xB0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC3,
+        hseed: 0x70,
+        lseed: 0xB0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x97,
+        hseed: 0x9C,
+        lseed: 0x2C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBA,
+        hseed: 0xCE,
+        lseed: 0x16,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB1,
+        hseed: 0x67,
+        lseed: 0x0B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB1,
+        hseed: 0x67,
+        lseed: 0x0B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB1,
+        hseed: 0x67,
+        lseed: 0x0B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x01,
+        hseed: 0x99,
+        lseed: 0xC2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x41,
+        hseed: 0x4C,
+        lseed: 0xE1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEB,
+        hseed: 0xA6,
+        lseed: 0x70,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5E,
+        hseed: 0x53,
+        lseed: 0x38,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x70,
+        hseed: 0xA9,
+        lseed: 0x9C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x70,
+        hseed: 0xA9,
+        lseed: 0x9C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x04,
+        hseed: 0xD4,
+        lseed: 0xCE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6E,
+        hseed: 0xEA,
+        lseed: 0x67,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2E,
+        hseed: 0xFA,
+        lseed: 0x99,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x64,
+        hseed: 0x7D,
+        lseed: 0x4C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA1,
+        hseed: 0xBE,
+        lseed: 0xA6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA1,
+        hseed: 0xBE,
+        lseed: 0xA6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA1,
+        hseed: 0xBE,
+        lseed: 0xA6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA7,
+        hseed: 0x5F,
+        lseed: 0x53,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x56,
+        hseed: 0x57,
+        lseed: 0xD4,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x28,
+        hseed: 0x2B,
+        lseed: 0xEA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x14,
+        hseed: 0x95,
+        lseed: 0xF5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x12,
+        hseed: 0xCA,
+        lseed: 0xFA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x12,
+        hseed: 0xCA,
+        lseed: 0xFA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3C,
+        hseed: 0x72,
+        lseed: 0xBE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDE,
+        hseed: 0xB9,
+        lseed: 0x5F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB7,
+        hseed: 0x5C,
+        lseed: 0xAF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBB,
+        hseed: 0x2E,
+        lseed: 0x57,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x04,
+        hseed: 0x97,
+        lseed: 0x2B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x04,
+        hseed: 0x97,
+        lseed: 0x2B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFD,
+        hseed: 0x4B,
+        lseed: 0x95,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x77,
+        hseed: 0xA5,
+        lseed: 0xCA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2E,
+        hseed: 0xD2,
+        lseed: 0xE5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF7,
+        hseed: 0xE9,
+        lseed: 0x72,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF7,
+        hseed: 0xE9,
+        lseed: 0x72,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x13,
+        hseed: 0x3A,
+        lseed: 0x5C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x13,
+        hseed: 0x3A,
+        lseed: 0x5C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x15,
+        hseed: 0x9D,
+        lseed: 0x2E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB5,
+        hseed: 0xCE,
+        lseed: 0x97,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x62,
+        hseed: 0xE7,
+        lseed: 0x4B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4F,
+        hseed: 0x73,
+        lseed: 0xA5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8A,
+        hseed: 0xB9,
+        lseed: 0xD2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF5,
+        hseed: 0x5C,
+        lseed: 0xE9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x93,
+        hseed: 0x2E,
+        lseed: 0x74,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1C,
+        hseed: 0x17,
+        lseed: 0x3A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8E,
+        hseed: 0x8B,
+        lseed: 0x9D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCF,
+        hseed: 0x45,
+        lseed: 0xCE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x08,
+        hseed: 0xA2,
+        lseed: 0xE7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6D,
+        hseed: 0xD1,
+        lseed: 0x73,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6D,
+        hseed: 0xD1,
+        lseed: 0x73,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD0,
+        hseed: 0x74,
+        lseed: 0x5C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x69,
+        hseed: 0xBA,
+        lseed: 0x2E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x40,
+        hseed: 0xDD,
+        lseed: 0x17,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4B,
+        hseed: 0xEE,
+        lseed: 0x8B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAF,
+        hseed: 0x77,
+        lseed: 0x45,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAF,
+        hseed: 0x77,
+        lseed: 0x45,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7B,
+        hseed: 0xBB,
+        lseed: 0xA2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB1,
+        hseed: 0x5D,
+        lseed: 0xD1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBB,
+        hseed: 0xAE,
+        lseed: 0xE8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8D,
+        hseed: 0xD7,
+        lseed: 0x74,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDE,
+        hseed: 0x6B,
+        lseed: 0xBA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3E,
+        hseed: 0xB5,
+        lseed: 0xDD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3E,
+        hseed: 0xB5,
+        lseed: 0xDD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x71,
+        hseed: 0xAD,
+        lseed: 0x77,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF6,
+        hseed: 0xD6,
+        lseed: 0xBB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBC,
+        hseed: 0x6B,
+        lseed: 0x5D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x28,
+        hseed: 0x35,
+        lseed: 0xAE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFB,
+        hseed: 0x9A,
+        lseed: 0xD7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFB,
+        hseed: 0x9A,
+        lseed: 0xD7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3A,
+        hseed: 0xCD,
+        lseed: 0x6B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDB,
+        hseed: 0x66,
+        lseed: 0xB5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAF,
+        hseed: 0xB3,
+        lseed: 0x5A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA4,
+        hseed: 0xD9,
+        lseed: 0xAD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x40,
+        hseed: 0x6C,
+        lseed: 0xD6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x73,
+        hseed: 0x36,
+        lseed: 0x6B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBA,
+        hseed: 0x1B,
+        lseed: 0x35,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x66,
+        hseed: 0x8D,
+        lseed: 0x9A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD7,
+        hseed: 0xC6,
+        lseed: 0xCD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5F,
+        hseed: 0x63,
+        lseed: 0x66,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x12,
+        hseed: 0x31,
+        lseed: 0xB3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB9,
+        hseed: 0x98,
+        lseed: 0xD9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB9,
+        hseed: 0x98,
+        lseed: 0xD9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF4,
+        hseed: 0x4C,
+        lseed: 0x6C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCA,
+        hseed: 0xA6,
+        lseed: 0x36,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDD,
+        hseed: 0x53,
+        lseed: 0x1B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5F,
+        hseed: 0x29,
+        lseed: 0x8D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x08,
+        hseed: 0x14,
+        lseed: 0xC6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x96,
+        hseed: 0x0A,
+        lseed: 0x63,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8A,
+        hseed: 0x85,
+        lseed: 0x31,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x0A,
+        hseed: 0xC2,
+        lseed: 0x98,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5C,
+        hseed: 0xE1,
+        lseed: 0x4C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBB,
+        hseed: 0xF0,
+        lseed: 0xA6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x0D,
+        hseed: 0x78,
+        lseed: 0x53,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1D,
+        hseed: 0xBC,
+        lseed: 0x29,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDA,
+        hseed: 0x5E,
+        lseed: 0x14,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD8,
+        hseed: 0x2F,
+        lseed: 0x0A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB6,
+        hseed: 0x97,
+        lseed: 0x85,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC0,
+        hseed: 0xCB,
+        lseed: 0xC2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x98,
+        hseed: 0x65,
+        lseed: 0xE1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7C,
+        hseed: 0xB2,
+        lseed: 0xF0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x56,
+        hseed: 0x59,
+        lseed: 0x78,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7B,
+        hseed: 0xAC,
+        lseed: 0xBC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB6,
+        hseed: 0xD6,
+        lseed: 0x5E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4D,
+        hseed: 0xEB,
+        lseed: 0x2F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x05,
+        hseed: 0x75,
+        lseed: 0x97,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA5,
+        hseed: 0xBA,
+        lseed: 0xCB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA5,
+        hseed: 0xBA,
+        lseed: 0xCB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC2,
+        hseed: 0x5D,
+        lseed: 0x65,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB8,
+        hseed: 0xAE,
+        lseed: 0xB2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE9,
+        hseed: 0x57,
+        lseed: 0x59,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA4,
+        hseed: 0x2B,
+        lseed: 0xAC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x69,
+        hseed: 0x95,
+        lseed: 0xD6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x82,
+        hseed: 0x4A,
+        lseed: 0xEB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x32,
+        hseed: 0x25,
+        lseed: 0x75,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF4,
+        hseed: 0x92,
+        lseed: 0xBA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x14,
+        hseed: 0xC9,
+        lseed: 0x5D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5F,
+        hseed: 0x64,
+        lseed: 0xAE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x37,
+        hseed: 0xB2,
+        lseed: 0x57,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBA,
+        hseed: 0xD9,
+        lseed: 0x2B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBA,
+        hseed: 0xD9,
+        lseed: 0x2B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x40,
+        hseed: 0x6C,
+        lseed: 0x95,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD2,
+        hseed: 0xB6,
+        lseed: 0x4A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x87,
+        hseed: 0xDB,
+        lseed: 0x25,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x26,
+        hseed: 0xED,
+        lseed: 0x92,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC3,
+        hseed: 0x76,
+        lseed: 0xC9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF9,
+        hseed: 0x3B,
+        lseed: 0x64,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCC,
+        hseed: 0x1D,
+        lseed: 0xB2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5D,
+        hseed: 0x0E,
+        lseed: 0xD9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9B,
+        hseed: 0x07,
+        lseed: 0x6C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1C,
+        hseed: 0x83,
+        lseed: 0xB6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x82,
+        hseed: 0x41,
+        lseed: 0xDB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA5,
+        hseed: 0x20,
+        lseed: 0xED,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA5,
+        hseed: 0x20,
+        lseed: 0xED,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE6,
+        hseed: 0x08,
+        lseed: 0x3B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE4,
+        hseed: 0x04,
+        lseed: 0x1D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCD,
+        hseed: 0x02,
+        lseed: 0x0E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x00,
+        hseed: 0x81,
+        lseed: 0x07,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x54,
+        hseed: 0xC0,
+        lseed: 0x83,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2E,
+        hseed: 0xE0,
+        lseed: 0x41,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAB,
+        hseed: 0xF0,
+        lseed: 0x20,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9A,
+        hseed: 0x78,
+        lseed: 0x10,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x23,
+        hseed: 0x3C,
+        lseed: 0x08,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1C,
+        hseed: 0x9E,
+        lseed: 0x04,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB6,
+        hseed: 0x4F,
+        lseed: 0x02,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDB,
+        hseed: 0x27,
+        lseed: 0x81,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF6,
+        hseed: 0x93,
+        lseed: 0xC0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1D,
+        hseed: 0x49,
+        lseed: 0xE0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7D,
+        hseed: 0x24,
+        lseed: 0xF0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x13,
+        hseed: 0x12,
+        lseed: 0x78,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x0F,
+        hseed: 0x89,
+        lseed: 0x3C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA0,
+        hseed: 0xC4,
+        lseed: 0x9E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x23,
+        hseed: 0xE2,
+        lseed: 0x4F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x12,
+        hseed: 0x71,
+        lseed: 0x27,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x92,
+        hseed: 0xB8,
+        lseed: 0x93,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xED,
+        hseed: 0xDC,
+        lseed: 0x49,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6A,
+        hseed: 0x6E,
+        lseed: 0x24,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6A,
+        hseed: 0x6E,
+        lseed: 0x24,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x98,
+        hseed: 0x37,
+        lseed: 0x12,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7E,
+        hseed: 0x1B,
+        lseed: 0x89,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5D,
+        hseed: 0x0D,
+        lseed: 0xC4,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x11,
+        hseed: 0x06,
+        lseed: 0xE2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB8,
+        hseed: 0x03,
+        lseed: 0x71,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x72,
+        hseed: 0x81,
+        lseed: 0xB8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x04,
+        hseed: 0xC0,
+        lseed: 0xDC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6B,
+        hseed: 0xE0,
+        lseed: 0x6E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x79,
+        hseed: 0xF0,
+        lseed: 0x37,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8F,
+        hseed: 0xF8,
+        lseed: 0x1B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x47,
+        hseed: 0x7C,
+        lseed: 0x0D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2A,
+        hseed: 0x3E,
+        lseed: 0x06,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2A,
+        hseed: 0x3E,
+        lseed: 0x06,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2A,
+        hseed: 0x3E,
+        lseed: 0x06,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x34,
+        hseed: 0x8F,
+        lseed: 0x81,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x35,
+        hseed: 0xC7,
+        lseed: 0xC0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF4,
+        hseed: 0x63,
+        lseed: 0xE0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x0F,
+        hseed: 0x31,
+        lseed: 0xF0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4F,
+        hseed: 0x18,
+        lseed: 0xF8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x07,
+        hseed: 0x8C,
+        lseed: 0x7C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2A,
+        hseed: 0xC6,
+        lseed: 0x3E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x91,
+        hseed: 0xE3,
+        lseed: 0x1F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC5,
+        hseed: 0x71,
+        lseed: 0x8F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x60,
+        hseed: 0x38,
+        lseed: 0xC7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x30,
+        hseed: 0x9C,
+        lseed: 0x63,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x30,
+        hseed: 0x9C,
+        lseed: 0x63,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA0,
+        hseed: 0xCE,
+        lseed: 0x31,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF1,
+        hseed: 0xE7,
+        lseed: 0x18,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x64,
+        hseed: 0xF3,
+        lseed: 0x8C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFD,
+        hseed: 0xF9,
+        lseed: 0xC6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x67,
+        hseed: 0x7C,
+        lseed: 0xE3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x75,
+        hseed: 0xBE,
+        lseed: 0x71,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x87,
+        hseed: 0xDF,
+        lseed: 0x38,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x32,
+        hseed: 0xEF,
+        lseed: 0x9C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6D,
+        hseed: 0xF7,
+        lseed: 0xCE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3B,
+        hseed: 0xFB,
+        lseed: 0xE7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB3,
+        hseed: 0xFD,
+        lseed: 0xF3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x22,
+        hseed: 0xFE,
+        lseed: 0xF9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x72,
+        hseed: 0x7F,
+        lseed: 0x7C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE5,
+        hseed: 0xBF,
+        lseed: 0xBE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7F,
+        hseed: 0xDF,
+        lseed: 0xDF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xED,
+        hseed: 0x6F,
+        lseed: 0xEF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x07,
+        hseed: 0x37,
+        lseed: 0xF7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBD,
+        hseed: 0x9B,
+        lseed: 0xFB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x93,
+        hseed: 0x4D,
+        lseed: 0xFD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEF,
+        hseed: 0x26,
+        lseed: 0xFE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF1,
+        hseed: 0x93,
+        lseed: 0x7F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xED,
+        hseed: 0x49,
+        lseed: 0xBF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDC,
+        hseed: 0x24,
+        lseed: 0xDF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x27,
+        hseed: 0x12,
+        lseed: 0x6F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x27,
+        hseed: 0x12,
+        lseed: 0x6F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x82,
+        hseed: 0x84,
+        lseed: 0x9B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x26,
+        hseed: 0x42,
+        lseed: 0x4D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCA,
+        hseed: 0x21,
+        lseed: 0x26,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x13,
+        hseed: 0x10,
+        lseed: 0x93,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1B,
+        hseed: 0x88,
+        lseed: 0x49,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCA,
+        hseed: 0x44,
+        lseed: 0x24,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA3,
+        hseed: 0x22,
+        lseed: 0x12,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x15,
+        hseed: 0x11,
+        lseed: 0x09,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDC,
+        hseed: 0x08,
+        lseed: 0x84,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEB,
+        hseed: 0x04,
+        lseed: 0x42,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF5,
+        hseed: 0x02,
+        lseed: 0x21,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF5,
+        hseed: 0x02,
+        lseed: 0x21,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x82,
+        hseed: 0x81,
+        lseed: 0x10,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x60,
+        hseed: 0x40,
+        lseed: 0x88,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x15,
+        hseed: 0xA0,
+        lseed: 0x44,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC2,
+        hseed: 0x50,
+        lseed: 0x22,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x90,
+        hseed: 0x28,
+        lseed: 0x11,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5D,
+        hseed: 0x94,
+        lseed: 0x08,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF6,
+        hseed: 0xCA,
+        lseed: 0x04,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5A,
+        hseed: 0x65,
+        lseed: 0x02,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD2,
+        hseed: 0x32,
+        lseed: 0x81,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x60,
+        hseed: 0x99,
+        lseed: 0x40,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1D,
+        hseed: 0x4C,
+        lseed: 0xA0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDE,
+        hseed: 0x26,
+        lseed: 0x50,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDE,
+        hseed: 0x26,
+        lseed: 0x50,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE6,
+        hseed: 0x13,
+        lseed: 0x28,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE1,
+        hseed: 0x89,
+        lseed: 0x94,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC3,
+        hseed: 0x44,
+        lseed: 0xCA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x61,
+        hseed: 0xA2,
+        lseed: 0x65,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x37,
+        hseed: 0xD1,
+        lseed: 0x32,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB8,
+        hseed: 0x68,
+        lseed: 0x99,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB9,
+        hseed: 0x34,
+        lseed: 0x4C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFC,
+        hseed: 0x9A,
+        lseed: 0x26,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x65,
+        hseed: 0x4D,
+        lseed: 0x13,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6F,
+        hseed: 0xA6,
+        lseed: 0x89,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF5,
+        hseed: 0x53,
+        lseed: 0x44,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBC,
+        hseed: 0x29,
+        lseed: 0xA2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2B,
+        hseed: 0x14,
+        lseed: 0xD1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x84,
+        hseed: 0x8A,
+        lseed: 0x68,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x96,
+        hseed: 0xC5,
+        lseed: 0x34,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD0,
+        hseed: 0x62,
+        lseed: 0x9A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7F,
+        hseed: 0xB1,
+        lseed: 0x4D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8D,
+        hseed: 0x58,
+        lseed: 0xA6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x38,
+        hseed: 0x2C,
+        lseed: 0x53,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x78,
+        hseed: 0x96,
+        lseed: 0x29,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD8,
+        hseed: 0x4B,
+        lseed: 0x14,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x49,
+        hseed: 0x25,
+        lseed: 0x8A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x44,
+        hseed: 0x92,
+        lseed: 0xC5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x09,
+        hseed: 0xC9,
+        lseed: 0x62,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x09,
+        hseed: 0xC9,
+        lseed: 0x62,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x41,
+        hseed: 0x64,
+        lseed: 0xB1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDF,
+        hseed: 0xB2,
+        lseed: 0x58,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB3,
+        hseed: 0xD9,
+        lseed: 0x2C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAC,
+        hseed: 0xEC,
+        lseed: 0x96,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD6,
+        hseed: 0x76,
+        lseed: 0x4B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF3,
+        hseed: 0x3B,
+        lseed: 0x25,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1A,
+        hseed: 0x9D,
+        lseed: 0x92,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x77,
+        hseed: 0x4E,
+        lseed: 0xC9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x01,
+        hseed: 0x27,
+        lseed: 0x64,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD9,
+        hseed: 0x13,
+        lseed: 0xB2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7F,
+        hseed: 0x09,
+        lseed: 0xD9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7F,
+        hseed: 0x04,
+        lseed: 0xEC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7F,
+        hseed: 0x04,
+        lseed: 0xEC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x87,
+        hseed: 0x82,
+        lseed: 0x76,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x22,
+        hseed: 0x41,
+        lseed: 0x3B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x35,
+        hseed: 0x20,
+        lseed: 0x9D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x0E,
+        hseed: 0x10,
+        lseed: 0x4E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEA,
+        hseed: 0x88,
+        lseed: 0x27,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA6,
+        hseed: 0xC4,
+        lseed: 0x13,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEE,
+        hseed: 0xE2,
+        lseed: 0x09,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x50,
+        hseed: 0x71,
+        lseed: 0x04,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBB,
+        hseed: 0x38,
+        lseed: 0x82,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9F,
+        hseed: 0x1C,
+        lseed: 0x41,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9D,
+        hseed: 0x8E,
+        lseed: 0x20,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3F,
+        hseed: 0x47,
+        lseed: 0x10,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3F,
+        hseed: 0x47,
+        lseed: 0x10,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7A,
+        hseed: 0x23,
+        lseed: 0x88,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD5,
+        hseed: 0x91,
+        lseed: 0xC4,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBB,
+        hseed: 0x48,
+        lseed: 0xE2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD7,
+        hseed: 0x24,
+        lseed: 0x71,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x60,
+        hseed: 0x92,
+        lseed: 0x38,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x16,
+        hseed: 0xC9,
+        lseed: 0x1C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC5,
+        hseed: 0xE4,
+        lseed: 0x8E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x99,
+        hseed: 0xF2,
+        lseed: 0x47,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF8,
+        hseed: 0xF9,
+        lseed: 0x23,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x87,
+        hseed: 0xFC,
+        lseed: 0x91,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEC,
+        hseed: 0xFE,
+        lseed: 0x48,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF8,
+        hseed: 0xFF,
+        lseed: 0x24,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x0B,
+        hseed: 0x7F,
+        lseed: 0x92,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3A,
+        hseed: 0x3F,
+        lseed: 0xC9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC3,
+        hseed: 0x1F,
+        lseed: 0xE4,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5C,
+        hseed: 0x0F,
+        lseed: 0xF2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x26,
+        hseed: 0x07,
+        lseed: 0xF9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x83,
+        hseed: 0x03,
+        lseed: 0xFC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1A,
+        hseed: 0x81,
+        lseed: 0xFE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1F,
+        hseed: 0xC0,
+        lseed: 0xFF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4D,
+        hseed: 0x60,
+        lseed: 0x7F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x68,
+        hseed: 0x30,
+        lseed: 0x3F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x80,
+        hseed: 0x18,
+        lseed: 0x1F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAC,
+        hseed: 0x0C,
+        lseed: 0x0F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAC,
+        hseed: 0x0C,
+        lseed: 0x0F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFD,
+        hseed: 0x83,
+        lseed: 0x03,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4A,
+        hseed: 0xC1,
+        lseed: 0x81,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x90,
+        hseed: 0xE0,
+        lseed: 0xC0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x92,
+        hseed: 0x70,
+        lseed: 0x60,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2F,
+        hseed: 0x38,
+        lseed: 0x30,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD2,
+        hseed: 0x1C,
+        lseed: 0x18,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x21,
+        hseed: 0x8E,
+        lseed: 0x0C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x41,
+        hseed: 0xC7,
+        lseed: 0x06,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBB,
+        hseed: 0x63,
+        lseed: 0x83,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB5,
+        hseed: 0xB1,
+        lseed: 0xC1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE9,
+        hseed: 0xD8,
+        lseed: 0xE0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE9,
+        hseed: 0xD8,
+        lseed: 0xE0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA9,
+        hseed: 0x6C,
+        lseed: 0x70,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7A,
+        hseed: 0x36,
+        lseed: 0x38,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x36,
+        hseed: 0x9B,
+        lseed: 0x1C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x0F,
+        hseed: 0xCD,
+        lseed: 0x8E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEC,
+        hseed: 0xE6,
+        lseed: 0xC7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2C,
+        hseed: 0xF3,
+        lseed: 0x63,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x40,
+        hseed: 0xF9,
+        lseed: 0xB1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA6,
+        hseed: 0xFC,
+        lseed: 0xD8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6D,
+        hseed: 0xFE,
+        lseed: 0x6C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8D,
+        hseed: 0xFF,
+        lseed: 0x36,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD3,
+        hseed: 0x7F,
+        lseed: 0x9B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x97,
+        hseed: 0x3F,
+        lseed: 0xCD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x97,
+        hseed: 0x3F,
+        lseed: 0xCD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDC,
+        hseed: 0x1F,
+        lseed: 0xE6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA8,
+        hseed: 0x0F,
+        lseed: 0xF3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8A,
+        hseed: 0x87,
+        lseed: 0xF9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEF,
+        hseed: 0x43,
+        lseed: 0xFC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7E,
+        hseed: 0xA1,
+        lseed: 0xFE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5B,
+        hseed: 0xD0,
+        lseed: 0xFF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x09,
+        hseed: 0x68,
+        lseed: 0x7F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9F,
+        hseed: 0x34,
+        lseed: 0x3F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x28,
+        hseed: 0x1A,
+        lseed: 0x1F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA5,
+        hseed: 0x0D,
+        lseed: 0x0F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8D,
+        hseed: 0x06,
+        lseed: 0x87,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7E,
+        hseed: 0x83,
+        lseed: 0x43,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEE,
+        hseed: 0xC1,
+        lseed: 0xA1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8C,
+        hseed: 0xE0,
+        lseed: 0xD0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8E,
+        hseed: 0x70,
+        lseed: 0x68,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA7,
+        hseed: 0xB8,
+        lseed: 0x34,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7C,
+        hseed: 0x5C,
+        lseed: 0x1A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x40,
+        hseed: 0xAE,
+        lseed: 0x0D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2E,
+        hseed: 0x57,
+        lseed: 0x06,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4A,
+        hseed: 0x2B,
+        lseed: 0x83,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x46,
+        hseed: 0x95,
+        lseed: 0xC1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8E,
+        hseed: 0xCA,
+        lseed: 0xE0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x91,
+        hseed: 0x65,
+        lseed: 0x70,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAF,
+        hseed: 0x32,
+        lseed: 0xB8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAF,
+        hseed: 0x32,
+        lseed: 0xB8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x13,
+        hseed: 0x99,
+        lseed: 0x5C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC4,
+        hseed: 0xCC,
+        lseed: 0xAE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9A,
+        hseed: 0xE6,
+        lseed: 0x57,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFE,
+        hseed: 0xF3,
+        lseed: 0x2B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x19,
+        hseed: 0x79,
+        lseed: 0x95,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE3,
+        hseed: 0xBC,
+        lseed: 0xCA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFE,
+        hseed: 0xDE,
+        lseed: 0x65,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2C,
+        hseed: 0xEF,
+        lseed: 0x32,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA6,
+        hseed: 0x77,
+        lseed: 0x99,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x0A,
+        hseed: 0x3B,
+        lseed: 0xCC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB3,
+        hseed: 0x9D,
+        lseed: 0xE6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6C,
+        hseed: 0x4E,
+        lseed: 0xF3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6C,
+        hseed: 0x4E,
+        lseed: 0xF3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x75,
+        hseed: 0xA7,
+        lseed: 0x79,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x80,
+        hseed: 0x53,
+        lseed: 0xBC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x19,
+        hseed: 0xA9,
+        lseed: 0xDE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x20,
+        hseed: 0xD4,
+        lseed: 0xEF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x52,
+        hseed: 0x6A,
+        lseed: 0x77,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF7,
+        hseed: 0xB5,
+        lseed: 0x3B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xEE,
+        hseed: 0x5A,
+        lseed: 0x9D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x57,
+        hseed: 0x2D,
+        lseed: 0x4E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x53,
+        hseed: 0x96,
+        lseed: 0xA7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x28,
+        hseed: 0xCB,
+        lseed: 0x53,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x18,
+        hseed: 0xE5,
+        lseed: 0xA9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA0,
+        hseed: 0x72,
+        lseed: 0xD4,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA0,
+        hseed: 0x72,
+        lseed: 0xD4,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x22,
+        hseed: 0x9C,
+        lseed: 0xB5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9F,
+        hseed: 0xCE,
+        lseed: 0x5A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x03,
+        hseed: 0xE7,
+        lseed: 0x2D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x23,
+        hseed: 0x73,
+        lseed: 0x96,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7F,
+        hseed: 0x39,
+        lseed: 0xCB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x90,
+        hseed: 0x1C,
+        lseed: 0xE5,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC2,
+        hseed: 0x8E,
+        lseed: 0x72,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD7,
+        hseed: 0x47,
+        lseed: 0x39,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x56,
+        hseed: 0x23,
+        lseed: 0x9C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x72,
+        hseed: 0x91,
+        lseed: 0xCE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x17,
+        hseed: 0xC8,
+        lseed: 0xE7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAD,
+        hseed: 0xE4,
+        lseed: 0x73,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x43,
+        hseed: 0xF2,
+        lseed: 0x39,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6F,
+        hseed: 0x79,
+        lseed: 0x1C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA8,
+        hseed: 0xBC,
+        lseed: 0x8E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2E,
+        hseed: 0xDE,
+        lseed: 0x47,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAD,
+        hseed: 0xEF,
+        lseed: 0x23,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA0,
+        hseed: 0xF7,
+        lseed: 0x91,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB5,
+        hseed: 0xFB,
+        lseed: 0xC8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x12,
+        hseed: 0xFD,
+        lseed: 0xE4,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB8,
+        hseed: 0x7E,
+        lseed: 0xF2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF1,
+        hseed: 0x3F,
+        lseed: 0x79,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC0,
+        hseed: 0x1F,
+        lseed: 0xBC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC0,
+        hseed: 0x1F,
+        lseed: 0xBC,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBF,
+        hseed: 0x8F,
+        lseed: 0xDE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x05,
+        hseed: 0xC7,
+        lseed: 0xEF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7B,
+        hseed: 0x63,
+        lseed: 0xF7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2F,
+        hseed: 0xB1,
+        lseed: 0xFB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF4,
+        hseed: 0x58,
+        lseed: 0xFD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x98,
+        hseed: 0x2C,
+        lseed: 0x7E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAF,
+        hseed: 0x96,
+        lseed: 0x3F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x88,
+        hseed: 0x4B,
+        lseed: 0x1F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5E,
+        hseed: 0x25,
+        lseed: 0x8F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x04,
+        hseed: 0x12,
+        lseed: 0xC7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x09,
+        hseed: 0x89,
+        lseed: 0x63,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA1,
+        hseed: 0xC4,
+        lseed: 0xB1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA1,
+        hseed: 0xC4,
+        lseed: 0xB1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2F,
+        hseed: 0xE2,
+        lseed: 0x58,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xBB,
+        hseed: 0xF1,
+        lseed: 0x2C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD0,
+        hseed: 0xF8,
+        lseed: 0x96,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x48,
+        hseed: 0x7C,
+        lseed: 0x4B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x4D,
+        hseed: 0x3E,
+        lseed: 0x25,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAA,
+        hseed: 0x9F,
+        lseed: 0x12,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE7,
+        hseed: 0x4F,
+        lseed: 0x89,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB2,
+        hseed: 0x27,
+        lseed: 0xC4,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1D,
+        hseed: 0x13,
+        lseed: 0xE2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x63,
+        hseed: 0x09,
+        lseed: 0xF1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB7,
+        hseed: 0x84,
+        lseed: 0xF8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x74,
+        hseed: 0xC2,
+        lseed: 0x7C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x74,
+        hseed: 0xC2,
+        lseed: 0x7C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8C,
+        hseed: 0xE1,
+        lseed: 0x3E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x45,
+        hseed: 0xF0,
+        lseed: 0x9F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA8,
+        hseed: 0x78,
+        lseed: 0x4F,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6C,
+        hseed: 0x3C,
+        lseed: 0x27,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x06,
+        hseed: 0x9E,
+        lseed: 0x13,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFB,
+        hseed: 0xCF,
+        lseed: 0x09,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xED,
+        hseed: 0x67,
+        lseed: 0x84,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCE,
+        hseed: 0x33,
+        lseed: 0xC2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x76,
+        hseed: 0x19,
+        lseed: 0xE1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF0,
+        hseed: 0x8C,
+        lseed: 0xF0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA0,
+        hseed: 0x46,
+        lseed: 0x78,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xD1,
+        hseed: 0xA3,
+        lseed: 0x3C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF4,
+        hseed: 0xD1,
+        lseed: 0x9E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA5,
+        hseed: 0xE8,
+        lseed: 0xCF,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDB,
+        hseed: 0x74,
+        lseed: 0x67,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8F,
+        hseed: 0xBA,
+        lseed: 0x33,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB4,
+        hseed: 0xDD,
+        lseed: 0x19,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x27,
+        hseed: 0x6E,
+        lseed: 0x8C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x83,
+        hseed: 0xB7,
+        lseed: 0x46,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x99,
+        hseed: 0x5B,
+        lseed: 0xA3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5B,
+        hseed: 0xAD,
+        lseed: 0xD1,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE1,
+        hseed: 0xD6,
+        lseed: 0xE8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x14,
+        hseed: 0xEB,
+        lseed: 0x74,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7D,
+        hseed: 0x75,
+        lseed: 0xBA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7D,
+        hseed: 0x75,
+        lseed: 0xBA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x20,
+        hseed: 0xBA,
+        lseed: 0xDD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x3C,
+        hseed: 0x5D,
+        lseed: 0x6E,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x2B,
+        hseed: 0xAE,
+        lseed: 0xB7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xC4,
+        hseed: 0xD7,
+        lseed: 0x5B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x76,
+        hseed: 0x6B,
+        lseed: 0xAD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x7F,
+        hseed: 0x35,
+        lseed: 0xD6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x94,
+        hseed: 0x1A,
+        lseed: 0xEB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x50,
+        hseed: 0x0D,
+        lseed: 0x75,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x41,
+        hseed: 0x86,
+        lseed: 0xBA,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF5,
+        hseed: 0xC3,
+        lseed: 0x5D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x00,
+        hseed: 0x61,
+        lseed: 0xAE,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x98,
+        hseed: 0xB0,
+        lseed: 0xD7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x98,
+        hseed: 0xB0,
+        lseed: 0xD7,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1D,
+        hseed: 0xD8,
+        lseed: 0x6B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x09,
+        hseed: 0x6C,
+        lseed: 0x35,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xFC,
+        hseed: 0xB6,
+        lseed: 0x1A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xED,
+        hseed: 0xDB,
+        lseed: 0x0D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xCC,
+        hseed: 0x6D,
+        lseed: 0x86,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6F,
+        hseed: 0x36,
+        lseed: 0xC3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x5A,
+        hseed: 0x9B,
+        lseed: 0x61,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9C,
+        hseed: 0xCD,
+        lseed: 0xB0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x24,
+        hseed: 0x66,
+        lseed: 0xD8,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9C,
+        hseed: 0xB3,
+        lseed: 0x6C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x75,
+        hseed: 0xD9,
+        lseed: 0xB6,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB8,
+        hseed: 0x6C,
+        lseed: 0xDB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB8,
+        hseed: 0x6C,
+        lseed: 0xDB,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF6,
+        hseed: 0x1B,
+        lseed: 0x36,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9C,
+        hseed: 0x0D,
+        lseed: 0x9B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB9,
+        hseed: 0x06,
+        lseed: 0xCD,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA5,
+        hseed: 0x03,
+        lseed: 0x66,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB4,
+        hseed: 0x01,
+        lseed: 0xB3,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x87,
+        hseed: 0x80,
+        lseed: 0xD9,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x53,
+        hseed: 0x40,
+        lseed: 0x6C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xE0,
+        hseed: 0xA0,
+        lseed: 0x36,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x1C,
+        hseed: 0x50,
+        lseed: 0x1B,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x9A,
+        hseed: 0x28,
+        lseed: 0x0D,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xF9,
+        hseed: 0x14,
+        lseed: 0x06,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x09,
+        hseed: 0x0A,
+        lseed: 0x03,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xB2,
+        hseed: 0x85,
+        lseed: 0x01,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x69,
+        hseed: 0xC2,
+        lseed: 0x80,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xED,
+        hseed: 0x61,
+        lseed: 0x40,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA9,
+        hseed: 0x30,
+        lseed: 0xA0,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x74,
+        hseed: 0x18,
+        lseed: 0x50,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xA1,
+        hseed: 0x0C,
+        lseed: 0x28,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x8F,
+        hseed: 0x86,
+        lseed: 0x14,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x0B,
+        hseed: 0x43,
+        lseed: 0x0A,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x58,
+        hseed: 0xA1,
+        lseed: 0x85,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xAB,
+        hseed: 0xD0,
+        lseed: 0xC2,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDB,
+        hseed: 0x68,
+        lseed: 0x61,
+    },
+    RedLabelTraceRandSample {
+        seed: 0xDB,
+        hseed: 0x68,
+        lseed: 0x61,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x86,
+        hseed: 0xB4,
+        lseed: 0x30,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x15,
+        hseed: 0x5A,
+        lseed: 0x18,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x09,
+        hseed: 0xAD,
+        lseed: 0x0C,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x88,
+        hseed: 0xD6,
+        lseed: 0x86,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x57,
+        hseed: 0x6B,
+        lseed: 0x43,
+    },
+    RedLabelTraceRandSample {
+        seed: 0x6C,
+        hseed: 0xB5,
+        lseed: 0xA1,
+    },
 ];
 
 pub(crate) fn red_label_long_instruction_crc_sample(frame: u64) -> Option<RedLabelTraceCrcSample> {
@@ -12052,7 +18052,7 @@ mod tests {
 
     #[test]
     fn long_instruction_crc_samples_cover_the_reference_tail() {
-        assert_eq!(RED_LABEL_LONG_INSTRUCTION_CRC_SAMPLES.len(), 1468);
+        assert_eq!(RED_LABEL_LONG_INSTRUCTION_CRC_SAMPLES.len(), 2068);
         assert_eq!(red_label_long_instruction_crc_sample(1360), None);
         assert_eq!(
             red_label_long_instruction_crc_sample(1361),
@@ -12078,12 +18078,28 @@ mod tests {
                 video_crc32: 0x45D5_90F3,
             })
         );
-        assert_eq!(red_label_long_instruction_crc_sample(2829), None);
+        assert_eq!(
+            red_label_long_instruction_crc_sample(2829),
+            Some(RedLabelTraceCrcSample {
+                object_table_crc32: 0x2A30_A3EC,
+                process_table_crc32: 0x1C43_3135,
+                video_crc32: 0x45D5_90F3,
+            })
+        );
+        assert_eq!(
+            red_label_long_instruction_crc_sample(3428),
+            Some(RedLabelTraceCrcSample {
+                object_table_crc32: 0x65B1_5F89,
+                process_table_crc32: 0x9727_7A28,
+                video_crc32: 0xB466_EC8C,
+            })
+        );
+        assert_eq!(red_label_long_instruction_crc_sample(3429), None);
     }
 
     #[test]
     fn long_instruction_rand_samples_start_at_the_observed_rng_drift() {
-        assert_eq!(RED_LABEL_LONG_INSTRUCTION_RAND_SAMPLES.len(), 934);
+        assert_eq!(RED_LABEL_LONG_INSTRUCTION_RAND_SAMPLES.len(), 1534);
         assert_eq!(red_label_long_instruction_rand_sample(1894), None);
         assert_eq!(
             red_label_long_instruction_rand_sample(1895),
@@ -12101,6 +18117,22 @@ mod tests {
                 lseed: 0x05,
             })
         );
-        assert_eq!(red_label_long_instruction_rand_sample(2829), None);
+        assert_eq!(
+            red_label_long_instruction_rand_sample(2829),
+            Some(RedLabelTraceRandSample {
+                seed: 0xAB,
+                hseed: 0xF2,
+                lseed: 0x82,
+            })
+        );
+        assert_eq!(
+            red_label_long_instruction_rand_sample(3428),
+            Some(RedLabelTraceRandSample {
+                seed: 0x6C,
+                hseed: 0xB5,
+                lseed: 0xA1,
+            })
+        );
+        assert_eq!(red_label_long_instruction_rand_sample(3429), None);
     }
 }

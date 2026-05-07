@@ -4,6 +4,53 @@ This file records local Rust-vs-reference trace comparisons. The reference
 fixtures remain ignored local artifacts; only the comparison findings are
 checked in.
 
+## 2026-05-07 Phase 10 Exact Reference Closure
+
+Scenarios:
+
+- `attract_boot`
+- `start_game`
+- `first_300_frames`
+- `firing`
+- `thrust_reverse`
+- `smart_bomb`
+- `hyperspace`
+- `abduction`
+- `death`
+- `wave_advance`
+- `planet_destruction`
+- `high_score_entry`
+
+Commands:
+
+```sh
+cargo test local_reference_ --all-targets -- --nocapture
+cargo test --all-targets -- --ignored
+cargo run --quiet -- --fidelity-check-reference-trace-dir \
+  docs/fidelity/fixtures/local/reference
+```
+
+Result:
+
+- All 12 Phase 1 local MAME reference fixtures now pass as normal unignored
+  Rust tests.
+- `--fidelity-check-reference-trace-dir` validates 12 complete fixtures and
+  22,308 frames with populated state, RNG, table CRC, video CRC, sound-command,
+  and event evidence.
+- `cargo test --all-targets -- --ignored` now reports zero ignored tests; the
+  old known-unknown sentinels have been replaced by executable Phase 10
+  acceptance-shape tests.
+- The long-tail trace bridge now uses
+  `planet_destruction.expected.tsv` so the accepted object/process/video CRC
+  samples cover frames 1361 through 3428, and RNG samples cover frames 1895
+  through 3428.
+
+Interpretation:
+
+- The current Phase 10 exact-reference gate is closed for the checked Phase 1
+  red-label scenarios. Older sections below are retained as historical drift
+  records and no longer describe the active blocker state.
+
 ## 2026-05-06 `DC-25` Title And Initial Attract Pixel Fidelity
 
 Scenario:

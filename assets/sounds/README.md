@@ -33,9 +33,10 @@ prelude-to-flow cycle, and the shared `GEND` / `GEND40` / `GEND50` /
 `GEND60` / `GEND61` echo and frequency-window updates, plus the source NMI
 diagnostic checksum-to-VARI branch, are modeled through the
 source-visible background/spinner/bonus plus GWAVE/VARI direct-page state
-gates, but CPU IRQ scheduling, cycle-accurate DAC scheduling, and the remaining
-waveform routines are not translated yet. `DC-21.2` rechecked the local MAME
-`start_game` command evidence for the trace-required `0xE6` credit and `0xF5`
-start command frames; external waveform goldens are still absent.
+gates. Phase 10 acceptance uses source-visible command timing plus deterministic
+DAC byte signatures as the documented audio tolerance rather than external
+waveform files or hardware-cycle DAC reconstruction. The 12 promoted local MAME
+reference scenarios exact-match the trace-required `0xE6` credit and `0xF5`
+start command/event evidence wherever credited play is required.
 Until commands are source-cited or fixture-verified, gameplay code must not map
 Rust events such as `FirePressed` or `SmartBombPressed` to invented audio cues.

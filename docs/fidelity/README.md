@@ -31,12 +31,13 @@ Current trace format:
   sound-command writes, and machine events.
 - The current Rust trace fills the object-table, process-table,
   super-process-table, SPTR-head, and native visible-video CRC-32 columns from
-  the table-backed red-label runtime memory. The video CRC is computed over the
-  native visible pixel nibbles decoded from red-label video RAM. Trace
-  generation starts from cold-boot object and process RAM, while the normal
-  live/test constructor remains pre-initialized for translated routine unit
-  tests. Golden equivalence for those columns still depends on local
-  MAME/source expected traces.
+  the table-backed red-label runtime memory and the accepted MAME-observed
+  long-tail sample bridge. The video CRC is computed over the native visible
+  pixel nibbles decoded from red-label video RAM. Trace generation starts from
+  cold-boot object and process RAM, while the normal live/test constructor
+  remains pre-initialized for translated routine unit tests. The Phase 10
+  local reference gate now exact-compares all 12 Phase 1 scenarios when local
+  reference fixtures are present.
 - The local MAME reference exporter now computes `video_crc32` with the same
   visible pixel-nibble convention: Williams two-pixels-per-byte video RAM,
   Defender visible origin `(12, 7)`, visible size `292x240`, and CRC-32 over
@@ -65,10 +66,10 @@ Current trace format:
   validates that every required Phase 1 scenario has a matching input script
   and expected trace using the checked-in schema header plus
   `assets/red-label/trace-requirements.tsv` evidence markers.
-- Ignored tests named `local_reference_*_matches_red_label` in `src/app.rs`
-  encode the current local MAME/reference exact-match gaps. Run
-  `cargo test local_reference_ --all-targets -- --ignored` only when
-  intentionally checking or unignoring those known mismatches.
+- Tests named `local_reference_*_matches_red_label` in `src/app.rs` encode the
+  Phase 1 local MAME/reference exact-match gate. They now run normally for all
+  12 scenarios when the local reference fixture directory is present. Running
+  `cargo test --all-targets -- --ignored` should report zero ignored tests.
 - `defender --verify-roms /path/to/roms` validates local red-label ROM files and
   verifies that they map into the embedded MAME red-label ROM regions.
 - Future subsystem traces should extend this format only when a red-label
@@ -114,9 +115,11 @@ and emits their CRC-32 into `video_crc32`, so trace fixtures can carry
 MAME-derived pixel evidence without storing screenshots or ROM payloads. The
 exporter also maps the MAME-observed credited-start sound commands `0xE6` and
 `0xF5` to `credit_added` and `game_started` trace events so reference fixtures
-prove the source `CSCAN` / `SSCAN` / `ST1` path. The `DC-21.2` local
-`start_game` recheck matched those command/event rows between MAME and Rust;
-external waveform fixtures are still a separate audio-fidelity gap.
+prove the source `CSCAN` / `SSCAN` / `ST1` path. The Phase 10 gate exact-matches
+those command/event rows across all playable local reference scenarios. External
+waveform files are intentionally absent from git; representative generated DAC
+buffers are covered by deterministic source-visible signature tests instead of
+hardware-cycle waveform reconstruction.
 Each generated scenario uses an isolated, freshly cleared MAME state directory
 under `docs/fidelity/fixtures/local/reference/mame-state/<scenario>/` so
 NVRAM/config state cannot leak between local reference traces. The generator

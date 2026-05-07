@@ -260,7 +260,10 @@ compatibility behavior.
   `video_crc32=-` fixtures fail before exact comparison, and `DC-25` fixed the
   MAME-derived cold-boot/title/initial-attract pixel drift enough to promote
   `local_reference_attract_boot_matches_red_label` as a normal passing test.
-  Full terminal screenshot proof remains tracked in `DC-30`.
+  `DC-27`/`DC-30` then extended the exact local reference gate through all 12
+  Phase 1 scenarios and added live-render/core-input and release-runtime
+  evidence, so the old title corruption and Williams-screen stall are no
+  longer active blockers.
 - `DC-22` closes the hardware/asset audit by naming which edge
   cases are fixture-backed versus deferred. Fixed main CPU ROM, selected
   banked program ROM, sound CPU ROM, decoder PROM image views, `CROM0`
@@ -474,8 +477,10 @@ compatibility behavior.
   native visible-video CRC computed from red-label video RAM. The
   `DC-21.2` local MAME `start_game` recheck matched the trace-required sound
   command/event rows at frames 731 (`0xC0`), 912 (`0xE6`, `credit_added`), and
-  1027 (`0xF5`, `game_started`). External waveform goldens and cycle-accurate
-  6808 DAC/IRQ scheduling remain open fidelity gaps. The
+  1027 (`0xF5`, `game_started`). Phase 10 acceptance now uses exact
+  source-visible command traces and deterministic DAC byte signatures as the
+  documented audio tolerance rather than checked-in external waveform files or
+  hardware-cycle DAC reconstruction. The
   source `CSCAN` branch now keeps
   the `PIA01` / `PIA02` coin-door history, masks IN2 through `ANDB #$3F`,
   double-checks the sample, and queues the first surviving `SWTAB1`
@@ -587,13 +592,13 @@ compatibility behavior.
   CMOS defaults by default, uses a MAME-observed 900-frame ready wait followed
   by held coin and delayed held one-player start, and validates the credited
   start through observed `0xE6` / `0xF5` sound commands plus
-  `credit_added` / `game_started` trace events. Exact Rust-current comparisons
-  use a separate optional local fixture directory until later subsystem work
-  catches the Rust core up to those gameplay references.
-- Operator-screen rendering, untranslated object/shell/process bodies, generic
-  body dispatch/frame scheduling, remaining attract screen flow, and
-  sound-routine execution are still fidelity gaps tracked in `SPEC.md` and
-  `docs/fidelity/gaps.md`.
+  `credit_added` / `game_started` trace events. All 12 Phase 1 local MAME
+  reference scenarios now pass as normal `local_reference_*_matches_red_label`
+  tests when the local fixture directory is present; `cargo test --all-targets
+  -- --ignored` should report zero ignored tests.
+- Phase 10 ROM-complete playability is closed for the accepted red-label
+  target. The remaining pre-refactor obligation is final acceptance
+  documentation in `PLAN.md`, not additional module-split work.
 
 ## SonarQube
 

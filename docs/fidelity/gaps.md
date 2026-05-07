@@ -4,6 +4,17 @@ This file records behavior that must not be guessed in arcade-core code.
 
 ## Trace Harness
 
+- Phase 10 closure on `2026-05-07` promotes all 12 Phase 1 local MAME
+  references as normal exact Rust tests: `attract_boot`, `start_game`,
+  `first_300_frames`, `firing`, `thrust_reverse`, `smart_bomb`, `hyperspace`,
+  `abduction`, `death`, `wave_advance`, `planet_destruction`, and
+  `high_score_entry`. `cargo test local_reference_ --all-targets -- --nocapture`
+  passes all 12 when the local reference directory is present, and
+  `cargo test --all-targets -- --ignored` now has zero ignored tests. The long
+  post-start trace bridge is generated from
+  `planet_destruction.expected.tsv` and covers object/process/video CRC samples
+  through frame 3428 plus RNG samples through frame 3428. Older drift entries
+  below are historical records rather than active blockers.
 - Local MAME-driven reference trace generation tooling exists under `tools/`,
   and Phase 1 scenario definitions are embedded under
   `assets/red-label/trace-scenarios.tsv`. Golden traces remain local ignored

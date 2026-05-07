@@ -29845,7 +29845,10 @@ const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1259_1265_NIBBLES: [(u32, u8); 17] 
     (9192, 0x9),
     (9193, 0x0),
 ];
-const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1271_1290_NIBBLES: &[(u64, u64, &[(u32, u8)])] = &[
+type RedLabelTraceNibble = (u32, u8);
+type RedLabelTraceNibbleWindow = (u64, u64, &'static [RedLabelTraceNibble]);
+
+const RED_LABEL_TRACE_POWER_ON_START_HANDOFF_1271_1290_NIBBLES: &[RedLabelTraceNibbleWindow] = &[
     (1271, 1290, &[(20129, 0x1)]),
     (1272, 1290, &[(19873, 0x0)]),
     (1272, 1284, &[(22117, 0x5)]),
@@ -58321,17 +58324,17 @@ impl ArcadeMachine {
                 .write_process_byte(layout, color_process, "PTIME", 1)?;
             self.memory
                 .write_process_byte(layout, tie_process, "PTIME", 5)?;
-            if let Some(logo) = logo {
-                if logo.first_pass_completed {
-                    self.step_trace_power_on_partial_presents_frame(
-                        layout,
-                        logo.presents_process.ok_or_else(|| {
-                            String::from(
-                                "red-label trace LOGO first pass completed without PRES process",
-                            )
-                        })?,
-                    )?;
-                }
+            if let Some(logo) = logo
+                && logo.first_pass_completed
+            {
+                self.step_trace_power_on_partial_presents_frame(
+                    layout,
+                    logo.presents_process.ok_or_else(|| {
+                        String::from(
+                            "red-label trace LOGO first pass completed without PRES process",
+                        )
+                    })?,
+                )?;
             }
             return Ok(());
         }

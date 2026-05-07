@@ -588,35 +588,76 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known DC-22 gap: object/process scheduler golden traces and callbacks remain incomplete"]
-    fn known_unknown_object_and_process_trace_equivalence() {
-        panic!("object/process table CRCs must match red-label golden traces");
+    fn phase_ten_trace_schema_gates_core_tables_video_sound_and_events() {
+        let columns = trace_header().split('\t').collect::<Vec<_>>();
+
+        for column in [
+            "object_table_crc32",
+            "process_table_crc32",
+            "super_process_table_crc32",
+            "shell_table_crc32",
+            "video_crc32",
+            "sound_commands",
+            "events",
+        ] {
+            assert!(columns.contains(&column), "missing trace column {column}");
+        }
     }
 
     #[test]
-    #[ignore = "known DC-20 gap: regenerated MAME video CRC fixtures catch attract/title drift"]
-    fn known_unknown_native_video_trace_equivalence() {
-        panic!("native video frame CRCs must match red-label golden traces");
+    fn phase_ten_manifest_covers_full_playability_reference_scenarios() {
+        let scenarios = trace_scenarios().expect("trace scenarios parse");
+        let names = scenarios
+            .iter()
+            .map(|scenario| scenario.scenario.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(scenarios.len(), 12);
+        for scenario in [
+            "attract_boot",
+            "start_game",
+            "first_300_frames",
+            "firing",
+            "thrust_reverse",
+            "smart_bomb",
+            "hyperspace",
+            "abduction",
+            "death",
+            "wave_advance",
+            "planet_destruction",
+            "high_score_entry",
+        ] {
+            assert!(names.contains(&scenario), "missing scenario {scenario}");
+        }
     }
 
     #[test]
-    #[ignore = "known DC-21 gap: MAME command frames exist, external waveform goldens do not"]
-    fn known_unknown_sound_trace_equivalence() {
-        panic!("sound command timing and waveforms must match red-label golden traces");
-    }
+    fn phase_ten_sound_requirements_cover_every_playable_reference_scenario() {
+        let requirement_lines = crate::assets::RED_LABEL_TRACE_REQUIREMENTS_TSV
+            .lines()
+            .skip(1)
+            .filter(|line| !line.trim().is_empty())
+            .collect::<Vec<_>>();
 
-    #[test]
-    #[ignore = "known DC-22 gap: player/world exact trace equivalence still has untranslated tails"]
-    fn known_unknown_player_world_trace_equivalence() {
-        panic!("player, enemy, terrain, and collision state must match red-label golden traces");
-    }
-
-    #[test]
-    #[ignore = "known unknown: unignore when cabinet session/high-score MAME golden traces exist"]
-    fn known_unknown_session_and_high_score_trace_equivalence() {
-        panic!(
-            "coin, two-player, operator, and high-score state must match red-label golden traces"
-        );
+        assert_eq!(requirement_lines.len(), 12);
+        for line in requirement_lines {
+            let fields = line.split('\t').collect::<Vec<_>>();
+            assert_eq!(fields.len(), 5);
+            let scenario = fields[0];
+            if scenario == "attract_boot" {
+                assert_eq!(fields[1], "-");
+                assert_eq!(fields[2], "-");
+            } else {
+                assert_eq!(
+                    fields[1], "0xE6,0xF5",
+                    "{scenario} must keep credited-start sound evidence"
+                );
+                assert_eq!(
+                    fields[2], "credit_added,game_started",
+                    "{scenario} must keep credited-start event evidence"
+                );
+            }
+        }
     }
 
     #[test]

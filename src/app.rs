@@ -1727,6 +1727,11 @@ mod tests {
     }
 
     #[test]
+    fn local_reference_first_300_frames_matches_red_label() {
+        assert_local_reference_trace_matches("first_300_frames");
+    }
+
+    #[test]
     fn local_reference_firing_matches_red_label() {
         assert_local_reference_trace_matches("firing");
     }
@@ -1747,6 +1752,11 @@ mod tests {
     }
 
     #[test]
+    fn local_reference_abduction_matches_red_label() {
+        assert_local_reference_trace_matches("abduction");
+    }
+
+    #[test]
     fn local_reference_death_matches_red_label() {
         assert_local_reference_trace_matches("death");
     }
@@ -1754,6 +1764,16 @@ mod tests {
     #[test]
     fn local_reference_wave_advance_matches_red_label() {
         assert_local_reference_trace_matches("wave_advance");
+    }
+
+    #[test]
+    fn local_reference_planet_destruction_matches_red_label() {
+        assert_local_reference_trace_matches("planet_destruction");
+    }
+
+    #[test]
+    fn local_reference_high_score_entry_matches_red_label() {
+        assert_local_reference_trace_matches("high_score_entry");
     }
 
     #[test]
