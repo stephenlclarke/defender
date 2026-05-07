@@ -3574,9 +3574,39 @@ Steps:
   verifying that today's high-score cells stay valid for the later hall/table
   display path.
   Completed: `2026-05-07 07:29:12 BST`
+- [x] DC-30.8 Repair the reported heavy live screen flicker by removing
+  per-frame terminal clears from Kitty presentation, preventing blank intervals
+  between frame uploads, and proving the live presenter keeps an already
+  visible frame on screen while the next frame is transmitted.
+  Completed: `2026-05-07 07:38:39 BST`
 
 Work log:
 
+- `2026-05-07 07:33:43 BST` Started `DC-30.8` after the owner reported that
+  the screen flickers a lot. Initial audit found the live core render tests
+  already prove red-label video RAM does not blank through the Williams color
+  cycle, while `KittyGraphics::draw_frame` clears the entire terminal before
+  each image upload. The fix will target the live terminal presentation path:
+  stop blanking between frames, use image-buffer replacement/deletion ordering
+  that keeps one frame visible, and add regression tests around the emitted
+  Kitty escape stream.
+- `2026-05-07 07:38:39 BST` Completed `DC-30.8`: removed the per-frame
+  terminal clear from `KittyGraphics::draw_frame`, switched live Kitty
+  presentation to two alternating image IDs with a stable placement ID, and
+  now deletes the previous image only after the replacement frame has been
+  transmitted. The live presenter therefore keeps an already visible frame on
+  screen while the next PNG is uploaded instead of flashing to terminal black.
+  Added escape-stream regression tests for no `ESC[2J` frame clears,
+  double-buffer alternation, replacement-before-delete ordering, and clear
+  teardown across both buffers. README now documents the double-buffered
+  presenter behavior. Validation passed with `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`,
+  `cargo test draw_frame --all-targets`,
+  `cargo test render_live_machine_frame_survives_williams_handoff_and_remains_playable
+  --all-targets`,
+  `markdownlint README.md PLAN.md`, `git diff --check`, and a forced
+  Kitty-compatible PTY run that emitted frames, accepted `q`, deleted both
+  image buffers, and exited with code 0.
 - `2026-05-07 07:10:22 BST` Started `DC-30.7` after the owner reported that
   attract mode does not start after the Williams screen. Local investigation
   reproduced a live attract panic before later attract pages because the title
@@ -3627,10 +3657,11 @@ Work log:
   the recorded evidence is the PTY Kitty stream plus core live render/input
   regressions rather than a terminal screenshot artifact.
 
-Completion gate result: `DC-30` is complete as of `2026-05-07 07:29:12 BST`.
+Completion gate result: `DC-30` is complete as of `2026-05-07 07:38:39 BST`.
 `DC-30.6` fixed dropped live input pulses, and `DC-30.7` fixed the later
 live-attract handoff after the Williams/title sequence without corrupting
-high-score state.
+high-score state. `DC-30.8` removed live Kitty per-frame terminal blanking and
+keeps one frame visible while the replacement frame is transmitted.
 
 Slack updates:
 
@@ -3648,7 +3679,8 @@ Slack updates:
 Status: `ready`
 
 Readiness note: Phase 10 live playability is complete as of
-`2026-05-07 07:29:12 BST`; `DC-31` may now start.
+`2026-05-07 07:38:39 BST`; `DC-31` may start after the `DC-30.8` fix is
+committed, pushed, and reported.
 
 Goal: certify the project as a complete exact red-label implementation with
 supported compatibility overlays before any large refactor starts.

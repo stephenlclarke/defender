@@ -1,19 +1,17 @@
 //! Wraps the Kitty graphics protocol so rendered frames can be pushed into compatible terminals.
 
-use std::io::{IsTerminal, Stdout, Write};
+use std::io::{IsTerminal, Write};
 
 use anyhow::{Result, bail};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use crossterm::{
-    cursor::MoveTo,
-    queue,
-    terminal::{Clear, ClearType},
-};
+use crossterm::{cursor::MoveTo, queue};
 use png::{BitDepth, ColorType, Compression, Encoder};
 
 use crate::video::RenderedImage;
 
 const IMAGE_ID: u32 = 1_981;
+const SECONDARY_IMAGE_ID: u32 = IMAGE_ID + 1;
+const PLACEMENT_ID: u32 = 1;
 const CHUNK_SIZE: usize = 4_096;
 const ESCAPE_BEGIN: &str = "\x1b_G";
 const ESCAPE_END: &str = "\x1b\\";
@@ -21,6 +19,8 @@ const ESCAPE_END: &str = "\x1b\\";
 pub struct KittyGraphics {
     placement_cols: u16,
     placement_rows: u16,
+    visible_image_id: Option<u32>,
+    next_image_id: u32,
     png_buffer: Vec<u8>,
     base64_buffer: String,
 }
@@ -30,6 +30,8 @@ impl KittyGraphics {
         Self {
             placement_cols,
             placement_rows,
+            visible_image_id: None,
+            next_image_id: IMAGE_ID,
             png_buffer: Vec::new(),
             base64_buffer: String::new(),
         }
@@ -53,20 +55,22 @@ impl KittyGraphics {
         self.placement_rows = placement_rows;
     }
 
-    pub fn draw_frame(&mut self, stdout: &mut Stdout, image: &RenderedImage) -> Result<()> {
+    pub fn draw_frame<W: Write>(&mut self, stdout: &mut W, image: &RenderedImage) -> Result<()> {
         encode_png_into(image, &mut self.png_buffer)?;
         self.base64_buffer.clear();
         STANDARD.encode_string(&self.png_buffer, &mut self.base64_buffer);
         let chunk_count = self.base64_buffer.len().div_ceil(CHUNK_SIZE);
+        let image_id = self.next_image_id;
+        let previous_image_id = self.visible_image_id;
 
-        queue!(stdout, MoveTo(0, 0), Clear(ClearType::All))?;
+        queue!(stdout, MoveTo(0, 0))?;
 
         for (index, chunk) in self.base64_buffer.as_bytes().chunks(CHUNK_SIZE).enumerate() {
             let more = if index + 1 == chunk_count { 0 } else { 1 };
             if index == 0 {
                 write!(
                     stdout,
-                    "{ESCAPE_BEGIN}a=T,f=100,i={IMAGE_ID},q=2,C=1,c={},r={},z=-1,m={more};",
+                    "{ESCAPE_BEGIN}a=T,f=100,i={image_id},p={PLACEMENT_ID},q=2,C=1,c={},r={},z=-1,m={more};",
                     self.placement_cols, self.placement_rows
                 )?;
             } else {
@@ -77,13 +81,35 @@ impl KittyGraphics {
             write!(stdout, "{ESCAPE_END}")?;
         }
 
+        if let Some(previous_image_id) = previous_image_id {
+            write_delete_image(stdout, previous_image_id)?;
+        }
+        self.visible_image_id = Some(image_id);
+        self.next_image_id = alternate_image_id(image_id);
+
         Ok(())
     }
 
-    pub fn clear(&self, stdout: &mut Stdout) -> Result<()> {
-        write!(stdout, "{ESCAPE_BEGIN}a=d,d=I,i={IMAGE_ID},q=2{ESCAPE_END}")?;
+    pub fn clear<W: Write>(&mut self, stdout: &mut W) -> Result<()> {
+        write_delete_image(stdout, IMAGE_ID)?;
+        write_delete_image(stdout, SECONDARY_IMAGE_ID)?;
+        self.visible_image_id = None;
+        self.next_image_id = IMAGE_ID;
         Ok(())
     }
+}
+
+fn alternate_image_id(image_id: u32) -> u32 {
+    if image_id == IMAGE_ID {
+        SECONDARY_IMAGE_ID
+    } else {
+        IMAGE_ID
+    }
+}
+
+fn write_delete_image<W: Write>(stdout: &mut W, image_id: u32) -> Result<()> {
+    write!(stdout, "{ESCAPE_BEGIN}a=d,d=I,i={image_id},q=2{ESCAPE_END}")?;
+    Ok(())
 }
 
 fn is_known_kitty_graphics_terminal(term: &str, term_program: &str) -> bool {
@@ -139,8 +165,8 @@ mod tests {
     };
 
     use super::{
-        CHUNK_SIZE, KittyGraphics, encode_png, is_known_kitty_graphics_terminal,
-        validate_environment,
+        CHUNK_SIZE, IMAGE_ID, KittyGraphics, PLACEMENT_ID, SECONDARY_IMAGE_ID, encode_png,
+        is_known_kitty_graphics_terminal, validate_environment,
     };
     use crate::video::RenderedImage;
 
@@ -188,6 +214,89 @@ mod tests {
     #[test]
     fn chunk_size_matches_protocol_limit() {
         assert_eq!(CHUNK_SIZE, 4_096);
+    }
+
+    #[test]
+    fn draw_frame_keeps_previous_image_visible_while_transmitting_replacement() {
+        let mut graphics = KittyGraphics::new(10, 20);
+        let image = RenderedImage::new_blank(2, 2, [12, 34, 56, 255]);
+        let mut first = Vec::new();
+        graphics
+            .draw_frame(&mut first, &image)
+            .expect("first Kitty frame");
+        let first = String::from_utf8(first).expect("Kitty escapes are UTF-8");
+
+        assert!(first.contains(&format!("a=T,f=100,i={IMAGE_ID},p={PLACEMENT_ID}")));
+        assert!(!first.contains("a=d,d=I"));
+        assert!(!first.contains("\x1b[2J"));
+
+        let mut second = Vec::new();
+        graphics
+            .draw_frame(&mut second, &image)
+            .expect("second Kitty frame");
+        let second = String::from_utf8(second).expect("Kitty escapes are UTF-8");
+        let transmit = second
+            .find(&format!(
+                "a=T,f=100,i={SECONDARY_IMAGE_ID},p={PLACEMENT_ID}"
+            ))
+            .expect("second frame should transmit the secondary image first");
+        let delete = second
+            .find(&format!("a=d,d=I,i={IMAGE_ID}"))
+            .expect("second frame should delete the previous image");
+
+        assert!(
+            transmit < delete,
+            "previous image must be deleted only after the replacement is transmitted"
+        );
+        assert!(!second.contains("\x1b[2J"));
+    }
+
+    #[test]
+    fn draw_frame_double_buffers_images_between_frames() {
+        let mut graphics = KittyGraphics::new(10, 20);
+        let image = RenderedImage::new_blank(2, 2, [90, 12, 34, 255]);
+        let mut output = Vec::new();
+
+        graphics
+            .draw_frame(&mut output, &image)
+            .expect("first frame");
+        graphics
+            .draw_frame(&mut output, &image)
+            .expect("second frame");
+        graphics
+            .draw_frame(&mut output, &image)
+            .expect("third frame");
+
+        let output = String::from_utf8(output).expect("Kitty escapes are UTF-8");
+        assert!(output.contains(&format!("a=T,f=100,i={IMAGE_ID},p={PLACEMENT_ID}")));
+        assert!(output.contains(&format!(
+            "a=T,f=100,i={SECONDARY_IMAGE_ID},p={PLACEMENT_ID}"
+        )));
+        assert!(output.contains(&format!("a=d,d=I,i={IMAGE_ID}")));
+        assert!(output.contains(&format!("a=d,d=I,i={SECONDARY_IMAGE_ID}")));
+    }
+
+    #[test]
+    fn clear_deletes_both_frame_buffers_and_resets_draw_order() {
+        let mut graphics = KittyGraphics::new(10, 20);
+        let image = RenderedImage::new_blank(2, 2, [1, 2, 3, 255]);
+        let mut output = Vec::new();
+
+        graphics
+            .draw_frame(&mut output, &image)
+            .expect("first frame");
+        graphics.clear(&mut output).expect("clear frame buffers");
+        let clear_output = String::from_utf8(output).expect("Kitty escapes are UTF-8");
+        assert!(clear_output.contains(&format!("a=d,d=I,i={IMAGE_ID}")));
+        assert!(clear_output.contains(&format!("a=d,d=I,i={SECONDARY_IMAGE_ID}")));
+
+        let mut next = Vec::new();
+        graphics
+            .draw_frame(&mut next, &image)
+            .expect("frame after clear");
+        let next = String::from_utf8(next).expect("Kitty escapes are UTF-8");
+        assert!(next.contains(&format!("a=T,f=100,i={IMAGE_ID},p={PLACEMENT_ID}")));
+        assert!(!next.contains("a=d,d=I"));
     }
 
     #[test]

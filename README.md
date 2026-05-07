@@ -148,7 +148,9 @@ Notes:
   before drawing while preserving coin processes. Source branch-only labels
   `CPR56` and `HALD4` now dispatch through the same translated `HALDIS` and
   `LEDRET` paths, and the live Kitty presenter copies source `PCRAM` into
-  hardware palette RAM before scaling each native cabinet frame. The
+  hardware palette RAM before scaling each native cabinet frame, then
+  double-buffers Kitty image IDs so the terminal is not cleared to black
+  between frames. The
   ROM-derived high-score reset copy, packed high-score table
   comparison/insertion helpers, translated death-tail game-over handoff,
   player-one/player-two initials-entry order, today's-greatest qualification
