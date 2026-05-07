@@ -3828,7 +3828,7 @@ Slack updates:
 
 ### DC-31: ROM-Complete Final Acceptance And Documentation
 
-Status: `in_progress`
+Status: `complete`
 
 Readiness note: Phase 10 live playability was reopened on
 `2026-05-07 20:03:41 BST` after owner visual-corruption and laser-fidelity
@@ -3865,13 +3865,19 @@ Steps:
   instructions, controls, ROM verification docs, and release notes to match the
   final behavior.
   Completed: `2026-05-07 22:51:20 BST`
-- [ ] DC-31.5 Push the final completion commit to `red-label` and post the
+- [x] DC-31.5 Push the final completion commit to `red-label` and post the
   complete acceptance summary to `xyzzytools.slack.com#codex`.
+  Completed: `2026-05-07 22:53:05 BST`
 
 Completion gate: the project owner can reasonably call the game fully
 ROM-complete and playable: exact red-label behavior is proven or explicitly
 scoped, live play is verified, documentation matches the build, and no blocking
 fidelity gap remains.
+
+Completion gate result: Phase 11 is complete as of `2026-05-07 22:53:05 BST`.
+The accepted red-label implementation passed the final validation sweep,
+documentation was updated, the completion commit was pushed to `red-label`,
+and the acceptance summary was posted to `xyzzytools.slack.com#codex`.
 
 Work log:
 
@@ -3926,6 +3932,12 @@ Work log:
   `docs/fidelity/refactor-freeze.md` so docs state that Phase 11 final
   acceptance is complete except for the required final push/Slack report, and
   that `wgpu` presentation migration comes before the later broad refactor.
+- `2026-05-07 22:53:05 BST` Completed `DC-31.5`: pushed commit `de84586`
+  (`docs: complete DC-31 acceptance validation`) to `red-label`, posted the
+  final acceptance summary to `xyzzytools.slack.com#codex`, and recorded the
+  Slack permalink below. Phase 11 is complete; `DC-32` may begin next as the
+  post-acceptance `wgpu` presentation backend. The broad refactor remains
+  blocked until `DC-32` is complete.
 - `2026-05-06 19:34:34 BST` Phase 11 completion requested and checked against
   the plan gates. `DC-31` remains blocked because all seven gameplay
   local-reference tests still fail, `DC-26` is incomplete, and `DC-27` through
@@ -3960,6 +3972,8 @@ Slack updates:
 
 - `DC-31.0`:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778188682048429`
+- `DC-31.1` through `DC-31.5`:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778190782662549`
 
 ## Phase 12: Post-Acceptance `wgpu` Presentation Backend
 
