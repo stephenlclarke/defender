@@ -283,7 +283,9 @@ compatibility behavior.
   rather than scanner/HUD-only state, clearing stale active-object and
   expanded-object footprints before redraw, bounding the reported ship/laser
   trails, and presenting live gameplay fire as a continuous beam instead of a
-  small bolt.
+  small bolt. `DC-30.12` then repaired the Williams startup-screen
+  `DEFENDER` wordmark blink, preserving the coalesced wordmark until the normal
+  whole-wordmark refresh lands.
 - `DC-22` closes the hardware/asset audit by naming which edge
   cases are fixture-backed versus deferred. Fixed main CPU ROM, selected
   banked program ROM, sound CPU ROM, decoder PROM image views, `CROM0`
@@ -627,7 +629,7 @@ compatibility behavior.
   tests when the local fixture directory is present; `cargo test --all-targets
   -- --ignored` should report zero ignored tests.
 - Phase 10 ROM-complete playability is closed again for the accepted red-label
-  target after the `DC-30.11` live visual-fidelity repair. The remaining
+  target after the `DC-30.12` Williams wordmark repair. The remaining
   pre-refactor obligation is Phase 11 final acceptance in `PLAN.md`, not
   additional module-split work.
 

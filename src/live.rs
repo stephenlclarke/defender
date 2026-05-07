@@ -617,6 +617,41 @@ mod tests {
     }
 
     #[test]
+    fn rendered_live_williams_defender_wordmark_does_not_blink_after_coalescing() {
+        let mut machine = ArcadeMachine::new();
+        let mut renderer = Renderer::with_size(292, 240);
+        let mut saw_coalesced_wordmark = false;
+        let mut saw_full_wordmark = false;
+        let mut blanked_after_coalescing = Vec::new();
+
+        for frame in 1..=520 {
+            let output = machine.step(CabinetInput::NONE);
+            assert_eq!(output.snapshot.phase, GamePhase::Attract);
+            let _ = render_live_machine_frame(&mut renderer, &mut machine)
+                .expect("render Williams title");
+            let wordmark_bytes = live_defender_wordmark_byte_count(&machine);
+            saw_coalesced_wordmark |= wordmark_bytes >= 500;
+            saw_full_wordmark |= wordmark_bytes >= 1_000;
+            if saw_coalesced_wordmark && wordmark_bytes < 250 {
+                blanked_after_coalescing.push((frame, wordmark_bytes));
+            }
+        }
+
+        assert!(
+            saw_coalesced_wordmark,
+            "Williams title did not produce a coalescing DEFENDER wordmark"
+        );
+        assert!(
+            saw_full_wordmark,
+            "Williams title did not settle on the full DEFENDER wordmark"
+        );
+        assert!(
+            blanked_after_coalescing.is_empty(),
+            "Williams DEFENDER wordmark blinked after coalescing: {blanked_after_coalescing:?}"
+        );
+    }
+
+    #[test]
     fn rendered_live_attract_action_scene_has_objects_without_vertical_trails() {
         let mut machine = ArcadeMachine::new();
         let mut renderer = Renderer::with_size(292, 240);
@@ -991,6 +1026,20 @@ mod tests {
             }
         }
         false
+    }
+
+    fn live_defender_wordmark_byte_count(machine: &ArcadeMachine) -> usize {
+        let mut count = 0;
+        for column in 0..0x3Cu16 {
+            let column_address = 0x3090u16.wrapping_add(column << 8);
+            for row in 0..0x18u16 {
+                let address = column_address.wrapping_add(row);
+                if read_byte(machine, address).is_some_and(|byte| byte != 0) {
+                    count += 1;
+                }
+            }
+        }
+        count
     }
 
     fn assert_live_target_list_valid(machine: &ArcadeMachine) {

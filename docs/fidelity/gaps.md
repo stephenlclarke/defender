@@ -26,6 +26,13 @@ This file records behavior that must not be guessed in arcade-core code.
   a continuous beam in presentation video RAM while preserving the source
   process/collision state, and the credited-start regression continues to cover
   terrain, enemy objects, reverse, and crash resistance.
+- `DC-30.12` closed the Williams startup-screen `DEFENDER` wordmark blink
+  reported on `2026-05-07`. The live title sequence previously let the
+  coalescing raw Defender appearance drop to a near-blank frame while `DEF33`
+  was still sleeping and before the `DEF50` whole-wordmark refresh arrived.
+  Live presentation now tracks when the wordmark has visibly coalesced and
+  redraws the completed wordmark from source logo RAM during that gap. The
+  regression fails if the wordmark region falls near blank after coalescing.
 
 ## Trace Harness
 

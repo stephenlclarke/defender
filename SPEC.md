@@ -467,8 +467,11 @@ closed that reopened gate by proving attract enemies as main-screen sprites
 rather than scanner/HUD-only state, bounding the reported stale
 ship/laser trails, preserving credited-start terrain/enemy/reverse coverage,
 and presenting live gameplay fire as a continuous arcade-style beam rather
-than a small bolt. The already-passing Phase 10 trace and packaging evidence
-remains valid:
+than a small bolt. `DC-30.12` then closed the follow-up Williams startup-screen
+wordmark blink by preserving the completed `DEFENDER` wordmark after the
+coalescing appearance sequence and before the normal `DEF50` whole-wordmark
+refresh. The already-passing Phase 10 trace and packaging evidence remains
+valid:
 
 - All 12 Phase 1 local MAME reference scenarios pass as normal
   `local_reference_*_matches_red_label` tests when the local fixture directory

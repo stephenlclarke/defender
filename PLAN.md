@@ -3598,6 +3598,11 @@ Steps:
   player/laser trail, gameplay laser appearing as a small bolt instead of the
   original arcade beam, and alien deaths producing no visible result.
   Completed: `2026-05-07 21:36:27 BST`
+- [x] DC-30.12 Repair the Williams/DEFENDER startup-screen wordmark fidelity
+  gap where the pixel implode/coalesce effect drops the `DEFENDER` word out
+  before the whole-wordmark refresh brings it back, and prove the visible title
+  region does not blink to blank after the coalescing word has appeared.
+  Completed: `2026-05-07 21:53:55 BST`
 
 Work log:
 
@@ -3692,6 +3697,26 @@ Work log:
   laser, and credited-start gameplay regressions, plus `cargo fmt --check`,
   `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`, and
   `git diff --check`.
+- `2026-05-07 21:48:57 BST` Started `DC-30.12` after the owner reported that
+  the Williams-screen pixel implode/coalesce into `DEFENDER` is not quite
+  right: the word blinks out and back again. A local title-region diagnostic
+  reproduced the issue: the `DEFENDER` wordmark byte count rises during the
+  appearance sequence, drops to zero while `DEF33` is still sleeping, then
+  returns when the whole-wordmark refresh reaches `DEF50`. The fix will keep
+  the live presentation from clearing the completed raw Defender appearance
+  before the whole-wordmark refresh lands, and the regression will fail if the
+  visible wordmark blanks after it has coalesced.
+- `2026-05-07 21:53:55 BST` Completed `DC-30.12`: added live presentation
+  state for the Williams `DEFENDER` wordmark so, once the raw appearance
+  sequence has visibly coalesced, a near-blank frame while `DEF33` is still
+  sleeping redraws the completed wordmark from source logo RAM until the normal
+  `DEF50` whole-wordmark refresh arrives. Added a regression that steps through
+  the Williams title sequence and fails if the wordmark byte count drops near
+  blank after coalescing. A diagnostic replay showed the previous `529 -> 0`
+  drop now transitions to the completed wordmark instead. Focused
+  `rendered_live_` regressions passed, covering the Williams wordmark,
+  post-title attract progress, attract action sprites/trails, and gameplay
+  laser beam presentation.
 - `2026-05-07 07:33:43 BST` Started `DC-30.8` after the owner reported that
   the screen flickers a lot. Initial audit found the live core render tests
   already prove red-label video RAM does not blank through the Williams color
@@ -3767,13 +3792,14 @@ Work log:
   the recorded evidence is the PTY Kitty stream plus core live render/input
   regressions rather than a terminal screenshot artifact.
 
-Completion gate result: `DC-30` is closed again after `DC-30.11`. The reopened
+Completion gate result: `DC-30` is closed again after `DC-30.12`. The reopened
 live visual-fidelity reports for attract action corruption, scanner/HUD-only
 enemy visibility, player/laser trails, credited gameplay terrain/enemy/reverse
-stability, and gameplay laser beam presentation are covered by executable
-regressions and the full `cargo test --all-targets` gate. Phase 11 final
-acceptance is unblocked, but the large refactor remains deferred until
-Phase 11 is completed, committed, pushed to `red-label`, and reported to Slack.
+stability, gameplay laser beam presentation, and the Williams `DEFENDER`
+wordmark blink are covered by executable regressions and the validation gate.
+Phase 11 final acceptance is unblocked, but the large refactor remains deferred
+until Phase 11 is completed, committed, pushed to `red-label`, and reported to
+Slack.
 
 Slack updates:
 
@@ -3800,8 +3826,10 @@ Status: `pending`
 
 Readiness note: Phase 10 live playability was reopened on
 `2026-05-07 20:03:41 BST` after owner visual-corruption and laser-fidelity
-reports, then reclosed by `DC-30.11` on `2026-05-07 21:36:27 BST`. `DC-31`
-is the next final-acceptance cycle before any large refactor.
+reports, reclosed by `DC-30.11` on `2026-05-07 21:36:27 BST`, then briefly
+reopened for the Williams `DEFENDER` wordmark blink and reclosed by `DC-30.12`
+on `2026-05-07 21:53:55 BST`. `DC-31` is the next final-acceptance cycle
+before any large refactor.
 
 Goal: certify the project as a complete exact red-label implementation with
 supported compatibility overlays before any large refactor starts.

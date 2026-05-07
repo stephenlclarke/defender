@@ -208,6 +208,8 @@ const RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT: u8 = 0x18;
 const RED_LABEL_ATTRACT_DEFENDER_RESTORE_SLEEP_TICKS: u8 = 0x28;
 const RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN: u16 = 0x3090;
 const RED_LABEL_ATTRACT_DEFENDER_REFRESH_SLEEP_TICKS: u8 = 1;
+const RED_LABEL_LIVE_DEFENDER_WORDMARK_COALESCED_BYTES: usize = 500;
+const RED_LABEL_LIVE_DEFENDER_WORDMARK_BLANK_BYTES: usize = 250;
 const RED_LABEL_ATTRACT_COPYRIGHT_SCREEN: u16 = 0x3BD0;
 const RED_LABEL_ATTRACT_COPYRIGHT_DATA_ADDRESS: u16 = 0xCC11;
 const RED_LABEL_ATTRACT_COPYRIGHT_ROW_WIDTH: u8 = 8;
@@ -3880,6 +3882,7 @@ pub struct RedLabelRuntimeMemory {
     attract_instruction_laser_addresses: Vec<u16>,
     live_object_addresses: Vec<u16>,
     live_expanded_object_addresses: Vec<(u16, u8)>,
+    live_defender_wordmark_coalesced: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31208,6 +31211,7 @@ impl RedLabelRuntimeMemory {
             attract_instruction_laser_addresses: Vec::new(),
             live_object_addresses: Vec::new(),
             live_expanded_object_addresses: Vec::new(),
+            live_defender_wordmark_coalesced: false,
         };
         let cmos_defaults = red_label_cmos_defaults()?;
         memory.apply_cmos_defaults(&cmos_defaults)?;
@@ -34110,6 +34114,7 @@ impl RedLabelRuntimeMemory {
     ) -> Result<RedLabelHallOfFameEntryDispatch, String> {
         let layout = red_label_ram_layout()?;
         let process_address = self.current_process_address(&layout)?;
+        self.live_defender_wordmark_coalesced = false;
         let genocide = self.genocide_other_processes()?;
         self.write_field_byte(
             &layout,
@@ -39864,6 +39869,59 @@ impl RedLabelRuntimeMemory {
             "red-label {:?} live laser redraw did not reach PD 0x{tip:04X}",
             direction
         ))
+    }
+
+    pub fn redraw_live_defender_wordmark_gap(&mut self) -> Result<bool, String> {
+        let visible_wordmark_bytes = self.defender_wordmark_video_byte_count()?;
+        if visible_wordmark_bytes >= RED_LABEL_LIVE_DEFENDER_WORDMARK_COALESCED_BYTES {
+            self.live_defender_wordmark_coalesced = true;
+            return Ok(false);
+        }
+
+        let def33 = red_label_routine_address("DEF33")?;
+        if !self.live_defender_wordmark_coalesced || !self.active_process_has_routine(&[def33])? {
+            return Ok(false);
+        }
+        if visible_wordmark_bytes >= RED_LABEL_LIVE_DEFENDER_WORDMARK_BLANK_BYTES {
+            return Ok(false);
+        }
+
+        self.write_live_defender_wordmark()?;
+        Ok(true)
+    }
+
+    fn defender_wordmark_video_byte_count(&self) -> Result<usize, String> {
+        let mut count = 0;
+        for column in 0..RED_LABEL_ATTRACT_DEFENDER_WHOLE_WIDTH {
+            let column_address = screen_offset(
+                RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN,
+                u16::from(column) << 8,
+            )?;
+            for row in 0..RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT {
+                let address = screen_offset(column_address, u16::from(row))?;
+                if self.read_byte(address)? != 0 {
+                    count += 1;
+                }
+            }
+        }
+        Ok(count)
+    }
+
+    fn write_live_defender_wordmark(&mut self) -> Result<(), String> {
+        for column in 0..RED_LABEL_ATTRACT_DEFENDER_WHOLE_WIDTH {
+            let column_address = screen_offset(
+                RED_LABEL_ATTRACT_DEFENDER_RESTORE_SCREEN,
+                u16::from(column) << 8,
+            )?;
+            let source_column = RED_LABEL_ATTRACT_DEFENDER_DATA
+                + u16::from(column) * u16::from(RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT);
+            for row in 0..RED_LABEL_ATTRACT_DEFENDER_WHOLE_HEIGHT {
+                let address = screen_offset(column_address, u16::from(row))?;
+                self.write_byte(address, self.read_byte(source_column + u16::from(row))?)?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Source-shaped `VELO`: walk `OPTR`, add each active object's velocity to
@@ -59821,6 +59879,7 @@ impl ArcadeMachine {
         self.memory.update_expanded_objects()?;
         let frame = self.red_label_run_live_irq_video_frame()?;
         self.memory.process_live_active_objects_full_frame()?;
+        self.memory.redraw_live_defender_wordmark_gap()?;
         self.memory.redraw_live_laser_beams()?;
         self.sync_player_motion_from_red_label_memory()?;
         Ok(frame)
