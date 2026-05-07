@@ -3221,6 +3221,8 @@ Work log:
   render_live_machine_frame_survives_williams_handoff_and_remains_playable
   --all-targets -- --nocapture`, `markdownlint PLAN.md`, and
   `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778123999833789`
 - `2026-05-07 01:49:11 BST` Continued `DC-27.1` for the open Phase 10 gate:
   frame 1258 now matches the MAME visible-video and process samples, but all
   remaining gameplay traces fail first at frame 1259 visible-video only. This
