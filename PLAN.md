@@ -3586,6 +3586,9 @@ built binary launches, emits Kitty frames, can be muted, quits cleanly, and
 passes ROM/report/trace tooling checks while preserving exact arcade-core
 behavior.
 
+Slack update:
+`https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778125415052949`
+
 ## Phase 11: Final Acceptance Before Refactor
 
 ### DC-31: ROM-Complete Final Acceptance And Documentation
