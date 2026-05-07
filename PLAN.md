@@ -3607,8 +3607,12 @@ can be muted, quits cleanly, accepts the documented `5` then `1` start path,
 and passes ROM/report/trace tooling checks while preserving exact arcade-core
 behavior.
 
-Slack update:
-`https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778125415052949`
+Slack updates:
+
+- `DC-30.1` through `DC-30.5`:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778125415052949`
+- `DC-30.6`:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778133575663359`
 
 ## Phase 11: Final Acceptance Before Refactor
 
