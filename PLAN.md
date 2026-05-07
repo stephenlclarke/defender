@@ -3592,10 +3592,12 @@ Steps:
   and no stale vertical object trails, and compare the repaired native frames
   against the local MAME attract snapshots before pushing.
   Completed: `2026-05-07 20:09:18 BST`
-- [ ] DC-30.11 Compare release gameplay fire/reverse/output against local MAME
-  gameplay references and repair any remaining visual-fidelity gaps, especially
-  the reported gameplay laser appearing as a small bolt instead of the original
-  arcade beam.
+- [x] DC-30.11 Compare release attract/gameplay fire/reverse/output against
+  local MAME references and repair any remaining visual-fidelity gaps,
+  especially the reported attract action scene missing aliens and leaving a
+  player/laser trail, gameplay laser appearing as a small bolt instead of the
+  original arcade beam, and alien deaths producing no visible result.
+  Completed: `2026-05-07 21:36:27 BST`
 
 Work log:
 
@@ -3656,6 +3658,39 @@ Work log:
   passed with focused `DC-30.10` regressions, `cargo test --all-targets`,
   `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
   `markdownlint PLAN.md SPEC.md docs/fidelity/gaps.md`, and
+  `git diff --check`.
+- `2026-05-07 20:30:14 BST` Started `DC-30.11` after the owner reported that
+  gameplay fire still appears as a small bolt instead of the original arcade
+  beam, and that an alien death has no visible result. The investigation will
+  compare live gameplay fire/collision output against the local MAME evidence,
+  then repair the translated `LFIRE` / laser-loop / collision-vector path so
+  beam growth, hit effects, scoring, and explosion/appearance mutations are
+  visible in the live cabinet frame.
+- `2026-05-07 20:32:34 BST` Expanded `DC-30.11` after the owner reported that
+  attract is still not correct: aliens do not appear in the instruction/action
+  scene and the player ship leaves a visible trail. The completion gate now
+  includes MAME-backed attract action parity as well as gameplay fire/death
+  parity; the previous `DC-30.10` regression was too loose because it accepted
+  terrain plus object pointers without proving enemy sprites and clean
+  player/laser erasure in the rendered frame.
+- `2026-05-07 21:27:18 BST` Clarified `DC-30.11` after the owner reported that
+  aliens appear on the HUD/scanner but not on the main screen. The regression
+  proof must now distinguish enemy state from rendered enemy sprites: scanner
+  target data alone is not sufficient, and completion requires main-screen
+  enemy object pixels in the attract/action frame.
+- `2026-05-07 21:36:27 BST` Completed `DC-30.11`: live video presentation now
+  clears recorded expanded-object and active-object footprints before each
+  redraw, runs the expanded-object update in the live frame path, redraws the
+  full active-object list after the native IRQ frame, and records attract laser
+  bytes so the instruction/action scene no longer leaves stale vertical or
+  diagonal player/laser trails. The attract regression now scans into the later
+  enemy-table sequence and requires actual main-screen enemy sprite bytes
+  rather than accepting scanner/HUD state. Live gameplay fire now redraws active
+  `LASR0` / `LASL0` process spans as a continuous beam in presentation video
+  RAM, so the visible fire path is beam-shaped while source process/collision
+  state remains intact. Validation passed with focused live attract, gameplay
+  laser, and credited-start gameplay regressions, plus `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`, and
   `git diff --check`.
 - `2026-05-07 07:33:43 BST` Started `DC-30.8` after the owner reported that
   the screen flickers a lot. Initial audit found the live core render tests
@@ -3732,12 +3767,13 @@ Work log:
   the recorded evidence is the PTY Kitty stream plus core live render/input
   regressions rather than a terminal screenshot artifact.
 
-Completion gate result: `DC-30` remains reopened after `DC-30.10` because the
-owner also reported a gameplay laser-beam fidelity gap. `DC-30.10` completed
-the stale-column attract/action repair. `DC-30.11` remains the MAME-backed
-gameplay fire/reverse visual comparison and any follow-up repair. Phase 10 live
-playability acceptance is not final again until `DC-30.11` is completed,
-committed, pushed to `red-label`, and reported to Slack.
+Completion gate result: `DC-30` is closed again after `DC-30.11`. The reopened
+live visual-fidelity reports for attract action corruption, scanner/HUD-only
+enemy visibility, player/laser trails, credited gameplay terrain/enemy/reverse
+stability, and gameplay laser beam presentation are covered by executable
+regressions and the full `cargo test --all-targets` gate. Phase 11 final
+acceptance is unblocked, but the large refactor remains deferred until
+Phase 11 is completed, committed, pushed to `red-label`, and reported to Slack.
 
 Slack updates:
 
@@ -3758,12 +3794,12 @@ Slack updates:
 
 ### DC-31: ROM-Complete Final Acceptance And Documentation
 
-Status: `blocked`
+Status: `pending`
 
 Readiness note: Phase 10 live playability was reopened on
 `2026-05-07 20:03:41 BST` after owner visual-corruption and laser-fidelity
-reports. `DC-31` stays blocked until `DC-30.10` and `DC-30.11` are complete and
-reported.
+reports, then reclosed by `DC-30.11` on `2026-05-07 21:36:27 BST`. `DC-31`
+is the next final-acceptance cycle before any large refactor.
 
 Goal: certify the project as a complete exact red-label implementation with
 supported compatibility overlays before any large refactor starts.

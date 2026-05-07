@@ -278,7 +278,12 @@ compatibility behavior.
   `DC-27`/`DC-30` then extended the exact local reference gate through all 12
   Phase 1 scenarios and added live-render/core-input and release-runtime
   evidence, so the old title corruption and Williams-screen stall are no
-  longer active blockers.
+  longer active blockers. Later `DC-30.11` live evidence repaired the remaining
+  attract/action visual reports by proving enemies as main-screen sprites
+  rather than scanner/HUD-only state, clearing stale active-object and
+  expanded-object footprints before redraw, bounding the reported ship/laser
+  trails, and presenting live gameplay fire as a continuous beam instead of a
+  small bolt.
 - `DC-22` closes the hardware/asset audit by naming which edge
   cases are fixture-backed versus deferred. Fixed main CPU ROM, selected
   banked program ROM, sound CPU ROM, decoder PROM image views, `CROM0`
@@ -621,9 +626,10 @@ compatibility behavior.
   reference scenarios now pass as normal `local_reference_*_matches_red_label`
   tests when the local fixture directory is present; `cargo test --all-targets
   -- --ignored` should report zero ignored tests.
-- Phase 10 ROM-complete playability is closed for the accepted red-label
-  target. The remaining pre-refactor obligation is final acceptance
-  documentation in `PLAN.md`, not additional module-split work.
+- Phase 10 ROM-complete playability is closed again for the accepted red-label
+  target after the `DC-30.11` live visual-fidelity repair. The remaining
+  pre-refactor obligation is Phase 11 final acceptance in `PLAN.md`, not
+  additional module-split work.
 
 ## SonarQube
 

@@ -551,6 +551,40 @@ mod tests {
     }
 
     #[test]
+    fn rendered_live_gameplay_fire_draws_beam_not_single_bolt() {
+        let mut machine = ArcadeMachine::new();
+        let mut renderer = Renderer::with_size(292, 240);
+
+        start_live_one_player_game(&mut machine, &mut renderer);
+        let mut longest_beam = 0;
+        let mut longest_live_beam = 0;
+        for frame in 0..1_200 {
+            let input = if frame % 8 == 0 {
+                CabinetInput {
+                    fire: true,
+                    ..CabinetInput::NONE
+                }
+            } else {
+                CabinetInput::NONE
+            };
+            machine.step(input);
+            let image =
+                render_live_machine_frame(&mut renderer, &mut machine).expect("render fire");
+            longest_beam =
+                longest_beam.max(rendered_max_nonblack_horizontal_streak(image, 60..170));
+            longest_live_beam = longest_live_beam.max(live_visible_laser_beam_byte_count(&machine));
+            if longest_live_beam >= 12 {
+                break;
+            }
+        }
+
+        assert!(
+            longest_live_beam >= 12,
+            "gameplay fire rendered as a short bolt instead of an arcade-style beam; longest presented beam was {longest_live_beam} video bytes and longest rendered streak was {longest_beam} pixels"
+        );
+    }
+
+    #[test]
     fn rendered_live_attract_visibly_advances_after_title_page() {
         let mut machine = ArcadeMachine::new();
         let mut renderer = Renderer::with_size(292, 240);
@@ -587,9 +621,11 @@ mod tests {
         let mut machine = ArcadeMachine::new();
         let mut renderer = Renderer::with_size(292, 240);
         let mut saw_action_scene = false;
+        let mut saw_visible_enemy_sprites = false;
         let mut worst_vertical_streak = 0;
+        let mut worst_diagonal_streak = 0;
 
-        for tick in 1..=4_400 {
+        for tick in 1..=5_900 {
             let output = machine.step(CabinetInput::NONE);
             assert_eq!(output.snapshot.phase, GamePhase::Attract);
             if tick < 4_000 || tick % 30 != 0 {
@@ -603,14 +639,17 @@ mod tests {
             let has_terrain =
                 rendered_nonblack_pixels_in_band(image, 180..usize::from(VISIBLE_HEIGHT)) >= 100;
             let vertical_streak = rendered_max_nonblack_vertical_streak(image, 40..220);
+            let diagonal_streak = rendered_max_nonblack_diagonal_streak(image, 40..180);
             worst_vertical_streak = worst_vertical_streak.max(vertical_streak);
+            worst_diagonal_streak = worst_diagonal_streak.max(diagonal_streak);
+            saw_visible_enemy_sprites |=
+                live_visible_attract_instruction_enemy_sprite_count(&machine) >= 3;
             if has_ship && has_astronaut && has_terrain {
                 saw_action_scene = true;
                 assert!(
                     vertical_streak <= 16,
                     "attract action scene retained a vertical object trail of {vertical_streak} pixels"
                 );
-                break;
             }
         }
 
@@ -619,8 +658,16 @@ mod tests {
             "rendered live attract did not show the instruction-scene ship, astronaut, and terrain"
         );
         assert!(
+            saw_visible_enemy_sprites,
+            "rendered live attract kept enemy state on the scanner/HUD without producing main-screen enemy sprites"
+        );
+        assert!(
             worst_vertical_streak <= 16,
             "rendered live attract retained vertical object trails; worst streak was {worst_vertical_streak} pixels"
+        );
+        assert!(
+            worst_diagonal_streak <= 24,
+            "rendered live attract retained diagonal ship/laser trails; worst streak was {worst_diagonal_streak} pixels"
         );
     }
 
@@ -722,6 +769,73 @@ mod tests {
         max_streak
     }
 
+    fn rendered_max_nonblack_horizontal_streak(
+        image: &RenderedImage,
+        y_range: std::ops::Range<usize>,
+    ) -> usize {
+        let width = image.width as usize;
+        let mut max_streak = 0;
+        for y in y_range {
+            let mut streak = 0;
+            for x in 0..width {
+                let offset = (y * width + x) * 4;
+                if &image.pixels[offset..offset + 4] != [0, 0, 0, 255].as_slice() {
+                    streak += 1;
+                    max_streak = max_streak.max(streak);
+                } else {
+                    streak = 0;
+                }
+            }
+        }
+        max_streak
+    }
+
+    fn rendered_max_nonblack_diagonal_streak(
+        image: &RenderedImage,
+        y_range: std::ops::Range<usize>,
+    ) -> usize {
+        let width = image.width as usize;
+        let height = image.height as usize;
+        let mut max_streak = 0;
+        for y in y_range.clone() {
+            for x in 0..width {
+                max_streak = max_streak.max(rendered_diagonal_streak_from(image, x, y, 1, 1));
+                max_streak = max_streak.max(rendered_diagonal_streak_from(image, x, y, -1, 1));
+            }
+        }
+        max_streak.min(height)
+    }
+
+    fn rendered_diagonal_streak_from(
+        image: &RenderedImage,
+        mut x: usize,
+        mut y: usize,
+        x_step: isize,
+        y_step: isize,
+    ) -> usize {
+        let width = image.width as usize;
+        let height = image.height as usize;
+        let mut streak = 0;
+        loop {
+            let offset = (y * width + x) * 4;
+            if &image.pixels[offset..offset + 4] == [0, 0, 0, 255].as_slice() {
+                return streak;
+            }
+            streak += 1;
+            let Some(next_x) = x.checked_add_signed(x_step) else {
+                return streak;
+            };
+            let Some(next_y) = y.checked_add_signed(y_step) else {
+                return streak;
+            };
+            if next_x >= width || next_y >= height {
+                return streak;
+            }
+            x = next_x;
+            y = next_y;
+        }
+    }
+
     fn live_object_screen_from_pointer(
         machine: &ArcadeMachine,
         pointer_address: u16,
@@ -756,6 +870,127 @@ mod tests {
             object_address = next_object;
         }
         count
+    }
+
+    fn live_visible_attract_instruction_enemy_sprite_count(machine: &ArcadeMachine) -> usize {
+        const ATTRACT_ENEMY_PICTURES: [u16; 6] = [0xF985, 0xF8CE, 0xF9A3, 0xF929, 0xF8F7, 0xF97B];
+        let mut count = 0;
+        let mut object_address = read_word(machine, 0xA065).expect("active object head");
+        for _ in 0..95 {
+            if object_address == 0 {
+                break;
+            }
+            if !live_object_address_is_valid(object_address) {
+                break;
+            }
+
+            let next_object = read_word(machine, object_address).expect("active object link word");
+            let picture = read_word(machine, object_address + 0x02).expect("object OPICT");
+            let screen = read_word(machine, object_address + 0x04).expect("object screen");
+            if screen != 0
+                && ATTRACT_ENEMY_PICTURES.contains(&picture)
+                && live_screen_region_has_nonzero_bytes(machine, screen, 16, 16)
+            {
+                count += 1;
+            }
+            object_address = next_object;
+        }
+        count
+    }
+
+    fn live_visible_laser_beam_byte_count(machine: &ArcadeMachine) -> usize {
+        const ACTIVE_PROCESS_HEAD: u16 = 0xA05F;
+        const PROCESS_TABLE_BASE: u16 = 0xAAC5;
+        const PROCESS_ENTRY_SIZE: u16 = 0x0F;
+        const PROCESS_ENTRIES: usize = 75;
+        const LASR0: u16 = 0xE5CB;
+        const LASL0: u16 = 0xE638;
+
+        let mut longest_beam = 0;
+        let mut process_address = read_word(machine, ACTIVE_PROCESS_HEAD).expect("ACTIVE process");
+        for _ in 0..PROCESS_ENTRIES {
+            if process_address == 0 {
+                return longest_beam;
+            }
+            if !(PROCESS_TABLE_BASE..PROCESS_TABLE_BASE + PROCESS_ENTRY_SIZE * 75)
+                .contains(&process_address)
+                || !(process_address - PROCESS_TABLE_BASE).is_multiple_of(PROCESS_ENTRY_SIZE)
+            {
+                return longest_beam;
+            }
+
+            let next_process = read_word(machine, process_address).expect("process PLINK");
+            let routine_address =
+                read_word(machine, process_address + 0x02).expect("process PADDR");
+            let direction = match routine_address {
+                LASR0 => Some(LiveLaserDirection::Right),
+                LASL0 => Some(LiveLaserDirection::Left),
+                _ => None,
+            };
+            if let Some(direction) = direction {
+                let tip = read_word(machine, process_address + 0x07).expect("process PD");
+                let tail = read_word(machine, process_address + 0x0B).expect("process PD4");
+                longest_beam = longest_beam.max(live_laser_beam_span_byte_count(
+                    machine, direction, tail, tip,
+                ));
+            }
+            process_address = next_process;
+        }
+
+        longest_beam
+    }
+
+    #[derive(Clone, Copy)]
+    enum LiveLaserDirection {
+        Right,
+        Left,
+    }
+
+    fn live_laser_beam_span_byte_count(
+        machine: &ArcadeMachine,
+        direction: LiveLaserDirection,
+        tail: u16,
+        tip: u16,
+    ) -> usize {
+        let mut address = tail;
+        let mut beam_bytes = 0;
+        for _ in 0..=u8::MAX {
+            if read_byte(machine, address).is_some_and(|byte| byte == 0x99) {
+                beam_bytes += 1;
+            }
+            let next = match direction {
+                LiveLaserDirection::Right => address.wrapping_add(0x0100),
+                LiveLaserDirection::Left => address.wrapping_sub(0x0100),
+            };
+            let keep_counting = match direction {
+                LiveLaserDirection::Right => next <= tip,
+                LiveLaserDirection::Left => next >= tip,
+            };
+            if !keep_counting {
+                return beam_bytes;
+            }
+            address = next;
+        }
+
+        beam_bytes
+    }
+
+    fn live_screen_region_has_nonzero_bytes(
+        machine: &ArcadeMachine,
+        upper_left: u16,
+        width: u8,
+        height: u8,
+    ) -> bool {
+        for column in 0..width {
+            let column_address = upper_left.wrapping_add(u16::from(column) << 8);
+            for row in 0..height {
+                let address = column_address.wrapping_add(u16::from(row));
+                if read_byte(machine, address).is_some_and(|byte| byte != 0) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn assert_live_target_list_valid(machine: &ArcadeMachine) {
@@ -811,6 +1046,12 @@ mod tests {
     fn read_word(machine: &ArcadeMachine, address: u16) -> Option<u16> {
         let bytes = machine.red_label_ram_range(address..address + 2)?;
         Some(u16::from_be_bytes([bytes[0], bytes[1]]))
+    }
+
+    fn read_byte(machine: &ArcadeMachine, address: u16) -> Option<u8> {
+        machine
+            .red_label_ram_range(address..address.wrapping_add(1))
+            .and_then(|bytes| bytes.first().copied())
     }
 
     #[test]

@@ -3877,6 +3877,9 @@ pub struct RedLabelRuntimeMemory {
     process_table_range: std::ops::Range<usize>,
     super_process_table_range: std::ops::Range<usize>,
     shell_head_range: std::ops::Range<usize>,
+    attract_instruction_laser_addresses: Vec<u16>,
+    live_object_addresses: Vec<u16>,
+    live_expanded_object_addresses: Vec<(u16, u8)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31202,6 +31205,9 @@ impl RedLabelRuntimeMemory {
             process_table_range,
             super_process_table_range,
             shell_head_range: usize::from(shell_head)..usize::from(shell_head) + 2,
+            attract_instruction_laser_addresses: Vec::new(),
+            live_object_addresses: Vec::new(),
+            live_expanded_object_addresses: Vec::new(),
         };
         let cmos_defaults = red_label_cmos_defaults()?;
         memory.apply_cmos_defaults(&cmos_defaults)?;
@@ -31926,6 +31932,18 @@ impl RedLabelRuntimeMemory {
         }
 
         Ok(updates)
+    }
+
+    pub fn clear_live_expanded_object_addresses(&mut self) -> Result<(), String> {
+        let recorded_addresses = std::mem::take(&mut self.live_expanded_object_addresses);
+        for (address, width) in recorded_addresses {
+            if width == 2 {
+                self.write_word(address, 0)?;
+            } else {
+                self.write_byte(address, 0)?;
+            }
+        }
+        Ok(())
     }
 
     /// Source-shaped `KILLOB`: search active objects, then inactive objects,
@@ -35229,6 +35247,7 @@ impl RedLabelRuntimeMemory {
         let layout = red_label_ram_layout()?;
         let process_address = self.current_process_address(&layout)?;
         let ship_object = if initialize {
+            self.attract_instruction_laser_addresses.clear();
             let ship_object = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_SHIP_POINTER_RAM)?;
             let ship_screen_address = self.read_object_screen_address(&layout, ship_object)?;
             let laser_start = ship_screen_address
@@ -35243,10 +35262,12 @@ impl RedLabelRuntimeMemory {
 
         let laser_start = self.read_process_data_word(&layout, process_address, "PD")?;
         let tip_address = self.draw_laser_body(RedLabelLaserDirection::Right, laser_start)?;
+        self.record_attract_instruction_laser_path(laser_start, tip_address);
         self.write_process_data_word(&layout, process_address, "PD", tip_address)?;
         let fizzle_target = self.read_process_data_word(&layout, process_address, "PD2")?;
         let (fizzle_source_next, fizzle_target_next) =
             self.draw_laser_fizzle(&layout, RedLabelLaserDirection::Right, fizzle_target)?;
+        self.record_attract_instruction_laser_path_exclusive(fizzle_target, fizzle_target_next);
         self.write_process_data_word(&layout, process_address, "PD2", fizzle_target_next)?;
         let erase_address = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM)?;
         self.write_byte(erase_address, 0)?;
@@ -35348,16 +35369,12 @@ impl RedLabelRuntimeMemory {
         let laser_state_start = self.read_word(RED_LABEL_ATTRACT_INSTRUCTION_LASER_STATE_RAM)?;
         let laser_state_end = self.read_process_data_word(layout, laser_process_address, "PD")?;
         let mut cleared_addresses = Vec::new();
-        let mut address = laser_state_start;
-        for _ in 0..0x100 {
-            self.write_byte(address, 0)?;
-            cleared_addresses.push(address);
-            let next = address.wrapping_add(0x0100);
-            if next > laser_state_end {
-                break;
-            }
-            address = next;
-        }
+        self.clear_attract_instruction_laser_path(
+            laser_state_start,
+            laser_state_end,
+            &mut cleared_addresses,
+        )?;
+        self.clear_recorded_attract_instruction_laser_addresses(&mut cleared_addresses)?;
         let previous_link_address = self.kill_process(laser_process_address)?;
         let killed_process = RedLabelKilledProcess {
             killed_process_address: laser_process_address,
@@ -35370,6 +35387,70 @@ impl RedLabelRuntimeMemory {
             cleared_addresses,
             killed_process,
         })
+    }
+
+    fn clear_attract_instruction_laser_path(
+        &mut self,
+        start: u16,
+        end: u16,
+        cleared_addresses: &mut Vec<u16>,
+    ) -> Result<(), String> {
+        let mut address = start;
+        for _ in 0..0x100 {
+            self.write_byte(address, 0)?;
+            if !cleared_addresses.contains(&address) {
+                cleared_addresses.push(address);
+            }
+            let next = address.wrapping_add(0x0100);
+            if next > end {
+                break;
+            }
+            address = next;
+        }
+        Ok(())
+    }
+
+    fn record_attract_instruction_laser_path(&mut self, start: u16, end: u16) {
+        let mut address = start;
+        for _ in 0..0x100 {
+            self.record_attract_instruction_laser_address(address);
+            let next = address.wrapping_add(0x0100);
+            if next > end {
+                break;
+            }
+            address = next;
+        }
+    }
+
+    fn record_attract_instruction_laser_path_exclusive(&mut self, start: u16, end: u16) {
+        let mut address = start;
+        for _ in 0..0x100 {
+            if address == end {
+                break;
+            }
+            self.record_attract_instruction_laser_address(address);
+            address = address.wrapping_add(0x0100);
+        }
+    }
+
+    fn record_attract_instruction_laser_address(&mut self, address: u16) {
+        if !self.attract_instruction_laser_addresses.contains(&address) {
+            self.attract_instruction_laser_addresses.push(address);
+        }
+    }
+
+    fn clear_recorded_attract_instruction_laser_addresses(
+        &mut self,
+        cleared_addresses: &mut Vec<u16>,
+    ) -> Result<(), String> {
+        let recorded_addresses = std::mem::take(&mut self.attract_instruction_laser_addresses);
+        for address in recorded_addresses {
+            self.write_byte(address, 0)?;
+            if !cleared_addresses.contains(&address) {
+                cleared_addresses.push(address);
+            }
+        }
+        Ok(())
     }
 
     fn run_attract_instruction_free_fall_frame(
@@ -39667,6 +39748,122 @@ impl RedLabelRuntimeMemory {
             }
             object_address = next_object;
         }
+    }
+
+    pub fn process_live_active_objects_full_frame(
+        &mut self,
+    ) -> Result<RedLabelObjectDisplayBand, String> {
+        self.clear_recorded_live_object_addresses()?;
+        let display = self.process_active_objects_in_band(0xFF, 0)?;
+        self.record_current_live_object_footprints()?;
+        Ok(display)
+    }
+
+    fn clear_recorded_live_object_addresses(&mut self) -> Result<(), String> {
+        let recorded_addresses = std::mem::take(&mut self.live_object_addresses);
+        for address in recorded_addresses {
+            self.write_byte(address, 0)?;
+        }
+        Ok(())
+    }
+
+    fn record_current_live_object_footprints(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let lists = red_label_linked_lists()?;
+        let object_table = table_descriptor(&layout, "object")?;
+        let mut object_address =
+            self.read_word(linked_list(&lists, "active_object")?.head_address)?;
+        for _ in 0..object_table.entries {
+            if object_address == 0 {
+                return Ok(());
+            }
+            if object_table_for_address(&layout, object_address).is_err() {
+                return Ok(());
+            }
+            let next_object = self.read_object_word(&layout, object_address, "OLINK")?;
+            let screen_address = self.read_object_screen_address(&layout, object_address)?;
+            if screen_address != 0 {
+                let picture_address = self.read_object_word(&layout, object_address, "OPICT")?;
+                let picture = red_label_object_picture(picture_address)?;
+                for column in 0..picture.width {
+                    let column_address = screen_offset(screen_address, u16::from(column) << 8)?;
+                    for row in 0..picture.height {
+                        let address = screen_offset(column_address, u16::from(row))?;
+                        if !self.live_object_addresses.contains(&address) {
+                            self.live_object_addresses.push(address);
+                        }
+                    }
+                }
+            }
+            object_address = next_object;
+        }
+
+        Err(String::from(
+            "red-label active object list did not terminate while recording live footprints",
+        ))
+    }
+
+    pub fn redraw_live_laser_beams(&mut self) -> Result<(), String> {
+        let layout = red_label_ram_layout()?;
+        let lists = red_label_linked_lists()?;
+        let process_table = table_descriptor(&layout, "process")?;
+        let lasr0 = red_label_routine_address("LASR0")?;
+        let lasl0 = red_label_routine_address("LASL0")?;
+        let mut process_address =
+            self.read_word(linked_list(&lists, "active_process")?.head_address)?;
+
+        for _ in 0..process_table.entries {
+            if process_address == 0 {
+                return Ok(());
+            }
+            process_table_for_address(&layout, process_address)?;
+            let next_process = self.read_process_word(&layout, process_address, "PLINK")?;
+            let routine_address = self.read_process_word(&layout, process_address, "PADDR")?;
+            let direction = if routine_address == lasr0 {
+                Some(RedLabelLaserDirection::Right)
+            } else if routine_address == lasl0 {
+                Some(RedLabelLaserDirection::Left)
+            } else {
+                None
+            };
+            if let Some(direction) = direction {
+                let tail = self.read_process_data_word(&layout, process_address, "PD4")?;
+                let tip = self.read_process_data_word(&layout, process_address, "PD")?;
+                self.draw_live_laser_beam_span(direction, tail, tip)?;
+            }
+            process_address = next_process;
+        }
+
+        Err(String::from(
+            "red-label active process list did not terminate while redrawing live laser beams",
+        ))
+    }
+
+    fn draw_live_laser_beam_span(
+        &mut self,
+        direction: RedLabelLaserDirection,
+        tail: u16,
+        tip: u16,
+    ) -> Result<(), String> {
+        let mut address = tail;
+        for _ in 0..=u8::MAX {
+            self.write_byte(address, 0x99)?;
+            let next = step_laser_address(direction, address);
+            let keep_drawing = match direction {
+                RedLabelLaserDirection::Right => next <= tip,
+                RedLabelLaserDirection::Left => next >= tip,
+            };
+            if !keep_drawing {
+                self.write_byte(tip, 0x99)?;
+                return Ok(());
+            }
+            address = next;
+        }
+
+        Err(format!(
+            "red-label {:?} live laser redraw did not reach PD 0x{tip:04X}",
+            direction
+        ))
     }
 
     /// Source-shaped `VELO`: walk `OPTR`, add each active object's velocity to
@@ -46219,7 +46416,9 @@ impl RedLabelRuntimeMemory {
                     Some(picture) => red_label_object_image_word(source_pointer, picture)?,
                     None => self.read_word(source_pointer)?,
                 };
-                self.write_word(u16::from_be_bytes([screen_x, screen_y]), image_word)?;
+                let target_address = u16::from_be_bytes([screen_x, screen_y]);
+                self.write_word(target_address, image_word)?;
+                self.record_live_expanded_object_address(target_address, 2);
                 source_pointer = source_pointer.wrapping_add(2);
                 remaining = remaining.wrapping_sub(2);
                 let (next_y, carry) = screen_y.overflowing_add(double_size);
@@ -46242,7 +46441,9 @@ impl RedLabelRuntimeMemory {
                     Some(picture) => red_label_object_image_byte_required(source_pointer, picture)?,
                     None => self.read_byte(source_pointer)?,
                 };
-                self.write_byte(u16::from_be_bytes([screen_x, screen_y]), image_byte)?;
+                let target_address = u16::from_be_bytes([screen_x, screen_y]);
+                self.write_byte(target_address, image_byte)?;
+                self.record_live_expanded_object_address(target_address, 1);
                 source_pointer = source_pointer.wrapping_add(1);
             }
 
@@ -46266,6 +46467,13 @@ impl RedLabelRuntimeMemory {
             )?;
         }
         Ok(())
+    }
+
+    fn record_live_expanded_object_address(&mut self, address: u16, width: u8) {
+        let entry = (address, width);
+        if !self.live_expanded_object_addresses.contains(&entry) {
+            self.live_expanded_object_addresses.push(entry);
+        }
     }
 
     fn store_expanded_erase_address(
@@ -59609,7 +59817,11 @@ impl ArcadeMachine {
     }
 
     fn red_label_update_live_video_frame(&mut self) -> Result<RedLabelLiveVideoFrame, String> {
+        self.memory.clear_live_expanded_object_addresses()?;
+        self.memory.update_expanded_objects()?;
         let frame = self.red_label_run_live_irq_video_frame()?;
+        self.memory.process_live_active_objects_full_frame()?;
+        self.memory.redraw_live_laser_beams()?;
         self.sync_player_motion_from_red_label_memory()?;
         Ok(frame)
     }

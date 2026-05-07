@@ -16,10 +16,16 @@ This file records behavior that must not be guessed in arcade-core code.
   the trailing row for source OFF28 / OFF48 / OFF58 columnar object erasers.
   Acceptance requires rendered live attract proof containing the ship,
   astronaut/enemy objects, terrain, and no stale vertical object trail.
-- `DC-30.11` remains open for a MAME-backed gameplay fire/reverse visual
-  comparison. It must either repair or explicitly prove the gameplay laser as
-  an arcade-style beam, and it must cover the reverse path where corruption was
-  reported.
+- `DC-30.11` closed the remaining live visual-fidelity reports from
+  `2026-05-07`. Live attract now replays the expanded-object and active-object
+  updates into the presented cabinet frame, clears prior active/expanded
+  footprints before redrawing, and records enough screen bytes to prove enemy
+  objects are visible on the main screen rather than only on the scanner/HUD.
+  The live instruction/action regression also bounds stale vertical and
+  diagonal trails. Live gameplay now redraws active `LASR0` / `LASL0` spans as
+  a continuous beam in presentation video RAM while preserving the source
+  process/collision state, and the credited-start regression continues to cover
+  terrain, enemy objects, reverse, and crash resistance.
 
 ## Trace Harness
 

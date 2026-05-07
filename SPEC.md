@@ -462,11 +462,13 @@ Additional gaps and corrections found during this review:
 ### Phase 10 Closure Addendum 2026-05-07
 
 Phase 10 was provisionally closed for the accepted red-label scope, but live
-owner testing on `2026-05-07` reopened the live visual-fidelity gate. The
-project is not ROM-complete playable until the reopened `DC-30` work proves
-there is no stale screen corruption in attract/gameplay and the gameplay laser
-matches the original arcade beam behavior rather than a small bolt. The
-already-passing Phase 10 trace and packaging evidence remains valid:
+owner testing on `2026-05-07` reopened the live visual-fidelity gate. `DC-30.11`
+closed that reopened gate by proving attract enemies as main-screen sprites
+rather than scanner/HUD-only state, bounding the reported stale
+ship/laser trails, preserving credited-start terrain/enemy/reverse coverage,
+and presenting live gameplay fire as a continuous arcade-style beam rather
+than a small bolt. The already-passing Phase 10 trace and packaging evidence
+remains valid:
 
 - All 12 Phase 1 local MAME reference scenarios pass as normal
   `local_reference_*_matches_red_label` tests when the local fixture directory
