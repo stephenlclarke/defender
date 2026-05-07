@@ -3838,6 +3838,11 @@ supported compatibility overlays before any large refactor starts.
 
 Steps:
 
+- [x] DC-31.0 Refresh the README start-sequence media from the current
+  red-label renderer, replacing `docs/start-sequence.gif` with an eight-second
+  Williams hold, an eight-second hall-of-fame hold, and a shortened full
+  attract sequence; wire `make readme-media` to regenerate it.
+  Completed: `2026-05-07 22:16:30 BST`
 - [ ] DC-31.1 Run `make fidelity`, all promoted local reference fixtures, pixel
   fixtures, audio fixtures, live terminal smoke tests, packaging checks, and
   CI/Sonar gates.
@@ -3859,6 +3864,22 @@ fidelity gap remains.
 
 Work log:
 
+- `2026-05-07 22:06:47 BST` Started `DC-31.0` after the owner requested a new
+  README start-sequence GIF that transitions from the Williams screen to the
+  high-score screen after eight seconds, then to the full attract sequence
+  after another eight seconds. The implementation will replace the archived
+  `oldsrc` media path with a current-core generator and wire
+  `make readme-media` to rebuild `docs/start-sequence.gif`.
+- `2026-05-07 22:16:30 BST` Completed `DC-31.0`: added
+  `examples/generate_readme_media.rs`, rewired `make readme-media` to generate
+  `docs/start-sequence.gif` from the current red-label live renderer, and
+  replaced the README GIF with a 768x576 sequence that holds the Williams page
+  for eight seconds, the hall-of-fame page for eight seconds, then shows the
+  attract/action sequence. The generated GIF is roughly 1.8 MB instead of the
+  previous 15 MB. Validation passed with `make readme-media`,
+  `cargo test --example generate_readme_media`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`,
+  `markdownlint README.md PLAN.md`, and `git diff --check`.
 - `2026-05-06 19:34:34 BST` Phase 11 completion requested and checked against
   the plan gates. `DC-31` remains blocked because all seven gameplay
   local-reference tests still fail, `DC-26` is incomplete, and `DC-27` through

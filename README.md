@@ -75,7 +75,7 @@ Run targets:
 - `make coverage-new-code NEW_CODE_COVERAGE_BASE=<git-ref>`
 - `make sq-ci`
 - `make sq`
-- `make readme-media` (currently archived with the old prototype)
+- `make readme-media`
 
 Run the live game inside `kitty`, `ghostty`, `warp`, or another terminal that
 supports the Kitty graphics protocol. `--rom-report` remains non-interactive,
@@ -88,6 +88,9 @@ semicolon-separated per-frame cabinet input script. Use
 `--fidelity-trace-inputs-file` to read the same script format from a local
 fixture file. `--fidelity-check-trace` reads that input script, generates the
 current Rust trace, and compares it exactly with an expected TSV fixture.
+`make readme-media` rebuilds `docs/start-sequence.gif` from the current
+red-label renderer with eight-second Williams and hall-of-fame holds before the
+full attract sequence.
 `--fidelity-check-trace-dir` checks all local `*.inputs.txt` /
 `*.expected.tsv` fixture pairs in a directory, skipping the directory when it is
 absent. `--fidelity-list-scenarios` and `--fidelity-write-scenario-inputs`

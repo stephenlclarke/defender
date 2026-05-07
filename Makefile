@@ -9,6 +9,7 @@ DEFENDER_REFERENCE_TRACE_DIR ?= docs/fidelity/fixtures/local/reference
 NEW_CODE_COVERAGE_BASE ?= HEAD
 LUA ?= lua
 PYTHON ?= python3
+README_START_SEQUENCE_GIF ?= docs/start-sequence.gif
 
 fmt:
 	cargo fmt --check
@@ -93,4 +94,4 @@ live: run
 live-muted: run-muted
 
 readme-media:
-	@echo "README media generation is archived under oldsrc/examples during the clean-slate rewrite."
+	cargo run --quiet --example generate_readme_media -- "$(README_START_SEQUENCE_GIF)"
