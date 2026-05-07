@@ -352,8 +352,11 @@ mod tests {
         let mut machine = ArcadeMachine::new();
         let mut renderer = Renderer::with_size(292, 240);
         let mut render_crcs = BTreeSet::new();
+        let mut color_cycle_render_crcs = BTreeSet::new();
+        let mut color_cycle_video_crcs = BTreeSet::new();
         let mut saw_non_blank_frame = false;
         let mut saw_post_williams_non_blank_frame = false;
+        let mut post_non_blank_blank_frames = Vec::new();
 
         for frame in 0..1_220 {
             let output = machine.step(CabinetInput::NONE);
@@ -377,14 +380,42 @@ mod tests {
                 )
             };
             render_crcs.insert(render_crc);
+            if saw_non_blank_frame && !non_blank {
+                post_non_blank_blank_frames.push(frame);
+            }
             saw_non_blank_frame |= non_blank;
             if frame >= 420 {
                 saw_post_williams_non_blank_frame |= non_blank;
+            }
+            if (900..=1_040).contains(&frame) {
+                color_cycle_render_crcs.insert(render_crc);
+                color_cycle_video_crcs.insert(
+                    machine
+                        .red_label_visible_video_crc32()
+                        .expect("video CRC remains available during Williams color cycle"),
+                );
+                assert!(
+                    non_blank,
+                    "Williams color-cycle frame {frame} should not render blank"
+                );
             }
         }
 
         assert!(saw_non_blank_frame);
         assert!(saw_post_williams_non_blank_frame);
+        assert!(
+            post_non_blank_blank_frames.is_empty(),
+            "render path returned blank frames after startup became visible: {post_non_blank_blank_frames:?}"
+        );
+        assert!(
+            color_cycle_render_crcs.len() >= 2,
+            "expected Williams color cycle to change rendered palette CRCs"
+        );
+        assert_eq!(
+            color_cycle_video_crcs.len(),
+            1,
+            "Williams color cycle should not blank or rewrite visible video RAM"
+        );
         assert!(
             render_crcs.len() > 8,
             "expected animated rendered frames through Williams handoff, got {} distinct CRCs",

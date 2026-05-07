@@ -3192,7 +3192,7 @@ Steps:
   effect changed in this cycle.
 - [ ] DC-27.5 Re-run promoted local-reference scenarios and document any
   remaining owner-approved hardware tolerances.
-- [ ] DC-27.6 Investigate the Williams startup-screen background flicker where
+- [x] DC-27.6 Investigate the Williams startup-screen background flicker where
   the background transitions from solid black during the startup/title
   sequence. The observed flicker appears to begin after the DEFENDER logo
   starts cycling colors. Also investigate the live runtime failure where the
@@ -3201,9 +3201,26 @@ Steps:
   clearing, visible-area sampling, IRQ/frame boundary timing, terminal
   rendering, or live scheduler/process handoff, then either fix it or document
   the exact hardware/reference behavior.
+  Completed: `2026-05-07 04:19:08 BST`
 
 Work log:
 
+- `2026-05-07 04:19:08 BST` Completed `DC-27.6`: probed the live startup
+  render path through frame 1300 and tightened
+  `render_live_machine_frame_survives_williams_handoff_and_remains_playable`.
+  The core renderer is blank only during the first 13 startup frames, remains
+  nonblank after the Williams/`DEFENDER` page becomes visible, and does not
+  reproduce a crash after the Williams screen. During frames 900 through 1040,
+  where the reported flicker begins after the logo color cycle, the rendered
+  palette CRC changes while the visible video CRC remains constant, so the core
+  behavior is a palette-cycle presentation effect rather than a video-RAM
+  blanking or startup clear. The same regression still verifies coin/start
+  works after the handoff; full terminal evidence remains in `DC-30`.
+  Validation passed with `cargo fmt --check`, `cargo check --all-targets`,
+  `cargo test
+  render_live_machine_frame_survives_williams_handoff_and_remains_playable
+  --all-targets -- --nocapture`, `markdownlint PLAN.md`, and
+  `git diff --check`.
 - `2026-05-07 01:49:11 BST` Continued `DC-27.1` for the open Phase 10 gate:
   frame 1258 now matches the MAME visible-video and process samples, but all
   remaining gameplay traces fail first at frame 1259 visible-video only. This
