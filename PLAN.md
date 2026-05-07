@@ -3789,6 +3789,8 @@ Slack updates:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778175278467879`
 - `DC-30.10`:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778181147126199`
+- `DC-30.11`:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778186356514289`
 
 ## Phase 11: Final Acceptance Before Refactor
 
