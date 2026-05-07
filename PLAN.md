@@ -3539,7 +3539,7 @@ documented compatibility overlays.
 
 ### DC-30: Live Playability, Packaging, And Runtime Evidence
 
-Status: `complete`
+Status: `in_progress`
 
 Goal: prove a user can run and play the game from the built binary without
 local development fixtures.
@@ -3586,6 +3586,16 @@ Steps:
   corruption, preserves reverse without visible screen corruption, and leaves
   the attract loop visibly progressing before start.
   Completed: `2026-05-07 18:31:55 BST`
+- [x] DC-30.10 Repair the owner-reported live attract/action screen corruption
+  visible as tall stale columns during the scanner/action sequence, prove the
+  instruction scene contains the player ship, astronaut/enemy objects, terrain,
+  and no stale vertical object trails, and compare the repaired native frames
+  against the local MAME attract snapshots before pushing.
+  Completed: `2026-05-07 20:09:18 BST`
+- [ ] DC-30.11 Compare release gameplay fire/reverse/output against local MAME
+  gameplay references and repair any remaining visual-fidelity gaps, especially
+  the reported gameplay laser appearing as a small bolt instead of the original
+  arcade beam.
 
 Work log:
 
@@ -3623,6 +3633,30 @@ Work log:
   Kitty-compatible release PTY smoke that sent credit, one-player start,
   reverse, and quit inputs and exited with status 0 without panic/error
   signatures.
+- `2026-05-07 20:03:41 BST` Started `DC-30.10` after owner screenshots showed
+  the scanner/action sequence still corrupting into tall green/orange columns,
+  and the owner separately reported that attract action did not show the ship
+  and aliens being shot. The current repair targets stale live video state
+  rather than terminal presentation: stale title appearance slots must be
+  cleared at source object-list resets, old terrain table screen bytes must be
+  fully erased before replacement terrain is emitted, and the source OFF28 /
+  OFF48 / OFF58 columnar erasers must clear the trailing row that was leaving
+  vertical object trails.
+- `2026-05-07 20:09:18 BST` Completed `DC-30.10`: live attract now continues
+  to run the native source video-frame update while it dispatches translated
+  attract process bodies, so the post-Williams instruction scene reaches the
+  ship/object/terrain action instead of retaining stale title state. Source
+  object-list resets now clear appearance RAM, start-game setup clears the same
+  slots before play, `BGOUT` clears every prior screen-table terrain byte
+  before writing replacement terrain, and OFF28 / OFF48 / OFF58 descriptor
+  erasers clear the trailing row that produced the tall column artifact on
+  columnar eight-row objects. Added a rendered live attract regression that
+  steps into the scanner/action scene, verifies ship plus astronaut/object
+  state and terrain are visible, and fails on stale vertical trails. Validation
+  passed with focused `DC-30.10` regressions, `cargo test --all-targets`,
+  `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+  `markdownlint PLAN.md SPEC.md docs/fidelity/gaps.md`, and
+  `git diff --check`.
 - `2026-05-07 07:33:43 BST` Started `DC-30.8` after the owner reported that
   the screen flickers a lot. Initial audit found the live core render tests
   already prove red-label video RAM does not blank through the Williams color
@@ -3698,15 +3732,12 @@ Work log:
   the recorded evidence is the PTY Kitty stream plus core live render/input
   regressions rather than a terminal screenshot artifact.
 
-Completion gate result: `DC-30` is complete as of `2026-05-07 18:31:55 BST`.
-`DC-30.6` fixed dropped live input pulses, `DC-30.7` fixed the later
-live-attract handoff after the Williams/title sequence without corrupting
-high-score state, `DC-30.8` removed live Kitty per-frame terminal blanking, and
-`DC-30.9` fixed the owner-visible release blockers where attract did not appear
-to progress, start flow was unclear, terrain/ground and enemies were missing
-after start, reverse could coincide with screen corruption, and the release
-game eventually crashed. Phase 10 live playability acceptance is complete once
-this `DC-30.9` update is committed and pushed to `red-label`.
+Completion gate result: `DC-30` remains reopened after `DC-30.10` because the
+owner also reported a gameplay laser-beam fidelity gap. `DC-30.10` completed
+the stale-column attract/action repair. `DC-30.11` remains the MAME-backed
+gameplay fire/reverse visual comparison and any follow-up repair. Phase 10 live
+playability acceptance is not final again until `DC-30.11` is completed,
+committed, pushed to `red-label`, and reported to Slack.
 
 Slack updates:
 
@@ -3720,16 +3751,18 @@ Slack updates:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778136028385079`
 - `DC-30.9`:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778175278467879`
+- `DC-30.10`: pending
 
 ## Phase 11: Final Acceptance Before Refactor
 
 ### DC-31: ROM-Complete Final Acceptance And Documentation
 
-Status: `ready`
+Status: `blocked`
 
-Readiness note: Phase 10 live playability is complete as of
-`2026-05-07 18:31:55 BST` once the `DC-30.9` commit is pushed and reported.
-`DC-31` may then start as the final acceptance pass before any large refactor.
+Readiness note: Phase 10 live playability was reopened on
+`2026-05-07 20:03:41 BST` after owner visual-corruption and laser-fidelity
+reports. `DC-31` stays blocked until `DC-30.10` and `DC-30.11` are complete and
+reported.
 
 Goal: certify the project as a complete exact red-label implementation with
 supported compatibility overlays before any large refactor starts.

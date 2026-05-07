@@ -292,7 +292,7 @@ mod tests {
     use crate::input::CabinetInput;
     use crate::machine::{
         ArcadeMachine, FRAME_RATE_MILLIHZ, GamePhase, MachineEvent, RedLabelSoundBoardSnapshot,
-        VISIBLE_WIDTH,
+        VISIBLE_HEIGHT, VISIBLE_WIDTH,
     };
     use crate::rom::crc32;
     use crate::sound::SoundCommandLatch;
@@ -583,6 +583,48 @@ mod tests {
     }
 
     #[test]
+    fn rendered_live_attract_action_scene_has_objects_without_vertical_trails() {
+        let mut machine = ArcadeMachine::new();
+        let mut renderer = Renderer::with_size(292, 240);
+        let mut saw_action_scene = false;
+        let mut worst_vertical_streak = 0;
+
+        for tick in 1..=4_400 {
+            let output = machine.step(CabinetInput::NONE);
+            assert_eq!(output.snapshot.phase, GamePhase::Attract);
+            if tick < 4_000 || tick % 30 != 0 {
+                continue;
+            }
+
+            let image =
+                render_live_machine_frame(&mut renderer, &mut machine).expect("render attract");
+            let has_ship = live_object_screen_from_pointer(&machine, 0xA18B).is_some();
+            let has_astronaut = live_object_screen_from_pointer(&machine, 0xA189).is_some();
+            let has_terrain =
+                rendered_nonblack_pixels_in_band(image, 180..usize::from(VISIBLE_HEIGHT)) >= 100;
+            let vertical_streak = rendered_max_nonblack_vertical_streak(image, 40..220);
+            worst_vertical_streak = worst_vertical_streak.max(vertical_streak);
+            if has_ship && has_astronaut && has_terrain {
+                saw_action_scene = true;
+                assert!(
+                    vertical_streak <= 16,
+                    "attract action scene retained a vertical object trail of {vertical_streak} pixels"
+                );
+                break;
+            }
+        }
+
+        assert!(
+            saw_action_scene,
+            "rendered live attract did not show the instruction-scene ship, astronaut, and terrain"
+        );
+        assert!(
+            worst_vertical_streak <= 16,
+            "rendered live attract retained vertical object trails; worst streak was {worst_vertical_streak} pixels"
+        );
+    }
+
+    #[test]
     fn frame_duration_tracks_cabinet_refresh_not_old_ninety_ms_tick() {
         assert_eq!(
             FRAME_DURATION.as_micros(),
@@ -657,6 +699,39 @@ mod tests {
             })
             .filter(|pixel| *pixel != [0, 0, 0, 255])
             .count()
+    }
+
+    fn rendered_max_nonblack_vertical_streak(
+        image: &RenderedImage,
+        y_range: std::ops::Range<usize>,
+    ) -> usize {
+        let width = image.width as usize;
+        let mut max_streak = 0;
+        for x in 0..width {
+            let mut streak = 0;
+            for y in y_range.clone() {
+                let offset = (y * width + x) * 4;
+                if &image.pixels[offset..offset + 4] != [0, 0, 0, 255].as_slice() {
+                    streak += 1;
+                    max_streak = max_streak.max(streak);
+                } else {
+                    streak = 0;
+                }
+            }
+        }
+        max_streak
+    }
+
+    fn live_object_screen_from_pointer(
+        machine: &ArcadeMachine,
+        pointer_address: u16,
+    ) -> Option<u16> {
+        let object_address = read_word(machine, pointer_address)?;
+        if !live_object_address_is_valid(object_address) {
+            return None;
+        }
+        let screen_address = read_word(machine, object_address + 0x04)?;
+        (screen_address != 0).then_some(screen_address)
     }
 
     fn live_visible_enemy_object_count(machine: &ArcadeMachine) -> usize {

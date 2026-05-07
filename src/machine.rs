@@ -36996,8 +36996,8 @@ impl RedLabelRuntimeMemory {
         let mut first_screen_address = 0;
         for entry_index in 0..0x98u16 {
             let screen_table_entry = screen_table.start.wrapping_add(entry_index * 2);
-            if entry_index % 8 != 0 {
-                let old_screen_address = self.read_word(screen_table_entry)?;
+            let old_screen_address = self.read_word(screen_table_entry)?;
+            if old_screen_address != 0 {
                 self.write_word(old_screen_address, 0)?;
             }
             let record_address = selected_flavor_pointer.wrapping_add(entry_index * 3);
@@ -40828,11 +40828,19 @@ impl RedLabelRuntimeMemory {
             ));
         }
 
-        self.clear_screen_block(screen_address, picture.width, picture.height)?;
+        let erase_height = if red_label_routine_address_matches_any(
+            routine_address,
+            &["OFF28", "OFF48", "OFF58"],
+        )? {
+            picture.height.saturating_add(1)
+        } else {
+            picture.height
+        };
+        self.clear_screen_block(screen_address, picture.width, erase_height)?;
         Ok(Some(RedLabelBlockClear {
             screen_address,
             width: picture.width,
-            height: picture.height,
+            height: erase_height,
         }))
     }
 
@@ -45748,7 +45756,16 @@ impl RedLabelRuntimeMemory {
         self.write_word(linked_list(lists, "free_object")?.head_address, object.base)?;
         self.write_word(linked_list(lists, "active_object")?.head_address, 0)?;
         self.write_word(linked_list(lists, "inactive_object")?.head_address, 0)?;
-        self.write_word(linked_list(lists, "shell_object")?.head_address, 0)
+        self.write_word(linked_list(lists, "shell_object")?.head_address, 0)?;
+        self.clear_appearance_ram(layout)
+    }
+
+    fn clear_appearance_ram(&mut self, layout: &[RedLabelRamLayoutEntry]) -> Result<(), String> {
+        let appearance = table_descriptor(layout, "appearance_ram")?;
+        let range = appearance
+            .table_range()
+            .ok_or_else(|| String::from("red-label appearance RAM table range is invalid"))?;
+        self.clear_range(range)
     }
 
     fn explosion_start_center(
@@ -47211,6 +47228,7 @@ impl RedLabelRuntimeMemory {
     ) -> Result<RedLabelStartGameInit, String> {
         let genocide = self.genocide_other_processes()?;
         let screen_clear = self.clear_screen_ram()?;
+        self.clear_appearance_ram(layout)?;
         self.write_field_byte(layout, "base_page", "STATUS", 0x7F)?;
         self.write_field_byte(layout, "base_page", "CURPLR", 1)?;
         self.write_field_byte(layout, "base_page", "PDFLG", 1)?;
@@ -59070,11 +59088,19 @@ impl ArcadeMachine {
             )?;
         }
 
-        let Some(dispatch) = self.step_red_label_translated_process()? else {
-            return Ok(false);
+        let dispatched = if let Some(dispatch) = self.step_red_label_translated_process()? {
+            self.dispatch_live_attract_immediate_jumps(dispatch)?;
+            true
+        } else {
+            false
         };
-        self.dispatch_live_attract_immediate_jumps(dispatch)?;
-        Ok(true)
+
+        if self.phase == GamePhase::Attract {
+            let video_frame = self.red_label_update_live_video_frame()?;
+            self.record_main_board_live_video_frame(&video_frame);
+        }
+
+        Ok(dispatched)
     }
 
     fn dispatch_live_attract_immediate_jumps(
@@ -68196,6 +68222,14 @@ mod tests {
             .memory
             .write_word(0xA0BF, 0xFFFF)
             .expect("dirty PLAXC");
+        machine
+            .memory
+            .write_word(0x9C00, 0xAF00)
+            .expect("dirty appearance size");
+        machine
+            .memory
+            .write_word(0x9FFC, 0x7788)
+            .expect("dirty final appearance slot bytes");
 
         let init = machine
             .red_label_initialize_attract_scene_from_scinit()
@@ -68244,6 +68278,10 @@ mod tests {
             Some(&[0x10, 0x30][..])
         );
         assert_eq!(
+            machine.memory.ram_range(0x9C00..0xA000),
+            Some(&[0; 0x0400][..])
+        );
+        assert_eq!(
             machine.memory.ram_range(0xA23C..0xA23E),
             Some(&[0xA2, 0x53][..])
         );
@@ -68290,9 +68328,9 @@ mod tests {
         assert_eq!(memory.ram_range(0x98DE..0x98E0), Some(&[0x70, 0x07][..]));
         assert_eq!(memory.ram_range(0x97DE..0x97E0), Some(&[0x70, 0x07][..]));
         assert_eq!(memory.ram_range(0x92D7..0x92D9), Some(&[0x07, 0x70][..]));
-        assert_eq!(memory.ram_range(0x4000..0x4002), Some(&[0x22, 0x22][..]));
+        assert_eq!(memory.ram_range(0x4000..0x4002), Some(&[0, 0][..]));
         assert_eq!(memory.ram_range(0x4002..0x4004), Some(&[0, 0][..]));
-        assert_eq!(memory.ram_range(0x4010..0x4012), Some(&[0x22, 0x22][..]));
+        assert_eq!(memory.ram_range(0x4010..0x4012), Some(&[0, 0][..]));
     }
 
     #[test]
@@ -69062,10 +69100,7 @@ mod tests {
         );
         assert_eq!(machine.red_label_ram_range(0x0000..0x0001), Some(&[0][..]));
         assert_eq!(machine.red_label_ram_range(0x9BFF..0x9C00), Some(&[0][..]));
-        assert_eq!(
-            machine.red_label_ram_range(0x9C00..0x9C01),
-            Some(&[0xCC][..])
-        );
+        assert_eq!(machine.red_label_ram_range(0x9C00..0x9C01), Some(&[0][..]));
         assert_eq!(
             machine.red_label_ram_range(0xA037..0xA03A),
             Some(&[0x00, 0x00, 0x00][..])
@@ -69518,6 +69553,47 @@ mod tests {
             machine.red_label_ram_range(screen_address..screen_address + 1),
             Some(&[0xAA][..])
         );
+    }
+
+    #[test]
+    fn descriptor_erase_clears_columnar_eight_row_trailing_byte() {
+        let mut machine = ArcadeMachine::new();
+        let screen_address = 0x785F;
+        let picture_address = red_label_object_picture_address("ASTP1").expect("ASTP1 address");
+        let picture = red_label_object_picture(picture_address).expect("ASTP1 picture");
+        write_object_footprint(&mut machine, screen_address, picture_address, 0x07);
+        for column in 0..picture.width {
+            let trailing_address =
+                screen_address + (u16::from(column) << 8) + u16::from(picture.height);
+            machine
+                .memory
+                .write_byte(trailing_address, 0x07)
+                .expect("seed trailing byte");
+        }
+
+        let clear = machine
+            .red_label_erase_object_picture_by_descriptor(screen_address, picture_address)
+            .expect("OFF28 descriptor erase")
+            .expect("ASTP1 erases");
+
+        assert_eq!(
+            clear,
+            RedLabelBlockClear {
+                screen_address,
+                width: 2,
+                height: 9,
+            }
+        );
+        assert_object_footprint_cleared(&machine, screen_address, picture_address);
+        for column in 0..picture.width {
+            let trailing_address =
+                screen_address + (u16::from(column) << 8) + u16::from(picture.height);
+            assert_eq!(
+                machine.red_label_ram_range(trailing_address..trailing_address + 1),
+                Some(&[0][..]),
+                "columnar object trailing byte 0x{trailing_address:04X} was not cleared"
+            );
+        }
     }
 
     #[test]

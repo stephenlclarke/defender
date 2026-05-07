@@ -2,6 +2,25 @@
 
 This file records behavior that must not be guessed in arcade-core code.
 
+## Live Visual Fidelity
+
+- `2026-05-07`: owner screenshots reopened Phase 10 live playability after
+  `DC-30.9`. The active evidence gap is live visual fidelity, not trace
+  scenario completion: the scanner/action attract sequence showed tall
+  green/orange stale columns, attract action was reported without the expected
+  player ship and aliens being shot, and gameplay fire was reported as a small
+  bolt instead of the original arcade beam.
+- `DC-30.10` targets the stale-column attract/action corruption by clearing
+  stale title appearance RAM at source object-list resets, fully erasing prior
+  terrain-table screen bytes before replacement terrain output, and clearing
+  the trailing row for source OFF28 / OFF48 / OFF58 columnar object erasers.
+  Acceptance requires rendered live attract proof containing the ship,
+  astronaut/enemy objects, terrain, and no stale vertical object trail.
+- `DC-30.11` remains open for a MAME-backed gameplay fire/reverse visual
+  comparison. It must either repair or explicitly prove the gameplay laser as
+  an arcade-style beam, and it must cover the reverse path where corruption was
+  reported.
+
 ## Trace Harness
 
 - Phase 10 closure on `2026-05-07` promotes all 12 Phase 1 local MAME
