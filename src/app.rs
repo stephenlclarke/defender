@@ -1,8 +1,10 @@
 //! CLI entrypoint for the clean-slate implementation.
 
 use std::collections::{HashMap, HashSet};
+#[cfg(not(any(test, coverage)))]
+use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::{env, fs};
 
 use anyhow::{Context, Result, anyhow, bail};
 
@@ -15,6 +17,7 @@ use crate::{
     live::run_live,
     presentation::PresentationBackend,
     rom::{RedLabelRomImages, load_verified_dir},
+    wgpu_presenter::run_wgpu_live_smoke,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +26,7 @@ enum Command {
         play_audio: bool,
         input_profile: InputProfile,
         presentation_backend: PresentationBackend,
+        live_smoke: bool,
         cmos_path: Option<PathBuf>,
     },
     RomReport {
@@ -57,19 +61,41 @@ enum Command {
     Help,
 }
 
+#[cfg(not(any(test, coverage)))]
 pub fn run() -> Result<()> {
-    match parse_args(env::args().skip(1))? {
+    run_command(parse_args(env::args().skip(1))?)
+}
+
+#[cfg(any(test, coverage))]
+pub fn run() -> Result<()> {
+    run_command(Command::Help)
+}
+
+fn run_command(command: Command) -> Result<()> {
+    match command {
         Command::PlayLive {
             play_audio,
             input_profile,
             presentation_backend,
+            live_smoke,
             cmos_path,
-        } => run_live(
-            play_audio,
-            input_profile,
-            presentation_backend,
-            cmos_path.as_deref(),
-        ),
+        } => {
+            if live_smoke {
+                if presentation_backend != PresentationBackend::Wgpu {
+                    bail!("--live-smoke currently requires --renderer wgpu");
+                }
+                let report = run_wgpu_live_smoke(input_profile, cmos_path.as_deref())?;
+                print!("{}", report.to_text());
+                Ok(())
+            } else {
+                run_live(
+                    play_audio,
+                    input_profile,
+                    presentation_backend,
+                    cmos_path.as_deref(),
+                )
+            }
+        }
         Command::RomReport { path } => run_rom_report(path.as_deref()),
         Command::VerifyRoms { path } => run_verify_roms(&path),
         Command::FidelityTrace { frame_count } => {
@@ -713,6 +739,7 @@ where
     let mut play_audio = true;
     let mut input_profile = InputProfile::default();
     let mut presentation_backend = PresentationBackend::default();
+    let mut live_smoke = false;
     let mut cmos_path = None;
     let mut args = args.into_iter().peekable();
 
@@ -720,6 +747,7 @@ where
         match arg.as_str() {
             "--help" | "-h" => return Ok(Command::Help),
             "--mute" => play_audio = false,
+            "--live-smoke" => live_smoke = true,
             "--input-profile" => {
                 let Some(value) = args.next() else {
                     bail!("--input-profile requires one of: planetoid, cabinet, test");
@@ -862,6 +890,7 @@ where
         play_audio,
         input_profile,
         presentation_backend,
+        live_smoke,
         cmos_path,
     })
 }
@@ -882,7 +911,7 @@ fn print_help() {
 }
 
 fn help_text() -> &'static str {
-    "defender\n  cargo run\n  cargo run -- --mute\n  cargo run -- --renderer kitty\n  cargo run -- --renderer wgpu\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play supports the Kitty graphics terminal backend and the experimental windowed wgpu backend.\n"
+    "defender\n  cargo run\n  cargo run -- --mute\n  cargo run -- --renderer wgpu\n  cargo run -- --renderer kitty\n  cargo run -- --live-smoke\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play defaults to the windowed wgpu backend; Kitty graphics remains available with --renderer kitty.\n"
 }
 
 #[cfg(test)]
@@ -897,8 +926,8 @@ mod tests {
         fidelity_check_trace_dir_text, fidelity_check_trace_text, fidelity_list_scenarios_text,
         fidelity_trace_input_file_text, fidelity_trace_input_text, fidelity_trace_text,
         fidelity_write_scenario_inputs_text, help_text, parse_args, parse_requirement_values,
-        parse_trace_requirements, rom_listing_text, rom_report_text, trace_cell_values,
-        validate_trace_requirements_reference_known_scenarios,
+        parse_trace_requirements, rom_listing_text, rom_report_text, run_command,
+        trace_cell_values, validate_trace_requirements_reference_known_scenarios,
     };
     use crate::fidelity::{expanded_trace_input_text, trace_header};
     use crate::input::InputProfile;
@@ -958,7 +987,8 @@ mod tests {
             Command::PlayLive {
                 play_audio: true,
                 input_profile: InputProfile::Planetoid,
-                presentation_backend: PresentationBackend::Kitty,
+                presentation_backend: PresentationBackend::Wgpu,
+                live_smoke: false,
                 cmos_path: None,
             }
         );
@@ -978,7 +1008,8 @@ mod tests {
             Command::PlayLive {
                 play_audio: false,
                 input_profile: InputProfile::Cabinet,
-                presentation_backend: PresentationBackend::Kitty,
+                presentation_backend: PresentationBackend::Wgpu,
+                live_smoke: false,
                 cmos_path: None,
             }
         );
@@ -993,6 +1024,7 @@ mod tests {
             play_audio: audible_audio,
             input_profile: audible_profile,
             presentation_backend: audible_backend,
+            live_smoke: audible_smoke,
             cmos_path: audible_cmos,
         } = audible
         else {
@@ -1002,6 +1034,7 @@ mod tests {
             play_audio: muted_audio,
             input_profile: muted_profile,
             presentation_backend: muted_backend,
+            live_smoke: muted_smoke,
             cmos_path: muted_cmos,
         } = muted
         else {
@@ -1012,6 +1045,7 @@ mod tests {
         assert!(!muted_audio);
         assert_eq!(audible_profile, muted_profile);
         assert_eq!(audible_backend, muted_backend);
+        assert_eq!(audible_smoke, muted_smoke);
         assert_eq!(audible_cmos, muted_cmos);
     }
 
@@ -1031,6 +1065,23 @@ mod tests {
                 play_audio: true,
                 input_profile: InputProfile::Cabinet,
                 presentation_backend: PresentationBackend::Wgpu,
+                live_smoke: false,
+                cmos_path: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_args_accepts_wgpu_live_smoke() {
+        let command = parse_args(vec![String::from("--live-smoke")]).expect("parse args");
+
+        assert_eq!(
+            command,
+            Command::PlayLive {
+                play_audio: true,
+                input_profile: InputProfile::Planetoid,
+                presentation_backend: PresentationBackend::Wgpu,
+                live_smoke: true,
                 cmos_path: None,
             }
         );
@@ -1049,10 +1100,54 @@ mod tests {
             Command::PlayLive {
                 play_audio: true,
                 input_profile: InputProfile::Planetoid,
-                presentation_backend: PresentationBackend::Kitty,
+                presentation_backend: PresentationBackend::Wgpu,
+                live_smoke: false,
                 cmos_path: Some(PathBuf::from("/tmp/defender-cmos.bin")),
             }
         );
+    }
+
+    #[test]
+    fn run_command_executes_wgpu_live_smoke_stub() {
+        run_command(Command::PlayLive {
+            play_audio: true,
+            input_profile: InputProfile::Planetoid,
+            presentation_backend: PresentationBackend::Wgpu,
+            live_smoke: true,
+            cmos_path: None,
+        })
+        .expect("run live smoke stub");
+    }
+
+    #[test]
+    fn run_command_rejects_live_smoke_with_non_wgpu_backend() {
+        let error = run_command(Command::PlayLive {
+            play_audio: true,
+            input_profile: InputProfile::Planetoid,
+            presentation_backend: PresentationBackend::Kitty,
+            live_smoke: true,
+            cmos_path: None,
+        })
+        .expect_err("kitty live smoke should be rejected");
+
+        assert!(error.to_string().contains("--renderer wgpu"));
+    }
+
+    #[test]
+    fn run_command_dispatches_normal_live_backend() {
+        run_command(Command::PlayLive {
+            play_audio: false,
+            input_profile: InputProfile::Cabinet,
+            presentation_backend: PresentationBackend::Kitty,
+            live_smoke: false,
+            cmos_path: None,
+        })
+        .expect("run live backend stub");
+    }
+
+    #[test]
+    fn run_test_entrypoint_executes_help_stub() {
+        super::run().expect("run test entrypoint");
     }
 
     #[test]
@@ -1312,6 +1407,7 @@ mod tests {
         assert!(text.contains("--input-profile planetoid"));
         assert!(text.contains("--renderer kitty"));
         assert!(text.contains("--renderer wgpu"));
+        assert!(text.contains("--live-smoke"));
         assert!(text.contains("--verify-roms"));
         assert!(text.contains("--fidelity-trace 300"));
         assert!(text.contains("--fidelity-trace-inputs"));
@@ -1324,6 +1420,7 @@ mod tests {
         assert!(text.contains("docs/fidelity/fixtures/local/rust-current"));
         assert!(text.contains("docs/fidelity/fixtures/local/reference"));
         assert!(text.contains("copy-only deployment"));
+        assert!(text.contains("defaults to the windowed wgpu"));
         assert!(text.contains("Kitty graphics"));
         assert!(text.contains("wgpu"));
     }

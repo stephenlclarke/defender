@@ -1,38 +1,57 @@
 //! Windowed live runner using wgpu.
 #![cfg_attr(any(test, coverage), allow(dead_code))]
 
+use std::collections::BTreeSet;
 use std::path::Path;
+#[cfg(all(not(test), not(coverage)))]
 use std::sync::Arc;
+#[cfg(all(not(test), not(coverage)))]
 use std::time::Instant;
 
-use anyhow::{Context, Result, anyhow, bail};
+#[cfg(all(not(test), not(coverage)))]
+use anyhow::{Context, anyhow};
+use anyhow::{Result, bail};
+#[cfg(all(not(test), not(coverage)))]
 use winit::{
     application::ApplicationHandler,
-    dpi::{LogicalSize, PhysicalSize},
-    event::{ElementState, KeyEvent, WindowEvent},
+    dpi::LogicalSize,
+    event::WindowEvent,
     event_loop::{ActiveEventLoop, ControlFlow},
-    keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
     window::{Window, WindowId},
 };
+use winit::{
+    dpi::PhysicalSize,
+    event::{ElementState, KeyEvent},
+    keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
+};
 
+#[cfg(all(not(test), not(coverage)))]
 use crate::{
     cmos_storage::{CmosStorage, FileCmosStorage},
-    input::{
-        CabinetInput, InputEvent, InputEventKind, InputKey, InputMapper, InputProfile, PolledInput,
-        XyzzyOverlay,
-    },
+    input::{CabinetInput, InputMapper, PolledInput, XyzzyOverlay},
     live::{
         LiveCoreClock, live_frame_inputs, render_live_machine_frame, save_live_cmos,
         step_live_core_frames,
     },
-    machine::{ArcadeMachine, CompatibilityState},
-    video::{RenderedImage, Renderer},
+    machine::CompatibilityState,
+    video::Renderer,
+};
+use crate::{
+    input::{InputEvent, InputEventKind, InputKey, InputProfile},
+    machine::{ArcadeMachine, GamePhase},
+    rom::crc32,
+    video::RenderedImage,
 };
 
 const INITIAL_WINDOW_WIDTH: u32 = 1_024;
 const INITIAL_WINDOW_HEIGHT: u32 = 768;
+const SMOKE_WINDOW_WIDTH: u32 = 320;
+const SMOKE_WINDOW_HEIGHT: u32 = 240;
+#[cfg(all(not(test), not(coverage)))]
 const FRAME_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+const SMOKE_TARGET_FRAMES: u32 = 240;
 
+#[cfg(all(not(test), not(coverage)))]
 const FRAME_SHADER: &str = r#"
 @group(0) @binding(0) var frame_texture: texture_2d<f32>;
 @group(0) @binding(1) var frame_sampler: sampler;
@@ -88,11 +107,139 @@ pub fn run_wgpu_live(input_profile: InputProfile, cmos_path: Option<&Path>) -> R
     cmos_result
 }
 
+#[cfg(all(not(test), not(coverage)))]
+pub fn run_wgpu_live_smoke(
+    input_profile: InputProfile,
+    cmos_path: Option<&Path>,
+) -> Result<WgpuSmokeReport> {
+    let cmos_storage = cmos_path.map(FileCmosStorage::new);
+    let storage = cmos_storage
+        .as_ref()
+        .map(|storage| storage as &dyn CmosStorage);
+    let machine = crate::live::live_machine_from_cmos_storage(storage)?;
+    let event_loop = winit::event_loop::EventLoop::new().context("creating wgpu event loop")?;
+    let mut app = WgpuLiveApp::new_smoke(input_profile, cmos_storage, machine, SMOKE_TARGET_FRAMES);
+
+    let run_result = event_loop
+        .run_app(&mut app)
+        .context("running wgpu live smoke event loop");
+    let cmos_result = app.save_cmos();
+    if let Some(error) = app.take_error() {
+        return Err(error);
+    }
+    run_result?;
+    cmos_result?;
+
+    let report = app
+        .take_smoke_report()
+        .ok_or_else(|| anyhow!("wgpu live smoke did not produce a report"))?;
+    if let Err(error) = report.validate() {
+        bail!("{error}\n{}", report.to_text());
+    }
+    Ok(report)
+}
+
 #[cfg(any(test, coverage))]
 pub fn run_wgpu_live(_input_profile: InputProfile, _cmos_path: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(test, coverage))]
+pub fn run_wgpu_live_smoke(
+    _input_profile: InputProfile,
+    _cmos_path: Option<&Path>,
+) -> Result<WgpuSmokeReport> {
+    let report = WgpuSmokeReport {
+        window_created: true,
+        rendered_frames: 1,
+        first_frame_size: Some((INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT)),
+        distinct_frame_crcs: 1,
+        saw_non_blank_frame: true,
+        saw_attract: true,
+        saw_credit: true,
+        saw_playing: true,
+        injected_inputs: required_smoke_inputs()
+            .iter()
+            .map(|input| String::from(*input))
+            .collect(),
+        clean_exit: true,
+    };
+    Ok(report)
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WgpuSmokeReport {
+    pub window_created: bool,
+    pub rendered_frames: u32,
+    pub first_frame_size: Option<(u32, u32)>,
+    pub distinct_frame_crcs: usize,
+    pub saw_non_blank_frame: bool,
+    pub saw_attract: bool,
+    pub saw_credit: bool,
+    pub saw_playing: bool,
+    pub injected_inputs: Vec<String>,
+    pub clean_exit: bool,
+}
+
+impl WgpuSmokeReport {
+    pub fn validate(&self) -> Result<()> {
+        if !self.window_created {
+            bail!("wgpu live smoke did not create a window");
+        }
+        if self.rendered_frames == 0 {
+            bail!("wgpu live smoke did not render any frames");
+        }
+        if self.first_frame_size.is_none() {
+            bail!("wgpu live smoke did not record a renderable frame size");
+        }
+        if self.distinct_frame_crcs < 1 {
+            bail!("wgpu live smoke did not record rendered frame CRCs");
+        }
+        if !self.saw_non_blank_frame {
+            bail!("wgpu live smoke rendered only blank frames");
+        }
+        if !self.saw_attract {
+            bail!("wgpu live smoke did not observe attract mode");
+        }
+        if !self.saw_credit {
+            bail!("wgpu live smoke did not observe credited input");
+        }
+        if !self.saw_playing {
+            bail!("wgpu live smoke did not observe a started game");
+        }
+        for required in required_smoke_inputs() {
+            if !self.injected_inputs.iter().any(|input| input == required) {
+                bail!("wgpu live smoke did not inject {required}");
+            }
+        }
+        if !self.clean_exit {
+            bail!("wgpu live smoke did not exit cleanly");
+        }
+        Ok(())
+    }
+
+    pub fn to_text(&self) -> String {
+        let frame_size = self
+            .first_frame_size
+            .map(|(width, height)| format!("{width}x{height}"))
+            .unwrap_or_else(|| String::from("unrecorded"));
+        format!(
+            "wgpu live smoke passed\n  window_created: {}\n  rendered_frames: {}\n  first_frame_size: {}\n  distinct_frame_crcs: {}\n  saw_non_blank_frame: {}\n  saw_attract: {}\n  saw_credit: {}\n  saw_playing: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            self.window_created,
+            self.rendered_frames,
+            frame_size,
+            self.distinct_frame_crcs,
+            self.saw_non_blank_frame,
+            self.saw_attract,
+            self.saw_credit,
+            self.saw_playing,
+            self.injected_inputs.join(","),
+            self.clean_exit
+        )
+    }
+}
+
+#[cfg(all(not(test), not(coverage)))]
 struct WgpuLiveApp {
     input_mapper: InputMapper,
     xyzzy: XyzzyOverlay,
@@ -103,11 +250,14 @@ struct WgpuLiveApp {
     pending_cabinet_input: CabinetInput,
     pending_typed_chars: Vec<char>,
     polled_input: PolledInput,
+    window_size: (u32, u32),
     window: Option<Arc<Window>>,
     presenter: Option<WgpuPresenter>,
+    smoke: Option<WgpuSmoke>,
     error: Option<anyhow::Error>,
 }
 
+#[cfg(all(not(test), not(coverage)))]
 impl WgpuLiveApp {
     fn new(
         input_profile: InputProfile,
@@ -124,10 +274,25 @@ impl WgpuLiveApp {
             pending_cabinet_input: CabinetInput::NONE,
             pending_typed_chars: Vec::new(),
             polled_input: PolledInput::default(),
+            window_size: (INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT),
             window: None,
             presenter: None,
+            smoke: None,
             error: None,
         }
+    }
+
+    fn new_smoke(
+        input_profile: InputProfile,
+        cmos_storage: Option<FileCmosStorage>,
+        machine: ArcadeMachine,
+        target_frames: u32,
+    ) -> Self {
+        let mut app = Self::new(input_profile, cmos_storage, machine);
+        app.window_size = (SMOKE_WINDOW_WIDTH, SMOKE_WINDOW_HEIGHT);
+        app.renderer = Renderer::with_size(SMOKE_WINDOW_WIDTH, SMOKE_WINDOW_HEIGHT);
+        app.smoke = Some(WgpuSmoke::new(target_frames));
+        app
     }
 
     fn save_cmos(&self) -> Result<()> {
@@ -143,6 +308,10 @@ impl WgpuLiveApp {
         self.error.take()
     }
 
+    fn take_smoke_report(&mut self) -> Option<WgpuSmokeReport> {
+        self.smoke.take().map(WgpuSmoke::into_report)
+    }
+
     fn initialize_window(&mut self, event_loop: &ActiveEventLoop) -> Result<()> {
         if self.window.is_some() {
             return Ok(());
@@ -154,20 +323,23 @@ impl WgpuLiveApp {
                     Window::default_attributes()
                         .with_title("Defender red-label")
                         .with_inner_size(LogicalSize::new(
-                            f64::from(INITIAL_WINDOW_WIDTH),
-                            f64::from(INITIAL_WINDOW_HEIGHT),
+                            f64::from(self.window_size.0),
+                            f64::from(self.window_size.1),
                         )),
                 )
                 .context("creating wgpu window")?,
         );
-        let size = renderable_window_size(window.inner_size())
-            .unwrap_or((INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT));
+        let size = renderable_window_size(window.inner_size()).unwrap_or(self.window_size);
         self.renderer = Renderer::with_size(size.0, size.1);
         self.presenter = Some(
             pollster::block_on(WgpuPresenter::new(window.clone()))
                 .context("initializing wgpu presenter")?,
         );
+        self.core_clock = LiveCoreClock::new(Instant::now());
         self.window = Some(window);
+        if let Some(smoke) = &mut self.smoke {
+            smoke.observe_window_created();
+        }
         Ok(())
     }
 
@@ -188,6 +360,19 @@ impl WgpuLiveApp {
         if let Some(input_event) = input_event_from_winit(&key_event) {
             self.input_mapper
                 .handle_input_event(input_event, &mut self.polled_input);
+        }
+    }
+
+    fn inject_smoke_inputs(&mut self) {
+        let Some(smoke) = &mut self.smoke else {
+            return;
+        };
+        for input in smoke_input_events(self.input_mapper.profile(), smoke.frame()) {
+            self.input_mapper
+                .handle_input_event(input.event, &mut self.polled_input);
+            if input.counts_for_report {
+                smoke.record_injected_input(input.label);
+            }
         }
     }
 
@@ -216,7 +401,11 @@ impl WgpuLiveApp {
             xyzzy_auto_fire: self.xyzzy.auto_fire(),
         });
 
-        let core_steps = self.core_clock.steps_due(Instant::now());
+        let core_steps = if self.smoke.is_some() {
+            1
+        } else {
+            self.core_clock.steps_due(Instant::now())
+        };
         let held_input = self.input_mapper.held_cabinet_input();
         if let Some(frame_inputs) = live_frame_inputs(
             &mut self.pending_cabinet_input,
@@ -235,20 +424,30 @@ impl WgpuLiveApp {
         }
 
         self.polled_input = PolledInput::default();
+        if let Some(smoke) = &mut self.smoke {
+            smoke.observe_machine(&self.machine);
+            smoke.advance_frame();
+        }
     }
 
     fn draw_frame(&mut self) -> Result<()> {
         let image = render_live_machine_frame(&mut self.renderer, &mut self.machine)
             .context("rendering live machine frame")?;
+        let metrics = rendered_image_metrics(image);
         let Some(presenter) = &mut self.presenter else {
             return Ok(());
         };
         presenter
             .draw_frame(image)
-            .context("drawing wgpu graphics frame")
+            .context("drawing wgpu graphics frame")?;
+        if let Some(smoke) = &mut self.smoke {
+            smoke.observe_rendered_image(metrics);
+        }
+        Ok(())
     }
 }
 
+#[cfg(all(not(test), not(coverage)))]
 impl ApplicationHandler for WgpuLiveApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if let Err(error) = self.initialize_window(event_loop) {
@@ -297,12 +496,24 @@ impl ApplicationHandler for WgpuLiveApp {
             return;
         }
 
+        self.inject_smoke_inputs();
         self.advance_core();
         if let Some(window) = &self.window {
             window.request_redraw();
         }
-        let sleep = self.core_clock.sleep_until_next_step(Instant::now());
-        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + sleep));
+        if let Some(smoke) = &mut self.smoke
+            && smoke.should_stop()
+        {
+            smoke.mark_clean_exit();
+            event_loop.exit();
+            return;
+        }
+        if self.smoke.is_some() {
+            event_loop.set_control_flow(ControlFlow::Poll);
+        } else {
+            let sleep = self.core_clock.sleep_until_next_step(Instant::now());
+            event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + sleep));
+        }
     }
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
@@ -311,6 +522,209 @@ impl ApplicationHandler for WgpuLiveApp {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RenderedImageMetrics {
+    size: (u32, u32),
+    crc32: u32,
+    non_blank: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SmokeInput {
+    label: &'static str,
+    event: InputEvent,
+    counts_for_report: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WgpuSmoke {
+    frame: u32,
+    target_frames: u32,
+    window_created: bool,
+    rendered_frames: u32,
+    first_frame_size: Option<(u32, u32)>,
+    frame_crcs: BTreeSet<u32>,
+    saw_non_blank_frame: bool,
+    saw_attract: bool,
+    saw_credit: bool,
+    saw_playing: bool,
+    injected_inputs: BTreeSet<&'static str>,
+    clean_exit: bool,
+}
+
+impl WgpuSmoke {
+    fn new(target_frames: u32) -> Self {
+        Self {
+            frame: 0,
+            target_frames,
+            window_created: false,
+            rendered_frames: 0,
+            first_frame_size: None,
+            frame_crcs: BTreeSet::new(),
+            saw_non_blank_frame: false,
+            saw_attract: false,
+            saw_credit: false,
+            saw_playing: false,
+            injected_inputs: BTreeSet::new(),
+            clean_exit: false,
+        }
+    }
+
+    fn frame(&self) -> u32 {
+        self.frame
+    }
+
+    fn observe_window_created(&mut self) {
+        self.window_created = true;
+    }
+
+    fn observe_machine(&mut self, machine: &ArcadeMachine) {
+        let snapshot = machine.snapshot();
+        self.saw_attract |= snapshot.phase == GamePhase::Attract;
+        self.saw_credit |= snapshot.credits > 0;
+        self.saw_playing |= snapshot.phase == GamePhase::Playing;
+    }
+
+    fn observe_rendered_image(&mut self, metrics: RenderedImageMetrics) {
+        self.rendered_frames += 1;
+        self.first_frame_size.get_or_insert(metrics.size);
+        self.frame_crcs.insert(metrics.crc32);
+        self.saw_non_blank_frame |= metrics.non_blank;
+    }
+
+    fn record_injected_input(&mut self, label: &'static str) {
+        self.injected_inputs.insert(label);
+    }
+
+    fn advance_frame(&mut self) {
+        self.frame = self.frame.saturating_add(1);
+    }
+
+    fn should_stop(&self) -> bool {
+        self.frame >= self.target_frames
+    }
+
+    fn mark_clean_exit(&mut self) {
+        self.clean_exit = true;
+    }
+
+    fn into_report(self) -> WgpuSmokeReport {
+        WgpuSmokeReport {
+            window_created: self.window_created,
+            rendered_frames: self.rendered_frames,
+            first_frame_size: self.first_frame_size,
+            distinct_frame_crcs: self.frame_crcs.len(),
+            saw_non_blank_frame: self.saw_non_blank_frame,
+            saw_attract: self.saw_attract,
+            saw_credit: self.saw_credit,
+            saw_playing: self.saw_playing,
+            injected_inputs: self
+                .injected_inputs
+                .iter()
+                .map(|input| String::from(*input))
+                .collect(),
+            clean_exit: self.clean_exit,
+        }
+    }
+}
+
+fn rendered_image_metrics(image: &RenderedImage) -> RenderedImageMetrics {
+    RenderedImageMetrics {
+        size: (image.width, image.height),
+        crc32: crc32(&image.pixels),
+        non_blank: image
+            .pixels
+            .chunks_exact(4)
+            .any(|pixel| pixel != [0, 0, 0, 255].as_slice()),
+    }
+}
+
+fn required_smoke_inputs() -> &'static [&'static str] {
+    &[
+        "coin",
+        "start_one",
+        "fire",
+        "thrust",
+        "altitude_up",
+        "altitude_down",
+        "reverse",
+        "smart_bomb",
+        "hyperspace",
+    ]
+}
+
+fn smoke_input_events(profile: InputProfile, frame: u32) -> Vec<SmokeInput> {
+    match profile {
+        InputProfile::Planetoid => planetoid_smoke_input_events(frame),
+        InputProfile::Cabinet | InputProfile::Test => cabinet_smoke_input_events(frame),
+    }
+}
+
+fn planetoid_smoke_input_events(frame: u32) -> Vec<SmokeInput> {
+    match frame {
+        30 => vec![smoke_press("coin", InputKey::Char('5'))],
+        31 => vec![smoke_release("coin", InputKey::Char('5'))],
+        70 => vec![smoke_press("start_one", InputKey::Char('1'))],
+        71 => vec![smoke_release("start_one", InputKey::Char('1'))],
+        120 => vec![smoke_press("fire", InputKey::Enter)],
+        121 => vec![smoke_release("fire", InputKey::Enter)],
+        130 => vec![smoke_press("thrust", InputKey::LeftShift)],
+        145 => vec![smoke_release("thrust", InputKey::LeftShift)],
+        150 => vec![smoke_press("altitude_up", InputKey::Char('a'))],
+        170 => vec![smoke_release("altitude_up", InputKey::Char('a'))],
+        180 => vec![smoke_press("altitude_down", InputKey::Char('z'))],
+        200 => vec![smoke_release("altitude_down", InputKey::Char('z'))],
+        210 => vec![smoke_press("reverse", InputKey::Char(' '))],
+        211 => vec![smoke_release("reverse", InputKey::Char(' '))],
+        220 => vec![smoke_press("smart_bomb", InputKey::Tab)],
+        221 => vec![smoke_release("smart_bomb", InputKey::Tab)],
+        230 => vec![smoke_press("hyperspace", InputKey::Char('h'))],
+        231 => vec![smoke_release("hyperspace", InputKey::Char('h'))],
+        _ => Vec::new(),
+    }
+}
+
+fn cabinet_smoke_input_events(frame: u32) -> Vec<SmokeInput> {
+    match frame {
+        30 => vec![smoke_press("coin", InputKey::Char('5'))],
+        31 => vec![smoke_release("coin", InputKey::Char('5'))],
+        70 => vec![smoke_press("start_one", InputKey::Char('1'))],
+        71 => vec![smoke_release("start_one", InputKey::Char('1'))],
+        120 => vec![smoke_press("fire", InputKey::Char('f'))],
+        121 => vec![smoke_release("fire", InputKey::Char('f'))],
+        130 => vec![smoke_press("thrust", InputKey::Char('t'))],
+        145 => vec![smoke_release("thrust", InputKey::Char('t'))],
+        150 => vec![smoke_press("altitude_up", InputKey::Up)],
+        170 => vec![smoke_release("altitude_up", InputKey::Up)],
+        180 => vec![smoke_press("altitude_down", InputKey::Down)],
+        200 => vec![smoke_release("altitude_down", InputKey::Down)],
+        210 => vec![smoke_press("reverse", InputKey::Char('r'))],
+        211 => vec![smoke_release("reverse", InputKey::Char('r'))],
+        220 => vec![smoke_press("smart_bomb", InputKey::Char('b'))],
+        221 => vec![smoke_release("smart_bomb", InputKey::Char('b'))],
+        230 => vec![smoke_press("hyperspace", InputKey::Char('h'))],
+        231 => vec![smoke_release("hyperspace", InputKey::Char('h'))],
+        _ => Vec::new(),
+    }
+}
+
+fn smoke_press(label: &'static str, key: InputKey) -> SmokeInput {
+    SmokeInput {
+        label,
+        event: InputEvent::new(key, InputEventKind::Press),
+        counts_for_report: true,
+    }
+}
+
+fn smoke_release(label: &'static str, key: InputKey) -> SmokeInput {
+    SmokeInput {
+        label,
+        event: InputEvent::new(key, InputEventKind::Release),
+        counts_for_report: false,
+    }
+}
+
+#[cfg(all(not(test), not(coverage)))]
 struct WgpuPresenter {
     window: Arc<Window>,
     surface: wgpu::Surface<'static>,
@@ -323,6 +737,7 @@ struct WgpuPresenter {
     frame_texture: Option<FrameTexture>,
 }
 
+#[cfg(all(not(test), not(coverage)))]
 impl WgpuPresenter {
     async fn new(window: Arc<Window>) -> Result<Self> {
         let size = window.inner_size();
@@ -556,12 +971,14 @@ impl WgpuPresenter {
     }
 }
 
+#[cfg(all(not(test), not(coverage)))]
 struct FrameTexture {
     size: (u32, u32),
     texture: wgpu::Texture,
     bind_group: wgpu::BindGroup,
 }
 
+#[cfg(all(not(test), not(coverage)))]
 impl FrameTexture {
     fn new(
         device: &wgpu::Device,
@@ -754,6 +1171,8 @@ fn single_character(value: &str) -> Option<char> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use winit::{
         dpi::PhysicalSize,
         event::ElementState,
@@ -761,9 +1180,13 @@ mod tests {
     };
 
     use crate::{
-        input::{InputEventKind, InputKey},
+        input::{CabinetInput, InputEventKind, InputKey, InputMapper, InputProfile, PolledInput},
+        machine::ArcadeMachine,
+        video::RenderedImage,
         wgpu_presenter::{
-            input_event_kind_from_winit, input_key_from_winit, renderable_window_size,
+            WgpuSmoke, WgpuSmokeReport, input_event_kind_from_winit, input_key_from_winit,
+            renderable_window_size, rendered_image_metrics, required_smoke_inputs,
+            run_wgpu_live_smoke, smoke_input_events,
         },
     };
 
@@ -845,5 +1268,184 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn wgpu_smoke_script_exercises_planetoid_controls_through_input_mapper() {
+        let (seen, labels) = smoke_script_result(InputProfile::Planetoid);
+
+        assert!(seen.coin);
+        assert!(seen.start_one);
+        assert!(seen.fire);
+        assert!(seen.thrust);
+        assert!(seen.altitude_up);
+        assert!(seen.altitude_down);
+        assert!(seen.reverse);
+        assert!(seen.smart_bomb);
+        assert!(seen.hyperspace);
+        assert!(
+            required_smoke_inputs()
+                .iter()
+                .all(|input| labels.contains(input))
+        );
+    }
+
+    #[test]
+    fn wgpu_smoke_script_exercises_cabinet_controls_through_input_mapper() {
+        let (seen, labels) = smoke_script_result(InputProfile::Cabinet);
+
+        assert!(seen.coin);
+        assert!(seen.start_one);
+        assert!(seen.fire);
+        assert!(seen.thrust);
+        assert!(seen.altitude_up);
+        assert!(seen.altitude_down);
+        assert!(seen.reverse);
+        assert!(seen.smart_bomb);
+        assert!(seen.hyperspace);
+        assert!(
+            required_smoke_inputs()
+                .iter()
+                .all(|input| labels.contains(input))
+        );
+    }
+
+    #[test]
+    fn wgpu_smoke_report_validates_required_evidence() {
+        let report = complete_smoke_report();
+        report.validate().expect("complete smoke report");
+
+        let mut report = complete_smoke_report();
+        report.window_created = false;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.rendered_frames = 0;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.first_frame_size = None;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.distinct_frame_crcs = 0;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.saw_non_blank_frame = false;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.saw_attract = false;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.saw_credit = false;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.saw_playing = false;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.injected_inputs.retain(|input| input != "hyperspace");
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.clean_exit = false;
+        assert!(report.validate().is_err());
+    }
+
+    #[test]
+    fn wgpu_smoke_report_formats_recorded_and_unrecorded_frame_size() {
+        let text = complete_smoke_report().to_text();
+        assert!(text.contains("first_frame_size: 1024x768"));
+        assert!(text.contains("injected_inputs: coin,start_one"));
+
+        let mut report = complete_smoke_report();
+        report.first_frame_size = None;
+        assert!(report.to_text().contains("first_frame_size: unrecorded"));
+    }
+
+    #[test]
+    fn wgpu_smoke_accumulates_window_render_input_and_machine_evidence() {
+        let mut smoke = WgpuSmoke::new(2);
+        assert_eq!(smoke.frame(), 0);
+        assert!(!smoke.should_stop());
+
+        smoke.observe_window_created();
+        smoke.observe_machine(&ArcadeMachine::new());
+        smoke.observe_rendered_image(rendered_image_metrics(&RenderedImage::new_blank(
+            2,
+            1,
+            [0, 0, 0, 255],
+        )));
+        smoke.observe_rendered_image(rendered_image_metrics(&RenderedImage::new_blank(
+            2,
+            1,
+            [1, 2, 3, 255],
+        )));
+        for input in required_smoke_inputs() {
+            smoke.record_injected_input(input);
+        }
+        smoke.advance_frame();
+        smoke.advance_frame();
+        assert!(smoke.should_stop());
+        smoke.mark_clean_exit();
+
+        let report = smoke.into_report();
+        assert!(report.window_created);
+        assert_eq!(report.rendered_frames, 2);
+        assert_eq!(report.first_frame_size, Some((2, 1)));
+        assert_eq!(report.distinct_frame_crcs, 2);
+        assert!(report.saw_non_blank_frame);
+        assert!(report.saw_attract);
+        assert!(report.clean_exit);
+        assert!(
+            required_smoke_inputs()
+                .iter()
+                .all(|input| report.injected_inputs.iter().any(|seen| seen == input))
+        );
+    }
+
+    #[test]
+    fn test_build_wgpu_live_smoke_stub_returns_valid_report() {
+        let report = run_wgpu_live_smoke(InputProfile::Planetoid, None).expect("smoke stub");
+        report.validate().expect("valid smoke stub report");
+    }
+
+    fn smoke_script_result(profile: InputProfile) -> (CabinetInput, BTreeSet<&'static str>) {
+        let mut mapper = InputMapper::new(profile);
+        let mut seen = CabinetInput::NONE;
+        let mut labels = BTreeSet::new();
+        for frame in 0..260 {
+            let mut input = PolledInput::default();
+            for smoke_input in smoke_input_events(profile, frame) {
+                mapper.handle_input_event(smoke_input.event, &mut input);
+                if smoke_input.counts_for_report {
+                    labels.insert(smoke_input.label);
+                }
+            }
+            seen.merge(input.cabinet);
+        }
+        (seen, labels)
+    }
+
+    fn complete_smoke_report() -> WgpuSmokeReport {
+        WgpuSmokeReport {
+            window_created: true,
+            rendered_frames: 4,
+            first_frame_size: Some((1024, 768)),
+            distinct_frame_crcs: 2,
+            saw_non_blank_frame: true,
+            saw_attract: true,
+            saw_credit: true,
+            saw_playing: true,
+            injected_inputs: required_smoke_inputs()
+                .iter()
+                .map(|input| String::from(*input))
+                .collect(),
+            clean_exit: true,
+        }
     }
 }

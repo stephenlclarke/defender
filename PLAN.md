@@ -3979,7 +3979,7 @@ Slack updates:
 
 ### DC-32: Windowed `wgpu` Renderer And Input Shell
 
-Status: `in_progress`
+Status: `complete`
 
 Branch: `red-label-wgpu`, created from `red-label` after the `DC-31`
 screenshot evidence commit was pushed. For this phase, completed `DC-32` work
@@ -4001,14 +4001,17 @@ Steps:
   scaling path for Kitty/wgpu comparison, and maps keyboard input through the
   existing cabinet/input-profile layer.
   Completed: `2026-05-07 23:22:21 BST`
-- [ ] DC-32.3 Keep Kitty graphics as a compatibility backend until the `wgpu`
+- [x] DC-32.3 Keep Kitty graphics as a compatibility backend until the `wgpu`
   path has live-smoke evidence and README/docs coverage.
-- [ ] DC-32.4 Add focused tests for backend-independent frame production,
+  Completed: `2026-05-08 01:06:38 BST`
+- [x] DC-32.4 Add focused tests for backend-independent frame production,
   input projection, and presentation-boundary invariants; run the full Phase 11
   acceptance gates after each slice.
-- [ ] DC-32.5 Update `README.md`, CLI/help text, Makefile targets, screenshots,
+  Completed: `2026-05-08 01:06:38 BST`
+- [x] DC-32.5 Update `README.md`, CLI/help text, Makefile targets, screenshots,
   and release notes so the default user path is the accepted `wgpu` backend and
   Kitty is documented as compatibility or removed by explicit decision.
+  Completed: `2026-05-08 01:06:38 BST`
 
 Completion gate: the `wgpu` backend is the preferred playable UI, the accepted
 red-label core traces/fixtures/mutations still match Phase 11, and live smoke
@@ -4030,16 +4033,38 @@ Work log:
   `DC-32.3`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778192851259819`
+- `2026-05-08 01:06:38 BST` Completed `DC-32.3` through `DC-32.5`: made
+  `wgpu` the default live presentation backend, kept Kitty available through
+  `--renderer kitty` and `run-kitty`/`live-kitty` Makefile targets, added
+  `--live-smoke` plus `make smoke-wgpu`, and documented the default/compatibility
+  paths in `README.md` and CLI help. The smoke runner creates a real `wgpu`
+  window, renders cabinet frames through the shared RGBA presentation boundary,
+  injects coin/start/fire/thrust/altitude/reverse/smart-bomb/hyperspace inputs
+  through the same input mapper as live play, observes attract/credit/playing
+  states, records nonblank frame CRCs, and exits cleanly. Added focused app and
+  `wgpu` smoke-report/unit coverage, with coverage builds using stubs for the
+  real window event loop while the actual window path is verified by
+  `make smoke-wgpu`. Validation at `2026-05-08 01:06:38 BST`: `cargo fmt
+  --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test
+  --all-targets` (918 library tests, 2 binary tests, 2 example tests), `make
+  trace-script-test trace-fixtures` (10 fixture(s), 15452 frame(s)), `make
+  coverage` (`new Rust line coverage: 179/179 added executable line(s)`), `cargo
+  run -- --help`, and `make smoke-wgpu` all passed. Final smoke evidence:
+  `rendered_frames: 240`, `first_frame_size: 640x480`, `distinct_frame_crcs:
+  74`, `saw_non_blank_frame: true`, `saw_attract: true`, `saw_credit: true`,
+  `saw_playing: true`, `clean_exit: true`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778198860745489`
 
 ## Phase 13: Post-`wgpu` Large Refactor
 
 ### DC-33: Module Split And Behavior Preservation
 
-Status: `blocked`
+Status: `pending`
 
-Blocker: `DC-31` and `DC-32` must be complete. The large refactor does not
-begin until the game is fully ROM-complete/playable and the presentation
-backend migration is accepted.
+Prerequisite: `DC-31` and `DC-32` are complete. The large refactor can begin
+next, but must keep the completed red-label core behavior and accepted `wgpu`
+presentation path unchanged unless a new dev-cycle explicitly changes them.
 
 Goal: split the large translated core safely without changing completed
 behavior.

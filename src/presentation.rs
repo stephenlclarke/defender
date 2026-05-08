@@ -2,8 +2,8 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PresentationBackend {
-    #[default]
     Kitty,
+    #[default]
     Wgpu,
 }
 

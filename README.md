@@ -16,8 +16,8 @@
 ---
 
 This repository is a native Rust reimplementation of Williams' `Defender`.
-Live play currently supports the original Kitty graphics terminal backend and
-an experimental windowed `wgpu` backend.
+Live play now defaults to a windowed `wgpu` backend, while the original Kitty
+graphics terminal backend remains available for compatibility checks.
 
 The project is now being rewritten from a clean slate as an exact red-label
 arcade implementation. The previous prototype source has been moved to
@@ -50,8 +50,9 @@ Run targets:
 
 - `cargo run`
 - `cargo run -- --mute`
-- `cargo run -- --renderer kitty`
 - `cargo run -- --renderer wgpu`
+- `cargo run -- --renderer kitty`
+- `cargo run -- --live-smoke`
 - `cargo run -- --rom-report`
 - `cargo run -- --rom-report /path/to/roms`
 - `cargo run -- --verify-roms /path/to/roms`
@@ -67,8 +68,13 @@ Run targets:
 - `make run-muted`
 - `make run-wgpu`
 - `make run-wgpu-muted`
+- `make run-kitty`
+- `make run-kitty-muted`
 - `make live-wgpu`
 - `make live-wgpu-muted`
+- `make live-kitty`
+- `make live-kitty-muted`
+- `make smoke-wgpu`
 - `make trace-script-test`
 - `make trace-fixtures`
 - `make reference-inputs`
@@ -84,15 +90,18 @@ Run targets:
 - `make sq`
 - `make readme-media`
 
-By default, live play uses the Kitty graphics protocol. Run `cargo run` inside
-`kitty`, `ghostty`, `warp`, or another compatible graphics terminal, or use
-`cargo run -- --renderer wgpu` / `make run-wgpu` to open the experimental
-windowed backend. `--rom-report` remains non-interactive, validates red-label
-file sizes and CRC-32 values, and does not require a compatible graphics
-terminal. `--verify-roms` performs the same validation and then checks that the
-ROM files map into the embedded MAME red-label regions. `--fidelity-trace`
-emits deterministic TSV frames from the current Rust core for local trace
-fixture work. `--fidelity-trace-inputs` does the same with a
+By default, live play opens the `wgpu` windowed backend. Use
+`cargo run -- --renderer kitty` / `make run-kitty` inside `kitty`, `ghostty`,
+`warp`, or another compatible graphics terminal to compare against the Kitty
+presentation backend. `cargo run -- --live-smoke` / `make smoke-wgpu` opens the
+`wgpu` backend, renders live frames, injects coin/start/control input through
+the normal input-profile mapper, verifies attract/credited-start/gameplay
+state, and exits cleanly. `--rom-report` remains non-interactive, validates
+red-label file sizes and CRC-32 values, and does not require a compatible
+graphics terminal. `--verify-roms` performs the same validation and then checks
+that the ROM files map into the embedded MAME red-label regions.
+`--fidelity-trace` emits deterministic TSV frames from the current Rust core
+for local trace fixture work. `--fidelity-trace-inputs` does the same with a
 semicolon-separated per-frame cabinet input script. Use
 `--fidelity-trace-inputs-file` to read the same script format from a local
 fixture file. `--fidelity-check-trace` reads that input script, generates the
@@ -122,8 +131,9 @@ After installation, run the clean-slate runtime and tooling with:
 
 - `defender`
 - `defender --mute`
-- `defender --renderer kitty`
 - `defender --renderer wgpu`
+- `defender --renderer kitty`
+- `defender --live-smoke`
 - `defender --cmos-path ~/.local/state/defender/red-label-cmos.bin`
 - `defender --rom-report`
 - `defender --rom-report /path/to/roms`
@@ -139,9 +149,9 @@ After installation, run the clean-slate runtime and tooling with:
 
 Notes:
 
-- `defender` defaults to the Kitty graphics protocol, so run it inside `kitty`,
-  `ghostty`, `warp`, or another compatible terminal. Use
-  `defender --renderer wgpu` to launch the experimental windowed backend.
+- `defender` defaults to the windowed `wgpu` backend. Use
+  `defender --renderer kitty` inside `kitty`, `ghostty`, `warp`, or another
+  compatible graphics terminal when Kitty compatibility evidence is needed.
 - Live CMOS persistence is explicit opt-in. Running without `--cmos-path` uses
   embedded red-label defaults for the session and does not create or update a
   platform default CMOS file. Provide `--cmos-path <file>` when high scores,
@@ -988,17 +998,20 @@ signatures can be checked against MAME-derived pixel evidence.
 
 ## Platform Support
 
-The live loop now depends on a terminal that supports the Kitty graphics
-protocol. `cargo run` / `defender` should be launched from a real interactive
-terminal session inside `kitty`, `ghostty`, `warp`, or a compatible emulator.
-If your terminal supports the protocol but is not recognised by name, set
-`DEFENDER_FORCE_KITTY=1` to bypass the terminal-name guard.
+The preferred live loop uses the windowed `wgpu` backend and does not require a
+graphics terminal. The compatibility Kitty backend still depends on the Kitty
+graphics protocol: launch `cargo run -- --renderer kitty` / `defender
+--renderer kitty` from a real interactive terminal session inside `kitty`,
+`ghostty`, `warp`, or a compatible emulator. If your terminal supports the
+protocol but is not recognised by name, set `DEFENDER_FORCE_KITTY=1` to bypass
+the terminal-name guard.
 
 Non-interactive tooling paths such as `--rom-report`, `--verify-roms`,
 `--fidelity-trace`, `--fidelity-trace-inputs-file`, and
 `--fidelity-check-trace` / `--fidelity-check-trace-dir` remain usable anywhere
 a recent Rust toolchain is available.
 
-The live session now requests terminal keyboard-enhancement reporting so
+The Kitty live session requests terminal keyboard-enhancement reporting so
 standalone `Shift` thrust input can be captured in terminals that support the
-extended key protocol.
+extended key protocol. The `wgpu` backend receives keyboard input through
+`winit` and maps it through the same cabinet input-profile layer.
