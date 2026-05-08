@@ -668,6 +668,50 @@ mod tests {
     }
 
     #[test]
+    fn rendered_live_williams_defender_wordmark_clears_dot_bands_after_coalescing() {
+        let mut machine = ArcadeMachine::new();
+        let mut renderer = Renderer::with_size(292, 240);
+        let mut saw_coalesced_wordmark = false;
+        let mut saw_precoalescence_dot_bands = false;
+        let mut stray_dot_bands = Vec::new();
+
+        for frame in 1..=520 {
+            let output = machine.step(CabinetInput::NONE);
+            assert_eq!(output.snapshot.phase, GamePhase::Attract);
+            let _ = render_live_machine_frame(&mut renderer, &mut machine)
+                .expect("render Williams title");
+
+            let wordmark_bytes = live_defender_wordmark_byte_count(&machine);
+            let noisy_rows: Vec<_> =
+                native_nonzero_rows_in_band(&machine, 190..usize::from(VISIBLE_HEIGHT))
+                    .into_iter()
+                    .filter(|(_, count)| *count >= 20)
+                    .collect();
+            if wordmark_bytes >= 500 {
+                saw_coalesced_wordmark = true;
+                if !noisy_rows.is_empty() {
+                    stray_dot_bands.push((frame, noisy_rows));
+                }
+            } else if !noisy_rows.is_empty() {
+                saw_precoalescence_dot_bands = true;
+            }
+        }
+
+        assert!(
+            saw_precoalescence_dot_bands,
+            "Williams title did not exercise the MAME-observed dot-band coalescence phase"
+        );
+        assert!(
+            saw_coalesced_wordmark,
+            "Williams title did not produce a coalescing DEFENDER wordmark"
+        );
+        assert!(
+            stray_dot_bands.is_empty(),
+            "Williams DEFENDER wordmark left post-coalescence dot bands: {stray_dot_bands:?}"
+        );
+    }
+
+    #[test]
     fn rendered_live_attract_action_scene_has_objects_without_vertical_trails() {
         let mut machine = ArcadeMachine::new();
         let mut renderer = Renderer::with_size(292, 240);
@@ -783,6 +827,27 @@ mod tests {
             })
             .filter(|nibble| **nibble != 0)
             .count()
+    }
+
+    fn native_nonzero_rows_in_band(
+        machine: &ArcadeMachine,
+        y_range: std::ops::Range<usize>,
+    ) -> Vec<(usize, usize)> {
+        let nibbles = machine
+            .red_label_visible_pixel_nibbles()
+            .expect("native visible pixel nibbles");
+        let width = usize::from(VISIBLE_WIDTH);
+        y_range
+            .map(|y| {
+                let row = y * width;
+                let count = nibbles[row..row + width]
+                    .iter()
+                    .filter(|nibble| **nibble != 0)
+                    .count();
+                (y, count)
+            })
+            .filter(|(_, count)| *count != 0)
+            .collect()
     }
 
     fn rendered_nonblack_pixels_in_band(

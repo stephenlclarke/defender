@@ -470,8 +470,12 @@ and presenting live gameplay fire as a continuous arcade-style beam rather
 than a small bolt. `DC-30.12` then closed the follow-up Williams startup-screen
 wordmark blink by preserving the completed `DEFENDER` wordmark after the
 coalescing appearance sequence and before the normal `DEF50` whole-wordmark
-refresh. The already-passing Phase 10 trace and packaging evidence remains
-valid:
+refresh. `DC-32.6` investigated a later report of horizontal dot bands around
+the Williams startup wordmark; comparison against the embedded cold-boot MAME
+trace showed those bands belong to the pre-coalescence `APVCT` appearance phase
+and clear before the full wordmark settles, so the live regression now guards
+against only post-coalescence dot-band residue. The already-passing Phase 10
+trace and packaging evidence remains valid:
 
 - All 12 Phase 1 local MAME reference scenarios pass as normal
   `local_reference_*_matches_red_label` tests when the local fixture directory

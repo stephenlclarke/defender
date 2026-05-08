@@ -10,6 +10,13 @@ here before changing source-shaped arcade-core behavior.
 
 ## Live Visual Fidelity
 
+- `DC-32.6` investigated the `2026-05-08` owner report that the Williams startup
+  `DEFENDER` wordmark leaves stray horizontal dot bands after coalescing. The
+  live sequence and embedded cold-boot MAME trace both show those bands during
+  the pre-coalescence `APVCT` appearance phase, and both clear them before the
+  full wordmark settles. A live regression now fails if dot bands remain after
+  the coalesced wordmark threshold, preserving the `DC-30.12` whole-wordmark
+  blink guard without rewriting the MAME-observed appearance phase.
 - `2026-05-07`: owner screenshots reopened Phase 10 live playability after
   `DC-30.9`. The active evidence gap is live visual fidelity, not trace
   scenario completion: the scanner/action attract sequence showed tall

@@ -4012,6 +4012,11 @@ Steps:
   and release notes so the default user path is the accepted `wgpu` backend and
   Kitty is documented as compatibility or removed by explicit decision.
   Completed: `2026-05-08 01:06:38 BST`
+- [x] DC-32.6 Investigate the Williams startup `DEFENDER` wordmark fidelity
+  report where stray dot bands appear around coalescence, repair it if the live
+  output differs from MAME evidence, and prove the live title sequence settles
+  without post-coalescence dot bands.
+  Completed: `2026-05-08 08:13:02 BST`
 
 Completion gate: the `wgpu` backend is the preferred playable UI, the accepted
 red-label core traces/fixtures/mutations still match Phase 11, and live smoke
@@ -4055,6 +4060,29 @@ Work log:
   `saw_playing: true`, `clean_exit: true`.
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778198860745489`
+- `2026-05-08 08:04:22 BST` Started `DC-32.6` after the owner reported that the
+  Williams startup `DEFENDER` logo leaves a band of dots after it coalesces. The
+  investigation is focused on the live title presentation around the prior
+  `DC-30.12` wordmark-blink repair: completion requires a regression that fails
+  on post-coalescence dot bands while keeping the whole-wordmark refresh and
+  `wgpu`/Kitty shared frame path intact.
+- `2026-05-08 08:13:02 BST` Completed `DC-32.6`: compared the live Williams
+  startup row activity against the embedded cold-boot MAME trace and found the
+  visible dot bands occur during the pre-coalescence `APVCT` appearance phase in
+  both paths. The current live path clears the bands before the coalesced
+  wordmark threshold and before the full `DEFENDER` wordmark settles, so no
+  source-shaped rendering mutation was made. Added a live regression that first
+  proves the pre-coalescence dot-band phase is exercised, then fails if any
+  lower title-region dot bands remain after the wordmark reaches the coalesced
+  threshold. Validation passed with `cargo fmt --check`, focused
+  `rendered_live_williams_defender_wordmark*` tests, `markdownlint PLAN.md
+  SPEC.md docs/fidelity/gaps.md`, `git diff --check`, `cargo clippy
+  --all-targets -- -D warnings`, `cargo test --all-targets`, and
+  `make smoke-wgpu` (`rendered_frames: 241`, `distinct_frame_crcs: 74`,
+  `saw_attract: true`, `saw_credit: true`, `saw_playing: true`,
+  `clean_exit: true`).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778224501178659`
 
 ## Phase 13: Post-`wgpu` Large Refactor
 
