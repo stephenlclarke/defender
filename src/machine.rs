@@ -38376,16 +38376,6 @@ impl RedLabelRuntimeMemory {
         )
     }
 
-    /// Backwards-compatible entry point for the first `SSCAN` fire-switch
-    /// slice. New translated player switch work should call
-    /// `scan_translated_player_switches`.
-    pub fn scan_laser_fire_switch(
-        &mut self,
-        input_ports: DefenderInputPorts,
-    ) -> Result<RedLabelSwitchScan, String> {
-        self.scan_translated_player_switches(input_ports)
-    }
-
     /// Source-shaped translated-control slice of red-label `SSCAN`: keep the
     /// two-frame `PIA21`/`PIA22` history, store current IN0/IN1 bytes in
     /// `PIA21`/`PIA31`, read the complete asset-backed `SWTAB`, and queue
@@ -55679,13 +55669,6 @@ impl ArcadeMachine {
             .make_super_process(routine_address, process_type)
     }
 
-    pub fn red_label_scan_laser_fire_switch(
-        &mut self,
-        input_ports: DefenderInputPorts,
-    ) -> Result<RedLabelSwitchScan, String> {
-        self.memory.scan_laser_fire_switch(input_ports)
-    }
-
     pub fn red_label_scan_translated_player_switches(
         &mut self,
         input_ports: DefenderInputPorts,
@@ -72087,14 +72070,14 @@ mod tests {
         let mut machine = ArcadeMachine::new();
 
         machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts {
+            .red_label_scan_translated_player_switches(DefenderInputPorts {
                 in0: 0x02,
                 in1: 0x01,
                 in2: 0,
             })
             .expect("sample thrust and up");
         let held = machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts {
+            .red_label_scan_translated_player_switches(DefenderInputPorts {
                 in0: 0x03,
                 in1: 0,
                 in2: 0,
@@ -72127,10 +72110,10 @@ mod tests {
         );
 
         machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts::EMPTY)
+            .red_label_scan_translated_player_switches(DefenderInputPorts::EMPTY)
             .expect("release fire");
         let blocked_by_history = machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts {
+            .red_label_scan_translated_player_switches(DefenderInputPorts {
                 in0: 0x01,
                 in1: 0,
                 in2: 0,
@@ -72139,13 +72122,13 @@ mod tests {
         assert_eq!(blocked_by_history.queued, None);
 
         machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts::EMPTY)
+            .red_label_scan_translated_player_switches(DefenderInputPorts::EMPTY)
             .expect("clear blocked sample");
         machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts::EMPTY)
+            .red_label_scan_translated_player_switches(DefenderInputPorts::EMPTY)
             .expect("second clear sample");
         let retriggered = machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts {
+            .red_label_scan_translated_player_switches(DefenderInputPorts {
                 in0: 0x01,
                 in1: 0,
                 in2: 0,
@@ -73070,7 +73053,7 @@ mod tests {
     fn switch_process_dispatch_honors_status_mask_and_creates_lfire_process() {
         let mut machine = ArcadeMachine::new();
         machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts {
+            .red_label_scan_translated_player_switches(DefenderInputPorts {
                 in0: 0x01,
                 in1: 0,
                 in2: 0,
@@ -73097,13 +73080,13 @@ mod tests {
             .write_byte(0xA0BA, 0x00)
             .expect("clear status");
         machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts::EMPTY)
+            .red_label_scan_translated_player_switches(DefenderInputPorts::EMPTY)
             .expect("release fire");
         machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts::EMPTY)
+            .red_label_scan_translated_player_switches(DefenderInputPorts::EMPTY)
             .expect("second clear sample");
         machine
-            .red_label_scan_laser_fire_switch(DefenderInputPorts {
+            .red_label_scan_translated_player_switches(DefenderInputPorts {
                 in0: 0x01,
                 in1: 0,
                 in2: 0,

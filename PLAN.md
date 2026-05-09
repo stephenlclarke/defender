@@ -4117,7 +4117,7 @@ Steps:
   first refactor slice.
 - [x] DC-33.3 Keep the scheduler contract public surface narrow while moving
   it behind an internal module boundary.
-- [ ] DC-33.4 Remove dead scaffold paths only after tests prove exact
+- [x] DC-33.4 Remove dead scaffold paths only after tests prove exact
   replacements.
 - [ ] DC-33.5 Update docs after each module boundary becomes stable.
 
@@ -4160,3 +4160,19 @@ Work log:
   `clean_exit: true`).
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778323537340449`
+- `2026-05-09 11:56:12 BST` Started `DC-33.4`: auditing dead scaffold and
+  compatibility paths. The first removal target is the old
+  `scan_laser_fire_switch` wrapper, which only delegates to the translated
+  player switch scanner and is covered by existing switch-scan tests.
+- `2026-05-09 12:00:17 BST` Completed `DC-33.4`: removed the dead
+  `RedLabelRuntimeMemory::scan_laser_fire_switch` and
+  `ArcadeMachine::red_label_scan_laser_fire_switch` compatibility wrappers.
+  Existing switch-scan tests now call `red_label_scan_translated_player_switches`
+  directly, proving the source-shaped scanner remains the only path. Validation
+  passed with focused switch/live-fire regressions, `cargo fmt --check`,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo test --all-targets -- --ignored`, and `cargo run -- --live-smoke`
+  (`saw_attract: true`, `saw_credit: true`, `saw_playing: true`,
+  `clean_exit: true`).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778324447868369`
