@@ -65,8 +65,10 @@ Status values:
   `ci` now runs the real `wgpu` live smoke target, smoke validation requires
   nonblank visual evidence for attract, credited, and gameplay phases, and the
   unsupported `--mute` path has been removed until live audio output exists.
-- The large idiomatic refactor remains deferred until post-acceptance renderer
-  and verification work is explicitly closed and pushed from `red-label-wgpu`.
+- The large idiomatic refactor is active on `red-label-refactor` after the
+  Phase 12 renderer acceptance was closed and pushed from `red-label-wgpu`;
+  each slice must preserve the accepted red-label core behavior and `wgpu`
+  smoke evidence.
 
 ### Historical Fidelity Gap Review 2026-05-05
 
@@ -2630,7 +2632,7 @@ Work log:
   `public_arcade_api_reset_matches_new_machine_contract` test proving reset
   returns a mutated machine to the same observable state and replay output as
   `ArcadeMachine::new()`. Added `docs/fidelity/refactor-freeze.md` as the
-  future-refactor contract for validation commands, focused filters, API
+  refactor contract for validation commands, focused filters, API
   behavior, module ownership boundaries, and byte-compatible surfaces. Updated
   `SPEC.md`, `README.md`, and `docs/fidelity/README.md` to point at that
   contract and to document the actual completion-phase `ArcadeMachine` API.
@@ -4096,7 +4098,7 @@ Work log:
 
 ### DC-33: Module Split And Behavior Preservation
 
-Status: `in_progress`
+Status: `complete`
 
 Prerequisite: `DC-31` and `DC-32` are complete. The large refactor can begin
 next, but must keep the completed red-label core behavior and accepted `wgpu`
@@ -4119,7 +4121,7 @@ Steps:
   it behind an internal module boundary.
 - [x] DC-33.4 Remove dead scaffold paths only after tests prove exact
   replacements.
-- [ ] DC-33.5 Update docs after each module boundary becomes stable.
+- [x] DC-33.5 Update docs after each module boundary becomes stable.
 
 Completion gate: the refactored code produces the same traces, byte mutations,
 pixel fixtures, audio fixtures, live/session behavior, and release evidence as
@@ -4176,3 +4178,16 @@ Work log:
   `clean_exit: true`).
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778324447868369`
+- `2026-05-09 12:03:32 BST` Started `DC-33.5`: updating README, SPEC, and the
+  refactor-freeze contract now that the first stable module boundaries exist
+  on `red-label-refactor`.
+- `2026-05-09 12:25:09 BST` Completed `DC-33.5` and closed `DC-33`: updated
+  README, SPEC, and `docs/fidelity/refactor-freeze.md` to state that the
+  post-`wgpu` refactor is active on `red-label-refactor`, document the accepted
+  `machine_state`, `machine_process`, and `machine` re-export boundaries, and
+  add focused scheduler-module validation filters. Validation passed with
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md`,
+  `make fidelity`, and `cargo run -- --live-smoke` (`saw_attract: true`,
+  `saw_credit: true`, `saw_playing: true`, `clean_exit: true`).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778325900638199`

@@ -1,17 +1,16 @@
 # Refactor Freeze
 
-This file is the `DC-23` future-refactor contract. The broad module-split
-refactor is deferred until the game is fully ROM-complete and playable and the
-post-acceptance `wgpu` presentation backend has been accepted. After those
-acceptance gates, the refactor may move code between modules, but it must not
-change the observable red-label behavior listed here unless `SPEC.md`,
-`PLAN.md`, and the relevant fidelity gap record are updated first.
+This file is the `DC-23` refactor contract. The broad module-split refactor was
+deferred until the game was fully ROM-complete and playable and the
+post-acceptance `wgpu` presentation backend was accepted. Those acceptance gates
+are now complete, and the refactor is active on `red-label-refactor`. Refactor
+slices may move code between modules, but they must not change the observable
+red-label behavior listed here unless `SPEC.md`, `PLAN.md`, and the relevant
+fidelity gap record are updated first.
 
 ## Frozen Validation Suite
 
-After final acceptance is complete, run this suite before the `wgpu`
-presentation backend, before the first refactor slice, and after every
-meaningful module split:
+After final acceptance, run this suite before every meaningful module split:
 
 ```sh
 make fidelity
@@ -36,6 +35,8 @@ Important focused filters for the first refactor slices:
 - `cargo test public_arcade_api --all-targets`
 - `cargo test snapshot_restore --all-targets`
 - `cargo test save_state_restore --all-targets`
+- `cargo test machine_process::tests --all-targets`
+- `cargo test process_scheduler --all-targets`
 - `cargo test trace_text_ --all-targets`
 - `cargo test native_video_fixture --all-targets`
 - `cargo test sound_ --all-targets`
@@ -83,7 +84,18 @@ have a source-backed use, a focused test, and documentation here.
 
 ## Module Boundaries
 
-Target module ownership for the large refactor:
+Current accepted boundaries on `red-label-refactor`:
+
+- `src/machine_state.rs` owns data-only arcade-core state and frame-output
+  contracts: public snapshots, player/score state, high-score entry state,
+  trace state, compatibility flags, machine events, and `FrameOutput`.
+- `src/machine_process.rs` owns scheduler data contracts:
+  `RedLabelCpuRegisters` and `RedLabelScheduledProcess`.
+- `src/machine.rs` re-exports those contracts to preserve existing
+  `machine::...` import paths while the source-shaped runtime remains in that
+  module.
+
+Target module ownership for the continuing large refactor:
 
 - CPU and board: `src/board.rs`, `src/pia.rs`, `src/rom.rs`, and the
   board-facing parts of `src/machine.rs`.

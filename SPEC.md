@@ -508,10 +508,13 @@ Kitty-compatible live smoke with boot, credit, one-player start, movement,
 fire, smart bomb, hyperspace, and clean quit. No active ROM-complete or
 playability blocker remains open.
 
-The next planned work is a post-acceptance `wgpu` presentation backend behind
-a stable native-frame/input boundary. The large module-split refactor remains
-prohibited until both Phase 11 final acceptance and the `wgpu` presentation
-backend acceptance are complete.
+The post-acceptance `wgpu` presentation backend was accepted after Phase 11.
+The large module-split refactor may now proceed only as behavior-preserving
+dev-cycles on `red-label-refactor`. The first accepted boundaries are
+`src/machine_state.rs` for data-only state/frame-output contracts and
+`src/machine_process.rs` for scheduler data contracts. `src/machine.rs`
+continues to re-export those public contracts while source-derived scheduler,
+runtime, and process behavior is split in narrow tested slices.
 
 ### Drift And Cleanup Items
 
@@ -1435,9 +1438,9 @@ the same observable contract:
 - `ArcadeMachine::save_state()`.
 - `ArcadeMachine::restore_state(state)`.
 
-`docs/fidelity/refactor-freeze.md` owns the `DC-23` future-refactor contract:
-the validation suite, module boundaries, and byte-compatible surfaces that must
-remain stable during the large refactor after final acceptance is complete.
+`docs/fidelity/refactor-freeze.md` owns the `DC-23` refactor contract: the
+validation suite, active module boundaries, and byte-compatible surfaces that
+must remain stable during the large refactor after final acceptance.
 
 ### Compatibility Layer
 

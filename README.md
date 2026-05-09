@@ -313,13 +313,17 @@ compatibility behavior.
   CPU/IRQ cycle ownership, physical advance/lamp timing, full watchdog timeout
   side effects, complete decoder PROM hardware behavior, and remaining
   scheduler/golden-trace equivalence are still explicit fidelity gaps.
-- `DC-23` freezes the API and future-refactor validation contract in
-  `docs/fidelity/refactor-freeze.md`. The large module-split refactor is
-  deferred until the game is fully ROM-complete and playable. `ArcadeMachine`
-  now explicitly exposes `new`, `reset`, `step`, `snapshot`, `restore`, and
-  full `save_state` / `restore_state` behavior for that later refactor, with a
-  focused reset/API unit test proving reset returns to the same observable
-  state as `new`.
+- `DC-23` freezes the API and refactor validation contract in
+  `docs/fidelity/refactor-freeze.md`. After Phase 11 final acceptance and
+  Phase 12 `wgpu` acceptance, the large module-split refactor began on
+  `red-label-refactor`. The first stable boundaries are
+  `src/machine_state.rs` for data-only state/frame-output contracts and
+  `src/machine_process.rs` for scheduler data contracts; `src/machine.rs`
+  still re-exports those contracts so existing `machine::...` imports stay
+  stable. `ArcadeMachine` explicitly exposes `new`, `reset`, `step`,
+  `snapshot`, `restore`, and full `save_state` / `restore_state` behavior for
+  the refactor, with reset/API tests proving reset returns to the same
+  observable state as `new`.
 - `ArcadeMachine::step` returns post-frame main-board and sound-board snapshots
   on `FrameOutput`. Tests now lock the input-port bytes, main RAM/CMOS CRCs,
   palette RAM, hardware map, watchdog count, video-counter sample, sound latch,
@@ -649,9 +653,11 @@ compatibility behavior.
 - Phase 11 final acceptance has passed for the accepted red-label target: the
   full fidelity gate, all promoted local reference fixtures, README media
   generation, release build, ROM report/verification, short fidelity trace, and
-  forced Kitty-compatible live smoke all pass. The next planned work is the
-  post-acceptance `wgpu` presentation backend; the broad module-split refactor
-  stays deferred until after that renderer path is accepted.
+  forced Kitty-compatible live smoke all pass. Phase 12 accepted the
+  post-acceptance `wgpu` presentation backend. The current follow-on work is
+  the behavior-preserving module split on `red-label-refactor`; each dev-cycle
+  must keep the existing red-label core behavior and accepted `wgpu` live-smoke
+  evidence unchanged.
 
 ## SonarQube
 
