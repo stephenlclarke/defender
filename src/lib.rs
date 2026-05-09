@@ -14,6 +14,7 @@ pub mod input;
 pub mod kitty;
 pub mod live;
 pub mod machine;
+pub(crate) mod machine_process;
 pub(crate) mod machine_state;
 pub mod pia;
 pub mod presentation;

@@ -37,6 +37,7 @@ use crate::{
     },
 };
 
+pub use crate::machine_process::{RedLabelCpuRegisters, RedLabelScheduledProcess};
 pub use crate::machine_state::{
     CompatibilityState, FrameOutput, GamePhase, HighScoreEntryState, HighScoreSubmissionState,
     MachineEvent, MachineSnapshot, PlayerState, RED_LABEL_INITIALS_ENTRY_CHARS,
@@ -447,47 +448,7 @@ struct LiveStartSwitchOutcome {
     game_started: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct RedLabelCpuRegisters {
-    pub a: Option<u8>,
-    pub b: Option<u8>,
-    pub x: Option<u16>,
-    pub y: Option<u16>,
-    pub u: Option<u16>,
-    pub s: Option<u16>,
-    pub cc: Option<u8>,
-}
-
-impl RedLabelCpuRegisters {
-    pub const fn from_source_disp(process_address: u16) -> Self {
-        Self {
-            a: None,
-            b: None,
-            x: None,
-            y: None,
-            u: Some(process_address),
-            s: None,
-            cc: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RedLabelScheduledProcess {
-    pub process_address: u16,
-    pub routine_address: u16,
-    pub entry_registers: RedLabelCpuRegisters,
-}
-
 impl RedLabelScheduledProcess {
-    pub const fn from_source_disp(process_address: u16, routine_address: u16) -> Self {
-        Self {
-            process_address,
-            routine_address,
-            entry_registers: RedLabelCpuRegisters::from_source_disp(process_address),
-        }
-    }
-
     pub fn from_source_routine(process_address: u16, routine_address: u16) -> Result<Self, String> {
         Ok(Self {
             process_address,

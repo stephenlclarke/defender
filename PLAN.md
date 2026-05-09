@@ -4115,7 +4115,8 @@ Steps:
   `machine.rs`.
 - [x] DC-33.2 Run the full characterization and final acceptance gates for the
   first refactor slice.
-- [ ] DC-33.3 Keep subsequent public surfaces narrow and source-cited.
+- [x] DC-33.3 Keep the scheduler contract public surface narrow while moving
+  it behind an internal module boundary.
 - [ ] DC-33.4 Remove dead scaffold paths only after tests prove exact
   replacements.
 - [ ] DC-33.5 Update docs after each module boundary becomes stable.
@@ -4142,3 +4143,20 @@ Work log:
   `clean_exit: true`).
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778323104902169`
+- `2026-05-09 11:40:57 BST` Started `DC-33.3`: moving the
+  register-aware scheduled-process data contracts behind a narrow internal
+  module while preserving the existing `machine::...` public import path and
+  leaving source-derived scheduler behavior in `machine.rs`.
+- `2026-05-09 11:45:15 BST` Completed `DC-33.3`: added
+  `src/machine_process.rs`, moved `RedLabelCpuRegisters` and
+  `RedLabelScheduledProcess` into that internal module, kept their public path
+  stable through `machine` re-exports, and added focused constructor tests for
+  the moved scheduler contracts. Source-derived routine resolution and context
+  validation stay in `machine.rs` because they depend on the translated routine
+  table. Validation passed with `cargo fmt --check`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`,
+  `cargo test --all-targets -- --ignored`, and `cargo run -- --live-smoke`
+  (`saw_attract: true`, `saw_credit: true`, `saw_playing: true`,
+  `clean_exit: true`).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778323537340449`
