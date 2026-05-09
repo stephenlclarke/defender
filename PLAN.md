@@ -20,10 +20,12 @@ the communication protocol for each completed step.
   cycle and step number, changed files, tests run, and any skipped validation.
 - If Slack is unavailable, add a `Slack pending` note under the step and post it
   as soon as the integration is available.
-- Each completed dev-cycle must result in a push to the `red-label` branch.
-  When a step is delivered independently, commit and push that step before
-  starting the next independent step. Commit messages must use Conventional
-  Commits format and reference the completed dev-cycle or step, for example
+- Each completed dev-cycle must result in a push to the active branch named by
+  that cycle. The default completion branch is `red-label`; Phase 13 refactor
+  work is delivered on `red-label-refactor`. When a step is delivered
+  independently, commit and push that step before starting the next independent
+  step. Commit messages must use Conventional Commits format and reference the
+  completed dev-cycle or step, for example
   `test: add mutation snapshots for DC-02.1`.
 - New code must include focused unit tests. Coverage does not need to reach
   100%, but new behavior must be covered at the routine boundary or public API
@@ -32,10 +34,11 @@ the communication protocol for each completed step.
   only returned values. RAM, CMOS, video RAM, palette RAM, process-list,
   object-list, shell-list, sound-command, scheduler, and snapshot mutations
   should be checked with before/after assertions or golden traces.
-- The large refactor must not start until final ROM-complete playable
-  acceptance is complete. The refactor freeze created in `DC-23` remains a
-  contract for later work, not permission to begin module splitting while
-  fidelity gaps remain open.
+- The large refactor must preserve the final ROM-complete playable acceptance
+  surface. Phase 13 may split modules only under the `DC-23` refactor contract:
+  every slice must keep traces, byte mutations, video, audio, session behavior,
+  and `wgpu` smoke evidence unchanged unless a new gap/spec update explicitly
+  permits a behavior change.
 - Keep `make fidelity` as the broad local gate when practical. If only a
   narrower command is run, record why in the work log.
 - Do not check generated ROM payloads or MAME-derived golden traces into the
@@ -4191,3 +4194,291 @@ Work log:
   `saw_credit: true`, `saw_playing: true`, `clean_exit: true`).
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778325900638199`
+
+### Phase 13 Refactor Roadmap
+
+These refactor dev-cycles are behavior-preserving slices on
+`red-label-refactor`. Each cycle must start with a timestamped work-log note,
+finish with a Slack update to `xyzzytools.slack.com#codex`, and push a
+Conventional Commit that references the completed dev-cycle or step.
+
+Refactor rules:
+
+- Move one ownership boundary per dev-cycle. Do not mix scheduler, memory,
+  video, sound, and session rewrites in the same commit.
+- Keep existing public imports stable through `machine` re-exports until a
+  separate API cleanup cycle removes or renames them.
+- Add focused tests for any newly public helper, moved boundary, or removed
+  compatibility path.
+- Run the focused tests named in `docs/fidelity/refactor-freeze.md` before the
+  broad gate. Run `make fidelity` and `cargo run -- --live-smoke` before
+  closing each material behavior-adjacent slice.
+- Do not introduce threaded, async, or broad idiomatic rewrites until the
+  source-shaped module boundaries are stable and the trace/snapshot acceptance
+  gate still passes.
+
+### DC-34: Scheduler And Process Routing Extraction
+
+Status: `planned`
+
+Goal: move source-shaped scheduler primitives out of `machine.rs` while leaving
+translated process bodies and routine-address dispatch behavior unchanged.
+
+Steps:
+
+- [ ] DC-34.1 Inventory scheduler-owned functions and constants: process and
+  super-process allocation, sleep, suicide/kill, due-process selection,
+  executive iteration, routine-address context checks, switch-process queueing,
+  and dispatch entrypoints.
+- [ ] DC-34.2 Create a narrow scheduler module boundary, expected to be
+  `src/machine_scheduler.rs`, and move only scheduler data-flow helpers that do
+  not depend on gameplay-specific process bodies.
+- [ ] DC-34.3 Keep translated routine bodies in their current module until
+  later process-family cycles; scheduler extraction must not change routine
+  ordering, register context, process-list bytes, or sleep cadence.
+- [ ] DC-34.4 Add or preserve focused tests for `process_scheduler`,
+  `scheduled_process`, `executive_iteration`, `sleep_current_process`,
+  `kill_process`, switch queueing, and live credited-start process dispatch.
+- [ ] DC-34.5 Update docs after the scheduler boundary is stable, then run the
+  DC-34 completion gate.
+
+Completion gate: `cargo fmt --check`, focused scheduler/process tests,
+`cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+`make fidelity`, and `cargo run -- --live-smoke` all pass with unchanged
+attract, credit, playing, and clean-exit evidence.
+
+Work log:
+
+- Pending.
+
+### DC-35: Runtime Memory And Source RAM Boundary
+
+Status: `planned`
+
+Goal: isolate source-owned RAM, CMOS, list, and snapshot mutation helpers so
+later process-family modules can depend on an explicit memory boundary instead
+of reaching through unrelated `machine.rs` internals.
+
+Steps:
+
+- [ ] DC-35.1 Inventory source-owned memory helpers: main RAM, CMOS, palette
+  RAM, hardware map, table-backed state, process/super-process/object/shell
+  lists, scanner scratch, high-score RAM, and restore/save-state surfaces.
+- [ ] DC-35.2 Create a memory boundary, expected to be
+  `src/machine_memory.rs`, for byte-compatible read/write helpers and list
+  mutation primitives that are currently embedded in `machine.rs`.
+- [ ] DC-35.3 Preserve `ArcadeMachine::snapshot`, `restore`, `save_state`,
+  `restore_state`, `reset`, and replay behavior through existing public APIs.
+- [ ] DC-35.4 Add or preserve focused mutation tests for process lists, object
+  lists, shell lists, CMOS/high-score state, palette RAM, trace CRC helpers,
+  save/restore, and public reset contracts.
+- [ ] DC-35.5 Update docs after the memory boundary is stable, then run the
+  DC-35 completion gate.
+
+Completion gate: focused snapshot/restore/list-memory tests,
+`cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+`make fidelity`, and `cargo run -- --live-smoke` pass without trace, CRC,
+snapshot, CMOS, or list-mutation drift.
+
+Work log:
+
+- Pending.
+
+### DC-36: Video, Picture, Terrain, And Scanner Boundary
+
+Status: `planned`
+
+Goal: split native video-frame construction and source-shaped drawing helpers
+from gameplay/session logic while preserving every accepted pixel and live
+presentation fixture.
+
+Steps:
+
+- [ ] DC-36.1 Inventory video-owned helpers: visible frame construction,
+  palette/color mapping, picture descriptor output/erase, Williams title logo,
+  high-score logo, terrain generation/output, scanner drawing, star output,
+  explosion/appearance drawing, and native pixel CRC helpers.
+- [ ] DC-36.2 Create a video boundary, expected to be
+  `src/machine_video.rs`, for source-shaped drawing helpers that currently live
+  in `machine.rs`; keep renderer-only scaling in `video`, `live`, `kitty`, and
+  `wgpu_presenter`.
+- [ ] DC-36.3 Preserve the accepted Williams startup, high-score, attract,
+  credited gameplay, laser beam, reverse, terrain, scanner, and no-trail
+  regressions.
+- [ ] DC-36.4 Add or preserve focused tests for native video fixtures,
+  visible-pixel CRCs, terrain/scanner output, picture descriptor mutations,
+  Williams wordmark coalescence, and live rendered smoke evidence.
+- [ ] DC-36.5 Update docs after the video boundary is stable, then run the
+  DC-36 completion gate.
+
+Completion gate: focused video/live-render tests, `cargo test --all-targets`,
+`cargo clippy --all-targets -- -D warnings`, `make fidelity`, README media
+generation if affected, and `cargo run -- --live-smoke` pass without pixel,
+terrain, scanner, or presentation drift.
+
+Work log:
+
+- Pending.
+
+### DC-37: Sound Command And Sound-Board Boundary
+
+Status: `planned`
+
+Goal: isolate red-label sound command production and sound-board state plumbing
+from gameplay process bodies without changing source command ordering or DAC
+fixture behavior.
+
+Steps:
+
+- [ ] DC-37.1 Inventory sound-owned helpers: direct sound commands, table
+  sound sequences, thrust gates, command-latch state, sound-board snapshots,
+  PIA CB1/IRQ interactions, and fixture/export helpers.
+- [ ] DC-37.2 Create a machine-sound boundary, expected to be
+  `src/machine_sound.rs`, for main-board sound command surfaces that are not
+  already owned by `src/sound.rs`.
+- [ ] DC-37.3 Keep source command priority, idle writes, latch timing, and
+  trace-visible sound-command rows unchanged.
+- [ ] DC-37.4 Add or preserve focused tests for `sound_`, direct/table/thrust
+  command sequence fixtures, sound-board snapshot replay, and live thrust/fire
+  command propagation.
+- [ ] DC-37.5 Update docs after the sound boundary is stable, then run the
+  DC-37 completion gate.
+
+Completion gate: focused sound tests, `cargo test --all-targets`,
+`cargo clippy --all-targets -- -D warnings`, `make fidelity`, and
+`cargo run -- --live-smoke` pass without trace sound-command or sound-board
+snapshot drift.
+
+Work log:
+
+- Pending.
+
+### DC-38: Session, Credits, High Scores, And Operator Boundary
+
+Status: `planned`
+
+Goal: separate cabinet/session flow from low-level process scheduling while
+preserving operator-visible behavior and public arcade APIs.
+
+Steps:
+
+- [ ] DC-38.1 Inventory session-owned behavior: coin/start flow, one/two-player
+  setup, player switching, high-score entry, CMOS persistence, diagnostics,
+  audits, operator controls, and compatibility overlays.
+- [ ] DC-38.2 Create a session boundary, expected to be
+  `src/machine_session.rs`, for session/high-score/operator helpers that can
+  move without altering process scheduling or runtime memory contracts.
+- [ ] DC-38.3 Preserve current input profiles, keyboard mapping, public
+  `ArcadeMachine` APIs, CMOS file storage behavior, high-score reset paths, and
+  `xyzzy` disabled/enabled hook tests.
+- [ ] DC-38.4 Add or preserve focused tests for credit/start/session fixtures,
+  high-score submission, two-player state, operator/audit flow, CMOS
+  persistence, public reset/save/restore, and compatibility overlay behavior.
+- [ ] DC-38.5 Update docs after the session boundary is stable, then run the
+  DC-38 completion gate.
+
+Completion gate: focused session/operator/API tests, `cargo test --all-targets`,
+`cargo clippy --all-targets -- -D warnings`, `make fidelity`, README help or
+keyboard docs if affected, and `cargo run -- --live-smoke` pass with unchanged
+start, credit, high-score, CMOS, and operator behavior.
+
+Work log:
+
+- Pending.
+
+### DC-39: Player, Projectile, And Collision Process Families
+
+Status: `planned`
+
+Goal: move gameplay process families in small source-shaped groups after the
+scheduler, memory, video, sound, and session boundaries exist.
+
+Steps:
+
+- [ ] DC-39.1 Move player control, thrust, reverse, hyperspace, death,
+  respawn, and player-display helpers into a focused process-family module.
+- [ ] DC-39.2 Move laser, smart-bomb, shell, collision, explosion, and scoring
+  helpers only after player-process mutations remain stable.
+- [ ] DC-39.3 Preserve source routine-address dispatch, object/shell list
+  mutations, `FrameOutput`, sound commands, and live rendered laser-beam
+  behavior.
+- [ ] DC-39.4 Add or preserve focused tests for player runtime, movement,
+  fire/reverse/hyperspace/smart-bomb, shell collision, scoring, death/respawn,
+  save/restore, and local reference scenarios.
+- [ ] DC-39.5 Update docs after each process-family boundary is stable, then
+  run the DC-39 completion gate.
+
+Completion gate: focused gameplay/process tests, all promoted local reference
+fixtures, `cargo test --all-targets`, clippy with warnings-as-errors,
+`make fidelity`, and `cargo run -- --live-smoke` pass without mutation, video,
+audio, or session drift.
+
+Work log:
+
+- Pending.
+
+### DC-40: Enemy, World, Attract, And Wave Process Families
+
+Status: `planned`
+
+Goal: finish the source-shaped process-family split for enemies, world state,
+attract scenes, and wave progression without changing accepted playability.
+
+Steps:
+
+- [ ] DC-40.1 Move lander, mutant, bomber, pod, swarmer, baiter, tie, UFO,
+  astronaut, human-rescue, and target-selection helpers in bounded families.
+- [ ] DC-40.2 Move terrain/world progression, wave launch/advance, planet
+  destruction, scanner enemy visibility, and attract instruction/action scenes
+  only after their fixtures are green.
+- [ ] DC-40.3 Preserve enemy counts, wave tables, object/shell/process list
+  mutations, terrain/video CRCs, attract action visuals, and scoring/sound
+  side effects.
+- [ ] DC-40.4 Add or preserve focused tests for every moved enemy/world family,
+  attract action sequence, wave advance, planet destruction, human rescue, and
+  local MAME reference scenario.
+- [ ] DC-40.5 Update docs after each family boundary is stable, then run the
+  DC-40 completion gate.
+
+Completion gate: focused enemy/world/attract tests, all promoted local
+reference fixtures, `cargo test --all-targets`, clippy with warnings-as-errors,
+`make fidelity`, and `cargo run -- --live-smoke` pass without trace,
+object-list, pixel, audio, attract, or gameplay drift.
+
+Work log:
+
+- Pending.
+
+### DC-41: Refactor Acceptance, API Cleanup, And Merge Preparation
+
+Status: `planned`
+
+Goal: close Phase 13 by proving the refactored tree is behavior-equivalent,
+removing only dead compatibility paths that tests prove obsolete, and preparing
+the branch for review/merge.
+
+Steps:
+
+- [ ] DC-41.1 Audit `machine.rs` after all planned splits and identify any
+  remaining oversized regions, stale compatibility exports, duplicate helpers,
+  or docs that still describe pre-refactor ownership.
+- [ ] DC-41.2 Remove or narrow public re-exports only when no crate-facing
+  caller depends on them and tests prove the replacement path.
+- [ ] DC-41.3 Run final behavior-equivalence evidence: full fidelity gate,
+  promoted local reference fixtures, `wgpu` live smoke, Kitty compatibility
+  smoke when practical, ROM report/verification, and README media generation if
+  visuals or docs changed.
+- [ ] DC-41.4 Update `README.md`, `SPEC.md`,
+  `docs/fidelity/refactor-freeze.md`, and this plan with final module
+  ownership, validation evidence, and any deliberately deferred cleanup.
+- [ ] DC-41.5 Push the final Phase 13 branch state and report the acceptance
+  summary to Slack.
+
+Completion gate: the refactored source tree has no undocumented behavior drift,
+no obsolete compatibility path without an explicit reason, green full fidelity
+and live-smoke evidence, updated docs, a clean worktree, and a pushed
+Conventional Commit trail on `red-label-refactor`.
+
+Work log:
+
+- Pending.
