@@ -4096,22 +4096,26 @@ Work log:
 
 ### DC-33: Module Split And Behavior Preservation
 
-Status: `pending`
+Status: `in_progress`
 
 Prerequisite: `DC-31` and `DC-32` are complete. The large refactor can begin
 next, but must keep the completed red-label core behavior and accepted `wgpu`
 presentation path unchanged unless a new dev-cycle explicitly changes them.
+
+Branch: `red-label-refactor`, created from `red-label-wgpu` after the DC-32
+smoke/CLI hardening patch was pushed.
 
 Goal: split the large translated core safely without changing completed
 behavior.
 
 Steps:
 
-- [ ] DC-33.1 Move code in small ownership-based slices with no unrelated
-  rewrites.
-- [ ] DC-33.2 Run the full characterization and final acceptance gates after
-  every slice.
-- [ ] DC-33.3 Keep public surfaces narrow and source-cited.
+- [x] DC-33.1 Move the first ownership-based slice with no unrelated rewrites:
+  split data-only machine state and frame-output contracts out of
+  `machine.rs`.
+- [x] DC-33.2 Run the full characterization and final acceptance gates for the
+  first refactor slice.
+- [ ] DC-33.3 Keep subsequent public surfaces narrow and source-cited.
 - [ ] DC-33.4 Remove dead scaffold paths only after tests prove exact
   replacements.
 - [ ] DC-33.5 Update docs after each module boundary becomes stable.
@@ -4120,3 +4124,21 @@ Completion gate: the refactored code produces the same traces, byte mutations,
 pixel fixtures, audio fixtures, live/session behavior, and release evidence as
 the `DC-31` completed implementation and the `DC-32` accepted `wgpu`
 presentation backend.
+
+Work log:
+
+- `2026-05-09 11:26:30 BST` Started `DC-33.1` on new branch
+  `red-label-refactor`: beginning the large refactor with a narrow
+  ownership-based slice that moves data-only machine state/output types behind
+  stable `machine` re-exports, with no behavior changes intended.
+- `2026-05-09 11:37:04 BST` Completed `DC-33.1` and `DC-33.2`: added
+  `src/machine_state.rs`, moved data-only machine state, snapshot, event, and
+  frame-output contracts out of `machine.rs`, and re-exported them from
+  `machine` to keep existing call sites and public imports stable. Validation
+  passed with `cargo fmt --check`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`,
+  `cargo test --all-targets -- --ignored`, and `cargo run -- --live-smoke`
+  (`saw_attract: true`, `saw_credit: true`, `saw_playing: true`,
+  `clean_exit: true`).
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778323104902169`
