@@ -49,7 +49,6 @@ behavior and the BBC Micro `Planetoid` key mapping.
 Run targets:
 
 - `cargo run`
-- `cargo run -- --mute`
 - `cargo run -- --renderer wgpu`
 - `cargo run -- --renderer kitty`
 - `cargo run -- --live-smoke`
@@ -65,15 +64,10 @@ Run targets:
 - `cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference`
 - `cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference`
 - `make run`
-- `make run-muted`
 - `make run-wgpu`
-- `make run-wgpu-muted`
 - `make run-kitty`
-- `make run-kitty-muted`
 - `make live-wgpu`
-- `make live-wgpu-muted`
 - `make live-kitty`
-- `make live-kitty-muted`
 - `make smoke-wgpu`
 - `make trace-script-test`
 - `make trace-fixtures`
@@ -130,7 +124,6 @@ Install directly from git with Cargo:
 After installation, run the clean-slate runtime and tooling with:
 
 - `defender`
-- `defender --mute`
 - `defender --renderer wgpu`
 - `defender --renderer kitty`
 - `defender --live-smoke`
@@ -1005,6 +998,10 @@ graphics protocol: launch `cargo run -- --renderer kitty` / `defender
 `ghostty`, `warp`, or a compatible emulator. If your terminal supports the
 protocol but is not recognised by name, set `DEFENDER_FORCE_KITTY=1` to bypass
 the terminal-name guard.
+
+Live audio output is not implemented yet. Sound fidelity is currently covered by
+source-visible command traces and deterministic DAC byte signatures, so the
+runtime does not expose audio or mute controls.
 
 Non-interactive tooling paths such as `--rom-report`, `--verify-roms`,
 `--fidelity-trace`, `--fidelity-trace-inputs-file`, and

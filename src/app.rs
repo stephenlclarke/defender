@@ -23,7 +23,6 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
     PlayLive {
-        play_audio: bool,
         input_profile: InputProfile,
         presentation_backend: PresentationBackend,
         live_smoke: bool,
@@ -74,7 +73,6 @@ pub fn run() -> Result<()> {
 fn run_command(command: Command) -> Result<()> {
     match command {
         Command::PlayLive {
-            play_audio,
             input_profile,
             presentation_backend,
             live_smoke,
@@ -88,12 +86,7 @@ fn run_command(command: Command) -> Result<()> {
                 print!("{}", report.to_text());
                 Ok(())
             } else {
-                run_live(
-                    play_audio,
-                    input_profile,
-                    presentation_backend,
-                    cmos_path.as_deref(),
-                )
+                run_live(input_profile, presentation_backend, cmos_path.as_deref())
             }
         }
         Command::RomReport { path } => run_rom_report(path.as_deref()),
@@ -736,7 +729,6 @@ fn parse_args<I>(args: I) -> Result<Command>
 where
     I: IntoIterator<Item = String>,
 {
-    let mut play_audio = true;
     let mut input_profile = InputProfile::default();
     let mut presentation_backend = PresentationBackend::default();
     let mut live_smoke = false;
@@ -746,7 +738,9 @@ where
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => return Ok(Command::Help),
-            "--mute" => play_audio = false,
+            "--mute" => {
+                bail!("--mute is not supported because live audio output is not implemented")
+            }
             "--live-smoke" => live_smoke = true,
             "--input-profile" => {
                 let Some(value) = args.next() else {
@@ -887,7 +881,6 @@ where
     }
 
     Ok(Command::PlayLive {
-        play_audio,
         input_profile,
         presentation_backend,
         live_smoke,
@@ -911,7 +904,7 @@ fn print_help() {
 }
 
 fn help_text() -> &'static str {
-    "defender\n  cargo run\n  cargo run -- --mute\n  cargo run -- --renderer wgpu\n  cargo run -- --renderer kitty\n  cargo run -- --live-smoke\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play defaults to the windowed wgpu backend; Kitty graphics remains available with --renderer kitty.\n"
+    "defender\n  cargo run\n  cargo run -- --renderer wgpu\n  cargo run -- --renderer kitty\n  cargo run -- --live-smoke\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play defaults to the windowed wgpu backend; Kitty graphics remains available with --renderer kitty.\n"
 }
 
 #[cfg(test)]
@@ -980,12 +973,11 @@ mod tests {
     }
 
     #[test]
-    fn parse_args_defaults_to_live_planetoid_audio() {
+    fn parse_args_defaults_to_live_planetoid() {
         let command = parse_args(Vec::<String>::new()).expect("parse args");
         assert_eq!(
             command,
             Command::PlayLive {
-                play_audio: true,
                 input_profile: InputProfile::Planetoid,
                 presentation_backend: PresentationBackend::Wgpu,
                 live_smoke: false,
@@ -995,58 +987,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_args_accepts_mute_and_profile() {
-        let command = parse_args(vec![
-            String::from("--mute"),
-            String::from("--input-profile"),
-            String::from("cabinet"),
-        ])
-        .expect("parse args");
+    fn parse_args_rejects_unsupported_mute_audio_flag() {
+        let error = parse_args(vec![String::from("--mute")]).expect_err("mute is unsupported");
 
-        assert_eq!(
-            command,
-            Command::PlayLive {
-                play_audio: false,
-                input_profile: InputProfile::Cabinet,
-                presentation_backend: PresentationBackend::Wgpu,
-                live_smoke: false,
-                cmos_path: None,
-            }
+        assert!(
+            error
+                .to_string()
+                .contains("live audio output is not implemented")
         );
-    }
-
-    #[test]
-    fn parse_args_mute_changes_only_live_audio_output_flag() {
-        let audible = parse_args(Vec::<String>::new()).expect("parse audible args");
-        let muted = parse_args(vec![String::from("--mute")]).expect("parse muted args");
-
-        let Command::PlayLive {
-            play_audio: audible_audio,
-            input_profile: audible_profile,
-            presentation_backend: audible_backend,
-            live_smoke: audible_smoke,
-            cmos_path: audible_cmos,
-        } = audible
-        else {
-            panic!("default command should play live");
-        };
-        let Command::PlayLive {
-            play_audio: muted_audio,
-            input_profile: muted_profile,
-            presentation_backend: muted_backend,
-            live_smoke: muted_smoke,
-            cmos_path: muted_cmos,
-        } = muted
-        else {
-            panic!("muted command should play live");
-        };
-
-        assert!(audible_audio);
-        assert!(!muted_audio);
-        assert_eq!(audible_profile, muted_profile);
-        assert_eq!(audible_backend, muted_backend);
-        assert_eq!(audible_smoke, muted_smoke);
-        assert_eq!(audible_cmos, muted_cmos);
     }
 
     #[test]
@@ -1062,7 +1010,6 @@ mod tests {
         assert_eq!(
             command,
             Command::PlayLive {
-                play_audio: true,
                 input_profile: InputProfile::Cabinet,
                 presentation_backend: PresentationBackend::Wgpu,
                 live_smoke: false,
@@ -1078,7 +1025,6 @@ mod tests {
         assert_eq!(
             command,
             Command::PlayLive {
-                play_audio: true,
                 input_profile: InputProfile::Planetoid,
                 presentation_backend: PresentationBackend::Wgpu,
                 live_smoke: true,
@@ -1098,7 +1044,6 @@ mod tests {
         assert_eq!(
             command,
             Command::PlayLive {
-                play_audio: true,
                 input_profile: InputProfile::Planetoid,
                 presentation_backend: PresentationBackend::Wgpu,
                 live_smoke: false,
@@ -1110,7 +1055,6 @@ mod tests {
     #[test]
     fn run_command_executes_wgpu_live_smoke_stub() {
         run_command(Command::PlayLive {
-            play_audio: true,
             input_profile: InputProfile::Planetoid,
             presentation_backend: PresentationBackend::Wgpu,
             live_smoke: true,
@@ -1122,7 +1066,6 @@ mod tests {
     #[test]
     fn run_command_rejects_live_smoke_with_non_wgpu_backend() {
         let error = run_command(Command::PlayLive {
-            play_audio: true,
             input_profile: InputProfile::Planetoid,
             presentation_backend: PresentationBackend::Kitty,
             live_smoke: true,
@@ -1136,7 +1079,6 @@ mod tests {
     #[test]
     fn run_command_dispatches_normal_live_backend() {
         run_command(Command::PlayLive {
-            play_audio: false,
             input_profile: InputProfile::Cabinet,
             presentation_backend: PresentationBackend::Kitty,
             live_smoke: false,
@@ -1408,6 +1350,7 @@ mod tests {
         assert!(text.contains("--renderer kitty"));
         assert!(text.contains("--renderer wgpu"));
         assert!(text.contains("--live-smoke"));
+        assert!(!text.contains("--mute"));
         assert!(text.contains("--verify-roms"));
         assert!(text.contains("--fidelity-trace 300"));
         assert!(text.contains("--fidelity-trace-inputs"));

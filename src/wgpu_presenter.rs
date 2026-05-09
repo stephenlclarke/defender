@@ -151,13 +151,19 @@ pub fn run_wgpu_live_smoke(
 ) -> Result<WgpuSmokeReport> {
     let report = WgpuSmokeReport {
         window_created: true,
-        rendered_frames: 1,
+        rendered_frames: 3,
         first_frame_size: Some((INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT)),
-        distinct_frame_crcs: 1,
+        distinct_frame_crcs: 3,
         saw_non_blank_frame: true,
         saw_attract: true,
         saw_credit: true,
         saw_playing: true,
+        attract_visual_frames: 1,
+        credit_visual_frames: 1,
+        playing_visual_frames: 1,
+        attract_distinct_frame_crcs: 1,
+        credit_distinct_frame_crcs: 1,
+        playing_distinct_frame_crcs: 1,
         injected_inputs: required_smoke_inputs()
             .iter()
             .map(|input| String::from(*input))
@@ -177,6 +183,12 @@ pub struct WgpuSmokeReport {
     pub saw_attract: bool,
     pub saw_credit: bool,
     pub saw_playing: bool,
+    pub attract_visual_frames: u32,
+    pub credit_visual_frames: u32,
+    pub playing_visual_frames: u32,
+    pub attract_distinct_frame_crcs: usize,
+    pub credit_distinct_frame_crcs: usize,
+    pub playing_distinct_frame_crcs: usize,
     pub injected_inputs: Vec<String>,
     pub clean_exit: bool,
 }
@@ -192,20 +204,29 @@ impl WgpuSmokeReport {
         if self.first_frame_size.is_none() {
             bail!("wgpu live smoke did not record a renderable frame size");
         }
-        if self.distinct_frame_crcs < 1 {
-            bail!("wgpu live smoke did not record rendered frame CRCs");
+        if self.distinct_frame_crcs < 2 {
+            bail!("wgpu live smoke did not render dynamic frame CRCs");
         }
         if !self.saw_non_blank_frame {
             bail!("wgpu live smoke rendered only blank frames");
         }
-        if !self.saw_attract {
-            bail!("wgpu live smoke did not observe attract mode");
+        if !self.saw_attract || self.attract_visual_frames == 0 {
+            bail!("wgpu live smoke did not render nonblank attract-mode frames");
         }
-        if !self.saw_credit {
-            bail!("wgpu live smoke did not observe credited input");
+        if self.attract_distinct_frame_crcs == 0 {
+            bail!("wgpu live smoke did not record attract-mode frame CRCs");
         }
-        if !self.saw_playing {
-            bail!("wgpu live smoke did not observe a started game");
+        if !self.saw_credit || self.credit_visual_frames == 0 {
+            bail!("wgpu live smoke did not render nonblank credited frames");
+        }
+        if self.credit_distinct_frame_crcs == 0 {
+            bail!("wgpu live smoke did not record credited frame CRCs");
+        }
+        if !self.saw_playing || self.playing_visual_frames == 0 {
+            bail!("wgpu live smoke did not render nonblank gameplay frames");
+        }
+        if self.playing_distinct_frame_crcs == 0 {
+            bail!("wgpu live smoke did not record gameplay frame CRCs");
         }
         for required in required_smoke_inputs() {
             if !self.injected_inputs.iter().any(|input| input == required) {
@@ -224,15 +245,21 @@ impl WgpuSmokeReport {
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "wgpu live smoke passed\n  window_created: {}\n  rendered_frames: {}\n  first_frame_size: {}\n  distinct_frame_crcs: {}\n  saw_non_blank_frame: {}\n  saw_attract: {}\n  saw_credit: {}\n  saw_playing: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            "wgpu live smoke passed\n  window_created: {}\n  rendered_frames: {}\n  first_frame_size: {}\n  distinct_frame_crcs: {}\n  saw_non_blank_frame: {}\n  saw_attract: {} (visual_frames: {}, visual_crcs: {})\n  saw_credit: {} (visual_frames: {}, visual_crcs: {})\n  saw_playing: {} (visual_frames: {}, visual_crcs: {})\n  injected_inputs: {}\n  clean_exit: {}\n",
             self.window_created,
             self.rendered_frames,
             frame_size,
             self.distinct_frame_crcs,
             self.saw_non_blank_frame,
             self.saw_attract,
+            self.attract_visual_frames,
+            self.attract_distinct_frame_crcs,
             self.saw_credit,
+            self.credit_visual_frames,
+            self.credit_distinct_frame_crcs,
             self.saw_playing,
+            self.playing_visual_frames,
+            self.playing_distinct_frame_crcs,
             self.injected_inputs.join(","),
             self.clean_exit
         )
@@ -425,7 +452,6 @@ impl WgpuLiveApp {
 
         self.polled_input = PolledInput::default();
         if let Some(smoke) = &mut self.smoke {
-            smoke.observe_machine(&self.machine);
             smoke.advance_frame();
         }
     }
@@ -434,6 +460,7 @@ impl WgpuLiveApp {
         let image = render_live_machine_frame(&mut self.renderer, &mut self.machine)
             .context("rendering live machine frame")?;
         let metrics = rendered_image_metrics(image);
+        let smoke_state = SmokeMachineState::from_machine(&self.machine);
         let Some(presenter) = &mut self.presenter else {
             return Ok(());
         };
@@ -441,7 +468,7 @@ impl WgpuLiveApp {
             .draw_frame(image)
             .context("drawing wgpu graphics frame")?;
         if let Some(smoke) = &mut self.smoke {
-            smoke.observe_rendered_image(metrics);
+            smoke.observe_rendered_image(metrics, smoke_state);
         }
         Ok(())
     }
@@ -530,10 +557,45 @@ struct RenderedImageMetrics {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SmokeMachineState {
+    phase: GamePhase,
+    credits: u8,
+}
+
+impl SmokeMachineState {
+    fn from_machine(machine: &ArcadeMachine) -> Self {
+        let snapshot = machine.snapshot();
+        Self {
+            phase: snapshot.phase,
+            credits: snapshot.credits,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SmokeInput {
     label: &'static str,
     event: InputEvent,
     counts_for_report: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct SmokeVisualBucket {
+    non_blank_frames: u32,
+    frame_crcs: BTreeSet<u32>,
+}
+
+impl SmokeVisualBucket {
+    fn observe(&mut self, metrics: RenderedImageMetrics) {
+        if metrics.non_blank {
+            self.non_blank_frames += 1;
+            self.frame_crcs.insert(metrics.crc32);
+        }
+    }
+
+    fn distinct_frame_crcs(&self) -> usize {
+        self.frame_crcs.len()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -548,6 +610,9 @@ struct WgpuSmoke {
     saw_attract: bool,
     saw_credit: bool,
     saw_playing: bool,
+    attract_visual: SmokeVisualBucket,
+    credit_visual: SmokeVisualBucket,
+    playing_visual: SmokeVisualBucket,
     injected_inputs: BTreeSet<&'static str>,
     clean_exit: bool,
 }
@@ -565,6 +630,9 @@ impl WgpuSmoke {
             saw_attract: false,
             saw_credit: false,
             saw_playing: false,
+            attract_visual: SmokeVisualBucket::default(),
+            credit_visual: SmokeVisualBucket::default(),
+            playing_visual: SmokeVisualBucket::default(),
             injected_inputs: BTreeSet::new(),
             clean_exit: false,
         }
@@ -578,18 +646,23 @@ impl WgpuSmoke {
         self.window_created = true;
     }
 
-    fn observe_machine(&mut self, machine: &ArcadeMachine) {
-        let snapshot = machine.snapshot();
-        self.saw_attract |= snapshot.phase == GamePhase::Attract;
-        self.saw_credit |= snapshot.credits > 0;
-        self.saw_playing |= snapshot.phase == GamePhase::Playing;
-    }
-
-    fn observe_rendered_image(&mut self, metrics: RenderedImageMetrics) {
+    fn observe_rendered_image(&mut self, metrics: RenderedImageMetrics, state: SmokeMachineState) {
         self.rendered_frames += 1;
         self.first_frame_size.get_or_insert(metrics.size);
         self.frame_crcs.insert(metrics.crc32);
         self.saw_non_blank_frame |= metrics.non_blank;
+        self.saw_attract |= state.phase == GamePhase::Attract;
+        self.saw_credit |= state.credits > 0;
+        self.saw_playing |= state.phase == GamePhase::Playing;
+        if state.phase == GamePhase::Attract {
+            self.attract_visual.observe(metrics);
+        }
+        if state.credits > 0 {
+            self.credit_visual.observe(metrics);
+        }
+        if state.phase == GamePhase::Playing {
+            self.playing_visual.observe(metrics);
+        }
     }
 
     fn record_injected_input(&mut self, label: &'static str) {
@@ -618,6 +691,12 @@ impl WgpuSmoke {
             saw_attract: self.saw_attract,
             saw_credit: self.saw_credit,
             saw_playing: self.saw_playing,
+            attract_visual_frames: self.attract_visual.non_blank_frames,
+            credit_visual_frames: self.credit_visual.non_blank_frames,
+            playing_visual_frames: self.playing_visual.non_blank_frames,
+            attract_distinct_frame_crcs: self.attract_visual.distinct_frame_crcs(),
+            credit_distinct_frame_crcs: self.credit_visual.distinct_frame_crcs(),
+            playing_distinct_frame_crcs: self.playing_visual.distinct_frame_crcs(),
             injected_inputs: self
                 .injected_inputs
                 .iter()
@@ -1181,12 +1260,12 @@ mod tests {
 
     use crate::{
         input::{CabinetInput, InputEventKind, InputKey, InputMapper, InputProfile, PolledInput},
-        machine::ArcadeMachine,
+        machine::GamePhase,
         video::RenderedImage,
         wgpu_presenter::{
-            WgpuSmoke, WgpuSmokeReport, input_event_kind_from_winit, input_key_from_winit,
-            renderable_window_size, rendered_image_metrics, required_smoke_inputs,
-            run_wgpu_live_smoke, smoke_input_events,
+            SmokeMachineState, WgpuSmoke, WgpuSmokeReport, input_event_kind_from_winit,
+            input_key_from_winit, renderable_window_size, rendered_image_metrics,
+            required_smoke_inputs, run_wgpu_live_smoke, smoke_input_events,
         },
     };
 
@@ -1332,6 +1411,10 @@ mod tests {
         assert!(report.validate().is_err());
 
         let mut report = complete_smoke_report();
+        report.distinct_frame_crcs = 1;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
         report.saw_non_blank_frame = false;
         assert!(report.validate().is_err());
 
@@ -1340,11 +1423,35 @@ mod tests {
         assert!(report.validate().is_err());
 
         let mut report = complete_smoke_report();
+        report.attract_visual_frames = 0;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.attract_distinct_frame_crcs = 0;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
         report.saw_credit = false;
         assert!(report.validate().is_err());
 
         let mut report = complete_smoke_report();
+        report.credit_visual_frames = 0;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.credit_distinct_frame_crcs = 0;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
         report.saw_playing = false;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.playing_visual_frames = 0;
+        assert!(report.validate().is_err());
+
+        let mut report = complete_smoke_report();
+        report.playing_distinct_frame_crcs = 0;
         assert!(report.validate().is_err());
 
         let mut report = complete_smoke_report();
@@ -1369,25 +1476,36 @@ mod tests {
 
     #[test]
     fn wgpu_smoke_accumulates_window_render_input_and_machine_evidence() {
-        let mut smoke = WgpuSmoke::new(2);
+        let mut smoke = WgpuSmoke::new(3);
         assert_eq!(smoke.frame(), 0);
         assert!(!smoke.should_stop());
 
         smoke.observe_window_created();
-        smoke.observe_machine(&ArcadeMachine::new());
-        smoke.observe_rendered_image(rendered_image_metrics(&RenderedImage::new_blank(
-            2,
-            1,
-            [0, 0, 0, 255],
-        )));
-        smoke.observe_rendered_image(rendered_image_metrics(&RenderedImage::new_blank(
-            2,
-            1,
-            [1, 2, 3, 255],
-        )));
+        smoke.observe_rendered_image(
+            rendered_image_metrics(&RenderedImage::new_blank(2, 1, [1, 2, 3, 255])),
+            SmokeMachineState {
+                phase: GamePhase::Attract,
+                credits: 0,
+            },
+        );
+        smoke.observe_rendered_image(
+            rendered_image_metrics(&RenderedImage::new_blank(2, 1, [4, 5, 6, 255])),
+            SmokeMachineState {
+                phase: GamePhase::Attract,
+                credits: 1,
+            },
+        );
+        smoke.observe_rendered_image(
+            rendered_image_metrics(&RenderedImage::new_blank(2, 1, [7, 8, 9, 255])),
+            SmokeMachineState {
+                phase: GamePhase::Playing,
+                credits: 1,
+            },
+        );
         for input in required_smoke_inputs() {
             smoke.record_injected_input(input);
         }
+        smoke.advance_frame();
         smoke.advance_frame();
         smoke.advance_frame();
         assert!(smoke.should_stop());
@@ -1395,11 +1513,19 @@ mod tests {
 
         let report = smoke.into_report();
         assert!(report.window_created);
-        assert_eq!(report.rendered_frames, 2);
+        assert_eq!(report.rendered_frames, 3);
         assert_eq!(report.first_frame_size, Some((2, 1)));
-        assert_eq!(report.distinct_frame_crcs, 2);
+        assert_eq!(report.distinct_frame_crcs, 3);
         assert!(report.saw_non_blank_frame);
         assert!(report.saw_attract);
+        assert!(report.saw_credit);
+        assert!(report.saw_playing);
+        assert_eq!(report.attract_visual_frames, 2);
+        assert_eq!(report.credit_visual_frames, 2);
+        assert_eq!(report.playing_visual_frames, 1);
+        assert_eq!(report.attract_distinct_frame_crcs, 2);
+        assert_eq!(report.credit_distinct_frame_crcs, 2);
+        assert_eq!(report.playing_distinct_frame_crcs, 1);
         assert!(report.clean_exit);
         assert!(
             required_smoke_inputs()
@@ -1441,6 +1567,12 @@ mod tests {
             saw_attract: true,
             saw_credit: true,
             saw_playing: true,
+            attract_visual_frames: 1,
+            credit_visual_frames: 1,
+            playing_visual_frames: 1,
+            attract_distinct_frame_crcs: 1,
+            credit_distinct_frame_crcs: 1,
+            playing_distinct_frame_crcs: 1,
             injected_inputs: required_smoke_inputs()
                 .iter()
                 .map(|input| String::from(*input))

@@ -65,7 +65,6 @@ impl LiveCoreClock {
 
 #[cfg(all(not(test), not(coverage)))]
 pub fn run_live(
-    _play_audio: bool,
     input_profile: InputProfile,
     presentation_backend: PresentationBackend,
     cmos_path: Option<&Path>,
@@ -156,7 +155,6 @@ fn run_kitty_live(input_profile: InputProfile, cmos_path: Option<&Path>) -> Resu
 
 #[cfg(any(test, coverage))]
 pub fn run_live(
-    _play_audio: bool,
     _input_profile: InputProfile,
     _presentation_backend: PresentationBackend,
     _cmos_path: Option<&Path>,
@@ -1277,19 +1275,19 @@ mod tests {
     }
 
     #[test]
-    fn live_core_sound_state_is_independent_of_audio_output_mode() {
-        let mut audible_core = ArcadeMachine::new_cold_boot_trace();
-        let mut muted_core = ArcadeMachine::new_cold_boot_trace();
+    fn live_core_sound_state_is_presentation_independent() {
+        let mut baseline_core = ArcadeMachine::new_cold_boot_trace();
+        let mut comparison_core = ArcadeMachine::new_cold_boot_trace();
 
         step_live_core_frames(
-            &mut audible_core,
+            &mut baseline_core,
             CabinetInput::NONE,
             CabinetInput::NONE,
             &[],
             731,
         );
         step_live_core_frames(
-            &mut muted_core,
+            &mut comparison_core,
             CabinetInput::NONE,
             CabinetInput::NONE,
             &[],
@@ -1302,11 +1300,11 @@ mod tests {
             command_cb1_asserted: true,
             latch_write_count: 1,
         };
-        assert_eq!(audible_core.red_label_sound_board_snapshot(), expected);
-        assert_eq!(muted_core.red_label_sound_board_snapshot(), expected);
+        assert_eq!(baseline_core.red_label_sound_board_snapshot(), expected);
+        assert_eq!(comparison_core.red_label_sound_board_snapshot(), expected);
         assert_eq!(
-            muted_core.red_label_sound_board_snapshot(),
-            audible_core.red_label_sound_board_snapshot()
+            comparison_core.red_label_sound_board_snapshot(),
+            baseline_core.red_label_sound_board_snapshot()
         );
     }
 

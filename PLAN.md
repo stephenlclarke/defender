@@ -1,6 +1,6 @@
 # Defender Completion Plan
 
-Last reviewed: `2026-05-06 07:28:40 BST`
+Last reviewed: `2026-05-09 13:11:00 BST`
 
 ## Purpose
 
@@ -55,15 +55,23 @@ Status values:
   table-backed core in `src/machine.rs`.
 - The repository already has extensive unit tests, trace tooling, ROM metadata,
   MAME memory/input metadata, and local MAME reference trace generation.
-- `SPEC.md` now records the 2026-05-04 review findings and the refactor-safety
-  testing rule.
-- The major gaps are still ROM-complete playable acceptance: source-exact
-  hardware/frame scheduling, full frame/cycle integration, golden-trace proof
-  for translated gameplay/session paths, pixel/audio golden fixtures,
-  cycle-scheduled sound-board execution, live terminal proof, and final release
-  documentation. The large refactor is deferred until those gaps are closed.
+- Phase 11 final acceptance is complete for the accepted red-label target, and
+  Phase 12 has added the preferred `wgpu` live presentation backend on
+  `red-label-wgpu` while preserving Kitty as a compatibility backend.
+- No active ROM-complete/playability blocker is open in
+  `docs/fidelity/gaps.md`. Historical drift notes remain in the plan and
+  fidelity docs as audit history, not as the current branch baseline.
+- The `2026-05-09` repo review tightened the current acceptance surface:
+  `ci` now runs the real `wgpu` live smoke target, smoke validation requires
+  nonblank visual evidence for attract, credited, and gameplay phases, and the
+  unsupported `--mute` path has been removed until live audio output exists.
+- The large idiomatic refactor remains deferred until post-acceptance renderer
+  and verification work is explicitly closed and pushed from `red-label-wgpu`.
 
-### Fidelity Gap Review 2026-05-05
+### Historical Fidelity Gap Review 2026-05-05
+
+The following inventory is retained as audit history. It is superseded by the
+Phase 10, Phase 11, and Phase 12 completion records later in this plan.
 
 This review checked `SPEC.md`, `docs/fidelity/gaps.md`,
 `docs/fidelity/golden-comparison-results.md`, the ignored fidelity tests in
