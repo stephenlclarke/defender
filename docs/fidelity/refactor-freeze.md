@@ -36,6 +36,7 @@ Important focused filters for the first refactor slices:
 - `cargo test snapshot_restore --all-targets`
 - `cargo test save_state_restore --all-targets`
 - `cargo test machine_process::tests --all-targets`
+- `cargo test machine_scheduler::tests --all-targets`
 - `cargo test process_scheduler --all-targets`
 - `cargo test trace_text_ --all-targets`
 - `cargo test native_video_fixture --all-targets`
@@ -91,27 +92,54 @@ Current accepted boundaries on `red-label-refactor`:
   trace state, compatibility flags, machine events, and `FrameOutput`.
 - `src/machine_process.rs` owns scheduler data contracts:
   `RedLabelCpuRegisters` and `RedLabelScheduledProcess`.
-- `src/machine.rs` re-exports those contracts to preserve existing
-  `machine::...` import paths while the source-shaped runtime remains in that
-  module.
+- `src/machine_scheduler.rs` owns source scheduler routing helpers:
+  source-entry register overrides, live-prioritized process routine sets, and
+  the scheduler-focused tests that keep routine-address dispatch stable.
+- `src/machine_memory.rs` owns the source-visible `RedLabelRuntimeMemory`
+  implementation: RAM/CMOS/palette/hardware-map mutation helpers, list
+  primitives, translated source routine bodies, trace helper mutations,
+  save/restore-sensitive memory surfaces, and fixture-backed byte helpers.
+- `src/machine_session.rs` owns the public `ArcadeMachine` API and live/session
+  orchestration: construction, reset, snapshot/restore, save/restore,
+  frame stepping, board/sound snapshots, coin/start/high-score flow, live
+  attract/gameplay dispatch, and compatibility-overlay handling.
+- `src/machine_sound.rs` owns red-label sound command contracts and fixture
+  helpers: direct/table/thrust command TSV generation, timeline expansion,
+  source `SNDOUT` modeling, command priority, and sound sequence structs.
+- `src/machine_video.rs` owns reusable video helper primitives: laser address
+  stepping, star-table generation/output helpers, terrain bit-state
+  advancement, and terrain pointer validation.
+- `src/machine_player.rs` owns reusable player/projectile/object helper
+  primitives: switch-derived vertical action, player scroll clamping,
+  signed-word helpers, object band checks, tie vertical deltas, and swarmer
+  damping.
+- `src/machine_world.rs` owns small wave/world helper primitives: `GETWV`
+  restore-wave checks, inter-wall delta iteration counts, and BCD display
+  helpers shared by session/runtime code.
+- `src/machine.rs` re-exports public contracts to preserve existing
+  `machine::...` import paths while retaining source-derived type definitions
+  that have not yet justified a separate public module.
 
-Target module ownership for the continuing large refactor:
+Continuing ownership rules:
 
 - CPU and board: `src/board.rs`, `src/pia.rs`, `src/rom.rs`, and the
   board-facing parts of `src/machine.rs`.
-- Scheduler and process dispatch: source-shaped `MKPROC`, `MSPROC`, `SLEEP`,
-  `KILL`, `DISP`, executive iteration, switch-process dispatch, and translated
-  process-body routing currently inside `src/machine.rs`.
+- Scheduler and process dispatch: keep source-shaped `MKPROC`, `MSPROC`,
+  `SLEEP`, `KILL`, `DISP`, executive iteration, switch-process dispatch, and
+  translated process-body routing byte-compatible inside `machine_memory`
+  unless a later narrow slice proves a smaller extraction.
 - Memory and source assets: `src/red_label_memory.rs`, source-owned runtime RAM
-  helpers in `src/machine.rs`, and embedded TSVs under `assets/red-label/`.
-- Video: `src/video.rs`, native video-frame construction in `src/machine.rs`,
-  and renderer-only scaling in `src/live.rs` / `src/kitty.rs`.
+  helpers in `src/machine_memory.rs`, and embedded TSVs under
+  `assets/red-label/`.
+- Video: `src/video.rs`, native video-frame construction and renderer-only
+  scaling in `src/live.rs`, `src/kitty.rs`, and `src/wgpu_presenter.rs`, plus
+  source helper primitives in `src/machine_video.rs`.
 - Sound: `src/sound.rs`, red-label sound command fixtures in
-  `src/machine.rs`, sound-board snapshots, and main-board command-latch
-  plumbing.
+  `src/machine_sound.rs`, sound-board snapshots, and main-board command-latch
+  plumbing in `src/machine_session.rs`.
 - Input and session: `src/input.rs`, live input mapping in `src/live.rs`,
-  high-score/session flow in `src/machine.rs`, and CMOS persistence in
-  `src/cmos_storage.rs`.
+  high-score/session flow in `src/machine_session.rs`, and CMOS persistence
+  in `src/cmos_storage.rs`.
 - Compatibility: `CompatibilityState`, `xyzzy` hook behavior, Planetoid input
   mapping, and any future overlay code. Compatibility must stay outside the
   red-label trace contract unless paired disabled/enabled tests prove the

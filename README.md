@@ -316,14 +316,16 @@ compatibility behavior.
 - `DC-23` freezes the API and refactor validation contract in
   `docs/fidelity/refactor-freeze.md`. After Phase 11 final acceptance and
   Phase 12 `wgpu` acceptance, the large module-split refactor began on
-  `red-label-refactor`. The first stable boundaries are
+  `red-label-refactor`. The stable boundaries are
   `src/machine_state.rs` for data-only state/frame-output contracts and
-  `src/machine_process.rs` for scheduler data contracts; `src/machine.rs`
-  still re-exports those contracts so existing `machine::...` imports stay
-  stable. `ArcadeMachine` explicitly exposes `new`, `reset`, `step`,
-  `snapshot`, `restore`, and full `save_state` / `restore_state` behavior for
-  the refactor, with reset/API tests proving reset returns to the same
-  observable state as `new`.
+  `src/machine_process.rs` for scheduler data contracts, plus child modules
+  under `machine` for runtime memory, scheduler routing, sound helpers, video
+  helpers, session/API orchestration, player helpers, and wave/world helpers.
+  `src/machine.rs` still re-exports public contracts so existing
+  `machine::...` imports stay stable. `ArcadeMachine` explicitly exposes
+  `new`, `reset`, `step`, `snapshot`, `restore`, and full `save_state` /
+  `restore_state` behavior for the refactor, with reset/API tests proving
+  reset returns to the same observable state as `new`.
 - `ArcadeMachine::step` returns post-frame main-board and sound-board snapshots
   on `FrameOutput`. Tests now lock the input-port bytes, main RAM/CMOS CRCs,
   palette RAM, hardware map, watchdog count, video-counter sample, sound latch,

@@ -510,11 +510,14 @@ playability blocker remains open.
 
 The post-acceptance `wgpu` presentation backend was accepted after Phase 11.
 The large module-split refactor may now proceed only as behavior-preserving
-dev-cycles on `red-label-refactor`. The first accepted boundaries are
+dev-cycles on `red-label-refactor`. The accepted boundaries are
 `src/machine_state.rs` for data-only state/frame-output contracts and
-`src/machine_process.rs` for scheduler data contracts. `src/machine.rs`
-continues to re-export those public contracts while source-derived scheduler,
-runtime, and process behavior is split in narrow tested slices.
+`src/machine_process.rs` for scheduler data contracts, with `machine` child
+modules now owning source-runtime memory, scheduler routing, sound helpers,
+video helpers, public session/API orchestration, player helpers, and
+wave/world helpers. `src/machine.rs` continues to re-export public contracts
+while source-derived scheduler, runtime, and process behavior is split in
+narrow tested slices.
 
 ### Drift And Cleanup Items
 

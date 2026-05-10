@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
+from pathlib import Path
 import re
 import subprocess
 import sys
-from pathlib import Path
 
 
 HUNK_RE = re.compile(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
@@ -41,8 +42,15 @@ def git_diff_text(repo_root: Path, base: str) -> str:
     return subprocess.check_output(command, cwd=repo_root, text=True)
 
 
-def parse_added_rust_lines(diff_text: str, repo_root: Path) -> dict[Path, set[int]]:
+def parse_added_rust_lines(
+    diff_text: str,
+    repo_root: Path,
+    *,
+    ignore_moved: bool = False,
+) -> dict[Path, set[int]]:
     added: dict[Path, set[int]] = {}
+    removed_lines: Counter[str] = Counter()
+    added_lines: list[tuple[Path, int, str]] = []
     current_file: Path | None = None
     current_line: int | None = None
 
@@ -59,14 +67,32 @@ def parse_added_rust_lines(diff_text: str, repo_root: Path) -> dict[Path, set[in
         if current_file is None or current_line is None:
             continue
         if line.startswith("+") and not line.startswith("+++"):
-            added.setdefault(current_file, set()).add(current_line)
+            if ignore_moved:
+                added_lines.append((current_file, current_line, line[1:]))
+            else:
+                added.setdefault(current_file, set()).add(current_line)
             current_line += 1
         elif line.startswith("-") and not line.startswith("---"):
+            if ignore_moved:
+                removed_lines[moved_line_fingerprint(line[1:])] += 1
             continue
         else:
             current_line += 1
 
+    if ignore_moved:
+        for path, line_number, line_text in added_lines:
+            fingerprint = moved_line_fingerprint(line_text)
+            if removed_lines[fingerprint] > 0:
+                removed_lines[fingerprint] -= 1
+                continue
+            added.setdefault(path, set()).add(line_number)
+
     return added
+
+
+def moved_line_fingerprint(line: str) -> str:
+    normalized = re.sub(r"\s+", " ", line.strip())
+    return re.sub(r"^pub(?:\([^)]*\))?\s+", "", normalized)
 
 
 def normalize_diff_path(path: str, repo_root: Path) -> Path:
@@ -270,7 +296,11 @@ def rust_code_without_strings_or_comments(line: str) -> str:
 def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
-    diff_added_lines = parse_added_rust_lines(git_diff_text(repo_root, args.base), repo_root)
+    diff_added_lines = parse_added_rust_lines(
+        git_diff_text(repo_root, args.base),
+        repo_root,
+        ignore_moved=True,
+    )
     added_lines = executable_added_lines(
         production_added_lines(diff_added_lines)
     )

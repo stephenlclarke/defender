@@ -31,6 +31,44 @@ class CheckNewRustCoverageTest(unittest.TestCase):
 
         self.assertEqual(added, {Path("/repo/src/app.rs"): {11, 12}})
 
+    def test_parse_added_rust_lines_can_ignore_moved_lines(self):
+        repo_root = Path("/repo")
+        diff = """diff --git a/src/machine.rs b/src/machine.rs
+--- a/src/machine.rs
++++ b/src/machine.rs
+@@ -10,2 +10,0 @@
+-    let moved = true;
+-    let duplicated = 1;
+@@ -30,0 +29,3 @@
++    let moved = true;
++    let duplicated = 1;
++    let new_line = true;
+"""
+
+        added = parse_added_rust_lines(diff, repo_root, ignore_moved=True)
+
+        self.assertEqual(added, {Path("/repo/src/machine.rs"): {31}})
+
+    def test_parse_added_rust_lines_treats_visibility_only_moves_as_moved(self):
+        repo_root = Path("/repo")
+        diff = """diff --git a/src/machine.rs b/src/machine.rs
+--- a/src/machine.rs
++++ b/src/machine.rs
+@@ -10 +10,0 @@
+-fn helper() -> bool {
+diff --git a/src/machine_child.rs b/src/machine_child.rs
+new file mode 100644
+--- /dev/null
++++ b/src/machine_child.rs
+@@ -0,0 +1,2 @@
++pub(super) fn helper() -> bool {
++    true
+"""
+
+        added = parse_added_rust_lines(diff, repo_root, ignore_moved=True)
+
+        self.assertEqual(added, {Path("/repo/src/machine_child.rs"): {2}})
+
     def test_parse_lcov_line_counts_normalizes_relative_sources(self):
         repo_root = Path("/repo")
         lcov = """TN:
