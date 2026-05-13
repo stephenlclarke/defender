@@ -195,13 +195,23 @@ fn adapt_event(event: MachineEvent) -> GameEvent {
 
 #[cfg(test)]
 mod tests {
-    use crate::{input::CabinetInput, machine::ArcadeMachine};
+    use crate::{
+        input::{
+            CabinetInput, DEFENDER_IN0_ALTITUDE_DOWN, DEFENDER_IN0_FIRE, DEFENDER_IN0_HYPERSPACE,
+            DEFENDER_IN0_REVERSE, DEFENDER_IN0_SMART_BOMB, DEFENDER_IN0_THRUST,
+            DEFENDER_IN1_ALTITUDE_UP,
+        },
+        machine::ArcadeMachine,
+    };
 
     use super::{
         GameEvent, GameInput, GamePhase, GameplayOracle, adapt_event, adapt_scene, adapt_snapshot,
         to_cabinet_input,
     };
-    use crate::systems::{GameSimulation, advance_one_frame};
+    use crate::systems::{
+        GameSimulation, PlayerActionTriggers, PlayerControlFrame, PlayerControlSystem,
+        VerticalControl, advance_one_frame,
+    };
 
     #[test]
     fn oracle_starts_from_clean_attract_snapshot() {
@@ -256,6 +266,27 @@ mod tests {
 
         assert_eq!(frame.state.frame, 1);
         assert_eq!(GameSimulation::state(&oracle).frame, 1);
+    }
+
+    #[test]
+    fn clean_player_control_history_matches_oracle_switch_scan() {
+        let mut clean = PlayerControlSystem::new();
+        let mut oracle = ArcadeMachine::new();
+
+        for input in player_control_inputs() {
+            let frame = clean.step(input);
+            let scan = oracle
+                .red_label_scan_translated_player_switches(
+                    to_cabinet_input(input).defender_input_ports(),
+                )
+                .expect("oracle player switch scan should stay valid");
+
+            assert_eq!(trigger_bits(frame), scan.triggered_bits);
+            assert_eq!(
+                frame.intent.vertical,
+                vertical_control_from_ports(scan.current_pia21, scan.current_pia31)
+            );
+        }
     }
 
     #[test]
@@ -323,5 +354,79 @@ mod tests {
             });
         }
         inputs
+    }
+
+    fn player_control_inputs() -> [GameInput; 8] {
+        [
+            GameInput {
+                thrust: true,
+                altitude_up: true,
+                ..GameInput::NONE
+            },
+            GameInput {
+                fire: true,
+                thrust: true,
+                ..GameInput::NONE
+            },
+            GameInput::NONE,
+            GameInput {
+                fire: true,
+                ..GameInput::NONE
+            },
+            GameInput::NONE,
+            GameInput::NONE,
+            GameInput {
+                fire: true,
+                smart_bomb: true,
+                hyperspace: true,
+                reverse: true,
+                altitude_down: true,
+                ..GameInput::NONE
+            },
+            GameInput {
+                altitude_up: true,
+                altitude_down: true,
+                ..GameInput::NONE
+            },
+        ]
+    }
+
+    fn trigger_bits(frame: PlayerControlFrame) -> u8 {
+        let triggers = frame.triggers;
+        let mut bits = 0;
+        if triggers.fire {
+            bits |= DEFENDER_IN0_FIRE;
+        }
+        if triggers.thrust {
+            bits |= DEFENDER_IN0_THRUST;
+        }
+        if triggers.smart_bomb {
+            bits |= DEFENDER_IN0_SMART_BOMB;
+        }
+        if triggers.hyperspace {
+            bits |= DEFENDER_IN0_HYPERSPACE;
+        }
+        if triggers.reverse {
+            bits |= DEFENDER_IN0_REVERSE;
+        }
+        if triggers.altitude_down {
+            bits |= DEFENDER_IN0_ALTITUDE_DOWN;
+        }
+        bits
+    }
+
+    fn vertical_control_from_ports(in0: u8, in1: u8) -> VerticalControl {
+        if in1 & DEFENDER_IN1_ALTITUDE_UP != 0 {
+            VerticalControl::Up
+        } else if in0 & DEFENDER_IN0_ALTITUDE_DOWN != 0 {
+            VerticalControl::Down
+        } else {
+            VerticalControl::Neutral
+        }
+    }
+
+    #[test]
+    fn player_action_triggers_none_is_empty() {
+        assert!(!PlayerActionTriggers::NONE.any());
     }
 }

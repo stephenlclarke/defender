@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `9eadc89`.
+- Latest accepted implementation commit before this cycle: `bcd9b35`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy `machine::...` imports through explicit oracle wiring.
@@ -97,7 +97,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-56` are complete, and
+No active development cycle remains. `DC-42` through `DC-57` are complete, and
 the standing maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -847,27 +847,90 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778667397382589`
 
-### DC-57: Gameplay System Migration
+### DC-57: Player Control System Migration
 
-Status: `planned`
+Status: `complete`
 
-Goal: migrate gameplay from memory-oriented routines to clean deterministic
-systems, one behavior slice at a time.
+Goal: begin migrating gameplay from memory-oriented routines to clean
+deterministic systems with the first input/player-control slice.
 
 Scope:
 
-- Migrate input/player movement first, then projectiles, collision, scoring,
-  waves/enemy spawning, terrain/starfield, attract mode, high-score flow, and
-  sound-event emission.
-- Keep update order explicit and tested.
-- Compare each migrated system against the oracle before deleting the old path.
-- Remove assembler-derived names from migrated production code.
+- Add a clean player-control system that separates held movement/fire intent
+  from two-clear-sample action triggers.
+- Preserve vertical-control priority and input history behavior without exposing
+  RAM-layout fields or assembler routine names in production code.
+- Compare the clean control history against the oracle before replacing live
+  gameplay paths.
+- Keep the remaining gameplay migration sequence explicit for follow-on cycles.
 
 Acceptance criteria:
 
-- Each migrated system has clean domain tests and oracle equivalence tests.
-- Production gameplay modules no longer read or write RAM-layout fields.
+- The migrated player-control slice has clean domain tests and oracle
+  equivalence tests.
+- Production player-control code no longer reads or writes RAM-layout fields.
 - Behavior, trace output, live smoke, and accepted visual/audio evidence remain
+  stable.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+```
+
+Work log:
+
+- `2026-05-13` Started `DC-57` on branch `rewrite`: posted the cycle start
+  update and began migrating player input/control behavior into clean
+  deterministic systems while keeping accepted behavior behind the oracle.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778667591192949`
+- `2026-05-13` Completed `DC-57`: added clean `PlayerControlIntent`,
+  `PlayerActionTriggers`, `PlayerControlFrame`, and `PlayerControlSystem`
+  contracts for held control intent and two-clear-sample action triggers;
+  exported the contracts through the clean public API; and added both clean
+  domain tests and oracle switch-scan equivalence coverage. `README.md` and
+  `SPEC.md` now describe the clean player-control system, and `DC-58` now
+  carries the next player-motion/projectile migration slice. Validation passed
+  with `cargo fmt --check`, `cargo test --lib systems`, `cargo test
+  --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity`, `cargo run -- --live-smoke`, `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  and `git diff --check`; live smoke rendered 239 frames with 74 distinct scene
+  CRCs, attract/credit/playing evidence, all required injected inputs, and a
+  clean exit.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778669085679879`
+
+### DC-58: Player Motion And Projectile Systems
+
+Status: `planned`
+
+Goal: continue gameplay migration by moving player motion and projectile
+behavior into clean deterministic systems.
+
+Scope:
+
+- Drive player motion from `PlayerControlIntent` while preserving accepted
+  damping, thrust, vertical priority, bounds, and scroll behavior.
+- Add clean projectile launch/update state and compare fire timing against the
+  oracle.
+- Keep update order explicit for controls, motion, projectiles, collision, and
+  rendering scene emission.
+- Remove assembler-derived names from newly migrated production code.
+
+Acceptance criteria:
+
+- Player motion and projectile slices have clean domain tests and oracle
+  equivalence tests.
+- Production player-motion and projectile modules do not read or write
+  RAM-layout fields.
+- Behavior, trace output, live smoke, and accepted visual evidence remain
   stable unless an intentional difference is documented.
 
 Validation:
@@ -881,7 +944,7 @@ make fidelity
 cargo run -- --live-smoke
 ```
 
-### DC-58: Audio Device And Event Model
+### DC-59: Audio Device And Event Model
 
 Status: `planned`
 
@@ -913,7 +976,7 @@ make fidelity
 cargo run -- --live-smoke
 ```
 
-### DC-59: Oracle Retirement
+### DC-60: Oracle Retirement
 
 Status: `planned`
 

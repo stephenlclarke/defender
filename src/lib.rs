@@ -67,7 +67,10 @@ pub use renderer::{
     RenderScene, RenderSceneSummary, SceneDrawPlan, SceneRaster, SceneRasterError,
     SceneRasterUpload, SceneSprite, SpriteId, SurfaceSize, TextureAtlas,
 };
-pub use systems::{FixedStepAccumulator, FrameRate, GameSimulation, advance_one_frame};
+pub use systems::{
+    FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,
+    PlayerControlIntent, PlayerControlSystem, VerticalControl, advance_one_frame,
+};
 
 #[cfg(test)]
 #[path = "../src_legacy/test_support.rs"]
