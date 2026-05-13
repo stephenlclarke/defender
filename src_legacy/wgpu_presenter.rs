@@ -26,6 +26,8 @@ use winit::{
 };
 
 #[cfg(all(not(test), not(coverage)))]
+use crate::renderer::SceneRaster;
+#[cfg(all(not(test), not(coverage)))]
 use crate::{
     audio::{LiveAudioMode, LiveAudioRuntime},
     cmos_storage::{CmosStorage, FileCmosStorage},
@@ -35,8 +37,8 @@ use crate::{
 use crate::{
     input::{InputEvent, InputEventKind, InputKey, InputProfile},
     machine_state::{GamePhase, MachineSnapshot},
+    renderer::RenderScene,
     rom::crc32,
-    video::RenderedImage,
 };
 
 const INITIAL_WINDOW_WIDTH: u32 = 1_024;
@@ -472,16 +474,16 @@ impl WgpuLiveApp {
         let Some(frame) = &self.latest_frame else {
             return Ok(());
         };
-        let metrics = rendered_image_metrics(&frame.image);
+        let metrics = render_scene_metrics(&frame.scene);
         let smoke_state = SmokeMachineState::from_snapshot(frame.snapshot);
         let Some(presenter) = &mut self.presenter else {
             return Ok(());
         };
         presenter
-            .draw_frame(&frame.image)
-            .context("drawing wgpu graphics frame")?;
+            .draw_scene(&frame.scene)
+            .context("drawing wgpu render scene")?;
         if let Some(smoke) = &mut self.smoke {
-            smoke.observe_rendered_image(metrics, smoke_state);
+            smoke.observe_render_scene(metrics, smoke_state);
         }
         Ok(())
     }
@@ -585,7 +587,7 @@ impl ApplicationHandler for WgpuLiveApp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct RenderedImageMetrics {
+struct SceneRenderMetrics {
     size: (u32, u32),
     crc32: u32,
     non_blank: bool,
@@ -620,7 +622,7 @@ struct SmokeVisualBucket {
 }
 
 impl SmokeVisualBucket {
-    fn observe(&mut self, metrics: RenderedImageMetrics) {
+    fn observe(&mut self, metrics: SceneRenderMetrics) {
         if metrics.non_blank {
             self.non_blank_frames += 1;
             self.frame_crcs.insert(metrics.crc32);
@@ -680,7 +682,7 @@ impl WgpuSmoke {
         self.window_created = true;
     }
 
-    fn observe_rendered_image(&mut self, metrics: RenderedImageMetrics, state: SmokeMachineState) {
+    fn observe_render_scene(&mut self, metrics: SceneRenderMetrics, state: SmokeMachineState) {
         self.rendered_frames += 1;
         self.first_frame_size.get_or_insert(metrics.size);
         self.frame_crcs.insert(metrics.crc32);
@@ -741,14 +743,19 @@ impl WgpuSmoke {
     }
 }
 
-fn rendered_image_metrics(image: &RenderedImage) -> RenderedImageMetrics {
-    RenderedImageMetrics {
-        size: (image.width, image.height),
-        crc32: crc32(&image.pixels),
-        non_blank: image
-            .pixels
-            .chunks_exact(4)
-            .any(|pixel| pixel != [0, 0, 0, 255].as_slice()),
+fn render_scene_metrics(scene: &RenderScene) -> SceneRenderMetrics {
+    let Some(raster) = scene.raster() else {
+        return SceneRenderMetrics {
+            size: (scene.surface.width, scene.surface.height),
+            crc32: crc32(&[]),
+            non_blank: false,
+        };
+    };
+
+    SceneRenderMetrics {
+        size: (raster.surface.width, raster.surface.height),
+        crc32: crc32(raster.pixels()),
+        non_blank: raster.is_non_blank(),
     }
 }
 
@@ -981,12 +988,15 @@ impl WgpuPresenter {
         self.surface.configure(&self.device, &self.config);
     }
 
-    fn draw_frame(&mut self, image: &RenderedImage) -> Result<()> {
-        if image.width == 0 || image.height == 0 {
+    fn draw_scene(&mut self, scene: &RenderScene) -> Result<()> {
+        let Some(raster) = scene.raster() else {
+            return Ok(());
+        };
+        if raster.surface.is_empty() {
             return Ok(());
         }
 
-        self.ensure_frame_texture(image);
+        self.ensure_frame_texture(raster);
         let frame_texture = self
             .frame_texture
             .as_ref()
@@ -998,15 +1008,15 @@ impl WgpuPresenter {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &image.pixels,
+            raster.pixels(),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(image.width * 4),
-                rows_per_image: Some(image.height),
+                bytes_per_row: Some(raster.surface.width * 4),
+                rows_per_image: Some(raster.surface.height),
             },
             wgpu::Extent3d {
-                width: image.width,
-                height: image.height,
+                width: raster.surface.width,
+                height: raster.surface.height,
                 depth_or_array_layers: 1,
             },
         );
@@ -1066,8 +1076,8 @@ impl WgpuPresenter {
         Ok(())
     }
 
-    fn ensure_frame_texture(&mut self, image: &RenderedImage) {
-        let size = (image.width, image.height);
+    fn ensure_frame_texture(&mut self, raster: &SceneRaster) {
+        let size = (raster.surface.width, raster.surface.height);
         if self
             .frame_texture
             .as_ref()
@@ -1296,10 +1306,10 @@ mod tests {
         input::{CabinetInput, InputEventKind, InputKey, InputMapper, InputProfile, PolledInput},
         machine::ArcadeMachine,
         machine_state::GamePhase,
-        video::RenderedImage,
+        renderer::{RenderScene, SurfaceSize},
         wgpu_presenter::{
             SmokeMachineState, WgpuSmoke, WgpuSmokeReport, input_event_kind_from_winit,
-            input_key_from_winit, renderable_window_size, rendered_image_metrics,
+            input_key_from_winit, render_scene_metrics, renderable_window_size,
             required_smoke_inputs, run_wgpu_live_smoke, smoke_input_events,
         },
     };
@@ -1516,22 +1526,22 @@ mod tests {
         assert!(!smoke.should_stop());
 
         smoke.observe_window_created();
-        smoke.observe_rendered_image(
-            rendered_image_metrics(&RenderedImage::new_blank(2, 1, [1, 2, 3, 255])),
+        smoke.observe_render_scene(
+            render_scene_metrics(&test_render_scene(2, 1, [1, 2, 3, 255])),
             SmokeMachineState {
                 phase: GamePhase::Attract,
                 credits: 0,
             },
         );
-        smoke.observe_rendered_image(
-            rendered_image_metrics(&RenderedImage::new_blank(2, 1, [4, 5, 6, 255])),
+        smoke.observe_render_scene(
+            render_scene_metrics(&test_render_scene(2, 1, [4, 5, 6, 255])),
             SmokeMachineState {
                 phase: GamePhase::Attract,
                 credits: 1,
             },
         );
-        smoke.observe_rendered_image(
-            rendered_image_metrics(&RenderedImage::new_blank(2, 1, [7, 8, 9, 255])),
+        smoke.observe_render_scene(
+            render_scene_metrics(&test_render_scene(2, 1, [7, 8, 9, 255])),
             SmokeMachineState {
                 phase: GamePhase::Playing,
                 credits: 1,
@@ -1570,6 +1580,17 @@ mod tests {
     }
 
     #[test]
+    fn wgpu_smoke_metrics_accept_empty_scene_without_raster_payload() {
+        let scene = RenderScene::empty(1, SurfaceSize::new(292, 240));
+
+        let metrics = render_scene_metrics(&scene);
+
+        assert_eq!(metrics.size, (292, 240));
+        assert_eq!(metrics.crc32, crate::rom::crc32(&[]));
+        assert!(!metrics.non_blank);
+    }
+
+    #[test]
     fn wgpu_smoke_machine_state_uses_thread_frame_snapshot() {
         let mut snapshot = ArcadeMachine::new().snapshot();
         snapshot.phase = GamePhase::Playing;
@@ -1605,6 +1626,15 @@ mod tests {
             seen.merge(input.cabinet);
         }
         (seen, labels)
+    }
+
+    fn test_render_scene(width: u32, height: u32, color: [u8; 4]) -> RenderScene {
+        let mut pixels = Vec::with_capacity((width as usize) * (height as usize) * 4);
+        for _ in 0..(width * height) {
+            pixels.extend_from_slice(&color);
+        }
+        RenderScene::from_rgba(0, SurfaceSize::new(width, height), pixels, None)
+            .expect("test scene")
     }
 
     fn complete_smoke_report() -> WgpuSmokeReport {

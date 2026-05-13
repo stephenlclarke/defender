@@ -19,6 +19,8 @@ use crate::{
     input::{CabinetInput, InputEvent, InputMapper, InputProfile, PolledInput, XyzzyOverlay},
     machine::{ArcadeMachine, FRAME_RATE_MILLIHZ},
     machine_state::{CompatibilityState, MachineSnapshot},
+    renderer::{RenderScene, SurfaceSize},
+    rom::crc32,
     video::{RenderedImage, Renderer},
 };
 
@@ -164,9 +166,10 @@ pub(crate) enum LiveAdvanceMode {
     FixedFrames(u32),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LiveCoreFrame {
     pub(crate) image: RenderedImage,
+    pub(crate) scene: RenderScene,
     pub(crate) snapshot: MachineSnapshot,
     pub(crate) next_step_at: Instant,
 }
@@ -766,9 +769,12 @@ fn advance_and_render_live_core(
 
     *polled_input = PolledInput::default();
     let image = render_live_machine_frame(renderer, core.machine_mut())?.clone();
+    let snapshot = core.machine().snapshot();
+    let scene = live_render_scene(snapshot.frame, &image)?;
     Ok(LiveCoreFrame {
         image,
-        snapshot: core.machine().snapshot(),
+        scene,
+        snapshot,
         next_step_at: core.next_step_at(),
     })
 }
@@ -816,6 +822,16 @@ pub(crate) fn render_live_machine_frame<'a>(
 
 fn render_live_frame(renderer: &mut Renderer, native_frame: RenderedImage) -> &RenderedImage {
     renderer.render_cabinet_frame(&native_frame)
+}
+
+fn live_render_scene(frame: u64, image: &RenderedImage) -> Result<RenderScene> {
+    RenderScene::from_rgba(
+        frame,
+        SurfaceSize::new(image.width, image.height),
+        image.pixels.clone(),
+        Some(crc32(&image.pixels)),
+    )
+    .context("building live render scene")
 }
 
 pub(crate) fn step_live_core_frames(
@@ -915,7 +931,7 @@ mod tests {
         FRAME_DURATION, LiveAdvanceMode, LiveCoreClock, LiveCoreCommandName, LiveCoreDriver,
         LiveCoreError, LiveCoreErrorKind, LiveCoreFrame, LiveCoreFrameMailbox, LiveCoreRuntime,
         LiveCoreThread, LiveCoreWorkerError, cabinet_frame_duration_micros, live_frame_inputs,
-        live_machine_from_cmos_storage, panic_message, render_live_frame,
+        live_machine_from_cmos_storage, live_render_scene, panic_message, render_live_frame,
         render_live_machine_frame, save_live_cmos_ram, step_live_core_frames,
     };
 
@@ -986,6 +1002,21 @@ mod tests {
         let source_frame =
             render_live_machine_frame(&mut renderer, &mut machine).expect("render machine");
         assert_eq!((source_frame.width, source_frame.height), (32, 16));
+    }
+
+    #[test]
+    fn live_render_scene_wraps_current_frame_as_temporary_raster_payload() {
+        let image = RenderedImage::new_blank(2, 1, [9, 8, 7, 255]);
+
+        let scene = live_render_scene(17, &image).expect("live render scene");
+
+        assert_eq!(scene.frame, 17);
+        assert_eq!(scene.summary().raster_count, 1);
+        assert_eq!(scene.summary().visual_hash, Some(crc32(&image.pixels)));
+        assert_eq!(
+            scene.raster().expect("scene raster").pixels(),
+            image.pixels.as_slice()
+        );
     }
 
     #[test]
@@ -2440,8 +2471,11 @@ mod tests {
     fn test_live_core_frame(frame: u64, width: u32, height: u32) -> LiveCoreFrame {
         let mut snapshot = ArcadeMachine::new().snapshot();
         snapshot.frame = frame;
+        let image = RenderedImage::new_blank(width, height, [frame as u8, 0, 0, 255]);
+        let scene = live_render_scene(frame, &image).expect("test live scene");
         LiveCoreFrame {
-            image: RenderedImage::new_blank(width, height, [frame as u8, 0, 0, 255]),
+            image,
+            scene,
             snapshot,
             next_step_at: Instant::now() + FRAME_DURATION,
         }

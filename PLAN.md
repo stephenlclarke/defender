@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `815673c`.
+- Latest accepted implementation commit before this cycle: `9eadc89`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy `machine::...` imports through explicit oracle wiring.
@@ -97,7 +97,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-55` are complete, and
+No active development cycle remains. `DC-42` through `DC-56` are complete, and
 the standing maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -795,7 +795,7 @@ Work log:
 
 ### DC-56: Native Wgpu Scene Renderer
 
-Status: `planned`
+Status: `complete`
 
 Goal: replace framebuffer presentation with a native `wgpu` scene renderer
 while keeping visual behavior equivalent.
@@ -825,6 +825,27 @@ cargo clippy --all-targets -- -D warnings
 make fidelity
 cargo run -- --live-smoke
 ```
+
+Work log:
+
+- `2026-05-13` Started `DC-56` on branch `rewrite`: posted the cycle start
+  update and began replacing direct frame upload with clean renderer scene data.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778664443957909`
+- `2026-05-13` Completed `DC-56`: `RenderScene` now supports a validated
+  temporary raster payload for visual equivalence, renderer-owned atlas,
+  palette, font, native pipeline, and draw-plan resources live in the clean
+  renderer module, and the live `wgpu` path uploads scene raster data instead
+  of drawing directly from `RenderedImage`. Smoke visual evidence now derives
+  from scene metrics while the temporary raster path keeps golden visual drift
+  detectable. Validation passed with `cargo fmt --check`, focused
+  `renderer`, `wgpu_smoke`, and live scene tests, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `make fidelity`, and
+  `cargo run -- --live-smoke`; the live smoke reported 240 rendered frames,
+  74 distinct scene CRCs, attract/credit/playing evidence, all required
+  injected inputs, and clean exit.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778667397382589`
 
 ### DC-57: Gameplay System Migration
 

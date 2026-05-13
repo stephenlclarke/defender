@@ -204,7 +204,8 @@ Clean rewrite modules:
 - `src/systems.rs`: deterministic fixed-step timing utilities plus the clean
   `GameSimulation` trait for future game systems.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
-  layers, scene summaries, and renderer settings.
+  layers, temporary raster evidence, renderer-owned resources, scene summaries,
+  and draw planning.
 - `src/platform.rs`: runtime configuration for controls, audio, run mode, and
   persistence.
 - `src/oracle.rs`: the only clean-tree adapter to the converted implementation,
@@ -213,10 +214,11 @@ Clean rewrite modules:
 Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input, live
 audio command delivery, fidelity trace generation and threaded fixture checks,
-the threaded live core runtime boundary, `wgpu` latest-frame delivery, CMOS
-  storage, and test helpers. Kitty terminal graphics code remains parked there
-  as historical compatibility evidence, but it is no longer an active runtime
-  path.
+the threaded live core runtime boundary, `wgpu` window ownership, CMOS storage,
+and test helpers. The live worker now wraps accepted visual output as a clean
+`RenderScene` raster payload before the presenter draws it. Kitty terminal
+graphics code remains parked there as historical compatibility evidence, but it
+is no longer an active runtime path.
 
 ## Assets And ROMs
 

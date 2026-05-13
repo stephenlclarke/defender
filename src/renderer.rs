@@ -1,5 +1,7 @@
 //! Wgpu-oriented scene contracts.
 
+use std::collections::BTreeSet;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SurfaceSize {
     pub width: u32,
@@ -13,6 +15,11 @@ impl SurfaceSize {
 
     pub const fn is_empty(self) -> bool {
         self.width == 0 || self.height == 0
+    }
+
+    pub fn rgba_len(self) -> Option<usize> {
+        let pixels = (self.width as usize).checked_mul(self.height as usize)?;
+        pixels.checked_mul(4)
     }
 }
 
@@ -78,6 +85,66 @@ pub struct SceneSprite {
     pub tint: Color,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneRaster {
+    pub surface: SurfaceSize,
+    pixels: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SceneRasterError {
+    PixelBufferTooLarge { surface: SurfaceSize },
+    PixelBufferLength { expected: usize, actual: usize },
+}
+
+impl SceneRaster {
+    pub fn from_rgba(surface: SurfaceSize, pixels: Vec<u8>) -> Result<Self, SceneRasterError> {
+        let Some(expected) = surface.rgba_len() else {
+            return Err(SceneRasterError::PixelBufferTooLarge { surface });
+        };
+        if pixels.len() != expected {
+            return Err(SceneRasterError::PixelBufferLength {
+                expected,
+                actual: pixels.len(),
+            });
+        }
+
+        Ok(Self { surface, pixels })
+    }
+
+    pub fn pixels(&self) -> &[u8] {
+        &self.pixels
+    }
+
+    pub fn into_pixels(self) -> Vec<u8> {
+        self.pixels
+    }
+
+    pub fn is_non_blank(&self) -> bool {
+        self.pixels
+            .chunks_exact(4)
+            .any(|pixel| pixel != [0, 0, 0, 255].as_slice())
+    }
+}
+
+impl std::fmt::Display for SceneRasterError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::PixelBufferTooLarge { surface } => write!(
+                formatter,
+                "rgba buffer is too large for {}x{} surface",
+                surface.width, surface.height
+            ),
+            Self::PixelBufferLength { expected, actual } => write!(
+                formatter,
+                "rgba buffer length mismatch: expected {expected} bytes, got {actual}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SceneRasterError {}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RenderScene {
     pub frame: u64,
@@ -85,6 +152,7 @@ pub struct RenderScene {
     pub clear_color: Color,
     pub visual_hash: Option<u32>,
     pub sprites: Vec<SceneSprite>,
+    raster: Option<SceneRaster>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +160,7 @@ pub struct RenderSceneSummary {
     pub frame: u64,
     pub surface: SurfaceSize,
     pub visual_hash: Option<u32>,
+    pub raster_count: usize,
     pub sprite_count: usize,
     pub layers: RenderLayerCounts,
 }
@@ -104,11 +173,38 @@ impl RenderScene {
             clear_color: Color { rgba: [0; 4] },
             visual_hash: None,
             sprites: Vec::new(),
+            raster: None,
         }
+    }
+
+    pub fn from_rgba(
+        frame: u64,
+        surface: SurfaceSize,
+        pixels: Vec<u8>,
+        visual_hash: Option<u32>,
+    ) -> Result<Self, SceneRasterError> {
+        let raster = SceneRaster::from_rgba(surface, pixels)?;
+        Ok(Self {
+            frame,
+            surface,
+            clear_color: Color { rgba: [0; 4] },
+            visual_hash,
+            sprites: Vec::new(),
+            raster: Some(raster),
+        })
     }
 
     pub fn push_sprite(&mut self, sprite: SceneSprite) {
         self.sprites.push(sprite);
+    }
+
+    pub fn raster(&self) -> Option<&SceneRaster> {
+        self.raster.as_ref()
+    }
+
+    pub fn set_raster(&mut self, raster: SceneRaster) {
+        self.surface = raster.surface;
+        self.raster = Some(raster);
     }
 
     pub fn summary(&self) -> RenderSceneSummary {
@@ -121,9 +217,211 @@ impl RenderScene {
             frame: self.frame,
             surface: self.surface,
             visual_hash: self.visual_hash,
+            raster_count: usize::from(self.raster.is_some()),
             sprite_count: self.sprites.len(),
             layers,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum NativeRenderPipeline {
+    TemporaryRaster,
+    Terrain,
+    Starfield,
+    Sprites,
+    Projectiles,
+    Explosions,
+    HudText,
+    DebugOverlay,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AtlasRegion {
+    pub sprite: SpriteId,
+    pub origin: [u32; 2],
+    pub size: [u32; 2],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextureAtlas {
+    pub surface: SurfaceSize,
+    pub regions: Vec<AtlasRegion>,
+}
+
+impl TextureAtlas {
+    pub fn new(surface: SurfaceSize, regions: Vec<AtlasRegion>) -> Self {
+        Self { surface, regions }
+    }
+
+    pub fn default_sprites() -> Self {
+        Self {
+            surface: SurfaceSize::new(128, 128),
+            regions: vec![
+                AtlasRegion {
+                    sprite: SpriteId::PLAYER_SHIP,
+                    origin: [0, 0],
+                    size: [16, 8],
+                },
+                AtlasRegion {
+                    sprite: SpriteId::SCORE_TEXT,
+                    origin: [0, 16],
+                    size: [80, 8],
+                },
+                AtlasRegion {
+                    sprite: SpriteId::STATUS_TEXT,
+                    origin: [0, 32],
+                    size: [96, 8],
+                },
+            ],
+        }
+    }
+
+    pub fn contains(&self, sprite: SpriteId) -> bool {
+        self.regions.iter().any(|region| region.sprite == sprite)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PaletteResource {
+    pub colors: Vec<Color>,
+}
+
+impl PaletteResource {
+    pub fn defender_default() -> Self {
+        Self {
+            colors: vec![
+                Color {
+                    rgba: [0, 0, 0, 255],
+                },
+                Color::WHITE,
+                Color {
+                    rgba: [217, 81, 255, 255],
+                },
+                Color {
+                    rgba: [38, 174, 0, 255],
+                },
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FontAtlas {
+    pub glyph_size: [u32; 2],
+    pub glyph_count: u16,
+}
+
+impl Default for FontAtlas {
+    fn default() -> Self {
+        Self {
+            glyph_size: [8, 8],
+            glyph_count: 96,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeRendererResources {
+    pub atlas: TextureAtlas,
+    pub palette: PaletteResource,
+    pub font: FontAtlas,
+    pub pipelines: BTreeSet<NativeRenderPipeline>,
+}
+
+impl Default for NativeRendererResources {
+    fn default() -> Self {
+        let pipelines = [
+            NativeRenderPipeline::TemporaryRaster,
+            NativeRenderPipeline::Terrain,
+            NativeRenderPipeline::Starfield,
+            NativeRenderPipeline::Sprites,
+            NativeRenderPipeline::Projectiles,
+            NativeRenderPipeline::Explosions,
+            NativeRenderPipeline::HudText,
+            NativeRenderPipeline::DebugOverlay,
+        ]
+        .into_iter()
+        .collect();
+
+        Self {
+            atlas: TextureAtlas::default_sprites(),
+            palette: PaletteResource::defender_default(),
+            font: FontAtlas::default(),
+            pipelines,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SceneRasterUpload {
+    pub surface: SurfaceSize,
+    pub byte_len: usize,
+    pub visual_hash: Option<u32>,
+    pub non_blank: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneDrawPlan {
+    pub frame: u64,
+    pub surface: SurfaceSize,
+    pub pipelines: Vec<NativeRenderPipeline>,
+    pub sprite_instances: usize,
+    pub layer_counts: RenderLayerCounts,
+    pub raster_upload: Option<SceneRasterUpload>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NativeSceneRenderer {
+    pub resources: NativeRendererResources,
+}
+
+impl NativeSceneRenderer {
+    pub fn new(resources: NativeRendererResources) -> Self {
+        Self { resources }
+    }
+
+    pub fn prepare(&self, scene: &RenderScene) -> SceneDrawPlan {
+        let mut requested = BTreeSet::new();
+        if scene.raster.is_some() {
+            requested.insert(NativeRenderPipeline::TemporaryRaster);
+        }
+
+        let mut layer_counts = RenderLayerCounts::default();
+        for sprite in &scene.sprites {
+            layer_counts.add(sprite.layer);
+            requested.insert(pipeline_for_layer(sprite.layer));
+        }
+
+        let pipelines = requested
+            .into_iter()
+            .filter(|pipeline| self.resources.pipelines.contains(pipeline))
+            .collect();
+
+        SceneDrawPlan {
+            frame: scene.frame,
+            surface: scene.surface,
+            pipelines,
+            sprite_instances: scene.sprites.len(),
+            layer_counts,
+            raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
+                surface: raster.surface,
+                byte_len: raster.pixels.len(),
+                visual_hash: scene.visual_hash,
+                non_blank: raster.is_non_blank(),
+            }),
+        }
+    }
+}
+
+fn pipeline_for_layer(layer: RenderLayer) -> NativeRenderPipeline {
+    match layer {
+        RenderLayer::Terrain => NativeRenderPipeline::Terrain,
+        RenderLayer::Starfield => NativeRenderPipeline::Starfield,
+        RenderLayer::Objects => NativeRenderPipeline::Sprites,
+        RenderLayer::Projectiles => NativeRenderPipeline::Projectiles,
+        RenderLayer::Hud => NativeRenderPipeline::HudText,
+        RenderLayer::Overlay => NativeRenderPipeline::DebugOverlay,
     }
 }
 
@@ -147,8 +445,9 @@ impl Default for GpuRendererSettings {
 #[cfg(test)]
 mod tests {
     use super::{
-        Color, GpuRendererSettings, RenderLayer, RenderLayerCounts, RenderScene, SceneSprite,
-        SpriteId, SurfaceSize,
+        AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
+        NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneRaster,
+        SceneRasterError, SceneSprite, SpriteId, SurfaceSize, TextureAtlas,
     };
 
     #[test]
@@ -195,6 +494,7 @@ mod tests {
         let summary = scene.summary();
 
         assert_eq!(summary.visual_hash, Some(0xCAFE_BABE));
+        assert_eq!(summary.raster_count, 0);
         assert_eq!(summary.sprite_count, 2);
         assert_eq!(
             summary.layers,
@@ -204,6 +504,76 @@ mod tests {
                 ..RenderLayerCounts::default()
             }
         );
+    }
+
+    #[test]
+    fn scene_raster_validates_rgba_payload_length() {
+        let surface = SurfaceSize::new(2, 2);
+        let pixels = vec![0; 15];
+
+        assert_eq!(
+            SceneRaster::from_rgba(surface, pixels).expect_err("invalid length"),
+            SceneRasterError::PixelBufferLength {
+                expected: 16,
+                actual: 15
+            }
+        );
+    }
+
+    #[test]
+    fn scene_raster_reports_oversized_surfaces_and_formats_errors() {
+        let error = SceneRaster::from_rgba(SurfaceSize::new(u32::MAX, u32::MAX), Vec::new())
+            .expect_err("oversized surface");
+
+        assert_eq!(
+            error,
+            SceneRasterError::PixelBufferTooLarge {
+                surface: SurfaceSize::new(u32::MAX, u32::MAX)
+            }
+        );
+        assert_eq!(
+            error.to_string(),
+            "rgba buffer is too large for 4294967295x4294967295 surface"
+        );
+        assert_eq!(
+            SceneRasterError::PixelBufferLength {
+                expected: 8,
+                actual: 4
+            }
+            .to_string(),
+            "rgba buffer length mismatch: expected 8 bytes, got 4"
+        );
+    }
+
+    #[test]
+    fn render_scene_from_raster_keeps_temporary_fidelity_payload() {
+        let scene = RenderScene::from_rgba(
+            21,
+            SurfaceSize::new(2, 1),
+            vec![0, 0, 0, 255, 10, 20, 30, 255],
+            Some(0x1234_5678),
+        )
+        .expect("raster scene");
+
+        let raster = scene.raster().expect("scene raster");
+        assert_eq!(raster.surface, SurfaceSize::new(2, 1));
+        assert!(raster.is_non_blank());
+        assert_eq!(scene.summary().raster_count, 1);
+        assert_eq!(scene.summary().visual_hash, Some(0x1234_5678));
+    }
+
+    #[test]
+    fn render_scene_can_replace_raster_payload_and_move_pixels_out() {
+        let mut scene = RenderScene::empty(22, SurfaceSize::new(1, 1));
+        let raster =
+            SceneRaster::from_rgba(SurfaceSize::new(2, 1), vec![1, 2, 3, 255, 4, 5, 6, 255])
+                .expect("replacement raster");
+
+        scene.set_raster(raster.clone());
+
+        assert_eq!(scene.surface, SurfaceSize::new(2, 1));
+        assert_eq!(scene.summary().raster_count, 1);
+        assert_eq!(raster.into_pixels(), vec![1, 2, 3, 255, 4, 5, 6, 255]);
     }
 
     #[test]
@@ -248,5 +618,141 @@ mod tests {
 
         assert_eq!(settings.texture_format, wgpu::TextureFormat::Rgba8UnormSrgb);
         assert_eq!(settings.present_mode, wgpu::PresentMode::AutoVsync);
+    }
+
+    #[test]
+    fn texture_atlas_owns_sprite_regions() {
+        let atlas = TextureAtlas::new(
+            SurfaceSize::new(16, 16),
+            vec![AtlasRegion {
+                sprite: SpriteId(42),
+                origin: [1, 2],
+                size: [3, 4],
+            }],
+        );
+
+        assert!(atlas.contains(SpriteId(42)));
+        assert!(!atlas.contains(SpriteId::PLAYER_SHIP));
+        assert!(TextureAtlas::default_sprites().contains(SpriteId::STATUS_TEXT));
+    }
+
+    #[test]
+    fn native_scene_renderer_builds_draw_plan_from_scene_layers() {
+        let mut scene = RenderScene::empty(34, SurfaceSize::new(292, 240));
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_SHIP,
+            layer: RenderLayer::Objects,
+            position: [128.0, 96.0],
+            size: [16.0, 8.0],
+            tint: Color::WHITE,
+        });
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::SCORE_TEXT,
+            layer: RenderLayer::Hud,
+            position: [0.0, 0.0],
+            size: [80.0, 8.0],
+            tint: Color::WHITE,
+        });
+
+        let plan = NativeSceneRenderer::default().prepare(&scene);
+
+        assert_eq!(plan.frame, 34);
+        assert_eq!(plan.sprite_instances, 2);
+        assert_eq!(
+            plan.pipelines,
+            vec![NativeRenderPipeline::Sprites, NativeRenderPipeline::HudText]
+        );
+        assert_eq!(
+            plan.layer_counts,
+            RenderLayerCounts {
+                objects: 1,
+                hud: 1,
+                ..RenderLayerCounts::default()
+            }
+        );
+        assert_eq!(plan.raster_upload, None);
+    }
+
+    #[test]
+    fn native_scene_renderer_respects_available_resource_pipelines() {
+        let mut resources = NativeRendererResources::default();
+        resources
+            .pipelines
+            .remove(&NativeRenderPipeline::TemporaryRaster);
+        let renderer = NativeSceneRenderer::new(resources);
+        let scene = RenderScene::from_rgba(1, SurfaceSize::new(1, 1), vec![0, 0, 0, 255], None)
+            .expect("raster scene");
+
+        let plan = renderer.prepare(&scene);
+
+        assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
+        assert!(plan.raster_upload.is_some());
+    }
+
+    #[test]
+    fn native_scene_renderer_maps_all_domain_layers_to_pipelines() {
+        let mut scene = RenderScene::empty(80, SurfaceSize::new(292, 240));
+        for (layer, sprite) in [
+            (RenderLayer::Terrain, SpriteId(10)),
+            (RenderLayer::Starfield, SpriteId(11)),
+            (RenderLayer::Projectiles, SpriteId(12)),
+        ] {
+            scene.push_sprite(SceneSprite {
+                sprite,
+                layer,
+                position: [0.0, 0.0],
+                size: [1.0, 1.0],
+                tint: Color::WHITE,
+            });
+        }
+
+        let plan = NativeSceneRenderer::default().prepare(&scene);
+
+        assert_eq!(
+            plan.pipelines,
+            vec![
+                NativeRenderPipeline::Terrain,
+                NativeRenderPipeline::Starfield,
+                NativeRenderPipeline::Projectiles
+            ]
+        );
+    }
+
+    #[test]
+    fn native_scene_renderer_keeps_raster_upload_separate_from_sprites() {
+        let mut scene = RenderScene::from_rgba(
+            55,
+            SurfaceSize::new(1, 1),
+            vec![1, 2, 3, 255],
+            Some(0xFEED_FACE),
+        )
+        .expect("raster scene");
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::STATUS_TEXT,
+            layer: RenderLayer::Overlay,
+            position: [0.0, 0.0],
+            size: [8.0, 8.0],
+            tint: Color::WHITE,
+        });
+
+        let plan = NativeSceneRenderer::default().prepare(&scene);
+
+        assert_eq!(
+            plan.pipelines,
+            vec![
+                NativeRenderPipeline::TemporaryRaster,
+                NativeRenderPipeline::DebugOverlay
+            ]
+        );
+        assert_eq!(
+            plan.raster_upload,
+            Some(super::SceneRasterUpload {
+                surface: SurfaceSize::new(1, 1),
+                byte_len: 4,
+                visual_hash: Some(0xFEED_FACE),
+                non_blank: true,
+            })
+        );
+        assert_eq!(plan.sprite_instances, 1);
     }
 }

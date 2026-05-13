@@ -62,8 +62,10 @@ pub use game::{
 pub use oracle::GameplayOracle;
 pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
 pub use renderer::{
-    Color, GpuRendererSettings, RenderLayer, RenderLayerCounts, RenderScene, RenderSceneSummary,
-    SceneSprite, SpriteId, SurfaceSize,
+    AtlasRegion, Color, FontAtlas, GpuRendererSettings, NativeRenderPipeline,
+    NativeRendererResources, NativeSceneRenderer, PaletteResource, RenderLayer, RenderLayerCounts,
+    RenderScene, RenderSceneSummary, SceneDrawPlan, SceneRaster, SceneRasterError,
+    SceneRasterUpload, SceneSprite, SpriteId, SurfaceSize, TextureAtlas,
 };
 pub use systems::{FixedStepAccumulator, FrameRate, GameSimulation, advance_one_frame};
 

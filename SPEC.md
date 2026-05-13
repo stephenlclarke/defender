@@ -59,7 +59,8 @@ tree:
 - `src/systems.rs`: deterministic fixed-step timing utilities plus the clean
   `GameSimulation` trait for future game systems.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
-  layers, scene summaries, and renderer settings.
+  layers, temporary raster evidence, renderer-owned resources, scene summaries,
+  and draw planning.
 - `src/platform.rs`: runtime configuration for controls, audio, run mode, and
   persistence.
 - `src/oracle.rs`: the explicit adapter from clean gameplay contracts to the
@@ -69,10 +70,11 @@ tree:
 The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,
 live audio command delivery, fidelity trace generation, the threaded live core
-runtime boundary, `wgpu` latest-frame delivery, CMOS storage, and test helpers
-until clean systems replace those responsibilities. Kitty terminal graphics
-code remains parked there as historical compatibility evidence, but it is not
-part of the active runtime surface.
+runtime boundary, `wgpu` window ownership, CMOS storage, and test helpers until
+clean systems replace those responsibilities. Live presentation receives clean
+`RenderScene` data, currently with a temporary raster payload for visual
+equivalence. Kitty terminal graphics code remains parked there as historical
+compatibility evidence, but it is not part of the active runtime surface.
 
 ## Current Behavior Surface
 
