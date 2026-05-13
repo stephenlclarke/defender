@@ -81,6 +81,8 @@ clean systems replace those responsibilities. Those root adapters are
 crate-private. Clean runtime and oracle callers use the crate-private
 `accepted` facade, which translates legacy frame output into neutral
 accepted-behavior contracts before the public clean gameplay types see it.
+Legacy-specific clean equivalence regressions are also wired from
+`src_legacy/` so clean oracle source stays focused on gameplay contracts.
 Temporary tools still use the doc-hidden `defender::compatibility` namespace as
 the boundary to the legacy tree. Live presentation receives clean `RenderScene`
 data, currently with a temporary raster payload for visual equivalence. Kitty

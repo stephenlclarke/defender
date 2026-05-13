@@ -227,7 +227,9 @@ Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input,
 sound-board command evidence, fidelity trace generation and threaded fixture
 checks, the threaded live core runtime boundary, `wgpu` window ownership, CMOS
-storage, and test helpers. They remain wired as doc-hidden compatibility
+storage, and test helpers. Legacy-specific clean equivalence regressions are
+also wired from `src_legacy/` so `src/oracle.rs` stays focused on clean gameplay
+contracts. They remain wired as doc-hidden compatibility
 modules rather than supported public API. The binary enters through the clean
 platform boundary before delegating to the compatibility runtime. The live
 worker now wraps accepted visual output as a clean `RenderScene` raster payload

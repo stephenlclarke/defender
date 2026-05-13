@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `a60585d`.
+- Latest accepted implementation commit before this cycle: `161bb13`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
@@ -98,7 +98,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-64` are complete. `DC-65` is planned, and the standing
+`DC-42` through `DC-65` are complete. `DC-66` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1353,7 +1353,69 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778701401764609`
 
-### DC-65: Oracle Retirement
+### DC-65: Oracle Equivalence Quarantine
+
+Status: `complete`
+
+Goal: move legacy-specific oracle equivalence checks out of clean oracle source
+without weakening the clean-system regression coverage.
+
+Scope:
+
+- Keep `src/oracle.rs` focused on clean gameplay adapter contracts.
+- Move low-level accepted-behavior equivalence checks that need legacy process,
+  memory, and red-label names into a `src_legacy/` test module.
+- Wire the quarantined tests through `src/lib.rs` only for `cfg(test)`.
+- Add a public API guard so `src/oracle.rs` does not reintroduce legacy
+  terminology while the accepted facade remains temporary.
+- Document the test quarantine boundary in README and SPEC.
+
+Acceptance criteria:
+
+- `src/oracle.rs` contains no direct compatibility or red-label terminology.
+- The moved equivalence tests still run in the normal library test suite.
+- Focused oracle, quarantined equivalence, and public API tests pass.
+- README, SPEC, and PLAN describe the new test boundary.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib oracle::tests
+cargo test --lib oracle_equivalence_tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+ORACLE_LEGACY_TERMS='red_label|RED_LABEL|defend\\.|src/machine_memory|source routine|assembler|compatibility'
+! rg -n "$ORACLE_LEGACY_TERMS" src/oracle.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 21:03:12 BST` Started `DC-65`: posted the cycle start update and
+  began quarantining legacy-heavy oracle equivalence checks out of
+  `src/oracle.rs` while preserving the clean-system regression coverage.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778702592948259`
+- `2026-05-13 21:28:13 BST` Completed `DC-65`: moved the low-level legacy
+  oracle equivalence checks into `src_legacy/oracle_equivalence_tests.rs`, left
+  `src/oracle.rs` with clean accepted/gameplay adapter tests, added a public
+  API guard against legacy terminology in `src/oracle.rs`, and documented the
+  test quarantine boundary. Validation passed with the DC-65 gate: focused
+  oracle/equivalence/API tests, all-target tests, clippy, `make fidelity`, live
+  smoke, oracle terminology search, markdownlint, and `git diff --check`.
+  `make fidelity` reported new Rust line coverage `0/0` non-baselined added
+  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs,
+  observed attract, credit, and playing states, injected all required controls,
+  and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778704093033349`
+
+### DC-66: Oracle Retirement
 
 Status: `planned`
 

@@ -167,6 +167,10 @@ pub use systems::{
 pub(crate) mod test_support;
 
 #[cfg(test)]
+#[path = "../src_legacy/oracle_equivalence_tests.rs"]
+mod oracle_equivalence_tests;
+
+#[cfg(test)]
 mod public_api_tests {
     #[test]
     fn clean_contracts_have_oracle_path() {
@@ -217,7 +221,7 @@ mod public_api_tests {
     }
 
     #[test]
-    fn compatibility_namespace_is_used_by_clean_runtime_and_oracle() {
+    fn clean_runtime_and_oracle_use_accepted_facade() {
         let platform_rs = include_str!("platform.rs");
         assert!(platform_rs.contains("crate::accepted::run_runtime()"));
         assert!(!platform_rs.contains("crate::compatibility::"));
@@ -235,7 +239,14 @@ mod public_api_tests {
         ] {
             assert!(
                 !oracle_rs.contains(forbidden),
-                "clean oracle boundary must use compatibility namespace instead of {forbidden}"
+                "clean oracle boundary must use accepted facade instead of {forbidden}"
+            );
+        }
+
+        for forbidden in ["red_label", "RED_LABEL", "source routine", "assembler"] {
+            assert!(
+                !oracle_rs.contains(forbidden),
+                "clean oracle source must not expose legacy terminology {forbidden}"
             );
         }
     }
