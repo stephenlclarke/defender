@@ -4,6 +4,8 @@
 //! parked under `src_legacy/` and remains wired only as the gameplay oracle and
 //! compatibility runtime while the rewrite proves equivalent behavior.
 
+mod accepted;
+
 pub mod audio;
 pub mod game;
 pub mod oracle;
@@ -217,12 +219,14 @@ mod public_api_tests {
     #[test]
     fn compatibility_namespace_is_used_by_clean_runtime_and_oracle() {
         let platform_rs = include_str!("platform.rs");
-        assert!(platform_rs.contains("crate::compatibility::app::run()"));
+        assert!(platform_rs.contains("crate::accepted::run_runtime()"));
+        assert!(!platform_rs.contains("crate::compatibility::"));
         assert!(!platform_rs.contains("crate::app::run()"));
 
         let oracle_rs = include_str!("oracle.rs");
-        assert!(oracle_rs.contains("crate::compatibility::"));
+        assert!(oracle_rs.contains("crate::accepted::"));
         for forbidden in [
+            "crate::compatibility::",
             "crate::input::",
             "crate::machine::",
             "crate::machine_state::",

@@ -55,6 +55,8 @@ tree:
 - `src/lib.rs`: clean public crate wiring plus crate-private explicit
   `#[path]` adapters to the legacy oracle tree and a doc-hidden
   `compatibility` namespace for temporary oracle/tool access.
+- `src/accepted.rs`: crate-private accepted-behavior facade that isolates clean
+  production modules from direct legacy runtime and oracle imports.
 - `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
   `GameEvents`, score, player, direction, and sound-event contracts.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
@@ -68,21 +70,22 @@ tree:
   controls, audio, run mode, and persistence.
 - `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
   boundary, disabled/null no-device modes, and runtime diagnostics.
-- `src/oracle.rs`: the explicit adapter from clean gameplay contracts to the
-  current accepted implementation, including clean state, event, sound, and
-  scene-summary frames.
+- `src/oracle.rs`: the explicit clean gameplay oracle, including clean state,
+  event, sound, and scene-summary frames from the accepted-behavior facade.
 
 The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,
 sound-board command evidence, fidelity trace generation, the threaded live core
 runtime boundary, `wgpu` window ownership, CMOS storage, and test helpers until
 clean systems replace those responsibilities. Those root adapters are
-crate-private, and clean runtime, oracle, and tool callers that still need
-accepted-behavior evidence use the doc-hidden `defender::compatibility`
-namespace as the boundary to that legacy tree. Live presentation receives clean
-`RenderScene` data, currently with a temporary raster payload for visual
-equivalence. Kitty terminal graphics code remains parked there as historical
-compatibility evidence, but it is not part of the active runtime surface.
+crate-private. Clean runtime and oracle callers use the crate-private
+`accepted` facade, which translates legacy frame output into neutral
+accepted-behavior contracts before the public clean gameplay types see it.
+Temporary tools still use the doc-hidden `defender::compatibility` namespace as
+the boundary to the legacy tree. Live presentation receives clean `RenderScene`
+data, currently with a temporary raster payload for visual equivalence. Kitty
+terminal graphics code remains parked there as historical compatibility
+evidence, but it is not part of the active runtime surface.
 
 ## Current Behavior Surface
 
@@ -147,7 +150,8 @@ explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
   `docs/fidelity/live-audio.md`.
 - Local MAME reference generation is intentionally local tooling; generated
   reference traces are not part of the normal runtime.
-- New clean callers must avoid direct legacy module imports. Code that still
-  needs accepted-behavior evidence should use the doc-hidden
-  `compatibility::...` boundary until the clean system replaces that
-  responsibility; root legacy modules must remain crate-private.
+- New clean production callers must avoid direct legacy module imports. Code
+  that still needs accepted-behavior evidence should use the crate-private
+  `accepted` facade until the clean system replaces that responsibility.
+  Temporary tool callers may use the doc-hidden `compatibility::...` boundary;
+  root legacy modules must remain crate-private.

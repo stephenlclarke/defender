@@ -53,7 +53,7 @@ impl RuntimeConfig {
 }
 
 pub fn run() -> anyhow::Result<()> {
-    crate::compatibility::app::run()
+    crate::accepted::run_runtime()
 }
 
 #[cfg(test)]

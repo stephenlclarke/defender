@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `05fdeb2`.
+- Latest accepted implementation commit before this cycle: `a60585d`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
@@ -98,7 +98,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-63` are complete. `DC-64` is planned, and the standing
+`DC-42` through `DC-64` are complete. `DC-65` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1285,7 +1285,75 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778698710074379`
 
-### DC-64: Oracle Retirement
+### DC-64: Accepted-Behavior Facade
+
+Status: `complete`
+
+Goal: isolate production clean runtime and oracle code from direct legacy
+module names while preserving the accepted gameplay implementation as the
+temporary oracle.
+
+Scope:
+
+- Add a crate-private `src/accepted.rs` facade over the temporary accepted
+  implementation.
+- Convert accepted machine output into neutral accepted-behavior frame,
+  snapshot, phase, direction, event, sound, and visual-hash contracts before
+  `src/oracle.rs` adapts them to clean gameplay types.
+- Route `src/platform.rs` through the accepted facade instead of calling the
+  doc-hidden compatibility runtime directly.
+- Keep low-level legacy method access in tests and temporary tooling only.
+- Update architecture tests and docs so future clean production callers use
+  the accepted facade rather than `defender::compatibility`.
+
+Acceptance criteria:
+
+- `src/oracle.rs` production code imports `crate::accepted::...`, not
+  `crate::compatibility::...` or direct legacy root modules.
+- `src/platform.rs` dispatches through `crate::accepted::run_runtime()`.
+- Focused accepted-facade, oracle, and public API tests pass.
+- README, SPEC, and PLAN describe the accepted facade as the current retirement
+  boundary.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib accepted::tests
+cargo test --lib oracle::tests
+cargo test --lib public_api_tests
+cargo check --all-targets
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 20:01:11 BST` Started `DC-64`: posted the cycle start update and
+  began isolating production runtime/oracle access behind a neutral
+  accepted-behavior facade while keeping the legacy machine available for
+  behavior comparison.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778698871347899`
+- `2026-05-13 20:43:21 BST` Completed `DC-64`: added the crate-private
+  `src/accepted.rs` facade, routed `platform` and `GameplayOracle` through
+  `crate::accepted`, converted accepted machine output into neutral frame,
+  snapshot, phase, direction, event, sound-command, and visual-hash contracts,
+  and updated docs/tests to preserve the boundary. Validation passed with the
+  DC-64 gate: formatting, focused accepted/oracle/API tests, all-target
+  check/test/clippy, `make fidelity`, live smoke, markdownlint, and
+  `git diff --check`. `make fidelity` reported new Rust line coverage `38/38`
+  non-baselined added executable lines. Live smoke rendered 239 frames, saw 74
+  distinct frame CRCs, observed attract, credit, and playing states, injected
+  all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778701401764609`
+
+### DC-65: Oracle Retirement
 
 Status: `planned`
 

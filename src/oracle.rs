@@ -4,29 +4,27 @@
 //! against the existing behavior without letting converted implementation names
 //! leak into new production contracts.
 
-use crate::compatibility::{
-    input::CabinetInput,
-    machine::ArcadeMachine,
-    machine_state::{self, FrameOutput, MachineEvent, MachineSnapshot},
-    red_label::Facing,
+use crate::accepted::{
+    AcceptedDirection, AcceptedEvent, AcceptedFrame, AcceptedGameplayMachine, AcceptedPhase,
+    AcceptedSnapshot,
 };
 
-use super::game::{
+use crate::game::{
     Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameState, PlayerSnapshot,
     ScoreSnapshot, SoundEvent, WorldVector,
 };
-use super::renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize};
-use super::systems::GameSimulation;
+use crate::renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize};
+use crate::systems::GameSimulation;
 
 #[derive(Debug)]
 pub struct GameplayOracle {
-    machine: ArcadeMachine,
+    machine: AcceptedGameplayMachine,
 }
 
 impl GameplayOracle {
     pub fn new() -> Self {
         Self {
-            machine: ArcadeMachine::new(),
+            machine: AcceptedGameplayMachine::new(),
         }
     }
 
@@ -35,7 +33,7 @@ impl GameplayOracle {
     }
 
     pub fn step(&mut self, input: GameInput) -> GameFrame {
-        adapt_frame_output(self.machine.step(to_cabinet_input(input)))
+        adapt_frame_output(self.machine.step(input))
     }
 }
 
@@ -55,45 +53,25 @@ impl GameSimulation for GameplayOracle {
     }
 }
 
-fn to_cabinet_input(input: GameInput) -> CabinetInput {
-    CabinetInput {
-        coin: input.coin,
-        coin_two: input.coin_two,
-        coin_three: input.coin_three,
-        start_one: input.start_one,
-        start_two: input.start_two,
-        altitude_up: input.altitude_up,
-        altitude_down: input.altitude_down,
-        reverse: input.reverse,
-        thrust: input.thrust,
-        fire: input.fire,
-        smart_bomb: input.smart_bomb,
-        hyperspace: input.hyperspace,
-        auto_up_manual_down: input.service_auto_up,
-        service_advance: input.service_advance,
-        high_score_reset: input.high_score_reset,
-        tilt: input.tilt,
-    }
-}
-
-fn adapt_frame_output(output: FrameOutput) -> GameFrame {
+fn adapt_frame_output(output: AcceptedFrame) -> GameFrame {
     let state = adapt_snapshot(output.snapshot);
-    let scene = adapt_scene(&state, output.video_crc32);
+    let scene = adapt_scene(&state, output.visual_hash);
 
     GameFrame {
         state,
         events: GameEvents::new(
-            output.events().map(adapt_event).collect(),
+            output.events.into_iter().map(adapt_event).collect(),
             output
-                .sound_commands()
-                .map(|command| SoundEvent::from_accepted_command(command.raw()))
+                .sound_commands
+                .into_iter()
+                .map(SoundEvent::from_accepted_command)
                 .collect(),
         ),
         scene,
     }
 }
 
-fn adapt_snapshot(snapshot: MachineSnapshot) -> GameState {
+fn adapt_snapshot(snapshot: AcceptedSnapshot) -> GameState {
     GameState {
         frame: snapshot.frame,
         phase: adapt_phase(snapshot.phase),
@@ -102,14 +80,14 @@ fn adapt_snapshot(snapshot: MachineSnapshot) -> GameState {
         wave: snapshot.wave,
         player: PlayerSnapshot {
             position: (
-                WorldVector::from_subpixels(snapshot.player.x.0),
-                WorldVector::from_subpixels(snapshot.player.y.0),
+                WorldVector::from_subpixels(snapshot.player.x_subpixels),
+                WorldVector::from_subpixels(snapshot.player.y_subpixels),
             ),
             velocity: (
-                WorldVector::from_subpixels(snapshot.player.xv.0),
-                WorldVector::from_subpixels(snapshot.player.yv.0),
+                WorldVector::from_subpixels(snapshot.player.x_velocity_subpixels),
+                WorldVector::from_subpixels(snapshot.player.y_velocity_subpixels),
             ),
-            direction: adapt_direction(snapshot.player.facing),
+            direction: adapt_direction(snapshot.player.direction),
             lives: snapshot.player.lives,
             smart_bombs: snapshot.player.smart_bombs,
         },
@@ -123,7 +101,7 @@ fn adapt_snapshot(snapshot: MachineSnapshot) -> GameState {
 }
 
 fn adapt_scene(state: &GameState, visual_hash: Option<u32>) -> RenderScene {
-    let (width, height) = crate::compatibility::video::native_visible_size();
+    let (width, height) = crate::accepted::native_visible_size();
     let mut scene = RenderScene::empty(
         state.frame,
         SurfaceSize::new(u32::from(width), u32::from(height)),
@@ -157,59 +135,64 @@ fn world_vector_pixels(vector: WorldVector) -> f32 {
     vector.subpixels() as f32 / WorldVector::SUBPIXELS_PER_PIXEL as f32
 }
 
-fn adapt_phase(phase: machine_state::GamePhase) -> GamePhase {
+fn adapt_phase(phase: AcceptedPhase) -> GamePhase {
     match phase {
-        machine_state::GamePhase::Attract => GamePhase::Attract,
-        machine_state::GamePhase::Playing => GamePhase::Playing,
-        machine_state::GamePhase::GameOver => GamePhase::GameOver,
-        machine_state::GamePhase::HighScoreEntry => GamePhase::HighScoreEntry,
+        AcceptedPhase::Attract => GamePhase::Attract,
+        AcceptedPhase::Playing => GamePhase::Playing,
+        AcceptedPhase::GameOver => GamePhase::GameOver,
+        AcceptedPhase::HighScoreEntry => GamePhase::HighScoreEntry,
     }
 }
 
-fn adapt_direction(direction: Facing) -> Direction {
+fn adapt_direction(direction: AcceptedDirection) -> Direction {
     match direction {
-        Facing::Left => Direction::Left,
-        Facing::Right => Direction::Right,
+        AcceptedDirection::Left => Direction::Left,
+        AcceptedDirection::Right => Direction::Right,
     }
 }
 
-fn adapt_event(event: MachineEvent) -> GameEvent {
+fn adapt_event(event: AcceptedEvent) -> GameEvent {
     match event {
-        MachineEvent::CreditAdded => GameEvent::CreditAdded,
-        MachineEvent::GameStarted => GameEvent::GameStarted,
-        MachineEvent::DiagnosticsSelected => GameEvent::DiagnosticsSelected,
-        MachineEvent::AuditsSelected => GameEvent::AuditsSelected,
-        MachineEvent::HighScoreReset => GameEvent::HighScoreReset,
-        MachineEvent::ReversePressed => GameEvent::ReversePressed,
-        MachineEvent::FirePressed => GameEvent::FirePressed,
-        MachineEvent::SmartBombPressed => GameEvent::SmartBombPressed,
-        MachineEvent::HyperspacePressed => GameEvent::HyperspacePressed,
-        MachineEvent::BonusAwarded => GameEvent::BonusAwarded,
-        MachineEvent::HighScoreEntryStarted => GameEvent::HighScoreEntryStarted,
-        MachineEvent::HighScoreInitialAccepted => GameEvent::HighScoreInitialAccepted,
-        MachineEvent::HighScoreSubmitted => GameEvent::HighScoreSubmitted,
+        AcceptedEvent::CreditAdded => GameEvent::CreditAdded,
+        AcceptedEvent::GameStarted => GameEvent::GameStarted,
+        AcceptedEvent::DiagnosticsSelected => GameEvent::DiagnosticsSelected,
+        AcceptedEvent::AuditsSelected => GameEvent::AuditsSelected,
+        AcceptedEvent::HighScoreReset => GameEvent::HighScoreReset,
+        AcceptedEvent::ReversePressed => GameEvent::ReversePressed,
+        AcceptedEvent::FirePressed => GameEvent::FirePressed,
+        AcceptedEvent::SmartBombPressed => GameEvent::SmartBombPressed,
+        AcceptedEvent::HyperspacePressed => GameEvent::HyperspacePressed,
+        AcceptedEvent::BonusAwarded => GameEvent::BonusAwarded,
+        AcceptedEvent::HighScoreEntryStarted => GameEvent::HighScoreEntryStarted,
+        AcceptedEvent::HighScoreInitialAccepted => GameEvent::HighScoreInitialAccepted,
+        AcceptedEvent::HighScoreSubmitted => GameEvent::HighScoreSubmitted,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::compatibility::{
-        input::{
-            CabinetInput, DEFENDER_IN0_ALTITUDE_DOWN, DEFENDER_IN0_FIRE, DEFENDER_IN0_HYPERSPACE,
-            DEFENDER_IN0_REVERSE, DEFENDER_IN0_SMART_BOMB, DEFENDER_IN0_THRUST,
-            DEFENDER_IN1_ALTITUDE_UP,
+    use crate::{
+        accepted::{
+            AcceptedDirection, AcceptedEvent, AcceptedFrame, AcceptedPhase, cabinet_input_for_test,
         },
-        machine::{
-            ArcadeMachine, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelLaserDirection,
-            RedLabelLaserFire, RedLabelPlayerMotion,
+        compatibility::{
+            input::{
+                DEFENDER_IN0_ALTITUDE_DOWN, DEFENDER_IN0_FIRE, DEFENDER_IN0_HYPERSPACE,
+                DEFENDER_IN0_REVERSE, DEFENDER_IN0_SMART_BOMB, DEFENDER_IN0_THRUST,
+                DEFENDER_IN1_ALTITUDE_UP,
+            },
+            machine::{
+                ArcadeMachine, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelLaserDirection,
+                RedLabelLaserFire, RedLabelPlayerMotion,
+            },
+            machine_state,
+            red_label::{Facing, Fixed16},
         },
-        machine_state,
-        red_label::{Facing, Fixed16},
     };
 
     use super::{
-        Direction, GameEvent, GameInput, GamePhase, GameplayOracle, WorldVector, adapt_event,
-        adapt_phase, adapt_scene, adapt_snapshot, to_cabinet_input,
+        Direction, GameEvent, GameInput, GamePhase, GameplayOracle, WorldVector, adapt_direction,
+        adapt_event, adapt_phase, adapt_scene, adapt_snapshot,
     };
     use crate::systems::{
         GameSimulation, PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent,
@@ -240,47 +223,57 @@ mod tests {
 
     #[test]
     fn oracle_maps_all_accepted_phase_contracts() {
+        assert_eq!(adapt_phase(AcceptedPhase::Attract), GamePhase::Attract);
+        assert_eq!(adapt_phase(AcceptedPhase::Playing), GamePhase::Playing);
+        assert_eq!(adapt_phase(AcceptedPhase::GameOver), GamePhase::GameOver);
         assert_eq!(
-            adapt_phase(machine_state::GamePhase::Attract),
-            GamePhase::Attract
-        );
-        assert_eq!(
-            adapt_phase(machine_state::GamePhase::Playing),
-            GamePhase::Playing
-        );
-        assert_eq!(
-            adapt_phase(machine_state::GamePhase::GameOver),
-            GamePhase::GameOver
-        );
-        assert_eq!(
-            adapt_phase(machine_state::GamePhase::HighScoreEntry),
+            adapt_phase(AcceptedPhase::HighScoreEntry),
             GamePhase::HighScoreEntry
         );
     }
 
     #[test]
-    fn oracle_maps_clean_input_to_cabinet_input() {
-        let input = GameInput {
-            coin: true,
-            start_one: true,
-            fire: true,
-            service_auto_up: true,
-            ..GameInput::NONE
-        };
+    fn oracle_maps_all_accepted_direction_contracts() {
+        assert_eq!(adapt_direction(AcceptedDirection::Left), Direction::Left);
+        assert_eq!(adapt_direction(AcceptedDirection::Right), Direction::Right);
+    }
 
-        let cabinet = to_cabinet_input(input);
+    #[test]
+    fn oracle_maps_all_accepted_event_contracts() {
+        let pairs = [
+            (AcceptedEvent::CreditAdded, GameEvent::CreditAdded),
+            (AcceptedEvent::GameStarted, GameEvent::GameStarted),
+            (
+                AcceptedEvent::DiagnosticsSelected,
+                GameEvent::DiagnosticsSelected,
+            ),
+            (AcceptedEvent::AuditsSelected, GameEvent::AuditsSelected),
+            (AcceptedEvent::HighScoreReset, GameEvent::HighScoreReset),
+            (AcceptedEvent::ReversePressed, GameEvent::ReversePressed),
+            (AcceptedEvent::FirePressed, GameEvent::FirePressed),
+            (AcceptedEvent::SmartBombPressed, GameEvent::SmartBombPressed),
+            (
+                AcceptedEvent::HyperspacePressed,
+                GameEvent::HyperspacePressed,
+            ),
+            (AcceptedEvent::BonusAwarded, GameEvent::BonusAwarded),
+            (
+                AcceptedEvent::HighScoreEntryStarted,
+                GameEvent::HighScoreEntryStarted,
+            ),
+            (
+                AcceptedEvent::HighScoreInitialAccepted,
+                GameEvent::HighScoreInitialAccepted,
+            ),
+            (
+                AcceptedEvent::HighScoreSubmitted,
+                GameEvent::HighScoreSubmitted,
+            ),
+        ];
 
-        assert_eq!(
-            cabinet.bits(),
-            CabinetInput {
-                coin: true,
-                start_one: true,
-                fire: true,
-                auto_up_manual_down: true,
-                ..CabinetInput::NONE
-            }
-            .bits()
-        );
+        for (accepted, clean) in pairs {
+            assert_eq!(adapt_event(accepted), clean);
+        }
     }
 
     #[test]
@@ -302,7 +295,7 @@ mod tests {
             let frame = clean.step(input);
             let scan = oracle
                 .red_label_scan_translated_player_switches(
-                    to_cabinet_input(input).defender_input_ports(),
+                    cabinet_input_for_test(input).defender_input_ports(),
                 )
                 .expect("oracle player switch scan should stay valid");
 
@@ -334,7 +327,7 @@ mod tests {
         ] {
             let mut oracle = ArcadeMachine::new();
             restore_oracle_motion(&mut oracle, state);
-            let ports = to_cabinet_input(input).defender_input_ports();
+            let ports = cabinet_input_for_test(input).defender_input_ports();
             oracle.red_label_write_ram_byte_for_test(ORACLE_PLAYER_INPUT_IN0, ports.in0);
             oracle.red_label_write_ram_byte_for_test(ORACLE_PLAYER_INPUT_IN1, ports.in1);
 
@@ -409,16 +402,20 @@ mod tests {
 
         for input in credited_start_and_controls_inputs() {
             let clean_frame = clean.step(input);
-            let legacy_output = legacy.step(to_cabinet_input(input));
-            let expected_state = adapt_snapshot(legacy_output.snapshot);
-            let expected_gameplay_events =
-                legacy_output.events().map(adapt_event).collect::<Vec<_>>();
-            let expected_sounds = legacy_output
-                .sound_commands()
-                .map(|command| super::SoundEvent::from_accepted_command(command.raw()))
+            let accepted_frame = AcceptedFrame::from(legacy.step(cabinet_input_for_test(input)));
+            let expected_state = adapt_snapshot(accepted_frame.snapshot);
+            let expected_gameplay_events = accepted_frame
+                .events
+                .into_iter()
+                .map(adapt_event)
+                .collect::<Vec<_>>();
+            let expected_sounds = accepted_frame
+                .sound_commands
+                .into_iter()
+                .map(super::SoundEvent::from_accepted_command)
                 .collect::<Vec<_>>();
             let expected_scene_summary =
-                adapt_scene(&expected_state, legacy_output.video_crc32).summary();
+                adapt_scene(&expected_state, accepted_frame.visual_hash).summary();
 
             assert_eq!(clean_frame.state, expected_state);
             assert_eq!(

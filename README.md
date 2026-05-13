@@ -196,15 +196,17 @@ make sq
 The primary source tree is now the clean rewrite under `src/`; the converted
 implementation is parked under `src_legacy/` and remains wired through
 `src/lib.rs` as the temporary gameplay oracle and compatibility runtime. Clean
-modules that still need accepted-behavior evidence reach those adapters through
-the doc-hidden `defender::compatibility` namespace instead of taking new direct
-dependencies on legacy module names. The root legacy adapters are
-crate-private; tool targets such as README media generation use the same
-compatibility boundary as the oracle while those responsibilities are being
-retired.
+runtime and oracle code reaches those adapters through the crate-private
+`src/accepted.rs` facade, which translates accepted behavior into neutral
+contracts before `src/oracle.rs` adapts it to gameplay state. The root legacy
+adapters remain crate-private; tool targets such as README media generation use
+the doc-hidden `defender::compatibility` boundary while those responsibilities
+are being retired.
 
 Clean rewrite modules:
 
+- `src/accepted.rs`: crate-private accepted-behavior facade over the temporary
+  legacy implementation.
 - `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
   `GameEvents`, score, player, direction, and sound-event contracts.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
@@ -218,8 +220,8 @@ Clean rewrite modules:
   controls, audio, run mode, and persistence.
 - `src/audio.rs`: gameplay-facing sound events, the bounded live-audio runtime,
   no-device backends, and worker diagnostics.
-- `src/oracle.rs`: the only clean-tree adapter to the converted implementation,
-  returning clean state, event, sound, and scene-summary frames.
+- `src/oracle.rs`: the clean gameplay oracle, returning clean state, event,
+  sound, and scene-summary frames from the accepted-behavior facade.
 
 Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input,
