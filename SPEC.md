@@ -51,9 +51,9 @@ The crate is now split between a clean rewrite source tree and a legacy oracle
 tree:
 
 - `src/main.rs`: thin CLI entry point that still dispatches to the compatibility
-  app while the rewrite takes over.
-- `src/lib.rs`: clean public crate wiring plus explicit `#[path]` adapters to
-  the legacy oracle tree.
+  runtime through the clean platform launcher while the rewrite takes over.
+- `src/lib.rs`: clean public crate wiring plus a doc-hidden `compatibility`
+  namespace over explicit `#[path]` adapters to the legacy oracle tree.
 - `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
   `GameEvents`, score, player, direction, and sound-event contracts.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
@@ -76,12 +76,13 @@ accepted arcade behavior, hardware models, ROM verification, rendering, input,
 sound-board command evidence, fidelity trace generation, the threaded live core
 runtime boundary, `wgpu` window ownership, CMOS storage, and test helpers until
 clean systems replace those responsibilities. Those compatibility modules are
-doc-hidden from the supported public API surface, and the binary now enters
-through the clean platform boundary before delegating to the compatibility
-runtime. Live presentation receives clean `RenderScene` data, currently with a
-temporary raster payload for visual equivalence. Kitty terminal graphics code
-remains parked there as historical compatibility evidence, but it is not part
-of the active runtime surface.
+doc-hidden from the supported public API surface. Clean runtime and oracle
+callers that still need accepted-behavior evidence use the
+`defender::compatibility` namespace as the boundary to that legacy tree. Live
+presentation receives clean `RenderScene` data, currently with a temporary
+raster payload for visual equivalence. Kitty terminal graphics code remains
+parked there as historical compatibility evidence, but it is not part of the
+active runtime surface.
 
 ## Current Behavior Surface
 
@@ -146,7 +147,7 @@ explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
   `docs/fidelity/live-audio.md`.
 - Local MAME reference generation is intentionally local tooling; generated
   reference traces are not part of the normal runtime.
-- New callers should prefer canonical `machine_state::...` and
-  `machine_process::...` contract paths; existing `machine::...` compatibility
-  imports stay available until a narrow migration proves callers no longer need
-  them.
+- New clean callers must avoid direct legacy module imports. Code that still
+  needs accepted-behavior evidence should use the doc-hidden
+  `compatibility::...` boundary until the clean system replaces that
+  responsibility.

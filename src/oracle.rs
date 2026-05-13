@@ -4,10 +4,10 @@
 //! against the existing behavior without letting converted implementation names
 //! leak into new production contracts.
 
-use crate::{
+use crate::compatibility::{
     input::CabinetInput,
     machine::ArcadeMachine,
-    machine_state::{FrameOutput, MachineEvent, MachineSnapshot},
+    machine_state::{self, FrameOutput, MachineEvent, MachineSnapshot},
     red_label::Facing,
 };
 
@@ -123,7 +123,7 @@ fn adapt_snapshot(snapshot: MachineSnapshot) -> GameState {
 }
 
 fn adapt_scene(state: &GameState, visual_hash: Option<u32>) -> RenderScene {
-    let (width, height) = crate::video::native_visible_size();
+    let (width, height) = crate::compatibility::video::native_visible_size();
     let mut scene = RenderScene::empty(
         state.frame,
         SurfaceSize::new(u32::from(width), u32::from(height)),
@@ -157,12 +157,12 @@ fn world_vector_pixels(vector: WorldVector) -> f32 {
     vector.subpixels() as f32 / WorldVector::SUBPIXELS_PER_PIXEL as f32
 }
 
-fn adapt_phase(phase: crate::machine_state::GamePhase) -> GamePhase {
+fn adapt_phase(phase: machine_state::GamePhase) -> GamePhase {
     match phase {
-        crate::machine_state::GamePhase::Attract => GamePhase::Attract,
-        crate::machine_state::GamePhase::Playing => GamePhase::Playing,
-        crate::machine_state::GamePhase::GameOver => GamePhase::GameOver,
-        crate::machine_state::GamePhase::HighScoreEntry => GamePhase::HighScoreEntry,
+        machine_state::GamePhase::Attract => GamePhase::Attract,
+        machine_state::GamePhase::Playing => GamePhase::Playing,
+        machine_state::GamePhase::GameOver => GamePhase::GameOver,
+        machine_state::GamePhase::HighScoreEntry => GamePhase::HighScoreEntry,
     }
 }
 
@@ -193,7 +193,7 @@ fn adapt_event(event: MachineEvent) -> GameEvent {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use crate::compatibility::{
         input::{
             CabinetInput, DEFENDER_IN0_ALTITUDE_DOWN, DEFENDER_IN0_FIRE, DEFENDER_IN0_HYPERSPACE,
             DEFENDER_IN0_REVERSE, DEFENDER_IN0_SMART_BOMB, DEFENDER_IN0_THRUST,
@@ -203,12 +203,13 @@ mod tests {
             ArcadeMachine, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelLaserDirection,
             RedLabelLaserFire, RedLabelPlayerMotion,
         },
+        machine_state,
         red_label::{Facing, Fixed16},
     };
 
     use super::{
         Direction, GameEvent, GameInput, GamePhase, GameplayOracle, WorldVector, adapt_event,
-        adapt_scene, adapt_snapshot, to_cabinet_input,
+        adapt_phase, adapt_scene, adapt_snapshot, to_cabinet_input,
     };
     use crate::systems::{
         GameSimulation, PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent,
@@ -235,6 +236,26 @@ mod tests {
         assert_eq!(frame.state.frame, 1);
         assert_eq!(frame.state.phase, GamePhase::Attract);
         assert_eq!(frame.scene.summary().frame, 1);
+    }
+
+    #[test]
+    fn oracle_maps_all_accepted_phase_contracts() {
+        assert_eq!(
+            adapt_phase(machine_state::GamePhase::Attract),
+            GamePhase::Attract
+        );
+        assert_eq!(
+            adapt_phase(machine_state::GamePhase::Playing),
+            GamePhase::Playing
+        );
+        assert_eq!(
+            adapt_phase(machine_state::GamePhase::GameOver),
+            GamePhase::GameOver
+        );
+        assert_eq!(
+            adapt_phase(machine_state::GamePhase::HighScoreEntry),
+            GamePhase::HighScoreEntry
+        );
     }
 
     #[test]
@@ -543,7 +564,7 @@ mod tests {
 
     fn restore_oracle_motion(oracle: &mut ArcadeMachine, state: PlayerMotionState) {
         let mut snapshot = oracle.snapshot();
-        snapshot.phase = crate::machine_state::GamePhase::Playing;
+        snapshot.phase = machine_state::GamePhase::Playing;
         snapshot.player.x = Fixed16(state.position.0.subpixels());
         snapshot.player.y = Fixed16(state.position.1.subpixels());
         snapshot.player.xv = Fixed16(state.velocity.0.subpixels());

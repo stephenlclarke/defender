@@ -5,10 +5,10 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `9c522ea`.
+- Latest accepted implementation commit before this cycle: `4762d39`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
-  preserving legacy `machine::...` imports through explicit oracle wiring.
+  preserving legacy access through the doc-hidden `compatibility` namespace.
 - Live play uses the `wgpu` backend. Kitty is parked in `src_legacy/` as
   historical compatibility evidence and is no longer an active runtime path.
 - The next product direction is a `wgpu`-only clean game rewrite. Kitty should
@@ -97,7 +97,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-61` are complete, and
+No active development cycle remains. `DC-42` through `DC-62` are complete, and
 the standing maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1150,7 +1150,76 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778679271201939`
 
-### DC-62: Oracle Retirement
+### DC-62: Compatibility Namespace Facade
+
+Status: `complete`
+
+Goal: make the remaining legacy access explicit by routing clean runtime and
+oracle callers through a single doc-hidden compatibility namespace.
+
+Scope:
+
+- Add a `defender::compatibility` facade over the parked `src_legacy/`
+  adapters.
+- Route `platform` runtime launch and `oracle` accepted-behavior calls through
+  the compatibility namespace instead of direct legacy crate-root paths.
+- Preserve the existing doc-hidden legacy modules for legacy internals until a
+  later deletion pass can retire them safely.
+- Add architecture tests that keep clean runtime and oracle callers on the
+  compatibility boundary.
+
+Acceptance criteria:
+
+- Clean runtime and oracle modules no longer call `crate::app`,
+  `crate::machine_state`, `crate::video`, or related legacy root paths
+  directly.
+- The compatibility facade re-exports the machine-state and process contracts
+  still needed by oracle tests.
+- README, SPEC, and PLAN describe compatibility access as a temporary boundary,
+  not a clean production dependency.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::compatibility_namespace
+cargo test --lib platform::tests::runtime_entrypoint_delegates_to_compatibility_runtime
+cargo check --all-targets
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 18:56:46 BST` Started `DC-62`: posted the cycle start update and
+  began introducing a compatibility namespace boundary for clean runtime and
+  oracle legacy access.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778695006846469`
+- `2026-05-13 19:34:22 BST` Completed `DC-62`: added the doc-hidden
+  `defender::compatibility` facade, routed `platform` and `oracle` legacy
+  calls through that namespace, added architecture tests to keep clean runtime
+  and oracle callers off direct legacy crate-root paths, added an oracle phase
+  contract test to cover all accepted phase mappings, and updated README,
+  SPEC, and PLAN to describe the compatibility boundary and next oracle
+  retirement slice. Validation passed with the documented DC-62 gate:
+  formatting, focused compatibility and platform tests, `cargo check
+  --all-targets`, the full Rust test suite, clippy with warnings denied,
+  `make fidelity`, `cargo run -- --live-smoke`, markdownlint, and
+  `git diff --check`; the first `make fidelity` run exposed missing new-line
+  coverage for two phase mapping arms, which was fixed before rerunning the
+  gate successfully. The final coverage gate reported 7/7 non-baselined added
+  executable Rust lines, and live smoke rendered 239 frames with 74 distinct
+  scene CRCs, attract/credit/playing evidence, all required injected inputs,
+  and a clean exit.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778697300468119`
+
+### DC-63: Oracle Retirement
 
 Status: `planned`
 

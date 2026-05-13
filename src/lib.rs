@@ -77,6 +77,15 @@ pub mod video;
 #[path = "../src_legacy/wgpu_presenter.rs"]
 pub mod wgpu_presenter;
 
+#[doc(hidden)]
+pub mod compatibility {
+    pub use crate::{
+        app, assets, board, cmos_storage, fidelity, input, live, machine, machine_process,
+        machine_state, pia, red_label, red_label_memory, red_label_message, red_label_wave, rom,
+        sound, terminal, video, wgpu_presenter,
+    };
+}
+
 pub use game::{
     Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameSnapshot, GameState,
     PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldVector,
@@ -121,26 +130,55 @@ mod public_api_tests {
     }
 
     #[test]
-    fn legacy_machine_state_contracts_remain_available_for_oracle_tests() {
-        let direct_phase = crate::machine_state::GamePhase::Attract;
-        let compatibility_phase: crate::machine::GamePhase = direct_phase;
-        let direct_phase_again: crate::machine_state::GamePhase = compatibility_phase;
-        assert_eq!(direct_phase_again, crate::machine_state::GamePhase::Attract);
+    fn compatibility_namespace_reexports_legacy_machine_state_contracts() {
+        let direct_phase = crate::compatibility::machine_state::GamePhase::Attract;
+        let compatibility_phase: crate::compatibility::machine::GamePhase = direct_phase;
+        let direct_phase_again: crate::compatibility::machine_state::GamePhase =
+            compatibility_phase;
+        assert_eq!(
+            direct_phase_again,
+            crate::compatibility::machine_state::GamePhase::Attract
+        );
 
-        let direct = crate::machine_state::CompatibilityState::default();
-        let compatibility: crate::machine::CompatibilityState = direct;
+        let direct = crate::compatibility::machine_state::CompatibilityState::default();
+        let compatibility: crate::compatibility::machine::CompatibilityState = direct;
         assert!(!compatibility.xyzzy_active);
     }
 
     #[test]
-    fn legacy_machine_process_contracts_remain_available_for_oracle_tests() {
+    fn compatibility_namespace_reexports_legacy_process_contracts() {
         let direct =
-            crate::machine_process::RedLabelScheduledProcess::from_source_disp(0xA05F, 0xC123);
-        let compatibility: crate::machine::RedLabelScheduledProcess = direct;
-        let direct_again: crate::machine_process::RedLabelScheduledProcess = compatibility;
+            crate::compatibility::machine_process::RedLabelScheduledProcess::from_source_disp(
+                0xA05F, 0xC123,
+            );
+        let compatibility: crate::compatibility::machine::RedLabelScheduledProcess = direct;
+        let direct_again: crate::compatibility::machine_process::RedLabelScheduledProcess =
+            compatibility;
 
         assert_eq!(direct_again.process_address, 0xA05F);
         assert_eq!(direct_again.routine_address, 0xC123);
+    }
+
+    #[test]
+    fn compatibility_namespace_is_used_by_clean_runtime_and_oracle() {
+        let platform_rs = include_str!("platform.rs");
+        assert!(platform_rs.contains("crate::compatibility::app::run()"));
+        assert!(!platform_rs.contains("crate::app::run()"));
+
+        let oracle_rs = include_str!("oracle.rs");
+        assert!(oracle_rs.contains("crate::compatibility::"));
+        for forbidden in [
+            "crate::input::",
+            "crate::machine::",
+            "crate::machine_state::",
+            "crate::red_label::",
+            "crate::video::",
+        ] {
+            assert!(
+                !oracle_rs.contains(forbidden),
+                "clean oracle boundary must use compatibility namespace instead of {forbidden}"
+            );
+        }
     }
 
     #[test]

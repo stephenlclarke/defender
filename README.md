@@ -195,7 +195,10 @@ make sq
 
 The primary source tree is now the clean rewrite under `src/`; the converted
 implementation is parked under `src_legacy/` and remains wired through
-`src/lib.rs` as the temporary gameplay oracle and compatibility runtime.
+`src/lib.rs` as the temporary gameplay oracle and compatibility runtime. Clean
+modules that still need accepted-behavior evidence reach those adapters through
+the doc-hidden `defender::compatibility` namespace instead of taking new direct
+dependencies on legacy module names.
 
 Clean rewrite modules:
 
