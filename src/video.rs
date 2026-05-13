@@ -104,7 +104,7 @@ impl Renderer {
     }
 }
 
-fn raster_size(geometry: TerminalGeometry) -> (u32, u32) {
+pub(crate) fn raster_size(geometry: TerminalGeometry) -> (u32, u32) {
     let width = u32::from(geometry.pixel_width).clamp(640, 1_280);
     let height = u32::from(geometry.pixel_height).clamp(480, 960);
     if geometry.pixel_width == 0 || geometry.pixel_height == 0 {

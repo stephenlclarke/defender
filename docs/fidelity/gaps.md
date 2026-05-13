@@ -870,6 +870,23 @@ here before changing source-shaped arcade-core behavior.
   `0xE6`/`credit_added`, and frame 1027 `0xF5`/`game_started`, and current Rust
   matches those `sound_commands`/`events` rows exactly. Broader local MAME
   command-sequence fixtures and external waveform fixtures are still missing.
+- `DC-51` accepted `FrameOutput::sound_commands()` as the live-audio command
+  timing surface, with `FrameOutput::sound_board` retained as a diagnostic
+  latch/IRQ surface and deterministic DAC byte signatures retained as the
+  content guard for translated sound-ROM routines. The implementation contract
+  is documented in `docs/fidelity/live-audio.md`, and
+  `assets/red-label/live-audio-acceptance.tsv` ties coin, start, thrust, smart
+  bomb, hyperspace, player explosion, terrain blow, and high-score paths to
+  existing tests or generated sound fixtures. The remaining cycle-accurate
+  sound CPU scheduling, external waveform fixtures, and broader MAME command
+  fixtures are later fidelity work, not blockers for a command-fed live audio
+  runtime prototype.
+- `DC-52` added the first live audio runtime path in `src/audio.rs`. Live core
+  stepping now copies accepted `FrameOutput::sound_commands()` batches to a
+  bounded non-blocking channel owned by `LiveAudioRuntime`; `LiveAudioBackend`
+  keeps backend behavior swappable, `NullLiveAudioBackend` opens no device, and
+  `--mute` disables the path. `--live-smoke` uses a disabled no-device audio
+  path, so smoke evidence stays deterministic.
 - Sound-board RAM/PIA/ROM address classification exists, and the MAME-documented
   main-board command latch byte/CB1 handoff is modeled from the PIA1 port-B
   output callback boundary. `ArcadeMachine::step` now records every emitted

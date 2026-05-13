@@ -14,6 +14,8 @@ pub const RED_LABEL_DEFAULTS_TSV: &str = include_str!("../assets/red-label/defau
 pub const RED_LABEL_HIGH_SCORES_TSV: &str = include_str!("../assets/red-label/high-scores.tsv");
 pub const RED_LABEL_INPUT_PORTS_TSV: &str = include_str!("../assets/red-label/input-ports.tsv");
 pub const RED_LABEL_LINKED_LISTS_TSV: &str = include_str!("../assets/red-label/linked-lists.tsv");
+pub const RED_LABEL_LIVE_AUDIO_ACCEPTANCE_TSV: &str =
+    include_str!("../assets/red-label/live-audio-acceptance.tsv");
 pub const RED_LABEL_MEMORY_MAP_TSV: &str = include_str!("../assets/red-label/memory-map.tsv");
 pub const RED_LABEL_MESSAGE_GLYPHS_TSV: &str =
     include_str!("../assets/red-label/message-glyphs.tsv");
@@ -62,17 +64,17 @@ mod tests {
         RED_LABEL_AUDIT_ADJUSTMENTS_TSV, RED_LABEL_CMOS_DEFAULTS_TSV, RED_LABEL_CMOS_LAYOUT_TSV,
         RED_LABEL_COLOR_CYCLE_TSV, RED_LABEL_COLOR_RAM_TSV, RED_LABEL_DEFAULTS_TSV,
         RED_LABEL_HIGH_SCORES_TSV, RED_LABEL_INPUT_PORTS_TSV, RED_LABEL_LINKED_LISTS_TSV,
-        RED_LABEL_MEMORY_MAP_TSV, RED_LABEL_MESSAGE_GLYPHS_TSV, RED_LABEL_MESSAGES_TSV,
-        RED_LABEL_OBJECT_IMAGES_TSV, RED_LABEL_OBJECT_PICTURES_TSV, RED_LABEL_PLAYER_DEATH_TSV,
-        RED_LABEL_RAM_LAYOUT_TSV, RED_LABEL_ROM_MAP_TSV, RED_LABEL_ROM_REGIONS_TSV,
-        RED_LABEL_ROMS_TSV, RED_LABEL_ROUTINE_ADDRESSES_TSV, RED_LABEL_SCORE_DIGITS_TSV,
-        RED_LABEL_SCORES_TSV, RED_LABEL_SHELL_IMAGES_TSV,
-        RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV, RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV,
-        RED_LABEL_SOUND_TABLE_TIMELINES_TSV, RED_LABEL_SOUND_TABLES_TSV,
-        RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV, RED_LABEL_SRAM_ROUTINES_TSV,
-        RED_LABEL_SWITCH_TABLE_TSV, RED_LABEL_TERRAIN_DATA_TSV, RED_LABEL_TRACE_REQUIREMENTS_TSV,
-        RED_LABEL_TRACE_SCENARIOS_TSV, RED_LABEL_TRACE_SCHEMA_TSV, RED_LABEL_WAVE_TABLE_TSV,
-        first_tsv_line,
+        RED_LABEL_LIVE_AUDIO_ACCEPTANCE_TSV, RED_LABEL_MEMORY_MAP_TSV,
+        RED_LABEL_MESSAGE_GLYPHS_TSV, RED_LABEL_MESSAGES_TSV, RED_LABEL_OBJECT_IMAGES_TSV,
+        RED_LABEL_OBJECT_PICTURES_TSV, RED_LABEL_PLAYER_DEATH_TSV, RED_LABEL_RAM_LAYOUT_TSV,
+        RED_LABEL_ROM_MAP_TSV, RED_LABEL_ROM_REGIONS_TSV, RED_LABEL_ROMS_TSV,
+        RED_LABEL_ROUTINE_ADDRESSES_TSV, RED_LABEL_SCORE_DIGITS_TSV, RED_LABEL_SCORES_TSV,
+        RED_LABEL_SHELL_IMAGES_TSV, RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV,
+        RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV, RED_LABEL_SOUND_TABLE_TIMELINES_TSV,
+        RED_LABEL_SOUND_TABLES_TSV, RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV,
+        RED_LABEL_SRAM_ROUTINES_TSV, RED_LABEL_SWITCH_TABLE_TSV, RED_LABEL_TERRAIN_DATA_TSV,
+        RED_LABEL_TRACE_REQUIREMENTS_TSV, RED_LABEL_TRACE_SCENARIOS_TSV,
+        RED_LABEL_TRACE_SCHEMA_TSV, RED_LABEL_WAVE_TABLE_TSV, first_tsv_line,
     };
 
     #[test]
@@ -106,6 +108,10 @@ mod tests {
         assert_eq!(
             first_tsv_line(RED_LABEL_LINKED_LISTS_TSV),
             "list\thead_symbol\thead_address\tentry_table\tlink_field\tsource"
+        );
+        assert_eq!(
+            first_tsv_line(RED_LABEL_LIVE_AUDIO_ACCEPTANCE_TSV),
+            "path\tauthoritative_surface\ttiming_guard\tcontent_guard\tsound_table_labels\trequired_commands"
         );
         assert_eq!(
             first_tsv_line(RED_LABEL_MEMORY_MAP_TSV),
@@ -247,6 +253,55 @@ mod tests {
         }
     }
 
+    #[test]
+    fn live_audio_acceptance_matrix_is_fixture_backed() {
+        let rows = live_audio_acceptance_rows();
+        assert_eq!(
+            rows.iter().map(|fields| fields[0]).collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                "coin_credit",
+                "high_score_entry",
+                "hyperspace",
+                "one_player_start",
+                "player_explosion",
+                "smart_bomb",
+                "terrain_blow_complete",
+                "terrain_blow_start",
+                "thrust_start_stop",
+            ])
+        );
+
+        let timeline_labels = sound_timeline_labels();
+        let mut fixture_commands = sound_command_sequence_commands(
+            RED_LABEL_SOUND_TABLE_COMMAND_SEQUENCES_TSV,
+            "sound-table-command-sequences.tsv",
+        );
+        fixture_commands.extend(sound_command_sequence_commands(
+            RED_LABEL_SOUND_DIRECT_COMMAND_SEQUENCES_TSV,
+            "sound-direct-command-sequences.tsv",
+        ));
+        fixture_commands.extend(sound_command_sequence_commands(
+            RED_LABEL_SOUND_THRUST_COMMAND_SEQUENCES_TSV,
+            "sound-thrust-command-sequences.tsv",
+        ));
+
+        for fields in rows {
+            let path = fields[0];
+            for label in csv_values(fields[4]) {
+                assert!(
+                    timeline_labels.contains(label),
+                    "{path} references missing sound timeline label {label}"
+                );
+            }
+            for command in csv_values(fields[5]) {
+                assert!(
+                    fixture_commands.contains(command),
+                    "{path} references missing command fixture value {command}"
+                );
+            }
+        }
+    }
+
     fn trace_required_sound_commands() -> BTreeSet<String> {
         let mut commands = BTreeSet::new();
         for line in RED_LABEL_TRACE_REQUIREMENTS_TSV.lines().skip(1) {
@@ -258,6 +313,36 @@ mod tests {
             commands.extend(fields[1].split(',').map(String::from));
         }
         commands
+    }
+
+    fn live_audio_acceptance_rows() -> Vec<Vec<&'static str>> {
+        RED_LABEL_LIVE_AUDIO_ACCEPTANCE_TSV
+            .lines()
+            .skip(1)
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                let fields = line.split('\t').collect::<Vec<_>>();
+                assert_eq!(fields.len(), 6, "live-audio acceptance row shape");
+                fields
+            })
+            .collect()
+    }
+
+    fn sound_timeline_labels() -> BTreeSet<&'static str> {
+        RED_LABEL_SOUND_TABLE_TIMELINES_TSV
+            .lines()
+            .skip(1)
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                let fields = line.split('\t').collect::<Vec<_>>();
+                assert_eq!(fields.len(), 16, "sound timeline row shape");
+                fields[0]
+            })
+            .collect()
+    }
+
+    fn csv_values(value: &'static str) -> impl Iterator<Item = &'static str> {
+        value.split(',').filter(|entry| *entry != "-")
     }
 
     fn sound_command_sequence_commands(tsv: &str, name: &str) -> BTreeSet<String> {

@@ -938,10 +938,7 @@ impl ArcadeMachine {
                 ..
             }) => {
                 self.phase = GamePhase::GameOver;
-                self.high_score_entry = None;
-                self.high_score_entry_player = 0;
-                self.high_score_completed_players_mask = 0;
-                self.high_score_submission = None;
+                self.clear_live_high_score_session();
             }
             RedLabelProcessDispatch::PlayerDeath(RedLabelPlayerDeath::AttractJump { .. }) => {
                 self.phase = GamePhase::Attract;
@@ -4753,8 +4750,7 @@ impl ArcadeMachine {
         self.player = PlayerState::default();
         self.scores.player_one = 0;
         self.scores.next_bonus = crate::red_label::bonus_stock_score();
-        self.high_score_entry = None;
-        self.high_score_submission = None;
+        self.clear_live_high_score_session();
         self.memory
             .start_one_player_tables()
             .expect("embedded red-label START player table assets are valid");

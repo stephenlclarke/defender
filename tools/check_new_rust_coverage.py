@@ -26,16 +26,29 @@ def parse_args() -> argparse.Namespace:
         help="Git revision to diff against. Defaults to HEAD for local dirty worktrees.",
     )
     parser.add_argument(
+        "--uncovered-baseline",
+        type=Path,
+        help="Optional accepted uncovered-line baseline to subtract from failures.",
+    )
+    parser.add_argument(
+        "--write-uncovered-baseline",
+        type=Path,
+        help="Write the current uncovered added-line set as a baseline and exit successfully.",
+    )
+    parser.add_argument(
         "--repo-root",
         default=Path.cwd(),
         type=Path,
         help="Repository root. Defaults to the current working directory.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.uncovered_baseline and args.write_uncovered_baseline:
+        parser.error("--uncovered-baseline and --write-uncovered-baseline cannot be combined")
+    return args
 
 
 def git_diff_text(repo_root: Path, base: str) -> str:
-    command = ["git", "diff", "--unified=0", "--diff-filter=AM"]
+    command = ["git", "diff", "--unified=0", "--find-renames"]
     if base:
         command.append(base)
     command.extend(["--", "*.rs"])
@@ -53,24 +66,28 @@ def parse_added_rust_lines(
     added_lines: list[tuple[Path, int, str]] = []
     current_file: Path | None = None
     current_line: int | None = None
+    in_hunk = False
 
     for line in diff_text.splitlines():
         if line.startswith("+++ "):
             path = line[4:].strip()
             current_file = None if path == "/dev/null" else normalize_diff_path(path, repo_root)
             current_line = None
+            in_hunk = False
             continue
         if line.startswith("@@ "):
             match = HUNK_RE.match(line)
             current_line = int(match.group(1)) if match else None
+            in_hunk = match is not None
             continue
-        if current_file is None or current_line is None:
+        if not in_hunk or current_line is None:
             continue
         if line.startswith("+") and not line.startswith("+++"):
-            if ignore_moved:
-                added_lines.append((current_file, current_line, line[1:]))
-            else:
-                added.setdefault(current_file, set()).add(current_line)
+            if current_file is not None:
+                if ignore_moved:
+                    added_lines.append((current_file, current_line, line[1:]))
+                else:
+                    added.setdefault(current_file, set()).add(current_line)
             current_line += 1
         elif line.startswith("-") and not line.startswith("---"):
             if ignore_moved:
@@ -141,6 +158,64 @@ def uncovered_added_lines(
             if file_coverage[line] == 0:
                 uncovered.append((path, line))
     return instrumented, uncovered
+
+
+def read_uncovered_baseline(path: Path) -> Counter[str]:
+    baseline: Counter[str] = Counter()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        baseline[line] += 1
+    return baseline
+
+
+def write_uncovered_baseline(
+    path: Path,
+    uncovered: list[tuple[Path, int]],
+    repo_root: Path,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    entries = [
+        uncovered_baseline_key(uncovered_path, line, repo_root)
+        for uncovered_path, line in uncovered
+    ]
+    header = (
+        "# Accepted uncovered executable Rust lines for this branch.\n"
+        "# Format: relative/path.rs<TAB>normalized source line.\n"
+    )
+    body = "\n".join(entries)
+    path.write_text(f"{header}{body}\n" if body else header, encoding="utf-8")
+
+
+def apply_uncovered_baseline(
+    uncovered: list[tuple[Path, int]],
+    repo_root: Path,
+    baseline: Counter[str],
+) -> tuple[list[tuple[Path, int]], list[tuple[Path, int]]]:
+    remaining = baseline.copy()
+    kept = []
+    accepted = []
+
+    for path, line in uncovered:
+        key = uncovered_baseline_key(path, line, repo_root)
+        if remaining[key] > 0:
+            remaining[key] -= 1
+            accepted.append((path, line))
+            continue
+        kept.append((path, line))
+
+    return kept, accepted
+
+
+def uncovered_baseline_key(path: Path, line: int, repo_root: Path) -> str:
+    try:
+        relative_path = path.relative_to(repo_root).as_posix()
+    except ValueError:
+        relative_path = path.as_posix()
+
+    source_lines = source_text_lines(path)
+    line_text = source_lines[line - 1] if 0 < line <= len(source_lines) else ""
+    return f"{relative_path}\t{moved_line_fingerprint(line_text)}"
 
 
 def production_added_lines(added_lines: dict[Path, set[int]]) -> dict[Path, set[int]]:
@@ -307,13 +382,35 @@ def main() -> int:
     coverage = parse_lcov_line_counts(args.lcov.read_text(encoding="utf-8"), repo_root)
     instrumented, uncovered = uncovered_added_lines(added_lines, coverage)
 
+    if args.write_uncovered_baseline:
+        write_uncovered_baseline(args.write_uncovered_baseline, uncovered, repo_root)
+        print(
+            f"wrote {len(uncovered)} accepted uncovered added line(s) to "
+            f"{args.write_uncovered_baseline}"
+        )
+        return 0
+
+    accepted_baseline = []
+    if args.uncovered_baseline:
+        uncovered, accepted_baseline = apply_uncovered_baseline(
+            uncovered,
+            repo_root,
+            read_uncovered_baseline(args.uncovered_baseline),
+        )
+
     if uncovered:
         print("Added executable Rust lines without coverage:", file=sys.stderr)
         for path, line in uncovered:
             print(f"  {path.relative_to(repo_root)}:{line}", file=sys.stderr)
         return 1
 
-    print(f"new Rust line coverage: {instrumented}/{instrumented} added executable line(s)")
+    checked_instrumented = instrumented - len(accepted_baseline)
+    print(
+        "new Rust line coverage: "
+        f"{checked_instrumented}/{checked_instrumented} non-baselined added executable line(s)"
+    )
+    if accepted_baseline:
+        print(f"accepted uncovered baseline: {len(accepted_baseline)} line(s)")
     return 0
 
 

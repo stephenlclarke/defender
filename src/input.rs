@@ -266,7 +266,7 @@ impl InputEvent {
         Self { key, kind }
     }
 
-    fn from_crossterm(key_event: KeyEvent) -> Option<Self> {
+    pub(crate) fn from_crossterm(key_event: KeyEvent) -> Option<Self> {
         Some(Self {
             key: input_key_from_crossterm(key_event.code)?,
             kind: input_event_kind_from_crossterm(key_event.kind),

@@ -52,6 +52,7 @@ cargo run -- --input-profile planetoid
 cargo run -- --input-profile cabinet
 cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin
 cargo run -- --live-smoke
+cargo run -- --mute
 cargo run -- --rom-report
 cargo run -- --rom-report /path/to/roms
 cargo run -- --verify-roms /path/to/roms
@@ -80,6 +81,10 @@ make live-wgpu
 make live-kitty
 make smoke-wgpu
 make ci
+make ci-doctor
+make trace-doctor
+make coverage-doctor
+make smoke-doctor
 make fidelity
 make trace-script-test
 make trace-fixtures
@@ -88,6 +93,7 @@ make reference-traces
 make reference-fixtures-check
 make coverage
 make coverage-new-code NEW_CODE_COVERAGE_BASE=origin/main
+make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=origin/main
 make sq-ci
 make sq
 make readme-media
@@ -168,7 +174,19 @@ markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
 
 `make fidelity` runs formatting, all Rust targets, clippy, Lua trace exporter
 self-tests, Python helper tests, local Rust trace fixture comparison, coverage,
-and new-Rust-line coverage. `make ci` adds the `wgpu` live smoke test.
+and new-Rust-line coverage. The new-line gate compares against
+`NEW_CODE_COVERAGE_BASE` when set, otherwise `HEAD` for local dirty worktrees.
+`make coverage-new-code` requires an explicit base and subtracts the accepted
+uncovered-line baseline in `tools/new_rust_coverage_baseline.txt`; refresh that
+baseline only when intentionally accepting existing uncovered debt. `make ci`
+adds the `wgpu` live smoke test. GitHub CI runs `make ci-doctor`, then
+`make fidelity`, then `xvfb-run -a make smoke-wgpu` so prerequisite, fidelity,
+coverage, and smoke failures are separated in the Actions UI. The
+`make smoke-doctor` target is Linux CI-oriented and expects `xvfb-run` plus
+`vulkaninfo`.
+Slack completion notes are a best-effort project protocol outside CI; connector
+or token failures should be handled as Slack tooling failures, not Rust
+validation failures.
 
 Local SonarCloud support:
 
@@ -185,7 +203,10 @@ The public crate surface is `src/lib.rs`; the CLI entry point is `src/main.rs`.
 The current machine core is split into source-shaped modules:
 
 - `src/machine.rs`: shared contracts, source-derived metadata parsers, and
-  stable `machine::...` re-exports.
+  compatibility `machine::...` re-exports.
+- `src/machine_state.rs`: canonical public state, snapshot, event, and
+  frame-output contracts.
+- `src/machine_process.rs`: canonical public scheduler process contracts.
 - `src/machine_memory.rs`: source-visible runtime RAM, CMOS, palette,
   hardware-map, list, trace, save/restore, and translated routine mutations.
 - `src/machine_session.rs`: `ArcadeMachine` construction, reset, stepping,
@@ -201,8 +222,10 @@ The current machine core is split into source-shaped modules:
 - `src/machine_world.rs`: wave/world and BCD helper primitives.
 
 Supporting modules own hardware, rendering, input, assets, ROM verification,
-sound-board behavior, fidelity trace generation, CMOS storage, and test
-helpers.
+sound-board behavior, live audio command delivery, fidelity trace generation
+and threaded fixture checks, the threaded live core runtime boundary used by
+both presentation backends, non-blocking `wgpu` latest-frame delivery, CMOS
+storage, and test helpers.
 
 ## Assets And ROMs
 
@@ -210,7 +233,8 @@ Clean runtime data lives under `assets/red-label/` and is embedded in the
 binary. The active assets include ROM metadata, MAME memory/input maps,
 red-label RAM/CMOS layouts, linked lists, routine addresses, switch tables,
 object pictures and images, terrain data, wave data, high-score/default data,
-sound command timelines, and fidelity trace schemas.
+sound command timelines, the live-audio acceptance matrix, and fidelity trace
+schemas.
 
 Local ROM files are optional verification inputs for `--rom-report` and
 `--verify-roms`. They are not needed for normal play.
@@ -227,8 +251,11 @@ with source or ROM provenance.
 - Compatible graphics terminals include Kitty, Ghostty, and Warp. Set
   `DEFENDER_FORCE_KITTY=1` if the terminal supports the protocol but is not
   recognized by name.
-- Live audio output is not implemented yet. Sound fidelity is currently tested
-  through command traces and deterministic DAC byte signatures.
+- Live audio has a runtime command-delivery prototype behind a bounded
+  non-blocking backend trait. The built-in backend is a null backend that opens
+  no audio device; `--mute` disables the runtime path. Audible device output is
+  still future work. The accepted implementation contract is in
+  `docs/fidelity/live-audio.md`.
 
 ## References
 

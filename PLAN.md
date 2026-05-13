@@ -1,6 +1,6 @@
 # Defender Current Plan
 
-Last reviewed: `2026-05-10`
+Last reviewed: `2026-05-13`
 
 ## Current Baseline
 
@@ -11,6 +11,10 @@ Last reviewed: `2026-05-10`
   imports.
 - Live play defaults to the `wgpu` backend. Kitty remains a compatibility
   backend.
+- The next product direction is a `wgpu`-only clean game rewrite. Kitty should
+  be removed from the active application surface, and the current
+  assembler-shaped machine should become a temporary fidelity oracle rather
+  than the production gameplay model.
 - Normal runtime is self-contained. ROM files are optional verification inputs.
 - No active behavior gap is tracked in this plan. New fidelity gaps should be
   documented in `docs/fidelity/gaps.md` and linked from this file only when
@@ -44,14 +48,57 @@ and added executable Rust line coverage.
 - Keep `README.md`, `SPEC.md`, and `PLAN.md` aligned with the current code.
 - Use focused tests for material code changes.
 - Preserve source-visible mutation checks for arcade-core behavior.
-- Keep compatibility behavior (`XYZZY`, Planetoid controls, Kitty renderer)
-  outside the red-label arcade contract unless paired tests prove the boundary.
+- Preserve gameplay behavior while the rewrite is underway. `XYZZY` and
+  Planetoid controls remain compatibility features unless explicitly removed.
+- Kitty removal is now intentional rewrite scope; do not add new terminal
+  renderer abstractions.
 - Use Conventional Commits for committed work.
 - Do not use `codex` in branch names, commit messages, or PR titles.
-- Post completion notes to `xyzzytools.slack.com#codex` when a planned
+- Post a start note to `xyzzytools.slack.com#codex` before beginning each
+  planned dev-cycle, and post a completion note after validation when the
   dev-cycle closes.
 
-## Active Cycle
+## Rewrite Target
+
+Rewrite the application as a modern `wgpu` game while preserving accepted
+gameplay behavior. The production source should describe game concepts instead
+of ROM labels, assembler routines, or memory-table implementation details.
+
+Target module ownership:
+
+- `game`: pure gameplay domain types such as `Game`, `World`, `Player`,
+  `Enemy`, `Projectile`, `Human`, `Terrain`, `Score`, `Wave`, and
+  `HighScore`.
+- `systems`: deterministic fixed-step systems for input, player movement,
+  projectiles, enemies, collisions, waves, scoring, high-score entry, attract
+  mode, and sound-event emission.
+- `renderer`: native `wgpu` rendering from scene data using sprite/quad
+  pipelines, texture atlases, uniform buffers, instanced draws, HUD/text
+  rendering, debug overlays, and viewport scaling.
+- `platform`: `winit` event loop, input collection, fixed timestep, persistence,
+  smoke runner, and device lifecycle.
+- `audio`: gameplay-facing sound events and backend/runtime ownership.
+- `fidelity`: legacy oracle, golden fixtures, trace tooling, and any remaining
+  ROM/source terminology needed to prove behavioral equivalence.
+
+Rewrite rules:
+
+- Keep the current machine/memory implementation available as an oracle until
+  the clean model proves equivalent for accepted scenarios.
+- Production modules must not expose `red_label`, ROM file labels, assembler
+  routine names, source process names, or memory table names.
+- Renderer code must consume clean scene data, not RAM bytes or source layout
+  fields.
+- Replace memory CRC confidence gradually with clean state, event, sound, and
+  rendered-frame equivalence gates.
+- Prefer small deterministic systems over a monolithic memory-oriented machine.
+- Use `wgpu` directly as the renderer, not as a final framebuffer presenter for
+  a hidden memory model once the clean scene path exists.
+
+## Completed Development Cycles
+
+No active development cycle remains. `DC-42` through `DC-53` are complete, and
+only the standing maintenance guidance in Ongoing Work remains.
 
 ### DC-42: Documentation Reset
 
@@ -88,11 +135,754 @@ Work log:
   Slack update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778420701682049`
 
-## Next Work
+### DC-43: Threaded Fidelity Fixture Runner
 
-- Keep docs synchronized with the CLI help, Makefile targets, and current
-  module boundaries.
-- If live audio output becomes a target, add a new cycle with source-backed
-  acceptance criteria before implementation.
-- If public API cleanup is desired, migrate `machine::...` re-exports in a
-  narrow cycle with caller checks and focused tests.
+Status: `complete`
+
+Goal: continue the refactor by replacing serial fixture orchestration with a
+small trait-based runner that can execute independent Rust fidelity fixture
+checks on scoped worker threads while preserving manifest ordering and
+first-error reporting.
+
+Scope:
+
+- Add a `TraceFixtureChecker` trait to separate fixture discovery/order from
+  fixture execution.
+- Run fixture checks in ordered chunks across available scoped worker threads.
+- Preserve existing `--fidelity-check-trace-dir` output and first-error
+  behavior.
+- Add focused tests for parallel result aggregation, ordered error reporting,
+  and worker panic handling.
+
+Work log:
+
+- `2026-05-12` Completed `DC-43`: `src/app.rs` now checks fidelity fixture
+  pairs through a trait-based checker on scoped threads. Validation passed with
+  `cargo fmt --check`, targeted `app::tests::check_trace_fixtures`,
+  targeted `app::tests::fidelity_check_trace_dir_text`, and
+  `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`,
+  `make trace-script-test`, `make trace-fixtures`,
+  `make coverage NEW_CODE_COVERAGE_BASE=origin/main`, `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md`, and `git diff --check`.
+
+### DC-44: Shared Live Core Driver
+
+Status: `complete`
+
+Goal: continue carving the live runtime into explicit, reusable boundaries
+before a later presentation/core thread split.
+
+Scope:
+
+- Add a `LiveCoreDriver` that owns the live input mapper, XYZZY overlay,
+  machine, timing clock, pending pulse input, and pending typed characters.
+- Reuse the driver from both Kitty and `wgpu` live presentation paths.
+- Preserve pulse buffering, held-input catch-up frames, typed-character
+  high-score entry behavior, and XYZZY overlay behavior.
+- Add focused tests for driver-owned held input, overlay state, and realtime
+  pulse buffering.
+
+Work log:
+
+- `2026-05-12` Completed `DC-44`: Kitty and `wgpu` now advance the arcade core
+  through the shared `LiveCoreDriver` instead of duplicating input/clock/overlay
+  logic. Validation passed with `cargo fmt --check`, `cargo check`, targeted
+  `live::tests::live_core_driver`, targeted `wgpu_presenter::tests::wgpu_smoke`,
+  `cargo test --all-targets`, and `cargo clippy --all-targets -- -D warnings`.
+
+### DC-45: Threaded Live Core Runtime
+
+Status: `complete`
+
+Goal: move the `wgpu` live path onto an explicit presentation/core thread
+boundary without changing gameplay behavior.
+
+Scope:
+
+- Add a `LiveCoreRuntime` trait and `LiveCoreThread` worker that owns
+  `LiveCoreDriver`, live `Renderer`, pending input, and CMOS access.
+- Move `wgpu` input, resize, advance, render, and CMOS-save calls through the
+  worker command protocol.
+- Preserve realtime and deterministic smoke-frame stepping, pulse buffering,
+  held input, typed characters, XYZZY overlay state, and live smoke reporting.
+- Add focused tests for threaded input/overlay advancement, realtime pulse
+  buffering, renderer resize, and CMOS snapshots.
+
+Work log:
+
+- `2026-05-12` Completed `DC-45`: `wgpu` presentation now draws the latest
+  `LiveCoreFrame` returned from a dedicated live core worker thread instead of
+  owning the arcade machine directly. Validation passed with
+  `cargo fmt --check`, `cargo check`, targeted
+  `live::tests::live_core_thread`, targeted
+  `wgpu_presenter::tests::wgpu_smoke`, and
+  `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`,
+  `cargo run -- --live-smoke`, `make trace-script-test`,
+  `make trace-fixtures`, `make coverage NEW_CODE_COVERAGE_BASE=origin/main`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md`,
+  and `git diff --check`.
+
+## Completed Follow-On Cycles
+
+These ordered cycles are complete. If a future behavior gap appears, document
+the gap in `docs/fidelity/gaps.md` and add a source-backed fixture or
+characterization test before implementation.
+
+### DC-46: Kitty Runtime Unification
+
+Status: `complete`
+
+Goal: put the Kitty compatibility backend behind the same live runtime
+boundary as `wgpu`, so presentation code no longer owns arcade-core state in
+either live path.
+
+Scope:
+
+- Route Kitty input, frame advancement, rendering, resize handling, sleep
+  timing, and CMOS save/load through `LiveCoreRuntime`.
+- Keep the existing Kitty graphics protocol, terminal-session handling, and
+  terminal geometry code unchanged except for the runtime call sites.
+- Preserve pulse buffering, held-input catch-up frames, typed-character high
+  score entry, XYZZY overlay behavior, and CMOS persistence.
+- Add tests around any extracted Kitty/runtime adapter seams rather than
+  requiring an interactive terminal for coverage.
+
+Acceptance criteria:
+
+- `run_kitty_live` does not directly own or mutate `ArcadeMachine`,
+  `LiveCoreDriver`, `InputMapper`, `XyzzyOverlay`, or `Renderer`.
+- Kitty and `wgpu` share the same runtime command contract for input, resize,
+  advance/render, and CMOS access.
+- Existing Kitty renderer tests still cover double buffering, clear behavior,
+  resize behavior, and environment gating.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib live::tests::live_core
+cargo test --lib kitty::tests
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+```
+
+Work log:
+
+- `2026-05-12` Completed `DC-46`: Kitty now uses `LiveCoreThread` for input,
+  resize, advance/render, and CMOS snapshots, matching the `wgpu` live runtime
+  command boundary while keeping the existing Kitty graphics and terminal
+  session code in the presentation path. Focused adapter coverage was added for
+  terminal geometry updates, and the shared CMOS-save helper is used by both
+  live backends. Validation passed with `cargo fmt --check`, `cargo check`,
+  targeted `live::tests::live_core_thread`, targeted
+  `live::tests::terminal_geometry_update_reports_runtime_and_kitty_sizes`,
+  targeted `kitty::tests`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo test --all-targets`, `cargo run -- --live-smoke`,
+  `make trace-script-test`, `make trace-fixtures`, and
+  `make coverage NEW_CODE_COVERAGE_BASE=origin/main`, `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md`, and `git diff --check`.
+
+### DC-47: Non-Blocking Wgpu Frame Pipeline
+
+Status: `complete`
+
+Goal: separate `wgpu` event-loop scheduling from core frame production so the
+window thread draws the latest completed frame instead of synchronously waiting
+for every arcade-core advance/render command.
+
+Scope:
+
+- Introduce a small latest-frame mailbox or bounded channel between the live
+  core worker and `WgpuLiveApp`.
+- Keep input and resize commands ordered relative to core advancement.
+- Preserve deterministic `--live-smoke` behavior by keeping smoke mode on an
+  explicit fixed-frame cadence with observable frame counts.
+- Keep normal realtime mode tied to `FRAME_RATE_MILLIHZ` deadlines from the
+  core runtime.
+- Add tests for latest-frame replacement, stale-frame dropping, resize
+  ordering, clean shutdown, and smoke determinism.
+
+Acceptance criteria:
+
+- `WgpuLiveApp::draw_frame` can render the latest available frame without
+  blocking on an arcade-core step.
+- Normal mode does not busy-spin when no frame is due.
+- Smoke reports still include window creation, rendered frame count, distinct
+  frame CRCs, attract/credit/playing evidence, injected inputs, and clean exit.
+- Worker shutdown cannot leave the event loop waiting forever on a channel
+  receive.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib live::tests::live_core
+cargo test --lib wgpu_presenter::tests::wgpu_smoke
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+cargo run -- --live-smoke
+```
+
+Work log:
+
+- `2026-05-12` Completed `DC-47`: `LiveCoreThread` now supports a
+  replacement latest-frame mailbox and non-blocking frame requests, while
+  keeping the synchronous advance path for Kitty. `WgpuLiveApp` requests at
+  most one core frame at a time, drains completed frames without blocking the
+  redraw path, schedules normal mode from the worker-owned frame deadline, and
+  keeps smoke mode on explicit fixed-frame requests. Focused coverage was
+  added for mailbox replacement, stale-frame dropping, resize ordering, async
+  fixed-frame determinism, and in-flight shutdown joining. Validation passed
+  with `cargo fmt --check`, targeted `live::tests::live_core`, targeted
+  `wgpu_presenter::tests::wgpu_smoke`, clippy with warnings denied,
+  `cargo test --all-targets`, `cargo run -- --live-smoke`, `make fidelity`,
+  Markdown lint, and the whitespace diff check.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778624044098319`
+
+### DC-48: Runtime Lifecycle And Error Contracts
+
+Status: `complete`
+
+Goal: make live runtime startup, shutdown, worker panic reporting, and CMOS
+persistence explicit and testable before adding more long-running runtime
+features.
+
+Scope:
+
+- Replace stringly worker failures with a small runtime error type or structured
+  context that distinguishes command send failures, worker termination, render
+  failures, and worker panics.
+- Ensure live workers shut down and join predictably from normal exit, smoke
+  exit, window close, suspended windows, and error paths.
+- Confirm CMOS save uses the final core-owned CMOS state after live runtime
+  shutdown.
+- Add tests for worker drop, failed command response, render error propagation,
+  and CMOS snapshot retrieval after gameplay mutations.
+
+Acceptance criteria:
+
+- Runtime errors include enough context to identify the failed command.
+- Dropping the runtime cannot leak a worker thread.
+- `run_wgpu_live` and `run_wgpu_live_smoke` preserve their public error
+  behavior while using the structured runtime errors internally.
+- CMOS save remains best-effort only where it already was; no new gameplay
+  behavior depends on persistence.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib live::tests::live_core_thread
+cargo test --lib wgpu_presenter::tests
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+```
+
+Work log:
+
+- `2026-05-12` Completed `DC-48`: live runtime failures now report structured
+  command-scoped errors for command send failures, worker termination, worker
+  panics, mailbox failures, and render failures. Live shutdown now joins the
+  worker and returns the final core-owned CMOS snapshot before persistence, so
+  Kitty and `wgpu` both save after runtime shutdown. Focused coverage was added
+  for drop/join behavior, failed command context, worker panic context,
+  sync/async render error propagation, and CMOS mutation persistence.
+  Validation passed with `cargo fmt --check`, targeted
+  `live::tests::live_core_thread`, targeted `wgpu_presenter::tests`, clippy
+  with warnings denied, `cargo test --all-targets`, and
+  `cargo run -- --live-smoke`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778624792340579`
+
+### DC-49: Public Arcade API Narrowing
+
+Status: `complete`
+
+Goal: reduce the public `machine::...` compatibility surface without breaking
+existing internal callers or hiding source-shaped contracts that tests still
+need.
+
+Scope:
+
+- Inventory current `machine::...` re-exports and classify them as public API,
+  test-only support, internal implementation detail, or source fixture
+  contract.
+- Move internal-only imports to their owning modules where practical.
+- Keep compatibility re-exports temporarily when the migration would otherwise
+  create broad churn.
+- Add compile-time caller checks or focused tests for any moved public surface.
+- Update `README.md` and `SPEC.md` only if the user-facing API changes.
+
+Acceptance criteria:
+
+- No behavior code changes are mixed into this cycle.
+- Existing external-facing commands and live behavior are unchanged.
+- Any removed or moved symbol has a documented replacement path or is proven
+  private to the crate.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make coverage NEW_CODE_COVERAGE_BASE=origin/main
+```
+
+Work log:
+
+- `2026-05-12` Completed `DC-49`: `machine_state` and `machine_process` are
+  now public canonical contract modules, while the existing `machine::...`
+  re-exports remain as compatibility aliases. Internal callers in fidelity,
+  live runtime, and `wgpu` presentation now import state/process contracts from
+  the owning modules where practical. Compile-time API checks cover both direct
+  and compatibility paths, and README/SPEC now document the canonical paths.
+  Validation passed with `cargo fmt --check`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, and
+  `make coverage NEW_CODE_COVERAGE_BASE=origin/main`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778626931639039`
+
+### DC-50: Machine Module Ergonomics Pass
+
+Status: `complete`
+
+Goal: keep shrinking assembler-shaped bulk into readable Rust modules while
+preserving source-visible behavior and fixture coverage.
+
+Scope:
+
+- Pick one high-cohesion area at a time: scoring/high-score flow, object list
+  mutations, shell/projectile handling, terrain/world flow, or operator/audit
+  flow.
+- Extract small typed data structures or helper traits only when they remove
+  real duplication or clarify a source contract.
+- Keep source routine names visible in tests and error messages where they are
+  part of fidelity evidence.
+- Avoid broad rewrites of `machine.rs` and `machine_memory.rs`; each pass must
+  have a narrow ownership boundary and focused tests.
+
+Acceptance criteria:
+
+- The selected module area has less duplicated address/list manipulation or
+  less incidental register plumbing than before the cycle.
+- Source-visible mutations remain covered by existing or new tests.
+- Public behavior, trace output, live play, and fixture checks are unchanged.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib machine::tests::<focused_filter>
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make trace-fixtures
+make coverage NEW_CODE_COVERAGE_BASE=origin/main
+```
+
+Work log:
+
+- `2026-05-13` Completed `DC-50`: the high-score game-over dispatch path and
+  test-only one-player game setup now reuse the live high-score session reset
+  helper instead of duplicating entry/submission/player-mask cleanup. Focused
+  regression coverage now asserts `GameOverSleeping` clears the entry,
+  submission, active-entry player, completed-player mask, and phase state.
+  Validation passed with `cargo fmt --check`, targeted
+  `machine::tests::game_over_sleeping_dispatch_clears_live_high_score_session`,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `make trace-fixtures`, and
+  `make coverage NEW_CODE_COVERAGE_BASE=origin/main`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778628102721249`
+
+### DC-51: Live Audio Acceptance Design
+
+Status: `complete`
+
+Goal: prepare live audio output with source-backed acceptance criteria before
+implementing any audio device or mixer code.
+
+Scope:
+
+- Define which sound-board surface is authoritative for live audio:
+  per-frame sound commands, sound-board state snapshots, DAC byte signatures,
+  or a combination.
+- Add a documented live-audio design note that covers cadence, buffering,
+  sample rate, worker-thread ownership, and how audio interacts with pause,
+  window suspend, smoke mode, and CMOS persistence.
+- Add or extend fixtures that prove command timing for coin, start, thrust,
+  smart bomb, hyperspace, explosion, terrain blow, and high-score paths.
+- Do not add audible output in this cycle.
+
+Acceptance criteria:
+
+- `docs/fidelity/gaps.md` has no unresolved live-audio behavior question that
+  would block implementation.
+- The plan identifies the exact fixture or test that will fail if audio timing
+  drifts.
+- Runtime threading ownership for audio is specified before implementation.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --all-targets
+make trace-script-test
+make trace-fixtures
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+```
+
+Work log:
+
+- `2026-05-13` Completed `DC-51`: added the source-backed live audio
+  acceptance design in `docs/fidelity/live-audio.md`, added
+  `assets/red-label/live-audio-acceptance.tsv`, and wired the matrix into
+  embedded-asset tests so each accepted path is backed by existing command or
+  sound-table fixtures. README, SPEC, fidelity README, gap notes, and the
+  refactor freeze inventory now point to the accepted timing, diagnostic, and
+  content-guard surfaces before runtime audio implementation begins.
+  Validation passed with `cargo fmt --check`, `cargo test --all-targets`,
+  `make trace-script-test`, `make trace-fixtures`, and `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/live-audio.md`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778628605842599`
+
+### DC-52: Live Audio Runtime Prototype
+
+Status: `complete`
+
+Goal: add the first live audio runtime path only after `DC-51` establishes the
+source-backed acceptance contract.
+
+Scope:
+
+- Add an audio backend behind a trait so live audio can be disabled, mocked, or
+  swapped without changing the arcade core.
+- Feed audio from the accepted sound-board surface without changing trace
+  output or machine stepping cadence.
+- Keep audio commands on a runtime-owned thread or channel boundary that does
+  not block `wgpu` redraw or core stepping.
+- Add a CLI/config path only if the default behavior and platform failure modes
+  are clear.
+
+Acceptance criteria:
+
+- Audio can be disabled for tests and unsupported platforms.
+- `--live-smoke` remains deterministic and does not require an audio device.
+- Sound command fixtures and DAC signature tests still pass unchanged unless
+  `DC-51` explicitly updated their accepted contract.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+```
+
+Work log:
+
+- `2026-05-13` Completed `DC-52`: added `src/audio.rs` with a live audio
+  backend trait, disabled mode, no-device null backend, bounded non-blocking
+  command queue, drop accounting, flush/shutdown handling, and focused tests.
+  Live core stepping now copies accepted `FrameOutput::sound_commands()`
+  batches to the audio runtime without changing arcade-core ownership, trace
+  output, or step cadence. Normal live play uses the null backend, `--mute`
+  disables the runtime path, and `--live-smoke` uses a disabled no-device path.
+  README, SPEC, fidelity docs, gap notes, and refactor-freeze ownership notes
+  now describe the prototype boundary and the remaining audible-device work.
+  Validation passed with `cargo fmt --check`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `make fidelity`,
+  `cargo run -- --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/README.md
+  docs/fidelity/gaps.md docs/fidelity/live-audio.md`, and `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778630482569359`
+
+### DC-53: Release And CI Hardening
+
+Status: `complete`
+
+Goal: make the refactored runtime cheaper to maintain by tightening local and
+GitHub validation around the expensive fidelity, smoke, and coverage gates.
+
+Scope:
+
+- Review CI runtime after the threaded fixture runner and live runtime changes.
+- Keep `make ci`, `make fidelity`, Sonar, coverage baseline, and local docs in
+  sync.
+- Add targeted CI diagnostics for `wgpu` smoke failures, coverage baseline
+  drift, missing Lua/Mesa tools, and Slack update failures.
+- Keep generated artifacts out of git unless the project explicitly accepts
+  them as source fixtures or documentation media.
+
+Acceptance criteria:
+
+- A CI failure points at the failed subsystem instead of requiring full log
+  archaeology.
+- Coverage baseline refresh remains an intentional command, not an implicit
+  side effect.
+- README development commands match the Makefile and workflows.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13` Completed `DC-53`: added Makefile doctor targets for trace,
+  coverage, and `wgpu` smoke prerequisites; split GitHub CI into explicit
+  prerequisite diagnostics, fidelity, and `xvfb` smoke steps; added Sonar
+  coverage diagnostics; and updated README/SPEC development guidance so local
+  commands, workflow steps, and the intentional coverage-baseline refresh path
+  stay aligned. Validation passed with `make trace-doctor`,
+  `make coverage-doctor`, `make trace-script-test`, `make fidelity`,
+  `cargo run -- --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/README.md docs/fidelity/gaps.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
+  `git diff --check`.
+  Slack update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778631713574199`
+
+## Planned Rewrite Cycles
+
+These cycles replace the completed refactor track with a clean `wgpu`-only
+rewrite track. Keep each cycle narrow enough to finish with focused tests and
+the full fidelity gate before moving on.
+
+### DC-54: Wgpu-Only Rewrite Foundation
+
+Status: `planned`
+
+Goal: establish the clean rewrite boundary without changing gameplay behavior.
+
+Scope:
+
+- Remove Kitty from the active app surface: CLI renderer selection, runtime
+  routing, docs, active tests, and CI expectations.
+- Make `wgpu` the only supported live runtime and `--live-smoke` path.
+- Introduce `game`, `systems`, `renderer`, and `platform` module shells with
+  clean public contracts.
+- Move or wrap the current assembler-shaped implementation behind an explicit
+  `fidelity::oracle` or `legacy` boundary.
+- Narrow `src/lib.rs` public exports to the intended clean API plus temporary
+  oracle/test surfaces.
+- Replace fragile new-code coverage baseline matching with a line-and-context
+  or source-hash keyed baseline.
+- Convert CLI parsing to typed command parsing so mixed commands and flags are
+  rejected predictably.
+
+Acceptance criteria:
+
+- `cargo run` and `cargo run -- --live-smoke` use `wgpu` without backend
+  selection.
+- No active production path depends on Kitty or terminal graphics.
+- The current gameplay model is still available to tests as an oracle.
+- Public crate exports distinguish clean API from temporary oracle internals.
+- Coverage baseline entries cannot accidentally accept unrelated repeated
+  source lines.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+git diff --check
+```
+
+### DC-55: Clean Simulation Contracts
+
+Status: `planned`
+
+Goal: define the domain-first frame API that future gameplay systems will own.
+
+Scope:
+
+- Add clean `GameState`, `GameInput`, `GameFrame`, `GameEvents`, and
+  `RenderScene` contracts.
+- Add an oracle adapter that converts current machine output into the clean
+  contracts for comparison.
+- Add fixtures that compare clean frame events and scene summaries against the
+  current accepted behavior.
+- Keep all red-label/source terminology inside the oracle adapter and fidelity
+  tests.
+
+Acceptance criteria:
+
+- The `wgpu` runtime can advance through the clean frame API even while the
+  oracle still produces the underlying behavior.
+- New gameplay code can be written against clean contracts without importing
+  machine memory modules.
+- Accepted trace scenarios have clean event/scene comparison coverage.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game
+cargo test --lib systems
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+```
+
+### DC-56: Native Wgpu Scene Renderer
+
+Status: `planned`
+
+Goal: replace framebuffer presentation with a native `wgpu` scene renderer
+while keeping visual behavior equivalent.
+
+Scope:
+
+- Build renderer-owned pipelines for terrain/starfield, sprites, projectiles,
+  explosions, HUD/text, and debug overlays.
+- Introduce texture atlas and palette/font resources owned by the renderer.
+- Render from `RenderScene` instead of machine RAM.
+- Keep a temporary framebuffer comparison path for golden visual fixtures.
+
+Acceptance criteria:
+
+- Live play and smoke render through native `wgpu` scene data.
+- Golden visual evidence still catches behavioral or visual drift.
+- Renderer modules do not import machine memory or oracle-specific types.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer
+cargo test --lib wgpu_presenter::tests::wgpu_smoke
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+```
+
+### DC-57: Gameplay System Migration
+
+Status: `planned`
+
+Goal: migrate gameplay from memory-oriented routines to clean deterministic
+systems, one behavior slice at a time.
+
+Scope:
+
+- Migrate input/player movement first, then projectiles, collision, scoring,
+  waves/enemy spawning, terrain/starfield, attract mode, high-score flow, and
+  sound-event emission.
+- Keep update order explicit and tested.
+- Compare each migrated system against the oracle before deleting the old path.
+- Remove assembler-derived names from migrated production code.
+
+Acceptance criteria:
+
+- Each migrated system has clean domain tests and oracle equivalence tests.
+- Production gameplay modules no longer read or write RAM-layout fields.
+- Behavior, trace output, live smoke, and accepted visual/audio evidence remain
+  stable unless an intentional difference is documented.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+```
+
+### DC-58: Audio Device And Event Model
+
+Status: `planned`
+
+Goal: replace command-byte delivery with gameplay-facing sound events and a
+diagnosable audio runtime.
+
+Scope:
+
+- Map accepted command timing to clean `SoundEvent` values.
+- Add structured audio worker errors, backend lifecycle reporting, and smoke
+  diagnostics.
+- Add an audible backend only after null/disabled/event equivalence is stable.
+- Keep sound fixture timing as the oracle for migrated sound events.
+
+Acceptance criteria:
+
+- Gameplay systems emit semantic sound events.
+- Audio worker failure is visible in tests and diagnostics.
+- `--live-smoke` stays deterministic and device-independent.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib audio
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+```
+
+### DC-59: Oracle Retirement
+
+Status: `planned`
+
+Goal: remove the memory-oriented production model after clean systems own
+accepted gameplay behavior.
+
+Scope:
+
+- Delete or quarantine obsolete machine memory/session modules from production
+  builds.
+- Keep only fixture parsers and historical oracle tooling that still provide
+  review value.
+- Replace memory CRC gates with clean state/event/render/sound equivalence
+  gates.
+- Ensure no production symbol names expose red-label, ROM, source routine, or
+  assembler process terminology.
+
+Acceptance criteria:
+
+- Production gameplay no longer depends on the legacy memory model.
+- Fidelity tooling remains available for historical comparison where needed.
+- Public API and module names read as a clean game implementation.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+rg -n 'red_label|RED_LABEL|defend\\.|src/machine_memory|source routine' src
+```
+
+## Ongoing Work
+
+- Keep `README.md`, `SPEC.md`, and `PLAN.md` synchronized with CLI help,
+  Makefile targets, workflows, and module boundaries.
+- Keep added executable Rust lines covered or explicitly refresh the accepted
+  uncovered baseline only when accepting existing debt.
+- Keep Slack completion notes best-effort until the connector authentication
+  is restored; do not treat a Slack token failure as a code or validation
+  failure.

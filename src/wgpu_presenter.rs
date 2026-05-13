@@ -6,7 +6,7 @@ use std::path::Path;
 #[cfg(all(not(test), not(coverage)))]
 use std::sync::Arc;
 #[cfg(all(not(test), not(coverage)))]
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[cfg(all(not(test), not(coverage)))]
 use anyhow::{Context, anyhow};
@@ -27,18 +27,14 @@ use winit::{
 
 #[cfg(all(not(test), not(coverage)))]
 use crate::{
+    audio::{LiveAudioMode, LiveAudioRuntime},
     cmos_storage::{CmosStorage, FileCmosStorage},
-    input::{CabinetInput, InputMapper, PolledInput, XyzzyOverlay},
-    live::{
-        LiveCoreClock, live_frame_inputs, render_live_machine_frame, save_live_cmos,
-        step_live_core_frames,
-    },
-    machine::CompatibilityState,
-    video::Renderer,
+    live::{LiveAdvanceMode, LiveCoreFrame, LiveCoreRuntime, LiveCoreThread, save_live_cmos_ram},
+    machine::ArcadeMachine,
 };
 use crate::{
     input::{InputEvent, InputEventKind, InputKey, InputProfile},
-    machine::{ArcadeMachine, GamePhase},
+    machine_state::{GamePhase, MachineSnapshot},
     rom::crc32,
     video::RenderedImage,
 };
@@ -87,14 +83,18 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
 "#;
 
 #[cfg(all(not(test), not(coverage)))]
-pub fn run_wgpu_live(input_profile: InputProfile, cmos_path: Option<&Path>) -> Result<()> {
+pub fn run_wgpu_live(
+    input_profile: InputProfile,
+    audio_mode: LiveAudioMode,
+    cmos_path: Option<&Path>,
+) -> Result<()> {
     let cmos_storage = cmos_path.map(FileCmosStorage::new);
     let storage = cmos_storage
         .as_ref()
         .map(|storage| storage as &dyn CmosStorage);
     let machine = crate::live::live_machine_from_cmos_storage(storage)?;
     let event_loop = winit::event_loop::EventLoop::new().context("creating wgpu event loop")?;
-    let mut app = WgpuLiveApp::new(input_profile, cmos_storage, machine);
+    let mut app = WgpuLiveApp::new(input_profile, cmos_storage, machine, audio_mode);
 
     let run_result = event_loop
         .run_app(&mut app)
@@ -140,7 +140,11 @@ pub fn run_wgpu_live_smoke(
 }
 
 #[cfg(any(test, coverage))]
-pub fn run_wgpu_live(_input_profile: InputProfile, _cmos_path: Option<&Path>) -> Result<()> {
+pub fn run_wgpu_live(
+    _input_profile: InputProfile,
+    _audio_mode: crate::audio::LiveAudioMode,
+    _cmos_path: Option<&Path>,
+) -> Result<()> {
     Ok(())
 }
 
@@ -268,15 +272,12 @@ impl WgpuSmokeReport {
 
 #[cfg(all(not(test), not(coverage)))]
 struct WgpuLiveApp {
-    input_mapper: InputMapper,
-    xyzzy: XyzzyOverlay,
     cmos_storage: Option<FileCmosStorage>,
-    machine: ArcadeMachine,
-    renderer: Renderer,
-    core_clock: LiveCoreClock,
-    pending_cabinet_input: CabinetInput,
-    pending_typed_chars: Vec<char>,
-    polled_input: PolledInput,
+    core: LiveCoreThread,
+    latest_frame: Option<LiveCoreFrame>,
+    frame_request_in_flight: bool,
+    next_wake_at: Instant,
+    quit_requested: bool,
     window_size: (u32, u32),
     window: Option<Arc<Window>>,
     presenter: Option<WgpuPresenter>,
@@ -290,17 +291,21 @@ impl WgpuLiveApp {
         input_profile: InputProfile,
         cmos_storage: Option<FileCmosStorage>,
         machine: ArcadeMachine,
+        audio_mode: LiveAudioMode,
     ) -> Self {
         Self {
-            input_mapper: InputMapper::new(input_profile),
-            xyzzy: XyzzyOverlay::default(),
             cmos_storage,
-            machine,
-            renderer: Renderer::with_size(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT),
-            core_clock: LiveCoreClock::new(Instant::now()),
-            pending_cabinet_input: CabinetInput::NONE,
-            pending_typed_chars: Vec::new(),
-            polled_input: PolledInput::default(),
+            core: LiveCoreThread::spawn_with_audio(
+                input_profile,
+                machine,
+                Instant::now(),
+                (INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT),
+                LiveAudioRuntime::for_mode(audio_mode),
+            ),
+            latest_frame: None,
+            frame_request_in_flight: false,
+            next_wake_at: Instant::now(),
+            quit_requested: false,
             window_size: (INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT),
             window: None,
             presenter: None,
@@ -315,19 +320,27 @@ impl WgpuLiveApp {
         machine: ArcadeMachine,
         target_frames: u32,
     ) -> Self {
-        let mut app = Self::new(input_profile, cmos_storage, machine);
+        let mut app = Self::new(
+            input_profile,
+            cmos_storage,
+            machine,
+            LiveAudioMode::Disabled,
+        );
         app.window_size = (SMOKE_WINDOW_WIDTH, SMOKE_WINDOW_HEIGHT);
-        app.renderer = Renderer::with_size(SMOKE_WINDOW_WIDTH, SMOKE_WINDOW_HEIGHT);
+        app.core
+            .resize_renderer(SMOKE_WINDOW_WIDTH, SMOKE_WINDOW_HEIGHT)
+            .expect("live core thread should accept initial smoke renderer size");
         app.smoke = Some(WgpuSmoke::new(target_frames));
         app
     }
 
     fn save_cmos(&self) -> Result<()> {
-        save_live_cmos(
+        let cmos = self.core.shutdown_cmos_ram()?;
+        save_live_cmos_ram(
             self.cmos_storage
                 .as_ref()
                 .map(|storage| storage as &dyn CmosStorage),
-            &self.machine,
+            &cmos,
         )
     }
 
@@ -357,12 +370,12 @@ impl WgpuLiveApp {
                 .context("creating wgpu window")?,
         );
         let size = renderable_window_size(window.inner_size()).unwrap_or(self.window_size);
-        self.renderer = Renderer::with_size(size.0, size.1);
+        self.core.resize_renderer(size.0, size.1)?;
         self.presenter = Some(
             pollster::block_on(WgpuPresenter::new(window.clone()))
                 .context("initializing wgpu presenter")?,
         );
-        self.core_clock = LiveCoreClock::new(Instant::now());
+        self.core.reset_clock(Instant::now())?;
         self.window = Some(window);
         if let Some(smoke) = &mut self.smoke {
             smoke.observe_window_created();
@@ -383,89 +396,89 @@ impl WgpuLiveApp {
             .is_some_and(|window| window.id() == window_id)
     }
 
-    fn handle_keyboard_input(&mut self, key_event: KeyEvent) {
+    fn handle_keyboard_input(&mut self, key_event: KeyEvent) -> Result<bool> {
         if let Some(input_event) = input_event_from_winit(&key_event) {
-            self.input_mapper
-                .handle_input_event(input_event, &mut self.polled_input);
+            self.quit_requested |= self.core.handle_input_event(input_event)?;
         }
+        Ok(self.quit_requested)
     }
 
-    fn inject_smoke_inputs(&mut self) {
-        let Some(smoke) = &mut self.smoke else {
-            return;
+    fn inject_smoke_inputs(&mut self) -> Result<()> {
+        let Some(frame) = self.smoke.as_ref().map(WgpuSmoke::frame) else {
+            return Ok(());
         };
-        for input in smoke_input_events(self.input_mapper.profile(), smoke.frame()) {
-            self.input_mapper
-                .handle_input_event(input.event, &mut self.polled_input);
-            if input.counts_for_report {
+        for input in smoke_input_events(self.core.input_profile(), frame) {
+            self.quit_requested |= self.core.handle_input_event(input.event)?;
+            if input.counts_for_report
+                && let Some(smoke) = &mut self.smoke
+            {
                 smoke.record_injected_input(input.label);
+            }
+        }
+        Ok(())
+    }
+
+    fn resize(&mut self, size: PhysicalSize<u32>) -> Result<()> {
+        let Some((width, height)) = renderable_window_size(size) else {
+            return Ok(());
+        };
+        self.core.resize_renderer(width, height)?;
+        if let Some(presenter) = &mut self.presenter {
+            presenter.resize(width, height);
+        }
+        Ok(())
+    }
+
+    fn collect_latest_core_frame(&mut self) -> Result<bool> {
+        match self.core.take_latest_frame() {
+            Ok(Some(frame)) => {
+                self.frame_request_in_flight = false;
+                self.next_wake_at = frame.next_step_at;
+                self.latest_frame = Some(frame);
+                if let Some(smoke) = &mut self.smoke {
+                    smoke.advance_frame();
+                }
+                Ok(true)
+            }
+            Ok(None) => Ok(false),
+            Err(error) => {
+                self.frame_request_in_flight = false;
+                Err(error)
             }
         }
     }
 
-    fn resize(&mut self, size: PhysicalSize<u32>) {
-        let Some((width, height)) = renderable_window_size(size) else {
-            return;
-        };
-        self.renderer = Renderer::with_size(width, height);
-        if let Some(presenter) = &mut self.presenter {
-            presenter.resize(width, height);
-        }
-    }
-
-    fn advance_core(&mut self) {
-        if self.polled_input.quit_requested {
-            return;
+    fn request_core_frame(&mut self) -> Result<()> {
+        if self.quit_requested || self.frame_request_in_flight {
+            return Ok(());
         }
 
-        self.xyzzy
-            .handle_typed_chars(&self.polled_input.typed_chars);
-        self.pending_typed_chars
-            .extend(self.polled_input.typed_chars.iter().copied());
-        self.machine.set_compatibility(CompatibilityState {
-            xyzzy_active: self.xyzzy.active(),
-            xyzzy_invincible: self.xyzzy.invincible(),
-            xyzzy_auto_fire: self.xyzzy.auto_fire(),
-        });
+        let now = Instant::now();
+        if self.smoke.is_none() && now < self.next_wake_at {
+            return Ok(());
+        }
 
-        let core_steps = if self.smoke.is_some() {
-            1
+        let mode = if self.smoke.is_some() {
+            LiveAdvanceMode::FixedFrames(1)
         } else {
-            self.core_clock.steps_due(Instant::now())
+            LiveAdvanceMode::Realtime
         };
-        let held_input = self.input_mapper.held_cabinet_input();
-        if let Some(frame_inputs) = live_frame_inputs(
-            &mut self.pending_cabinet_input,
-            self.polled_input.cabinet,
-            held_input,
-            core_steps,
-        ) {
-            step_live_core_frames(
-                &mut self.machine,
-                frame_inputs.first,
-                frame_inputs.catch_up,
-                &self.pending_typed_chars,
-                core_steps,
-            );
-            self.pending_typed_chars.clear();
-        }
-
-        self.polled_input = PolledInput::default();
-        if let Some(smoke) = &mut self.smoke {
-            smoke.advance_frame();
-        }
+        self.core.request_frame(mode, now)?;
+        self.frame_request_in_flight = true;
+        Ok(())
     }
 
     fn draw_frame(&mut self) -> Result<()> {
-        let image = render_live_machine_frame(&mut self.renderer, &mut self.machine)
-            .context("rendering live machine frame")?;
-        let metrics = rendered_image_metrics(image);
-        let smoke_state = SmokeMachineState::from_machine(&self.machine);
+        let Some(frame) = &self.latest_frame else {
+            return Ok(());
+        };
+        let metrics = rendered_image_metrics(&frame.image);
+        let smoke_state = SmokeMachineState::from_snapshot(frame.snapshot);
         let Some(presenter) = &mut self.presenter else {
             return Ok(());
         };
         presenter
-            .draw_frame(image)
+            .draw_frame(&frame.image)
             .context("drawing wgpu graphics frame")?;
         if let Some(smoke) = &mut self.smoke {
             smoke.observe_rendered_image(metrics, smoke_state);
@@ -494,13 +507,16 @@ impl ApplicationHandler for WgpuLiveApp {
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::KeyboardInput { event, .. } => {
-                self.handle_keyboard_input(event);
-                if self.polled_input.quit_requested {
-                    event_loop.exit();
+            WindowEvent::KeyboardInput { event, .. } => match self.handle_keyboard_input(event) {
+                Ok(true) => event_loop.exit(),
+                Ok(false) => {}
+                Err(error) => self.handle_error(event_loop, error),
+            },
+            WindowEvent::Resized(size) => {
+                if let Err(error) = self.resize(size) {
+                    self.handle_error(event_loop, error);
                 }
             }
-            WindowEvent::Resized(size) => self.resize(size),
             WindowEvent::RedrawRequested => {
                 if let Some(window) = &self.window {
                     window.pre_present_notify();
@@ -518,14 +534,19 @@ impl ApplicationHandler for WgpuLiveApp {
             event_loop.exit();
             return;
         }
-        if self.polled_input.quit_requested {
+        if self.quit_requested {
             event_loop.exit();
             return;
         }
 
-        self.inject_smoke_inputs();
-        self.advance_core();
-        if let Some(window) = &self.window {
+        let frame_ready = match self.collect_latest_core_frame() {
+            Ok(frame_ready) => frame_ready,
+            Err(error) => {
+                self.handle_error(event_loop, error);
+                return;
+            }
+        };
+        if frame_ready && let Some(window) = &self.window {
             window.request_redraw();
         }
         if let Some(smoke) = &mut self.smoke
@@ -535,11 +556,25 @@ impl ApplicationHandler for WgpuLiveApp {
             event_loop.exit();
             return;
         }
+
+        let frame_due = self.smoke.is_some() || Instant::now() >= self.next_wake_at;
+        if !self.frame_request_in_flight
+            && frame_due
+            && let Err(error) = self
+                .inject_smoke_inputs()
+                .and_then(|()| self.request_core_frame())
+        {
+            self.handle_error(event_loop, error);
+            return;
+        }
         if self.smoke.is_some() {
             event_loop.set_control_flow(ControlFlow::Poll);
+        } else if self.frame_request_in_flight {
+            event_loop.set_control_flow(ControlFlow::WaitUntil(
+                Instant::now() + Duration::from_millis(1),
+            ));
         } else {
-            let sleep = self.core_clock.sleep_until_next_step(Instant::now());
-            event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + sleep));
+            event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_wake_at));
         }
     }
 
@@ -563,8 +598,7 @@ struct SmokeMachineState {
 }
 
 impl SmokeMachineState {
-    fn from_machine(machine: &ArcadeMachine) -> Self {
-        let snapshot = machine.snapshot();
+    fn from_snapshot(snapshot: MachineSnapshot) -> Self {
         Self {
             phase: snapshot.phase,
             credits: snapshot.credits,
@@ -1260,7 +1294,8 @@ mod tests {
 
     use crate::{
         input::{CabinetInput, InputEventKind, InputKey, InputMapper, InputProfile, PolledInput},
-        machine::GamePhase,
+        machine::ArcadeMachine,
+        machine_state::GamePhase,
         video::RenderedImage,
         wgpu_presenter::{
             SmokeMachineState, WgpuSmoke, WgpuSmokeReport, input_event_kind_from_winit,
@@ -1531,6 +1566,21 @@ mod tests {
             required_smoke_inputs()
                 .iter()
                 .all(|input| report.injected_inputs.iter().any(|seen| seen == input))
+        );
+    }
+
+    #[test]
+    fn wgpu_smoke_machine_state_uses_thread_frame_snapshot() {
+        let mut snapshot = ArcadeMachine::new().snapshot();
+        snapshot.phase = GamePhase::Playing;
+        snapshot.credits = 2;
+
+        assert_eq!(
+            SmokeMachineState::from_snapshot(snapshot),
+            SmokeMachineState {
+                phase: GamePhase::Playing,
+                credits: 2,
+            }
         );
     }
 

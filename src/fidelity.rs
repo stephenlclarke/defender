@@ -9,9 +9,8 @@ use std::fmt;
 
 use crate::{
     input::{CabinetInput, DefenderInputPorts},
-    machine::{
-        ArcadeMachine, CompatibilityState, FrameOutput, GamePhase, MachineEvent, MachineSnapshot,
-    },
+    machine::ArcadeMachine,
+    machine_state::{CompatibilityState, FrameOutput, GamePhase, MachineEvent, MachineSnapshot},
     rom::crc32,
     sound::{SoundCommand, format_sound_command_list},
     video::RenderedImage,
@@ -513,7 +512,8 @@ mod tests {
             trace_text_for_inputs,
         },
         input::CabinetInput,
-        machine::{ArcadeMachine, CompatibilityState, GamePhase, MachineEvent},
+        machine::ArcadeMachine,
+        machine_state::{CompatibilityState, GamePhase, MachineEvent},
         rom::crc32,
         sound::SoundCommand,
         video::RenderedImage,

@@ -1,6 +1,7 @@
 //! Live terminal runner for the new core.
 #![cfg_attr(coverage, allow(dead_code, unused_imports))]
 
+use std::any::Any;
 #[cfg(not(test))]
 use std::io;
 #[cfg(not(test))]
@@ -8,8 +9,11 @@ use std::io::IsTerminal;
 #[cfg(not(test))]
 use std::io::Write;
 use std::path::Path;
-#[cfg(not(test))]
-use std::thread;
+use std::sync::{
+    Arc, Mutex,
+    mpsc::{self, Sender},
+};
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -17,18 +21,20 @@ use anyhow::{Context, Result, anyhow, bail};
 use crossterm::event::{self, Event};
 
 use crate::{
+    audio::{LiveAudioMode, LiveAudioRuntime},
+    board::CmosRam,
     cmos_storage::CmosStorage,
-    input::{CabinetInput, InputProfile},
+    input::{CabinetInput, InputEvent, InputMapper, InputProfile, PolledInput, XyzzyOverlay},
     machine::{ArcadeMachine, FRAME_RATE_MILLIHZ},
+    machine_state::{CompatibilityState, MachineSnapshot},
     presentation::PresentationBackend,
-    video::{RenderedImage, Renderer},
+    terminal::TerminalGeometry,
+    video::{RenderedImage, Renderer, raster_size},
 };
 #[cfg(not(test))]
 use crate::{
     cmos_storage::FileCmosStorage,
-    input::{InputMapper, PolledInput, XyzzyOverlay},
     kitty::KittyGraphics,
-    machine::CompatibilityState,
     terminal::{TerminalSession, geometry},
 };
 
@@ -58,85 +64,794 @@ impl LiveCoreClock {
         steps
     }
 
+    #[cfg(test)]
     pub(crate) fn sleep_until_next_step(&self, now: Instant) -> Duration {
         self.next_step.saturating_duration_since(now)
     }
+
+    pub(crate) fn next_step_at(&self) -> Instant {
+        self.next_step
+    }
+}
+
+pub(crate) struct LiveCoreDriver {
+    input_mapper: InputMapper,
+    xyzzy: XyzzyOverlay,
+    machine: ArcadeMachine,
+    core_clock: LiveCoreClock,
+    audio: LiveAudioRuntime,
+    pending_cabinet_input: CabinetInput,
+    pending_typed_chars: Vec<char>,
+}
+
+#[cfg_attr(test, allow(dead_code))]
+impl LiveCoreDriver {
+    #[cfg(test)]
+    pub(crate) fn new(input_profile: InputProfile, machine: ArcadeMachine, now: Instant) -> Self {
+        Self::new_with_audio(input_profile, machine, now, LiveAudioRuntime::disabled())
+    }
+
+    pub(crate) fn new_with_audio(
+        input_profile: InputProfile,
+        machine: ArcadeMachine,
+        now: Instant,
+        audio: LiveAudioRuntime,
+    ) -> Self {
+        Self {
+            input_mapper: InputMapper::new(input_profile),
+            xyzzy: XyzzyOverlay::default(),
+            machine,
+            core_clock: LiveCoreClock::new(now),
+            audio,
+            pending_cabinet_input: CabinetInput::NONE,
+            pending_typed_chars: Vec::new(),
+        }
+    }
+
+    pub(crate) fn machine(&self) -> &ArcadeMachine {
+        &self.machine
+    }
+
+    pub(crate) fn machine_mut(&mut self) -> &mut ArcadeMachine {
+        &mut self.machine
+    }
+
+    pub(crate) fn handle_input_event(&mut self, input_event: InputEvent, input: &mut PolledInput) {
+        self.input_mapper.handle_input_event(input_event, input);
+    }
+
+    pub(crate) fn reset_clock(&mut self, now: Instant) {
+        self.core_clock = LiveCoreClock::new(now);
+        self.audio.flush();
+    }
+
+    pub(crate) fn next_step_at(&self) -> Instant {
+        self.core_clock.next_step_at()
+    }
+
+    pub(crate) fn advance_realtime(&mut self, input: &PolledInput, now: Instant) -> u32 {
+        let core_steps = self.core_clock.steps_due(now);
+        self.advance_fixed_frames(input, core_steps);
+        core_steps
+    }
+
+    pub(crate) fn advance_fixed_frames(&mut self, input: &PolledInput, frames: u32) {
+        if input.quit_requested {
+            return;
+        }
+
+        self.xyzzy.handle_typed_chars(&input.typed_chars);
+        self.pending_typed_chars
+            .extend(input.typed_chars.iter().copied());
+        self.machine.set_compatibility(CompatibilityState {
+            xyzzy_active: self.xyzzy.active(),
+            xyzzy_invincible: self.xyzzy.invincible(),
+            xyzzy_auto_fire: self.xyzzy.auto_fire(),
+        });
+
+        let held_input = self.input_mapper.held_cabinet_input();
+        if let Some(frame_inputs) = live_frame_inputs(
+            &mut self.pending_cabinet_input,
+            input.cabinet,
+            held_input,
+            frames,
+        ) {
+            step_live_core_frames(
+                &mut self.machine,
+                frame_inputs.first,
+                frame_inputs.catch_up,
+                &self.pending_typed_chars,
+                frames,
+                &self.audio,
+            );
+            self.pending_typed_chars.clear();
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shutdown_audio(&mut self) {
+        self.audio.shutdown();
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LiveAdvanceMode {
+    Realtime,
+    FixedFrames(u32),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LiveCoreFrame {
+    pub(crate) image: RenderedImage,
+    pub(crate) snapshot: MachineSnapshot,
+    pub(crate) next_step_at: Instant,
+}
+
+#[derive(Clone, Default)]
+struct LiveCoreFrameMailbox {
+    latest: Arc<Mutex<Option<std::result::Result<LiveCoreFrame, LiveCoreError>>>>,
+}
+
+impl LiveCoreFrameMailbox {
+    fn post(
+        &self,
+        frame: std::result::Result<LiveCoreFrame, LiveCoreError>,
+    ) -> std::result::Result<(), LiveCoreError> {
+        *self
+            .latest
+            .lock()
+            .map_err(|_| LiveCoreError::mailbox_unavailable(LiveCoreCommandName::RequestFrame))? =
+            Some(frame);
+        Ok(())
+    }
+
+    fn take_latest(&self) -> Result<Option<LiveCoreFrame>> {
+        let Some(frame) = self
+            .latest
+            .lock()
+            .map_err(|_| LiveCoreError::mailbox_unavailable(LiveCoreCommandName::RequestFrame))?
+            .take()
+        else {
+            return Ok(None);
+        };
+
+        frame.map(Some).map_err(Into::into)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LiveCoreCommandName {
+    InputEvent,
+    ResetClock,
+    ResizeRenderer,
+    Advance,
+    RequestFrame,
+    #[cfg(test)]
+    CmosRam,
+    Shutdown,
+    #[cfg(test)]
+    FailNextRenderForTest,
+    #[cfg(test)]
+    PanicForTest,
+}
+
+impl std::fmt::Display for LiveCoreCommandName {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Self::InputEvent => "input_event",
+            Self::ResetClock => "reset_clock",
+            Self::ResizeRenderer => "resize_renderer",
+            Self::Advance => "advance",
+            Self::RequestFrame => "request_frame",
+            #[cfg(test)]
+            Self::CmosRam => "cmos_ram",
+            Self::Shutdown => "shutdown",
+            #[cfg(test)]
+            Self::FailNextRenderForTest => "fail_next_render_for_test",
+            #[cfg(test)]
+            Self::PanicForTest => "panic_for_test",
+        };
+        formatter.write_str(name)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum LiveCoreWorkerError {
+    Render(String),
+}
+
+impl LiveCoreWorkerError {
+    fn render(error: impl Into<String>) -> Self {
+        Self::Render(error.into())
+    }
+}
+
+impl std::fmt::Display for LiveCoreWorkerError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Render(error) => write!(formatter, "render failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for LiveCoreWorkerError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum LiveCoreErrorKind {
+    CommandSend,
+    WorkerTerminated,
+    WorkerPanic(String),
+    WorkerFailed(LiveCoreWorkerError),
+    MailboxUnavailable,
+    WorkerStateUnavailable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LiveCoreError {
+    command: LiveCoreCommandName,
+    kind: LiveCoreErrorKind,
+}
+
+impl LiveCoreError {
+    fn command_send(command: LiveCoreCommandName) -> Self {
+        Self {
+            command,
+            kind: LiveCoreErrorKind::CommandSend,
+        }
+    }
+
+    fn worker_terminated(command: LiveCoreCommandName) -> Self {
+        Self {
+            command,
+            kind: LiveCoreErrorKind::WorkerTerminated,
+        }
+    }
+
+    fn worker_panic(command: LiveCoreCommandName, message: String) -> Self {
+        Self {
+            command,
+            kind: LiveCoreErrorKind::WorkerPanic(message),
+        }
+    }
+
+    fn worker_failed(command: LiveCoreCommandName, error: LiveCoreWorkerError) -> Self {
+        Self {
+            command,
+            kind: LiveCoreErrorKind::WorkerFailed(error),
+        }
+    }
+
+    fn mailbox_unavailable(command: LiveCoreCommandName) -> Self {
+        Self {
+            command,
+            kind: LiveCoreErrorKind::MailboxUnavailable,
+        }
+    }
+
+    fn worker_state_unavailable(command: LiveCoreCommandName) -> Self {
+        Self {
+            command,
+            kind: LiveCoreErrorKind::WorkerStateUnavailable,
+        }
+    }
+
+    #[cfg(test)]
+    fn command(&self) -> LiveCoreCommandName {
+        self.command
+    }
+
+    #[cfg(test)]
+    fn kind(&self) -> &LiveCoreErrorKind {
+        &self.kind
+    }
+}
+
+impl std::fmt::Display for LiveCoreError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "live core command {} failed: ", self.command)?;
+        match &self.kind {
+            LiveCoreErrorKind::CommandSend => formatter.write_str("command channel closed"),
+            LiveCoreErrorKind::WorkerTerminated => {
+                formatter.write_str("worker terminated before replying")
+            }
+            LiveCoreErrorKind::WorkerPanic(message) => {
+                write!(formatter, "worker panicked: {message}")
+            }
+            LiveCoreErrorKind::WorkerFailed(error) => write!(formatter, "{error}"),
+            LiveCoreErrorKind::MailboxUnavailable => {
+                formatter.write_str("frame mailbox is unavailable")
+            }
+            LiveCoreErrorKind::WorkerStateUnavailable => {
+                formatter.write_str("worker state is unavailable")
+            }
+        }
+    }
+}
+
+impl std::error::Error for LiveCoreError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.kind {
+            LiveCoreErrorKind::WorkerFailed(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+pub(crate) trait LiveCoreRuntime {
+    fn input_profile(&self) -> InputProfile;
+    fn handle_input_event(&self, input_event: InputEvent) -> Result<bool>;
+    fn reset_clock(&self, now: Instant) -> Result<()>;
+    fn resize_renderer(&self, width: u32, height: u32) -> Result<()>;
+    fn advance(&self, mode: LiveAdvanceMode, now: Instant) -> Result<LiveCoreFrame>;
+    fn request_frame(&self, mode: LiveAdvanceMode, now: Instant) -> Result<()>;
+    fn take_latest_frame(&self) -> Result<Option<LiveCoreFrame>>;
+    #[cfg(test)]
+    fn cmos_ram(&self) -> Result<CmosRam>;
+    fn shutdown_cmos_ram(&self) -> Result<CmosRam>;
+}
+
+pub(crate) struct LiveCoreThread {
+    input_profile: InputProfile,
+    commands: Sender<LiveCoreCommand>,
+    frames: LiveCoreFrameMailbox,
+    worker: Mutex<Option<JoinHandle<()>>>,
+}
+
+type LiveCoreResponse<T> = std::result::Result<T, LiveCoreWorkerError>;
+
+enum LiveCoreCommand {
+    InputEvent {
+        input_event: InputEvent,
+        response: Sender<bool>,
+    },
+    ResetClock {
+        now: Instant,
+    },
+    ResizeRenderer {
+        width: u32,
+        height: u32,
+    },
+    Advance {
+        mode: LiveAdvanceMode,
+        now: Instant,
+        response: Sender<LiveCoreResponse<LiveCoreFrame>>,
+    },
+    RequestFrame {
+        mode: LiveAdvanceMode,
+        now: Instant,
+    },
+    #[cfg(test)]
+    CmosRam {
+        response: Sender<CmosRam>,
+    },
+    Shutdown {
+        response: Option<Sender<CmosRam>>,
+    },
+    #[cfg(test)]
+    FailNextRenderForTest {
+        message: String,
+    },
+    #[cfg(test)]
+    PanicForTest,
+}
+
+impl LiveCoreThread {
+    #[cfg(test)]
+    pub(crate) fn spawn(
+        input_profile: InputProfile,
+        machine: ArcadeMachine,
+        now: Instant,
+        renderer_size: (u32, u32),
+    ) -> Self {
+        Self::spawn_with_audio(
+            input_profile,
+            machine,
+            now,
+            renderer_size,
+            LiveAudioRuntime::disabled(),
+        )
+    }
+
+    pub(crate) fn spawn_with_audio(
+        input_profile: InputProfile,
+        machine: ArcadeMachine,
+        now: Instant,
+        renderer_size: (u32, u32),
+        audio: LiveAudioRuntime,
+    ) -> Self {
+        let (commands, receiver) = mpsc::channel();
+        let frames = LiveCoreFrameMailbox::default();
+        let worker_frames = frames.clone();
+        let worker = thread::spawn(move || {
+            run_live_core_thread(
+                input_profile,
+                machine,
+                now,
+                renderer_size,
+                audio,
+                receiver,
+                worker_frames,
+            )
+        });
+        Self {
+            input_profile,
+            commands,
+            frames,
+            worker: Mutex::new(Some(worker)),
+        }
+    }
+
+    fn request<T>(
+        &self,
+        command_name: LiveCoreCommandName,
+        command: impl FnOnce(Sender<T>) -> LiveCoreCommand,
+    ) -> Result<T> {
+        let (response, receiver) = mpsc::channel();
+        self.send_command(command_name, command(response))?;
+        receiver
+            .recv()
+            .map_err(|_| self.worker_stopped_error(command_name).into())
+    }
+
+    fn request_result<T>(
+        &self,
+        command_name: LiveCoreCommandName,
+        command: impl FnOnce(Sender<LiveCoreResponse<T>>) -> LiveCoreCommand,
+    ) -> Result<T> {
+        self.request(command_name, command).and_then(|result| {
+            result.map_err(|error| LiveCoreError::worker_failed(command_name, error).into())
+        })
+    }
+
+    fn send_command(
+        &self,
+        command_name: LiveCoreCommandName,
+        command: LiveCoreCommand,
+    ) -> std::result::Result<(), LiveCoreError> {
+        self.commands
+            .send(command)
+            .map_err(|_| self.command_send_error(command_name))
+    }
+
+    fn send(&self, command_name: LiveCoreCommandName, command: LiveCoreCommand) -> Result<()> {
+        self.send_command(command_name, command).map_err(Into::into)
+    }
+
+    fn command_send_error(&self, command: LiveCoreCommandName) -> LiveCoreError {
+        self.join_worker(command)
+            .err()
+            .unwrap_or_else(|| LiveCoreError::command_send(command))
+    }
+
+    fn worker_stopped_error(&self, command: LiveCoreCommandName) -> LiveCoreError {
+        self.join_worker(command)
+            .err()
+            .unwrap_or_else(|| LiveCoreError::worker_terminated(command))
+    }
+
+    fn worker_is_finished(&self, command: LiveCoreCommandName) -> Result<bool> {
+        let worker = self
+            .worker
+            .lock()
+            .map_err(|_| LiveCoreError::worker_state_unavailable(command))?;
+        Ok(match worker.as_ref() {
+            Some(worker) => worker.is_finished(),
+            None => true,
+        })
+    }
+
+    fn join_worker(&self, command: LiveCoreCommandName) -> std::result::Result<(), LiveCoreError> {
+        let Some(worker) = self
+            .worker
+            .lock()
+            .map_err(|_| LiveCoreError::worker_state_unavailable(command))?
+            .take()
+        else {
+            return Ok(());
+        };
+
+        worker
+            .join()
+            .map_err(|panic| LiveCoreError::worker_panic(command, panic_message(panic)))
+    }
+
+    #[cfg(test)]
+    fn fail_next_render_for_test(&self, message: impl Into<String>) -> Result<()> {
+        self.send(
+            LiveCoreCommandName::FailNextRenderForTest,
+            LiveCoreCommand::FailNextRenderForTest {
+                message: message.into(),
+            },
+        )
+    }
+
+    #[cfg(test)]
+    fn panic_worker_for_test(&self) -> Result<()> {
+        self.send(
+            LiveCoreCommandName::PanicForTest,
+            LiveCoreCommand::PanicForTest,
+        )
+    }
+}
+
+impl LiveCoreRuntime for LiveCoreThread {
+    fn input_profile(&self) -> InputProfile {
+        self.input_profile
+    }
+
+    fn handle_input_event(&self, input_event: InputEvent) -> Result<bool> {
+        self.request(LiveCoreCommandName::InputEvent, |response| {
+            LiveCoreCommand::InputEvent {
+                input_event,
+                response,
+            }
+        })
+    }
+
+    fn reset_clock(&self, now: Instant) -> Result<()> {
+        self.send(
+            LiveCoreCommandName::ResetClock,
+            LiveCoreCommand::ResetClock { now },
+        )
+    }
+
+    fn resize_renderer(&self, width: u32, height: u32) -> Result<()> {
+        self.send(
+            LiveCoreCommandName::ResizeRenderer,
+            LiveCoreCommand::ResizeRenderer { width, height },
+        )
+    }
+
+    fn advance(&self, mode: LiveAdvanceMode, now: Instant) -> Result<LiveCoreFrame> {
+        self.request_result(LiveCoreCommandName::Advance, |response| {
+            LiveCoreCommand::Advance {
+                mode,
+                now,
+                response,
+            }
+        })
+    }
+
+    fn request_frame(&self, mode: LiveAdvanceMode, now: Instant) -> Result<()> {
+        self.send(
+            LiveCoreCommandName::RequestFrame,
+            LiveCoreCommand::RequestFrame { mode, now },
+        )
+    }
+
+    fn take_latest_frame(&self) -> Result<Option<LiveCoreFrame>> {
+        if let Some(frame) = self.frames.take_latest()? {
+            return Ok(Some(frame));
+        }
+
+        if self.worker_is_finished(LiveCoreCommandName::RequestFrame)? {
+            return Err(self
+                .worker_stopped_error(LiveCoreCommandName::RequestFrame)
+                .into());
+        }
+
+        Ok(None)
+    }
+
+    #[cfg(test)]
+    fn cmos_ram(&self) -> Result<CmosRam> {
+        self.request(LiveCoreCommandName::CmosRam, |response| {
+            LiveCoreCommand::CmosRam { response }
+        })
+    }
+
+    fn shutdown_cmos_ram(&self) -> Result<CmosRam> {
+        let cmos = self.request(LiveCoreCommandName::Shutdown, |response| {
+            LiveCoreCommand::Shutdown {
+                response: Some(response),
+            }
+        })?;
+        self.join_worker(LiveCoreCommandName::Shutdown)?;
+        Ok(cmos)
+    }
+}
+
+impl Drop for LiveCoreThread {
+    fn drop(&mut self) {
+        let _ = self.send_command(
+            LiveCoreCommandName::Shutdown,
+            LiveCoreCommand::Shutdown { response: None },
+        );
+        let _ = self.join_worker(LiveCoreCommandName::Shutdown);
+    }
+}
+
+fn run_live_core_thread(
+    input_profile: InputProfile,
+    machine: ArcadeMachine,
+    now: Instant,
+    renderer_size: (u32, u32),
+    audio: LiveAudioRuntime,
+    receiver: mpsc::Receiver<LiveCoreCommand>,
+    frames: LiveCoreFrameMailbox,
+) {
+    let mut core = LiveCoreDriver::new_with_audio(input_profile, machine, now, audio);
+    let mut renderer = Renderer::with_size(renderer_size.0, renderer_size.1);
+    let mut polled_input = PolledInput::default();
+    let mut next_render_error = None;
+
+    while let Ok(command) = receiver.recv() {
+        match command {
+            LiveCoreCommand::InputEvent {
+                input_event,
+                response,
+            } => {
+                core.handle_input_event(input_event, &mut polled_input);
+                let _ = response.send(polled_input.quit_requested);
+            }
+            LiveCoreCommand::ResetClock { now } => core.reset_clock(now),
+            LiveCoreCommand::ResizeRenderer { width, height } => {
+                renderer = Renderer::with_size(width, height);
+            }
+            LiveCoreCommand::Advance {
+                mode,
+                now,
+                response,
+            } => {
+                let result = advance_and_render_live_core_response(
+                    &mut core,
+                    &mut renderer,
+                    &mut polled_input,
+                    mode,
+                    now,
+                    &mut next_render_error,
+                );
+                let _ = response.send(result);
+            }
+            LiveCoreCommand::RequestFrame { mode, now } => {
+                let result = advance_and_render_live_core_response(
+                    &mut core,
+                    &mut renderer,
+                    &mut polled_input,
+                    mode,
+                    now,
+                    &mut next_render_error,
+                )
+                .map_err(|error| {
+                    LiveCoreError::worker_failed(LiveCoreCommandName::RequestFrame, error)
+                });
+                let _ = frames.post(result);
+            }
+            #[cfg(test)]
+            LiveCoreCommand::CmosRam { response } => {
+                let _ = response.send(*core.machine().red_label_cmos_ram());
+            }
+            LiveCoreCommand::Shutdown { response } => {
+                if let Some(response) = response {
+                    let _ = response.send(*core.machine().red_label_cmos_ram());
+                }
+                break;
+            }
+            #[cfg(test)]
+            LiveCoreCommand::FailNextRenderForTest { message } => {
+                next_render_error = Some(message);
+            }
+            #[cfg(test)]
+            LiveCoreCommand::PanicForTest => {
+                panic!("live core worker panic requested by test");
+            }
+        }
+    }
+}
+
+fn advance_and_render_live_core_response(
+    core: &mut LiveCoreDriver,
+    renderer: &mut Renderer,
+    polled_input: &mut PolledInput,
+    mode: LiveAdvanceMode,
+    now: Instant,
+    next_render_error: &mut Option<String>,
+) -> LiveCoreResponse<LiveCoreFrame> {
+    if let Some(error) = next_render_error.take() {
+        return Err(LiveCoreWorkerError::render(error));
+    }
+
+    advance_and_render_live_core(core, renderer, polled_input, mode, now)
+        .map_err(|error| LiveCoreWorkerError::render(error.to_string()))
+}
+
+fn advance_and_render_live_core(
+    core: &mut LiveCoreDriver,
+    renderer: &mut Renderer,
+    polled_input: &mut PolledInput,
+    mode: LiveAdvanceMode,
+    now: Instant,
+) -> Result<LiveCoreFrame> {
+    if !polled_input.quit_requested {
+        match mode {
+            LiveAdvanceMode::Realtime => {
+                core.advance_realtime(polled_input, now);
+            }
+            LiveAdvanceMode::FixedFrames(frames) => {
+                core.advance_fixed_frames(polled_input, frames);
+            }
+        }
+    }
+
+    *polled_input = PolledInput::default();
+    let image = render_live_machine_frame(renderer, core.machine_mut())?.clone();
+    Ok(LiveCoreFrame {
+        image,
+        snapshot: core.machine().snapshot(),
+        next_step_at: core.next_step_at(),
+    })
+}
+
+fn panic_message(panic: Box<dyn Any + Send + 'static>) -> String {
+    if let Some(message) = panic.downcast_ref::<&str>() {
+        return String::from(*message);
+    }
+    if let Some(message) = panic.downcast_ref::<String>() {
+        return message.clone();
+    }
+    String::from("unknown panic payload")
 }
 
 #[cfg(all(not(test), not(coverage)))]
 pub fn run_live(
     input_profile: InputProfile,
     presentation_backend: PresentationBackend,
+    audio_mode: LiveAudioMode,
     cmos_path: Option<&Path>,
 ) -> Result<()> {
     match presentation_backend {
-        PresentationBackend::Kitty => run_kitty_live(input_profile, cmos_path),
-        PresentationBackend::Wgpu => crate::wgpu_presenter::run_wgpu_live(input_profile, cmos_path),
+        PresentationBackend::Kitty => run_kitty_live(input_profile, audio_mode, cmos_path),
+        PresentationBackend::Wgpu => {
+            crate::wgpu_presenter::run_wgpu_live(input_profile, audio_mode, cmos_path)
+        }
     }
 }
 
 #[cfg(all(not(test), not(coverage)))]
-fn run_kitty_live(input_profile: InputProfile, cmos_path: Option<&Path>) -> Result<()> {
+fn run_kitty_live(
+    input_profile: InputProfile,
+    audio_mode: LiveAudioMode,
+    cmos_path: Option<&Path>,
+) -> Result<()> {
     ensure_interactive_terminal()?;
     KittyGraphics::ensure_supported()?;
 
     let mut stdout = io::stdout();
     let _terminal = TerminalSession::enter(&mut stdout)?;
     let mut terminal_geometry = geometry()?;
-    let mut renderer = Renderer::new(terminal_geometry);
     let mut graphics = KittyGraphics::new(terminal_geometry.cols, terminal_geometry.rows);
-    let mut input_mapper = InputMapper::new(input_profile);
-    let mut xyzzy = XyzzyOverlay::default();
     let cmos_storage = cmos_path.map(FileCmosStorage::new);
     let storage = cmos_storage
         .as_ref()
         .map(|storage| storage as &dyn CmosStorage);
-    let mut machine = live_machine_from_cmos_storage(storage)?;
-    let mut core_clock = LiveCoreClock::new(Instant::now());
-    let mut pending_cabinet_input = CabinetInput::NONE;
-    let mut pending_typed_chars = Vec::new();
+    let machine = live_machine_from_cmos_storage(storage)?;
+    let core = LiveCoreThread::spawn_with_audio(
+        input_profile,
+        machine,
+        Instant::now(),
+        raster_size(terminal_geometry),
+        LiveAudioRuntime::for_mode(audio_mode),
+    );
 
     loop {
-        sync_terminal_geometry(&mut terminal_geometry, &mut renderer, &mut graphics)?;
+        sync_terminal_geometry(&mut terminal_geometry, &mut graphics, &core)?;
 
-        let input = poll_input(&mut input_mapper)?;
-        if input.quit_requested {
+        if poll_input(&core)? {
             break;
         }
 
-        xyzzy.handle_typed_chars(&input.typed_chars);
-        pending_typed_chars.extend(input.typed_chars.iter().copied());
-        machine.set_compatibility(CompatibilityState {
-            xyzzy_active: xyzzy.active(),
-            xyzzy_invincible: xyzzy.invincible(),
-            xyzzy_auto_fire: xyzzy.auto_fire(),
-        });
-        let core_steps = core_clock.steps_due(Instant::now());
-        let held_input = input_mapper.held_cabinet_input();
-        if let Some(frame_inputs) = live_frame_inputs(
-            &mut pending_cabinet_input,
-            input.cabinet,
-            held_input,
-            core_steps,
-        ) {
-            step_live_core_frames(
-                &mut machine,
-                frame_inputs.first,
-                frame_inputs.catch_up,
-                &pending_typed_chars,
-                core_steps,
-            );
-            pending_typed_chars.clear();
-        }
+        let now = Instant::now();
+        let frame = core
+            .advance(LiveAdvanceMode::Realtime, now)
+            .context("advancing live core frame")?;
+        let next_wake_at = frame.next_step_at;
 
-        let image = render_live_machine_frame(&mut renderer, &mut machine)
-            .context("rendering live machine frame")?;
         graphics
-            .draw_frame(&mut stdout, image)
+            .draw_frame(&mut stdout, &frame.image)
             .context("drawing kitty graphics frame")?;
         stdout.flush().context("flushing kitty graphics frame")?;
 
-        let sleep_duration = core_clock.sleep_until_next_step(Instant::now());
+        let sleep_duration = next_wake_at.saturating_duration_since(Instant::now());
         if !sleep_duration.is_zero() {
             thread::sleep(sleep_duration);
         }
@@ -144,11 +859,12 @@ fn run_kitty_live(input_profile: InputProfile, cmos_path: Option<&Path>) -> Resu
 
     graphics.clear(&mut stdout)?;
     stdout.flush().context("flushing kitty clear escape")?;
-    save_live_cmos(
+    let cmos = core.shutdown_cmos_ram()?;
+    save_live_cmos_ram(
         cmos_storage
             .as_ref()
             .map(|storage| storage as &dyn CmosStorage),
-        &machine,
+        &cmos,
     )?;
     Ok(())
 }
@@ -157,6 +873,7 @@ fn run_kitty_live(input_profile: InputProfile, cmos_path: Option<&Path>) -> Resu
 pub fn run_live(
     _input_profile: InputProfile,
     _presentation_backend: PresentationBackend,
+    _audio_mode: LiveAudioMode,
     _cmos_path: Option<&Path>,
 ) -> Result<()> {
     Ok(())
@@ -185,14 +902,17 @@ pub(crate) fn step_live_core_frames(
     catch_up_input: CabinetInput,
     typed_chars: &[char],
     frames: u32,
+    audio: &LiveAudioRuntime,
 ) {
     if frames == 0 {
         return;
     }
 
-    machine.step_with_typed_chars(first_input, typed_chars);
+    let output = machine.step_with_typed_chars(first_input, typed_chars);
+    audio.submit_frame_output(&output);
     for _ in 1..frames {
-        machine.step(catch_up_input);
+        let output = machine.step(catch_up_input);
+        audio.submit_frame_output(&output);
     }
 }
 
@@ -253,43 +973,60 @@ pub(crate) fn live_machine_from_cmos_storage(
         .map_err(|error| anyhow!("loading persisted CMOS RAM into arcade core: {error}"))
 }
 
-pub(crate) fn save_live_cmos(
-    storage: Option<&dyn CmosStorage>,
-    machine: &ArcadeMachine,
-) -> Result<()> {
+pub(crate) fn save_live_cmos_ram(storage: Option<&dyn CmosStorage>, cmos: &CmosRam) -> Result<()> {
     let Some(storage) = storage else {
         return Ok(());
     };
 
-    storage
-        .save_cmos(machine.red_label_cmos_ram())
-        .context("saving persisted CMOS RAM")
+    storage.save_cmos(cmos).context("saving persisted CMOS RAM")
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TerminalGeometryUpdate {
+    renderer_size: (u32, u32),
+    kitty_size: (u16, u16),
+}
+
+fn terminal_geometry_update(
+    terminal_geometry: &mut TerminalGeometry,
+    latest_geometry: TerminalGeometry,
+) -> Option<TerminalGeometryUpdate> {
+    if latest_geometry == *terminal_geometry {
+        return None;
+    }
+
+    *terminal_geometry = latest_geometry;
+    Some(TerminalGeometryUpdate {
+        renderer_size: raster_size(latest_geometry),
+        kitty_size: (latest_geometry.cols, latest_geometry.rows),
+    })
 }
 
 #[cfg(not(test))]
 fn sync_terminal_geometry(
-    terminal_geometry: &mut crate::terminal::TerminalGeometry,
-    renderer: &mut Renderer,
+    terminal_geometry: &mut TerminalGeometry,
     graphics: &mut KittyGraphics,
+    core: &impl LiveCoreRuntime,
 ) -> Result<()> {
     let latest_geometry = geometry()?;
-    if latest_geometry != *terminal_geometry {
-        *terminal_geometry = latest_geometry;
-        renderer.resize(*terminal_geometry);
-        graphics.resize(terminal_geometry.cols, terminal_geometry.rows);
+    if let Some(update) = terminal_geometry_update(terminal_geometry, latest_geometry) {
+        core.resize_renderer(update.renderer_size.0, update.renderer_size.1)?;
+        graphics.resize(update.kitty_size.0, update.kitty_size.1);
     }
     Ok(())
 }
 
 #[cfg(not(test))]
-fn poll_input(input_mapper: &mut InputMapper) -> Result<PolledInput> {
-    let mut input = PolledInput::default();
+fn poll_input(core: &impl LiveCoreRuntime) -> Result<bool> {
+    let mut quit_requested = false;
     while event::poll(Duration::ZERO)? {
-        if let Event::Key(key_event) = event::read()? {
-            input_mapper.handle_key_event(key_event, &mut input);
+        if let Event::Key(key_event) = event::read()?
+            && let Some(input_event) = InputEvent::from_crossterm(key_event)
+        {
+            quit_requested |= core.handle_input_event(input_event)?;
         }
     }
-    Ok(input)
+    Ok(quit_requested)
 }
 
 #[cfg(test)]
@@ -297,25 +1034,32 @@ mod tests {
     use std::cell::RefCell;
     use std::collections::BTreeSet;
     use std::io;
-    use std::time::Instant;
+    use std::sync::{Arc, Mutex, mpsc};
+    use std::thread;
+    use std::time::{Duration, Instant};
 
+    use crate::audio::{LiveAudioBackend, LiveAudioCommandBatch, LiveAudioRuntime};
     use crate::board::{
         CMOS_RAM_SIZE, CmosRam, RED_LABEL_CRHSTD_CELL_OFFSET, cmos_sram_write_byte,
     };
     use crate::cmos_storage::CmosStorage;
-    use crate::input::CabinetInput;
-    use crate::machine::{
-        ArcadeMachine, FRAME_RATE_MILLIHZ, GamePhase, MachineEvent, RedLabelSoundBoardSnapshot,
-        VISIBLE_HEIGHT, VISIBLE_WIDTH,
+    use crate::input::{
+        CabinetInput, InputEvent, InputEventKind, InputKey, InputProfile, PolledInput,
     };
+    use crate::machine::{ArcadeMachine, FRAME_RATE_MILLIHZ, VISIBLE_HEIGHT, VISIBLE_WIDTH};
+    use crate::machine_state::{GamePhase, MachineEvent, RedLabelSoundBoardSnapshot};
     use crate::rom::crc32;
-    use crate::sound::SoundCommandLatch;
+    use crate::sound::{SoundCommand, SoundCommandLatch};
+    use crate::terminal::TerminalGeometry;
     use crate::video::{RenderedImage, Renderer, defender_visible_byte_offset};
 
     use super::{
-        FRAME_DURATION, LiveCoreClock, cabinet_frame_duration_micros, live_frame_inputs,
-        live_machine_from_cmos_storage, render_live_frame, render_live_machine_frame,
-        save_live_cmos, step_live_core_frames, validate_interactive_terminal,
+        FRAME_DURATION, LiveAdvanceMode, LiveCoreClock, LiveCoreCommandName, LiveCoreDriver,
+        LiveCoreError, LiveCoreErrorKind, LiveCoreFrame, LiveCoreFrameMailbox, LiveCoreRuntime,
+        LiveCoreThread, LiveCoreWorkerError, cabinet_frame_duration_micros, live_frame_inputs,
+        live_machine_from_cmos_storage, panic_message, render_live_frame,
+        render_live_machine_frame, save_live_cmos_ram, step_live_core_frames,
+        terminal_geometry_update, validate_interactive_terminal,
     };
 
     #[derive(Default)]
@@ -334,10 +1078,54 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct RecordingAudioBackend {
+        batches: Arc<Mutex<Vec<LiveAudioCommandBatch>>>,
+    }
+
+    impl LiveAudioBackend for RecordingAudioBackend {
+        fn handle_command_batch(&mut self, batch: LiveAudioCommandBatch) {
+            self.batches
+                .lock()
+                .expect("audio recording lock")
+                .push(batch);
+        }
+    }
+
     #[test]
     fn live_mode_rejects_non_interactive_terminal() {
         let error = validate_interactive_terminal(false, true).expect_err("terminal guard");
         assert!(error.to_string().contains("interactive terminal"));
+    }
+
+    #[test]
+    fn live_mode_accepts_interactive_terminal() {
+        validate_interactive_terminal(true, true).expect("interactive terminal");
+    }
+
+    #[test]
+    fn terminal_geometry_update_reports_runtime_and_kitty_sizes() {
+        let mut current = TerminalGeometry {
+            cols: 80,
+            rows: 24,
+            pixel_width: 800,
+            pixel_height: 600,
+        };
+        let unchanged = current;
+        assert_eq!(terminal_geometry_update(&mut current, unchanged), None);
+
+        let latest = TerminalGeometry {
+            cols: 100,
+            rows: 30,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+
+        let update = terminal_geometry_update(&mut current, latest).expect("geometry update");
+
+        assert_eq!(current, latest);
+        assert_eq!(update.renderer_size, (960, 720));
+        assert_eq!(update.kitty_size, (100, 30));
     }
 
     #[test]
@@ -1203,6 +1991,17 @@ mod tests {
     #[test]
     fn live_core_steps_catch_up_without_replaying_typed_chars() {
         let mut machine = ArcadeMachine::new();
+        let audio = LiveAudioRuntime::disabled();
+        step_live_core_frames(
+            &mut machine,
+            CabinetInput::NONE,
+            CabinetInput::NONE,
+            &['z'],
+            0,
+            &audio,
+        );
+        assert_eq!(machine.snapshot().frame, 0);
+
         let mut snapshot = machine.snapshot();
         snapshot.phase = GamePhase::HighScoreEntry;
         machine.restore(snapshot);
@@ -1216,6 +2015,7 @@ mod tests {
             CabinetInput::NONE,
             &['a'],
             3,
+            &audio,
         );
 
         let snapshot = machine.snapshot();
@@ -1227,6 +2027,428 @@ mod tests {
                 .initials,
             [b'A', b' ', b' ']
         );
+    }
+
+    #[test]
+    fn live_core_driver_advances_machine_overlay_and_held_input() {
+        let mut driver =
+            LiveCoreDriver::new(InputProfile::Test, ArcadeMachine::new(), Instant::now());
+        let mut input = PolledInput::default();
+        driver.handle_input_event(
+            InputEvent::new(InputKey::Char('t'), InputEventKind::Press),
+            &mut input,
+        );
+        input.typed_chars.extend(['x', 'y', 'z', 'z', 'y', 'f']);
+
+        driver.advance_fixed_frames(&input, 2);
+
+        let snapshot = driver.machine().snapshot();
+        assert_eq!(snapshot.frame, 2);
+        assert_eq!(
+            snapshot.last_input_bits,
+            CabinetInput {
+                thrust: true,
+                ..CabinetInput::NONE
+            }
+            .bits()
+        );
+        assert!(snapshot.xyzzy_active);
+        assert!(snapshot.xyzzy_auto_fire);
+    }
+
+    #[test]
+    fn live_core_driver_buffers_pulses_until_realtime_step_is_due() {
+        let start = Instant::now();
+        let mut driver = LiveCoreDriver::new(InputProfile::Test, ArcadeMachine::new(), start);
+        let pulse = PolledInput {
+            cabinet: CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            },
+            ..PolledInput::default()
+        };
+
+        assert_eq!(
+            driver.advance_realtime(&pulse, start - Duration::from_millis(1)),
+            0
+        );
+        assert_eq!(driver.machine().snapshot().frame, 0);
+        assert_eq!(driver.advance_realtime(&PolledInput::default(), start), 1);
+
+        let snapshot = driver.machine().snapshot();
+        assert_eq!(snapshot.frame, 1);
+        assert_eq!(
+            snapshot.last_input_bits,
+            CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            }
+            .bits()
+        );
+    }
+
+    #[test]
+    fn live_core_driver_feeds_sound_commands_to_audio_runtime() {
+        let start = Instant::now();
+        let backend = RecordingAudioBackend::default();
+        let recorded = backend.batches.clone();
+        let audio = LiveAudioRuntime::spawn_with_capacity(backend, 8);
+        let mut driver = LiveCoreDriver::new_with_audio(
+            InputProfile::Test,
+            ArcadeMachine::new_cold_boot_trace(),
+            start,
+            audio,
+        );
+
+        driver.advance_fixed_frames(&PolledInput::default(), 731);
+        driver.shutdown_audio();
+
+        let recorded = recorded.lock().expect("recorded audio batches");
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(recorded[0].frame, 731);
+        assert_eq!(
+            recorded[0].commands().collect::<Vec<_>>(),
+            vec![SoundCommand::from_main_board_pia_port_b(0xC0)]
+        );
+    }
+
+    #[test]
+    fn live_core_thread_advances_renders_and_reports_overlay_snapshot() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+
+        assert_eq!(runtime.input_profile(), InputProfile::Test);
+        runtime.reset_clock(start).expect("reset core clock");
+        assert!(
+            !runtime
+                .handle_input_event(InputEvent::new(InputKey::Char('t'), InputEventKind::Press))
+                .expect("input event")
+        );
+        for character in ['x', 'y', 'z', 'z', 'y', 'f'] {
+            runtime
+                .handle_input_event(InputEvent::new(
+                    InputKey::Char(character),
+                    InputEventKind::Press,
+                ))
+                .expect("typed input");
+        }
+
+        let frame = runtime
+            .advance(LiveAdvanceMode::FixedFrames(2), start)
+            .expect("advance core thread");
+
+        assert_eq!((frame.image.width, frame.image.height), (64, 48));
+        assert_eq!(frame.snapshot.frame, 2);
+        assert_eq!(
+            frame.snapshot.last_input_bits,
+            CabinetInput {
+                thrust: true,
+                ..CabinetInput::NONE
+            }
+            .bits()
+        );
+        assert!(frame.snapshot.xyzzy_active);
+        assert!(frame.snapshot.xyzzy_auto_fire);
+    }
+
+    #[test]
+    fn live_core_thread_buffers_pulses_until_realtime_step_is_due() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+
+        runtime
+            .handle_input_event(InputEvent::new(InputKey::Char('5'), InputEventKind::Press))
+            .expect("coin input");
+
+        let early_frame = runtime
+            .advance(LiveAdvanceMode::Realtime, start - Duration::from_millis(1))
+            .expect("early frame");
+        assert_eq!(early_frame.snapshot.frame, 0);
+
+        let due_frame = runtime
+            .advance(LiveAdvanceMode::Realtime, start)
+            .expect("due frame");
+        assert_eq!(due_frame.snapshot.frame, 1);
+        assert_eq!(
+            due_frame.snapshot.last_input_bits,
+            CabinetInput {
+                coin: true,
+                ..CabinetInput::NONE
+            }
+            .bits()
+        );
+    }
+
+    #[test]
+    fn live_core_thread_resizes_renderer_and_returns_cmos_snapshot() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+
+        runtime.resize_renderer(80, 60).expect("resize renderer");
+        let frame = runtime
+            .advance(LiveAdvanceMode::FixedFrames(1), start)
+            .expect("advance after resize");
+
+        assert_eq!((frame.image.width, frame.image.height), (80, 60));
+        assert_eq!(
+            runtime.cmos_ram().expect("cmos snapshot"),
+            *ArcadeMachine::new().red_label_cmos_ram()
+        );
+    }
+
+    #[test]
+    fn live_core_frame_mailbox_replaces_stale_frames() {
+        let mailbox = LiveCoreFrameMailbox::default();
+
+        mailbox
+            .post(Ok(test_live_core_frame(1, 32, 24)))
+            .expect("post first frame");
+        mailbox
+            .post(Ok(test_live_core_frame(2, 48, 36)))
+            .expect("replace first frame");
+
+        let frame = mailbox
+            .take_latest()
+            .expect("take latest frame")
+            .expect("latest frame");
+
+        assert_eq!(frame.snapshot.frame, 2);
+        assert_eq!((frame.image.width, frame.image.height), (48, 36));
+        assert!(mailbox.take_latest().expect("take empty mailbox").is_none());
+    }
+
+    #[test]
+    fn live_core_thread_async_frame_request_respects_resize_order() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+
+        runtime.resize_renderer(80, 60).expect("resize renderer");
+        runtime
+            .request_frame(LiveAdvanceMode::FixedFrames(1), start)
+            .expect("request async frame");
+
+        let frame = wait_for_latest_frame(&runtime);
+
+        assert_eq!(frame.snapshot.frame, 1);
+        assert_eq!((frame.image.width, frame.image.height), (80, 60));
+    }
+
+    #[test]
+    fn live_core_thread_async_fixed_frame_requests_are_deterministic() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+
+        runtime
+            .request_frame(LiveAdvanceMode::FixedFrames(1), start)
+            .expect("request first async frame");
+        let first = wait_for_latest_frame(&runtime);
+        runtime
+            .request_frame(LiveAdvanceMode::FixedFrames(1), start + FRAME_DURATION)
+            .expect("request second async frame");
+        let second = wait_for_latest_frame(&runtime);
+
+        assert_eq!(first.snapshot.frame, 1);
+        assert_eq!(second.snapshot.frame, 2);
+    }
+
+    #[test]
+    fn live_core_thread_drop_joins_in_flight_async_frame_request() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+        runtime
+            .request_frame(LiveAdvanceMode::FixedFrames(1), start)
+            .expect("request async frame before drop");
+        let (dropped, receiver) = mpsc::channel();
+
+        thread::spawn(move || {
+            drop(runtime);
+            dropped.send(()).expect("report runtime drop");
+        });
+
+        receiver
+            .recv_timeout(Duration::from_secs(2))
+            .expect("runtime drop should join worker thread");
+    }
+
+    #[test]
+    fn live_core_thread_shutdown_cmos_ram_returns_final_mutated_cmos() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+        let mut expected = ArcadeMachine::new();
+        expected.step(CabinetInput {
+            coin: true,
+            ..CabinetInput::NONE
+        });
+
+        runtime
+            .handle_input_event(InputEvent::new(InputKey::Char('5'), InputEventKind::Press))
+            .expect("coin input");
+        runtime
+            .advance(LiveAdvanceMode::FixedFrames(1), start)
+            .expect("advance coin frame");
+
+        let cmos = runtime
+            .shutdown_cmos_ram()
+            .expect("shutdown with final CMOS");
+
+        assert_eq!(cmos, *expected.red_label_cmos_ram());
+    }
+
+    #[test]
+    fn live_core_thread_failed_command_reports_command_context() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+        runtime
+            .shutdown_cmos_ram()
+            .expect("shutdown should return CMOS");
+
+        let error = runtime
+            .cmos_ram()
+            .expect_err("CMOS command after shutdown should fail");
+        let runtime_error = live_core_error(&error);
+
+        assert_eq!(runtime_error.command(), LiveCoreCommandName::CmosRam);
+        assert!(matches!(
+            runtime_error.kind(),
+            LiveCoreErrorKind::CommandSend
+        ));
+        assert!(error.to_string().contains("cmos_ram"));
+    }
+
+    #[test]
+    fn live_core_thread_take_latest_frame_reports_stopped_worker_context() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+        runtime
+            .shutdown_cmos_ram()
+            .expect("shutdown should return CMOS");
+
+        let error = runtime
+            .take_latest_frame()
+            .expect_err("taking a frame after shutdown should fail");
+        let runtime_error = live_core_error(&error);
+
+        assert_eq!(runtime_error.command(), LiveCoreCommandName::RequestFrame);
+        assert!(matches!(
+            runtime_error.kind(),
+            LiveCoreErrorKind::WorkerTerminated
+        ));
+        assert!(error.to_string().contains("request_frame"));
+    }
+
+    #[test]
+    fn live_core_thread_reports_worker_panic_with_command_context() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+
+        runtime.panic_worker_for_test().expect("send panic command");
+
+        let error = runtime
+            .cmos_ram()
+            .expect_err("command after worker panic should fail");
+        let runtime_error = live_core_error(&error);
+
+        assert_eq!(runtime_error.command(), LiveCoreCommandName::CmosRam);
+        match runtime_error.kind() {
+            LiveCoreErrorKind::WorkerPanic(message) => {
+                assert!(message.contains("live core worker panic requested by test"));
+            }
+            kind => panic!("expected worker panic, got {kind:?}"),
+        }
+    }
+
+    #[test]
+    fn live_core_thread_sync_render_error_reports_advance_context() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+
+        runtime
+            .fail_next_render_for_test("forced sync render failure")
+            .expect("arm render failure");
+
+        let error = runtime
+            .advance(LiveAdvanceMode::FixedFrames(1), start)
+            .expect_err("forced render failure should propagate");
+        let runtime_error = live_core_error(&error);
+
+        assert_eq!(runtime_error.command(), LiveCoreCommandName::Advance);
+        assert_render_error_contains(runtime_error, "forced sync render failure");
+    }
+
+    #[test]
+    fn live_core_thread_async_render_error_reports_request_frame_context() {
+        let start = Instant::now();
+        let runtime =
+            LiveCoreThread::spawn(InputProfile::Test, ArcadeMachine::new(), start, (64, 48));
+
+        runtime
+            .fail_next_render_for_test("forced async render failure")
+            .expect("arm render failure");
+        runtime
+            .request_frame(LiveAdvanceMode::FixedFrames(1), start)
+            .expect("request async frame");
+
+        let error = wait_for_latest_frame_error(&runtime);
+        let runtime_error = live_core_error(&error);
+
+        assert_eq!(runtime_error.command(), LiveCoreCommandName::RequestFrame);
+        assert_render_error_contains(runtime_error, "forced async render failure");
+    }
+
+    #[test]
+    fn live_core_error_display_and_source_cover_error_kinds() {
+        use std::error::Error as _;
+
+        let render_error = LiveCoreWorkerError::render("frame upload failed");
+        let failed =
+            LiveCoreError::worker_failed(LiveCoreCommandName::Advance, render_error.clone());
+        assert_eq!(
+            render_error.to_string(),
+            "render failed: frame upload failed"
+        );
+        assert_eq!(
+            failed.to_string(),
+            "live core command advance failed: render failed: frame upload failed"
+        );
+        assert!(failed.source().is_some());
+
+        let terminated = LiveCoreError::worker_terminated(LiveCoreCommandName::RequestFrame);
+        assert!(terminated.to_string().contains("worker terminated"));
+        assert!(terminated.source().is_none());
+
+        let panicked =
+            LiveCoreError::worker_panic(LiveCoreCommandName::CmosRam, String::from("boom"));
+        assert!(panicked.to_string().contains("worker panicked: boom"));
+
+        let mailbox = LiveCoreError::mailbox_unavailable(LiveCoreCommandName::RequestFrame);
+        assert!(mailbox.to_string().contains("frame mailbox is unavailable"));
+
+        let worker_state = LiveCoreError::worker_state_unavailable(LiveCoreCommandName::Shutdown);
+        assert!(
+            worker_state
+                .to_string()
+                .contains("worker state is unavailable")
+        );
+    }
+
+    #[test]
+    fn live_core_panic_message_formats_supported_payloads() {
+        assert_eq!(
+            panic_message(Box::new(String::from("owned panic"))),
+            "owned panic"
+        );
+        assert_eq!(panic_message(Box::new(())), "unknown panic payload");
     }
 
     #[test]
@@ -1278,6 +2500,7 @@ mod tests {
     fn live_core_sound_state_is_presentation_independent() {
         let mut baseline_core = ArcadeMachine::new_cold_boot_trace();
         let mut comparison_core = ArcadeMachine::new_cold_boot_trace();
+        let audio = LiveAudioRuntime::disabled();
 
         step_live_core_frames(
             &mut baseline_core,
@@ -1285,6 +2508,7 @@ mod tests {
             CabinetInput::NONE,
             &[],
             731,
+            &audio,
         );
         step_live_core_frames(
             &mut comparison_core,
@@ -1292,6 +2516,7 @@ mod tests {
             CabinetInput::NONE,
             &[],
             731,
+            &audio,
         );
 
         let expected = RedLabelSoundBoardSnapshot {
@@ -1335,10 +2560,69 @@ mod tests {
             coin: true,
             ..crate::input::CabinetInput::NONE
         });
-        save_live_cmos(Some(&storage), &changed_machine).expect("save machine CMOS");
+        save_live_cmos_ram(Some(&storage), changed_machine.red_label_cmos_ram())
+            .expect("save machine CMOS");
         assert_eq!(
             storage.cmos.borrow().expect("saved CMOS"),
             *changed_machine.red_label_cmos_ram()
         );
+    }
+
+    fn wait_for_latest_frame(runtime: &LiveCoreThread) -> LiveCoreFrame {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            if let Some(frame) = runtime
+                .take_latest_frame()
+                .expect("take latest async frame")
+            {
+                return frame;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for async live core frame"
+            );
+            thread::sleep(Duration::from_millis(1));
+        }
+    }
+
+    fn wait_for_latest_frame_error(runtime: &LiveCoreThread) -> anyhow::Error {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            match runtime.take_latest_frame() {
+                Ok(Some(_)) => panic!("expected async frame error, got frame"),
+                Ok(None) => {}
+                Err(error) => return error,
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for async live core frame error"
+            );
+            thread::sleep(Duration::from_millis(1));
+        }
+    }
+
+    fn live_core_error(error: &anyhow::Error) -> &LiveCoreError {
+        error
+            .downcast_ref::<LiveCoreError>()
+            .expect("expected typed live core error")
+    }
+
+    fn assert_render_error_contains(error: &LiveCoreError, expected: &str) {
+        match error.kind() {
+            LiveCoreErrorKind::WorkerFailed(LiveCoreWorkerError::Render(message)) => {
+                assert!(message.contains(expected));
+            }
+            kind => panic!("expected render error, got {kind:?}"),
+        }
+    }
+
+    fn test_live_core_frame(frame: u64, width: u32, height: u32) -> LiveCoreFrame {
+        let mut snapshot = ArcadeMachine::new().snapshot();
+        snapshot.frame = frame;
+        LiveCoreFrame {
+            image: RenderedImage::new_blank(width, height, [frame as u8, 0, 0, 255]),
+            snapshot,
+            next_step_at: Instant::now() + FRAME_DURATION,
+        }
     }
 }

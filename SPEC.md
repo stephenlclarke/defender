@@ -1,6 +1,6 @@
 # Defender Current Specification
 
-Last reviewed: `2026-05-10`
+Last reviewed: `2026-05-13`
 
 ## Purpose
 
@@ -50,13 +50,13 @@ sources or by an accepted fixture.
 The crate is split around the current accepted module boundaries:
 
 - `src/main.rs`: thin CLI entry point.
-- `src/app.rs`: CLI parsing, command dispatch, help text, and user-facing
-  command output.
+- `src/app.rs`: CLI parsing, command dispatch, help text, user-facing command
+  output, and threaded fidelity fixture orchestration.
 - `src/lib.rs`: public crate module wiring.
 - `src/machine.rs`: shared red-label contracts, source asset parsers, and
-  stable `machine::...` re-exports.
-- `src/machine_state.rs`: data-only arcade state, snapshots, events, and
-  frame-output contracts.
+  compatibility `machine::...` re-exports.
+- `src/machine_state.rs`: canonical public arcade state, snapshots, events,
+  and frame-output contracts.
 - `src/machine_process.rs`: scheduler data contracts:
   `RedLabelCpuRegisters` and `RedLabelScheduledProcess`.
 - `src/machine_memory.rs`: source-visible runtime memory and translated
@@ -77,9 +77,12 @@ The crate is split around the current accepted module boundaries:
   PIA, ROM metadata, and verification surfaces.
 - `src/sound.rs`: sound-board model, command latch, PIA, ROM, IRQ, and DAC
   signature behavior.
+- `src/audio.rs`: live audio command batching, bounded non-blocking delivery,
+  backend trait, disabled mode, and null backend.
 - `src/video.rs`, `src/live.rs`, `src/wgpu_presenter.rs`, `src/kitty.rs`, and
-  `src/terminal.rs`: native frame extraction, live presentation, input loop,
-  `wgpu`, Kitty, and terminal support.
+  `src/terminal.rs`: native frame extraction, shared live core driving, live
+  presentation, the threaded live runtime boundary, non-blocking `wgpu`
+  latest-frame delivery, input loop, Kitty, and terminal support.
 - `src/input.rs`: Planetoid, cabinet, and test input profiles plus `XYZZY`
   overlay input detection.
 - `src/fidelity.rs`: trace schema and fixture comparison support.
@@ -92,6 +95,7 @@ The crate is split around the current accepted module boundaries:
   compatibility evidence.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.
+- `--mute` disables the live audio command-delivery runtime path.
 - `--cmos-path <file>` opts into file-backed CMOS persistence.
 - `--rom-report` and `--verify-roms` validate optional local red-label ROM
   files against embedded metadata.
@@ -132,11 +136,22 @@ git diff --check
 trace exporter self-tests, Python helper tests, local trace fixture comparison,
 coverage, and added-line coverage.
 
+GitHub CI keeps the expensive gates split by subsystem: `make ci-doctor`
+checks Lua, Python, coverage, and Linux smoke prerequisites; `make fidelity`
+runs the Rust, trace, and coverage gate; and `xvfb-run -a make smoke-wgpu`
+runs the no-device live smoke path. Coverage baseline refreshes must use the
+explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
+
 ## Active Constraints
 
-- Live audio output is not implemented. Sound fidelity is currently covered by
-  command traces, sound-board state, and deterministic DAC byte signatures.
+- Live audio currently delivers accepted `FrameOutput::sound_commands()`
+  batches to a bounded non-blocking backend trait. The built-in backend is a
+  null backend that opens no audio device; audible device output remains future
+  work. The accepted implementation contract is documented in
+  `docs/fidelity/live-audio.md`.
 - Local MAME reference generation is intentionally local tooling; generated
   reference traces are not part of the normal runtime.
-- Any future public API cleanup must preserve existing `machine::...` imports
-  until a narrow migration proves callers no longer need them.
+- New callers should prefer canonical `machine_state::...` and
+  `machine_process::...` contract paths; existing `machine::...` compatibility
+  imports stay available until a narrow migration proves callers no longer need
+  them.

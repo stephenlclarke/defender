@@ -134,9 +134,11 @@ Continuing ownership rules:
 - Video: `src/video.rs`, native video-frame construction and renderer-only
   scaling in `src/live.rs`, `src/kitty.rs`, and `src/wgpu_presenter.rs`, plus
   source helper primitives in `src/machine_video.rs`.
-- Sound: `src/sound.rs`, red-label sound command fixtures in
-  `src/machine_sound.rs`, sound-board snapshots, and main-board command-latch
-  plumbing in `src/machine_session.rs`.
+- Sound: `src/sound.rs`, live audio runtime command delivery in
+  `src/audio.rs`, red-label sound command fixtures in `src/machine_sound.rs`,
+  live audio acceptance fixtures in
+  `assets/red-label/live-audio-acceptance.tsv`, sound-board snapshots, and
+  main-board command-latch plumbing in `src/machine_session.rs`.
 - Input and session: `src/input.rs`, live input mapping in `src/live.rs`,
   high-score/session flow in `src/machine_session.rs`, and CMOS persistence
   in `src/cmos_storage.rs`.

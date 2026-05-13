@@ -75,6 +75,9 @@ use self::machine_sound::{
 use self::machine_video::*;
 use self::machine_world::decimal_to_bcd_byte;
 
+// Compatibility re-exports for existing `machine::...` callers. New code in
+// this crate should import these contracts from `machine_process` or
+// `machine_state` directly.
 pub use crate::machine_process::{RedLabelCpuRegisters, RedLabelScheduledProcess};
 pub use crate::machine_state::{
     CompatibilityState, FrameOutput, GamePhase, HighScoreEntryState, HighScoreSubmissionState,
@@ -39553,6 +39556,36 @@ mod tests {
                 score: 30_000,
             })
         );
+    }
+
+    #[test]
+    fn game_over_sleeping_dispatch_clears_live_high_score_session() {
+        let mut machine = ArcadeMachine::new();
+        machine.high_score_entry = Some(super::HighScoreEntryState::new(50_000, 1));
+        machine.high_score_submission = Some(super::HighScoreSubmissionState {
+            player: 2,
+            score: 40_000,
+        });
+        machine.high_score_entry_player = 2;
+        machine.high_score_completed_players_mask = 0b11;
+
+        machine
+            .apply_process_dispatch_state(&RedLabelProcessDispatch::PlayerDeath(
+                RedLabelPlayerDeath::GameOverSleeping {
+                    process_address: 0xA05F,
+                    status: 0xFF,
+                    sound_command: SoundCommand::from_main_board_pia_port_b(0x2C),
+                    wakeup_address: 0xDB48,
+                },
+            ))
+            .expect("apply game-over dispatch");
+
+        let snapshot = machine.snapshot();
+        assert_eq!(snapshot.phase, GamePhase::GameOver);
+        assert_eq!(snapshot.high_score_entry, None);
+        assert_eq!(snapshot.high_score_submission, None);
+        assert_eq!(machine.high_score_entry_player, 0);
+        assert_eq!(machine.high_score_completed_players_mask, 0);
     }
 
     #[test]

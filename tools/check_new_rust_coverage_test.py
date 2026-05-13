@@ -1,4 +1,5 @@
 import unittest
+from collections import Counter
 from pathlib import Path
 import sys
 
@@ -6,6 +7,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from check_new_rust_coverage import (
+    apply_uncovered_baseline,
     executable_added_lines,
     parse_added_rust_lines,
     parse_lcov_line_counts,
@@ -69,6 +71,27 @@ new file mode 100644
 
         self.assertEqual(added, {Path("/repo/src/machine_child.rs"): {2}})
 
+    def test_parse_added_rust_lines_can_ignore_lines_moved_from_deleted_files(self):
+        repo_root = Path("/repo")
+        diff = """diff --git a/src/old.rs b/src/old.rs
+deleted file mode 100644
+--- a/src/old.rs
++++ /dev/null
+@@ -10 +0,0 @@
+-    let moved = true;
+diff --git a/src/new.rs b/src/new.rs
+new file mode 100644
+--- /dev/null
++++ b/src/new.rs
+@@ -0,0 +1,2 @@
++    let moved = true;
++    let new_line = true;
+"""
+
+        added = parse_added_rust_lines(diff, repo_root, ignore_moved=True)
+
+        self.assertEqual(added, {Path("/repo/src/new.rs"): {2}})
+
     def test_parse_lcov_line_counts_normalizes_relative_sources(self):
         repo_root = Path("/repo")
         lcov = """TN:
@@ -91,6 +114,26 @@ end_of_record
 
         self.assertEqual(instrumented, 2)
         self.assertEqual(uncovered, [(path, 12)])
+
+    def test_apply_uncovered_baseline_filters_by_path_and_source_line(self):
+        repo_root = Path(self.create_temp_dir())
+        source = repo_root / "src" / "app.rs"
+        source.parent.mkdir()
+        source.write_text(
+            "    let accepted = false;\n"
+            "    let new_uncovered = false;\n",
+            encoding="utf-8",
+        )
+        baseline = Counter({"src/app.rs\tlet accepted = false;": 1})
+
+        kept, accepted = apply_uncovered_baseline(
+            [(source, 1), (source, 2)],
+            repo_root,
+            baseline,
+        )
+
+        self.assertEqual(kept, [(source, 2)])
+        self.assertEqual(accepted, [(source, 1)])
 
     def test_production_added_lines_ignores_cfg_test_module_tail(self):
         repo_root = Path(self.create_temp_dir())

@@ -5,10 +5,12 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::thread;
 
 use anyhow::{Context, Result, anyhow, bail};
 
 use crate::{
+    audio::LiveAudioMode,
     fidelity::{
         compare_trace_text, expanded_trace_input_text, parse_trace_input_script, trace_header,
         trace_scenarios, trace_text_for_inputs,
@@ -25,6 +27,7 @@ enum Command {
     PlayLive {
         input_profile: InputProfile,
         presentation_backend: PresentationBackend,
+        audio_mode: LiveAudioMode,
         live_smoke: bool,
         cmos_path: Option<PathBuf>,
     },
@@ -75,6 +78,7 @@ fn run_command(command: Command) -> Result<()> {
         Command::PlayLive {
             input_profile,
             presentation_backend,
+            audio_mode,
             live_smoke,
             cmos_path,
         } => {
@@ -86,7 +90,12 @@ fn run_command(command: Command) -> Result<()> {
                 print!("{}", report.to_text());
                 Ok(())
             } else {
-                run_live(input_profile, presentation_backend, cmos_path.as_deref())
+                run_live(
+                    input_profile,
+                    presentation_backend,
+                    audio_mode,
+                    cmos_path.as_deref(),
+                )
             }
         }
         Command::RomReport { path } => run_rom_report(path.as_deref()),
@@ -252,19 +261,7 @@ fn fidelity_check_trace_dir_text(path: &Path) -> Result<String> {
         ));
     }
 
-    let mut frames = 0;
-    for fixture in &fixtures {
-        let actual = fidelity_trace_input_file_text(&fixture.inputs_path)?;
-        let expected = fs::read_to_string(&fixture.expected_path).with_context(|| {
-            format!(
-                "failed to read expected trace {}",
-                fixture.expected_path.display()
-            )
-        })?;
-        let comparison = compare_trace_text(&expected, &actual)
-            .map_err(|mismatch| anyhow!("{}: {mismatch}", fixture.expected_path.display()))?;
-        frames += comparison.frames;
-    }
+    let frames = check_trace_fixtures(&fixtures, RustTraceFixtureChecker)?;
 
     Ok(format!(
         "Fidelity trace fixture directory {} matched {} fixture(s), {} frame(s)\n",
@@ -619,6 +616,87 @@ struct TraceFixturePair {
     expected_path: PathBuf,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TraceFixtureCheck {
+    frames: usize,
+}
+
+trait TraceFixtureChecker {
+    fn check_fixture(&self, fixture: &TraceFixturePair) -> Result<TraceFixtureCheck>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RustTraceFixtureChecker;
+
+impl TraceFixtureChecker for RustTraceFixtureChecker {
+    fn check_fixture(&self, fixture: &TraceFixturePair) -> Result<TraceFixtureCheck> {
+        let actual = fidelity_trace_input_file_text(&fixture.inputs_path)?;
+        let expected = fs::read_to_string(&fixture.expected_path).with_context(|| {
+            format!(
+                "failed to read expected trace {}",
+                fixture.expected_path.display()
+            )
+        })?;
+        let comparison = compare_trace_text(&expected, &actual)
+            .map_err(|mismatch| anyhow!("{}: {mismatch}", fixture.expected_path.display()))?;
+
+        Ok(TraceFixtureCheck {
+            frames: comparison.frames,
+        })
+    }
+}
+
+fn check_trace_fixtures<T>(fixtures: &[TraceFixturePair], checker: T) -> Result<usize>
+where
+    T: TraceFixtureChecker + Copy + Send + Sync,
+{
+    if fixtures.is_empty() {
+        return Ok(0);
+    }
+
+    let workers = trace_fixture_worker_count(fixtures.len());
+    let chunk_size = fixtures.len().div_ceil(workers);
+    let mut checks = Vec::with_capacity(fixtures.len());
+
+    thread::scope(|scope| -> Result<()> {
+        let handles = fixtures
+            .chunks(chunk_size)
+            .map(|chunk| {
+                scope.spawn(move || {
+                    chunk
+                        .iter()
+                        .map(|fixture| checker.check_fixture(fixture))
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for handle in handles {
+            checks.extend(
+                handle
+                    .join()
+                    .map_err(|_| anyhow!("fidelity trace fixture worker panicked"))?,
+            );
+        }
+
+        Ok(())
+    })?;
+
+    let mut frames = 0;
+    for check in checks {
+        frames += check?.frames;
+    }
+
+    Ok(frames)
+}
+
+fn trace_fixture_worker_count(fixture_count: usize) -> usize {
+    let available = thread::available_parallelism()
+        .map(usize::from)
+        .unwrap_or(1);
+    fixture_count.min(available).max(1)
+}
+
 fn trace_fixture_pairs(path: &Path) -> Result<Vec<TraceFixturePair>> {
     let mut fixtures = Vec::new();
     let mut unexpected_expected = Vec::new();
@@ -731,6 +809,7 @@ where
 {
     let mut input_profile = InputProfile::default();
     let mut presentation_backend = PresentationBackend::default();
+    let mut audio_mode = LiveAudioMode::default();
     let mut live_smoke = false;
     let mut cmos_path = None;
     let mut args = args.into_iter().peekable();
@@ -738,9 +817,7 @@ where
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => return Ok(Command::Help),
-            "--mute" => {
-                bail!("--mute is not supported because live audio output is not implemented")
-            }
+            "--mute" => audio_mode = LiveAudioMode::Disabled,
             "--live-smoke" => live_smoke = true,
             "--input-profile" => {
                 let Some(value) = args.next() else {
@@ -883,6 +960,7 @@ where
     Ok(Command::PlayLive {
         input_profile,
         presentation_backend,
+        audio_mode,
         live_smoke,
         cmos_path,
     })
@@ -904,7 +982,7 @@ fn print_help() {
 }
 
 fn help_text() -> &'static str {
-    "defender\n  cargo run\n  cargo run -- --renderer wgpu\n  cargo run -- --renderer kitty\n  cargo run -- --live-smoke\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play defaults to the windowed wgpu backend; Kitty graphics remains available with --renderer kitty.\n"
+    "defender\n  cargo run\n  cargo run -- --renderer wgpu\n  cargo run -- --renderer kitty\n  cargo run -- --live-smoke\n  cargo run -- --mute\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play defaults to the windowed wgpu backend; Kitty graphics remains available with --renderer kitty.\nLive audio routes accepted sound commands through a non-blocking null backend; --mute disables that runtime path.\n"
 }
 
 #[cfg(test)]
@@ -914,18 +992,48 @@ mod tests {
     use std::{env, fs};
 
     use super::{
-        Command, TraceRequirement, check_reference_trace_evidence,
-        check_reference_trace_required_cells, fidelity_check_reference_trace_dir_text,
-        fidelity_check_trace_dir_text, fidelity_check_trace_text, fidelity_list_scenarios_text,
-        fidelity_trace_input_file_text, fidelity_trace_input_text, fidelity_trace_text,
-        fidelity_write_scenario_inputs_text, help_text, parse_args, parse_requirement_values,
-        parse_trace_requirements, rom_listing_text, rom_report_text, run_command,
-        trace_cell_values, validate_trace_requirements_reference_known_scenarios,
+        Command, TraceFixtureCheck, TraceFixtureChecker, TraceFixturePair, TraceRequirement,
+        check_reference_trace_evidence, check_reference_trace_required_cells, check_trace_fixtures,
+        fidelity_check_reference_trace_dir_text, fidelity_check_trace_dir_text,
+        fidelity_check_trace_text, fidelity_list_scenarios_text, fidelity_trace_input_file_text,
+        fidelity_trace_input_text, fidelity_trace_text, fidelity_write_scenario_inputs_text,
+        help_text, parse_args, parse_requirement_values, parse_trace_requirements,
+        rom_listing_text, rom_report_text, run_command, trace_cell_values,
+        trace_fixture_worker_count, validate_trace_requirements_reference_known_scenarios,
     };
+    use crate::audio::LiveAudioMode;
     use crate::fidelity::{expanded_trace_input_text, trace_header};
     use crate::input::InputProfile;
     use crate::presentation::PresentationBackend;
     use crate::rom::RomReport;
+    use anyhow::{Result, anyhow};
+
+    #[derive(Debug, Clone, Copy)]
+    struct FakeTraceFixtureChecker;
+
+    impl TraceFixtureChecker for FakeTraceFixtureChecker {
+        fn check_fixture(&self, fixture: &TraceFixturePair) -> Result<TraceFixtureCheck> {
+            let file_name = fixture
+                .inputs_path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default();
+            if file_name.contains("bad") {
+                return Err(anyhow!("{file_name} failed"));
+            }
+
+            Ok(TraceFixtureCheck { frames: 2 })
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct PanickingTraceFixtureChecker;
+
+    impl TraceFixtureChecker for PanickingTraceFixtureChecker {
+        fn check_fixture(&self, _fixture: &TraceFixturePair) -> Result<TraceFixtureCheck> {
+            panic!("intentional fixture worker panic")
+        }
+    }
 
     fn write_minimal_expected_fixture(
         path: &Path,
@@ -980,6 +1088,7 @@ mod tests {
             Command::PlayLive {
                 input_profile: InputProfile::Planetoid,
                 presentation_backend: PresentationBackend::Wgpu,
+                audio_mode: LiveAudioMode::Null,
                 live_smoke: false,
                 cmos_path: None,
             }
@@ -987,13 +1096,18 @@ mod tests {
     }
 
     #[test]
-    fn parse_args_rejects_unsupported_mute_audio_flag() {
-        let error = parse_args(vec![String::from("--mute")]).expect_err("mute is unsupported");
+    fn parse_args_accepts_mute_audio_flag() {
+        let command = parse_args(vec![String::from("--mute")]).expect("parse args");
 
-        assert!(
-            error
-                .to_string()
-                .contains("live audio output is not implemented")
+        assert_eq!(
+            command,
+            Command::PlayLive {
+                input_profile: InputProfile::Planetoid,
+                presentation_backend: PresentationBackend::Wgpu,
+                audio_mode: LiveAudioMode::Disabled,
+                live_smoke: false,
+                cmos_path: None,
+            }
         );
     }
 
@@ -1012,6 +1126,7 @@ mod tests {
             Command::PlayLive {
                 input_profile: InputProfile::Cabinet,
                 presentation_backend: PresentationBackend::Wgpu,
+                audio_mode: LiveAudioMode::Null,
                 live_smoke: false,
                 cmos_path: None,
             }
@@ -1027,6 +1142,7 @@ mod tests {
             Command::PlayLive {
                 input_profile: InputProfile::Planetoid,
                 presentation_backend: PresentationBackend::Wgpu,
+                audio_mode: LiveAudioMode::Null,
                 live_smoke: true,
                 cmos_path: None,
             }
@@ -1046,6 +1162,7 @@ mod tests {
             Command::PlayLive {
                 input_profile: InputProfile::Planetoid,
                 presentation_backend: PresentationBackend::Wgpu,
+                audio_mode: LiveAudioMode::Null,
                 live_smoke: false,
                 cmos_path: Some(PathBuf::from("/tmp/defender-cmos.bin")),
             }
@@ -1057,6 +1174,7 @@ mod tests {
         run_command(Command::PlayLive {
             input_profile: InputProfile::Planetoid,
             presentation_backend: PresentationBackend::Wgpu,
+            audio_mode: LiveAudioMode::Null,
             live_smoke: true,
             cmos_path: None,
         })
@@ -1068,6 +1186,7 @@ mod tests {
         let error = run_command(Command::PlayLive {
             input_profile: InputProfile::Planetoid,
             presentation_backend: PresentationBackend::Kitty,
+            audio_mode: LiveAudioMode::Null,
             live_smoke: true,
             cmos_path: None,
         })
@@ -1081,6 +1200,7 @@ mod tests {
         run_command(Command::PlayLive {
             input_profile: InputProfile::Cabinet,
             presentation_backend: PresentationBackend::Kitty,
+            audio_mode: LiveAudioMode::Disabled,
             live_smoke: false,
             cmos_path: None,
         })
@@ -1350,7 +1470,7 @@ mod tests {
         assert!(text.contains("--renderer kitty"));
         assert!(text.contains("--renderer wgpu"));
         assert!(text.contains("--live-smoke"));
-        assert!(!text.contains("--mute"));
+        assert!(text.contains("--mute"));
         assert!(text.contains("--verify-roms"));
         assert!(text.contains("--fidelity-trace 300"));
         assert!(text.contains("--fidelity-trace-inputs"));
@@ -1956,6 +2076,71 @@ mod tests {
 
         assert!(message.contains("attract_boot.expected.tsv"));
         assert!(!message.contains("abduction.expected.tsv"));
+    }
+
+    #[test]
+    fn check_trace_fixtures_sums_parallel_results_in_fixture_order() {
+        let fixtures = vec![
+            TraceFixturePair {
+                inputs_path: PathBuf::from("first.inputs.txt"),
+                expected_path: PathBuf::from("first.expected.tsv"),
+            },
+            TraceFixturePair {
+                inputs_path: PathBuf::from("second.inputs.txt"),
+                expected_path: PathBuf::from("second.expected.tsv"),
+            },
+        ];
+
+        let frames = check_trace_fixtures(&fixtures, FakeTraceFixtureChecker)
+            .expect("parallel fixture checks should pass");
+
+        assert_eq!(frames, 4);
+        assert_eq!(
+            check_trace_fixtures(&[], FakeTraceFixtureChecker).expect("empty fixture set"),
+            0
+        );
+        assert_eq!(trace_fixture_worker_count(0), 1);
+    }
+
+    #[test]
+    fn check_trace_fixtures_preserves_first_error_in_fixture_order() {
+        let fixtures = vec![
+            TraceFixturePair {
+                inputs_path: PathBuf::from("first-good.inputs.txt"),
+                expected_path: PathBuf::from("first-good.expected.tsv"),
+            },
+            TraceFixturePair {
+                inputs_path: PathBuf::from("second-bad.inputs.txt"),
+                expected_path: PathBuf::from("second-bad.expected.tsv"),
+            },
+            TraceFixturePair {
+                inputs_path: PathBuf::from("third-bad.inputs.txt"),
+                expected_path: PathBuf::from("third-bad.expected.tsv"),
+            },
+        ];
+
+        let error =
+            check_trace_fixtures(&fixtures, FakeTraceFixtureChecker).expect_err("ordered error");
+        let message = error.to_string();
+
+        assert!(message.contains("second-bad.inputs.txt"));
+        assert!(!message.contains("third-bad.inputs.txt"));
+    }
+
+    #[test]
+    fn check_trace_fixtures_reports_worker_panic() {
+        let fixtures = vec![TraceFixturePair {
+            inputs_path: PathBuf::from("panic.inputs.txt"),
+            expected_path: PathBuf::from("panic.expected.tsv"),
+        }];
+
+        let previous_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let result = check_trace_fixtures(&fixtures, PanickingTraceFixtureChecker);
+        std::panic::set_hook(previous_hook);
+        let error = result.expect_err("worker panic should be reported");
+
+        assert!(error.to_string().contains("worker panicked"));
     }
 
     #[test]
