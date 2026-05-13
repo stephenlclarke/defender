@@ -1,4 +1,4 @@
-//! Platform-facing runtime configuration.
+//! Platform-facing runtime configuration and launch boundaries.
 
 use std::path::PathBuf;
 
@@ -52,6 +52,10 @@ impl RuntimeConfig {
     }
 }
 
+pub fn run() -> anyhow::Result<()> {
+    crate::app::run()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
@@ -69,5 +73,10 @@ mod tests {
     #[test]
     fn smoke_config_selects_smoke_mode() {
         assert_eq!(RuntimeConfig::smoke().mode, RunMode::Smoke);
+    }
+
+    #[test]
+    fn runtime_entrypoint_delegates_to_compatibility_runtime() {
+        super::run().expect("compatibility runtime should run help under tests");
     }
 }

@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `27c30ae`.
+- Latest accepted implementation commit before this cycle: `9c522ea`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy `machine::...` imports through explicit oracle wiring.
@@ -97,7 +97,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-60` are complete, and
+No active development cycle remains. `DC-42` through `DC-61` are complete, and
 the standing maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1089,7 +1089,68 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778676669257919`
 
-### DC-61: Oracle Retirement
+### DC-61: Runtime Entrypoint Facade
+
+Status: `complete`
+
+Goal: continue oracle retirement by removing the binary entrypoint's direct
+dependency on the doc-hidden legacy `app` module.
+
+Scope:
+
+- Add a clean platform-facing runtime launcher that owns the production
+  entrypoint contract.
+- Point `src/main.rs` at the clean platform launcher instead of
+  `defender::app::run()`.
+- Add a focused architecture guard that rejects direct binary calls into the
+  legacy `app` module.
+- Document that the binary now enters through the clean runtime boundary while
+  the compatibility runtime remains the temporary accepted behavior owner.
+
+Acceptance criteria:
+
+- `src/main.rs` depends on `defender::platform::run()`.
+- The legacy `app` module remains hidden compatibility plumbing.
+- CLI behavior and fidelity gates are unchanged.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::binary_entrypoint_uses_clean_platform_runtime_boundary
+cargo test --lib platform::tests::runtime_entrypoint_delegates_to_compatibility_runtime
+cargo check --all-targets
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13` Started `DC-61` on branch `rewrite`: posted the cycle start
+  update and began moving the production binary entrypoint behind a clean
+  platform launcher.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778676810486839`
+- `2026-05-13` Completed `DC-61`: added `platform::run()` as the clean runtime
+  launcher, pointed `src/main.rs` at `defender::platform::run()`, guarded the
+  binary entrypoint against direct legacy `app` calls, and documented that the
+  binary now enters through the clean platform boundary while the compatibility
+  runtime remains the temporary accepted behavior owner. Validation passed with
+  the documented DC-61 gate: formatting, the focused public API and platform
+  entrypoint tests, `cargo check --all-targets`, the full Rust test suite,
+  clippy with warnings denied, `make fidelity`, `cargo run -- --live-smoke`,
+  markdownlint, and `git diff --check`; the coverage gate reported 2/2
+  non-baselined added executable Rust lines, and live smoke rendered 239 frames
+  with 74 distinct scene CRCs, attract/credit/playing evidence, all required
+  injected inputs, and a clean exit.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778679271201939`
+
+### DC-62: Oracle Retirement
 
 Status: `planned`
 

@@ -63,8 +63,8 @@ tree:
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, scene summaries,
   and draw planning.
-- `src/platform.rs`: runtime configuration for controls, audio, run mode, and
-  persistence.
+- `src/platform.rs`: the clean runtime launch boundary plus configuration for
+  controls, audio, run mode, and persistence.
 - `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
   boundary, disabled/null no-device modes, and runtime diagnostics.
 - `src/oracle.rs`: the explicit adapter from clean gameplay contracts to the
@@ -76,10 +76,12 @@ accepted arcade behavior, hardware models, ROM verification, rendering, input,
 sound-board command evidence, fidelity trace generation, the threaded live core
 runtime boundary, `wgpu` window ownership, CMOS storage, and test helpers until
 clean systems replace those responsibilities. Those compatibility modules are
-doc-hidden from the supported public API surface. Live presentation receives
-clean `RenderScene` data, currently with a temporary raster payload for visual
-equivalence. Kitty terminal graphics code remains parked there as historical
-compatibility evidence, but it is not part of the active runtime surface.
+doc-hidden from the supported public API surface, and the binary now enters
+through the clean platform boundary before delegating to the compatibility
+runtime. Live presentation receives clean `RenderScene` data, currently with a
+temporary raster payload for visual equivalence. Kitty terminal graphics code
+remains parked there as historical compatibility evidence, but it is not part
+of the active runtime surface.
 
 ## Current Behavior Surface
 

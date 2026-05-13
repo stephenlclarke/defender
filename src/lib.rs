@@ -112,6 +112,15 @@ mod public_api_tests {
     }
 
     #[test]
+    fn binary_entrypoint_uses_clean_platform_runtime_boundary() {
+        let main_rs = include_str!("main.rs");
+        let legacy_call = format!("{}::{}::{}()", "defender", "app", "run");
+
+        assert!(main_rs.contains("defender::platform::run()"));
+        assert!(!main_rs.contains(&legacy_call));
+    }
+
+    #[test]
     fn legacy_machine_state_contracts_remain_available_for_oracle_tests() {
         let direct_phase = crate::machine_state::GamePhase::Attract;
         let compatibility_phase: crate::machine::GamePhase = direct_phase;

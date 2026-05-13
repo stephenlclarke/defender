@@ -208,8 +208,8 @@ Clean rewrite modules:
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, scene summaries,
   and draw planning.
-- `src/platform.rs`: runtime configuration for controls, audio, run mode, and
-  persistence.
+- `src/platform.rs`: the clean runtime launch boundary plus configuration for
+  controls, audio, run mode, and persistence.
 - `src/audio.rs`: gameplay-facing sound events, the bounded live-audio runtime,
   no-device backends, and worker diagnostics.
 - `src/oracle.rs`: the only clean-tree adapter to the converted implementation,
@@ -220,10 +220,12 @@ behavior, assets, hardware models, ROM verification, rendering, input,
 sound-board command evidence, fidelity trace generation and threaded fixture
 checks, the threaded live core runtime boundary, `wgpu` window ownership, CMOS
 storage, and test helpers. They remain wired as doc-hidden compatibility
-modules rather than supported public API. The live worker now wraps accepted
-visual output as a clean `RenderScene` raster payload before the presenter
-draws it. Kitty terminal graphics code remains parked there as historical
-compatibility evidence, but it is no longer an active runtime path.
+modules rather than supported public API. The binary enters through the clean
+platform boundary before delegating to the compatibility runtime. The live
+worker now wraps accepted visual output as a clean `RenderScene` raster payload
+before the presenter draws it. Kitty terminal graphics code remains parked
+there as historical compatibility evidence, but it is no longer an active
+runtime path.
 
 ## Assets And ROMs
 
