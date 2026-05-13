@@ -15,27 +15,37 @@ pub mod systems;
 
 // Compatibility modules are hidden from the supported clean API surface while
 // the rewrite still uses them for the CLI, oracle, fixtures, and smoke tests.
+// Parked low-level modules tolerate dead code after removal from compatibility
+// re-exports; later rewrite cycles should delete them when their evidence is
+// no longer needed.
 #[doc(hidden)]
 #[path = "../src_legacy/accepted_behavior.rs"]
 pub(crate) mod accepted_behavior;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/app.rs"]
 pub(crate) mod app;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/assets.rs"]
 pub(crate) mod assets;
+#[allow(dead_code)]
+#[allow(clippy::enum_variant_names)]
 #[doc(hidden)]
 #[path = "../src_legacy/board.rs"]
 pub(crate) mod board;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/cmos_storage.rs"]
 pub(crate) mod cmos_storage;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/fidelity.rs"]
 pub(crate) mod fidelity;
 #[doc(hidden)]
 #[path = "../src_legacy/input.rs"]
 pub(crate) mod input;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/live.rs"]
 pub(crate) mod live;
@@ -48,24 +58,30 @@ pub(crate) mod machine_process;
 #[doc(hidden)]
 #[path = "../src_legacy/machine_state.rs"]
 pub(crate) mod machine_state;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/pia.rs"]
 pub(crate) mod pia;
 #[doc(hidden)]
 #[path = "../src_legacy/red_label.rs"]
 pub(crate) mod red_label;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/red_label_memory.rs"]
 pub(crate) mod red_label_memory;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/red_label_message.rs"]
 pub(crate) mod red_label_message;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/red_label_wave.rs"]
 pub(crate) mod red_label_wave;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/rom.rs"]
 pub(crate) mod rom;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/sound.rs"]
 pub(crate) mod sound;
@@ -182,6 +198,49 @@ mod public_api_tests {
             !compatibility_rs.contains("pub mod terminal"),
             "retired terminal-session code must not be re-exported through compatibility"
         );
+    }
+
+    #[test]
+    fn compatibility_namespace_exposes_only_temporary_tool_contracts() {
+        let compatibility_rs = include_str!("../src_legacy/compatibility.rs");
+
+        for module in [
+            "input",
+            "machine",
+            "machine_process",
+            "machine_state",
+            "red_label",
+            "video",
+        ] {
+            assert!(
+                compatibility_rs.contains(&format!(
+                    "pub mod {module} {{\n    pub use crate::{module}::*;\n}}"
+                )),
+                "compatibility namespace must keep temporary {module} tooling access"
+            );
+        }
+
+        for module in [
+            "app",
+            "assets",
+            "board",
+            "cmos_storage",
+            "fidelity",
+            "live",
+            "pia",
+            "red_label_memory",
+            "red_label_message",
+            "red_label_wave",
+            "rom",
+            "sound",
+            "terminal",
+            "wgpu_presenter",
+        ] {
+            assert!(
+                !compatibility_rs.contains(&format!("pub mod {module}")),
+                "low-level legacy module {module} must not be compatibility-exported"
+            );
+        }
     }
 
     #[test]

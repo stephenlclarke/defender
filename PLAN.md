@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `eba4748`.
+- Latest accepted implementation commit before this cycle: `16383be`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
@@ -98,7 +98,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-69` are complete. `DC-70` is planned, and the standing
+`DC-42` through `DC-70` are complete. `DC-71` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1677,7 +1677,76 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778710071723699`
 
-### DC-70: Memory-Oriented Oracle Retirement
+### DC-70: Compatibility Re-export Narrowing
+
+Status: `complete`
+
+Goal: shrink the doc-hidden compatibility namespace to the temporary tool and
+equivalence contracts still used in this repo, without changing gameplay
+behavior.
+
+Scope:
+
+- Remove compatibility re-exports for low-level legacy modules such as assets,
+  board, memory layout, ROM verification, sound internals, live runtime, PIA,
+  and `wgpu` presenter ownership.
+- Keep only compatibility modules required by README media tooling and clean
+  equivalence tests: input, machine, machine process/state, red-label math
+  types, and video.
+- Mark parked low-level legacy adapters as dead-code-tolerant while they remain
+  crate-private evidence for the oracle and tests.
+- Add a public API guard that fails if low-level compatibility re-exports are
+  restored.
+- Document the narrowed compatibility boundary in README, SPEC, and PLAN.
+
+Acceptance criteria:
+
+- `defender::compatibility` no longer exposes asset, board, memory, ROM, sound,
+  live, PIA, or `wgpu` presenter modules.
+- README media generation and clean equivalence tests still compile through the
+  reduced temporary compatibility surface.
+- Existing gameplay, fidelity fixtures, and live smoke behavior remain
+  unchanged.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::compatibility_namespace_exposes_only_temporary_tool_contracts
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+RETIRED_COMPAT='app|assets|board|cmos_storage|fidelity|live|pia'
+RETIRED_COMPAT="$RETIRED_COMPAT|red_label_memory|red_label_message"
+RETIRED_COMPAT="$RETIRED_COMPAT|red_label_wave|rom|sound|terminal"
+! rg -n "pub mod ($RETIRED_COMPAT|wgpu_presenter)" src_legacy/compatibility.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 23:12:14 BST` Started `DC-70`: posted the cycle start update and
+  began narrowing the doc-hidden compatibility namespace to the temporary
+  contracts still used by README media tooling and clean equivalence tests.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778710163561459`
+- `2026-05-13 23:33:27 BST` Completed `DC-70`: removed low-level compatibility
+  re-exports for asset, board, memory, ROM, sound, live, PIA, and `wgpu`
+  presenter internals; kept only the temporary README media and clean
+  equivalence contracts; added the public API regression guard; and documented
+  the narrowed boundary in README, SPEC, and PLAN. Validation passed with the
+  DC-70 gate: formatting, focused compatibility API guard, all-target tests,
+  clippy, `make fidelity`, live smoke, retired compatibility export search,
+  markdownlint, and `git diff --check`. `make fidelity` reported new Rust line
+  coverage `0/0` non-baselined added executable lines. Live smoke rendered 239
+  frames, saw 74 distinct frame CRCs, observed attract, credit, and playing
+  states, injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778711608813249`
+
+### DC-71: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 

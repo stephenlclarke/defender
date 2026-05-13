@@ -205,8 +205,11 @@ adapters remain crate-private; tool targets such as README media generation use
 the doc-hidden `defender::compatibility` boundary while those responsibilities
 are being retired. That compatibility re-export map is owned by
 `src_legacy/compatibility.rs`; `src/lib.rs` only wires the doc-hidden namespace.
-Generated long-trace sample fixtures are private to the legacy machine oracle,
-not root-wired through the clean crate.
+It now exposes only the temporary tool and equivalence contracts still used in
+this repo: input, machine, machine process/state, red-label math types, and
+video. Low-level asset, board, memory, ROM, sound, live, PIA, and `wgpu`
+modules stay crate-private. Generated long-trace sample fixtures are private
+to the legacy machine oracle, not root-wired through the clean crate.
 
 Clean rewrite modules:
 
@@ -237,16 +240,17 @@ temporary accepted-machine adapter, and legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so `src/accepted.rs` and
 `src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as
 doc-hidden compatibility modules rather than supported public API, with
-`src_legacy/compatibility.rs` owning temporary public re-exports for tools. The
-binary enters through the clean platform boundary before delegating to the
-compatibility runtime. The live worker now wraps accepted visual output as a
-clean `RenderScene` raster payload before the presenter draws it. Kitty graphics
-and terminal-session code remain parked there as historical compatibility
-evidence, but they are no longer active runtime or compatibility API paths. The
-legacy video renderer owns its remaining `TerminalGeometry` value type directly
-so it does not pull terminal session setup into active builds. Generated
-long-trace sample data is nested under the legacy machine oracle because it is
-historical fixture evidence, not a clean root adapter.
+`src_legacy/compatibility.rs` owning only the temporary re-exports still used by
+README media tooling and clean equivalence tests. The binary enters through the
+clean platform boundary before delegating to the compatibility runtime. The live
+worker now wraps accepted visual output as a clean `RenderScene` raster payload
+before the presenter draws it. Kitty graphics and terminal-session code remain
+parked there as historical compatibility evidence, but they are no longer
+active runtime or compatibility API paths. The legacy video renderer owns its
+remaining `TerminalGeometry` value type directly so it does not pull terminal
+session setup into active builds. Generated long-trace sample data is nested
+under the legacy machine oracle because it is historical fixture evidence, not
+a clean root adapter.
 
 ## Assets And ROMs
 
