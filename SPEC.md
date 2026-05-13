@@ -55,7 +55,8 @@ tree:
 - `src/lib.rs`: clean public crate wiring plus crate-private explicit
   `#[path]` adapters to the legacy oracle tree and a doc-hidden
   `compatibility` namespace wired from `src_legacy/compatibility.rs` for
-  temporary oracle/tool access.
+  temporary oracle/tool access. Generated long-trace sample fixtures must stay
+  private to the legacy machine oracle instead of being root-wired here.
 - `src/accepted.rs`: crate-private accepted-behavior contracts and facade that
   isolate clean production modules from direct legacy runtime and oracle
   imports.
@@ -93,7 +94,9 @@ temporary raster payload for visual equivalence. Kitty graphics and
 terminal-session code remain parked there as historical compatibility evidence,
 but they are not part of the active runtime or compatibility API surface. The
 legacy video renderer owns its remaining `TerminalGeometry` value type directly
-instead of importing terminal session setup.
+instead of importing terminal session setup. Generated long-trace sample data
+is nested under the legacy machine oracle because it is historical fixture
+evidence, not a clean root adapter.
 
 ## Current Behavior Surface
 

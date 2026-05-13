@@ -22,7 +22,6 @@ pub mod presentation;
 pub mod red_label;
 pub mod red_label_memory;
 pub mod red_label_message;
-pub(crate) mod red_label_trace_samples;
 pub mod red_label_wave;
 pub mod rom;
 pub mod sound;

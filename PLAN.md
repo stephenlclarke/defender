@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `b6da46c`.
+- Latest accepted implementation commit before this cycle: `eba4748`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
@@ -98,7 +98,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-68` are complete. `DC-69` is planned, and the standing
+`DC-42` through `DC-69` are complete. `DC-70` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1611,7 +1611,73 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778708566793249`
 
-### DC-69: Oracle Retirement
+### DC-69: Trace Sample Oracle Quarantine
+
+Status: `complete`
+
+Goal: keep generated long-trace sample fixture data out of clean crate-root
+wiring while preserving the legacy machine oracle behavior that still consumes
+that evidence.
+
+Scope:
+
+- Move `src_legacy/red_label_trace_samples.rs` from the active clean crate root
+  into the private legacy machine oracle module tree.
+- Remove the generated fixture module from the root legacy adapter guard in
+  `src/lib.rs`.
+- Add a public API guard that fails if generated trace samples become
+  root-wired or compatibility-exported again.
+- Keep generated trace sample tests and current oracle behavior intact.
+- Document that generated long-trace fixture data is historical oracle evidence,
+  not a clean root adapter.
+
+Acceptance criteria:
+
+- `src/lib.rs` no longer declares `red_label_trace_samples`.
+- The fixture module is private to `src_legacy/machine.rs`.
+- Current oracle fixture behavior and live behavior remain unchanged.
+- README, SPEC, and PLAN describe the private trace-sample oracle boundary.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests
+cargo test --lib machine::red_label_trace_samples::tests
+cargo test --lib oracle_equivalence_tests::clean_fixture_matches_accepted_oracle_events_and_scene_summaries
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+TRACE_SAMPLE_TERMS='red_label_trace_samples|crate::red_label_trace_samples'
+TRACE_SAMPLE_TERMS="$TRACE_SAMPLE_TERMS|compatibility::red_label_trace_samples"
+! rg -n "$TRACE_SAMPLE_TERMS" src src_legacy/compatibility.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 22:47:43 BST` Started `DC-69`: posted the cycle start update and
+  began moving generated long-trace sample fixture data out of clean crate-root
+  wiring while keeping it available to the legacy machine oracle.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778708773431689`
+- `2026-05-13 23:07:38 BST` Completed `DC-69`: moved generated long-trace
+  sample fixture data out of clean crate-root wiring and into the private
+  legacy machine oracle module tree, added a public API guard against root or
+  compatibility re-export regressions, and documented the private oracle
+  boundary in README, SPEC, and PLAN. Validation passed with the DC-69 gate:
+  formatting, focused public API/private fixture/oracle equivalence tests,
+  all-target tests, clippy, `make fidelity`, live smoke, trace-sample root
+  search, markdownlint, and `git diff --check`. `make fidelity` reported new
+  Rust line coverage `0/0` non-baselined added executable lines. Live smoke
+  rendered 240 frames, saw 74 distinct frame CRCs, observed attract, credit,
+  and playing states, injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778710071723699`
+
+### DC-70: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 

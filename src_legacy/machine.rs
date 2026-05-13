@@ -7,6 +7,9 @@
 
 use std::sync::OnceLock;
 
+use self::red_label_trace_samples::{
+    red_label_long_instruction_crc_sample, red_label_long_instruction_rand_sample,
+};
 use crate::{
     board::{
         CMOS_RAM_SIZE, CmosRam, MAIN_CPU_RAM_SIZE, MainCpuRam, PALETTE_RAM_SIZE,
@@ -23,9 +26,6 @@ use crate::{
         RedLabelCmosDefault, RedLabelLinkedList, RedLabelRamLayoutEntry, cmos_4bit_cell_value,
         pack_sram_byte, red_label_cmos_defaults, red_label_cmos_layout, red_label_linked_lists,
         red_label_ram_layout, unpack_sram_byte,
-    },
-    red_label_trace_samples::{
-        red_label_long_instruction_crc_sample, red_label_long_instruction_rand_sample,
     },
     red_label_wave::{RED_LABEL_WDELT_RECORD_COUNT, red_label_wave_table},
     rom::crc32,
@@ -51,6 +51,8 @@ mod machine_sound;
 mod machine_video;
 #[path = "machine_world.rs"]
 mod machine_world;
+#[path = "red_label_trace_samples.rs"]
+mod red_label_trace_samples;
 
 #[cfg(test)]
 use self::machine_player::*;

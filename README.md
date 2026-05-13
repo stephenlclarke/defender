@@ -205,6 +205,8 @@ adapters remain crate-private; tool targets such as README media generation use
 the doc-hidden `defender::compatibility` boundary while those responsibilities
 are being retired. That compatibility re-export map is owned by
 `src_legacy/compatibility.rs`; `src/lib.rs` only wires the doc-hidden namespace.
+Generated long-trace sample fixtures are private to the legacy machine oracle,
+not root-wired through the clean crate.
 
 Clean rewrite modules:
 
@@ -242,7 +244,9 @@ clean `RenderScene` raster payload before the presenter draws it. Kitty graphics
 and terminal-session code remain parked there as historical compatibility
 evidence, but they are no longer active runtime or compatibility API paths. The
 legacy video renderer owns its remaining `TerminalGeometry` value type directly
-so it does not pull terminal session setup into active builds.
+so it does not pull terminal session setup into active builds. Generated
+long-trace sample data is nested under the legacy machine oracle because it is
+historical fixture evidence, not a clean root adapter.
 
 ## Assets And ROMs
 

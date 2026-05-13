@@ -61,9 +61,6 @@ pub(crate) mod red_label_memory;
 #[path = "../src_legacy/red_label_message.rs"]
 pub(crate) mod red_label_message;
 #[doc(hidden)]
-#[path = "../src_legacy/red_label_trace_samples.rs"]
-pub(crate) mod red_label_trace_samples;
-#[doc(hidden)]
 #[path = "../src_legacy/red_label_wave.rs"]
 pub(crate) mod red_label_wave;
 #[doc(hidden)]
@@ -254,7 +251,6 @@ mod public_api_tests {
             "red_label",
             "red_label_memory",
             "red_label_message",
-            "red_label_trace_samples",
             "red_label_wave",
             "rom",
             "sound",
@@ -276,6 +272,29 @@ mod public_api_tests {
                 "legacy module {module} must be crate-private at the root"
             );
         }
+    }
+
+    #[test]
+    fn generated_trace_samples_are_machine_oracle_private() {
+        let lib_rs = include_str!("lib.rs");
+        let machine_rs = include_str!("../src_legacy/machine.rs");
+        let fixture_module = format!("{}_trace_samples", "red_label");
+        let fixture_path = format!("../src_legacy/{fixture_module}.rs");
+        let root_module = format!("mod {fixture_module};");
+        let machine_module = format!("#[path = \"{fixture_module}.rs\"]\nmod {fixture_module};");
+
+        assert!(
+            !lib_rs.contains(&fixture_path),
+            "generated trace samples must not be wired from clean crate root"
+        );
+        assert!(
+            !lib_rs.contains(&root_module),
+            "generated trace samples must stay private to the legacy machine oracle"
+        );
+        assert!(
+            machine_rs.contains(&machine_module),
+            "legacy machine oracle must own its generated trace sample fixture module"
+        );
     }
 
     #[test]
