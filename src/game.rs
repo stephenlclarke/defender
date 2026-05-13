@@ -1,5 +1,7 @@
 //! Domain-facing gameplay contracts.
 
+use crate::renderer::RenderScene;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GamePhase {
     Attract,
@@ -49,7 +51,7 @@ pub struct ScoreSnapshot {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GameSnapshot {
+pub struct GameState {
     pub frame: u64,
     pub phase: GamePhase,
     pub credits: u8,
@@ -58,6 +60,8 @@ pub struct GameSnapshot {
     pub player: PlayerSnapshot,
     pub scores: ScoreSnapshot,
 }
+
+pub type GameSnapshot = GameState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameEvent {
@@ -82,10 +86,40 @@ pub struct SoundEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GameEvents {
+    gameplay: Vec<GameEvent>,
+    sounds: Vec<SoundEvent>,
+}
+
+impl GameEvents {
+    pub fn new(gameplay: Vec<GameEvent>, sounds: Vec<SoundEvent>) -> Self {
+        Self { gameplay, sounds }
+    }
+
+    pub fn gameplay(&self) -> &[GameEvent] {
+        &self.gameplay
+    }
+
+    pub fn sounds(&self) -> &[SoundEvent] {
+        &self.sounds
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.gameplay.is_empty() && self.sounds.is_empty()
+    }
+}
+
+impl Default for GameEvents {
+    fn default() -> Self {
+        Self::new(Vec::new(), Vec::new())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct GameFrame {
-    pub snapshot: GameSnapshot,
-    pub events: Vec<GameEvent>,
-    pub sounds: Vec<SoundEvent>,
+    pub state: GameState,
+    pub events: GameEvents,
+    pub scene: RenderScene,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -131,7 +165,9 @@ impl GameInput {
 
 #[cfg(test)]
 mod tests {
-    use super::{GameInput, WorldVector};
+    use crate::renderer::{RenderScene, SurfaceSize};
+
+    use super::{GameEvent, GameEvents, GameFrame, GameInput, GamePhase, SoundEvent, WorldVector};
 
     #[test]
     fn world_vectors_preserve_subpixel_units() {
@@ -144,5 +180,49 @@ mod tests {
     #[test]
     fn game_input_none_is_empty() {
         assert_eq!(GameInput::NONE, GameInput::default());
+    }
+
+    #[test]
+    fn game_events_keep_gameplay_and_sound_surfaces_separate() {
+        let events = GameEvents::new(
+            vec![GameEvent::CreditAdded],
+            vec![SoundEvent { command: 0x3E }],
+        );
+
+        assert_eq!(events.gameplay(), &[GameEvent::CreditAdded]);
+        assert_eq!(events.sounds(), &[SoundEvent { command: 0x3E }]);
+        assert!(!events.is_empty());
+        assert!(GameEvents::default().is_empty());
+    }
+
+    #[test]
+    fn game_frame_uses_state_events_and_scene_contracts() {
+        let frame = GameFrame {
+            state: super::GameState {
+                frame: 9,
+                phase: GamePhase::Attract,
+                credits: 1,
+                current_player: 1,
+                wave: 0,
+                player: super::PlayerSnapshot {
+                    position: (WorldVector::default(), WorldVector::default()),
+                    velocity: (WorldVector::default(), WorldVector::default()),
+                    direction: super::Direction::Right,
+                    lives: 3,
+                    smart_bombs: 3,
+                },
+                scores: super::ScoreSnapshot {
+                    player_one: 0,
+                    player_two: 0,
+                    high_score: 100,
+                    next_bonus: 10_000,
+                },
+            },
+            events: GameEvents::default(),
+            scene: RenderScene::empty(9, SurfaceSize::new(292, 240)),
+        };
+
+        assert_eq!(frame.state.frame, frame.scene.frame);
+        assert!(frame.events.is_empty());
     }
 }

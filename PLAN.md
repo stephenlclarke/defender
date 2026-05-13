@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit: `b51ab35`.
+- Latest accepted implementation commit before this cycle: `815673c`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy `machine::...` imports through explicit oracle wiring.
@@ -97,8 +97,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-54` are complete, and
-only the standing maintenance guidance in Ongoing Work remains.
+No active development cycle remains. `DC-42` through `DC-55` are complete, and
+the standing maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -734,7 +734,7 @@ Work log:
 
 ### DC-55: Clean Simulation Contracts
 
-Status: `planned`
+Status: `complete`
 
 Goal: define the domain-first frame API that future gameplay systems will own.
 
@@ -768,6 +768,30 @@ cargo clippy --all-targets -- -D warnings
 make fidelity
 cargo run -- --live-smoke
 ```
+
+Work log:
+
+- `2026-05-13` Started `DC-55` on branch `rewrite`: posted the cycle start
+  update and began extending the clean `GameState`/`GameFrame`/`GameEvents`,
+  `RenderScene`, and simulation trait contracts while keeping the converted
+  implementation behind the oracle boundary.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778661176512439`
+- `2026-05-13` Completed `DC-55`: `GameFrame` now carries clean
+  `GameState`, `GameEvents`, sound events, and a `RenderScene`; renderer
+  scenes expose stable summaries and layer counts; `systems` exposes a
+  `GameSimulation` trait for clean frame advancement; and the gameplay oracle
+  implements that trait while converting accepted machine output into clean
+  state, event, sound, and scene-summary frames. Clean fixture coverage now
+  compares credited-start events and scene summaries against the accepted
+  oracle behavior. Validation passed with `cargo fmt --check`, focused
+  `game`, `systems`, `renderer`, and `oracle` tests, `cargo test
+  --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity`, `cargo run -- --live-smoke`, `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778664173986969`
 
 ### DC-56: Native Wgpu Scene Renderer
 

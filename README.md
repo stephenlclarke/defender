@@ -199,15 +199,16 @@ implementation is parked under `src_legacy/` and remains wired through
 
 Clean rewrite modules:
 
-- `src/game.rs`: gameplay-facing input, frame, snapshot, event, score, player,
-  direction, and sound-event contracts.
-- `src/systems.rs`: deterministic fixed-step timing utilities for future game
-  systems.
+- `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
+  `GameEvents`, score, player, direction, and sound-event contracts.
+- `src/systems.rs`: deterministic fixed-step timing utilities plus the clean
+  `GameSimulation` trait for future game systems.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
-  layers, and renderer settings.
+  layers, scene summaries, and renderer settings.
 - `src/platform.rs`: runtime configuration for controls, audio, run mode, and
   persistence.
-- `src/oracle.rs`: the only clean-tree adapter to the converted implementation.
+- `src/oracle.rs`: the only clean-tree adapter to the converted implementation,
+  returning clean state, event, sound, and scene-summary frames.
 
 Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input, live

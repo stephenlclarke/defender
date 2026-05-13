@@ -56,15 +56,16 @@ pub mod video;
 pub mod wgpu_presenter;
 
 pub use game::{
-    Direction, GameEvent, GameFrame, GameInput, GamePhase, GameSnapshot, PlayerSnapshot,
-    ScoreSnapshot, SoundEvent, WorldVector,
+    Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameSnapshot, GameState,
+    PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldVector,
 };
 pub use oracle::GameplayOracle;
 pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
 pub use renderer::{
-    Color, GpuRendererSettings, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
+    Color, GpuRendererSettings, RenderLayer, RenderLayerCounts, RenderScene, RenderSceneSummary,
+    SceneSprite, SpriteId, SurfaceSize,
 };
-pub use systems::{FixedStepAccumulator, FrameRate};
+pub use systems::{FixedStepAccumulator, FrameRate, GameSimulation, advance_one_frame};
 
 #[cfg(test)]
 #[path = "../src_legacy/test_support.rs"]
@@ -77,8 +78,8 @@ mod public_api_tests {
         let mut oracle = crate::GameplayOracle::new();
         let frame = oracle.step(crate::GameInput::NONE);
 
-        assert_eq!(frame.snapshot.frame, 1);
-        assert_eq!(frame.snapshot.phase, crate::GamePhase::Attract);
+        assert_eq!(frame.state.frame, 1);
+        assert_eq!(frame.state.phase, crate::GamePhase::Attract);
     }
 
     #[test]

@@ -1,5 +1,17 @@
 //! Deterministic fixed-step system utilities.
 
+use crate::game::{GameFrame, GameInput, GameState};
+
+pub trait GameSimulation {
+    fn state(&self) -> GameState;
+
+    fn step(&mut self, input: GameInput) -> GameFrame;
+}
+
+pub fn advance_one_frame(simulation: &mut impl GameSimulation, input: GameInput) -> GameFrame {
+    simulation.step(input)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FrameRate {
     millihz: u32,
@@ -54,7 +66,15 @@ impl FixedStepAccumulator {
 
 #[cfg(test)]
 mod tests {
-    use super::{FixedStepAccumulator, FrameRate};
+    use crate::{
+        game::{
+            Direction, GameEvents, GameFrame, GameInput, GamePhase, GameState, PlayerSnapshot,
+            ScoreSnapshot, WorldVector,
+        },
+        renderer::{RenderScene, SurfaceSize},
+    };
+
+    use super::{FixedStepAccumulator, FrameRate, GameSimulation, advance_one_frame};
 
     #[test]
     fn frame_rate_uses_rounded_microsecond_duration() {
@@ -71,5 +91,72 @@ mod tests {
         assert_eq!(accumulator.accumulated_micros(), 1_500_000);
         assert_eq!(accumulator.consume_due_steps(8), 1);
         assert_eq!(accumulator.accumulated_micros(), 500_000);
+    }
+
+    #[test]
+    fn simulation_trait_advances_clean_frames_without_memory_contracts() {
+        let mut simulation = FakeSimulation::default();
+
+        let frame = advance_one_frame(
+            &mut simulation,
+            GameInput {
+                coin: true,
+                ..GameInput::NONE
+            },
+        );
+
+        assert_eq!(frame.state.frame, 1);
+        assert_eq!(frame.state.credits, 1);
+        assert_eq!(frame.scene.summary().frame, 1);
+    }
+
+    #[derive(Debug)]
+    struct FakeSimulation {
+        state: GameState,
+    }
+
+    impl Default for FakeSimulation {
+        fn default() -> Self {
+            Self {
+                state: GameState {
+                    frame: 0,
+                    phase: GamePhase::Attract,
+                    credits: 0,
+                    current_player: 1,
+                    wave: 0,
+                    player: PlayerSnapshot {
+                        position: (WorldVector::default(), WorldVector::default()),
+                        velocity: (WorldVector::default(), WorldVector::default()),
+                        direction: Direction::Right,
+                        lives: 3,
+                        smart_bombs: 3,
+                    },
+                    scores: ScoreSnapshot {
+                        player_one: 0,
+                        player_two: 0,
+                        high_score: 100,
+                        next_bonus: 10_000,
+                    },
+                },
+            }
+        }
+    }
+
+    impl GameSimulation for FakeSimulation {
+        fn state(&self) -> GameState {
+            self.state.clone()
+        }
+
+        fn step(&mut self, input: GameInput) -> GameFrame {
+            self.state.frame += 1;
+            if input.coin {
+                self.state.credits += 1;
+            }
+            GameFrame {
+                state: self.state.clone(),
+                events: GameEvents::default(),
+                scene: RenderScene::empty(self.state.frame, SurfaceSize::new(292, 240)),
+            }
+        }
     }
 }

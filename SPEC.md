@@ -54,16 +54,17 @@ tree:
   app while the rewrite takes over.
 - `src/lib.rs`: clean public crate wiring plus explicit `#[path]` adapters to
   the legacy oracle tree.
-- `src/game.rs`: gameplay-facing input, frame, snapshot, event, score, player,
-  direction, and sound-event contracts.
-- `src/systems.rs`: deterministic fixed-step timing utilities for future game
-  systems.
+- `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
+  `GameEvents`, score, player, direction, and sound-event contracts.
+- `src/systems.rs`: deterministic fixed-step timing utilities plus the clean
+  `GameSimulation` trait for future game systems.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
-  layers, and renderer settings.
+  layers, scene summaries, and renderer settings.
 - `src/platform.rs`: runtime configuration for controls, audio, run mode, and
   persistence.
 - `src/oracle.rs`: the explicit adapter from clean gameplay contracts to the
-  current accepted implementation.
+  current accepted implementation, including clean state, event, sound, and
+  scene-summary frames.
 
 The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,

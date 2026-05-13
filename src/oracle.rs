@@ -12,9 +12,11 @@ use crate::{
 };
 
 use super::game::{
-    Direction, GameEvent, GameFrame, GameInput, GamePhase, GameSnapshot, PlayerSnapshot,
+    Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameState, PlayerSnapshot,
     ScoreSnapshot, SoundEvent, WorldVector,
 };
+use super::renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize};
+use super::systems::GameSimulation;
 
 #[derive(Debug)]
 pub struct GameplayOracle {
@@ -28,7 +30,7 @@ impl GameplayOracle {
         }
     }
 
-    pub fn snapshot(&self) -> GameSnapshot {
+    pub fn snapshot(&self) -> GameState {
         adapt_snapshot(self.machine.snapshot())
     }
 
@@ -40,6 +42,16 @@ impl GameplayOracle {
 impl Default for GameplayOracle {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GameSimulation for GameplayOracle {
+    fn state(&self) -> GameState {
+        self.snapshot()
+    }
+
+    fn step(&mut self, input: GameInput) -> GameFrame {
+        GameplayOracle::step(self, input)
     }
 }
 
@@ -65,20 +77,26 @@ fn to_cabinet_input(input: GameInput) -> CabinetInput {
 }
 
 fn adapt_frame_output(output: FrameOutput) -> GameFrame {
+    let state = adapt_snapshot(output.snapshot);
+    let scene = adapt_scene(&state, output.video_crc32);
+
     GameFrame {
-        snapshot: adapt_snapshot(output.snapshot),
-        events: output.events().map(adapt_event).collect(),
-        sounds: output
-            .sound_commands()
-            .map(|command| SoundEvent {
-                command: command.raw(),
-            })
-            .collect(),
+        state,
+        events: GameEvents::new(
+            output.events().map(adapt_event).collect(),
+            output
+                .sound_commands()
+                .map(|command| SoundEvent {
+                    command: command.raw(),
+                })
+                .collect(),
+        ),
+        scene,
     }
 }
 
-fn adapt_snapshot(snapshot: MachineSnapshot) -> GameSnapshot {
-    GameSnapshot {
+fn adapt_snapshot(snapshot: MachineSnapshot) -> GameState {
+    GameState {
         frame: snapshot.frame,
         phase: adapt_phase(snapshot.phase),
         credits: snapshot.credits,
@@ -104,6 +122,41 @@ fn adapt_snapshot(snapshot: MachineSnapshot) -> GameSnapshot {
             next_bonus: snapshot.scores.next_bonus,
         },
     }
+}
+
+fn adapt_scene(state: &GameState, visual_hash: Option<u32>) -> RenderScene {
+    let (width, height) = crate::video::native_visible_size();
+    let mut scene = RenderScene::empty(
+        state.frame,
+        SurfaceSize::new(u32::from(width), u32::from(height)),
+    );
+    scene.visual_hash = visual_hash;
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::SCORE_TEXT,
+        layer: RenderLayer::Hud,
+        position: [0.0, 0.0],
+        size: [96.0, 8.0],
+        tint: Color::WHITE,
+    });
+
+    if state.phase == GamePhase::Playing {
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_SHIP,
+            layer: RenderLayer::Objects,
+            position: [
+                world_vector_pixels(state.player.position.0),
+                world_vector_pixels(state.player.position.1),
+            ],
+            size: [16.0, 8.0],
+            tint: Color::WHITE,
+        });
+    }
+
+    scene
+}
+
+fn world_vector_pixels(vector: WorldVector) -> f32 {
+    vector.subpixels() as f32 / WorldVector::SUBPIXELS_PER_PIXEL as f32
 }
 
 fn adapt_phase(phase: crate::machine_state::GamePhase) -> GamePhase {
@@ -142,9 +195,13 @@ fn adapt_event(event: MachineEvent) -> GameEvent {
 
 #[cfg(test)]
 mod tests {
-    use crate::input::CabinetInput;
+    use crate::{input::CabinetInput, machine::ArcadeMachine};
 
-    use super::{GameInput, GamePhase, GameplayOracle, to_cabinet_input};
+    use super::{
+        GameEvent, GameInput, GamePhase, GameplayOracle, adapt_event, adapt_scene, adapt_snapshot,
+        to_cabinet_input,
+    };
+    use crate::systems::{GameSimulation, advance_one_frame};
 
     #[test]
     fn oracle_starts_from_clean_attract_snapshot() {
@@ -161,8 +218,9 @@ mod tests {
         let mut oracle = GameplayOracle::new();
         let frame = oracle.step(GameInput::NONE);
 
-        assert_eq!(frame.snapshot.frame, 1);
-        assert_eq!(frame.snapshot.phase, GamePhase::Attract);
+        assert_eq!(frame.state.frame, 1);
+        assert_eq!(frame.state.phase, GamePhase::Attract);
+        assert_eq!(frame.scene.summary().frame, 1);
     }
 
     #[test]
@@ -188,5 +246,82 @@ mod tests {
             }
             .bits()
         );
+    }
+
+    #[test]
+    fn oracle_implements_clean_simulation_trait() {
+        let mut oracle = GameplayOracle::new();
+
+        let frame = advance_one_frame(&mut oracle, GameInput::NONE);
+
+        assert_eq!(frame.state.frame, 1);
+        assert_eq!(GameSimulation::state(&oracle).frame, 1);
+    }
+
+    #[test]
+    fn clean_fixture_matches_accepted_oracle_events_and_scene_summaries() {
+        let mut clean = GameplayOracle::new();
+        let mut legacy = ArcadeMachine::new();
+        let mut observed_events = Vec::new();
+        let mut saw_playing_scene = false;
+
+        for input in credited_start_and_controls_inputs() {
+            let clean_frame = clean.step(input);
+            let legacy_output = legacy.step(to_cabinet_input(input));
+            let expected_state = adapt_snapshot(legacy_output.snapshot);
+            let expected_gameplay_events =
+                legacy_output.events().map(adapt_event).collect::<Vec<_>>();
+            let expected_sounds = legacy_output
+                .sound_commands()
+                .map(|command| super::SoundEvent {
+                    command: command.raw(),
+                })
+                .collect::<Vec<_>>();
+            let expected_scene_summary =
+                adapt_scene(&expected_state, legacy_output.video_crc32).summary();
+
+            assert_eq!(clean_frame.state, expected_state);
+            assert_eq!(
+                clean_frame.events.gameplay(),
+                expected_gameplay_events.as_slice()
+            );
+            assert_eq!(clean_frame.events.sounds(), expected_sounds.as_slice());
+            assert_eq!(clean_frame.scene.summary(), expected_scene_summary);
+
+            observed_events.extend_from_slice(clean_frame.events.gameplay());
+            let summary = clean_frame.scene.summary();
+            saw_playing_scene |= clean_frame.state.phase == GamePhase::Playing
+                && summary.visual_hash.is_some()
+                && summary.layers.objects == 1;
+        }
+
+        assert!(observed_events.contains(&GameEvent::CreditAdded));
+        assert!(observed_events.contains(&GameEvent::GameStarted));
+        assert!(saw_playing_scene);
+    }
+
+    fn credited_start_and_controls_inputs() -> Vec<GameInput> {
+        let mut inputs = vec![GameInput {
+            coin: true,
+            ..GameInput::NONE
+        }];
+        for _ in 0..16 {
+            inputs.push(GameInput::NONE);
+        }
+        inputs.push(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        for _ in 0..16 {
+            inputs.push(GameInput {
+                altitude_up: true,
+                reverse: true,
+                thrust: true,
+                fire: true,
+                hyperspace: true,
+                ..GameInput::NONE
+            });
+        }
+        inputs
     }
 }
