@@ -11,46 +11,69 @@ pub mod platform;
 pub mod renderer;
 pub mod systems;
 
+// Compatibility modules are hidden from the supported clean API surface while
+// the rewrite still uses them for the CLI, oracle, fixtures, and smoke tests.
+#[doc(hidden)]
 #[path = "../src_legacy/app.rs"]
 pub mod app;
+#[doc(hidden)]
 #[path = "../src_legacy/assets.rs"]
 pub mod assets;
+#[doc(hidden)]
 #[path = "../src_legacy/board.rs"]
 pub mod board;
+#[doc(hidden)]
 #[path = "../src_legacy/cmos_storage.rs"]
 pub mod cmos_storage;
+#[doc(hidden)]
 #[path = "../src_legacy/fidelity.rs"]
 pub mod fidelity;
+#[doc(hidden)]
 #[path = "../src_legacy/input.rs"]
 pub mod input;
+#[doc(hidden)]
 #[path = "../src_legacy/live.rs"]
 pub mod live;
+#[doc(hidden)]
 #[path = "../src_legacy/machine.rs"]
 pub mod machine;
+#[doc(hidden)]
 #[path = "../src_legacy/machine_process.rs"]
 pub mod machine_process;
+#[doc(hidden)]
 #[path = "../src_legacy/machine_state.rs"]
 pub mod machine_state;
+#[doc(hidden)]
 #[path = "../src_legacy/pia.rs"]
 pub mod pia;
+#[doc(hidden)]
 #[path = "../src_legacy/red_label.rs"]
 pub mod red_label;
+#[doc(hidden)]
 #[path = "../src_legacy/red_label_memory.rs"]
 pub mod red_label_memory;
+#[doc(hidden)]
 #[path = "../src_legacy/red_label_message.rs"]
 pub mod red_label_message;
+#[doc(hidden)]
 #[path = "../src_legacy/red_label_trace_samples.rs"]
 pub(crate) mod red_label_trace_samples;
+#[doc(hidden)]
 #[path = "../src_legacy/red_label_wave.rs"]
 pub mod red_label_wave;
+#[doc(hidden)]
 #[path = "../src_legacy/rom.rs"]
 pub mod rom;
+#[doc(hidden)]
 #[path = "../src_legacy/sound.rs"]
 pub mod sound;
+#[doc(hidden)]
 #[path = "../src_legacy/terminal.rs"]
 pub mod terminal;
+#[doc(hidden)]
 #[path = "../src_legacy/video.rs"]
 pub mod video;
+#[doc(hidden)]
 #[path = "../src_legacy/wgpu_presenter.rs"]
 pub mod wgpu_presenter;
 
@@ -109,5 +132,44 @@ mod public_api_tests {
 
         assert_eq!(direct_again.process_address, 0xA05F);
         assert_eq!(direct_again.routine_address, 0xC123);
+    }
+
+    #[test]
+    fn legacy_compatibility_modules_are_hidden_from_supported_api_docs() {
+        let lib_rs = include_str!("lib.rs");
+        let legacy_modules = [
+            "app",
+            "assets",
+            "board",
+            "cmos_storage",
+            "fidelity",
+            "input",
+            "live",
+            "machine",
+            "machine_process",
+            "machine_state",
+            "pia",
+            "red_label",
+            "red_label_memory",
+            "red_label_message",
+            "red_label_trace_samples",
+            "red_label_wave",
+            "rom",
+            "sound",
+            "terminal",
+            "video",
+            "wgpu_presenter",
+        ];
+
+        for module in legacy_modules {
+            let marker = format!("#[path = \"../src_legacy/{module}.rs\"]");
+            let Some(marker_start) = lib_rs.find(&marker) else {
+                panic!("missing legacy module path for {module}");
+            };
+            assert!(
+                lib_rs[..marker_start].ends_with("#[doc(hidden)]\n"),
+                "legacy module {module} must be hidden from supported API docs"
+            );
+        }
     }
 }

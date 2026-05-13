@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `6b8e516`.
+- Latest accepted implementation commit before this cycle: `27c30ae`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy `machine::...` imports through explicit oracle wiring.
@@ -97,7 +97,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-59` are complete, and
+No active development cycle remains. `DC-42` through `DC-60` are complete, and
 the standing maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1026,7 +1026,70 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778675086403679`
 
-### DC-60: Oracle Retirement
+### DC-60: Compatibility Surface Quarantine
+
+Status: `complete`
+
+Goal: begin oracle retirement by hiding legacy compatibility modules from the
+supported clean public API documentation while current runtime and fidelity
+tooling still depend on them.
+
+Scope:
+
+- Mark all `src_legacy/` path modules in `src/lib.rs` as doc-hidden
+  compatibility modules.
+- Add a focused architecture test that fails if a legacy path module is exposed
+  without the compatibility quarantine marker.
+- Keep the binary, README media tooling, oracle tests, and fidelity gates
+  working without changing gameplay behavior.
+- Document that compatibility modules remain wired but are not the supported
+  clean API surface.
+
+Acceptance criteria:
+
+- Supported docs expose clean modules first and legacy modules are explicitly
+  hidden.
+- Tests guard against adding new unhidden legacy path modules.
+- Public clean contracts and existing compatibility runtime remain intact.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::legacy_compatibility_modules_are_hidden_from_supported_api_docs
+cargo check --all-targets
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13` Started `DC-60` on branch `rewrite`: posted the cycle start
+  update and began the first oracle-retirement step by auditing legacy module
+  exposure from the clean crate root.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778675232663129`
+- `2026-05-13` Completed `DC-60`: marked every `src_legacy/` path module in
+  `src/lib.rs` as a doc-hidden compatibility module, added
+  `public_api_tests::legacy_compatibility_modules_are_hidden_from_supported_api_docs`
+  to guard the quarantine marker, and updated `README.md`, `SPEC.md`, and this
+  plan to describe the hidden compatibility surface while moving full oracle
+  retirement to `DC-61`. Validation passed with the documented DC-60 gate:
+  formatting, the focused public API guard, `cargo check --all-targets`, the
+  full Rust test suite, clippy with warnings denied, `make fidelity`,
+  `cargo run -- --live-smoke`, markdownlint, and `git diff --check`; the
+  coverage gate reported 0/0 non-baselined added executable Rust lines, and
+  live smoke rendered 240 frames with 74 distinct scene CRCs,
+  attract/credit/playing evidence, all required injected inputs, and a clean
+  exit.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778676669257919`
+
+### DC-61: Oracle Retirement
 
 Status: `planned`
 

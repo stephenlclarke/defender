@@ -75,8 +75,9 @@ The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,
 sound-board command evidence, fidelity trace generation, the threaded live core
 runtime boundary, `wgpu` window ownership, CMOS storage, and test helpers until
-clean systems replace those responsibilities. Live presentation receives clean
-`RenderScene` data, currently with a temporary raster payload for visual
+clean systems replace those responsibilities. Those compatibility modules are
+doc-hidden from the supported public API surface. Live presentation receives
+clean `RenderScene` data, currently with a temporary raster payload for visual
 equivalence. Kitty terminal graphics code remains parked there as historical
 compatibility evidence, but it is not part of the active runtime surface.
 

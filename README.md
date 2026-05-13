@@ -219,10 +219,11 @@ Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input,
 sound-board command evidence, fidelity trace generation and threaded fixture
 checks, the threaded live core runtime boundary, `wgpu` window ownership, CMOS
-storage, and test helpers. The live worker now wraps accepted visual output as
-a clean `RenderScene` raster payload before the presenter draws it. Kitty terminal
-graphics code remains parked there as historical compatibility evidence, but it
-is no longer an active runtime path.
+storage, and test helpers. They remain wired as doc-hidden compatibility
+modules rather than supported public API. The live worker now wraps accepted
+visual output as a clean `RenderScene` raster payload before the presenter
+draws it. Kitty terminal graphics code remains parked there as historical
+compatibility evidence, but it is no longer an active runtime path.
 
 ## Assets And ROMs
 
