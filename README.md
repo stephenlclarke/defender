@@ -203,7 +203,8 @@ legacy machine bridge lives in `src_legacy/accepted_behavior.rs`, keeping
 legacy imports out of the clean accepted-behavior surface. The root legacy
 adapters remain crate-private; tool targets such as README media generation use
 the doc-hidden `defender::compatibility` boundary while those responsibilities
-are being retired.
+are being retired. That compatibility re-export map is owned by
+`src_legacy/compatibility.rs`; `src/lib.rs` only wires the doc-hidden namespace.
 
 Clean rewrite modules:
 
@@ -233,12 +234,13 @@ storage, and test helpers. `src_legacy/accepted_behavior.rs` owns the
 temporary accepted-machine adapter, and legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so `src/accepted.rs` and
 `src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as
-doc-hidden compatibility modules rather than supported public API. The binary
-enters through the clean platform boundary before delegating to the
+doc-hidden compatibility modules rather than supported public API, with
+`src_legacy/compatibility.rs` owning temporary public re-exports for tools. The
+binary enters through the clean platform boundary before delegating to the
 compatibility runtime. The live worker now wraps accepted visual output as a
-clean `RenderScene` raster payload before the presenter draws it. Kitty
-terminal graphics code remains parked there as historical compatibility
-evidence, but it is no longer an active runtime path.
+clean `RenderScene` raster payload before the presenter draws it. Kitty terminal
+graphics code remains parked there as historical compatibility evidence, but it
+is no longer an active runtime path.
 
 ## Assets And ROMs
 

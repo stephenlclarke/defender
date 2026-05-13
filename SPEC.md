@@ -54,7 +54,8 @@ tree:
   runtime through the clean platform launcher while the rewrite takes over.
 - `src/lib.rs`: clean public crate wiring plus crate-private explicit
   `#[path]` adapters to the legacy oracle tree and a doc-hidden
-  `compatibility` namespace for temporary oracle/tool access.
+  `compatibility` namespace wired from `src_legacy/compatibility.rs` for
+  temporary oracle/tool access.
 - `src/accepted.rs`: crate-private accepted-behavior contracts and facade that
   isolate clean production modules from direct legacy runtime and oracle
   imports.
@@ -85,11 +86,12 @@ legacy-machine adaptation into neutral accepted-behavior contracts before the
 public clean gameplay types see it. Legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so clean accepted/oracle source
 stays focused on gameplay contracts. Temporary tools still use the doc-hidden
-`defender::compatibility` namespace as the boundary to the legacy tree. Live
-presentation receives clean `RenderScene` data, currently with a temporary
-raster payload for visual equivalence. Kitty terminal graphics code remains
-parked there as historical compatibility evidence, but it is not part of the
-active runtime surface.
+`defender::compatibility` namespace as the boundary to the legacy tree; its
+re-export map lives in `src_legacy/compatibility.rs`, not in the clean crate
+root. Live presentation receives clean `RenderScene` data, currently with a
+temporary raster payload for visual equivalence. Kitty terminal graphics code
+remains parked there as historical compatibility evidence, but it is not part
+of the active runtime surface.
 
 ## Current Behavior Surface
 

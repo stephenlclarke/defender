@@ -83,68 +83,8 @@ pub(crate) mod video;
 pub(crate) mod wgpu_presenter;
 
 #[doc(hidden)]
-pub mod compatibility {
-    pub mod app {
-        pub use crate::app::*;
-    }
-    pub mod assets {
-        pub use crate::assets::*;
-    }
-    pub mod board {
-        pub use crate::board::*;
-    }
-    pub mod cmos_storage {
-        pub use crate::cmos_storage::*;
-    }
-    pub mod fidelity {
-        pub use crate::fidelity::*;
-    }
-    pub mod input {
-        pub use crate::input::*;
-    }
-    pub mod live {
-        pub use crate::live::*;
-    }
-    pub mod machine {
-        pub use crate::machine::*;
-    }
-    pub mod machine_process {
-        pub use crate::machine_process::*;
-    }
-    pub mod machine_state {
-        pub use crate::machine_state::*;
-    }
-    pub mod pia {
-        pub use crate::pia::*;
-    }
-    pub mod red_label {
-        pub use crate::red_label::*;
-    }
-    pub mod red_label_memory {
-        pub use crate::red_label_memory::*;
-    }
-    pub mod red_label_message {
-        pub use crate::red_label_message::*;
-    }
-    pub mod red_label_wave {
-        pub use crate::red_label_wave::*;
-    }
-    pub mod rom {
-        pub use crate::rom::*;
-    }
-    pub mod sound {
-        pub use crate::sound::*;
-    }
-    pub mod terminal {
-        pub use crate::terminal::*;
-    }
-    pub mod video {
-        pub use crate::video::*;
-    }
-    pub mod wgpu_presenter {
-        pub use crate::wgpu_presenter::*;
-    }
-}
+#[path = "../src_legacy/compatibility.rs"]
+pub mod compatibility;
 
 pub use game::{
     Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameSnapshot, GameState,
@@ -221,6 +161,28 @@ mod public_api_tests {
 
         assert_eq!(direct_again.process_address, 0xA05F);
         assert_eq!(direct_again.routine_address, 0xC123);
+    }
+
+    #[test]
+    fn compatibility_namespace_is_legacy_owned_and_doc_hidden() {
+        let lib_rs = include_str!("lib.rs");
+        let marker = "#[path = \"../src_legacy/compatibility.rs\"]";
+        let Some(marker_start) = lib_rs.find(marker) else {
+            panic!("missing compatibility namespace path");
+        };
+
+        assert!(
+            lib_rs[..marker_start].ends_with("#[doc(hidden)]\n"),
+            "compatibility namespace must be hidden from supported API docs"
+        );
+        assert!(
+            lib_rs[marker_start..].starts_with(&format!("{marker}\npub mod compatibility;")),
+            "compatibility namespace must be owned by src_legacy"
+        );
+        assert!(
+            !lib_rs.contains("pub mod compatibility {\n"),
+            "compatibility re-export details must stay out of clean src/lib.rs"
+        );
     }
 
     #[test]

@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `48a0cb0`.
+- Latest accepted implementation commit before this cycle: `2613e6d`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
@@ -98,7 +98,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-66` are complete. `DC-67` is planned, and the standing
+`DC-42` through `DC-67` are complete. `DC-68` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1489,7 +1489,66 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778705634783139`
 
-### DC-67: Oracle Retirement
+### DC-67: Compatibility Namespace Quarantine
+
+Status: `complete`
+
+Goal: keep temporary oracle and tool access intact while moving the
+compatibility re-export details out of the clean crate root.
+
+Scope:
+
+- Add `src_legacy/compatibility.rs` as the owner of the doc-hidden
+  `defender::compatibility` re-export namespace.
+- Keep `src/lib.rs` focused on clean public exports, crate-private legacy path
+  adapters, and the one doc-hidden compatibility path declaration.
+- Preserve README media tooling and legacy equivalence tests that still use
+  the temporary compatibility namespace.
+- Add a public API guard that fails if the compatibility re-export map moves
+  back into `src/lib.rs`.
+
+Acceptance criteria:
+
+- `defender::compatibility` behavior is unchanged for current temporary users.
+- `src/lib.rs` no longer contains inline compatibility re-export details.
+- README, SPEC, and PLAN document the compatibility namespace ownership.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 21:57:04 BST` Started `DC-67`: posted the cycle start update and
+  began moving the doc-hidden compatibility re-export details from clean
+  `src/lib.rs` to `src_legacy/compatibility.rs` while preserving temporary
+  tooling and oracle access.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778705824813039`
+- `2026-05-13 22:18:12 BST` Completed `DC-67`: moved
+  `defender::compatibility` re-export ownership to
+  `src_legacy/compatibility.rs`, left `src/lib.rs` with only the doc-hidden
+  path declaration, added a public API guard against moving the re-export map
+  back into the clean crate root, and updated README/SPEC/PLAN to document the
+  ownership boundary. Validation passed with the DC-67 gate: formatting,
+  focused public API tests, all-target tests, clippy, `make fidelity`, live
+  smoke, markdownlint, and `git diff --check`. `make fidelity` reported new
+  Rust line coverage `0/0` non-baselined added executable lines. Live smoke
+  rendered 239 frames, saw 74 distinct frame CRCs, observed attract, credit,
+  and playing states, injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778707109325719`
+
+### DC-68: Oracle Retirement
 
 Status: `planned`
 
