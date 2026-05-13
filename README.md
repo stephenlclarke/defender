@@ -205,11 +205,12 @@ adapters remain crate-private; tool targets such as README media generation use
 the doc-hidden `defender::compatibility` boundary while those responsibilities
 are being retired. That compatibility re-export map is owned by
 `src_legacy/compatibility.rs`; `src/lib.rs` only wires the doc-hidden namespace.
-It now exposes only the temporary tool and equivalence contracts still used in
-this repo: input, machine, machine process/state, and video. Red-label math
-types and low-level asset, board, memory, ROM, sound, live, PIA, and `wgpu`
-modules stay crate-private. Generated long-trace sample fixtures are private
-to the legacy machine oracle, not root-wired through the clean crate.
+It now exposes only the temporary tool contracts still used by README media
+generation: input, machine, and video. Machine process/state contracts,
+red-label math types, and low-level asset, board, memory, ROM, sound, live,
+PIA, and `wgpu` modules stay crate-private. Generated long-trace sample
+fixtures are private to the legacy machine oracle, not root-wired through the
+clean crate.
 
 Clean rewrite modules:
 

@@ -56,10 +56,10 @@ tree:
   `#[path]` adapters to the legacy oracle tree and a doc-hidden
   `compatibility` namespace wired from `src_legacy/compatibility.rs` for
   temporary oracle/tool access. Compatibility exports are limited to current
-  in-repo tool and equivalence contracts; red-label math types and low-level
-  asset, board, memory, ROM, sound, live, PIA, and `wgpu` modules must remain
-  crate-private. Generated long-trace sample fixtures must stay private to the
-  legacy machine oracle instead of being root-wired here.
+  in-repo tool contracts; machine process/state contracts, red-label math
+  types, and low-level asset, board, memory, ROM, sound, live, PIA, and `wgpu`
+  modules must remain crate-private. Generated long-trace sample fixtures must
+  stay private to the legacy machine oracle instead of being root-wired here.
 - `src/accepted.rs`: crate-private accepted-behavior contracts and facade that
   isolate clean production modules from direct legacy runtime and oracle
   imports.
@@ -93,9 +93,11 @@ stays focused on gameplay contracts. Temporary tools still use the doc-hidden
 `defender::compatibility` namespace as the boundary to the legacy tree; its
 re-export map lives in `src_legacy/compatibility.rs`, not in the clean crate
 root, and exposes only the temporary modules used by README media tooling and
-clean equivalence tests. Live presentation receives clean `RenderScene` data,
-currently with a temporary raster payload for visual equivalence. Kitty
-graphics and terminal-session code remain parked there as historical
+clean equivalence tests. The current compatibility surface is only input,
+machine, and video; machine process/state contracts remain crate-private oracle
+wiring. Live presentation receives clean `RenderScene` data, currently with a
+temporary raster payload for visual equivalence. Kitty graphics and
+terminal-session code remain parked there as historical
 compatibility evidence, but they are not part of the active runtime or
 compatibility API surface. The legacy video renderer owns its remaining
 `TerminalGeometry` value type directly instead of importing terminal session

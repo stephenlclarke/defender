@@ -145,36 +145,6 @@ mod public_api_tests {
     }
 
     #[test]
-    fn compatibility_namespace_reexports_legacy_machine_state_contracts() {
-        let direct_phase = crate::compatibility::machine_state::GamePhase::Attract;
-        let compatibility_phase: crate::compatibility::machine::GamePhase = direct_phase;
-        let direct_phase_again: crate::compatibility::machine_state::GamePhase =
-            compatibility_phase;
-        assert_eq!(
-            direct_phase_again,
-            crate::compatibility::machine_state::GamePhase::Attract
-        );
-
-        let direct = crate::compatibility::machine_state::CompatibilityState::default();
-        let compatibility: crate::compatibility::machine::CompatibilityState = direct;
-        assert!(!compatibility.xyzzy_active);
-    }
-
-    #[test]
-    fn compatibility_namespace_reexports_legacy_process_contracts() {
-        let direct =
-            crate::compatibility::machine_process::RedLabelScheduledProcess::from_source_disp(
-                0xA05F, 0xC123,
-            );
-        let compatibility: crate::compatibility::machine::RedLabelScheduledProcess = direct;
-        let direct_again: crate::compatibility::machine_process::RedLabelScheduledProcess =
-            compatibility;
-
-        assert_eq!(direct_again.process_address, 0xA05F);
-        assert_eq!(direct_again.routine_address, 0xC123);
-    }
-
-    #[test]
     fn compatibility_namespace_is_legacy_owned_and_doc_hidden() {
         let lib_rs = include_str!("lib.rs");
         let compatibility_rs = include_str!("../src_legacy/compatibility.rs");
@@ -205,13 +175,7 @@ mod public_api_tests {
     fn compatibility_namespace_exposes_only_temporary_tool_contracts() {
         let compatibility_rs = include_str!("../src_legacy/compatibility.rs");
 
-        for module in [
-            "input",
-            "machine",
-            "machine_process",
-            "machine_state",
-            "video",
-        ] {
+        for module in ["input", "machine", "video"] {
             assert!(
                 compatibility_rs.contains(&format!(
                     "pub mod {module} {{\n    pub use crate::{module}::*;\n}}"
@@ -227,6 +191,8 @@ mod public_api_tests {
             "cmos_storage",
             "fidelity",
             "live",
+            "machine_process",
+            "machine_state",
             "pia",
             "red_label",
             "red_label_memory",

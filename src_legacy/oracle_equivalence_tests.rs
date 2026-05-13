@@ -11,9 +11,9 @@ use crate::{
             ArcadeMachine, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelLaserDirection,
             RedLabelLaserFire, RedLabelPlayerMotion,
         },
-        machine_state,
     },
     game::{Direction, GameEvent, GameInput, GamePhase, SoundEvent, WorldVector},
+    machine_state,
     oracle::{
         GameplayOracle,
         test_support::{adapt_accepted_event, adapt_accepted_scene, adapt_accepted_snapshot},

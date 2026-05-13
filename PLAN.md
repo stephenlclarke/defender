@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `724dcbc`.
+- Latest accepted implementation commit before this cycle: `640670b`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
@@ -98,7 +98,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-71` are complete. `DC-72` is planned, and the standing
+`DC-42` through `DC-72` are complete. `DC-73` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1808,7 +1808,74 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778713016113959`
 
-### DC-72: Memory-Oriented Oracle Retirement
+### DC-72: Process/State Compatibility Export Retirement
+
+Status: `complete`
+
+Goal: remove unused machine process/state exports from the doc-hidden
+compatibility namespace while preserving crate-private oracle behavior.
+
+Scope:
+
+- Remove `defender::compatibility::machine_process` and
+  `defender::compatibility::machine_state` now that in-repo callers no longer
+  require those temporary exports.
+- Keep the legacy process/state adapters crate-private for the accepted
+  behavior bridge and oracle internals.
+- Move legacy clean-equivalence test imports to crate-private oracle wiring.
+- Strengthen the public API guard so restoring these process/state
+  compatibility exports fails a focused test.
+- Update README, SPEC, and PLAN to describe the compatibility namespace as the
+  remaining README media surface: input, machine, and video.
+
+Acceptance criteria:
+
+- `defender::compatibility` exposes only input, machine, and video temporary
+  contracts.
+- Existing accepted-machine, oracle equivalence, README media, and live smoke
+  behavior remain unchanged.
+- Docs describe machine process/state contracts as crate-private oracle wiring,
+  not compatibility API.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::compatibility_namespace_exposes_only_temporary_tool_contracts
+cargo test --lib oracle_equivalence_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+! rg -n "pub mod (machine_process|machine_state)" src_legacy/compatibility.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 23:59:21 BST` Started `DC-72`: posted the cycle start update and
+  began removing the unused machine process/state exports from the doc-hidden
+  compatibility namespace while keeping the underlying legacy adapters
+  crate-private for oracle internals.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778713129737859`
+- `2026-05-14 00:20:02 BST` Completed `DC-72`: removed
+  `defender::compatibility::machine_process` and
+  `defender::compatibility::machine_state`, moved the legacy equivalence test
+  import to crate-private oracle wiring, left the process/state adapters
+  crate-private at the root, and updated README, SPEC, and PLAN. Validation
+  passed with the DC-72 gate: formatting, focused compatibility API guard,
+  focused oracle-equivalence tests, all-target tests, clippy, `make fidelity`,
+  live smoke, retired export search, markdownlint, and `git diff --check`.
+  `make fidelity` reported new Rust line coverage `0/0` non-baselined added
+  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs,
+  observed attract, credit, and playing states, injected all required controls,
+  and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778714403527089`
+
+### DC-73: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 
