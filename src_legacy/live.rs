@@ -913,7 +913,7 @@ mod tests {
     use std::thread;
     use std::time::{Duration, Instant};
 
-    use crate::audio::{LiveAudioBackend, LiveAudioCommandBatch, LiveAudioRuntime};
+    use crate::audio::{LiveAudioBackend, LiveAudioEventBatch, LiveAudioRuntime};
     use crate::board::{
         CMOS_RAM_SIZE, CmosRam, RED_LABEL_CRHSTD_CELL_OFFSET, cmos_sram_write_byte,
     };
@@ -924,7 +924,7 @@ mod tests {
     use crate::machine::{ArcadeMachine, FRAME_RATE_MILLIHZ, VISIBLE_HEIGHT, VISIBLE_WIDTH};
     use crate::machine_state::{GamePhase, MachineEvent, RedLabelSoundBoardSnapshot};
     use crate::rom::crc32;
-    use crate::sound::{SoundCommand, SoundCommandLatch};
+    use crate::sound::SoundCommandLatch;
     use crate::video::{RenderedImage, Renderer, defender_visible_byte_offset};
 
     use super::{
@@ -953,11 +953,11 @@ mod tests {
 
     #[derive(Default)]
     struct RecordingAudioBackend {
-        batches: Arc<Mutex<Vec<LiveAudioCommandBatch>>>,
+        batches: Arc<Mutex<Vec<LiveAudioEventBatch>>>,
     }
 
     impl LiveAudioBackend for RecordingAudioBackend {
-        fn handle_command_batch(&mut self, batch: LiveAudioCommandBatch) {
+        fn handle_event_batch(&mut self, batch: LiveAudioEventBatch) {
             self.batches
                 .lock()
                 .expect("audio recording lock")
@@ -1940,7 +1940,7 @@ mod tests {
     }
 
     #[test]
-    fn live_core_driver_feeds_sound_commands_to_audio_runtime() {
+    fn live_core_driver_feeds_sound_events_to_audio_runtime() {
         let start = Instant::now();
         let backend = RecordingAudioBackend::default();
         let recorded = backend.batches.clone();
@@ -1959,8 +1959,8 @@ mod tests {
         assert_eq!(recorded.len(), 1);
         assert_eq!(recorded[0].frame, 731);
         assert_eq!(
-            recorded[0].commands().collect::<Vec<_>>(),
-            vec![SoundCommand::from_main_board_pia_port_b(0xC0)]
+            recorded[0].events().collect::<Vec<_>>(),
+            vec![crate::SoundEvent::Startup]
         );
     }
 

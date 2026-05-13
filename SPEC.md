@@ -65,13 +65,15 @@ tree:
   and draw planning.
 - `src/platform.rs`: runtime configuration for controls, audio, run mode, and
   persistence.
+- `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
+  boundary, disabled/null no-device modes, and runtime diagnostics.
 - `src/oracle.rs`: the explicit adapter from clean gameplay contracts to the
   current accepted implementation, including clean state, event, sound, and
   scene-summary frames.
 
 The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,
-live audio command delivery, fidelity trace generation, the threaded live core
+sound-board command evidence, fidelity trace generation, the threaded live core
 runtime boundary, `wgpu` window ownership, CMOS storage, and test helpers until
 clean systems replace those responsibilities. Live presentation receives clean
 `RenderScene` data, currently with a temporary raster payload for visual
@@ -84,7 +86,7 @@ compatibility evidence, but it is not part of the active runtime surface.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.
-- `--mute` disables the live audio command-delivery runtime path.
+- `--mute` disables the live audio event runtime path.
 - `--cmos-path <file>` opts into file-backed CMOS persistence.
 - `--rom-report` and `--verify-roms` validate optional local red-label ROM
   files against embedded metadata.
@@ -133,10 +135,11 @@ explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
 
 ## Active Constraints
 
-- Live audio currently delivers accepted `FrameOutput::sound_commands()`
-  batches to a bounded non-blocking backend trait. The built-in backend is a
-  null backend that opens no audio device; audible device output remains future
-  work. The accepted implementation contract is documented in
+- Live audio currently maps accepted `FrameOutput::sound_commands()` timing to
+  clean `SoundEvent` batches and delivers them to a bounded non-blocking
+  backend trait. The built-in backend is a null backend that opens no audio
+  device; audible device output remains future work. The accepted
+  implementation contract is documented in
   `docs/fidelity/live-audio.md`.
 - Local MAME reference generation is intentionally local tooling; generated
   reference traces are not part of the normal runtime.

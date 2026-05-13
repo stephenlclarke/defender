@@ -4,6 +4,7 @@
 //! parked under `src_legacy/` and remains wired only as the gameplay oracle and
 //! compatibility runtime while the rewrite proves equivalent behavior.
 
+pub mod audio;
 pub mod game;
 pub mod oracle;
 pub mod platform;
@@ -14,8 +15,6 @@ pub mod systems;
 pub mod app;
 #[path = "../src_legacy/assets.rs"]
 pub mod assets;
-#[path = "../src_legacy/audio.rs"]
-pub mod audio;
 #[path = "../src_legacy/board.rs"]
 pub mod board;
 #[path = "../src_legacy/cmos_storage.rs"]

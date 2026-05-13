@@ -1,7 +1,8 @@
 # Live Audio Acceptance
 
 Status: `DC-51` accepted the contract on `2026-05-13`; `DC-52` added the
-runtime command-delivery prototype on `2026-05-13`.
+first bounded runtime on `2026-05-13`; `DC-59` moved the active runtime surface
+to gameplay-facing `SoundEvent` batches on `2026-05-13`.
 
 This note defines the source-backed contract for adding live audio runtime code.
 It does not add audible output by itself.
@@ -11,7 +12,8 @@ It does not add audible output by itself.
 `FrameOutput::sound_commands()` is the authoritative timing surface for live
 audio. Each `SoundCommand` in that frame output is a source-cited main-board
 PIA port-B command emitted by the arcade core after one red-label frame step.
-Runtime audio code must consume those command batches in core-frame order.
+Runtime audio code maps that accepted timing to `SoundEvent` batches and must
+consume those batches in core-frame order.
 
 `FrameOutput::sound_board` is a diagnostic surface. It preserves the last
 latched command, CB1 assertion state, and latch write count, but it is not
@@ -26,34 +28,35 @@ cycle-accurate 6808 CPU or analog sample duration.
 ## Runtime Contract
 
 - The live core thread remains the only owner of `ArcadeMachine`.
-- The audio path receives copies of emitted `SoundCommand` batches; it must not
-  call `ArcadeMachine::step`, mutate machine state, or affect trace output.
+- The audio path receives copies of gameplay-facing `SoundEvent` batches; it
+  must not call `ArcadeMachine::step`, mutate machine state, or affect trace
+  output.
 - Audio delivery must be best effort. A missing device, backend creation
   failure, queue overflow, or shutdown race may silence audio, but must not
   change gameplay, CMOS persistence, live smoke behavior, or process exit
   semantics.
 - The audio backend is behind a trait with disabled and null no-device paths
   for tests, smoke mode, unsupported platforms, and explicit disablement.
-- The `DC-52` runtime prototype implements this as `src/audio.rs`:
-  `LiveAudioRuntime` queues copied `LiveAudioCommandBatch` values on a bounded
-  non-blocking channel, `LiveAudioBackend` owns backend behavior, and
-  `NullLiveAudioBackend` opens no device and emits no audible output.
-- Commands retain core-frame order. Within one frame, command order is the
-  order already exposed by `FrameOutput::sound_commands()`.
+- The active runtime implements this as `src/audio.rs`: `LiveAudioRuntime`
+  queues copied `LiveAudioEventBatch` values on a bounded non-blocking channel,
+  `LiveAudioBackend` owns backend behavior, and `NullLiveAudioBackend` opens no
+  device and emits no audible output.
+- Sound events retain core-frame order. Within one frame, the compatibility
+  adapter preserves the command order exposed by `FrameOutput::sound_commands()`.
 - The audio queue is bounded and non-blocking from the presentation and core
   worker perspective. If the queue cannot accept work, the backend records the
-  dropped command batch and continues without blocking the core.
+  dropped event batch and continues without blocking the core.
 
 ## Cadence And Buffering
 
-Core frame cadence is `FRAME_RATE_MILLIHZ` (`60_100` millihertz). Audio command
+Core frame cadence is `FRAME_RATE_MILLIHZ` (`60_100` millihertz). Audio event
 batches are therefore frame-indexed at the same cadence as live core stepping,
 not at redraw cadence.
 
-The first runtime prototype should use the host output sample rate reported by
-the selected audio backend. Tests should use a deterministic mock rate, with
-`48_000` Hz as the default fixture rate. Any DAC-byte-to-PCM conversion must be
-owned by the audio thread or backend, not by the arcade core.
+The runtime should use the host output sample rate reported by the selected
+audio backend. Tests should use a deterministic mock rate, with `48_000` Hz as
+the default fixture rate. Any DAC-byte-to-PCM conversion must be owned by the
+audio thread or backend, not by the arcade core.
 
 Until cycle-accurate sound CPU scheduling exists, source-visible command
 timing and deterministic DAC byte order are the acceptance target. The runtime
@@ -62,16 +65,16 @@ spacing.
 
 ## Lifecycle Rules
 
-- Pause or suspend: no new core frames means no new command batches. The audio
+- Pause or suspend: no new core frames means no new event batches. The audio
   backend may drain already queued buffers, then idle.
 - Resume: resetting the live core clock creates a timing discontinuity. The
-  audio backend should flush pending queued command batches on that boundary.
-- Window close and normal exit: stop accepting new command batches, drain or
+  audio backend should flush pending queued event batches on that boundary.
+- Window close and normal exit: stop accepting new event batches, drain or
   drop pending audio according to backend policy, and join the audio thread
   without delaying CMOS save.
 - Smoke mode: use a disabled no-device audio path. `--live-smoke` must not
   require or open an audio device, and smoke reports must stay deterministic.
-- Explicit disablement: `--mute` disables live audio command delivery entirely.
+- Explicit disablement: `--mute` disables live audio event delivery entirely.
 - CMOS persistence: audio owns no CMOS state. The final core-owned CMOS snapshot
   after live shutdown remains the persistence source.
 
@@ -118,6 +121,5 @@ prototype:
 - untranslated sound-ROM routines not yet covered by deterministic DAC byte
   signatures.
 
-Those gaps affect later audio fidelity work, but they do not block a
-command-fed live audio backend that can be disabled and tested through the
-surfaces above.
+Those gaps affect later audio fidelity work, but they do not block an event-fed
+live audio backend that can be disabled and tested through the surfaces above.

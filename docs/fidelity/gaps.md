@@ -879,14 +879,17 @@ here before changing source-shaped arcade-core behavior.
   bomb, hyperspace, player explosion, terrain blow, and high-score paths to
   existing tests or generated sound fixtures. The remaining cycle-accurate
   sound CPU scheduling, external waveform fixtures, and broader MAME command
-  fixtures are later fidelity work, not blockers for a command-fed live audio
+  fixtures are later fidelity work, not blockers for an event-fed live audio
   runtime prototype.
-- `DC-52` added the first live audio runtime path in `src/audio.rs`. Live core
-  stepping now copies accepted `FrameOutput::sound_commands()` batches to a
-  bounded non-blocking channel owned by `LiveAudioRuntime`; `LiveAudioBackend`
-  keeps backend behavior swappable, `NullLiveAudioBackend` opens no device, and
-  `--mute` disables the path. `--live-smoke` uses a disabled no-device audio
-  path, so smoke evidence stays deterministic.
+- `DC-52` added the first live audio runtime path, and `DC-59` moved the active
+  `src/audio.rs` surface to gameplay-facing `SoundEvent` batches. Live core
+  stepping still uses accepted `FrameOutput::sound_commands()` as the timing
+  oracle, then maps those bytes to semantic events for the bounded
+  non-blocking channel owned by `LiveAudioRuntime`; `LiveAudioBackend` keeps
+  backend behavior swappable, `NullLiveAudioBackend` opens no device, worker
+  failures are reported through structured shutdown diagnostics, and `--mute`
+  disables the path. `--live-smoke` uses a disabled no-device audio path, so
+  smoke evidence stays deterministic.
 - Sound-board RAM/PIA/ROM address classification exists, and the MAME-documented
   main-board command latch byte/CB1 handoff is modeled from the PIA1 port-B
   output callback boundary. `ArcadeMachine::step` now records every emitted

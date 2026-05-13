@@ -86,9 +86,7 @@ fn adapt_frame_output(output: FrameOutput) -> GameFrame {
             output.events().map(adapt_event).collect(),
             output
                 .sound_commands()
-                .map(|command| SoundEvent {
-                    command: command.raw(),
-                })
+                .map(|command| SoundEvent::from_accepted_command(command.raw()))
                 .collect(),
         ),
         scene,
@@ -396,9 +394,7 @@ mod tests {
                 legacy_output.events().map(adapt_event).collect::<Vec<_>>();
             let expected_sounds = legacy_output
                 .sound_commands()
-                .map(|command| super::SoundEvent {
-                    command: command.raw(),
-                })
+                .map(|command| super::SoundEvent::from_accepted_command(command.raw()))
                 .collect::<Vec<_>>();
             let expected_scene_summary =
                 adapt_scene(&expected_state, legacy_output.video_crc32).summary();

@@ -120,7 +120,7 @@ those command/event rows across all playable local reference scenarios. External
 waveform files are intentionally absent from git; representative generated DAC
 buffers are covered by deterministic source-visible signature tests instead of
 hardware-cycle waveform reconstruction.
-The live audio acceptance contract and `DC-52` command-delivery prototype are
+The live audio acceptance contract and clean event-delivery runtime are
 documented in `live-audio.md`, with the checked-in path matrix embedded from
 `assets/red-label/live-audio-acceptance.tsv`.
 Each generated scenario uses an isolated, freshly cleared MAME state directory

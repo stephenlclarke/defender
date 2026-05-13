@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `3f6d965`.
+- Latest accepted implementation commit before this cycle: `6b8e516`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy `machine::...` imports through explicit oracle wiring.
@@ -97,7 +97,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-58` are complete, and
+No active development cycle remains. `DC-42` through `DC-59` are complete, and
 the standing maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -971,7 +971,7 @@ Work log:
 
 ### DC-59: Audio Device And Event Model
 
-Status: `planned`
+Status: `complete`
 
 Goal: replace command-byte delivery with gameplay-facing sound events and a
 diagnosable audio runtime.
@@ -1000,6 +1000,31 @@ cargo clippy --all-targets -- -D warnings
 make fidelity
 cargo run -- --live-smoke
 ```
+
+Work log:
+
+- `2026-05-13` Started `DC-59` on branch `rewrite`: posted the cycle start
+  update and began moving live audio from raw command-batch delivery to
+  gameplay-facing sound events while keeping accepted frame-output timing as
+  the oracle boundary.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778672338922919`
+- `2026-05-13` Completed `DC-59`: added active clean `src/audio.rs` event
+  batches, semantic `SoundEvent` mapping for accepted startup, credit, start,
+  and thrust cues, structured audio shutdown diagnostics, backend lifecycle
+  and sample-rate reporting, queue drop stats, and worker panic visibility.
+  The legacy live core now feeds `SoundEvent` batches through the clean runtime,
+  and documentation now describes event delivery with `FrameOutput` retained
+  as the timing adapter. Validation passed with `cargo fmt --check`, `cargo
+  test --lib audio`, `cargo test --all-targets`, `cargo clippy --all-targets
+  -- -D warnings`, `make fidelity`, `cargo run -- --live-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, and `git diff --check`; the coverage gate
+  reported 17/17 non-baselined added executable Rust lines covered, and live
+  smoke rendered 239 frames with 74 distinct scene CRCs, attract/credit/playing
+  evidence, all required injected inputs, and a clean exit.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778675086403679`
 
 ### DC-60: Oracle Retirement
 

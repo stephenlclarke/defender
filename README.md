@@ -210,15 +210,17 @@ Clean rewrite modules:
   and draw planning.
 - `src/platform.rs`: runtime configuration for controls, audio, run mode, and
   persistence.
+- `src/audio.rs`: gameplay-facing sound events, the bounded live-audio runtime,
+  no-device backends, and worker diagnostics.
 - `src/oracle.rs`: the only clean-tree adapter to the converted implementation,
   returning clean state, event, sound, and scene-summary frames.
 
 Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
-behavior, assets, hardware models, ROM verification, rendering, input, live
-audio command delivery, fidelity trace generation and threaded fixture checks,
-the threaded live core runtime boundary, `wgpu` window ownership, CMOS storage,
-and test helpers. The live worker now wraps accepted visual output as a clean
-`RenderScene` raster payload before the presenter draws it. Kitty terminal
+behavior, assets, hardware models, ROM verification, rendering, input,
+sound-board command evidence, fidelity trace generation and threaded fixture
+checks, the threaded live core runtime boundary, `wgpu` window ownership, CMOS
+storage, and test helpers. The live worker now wraps accepted visual output as
+a clean `RenderScene` raster payload before the presenter draws it. Kitty terminal
 graphics code remains parked there as historical compatibility evidence, but it
 is no longer an active runtime path.
 
@@ -241,10 +243,11 @@ with source or ROM provenance.
 ## Platform Support
 
 - Live backend: `wgpu`, through `cargo run` or `defender`.
-- Live audio has a runtime command-delivery prototype behind a bounded
-  non-blocking backend trait. The built-in backend is a null backend that opens
-  no audio device; `--mute` disables the runtime path. Audible device output is
-  still future work. The accepted implementation contract is in
+- Live audio consumes gameplay-facing `SoundEvent` batches through a bounded
+  non-blocking runtime with worker diagnostics. The built-in backend is a null
+  backend that opens no audio device; `--mute` disables the runtime path.
+  Audible device output is still future work. The accepted implementation
+  contract is in
   `docs/fidelity/live-audio.md`.
 
 ## References
