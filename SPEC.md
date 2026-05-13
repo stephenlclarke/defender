@@ -52,8 +52,9 @@ tree:
 
 - `src/main.rs`: thin CLI entry point that still dispatches to the compatibility
   runtime through the clean platform launcher while the rewrite takes over.
-- `src/lib.rs`: clean public crate wiring plus a doc-hidden `compatibility`
-  namespace over explicit `#[path]` adapters to the legacy oracle tree.
+- `src/lib.rs`: clean public crate wiring plus crate-private explicit
+  `#[path]` adapters to the legacy oracle tree and a doc-hidden
+  `compatibility` namespace for temporary oracle/tool access.
 - `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
   `GameEvents`, score, player, direction, and sound-event contracts.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
@@ -75,14 +76,13 @@ The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,
 sound-board command evidence, fidelity trace generation, the threaded live core
 runtime boundary, `wgpu` window ownership, CMOS storage, and test helpers until
-clean systems replace those responsibilities. Those compatibility modules are
-doc-hidden from the supported public API surface. Clean runtime and oracle
-callers that still need accepted-behavior evidence use the
-`defender::compatibility` namespace as the boundary to that legacy tree. Live
-presentation receives clean `RenderScene` data, currently with a temporary
-raster payload for visual equivalence. Kitty terminal graphics code remains
-parked there as historical compatibility evidence, but it is not part of the
-active runtime surface.
+clean systems replace those responsibilities. Those root adapters are
+crate-private, and clean runtime, oracle, and tool callers that still need
+accepted-behavior evidence use the doc-hidden `defender::compatibility`
+namespace as the boundary to that legacy tree. Live presentation receives clean
+`RenderScene` data, currently with a temporary raster payload for visual
+equivalence. Kitty terminal graphics code remains parked there as historical
+compatibility evidence, but it is not part of the active runtime surface.
 
 ## Current Behavior Surface
 
@@ -150,4 +150,4 @@ explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
 - New clean callers must avoid direct legacy module imports. Code that still
   needs accepted-behavior evidence should use the doc-hidden
   `compatibility::...` boundary until the clean system replaces that
-  responsibility.
+  responsibility; root legacy modules must remain crate-private.

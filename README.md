@@ -198,7 +198,10 @@ implementation is parked under `src_legacy/` and remains wired through
 `src/lib.rs` as the temporary gameplay oracle and compatibility runtime. Clean
 modules that still need accepted-behavior evidence reach those adapters through
 the doc-hidden `defender::compatibility` namespace instead of taking new direct
-dependencies on legacy module names.
+dependencies on legacy module names. The root legacy adapters are
+crate-private; tool targets such as README media generation use the same
+compatibility boundary as the oracle while those responsibilities are being
+retired.
 
 Clean rewrite modules:
 

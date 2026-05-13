@@ -15,75 +15,130 @@ pub mod systems;
 // the rewrite still uses them for the CLI, oracle, fixtures, and smoke tests.
 #[doc(hidden)]
 #[path = "../src_legacy/app.rs"]
-pub mod app;
+pub(crate) mod app;
 #[doc(hidden)]
 #[path = "../src_legacy/assets.rs"]
-pub mod assets;
+pub(crate) mod assets;
 #[doc(hidden)]
 #[path = "../src_legacy/board.rs"]
-pub mod board;
+pub(crate) mod board;
 #[doc(hidden)]
 #[path = "../src_legacy/cmos_storage.rs"]
-pub mod cmos_storage;
+pub(crate) mod cmos_storage;
 #[doc(hidden)]
 #[path = "../src_legacy/fidelity.rs"]
-pub mod fidelity;
+pub(crate) mod fidelity;
 #[doc(hidden)]
 #[path = "../src_legacy/input.rs"]
-pub mod input;
+pub(crate) mod input;
 #[doc(hidden)]
 #[path = "../src_legacy/live.rs"]
-pub mod live;
+pub(crate) mod live;
 #[doc(hidden)]
 #[path = "../src_legacy/machine.rs"]
-pub mod machine;
+pub(crate) mod machine;
 #[doc(hidden)]
 #[path = "../src_legacy/machine_process.rs"]
-pub mod machine_process;
+pub(crate) mod machine_process;
 #[doc(hidden)]
 #[path = "../src_legacy/machine_state.rs"]
-pub mod machine_state;
+pub(crate) mod machine_state;
 #[doc(hidden)]
 #[path = "../src_legacy/pia.rs"]
-pub mod pia;
+pub(crate) mod pia;
 #[doc(hidden)]
 #[path = "../src_legacy/red_label.rs"]
-pub mod red_label;
+pub(crate) mod red_label;
 #[doc(hidden)]
 #[path = "../src_legacy/red_label_memory.rs"]
-pub mod red_label_memory;
+pub(crate) mod red_label_memory;
 #[doc(hidden)]
 #[path = "../src_legacy/red_label_message.rs"]
-pub mod red_label_message;
+pub(crate) mod red_label_message;
 #[doc(hidden)]
 #[path = "../src_legacy/red_label_trace_samples.rs"]
 pub(crate) mod red_label_trace_samples;
 #[doc(hidden)]
 #[path = "../src_legacy/red_label_wave.rs"]
-pub mod red_label_wave;
+pub(crate) mod red_label_wave;
 #[doc(hidden)]
 #[path = "../src_legacy/rom.rs"]
-pub mod rom;
+pub(crate) mod rom;
 #[doc(hidden)]
 #[path = "../src_legacy/sound.rs"]
-pub mod sound;
+pub(crate) mod sound;
 #[doc(hidden)]
 #[path = "../src_legacy/terminal.rs"]
-pub mod terminal;
+pub(crate) mod terminal;
 #[doc(hidden)]
 #[path = "../src_legacy/video.rs"]
-pub mod video;
+pub(crate) mod video;
 #[doc(hidden)]
 #[path = "../src_legacy/wgpu_presenter.rs"]
-pub mod wgpu_presenter;
+pub(crate) mod wgpu_presenter;
 
 #[doc(hidden)]
 pub mod compatibility {
-    pub use crate::{
-        app, assets, board, cmos_storage, fidelity, input, live, machine, machine_process,
-        machine_state, pia, red_label, red_label_memory, red_label_message, red_label_wave, rom,
-        sound, terminal, video, wgpu_presenter,
-    };
+    pub mod app {
+        pub use crate::app::*;
+    }
+    pub mod assets {
+        pub use crate::assets::*;
+    }
+    pub mod board {
+        pub use crate::board::*;
+    }
+    pub mod cmos_storage {
+        pub use crate::cmos_storage::*;
+    }
+    pub mod fidelity {
+        pub use crate::fidelity::*;
+    }
+    pub mod input {
+        pub use crate::input::*;
+    }
+    pub mod live {
+        pub use crate::live::*;
+    }
+    pub mod machine {
+        pub use crate::machine::*;
+    }
+    pub mod machine_process {
+        pub use crate::machine_process::*;
+    }
+    pub mod machine_state {
+        pub use crate::machine_state::*;
+    }
+    pub mod pia {
+        pub use crate::pia::*;
+    }
+    pub mod red_label {
+        pub use crate::red_label::*;
+    }
+    pub mod red_label_memory {
+        pub use crate::red_label_memory::*;
+    }
+    pub mod red_label_message {
+        pub use crate::red_label_message::*;
+    }
+    pub mod red_label_wave {
+        pub use crate::red_label_wave::*;
+    }
+    pub mod rom {
+        pub use crate::rom::*;
+    }
+    pub mod sound {
+        pub use crate::sound::*;
+    }
+    pub mod terminal {
+        pub use crate::terminal::*;
+    }
+    pub mod video {
+        pub use crate::video::*;
+    }
+    pub mod wgpu_presenter {
+        pub use crate::wgpu_presenter::*;
+    }
 }
 
 pub use game::{
@@ -182,7 +237,7 @@ mod public_api_tests {
     }
 
     #[test]
-    fn legacy_compatibility_modules_are_hidden_from_supported_api_docs() {
+    fn legacy_compatibility_modules_are_crate_private_at_root() {
         let lib_rs = include_str!("lib.rs");
         let legacy_modules = [
             "app",
@@ -216,6 +271,10 @@ mod public_api_tests {
             assert!(
                 lib_rs[..marker_start].ends_with("#[doc(hidden)]\n"),
                 "legacy module {module} must be hidden from supported API docs"
+            );
+            assert!(
+                lib_rs[marker_start..].starts_with(&format!("{marker}\npub(crate) mod {module};")),
+                "legacy module {module} must be crate-private at the root"
             );
         }
     }

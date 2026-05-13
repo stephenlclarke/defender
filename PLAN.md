@@ -5,10 +5,11 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `4762d39`.
+- Latest accepted implementation commit before this cycle: `05fdeb2`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
+  Root legacy adapters should stay crate-private.
 - Live play uses the `wgpu` backend. Kitty is parked in `src_legacy/` as
   historical compatibility evidence and is no longer an active runtime path.
 - The next product direction is a `wgpu`-only clean game rewrite. Kitty should
@@ -97,8 +98,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-62` are complete, and
-the standing maintenance guidance in Ongoing Work still applies.
+`DC-42` through `DC-63` are complete. `DC-64` is planned, and the standing
+maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -1219,7 +1220,72 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778697300468119`
 
-### DC-63: Oracle Retirement
+### DC-63: Public Legacy Export Retirement
+
+Status: `complete`
+
+Goal: stop exposing parked legacy modules from the public crate root while
+keeping temporary oracle and tooling access behind the doc-hidden compatibility
+namespace.
+
+Scope:
+
+- Change `src_legacy/` root adapters in `src/lib.rs` from public modules to
+  crate-private modules.
+- Rebuild `defender::compatibility` as explicit doc-hidden submodules that
+  re-export the public legacy items needed by the oracle and temporary tools.
+- Route the README media example through `defender::compatibility` instead of
+  direct legacy public crate-root paths.
+- Add architecture tests that fail if legacy root adapters become public again.
+
+Acceptance criteria:
+
+- External callers can no longer import `defender::machine`,
+  `defender::input`, `defender::video`, or related parked legacy modules from
+  the root crate namespace.
+- Temporary oracle and README media tooling still compile through the
+  compatibility namespace.
+- README, SPEC, and PLAN describe root legacy adapters as crate-private.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::compatibility_namespace
+cargo test --lib public_api_tests::legacy_compatibility_modules_are_crate_private_at_root
+cargo check --all-targets
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 19:38:28 BST` Started `DC-63`: posted the cycle start update and
+  began retiring public root exports for the parked legacy adapters while
+  preserving temporary oracle and tooling access through the compatibility
+  namespace.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778697445868899`
+- `2026-05-13 19:58:11 BST` Completed `DC-63`: made parked legacy adapters
+  crate-private at the root, rebuilt `defender::compatibility` as explicit
+  doc-hidden submodules, routed README media generation through that boundary,
+  and updated architecture docs/tests to preserve the split. Validation passed:
+  `cargo fmt --check`, targeted public API tests, `cargo check --all-targets`,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity`, `cargo run -- --live-smoke`, `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  and `git diff --check`. `make fidelity` reported new Rust line coverage
+  `0/0` non-baselined added executable lines. Live smoke rendered 239 frames,
+  saw 74 distinct frame CRCs, observed attract, credit, and playing states,
+  injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778698710074379`
+
+### DC-64: Oracle Retirement
 
 Status: `planned`
 

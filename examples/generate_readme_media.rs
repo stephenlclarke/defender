@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use defender::{
+use defender::compatibility::{
     input::CabinetInput,
     machine::{ArcadeMachine, FRAME_RATE_MILLIHZ},
     video::{RenderedImage, Renderer},
