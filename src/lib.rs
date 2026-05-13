@@ -62,6 +62,7 @@ pub(crate) mod machine_state;
 #[doc(hidden)]
 #[path = "../src_legacy/pia.rs"]
 pub(crate) mod pia;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/red_label.rs"]
 pub(crate) mod red_label;
@@ -209,7 +210,6 @@ mod public_api_tests {
             "machine",
             "machine_process",
             "machine_state",
-            "red_label",
             "video",
         ] {
             assert!(
@@ -228,6 +228,7 @@ mod public_api_tests {
             "fidelity",
             "live",
             "pia",
+            "red_label",
             "red_label_memory",
             "red_label_message",
             "red_label_wave",

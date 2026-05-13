@@ -16,10 +16,6 @@ pub mod machine_state {
     pub use crate::machine_state::*;
 }
 
-pub mod red_label {
-    pub use crate::red_label::*;
-}
-
 pub mod video {
     pub use crate::video::*;
 }

@@ -12,13 +12,13 @@ use crate::{
             RedLabelLaserFire, RedLabelPlayerMotion,
         },
         machine_state,
-        red_label::{Facing, Fixed16},
     },
     game::{Direction, GameEvent, GameInput, GamePhase, SoundEvent, WorldVector},
     oracle::{
         GameplayOracle,
         test_support::{adapt_accepted_event, adapt_accepted_scene, adapt_accepted_snapshot},
     },
+    red_label::{Facing, Fixed16},
     systems::{
         PlayerControlFrame, PlayerControlIntent, PlayerControlSystem, PlayerMotionFrame,
         PlayerMotionState, PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileState,

@@ -56,10 +56,10 @@ tree:
   `#[path]` adapters to the legacy oracle tree and a doc-hidden
   `compatibility` namespace wired from `src_legacy/compatibility.rs` for
   temporary oracle/tool access. Compatibility exports are limited to current
-  in-repo tool and equivalence contracts; low-level asset, board, memory, ROM,
-  sound, live, PIA, and `wgpu` modules must remain crate-private. Generated
-  long-trace sample fixtures must stay private to the legacy machine oracle
-  instead of being root-wired here.
+  in-repo tool and equivalence contracts; red-label math types and low-level
+  asset, board, memory, ROM, sound, live, PIA, and `wgpu` modules must remain
+  crate-private. Generated long-trace sample fixtures must stay private to the
+  legacy machine oracle instead of being root-wired here.
 - `src/accepted.rs`: crate-private accepted-behavior contracts and facade that
   isolate clean production modules from direct legacy runtime and oracle
   imports.

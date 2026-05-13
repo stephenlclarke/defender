@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `16383be`.
+- Latest accepted implementation commit before this cycle: `724dcbc`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
@@ -98,7 +98,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-70` are complete. `DC-71` is planned, and the standing
+`DC-42` through `DC-71` are complete. `DC-72` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1713,6 +1713,7 @@ Validation:
 ```sh
 cargo fmt --check
 cargo test --lib public_api_tests::compatibility_namespace_exposes_only_temporary_tool_contracts
+cargo test --lib oracle_equivalence_tests
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
@@ -1746,7 +1747,68 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778711608813249`
 
-### DC-71: Memory-Oriented Oracle Retirement
+### DC-71: Red-Label Compatibility Export Retirement
+
+Status: `complete`
+
+Goal: remove the remaining red-label math-type export from the doc-hidden
+compatibility namespace while preserving crate-private oracle behavior.
+
+Scope:
+
+- Remove `defender::compatibility::red_label` now that in-repo callers no
+  longer require that temporary export.
+- Keep the legacy `red_label` adapter crate-private for the accepted-behavior
+  bridge and oracle internals.
+- Strengthen the public API guard so restoring the red-label compatibility
+  export fails a focused test.
+- Update README, SPEC, and PLAN to describe the narrower compatibility surface.
+
+Acceptance criteria:
+
+- `defender::compatibility` exposes only input, machine, machine process/state,
+  and video temporary contracts.
+- Existing accepted-machine, oracle, README media, and live smoke behavior
+  remain unchanged.
+- Docs describe red-label math types as crate-private oracle wiring, not
+  compatibility API.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::compatibility_namespace_exposes_only_temporary_tool_contracts
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+! rg -n "pub mod red_label" src_legacy/compatibility.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 23:35:58 BST` Started `DC-71`: posted the cycle start update and
+  began retiring the remaining red-label math-type export from the doc-hidden
+  compatibility namespace.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778711721691489`
+- `2026-05-13 23:56:56 BST` Completed `DC-71`: removed
+  `defender::compatibility::red_label`, moved the legacy equivalence test
+  import to crate-private oracle wiring, kept the red-label adapter hidden at
+  the root with the other parked oracle modules, and updated README, SPEC, and
+  PLAN. Validation passed with the DC-71 gate: formatting, focused
+  compatibility API guard, focused oracle-equivalence tests, all-target tests,
+  clippy, `make fidelity`, live smoke, retired export search, markdownlint,
+  and `git diff --check`. `make fidelity` reported new Rust line coverage
+  `0/0` non-baselined added executable lines. Live smoke rendered 240 frames,
+  saw 74 distinct frame CRCs, observed attract, credit, and playing states,
+  injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778713016113959`
+
+### DC-72: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 
