@@ -73,9 +73,6 @@ pub(crate) mod rom;
 #[path = "../src_legacy/sound.rs"]
 pub(crate) mod sound;
 #[doc(hidden)]
-#[path = "../src_legacy/terminal.rs"]
-pub(crate) mod terminal;
-#[doc(hidden)]
 #[path = "../src_legacy/video.rs"]
 pub(crate) mod video;
 #[doc(hidden)]
@@ -166,6 +163,7 @@ mod public_api_tests {
     #[test]
     fn compatibility_namespace_is_legacy_owned_and_doc_hidden() {
         let lib_rs = include_str!("lib.rs");
+        let compatibility_rs = include_str!("../src_legacy/compatibility.rs");
         let marker = "#[path = \"../src_legacy/compatibility.rs\"]";
         let Some(marker_start) = lib_rs.find(marker) else {
             panic!("missing compatibility namespace path");
@@ -182,6 +180,10 @@ mod public_api_tests {
         assert!(
             !lib_rs.contains("pub mod compatibility {\n"),
             "compatibility re-export details must stay out of clean src/lib.rs"
+        );
+        assert!(
+            !compatibility_rs.contains("pub mod terminal"),
+            "retired terminal-session code must not be re-exported through compatibility"
         );
     }
 
@@ -256,7 +258,6 @@ mod public_api_tests {
             "red_label_wave",
             "rom",
             "sound",
-            "terminal",
             "video",
             "wgpu_presenter",
         ];
@@ -275,5 +276,20 @@ mod public_api_tests {
                 "legacy module {module} must be crate-private at the root"
             );
         }
+    }
+
+    #[test]
+    fn legacy_terminal_session_is_not_active_crate_wiring() {
+        let lib_rs = include_str!("lib.rs");
+        let module_declaration = format!("{} {};", "mod", "terminal");
+
+        assert!(
+            !lib_rs.contains("#[path = \"../src_legacy/terminal.rs\"]"),
+            "terminal session code must stay parked outside active crate wiring"
+        );
+        assert!(
+            !lib_rs.contains(&module_declaration),
+            "terminal session code must not be compiled as an active root module"
+        );
     }
 }

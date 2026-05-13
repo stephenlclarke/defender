@@ -68,10 +68,6 @@ pub mod sound {
     pub use crate::sound::*;
 }
 
-pub mod terminal {
-    pub use crate::terminal::*;
-}
-
 pub mod video {
     pub use crate::video::*;
 }

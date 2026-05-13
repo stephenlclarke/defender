@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `2613e6d`.
+- Latest accepted implementation commit before this cycle: `b6da46c`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
@@ -98,7 +98,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-67` are complete. `DC-68` is planned, and the standing
+`DC-42` through `DC-68` are complete. `DC-69` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1548,7 +1548,70 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778707109325719`
 
-### DC-68: Oracle Retirement
+### DC-68: Terminal Session Retirement
+
+Status: `complete`
+
+Goal: remove parked terminal-session code from active crate wiring after Kitty
+left the runtime surface.
+
+Scope:
+
+- Move the remaining `TerminalGeometry` value type into the legacy video
+  renderer that still consumes it.
+- Remove the `src_legacy/terminal.rs` path module from active `src/lib.rs`
+  wiring.
+- Remove `defender::compatibility::terminal` from temporary compatibility
+  re-exports.
+- Keep `src_legacy/terminal.rs` parked as historical Kitty terminal-session
+  evidence, but leave it unwired from production builds.
+- Add public API guards that fail if terminal-session code is rewired through
+  the clean crate root or compatibility namespace.
+
+Acceptance criteria:
+
+- Current `wgpu` live behavior and fidelity tooling remain unchanged.
+- No active root module or compatibility namespace exposes terminal-session
+  setup.
+- README, SPEC, and PLAN describe the parked terminal-session boundary.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests
+cargo test --lib video::tests::raster_size_uses_terminal_pixels_when_available
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 22:21:20 BST` Started `DC-68`: posted the cycle start update and
+  began removing legacy terminal-session code from active clean crate wiring
+  while keeping the legacy video renderer's geometry value type local to that
+  renderer.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778707270698529`
+- `2026-05-13 22:42:36 BST` Completed `DC-68`: moved `TerminalGeometry` into
+  the legacy video renderer, removed `src_legacy/terminal.rs` from active
+  clean crate wiring, removed `defender::compatibility::terminal`, and added
+  public API guards that keep terminal-session setup out of the active root and
+  compatibility namespace. Validation passed with the DC-68 gate: formatting,
+  focused public API and video tests, all-target tests, clippy,
+  `make fidelity`, live smoke, markdownlint, and `git diff --check`.
+  `make fidelity` reported new Rust line coverage `0/0` non-baselined added
+  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs,
+  observed attract, credit, and playing states, injected all required controls,
+  and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778708566793249`
+
+### DC-69: Oracle Retirement
 
 Status: `planned`
 

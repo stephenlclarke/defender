@@ -238,9 +238,11 @@ doc-hidden compatibility modules rather than supported public API, with
 `src_legacy/compatibility.rs` owning temporary public re-exports for tools. The
 binary enters through the clean platform boundary before delegating to the
 compatibility runtime. The live worker now wraps accepted visual output as a
-clean `RenderScene` raster payload before the presenter draws it. Kitty terminal
-graphics code remains parked there as historical compatibility evidence, but it
-is no longer an active runtime path.
+clean `RenderScene` raster payload before the presenter draws it. Kitty graphics
+and terminal-session code remain parked there as historical compatibility
+evidence, but they are no longer active runtime or compatibility API paths. The
+legacy video renderer owns its remaining `TerminalGeometry` value type directly
+so it does not pull terminal session setup into active builds.
 
 ## Assets And ROMs
 

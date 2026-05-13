@@ -89,9 +89,11 @@ stays focused on gameplay contracts. Temporary tools still use the doc-hidden
 `defender::compatibility` namespace as the boundary to the legacy tree; its
 re-export map lives in `src_legacy/compatibility.rs`, not in the clean crate
 root. Live presentation receives clean `RenderScene` data, currently with a
-temporary raster payload for visual equivalence. Kitty terminal graphics code
-remains parked there as historical compatibility evidence, but it is not part
-of the active runtime surface.
+temporary raster payload for visual equivalence. Kitty graphics and
+terminal-session code remain parked there as historical compatibility evidence,
+but they are not part of the active runtime or compatibility API surface. The
+legacy video renderer owns its remaining `TerminalGeometry` value type directly
+instead of importing terminal session setup.
 
 ## Current Behavior Surface
 

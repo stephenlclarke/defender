@@ -1,9 +1,6 @@
 //! Self-contained RGBA rendering for the clean-slate arcade core.
 
-use crate::{
-    machine::{VISIBLE_HEIGHT, VISIBLE_WIDTH},
-    terminal::TerminalGeometry,
-};
+use crate::machine::{VISIBLE_HEIGHT, VISIBLE_WIDTH};
 
 pub const WILLIAMS_VIDEO_PAIR_STRIDE: usize = 256;
 pub const DEFENDER_VISIBLE_X_START: u16 = 12;
@@ -21,6 +18,14 @@ pub struct RenderedImage {
     pub width: u32,
     pub height: u32,
     pub pixels: Vec<u8>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TerminalGeometry {
+    pub cols: u16,
+    pub rows: u16,
+    pub pixel_width: u16,
+    pub pixel_height: u16,
 }
 
 impl RenderedImage {
@@ -377,16 +382,16 @@ fn combine_palette_weights(weights: [f64; 3], bits: [bool; 3]) -> u8 {
 mod tests {
     use super::{
         DEFENDER_VISIBLE_X_END, DEFENDER_VISIBLE_X_START, DEFENDER_VISIBLE_Y_END,
-        DEFENDER_VISIBLE_Y_START, RenderedImage, Renderer, defender_visible_byte_offset,
-        defender_visible_palette_index, defender_visible_pixel_nibble, fit_image_rect,
-        native_visible_size, raster_size, render_defender_visible_palette_indices,
-        render_defender_visible_pixel_nibbles, render_defender_visible_rgba,
-        williams_palette_lookup, williams_palette_rgba, williams_screen_byte_offset,
+        DEFENDER_VISIBLE_Y_START, RenderedImage, Renderer, TerminalGeometry,
+        defender_visible_byte_offset, defender_visible_palette_index,
+        defender_visible_pixel_nibble, fit_image_rect, native_visible_size, raster_size,
+        render_defender_visible_palette_indices, render_defender_visible_pixel_nibbles,
+        render_defender_visible_rgba, williams_palette_lookup, williams_palette_rgba,
+        williams_screen_byte_offset,
     };
     use crate::{
         board::{MAIN_CPU_RAM_SIZE, PALETTE_RAM_SIZE},
         machine::{VISIBLE_HEIGHT, VISIBLE_WIDTH},
-        terminal::TerminalGeometry,
     };
 
     #[test]
