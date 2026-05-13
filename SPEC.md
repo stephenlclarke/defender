@@ -57,8 +57,9 @@ tree:
 - `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
   `GameEvents`, score, player, direction, and sound-event contracts.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
-  player-control intent/trigger systems, and the `GameSimulation` trait for
-  future game systems.
+  player-control intent/trigger systems, player-motion and projectile
+  launch/capacity systems, and the `GameSimulation` trait for future game
+  systems.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, scene summaries,
   and draw planning.

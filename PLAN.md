@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `bcd9b35`.
+- Latest accepted implementation commit before this cycle: `3f6d965`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy `machine::...` imports through explicit oracle wiring.
@@ -97,7 +97,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-57` are complete, and
+No active development cycle remains. `DC-42` through `DC-58` are complete, and
 the standing maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -909,25 +909,25 @@ Work log:
 
 ### DC-58: Player Motion And Projectile Systems
 
-Status: `planned`
+Status: `complete`
 
 Goal: continue gameplay migration by moving player motion and projectile
-behavior into clean deterministic systems.
+launch behavior into clean deterministic systems.
 
 Scope:
 
 - Drive player motion from `PlayerControlIntent` while preserving accepted
   damping, thrust, vertical priority, bounds, and scroll behavior.
-- Add clean projectile launch/update state and compare fire timing against the
-  oracle.
+- Add clean projectile launch/capacity state and compare fire entry timing
+  against the oracle.
 - Keep update order explicit for controls, motion, projectiles, collision, and
   rendering scene emission.
 - Remove assembler-derived names from newly migrated production code.
 
 Acceptance criteria:
 
-- Player motion and projectile slices have clean domain tests and oracle
-  equivalence tests.
+- Player motion and projectile launch/capacity slices have clean domain tests
+  and oracle equivalence tests.
 - Production player-motion and projectile modules do not read or write
   RAM-layout fields.
 - Behavior, trace output, live smoke, and accepted visual evidence remain
@@ -943,6 +943,31 @@ cargo clippy --all-targets -- -D warnings
 make fidelity
 cargo run -- --live-smoke
 ```
+
+Work log:
+
+- `2026-05-13` Started `DC-58` on branch `rewrite`: posted the cycle start
+  update and began moving player motion plus projectile launch/capacity
+  behavior into clean deterministic systems while keeping accepted behavior
+  behind the oracle.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778669202479739`
+- `2026-05-13` Completed `DC-58`: added clean `ScreenPosition`,
+  `PlayerMotionState`, `PlayerMotionFrame`, `PlayerMotionSystem`,
+  `ProjectileState`, `ProjectileLaunchOutcome`, and `ProjectileSystem`
+  contracts; exported them through the clean public API; and added focused
+  systems tests plus oracle equivalence for accepted player motion and laser
+  fire entry behavior. Validation passed with `cargo fmt --check`, `cargo test
+  --lib systems`, `cargo test --lib oracle`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `make fidelity`, `cargo run --
+  --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
+  `git diff --check`; the coverage gate reported 196/196 non-baselined added
+  executable Rust lines covered, and live smoke rendered 239 frames with 74
+  distinct scene CRCs, attract/credit/playing evidence, all required injected
+  inputs, and a clean exit.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778672203264889`
 
 ### DC-59: Audio Device And Event Model
 
