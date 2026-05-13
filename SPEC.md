@@ -55,8 +55,9 @@ tree:
 - `src/lib.rs`: clean public crate wiring plus crate-private explicit
   `#[path]` adapters to the legacy oracle tree and a doc-hidden
   `compatibility` namespace for temporary oracle/tool access.
-- `src/accepted.rs`: crate-private accepted-behavior facade that isolates clean
-  production modules from direct legacy runtime and oracle imports.
+- `src/accepted.rs`: crate-private accepted-behavior contracts and facade that
+  isolate clean production modules from direct legacy runtime and oracle
+  imports.
 - `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
   `GameEvents`, score, player, direction, and sound-event contracts.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
@@ -79,15 +80,16 @@ sound-board command evidence, fidelity trace generation, the threaded live core
 runtime boundary, `wgpu` window ownership, CMOS storage, and test helpers until
 clean systems replace those responsibilities. Those root adapters are
 crate-private. Clean runtime and oracle callers use the crate-private
-`accepted` facade, which translates legacy frame output into neutral
-accepted-behavior contracts before the public clean gameplay types see it.
-Legacy-specific clean equivalence regressions are also wired from
-`src_legacy/` so clean oracle source stays focused on gameplay contracts.
-Temporary tools still use the doc-hidden `defender::compatibility` namespace as
-the boundary to the legacy tree. Live presentation receives clean `RenderScene`
-data, currently with a temporary raster payload for visual equivalence. Kitty
-terminal graphics code remains parked there as historical compatibility
-evidence, but it is not part of the active runtime surface.
+`accepted` facade; `src_legacy/accepted_behavior.rs` performs the current
+legacy-machine adaptation into neutral accepted-behavior contracts before the
+public clean gameplay types see it. Legacy-specific clean equivalence
+regressions are also wired from `src_legacy/` so clean accepted/oracle source
+stays focused on gameplay contracts. Temporary tools still use the doc-hidden
+`defender::compatibility` namespace as the boundary to the legacy tree. Live
+presentation receives clean `RenderScene` data, currently with a temporary
+raster payload for visual equivalence. Kitty terminal graphics code remains
+parked there as historical compatibility evidence, but it is not part of the
+active runtime surface.
 
 ## Current Behavior Surface
 

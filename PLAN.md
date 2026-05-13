@@ -5,7 +5,7 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `161bb13`.
+- Latest accepted implementation commit before this cycle: `48a0cb0`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
@@ -98,7 +98,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-65` are complete. `DC-66` is planned, and the standing
+`DC-42` through `DC-66` are complete. `DC-67` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1415,7 +1415,81 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778704093033349`
 
-### DC-66: Oracle Retirement
+### DC-66: Accepted Adapter Quarantine
+
+Status: `complete`
+
+Goal: move the legacy-importing accepted-machine adapter out of the clean
+accepted-behavior facade while preserving the current temporary oracle.
+
+Scope:
+
+- Keep `src/accepted.rs` focused on neutral accepted frame, snapshot, phase,
+  direction, event, sound, and runtime delegation contracts.
+- Move accepted-machine adaptation, clean-input-to-cabinet-input projection,
+  legacy snapshot conversion, legacy event conversion, and runtime/video-size
+  bridge calls into `src_legacy/accepted_behavior.rs`.
+- Keep `src/oracle.rs` and `src/platform.rs` on the crate-private
+  `crate::accepted` facade.
+- Keep low-level equivalence tests in `src_legacy/` and point their
+  test-only helpers at the legacy adapter.
+- Add a public API guard so `src/accepted.rs` does not reintroduce direct
+  compatibility or legacy root imports.
+- Document the accepted adapter quarantine in README and SPEC.
+
+Acceptance criteria:
+
+- `src/accepted.rs` contains no direct compatibility, legacy root module, or
+  red-label imports.
+- Accepted facade, accepted adapter, oracle, and public API focused tests pass.
+- Normal runtime and oracle behavior remains unchanged.
+- README, SPEC, and PLAN describe the accepted adapter boundary.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib accepted::tests
+cargo test --lib accepted_behavior::tests
+cargo test --lib oracle::tests
+cargo test --lib oracle_equivalence_tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+ACCEPTED_LEGACY_TERMS='compatibility::|red_label|RED_LABEL|crate::input'
+ACCEPTED_LEGACY_TERMS="$ACCEPTED_LEGACY_TERMS|crate::machine|crate::machine_state"
+ACCEPTED_LEGACY_TERMS="$ACCEPTED_LEGACY_TERMS|crate::video|crate::app"
+! rg -n "$ACCEPTED_LEGACY_TERMS" src/accepted.rs src/oracle.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-13 21:30:32 BST` Started `DC-66`: posted the cycle start update and
+  began moving the legacy-importing accepted-machine adapter out of
+  `src/accepted.rs` into `src_legacy/accepted_behavior.rs` while preserving
+  current oracle behavior.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778704232856249`
+- `2026-05-13 21:53:54 BST` Completed `DC-66`: moved the legacy-importing
+  accepted-machine adapter into `src_legacy/accepted_behavior.rs`, kept
+  `src/accepted.rs` as neutral accepted-behavior contracts plus delegation,
+  added a public API guard against direct legacy imports in `src/accepted.rs`,
+  and updated the legacy equivalence tests to use the quarantined adapter.
+  Validation passed with the DC-66 gate: focused accepted/adapter/oracle/API
+  tests, all-target tests, clippy, `make fidelity`, live smoke, clean
+  accepted/oracle terminology search, markdownlint, and `git diff --check`.
+  `make fidelity` reported new Rust line coverage `5/5` non-baselined added
+  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs,
+  observed attract, credit, and playing states, injected all required controls,
+  and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778705634783139`
+
+### DC-67: Oracle Retirement
 
 Status: `planned`
 

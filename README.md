@@ -198,15 +198,17 @@ implementation is parked under `src_legacy/` and remains wired through
 `src/lib.rs` as the temporary gameplay oracle and compatibility runtime. Clean
 runtime and oracle code reaches those adapters through the crate-private
 `src/accepted.rs` facade, which translates accepted behavior into neutral
-contracts before `src/oracle.rs` adapts it to gameplay state. The root legacy
+contracts before `src/oracle.rs` adapts it to gameplay state. The actual
+legacy machine bridge lives in `src_legacy/accepted_behavior.rs`, keeping
+legacy imports out of the clean accepted-behavior surface. The root legacy
 adapters remain crate-private; tool targets such as README media generation use
 the doc-hidden `defender::compatibility` boundary while those responsibilities
 are being retired.
 
 Clean rewrite modules:
 
-- `src/accepted.rs`: crate-private accepted-behavior facade over the temporary
-  legacy implementation.
+- `src/accepted.rs`: crate-private accepted-behavior contracts and facade over
+  the temporary adapter.
 - `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
   `GameEvents`, score, player, direction, and sound-event contracts.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
@@ -227,15 +229,16 @@ Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input,
 sound-board command evidence, fidelity trace generation and threaded fixture
 checks, the threaded live core runtime boundary, `wgpu` window ownership, CMOS
-storage, and test helpers. Legacy-specific clean equivalence regressions are
-also wired from `src_legacy/` so `src/oracle.rs` stays focused on clean gameplay
-contracts. They remain wired as doc-hidden compatibility
-modules rather than supported public API. The binary enters through the clean
-platform boundary before delegating to the compatibility runtime. The live
-worker now wraps accepted visual output as a clean `RenderScene` raster payload
-before the presenter draws it. Kitty terminal graphics code remains parked
-there as historical compatibility evidence, but it is no longer an active
-runtime path.
+storage, and test helpers. `src_legacy/accepted_behavior.rs` owns the
+temporary accepted-machine adapter, and legacy-specific clean equivalence
+regressions are also wired from `src_legacy/` so `src/accepted.rs` and
+`src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as
+doc-hidden compatibility modules rather than supported public API. The binary
+enters through the clean platform boundary before delegating to the
+compatibility runtime. The live worker now wraps accepted visual output as a
+clean `RenderScene` raster payload before the presenter draws it. Kitty
+terminal graphics code remains parked there as historical compatibility
+evidence, but it is no longer an active runtime path.
 
 ## Assets And ROMs
 

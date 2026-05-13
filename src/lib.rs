@@ -16,6 +16,9 @@ pub mod systems;
 // Compatibility modules are hidden from the supported clean API surface while
 // the rewrite still uses them for the CLI, oracle, fixtures, and smoke tests.
 #[doc(hidden)]
+#[path = "../src_legacy/accepted_behavior.rs"]
+pub(crate) mod accepted_behavior;
+#[doc(hidden)]
 #[path = "../src_legacy/app.rs"]
 pub(crate) mod app;
 #[doc(hidden)]
@@ -249,12 +252,30 @@ mod public_api_tests {
                 "clean oracle source must not expose legacy terminology {forbidden}"
             );
         }
+
+        let accepted_rs = include_str!("accepted.rs");
+        assert!(accepted_rs.contains("crate::accepted_behavior::"));
+        for forbidden in [
+            "crate::compatibility::",
+            "crate::input::",
+            "crate::machine::",
+            "crate::machine_state::",
+            "crate::red_label::",
+            "crate::video::",
+            "crate::app::",
+        ] {
+            assert!(
+                !accepted_rs.contains(forbidden),
+                "accepted facade must use accepted_behavior adapter instead of {forbidden}"
+            );
+        }
     }
 
     #[test]
     fn legacy_compatibility_modules_are_crate_private_at_root() {
         let lib_rs = include_str!("lib.rs");
         let legacy_modules = [
+            "accepted_behavior",
             "app",
             "assets",
             "board",

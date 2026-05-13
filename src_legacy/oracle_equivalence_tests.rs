@@ -1,5 +1,6 @@
 use crate::{
-    accepted::{AcceptedFrame, cabinet_input_for_test},
+    accepted::AcceptedFrame,
+    accepted_behavior::cabinet_input_for_test,
     compatibility::{
         input::{
             DEFENDER_IN0_ALTITUDE_DOWN, DEFENDER_IN0_FIRE, DEFENDER_IN0_HYPERSPACE,
