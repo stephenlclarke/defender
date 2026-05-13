@@ -18,9 +18,7 @@ arcade behavior. The runtime is self-contained: red-label tables, ROM metadata,
 trace schema, video data, and sound command fixtures are embedded at build
 time, so normal play does not need a local ROM or asset directory.
 
-Live play defaults to a windowed `wgpu` renderer. A Kitty graphics backend is
-still available for compatibility evidence in terminals that support the Kitty
-graphics protocol.
+Live play uses a windowed `wgpu` renderer.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -46,8 +44,6 @@ Common commands:
 
 ```sh
 cargo run
-cargo run -- --renderer wgpu
-cargo run -- --renderer kitty
 cargo run -- --input-profile planetoid
 cargo run -- --input-profile cabinet
 cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin
@@ -76,9 +72,7 @@ Make targets:
 ```sh
 make run
 make run-wgpu
-make run-kitty
 make live-wgpu
-make live-kitty
 make smoke-wgpu
 make ci
 make ci-doctor
@@ -199,33 +193,29 @@ make sq
 
 ## Architecture
 
-The public crate surface is `src/lib.rs`; the CLI entry point is `src/main.rs`.
-The current machine core is split into source-shaped modules:
+The primary source tree is now the clean rewrite under `src/`; the converted
+implementation is parked under `src_legacy/` and remains wired through
+`src/lib.rs` as the temporary gameplay oracle and compatibility runtime.
 
-- `src/machine.rs`: shared contracts, source-derived metadata parsers, and
-  compatibility `machine::...` re-exports.
-- `src/machine_state.rs`: canonical public state, snapshot, event, and
-  frame-output contracts.
-- `src/machine_process.rs`: canonical public scheduler process contracts.
-- `src/machine_memory.rs`: source-visible runtime RAM, CMOS, palette,
-  hardware-map, list, trace, save/restore, and translated routine mutations.
-- `src/machine_session.rs`: `ArcadeMachine` construction, reset, stepping,
-  snapshots, save/restore, credit/start, high-score, operator, and live flow.
-- `src/machine_scheduler.rs`: scheduled-process source-entry context and
-  live-prioritized routine sets.
-- `src/machine_sound.rs`: red-label sound command contracts and fixture
-  helpers.
-- `src/machine_video.rs`: reusable laser, star, terrain, and video helper
-  primitives.
-- `src/machine_player.rs`: reusable player, projectile, object, and signed
-  arithmetic helpers.
-- `src/machine_world.rs`: wave/world and BCD helper primitives.
+Clean rewrite modules:
 
-Supporting modules own hardware, rendering, input, assets, ROM verification,
-sound-board behavior, live audio command delivery, fidelity trace generation
-and threaded fixture checks, the threaded live core runtime boundary used by
-both presentation backends, non-blocking `wgpu` latest-frame delivery, CMOS
-storage, and test helpers.
+- `src/game.rs`: gameplay-facing input, frame, snapshot, event, score, player,
+  direction, and sound-event contracts.
+- `src/systems.rs`: deterministic fixed-step timing utilities for future game
+  systems.
+- `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
+  layers, and renderer settings.
+- `src/platform.rs`: runtime configuration for controls, audio, run mode, and
+  persistence.
+- `src/oracle.rs`: the only clean-tree adapter to the converted implementation.
+
+Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
+behavior, assets, hardware models, ROM verification, rendering, input, live
+audio command delivery, fidelity trace generation and threaded fixture checks,
+the threaded live core runtime boundary, `wgpu` latest-frame delivery, CMOS
+  storage, and test helpers. Kitty terminal graphics code remains parked there
+  as historical compatibility evidence, but it is no longer an active runtime
+  path.
 
 ## Assets And ROMs
 
@@ -245,12 +235,7 @@ with source or ROM provenance.
 
 ## Platform Support
 
-- Preferred live backend: `wgpu`, through `cargo run` or `defender`.
-- Compatibility backend: Kitty graphics protocol through
-  `--renderer kitty`.
-- Compatible graphics terminals include Kitty, Ghostty, and Warp. Set
-  `DEFENDER_FORCE_KITTY=1` if the terminal supports the protocol but is not
-  recognized by name.
+- Live backend: `wgpu`, through `cargo run` or `defender`.
 - Live audio has a runtime command-delivery prototype behind a bounded
   non-blocking backend trait. The built-in backend is a null backend that opens
   no audio device; `--mute` disables the runtime path. Audible device output is

@@ -2,12 +2,6 @@
 #![cfg_attr(coverage, allow(dead_code, unused_imports))]
 
 use std::any::Any;
-#[cfg(not(test))]
-use std::io;
-#[cfg(not(test))]
-use std::io::IsTerminal;
-#[cfg(not(test))]
-use std::io::Write;
 use std::path::Path;
 use std::sync::{
     Arc, Mutex,
@@ -16,9 +10,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, anyhow, bail};
-#[cfg(not(test))]
-use crossterm::event::{self, Event};
+use anyhow::{Context, Result, anyhow};
 
 use crate::{
     audio::{LiveAudioMode, LiveAudioRuntime},
@@ -27,15 +19,7 @@ use crate::{
     input::{CabinetInput, InputEvent, InputMapper, InputProfile, PolledInput, XyzzyOverlay},
     machine::{ArcadeMachine, FRAME_RATE_MILLIHZ},
     machine_state::{CompatibilityState, MachineSnapshot},
-    presentation::PresentationBackend,
-    terminal::TerminalGeometry,
-    video::{RenderedImage, Renderer, raster_size},
-};
-#[cfg(not(test))]
-use crate::{
-    cmos_storage::FileCmosStorage,
-    kitty::KittyGraphics,
-    terminal::{TerminalSession, geometry},
+    video::{RenderedImage, Renderer},
 };
 
 pub(crate) const FRAME_DURATION: Duration =
@@ -224,6 +208,7 @@ pub(crate) enum LiveCoreCommandName {
     InputEvent,
     ResetClock,
     ResizeRenderer,
+    #[cfg(test)]
     Advance,
     RequestFrame,
     #[cfg(test)]
@@ -241,6 +226,7 @@ impl std::fmt::Display for LiveCoreCommandName {
             Self::InputEvent => "input_event",
             Self::ResetClock => "reset_clock",
             Self::ResizeRenderer => "resize_renderer",
+            #[cfg(test)]
             Self::Advance => "advance",
             Self::RequestFrame => "request_frame",
             #[cfg(test)]
@@ -382,6 +368,7 @@ pub(crate) trait LiveCoreRuntime {
     fn handle_input_event(&self, input_event: InputEvent) -> Result<bool>;
     fn reset_clock(&self, now: Instant) -> Result<()>;
     fn resize_renderer(&self, width: u32, height: u32) -> Result<()>;
+    #[cfg(test)]
     fn advance(&self, mode: LiveAdvanceMode, now: Instant) -> Result<LiveCoreFrame>;
     fn request_frame(&self, mode: LiveAdvanceMode, now: Instant) -> Result<()>;
     fn take_latest_frame(&self) -> Result<Option<LiveCoreFrame>>;
@@ -411,6 +398,7 @@ enum LiveCoreCommand {
         width: u32,
         height: u32,
     },
+    #[cfg(test)]
     Advance {
         mode: LiveAdvanceMode,
         now: Instant,
@@ -493,6 +481,7 @@ impl LiveCoreThread {
             .map_err(|_| self.worker_stopped_error(command_name).into())
     }
 
+    #[cfg(test)]
     fn request_result<T>(
         &self,
         command_name: LiveCoreCommandName,
@@ -602,6 +591,7 @@ impl LiveCoreRuntime for LiveCoreThread {
         )
     }
 
+    #[cfg(test)]
     fn advance(&self, mode: LiveAdvanceMode, now: Instant) -> Result<LiveCoreFrame> {
         self.request_result(LiveCoreCommandName::Advance, |response| {
             LiveCoreCommand::Advance {
@@ -688,6 +678,7 @@ fn run_live_core_thread(
             LiveCoreCommand::ResizeRenderer { width, height } => {
                 renderer = Renderer::with_size(width, height);
             }
+            #[cfg(test)]
             LiveCoreCommand::Advance {
                 mode,
                 now,
@@ -795,84 +786,15 @@ fn panic_message(panic: Box<dyn Any + Send + 'static>) -> String {
 #[cfg(all(not(test), not(coverage)))]
 pub fn run_live(
     input_profile: InputProfile,
-    presentation_backend: PresentationBackend,
     audio_mode: LiveAudioMode,
     cmos_path: Option<&Path>,
 ) -> Result<()> {
-    match presentation_backend {
-        PresentationBackend::Kitty => run_kitty_live(input_profile, audio_mode, cmos_path),
-        PresentationBackend::Wgpu => {
-            crate::wgpu_presenter::run_wgpu_live(input_profile, audio_mode, cmos_path)
-        }
-    }
-}
-
-#[cfg(all(not(test), not(coverage)))]
-fn run_kitty_live(
-    input_profile: InputProfile,
-    audio_mode: LiveAudioMode,
-    cmos_path: Option<&Path>,
-) -> Result<()> {
-    ensure_interactive_terminal()?;
-    KittyGraphics::ensure_supported()?;
-
-    let mut stdout = io::stdout();
-    let _terminal = TerminalSession::enter(&mut stdout)?;
-    let mut terminal_geometry = geometry()?;
-    let mut graphics = KittyGraphics::new(terminal_geometry.cols, terminal_geometry.rows);
-    let cmos_storage = cmos_path.map(FileCmosStorage::new);
-    let storage = cmos_storage
-        .as_ref()
-        .map(|storage| storage as &dyn CmosStorage);
-    let machine = live_machine_from_cmos_storage(storage)?;
-    let core = LiveCoreThread::spawn_with_audio(
-        input_profile,
-        machine,
-        Instant::now(),
-        raster_size(terminal_geometry),
-        LiveAudioRuntime::for_mode(audio_mode),
-    );
-
-    loop {
-        sync_terminal_geometry(&mut terminal_geometry, &mut graphics, &core)?;
-
-        if poll_input(&core)? {
-            break;
-        }
-
-        let now = Instant::now();
-        let frame = core
-            .advance(LiveAdvanceMode::Realtime, now)
-            .context("advancing live core frame")?;
-        let next_wake_at = frame.next_step_at;
-
-        graphics
-            .draw_frame(&mut stdout, &frame.image)
-            .context("drawing kitty graphics frame")?;
-        stdout.flush().context("flushing kitty graphics frame")?;
-
-        let sleep_duration = next_wake_at.saturating_duration_since(Instant::now());
-        if !sleep_duration.is_zero() {
-            thread::sleep(sleep_duration);
-        }
-    }
-
-    graphics.clear(&mut stdout)?;
-    stdout.flush().context("flushing kitty clear escape")?;
-    let cmos = core.shutdown_cmos_ram()?;
-    save_live_cmos_ram(
-        cmos_storage
-            .as_ref()
-            .map(|storage| storage as &dyn CmosStorage),
-        &cmos,
-    )?;
-    Ok(())
+    crate::wgpu_presenter::run_wgpu_live(input_profile, audio_mode, cmos_path)
 }
 
 #[cfg(any(test, coverage))]
 pub fn run_live(
     _input_profile: InputProfile,
-    _presentation_backend: PresentationBackend,
     _audio_mode: LiveAudioMode,
     _cmos_path: Option<&Path>,
 ) -> Result<()> {
@@ -943,21 +865,6 @@ pub(crate) fn live_frame_inputs(
     })
 }
 
-#[cfg(not(test))]
-fn ensure_interactive_terminal() -> Result<()> {
-    validate_interactive_terminal(io::stdin().is_terminal(), io::stdout().is_terminal())
-}
-
-fn validate_interactive_terminal(stdin_is_terminal: bool, stdout_is_terminal: bool) -> Result<()> {
-    if stdin_is_terminal && stdout_is_terminal {
-        Ok(())
-    } else {
-        bail!(
-            "live mode requires an interactive terminal; run `cargo run` in a real terminal window"
-        )
-    }
-}
-
 pub(crate) fn live_machine_from_cmos_storage(
     storage: Option<&dyn CmosStorage>,
 ) -> Result<ArcadeMachine> {
@@ -981,54 +888,6 @@ pub(crate) fn save_live_cmos_ram(storage: Option<&dyn CmosStorage>, cmos: &CmosR
     storage.save_cmos(cmos).context("saving persisted CMOS RAM")
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TerminalGeometryUpdate {
-    renderer_size: (u32, u32),
-    kitty_size: (u16, u16),
-}
-
-fn terminal_geometry_update(
-    terminal_geometry: &mut TerminalGeometry,
-    latest_geometry: TerminalGeometry,
-) -> Option<TerminalGeometryUpdate> {
-    if latest_geometry == *terminal_geometry {
-        return None;
-    }
-
-    *terminal_geometry = latest_geometry;
-    Some(TerminalGeometryUpdate {
-        renderer_size: raster_size(latest_geometry),
-        kitty_size: (latest_geometry.cols, latest_geometry.rows),
-    })
-}
-
-#[cfg(not(test))]
-fn sync_terminal_geometry(
-    terminal_geometry: &mut TerminalGeometry,
-    graphics: &mut KittyGraphics,
-    core: &impl LiveCoreRuntime,
-) -> Result<()> {
-    let latest_geometry = geometry()?;
-    if let Some(update) = terminal_geometry_update(terminal_geometry, latest_geometry) {
-        core.resize_renderer(update.renderer_size.0, update.renderer_size.1)?;
-        graphics.resize(update.kitty_size.0, update.kitty_size.1);
-    }
-    Ok(())
-}
-
-#[cfg(not(test))]
-fn poll_input(core: &impl LiveCoreRuntime) -> Result<bool> {
-    let mut quit_requested = false;
-    while event::poll(Duration::ZERO)? {
-        if let Event::Key(key_event) = event::read()?
-            && let Some(input_event) = InputEvent::from_crossterm(key_event)
-        {
-            quit_requested |= core.handle_input_event(input_event)?;
-        }
-    }
-    Ok(quit_requested)
-}
-
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
@@ -1050,7 +909,6 @@ mod tests {
     use crate::machine_state::{GamePhase, MachineEvent, RedLabelSoundBoardSnapshot};
     use crate::rom::crc32;
     use crate::sound::{SoundCommand, SoundCommandLatch};
-    use crate::terminal::TerminalGeometry;
     use crate::video::{RenderedImage, Renderer, defender_visible_byte_offset};
 
     use super::{
@@ -1059,7 +917,6 @@ mod tests {
         LiveCoreThread, LiveCoreWorkerError, cabinet_frame_duration_micros, live_frame_inputs,
         live_machine_from_cmos_storage, panic_message, render_live_frame,
         render_live_machine_frame, save_live_cmos_ram, step_live_core_frames,
-        terminal_geometry_update, validate_interactive_terminal,
     };
 
     #[derive(Default)]
@@ -1090,42 +947,6 @@ mod tests {
                 .expect("audio recording lock")
                 .push(batch);
         }
-    }
-
-    #[test]
-    fn live_mode_rejects_non_interactive_terminal() {
-        let error = validate_interactive_terminal(false, true).expect_err("terminal guard");
-        assert!(error.to_string().contains("interactive terminal"));
-    }
-
-    #[test]
-    fn live_mode_accepts_interactive_terminal() {
-        validate_interactive_terminal(true, true).expect("interactive terminal");
-    }
-
-    #[test]
-    fn terminal_geometry_update_reports_runtime_and_kitty_sizes() {
-        let mut current = TerminalGeometry {
-            cols: 80,
-            rows: 24,
-            pixel_width: 800,
-            pixel_height: 600,
-        };
-        let unchanged = current;
-        assert_eq!(terminal_geometry_update(&mut current, unchanged), None);
-
-        let latest = TerminalGeometry {
-            cols: 100,
-            rows: 30,
-            pixel_width: 0,
-            pixel_height: 0,
-        };
-
-        let update = terminal_geometry_update(&mut current, latest).expect("geometry update");
-
-        assert_eq!(current, latest);
-        assert_eq!(update.renderer_size, (960, 720));
-        assert_eq!(update.kitty_size, (100, 30));
     }
 
     #[test]

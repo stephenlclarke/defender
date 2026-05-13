@@ -17,7 +17,6 @@ use crate::{
     },
     input::{CabinetInput, InputProfile},
     live::run_live,
-    presentation::PresentationBackend,
     rom::{RedLabelRomImages, load_verified_dir},
     wgpu_presenter::run_wgpu_live_smoke,
 };
@@ -26,7 +25,6 @@ use crate::{
 enum Command {
     PlayLive {
         input_profile: InputProfile,
-        presentation_backend: PresentationBackend,
         audio_mode: LiveAudioMode,
         live_smoke: bool,
         cmos_path: Option<PathBuf>,
@@ -77,25 +75,16 @@ fn run_command(command: Command) -> Result<()> {
     match command {
         Command::PlayLive {
             input_profile,
-            presentation_backend,
             audio_mode,
             live_smoke,
             cmos_path,
         } => {
             if live_smoke {
-                if presentation_backend != PresentationBackend::Wgpu {
-                    bail!("--live-smoke currently requires --renderer wgpu");
-                }
                 let report = run_wgpu_live_smoke(input_profile, cmos_path.as_deref())?;
                 print!("{}", report.to_text());
                 Ok(())
             } else {
-                run_live(
-                    input_profile,
-                    presentation_backend,
-                    audio_mode,
-                    cmos_path.as_deref(),
-                )
+                run_live(input_profile, audio_mode, cmos_path.as_deref())
             }
         }
         Command::RomReport { path } => run_rom_report(path.as_deref()),
@@ -808,18 +797,25 @@ where
     I: IntoIterator<Item = String>,
 {
     let mut input_profile = InputProfile::default();
-    let mut presentation_backend = PresentationBackend::default();
     let mut audio_mode = LiveAudioMode::default();
     let mut live_smoke = false;
     let mut cmos_path = None;
+    let mut live_option_seen = false;
     let mut args = args.into_iter().peekable();
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => return Ok(Command::Help),
-            "--mute" => audio_mode = LiveAudioMode::Disabled,
-            "--live-smoke" => live_smoke = true,
+            "--mute" => {
+                live_option_seen = true;
+                audio_mode = LiveAudioMode::Disabled;
+            }
+            "--live-smoke" => {
+                live_option_seen = true;
+                live_smoke = true;
+            }
             "--input-profile" => {
+                live_option_seen = true;
                 let Some(value) = args.next() else {
                     bail!("--input-profile requires one of: planetoid, cabinet, test");
                 };
@@ -827,26 +823,31 @@ where
                     .with_context(|| format!("unknown input profile: {value}"))?;
             }
             "--renderer" | "--presentation" => {
-                let Some(value) = args.next() else {
-                    bail!("--renderer requires one of: kitty, wgpu");
-                };
-                presentation_backend = PresentationBackend::parse(&value)
-                    .with_context(|| format!("unknown renderer: {value}"))?;
+                bail!("renderer selection was removed; live play is wgpu-only");
             }
             "--cmos-path" => {
+                live_option_seen = true;
                 let Some(value) = args.next() else {
                     bail!("--cmos-path requires a file path");
                 };
                 cmos_path = Some(PathBuf::from(value));
             }
             "--rom-report" => {
-                let path = args.next().map(PathBuf::from);
+                reject_live_options_with_command(live_option_seen, "--rom-report")?;
+                let path = match args.next() {
+                    Some(value) if value.starts_with('-') => {
+                        bail!("--rom-report optional path cannot be another flag: {value}");
+                    }
+                    Some(value) => Some(PathBuf::from(value)),
+                    None => None,
+                };
                 if args.next().is_some() {
                     bail!("--rom-report only accepts one optional path");
                 }
                 return Ok(Command::RomReport { path });
             }
             "--verify-roms" => {
+                reject_live_options_with_command(live_option_seen, "--verify-roms")?;
                 let Some(path) = args.next() else {
                     bail!("--verify-roms requires a ROM directory path");
                 };
@@ -858,6 +859,7 @@ where
                 });
             }
             "--fidelity-trace" => {
+                reject_live_options_with_command(live_option_seen, "--fidelity-trace")?;
                 let frame_count = match args.next() {
                     Some(value) => parse_frame_count(&value)?,
                     None => 1,
@@ -868,6 +870,7 @@ where
                 return Ok(Command::FidelityTrace { frame_count });
             }
             "--fidelity-trace-inputs" => {
+                reject_live_options_with_command(live_option_seen, "--fidelity-trace-inputs")?;
                 let Some(script) = args.next() else {
                     bail!("--fidelity-trace-inputs requires a semicolon-separated input script");
                 };
@@ -877,6 +880,7 @@ where
                 return Ok(Command::FidelityTraceInputs { script });
             }
             "--fidelity-trace-inputs-file" => {
+                reject_live_options_with_command(live_option_seen, "--fidelity-trace-inputs-file")?;
                 let Some(path) = args.next() else {
                     bail!("--fidelity-trace-inputs-file requires a trace input script path");
                 };
@@ -888,6 +892,7 @@ where
                 });
             }
             "--fidelity-check-trace" => {
+                reject_live_options_with_command(live_option_seen, "--fidelity-check-trace")?;
                 let Some(inputs_path) = args.next() else {
                     bail!(
                         "--fidelity-check-trace requires an input script path and expected trace path"
@@ -909,6 +914,7 @@ where
                 });
             }
             "--fidelity-check-trace-dir" => {
+                reject_live_options_with_command(live_option_seen, "--fidelity-check-trace-dir")?;
                 let Some(path) = args.next() else {
                     bail!("--fidelity-check-trace-dir requires a fixture directory path");
                 };
@@ -920,12 +926,17 @@ where
                 });
             }
             "--fidelity-list-scenarios" => {
+                reject_live_options_with_command(live_option_seen, "--fidelity-list-scenarios")?;
                 if args.next().is_some() {
                     bail!("--fidelity-list-scenarios does not accept extra arguments");
                 }
                 return Ok(Command::FidelityListScenarios);
             }
             "--fidelity-write-scenario-inputs" => {
+                reject_live_options_with_command(
+                    live_option_seen,
+                    "--fidelity-write-scenario-inputs",
+                )?;
                 let Some(path) = args.next() else {
                     bail!("--fidelity-write-scenario-inputs requires an output directory path");
                 };
@@ -939,6 +950,10 @@ where
                 });
             }
             "--fidelity-check-reference-trace-dir" => {
+                reject_live_options_with_command(
+                    live_option_seen,
+                    "--fidelity-check-reference-trace-dir",
+                )?;
                 let Some(path) = args.next() else {
                     bail!(
                         "--fidelity-check-reference-trace-dir requires a reference fixture directory path"
@@ -959,11 +974,17 @@ where
 
     Ok(Command::PlayLive {
         input_profile,
-        presentation_backend,
         audio_mode,
         live_smoke,
         cmos_path,
     })
+}
+
+fn reject_live_options_with_command(live_option_seen: bool, command: &str) -> Result<()> {
+    if live_option_seen {
+        bail!("live options cannot be combined with {command}");
+    }
+    Ok(())
 }
 
 fn parse_frame_count(value: &str) -> Result<usize> {
@@ -982,7 +1003,7 @@ fn print_help() {
 }
 
 fn help_text() -> &'static str {
-    "defender\n  cargo run\n  cargo run -- --renderer wgpu\n  cargo run -- --renderer kitty\n  cargo run -- --live-smoke\n  cargo run -- --mute\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play defaults to the windowed wgpu backend; Kitty graphics remains available with --renderer kitty.\nLive audio routes accepted sound commands through a non-blocking null backend; --mute disables that runtime path.\n"
+    "defender\n  cargo run\n  cargo run -- --live-smoke\n  cargo run -- --mute\n  cargo run -- --input-profile planetoid\n  cargo run -- --input-profile cabinet\n  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n  cargo run -- --rom-report\n  cargo run -- --rom-report /path/to/roms\n  cargo run -- --verify-roms /path/to/roms\n  cargo run -- --fidelity-trace 300\n  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n  cargo run -- --fidelity-list-scenarios\n  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n\nRuntime assets are embedded in the binary for copy-only deployment.\nLive play uses the windowed wgpu backend.\nLive audio routes accepted sound commands through a non-blocking null backend; --mute disables that runtime path.\n"
 }
 
 #[cfg(test)]
@@ -1004,7 +1025,6 @@ mod tests {
     use crate::audio::LiveAudioMode;
     use crate::fidelity::{expanded_trace_input_text, trace_header};
     use crate::input::InputProfile;
-    use crate::presentation::PresentationBackend;
     use crate::rom::RomReport;
     use anyhow::{Result, anyhow};
 
@@ -1087,7 +1107,6 @@ mod tests {
             command,
             Command::PlayLive {
                 input_profile: InputProfile::Planetoid,
-                presentation_backend: PresentationBackend::Wgpu,
                 audio_mode: LiveAudioMode::Null,
                 live_smoke: false,
                 cmos_path: None,
@@ -1103,7 +1122,6 @@ mod tests {
             command,
             Command::PlayLive {
                 input_profile: InputProfile::Planetoid,
-                presentation_backend: PresentationBackend::Wgpu,
                 audio_mode: LiveAudioMode::Disabled,
                 live_smoke: false,
                 cmos_path: None,
@@ -1112,25 +1130,34 @@ mod tests {
     }
 
     #[test]
-    fn parse_args_accepts_live_renderer_backend() {
-        let command = parse_args(vec![
-            String::from("--renderer"),
-            String::from("wgpu"),
-            String::from("--input-profile"),
-            String::from("cabinet"),
-        ])
-        .expect("parse args");
+    fn parse_args_rejects_live_renderer_selection() {
+        let error = parse_args(vec![String::from("--renderer"), String::from("wgpu")])
+            .expect_err("renderer selection should be removed");
 
-        assert_eq!(
-            command,
-            Command::PlayLive {
-                input_profile: InputProfile::Cabinet,
-                presentation_backend: PresentationBackend::Wgpu,
-                audio_mode: LiveAudioMode::Null,
-                live_smoke: false,
-                cmos_path: None,
-            }
+        assert!(error.to_string().contains("wgpu-only"));
+    }
+
+    #[test]
+    fn parse_args_rejects_live_options_mixed_with_commands() {
+        let error = parse_args(vec![String::from("--mute"), String::from("--rom-report")])
+            .expect_err("live option should not mix with report command");
+
+        assert!(
+            error
+                .to_string()
+                .contains("live options cannot be combined")
         );
+    }
+
+    #[test]
+    fn parse_args_rejects_optional_report_path_that_is_another_flag() {
+        let error = parse_args(vec![
+            String::from("--rom-report"),
+            String::from("--verify-roms"),
+        ])
+        .expect_err("optional path should not swallow a flag");
+
+        assert!(error.to_string().contains("cannot be another flag"));
     }
 
     #[test]
@@ -1141,7 +1168,6 @@ mod tests {
             command,
             Command::PlayLive {
                 input_profile: InputProfile::Planetoid,
-                presentation_backend: PresentationBackend::Wgpu,
                 audio_mode: LiveAudioMode::Null,
                 live_smoke: true,
                 cmos_path: None,
@@ -1161,7 +1187,6 @@ mod tests {
             command,
             Command::PlayLive {
                 input_profile: InputProfile::Planetoid,
-                presentation_backend: PresentationBackend::Wgpu,
                 audio_mode: LiveAudioMode::Null,
                 live_smoke: false,
                 cmos_path: Some(PathBuf::from("/tmp/defender-cmos.bin")),
@@ -1173,7 +1198,6 @@ mod tests {
     fn run_command_executes_wgpu_live_smoke_stub() {
         run_command(Command::PlayLive {
             input_profile: InputProfile::Planetoid,
-            presentation_backend: PresentationBackend::Wgpu,
             audio_mode: LiveAudioMode::Null,
             live_smoke: true,
             cmos_path: None,
@@ -1182,24 +1206,9 @@ mod tests {
     }
 
     #[test]
-    fn run_command_rejects_live_smoke_with_non_wgpu_backend() {
-        let error = run_command(Command::PlayLive {
-            input_profile: InputProfile::Planetoid,
-            presentation_backend: PresentationBackend::Kitty,
-            audio_mode: LiveAudioMode::Null,
-            live_smoke: true,
-            cmos_path: None,
-        })
-        .expect_err("kitty live smoke should be rejected");
-
-        assert!(error.to_string().contains("--renderer wgpu"));
-    }
-
-    #[test]
     fn run_command_dispatches_normal_live_backend() {
         run_command(Command::PlayLive {
             input_profile: InputProfile::Cabinet,
-            presentation_backend: PresentationBackend::Kitty,
             audio_mode: LiveAudioMode::Disabled,
             live_smoke: false,
             cmos_path: None,
@@ -1467,8 +1476,7 @@ mod tests {
         let text = help_text();
 
         assert!(text.contains("--input-profile planetoid"));
-        assert!(text.contains("--renderer kitty"));
-        assert!(text.contains("--renderer wgpu"));
+        assert!(!text.contains("--renderer"));
         assert!(text.contains("--live-smoke"));
         assert!(text.contains("--mute"));
         assert!(text.contains("--verify-roms"));
@@ -1483,8 +1491,8 @@ mod tests {
         assert!(text.contains("docs/fidelity/fixtures/local/rust-current"));
         assert!(text.contains("docs/fidelity/fixtures/local/reference"));
         assert!(text.contains("copy-only deployment"));
-        assert!(text.contains("defaults to the windowed wgpu"));
-        assert!(text.contains("Kitty graphics"));
+        assert!(text.contains("uses the windowed wgpu"));
+        assert!(!text.contains("Kitty graphics"));
         assert!(text.contains("wgpu"));
     }
 

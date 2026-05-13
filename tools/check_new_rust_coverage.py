@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import hashlib
 from pathlib import Path
 import re
 import subprocess
@@ -181,7 +182,7 @@ def write_uncovered_baseline(
     ]
     header = (
         "# Accepted uncovered executable Rust lines for this branch.\n"
-        "# Format: relative/path.rs<TAB>normalized source line.\n"
+        "# Format: relative/path.rs<TAB>line<TAB>source-hash<TAB>normalized source line.\n"
     )
     body = "\n".join(entries)
     path.write_text(f"{header}{body}\n" if body else header, encoding="utf-8")
@@ -215,7 +216,9 @@ def uncovered_baseline_key(path: Path, line: int, repo_root: Path) -> str:
 
     source_lines = source_text_lines(path)
     line_text = source_lines[line - 1] if 0 < line <= len(source_lines) else ""
-    return f"{relative_path}\t{moved_line_fingerprint(line_text)}"
+    fingerprint = moved_line_fingerprint(line_text)
+    digest = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:12]
+    return f"{relative_path}\t{line}\t{digest}\t{fingerprint}"
 
 
 def production_added_lines(added_lines: dict[Path, set[int]]) -> dict[Path, set[int]]:

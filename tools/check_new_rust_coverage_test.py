@@ -12,6 +12,7 @@ from check_new_rust_coverage import (
     parse_added_rust_lines,
     parse_lcov_line_counts,
     production_added_lines,
+    uncovered_baseline_key,
     uncovered_added_lines,
 )
 
@@ -115,24 +116,25 @@ end_of_record
         self.assertEqual(instrumented, 2)
         self.assertEqual(uncovered, [(path, 12)])
 
-    def test_apply_uncovered_baseline_filters_by_path_and_source_line(self):
+    def test_apply_uncovered_baseline_filters_by_path_line_and_source_hash(self):
         repo_root = Path(self.create_temp_dir())
         source = repo_root / "src" / "app.rs"
         source.parent.mkdir()
         source.write_text(
             "    let accepted = false;\n"
+            "    let accepted = false;\n"
             "    let new_uncovered = false;\n",
             encoding="utf-8",
         )
-        baseline = Counter({"src/app.rs\tlet accepted = false;": 1})
+        baseline = Counter({uncovered_baseline_key(source, 1, repo_root): 1})
 
         kept, accepted = apply_uncovered_baseline(
-            [(source, 1), (source, 2)],
+            [(source, 1), (source, 2), (source, 3)],
             repo_root,
             baseline,
         )
 
-        self.assertEqual(kept, [(source, 2)])
+        self.assertEqual(kept, [(source, 2), (source, 3)])
         self.assertEqual(accepted, [(source, 1)])
 
     def test_production_added_lines_ignores_cfg_test_module_tail(self):

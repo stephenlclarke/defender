@@ -47,52 +47,36 @@ sources or by an accepted fixture.
 
 ## Current Architecture
 
-The crate is split around the current accepted module boundaries:
+The crate is now split between a clean rewrite source tree and a legacy oracle
+tree:
 
-- `src/main.rs`: thin CLI entry point.
-- `src/app.rs`: CLI parsing, command dispatch, help text, user-facing command
-  output, and threaded fidelity fixture orchestration.
-- `src/lib.rs`: public crate module wiring.
-- `src/machine.rs`: shared red-label contracts, source asset parsers, and
-  compatibility `machine::...` re-exports.
-- `src/machine_state.rs`: canonical public arcade state, snapshots, events,
-  and frame-output contracts.
-- `src/machine_process.rs`: scheduler data contracts:
-  `RedLabelCpuRegisters` and `RedLabelScheduledProcess`.
-- `src/machine_memory.rs`: source-visible runtime memory and translated
-  source mutations.
-- `src/machine_session.rs`: `ArcadeMachine` public API, live stepping,
-  session flow, snapshots, save/restore, high-score, operator, and
-  compatibility orchestration.
-- `src/machine_scheduler.rs`: source-entry register overrides and
-  live-prioritized routine sets.
-- `src/machine_sound.rs`: red-label sound command contracts and fixture
-  helpers.
-- `src/machine_video.rs`: reusable laser, star, terrain, and video helper
-  primitives.
-- `src/machine_player.rs`: reusable player, projectile, object, and signed
-  arithmetic helpers.
-- `src/machine_world.rs`: wave/world and BCD helper primitives.
-- `src/board.rs`, `src/pia.rs`, and `src/rom.rs`: hardware, memory-map,
-  PIA, ROM metadata, and verification surfaces.
-- `src/sound.rs`: sound-board model, command latch, PIA, ROM, IRQ, and DAC
-  signature behavior.
-- `src/audio.rs`: live audio command batching, bounded non-blocking delivery,
-  backend trait, disabled mode, and null backend.
-- `src/video.rs`, `src/live.rs`, `src/wgpu_presenter.rs`, `src/kitty.rs`, and
-  `src/terminal.rs`: native frame extraction, shared live core driving, live
-  presentation, the threaded live runtime boundary, non-blocking `wgpu`
-  latest-frame delivery, input loop, Kitty, and terminal support.
-- `src/input.rs`: Planetoid, cabinet, and test input profiles plus `XYZZY`
-  overlay input detection.
-- `src/fidelity.rs`: trace schema and fixture comparison support.
-- `src/cmos_storage.rs`: optional file-backed CMOS persistence.
+- `src/main.rs`: thin CLI entry point that still dispatches to the compatibility
+  app while the rewrite takes over.
+- `src/lib.rs`: clean public crate wiring plus explicit `#[path]` adapters to
+  the legacy oracle tree.
+- `src/game.rs`: gameplay-facing input, frame, snapshot, event, score, player,
+  direction, and sound-event contracts.
+- `src/systems.rs`: deterministic fixed-step timing utilities for future game
+  systems.
+- `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
+  layers, and renderer settings.
+- `src/platform.rs`: runtime configuration for controls, audio, run mode, and
+  persistence.
+- `src/oracle.rs`: the explicit adapter from clean gameplay contracts to the
+  current accepted implementation.
+
+The converted implementation is parked under `src_legacy/`. It still owns the
+accepted arcade behavior, hardware models, ROM verification, rendering, input,
+live audio command delivery, fidelity trace generation, the threaded live core
+runtime boundary, `wgpu` latest-frame delivery, CMOS storage, and test helpers
+until clean systems replace those responsibilities. Kitty terminal graphics
+code remains parked there as historical compatibility evidence, but it is not
+part of the active runtime surface.
 
 ## Current Behavior Surface
 
-- Live play defaults to the windowed `wgpu` backend.
-- `--renderer kitty` keeps the Kitty graphics backend available for
-  compatibility evidence.
+- Live play uses the windowed `wgpu` backend.
+- Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.
 - `--mute` disables the live audio command-delivery runtime path.

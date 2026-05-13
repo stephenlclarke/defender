@@ -4,13 +4,13 @@ Last reviewed: `2026-05-13`
 
 ## Current Baseline
 
-- Active branch: `red-label-refactor`.
-- Latest accepted implementation commit: `7f7b6a1`.
-- Phase 13 is complete. The post-`wgpu` machine core is split into
-  source-shaped child modules while preserving existing `machine::...` public
-  imports.
-- Live play defaults to the `wgpu` backend. Kitty remains a compatibility
-  backend.
+- Active branch: `rewrite`.
+- Latest accepted implementation commit: `b51ab35`.
+- Phase 13 is complete. The converted implementation has been moved to
+  `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
+  preserving legacy `machine::...` imports through explicit oracle wiring.
+- Live play uses the `wgpu` backend. Kitty is parked in `src_legacy/` as
+  historical compatibility evidence and is no longer an active runtime path.
 - The next product direction is a `wgpu`-only clean game rewrite. Kitty should
   be removed from the active application surface, and the current
   assembler-shaped machine should become a temporary fidelity oracle rather
@@ -97,7 +97,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-No active development cycle remains. `DC-42` through `DC-53` are complete, and
+No active development cycle remains. `DC-42` through `DC-54` are complete, and
 only the standing maintenance guidance in Ongoing Work remains.
 
 ### DC-42: Documentation Reset
@@ -664,7 +664,7 @@ the full fidelity gate before moving on.
 
 ### DC-54: Wgpu-Only Rewrite Foundation
 
-Status: `planned`
+Status: `complete`
 
 Goal: establish the clean rewrite boundary without changing gameplay behavior.
 
@@ -675,6 +675,8 @@ Scope:
 - Make `wgpu` the only supported live runtime and `--live-smoke` path.
 - Introduce `game`, `systems`, `renderer`, and `platform` module shells with
   clean public contracts.
+- Move the converted `src/` tree to `src_legacy/` and make the clean rewrite
+  the primary `src/` tree.
 - Move or wrap the current assembler-shaped implementation behind an explicit
   `fidelity::oracle` or `legacy` boundary.
 - Narrow `src/lib.rs` public exports to the intended clean API plus temporary
@@ -705,6 +707,30 @@ cargo run -- --live-smoke
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
 git diff --check
 ```
+
+Work log:
+
+- `2026-05-13` Started `DC-54` on branch `rewrite`: posted the cycle start
+  update, moved the converted implementation to `src_legacy/`, promoted the
+  clean rewrite modules into `src/`, and kept the legacy implementation wired
+  as the temporary oracle/compatibility runtime.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778657320848069`
+- `2026-05-13` Continued `DC-54`: removed active Kitty renderer selection from
+  CLI parsing, help text, Make targets, and live runtime routing. `cargo run`
+  and `cargo run -- --live-smoke` now use the `wgpu` path without backend
+  selection.
+- `2026-05-13` Completed `DC-54`: moved the old implementation under
+  `src_legacy/`, made the clean rewrite tree the primary `src/`, kept the
+  legacy machine available as an oracle/compatibility runtime, strengthened the
+  new-code coverage baseline to line-and-source-hash matching, and refreshed
+  the baseline to zero accepted uncovered additions. Validation passed with
+  `make fidelity`, `cargo run -- --live-smoke`, `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, `git diff --check`, and
+  `cargo run --quiet -- --help`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778660955629679`
 
 ### DC-55: Clean Simulation Contracts
 

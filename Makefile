@@ -1,4 +1,4 @@
-.PHONY: fmt test clippy fidelity ci ci-doctor trace-doctor coverage-doctor smoke-doctor trace-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check coverage coverage-new-code coverage-new-code-baseline sq sq-ci sonar run run-wgpu run-kitty live live-wgpu live-kitty smoke-wgpu readme-media
+.PHONY: fmt test clippy fidelity ci ci-doctor trace-doctor coverage-doctor smoke-doctor trace-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check coverage coverage-new-code coverage-new-code-baseline sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu readme-media
 
 SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
@@ -138,17 +138,11 @@ sonar: sq
 run:
 	cargo run
 
-run-wgpu:
-	cargo run -- --renderer wgpu
-
-run-kitty:
-	cargo run -- --renderer kitty
+run-wgpu: run
 
 live: run
 
 live-wgpu: run-wgpu
-
-live-kitty: run-kitty
 
 smoke-wgpu:
 	cargo run -- --live-smoke
