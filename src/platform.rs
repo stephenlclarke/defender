@@ -79,7 +79,14 @@ where
 
 fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Result<()> {
     match classification {
-        CliClassification::AcceptedAdapter => crate::runtime::run_cli(),
+        CliClassification::HistoricalCommand(command) => {
+            let _command = command;
+            crate::runtime::run_cli()
+        }
+        CliClassification::CompatibilityFallback(arg) => {
+            let _first_arg = arg.first_arg;
+            crate::runtime::run_cli()
+        }
         CliClassification::CleanRuntime(config) => crate::runtime::run(&config),
         CliClassification::CleanHelp => crate::runtime::run_help(),
         CliClassification::CleanError(error) => Err(error.into()),
@@ -88,10 +95,30 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CliClassification {
-    AcceptedAdapter,
+    HistoricalCommand(HistoricalCliCommand),
+    CompatibilityFallback(CompatibilityCliArg),
     CleanRuntime(RuntimeConfig),
     CleanHelp,
     CleanError(CleanCliError),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HistoricalCliCommand {
+    RomReport,
+    VerifyRoms,
+    FidelityTrace,
+    FidelityTraceInputs,
+    FidelityTraceInputsFile,
+    FidelityCheckTrace,
+    FidelityCheckTraceDir,
+    FidelityListScenarios,
+    FidelityWriteScenarioInputs,
+    FidelityCheckReferenceTraceDir,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CompatibilityCliArg {
+    first_arg: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,7 +139,14 @@ impl RuntimeCliClassifier {
                 ArgClassification::CleanError(error) => {
                     return CliClassification::CleanError(error);
                 }
-                ArgClassification::AcceptedAdapter => return CliClassification::AcceptedAdapter,
+                ArgClassification::HistoricalCommand(command) => {
+                    return CliClassification::HistoricalCommand(command);
+                }
+                ArgClassification::CompatibilityFallback(first_arg) => {
+                    return CliClassification::CompatibilityFallback(CompatibilityCliArg {
+                        first_arg,
+                    });
+                }
             }
         }
 
@@ -152,14 +186,17 @@ impl RuntimeCliClassifier {
                 config.cmos_path = Some(PathBuf::from(value));
                 ArgClassification::CleanRuntime
             }
-            _ => ArgClassification::AcceptedAdapter,
+            _ => historical_cli_command(arg)
+                .map(ArgClassification::HistoricalCommand)
+                .unwrap_or_else(|| ArgClassification::CompatibilityFallback(String::from(arg))),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ArgClassification {
-    AcceptedAdapter,
+    HistoricalCommand(HistoricalCliCommand),
+    CompatibilityFallback(String),
     CleanRuntime,
     CleanHelp,
     CleanError(CleanCliError),
@@ -200,13 +237,33 @@ fn parse_control_profile(value: &str) -> Option<ControlProfile> {
     }
 }
 
+fn historical_cli_command(arg: &str) -> Option<HistoricalCliCommand> {
+    match arg {
+        "--rom-report" => Some(HistoricalCliCommand::RomReport),
+        "--verify-roms" => Some(HistoricalCliCommand::VerifyRoms),
+        "--fidelity-trace" => Some(HistoricalCliCommand::FidelityTrace),
+        "--fidelity-trace-inputs" => Some(HistoricalCliCommand::FidelityTraceInputs),
+        "--fidelity-trace-inputs-file" => Some(HistoricalCliCommand::FidelityTraceInputsFile),
+        "--fidelity-check-trace" => Some(HistoricalCliCommand::FidelityCheckTrace),
+        "--fidelity-check-trace-dir" => Some(HistoricalCliCommand::FidelityCheckTraceDir),
+        "--fidelity-list-scenarios" => Some(HistoricalCliCommand::FidelityListScenarios),
+        "--fidelity-write-scenario-inputs" => {
+            Some(HistoricalCliCommand::FidelityWriteScenarioInputs)
+        }
+        "--fidelity-check-reference-trace-dir" => {
+            Some(HistoricalCliCommand::FidelityCheckReferenceTraceDir)
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
     use super::{
-        AudioOutput, CleanCliError, CliClassification, ControlProfile, RunMode,
-        RuntimeCliClassifier, RuntimeConfig,
+        AudioOutput, CleanCliError, CliClassification, CompatibilityCliArg, ControlProfile,
+        HistoricalCliCommand, RunMode, RuntimeCliClassifier, RuntimeConfig,
     };
 
     fn args(values: &[&str]) -> Vec<String> {
@@ -308,13 +365,55 @@ mod tests {
 
     #[test]
     fn clean_cli_delegates_historical_commands() {
-        assert_eq!(
-            RuntimeCliClassifier::classify(args(&["--fidelity-trace", "1"])),
-            CliClassification::AcceptedAdapter
-        );
+        for (arg, command) in [
+            ("--rom-report", HistoricalCliCommand::RomReport),
+            ("--verify-roms", HistoricalCliCommand::VerifyRoms),
+            ("--fidelity-trace", HistoricalCliCommand::FidelityTrace),
+            (
+                "--fidelity-trace-inputs",
+                HistoricalCliCommand::FidelityTraceInputs,
+            ),
+            (
+                "--fidelity-trace-inputs-file",
+                HistoricalCliCommand::FidelityTraceInputsFile,
+            ),
+            (
+                "--fidelity-check-trace",
+                HistoricalCliCommand::FidelityCheckTrace,
+            ),
+            (
+                "--fidelity-check-trace-dir",
+                HistoricalCliCommand::FidelityCheckTraceDir,
+            ),
+            (
+                "--fidelity-list-scenarios",
+                HistoricalCliCommand::FidelityListScenarios,
+            ),
+            (
+                "--fidelity-write-scenario-inputs",
+                HistoricalCliCommand::FidelityWriteScenarioInputs,
+            ),
+            (
+                "--fidelity-check-reference-trace-dir",
+                HistoricalCliCommand::FidelityCheckReferenceTraceDir,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&[arg])),
+                CliClassification::HistoricalCommand(command)
+            );
+        }
+    }
+
+    #[test]
+    fn clean_cli_delegates_historical_commands_after_clean_live_flags() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--live-smoke", "--fidelity-trace", "1"])),
-            CliClassification::AcceptedAdapter
+            CliClassification::HistoricalCommand(HistoricalCliCommand::FidelityTrace)
+        );
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--mute", "--rom-report"])),
+            CliClassification::HistoricalCommand(HistoricalCliCommand::RomReport)
         );
     }
 
@@ -368,7 +467,21 @@ mod tests {
         for values in [vec!["--live-smoke", "--unknown"], vec!["--unknown"]] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::AcceptedAdapter
+                CliClassification::CompatibilityFallback(CompatibilityCliArg {
+                    first_arg: String::from("--unknown"),
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn clean_cli_delegates_removed_renderer_selection_as_compatibility() {
+        for values in [vec!["--renderer", "wgpu"], vec!["--presentation", "wgpu"]] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::CompatibilityFallback(CompatibilityCliArg {
+                    first_arg: String::from(values[0]),
+                })
             );
         }
     }
@@ -417,6 +530,12 @@ mod tests {
     fn accepted_cli_entrypoint_delegates_unsupported_args() {
         super::run_with_args(args(&["--unknown"]))
             .expect("unsupported clean CLI args should delegate to accepted CLI");
+    }
+
+    #[test]
+    fn accepted_cli_entrypoint_delegates_historical_commands() {
+        super::run_with_args(args(&["--rom-report"]))
+            .expect("historical CLI commands should delegate to accepted CLI");
     }
 
     #[test]

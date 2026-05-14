@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-90` are complete. `DC-91` is planned, and the standing
+`DC-42` through `DC-91` are complete. `DC-92` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3130,7 +3130,7 @@ Work log:
 
 ### DC-91: Clean CLI Legacy Command Inventory
 
-Status: `planned`
+Status: `complete`
 
 Goal: make the remaining accepted-adapter CLI delegation explicit by
 inventorying historical ROM/fidelity commands separately from unsupported
@@ -3173,6 +3173,78 @@ cargo run -- --rom-report
 cargo run -- --fidelity-list-scenarios
 cargo run -- --input-profile invalid
 cargo run -- --help
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 19:22:02 BST` Started `DC-91`: separating the known
+  historical ROM/fidelity command inventory from unsupported compatibility
+  arguments before accepted-adapter dispatch. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778782922103819`
+- `2026-05-14 20:01:24 BST` Completed `DC-91`: added explicit
+  `HistoricalCliCommand` classification for ROM report, ROM verification,
+  fidelity trace, fixture, scenario, and reference-trace commands; added a
+  separate `CompatibilityFallback` path for unsupported and removed
+  compatibility arguments; preserved clean live/help/error ownership; and
+  added focused platform/API tests plus entrypoint coverage for the
+  historical adapter dispatch. Validation passed with `cargo fmt --check`,
+  `cargo test --lib platform::tests::`,
+  `cargo test --lib runtime::tests::`,
+  `cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters`,
+  `cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined`,
+  `make fidelity` including 10 trace fixtures, 15452 frames, and 29/29
+  non-baselined added executable Rust lines covered, plus CLI probes for
+  `--rom-report`, `--fidelity-list-scenarios`, `--input-profile invalid`,
+  and `--help`. Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778785334701229`
+
+### DC-92: Clean ROM Report Command Ownership
+
+Status: `planned`
+
+Goal: retire the first historical CLI command family from the accepted adapter
+by moving ROM report listing into clean runtime ownership while preserving
+the current command output and optional verification path.
+
+Scope:
+
+- Add a clean runtime command/config path for `--rom-report` with no path and
+  with one optional ROM directory path.
+- Keep `--verify-roms` in the historical command inventory for now.
+- Preserve current ROM report text, optional path validation, and clean
+  live/help/error behavior.
+- Update the historical inventory so `--rom-report` no longer enters the
+  accepted adapter, while the other ROM/fidelity commands still do.
+- Add focused platform/runtime tests and public API guards for the new clean
+  ROM report path.
+
+Acceptance criteria:
+
+- `cargo run -- --rom-report` is served by clean runtime code and matches the
+  current report text.
+- `cargo run -- --rom-report /path/to/roms` preserves current scan behavior
+  and error reporting.
+- Unsupported extra `--rom-report` arguments remain rejected with the current
+  message.
+- Historical inventory still explicitly delegates `--verify-roms` and the
+  fidelity commands.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --rom-report
+cargo run -- --rom-report /path/to/roms
+cargo run -- --rom-report --verify-roms
+cargo run -- --verify-roms
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
 git diff --check
 ```
