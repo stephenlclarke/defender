@@ -79,6 +79,7 @@ where
 
 fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Result<()> {
     match classification {
+        CliClassification::CleanRomReport(request) => crate::runtime::run_rom_report(request.path),
         CliClassification::HistoricalCommand(command) => {
             let _command = command;
             crate::runtime::run_cli()
@@ -95,6 +96,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CliClassification {
+    CleanRomReport(RomReportRequest),
     HistoricalCommand(HistoricalCliCommand),
     CompatibilityFallback(CompatibilityCliArg),
     CleanRuntime(RuntimeConfig),
@@ -104,7 +106,6 @@ enum CliClassification {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HistoricalCliCommand {
-    RomReport,
     VerifyRoms,
     FidelityTrace,
     FidelityTraceInputs,
@@ -121,6 +122,11 @@ struct CompatibilityCliArg {
     first_arg: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RomReportRequest {
+    path: Option<PathBuf>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RuntimeCliClassifier;
 
@@ -131,10 +137,14 @@ impl RuntimeCliClassifier {
     {
         let mut config = RuntimeConfig::default();
         let mut args = args.into_iter();
+        let mut live_option_seen = false;
 
         while let Some(arg) = args.next() {
-            match Self::apply_arg(&arg, &mut args, &mut config) {
-                ArgClassification::CleanRuntime => {}
+            match Self::apply_arg(&arg, &mut args, &mut config, live_option_seen) {
+                ArgClassification::CleanRuntime => live_option_seen = true,
+                ArgClassification::CleanRomReport(request) => {
+                    return CliClassification::CleanRomReport(request);
+                }
                 ArgClassification::CleanHelp => return CliClassification::CleanHelp,
                 ArgClassification::CleanError(error) => {
                     return CliClassification::CleanError(error);
@@ -153,7 +163,12 @@ impl RuntimeCliClassifier {
         CliClassification::CleanRuntime(config)
     }
 
-    fn apply_arg<I>(arg: &str, args: &mut I, config: &mut RuntimeConfig) -> ArgClassification
+    fn apply_arg<I>(
+        arg: &str,
+        args: &mut I,
+        config: &mut RuntimeConfig,
+        live_option_seen: bool,
+    ) -> ArgClassification
     where
         I: Iterator<Item = String>,
     {
@@ -186,6 +201,26 @@ impl RuntimeCliClassifier {
                 config.cmos_path = Some(PathBuf::from(value));
                 ArgClassification::CleanRuntime
             }
+            "--rom-report" => {
+                if live_option_seen {
+                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                        "--rom-report",
+                    ));
+                }
+                let path = match args.next() {
+                    Some(value) if value.starts_with('-') => {
+                        return ArgClassification::CleanError(
+                            CleanCliError::RomReportPathCannotBeFlag(value),
+                        );
+                    }
+                    Some(value) => Some(PathBuf::from(value)),
+                    None => None,
+                };
+                if args.next().is_some() {
+                    return ArgClassification::CleanError(CleanCliError::TooManyRomReportArgs);
+                }
+                ArgClassification::CleanRomReport(RomReportRequest { path })
+            }
             _ => historical_cli_command(arg)
                 .map(ArgClassification::HistoricalCommand)
                 .unwrap_or_else(|| ArgClassification::CompatibilityFallback(String::from(arg))),
@@ -195,6 +230,7 @@ impl RuntimeCliClassifier {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ArgClassification {
+    CleanRomReport(RomReportRequest),
     HistoricalCommand(HistoricalCliCommand),
     CompatibilityFallback(String),
     CleanRuntime,
@@ -207,6 +243,9 @@ enum CleanCliError {
     MissingInputProfile,
     UnknownInputProfile(String),
     MissingCmosPath,
+    LiveOptionsWithCommand(&'static str),
+    RomReportPathCannotBeFlag(String),
+    TooManyRomReportArgs,
 }
 
 impl fmt::Display for CleanCliError {
@@ -222,6 +261,18 @@ impl fmt::Display for CleanCliError {
                 write!(formatter, "unknown input profile: {value}")
             }
             Self::MissingCmosPath => write!(formatter, "--cmos-path requires a file path"),
+            Self::LiveOptionsWithCommand(command) => {
+                write!(formatter, "live options cannot be combined with {command}")
+            }
+            Self::RomReportPathCannotBeFlag(value) => {
+                write!(
+                    formatter,
+                    "--rom-report optional path cannot be another flag: {value}"
+                )
+            }
+            Self::TooManyRomReportArgs => {
+                write!(formatter, "--rom-report only accepts one optional path")
+            }
         }
     }
 }
@@ -239,7 +290,6 @@ fn parse_control_profile(value: &str) -> Option<ControlProfile> {
 
 fn historical_cli_command(arg: &str) -> Option<HistoricalCliCommand> {
     match arg {
-        "--rom-report" => Some(HistoricalCliCommand::RomReport),
         "--verify-roms" => Some(HistoricalCliCommand::VerifyRoms),
         "--fidelity-trace" => Some(HistoricalCliCommand::FidelityTrace),
         "--fidelity-trace-inputs" => Some(HistoricalCliCommand::FidelityTraceInputs),
@@ -263,7 +313,7 @@ mod tests {
 
     use super::{
         AudioOutput, CleanCliError, CliClassification, CompatibilityCliArg, ControlProfile,
-        HistoricalCliCommand, RunMode, RuntimeCliClassifier, RuntimeConfig,
+        HistoricalCliCommand, RomReportRequest, RunMode, RuntimeCliClassifier, RuntimeConfig,
     };
 
     fn args(values: &[&str]) -> Vec<String> {
@@ -366,7 +416,6 @@ mod tests {
     #[test]
     fn clean_cli_delegates_historical_commands() {
         for (arg, command) in [
-            ("--rom-report", HistoricalCliCommand::RomReport),
             ("--verify-roms", HistoricalCliCommand::VerifyRoms),
             ("--fidelity-trace", HistoricalCliCommand::FidelityTrace),
             (
@@ -412,8 +461,22 @@ mod tests {
             CliClassification::HistoricalCommand(HistoricalCliCommand::FidelityTrace)
         );
         assert_eq!(
-            RuntimeCliClassifier::classify(args(&["--mute", "--rom-report"])),
-            CliClassification::HistoricalCommand(HistoricalCliCommand::RomReport)
+            RuntimeCliClassifier::classify(args(&["--mute", "--verify-roms", "roms"])),
+            CliClassification::HistoricalCommand(HistoricalCliCommand::VerifyRoms)
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_rom_report_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--rom-report"])),
+            CliClassification::CleanRomReport(RomReportRequest { path: None })
+        );
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--rom-report", "roms"])),
+            CliClassification::CleanRomReport(RomReportRequest {
+                path: Some(PathBuf::from("roms")),
+            })
         );
     }
 
@@ -447,6 +510,29 @@ mod tests {
     }
 
     #[test]
+    fn clean_cli_rejects_malformed_rom_report_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--rom-report"],
+                CleanCliError::LiveOptionsWithCommand("--rom-report"),
+            ),
+            (
+                vec!["--rom-report", "--verify-roms"],
+                CleanCliError::RomReportPathCannotBeFlag(String::from("--verify-roms")),
+            ),
+            (
+                vec!["--rom-report", "roms", "extra"],
+                CleanCliError::TooManyRomReportArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::CleanError(error)
+            );
+        }
+    }
+
+    #[test]
     fn clean_cli_error_messages_are_stable() {
         assert_eq!(
             CleanCliError::MissingInputProfile.to_string(),
@@ -459,6 +545,18 @@ mod tests {
         assert_eq!(
             CleanCliError::MissingCmosPath.to_string(),
             "--cmos-path requires a file path"
+        );
+        assert_eq!(
+            CleanCliError::LiveOptionsWithCommand("--rom-report").to_string(),
+            "live options cannot be combined with --rom-report"
+        );
+        assert_eq!(
+            CleanCliError::RomReportPathCannotBeFlag(String::from("--verify-roms")).to_string(),
+            "--rom-report optional path cannot be another flag: --verify-roms"
+        );
+        assert_eq!(
+            CleanCliError::TooManyRomReportArgs.to_string(),
+            "--rom-report only accepts one optional path"
         );
     }
 
@@ -533,8 +631,14 @@ mod tests {
     }
 
     #[test]
-    fn accepted_cli_entrypoint_delegates_historical_commands() {
+    fn clean_rom_report_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--rom-report"]))
+            .expect("clean ROM report CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn accepted_cli_entrypoint_delegates_historical_commands() {
+        super::run_with_args(args(&["--verify-roms"]))
             .expect("historical CLI commands should delegate to accepted CLI");
     }
 

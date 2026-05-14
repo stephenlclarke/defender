@@ -34,6 +34,10 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
         self.backend.run_command(RuntimeCommand::Help)
     }
 
+    pub(crate) fn run_rom_report(&self, path: Option<PathBuf>) -> anyhow::Result<()> {
+        self.backend.run_command(RuntimeCommand::RomReport { path })
+    }
+
     pub(crate) fn run(&self, config: &RuntimeConfig) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::from_config(config))
@@ -48,6 +52,9 @@ pub(crate) trait RuntimeBackend {
 pub(crate) enum RuntimeCommand {
     AcceptedCli,
     Help,
+    RomReport {
+        path: Option<PathBuf>,
+    },
     WgpuLive {
         input_profile: InputProfile,
         audio_mode: LiveAudioMode,
@@ -101,6 +108,7 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 print!("{}", help_text());
                 Ok(())
             }
+            RuntimeCommand::RomReport { path } => crate::rom_report::run(path.as_deref()),
             RuntimeCommand::WgpuLive {
                 input_profile,
                 audio_mode,
@@ -131,6 +139,10 @@ pub(crate) fn run_cli() -> anyhow::Result<()> {
 
 pub(crate) fn run_help() -> anyhow::Result<()> {
     RuntimeHost::current().run_help()
+}
+
+pub(crate) fn run_rom_report(path: Option<PathBuf>) -> anyhow::Result<()> {
+    RuntimeHost::current().run_rom_report(path)
 }
 
 pub(crate) fn run(config: &RuntimeConfig) -> anyhow::Result<()> {
@@ -244,6 +256,25 @@ mod tests {
     }
 
     #[test]
+    fn runtime_host_launches_rom_report_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_rom_report(Some(PathBuf::from("roms")))
+            .expect("runtime host should run ROM report command");
+
+        let observed = calls.borrow();
+        assert_eq!(
+            observed.as_slice(),
+            &[RuntimeCommand::RomReport {
+                path: Some(PathBuf::from("roms")),
+            }]
+        );
+    }
+
+    #[test]
     fn default_config_uses_wgpu_live_launch() {
         assert_eq!(
             RuntimeCommand::from_config(&RuntimeConfig::default()),
@@ -322,10 +353,18 @@ mod tests {
     }
 
     #[test]
+    fn installed_backend_runs_clean_rom_listing_report() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_rom_report(None)
+            .expect("installed backend should run clean ROM listing report");
+    }
+
+    #[test]
     fn clean_help_text_preserves_current_cli_contract() {
         let text = help_text();
 
         assert!(text.starts_with("defender\n  cargo run\n"));
+        assert!(text.contains("--rom-report"));
         assert!(text.contains("--input-profile planetoid"));
         assert!(text.contains("--input-profile cabinet"));
         assert!(text.contains("--live-smoke"));

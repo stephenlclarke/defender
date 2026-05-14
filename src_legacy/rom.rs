@@ -25,6 +25,10 @@ pub fn red_label_roms() -> &'static [RomDescriptor] {
     .as_slice()
 }
 
+pub fn expected_roms() -> &'static [RomDescriptor] {
+    red_label_roms()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RomReport {
     pub directory: PathBuf,

@@ -12,6 +12,7 @@ pub mod game;
 mod oracle;
 pub mod platform;
 pub mod renderer;
+mod rom_report;
 mod runtime;
 pub mod systems;
 
@@ -238,14 +239,20 @@ mod public_api_tests {
         assert!(platform_rs.contains("crate::runtime::run_cli()"));
         assert!(platform_rs.contains("crate::runtime::run(&config)"));
         assert!(platform_rs.contains("crate::runtime::run_help()"));
+        assert!(platform_rs.contains("crate::runtime::run_rom_report(request.path)"));
         assert!(platform_rs.contains("RuntimeCliClassifier::classify(args)"));
         assert!(platform_rs.contains("fn dispatch_cli_classification"));
+        assert!(platform_rs.contains("CliClassification::CleanRomReport(request)"));
         assert!(platform_rs.contains("CliClassification::HistoricalCommand(command)"));
         assert!(platform_rs.contains("CliClassification::CompatibilityFallback(arg)"));
         assert!(platform_rs.contains("enum HistoricalCliCommand"));
         assert!(platform_rs.contains("struct CompatibilityCliArg"));
+        assert!(platform_rs.contains("struct RomReportRequest"));
+        assert!(platform_rs.contains("\"--rom-report\" =>"));
+        assert!(platform_rs.contains("CleanCliError::RomReportPathCannotBeFlag"));
+        assert!(platform_rs.contains("CleanCliError::TooManyRomReportArgs"));
+        assert!(platform_rs.contains("CleanCliError::LiveOptionsWithCommand"));
         assert!(platform_rs.contains("historical_cli_command(arg)"));
-        assert!(platform_rs.contains("\"--rom-report\""));
         assert!(platform_rs.contains("\"--verify-roms\""));
         assert!(platform_rs.contains("\"--fidelity-trace\""));
         assert!(platform_rs.contains("\"--fidelity-trace-inputs\""));
@@ -277,9 +284,25 @@ mod public_api_tests {
         assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live("));
         assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live_smoke"));
         assert!(runtime_rs.contains("RuntimeCommand::Help"));
+        assert!(runtime_rs.contains("RuntimeCommand::RomReport { path }"));
         assert!(runtime_rs.contains("pub(crate) fn help_text()"));
+        assert!(runtime_rs.contains("pub(crate) fn run_rom_report"));
+        assert!(runtime_rs.contains("crate::rom_report::run(path.as_deref())"));
+        assert!(!runtime_rs.contains("crate::rom::"));
         assert!(!runtime_rs.contains(&accepted_runtime_call));
         assert!(!runtime_rs.contains(&app_runtime_call));
+
+        let lib_rs = include_str!("lib.rs");
+        let public_rom_report_module = format!("pub mod {};", "rom_report");
+        assert!(lib_rs.contains("mod rom_report;"));
+        assert!(!lib_rs.contains(&public_rom_report_module));
+
+        let rom_report_rs = include_str!("rom_report.rs");
+        assert!(rom_report_rs.contains("pub(crate) fn run("));
+        assert!(rom_report_rs.contains("fn listing_text()"));
+        assert!(rom_report_rs.contains("fn report_text(report: &crate::rom::RomReport)"));
+        assert!(rom_report_rs.contains("crate::rom::expected_roms()"));
+        assert!(rom_report_rs.contains("crate::rom::scan_dir(path)"));
 
         let oracle_rs = include_str!("oracle.rs");
         assert!(oracle_rs.contains("crate::accepted::"));
@@ -382,6 +405,7 @@ mod public_api_tests {
             ("src/oracle.rs", include_str!("oracle.rs")),
             ("src/platform.rs", include_str!("platform.rs")),
             ("src/renderer.rs", include_str!("renderer.rs")),
+            ("src/rom_report.rs", include_str!("rom_report.rs")),
             ("src/runtime.rs", include_str!("runtime.rs")),
             ("src/systems.rs", include_str!("systems.rs")),
         ];
@@ -412,6 +436,9 @@ mod public_api_tests {
                 if path == "src/runtime.rs"
                     && matches!(forbidden, "crate::input::" | "crate::wgpu_presenter::")
                 {
+                    continue;
+                }
+                if path == "src/rom_report.rs" && forbidden == "crate::rom::" {
                     continue;
                 }
 

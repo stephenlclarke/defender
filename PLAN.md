@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-91` are complete. `DC-92` is planned, and the standing
+`DC-42` through `DC-92` are complete. `DC-93` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3202,7 +3202,7 @@ Work log:
 
 ### DC-92: Clean ROM Report Command Ownership
 
-Status: `planned`
+Status: `complete`
 
 Goal: retire the first historical CLI command family from the accepted adapter
 by moving ROM report listing into clean runtime ownership while preserving
@@ -3237,14 +3237,79 @@ Validation:
 cargo fmt --check
 cargo test --lib platform::tests::
 cargo test --lib runtime::tests::
+cargo test --lib rom_report::tests::
 cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
 cargo run -- --rom-report
-cargo run -- --rom-report /path/to/roms
+cargo run -- --rom-report <empty-temp-dir>
 cargo run -- --rom-report --verify-roms
 cargo run -- --verify-roms
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 20:03:44 BST` Started `DC-92`: moving `--rom-report`
+  listing and optional ROM directory scanning from the historical
+  accepted-adapter CLI branch into clean runtime ownership. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778785424298289`
+- `2026-05-14 20:31:06 BST` Completed `DC-92`: `--rom-report` now
+  classifies as a clean CLI command, dispatches through `RuntimeCommand`, and
+  uses a private `rom_report` facade for current listing/scanning text while
+  `--verify-roms` and fidelity commands remain in the historical inventory.
+  Public API guards now assert that `runtime.rs` does not reach into legacy
+  ROM internals directly, and focused tests cover the clean classifier,
+  runtime dispatch, report formatting, malformed arguments, and quarantine
+  boundary. Validation passed with the full command set above, including
+  `make fidelity` with 10 trace fixtures, 15452 frames, and 38/38
+  non-baselined added executable Rust lines covered. Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778787066498619`
+
+### DC-93: Clean Fidelity Scenario Listing Ownership
+
+Status: `planned`
+
+Goal: retire the next low-risk historical CLI command by moving the
+read-only fidelity scenario listing command into clean runtime ownership while
+leaving trace generation and trace checking in the historical adapter.
+
+Scope:
+
+- Add a clean runtime command/config path for `--fidelity-list-scenarios`.
+- Preserve current scenario listing text and ordering.
+- Keep fidelity trace generation, trace checking, fixture checking, reference
+  checking, and scenario input writing in the historical command inventory.
+- Put scenario listing text behind a small clean facade owned by `fidelity` or
+  runtime-support code rather than calling the accepted adapter.
+- Add focused platform/runtime/API tests for command classification,
+  dispatch, and output contract.
+
+Acceptance criteria:
+
+- `cargo run -- --fidelity-list-scenarios` is served by clean runtime code and
+  matches the current output.
+- Historical inventory still explicitly delegates trace/check/write commands.
+- Public API guards make the new ownership boundary visible.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --fidelity-list-scenarios
+cargo run -- --fidelity-trace 1
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
 git diff --check
 ```
