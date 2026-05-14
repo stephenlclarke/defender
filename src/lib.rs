@@ -237,11 +237,14 @@ mod public_api_tests {
 
         assert!(platform_rs.contains("crate::runtime::run_cli()"));
         assert!(platform_rs.contains("crate::runtime::run(&config)"));
+        assert!(platform_rs.contains("RuntimeCliClassifier::classify(args)"));
+        assert!(platform_rs.contains("fn dispatch_cli_classification"));
+        assert!(platform_rs.contains("CliClassification::AcceptedAdapter"));
+        assert!(platform_rs.contains("CliClassification::CleanRuntime(config)"));
         assert!(platform_rs.contains("RuntimeConfig::default()"));
         assert!(platform_rs.contains("config.mode = RunMode::Smoke"));
         assert!(platform_rs.contains("\"--live-smoke\""));
         assert!(platform_rs.contains("RuntimeConfig::smoke()"));
-        assert!(platform_rs.contains("CliLaunch::CleanRuntime(config)"));
         assert!(!platform_rs.contains(&accepted_runtime_call));
         assert!(!platform_rs.contains("crate::compatibility::"));
         assert!(!platform_rs.contains(&app_runtime_call));

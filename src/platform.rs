@@ -74,50 +74,76 @@ fn run_with_args<I>(args: I) -> anyhow::Result<()>
 where
     I: IntoIterator<Item = String>,
 {
-    match launch_from_args(args) {
-        CliLaunch::AcceptedCli => crate::runtime::run_cli(),
-        CliLaunch::CleanRuntime(config) => crate::runtime::run(&config),
+    dispatch_cli_classification(RuntimeCliClassifier::classify(args))
+}
+
+fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Result<()> {
+    match classification {
+        CliClassification::AcceptedAdapter => crate::runtime::run_cli(),
+        CliClassification::CleanRuntime(config) => crate::runtime::run(&config),
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum CliLaunch {
-    AcceptedCli,
+enum CliClassification {
+    AcceptedAdapter,
     CleanRuntime(RuntimeConfig),
 }
 
-fn launch_from_args<I>(args: I) -> CliLaunch
-where
-    I: IntoIterator<Item = String>,
-{
-    let mut config = RuntimeConfig::default();
-    let mut args = args.into_iter();
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RuntimeCliClassifier;
 
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--live-smoke" => config.mode = RunMode::Smoke,
-            "--help" | "-h" => return CliLaunch::AcceptedCli,
-            "--input-profile" => {
-                let Some(value) = args.next() else {
-                    return CliLaunch::AcceptedCli;
-                };
-                let Some(controls) = parse_control_profile(&value) else {
-                    return CliLaunch::AcceptedCli;
-                };
-                config.controls = controls;
+impl RuntimeCliClassifier {
+    fn classify<I>(args: I) -> CliClassification
+    where
+        I: IntoIterator<Item = String>,
+    {
+        let mut config = RuntimeConfig::default();
+        let mut args = args.into_iter();
+
+        while let Some(arg) = args.next() {
+            if !Self::apply_arg(&arg, &mut args, &mut config) {
+                return CliClassification::AcceptedAdapter;
             }
-            "--mute" => config.audio = AudioOutput::Disabled,
-            "--cmos-path" => {
-                let Some(value) = args.next() else {
-                    return CliLaunch::AcceptedCli;
-                };
-                config.cmos_path = Some(PathBuf::from(value));
-            }
-            _ => return CliLaunch::AcceptedCli,
         }
+
+        CliClassification::CleanRuntime(config)
     }
 
-    CliLaunch::CleanRuntime(config)
+    fn apply_arg<I>(arg: &str, args: &mut I, config: &mut RuntimeConfig) -> bool
+    where
+        I: Iterator<Item = String>,
+    {
+        match arg {
+            "--live-smoke" => {
+                config.mode = RunMode::Smoke;
+                true
+            }
+            "--help" | "-h" => false,
+            "--input-profile" => {
+                let Some(value) = args.next() else {
+                    return false;
+                };
+                let Some(controls) = parse_control_profile(&value) else {
+                    return false;
+                };
+                config.controls = controls;
+                true
+            }
+            "--mute" => {
+                config.audio = AudioOutput::Disabled;
+                true
+            }
+            "--cmos-path" => {
+                let Some(value) = args.next() else {
+                    return false;
+                };
+                config.cmos_path = Some(PathBuf::from(value));
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 fn parse_control_profile(value: &str) -> Option<ControlProfile> {
@@ -133,7 +159,10 @@ fn parse_control_profile(value: &str) -> Option<ControlProfile> {
 mod tests {
     use std::path::PathBuf;
 
-    use super::{AudioOutput, CliLaunch, ControlProfile, RunMode, RuntimeConfig};
+    use super::{
+        AudioOutput, CliClassification, ControlProfile, RunMode, RuntimeCliClassifier,
+        RuntimeConfig,
+    };
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| String::from(*value)).collect()
@@ -157,22 +186,22 @@ mod tests {
     #[test]
     fn clean_cli_owns_default_interactive_launch() {
         assert_eq!(
-            super::launch_from_args(args(&[])),
-            CliLaunch::CleanRuntime(RuntimeConfig::default())
+            RuntimeCliClassifier::classify(args(&[])),
+            CliClassification::CleanRuntime(RuntimeConfig::default())
         );
     }
 
     #[test]
     fn clean_cli_owns_interactive_configuration_flags() {
         assert_eq!(
-            super::launch_from_args(args(&[
+            RuntimeCliClassifier::classify(args(&[
                 "--input-profile",
                 "cabinet",
                 "--mute",
                 "--cmos-path",
                 "scores.bin",
             ])),
-            CliLaunch::CleanRuntime(RuntimeConfig {
+            CliClassification::CleanRuntime(RuntimeConfig {
                 controls: ControlProfile::Cabinet,
                 audio: AudioOutput::Disabled,
                 mode: RunMode::Interactive,
@@ -184,15 +213,15 @@ mod tests {
     #[test]
     fn clean_cli_owns_live_smoke_launch() {
         assert_eq!(
-            super::launch_from_args(args(&["--live-smoke"])),
-            CliLaunch::CleanRuntime(RuntimeConfig::smoke())
+            RuntimeCliClassifier::classify(args(&["--live-smoke"])),
+            CliClassification::CleanRuntime(RuntimeConfig::smoke())
         );
     }
 
     #[test]
     fn clean_cli_owns_live_smoke_configuration_flags() {
         assert_eq!(
-            super::launch_from_args(args(&[
+            RuntimeCliClassifier::classify(args(&[
                 "--input-profile",
                 "cabinet",
                 "--mute",
@@ -200,7 +229,7 @@ mod tests {
                 "scores.bin",
                 "--live-smoke",
             ])),
-            CliLaunch::CleanRuntime(RuntimeConfig {
+            CliClassification::CleanRuntime(RuntimeConfig {
                 controls: ControlProfile::Cabinet,
                 audio: AudioOutput::Disabled,
                 mode: RunMode::Smoke,
@@ -212,8 +241,8 @@ mod tests {
     #[test]
     fn clean_cli_accepts_test_profile_for_live_smoke() {
         assert_eq!(
-            super::launch_from_args(args(&["--live-smoke", "--input-profile", "test"])),
-            CliLaunch::CleanRuntime(RuntimeConfig {
+            RuntimeCliClassifier::classify(args(&["--live-smoke", "--input-profile", "test"])),
+            CliClassification::CleanRuntime(RuntimeConfig {
                 controls: ControlProfile::Test,
                 audio: AudioOutput::Null,
                 mode: RunMode::Smoke,
@@ -226,8 +255,8 @@ mod tests {
     fn clean_cli_delegates_help_to_accepted_cli() {
         for values in [vec!["--help"], vec!["-h"], vec!["--mute", "--help"]] {
             assert_eq!(
-                super::launch_from_args(args(&values)),
-                CliLaunch::AcceptedCli
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::AcceptedAdapter
             );
         }
     }
@@ -235,12 +264,12 @@ mod tests {
     #[test]
     fn clean_cli_delegates_historical_commands() {
         assert_eq!(
-            super::launch_from_args(args(&["--fidelity-trace", "1"])),
-            CliLaunch::AcceptedCli
+            RuntimeCliClassifier::classify(args(&["--fidelity-trace", "1"])),
+            CliClassification::AcceptedAdapter
         );
         assert_eq!(
-            super::launch_from_args(args(&["--live-smoke", "--fidelity-trace", "1"])),
-            CliLaunch::AcceptedCli
+            RuntimeCliClassifier::classify(args(&["--live-smoke", "--fidelity-trace", "1"])),
+            CliClassification::AcceptedAdapter
         );
     }
 
@@ -257,8 +286,8 @@ mod tests {
             vec!["--unknown"],
         ] {
             assert_eq!(
-                super::launch_from_args(args(&values)),
-                CliLaunch::AcceptedCli
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::AcceptedAdapter
             );
         }
     }
@@ -284,6 +313,12 @@ mod tests {
             "scores.bin",
         ]))
         .expect("clean interactive CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn accepted_cli_entrypoint_delegates_unsupported_args() {
+        super::run_with_args(args(&["--help"]))
+            .expect("unsupported clean CLI args should delegate to accepted CLI");
     }
 
     #[test]

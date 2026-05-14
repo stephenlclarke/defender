@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before DC-87: `62aa4f9`.
+- Latest accepted implementation commit before DC-88: `c645d1b`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-87` are complete. `DC-88` is planned, and the standing
+`DC-42` through `DC-88` are complete. `DC-89` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2925,7 +2925,7 @@ Work log:
 
 ### DC-88: Clean CLI Classification Boundary
 
-Status: `planned`
+Status: `complete`
 
 Goal: make clean CLI ownership explicit and maintainable by separating runtime
 classification from launch dispatch while preserving current command behavior.
@@ -2962,6 +2962,73 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
 cargo run -- --live-smoke
+cargo run -- --help
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 14:31:38 BST` Started `DC-88`: posted the cycle start update
+  and began separating clean CLI classification from runtime launch dispatch
+  while keeping no-argument live play, valid live options, and valid
+  `--live-smoke` paths clean-owned and preserving accepted adapter delegation
+  for help, malformed live options, unsupported flags, and historical commands.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778765521036469`
+- `2026-05-14 15:12:20 BST` Completed `DC-88`: platform launch now dispatches
+  from an explicit clean CLI classification boundary. The classifier returns
+  clean `RuntimeConfig` values for no-argument live play, valid live options,
+  and valid `--live-smoke` paths while unsupported, malformed, help, and
+  historical command paths remain accepted-adapter delegations. Validation
+  passed with formatting; focused platform, runtime, and public API tests;
+  `cargo test --all-targets`; clippy with warnings denied; `make fidelity`;
+  live smoke; help output; markdownlint; and `git diff --check`.
+  `make fidelity` matched 10 trace fixtures covering 15452 frames and reported
+  new Rust line coverage `26/26` non-baselined added executable lines. Live
+  smoke rendered 239 frames, saw 74 distinct frame signatures, observed
+  attract, credit, and playing states, injected all required controls, and
+  exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778767934967469`
+
+### DC-89: Clean CLI Help Ownership
+
+Status: `planned`
+
+Goal: move help handling out of accepted-adapter delegation and into the clean
+platform/runtime CLI surface while preserving current user-facing help output.
+
+Scope:
+
+- Add a clean help classification or runtime command for `--help` and `-h`.
+- Preserve the current help text and command list while moving ownership away
+  from the legacy app parser.
+- Keep malformed live options, unsupported flags, and historical commands
+  delegated to the accepted adapter until clean replacements exist.
+- Update public API guards so help ownership is source-visible in the clean
+  platform/runtime boundary.
+
+Acceptance criteria:
+
+- `cargo run -- --help` is served by clean runtime/platform code without
+  invoking accepted CLI delegation.
+- Help output remains behavior-compatible with the current text.
+- Accepted-adapter delegation remains covered for malformed and historical
+  command paths.
+- README, SPEC, and PLAN stay aligned with the clean CLI ownership boundary.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
 cargo run -- --help
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
 git diff --check
