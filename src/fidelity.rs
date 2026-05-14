@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn frame_signature_captures_state_events_sound_and_render_summary() {
         let mut scene = RenderScene::empty(7, SurfaceSize::new(292, 240));
-        scene.visual_hash = Some(0x1234_5678);
+        scene.visual_signature = Some(0x1234_5678);
         let state = GameState {
             frame: 7,
             phase: GamePhase::Playing,
@@ -79,7 +79,7 @@ mod tests {
         assert_eq!(signature.gameplay_events, [GameEvent::CreditAdded]);
         assert_eq!(signature.sound_events, [SoundEvent::CreditAdded]);
         assert_eq!(signature.render.frame, 7);
-        assert_eq!(signature.render.visual_hash, Some(0x1234_5678));
+        assert_eq!(signature.render.visual_signature, Some(0x1234_5678));
     }
 
     #[test]
@@ -100,7 +100,7 @@ mod tests {
             observed_gameplay.extend_from_slice(&clean_signature.gameplay_events);
             observed_sounds.extend_from_slice(&clean_signature.sound_events);
             saw_playing_render |= clean_signature.state.phase == GamePhase::Playing
-                && clean_signature.render.visual_hash.is_some()
+                && clean_signature.render.visual_signature.is_some()
                 && clean_signature.render.layers.objects == 1;
         }
 

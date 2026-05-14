@@ -151,7 +151,7 @@ pub struct RenderScene {
     pub frame: u64,
     pub surface: SurfaceSize,
     pub clear_color: Color,
-    pub visual_hash: Option<u32>,
+    pub visual_signature: Option<u32>,
     pub sprites: Vec<SceneSprite>,
     raster: Option<SceneRaster>,
 }
@@ -160,7 +160,7 @@ pub struct RenderScene {
 pub struct RenderSceneSummary {
     pub frame: u64,
     pub surface: SurfaceSize,
-    pub visual_hash: Option<u32>,
+    pub visual_signature: Option<u32>,
     pub raster_count: usize,
     pub sprite_count: usize,
     pub layers: RenderLayerCounts,
@@ -172,7 +172,7 @@ impl RenderScene {
             frame,
             surface,
             clear_color: Color { rgba: [0; 4] },
-            visual_hash: None,
+            visual_signature: None,
             sprites: Vec::new(),
             raster: None,
         }
@@ -182,14 +182,14 @@ impl RenderScene {
         frame: u64,
         surface: SurfaceSize,
         pixels: Vec<u8>,
-        visual_hash: Option<u32>,
+        visual_signature: Option<u32>,
     ) -> Result<Self, SceneRasterError> {
         let raster = SceneRaster::from_rgba(surface, pixels)?;
         Ok(Self {
             frame,
             surface,
             clear_color: Color { rgba: [0; 4] },
-            visual_hash,
+            visual_signature,
             sprites: Vec::new(),
             raster: Some(raster),
         })
@@ -217,7 +217,7 @@ impl RenderScene {
         RenderSceneSummary {
             frame: self.frame,
             surface: self.surface,
-            visual_hash: self.visual_hash,
+            visual_signature: self.visual_signature,
             raster_count: usize::from(self.raster.is_some()),
             sprite_count: self.sprites.len(),
             layers,
@@ -363,7 +363,7 @@ impl Default for NativeRendererResources {
 pub struct SceneRasterUpload {
     pub surface: SurfaceSize,
     pub byte_len: usize,
-    pub visual_hash: Option<u32>,
+    pub visual_signature: Option<u32>,
     pub non_blank: bool,
 }
 
@@ -413,7 +413,7 @@ impl NativeSceneRenderer {
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
                 byte_len: raster.pixels.len(),
-                visual_hash: scene.visual_hash,
+                visual_signature: scene.visual_signature,
                 non_blank: raster.is_non_blank(),
             }),
         }
@@ -479,9 +479,9 @@ mod tests {
     }
 
     #[test]
-    fn render_scene_summary_counts_layers_and_visual_hash() {
+    fn render_scene_summary_counts_layers_and_visual_signature() {
         let mut scene = RenderScene::empty(12, SurfaceSize::new(292, 240));
-        scene.visual_hash = Some(0xCAFE_BABE);
+        scene.visual_signature = Some(0xCAFE_BABE);
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::PLAYER_SHIP,
             layer: RenderLayer::Objects,
@@ -499,7 +499,7 @@ mod tests {
 
         let summary = scene.summary();
 
-        assert_eq!(summary.visual_hash, Some(0xCAFE_BABE));
+        assert_eq!(summary.visual_signature, Some(0xCAFE_BABE));
         assert_eq!(summary.raster_count, 0);
         assert_eq!(summary.sprite_count, 2);
         assert_eq!(
@@ -565,7 +565,7 @@ mod tests {
         assert_eq!(raster.surface, SurfaceSize::new(2, 1));
         assert!(raster.is_non_blank());
         assert_eq!(scene.summary().raster_count, 1);
-        assert_eq!(scene.summary().visual_hash, Some(0x1234_5678));
+        assert_eq!(scene.summary().visual_signature, Some(0x1234_5678));
     }
 
     #[test]
@@ -756,7 +756,7 @@ mod tests {
             Some(super::SceneRasterUpload {
                 surface: SurfaceSize::new(1, 1),
                 byte_len: 4,
-                visual_hash: Some(0xFEED_FACE),
+                visual_signature: Some(0xFEED_FACE),
                 non_blank: true,
             })
         );

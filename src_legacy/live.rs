@@ -1019,7 +1019,7 @@ mod tests {
 
         assert_eq!(scene.frame, 17);
         assert_eq!(scene.summary().raster_count, 1);
-        assert_eq!(scene.summary().visual_hash, Some(crc32(&image.pixels)));
+        assert_eq!(scene.summary().visual_signature, Some(crc32(&image.pixels)));
         assert_eq!(
             scene.raster().expect("scene raster").pixels(),
             image.pixels.as_slice()

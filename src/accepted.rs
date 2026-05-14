@@ -35,7 +35,7 @@ pub(crate) struct AcceptedFrame {
     pub(crate) snapshot: AcceptedSnapshot,
     pub(crate) events: Vec<AcceptedEvent>,
     pub(crate) sound_commands: Vec<u8>,
-    pub(crate) visual_hash: Option<u32>,
+    pub(crate) visual_signature: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,7 +138,7 @@ mod tests {
 
         assert_eq!(frame.snapshot.frame, 1);
         assert_eq!(frame.snapshot.phase, AcceptedPhase::Attract);
-        assert!(frame.visual_hash.is_some());
+        assert!(frame.visual_signature.is_some());
     }
 
     #[test]

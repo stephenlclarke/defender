@@ -72,7 +72,7 @@ tree:
   and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, scene summaries,
-  and draw planning.
+  render signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
@@ -98,8 +98,10 @@ public clean gameplay types see it. Legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so clean accepted/oracle source
 stays focused on gameplay contracts. Internal clean equivalence regressions use
 crate-private oracle wiring. Clean frame-signature gates live under
-`src/fidelity.rs` and use oracle-owned reference probes for accepted behavior
-comparison, while legacy trace generation is root-wired as `legacy_fidelity`.
+`src/fidelity.rs`, compare clean render signatures rather than exposing
+memory-oriented CRC labels, and use oracle-owned reference probes for accepted
+behavior comparison, while legacy trace generation is root-wired as
+`legacy_fidelity`.
 Legacy live code adapts frame outputs into clean audio
 frames before submitting to `src/audio.rs`. Temporary README media tooling uses
 the doc-hidden `defender::readme_media` facade rather than low-level legacy

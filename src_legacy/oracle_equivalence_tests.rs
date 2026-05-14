@@ -156,7 +156,7 @@ fn clean_fixture_matches_accepted_oracle_events_and_scene_summaries() {
             .map(adapt_accepted_sound_command)
             .collect::<Vec<_>>();
         let expected_scene_summary =
-            adapt_accepted_scene(&expected_state, accepted_frame.visual_hash).summary();
+            adapt_accepted_scene(&expected_state, accepted_frame.visual_signature).summary();
 
         assert_eq!(clean_frame.state, expected_state);
         assert_eq!(
@@ -169,7 +169,7 @@ fn clean_fixture_matches_accepted_oracle_events_and_scene_summaries() {
         observed_events.extend_from_slice(clean_frame.events.gameplay());
         let summary = clean_frame.scene.summary();
         saw_playing_scene |= clean_frame.state.phase == GamePhase::Playing
-            && summary.visual_hash.is_some()
+            && summary.visual_signature.is_some()
             && summary.layers.objects == 1;
     }
 

@@ -46,7 +46,7 @@ impl From<machine_state::FrameOutput> for AcceptedFrame {
                 .sound_commands()
                 .map(|command| command.raw())
                 .collect(),
-            visual_hash: output.video_crc32,
+            visual_signature: output.video_crc32,
         }
     }
 }
@@ -286,7 +286,7 @@ mod tests {
     }
 
     #[test]
-    fn accepted_frame_owns_snapshot_sounds_and_visual_hash() {
+    fn accepted_frame_owns_snapshot_sounds_and_visual_signature() {
         let mut machine = crate::machine::ArcadeMachine::new();
         let output = machine.step(CabinetInput {
             coin: true,
@@ -297,7 +297,7 @@ mod tests {
 
         assert_eq!(frame.snapshot.frame, 1);
         assert!(frame.sound_commands.is_empty());
-        assert!(frame.visual_hash.is_some());
+        assert!(frame.visual_signature.is_some());
     }
 
     #[test]
@@ -328,6 +328,6 @@ mod tests {
         let frame = machine.step(GameInput::NONE);
 
         assert_eq!(frame.snapshot.frame, 1);
-        assert!(frame.visual_hash.is_some());
+        assert!(frame.visual_signature.is_some());
     }
 }

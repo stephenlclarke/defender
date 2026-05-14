@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `fb111e4`.
+- Latest accepted implementation commit before this cycle: `4bd2c01`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-81` are complete. `DC-82` is planned, and the standing
+`DC-42` through `DC-82` are complete. `DC-83` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -318,7 +318,8 @@ Acceptance criteria:
   blocking on an arcade-core step.
 - Normal mode does not busy-spin when no frame is due.
 - Smoke reports still include window creation, rendered frame count, distinct
-  frame CRCs, attract/credit/playing evidence, injected inputs, and clean exit.
+  frame signatures, attract/credit/playing evidence, injected inputs, and clean
+  exit.
 - Worker shutdown cannot leave the event loop waiting forever on a channel
   receive.
 
@@ -852,7 +853,7 @@ Work log:
   `renderer`, `wgpu_smoke`, and live scene tests, `cargo test --all-targets`,
   `cargo clippy --all-targets -- -D warnings`, `make fidelity`, and
   `cargo run -- --live-smoke`; the live smoke reported 240 rendered frames,
-  74 distinct scene CRCs, attract/credit/playing evidence, all required
+  74 distinct scene signatures, attract/credit/playing evidence, all required
   injected inputs, and clean exit.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778667397382589`
@@ -974,7 +975,7 @@ Work log:
   docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
   `git diff --check`; the coverage gate reported 196/196 non-baselined added
   executable Rust lines covered, and live smoke rendered 239 frames with 74
-  distinct scene CRCs, attract/credit/playing evidence, all required injected
+  distinct scene signatures, attract/credit/playing evidence, all required injected
   inputs, and a clean exit.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778672203264889`
@@ -1031,7 +1032,7 @@ Work log:
   `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
   docs/fidelity/live-audio.md`, and `git diff --check`; the coverage gate
   reported 17/17 non-baselined added executable Rust lines covered, and live
-  smoke rendered 239 frames with 74 distinct scene CRCs, attract/credit/playing
+  smoke rendered 239 frames with 74 distinct scene signatures, attract/credit/playing
   evidence, all required injected inputs, and a clean exit.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778675086403679`
@@ -1093,7 +1094,7 @@ Work log:
   full Rust test suite, clippy with warnings denied, `make fidelity`,
   `cargo run -- --live-smoke`, markdownlint, and `git diff --check`; the
   coverage gate reported 0/0 non-baselined added executable Rust lines, and
-  live smoke rendered 240 frames with 74 distinct scene CRCs,
+  live smoke rendered 240 frames with 74 distinct scene signatures,
   attract/credit/playing evidence, all required injected inputs, and a clean
   exit.
   Slack completion update:
@@ -1155,7 +1156,7 @@ Work log:
   clippy with warnings denied, `make fidelity`, `cargo run -- --live-smoke`,
   markdownlint, and `git diff --check`; the coverage gate reported 2/2
   non-baselined added executable Rust lines, and live smoke rendered 239 frames
-  with 74 distinct scene CRCs, attract/credit/playing evidence, all required
+  with 74 distinct scene signatures, attract/credit/playing evidence, all required
   injected inputs, and a clean exit.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778679271201939`
@@ -1224,7 +1225,7 @@ Work log:
   coverage for two phase mapping arms, which was fixed before rerunning the
   gate successfully. The final coverage gate reported 7/7 non-baselined added
   executable Rust lines, and live smoke rendered 239 frames with 74 distinct
-  scene CRCs, attract/credit/playing evidence, all required injected inputs,
+  scene signatures, attract/credit/playing evidence, all required injected inputs,
   and a clean exit.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778697300468119`
@@ -1289,7 +1290,7 @@ Work log:
   SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
   and `git diff --check`. `make fidelity` reported new Rust line coverage
   `0/0` non-baselined added executable lines. Live smoke rendered 239 frames,
-  saw 74 distinct frame CRCs, observed attract, credit, and playing states,
+  saw 74 distinct frame signatures, observed attract, credit, and playing states,
   injected all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778698710074379`
@@ -1307,7 +1308,7 @@ Scope:
 - Add a crate-private `src/accepted.rs` facade over the temporary accepted
   implementation.
 - Convert accepted machine output into neutral accepted-behavior frame,
-  snapshot, phase, direction, event, sound, and visual-hash contracts before
+  snapshot, phase, direction, event, sound, and visual-signature contracts before
   `src/oracle.rs` adapts them to clean gameplay types.
 - Route `src/platform.rs` through the accepted facade instead of calling the
   doc-hidden compatibility runtime directly.
@@ -1351,13 +1352,14 @@ Work log:
 - `2026-05-13 20:43:21 BST` Completed `DC-64`: added the crate-private
   `src/accepted.rs` facade, routed `platform` and `GameplayOracle` through
   `crate::accepted`, converted accepted machine output into neutral frame,
-  snapshot, phase, direction, event, sound-command, and visual-hash contracts,
+  snapshot, phase, direction, event, sound-command, and visual-signature
+  contracts,
   and updated docs/tests to preserve the boundary. Validation passed with the
   DC-64 gate: formatting, focused accepted/oracle/API tests, all-target
   check/test/clippy, `make fidelity`, live smoke, markdownlint, and
   `git diff --check`. `make fidelity` reported new Rust line coverage `38/38`
   non-baselined added executable lines. Live smoke rendered 239 frames, saw 74
-  distinct frame CRCs, observed attract, credit, and playing states, injected
+  distinct frame signatures, observed attract, credit, and playing states, injected
   all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778701401764609`
@@ -1418,7 +1420,7 @@ Work log:
   oracle/equivalence/API tests, all-target tests, clippy, `make fidelity`, live
   smoke, oracle terminology search, markdownlint, and `git diff --check`.
   `make fidelity` reported new Rust line coverage `0/0` non-baselined added
-  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs,
+  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures,
   observed attract, credit, and playing states, injected all required controls,
   and exited cleanly.
   Slack completion update:
@@ -1492,7 +1494,7 @@ Work log:
   tests, all-target tests, clippy, `make fidelity`, live smoke, clean
   accepted/oracle terminology search, markdownlint, and `git diff --check`.
   `make fidelity` reported new Rust line coverage `5/5` non-baselined added
-  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs,
+  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures,
   observed attract, credit, and playing states, injected all required controls,
   and exited cleanly.
   Slack completion update:
@@ -1552,7 +1554,7 @@ Work log:
   focused public API tests, all-target tests, clippy, `make fidelity`, live
   smoke, markdownlint, and `git diff --check`. `make fidelity` reported new
   Rust line coverage `0/0` non-baselined added executable lines. Live smoke
-  rendered 239 frames, saw 74 distinct frame CRCs, observed attract, credit,
+  rendered 239 frames, saw 74 distinct frame signatures, observed attract, credit,
   and playing states, injected all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778707109325719`
@@ -1614,7 +1616,7 @@ Work log:
   focused public API and video tests, all-target tests, clippy,
   `make fidelity`, live smoke, markdownlint, and `git diff --check`.
   `make fidelity` reported new Rust line coverage `0/0` non-baselined added
-  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs,
+  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures,
   observed attract, credit, and playing states, injected all required controls,
   and exited cleanly.
   Slack completion update:
@@ -1681,7 +1683,7 @@ Work log:
   all-target tests, clippy, `make fidelity`, live smoke, trace-sample root
   search, markdownlint, and `git diff --check`. `make fidelity` reported new
   Rust line coverage `0/0` non-baselined added executable lines. Live smoke
-  rendered 240 frames, saw 74 distinct frame CRCs, observed attract, credit,
+  rendered 240 frames, saw 74 distinct frame signatures, observed attract, credit,
   and playing states, injected all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778710071723699`
@@ -1751,7 +1753,7 @@ Work log:
   clippy, `make fidelity`, live smoke, retired compatibility export search,
   markdownlint, and `git diff --check`. `make fidelity` reported new Rust line
   coverage `0/0` non-baselined added executable lines. Live smoke rendered 239
-  frames, saw 74 distinct frame CRCs, observed attract, credit, and playing
+  frames, saw 74 distinct frame signatures, observed attract, credit, and playing
   states, injected all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778711608813249`
@@ -1812,7 +1814,7 @@ Work log:
   clippy, `make fidelity`, live smoke, retired export search, markdownlint,
   and `git diff --check`. `make fidelity` reported new Rust line coverage
   `0/0` non-baselined added executable lines. Live smoke rendered 240 frames,
-  saw 74 distinct frame CRCs, observed attract, credit, and playing states,
+  saw 74 distinct frame signatures, observed attract, credit, and playing states,
   injected all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778713016113959`
@@ -1878,7 +1880,7 @@ Work log:
   focused oracle-equivalence tests, all-target tests, clippy, `make fidelity`,
   live smoke, retired export search, markdownlint, and `git diff --check`.
   `make fidelity` reported new Rust line coverage `0/0` non-baselined added
-  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs,
+  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures,
   observed attract, credit, and playing states, injected all required controls,
   and exited cleanly.
   Slack completion update:
@@ -1948,7 +1950,7 @@ Work log:
   `make fidelity`, live smoke, retired-import search, markdownlint, and
   `git diff --check`. `make fidelity` reported new Rust line coverage `0/0`
   non-baselined added executable lines. Live smoke rendered 239 frames, saw
-  74 distinct frame CRCs, observed attract, credit, and playing states,
+  74 distinct frame signatures, observed attract, credit, and playing states,
   injected all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778741426762209`
@@ -2021,7 +2023,7 @@ Work log:
   clippy, `make fidelity`, live smoke, compatibility grep guard, deleted-file
   guard, markdownlint, and `git diff --check`. `make fidelity` reported new
   Rust line coverage `0/0` non-baselined added executable lines. Live smoke
-  rendered 239 frames, saw 74 distinct frame CRCs, observed attract, credit,
+  rendered 239 frames, saw 74 distinct frame signatures, observed attract, credit,
   and playing states, injected all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778743156254659`
@@ -2144,7 +2146,7 @@ Work log:
   all-target tests, clippy, `make fidelity`, live smoke, the clean audio
   static guard, markdownlint, and `git diff --check`. `make fidelity` reported
   new Rust line coverage `9/9` non-baselined added executable lines. Live
-  smoke rendered 239 frames, saw 74 distinct frame CRCs, observed attract,
+  smoke rendered 239 frames, saw 74 distinct frame signatures, observed attract,
   credit, and playing states, injected all required controls, and exited
   cleanly.
   Slack completion update:
@@ -2217,7 +2219,7 @@ Work log:
   clippy; `make fidelity`; live smoke; the static guard; markdownlint; and
   `git diff --check`. `make fidelity` reported new Rust line coverage `9/9`
   non-baselined added executable lines. Live smoke rendered 240 frames, saw 74
-  distinct frame CRCs, observed attract, credit, and playing states, injected
+  distinct frame signatures, observed attract, credit, and playing states, injected
   all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778747892960589`
@@ -2289,7 +2291,7 @@ Work log:
   markdownlint; and `git diff --check`. `make fidelity` matched 10 trace
   fixtures covering 15452 frames and reported new Rust line coverage `0/0`
   non-baselined added executable lines. Live smoke rendered 239 frames, saw 74
-  distinct frame CRCs, observed attract, credit, and playing states, injected
+  distinct frame signatures, observed attract, credit, and playing states, injected
   all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778749498248829`
@@ -2371,7 +2373,7 @@ Work log:
   static terminology guard; markdownlint; and `git diff --check`. The
   `make fidelity` gate matched 10 trace fixtures covering 15452 frames and
   reported new Rust line coverage `134/134` non-baselined added executable
-  lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs, observed
+  lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures, observed
   attract, credit, and playing states, injected all required controls, and
   exited cleanly.
   Slack completion update:
@@ -2448,7 +2450,7 @@ Work log:
   terminology scan; markdownlint; and `git diff --check`. The `make fidelity`
   gate matched 10 trace fixtures covering 15452 frames and reported new Rust
   line coverage `0/0` non-baselined added executable lines. Live smoke rendered
-  239 frames, saw 74 distinct frame CRCs, observed attract, credit, and playing
+  239 frames, saw 74 distinct frame signatures, observed attract, credit, and playing
   states, injected all required controls, and exited cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778753657368129`
@@ -2517,35 +2519,36 @@ Work log:
   the public-oracle static scan; markdownlint; and `git diff --check`. The
   `make fidelity` gate matched 10 trace fixtures covering 15452 frames and
   reported new Rust line coverage `0/0` non-baselined added executable lines.
-  Live smoke rendered 239 frames, saw 74 distinct frame CRCs, observed attract,
+  Live smoke rendered 239 frames, saw 74 distinct frame signatures, observed attract,
   credit, and playing states, injected all required controls, and exited
   cleanly.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778755376066379`
 
-### DC-82: Memory-Oriented Oracle Retirement
+### DC-82: Render Signature Terminology
 
-Status: `planned`
+Status: `complete`
 
-Goal: remove the memory-oriented production model after clean systems own
-accepted gameplay behavior.
+Goal: remove memory-oriented hash/CRC labels from clean render evidence and
+live-smoke reporting while preserving the accepted comparison behavior.
 
 Scope:
 
-- Delete or quarantine obsolete machine memory/session modules from production
-  builds.
-- Keep only fixture parsers and historical oracle tooling that still provide
-  review value.
-- Replace memory CRC gates with clean state/event/render/sound equivalence
-  gates.
-- Ensure no production symbol names expose red-label, ROM, source routine, or
-  assembler process terminology.
+- Rename clean render-scene evidence from `visual_hash` to
+  `visual_signature`.
+- Rename live-smoke frame and phase diversity metrics from CRC labels to
+  render-signature labels.
+- Keep historical CRC trace fixtures and legacy machine evidence quarantined in
+  `src_legacy/`.
+- Update README, SPEC, and this plan so clean fidelity language describes
+  state, event, sound, and render signatures.
 
 Acceptance criteria:
 
-- Production gameplay no longer depends on the legacy memory model.
-- Fidelity tooling remains available for historical comparison where needed.
-- Public API and module names read as a clean game implementation.
+- Clean `src/` APIs no longer expose render hash terminology.
+- Supported live-smoke output no longer exposes frame or scene CRC terminology.
+- Historical CRC terminology remains only where it describes legacy trace or
+  ROM verification evidence.
 
 Validation:
 
@@ -2555,8 +2558,84 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
 cargo run -- --live-smoke
-rg -n 'red_label|RED_LABEL|defend\\.|src/machine_memory|source routine' src
+! rg -n \
+  -e "visual_hash" \
+  -e "distinct_frame_crcs" \
+  -e "visual_crcs" \
+  -e "frame_crcs" \
+  -e "frame CRC" \
+  -e "scene CRC" \
+  src src_legacy/wgpu_presenter.rs src_legacy/live.rs \
+  src_legacy/accepted_behavior.rs src_legacy/oracle_equivalence_tests.rs \
+  README.md SPEC.md
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
 ```
+
+Work log:
+
+- `2026-05-14 11:45:41 BST` Started `DC-82`: posted the cycle start update and
+  began the first memory-oriented oracle retirement slice by moving clean
+  render equivalence and live-smoke evidence from hash/CRC labels to render
+  signature terminology.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778755466066549`
+- `2026-05-14 12:07:27 BST` Completed `DC-82`: renamed clean render evidence
+  from visual hashes to visual signatures, renamed live-smoke diversity metrics
+  from frame/visual CRCs to frame/visual signatures, updated the public rewrite
+  docs, and kept legacy CRC terminology limited to historical trace and ROM
+  evidence. Validation passed with formatting; focused renderer, fidelity, and
+  `wgpu` smoke unit tests; the full Rust target suite; clippy with warnings
+  denied; `make fidelity`; live smoke; stale render-hash/frame-CRC label scans
+  across clean source, supported live-smoke paths, README, and SPEC;
+  markdownlint; and `git diff --check`. The `make fidelity` gate matched 10
+  trace fixtures covering 15452 frames and reported new Rust line coverage
+  `30/30` non-baselined added executable lines. Live smoke rendered 239 frames,
+  saw 74 distinct frame signatures, observed attract, credit, and playing
+  states, injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778756923466539`
+
+### DC-83: Production Model Quarantine
+
+Status: `planned`
+
+Goal: continue retiring the memory-oriented production model by moving the next
+remaining legacy-facing runtime dependency behind clean gameplay boundaries.
+
+Scope:
+
+- Identify one production path that still pulls machine/session memory concepts
+  across the clean runtime boundary.
+- Move that dependency behind a clean domain or fidelity adapter with
+  game-facing names.
+- Keep fixture parsers and historical oracle tooling available only where they
+  provide review value.
+- Preserve accepted gameplay behavior and live `wgpu` behavior.
+
+Acceptance criteria:
+
+- The selected runtime path reads as clean gameplay code at its public boundary.
+- Any remaining memory-oriented names are explicitly quarantined in legacy or
+  fidelity modules.
+- Public API and module names continue moving away from red-label, ROM, source
+  routine, and assembler process terminology.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- Not started.
 
 ## Ongoing Work
 

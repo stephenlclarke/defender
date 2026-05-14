@@ -65,7 +65,7 @@ pub(crate) fn game_frame_from_accepted(output: AcceptedFrame) -> GameFrame {
 
 fn adapt_frame_output(output: AcceptedFrame) -> GameFrame {
     let state = adapt_snapshot(output.snapshot);
-    let scene = adapt_scene(&state, output.visual_hash);
+    let scene = adapt_scene(&state, output.visual_signature);
 
     GameFrame {
         state,
@@ -110,13 +110,13 @@ fn adapt_snapshot(snapshot: AcceptedSnapshot) -> GameState {
     }
 }
 
-fn adapt_scene(state: &GameState, visual_hash: Option<u32>) -> RenderScene {
+fn adapt_scene(state: &GameState, visual_signature: Option<u32>) -> RenderScene {
     let (width, height) = crate::accepted::native_visible_size();
     let mut scene = RenderScene::empty(
         state.frame,
         SurfaceSize::new(u32::from(width), u32::from(height)),
     );
-    scene.visual_hash = visual_hash;
+    scene.visual_signature = visual_signature;
     scene.push_sprite(SceneSprite {
         sprite: SpriteId::SCORE_TEXT,
         layer: RenderLayer::Hud,
@@ -220,8 +220,11 @@ pub(crate) mod test_support {
         super::adapt_event(event)
     }
 
-    pub(crate) fn adapt_accepted_scene(state: &GameState, visual_hash: Option<u32>) -> RenderScene {
-        super::adapt_scene(state, visual_hash)
+    pub(crate) fn adapt_accepted_scene(
+        state: &GameState,
+        visual_signature: Option<u32>,
+    ) -> RenderScene {
+        super::adapt_scene(state, visual_signature)
     }
 
     pub(crate) fn adapt_accepted_sound_command(command: u8) -> SoundEvent {
