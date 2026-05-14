@@ -225,22 +225,26 @@ Clean rewrite modules:
   controls, audio, run mode, and persistence.
 - `src/audio.rs`: gameplay-facing sound events, the bounded live-audio runtime,
   no-device backends, and worker diagnostics.
+- `src/fidelity.rs`: clean frame-equivalence signatures over gameplay state,
+  gameplay events, sound events, and render summaries.
 - `src/oracle.rs`: the clean gameplay oracle, returning clean state, event,
   sound, and scene-summary frames from the accepted-behavior facade.
 
 Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input,
-sound-board command evidence, fidelity trace generation and threaded fixture
-checks, the threaded live core runtime boundary, `wgpu` window ownership, CMOS
-storage, and test helpers. `src_legacy/accepted_behavior.rs` owns the
+sound-board command evidence, legacy fidelity trace generation and threaded
+fixture checks, the threaded live core runtime boundary, `wgpu` window
+ownership, CMOS storage, and test helpers. `src_legacy/accepted_behavior.rs`
+owns the
 temporary accepted-machine adapter, and legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so `src/accepted.rs` and
 `src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as
 doc-hidden legacy bridge modules rather than supported public API. Internal
-clean equivalence regressions use crate-private oracle wiring, while README
-media tooling uses the narrow doc-hidden `defender::readme_media` facade. The
-binary enters through the clean platform boundary before delegating to the
-runtime bridge. The live
+clean equivalence regressions use crate-private oracle wiring, while clean
+frame-signature gates live under `src/fidelity.rs`. README media tooling uses
+the narrow doc-hidden `defender::readme_media` facade. The binary enters
+through the clean platform boundary before delegating to the runtime bridge.
+The live
 worker now wraps accepted visual output as a clean `RenderScene` raster payload
 before the presenter draws it. Kitty graphics and terminal-session code remain
 parked there as historical compatibility evidence, but they are no longer

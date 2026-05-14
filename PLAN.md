@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `173eaec`.
+- Latest accepted implementation commit before this cycle: `a771596`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -83,8 +83,9 @@ Target module ownership:
 - `platform`: `winit` event loop, input collection, fixed timestep, persistence,
   smoke runner, and device lifecycle.
 - `audio`: gameplay-facing sound events and backend/runtime ownership.
-- `fidelity`: legacy oracle, golden fixtures, trace tooling, and any remaining
-  ROM/source terminology needed to prove behavioral equivalence.
+- `fidelity`: clean state, event, sound, and render-summary equivalence
+  signatures. Legacy oracle traces and any remaining source terminology should
+  stay in `src_legacy/` or historical fixture documentation.
 
 Rewrite rules:
 
@@ -106,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-74` are complete. `DC-75` is planned, and the standing
+`DC-42` through `DC-75` are complete. `DC-76` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2025,7 +2026,71 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778743156254659`
 
-### DC-75: Memory-Oriented Oracle Retirement
+### DC-75: Clean Equivalence Gate Foundation
+
+Status: `complete`
+
+Goal: establish clean state/event/render/sound equivalence signatures before
+retiring memory-oriented trace gates.
+
+Scope:
+
+- Add a clean `src/fidelity.rs` frame signature contract over `GameSnapshot`,
+  gameplay events, sound events, and `RenderSceneSummary`.
+- Root-wire legacy trace tooling as `legacy_fidelity` so the public clean
+  `fidelity` module no longer points at memory-oriented trace code.
+- Add focused tests comparing clean frame signatures with the accepted facade
+  for credited start and live control input.
+- Update README, SPEC, and PLAN to describe clean fidelity signatures and
+  legacy trace quarantine.
+
+Acceptance criteria:
+
+- `src/fidelity.rs` contains no direct legacy module imports.
+- Public clean API exposes `GameplayEquivalenceSignature`.
+- Historical trace tooling remains available under the crate-private
+  `legacy_fidelity` root adapter.
+- Focused signature tests cover state, gameplay events, sound events, and
+  render summaries.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib fidelity::tests
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
+cargo test --lib public_api_tests::legacy_modules_are_crate_private_at_root
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 08:21:38 BST` Started `DC-75`: posted the cycle start update and
+  began adding clean frame-equivalence signatures as the first memory-oriented
+  oracle retirement slice.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778743298143089`
+- `2026-05-14 08:48:24 BST` Completed `DC-75`: added the clean
+  `GameplayEquivalenceSignature` contract in `src/fidelity.rs`, root-wired
+  historical trace tooling as crate-private `legacy_fidelity`, and added
+  focused signature tests against the accepted facade for credited start and
+  live control input. README, SPEC, and PLAN now describe clean fidelity
+  signatures and leave broad memory-model retirement to `DC-76`. Validation
+  passed with formatting, focused fidelity/public API tests, all-target tests,
+  clippy, `make fidelity`, live smoke, markdownlint, and `git diff --check`.
+  `make fidelity` reported new Rust line coverage `0/0` non-baselined added
+  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame
+  CRCs, observed attract, credit, and playing states, injected all required
+  controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778744904031159`
+
+### DC-76: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 

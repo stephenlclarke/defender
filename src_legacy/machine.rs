@@ -32889,8 +32889,8 @@ mod tests {
             RED_LABEL_HIGH_SCORE_MAX_SCORE, RED_LABEL_THSTAB_START, cmos_sram_read_byte,
             cmos_sram_write_byte, video_counter_read_value,
         },
-        fidelity::TraceFrame,
         input::{CabinetInput, DefenderInputPorts},
+        legacy_fidelity::TraceFrame,
         machine::{
             ArcadeMachine, CompatibilityState, GamePhase, MachineEvent,
             RED_LABEL_ATTRACT_PROCESS_TYPE, RED_LABEL_COIN_PROCESS_TYPE,

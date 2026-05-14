@@ -75,24 +75,28 @@ tree:
   controls, audio, run mode, and persistence.
 - `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
   boundary, disabled/null no-device modes, and runtime diagnostics.
+- `src/fidelity.rs`: clean frame-equivalence signatures for gameplay state,
+  gameplay events, sound events, and render summaries.
 - `src/oracle.rs`: the explicit clean gameplay oracle, including clean state,
   event, sound, and scene-summary frames from the accepted-behavior facade.
 
 The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,
-sound-board command evidence, fidelity trace generation, the threaded live core
-runtime boundary, `wgpu` window ownership, CMOS storage, and test helpers until
-clean systems replace those responsibilities. Those root adapters are
-crate-private. Clean runtime and oracle callers use the crate-private
+sound-board command evidence, legacy fidelity trace generation, the threaded
+live core runtime boundary, `wgpu` window ownership, CMOS storage, and test
+helpers until clean systems replace those responsibilities. Those root adapters
+are crate-private. Clean runtime and oracle callers use the crate-private
 `accepted` facade; `src_legacy/accepted_behavior.rs` performs the current
 legacy-machine adaptation into neutral accepted-behavior contracts before the
 public clean gameplay types see it. Legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so clean accepted/oracle source
 stays focused on gameplay contracts. Internal clean equivalence regressions use
-crate-private oracle wiring. Temporary README media tooling uses the
-doc-hidden `defender::readme_media` facade rather than low-level legacy module
-exports. Machine process/state contracts remain crate-private oracle wiring.
-Live presentation receives clean `RenderScene` data, currently with a
+crate-private oracle wiring. Clean frame-signature gates live under
+`src/fidelity.rs`, while legacy trace generation is root-wired as
+`legacy_fidelity`. Temporary README media tooling uses the doc-hidden
+`defender::readme_media` facade rather than low-level legacy module exports.
+Machine process/state contracts remain crate-private oracle wiring. Live
+presentation receives clean `RenderScene` data, currently with a
 temporary raster payload for visual equivalence. Kitty graphics and
 terminal-session code remain parked there as historical
 compatibility evidence, but they are not part of the active runtime or

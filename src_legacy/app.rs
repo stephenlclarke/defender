@@ -11,11 +11,11 @@ use anyhow::{Context, Result, anyhow, bail};
 
 use crate::{
     audio::LiveAudioMode,
-    fidelity::{
+    input::{CabinetInput, InputProfile},
+    legacy_fidelity::{
         compare_trace_text, expanded_trace_input_text, parse_trace_input_script, trace_header,
         trace_scenarios, trace_text_for_inputs,
     },
-    input::{CabinetInput, InputProfile},
     live::run_live,
     rom::{RedLabelRomImages, load_verified_dir},
     wgpu_presenter::run_wgpu_live_smoke,
@@ -1023,8 +1023,8 @@ mod tests {
         trace_fixture_worker_count, validate_trace_requirements_reference_known_scenarios,
     };
     use crate::audio::LiveAudioMode;
-    use crate::fidelity::{expanded_trace_input_text, trace_header};
     use crate::input::InputProfile;
+    use crate::legacy_fidelity::{expanded_trace_input_text, trace_header};
     use crate::rom::RomReport;
     use anyhow::{Result, anyhow};
 

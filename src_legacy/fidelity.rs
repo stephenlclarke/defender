@@ -506,12 +506,12 @@ fn apply_trace_input_action(
 #[cfg(test)]
 mod tests {
     use crate::{
-        fidelity::{
+        input::CabinetInput,
+        legacy_fidelity::{
             TraceFrame, compare_trace_text, expanded_trace_input_text, parse_trace_input_script,
             parse_trace_scenarios, trace_header, trace_output, trace_scenarios,
             trace_text_for_inputs,
         },
-        input::CabinetInput,
         machine::ArcadeMachine,
         machine_state::{CompatibilityState, GamePhase, MachineEvent},
         rom::crc32,

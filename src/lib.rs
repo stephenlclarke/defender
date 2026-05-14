@@ -7,6 +7,7 @@
 mod accepted;
 
 pub mod audio;
+pub mod fidelity;
 pub mod game;
 pub mod oracle;
 pub mod platform;
@@ -40,12 +41,12 @@ pub(crate) mod board;
 pub(crate) mod cmos_storage;
 #[allow(dead_code)]
 #[doc(hidden)]
-#[path = "../src_legacy/fidelity.rs"]
-pub(crate) mod fidelity;
-#[allow(dead_code)]
-#[doc(hidden)]
 #[path = "../src_legacy/input.rs"]
 pub(crate) mod input;
+#[allow(dead_code)]
+#[doc(hidden)]
+#[path = "../src_legacy/fidelity.rs"]
+pub(crate) mod legacy_fidelity;
 #[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/live.rs"]
@@ -103,6 +104,7 @@ pub(crate) mod wgpu_presenter;
 #[path = "../src_legacy/readme_media.rs"]
 pub mod readme_media;
 
+pub use fidelity::GameplayEquivalenceSignature;
 pub use game::{
     Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameSnapshot, GameState,
     PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldVector,
@@ -258,36 +260,50 @@ mod public_api_tests {
                 "accepted facade must use accepted_behavior adapter instead of {forbidden}"
             );
         }
+
+        let fidelity_rs = include_str!("fidelity.rs");
+        for forbidden in [
+            "crate::input::",
+            "crate::machine::",
+            "crate::machine_state::",
+            "crate::red_label::",
+            "crate::video::",
+        ] {
+            assert!(
+                !fidelity_rs.contains(forbidden),
+                "clean fidelity contracts must avoid legacy module import {forbidden}"
+            );
+        }
     }
 
     #[test]
     fn legacy_modules_are_crate_private_at_root() {
         let lib_rs = include_str!("lib.rs");
         let legacy_modules = [
-            "accepted_behavior",
-            "app",
-            "assets",
-            "board",
-            "cmos_storage",
-            "fidelity",
-            "input",
-            "live",
-            "machine",
-            "machine_process",
-            "machine_state",
-            "pia",
-            "red_label",
-            "red_label_memory",
-            "red_label_message",
-            "red_label_wave",
-            "rom",
-            "sound",
-            "video",
-            "wgpu_presenter",
+            ("accepted_behavior", "accepted_behavior"),
+            ("app", "app"),
+            ("assets", "assets"),
+            ("board", "board"),
+            ("cmos_storage", "cmos_storage"),
+            ("legacy_fidelity", "fidelity"),
+            ("input", "input"),
+            ("live", "live"),
+            ("machine", "machine"),
+            ("machine_process", "machine_process"),
+            ("machine_state", "machine_state"),
+            ("pia", "pia"),
+            ("red_label", "red_label"),
+            ("red_label_memory", "red_label_memory"),
+            ("red_label_message", "red_label_message"),
+            ("red_label_wave", "red_label_wave"),
+            ("rom", "rom"),
+            ("sound", "sound"),
+            ("video", "video"),
+            ("wgpu_presenter", "wgpu_presenter"),
         ];
 
-        for module in legacy_modules {
-            let marker = format!("#[path = \"../src_legacy/{module}.rs\"]");
+        for (module, path) in legacy_modules {
+            let marker = format!("#[path = \"../src_legacy/{path}.rs\"]");
             let Some(marker_start) = lib_rs.find(&marker) else {
                 panic!("missing legacy module path for {module}");
             };
