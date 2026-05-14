@@ -80,6 +80,9 @@ where
 fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Result<()> {
     match classification {
         CliClassification::CleanRomReport(request) => crate::runtime::run_rom_report(request.path),
+        CliClassification::CleanVerifyRoms(request) => {
+            crate::runtime::run_verify_roms(request.path)
+        }
         CliClassification::CleanFidelityScenarioList => {
             crate::runtime::run_fidelity_scenario_list()
         }
@@ -103,6 +106,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CliClassification {
     CleanRomReport(RomReportRequest),
+    CleanVerifyRoms(VerifyRomsRequest),
     CleanFidelityScenarioList,
     CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
     HistoricalCommand(HistoricalCliCommand),
@@ -114,13 +118,12 @@ enum CliClassification {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HistoricalCliCommand {
-    VerifyRoms,
-    FidelityTrace,
-    FidelityTraceInputs,
-    FidelityTraceInputsFile,
-    FidelityCheckTrace,
-    FidelityCheckTraceDir,
-    FidelityCheckReferenceTraceDir,
+    Trace,
+    TraceInputs,
+    TraceInputsFile,
+    CheckTrace,
+    CheckTraceDir,
+    CheckReferenceTraceDir,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,6 +134,11 @@ struct CompatibilityCliArg {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RomReportRequest {
     path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct VerifyRomsRequest {
+    path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -155,6 +163,9 @@ impl RuntimeCliClassifier {
                 ArgClassification::CleanRuntime => live_option_seen = true,
                 ArgClassification::CleanRomReport(request) => {
                     return CliClassification::CleanRomReport(request);
+                }
+                ArgClassification::CleanVerifyRoms(request) => {
+                    return CliClassification::CleanVerifyRoms(request);
                 }
                 ArgClassification::CleanFidelityScenarioList => {
                     return CliClassification::CleanFidelityScenarioList;
@@ -238,6 +249,22 @@ impl RuntimeCliClassifier {
                 }
                 ArgClassification::CleanRomReport(RomReportRequest { path })
             }
+            "--verify-roms" => {
+                if live_option_seen {
+                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                        "--verify-roms",
+                    ));
+                }
+                let Some(path) = args.next() else {
+                    return ArgClassification::CleanError(CleanCliError::MissingVerifyRomsPath);
+                };
+                if args.next().is_some() {
+                    return ArgClassification::CleanError(CleanCliError::TooManyVerifyRomsArgs);
+                }
+                ArgClassification::CleanVerifyRoms(VerifyRomsRequest {
+                    path: PathBuf::from(path),
+                })
+            }
             "--fidelity-list-scenarios" => {
                 if live_option_seen {
                     return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
@@ -281,6 +308,7 @@ impl RuntimeCliClassifier {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ArgClassification {
     CleanRomReport(RomReportRequest),
+    CleanVerifyRoms(VerifyRomsRequest),
     CleanFidelityScenarioList,
     CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
     HistoricalCommand(HistoricalCliCommand),
@@ -298,6 +326,8 @@ enum CleanCliError {
     LiveOptionsWithCommand(&'static str),
     RomReportPathCannotBeFlag(String),
     TooManyRomReportArgs,
+    MissingVerifyRomsPath,
+    TooManyVerifyRomsArgs,
     FidelityListScenariosExtraArgs,
     FidelityWriteScenarioInputsMissingPath,
     FidelityWriteScenarioInputsExtraArgs,
@@ -327,6 +357,12 @@ impl fmt::Display for CleanCliError {
             }
             Self::TooManyRomReportArgs => {
                 write!(formatter, "--rom-report only accepts one optional path")
+            }
+            Self::MissingVerifyRomsPath => {
+                write!(formatter, "--verify-roms requires a ROM directory path")
+            }
+            Self::TooManyVerifyRomsArgs => {
+                write!(formatter, "--verify-roms only accepts one directory path")
             }
             Self::FidelityListScenariosExtraArgs => {
                 write!(
@@ -363,14 +399,13 @@ fn parse_control_profile(value: &str) -> Option<ControlProfile> {
 
 fn historical_cli_command(arg: &str) -> Option<HistoricalCliCommand> {
     match arg {
-        "--verify-roms" => Some(HistoricalCliCommand::VerifyRoms),
-        "--fidelity-trace" => Some(HistoricalCliCommand::FidelityTrace),
-        "--fidelity-trace-inputs" => Some(HistoricalCliCommand::FidelityTraceInputs),
-        "--fidelity-trace-inputs-file" => Some(HistoricalCliCommand::FidelityTraceInputsFile),
-        "--fidelity-check-trace" => Some(HistoricalCliCommand::FidelityCheckTrace),
-        "--fidelity-check-trace-dir" => Some(HistoricalCliCommand::FidelityCheckTraceDir),
+        "--fidelity-trace" => Some(HistoricalCliCommand::Trace),
+        "--fidelity-trace-inputs" => Some(HistoricalCliCommand::TraceInputs),
+        "--fidelity-trace-inputs-file" => Some(HistoricalCliCommand::TraceInputsFile),
+        "--fidelity-check-trace" => Some(HistoricalCliCommand::CheckTrace),
+        "--fidelity-check-trace-dir" => Some(HistoricalCliCommand::CheckTraceDir),
         "--fidelity-check-reference-trace-dir" => {
-            Some(HistoricalCliCommand::FidelityCheckReferenceTraceDir)
+            Some(HistoricalCliCommand::CheckReferenceTraceDir)
         }
         _ => None,
     }
@@ -387,7 +422,7 @@ mod tests {
     use super::{
         AudioOutput, CleanCliError, CliClassification, CompatibilityCliArg, ControlProfile,
         HistoricalCliCommand, RomReportRequest, RunMode, RuntimeCliClassifier, RuntimeConfig,
-        ScenarioInputWriterRequest,
+        ScenarioInputWriterRequest, VerifyRomsRequest,
     };
 
     fn args(values: &[&str]) -> Vec<String> {
@@ -490,27 +525,20 @@ mod tests {
     #[test]
     fn clean_cli_delegates_historical_commands() {
         for (arg, command) in [
-            ("--verify-roms", HistoricalCliCommand::VerifyRoms),
-            ("--fidelity-trace", HistoricalCliCommand::FidelityTrace),
-            (
-                "--fidelity-trace-inputs",
-                HistoricalCliCommand::FidelityTraceInputs,
-            ),
+            ("--fidelity-trace", HistoricalCliCommand::Trace),
+            ("--fidelity-trace-inputs", HistoricalCliCommand::TraceInputs),
             (
                 "--fidelity-trace-inputs-file",
-                HistoricalCliCommand::FidelityTraceInputsFile,
+                HistoricalCliCommand::TraceInputsFile,
             ),
-            (
-                "--fidelity-check-trace",
-                HistoricalCliCommand::FidelityCheckTrace,
-            ),
+            ("--fidelity-check-trace", HistoricalCliCommand::CheckTrace),
             (
                 "--fidelity-check-trace-dir",
-                HistoricalCliCommand::FidelityCheckTraceDir,
+                HistoricalCliCommand::CheckTraceDir,
             ),
             (
                 "--fidelity-check-reference-trace-dir",
-                HistoricalCliCommand::FidelityCheckReferenceTraceDir,
+                HistoricalCliCommand::CheckReferenceTraceDir,
             ),
         ] {
             assert_eq!(
@@ -524,11 +552,15 @@ mod tests {
     fn clean_cli_delegates_historical_commands_after_clean_live_flags() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--live-smoke", "--fidelity-trace", "1"])),
-            CliClassification::HistoricalCommand(HistoricalCliCommand::FidelityTrace)
+            CliClassification::HistoricalCommand(HistoricalCliCommand::Trace)
         );
         assert_eq!(
-            RuntimeCliClassifier::classify(args(&["--mute", "--verify-roms", "roms"])),
-            CliClassification::HistoricalCommand(HistoricalCliCommand::VerifyRoms)
+            RuntimeCliClassifier::classify(args(&[
+                "--mute",
+                "--fidelity-check-trace-dir",
+                "fixtures",
+            ])),
+            CliClassification::HistoricalCommand(HistoricalCliCommand::CheckTraceDir)
         );
     }
 
@@ -542,6 +574,16 @@ mod tests {
             RuntimeCliClassifier::classify(args(&["--rom-report", "roms"])),
             CliClassification::CleanRomReport(RomReportRequest {
                 path: Some(PathBuf::from("roms")),
+            })
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_verify_roms_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--verify-roms", "roms"])),
+            CliClassification::CleanVerifyRoms(VerifyRomsRequest {
+                path: PathBuf::from("roms"),
             })
         );
     }
@@ -620,6 +662,26 @@ mod tests {
     }
 
     #[test]
+    fn clean_cli_rejects_malformed_verify_roms_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--verify-roms", "roms"],
+                CleanCliError::LiveOptionsWithCommand("--verify-roms"),
+            ),
+            (vec!["--verify-roms"], CleanCliError::MissingVerifyRomsPath),
+            (
+                vec!["--verify-roms", "roms", "extra"],
+                CleanCliError::TooManyVerifyRomsArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::CleanError(error)
+            );
+        }
+    }
+
+    #[test]
     fn clean_cli_rejects_malformed_fidelity_scenario_listing_args() {
         for (values, error) in [
             (
@@ -686,6 +748,14 @@ mod tests {
         assert_eq!(
             CleanCliError::TooManyRomReportArgs.to_string(),
             "--rom-report only accepts one optional path"
+        );
+        assert_eq!(
+            CleanCliError::MissingVerifyRomsPath.to_string(),
+            "--verify-roms requires a ROM directory path"
+        );
+        assert_eq!(
+            CleanCliError::TooManyVerifyRomsArgs.to_string(),
+            "--verify-roms only accepts one directory path"
         );
         assert_eq!(
             CleanCliError::FidelityListScenariosExtraArgs.to_string(),
@@ -778,6 +848,20 @@ mod tests {
     }
 
     #[test]
+    fn clean_verify_roms_cli_entrypoint_rejects_incomplete_rom_set_through_clean_runtime() {
+        let path = unique_temp_dir("defender-clean-platform-verify-roms");
+        fs::create_dir_all(&path).expect("create temp ROM dir");
+        let path_arg = path.display().to_string();
+
+        let error = super::run_with_args(args(&["--verify-roms", path_arg.as_str()]))
+            .expect_err("incomplete ROM set should return clean verification report");
+
+        assert!(error.to_string().contains("ROM set"));
+        assert!(error.to_string().contains("Missing:"));
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[test]
     fn clean_fidelity_scenario_listing_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--fidelity-list-scenarios"]))
             .expect("clean scenario listing CLI should run through configured runtime");
@@ -801,7 +885,7 @@ mod tests {
 
     #[test]
     fn accepted_cli_entrypoint_delegates_historical_commands() {
-        super::run_with_args(args(&["--verify-roms"]))
+        super::run_with_args(args(&["--fidelity-trace"]))
             .expect("historical CLI commands should delegate to accepted CLI");
     }
 

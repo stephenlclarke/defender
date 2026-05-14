@@ -38,6 +38,11 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
         self.backend.run_command(RuntimeCommand::RomReport { path })
     }
 
+    pub(crate) fn run_verify_roms(&self, path: PathBuf) -> anyhow::Result<()> {
+        self.backend
+            .run_command(RuntimeCommand::VerifyRoms { path })
+    }
+
     pub(crate) fn run_fidelity_scenario_list(&self) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::FidelityScenarioList)
@@ -64,6 +69,9 @@ pub(crate) enum RuntimeCommand {
     Help,
     RomReport {
         path: Option<PathBuf>,
+    },
+    VerifyRoms {
+        path: PathBuf,
     },
     FidelityScenarioList,
     FidelityScenarioInputWriter {
@@ -123,6 +131,7 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 Ok(())
             }
             RuntimeCommand::RomReport { path } => crate::rom_report::run(path.as_deref()),
+            RuntimeCommand::VerifyRoms { path } => crate::rom_report::run_verify(&path),
             RuntimeCommand::FidelityScenarioList => crate::fidelity_scenarios::run_list(),
             RuntimeCommand::FidelityScenarioInputWriter { path } => {
                 crate::fidelity_scenarios::run_write_inputs(&path)
@@ -161,6 +170,10 @@ pub(crate) fn run_help() -> anyhow::Result<()> {
 
 pub(crate) fn run_rom_report(path: Option<PathBuf>) -> anyhow::Result<()> {
     RuntimeHost::current().run_rom_report(path)
+}
+
+pub(crate) fn run_verify_roms(path: PathBuf) -> anyhow::Result<()> {
+    RuntimeHost::current().run_verify_roms(path)
 }
 
 pub(crate) fn run_fidelity_scenario_list() -> anyhow::Result<()> {
@@ -307,6 +320,25 @@ mod tests {
     }
 
     #[test]
+    fn runtime_host_launches_verify_roms_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_verify_roms(PathBuf::from("roms"))
+            .expect("runtime host should run verify ROMs command");
+
+        let observed = calls.borrow();
+        assert_eq!(
+            observed.as_slice(),
+            &[RuntimeCommand::VerifyRoms {
+                path: PathBuf::from("roms"),
+            }]
+        );
+    }
+
+    #[test]
     fn runtime_host_launches_fidelity_scenario_list_separately() {
         let calls = Rc::new(RefCell::new(Vec::new()));
         let host = RuntimeHost::with_backend(RecordingBackend {
@@ -422,6 +454,20 @@ mod tests {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run_rom_report(None)
             .expect("installed backend should run clean ROM listing report");
+    }
+
+    #[test]
+    fn installed_backend_runs_clean_verify_roms_report() {
+        let path = unique_temp_dir("defender-clean-runtime-verify-roms");
+        fs::create_dir_all(&path).expect("create temp ROM dir");
+
+        let error = RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_verify_roms(path.clone())
+            .expect_err("installed backend should report incomplete ROM set");
+
+        assert!(error.to_string().contains("ROM set"));
+        assert!(error.to_string().contains("Missing:"));
+        let _ = fs::remove_dir_all(path);
     }
 
     #[test]

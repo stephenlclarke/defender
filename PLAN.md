@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-94` are complete. The standing maintenance guidance in
+`DC-42` through `DC-95` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3409,6 +3409,81 @@ Work log:
   15452 frames, and 26/26 non-baselined added executable Rust lines covered.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778791204633039`
+
+### DC-95: Clean Verify ROM Command Ownership
+
+Status: `complete`
+
+Goal: retire the remaining ROM-oriented historical CLI command by moving
+`--verify-roms /path/to/roms` into clean runtime ownership alongside
+`--rom-report`.
+
+Scope:
+
+- Add a clean runtime command/config path for `--verify-roms <rom-dir>`.
+- Preserve current required path, extra-argument, live-option conflict,
+  failure report, and successful verification output behavior.
+- Reuse the existing private ROM command facade instead of adding a new clean
+  legacy access path.
+- Keep fidelity trace generation and trace checking commands in the historical
+  command inventory.
+- Add focused platform/runtime/API tests for command classification,
+  malformed arguments, dispatch, and output contract.
+
+Acceptance criteria:
+
+- `cargo run -- --verify-roms <rom-dir>` is served by clean runtime code and
+  preserves the current verification output.
+- Missing paths, extra args, and mixed live options preserve current messages.
+- Historical inventory still explicitly delegates fidelity trace generation
+  and trace checking commands.
+- Public API guards make the new ROM verification ownership boundary visible.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib rom_report::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --verify-roms
+cargo run -- --verify-roms <rom-dir> extra
+cargo run -- --mute --verify-roms <rom-dir>
+cargo run -- --verify-roms <empty-rom-dir>
+cargo run -- --verify-roms assets/roms/defender
+cargo run -- --fidelity-trace 1
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 21:47:30 BST` Started `DC-95`: moving
+  `--verify-roms /path/to/roms` into clean platform/runtime ownership while
+  preserving argument validation, failure report, and success output behavior.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778791679350619`
+- `2026-05-14 22:30:47 BST` Completed `DC-95`: `--verify-roms
+  /path/to/roms` now classifies as a clean platform command, dispatches
+  through `RuntimeCommand::VerifyRoms`, and reuses the private `rom_report`
+  facade for verified-set loading, mapped-image construction, incomplete-set
+  reports, and success output. The historical command inventory now only owns
+  fidelity trace generation and trace checking commands. Validation passed
+  with the focused platform/runtime/rom_report/public API tests, `cargo test
+  --all-targets`, `cargo clippy --all-targets -- -D warnings`, `make
+  fidelity` with 10 trace fixtures, 15452 frames, and 47/47 non-baselined
+  added executable Rust lines covered, CLI probes for missing, extra, mixed
+  live-option, incomplete, complete verify fixture, and historical
+  `--fidelity-trace 1` behavior, `cargo run -- --live-smoke` with 240
+  rendered frames, markdownlint, `cargo fmt --check`, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778794248188319`
 
 ## Ongoing Work
 

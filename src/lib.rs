@@ -241,6 +241,7 @@ mod public_api_tests {
         assert!(platform_rs.contains("crate::runtime::run(&config)"));
         assert!(platform_rs.contains("crate::runtime::run_help()"));
         assert!(platform_rs.contains("crate::runtime::run_rom_report(request.path)"));
+        assert!(platform_rs.contains("crate::runtime::run_verify_roms(request.path)"));
         assert!(platform_rs.contains("crate::runtime::run_fidelity_scenario_list()"));
         assert!(
             platform_rs
@@ -249,6 +250,7 @@ mod public_api_tests {
         assert!(platform_rs.contains("RuntimeCliClassifier::classify(args)"));
         assert!(platform_rs.contains("fn dispatch_cli_classification"));
         assert!(platform_rs.contains("CliClassification::CleanRomReport(request)"));
+        assert!(platform_rs.contains("CliClassification::CleanVerifyRoms(request)"));
         assert!(platform_rs.contains("CliClassification::CleanFidelityScenarioList"));
         assert!(platform_rs.contains("CliClassification::CleanFidelityScenarioInputWriter"));
         assert!(platform_rs.contains("CliClassification::HistoricalCommand(command)"));
@@ -256,10 +258,14 @@ mod public_api_tests {
         assert!(platform_rs.contains("enum HistoricalCliCommand"));
         assert!(platform_rs.contains("struct CompatibilityCliArg"));
         assert!(platform_rs.contains("struct RomReportRequest"));
+        assert!(platform_rs.contains("struct VerifyRomsRequest"));
         assert!(platform_rs.contains("struct ScenarioInputWriterRequest"));
         assert!(platform_rs.contains("\"--rom-report\" =>"));
+        assert!(platform_rs.contains("\"--verify-roms\" =>"));
         assert!(platform_rs.contains("CleanCliError::RomReportPathCannotBeFlag"));
         assert!(platform_rs.contains("CleanCliError::TooManyRomReportArgs"));
+        assert!(platform_rs.contains("CleanCliError::MissingVerifyRomsPath"));
+        assert!(platform_rs.contains("CleanCliError::TooManyVerifyRomsArgs"));
         assert!(platform_rs.contains("CleanCliError::FidelityListScenariosExtraArgs"));
         assert!(platform_rs.contains("CleanCliError::FidelityWriteScenarioInputsMissingPath"));
         assert!(platform_rs.contains("CleanCliError::FidelityWriteScenarioInputsExtraArgs"));
@@ -274,6 +280,7 @@ mod public_api_tests {
         assert!(platform_rs.contains("\"--fidelity-list-scenarios\""));
         assert!(platform_rs.contains("\"--fidelity-write-scenario-inputs\""));
         assert!(platform_rs.contains("\"--fidelity-check-reference-trace-dir\""));
+        assert!(!platform_rs.contains("VerifyRoms,"));
         assert!(!platform_rs.contains("FidelityWriteScenarioInputs,"));
         assert!(platform_rs.contains("CliClassification::CleanRuntime(config)"));
         assert!(platform_rs.contains("CliClassification::CleanHelp"));
@@ -298,13 +305,16 @@ mod public_api_tests {
         assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live_smoke"));
         assert!(runtime_rs.contains("RuntimeCommand::Help"));
         assert!(runtime_rs.contains("RuntimeCommand::RomReport { path }"));
+        assert!(runtime_rs.contains("RuntimeCommand::VerifyRoms { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityScenarioList"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityScenarioInputWriter"));
         assert!(runtime_rs.contains("pub(crate) fn help_text()"));
         assert!(runtime_rs.contains("pub(crate) fn run_rom_report"));
+        assert!(runtime_rs.contains("pub(crate) fn run_verify_roms"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_scenario_list"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_scenario_input_writer"));
         assert!(runtime_rs.contains("crate::rom_report::run(path.as_deref())"));
+        assert!(runtime_rs.contains("crate::rom_report::run_verify(&path)"));
         assert!(runtime_rs.contains("crate::fidelity_scenarios::run_list()"));
         assert!(runtime_rs.contains("crate::fidelity_scenarios::run_write_inputs(&path)"));
         assert!(!runtime_rs.contains("crate::rom::"));
@@ -321,10 +331,14 @@ mod public_api_tests {
 
         let rom_report_rs = include_str!("rom_report.rs");
         assert!(rom_report_rs.contains("pub(crate) fn run("));
+        assert!(rom_report_rs.contains("pub(crate) fn run_verify("));
         assert!(rom_report_rs.contains("fn listing_text()"));
+        assert!(rom_report_rs.contains("fn verification_text("));
         assert!(rom_report_rs.contains("fn report_text(report: &crate::rom::RomReport)"));
         assert!(rom_report_rs.contains("crate::rom::expected_roms()"));
         assert!(rom_report_rs.contains("crate::rom::scan_dir(path)"));
+        assert!(rom_report_rs.contains("crate::rom::load_verified_dir(path)"));
+        assert!(rom_report_rs.contains("crate::rom::RedLabelRomImages::from_verified_rom_set"));
 
         let fidelity_scenarios_rs = include_str!("fidelity_scenarios.rs");
         assert!(fidelity_scenarios_rs.contains("pub(crate) fn run_list("));
