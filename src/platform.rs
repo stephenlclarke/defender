@@ -83,6 +83,9 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
         CliClassification::CleanVerifyRoms(request) => {
             crate::runtime::run_verify_roms(request.path)
         }
+        CliClassification::CleanFidelityTrace(request) => {
+            crate::runtime::run_fidelity_trace(request.frame_count)
+        }
         CliClassification::CleanFidelityScenarioList => {
             crate::runtime::run_fidelity_scenario_list()
         }
@@ -107,6 +110,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
 enum CliClassification {
     CleanRomReport(RomReportRequest),
     CleanVerifyRoms(VerifyRomsRequest),
+    CleanFidelityTrace(FidelityTraceRequest),
     CleanFidelityScenarioList,
     CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
     HistoricalCommand(HistoricalCliCommand),
@@ -118,7 +122,6 @@ enum CliClassification {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HistoricalCliCommand {
-    Trace,
     TraceInputs,
     TraceInputsFile,
     CheckTrace,
@@ -139,6 +142,11 @@ struct RomReportRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct VerifyRomsRequest {
     path: PathBuf,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FidelityTraceRequest {
+    frame_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -166,6 +174,9 @@ impl RuntimeCliClassifier {
                 }
                 ArgClassification::CleanVerifyRoms(request) => {
                     return CliClassification::CleanVerifyRoms(request);
+                }
+                ArgClassification::CleanFidelityTrace(request) => {
+                    return CliClassification::CleanFidelityTrace(request);
                 }
                 ArgClassification::CleanFidelityScenarioList => {
                     return CliClassification::CleanFidelityScenarioList;
@@ -265,6 +276,24 @@ impl RuntimeCliClassifier {
                     path: PathBuf::from(path),
                 })
             }
+            "--fidelity-trace" => {
+                if live_option_seen {
+                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                        "--fidelity-trace",
+                    ));
+                }
+                let frame_count = match args.next() {
+                    Some(value) => match parse_fidelity_trace_frame_count(&value) {
+                        Ok(frame_count) => frame_count,
+                        Err(error) => return ArgClassification::CleanError(error),
+                    },
+                    None => 1,
+                };
+                if args.next().is_some() {
+                    return ArgClassification::CleanError(CleanCliError::TooManyFidelityTraceArgs);
+                }
+                ArgClassification::CleanFidelityTrace(FidelityTraceRequest { frame_count })
+            }
             "--fidelity-list-scenarios" => {
                 if live_option_seen {
                     return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
@@ -309,6 +338,7 @@ impl RuntimeCliClassifier {
 enum ArgClassification {
     CleanRomReport(RomReportRequest),
     CleanVerifyRoms(VerifyRomsRequest),
+    CleanFidelityTrace(FidelityTraceRequest),
     CleanFidelityScenarioList,
     CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
     HistoricalCommand(HistoricalCliCommand),
@@ -328,6 +358,9 @@ enum CleanCliError {
     TooManyRomReportArgs,
     MissingVerifyRomsPath,
     TooManyVerifyRomsArgs,
+    InvalidFidelityTraceFrameCount { value: String, error: String },
+    NonPositiveFidelityTraceFrameCount,
+    TooManyFidelityTraceArgs,
     FidelityListScenariosExtraArgs,
     FidelityWriteScenarioInputsMissingPath,
     FidelityWriteScenarioInputsExtraArgs,
@@ -364,6 +397,24 @@ impl fmt::Display for CleanCliError {
             Self::TooManyVerifyRomsArgs => {
                 write!(formatter, "--verify-roms only accepts one directory path")
             }
+            Self::InvalidFidelityTraceFrameCount { value, error } => {
+                write!(
+                    formatter,
+                    "invalid --fidelity-trace frame count: {value}: {error}"
+                )
+            }
+            Self::NonPositiveFidelityTraceFrameCount => {
+                write!(
+                    formatter,
+                    "--fidelity-trace frame count must be greater than zero"
+                )
+            }
+            Self::TooManyFidelityTraceArgs => {
+                write!(
+                    formatter,
+                    "--fidelity-trace only accepts one optional frame count"
+                )
+            }
             Self::FidelityListScenariosExtraArgs => {
                 write!(
                     formatter,
@@ -388,6 +439,21 @@ impl fmt::Display for CleanCliError {
 
 impl std::error::Error for CleanCliError {}
 
+fn parse_fidelity_trace_frame_count(value: &str) -> Result<usize, CleanCliError> {
+    let frame_count =
+        value
+            .parse::<usize>()
+            .map_err(|error| CleanCliError::InvalidFidelityTraceFrameCount {
+                value: String::from(value),
+                error: error.to_string(),
+            })?;
+    if frame_count == 0 {
+        return Err(CleanCliError::NonPositiveFidelityTraceFrameCount);
+    }
+
+    Ok(frame_count)
+}
+
 fn parse_control_profile(value: &str) -> Option<ControlProfile> {
     match value {
         "planetoid" => Some(ControlProfile::Planetoid),
@@ -399,7 +465,6 @@ fn parse_control_profile(value: &str) -> Option<ControlProfile> {
 
 fn historical_cli_command(arg: &str) -> Option<HistoricalCliCommand> {
     match arg {
-        "--fidelity-trace" => Some(HistoricalCliCommand::Trace),
         "--fidelity-trace-inputs" => Some(HistoricalCliCommand::TraceInputs),
         "--fidelity-trace-inputs-file" => Some(HistoricalCliCommand::TraceInputsFile),
         "--fidelity-check-trace" => Some(HistoricalCliCommand::CheckTrace),
@@ -421,8 +486,8 @@ mod tests {
 
     use super::{
         AudioOutput, CleanCliError, CliClassification, CompatibilityCliArg, ControlProfile,
-        HistoricalCliCommand, RomReportRequest, RunMode, RuntimeCliClassifier, RuntimeConfig,
-        ScenarioInputWriterRequest, VerifyRomsRequest,
+        FidelityTraceRequest, HistoricalCliCommand, RomReportRequest, RunMode,
+        RuntimeCliClassifier, RuntimeConfig, ScenarioInputWriterRequest, VerifyRomsRequest,
     };
 
     fn args(values: &[&str]) -> Vec<String> {
@@ -525,7 +590,6 @@ mod tests {
     #[test]
     fn clean_cli_delegates_historical_commands() {
         for (arg, command) in [
-            ("--fidelity-trace", HistoricalCliCommand::Trace),
             ("--fidelity-trace-inputs", HistoricalCliCommand::TraceInputs),
             (
                 "--fidelity-trace-inputs-file",
@@ -551,8 +615,12 @@ mod tests {
     #[test]
     fn clean_cli_delegates_historical_commands_after_clean_live_flags() {
         assert_eq!(
-            RuntimeCliClassifier::classify(args(&["--live-smoke", "--fidelity-trace", "1"])),
-            CliClassification::HistoricalCommand(HistoricalCliCommand::Trace)
+            RuntimeCliClassifier::classify(args(&[
+                "--live-smoke",
+                "--fidelity-trace-inputs",
+                "none",
+            ])),
+            CliClassification::HistoricalCommand(HistoricalCliCommand::TraceInputs)
         );
         assert_eq!(
             RuntimeCliClassifier::classify(args(&[
@@ -585,6 +653,18 @@ mod tests {
             CliClassification::CleanVerifyRoms(VerifyRomsRequest {
                 path: PathBuf::from("roms"),
             })
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_fidelity_trace_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--fidelity-trace"])),
+            CliClassification::CleanFidelityTrace(FidelityTraceRequest { frame_count: 1 })
+        );
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--fidelity-trace", "300"])),
+            CliClassification::CleanFidelityTrace(FidelityTraceRequest { frame_count: 300 })
         );
     }
 
@@ -682,6 +762,36 @@ mod tests {
     }
 
     #[test]
+    fn clean_cli_rejects_malformed_fidelity_trace_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--fidelity-trace", "1"],
+                CleanCliError::LiveOptionsWithCommand("--fidelity-trace"),
+            ),
+            (
+                vec!["--fidelity-trace", "wat"],
+                CleanCliError::InvalidFidelityTraceFrameCount {
+                    value: String::from("wat"),
+                    error: String::from("invalid digit found in string"),
+                },
+            ),
+            (
+                vec!["--fidelity-trace", "0"],
+                CleanCliError::NonPositiveFidelityTraceFrameCount,
+            ),
+            (
+                vec!["--fidelity-trace", "1", "extra"],
+                CleanCliError::TooManyFidelityTraceArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::CleanError(error)
+            );
+        }
+    }
+
+    #[test]
     fn clean_cli_rejects_malformed_fidelity_scenario_listing_args() {
         for (values, error) in [
             (
@@ -756,6 +866,22 @@ mod tests {
         assert_eq!(
             CleanCliError::TooManyVerifyRomsArgs.to_string(),
             "--verify-roms only accepts one directory path"
+        );
+        assert_eq!(
+            CleanCliError::InvalidFidelityTraceFrameCount {
+                value: String::from("wat"),
+                error: String::from("invalid digit found in string"),
+            }
+            .to_string(),
+            "invalid --fidelity-trace frame count: wat: invalid digit found in string"
+        );
+        assert_eq!(
+            CleanCliError::NonPositiveFidelityTraceFrameCount.to_string(),
+            "--fidelity-trace frame count must be greater than zero"
+        );
+        assert_eq!(
+            CleanCliError::TooManyFidelityTraceArgs.to_string(),
+            "--fidelity-trace only accepts one optional frame count"
         );
         assert_eq!(
             CleanCliError::FidelityListScenariosExtraArgs.to_string(),
@@ -868,6 +994,12 @@ mod tests {
     }
 
     #[test]
+    fn clean_fidelity_trace_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&["--fidelity-trace", "1"]))
+            .expect("clean fidelity trace CLI should run through configured runtime");
+    }
+
+    #[test]
     fn clean_fidelity_scenario_input_writer_cli_entrypoint_accepts_supported_args() {
         let path = unique_temp_dir("defender-clean-platform-scenario-inputs");
         let _ = fs::remove_dir_all(&path);
@@ -885,7 +1017,7 @@ mod tests {
 
     #[test]
     fn accepted_cli_entrypoint_delegates_historical_commands() {
-        super::run_with_args(args(&["--fidelity-trace"]))
+        super::run_with_args(args(&["--fidelity-trace-inputs", "none"]))
             .expect("historical CLI commands should delegate to accepted CLI");
     }
 

@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-95` are complete. The standing maintenance guidance in
+`DC-42` through `DC-96` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3484,6 +3484,85 @@ Work log:
   rendered frames, markdownlint, `cargo fmt --check`, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778794248188319`
+
+### DC-96: Clean Fidelity Trace Command Ownership
+
+Status: `complete`
+
+Goal: move `--fidelity-trace <frames>` into clean platform/runtime ownership
+while preserving the current trace output and argument behavior.
+
+Scope:
+
+- Add a clean command/config path for `--fidelity-trace` with the current
+  default one-frame trace.
+- Preserve live-option conflict, invalid frame-count, zero frame-count, and
+  extra-argument error messages.
+- Add a private fidelity trace facade that keeps legacy trace generation
+  quarantined behind clean runtime ownership.
+- Leave trace-input and trace-check commands in the historical inventory for
+  later slices.
+- Add focused platform/runtime/API tests for classification, malformed
+  arguments, dispatch, and output contract.
+
+Acceptance criteria:
+
+- `cargo run -- --fidelity-trace` and `cargo run -- --fidelity-trace 2` are
+  served by clean runtime code and preserve the current trace text.
+- Malformed `--fidelity-trace` invocations preserve current messages.
+- Historical inventory still explicitly delegates trace-input and trace-check
+  commands.
+- Public API guards make the new trace generation boundary visible.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib fidelity_traces::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --fidelity-trace
+cargo run -- --fidelity-trace 2
+cargo run -- --fidelity-trace 0
+cargo run -- --fidelity-trace wat
+cargo run -- --fidelity-trace 1 extra
+cargo run -- --mute --fidelity-trace 1
+cargo run -- --fidelity-trace-inputs none
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 22:32:30 BST` Started `DC-96`: moving
+  `--fidelity-trace <frames>` into clean platform/runtime ownership while
+  preserving default frame count, malformed-count errors, trace text, and
+  historical delegation for trace-input and trace-check commands.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778794361787019`
+- `2026-05-14 22:55:51 BST` Completed `DC-96`: `--fidelity-trace
+  <frames>` now classifies as a clean platform command, dispatches through
+  `RuntimeCommand::FidelityTrace`, and generates the current idle trace through
+  a private `fidelity_traces` facade. The facade keeps legacy trace generation
+  quarantined while preserving default one-frame output, counted output,
+  malformed-count messages, zero-count rejection, extra-argument rejection, and
+  live-option conflict behavior. Trace-input and trace-check commands remain
+  in the historical inventory for later slices. Validation passed with the
+  focused platform/runtime/fidelity trace/public API tests, `cargo test
+  --all-targets`, `cargo clippy --all-targets -- -D warnings`, `make
+  fidelity` with 10 trace fixtures, 15452 frames, and 40/40 non-baselined
+  added executable Rust lines covered, CLI probes for successful and malformed
+  `--fidelity-trace` invocations plus historical `--fidelity-trace-inputs
+  none`, `cargo run -- --live-smoke` with 240 rendered frames, markdownlint,
+  `cargo fmt --check`, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778795765516439`
 
 ## Ongoing Work
 

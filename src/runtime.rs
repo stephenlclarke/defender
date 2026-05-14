@@ -43,6 +43,11 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
             .run_command(RuntimeCommand::VerifyRoms { path })
     }
 
+    pub(crate) fn run_fidelity_trace(&self, frame_count: usize) -> anyhow::Result<()> {
+        self.backend
+            .run_command(RuntimeCommand::FidelityTrace { frame_count })
+    }
+
     pub(crate) fn run_fidelity_scenario_list(&self) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::FidelityScenarioList)
@@ -72,6 +77,9 @@ pub(crate) enum RuntimeCommand {
     },
     VerifyRoms {
         path: PathBuf,
+    },
+    FidelityTrace {
+        frame_count: usize,
     },
     FidelityScenarioList,
     FidelityScenarioInputWriter {
@@ -132,6 +140,9 @@ impl RuntimeBackend for InstalledRuntimeBackend {
             }
             RuntimeCommand::RomReport { path } => crate::rom_report::run(path.as_deref()),
             RuntimeCommand::VerifyRoms { path } => crate::rom_report::run_verify(&path),
+            RuntimeCommand::FidelityTrace { frame_count } => {
+                crate::fidelity_traces::run_trace(frame_count)
+            }
             RuntimeCommand::FidelityScenarioList => crate::fidelity_scenarios::run_list(),
             RuntimeCommand::FidelityScenarioInputWriter { path } => {
                 crate::fidelity_scenarios::run_write_inputs(&path)
@@ -174,6 +185,10 @@ pub(crate) fn run_rom_report(path: Option<PathBuf>) -> anyhow::Result<()> {
 
 pub(crate) fn run_verify_roms(path: PathBuf) -> anyhow::Result<()> {
     RuntimeHost::current().run_verify_roms(path)
+}
+
+pub(crate) fn run_fidelity_trace(frame_count: usize) -> anyhow::Result<()> {
+    RuntimeHost::current().run_fidelity_trace(frame_count)
 }
 
 pub(crate) fn run_fidelity_scenario_list() -> anyhow::Result<()> {
@@ -339,6 +354,23 @@ mod tests {
     }
 
     #[test]
+    fn runtime_host_launches_fidelity_trace_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_fidelity_trace(300)
+            .expect("runtime host should run fidelity trace command");
+
+        let observed = calls.borrow();
+        assert_eq!(
+            observed.as_slice(),
+            &[RuntimeCommand::FidelityTrace { frame_count: 300 }]
+        );
+    }
+
+    #[test]
     fn runtime_host_launches_fidelity_scenario_list_separately() {
         let calls = Rc::new(RefCell::new(Vec::new()));
         let host = RuntimeHost::with_backend(RecordingBackend {
@@ -475,6 +507,13 @@ mod tests {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run_fidelity_scenario_list()
             .expect("installed backend should run clean scenario list");
+    }
+
+    #[test]
+    fn installed_backend_runs_clean_fidelity_trace() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_fidelity_trace(1)
+            .expect("installed backend should run clean fidelity trace");
     }
 
     #[test]
