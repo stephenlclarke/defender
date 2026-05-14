@@ -263,6 +263,10 @@ mod public_api_tests {
 
         let fidelity_rs = include_str!("fidelity.rs");
         for forbidden in [
+            "crate::accepted::",
+            "AcceptedFrame",
+            "AcceptedGameplayMachine",
+            "adapt_accepted_",
             "crate::input::",
             "crate::machine::",
             "crate::machine_state::",

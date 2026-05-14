@@ -228,7 +228,9 @@ Clean rewrite modules:
   no-device backends, and worker diagnostics. It consumes clean `GameFrame`
   and `SoundEvent` contracts, not legacy frame outputs.
 - `src/fidelity.rs`: clean frame-equivalence signatures over gameplay state,
-  gameplay events, sound events, and render summaries.
+  gameplay events, sound events, and render summaries. Clean fidelity tests use
+  oracle-owned reference probes instead of importing accepted facade types
+  directly.
 - `src/oracle.rs`: the clean gameplay oracle, returning clean state, event,
   sound, and scene-summary frames from the accepted-behavior facade while
   owning accepted sound command-byte mapping.

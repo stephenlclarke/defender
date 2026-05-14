@@ -78,7 +78,9 @@ tree:
   boundary, disabled/null no-device modes, and runtime diagnostics. It consumes
   clean `GameFrame` and `SoundEvent` contracts, not legacy frame outputs.
 - `src/fidelity.rs`: clean frame-equivalence signatures for gameplay state,
-  gameplay events, sound events, and render summaries.
+  gameplay events, sound events, and render summaries. Clean fidelity tests use
+  oracle-owned reference probes instead of importing accepted facade types
+  directly.
 - `src/oracle.rs`: the explicit clean gameplay oracle, including clean state,
   event, sound, scene-summary frames, and accepted sound command-byte mapping
   from the accepted-behavior facade.
@@ -95,8 +97,9 @@ public clean gameplay types see it. Legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so clean accepted/oracle source
 stays focused on gameplay contracts. Internal clean equivalence regressions use
 crate-private oracle wiring. Clean frame-signature gates live under
-`src/fidelity.rs`, while legacy trace generation is root-wired as
-`legacy_fidelity`. Legacy live code adapts frame outputs into clean audio
+`src/fidelity.rs` and use oracle-owned reference probes for accepted behavior
+comparison, while legacy trace generation is root-wired as `legacy_fidelity`.
+Legacy live code adapts frame outputs into clean audio
 frames before submitting to `src/audio.rs`. Temporary README media tooling uses
 the doc-hidden `defender::readme_media` facade rather than low-level legacy
 module exports. Machine process/state contracts remain crate-private oracle

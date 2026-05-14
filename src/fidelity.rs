@@ -27,18 +27,11 @@ impl GameplayEquivalenceSignature {
 #[cfg(test)]
 mod tests {
     use crate::{
-        accepted::{AcceptedFrame, AcceptedGameplayMachine},
         game::{
             Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameState,
             PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldVector,
         },
-        oracle::{
-            GameplayOracle,
-            test_support::{
-                adapt_accepted_event, adapt_accepted_scene, adapt_accepted_snapshot,
-                adapt_accepted_sound_command,
-            },
-        },
+        oracle::{GameplayOracle, test_support::ReferenceFrameProbe},
         renderer::{RenderScene, SurfaceSize},
     };
 
@@ -90,19 +83,20 @@ mod tests {
     }
 
     #[test]
-    fn clean_frame_signatures_match_accepted_facade_for_start_and_controls() {
+    fn clean_frame_signatures_match_reference_probe_for_start_and_controls() {
         let mut clean = GameplayOracle::new();
-        let mut accepted = AcceptedGameplayMachine::new();
+        let mut reference = ReferenceFrameProbe::new();
         let mut observed_gameplay = Vec::new();
         let mut observed_sounds = Vec::new();
         let mut saw_playing_render = false;
 
         for input in credited_start_and_controls_inputs() {
             let clean_frame = clean.step(input);
-            let expected_frame = accepted_frame_signature(accepted.step(input));
+            let expected_frame = reference.step(input);
             let clean_signature = GameplayEquivalenceSignature::from_frame(&clean_frame);
+            let expected_signature = GameplayEquivalenceSignature::from_frame(&expected_frame);
 
-            assert_eq!(clean_signature, expected_frame);
+            assert_eq!(clean_signature, expected_signature);
             observed_gameplay.extend_from_slice(&clean_signature.gameplay_events);
             observed_sounds.extend_from_slice(&clean_signature.sound_events);
             saw_playing_render |= clean_signature.state.phase == GamePhase::Playing
@@ -115,20 +109,6 @@ mod tests {
         assert!(observed_sounds.contains(&SoundEvent::CreditAdded));
         assert!(observed_sounds.contains(&SoundEvent::GameStarted));
         assert!(saw_playing_render);
-    }
-
-    fn accepted_frame_signature(frame: AcceptedFrame) -> GameplayEquivalenceSignature {
-        let state = adapt_accepted_snapshot(frame.snapshot);
-        GameplayEquivalenceSignature {
-            state: state.clone(),
-            gameplay_events: frame.events.into_iter().map(adapt_accepted_event).collect(),
-            sound_events: frame
-                .sound_commands
-                .into_iter()
-                .map(adapt_accepted_sound_command)
-                .collect(),
-            render: adapt_accepted_scene(&state, frame.visual_hash).summary(),
-        }
     }
 
     fn credited_start_and_controls_inputs() -> Vec<GameInput> {

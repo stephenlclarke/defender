@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `472e14f`.
+- Latest accepted implementation commit before this cycle: `58a2820`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-77` are complete. `DC-78` is planned, and the standing
+`DC-42` through `DC-78` are complete. `DC-79` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2222,7 +2222,79 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778747892960589`
 
-### DC-78: Memory-Oriented Oracle Retirement
+### DC-78: Clean Fidelity Reference Probe Isolation
+
+Status: `complete`
+
+Goal: remove clean fidelity tests' direct accepted-facade dependencies by
+moving reference-machine probing behind oracle test support.
+
+Scope:
+
+- Add an oracle-owned `ReferenceFrameProbe` for test-only reference frames.
+- Remove direct `AcceptedFrame` and `AcceptedGameplayMachine` imports from
+  `src/fidelity.rs`.
+- Keep `GameplayEquivalenceSignature` tests on clean `GameFrame` values and
+  oracle-provided reference frames.
+- Add a public API guard so clean fidelity cannot import accepted facade types
+  directly.
+- Update `README.md`, `SPEC.md`, and `PLAN.md`.
+
+Acceptance criteria:
+
+- `src/fidelity.rs` contains no `crate::accepted::`, `AcceptedFrame`,
+  `AcceptedGameplayMachine`, or `adapt_accepted_` references.
+- Oracle test support owns reference probing from the accepted implementation.
+- Fidelity tests still prove clean signatures match a separate reference probe
+  for credited start and controls.
+- Documentation describes the reference-probe boundary.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib fidelity::tests
+cargo test --lib oracle::tests
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+! rg -n \
+  -e "crate::accepted::" \
+  -e "AcceptedFrame" \
+  -e "AcceptedGameplayMachine" \
+  -e "adapt_accepted_" \
+  src/fidelity.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 09:40:38 BST` Started `DC-78`: posted the cycle start update and
+  began moving clean fidelity reference-machine probing out of `src/fidelity.rs`
+  and behind oracle test support while keeping the fidelity contract on clean
+  `GameFrame` signatures.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778748038056829`
+- `2026-05-14 10:04:58 BST` Completed `DC-78`: added the oracle-owned
+  `ReferenceFrameProbe`, removed direct accepted facade imports and adapter
+  helpers from `src/fidelity.rs`, strengthened the public API guard against
+  reintroducing those references, and updated README, SPEC, and PLAN to
+  describe the reference-probe boundary. Broad memory-oriented oracle
+  retirement moved to `DC-79`. Validation passed with formatting; focused
+  fidelity, oracle, and public API tests; all-target tests; clippy;
+  `make fidelity`; live smoke; the static fidelity accepted-facade guard;
+  markdownlint; and `git diff --check`. `make fidelity` matched 10 trace
+  fixtures covering 15452 frames and reported new Rust line coverage `0/0`
+  non-baselined added executable lines. Live smoke rendered 239 frames, saw 74
+  distinct frame CRCs, observed attract, credit, and playing states, injected
+  all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778749498248829`
+
+### DC-79: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 

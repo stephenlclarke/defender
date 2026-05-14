@@ -186,8 +186,25 @@ fn adapt_sound_command(command: u8) -> SoundEvent {
 
 #[cfg(test)]
 pub(crate) mod test_support {
-    use super::{GameEvent, GameState, RenderScene, SoundEvent};
-    use crate::accepted::{AcceptedEvent, AcceptedSnapshot};
+    use super::{GameEvent, GameFrame, GameInput, GameState, RenderScene, SoundEvent};
+    use crate::accepted::{AcceptedEvent, AcceptedGameplayMachine, AcceptedSnapshot};
+
+    #[derive(Debug)]
+    pub(crate) struct ReferenceFrameProbe {
+        machine: AcceptedGameplayMachine,
+    }
+
+    impl ReferenceFrameProbe {
+        pub(crate) fn new() -> Self {
+            Self {
+                machine: AcceptedGameplayMachine::new(),
+            }
+        }
+
+        pub(crate) fn step(&mut self, input: GameInput) -> GameFrame {
+            super::adapt_frame_output(self.machine.step(input))
+        }
+    }
 
     pub(crate) fn adapt_accepted_snapshot(snapshot: AcceptedSnapshot) -> GameState {
         super::adapt_snapshot(snapshot)
