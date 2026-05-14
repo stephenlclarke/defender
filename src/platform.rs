@@ -83,6 +83,9 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
         CliClassification::CleanFidelityScenarioList => {
             crate::runtime::run_fidelity_scenario_list()
         }
+        CliClassification::CleanFidelityScenarioInputWriter(request) => {
+            crate::runtime::run_fidelity_scenario_input_writer(request.path)
+        }
         CliClassification::HistoricalCommand(command) => {
             let _command = command;
             crate::runtime::run_cli()
@@ -101,6 +104,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
 enum CliClassification {
     CleanRomReport(RomReportRequest),
     CleanFidelityScenarioList,
+    CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
     HistoricalCommand(HistoricalCliCommand),
     CompatibilityFallback(CompatibilityCliArg),
     CleanRuntime(RuntimeConfig),
@@ -116,7 +120,6 @@ enum HistoricalCliCommand {
     FidelityTraceInputsFile,
     FidelityCheckTrace,
     FidelityCheckTraceDir,
-    FidelityWriteScenarioInputs,
     FidelityCheckReferenceTraceDir,
 }
 
@@ -128,6 +131,11 @@ struct CompatibilityCliArg {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RomReportRequest {
     path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ScenarioInputWriterRequest {
+    path: PathBuf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,6 +158,9 @@ impl RuntimeCliClassifier {
                 }
                 ArgClassification::CleanFidelityScenarioList => {
                     return CliClassification::CleanFidelityScenarioList;
+                }
+                ArgClassification::CleanFidelityScenarioInputWriter(request) => {
+                    return CliClassification::CleanFidelityScenarioInputWriter(request);
                 }
                 ArgClassification::CleanHelp => return CliClassification::CleanHelp,
                 ArgClassification::CleanError(error) => {
@@ -240,6 +251,26 @@ impl RuntimeCliClassifier {
                 }
                 ArgClassification::CleanFidelityScenarioList
             }
+            "--fidelity-write-scenario-inputs" => {
+                if live_option_seen {
+                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                        "--fidelity-write-scenario-inputs",
+                    ));
+                }
+                let Some(path) = args.next() else {
+                    return ArgClassification::CleanError(
+                        CleanCliError::FidelityWriteScenarioInputsMissingPath,
+                    );
+                };
+                if args.next().is_some() {
+                    return ArgClassification::CleanError(
+                        CleanCliError::FidelityWriteScenarioInputsExtraArgs,
+                    );
+                }
+                ArgClassification::CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest {
+                    path: PathBuf::from(path),
+                })
+            }
             _ => historical_cli_command(arg)
                 .map(ArgClassification::HistoricalCommand)
                 .unwrap_or_else(|| ArgClassification::CompatibilityFallback(String::from(arg))),
@@ -251,6 +282,7 @@ impl RuntimeCliClassifier {
 enum ArgClassification {
     CleanRomReport(RomReportRequest),
     CleanFidelityScenarioList,
+    CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
     HistoricalCommand(HistoricalCliCommand),
     CompatibilityFallback(String),
     CleanRuntime,
@@ -267,6 +299,8 @@ enum CleanCliError {
     RomReportPathCannotBeFlag(String),
     TooManyRomReportArgs,
     FidelityListScenariosExtraArgs,
+    FidelityWriteScenarioInputsMissingPath,
+    FidelityWriteScenarioInputsExtraArgs,
 }
 
 impl fmt::Display for CleanCliError {
@@ -300,6 +334,18 @@ impl fmt::Display for CleanCliError {
                     "--fidelity-list-scenarios does not accept extra arguments"
                 )
             }
+            Self::FidelityWriteScenarioInputsMissingPath => {
+                write!(
+                    formatter,
+                    "--fidelity-write-scenario-inputs requires an output directory path"
+                )
+            }
+            Self::FidelityWriteScenarioInputsExtraArgs => {
+                write!(
+                    formatter,
+                    "--fidelity-write-scenario-inputs only accepts one output directory path"
+                )
+            }
         }
     }
 }
@@ -323,9 +369,6 @@ fn historical_cli_command(arg: &str) -> Option<HistoricalCliCommand> {
         "--fidelity-trace-inputs-file" => Some(HistoricalCliCommand::FidelityTraceInputsFile),
         "--fidelity-check-trace" => Some(HistoricalCliCommand::FidelityCheckTrace),
         "--fidelity-check-trace-dir" => Some(HistoricalCliCommand::FidelityCheckTraceDir),
-        "--fidelity-write-scenario-inputs" => {
-            Some(HistoricalCliCommand::FidelityWriteScenarioInputs)
-        }
         "--fidelity-check-reference-trace-dir" => {
             Some(HistoricalCliCommand::FidelityCheckReferenceTraceDir)
         }
@@ -335,11 +378,16 @@ fn historical_cli_command(arg: &str) -> Option<HistoricalCliCommand> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     use super::{
         AudioOutput, CleanCliError, CliClassification, CompatibilityCliArg, ControlProfile,
         HistoricalCliCommand, RomReportRequest, RunMode, RuntimeCliClassifier, RuntimeConfig,
+        ScenarioInputWriterRequest,
     };
 
     fn args(values: &[&str]) -> Vec<String> {
@@ -461,10 +509,6 @@ mod tests {
                 HistoricalCliCommand::FidelityCheckTraceDir,
             ),
             (
-                "--fidelity-write-scenario-inputs",
-                HistoricalCliCommand::FidelityWriteScenarioInputs,
-            ),
-            (
                 "--fidelity-check-reference-trace-dir",
                 HistoricalCliCommand::FidelityCheckReferenceTraceDir,
             ),
@@ -507,6 +551,19 @@ mod tests {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-list-scenarios"])),
             CliClassification::CleanFidelityScenarioList
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_fidelity_scenario_input_writer_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&[
+                "--fidelity-write-scenario-inputs",
+                "scenario-inputs",
+            ])),
+            CliClassification::CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest {
+                path: PathBuf::from("scenario-inputs"),
+            })
         );
     }
 
@@ -582,6 +639,29 @@ mod tests {
     }
 
     #[test]
+    fn clean_cli_rejects_malformed_fidelity_scenario_input_writer_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--fidelity-write-scenario-inputs", "inputs"],
+                CleanCliError::LiveOptionsWithCommand("--fidelity-write-scenario-inputs"),
+            ),
+            (
+                vec!["--fidelity-write-scenario-inputs"],
+                CleanCliError::FidelityWriteScenarioInputsMissingPath,
+            ),
+            (
+                vec!["--fidelity-write-scenario-inputs", "inputs", "extra"],
+                CleanCliError::FidelityWriteScenarioInputsExtraArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::CleanError(error)
+            );
+        }
+    }
+
+    #[test]
     fn clean_cli_error_messages_are_stable() {
         assert_eq!(
             CleanCliError::MissingInputProfile.to_string(),
@@ -610,6 +690,14 @@ mod tests {
         assert_eq!(
             CleanCliError::FidelityListScenariosExtraArgs.to_string(),
             "--fidelity-list-scenarios does not accept extra arguments"
+        );
+        assert_eq!(
+            CleanCliError::FidelityWriteScenarioInputsMissingPath.to_string(),
+            "--fidelity-write-scenario-inputs requires an output directory path"
+        );
+        assert_eq!(
+            CleanCliError::FidelityWriteScenarioInputsExtraArgs.to_string(),
+            "--fidelity-write-scenario-inputs only accepts one output directory path"
         );
     }
 
@@ -696,6 +784,22 @@ mod tests {
     }
 
     #[test]
+    fn clean_fidelity_scenario_input_writer_cli_entrypoint_accepts_supported_args() {
+        let path = unique_temp_dir("defender-clean-platform-scenario-inputs");
+        let _ = fs::remove_dir_all(&path);
+        let path_arg = path.display().to_string();
+
+        super::run_with_args(args(&[
+            "--fidelity-write-scenario-inputs",
+            path_arg.as_str(),
+        ]))
+        .expect("clean scenario input writer CLI should run through configured runtime");
+
+        assert!(path.join("attract_boot.inputs.txt").is_file());
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[test]
     fn accepted_cli_entrypoint_delegates_historical_commands() {
         super::run_with_args(args(&["--verify-roms"]))
             .expect("historical CLI commands should delegate to accepted CLI");
@@ -711,5 +815,14 @@ mod tests {
     fn configured_runtime_entrypoint_accepts_clean_smoke_config() {
         super::run_with_config(RuntimeConfig::smoke())
             .expect("configured runtime bridge should run smoke under tests");
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+
+        std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()))
     }
 }

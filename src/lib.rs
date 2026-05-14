@@ -8,13 +8,13 @@ mod accepted;
 
 pub mod audio;
 pub mod fidelity;
+mod fidelity_scenarios;
 pub mod game;
 mod oracle;
 pub mod platform;
 pub mod renderer;
 mod rom_report;
 mod runtime;
-mod scenario_listing;
 pub mod systems;
 
 // Legacy bridge modules are hidden from the supported clean API surface while
@@ -242,19 +242,27 @@ mod public_api_tests {
         assert!(platform_rs.contains("crate::runtime::run_help()"));
         assert!(platform_rs.contains("crate::runtime::run_rom_report(request.path)"));
         assert!(platform_rs.contains("crate::runtime::run_fidelity_scenario_list()"));
+        assert!(
+            platform_rs
+                .contains("crate::runtime::run_fidelity_scenario_input_writer(request.path)")
+        );
         assert!(platform_rs.contains("RuntimeCliClassifier::classify(args)"));
         assert!(platform_rs.contains("fn dispatch_cli_classification"));
         assert!(platform_rs.contains("CliClassification::CleanRomReport(request)"));
         assert!(platform_rs.contains("CliClassification::CleanFidelityScenarioList"));
+        assert!(platform_rs.contains("CliClassification::CleanFidelityScenarioInputWriter"));
         assert!(platform_rs.contains("CliClassification::HistoricalCommand(command)"));
         assert!(platform_rs.contains("CliClassification::CompatibilityFallback(arg)"));
         assert!(platform_rs.contains("enum HistoricalCliCommand"));
         assert!(platform_rs.contains("struct CompatibilityCliArg"));
         assert!(platform_rs.contains("struct RomReportRequest"));
+        assert!(platform_rs.contains("struct ScenarioInputWriterRequest"));
         assert!(platform_rs.contains("\"--rom-report\" =>"));
         assert!(platform_rs.contains("CleanCliError::RomReportPathCannotBeFlag"));
         assert!(platform_rs.contains("CleanCliError::TooManyRomReportArgs"));
         assert!(platform_rs.contains("CleanCliError::FidelityListScenariosExtraArgs"));
+        assert!(platform_rs.contains("CleanCliError::FidelityWriteScenarioInputsMissingPath"));
+        assert!(platform_rs.contains("CleanCliError::FidelityWriteScenarioInputsExtraArgs"));
         assert!(platform_rs.contains("CleanCliError::LiveOptionsWithCommand"));
         assert!(platform_rs.contains("historical_cli_command(arg)"));
         assert!(platform_rs.contains("\"--verify-roms\""));
@@ -266,6 +274,7 @@ mod public_api_tests {
         assert!(platform_rs.contains("\"--fidelity-list-scenarios\""));
         assert!(platform_rs.contains("\"--fidelity-write-scenario-inputs\""));
         assert!(platform_rs.contains("\"--fidelity-check-reference-trace-dir\""));
+        assert!(!platform_rs.contains("FidelityWriteScenarioInputs,"));
         assert!(platform_rs.contains("CliClassification::CleanRuntime(config)"));
         assert!(platform_rs.contains("CliClassification::CleanHelp"));
         assert!(platform_rs.contains("CliClassification::CleanError(error)"));
@@ -290,22 +299,25 @@ mod public_api_tests {
         assert!(runtime_rs.contains("RuntimeCommand::Help"));
         assert!(runtime_rs.contains("RuntimeCommand::RomReport { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityScenarioList"));
+        assert!(runtime_rs.contains("RuntimeCommand::FidelityScenarioInputWriter"));
         assert!(runtime_rs.contains("pub(crate) fn help_text()"));
         assert!(runtime_rs.contains("pub(crate) fn run_rom_report"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_scenario_list"));
+        assert!(runtime_rs.contains("pub(crate) fn run_fidelity_scenario_input_writer"));
         assert!(runtime_rs.contains("crate::rom_report::run(path.as_deref())"));
-        assert!(runtime_rs.contains("crate::scenario_listing::run()"));
+        assert!(runtime_rs.contains("crate::fidelity_scenarios::run_list()"));
+        assert!(runtime_rs.contains("crate::fidelity_scenarios::run_write_inputs(&path)"));
         assert!(!runtime_rs.contains("crate::rom::"));
         assert!(!runtime_rs.contains(&accepted_runtime_call));
         assert!(!runtime_rs.contains(&app_runtime_call));
 
         let lib_rs = include_str!("lib.rs");
         let public_rom_report_module = format!("pub mod {};", "rom_report");
-        let public_scenario_listing_module = format!("pub mod {};", "scenario_listing");
+        let public_fidelity_scenarios_module = format!("pub mod {};", "fidelity_scenarios");
         assert!(lib_rs.contains("mod rom_report;"));
         assert!(!lib_rs.contains(&public_rom_report_module));
-        assert!(lib_rs.contains("mod scenario_listing;"));
-        assert!(!lib_rs.contains(&public_scenario_listing_module));
+        assert!(lib_rs.contains("mod fidelity_scenarios;"));
+        assert!(!lib_rs.contains(&public_fidelity_scenarios_module));
 
         let rom_report_rs = include_str!("rom_report.rs");
         assert!(rom_report_rs.contains("pub(crate) fn run("));
@@ -314,10 +326,15 @@ mod public_api_tests {
         assert!(rom_report_rs.contains("crate::rom::expected_roms()"));
         assert!(rom_report_rs.contains("crate::rom::scan_dir(path)"));
 
-        let scenario_listing_rs = include_str!("scenario_listing.rs");
-        assert!(scenario_listing_rs.contains("pub(crate) fn run("));
-        assert!(scenario_listing_rs.contains("fn listing_text()"));
-        assert!(scenario_listing_rs.contains("crate::legacy_fidelity::trace_scenarios()"));
+        let fidelity_scenarios_rs = include_str!("fidelity_scenarios.rs");
+        assert!(fidelity_scenarios_rs.contains("pub(crate) fn run_list("));
+        assert!(fidelity_scenarios_rs.contains("pub(crate) fn run_write_inputs("));
+        assert!(fidelity_scenarios_rs.contains("fn listing_text()"));
+        assert!(fidelity_scenarios_rs.contains("fn write_inputs_text(path: &Path)"));
+        assert!(fidelity_scenarios_rs.contains("crate::legacy_fidelity::trace_scenarios()"));
+        assert!(
+            fidelity_scenarios_rs.contains("crate::legacy_fidelity::expanded_trace_input_text")
+        );
 
         let oracle_rs = include_str!("oracle.rs");
         assert!(oracle_rs.contains("crate::accepted::"));
@@ -416,16 +433,16 @@ mod public_api_tests {
             ("src/audio.rs", include_str!("audio.rs")),
             ("src/fidelity.rs", include_str!("fidelity.rs")),
             ("src/game.rs", include_str!("game.rs")),
+            (
+                "src/fidelity_scenarios.rs",
+                include_str!("fidelity_scenarios.rs"),
+            ),
             ("src/main.rs", include_str!("main.rs")),
             ("src/oracle.rs", include_str!("oracle.rs")),
             ("src/platform.rs", include_str!("platform.rs")),
             ("src/renderer.rs", include_str!("renderer.rs")),
             ("src/rom_report.rs", include_str!("rom_report.rs")),
             ("src/runtime.rs", include_str!("runtime.rs")),
-            (
-                "src/scenario_listing.rs",
-                include_str!("scenario_listing.rs"),
-            ),
             ("src/systems.rs", include_str!("systems.rs")),
         ];
         let low_level_legacy_imports = [
@@ -460,7 +477,7 @@ mod public_api_tests {
                 if path == "src/rom_report.rs" && forbidden == "crate::rom::" {
                     continue;
                 }
-                if path == "src/scenario_listing.rs" && forbidden == "crate::legacy_fidelity::" {
+                if path == "src/fidelity_scenarios.rs" && forbidden == "crate::legacy_fidelity::" {
                     continue;
                 }
 

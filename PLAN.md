@@ -107,8 +107,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-93` are complete. `DC-94` is planned, and the standing
-maintenance guidance in Ongoing Work still applies.
+`DC-42` through `DC-94` are complete. The standing maintenance guidance in
+Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -3339,7 +3339,7 @@ Work log:
 
 ### DC-94: Clean Fidelity Scenario Input Writer Ownership
 
-Status: `planned`
+Status: `complete`
 
 Goal: move the read/write scenario input expansion helper command into clean
 runtime ownership while keeping trace generation and trace checking in the
@@ -3375,7 +3375,7 @@ Validation:
 cargo fmt --check
 cargo test --lib platform::tests::
 cargo test --lib runtime::tests::
-cargo test --lib scenario_listing::tests::
+cargo test --lib fidelity_scenarios::tests::
 cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
 cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
 cargo test --all-targets
@@ -3383,6 +3383,8 @@ cargo clippy --all-targets -- -D warnings
 make fidelity
 cargo run -- --fidelity-write-scenario-inputs <empty-temp-dir>
 cargo run -- --fidelity-write-scenario-inputs
+cargo run -- --fidelity-write-scenario-inputs <empty-temp-dir> extra
+cargo run -- --mute --fidelity-write-scenario-inputs <empty-temp-dir>
 cargo run -- --fidelity-trace-inputs 'coin,start_one'
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
 git diff --check
@@ -3390,7 +3392,23 @@ git diff --check
 
 Work log:
 
-- Not started.
+- `2026-05-14 21:14:36 BST` Started `DC-94`: moving
+  `--fidelity-write-scenario-inputs <output-dir>` into clean runtime
+  ownership while preserving directory creation, `*.inputs.txt` file naming,
+  expanded input text, and completion output. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778789688179609`
+- `2026-05-14 21:39:12 BST` Completed `DC-94`: scenario listing and scenario
+  input writing now share a private `fidelity_scenarios` clean facade.
+  `--fidelity-write-scenario-inputs <output-dir>` classifies as a clean CLI
+  command, dispatches through
+  `RuntimeCommand::FidelityScenarioInputWriter`, and writes the same 12
+  expanded scenario input scripts as the historical helper. Trace generation
+  and trace checking commands remain in the historical inventory, and public
+  API guards expose the new quarantine boundary. Validation passed with the
+  full command set above, including `make fidelity` with 10 trace fixtures,
+  15452 frames, and 26/26 non-baselined added executable Rust lines covered.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778791204633039`
 
 ## Ongoing Work
 

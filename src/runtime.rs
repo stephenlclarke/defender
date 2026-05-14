@@ -43,6 +43,11 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
             .run_command(RuntimeCommand::FidelityScenarioList)
     }
 
+    pub(crate) fn run_fidelity_scenario_input_writer(&self, path: PathBuf) -> anyhow::Result<()> {
+        self.backend
+            .run_command(RuntimeCommand::FidelityScenarioInputWriter { path })
+    }
+
     pub(crate) fn run(&self, config: &RuntimeConfig) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::from_config(config))
@@ -61,6 +66,9 @@ pub(crate) enum RuntimeCommand {
         path: Option<PathBuf>,
     },
     FidelityScenarioList,
+    FidelityScenarioInputWriter {
+        path: PathBuf,
+    },
     WgpuLive {
         input_profile: InputProfile,
         audio_mode: LiveAudioMode,
@@ -115,7 +123,10 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 Ok(())
             }
             RuntimeCommand::RomReport { path } => crate::rom_report::run(path.as_deref()),
-            RuntimeCommand::FidelityScenarioList => crate::scenario_listing::run(),
+            RuntimeCommand::FidelityScenarioList => crate::fidelity_scenarios::run_list(),
+            RuntimeCommand::FidelityScenarioInputWriter { path } => {
+                crate::fidelity_scenarios::run_write_inputs(&path)
+            }
             RuntimeCommand::WgpuLive {
                 input_profile,
                 audio_mode,
@@ -156,6 +167,10 @@ pub(crate) fn run_fidelity_scenario_list() -> anyhow::Result<()> {
     RuntimeHost::current().run_fidelity_scenario_list()
 }
 
+pub(crate) fn run_fidelity_scenario_input_writer(path: PathBuf) -> anyhow::Result<()> {
+    RuntimeHost::current().run_fidelity_scenario_input_writer(path)
+}
+
 pub(crate) fn run(config: &RuntimeConfig) -> anyhow::Result<()> {
     RuntimeHost::current().run(config)
 }
@@ -190,7 +205,13 @@ pub(crate) fn help_text() -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, path::PathBuf, rc::Rc};
+    use std::{
+        cell::RefCell,
+        fs,
+        path::PathBuf,
+        rc::Rc,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     use crate::platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
     use crate::{audio::LiveAudioMode, input::InputProfile};
@@ -300,6 +321,25 @@ mod tests {
     }
 
     #[test]
+    fn runtime_host_launches_fidelity_scenario_input_writer_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_fidelity_scenario_input_writer(PathBuf::from("inputs"))
+            .expect("runtime host should run scenario input writer command");
+
+        let observed = calls.borrow();
+        assert_eq!(
+            observed.as_slice(),
+            &[RuntimeCommand::FidelityScenarioInputWriter {
+                path: PathBuf::from("inputs"),
+            }]
+        );
+    }
+
+    #[test]
     fn default_config_uses_wgpu_live_launch() {
         assert_eq!(
             RuntimeCommand::from_config(&RuntimeConfig::default()),
@@ -392,6 +432,19 @@ mod tests {
     }
 
     #[test]
+    fn installed_backend_runs_clean_fidelity_scenario_input_writer() {
+        let path = unique_temp_dir("defender-clean-runtime-scenario-inputs");
+        let _ = fs::remove_dir_all(&path);
+
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_fidelity_scenario_input_writer(path.clone())
+            .expect("installed backend should run clean scenario input writer");
+
+        assert!(path.join("attract_boot.inputs.txt").is_file());
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[test]
     fn clean_help_text_preserves_current_cli_contract() {
         let text = help_text();
 
@@ -415,5 +468,14 @@ mod tests {
         assert!(text.contains("copy-only deployment"));
         assert!(text.contains("uses the windowed wgpu"));
         assert!(!text.contains("Kitty graphics"));
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+
+        std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()))
     }
 }
