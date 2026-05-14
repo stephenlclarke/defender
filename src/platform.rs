@@ -90,13 +90,13 @@ fn launch_from_args<I>(args: I) -> CliLaunch
 where
     I: IntoIterator<Item = String>,
 {
-    let mut config = RuntimeConfig::smoke();
-    let mut clean_smoke_requested = false;
+    let mut config = RuntimeConfig::default();
     let mut args = args.into_iter();
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--live-smoke" => clean_smoke_requested = true,
+            "--live-smoke" => config.mode = RunMode::Smoke,
+            "--help" | "-h" => return CliLaunch::AcceptedCli,
             "--input-profile" => {
                 let Some(value) = args.next() else {
                     return CliLaunch::AcceptedCli;
@@ -117,11 +117,7 @@ where
         }
     }
 
-    if clean_smoke_requested {
-        CliLaunch::CleanRuntime(config)
-    } else {
-        CliLaunch::AcceptedCli
-    }
+    CliLaunch::CleanRuntime(config)
 }
 
 fn parse_control_profile(value: &str) -> Option<ControlProfile> {
@@ -156,6 +152,33 @@ mod tests {
     #[test]
     fn smoke_config_selects_smoke_mode() {
         assert_eq!(RuntimeConfig::smoke().mode, RunMode::Smoke);
+    }
+
+    #[test]
+    fn clean_cli_owns_default_interactive_launch() {
+        assert_eq!(
+            super::launch_from_args(args(&[])),
+            CliLaunch::CleanRuntime(RuntimeConfig::default())
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_interactive_configuration_flags() {
+        assert_eq!(
+            super::launch_from_args(args(&[
+                "--input-profile",
+                "cabinet",
+                "--mute",
+                "--cmos-path",
+                "scores.bin",
+            ])),
+            CliLaunch::CleanRuntime(RuntimeConfig {
+                controls: ControlProfile::Cabinet,
+                audio: AudioOutput::Disabled,
+                mode: RunMode::Interactive,
+                cmos_path: Some(PathBuf::from("scores.bin")),
+            })
+        );
     }
 
     #[test]
@@ -200,12 +223,13 @@ mod tests {
     }
 
     #[test]
-    fn clean_cli_delegates_default_live_cli() {
-        assert_eq!(super::launch_from_args(args(&[])), CliLaunch::AcceptedCli);
-        assert_eq!(
-            super::launch_from_args(args(&["--input-profile", "cabinet"])),
-            CliLaunch::AcceptedCli
-        );
+    fn clean_cli_delegates_help_to_accepted_cli() {
+        for values in [vec!["--help"], vec!["-h"], vec!["--mute", "--help"]] {
+            assert_eq!(
+                super::launch_from_args(args(&values)),
+                CliLaunch::AcceptedCli
+            );
+        }
     }
 
     #[test]
@@ -221,12 +245,16 @@ mod tests {
     }
 
     #[test]
-    fn clean_cli_delegates_malformed_live_smoke_args() {
+    fn clean_cli_delegates_malformed_live_args() {
         for values in [
             vec!["--live-smoke", "--input-profile"],
             vec!["--live-smoke", "--input-profile", "unknown"],
             vec!["--live-smoke", "--cmos-path"],
             vec!["--live-smoke", "--unknown"],
+            vec!["--input-profile"],
+            vec!["--input-profile", "unknown"],
+            vec!["--cmos-path"],
+            vec!["--unknown"],
         ] {
             assert_eq!(
                 super::launch_from_args(args(&values)),
@@ -236,14 +264,26 @@ mod tests {
     }
 
     #[test]
-    fn runtime_entrypoint_delegates_to_runtime_bridge() {
-        super::run().expect("runtime bridge should run help under tests");
+    fn runtime_entrypoint_runs_clean_default_live_config() {
+        super::run().expect("runtime bridge should run clean default live under tests");
     }
 
     #[test]
     fn live_smoke_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--live-smoke", "--input-profile", "test", "--mute"]))
             .expect("clean live-smoke CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn interactive_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&[
+            "--input-profile",
+            "test",
+            "--mute",
+            "--cmos-path",
+            "scores.bin",
+        ]))
+        .expect("clean interactive CLI should run through configured runtime");
     }
 
     #[test]
