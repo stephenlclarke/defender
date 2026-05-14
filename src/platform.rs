@@ -80,6 +80,9 @@ where
 fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Result<()> {
     match classification {
         CliClassification::CleanRomReport(request) => crate::runtime::run_rom_report(request.path),
+        CliClassification::CleanFidelityScenarioList => {
+            crate::runtime::run_fidelity_scenario_list()
+        }
         CliClassification::HistoricalCommand(command) => {
             let _command = command;
             crate::runtime::run_cli()
@@ -97,6 +100,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CliClassification {
     CleanRomReport(RomReportRequest),
+    CleanFidelityScenarioList,
     HistoricalCommand(HistoricalCliCommand),
     CompatibilityFallback(CompatibilityCliArg),
     CleanRuntime(RuntimeConfig),
@@ -112,7 +116,6 @@ enum HistoricalCliCommand {
     FidelityTraceInputsFile,
     FidelityCheckTrace,
     FidelityCheckTraceDir,
-    FidelityListScenarios,
     FidelityWriteScenarioInputs,
     FidelityCheckReferenceTraceDir,
 }
@@ -144,6 +147,9 @@ impl RuntimeCliClassifier {
                 ArgClassification::CleanRuntime => live_option_seen = true,
                 ArgClassification::CleanRomReport(request) => {
                     return CliClassification::CleanRomReport(request);
+                }
+                ArgClassification::CleanFidelityScenarioList => {
+                    return CliClassification::CleanFidelityScenarioList;
                 }
                 ArgClassification::CleanHelp => return CliClassification::CleanHelp,
                 ArgClassification::CleanError(error) => {
@@ -221,6 +227,19 @@ impl RuntimeCliClassifier {
                 }
                 ArgClassification::CleanRomReport(RomReportRequest { path })
             }
+            "--fidelity-list-scenarios" => {
+                if live_option_seen {
+                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                        "--fidelity-list-scenarios",
+                    ));
+                }
+                if args.next().is_some() {
+                    return ArgClassification::CleanError(
+                        CleanCliError::FidelityListScenariosExtraArgs,
+                    );
+                }
+                ArgClassification::CleanFidelityScenarioList
+            }
             _ => historical_cli_command(arg)
                 .map(ArgClassification::HistoricalCommand)
                 .unwrap_or_else(|| ArgClassification::CompatibilityFallback(String::from(arg))),
@@ -231,6 +250,7 @@ impl RuntimeCliClassifier {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ArgClassification {
     CleanRomReport(RomReportRequest),
+    CleanFidelityScenarioList,
     HistoricalCommand(HistoricalCliCommand),
     CompatibilityFallback(String),
     CleanRuntime,
@@ -246,6 +266,7 @@ enum CleanCliError {
     LiveOptionsWithCommand(&'static str),
     RomReportPathCannotBeFlag(String),
     TooManyRomReportArgs,
+    FidelityListScenariosExtraArgs,
 }
 
 impl fmt::Display for CleanCliError {
@@ -273,6 +294,12 @@ impl fmt::Display for CleanCliError {
             Self::TooManyRomReportArgs => {
                 write!(formatter, "--rom-report only accepts one optional path")
             }
+            Self::FidelityListScenariosExtraArgs => {
+                write!(
+                    formatter,
+                    "--fidelity-list-scenarios does not accept extra arguments"
+                )
+            }
         }
     }
 }
@@ -296,7 +323,6 @@ fn historical_cli_command(arg: &str) -> Option<HistoricalCliCommand> {
         "--fidelity-trace-inputs-file" => Some(HistoricalCliCommand::FidelityTraceInputsFile),
         "--fidelity-check-trace" => Some(HistoricalCliCommand::FidelityCheckTrace),
         "--fidelity-check-trace-dir" => Some(HistoricalCliCommand::FidelityCheckTraceDir),
-        "--fidelity-list-scenarios" => Some(HistoricalCliCommand::FidelityListScenarios),
         "--fidelity-write-scenario-inputs" => {
             Some(HistoricalCliCommand::FidelityWriteScenarioInputs)
         }
@@ -435,10 +461,6 @@ mod tests {
                 HistoricalCliCommand::FidelityCheckTraceDir,
             ),
             (
-                "--fidelity-list-scenarios",
-                HistoricalCliCommand::FidelityListScenarios,
-            ),
-            (
                 "--fidelity-write-scenario-inputs",
                 HistoricalCliCommand::FidelityWriteScenarioInputs,
             ),
@@ -477,6 +499,14 @@ mod tests {
             CliClassification::CleanRomReport(RomReportRequest {
                 path: Some(PathBuf::from("roms")),
             })
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_fidelity_scenario_listing_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--fidelity-list-scenarios"])),
+            CliClassification::CleanFidelityScenarioList
         );
     }
 
@@ -533,6 +563,25 @@ mod tests {
     }
 
     #[test]
+    fn clean_cli_rejects_malformed_fidelity_scenario_listing_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--fidelity-list-scenarios"],
+                CleanCliError::LiveOptionsWithCommand("--fidelity-list-scenarios"),
+            ),
+            (
+                vec!["--fidelity-list-scenarios", "extra"],
+                CleanCliError::FidelityListScenariosExtraArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::CleanError(error)
+            );
+        }
+    }
+
+    #[test]
     fn clean_cli_error_messages_are_stable() {
         assert_eq!(
             CleanCliError::MissingInputProfile.to_string(),
@@ -557,6 +606,10 @@ mod tests {
         assert_eq!(
             CleanCliError::TooManyRomReportArgs.to_string(),
             "--rom-report only accepts one optional path"
+        );
+        assert_eq!(
+            CleanCliError::FidelityListScenariosExtraArgs.to_string(),
+            "--fidelity-list-scenarios does not accept extra arguments"
         );
     }
 
@@ -634,6 +687,12 @@ mod tests {
     fn clean_rom_report_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--rom-report"]))
             .expect("clean ROM report CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn clean_fidelity_scenario_listing_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&["--fidelity-list-scenarios"]))
+            .expect("clean scenario listing CLI should run through configured runtime");
     }
 
     #[test]

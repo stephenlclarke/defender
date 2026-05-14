@@ -38,6 +38,11 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
         self.backend.run_command(RuntimeCommand::RomReport { path })
     }
 
+    pub(crate) fn run_fidelity_scenario_list(&self) -> anyhow::Result<()> {
+        self.backend
+            .run_command(RuntimeCommand::FidelityScenarioList)
+    }
+
     pub(crate) fn run(&self, config: &RuntimeConfig) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::from_config(config))
@@ -55,6 +60,7 @@ pub(crate) enum RuntimeCommand {
     RomReport {
         path: Option<PathBuf>,
     },
+    FidelityScenarioList,
     WgpuLive {
         input_profile: InputProfile,
         audio_mode: LiveAudioMode,
@@ -109,6 +115,7 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 Ok(())
             }
             RuntimeCommand::RomReport { path } => crate::rom_report::run(path.as_deref()),
+            RuntimeCommand::FidelityScenarioList => crate::scenario_listing::run(),
             RuntimeCommand::WgpuLive {
                 input_profile,
                 audio_mode,
@@ -143,6 +150,10 @@ pub(crate) fn run_help() -> anyhow::Result<()> {
 
 pub(crate) fn run_rom_report(path: Option<PathBuf>) -> anyhow::Result<()> {
     RuntimeHost::current().run_rom_report(path)
+}
+
+pub(crate) fn run_fidelity_scenario_list() -> anyhow::Result<()> {
+    RuntimeHost::current().run_fidelity_scenario_list()
 }
 
 pub(crate) fn run(config: &RuntimeConfig) -> anyhow::Result<()> {
@@ -275,6 +286,20 @@ mod tests {
     }
 
     #[test]
+    fn runtime_host_launches_fidelity_scenario_list_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_fidelity_scenario_list()
+            .expect("runtime host should run scenario list command");
+
+        let observed = calls.borrow();
+        assert_eq!(observed.as_slice(), &[RuntimeCommand::FidelityScenarioList]);
+    }
+
+    #[test]
     fn default_config_uses_wgpu_live_launch() {
         assert_eq!(
             RuntimeCommand::from_config(&RuntimeConfig::default()),
@@ -357,6 +382,13 @@ mod tests {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run_rom_report(None)
             .expect("installed backend should run clean ROM listing report");
+    }
+
+    #[test]
+    fn installed_backend_runs_clean_fidelity_scenario_list() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_fidelity_scenario_list()
+            .expect("installed backend should run clean scenario list");
     }
 
     #[test]

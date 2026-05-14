@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-92` are complete. `DC-93` is planned, and the standing
+`DC-42` through `DC-93` are complete. `DC-94` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3273,7 +3273,7 @@ Work log:
 
 ### DC-93: Clean Fidelity Scenario Listing Ownership
 
-Status: `planned`
+Status: `complete`
 
 Goal: retire the next low-risk historical CLI command by moving the
 read-only fidelity scenario listing command into clean runtime ownership while
@@ -3303,13 +3303,87 @@ Validation:
 cargo fmt --check
 cargo test --lib platform::tests::
 cargo test --lib runtime::tests::
+cargo test --lib scenario_listing::tests::
 cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
 cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
 cargo run -- --fidelity-list-scenarios
+cargo run -- --fidelity-list-scenarios extra
+cargo run -- --mute --fidelity-list-scenarios
 cargo run -- --fidelity-trace 1
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 20:32:55 BST` Started `DC-93`: moving the read-only
+  `--fidelity-list-scenarios` command into clean runtime ownership while
+  leaving trace generation, trace checking, fixture checking, reference
+  checking, and scenario input writing in the historical inventory. Slack
+  start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778787188057879`
+- `2026-05-14 20:55:19 BST` Completed `DC-93`: `--fidelity-list-scenarios`
+  now classifies as a clean CLI command, dispatches through
+  `RuntimeCommand::FidelityScenarioList`, and uses a private
+  `scenario_listing` facade that preserves the current scenario manifest
+  text and ordering. Public API guards now expose the ownership boundary and
+  keep the new facade as the only clean source allowed to read the legacy
+  trace scenario manifest. Validation passed with the full command set above,
+  including `make fidelity` with 10 trace fixtures, 15452 frames, and 17/17
+  non-baselined added executable Rust lines covered. Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778789519436699`
+
+### DC-94: Clean Fidelity Scenario Input Writer Ownership
+
+Status: `planned`
+
+Goal: move the read/write scenario input expansion helper command into clean
+runtime ownership while keeping trace generation and trace checking in the
+historical adapter.
+
+Scope:
+
+- Add a clean runtime command/config path for
+  `--fidelity-write-scenario-inputs <output-dir>`.
+- Preserve current directory creation, file naming, expanded input text, and
+  completion message.
+- Keep `--fidelity-trace`, `--fidelity-trace-inputs`,
+  `--fidelity-trace-inputs-file`, `--fidelity-check-trace`,
+  `--fidelity-check-trace-dir`, and
+  `--fidelity-check-reference-trace-dir` in the historical command inventory.
+- Reuse the scenario manifest facade added in DC-93 rather than adding a new
+  legacy access path.
+- Add focused platform/runtime/API tests for command classification,
+  malformed arguments, dispatch, and output/file contract.
+
+Acceptance criteria:
+
+- `cargo run -- --fidelity-write-scenario-inputs <temp-dir>` is served by
+  clean runtime code and writes the same input scripts as before.
+- Historical inventory still explicitly delegates trace generation and trace
+  checking commands.
+- Public API guards keep the scenario manifest/input facade private and
+  quarantined.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib scenario_listing::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --fidelity-write-scenario-inputs <empty-temp-dir>
+cargo run -- --fidelity-write-scenario-inputs
+cargo run -- --fidelity-trace-inputs 'coin,start_one'
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
 git diff --check
 ```
