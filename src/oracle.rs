@@ -4,45 +4,51 @@
 //! against the existing behavior without letting converted implementation names
 //! leak into new production contracts.
 
+#[cfg(test)]
+use crate::accepted::AcceptedGameplayMachine;
 use crate::accepted::{
-    AcceptedDirection, AcceptedEvent, AcceptedFrame, AcceptedGameplayMachine, AcceptedPhase,
-    AcceptedSnapshot,
+    AcceptedDirection, AcceptedEvent, AcceptedFrame, AcceptedPhase, AcceptedSnapshot,
 };
 
 use crate::game::{
-    Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameState, PlayerSnapshot,
+    Direction, GameEvent, GameEvents, GameFrame, GamePhase, GameState, PlayerSnapshot,
     ScoreSnapshot, SoundEvent, WorldVector,
 };
 use crate::renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize};
-use crate::systems::GameSimulation;
+#[cfg(test)]
+use crate::{game::GameInput, systems::GameSimulation};
 
+#[cfg(test)]
 #[derive(Debug)]
-pub struct GameplayOracle {
+pub(crate) struct GameplayOracle {
     machine: AcceptedGameplayMachine,
 }
 
+#[cfg(test)]
 impl GameplayOracle {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             machine: AcceptedGameplayMachine::new(),
         }
     }
 
-    pub fn snapshot(&self) -> GameState {
+    pub(crate) fn snapshot(&self) -> GameState {
         adapt_snapshot(self.machine.snapshot())
     }
 
-    pub fn step(&mut self, input: GameInput) -> GameFrame {
+    pub(crate) fn step(&mut self, input: GameInput) -> GameFrame {
         adapt_frame_output(self.machine.step(input))
     }
 }
 
+#[cfg(test)]
 impl Default for GameplayOracle {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(test)]
 impl GameSimulation for GameplayOracle {
     fn state(&self) -> GameState {
         self.snapshot()

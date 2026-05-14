@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `3ab82ce`.
+- Latest accepted implementation commit before this cycle: `fb111e4`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-80` are complete. `DC-81` is planned, and the standing
+`DC-42` through `DC-81` are complete. `DC-82` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2442,7 +2442,7 @@ Work log:
   `src/oracle.rs` plus `src/platform.rs` can call the temporary accepted facade.
   Removed remaining clean-source references to memory-oriented terminology,
   documented the guard in `README.md` and `SPEC.md`, and moved the broader
-  memory-oriented oracle retirement milestone to `DC-81`. Validation passed with
+  memory-oriented oracle retirement milestone to `DC-82`. Validation passed with
   formatting; focused public API guards; the full Rust test suite; clippy with
   warnings denied; `make fidelity`; live smoke; the static clean-source
   terminology scan; markdownlint; and `git diff --check`. The `make fidelity`
@@ -2453,7 +2453,77 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778753657368129`
 
-### DC-81: Memory-Oriented Oracle Retirement
+### DC-81: Gameplay Oracle Public Surface Retirement
+
+Status: `complete`
+
+Goal: remove the gameplay oracle from the supported public API while keeping it
+available internally for fidelity and regression tests.
+
+Scope:
+
+- Make `src/oracle.rs` a crate-private module instead of a supported public
+  module.
+- Remove the public `GameplayOracle` re-export from `src/lib.rs`.
+- Keep internal oracle tests, fidelity signatures, and legacy equivalence tests
+  working through crate-private wiring.
+- Replace the public oracle contract test with a public clean `Game` simulation
+  contract and add a guard that the oracle stays internal.
+- Update `README.md`, `SPEC.md`, and `PLAN.md`.
+
+Acceptance criteria:
+
+- Supported public API exposes clean gameplay contracts, not the temporary
+  oracle.
+- Internal fidelity tooling can still instantiate the oracle for historical
+  comparison.
+- Runtime behavior and trace fixture fidelity remain unchanged.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation
+cargo test --lib public_api_tests::gameplay_oracle_is_internal_fidelity_wiring
+cargo test --lib oracle::tests
+cargo test --lib fidelity::tests::clean_frame_signatures_match_reference_probe_for_start_and_controls
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+! rg -n \
+  -e "pub mod oracle;" \
+  -e "pub use oracle::GameplayOracle;" \
+  -e "crate::GameplayOracle" \
+  src
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 11:16:26 BST` Started `DC-81`: posted the cycle start update and
+  began retiring the gameplay oracle from the supported public API while keeping
+  internal fidelity wiring available.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778753786573509`
+- `2026-05-14 11:42:10 BST` Completed `DC-81`: made the oracle module
+  crate-private, removed the public `GameplayOracle` export, replaced the public
+  API oracle contract with a clean `Game` simulation contract, kept the
+  machine-backed oracle as internal fidelity wiring, and documented the updated
+  boundary in `README.md`, `SPEC.md`, and this plan. Validation passed with
+  formatting; focused public API, oracle, and fidelity-signature tests; the full
+  Rust target suite; clippy with warnings denied; `make fidelity`; live smoke;
+  the public-oracle static scan; markdownlint; and `git diff --check`. The
+  `make fidelity` gate matched 10 trace fixtures covering 15452 frames and
+  reported new Rust line coverage `0/0` non-baselined added executable lines.
+  Live smoke rendered 239 frames, saw 74 distinct frame CRCs, observed attract,
+  credit, and playing states, injected all required controls, and exited
+  cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778755376066379`
+
+### DC-82: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 

@@ -6,19 +6,21 @@ use crate::{
         AcceptedScores, AcceptedSnapshot,
     },
     app,
-    game::GameInput,
-    input::CabinetInput,
-    machine::ArcadeMachine,
     machine_state::{self, MachineEvent, MachineSnapshot},
     red_label::Facing,
     video,
 };
 
+#[cfg(test)]
+use crate::{game::GameInput, input::CabinetInput, machine::ArcadeMachine};
+
+#[cfg(test)]
 #[derive(Debug)]
 pub(crate) struct AcceptedMachineAdapter {
     machine: ArcadeMachine,
 }
 
+#[cfg(test)]
 impl AcceptedMachineAdapter {
     pub(crate) fn new() -> Self {
         Self {
@@ -124,6 +126,7 @@ pub(crate) fn run_runtime() -> anyhow::Result<()> {
     app::run()
 }
 
+#[cfg(test)]
 fn to_cabinet_input(input: GameInput) -> CabinetInput {
     CabinetInput {
         coin: input.coin,

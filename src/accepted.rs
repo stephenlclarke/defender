@@ -4,13 +4,16 @@
 //! legacy module names. This keeps the current machine available as an oracle
 //! while making the remaining retirement work explicit and localized.
 
+#[cfg(test)]
 use crate::game::GameInput;
 
+#[cfg(test)]
 #[derive(Debug)]
 pub(crate) struct AcceptedGameplayMachine {
     machine: crate::accepted_behavior::AcceptedMachineAdapter,
 }
 
+#[cfg(test)]
 impl AcceptedGameplayMachine {
     pub(crate) fn new() -> Self {
         Self {

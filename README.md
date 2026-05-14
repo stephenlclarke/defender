@@ -195,10 +195,10 @@ make sq
 
 The primary source tree is now the clean rewrite under `src/`; the converted
 implementation is parked under `src_legacy/` and remains wired through
-`src/lib.rs` as the temporary gameplay oracle and runtime bridge. Clean
-runtime and oracle code reaches those adapters through the crate-private
-`src/accepted.rs` facade, which translates accepted behavior into neutral
-contracts before `src/oracle.rs` adapts it to gameplay state. The actual
+`src/lib.rs` as the internal gameplay oracle and runtime bridge. Clean
+runtime code and the internal oracle reach those adapters through the
+crate-private `src/accepted.rs` facade, which translates accepted behavior into
+neutral contracts before `src/oracle.rs` adapts it to gameplay state. The actual
 legacy machine bridge lives in `src_legacy/accepted_behavior.rs`, keeping
 legacy imports out of the clean accepted-behavior surface. The root legacy
 adapters remain crate-private; README media generation uses the doc-hidden
@@ -218,8 +218,8 @@ Clean rewrite modules:
   sprite-first scene frames without touching the accepted machine adapter.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion and projectile
-  launch/capacity systems, and the `GameSimulation` trait used by clean game
-  and oracle implementations.
+  launch/capacity systems, and the `GameSimulation` trait used by the clean game
+  and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, scene summaries,
   and draw planning.
@@ -232,9 +232,9 @@ Clean rewrite modules:
   gameplay events, sound events, and render summaries. Clean fidelity tests use
   oracle-owned reference probes instead of importing accepted facade types
   directly.
-- `src/oracle.rs`: the clean gameplay oracle, returning clean state, event,
-  sound, and scene-summary frames from the accepted-behavior facade while
-  owning accepted sound command-byte mapping.
+- `src/oracle.rs`: the crate-private gameplay oracle, returning clean state,
+  event, sound, and scene-summary frames from the accepted-behavior facade for
+  internal fidelity comparison.
 
 Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input,

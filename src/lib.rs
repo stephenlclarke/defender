@@ -9,7 +9,7 @@ mod accepted;
 pub mod audio;
 pub mod fidelity;
 pub mod game;
-pub mod oracle;
+mod oracle;
 pub mod platform;
 pub mod renderer;
 pub mod systems;
@@ -109,7 +109,6 @@ pub use game::{
     Direction, Game, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameSnapshot,
     GameState, PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldVector,
 };
-pub use oracle::GameplayOracle;
 pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
 pub use renderer::{
     AtlasRegion, Color, FontAtlas, GpuRendererSettings, NativeRenderPipeline,
@@ -135,12 +134,27 @@ mod oracle_equivalence_tests;
 #[cfg(test)]
 mod public_api_tests {
     #[test]
-    fn clean_contracts_have_oracle_path() {
-        let mut oracle = crate::GameplayOracle::new();
-        let frame = oracle.step(crate::GameInput::NONE);
+    fn clean_contracts_have_public_game_simulation() {
+        let mut game = crate::Game::new();
+        let frame = crate::advance_one_frame(&mut game, crate::GameInput::NONE);
 
         assert_eq!(frame.state.frame, 1);
         assert_eq!(frame.state.phase, crate::GamePhase::Attract);
+        assert_eq!(frame.scene.summary().layers.hud, 1);
+    }
+
+    #[test]
+    fn gameplay_oracle_is_internal_fidelity_wiring() {
+        let lib_rs = include_str!("lib.rs");
+        let mut oracle = crate::oracle::GameplayOracle::new();
+        let frame = oracle.step(crate::GameInput::NONE);
+        let public_module = format!("pub {} oracle;", "mod");
+        let public_export = format!("pub use {}::GameplayOracle;", "oracle");
+
+        assert_eq!(frame.state.frame, 1);
+        assert!(lib_rs.contains("mod oracle;"));
+        assert!(!lib_rs.contains(&public_module));
+        assert!(!lib_rs.contains(&public_export));
     }
 
     #[test]

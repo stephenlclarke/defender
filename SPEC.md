@@ -68,8 +68,8 @@ tree:
   sprite-first scene frames without touching the accepted machine adapter.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion and projectile
-  launch/capacity systems, and the `GameSimulation` trait used by clean game
-  and oracle implementations.
+  launch/capacity systems, and the `GameSimulation` trait used by the clean game
+  and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, scene summaries,
   and draw planning.
@@ -82,16 +82,16 @@ tree:
   gameplay events, sound events, and render summaries. Clean fidelity tests use
   oracle-owned reference probes instead of importing accepted facade types
   directly.
-- `src/oracle.rs`: the explicit clean gameplay oracle, including clean state,
-  event, sound, scene-summary frames, and accepted sound command-byte mapping
-  from the accepted-behavior facade.
+- `src/oracle.rs`: the crate-private gameplay oracle, including clean state,
+  event, sound, and scene-summary frames from the accepted-behavior facade for
+  internal fidelity comparison.
 
 The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,
 sound-board command evidence, legacy fidelity trace generation, the threaded
 live core runtime boundary, `wgpu` window ownership, CMOS storage, and test
 helpers until clean systems replace those responsibilities. Those root adapters
-are crate-private. Clean runtime and oracle callers use the crate-private
+are crate-private. Clean runtime code and the internal oracle use the crate-private
 `accepted` facade; `src_legacy/accepted_behavior.rs` performs the current
 legacy-machine adaptation into neutral accepted-behavior contracts before the
 public clean gameplay types see it. Legacy-specific clean equivalence
