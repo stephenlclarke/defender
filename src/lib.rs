@@ -244,6 +244,10 @@ mod public_api_tests {
         assert!(platform_rs.contains("crate::runtime::run_rom_report(request.path)"));
         assert!(platform_rs.contains("crate::runtime::run_verify_roms(request.path)"));
         assert!(platform_rs.contains("crate::runtime::run_fidelity_trace(request.frame_count)"));
+        assert!(platform_rs.contains("crate::runtime::run_fidelity_trace_inputs(request.script)"));
+        assert!(
+            platform_rs.contains("crate::runtime::run_fidelity_trace_inputs_file(request.path)")
+        );
         assert!(platform_rs.contains("crate::runtime::run_fidelity_scenario_list()"));
         assert!(
             platform_rs
@@ -254,6 +258,8 @@ mod public_api_tests {
         assert!(platform_rs.contains("CliClassification::CleanRomReport(request)"));
         assert!(platform_rs.contains("CliClassification::CleanVerifyRoms(request)"));
         assert!(platform_rs.contains("CliClassification::CleanFidelityTrace(request)"));
+        assert!(platform_rs.contains("CliClassification::CleanFidelityTraceInputs(request)"));
+        assert!(platform_rs.contains("CliClassification::CleanFidelityTraceInputsFile(request)"));
         assert!(platform_rs.contains("CliClassification::CleanFidelityScenarioList"));
         assert!(platform_rs.contains("CliClassification::CleanFidelityScenarioInputWriter"));
         assert!(platform_rs.contains("CliClassification::HistoricalCommand(command)"));
@@ -263,10 +269,14 @@ mod public_api_tests {
         assert!(platform_rs.contains("struct RomReportRequest"));
         assert!(platform_rs.contains("struct VerifyRomsRequest"));
         assert!(platform_rs.contains("struct FidelityTraceRequest"));
+        assert!(platform_rs.contains("struct FidelityTraceInputsRequest"));
+        assert!(platform_rs.contains("struct FidelityTraceInputsFileRequest"));
         assert!(platform_rs.contains("struct ScenarioInputWriterRequest"));
         assert!(platform_rs.contains("\"--rom-report\" =>"));
         assert!(platform_rs.contains("\"--verify-roms\" =>"));
         assert!(platform_rs.contains("\"--fidelity-trace\" =>"));
+        assert!(platform_rs.contains("\"--fidelity-trace-inputs\" =>"));
+        assert!(platform_rs.contains("\"--fidelity-trace-inputs-file\" =>"));
         assert!(platform_rs.contains("CleanCliError::RomReportPathCannotBeFlag"));
         assert!(platform_rs.contains("CleanCliError::TooManyRomReportArgs"));
         assert!(platform_rs.contains("CleanCliError::MissingVerifyRomsPath"));
@@ -274,6 +284,10 @@ mod public_api_tests {
         assert!(platform_rs.contains("CleanCliError::InvalidFidelityTraceFrameCount"));
         assert!(platform_rs.contains("CleanCliError::NonPositiveFidelityTraceFrameCount"));
         assert!(platform_rs.contains("CleanCliError::TooManyFidelityTraceArgs"));
+        assert!(platform_rs.contains("CleanCliError::FidelityTraceInputsMissingScript"));
+        assert!(platform_rs.contains("CleanCliError::FidelityTraceInputsExtraArgs"));
+        assert!(platform_rs.contains("CleanCliError::FidelityTraceInputsFileMissingPath"));
+        assert!(platform_rs.contains("CleanCliError::FidelityTraceInputsFileExtraArgs"));
         assert!(platform_rs.contains("CleanCliError::FidelityListScenariosExtraArgs"));
         assert!(platform_rs.contains("CleanCliError::FidelityWriteScenarioInputsMissingPath"));
         assert!(platform_rs.contains("CleanCliError::FidelityWriteScenarioInputsExtraArgs"));
@@ -290,6 +304,8 @@ mod public_api_tests {
         assert!(platform_rs.contains("\"--fidelity-check-reference-trace-dir\""));
         assert!(!platform_rs.contains("VerifyRoms,"));
         assert!(!platform_rs.contains("Some(HistoricalCliCommand::Trace)"));
+        assert!(!platform_rs.contains("Some(HistoricalCliCommand::TraceInputs)"));
+        assert!(!platform_rs.contains("Some(HistoricalCliCommand::TraceInputsFile)"));
         assert!(!platform_rs.contains("FidelityWriteScenarioInputs,"));
         assert!(platform_rs.contains("CliClassification::CleanRuntime(config)"));
         assert!(platform_rs.contains("CliClassification::CleanHelp"));
@@ -316,17 +332,23 @@ mod public_api_tests {
         assert!(runtime_rs.contains("RuntimeCommand::RomReport { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::VerifyRoms { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTrace { frame_count }"));
+        assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputs { script }"));
+        assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputsFile { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityScenarioList"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityScenarioInputWriter"));
         assert!(runtime_rs.contains("pub(crate) fn help_text()"));
         assert!(runtime_rs.contains("pub(crate) fn run_rom_report"));
         assert!(runtime_rs.contains("pub(crate) fn run_verify_roms"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace"));
+        assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace_inputs"));
+        assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace_inputs_file"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_scenario_list"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_scenario_input_writer"));
         assert!(runtime_rs.contains("crate::rom_report::run(path.as_deref())"));
         assert!(runtime_rs.contains("crate::rom_report::run_verify(&path)"));
         assert!(runtime_rs.contains("crate::fidelity_traces::run_trace(frame_count)"));
+        assert!(runtime_rs.contains("crate::fidelity_traces::run_trace_inputs(&script)"));
+        assert!(runtime_rs.contains("crate::fidelity_traces::run_trace_inputs_file(&path)"));
         assert!(runtime_rs.contains("crate::fidelity_scenarios::run_list()"));
         assert!(runtime_rs.contains("crate::fidelity_scenarios::run_write_inputs(&path)"));
         assert!(!runtime_rs.contains("crate::rom::"));
@@ -367,7 +389,12 @@ mod public_api_tests {
 
         let fidelity_traces_rs = include_str!("fidelity_traces.rs");
         assert!(fidelity_traces_rs.contains("pub(crate) fn run_trace("));
+        assert!(fidelity_traces_rs.contains("pub(crate) fn run_trace_inputs("));
+        assert!(fidelity_traces_rs.contains("pub(crate) fn run_trace_inputs_file("));
         assert!(fidelity_traces_rs.contains("fn trace_text("));
+        assert!(fidelity_traces_rs.contains("fn trace_input_text("));
+        assert!(fidelity_traces_rs.contains("fn trace_input_file_text("));
+        assert!(fidelity_traces_rs.contains("fs::read_to_string(path)"));
         assert!(fidelity_traces_rs.contains("crate::legacy_fidelity::expanded_trace_input_text"));
         assert!(fidelity_traces_rs.contains("crate::legacy_fidelity::parse_trace_input_script"));
         assert!(fidelity_traces_rs.contains("crate::legacy_fidelity::trace_text_for_inputs"));

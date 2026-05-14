@@ -48,6 +48,16 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
             .run_command(RuntimeCommand::FidelityTrace { frame_count })
     }
 
+    pub(crate) fn run_fidelity_trace_inputs(&self, script: String) -> anyhow::Result<()> {
+        self.backend
+            .run_command(RuntimeCommand::FidelityTraceInputs { script })
+    }
+
+    pub(crate) fn run_fidelity_trace_inputs_file(&self, path: PathBuf) -> anyhow::Result<()> {
+        self.backend
+            .run_command(RuntimeCommand::FidelityTraceInputsFile { path })
+    }
+
     pub(crate) fn run_fidelity_scenario_list(&self) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::FidelityScenarioList)
@@ -80,6 +90,12 @@ pub(crate) enum RuntimeCommand {
     },
     FidelityTrace {
         frame_count: usize,
+    },
+    FidelityTraceInputs {
+        script: String,
+    },
+    FidelityTraceInputsFile {
+        path: PathBuf,
     },
     FidelityScenarioList,
     FidelityScenarioInputWriter {
@@ -143,6 +159,12 @@ impl RuntimeBackend for InstalledRuntimeBackend {
             RuntimeCommand::FidelityTrace { frame_count } => {
                 crate::fidelity_traces::run_trace(frame_count)
             }
+            RuntimeCommand::FidelityTraceInputs { script } => {
+                crate::fidelity_traces::run_trace_inputs(&script)
+            }
+            RuntimeCommand::FidelityTraceInputsFile { path } => {
+                crate::fidelity_traces::run_trace_inputs_file(&path)
+            }
             RuntimeCommand::FidelityScenarioList => crate::fidelity_scenarios::run_list(),
             RuntimeCommand::FidelityScenarioInputWriter { path } => {
                 crate::fidelity_scenarios::run_write_inputs(&path)
@@ -189,6 +211,14 @@ pub(crate) fn run_verify_roms(path: PathBuf) -> anyhow::Result<()> {
 
 pub(crate) fn run_fidelity_trace(frame_count: usize) -> anyhow::Result<()> {
     RuntimeHost::current().run_fidelity_trace(frame_count)
+}
+
+pub(crate) fn run_fidelity_trace_inputs(script: String) -> anyhow::Result<()> {
+    RuntimeHost::current().run_fidelity_trace_inputs(script)
+}
+
+pub(crate) fn run_fidelity_trace_inputs_file(path: PathBuf) -> anyhow::Result<()> {
+    RuntimeHost::current().run_fidelity_trace_inputs_file(path)
 }
 
 pub(crate) fn run_fidelity_scenario_list() -> anyhow::Result<()> {
@@ -371,6 +401,32 @@ mod tests {
     }
 
     #[test]
+    fn runtime_host_launches_fidelity_trace_inputs_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_fidelity_trace_inputs(String::from("none"))
+            .expect("runtime host should run inline trace inputs command");
+        host.run_fidelity_trace_inputs_file(PathBuf::from("inputs.txt"))
+            .expect("runtime host should run file trace inputs command");
+
+        let observed = calls.borrow();
+        assert_eq!(
+            observed.as_slice(),
+            &[
+                RuntimeCommand::FidelityTraceInputs {
+                    script: String::from("none"),
+                },
+                RuntimeCommand::FidelityTraceInputsFile {
+                    path: PathBuf::from("inputs.txt"),
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn runtime_host_launches_fidelity_scenario_list_separately() {
         let calls = Rc::new(RefCell::new(Vec::new()));
         let host = RuntimeHost::with_backend(RecordingBackend {
@@ -514,6 +570,22 @@ mod tests {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run_fidelity_trace(1)
             .expect("installed backend should run clean fidelity trace");
+    }
+
+    #[test]
+    fn installed_backend_runs_clean_fidelity_trace_inputs() {
+        let path = unique_temp_dir("defender-clean-runtime-trace-inputs");
+        fs::create_dir_all(&path).expect("create temp dir");
+        let script_path = path.join("inputs.txt");
+        fs::write(&script_path, "none\n").expect("write trace input script");
+
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_fidelity_trace_inputs(String::from("none"))
+            .expect("installed backend should run clean inline trace inputs");
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_fidelity_trace_inputs_file(script_path)
+            .expect("installed backend should run clean file trace inputs");
+        let _ = fs::remove_dir_all(path);
     }
 
     #[test]

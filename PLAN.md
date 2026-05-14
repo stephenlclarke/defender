@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-96` are complete. The standing maintenance guidance in
+`DC-42` through `DC-97` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3563,6 +3563,86 @@ Work log:
   `cargo fmt --check`, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778795765516439`
+
+### DC-97: Clean Fidelity Trace Input Command Ownership
+
+Status: `complete`
+
+Goal: move `--fidelity-trace-inputs <script>` and
+`--fidelity-trace-inputs-file <path>` into clean platform/runtime ownership
+while preserving current trace output and argument behavior.
+
+Scope:
+
+- Add clean command/config paths for inline trace input scripts and trace input
+  script files.
+- Preserve live-option conflict, missing argument, extra argument, invalid
+  script, and file-read failure behavior.
+- Extend the private fidelity trace facade so legacy trace generation remains
+  quarantined behind clean runtime ownership.
+- Leave trace-check commands in the historical inventory for later slices.
+- Add focused platform/runtime/API tests for classification, malformed
+  arguments, dispatch, file reads, and output contract.
+
+Acceptance criteria:
+
+- `cargo run -- --fidelity-trace-inputs none` and
+  `cargo run -- --fidelity-trace-inputs-file <path>` are served by clean
+  runtime code and preserve current trace text.
+- Malformed trace-input invocations preserve current messages.
+- Historical inventory still explicitly delegates trace-check commands.
+- Public API guards make the trace input boundary visible.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib fidelity_traces::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --fidelity-trace-inputs none
+cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'
+cargo run -- --fidelity-trace-inputs
+cargo run -- --fidelity-trace-inputs none extra
+cargo run -- --mute --fidelity-trace-inputs none
+cargo run -- --fidelity-trace-inputs-file <input-script-path>
+cargo run -- --fidelity-trace-inputs-file
+cargo run -- --fidelity-trace-inputs-file <input-script-path> extra
+cargo run -- --mute --fidelity-trace-inputs-file <input-script-path>
+cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 22:57:49 BST` Started `DC-97`: moving
+  `--fidelity-trace-inputs <script>` and
+  `--fidelity-trace-inputs-file <path>` into clean platform/runtime ownership
+  while preserving argument validation, file-read behavior, trace output, and
+  historical delegation for trace-check commands.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778795883407799`
+- `2026-05-14 23:24:23 BST` Completed `DC-97`: clean platform/runtime code now
+  owns inline and file-based trace input commands, the private fidelity trace
+  facade owns inline and file trace text generation, trace-input commands are
+  removed from the historical command inventory, and public API guards cover
+  the new boundary. Validation passed: focused platform/runtime/fidelity trace
+  and public API tests; `cargo test --all-targets`; `cargo clippy --all-targets
+  -- -D warnings`; `make fidelity` with 10 trace fixtures, 15452 frames, and
+  68/68 added executable Rust lines covered; CLI probes for inline/file
+  success, malformed trace-input invocations, file-read failures, live-option
+  conflicts, invalid scripts, and historical trace-check delegation;
+  `cargo run -- --live-smoke` with 239 rendered frames; `markdownlint`;
+  `cargo fmt --check`; and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778797461215109`
 
 ## Ongoing Work
 
