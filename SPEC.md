@@ -112,6 +112,9 @@ compatibility API surface. The legacy video renderer owns its remaining
 `TerminalGeometry` value type directly instead of importing terminal session
 setup. Generated long-trace sample data is nested under the legacy machine
 oracle because it is historical fixture evidence, not a clean root adapter.
+Public API tests scan clean module sources so production code cannot import
+low-level legacy root modules, bypass the accepted-behavior facade, or
+reintroduce legacy implementation terminology.
 
 ## Current Behavior Surface
 
@@ -180,4 +183,5 @@ explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
   that still needs accepted-behavior evidence should use the crate-private
   `accepted` facade until the clean system replaces that responsibility.
   Temporary README media tooling may use the doc-hidden `readme_media` facade;
-  root legacy modules must remain crate-private.
+  root legacy modules must remain crate-private. This boundary is guarded by
+  source-level public API tests.

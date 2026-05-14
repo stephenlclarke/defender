@@ -1,4 +1,4 @@
-//! Clean equivalence contracts for retiring memory-oriented oracle checks.
+//! Clean equivalence contracts for retiring legacy oracle checks.
 
 use crate::{
     game::{GameEvent, GameFrame, GameSnapshot, SoundEvent},

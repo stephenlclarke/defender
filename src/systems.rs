@@ -613,7 +613,7 @@ mod tests {
     }
 
     #[test]
-    fn simulation_trait_advances_clean_frames_without_memory_contracts() {
+    fn simulation_trait_advances_clean_frames_without_legacy_state_contracts() {
         let mut simulation = FakeSimulation::default();
 
         let frame = advance_one_frame(

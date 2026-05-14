@@ -311,6 +311,82 @@ mod public_api_tests {
     }
 
     #[test]
+    fn clean_module_sources_keep_legacy_access_quarantined() {
+        let clean_sources = [
+            ("src/accepted.rs", include_str!("accepted.rs")),
+            ("src/audio.rs", include_str!("audio.rs")),
+            ("src/fidelity.rs", include_str!("fidelity.rs")),
+            ("src/game.rs", include_str!("game.rs")),
+            ("src/main.rs", include_str!("main.rs")),
+            ("src/oracle.rs", include_str!("oracle.rs")),
+            ("src/platform.rs", include_str!("platform.rs")),
+            ("src/renderer.rs", include_str!("renderer.rs")),
+            ("src/systems.rs", include_str!("systems.rs")),
+        ];
+        let low_level_legacy_imports = [
+            "crate::app::",
+            "crate::assets::",
+            "crate::board::",
+            "crate::cmos_storage::",
+            "crate::input::",
+            "crate::legacy_fidelity::",
+            "crate::live::",
+            "crate::machine::",
+            "crate::machine_process::",
+            "crate::machine_state::",
+            "crate::pia::",
+            "crate::red_label::",
+            "crate::red_label_memory::",
+            "crate::red_label_message::",
+            "crate::red_label_wave::",
+            "crate::rom::",
+            "crate::sound::",
+            "crate::video::",
+            "crate::wgpu_presenter::",
+        ];
+
+        for (path, source) in clean_sources {
+            for forbidden in low_level_legacy_imports {
+                assert!(
+                    !source.contains(forbidden),
+                    "{path} must not import legacy root module {forbidden}"
+                );
+            }
+
+            if path != "src/accepted.rs" {
+                assert!(
+                    !source.contains("crate::accepted_behavior::"),
+                    "{path} must not bypass the accepted facade"
+                );
+            }
+
+            if !matches!(
+                path,
+                "src/accepted.rs" | "src/oracle.rs" | "src/platform.rs"
+            ) {
+                assert!(
+                    !source.contains("crate::accepted::"),
+                    "{path} must not depend on the temporary accepted facade"
+                );
+            }
+
+            for forbidden in [
+                "red_label",
+                "RED_LABEL",
+                "source routine",
+                "assembler",
+                "memory",
+                "FrameOutput",
+            ] {
+                assert!(
+                    !source.contains(forbidden),
+                    "{path} must not expose legacy implementation terminology {forbidden}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn legacy_modules_are_crate_private_at_root() {
         let lib_rs = include_str!("lib.rs");
         let legacy_modules = [

@@ -258,7 +258,9 @@ active runtime or compatibility API paths. The legacy video renderer owns its
 remaining `TerminalGeometry` value type directly so it does not pull terminal
 session setup into active builds. Generated long-trace sample data is nested
 under the legacy machine oracle because it is historical fixture evidence, not
-a clean root adapter.
+a clean root adapter. A public API guard scans clean module sources so new
+production code cannot import low-level legacy root modules, bypass the
+accepted-behavior facade, or reintroduce legacy implementation terminology.
 
 ## Assets And ROMs
 
