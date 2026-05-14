@@ -74,6 +74,7 @@ impl SpriteId {
     pub const PLAYER_SHIP: Self = Self(1);
     pub const SCORE_TEXT: Self = Self(2);
     pub const STATUS_TEXT: Self = Self(3);
+    pub const PLAYER_PROJECTILE: Self = Self(4);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -272,6 +273,11 @@ impl TextureAtlas {
                     sprite: SpriteId::STATUS_TEXT,
                     origin: [0, 32],
                     size: [96, 8],
+                },
+                AtlasRegion {
+                    sprite: SpriteId::PLAYER_PROJECTILE,
+                    origin: [0, 48],
+                    size: [8, 2],
                 },
             ],
         }
@@ -634,6 +640,7 @@ mod tests {
         assert!(atlas.contains(SpriteId(42)));
         assert!(!atlas.contains(SpriteId::PLAYER_SHIP));
         assert!(TextureAtlas::default_sprites().contains(SpriteId::STATUS_TEXT));
+        assert!(TextureAtlas::default_sprites().contains(SpriteId::PLAYER_PROJECTILE));
     }
 
     #[test]

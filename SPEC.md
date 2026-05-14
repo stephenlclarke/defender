@@ -62,13 +62,14 @@ tree:
 - `src/accepted.rs`: crate-private accepted-behavior contracts and facade that
   isolate clean production modules from direct legacy runtime and oracle
   imports.
-- `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
-  `GameEvents`, score, player, direction, and sound-event contracts without
-  accepted command-byte mapping.
+- `src/game.rs`: gameplay-facing `Game`, `GameState`, `GameInput`,
+  `GameFrame`, `GameEvents`, score, player, direction, and sound-event
+  contracts without accepted command-byte mapping. The clean `Game` shell emits
+  sprite-first scene frames without touching the accepted machine adapter.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion and projectile
-  launch/capacity systems, and the `GameSimulation` trait for future game
-  systems.
+  launch/capacity systems, and the `GameSimulation` trait used by clean game
+  and oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, scene summaries,
   and draw planning.

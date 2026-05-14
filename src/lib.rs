@@ -106,8 +106,8 @@ pub mod readme_media;
 
 pub use fidelity::GameplayEquivalenceSignature;
 pub use game::{
-    Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameSnapshot, GameState,
-    PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldVector,
+    Direction, Game, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameSnapshot,
+    GameState, PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldVector,
 };
 pub use oracle::GameplayOracle;
 pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
@@ -289,13 +289,23 @@ mod public_api_tests {
 
         let game_rs = include_str!("game.rs");
         for forbidden in [
+            "crate::accepted::",
+            "crate::machine::",
+            "crate::machine_state::",
+            "crate::red_label::",
+            "FrameOutput",
             "from_accepted_command",
             "accepted_command",
             "UnmappedAcceptedCommand",
+            "red_label",
+            "RED_LABEL",
+            "source routine",
+            "assembler",
+            "memory",
         ] {
             assert!(
                 !game_rs.contains(forbidden),
-                "clean gameplay contracts must not own accepted sound command mapping {forbidden}"
+                "clean gameplay contracts must not expose legacy implementation terminology {forbidden}"
             );
         }
     }

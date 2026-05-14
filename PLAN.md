@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `58a2820`.
+- Latest accepted implementation commit before this cycle: `5684903`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-78` are complete. `DC-79` is planned, and the standing
+`DC-42` through `DC-79` are complete. `DC-80` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2294,7 +2294,90 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778749498248829`
 
-### DC-79: Memory-Oriented Oracle Retirement
+### DC-79: Clean Game Simulation Shell
+
+Status: `complete`
+
+Goal: create a clean, sprite-first gameplay simulation foothold that does not
+depend on the accepted machine or memory-oriented runtime model.
+
+Scope:
+
+- Add a clean `Game` simulation shell that owns `GameState` and emits
+  `GameFrame` values.
+- Drive credited start, basic playing controls, player motion, smart bomb
+  inventory, and projectile launch through clean deterministic systems.
+- Add a renderer-owned projectile sprite id and atlas region so clean game
+  frames stay sprite-first.
+- Keep live runtime and accepted-oracle behavior unchanged.
+- Add tests and public API guards so clean game source stays free of legacy
+  implementation terminology.
+- Update `README.md`, `SPEC.md`, and `PLAN.md`.
+
+Acceptance criteria:
+
+- `Game` implements `GameSimulation` and advances clean frames without accepted
+  machine state.
+- Clean game frames contain sprite scene data and no temporary raster payload.
+- Playing controls exercise clean control, motion, and projectile systems.
+- Public API guards reject legacy implementation terminology in `src/game.rs`.
+- Documentation describes the clean game shell as the next oracle-retirement
+  foothold.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game::tests
+cargo test --lib renderer::tests::texture_atlas_owns_sprite_regions
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+! rg -n \
+  -e "crate::accepted::" \
+  -e "crate::machine::" \
+  -e "crate::machine_state::" \
+  -e "crate::red_label::" \
+  -e "red_label" \
+  -e "RED_LABEL" \
+  -e "source routine" \
+  -e "assembler" \
+  -e "memory" \
+  -e "FrameOutput" \
+  src/game.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 10:08:58 BST` Started `DC-79`: posted the cycle start update and
+  began adding a clean `Game` simulation shell as a bounded first step toward
+  retiring the memory-oriented oracle from production gameplay.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778749749081009`
+- `2026-05-14 10:48:29 BST` Completed `DC-79`: added the clean `Game`
+  simulation shell, wired it to clean control, motion, and projectile systems,
+  emitted sprite-first `GameFrame` scenes without raster payloads, added a
+  renderer-owned projectile sprite atlas region, exported the clean game type,
+  and strengthened the public API guard against legacy terminology in
+  `src/game.rs`. The first full fidelity run exposed three uncovered added
+  lines in the clean game shell; focused coverage was added for `Default` and
+  left-to-right reversal before rerunning the full gate successfully. Validation
+  passed with formatting; focused game, renderer, and public API tests; the full
+  Rust test suite; clippy with warnings denied; `make fidelity`; live smoke; the
+  static terminology guard; markdownlint; and `git diff --check`. The
+  `make fidelity` gate matched 10 trace fixtures covering 15452 frames and
+  reported new Rust line coverage `134/134` non-baselined added executable
+  lines. Live smoke rendered 239 frames, saw 74 distinct frame CRCs, observed
+  attract, credit, and playing states, injected all required controls, and
+  exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778752130012979`
+
+### DC-80: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 
