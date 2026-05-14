@@ -1,6 +1,6 @@
 # Defender Current Plan
 
-Last reviewed: `2026-05-14`
+Last reviewed: `2026-05-15`
 
 ## Current Baseline
 
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-98` are complete. The standing maintenance guidance in
+`DC-42` through `DC-99` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3719,6 +3719,90 @@ Work log:
   `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778799033889449`
+
+### DC-99: Clean Trace Fixture Directory Command Ownership
+
+Status: `complete`
+
+Goal: move `--fidelity-check-trace-dir <fixtures>` into clean platform/runtime
+ownership while preserving current Rust-current fixture checking behavior.
+
+Scope:
+
+- Add a clean command/config path for checking a directory of paired
+  `*.inputs.txt` and `*.expected.tsv` trace fixtures.
+- Preserve live-option conflict, missing argument, extra argument, missing
+  directory, empty directory, non-directory, missing pair, fixture ordering,
+  mismatch, and summary text behavior.
+- Extend the private fidelity trace facade so trace fixture discovery and
+  checking remain quarantined behind clean runtime ownership.
+- Leave reference fixture directory checks in the historical inventory for a
+  later slice.
+- Add focused platform/runtime/API tests for classification, malformed
+  arguments, dispatch, fixture discovery, ordering, missing pairs, and output
+  contract.
+
+Acceptance criteria:
+
+- `cargo run -- --fidelity-check-trace-dir <fixtures>` is served by clean
+  runtime code and preserves current matched/skipped/error text.
+- Malformed trace fixture directory invocations preserve current messages.
+- Historical inventory still explicitly delegates reference fixture directory
+  checks.
+- Public API guards make the trace fixture directory boundary visible.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib fidelity_traces::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --fidelity-check-trace-dir \
+  docs/fidelity/fixtures/local/rust-current
+cargo run -- --fidelity-check-trace-dir
+cargo run -- --fidelity-check-trace-dir \
+  docs/fidelity/fixtures/local/rust-current extra
+cargo run -- --mute --fidelity-check-trace-dir \
+  docs/fidelity/fixtures/local/rust-current
+cargo run -- --fidelity-check-reference-trace-dir \
+  docs/fidelity/fixtures/local/reference
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 23:52:19 BST` Started `DC-99`: moving
+  `--fidelity-check-trace-dir <fixtures>` into clean platform/runtime
+  ownership while preserving argument validation, fixture discovery, skipped
+  directory behavior, pair validation, manifest ordering, trace comparison, and
+  historical delegation for reference fixture directory checks.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778799152129099`
+- `2026-05-15 00:38:25 BST` Completed `DC-99`: clean platform/runtime
+  now owns `--fidelity-check-trace-dir <fixtures>` through
+  `RuntimeCommand::FidelityTraceFixtureDirectory`, with paired fixture
+  discovery and trace comparison quarantined in the private fidelity trace
+  facade. Historical delegation remains only for
+  `--fidelity-check-reference-trace-dir`.
+  Validation passed: focused platform/runtime/fidelity trace/public API tests,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity`, CLI probes for matched/skipped/malformed/non-directory/
+  missing-pair/mismatch cases, historical reference delegation, and
+  `cargo run -- --live-smoke`.
+  `make fidelity` matched `10` trace fixture(s), `15452` frame(s), and covered
+  `146/146` non-baselined added executable Rust line(s). Live smoke rendered
+  `239` frames.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778801904026079`
 
 ## Ongoing Work
 

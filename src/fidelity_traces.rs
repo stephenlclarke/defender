@@ -1,6 +1,11 @@
 //! Runtime-owned fidelity trace command facade.
 
-use std::{fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+    thread,
+};
 
 use anyhow::{Context, anyhow, bail};
 
@@ -21,6 +26,11 @@ pub(crate) fn run_trace_inputs_file(path: &Path) -> anyhow::Result<()> {
 
 pub(crate) fn run_check_trace(inputs_path: &Path, expected_path: &Path) -> anyhow::Result<()> {
     print!("{}", check_trace_text(inputs_path, expected_path)?);
+    Ok(())
+}
+
+pub(crate) fn run_check_trace_dir(path: &Path) -> anyhow::Result<()> {
+    print!("{}", check_trace_dir_text(path)?);
     Ok(())
 }
 
@@ -48,17 +58,197 @@ fn trace_input_file_text(path: &Path) -> anyhow::Result<String> {
 }
 
 fn check_trace_text(inputs_path: &Path, expected_path: &Path) -> anyhow::Result<String> {
+    let frames = check_trace_frames(inputs_path, expected_path)?;
+
+    Ok(format!(
+        "Fidelity trace {} matched {} frame(s)\n",
+        expected_path.display(),
+        frames
+    ))
+}
+
+fn check_trace_frames(inputs_path: &Path, expected_path: &Path) -> anyhow::Result<usize> {
     let actual = trace_input_file_text(inputs_path)?;
     let expected = fs::read_to_string(expected_path)
         .with_context(|| format!("failed to read expected trace {}", expected_path.display()))?;
     let comparison = crate::legacy_fidelity::compare_trace_text(&expected, &actual)
         .map_err(|mismatch| anyhow!("{}: {mismatch}", expected_path.display()))?;
 
+    Ok(comparison.frames)
+}
+
+fn check_trace_dir_text(path: &Path) -> anyhow::Result<String> {
+    if !path.exists() {
+        return Ok(format!(
+            "Fidelity trace fixture directory {} not found; skipped\n",
+            path.display()
+        ));
+    }
+    if !path.is_dir() {
+        bail!(
+            "fidelity trace fixture path {} is not a directory",
+            path.display()
+        );
+    }
+
+    let fixtures = trace_fixture_pairs(path)?;
+    if fixtures.is_empty() {
+        return Ok(format!(
+            "Fidelity trace fixture directory {} has no *.inputs.txt fixtures; skipped\n",
+            path.display()
+        ));
+    }
+
+    let frames = check_trace_fixtures(&fixtures)?;
+
     Ok(format!(
-        "Fidelity trace {} matched {} frame(s)\n",
-        expected_path.display(),
-        comparison.frames
+        "Fidelity trace fixture directory {} matched {} fixture(s), {} frame(s)\n",
+        path.display(),
+        fixtures.len(),
+        frames
     ))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TraceFixture {
+    inputs_path: PathBuf,
+    expected_path: PathBuf,
+}
+
+fn check_trace_fixtures(fixtures: &[TraceFixture]) -> anyhow::Result<usize> {
+    if fixtures.is_empty() {
+        return Ok(0);
+    }
+
+    let workers = trace_fixture_worker_count(fixtures.len());
+    let chunk_size = fixtures.len().div_ceil(workers);
+    let mut checks = Vec::with_capacity(fixtures.len());
+
+    thread::scope(|scope| -> anyhow::Result<()> {
+        let handles = fixtures
+            .chunks(chunk_size)
+            .map(|chunk| {
+                scope.spawn(move || {
+                    chunk
+                        .iter()
+                        .map(check_trace_fixture)
+                        .collect::<Vec<anyhow::Result<usize>>>()
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for handle in handles {
+            checks.extend(
+                handle
+                    .join()
+                    .map_err(|_| anyhow!("fidelity trace fixture worker panicked"))?,
+            );
+        }
+
+        Ok(())
+    })?;
+
+    let mut frames = 0;
+    for check in checks {
+        frames += check?;
+    }
+
+    Ok(frames)
+}
+
+fn check_trace_fixture(fixture: &TraceFixture) -> anyhow::Result<usize> {
+    check_trace_frames(&fixture.inputs_path, &fixture.expected_path)
+}
+
+fn trace_fixture_worker_count(fixture_count: usize) -> usize {
+    let available = thread::available_parallelism()
+        .map(usize::from)
+        .unwrap_or(1);
+    fixture_count.min(available).max(1)
+}
+
+fn trace_fixture_pairs(path: &Path) -> anyhow::Result<Vec<TraceFixture>> {
+    let mut fixtures = Vec::new();
+    let mut expected_traces = Vec::new();
+    for entry in fs::read_dir(path)
+        .with_context(|| format!("failed to read fixture dir {}", path.display()))?
+    {
+        let entry =
+            entry.with_context(|| format!("failed to read fixture dir {}", path.display()))?;
+        let entry_path = entry.path();
+        if !entry_path.is_file() {
+            continue;
+        }
+
+        let file_name = entry.file_name();
+        let file_name = file_name.to_string_lossy();
+
+        if let Some(stem) = file_name.strip_suffix(".inputs.txt") {
+            let expected_path = path.join(format!("{stem}.expected.tsv"));
+            if !expected_path.is_file() {
+                bail!(
+                    "fidelity trace fixture {} is missing expected trace {}",
+                    entry_path.display(),
+                    expected_path.display()
+                );
+            }
+            fixtures.push(TraceFixture {
+                inputs_path: entry_path,
+                expected_path,
+            });
+        } else if let Some(stem) = file_name.strip_suffix(".expected.tsv") {
+            expected_traces.push((entry_path, String::from(stem)));
+        }
+    }
+
+    let scenario_order = crate::legacy_fidelity::trace_scenarios()
+        .map(|scenarios| {
+            scenarios
+                .into_iter()
+                .enumerate()
+                .map(|(index, scenario)| (scenario.scenario, index))
+                .collect::<HashMap<_, _>>()
+        })
+        .map_err(|error| anyhow!(error))?;
+    fixtures.sort_by(|left, right| {
+        let left_stem = trace_fixture_stem(&left.inputs_path);
+        let right_stem = trace_fixture_stem(&right.inputs_path);
+        let left_order = left_stem
+            .as_deref()
+            .and_then(|stem| scenario_order.get(stem))
+            .copied()
+            .unwrap_or(usize::MAX);
+        let right_order = right_stem
+            .as_deref()
+            .and_then(|stem| scenario_order.get(stem))
+            .copied()
+            .unwrap_or(usize::MAX);
+
+        left_order
+            .cmp(&right_order)
+            .then_with(|| left.inputs_path.cmp(&right.inputs_path))
+    });
+
+    expected_traces.sort_by(|left, right| left.0.cmp(&right.0));
+    for (expected_path, stem) in expected_traces {
+        let inputs_path = path.join(format!("{stem}.inputs.txt"));
+        if !inputs_path.is_file() {
+            bail!(
+                "fidelity trace fixture {} is missing input script {}",
+                expected_path.display(),
+                inputs_path.display()
+            );
+        }
+    }
+
+    Ok(fixtures)
+}
+
+fn trace_fixture_stem(path: &Path) -> Option<String> {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_suffix(".inputs.txt"))
+        .map(String::from)
 }
 
 #[cfg(test)]
@@ -70,8 +260,10 @@ mod tests {
     };
 
     use super::{
-        check_trace_text, run_check_trace, run_trace_inputs, run_trace_inputs_file,
-        trace_input_file_text, trace_input_text, trace_text,
+        TraceFixture, check_trace_dir_text, check_trace_fixtures, check_trace_text,
+        run_check_trace, run_check_trace_dir, run_trace_inputs, run_trace_inputs_file,
+        trace_fixture_pairs, trace_fixture_worker_count, trace_input_file_text, trace_input_text,
+        trace_text,
     };
 
     #[test]
@@ -217,6 +409,173 @@ mod tests {
         .expect("write expected trace");
 
         run_check_trace(&inputs_path, &expected_path).expect("trace check should run");
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn check_trace_dir_text_skips_missing_directory() {
+        let path = unique_temp_dir("defender-clean-trace-dir-missing");
+        let _ = fs::remove_dir_all(&path);
+
+        let text = check_trace_dir_text(&path).expect("missing dir skips");
+
+        assert!(text.contains("not found; skipped"));
+    }
+
+    #[test]
+    fn check_trace_dir_text_skips_empty_directory() {
+        let path = unique_temp_dir("defender-clean-trace-dir-empty");
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(&path).expect("create fixture dir");
+        fs::create_dir(path.join("nested")).expect("create nested non-fixture dir");
+
+        let text = check_trace_dir_text(&path).expect("empty dir skips");
+        let _ = fs::remove_dir_all(path);
+
+        assert!(text.contains("has no *.inputs.txt fixtures; skipped"));
+    }
+
+    #[test]
+    fn check_trace_dir_text_rejects_non_directory_path() {
+        let path = unique_temp_dir("defender-clean-trace-dir-file");
+        fs::write(&path, "not a directory").expect("write file fixture path");
+
+        let error = check_trace_dir_text(&path).expect_err("file path should fail");
+        let _ = fs::remove_file(path);
+
+        assert!(error.to_string().contains("is not a directory"));
+    }
+
+    #[test]
+    fn check_trace_dir_text_compares_fixture_pairs() {
+        let path = unique_temp_dir("defender-clean-trace-dir-match");
+        fs::create_dir_all(&path).expect("create fixture dir");
+        fs::write(path.join("attract.inputs.txt"), "coin,start_one;fire")
+            .expect("write fixture input");
+        fs::write(
+            path.join("attract.expected.tsv"),
+            trace_input_text("coin,start_one;fire").expect("trace text"),
+        )
+        .expect("write expected trace");
+
+        let text = check_trace_dir_text(&path).expect("fixture dir should match");
+        let _ = fs::remove_dir_all(path);
+
+        assert!(text.contains("matched 1 fixture(s), 2 frame(s)"));
+    }
+
+    #[test]
+    fn check_trace_dir_text_names_mismatched_fixture() {
+        let path = unique_temp_dir("defender-clean-trace-dir-mismatch");
+        fs::create_dir_all(&path).expect("create fixture dir");
+        fs::write(path.join("start.inputs.txt"), "coin,start_one").expect("write fixture input");
+        fs::write(path.join("start.expected.tsv"), "not\ta\ttrace\n")
+            .expect("write expected trace");
+
+        let error = check_trace_dir_text(&path).expect_err("trace mismatch");
+        let _ = fs::remove_dir_all(path);
+        let message = error.to_string();
+
+        assert!(message.contains("start.expected.tsv"));
+        assert!(message.contains("trace mismatch at line 1"));
+    }
+
+    #[test]
+    fn check_trace_dir_text_checks_manifest_fixtures_in_order() {
+        let path = unique_temp_dir("defender-clean-trace-dir-order");
+        fs::create_dir_all(&path).expect("create fixture dir");
+        fs::write(path.join("abduction.inputs.txt"), "coin,start_one")
+            .expect("write abduction input");
+        fs::write(path.join("abduction.expected.tsv"), "bad\tabduction\n")
+            .expect("write abduction expected trace");
+        fs::write(path.join("attract_boot.inputs.txt"), "none").expect("write attract input");
+        fs::write(path.join("attract_boot.expected.tsv"), "bad\tattract\n")
+            .expect("write attract expected trace");
+
+        let error = check_trace_dir_text(&path).expect_err("trace mismatch");
+        let _ = fs::remove_dir_all(path);
+        let message = error.to_string();
+
+        assert!(message.contains("attract_boot.expected.tsv"));
+        assert!(!message.contains("abduction.expected.tsv"));
+    }
+
+    #[test]
+    fn trace_fixture_pairs_reject_missing_expected_trace() {
+        let path = unique_temp_dir("defender-clean-trace-dir-missing-expected");
+        fs::create_dir_all(&path).expect("create fixture dir");
+        fs::write(path.join("boot.inputs.txt"), "none").expect("write fixture input");
+
+        let error = trace_fixture_pairs(&path).expect_err("missing expected trace should fail");
+        let _ = fs::remove_dir_all(path);
+
+        assert!(error.to_string().contains("missing expected trace"));
+    }
+
+    #[test]
+    fn trace_fixture_pairs_reject_expected_without_input_script() {
+        let path = unique_temp_dir("defender-clean-trace-dir-missing-input");
+        fs::create_dir_all(&path).expect("create fixture dir");
+        fs::write(path.join("boot.expected.tsv"), "frame\tinputs_bits\n")
+            .expect("write expected trace");
+
+        let error = trace_fixture_pairs(&path).expect_err("missing input script should fail");
+        let _ = fs::remove_dir_all(path);
+
+        assert!(error.to_string().contains("missing input script"));
+    }
+
+    #[test]
+    fn check_trace_fixtures_sums_frames_in_fixture_order() {
+        let path = unique_temp_dir("defender-clean-check-fixtures");
+        fs::create_dir_all(&path).expect("create fixture dir");
+        let first_inputs = path.join("first.inputs.txt");
+        let first_expected = path.join("first.expected.tsv");
+        let second_inputs = path.join("second.inputs.txt");
+        let second_expected = path.join("second.expected.tsv");
+        fs::write(&first_inputs, "none\n").expect("write first input");
+        fs::write(
+            &first_expected,
+            trace_input_text("none").expect("first expected trace"),
+        )
+        .expect("write first expected trace");
+        fs::write(&second_inputs, "none;none\n").expect("write second input");
+        fs::write(
+            &second_expected,
+            trace_input_text("none;none").expect("second expected trace"),
+        )
+        .expect("write second expected trace");
+
+        let frames = check_trace_fixtures(&[
+            TraceFixture {
+                inputs_path: first_inputs,
+                expected_path: first_expected,
+            },
+            TraceFixture {
+                inputs_path: second_inputs,
+                expected_path: second_expected,
+            },
+        ])
+        .expect("fixture checks should pass");
+        let _ = fs::remove_dir_all(path);
+
+        assert_eq!(frames, 3);
+        assert_eq!(check_trace_fixtures(&[]).expect("empty fixture list"), 0);
+        assert_eq!(trace_fixture_worker_count(0), 1);
+    }
+
+    #[test]
+    fn run_check_trace_dir_accepts_supported_inputs() {
+        let path = unique_temp_dir("defender-clean-run-check-trace-dir");
+        fs::create_dir_all(&path).expect("create fixture dir");
+        fs::write(path.join("boot.inputs.txt"), "none\n").expect("write fixture input");
+        fs::write(
+            path.join("boot.expected.tsv"),
+            trace_input_text("none").expect("expected trace text"),
+        )
+        .expect("write expected trace");
+
+        run_check_trace_dir(&path).expect("trace fixture directory should run");
         let _ = fs::remove_dir_all(path);
     }
 

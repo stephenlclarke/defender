@@ -70,6 +70,11 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
             })
     }
 
+    pub(crate) fn run_fidelity_trace_check_dir(&self, path: PathBuf) -> anyhow::Result<()> {
+        self.backend
+            .run_command(RuntimeCommand::FidelityTraceFixtureDirectory { path })
+    }
+
     pub(crate) fn run_fidelity_scenario_list(&self) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::FidelityScenarioList)
@@ -112,6 +117,9 @@ pub(crate) enum RuntimeCommand {
     FidelityTraceCheck {
         inputs_path: PathBuf,
         expected_path: PathBuf,
+    },
+    FidelityTraceFixtureDirectory {
+        path: PathBuf,
     },
     FidelityScenarioList,
     FidelityScenarioInputWriter {
@@ -185,6 +193,9 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 inputs_path,
                 expected_path,
             } => crate::fidelity_traces::run_check_trace(&inputs_path, &expected_path),
+            RuntimeCommand::FidelityTraceFixtureDirectory { path } => {
+                crate::fidelity_traces::run_check_trace_dir(&path)
+            }
             RuntimeCommand::FidelityScenarioList => crate::fidelity_scenarios::run_list(),
             RuntimeCommand::FidelityScenarioInputWriter { path } => {
                 crate::fidelity_scenarios::run_write_inputs(&path)
@@ -246,6 +257,10 @@ pub(crate) fn run_fidelity_trace_check(
     expected_path: PathBuf,
 ) -> anyhow::Result<()> {
     RuntimeHost::current().run_fidelity_trace_check(inputs_path, expected_path)
+}
+
+pub(crate) fn run_fidelity_trace_check_dir(path: PathBuf) -> anyhow::Result<()> {
+    RuntimeHost::current().run_fidelity_trace_check_dir(path)
 }
 
 pub(crate) fn run_fidelity_scenario_list() -> anyhow::Result<()> {
@@ -474,6 +489,25 @@ mod tests {
     }
 
     #[test]
+    fn runtime_host_launches_fidelity_trace_fixture_directory_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_fidelity_trace_check_dir(PathBuf::from("fixtures"))
+            .expect("runtime host should run trace fixture directory command");
+
+        let observed = calls.borrow();
+        assert_eq!(
+            observed.as_slice(),
+            &[RuntimeCommand::FidelityTraceFixtureDirectory {
+                path: PathBuf::from("fixtures"),
+            }]
+        );
+    }
+
+    #[test]
     fn runtime_host_launches_fidelity_scenario_list_separately() {
         let calls = Rc::new(RefCell::new(Vec::new()));
         let host = RuntimeHost::with_backend(RecordingBackend {
@@ -647,6 +681,20 @@ mod tests {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run_fidelity_trace_check(inputs_path, expected_path)
             .expect("installed backend should run clean trace check");
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn installed_backend_runs_clean_fidelity_trace_fixture_directory() {
+        let path = unique_temp_dir("defender-clean-runtime-trace-fixtures");
+        fs::create_dir_all(&path).expect("create fixture dir");
+        fs::write(path.join("boot.inputs.txt"), "none\n").expect("write fixture input");
+        fs::write(path.join("boot.expected.tsv"), one_frame_idle_trace_text())
+            .expect("write expected trace");
+
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_fidelity_trace_check_dir(path.clone())
+            .expect("installed backend should run clean trace fixture directory");
         let _ = fs::remove_dir_all(path);
     }
 
