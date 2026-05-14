@@ -237,6 +237,9 @@ mod public_api_tests {
 
         assert!(platform_rs.contains("crate::runtime::run_cli()"));
         assert!(platform_rs.contains("crate::runtime::run(&config)"));
+        assert!(platform_rs.contains("\"--live-smoke\""));
+        assert!(platform_rs.contains("RuntimeConfig::smoke()"));
+        assert!(platform_rs.contains("CliLaunch::CleanRuntime(config)"));
         assert!(!platform_rs.contains(&accepted_runtime_call));
         assert!(!platform_rs.contains("crate::compatibility::"));
         assert!(!platform_rs.contains(&app_runtime_call));

@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `b10c901`.
+- Latest accepted implementation commit before DC-86: `fa31203`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-85` are complete. `DC-86` is planned, and the standing
+`DC-42` through `DC-86` are complete. `DC-87` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2790,7 +2790,7 @@ Work log:
 
 ### DC-86: Clean Smoke CLI Handoff
 
-Status: `planned`
+Status: `complete`
 
 Goal: let the clean platform/runtime boundary own the supported smoke-launch
 CLI path while preserving the accepted adapter for unsupported historical
@@ -2820,6 +2820,73 @@ Validation:
 cargo fmt --check
 cargo test --lib runtime::tests::
 cargo test --lib platform::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 13:42:20 BST` Started `DC-86`: posted the cycle start update
+  and began moving supported `--live-smoke` CLI launches onto the clean
+  `RuntimeConfig` path while preserving accepted CLI delegation for default
+  live play, help, malformed smoke arguments, and historical commands.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778762555090619`
+- `2026-05-14 14:04:00 BST` Completed `DC-86`: clean platform CLI parsing now
+  owns valid `--live-smoke` launches and maps supported live configuration
+  flags into `RuntimeConfig`, while default live play, help, malformed smoke
+  arguments, and historical commands stay delegated to the accepted adapter.
+  Public API guards now assert the clean smoke CLI path remains source-visible.
+  Validation passed with formatting; focused platform, runtime, and public API
+  tests; `cargo test --all-targets`; clippy with warnings denied;
+  `make fidelity`; live smoke; markdownlint; and `git diff --check`.
+  `make fidelity` matched 10 trace fixtures covering 15452 frames and reported
+  new Rust line coverage `37/37` non-baselined added executable lines. Live
+  smoke rendered 239 frames, saw 74 distinct frame signatures, observed
+  attract, credit, and playing states, injected all required controls, and
+  exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778763856173449`
+
+### DC-87: Clean Interactive CLI Handoff
+
+Status: `planned`
+
+Goal: let the clean platform/runtime boundary own the supported default
+interactive live-play CLI path while preserving the accepted adapter for help,
+malformed live options, and historical commands.
+
+Scope:
+
+- Extend clean CLI handoff to the no-argument live launch and valid
+  `--input-profile`, `--mute`, and `--cmos-path` interactive combinations.
+- Keep `--help`, malformed live options, unsupported flags, and historical
+  commands delegated to the accepted CLI adapter.
+- Preserve the current help text and historical command behavior.
+- Keep interactive launch mapping on `RuntimeConfig` and the `wgpu` live
+  runtime bridge.
+
+Acceptance criteria:
+
+- No-argument launch and valid live configuration flags are classified as clean
+  interactive runtime launches.
+- Help, malformed live options, and historical commands still follow the
+  accepted adapter.
+- Public API guards identify the clean-owned interactive CLI path and keep
+  root launch adapters quarantined.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
 cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
 cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
 cargo test --all-targets
