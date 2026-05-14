@@ -19,6 +19,11 @@ pub(crate) fn run_trace_inputs_file(path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub(crate) fn run_check_trace(inputs_path: &Path, expected_path: &Path) -> anyhow::Result<()> {
+    print!("{}", check_trace_text(inputs_path, expected_path)?);
+    Ok(())
+}
+
 fn trace_text(frame_count: usize) -> anyhow::Result<String> {
     if frame_count == 0 {
         bail!("--fidelity-trace frame count must be greater than zero");
@@ -42,6 +47,20 @@ fn trace_input_file_text(path: &Path) -> anyhow::Result<String> {
     trace_input_text(&script)
 }
 
+fn check_trace_text(inputs_path: &Path, expected_path: &Path) -> anyhow::Result<String> {
+    let actual = trace_input_file_text(inputs_path)?;
+    let expected = fs::read_to_string(expected_path)
+        .with_context(|| format!("failed to read expected trace {}", expected_path.display()))?;
+    let comparison = crate::legacy_fidelity::compare_trace_text(&expected, &actual)
+        .map_err(|mismatch| anyhow!("{}: {mismatch}", expected_path.display()))?;
+
+    Ok(format!(
+        "Fidelity trace {} matched {} frame(s)\n",
+        expected_path.display(),
+        comparison.frames
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -51,8 +70,8 @@ mod tests {
     };
 
     use super::{
-        run_trace_inputs, run_trace_inputs_file, trace_input_file_text, trace_input_text,
-        trace_text,
+        check_trace_text, run_check_trace, run_trace_inputs, run_trace_inputs_file,
+        trace_input_file_text, trace_input_text, trace_text,
     };
 
     #[test]
@@ -131,6 +150,73 @@ mod tests {
 
         run_trace_inputs("none").expect("inline trace inputs should run");
         run_trace_inputs_file(&script_path).expect("file trace inputs should run");
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn check_trace_text_compares_expected_trace_file() {
+        let path = unique_temp_dir("defender-clean-check-trace");
+        fs::create_dir_all(&path).expect("create temp dir");
+        let inputs_path = path.join("inputs.txt");
+        let expected_path = path.join("expected.tsv");
+        fs::write(&inputs_path, "none\n").expect("write input script");
+        fs::write(
+            &expected_path,
+            trace_input_text("none").expect("expected trace text"),
+        )
+        .expect("write expected trace");
+
+        let text = check_trace_text(&inputs_path, &expected_path).expect("trace should match");
+        let _ = fs::remove_dir_all(path);
+
+        assert!(text.ends_with("matched 1 frame(s)\n"));
+    }
+
+    #[test]
+    fn check_trace_text_reports_mismatch_with_expected_path() {
+        let path = unique_temp_dir("defender-clean-check-trace-mismatch");
+        fs::create_dir_all(&path).expect("create temp dir");
+        let inputs_path = path.join("inputs.txt");
+        let expected_path = path.join("expected.tsv");
+        fs::write(&inputs_path, "none\n").expect("write input script");
+        fs::write(&expected_path, "frame\tinput_bits\n1\t0xFFFF\n").expect("write bad trace");
+
+        let error = check_trace_text(&inputs_path, &expected_path)
+            .expect_err("mismatched expected trace should fail");
+        let _ = fs::remove_dir_all(path);
+
+        assert!(error.to_string().contains("expected.tsv: trace mismatch"));
+    }
+
+    #[test]
+    fn check_trace_text_reports_expected_trace_read_failures() {
+        let path = unique_temp_dir("defender-clean-check-trace-missing-expected");
+        fs::create_dir_all(&path).expect("create temp dir");
+        let inputs_path = path.join("inputs.txt");
+        let expected_path = path.join("missing.tsv");
+        fs::write(&inputs_path, "none\n").expect("write input script");
+
+        let error = check_trace_text(&inputs_path, &expected_path)
+            .expect_err("missing expected trace should fail");
+        let _ = fs::remove_dir_all(path);
+
+        assert!(error.to_string().contains("failed to read expected trace"));
+    }
+
+    #[test]
+    fn run_check_trace_accepts_supported_inputs() {
+        let path = unique_temp_dir("defender-clean-run-check-trace");
+        fs::create_dir_all(&path).expect("create temp dir");
+        let inputs_path = path.join("inputs.txt");
+        let expected_path = path.join("expected.tsv");
+        fs::write(&inputs_path, "none\n").expect("write input script");
+        fs::write(
+            &expected_path,
+            trace_input_text("none").expect("expected trace text"),
+        )
+        .expect("write expected trace");
+
+        run_check_trace(&inputs_path, &expected_path).expect("trace check should run");
         let _ = fs::remove_dir_all(path);
     }
 

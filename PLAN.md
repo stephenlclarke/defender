@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-97` are complete. The standing maintenance guidance in
+`DC-42` through `DC-98` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3643,6 +3643,82 @@ Work log:
   `cargo fmt --check`; and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778797461215109`
+
+### DC-98: Clean Single Trace Check Command Ownership
+
+Status: `complete`
+
+Goal: move `--fidelity-check-trace <inputs> <expected>` into clean
+platform/runtime ownership while preserving current trace comparison behavior.
+
+Scope:
+
+- Add a clean command/config path for checking one trace input script against
+  one expected TSV trace.
+- Preserve live-option conflict, missing argument, extra argument, file-read,
+  and trace mismatch behavior.
+- Extend the private fidelity trace facade so single trace comparisons remain
+  quarantined behind clean runtime ownership.
+- Leave fixture directory and reference fixture directory checks in the
+  historical inventory for later slices.
+- Add focused platform/runtime/API tests for classification, malformed
+  arguments, dispatch, file reads, trace mismatch, and output contract.
+
+Acceptance criteria:
+
+- `cargo run -- --fidelity-check-trace <inputs> <expected>` is served by clean
+  runtime code and preserves current match/mismatch text.
+- Malformed single trace-check invocations preserve current messages.
+- Historical inventory still explicitly delegates fixture-directory and
+  reference-fixture-directory checks.
+- Public API guards make the single trace-check boundary visible.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib fidelity_traces::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --fidelity-check-trace <input-script-path> <expected-trace-path>
+cargo run -- --fidelity-check-trace
+cargo run -- --fidelity-check-trace <input-script-path>
+cargo run -- --fidelity-check-trace <input-script-path> <expected-trace-path> extra
+cargo run -- --mute --fidelity-check-trace <input-script-path> <expected-trace-path>
+cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 23:26:35 BST` Started `DC-98`: moving
+  `--fidelity-check-trace <inputs> <expected>` into clean platform/runtime
+  ownership while preserving argument validation, file-read behavior, trace
+  comparison output, and historical delegation for fixture-directory checks.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778797606858679`
+- `2026-05-14 23:50:33 BST` Completed `DC-98`: clean platform/runtime code now
+  owns single trace comparisons through `RuntimeCommand::FidelityTraceCheck`,
+  the private fidelity trace facade compares generated trace text against
+  expected TSV files, and single trace checks are removed from the historical
+  command inventory while fixture-directory checks remain delegated for later
+  slices. Validation passed: focused platform/runtime/fidelity trace and
+  public API tests; `cargo test --all-targets`; `cargo clippy --all-targets
+  -- -D warnings`; `make fidelity` with 10 trace fixtures, 15452 frames, and
+  54/54 added executable Rust lines covered; CLI probes for trace-check match,
+  mismatch, malformed arguments, file-read failures, live-option conflict, and
+  historical trace fixture directory delegation; `cargo run -- --live-smoke`
+  with 239 rendered frames; `markdownlint`; `cargo fmt --check`; and
+  `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778799033889449`
 
 ## Ongoing Work
 

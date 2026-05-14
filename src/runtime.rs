@@ -58,6 +58,18 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
             .run_command(RuntimeCommand::FidelityTraceInputsFile { path })
     }
 
+    pub(crate) fn run_fidelity_trace_check(
+        &self,
+        inputs_path: PathBuf,
+        expected_path: PathBuf,
+    ) -> anyhow::Result<()> {
+        self.backend
+            .run_command(RuntimeCommand::FidelityTraceCheck {
+                inputs_path,
+                expected_path,
+            })
+    }
+
     pub(crate) fn run_fidelity_scenario_list(&self) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::FidelityScenarioList)
@@ -96,6 +108,10 @@ pub(crate) enum RuntimeCommand {
     },
     FidelityTraceInputsFile {
         path: PathBuf,
+    },
+    FidelityTraceCheck {
+        inputs_path: PathBuf,
+        expected_path: PathBuf,
     },
     FidelityScenarioList,
     FidelityScenarioInputWriter {
@@ -165,6 +181,10 @@ impl RuntimeBackend for InstalledRuntimeBackend {
             RuntimeCommand::FidelityTraceInputsFile { path } => {
                 crate::fidelity_traces::run_trace_inputs_file(&path)
             }
+            RuntimeCommand::FidelityTraceCheck {
+                inputs_path,
+                expected_path,
+            } => crate::fidelity_traces::run_check_trace(&inputs_path, &expected_path),
             RuntimeCommand::FidelityScenarioList => crate::fidelity_scenarios::run_list(),
             RuntimeCommand::FidelityScenarioInputWriter { path } => {
                 crate::fidelity_scenarios::run_write_inputs(&path)
@@ -219,6 +239,13 @@ pub(crate) fn run_fidelity_trace_inputs(script: String) -> anyhow::Result<()> {
 
 pub(crate) fn run_fidelity_trace_inputs_file(path: PathBuf) -> anyhow::Result<()> {
     RuntimeHost::current().run_fidelity_trace_inputs_file(path)
+}
+
+pub(crate) fn run_fidelity_trace_check(
+    inputs_path: PathBuf,
+    expected_path: PathBuf,
+) -> anyhow::Result<()> {
+    RuntimeHost::current().run_fidelity_trace_check(inputs_path, expected_path)
 }
 
 pub(crate) fn run_fidelity_scenario_list() -> anyhow::Result<()> {
@@ -427,6 +454,26 @@ mod tests {
     }
 
     #[test]
+    fn runtime_host_launches_fidelity_trace_check_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_fidelity_trace_check(PathBuf::from("inputs.txt"), PathBuf::from("expected.tsv"))
+            .expect("runtime host should run trace check command");
+
+        let observed = calls.borrow();
+        assert_eq!(
+            observed.as_slice(),
+            &[RuntimeCommand::FidelityTraceCheck {
+                inputs_path: PathBuf::from("inputs.txt"),
+                expected_path: PathBuf::from("expected.tsv"),
+            }]
+        );
+    }
+
+    #[test]
     fn runtime_host_launches_fidelity_scenario_list_separately() {
         let calls = Rc::new(RefCell::new(Vec::new()));
         let host = RuntimeHost::with_backend(RecordingBackend {
@@ -589,6 +636,21 @@ mod tests {
     }
 
     #[test]
+    fn installed_backend_runs_clean_fidelity_trace_check() {
+        let path = unique_temp_dir("defender-clean-runtime-trace-check");
+        fs::create_dir_all(&path).expect("create temp dir");
+        let inputs_path = path.join("inputs.txt");
+        let expected_path = path.join("expected.tsv");
+        fs::write(&inputs_path, "none\n").expect("write trace input script");
+        fs::write(&expected_path, one_frame_idle_trace_text()).expect("write expected trace");
+
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_fidelity_trace_check(inputs_path, expected_path)
+            .expect("installed backend should run clean trace check");
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[test]
     fn installed_backend_runs_clean_fidelity_scenario_input_writer() {
         let path = unique_temp_dir("defender-clean-runtime-scenario-inputs");
         let _ = fs::remove_dir_all(&path);
@@ -634,5 +696,17 @@ mod tests {
             .as_nanos();
 
         std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()))
+    }
+
+    fn one_frame_idle_trace_text() -> &'static str {
+        concat!(
+            "frame\tinput_bits\tinput_in0\tinput_in1\tinput_in2\tphase\t",
+            "p1_score\tp2_score\twave\tlives\tsmart_bombs\tseed\thseed\tlseed\t",
+            "object_table_crc32\tprocess_table_crc32\tsuper_process_table_crc32\t",
+            "shell_table_crc32\tvideo_crc32\tsound_commands\tevents\n",
+            "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t0\t0\t0\t",
+            "0x00\t0x00\t0x00\t0xE15D8394\t0xC4C53DA1\t0x05B7E865\t",
+            "0x41D912FF\t0x157E98C7\t-\t-\n",
+        )
     }
 }
