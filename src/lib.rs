@@ -211,6 +211,29 @@ mod public_api_tests {
     }
 
     #[test]
+    fn legacy_equivalence_tests_use_crate_private_oracle_wiring() {
+        let oracle_equivalence_tests_rs = include_str!("../src_legacy/oracle_equivalence_tests.rs");
+
+        for forbidden in [
+            "compatibility::",
+            "compatibility::{",
+            "crate::compatibility",
+        ] {
+            assert!(
+                !oracle_equivalence_tests_rs.contains(forbidden),
+                "legacy equivalence tests must use crate-private oracle wiring instead of {forbidden}"
+            );
+        }
+
+        for required in ["input::{", "machine::{"] {
+            assert!(
+                oracle_equivalence_tests_rs.contains(required),
+                "legacy equivalence tests must keep explicit crate-private {required} imports"
+            );
+        }
+    }
+
+    #[test]
     fn clean_runtime_and_oracle_use_accepted_facade() {
         let platform_rs = include_str!("platform.rs");
         assert!(platform_rs.contains("crate::accepted::run_runtime()"));

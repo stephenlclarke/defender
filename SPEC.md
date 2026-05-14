@@ -89,13 +89,14 @@ crate-private. Clean runtime and oracle callers use the crate-private
 legacy-machine adaptation into neutral accepted-behavior contracts before the
 public clean gameplay types see it. Legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so clean accepted/oracle source
-stays focused on gameplay contracts. Temporary tools still use the doc-hidden
-`defender::compatibility` namespace as the boundary to the legacy tree; its
-re-export map lives in `src_legacy/compatibility.rs`, not in the clean crate
-root, and exposes only the temporary modules used by README media tooling and
-clean equivalence tests. The current compatibility surface is only input,
-machine, and video; machine process/state contracts remain crate-private oracle
-wiring. Live presentation receives clean `RenderScene` data, currently with a
+stays focused on gameplay contracts. Internal clean equivalence regressions use
+crate-private oracle wiring. Temporary README media tooling still uses the
+doc-hidden `defender::compatibility` namespace as the boundary to the legacy
+tree; its re-export map lives in `src_legacy/compatibility.rs`, not in the
+clean crate root, and exposes only the temporary modules used by README media
+tooling. The current compatibility surface is only input, machine, and video;
+machine process/state contracts remain crate-private oracle wiring. Live
+presentation receives clean `RenderScene` data, currently with a
 temporary raster payload for visual equivalence. Kitty graphics and
 terminal-session code remain parked there as historical
 compatibility evidence, but they are not part of the active runtime or

@@ -5,13 +5,17 @@ Last reviewed: `2026-05-13`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `640670b`.
+- Latest accepted implementation commit before this cycle: `af3c700`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving legacy access through the doc-hidden `compatibility` namespace.
   Root legacy adapters should stay crate-private.
 - Live play uses the `wgpu` backend. Kitty is parked in `src_legacy/` as
   historical compatibility evidence and is no longer an active runtime path.
+- Clean `wgpu` rendering should be sprite-first: gameplay visuals should use
+  renderer-owned sprite assets, texture atlases, and batched sprite draws.
+  Full-frame raster upload remains temporary fidelity evidence, not the final
+  gameplay representation.
 - The next product direction is a `wgpu`-only clean game rewrite. Kitty should
   be removed from the active application surface, and the current
   assembler-shaped machine should become a temporary fidelity oracle rather
@@ -55,9 +59,9 @@ and added executable Rust line coverage.
   renderer abstractions.
 - Use Conventional Commits for committed work.
 - Do not use `codex` in branch names, commit messages, or PR titles.
-- Post a start note to `xyzzytools.slack.com#codex` before beginning each
-  planned dev-cycle, and post a completion note after validation when the
-  dev-cycle closes.
+- Slack cycle updates are mandatory for planned dev-cycles: post a start note
+  to `xyzzytools.slack.com#codex` before implementation begins, and post a
+  completion note after validation when the dev-cycle closes.
 
 ## Rewrite Target
 
@@ -73,9 +77,9 @@ Target module ownership:
 - `systems`: deterministic fixed-step systems for input, player movement,
   projectiles, enemies, collisions, waves, scoring, high-score entry, attract
   mode, and sound-event emission.
-- `renderer`: native `wgpu` rendering from scene data using sprite/quad
-  pipelines, texture atlases, uniform buffers, instanced draws, HUD/text
-  rendering, debug overlays, and viewport scaling.
+- `renderer`: native `wgpu` rendering from scene data using sprite assets,
+  sprite/quad pipelines, texture atlases, uniform buffers, instanced draws,
+  HUD/text rendering, debug overlays, and viewport scaling.
 - `platform`: `winit` event loop, input collection, fixed timestep, persistence,
   smoke runner, and device lifecycle.
 - `audio`: gameplay-facing sound events and backend/runtime ownership.
@@ -90,6 +94,10 @@ Rewrite rules:
   routine names, source process names, or memory table names.
 - Renderer code must consume clean scene data, not RAM bytes or source layout
   fields.
+- Sprites are the primary gameplay-art primitive. Use renderer-owned sprite
+  assets, atlases, and batched draws for the player, enemies, humans,
+  projectiles, explosions, terrain details, and UI glyphs instead of treating
+  ROM bytemaps or full-frame raster uploads as the production representation.
 - Replace memory CRC confidence gradually with clean state, event, sound, and
   rendered-frame equivalence gates.
 - Prefer small deterministic systems over a monolithic memory-oriented machine.
@@ -98,7 +106,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-72` are complete. `DC-73` is planned, and the standing
+`DC-42` through `DC-73` are complete. `DC-74` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1875,7 +1883,76 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778714403527089`
 
-### DC-73: Memory-Oriented Oracle Retirement
+### DC-73: Sprite-First Plan and Internal Compatibility Import Retirement
+
+Status: `complete`
+
+Goal: record sprite-first rendering as an explicit rewrite requirement and
+remove the remaining internal oracle-equivalence test dependency on the
+temporary compatibility namespace.
+
+Scope:
+
+- Document that clean `wgpu` rendering should use sprite assets, texture
+  atlases, and batched sprite draws as the production representation.
+- Move `src_legacy/oracle_equivalence_tests.rs` imports from
+  `defender::compatibility` to crate-private legacy oracle modules.
+- Add a focused public API guard so internal equivalence tests cannot drift
+  back to the compatibility namespace.
+- Strengthen the plan requirement that every planned dev-cycle posts Slack
+  start and completion updates.
+- Update README, SPEC, and PLAN to describe compatibility as README media
+  tooling only for this slice.
+
+Acceptance criteria:
+
+- `PLAN.md` explicitly requires sprite-first `wgpu` rendering with atlases and
+  batched sprite draws.
+- Internal oracle-equivalence tests use crate-private legacy wiring, not the
+  doc-hidden `defender::compatibility` namespace.
+- `defender::compatibility` remains limited to the temporary README media
+  tooling surface for this cycle.
+- The work protocol explicitly requires Slack start and completion updates for
+  every planned dev-cycle.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::legacy_equivalence_tests_use_crate_private_oracle_wiring
+cargo test --lib oracle_equivalence_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+! rg -n "compatibility::|compatibility\\{" src_legacy/oracle_equivalence_tests.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 07:28:10 BST` Started `DC-73`: posted the cycle start update and
+  began recording sprite-first rendering as explicit rewrite scope while
+  moving legacy equivalence tests off the doc-hidden compatibility namespace.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778740070294709`
+- `2026-05-14 07:50:12 BST` Completed `DC-73`: documented sprite-first
+  `wgpu` rendering with sprite assets, texture atlases, and batched sprite
+  draws; moved legacy oracle-equivalence tests from the doc-hidden
+  compatibility namespace to crate-private oracle wiring; strengthened the
+  Slack start/completion update requirement in the work protocol; and updated
+  README, SPEC, and PLAN. Validation passed with the DC-73 gate: formatting,
+  focused public API guard, oracle-equivalence tests, all-target tests, clippy,
+  `make fidelity`, live smoke, retired-import search, markdownlint, and
+  `git diff --check`. `make fidelity` reported new Rust line coverage `0/0`
+  non-baselined added executable lines. Live smoke rendered 239 frames, saw
+  74 distinct frame CRCs, observed attract, credit, and playing states,
+  injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778741426762209`
+
+### DC-74: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 
@@ -1916,6 +1993,4 @@ rg -n 'red_label|RED_LABEL|defend\\.|src/machine_memory|source routine' src
   Makefile targets, workflows, and module boundaries.
 - Keep added executable Rust lines covered or explicitly refresh the accepted
   uncovered baseline only when accepting existing debt.
-- Keep Slack completion notes best-effort until the connector authentication
-  is restored; do not treat a Slack token failure as a code or validation
-  failure.
+- Keep Slack start and completion notes linked in each dev-cycle work log.

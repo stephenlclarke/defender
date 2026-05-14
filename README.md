@@ -240,9 +240,10 @@ storage, and test helpers. `src_legacy/accepted_behavior.rs` owns the
 temporary accepted-machine adapter, and legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so `src/accepted.rs` and
 `src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as
-doc-hidden compatibility modules rather than supported public API, with
-`src_legacy/compatibility.rs` owning only the temporary re-exports still used by
-README media tooling and clean equivalence tests. The binary enters through the
+doc-hidden compatibility modules rather than supported public API. Internal
+clean equivalence regressions use crate-private oracle wiring, while
+`src_legacy/compatibility.rs` owns only the temporary re-exports still used by
+README media tooling. The binary enters through the
 clean platform boundary before delegating to the compatibility runtime. The live
 worker now wraps accepted visual output as a clean `RenderScene` raster payload
 before the presenter draws it. Kitty graphics and terminal-session code remain

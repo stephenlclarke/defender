@@ -1,18 +1,16 @@
 use crate::{
     accepted::AcceptedFrame,
     accepted_behavior::cabinet_input_for_test,
-    compatibility::{
-        input::{
-            DEFENDER_IN0_ALTITUDE_DOWN, DEFENDER_IN0_FIRE, DEFENDER_IN0_HYPERSPACE,
-            DEFENDER_IN0_REVERSE, DEFENDER_IN0_SMART_BOMB, DEFENDER_IN0_THRUST,
-            DEFENDER_IN1_ALTITUDE_UP,
-        },
-        machine::{
-            ArcadeMachine, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelLaserDirection,
-            RedLabelLaserFire, RedLabelPlayerMotion,
-        },
-    },
     game::{Direction, GameEvent, GameInput, GamePhase, SoundEvent, WorldVector},
+    input::{
+        DEFENDER_IN0_ALTITUDE_DOWN, DEFENDER_IN0_FIRE, DEFENDER_IN0_HYPERSPACE,
+        DEFENDER_IN0_REVERSE, DEFENDER_IN0_SMART_BOMB, DEFENDER_IN0_THRUST,
+        DEFENDER_IN1_ALTITUDE_UP,
+    },
+    machine::{
+        ArcadeMachine, RED_LABEL_SYSTEM_PROCESS_TYPE, RedLabelLaserDirection, RedLabelLaserFire,
+        RedLabelPlayerMotion,
+    },
     machine_state,
     oracle::{
         GameplayOracle,
