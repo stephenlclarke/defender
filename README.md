@@ -213,7 +213,8 @@ Clean rewrite modules:
 - `src/accepted.rs`: crate-private accepted-behavior contracts and facade over
   the temporary adapter.
 - `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
-  `GameEvents`, score, player, direction, and sound-event contracts.
+  `GameEvents`, score, player, direction, and sound-event contracts without
+  accepted command-byte mapping.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion and projectile
   launch/capacity systems, and the `GameSimulation` trait for future game
@@ -229,7 +230,8 @@ Clean rewrite modules:
 - `src/fidelity.rs`: clean frame-equivalence signatures over gameplay state,
   gameplay events, sound events, and render summaries.
 - `src/oracle.rs`: the clean gameplay oracle, returning clean state, event,
-  sound, and scene-summary frames from the accepted-behavior facade.
+  sound, and scene-summary frames from the accepted-behavior facade while
+  owning accepted sound command-byte mapping.
 
 Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input,

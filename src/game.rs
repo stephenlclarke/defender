@@ -87,31 +87,7 @@ pub enum SoundEvent {
     GameStarted,
     ThrustStarted,
     ThrustStopped,
-    UnmappedAcceptedCommand { command: u8 },
-}
-
-impl SoundEvent {
-    pub const fn from_accepted_command(command: u8) -> Self {
-        match command {
-            0xC0 => Self::Startup,
-            0xE6 => Self::CreditAdded,
-            0xF5 => Self::GameStarted,
-            0xE9 => Self::ThrustStarted,
-            0xF0 => Self::ThrustStopped,
-            command => Self::UnmappedAcceptedCommand { command },
-        }
-    }
-
-    pub const fn accepted_command(self) -> u8 {
-        match self {
-            Self::Startup => 0xC0,
-            Self::CreditAdded => 0xE6,
-            Self::GameStarted => 0xF5,
-            Self::ThrustStarted => 0xE9,
-            Self::ThrustStopped => 0xF0,
-            Self::UnmappedAcceptedCommand { command } => command,
-        }
-    }
+    UnmappedSoundCommand { command: u8 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -219,40 +195,6 @@ mod tests {
         assert_eq!(events.sounds(), &[SoundEvent::CreditAdded]);
         assert!(!events.is_empty());
         assert!(GameEvents::default().is_empty());
-    }
-
-    #[test]
-    fn sound_events_map_accepted_command_bytes_at_oracle_boundary() {
-        assert_eq!(SoundEvent::from_accepted_command(0xC0), SoundEvent::Startup);
-        assert_eq!(
-            SoundEvent::from_accepted_command(0xE6),
-            SoundEvent::CreditAdded
-        );
-        assert_eq!(
-            SoundEvent::from_accepted_command(0xF5),
-            SoundEvent::GameStarted
-        );
-        assert_eq!(
-            SoundEvent::from_accepted_command(0xE9),
-            SoundEvent::ThrustStarted
-        );
-        assert_eq!(
-            SoundEvent::from_accepted_command(0xF0),
-            SoundEvent::ThrustStopped
-        );
-        assert_eq!(
-            SoundEvent::from_accepted_command(0x3E),
-            SoundEvent::UnmappedAcceptedCommand { command: 0x3E }
-        );
-        assert_eq!(SoundEvent::Startup.accepted_command(), 0xC0);
-        assert_eq!(SoundEvent::CreditAdded.accepted_command(), 0xE6);
-        assert_eq!(SoundEvent::GameStarted.accepted_command(), 0xF5);
-        assert_eq!(SoundEvent::ThrustStarted.accepted_command(), 0xE9);
-        assert_eq!(SoundEvent::ThrustStopped.accepted_command(), 0xF0);
-        assert_eq!(
-            SoundEvent::UnmappedAcceptedCommand { command: 0x3E }.accepted_command(),
-            0x3E
-        );
     }
 
     #[test]

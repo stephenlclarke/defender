@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `fe87ef7`.
+- Latest accepted implementation commit before this cycle: `472e14f`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-76` are complete. `DC-77` is planned, and the standing
+`DC-42` through `DC-77` are complete. `DC-78` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2150,7 +2150,79 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778746419261859`
 
-### DC-77: Memory-Oriented Oracle Retirement
+### DC-77: Clean Sound Event Contract Isolation
+
+Status: `complete`
+
+Goal: remove accepted sound command-byte mapping from the clean gameplay domain
+and keep that adapter logic at the oracle boundary.
+
+Scope:
+
+- Remove `SoundEvent::from_accepted_command`,
+  `SoundEvent::accepted_command`, and `UnmappedAcceptedCommand` from
+  `src/game.rs`.
+- Add oracle-owned accepted sound command mapping and test-support helpers.
+- Route clean fidelity and legacy oracle-equivalence tests through the oracle
+  mapping helper.
+- Add a public API guard so clean gameplay contracts cannot re-own accepted
+  sound command mapping.
+- Update README, SPEC, and PLAN to document the sound-event boundary.
+
+Acceptance criteria:
+
+- `src/game.rs` contains no accepted sound command mapping helpers or accepted
+  unmapped-command variant.
+- `src/oracle.rs` owns the accepted sound command mapping into clean
+  `SoundEvent` values.
+- Clean fidelity and legacy oracle-equivalence tests compare sound events
+  through the oracle boundary.
+- Docs describe clean `SoundEvent` as a gameplay contract, not a command-byte
+  adapter.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game::tests
+cargo test --lib oracle::tests
+cargo test --lib fidelity::tests
+cargo test --lib oracle_equivalence_tests::clean_fixture_matches_accepted_oracle_events_and_scene_summaries
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+! rg -n "from_accepted_command|accepted_command|UnmappedAcceptedCommand" src/game.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 09:16:30 BST` Started `DC-77`: posted the cycle start update and
+  began moving accepted sound command-byte mapping out of the clean gameplay
+  contract and into the oracle boundary.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778746590651139`
+- `2026-05-14 09:38:12 BST` Completed `DC-77`: removed accepted command-byte
+  conversion helpers from clean `SoundEvent`, renamed the unmapped sound
+  surface to neutral `UnmappedSoundCommand`, moved accepted sound command
+  mapping into `src/oracle.rs`, and routed clean fidelity plus legacy
+  oracle-equivalence checks through the oracle helper. Added a public API guard
+  so `src/game.rs` cannot re-own accepted command mapping. README, SPEC, and
+  PLAN now document the sound-event boundary and move broad memory-model
+  retirement to `DC-78`. Validation passed with focused game/oracle/fidelity,
+  oracle-equivalence, and public API tests; formatting; all-target tests;
+  clippy; `make fidelity`; live smoke; the static guard; markdownlint; and
+  `git diff --check`. `make fidelity` reported new Rust line coverage `9/9`
+  non-baselined added executable lines. Live smoke rendered 240 frames, saw 74
+  distinct frame CRCs, observed attract, credit, and playing states, injected
+  all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778747892960589`
+
+### DC-78: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 

@@ -68,7 +68,7 @@ fn adapt_frame_output(output: AcceptedFrame) -> GameFrame {
             output
                 .sound_commands
                 .into_iter()
-                .map(SoundEvent::from_accepted_command)
+                .map(adapt_sound_command)
                 .collect(),
         ),
         scene,
@@ -173,9 +173,20 @@ fn adapt_event(event: AcceptedEvent) -> GameEvent {
     }
 }
 
+fn adapt_sound_command(command: u8) -> SoundEvent {
+    match command {
+        0xC0 => SoundEvent::Startup,
+        0xE6 => SoundEvent::CreditAdded,
+        0xF5 => SoundEvent::GameStarted,
+        0xE9 => SoundEvent::ThrustStarted,
+        0xF0 => SoundEvent::ThrustStopped,
+        command => SoundEvent::UnmappedSoundCommand { command },
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod test_support {
-    use super::{GameEvent, GameState, RenderScene};
+    use super::{GameEvent, GameState, RenderScene, SoundEvent};
     use crate::accepted::{AcceptedEvent, AcceptedSnapshot};
 
     pub(crate) fn adapt_accepted_snapshot(snapshot: AcceptedSnapshot) -> GameState {
@@ -189,6 +200,10 @@ pub(crate) mod test_support {
     pub(crate) fn adapt_accepted_scene(state: &GameState, visual_hash: Option<u32>) -> RenderScene {
         super::adapt_scene(state, visual_hash)
     }
+
+    pub(crate) fn adapt_accepted_sound_command(command: u8) -> SoundEvent {
+        super::adapt_sound_command(command)
+    }
 }
 
 #[cfg(test)]
@@ -199,8 +214,8 @@ mod tests {
     };
 
     use super::{
-        Direction, GameEvent, GameInput, GamePhase, GameplayOracle, adapt_direction, adapt_event,
-        adapt_phase,
+        Direction, GameEvent, GameInput, GamePhase, GameplayOracle, SoundEvent, adapt_direction,
+        adapt_event, adapt_phase, adapt_sound_command,
     };
 
     #[test]
@@ -276,6 +291,19 @@ mod tests {
         for (accepted, clean) in pairs {
             assert_eq!(adapt_event(accepted), clean);
         }
+    }
+
+    #[test]
+    fn oracle_maps_accepted_sound_commands_to_clean_events() {
+        assert_eq!(adapt_sound_command(0xC0), SoundEvent::Startup);
+        assert_eq!(adapt_sound_command(0xE6), SoundEvent::CreditAdded);
+        assert_eq!(adapt_sound_command(0xF5), SoundEvent::GameStarted);
+        assert_eq!(adapt_sound_command(0xE9), SoundEvent::ThrustStarted);
+        assert_eq!(adapt_sound_command(0xF0), SoundEvent::ThrustStopped);
+        assert_eq!(
+            adapt_sound_command(0x3E),
+            SoundEvent::UnmappedSoundCommand { command: 0x3E }
+        );
     }
 
     #[test]

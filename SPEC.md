@@ -1,6 +1,6 @@
 # Defender Current Specification
 
-Last reviewed: `2026-05-13`
+Last reviewed: `2026-05-14`
 
 ## Purpose
 
@@ -63,7 +63,8 @@ tree:
   isolate clean production modules from direct legacy runtime and oracle
   imports.
 - `src/game.rs`: gameplay-facing `GameState`, `GameInput`, `GameFrame`,
-  `GameEvents`, score, player, direction, and sound-event contracts.
+  `GameEvents`, score, player, direction, and sound-event contracts without
+  accepted command-byte mapping.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion and projectile
   launch/capacity systems, and the `GameSimulation` trait for future game
@@ -79,7 +80,8 @@ tree:
 - `src/fidelity.rs`: clean frame-equivalence signatures for gameplay state,
   gameplay events, sound events, and render summaries.
 - `src/oracle.rs`: the explicit clean gameplay oracle, including clean state,
-  event, sound, and scene-summary frames from the accepted-behavior facade.
+  event, sound, scene-summary frames, and accepted sound command-byte mapping
+  from the accepted-behavior facade.
 
 The converted implementation is parked under `src_legacy/`. It still owns the
 accepted arcade behavior, hardware models, ROM verification, rendering, input,
@@ -162,11 +164,11 @@ explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
 
 ## Active Constraints
 
-- Live audio currently maps accepted `FrameOutput::sound_commands()` timing to
-  clean `SoundEvent` batches and delivers them to a bounded non-blocking
-  backend trait. The built-in backend is a null backend that opens no audio
-  device; audible device output remains future work. The accepted
-  implementation contract is documented in
+- Live audio consumes clean `GameFrame` and `SoundEvent` batches and delivers
+  them to a bounded non-blocking backend trait. Legacy frame-output sound
+  timing is adapted before it reaches `src/audio.rs`. The built-in backend is
+  a null backend that opens no audio device; audible device output remains
+  future work. The accepted implementation contract is documented in
   `docs/fidelity/live-audio.md`.
 - Local MAME reference generation is intentionally local tooling; generated
   reference traces are not part of the normal runtime.

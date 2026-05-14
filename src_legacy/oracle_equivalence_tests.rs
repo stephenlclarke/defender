@@ -1,7 +1,7 @@
 use crate::{
     accepted::AcceptedFrame,
     accepted_behavior::cabinet_input_for_test,
-    game::{Direction, GameEvent, GameInput, GamePhase, SoundEvent, WorldVector},
+    game::{Direction, GameEvent, GameInput, GamePhase, WorldVector},
     input::{
         DEFENDER_IN0_ALTITUDE_DOWN, DEFENDER_IN0_FIRE, DEFENDER_IN0_HYPERSPACE,
         DEFENDER_IN0_REVERSE, DEFENDER_IN0_SMART_BOMB, DEFENDER_IN0_THRUST,
@@ -14,7 +14,10 @@ use crate::{
     machine_state,
     oracle::{
         GameplayOracle,
-        test_support::{adapt_accepted_event, adapt_accepted_scene, adapt_accepted_snapshot},
+        test_support::{
+            adapt_accepted_event, adapt_accepted_scene, adapt_accepted_snapshot,
+            adapt_accepted_sound_command,
+        },
     },
     red_label::{Facing, Fixed16},
     systems::{
@@ -150,7 +153,7 @@ fn clean_fixture_matches_accepted_oracle_events_and_scene_summaries() {
         let expected_sounds = accepted_frame
             .sound_commands
             .into_iter()
-            .map(SoundEvent::from_accepted_command)
+            .map(adapt_accepted_sound_command)
             .collect::<Vec<_>>();
         let expected_scene_summary =
             adapt_accepted_scene(&expected_state, accepted_frame.visual_hash).summary();

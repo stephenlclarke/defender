@@ -34,7 +34,10 @@ mod tests {
         },
         oracle::{
             GameplayOracle,
-            test_support::{adapt_accepted_event, adapt_accepted_scene, adapt_accepted_snapshot},
+            test_support::{
+                adapt_accepted_event, adapt_accepted_scene, adapt_accepted_snapshot,
+                adapt_accepted_sound_command,
+            },
         },
         renderer::{RenderScene, SurfaceSize},
     };
@@ -122,7 +125,7 @@ mod tests {
             sound_events: frame
                 .sound_commands
                 .into_iter()
-                .map(SoundEvent::from_accepted_command)
+                .map(adapt_accepted_sound_command)
                 .collect(),
             render: adapt_accepted_scene(&state, frame.visual_hash).summary(),
         }

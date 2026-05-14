@@ -282,6 +282,18 @@ mod public_api_tests {
                 "clean audio runtime must consume GameFrame/SoundEvent contracts instead of {forbidden}"
             );
         }
+
+        let game_rs = include_str!("game.rs");
+        for forbidden in [
+            "from_accepted_command",
+            "accepted_command",
+            "UnmappedAcceptedCommand",
+        ] {
+            assert!(
+                !game_rs.contains(forbidden),
+                "clean gameplay contracts must not own accepted sound command mapping {forbidden}"
+            );
+        }
     }
 
     #[test]
