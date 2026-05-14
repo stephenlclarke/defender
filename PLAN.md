@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `a771596`.
+- Latest accepted implementation commit before this cycle: `fe87ef7`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-75` are complete. `DC-76` is planned, and the standing
+`DC-42` through `DC-76` are complete. `DC-77` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2080,7 +2080,7 @@ Work log:
   historical trace tooling as crate-private `legacy_fidelity`, and added
   focused signature tests against the accepted facade for credited start and
   live control input. README, SPEC, and PLAN now describe clean fidelity
-  signatures and leave broad memory-model retirement to `DC-76`. Validation
+  signatures and leave broad memory-model retirement to `DC-77`. Validation
   passed with formatting, focused fidelity/public API tests, all-target tests,
   clippy, `make fidelity`, live smoke, markdownlint, and `git diff --check`.
   `make fidelity` reported new Rust line coverage `0/0` non-baselined added
@@ -2090,7 +2090,67 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778744904031159`
 
-### DC-76: Memory-Oriented Oracle Retirement
+### DC-76: Clean Audio Boundary Isolation
+
+Status: `complete`
+
+Goal: remove the clean audio runtime's direct dependency on legacy frame
+outputs.
+
+Scope:
+
+- Remove `machine_state::FrameOutput` from `src/audio.rs`.
+- Keep live audio submission on clean `GameFrame` and `SoundEvent` contracts.
+- Move legacy output-to-clean audio adaptation into `src_legacy/live.rs`.
+- Add a public API guard so clean audio cannot re-import legacy frame outputs.
+- Update README, SPEC, and PLAN to document the audio boundary.
+
+Acceptance criteria:
+
+- `src/audio.rs` contains no `FrameOutput` or legacy `machine_state` imports.
+- Live audio still receives accepted startup sound events.
+- Legacy live code owns the only output-to-clean audio adapter.
+- Docs describe the clean audio boundary.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib audio::tests
+cargo test --lib live::tests::live_core_driver_feeds_sound_events_to_audio_runtime
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+! rg -n "FrameOutput|from_frame_output|submit_frame_output|machine_state" src/audio.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 08:50:28 BST` Started `DC-76`: posted the cycle start update and
+  began moving legacy frame-output audio adaptation out of the clean audio
+  runtime.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778745028598859`
+- `2026-05-14 09:13:39 BST` Completed `DC-76`: removed legacy
+  `FrameOutput` and `machine_state` dependencies from clean `src/audio.rs`,
+  moved output-to-clean audio adaptation into `src_legacy/live.rs`, and added
+  a public API guard to keep clean audio on `GameFrame` and `SoundEvent`
+  contracts. README, SPEC, and PLAN now document the clean audio boundary.
+  Validation passed with formatting, focused audio/live/public API tests,
+  all-target tests, clippy, `make fidelity`, live smoke, the clean audio
+  static guard, markdownlint, and `git diff --check`. `make fidelity` reported
+  new Rust line coverage `9/9` non-baselined added executable lines. Live
+  smoke rendered 239 frames, saw 74 distinct frame CRCs, observed attract,
+  credit, and playing states, injected all required controls, and exited
+  cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778746419261859`
+
+### DC-77: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 

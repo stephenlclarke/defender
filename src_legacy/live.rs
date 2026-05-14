@@ -13,12 +13,13 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, anyhow};
 
 use crate::{
+    accepted::AcceptedFrame,
     audio::{LiveAudioMode, LiveAudioRuntime},
     board::CmosRam,
     cmos_storage::CmosStorage,
     input::{CabinetInput, InputEvent, InputMapper, InputProfile, PolledInput, XyzzyOverlay},
     machine::{ArcadeMachine, FRAME_RATE_MILLIHZ},
-    machine_state::{CompatibilityState, MachineSnapshot},
+    machine_state::{CompatibilityState, FrameOutput, MachineSnapshot},
     renderer::{RenderScene, SurfaceSize},
     rom::crc32,
     video::{RenderedImage, Renderer},
@@ -846,12 +847,18 @@ pub(crate) fn step_live_core_frames(
         return;
     }
 
-    let output = machine.step_with_typed_chars(first_input, typed_chars);
-    audio.submit_frame_output(&output);
+    submit_live_audio_output(
+        audio,
+        machine.step_with_typed_chars(first_input, typed_chars),
+    );
     for _ in 1..frames {
-        let output = machine.step(catch_up_input);
-        audio.submit_frame_output(&output);
+        submit_live_audio_output(audio, machine.step(catch_up_input));
     }
+}
+
+fn submit_live_audio_output(audio: &LiveAudioRuntime, output: FrameOutput) {
+    let frame = crate::oracle::game_frame_from_accepted(AcceptedFrame::from(output));
+    audio.submit_game_frame(&frame);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

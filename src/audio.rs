@@ -8,10 +8,7 @@ use std::sync::{
 };
 use std::thread::{self, JoinHandle};
 
-use crate::{
-    game::{GameFrame, SoundEvent},
-    machine_state::FrameOutput,
-};
+use crate::game::{GameFrame, SoundEvent};
 
 pub const LIVE_AUDIO_TEST_SAMPLE_RATE_HZ: u32 = 48_000;
 pub const LIVE_AUDIO_QUEUE_CAPACITY: usize = 8;
@@ -48,14 +45,6 @@ impl LiveAudioEventBatch {
 
     pub fn from_game_frame(frame: &GameFrame) -> Option<Self> {
         Self::new(frame.state.frame, frame.events.sounds())
-    }
-
-    pub fn from_frame_output(output: &FrameOutput) -> Option<Self> {
-        let events = output
-            .sound_commands()
-            .map(|command| SoundEvent::from_accepted_command(command.raw()))
-            .collect::<Vec<_>>();
-        Self::new(output.snapshot.frame, &events)
     }
 
     pub fn events(&self) -> impl Iterator<Item = SoundEvent> + '_ {
@@ -242,12 +231,6 @@ impl LiveAudioRuntime {
         }
     }
 
-    pub fn submit_frame_output(&self, output: &FrameOutput) {
-        if let Some(batch) = LiveAudioEventBatch::from_frame_output(output) {
-            self.submit_event_batch(batch);
-        }
-    }
-
     pub fn submit_event_batch(&self, batch: LiveAudioEventBatch) {
         let Some(sender) = &self.sender else {
             return;
@@ -339,8 +322,6 @@ mod tests {
             Direction, GameEvents, GameFrame, GamePhase, GameState, PlayerSnapshot, ScoreSnapshot,
             SoundEvent, WorldVector,
         },
-        input::CabinetInput,
-        machine::ArcadeMachine,
         renderer::{RenderScene, SurfaceSize},
     };
 
@@ -433,28 +414,10 @@ mod tests {
     }
 
     #[test]
-    fn live_audio_event_batch_adapts_oracle_frame_output() {
-        let mut machine = ArcadeMachine::new_cold_boot_trace();
-        let mut output = machine.step(CabinetInput::NONE);
-        for _ in 1..731 {
-            output = machine.step(CabinetInput::NONE);
-        }
-
-        let batch = LiveAudioEventBatch::from_frame_output(&output).expect("sound event batch");
-
-        assert_eq!(batch.frame, 731);
-        assert_eq!(
-            batch.events().collect::<Vec<_>>(),
-            vec![SoundEvent::Startup]
-        );
-    }
-
-    #[test]
     fn live_audio_event_batch_ignores_silent_frames() {
-        let mut machine = ArcadeMachine::new_cold_boot_trace();
-        let output = machine.step(CabinetInput::NONE);
+        let frame = game_frame_with_sounds(1, Vec::new());
 
-        assert_eq!(LiveAudioEventBatch::from_frame_output(&output), None);
+        assert_eq!(LiveAudioEventBatch::from_game_frame(&frame), None);
     }
 
     #[test]

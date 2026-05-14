@@ -53,6 +53,10 @@ impl GameSimulation for GameplayOracle {
     }
 }
 
+pub(crate) fn game_frame_from_accepted(output: AcceptedFrame) -> GameFrame {
+    adapt_frame_output(output)
+}
+
 fn adapt_frame_output(output: AcceptedFrame) -> GameFrame {
     let state = adapt_snapshot(output.snapshot);
     let scene = adapt_scene(&state, output.visual_hash);

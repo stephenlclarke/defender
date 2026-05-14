@@ -74,7 +74,8 @@ tree:
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
-  boundary, disabled/null no-device modes, and runtime diagnostics.
+  boundary, disabled/null no-device modes, and runtime diagnostics. It consumes
+  clean `GameFrame` and `SoundEvent` contracts, not legacy frame outputs.
 - `src/fidelity.rs`: clean frame-equivalence signatures for gameplay state,
   gameplay events, sound events, and render summaries.
 - `src/oracle.rs`: the explicit clean gameplay oracle, including clean state,
@@ -93,10 +94,11 @@ regressions are also wired from `src_legacy/` so clean accepted/oracle source
 stays focused on gameplay contracts. Internal clean equivalence regressions use
 crate-private oracle wiring. Clean frame-signature gates live under
 `src/fidelity.rs`, while legacy trace generation is root-wired as
-`legacy_fidelity`. Temporary README media tooling uses the doc-hidden
-`defender::readme_media` facade rather than low-level legacy module exports.
-Machine process/state contracts remain crate-private oracle wiring. Live
-presentation receives clean `RenderScene` data, currently with a
+`legacy_fidelity`. Legacy live code adapts frame outputs into clean audio
+frames before submitting to `src/audio.rs`. Temporary README media tooling uses
+the doc-hidden `defender::readme_media` facade rather than low-level legacy
+module exports. Machine process/state contracts remain crate-private oracle
+wiring. Live presentation receives clean `RenderScene` data, currently with a
 temporary raster payload for visual equivalence. Kitty graphics and
 terminal-session code remain parked there as historical
 compatibility evidence, but they are not part of the active runtime or

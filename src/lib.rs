@@ -274,6 +274,14 @@ mod public_api_tests {
                 "clean fidelity contracts must avoid legacy module import {forbidden}"
             );
         }
+
+        let audio_rs = include_str!("audio.rs");
+        for forbidden in ["crate::machine_state::", "FrameOutput"] {
+            assert!(
+                !audio_rs.contains(forbidden),
+                "clean audio runtime must consume GameFrame/SoundEvent contracts instead of {forbidden}"
+            );
+        }
     }
 
     #[test]
