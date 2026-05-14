@@ -235,13 +235,15 @@ mod public_api_tests {
         let accepted_runtime_call = format!("crate::{}::{}()", "accepted", "run_runtime");
         let app_runtime_call = format!("crate::{}::{}()", "app", "run");
 
-        assert!(platform_rs.contains("crate::runtime::run("));
+        assert!(platform_rs.contains("crate::runtime::run_cli()"));
+        assert!(platform_rs.contains("crate::runtime::run(&config)"));
         assert!(!platform_rs.contains(&accepted_runtime_call));
         assert!(!platform_rs.contains("crate::compatibility::"));
         assert!(!platform_rs.contains(&app_runtime_call));
 
         let runtime_rs = include_str!("runtime.rs");
         assert!(runtime_rs.contains("crate::accepted_behavior::run_runtime()"));
+        assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live("));
         assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live_smoke"));
         assert!(!runtime_rs.contains(&accepted_runtime_call));
         assert!(!runtime_rs.contains(&app_runtime_call));

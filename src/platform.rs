@@ -53,7 +53,7 @@ impl RuntimeConfig {
 }
 
 pub fn run() -> anyhow::Result<()> {
-    crate::runtime::run(&RuntimeConfig::default())
+    crate::runtime::run_cli()
 }
 
 pub fn run_with_config(config: RuntimeConfig) -> anyhow::Result<()> {
@@ -85,7 +85,13 @@ mod tests {
     }
 
     #[test]
-    fn configured_runtime_entrypoint_accepts_clean_config() {
+    fn configured_runtime_entrypoint_accepts_clean_interactive_config() {
+        super::run_with_config(RuntimeConfig::default())
+            .expect("configured runtime bridge should run live under tests");
+    }
+
+    #[test]
+    fn configured_runtime_entrypoint_accepts_clean_smoke_config() {
         super::run_with_config(RuntimeConfig::smoke())
             .expect("configured runtime bridge should run smoke under tests");
     }

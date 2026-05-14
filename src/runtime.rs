@@ -3,8 +3,9 @@
 use std::path::PathBuf;
 
 use crate::{
+    audio::LiveAudioMode,
     input::InputProfile,
-    platform::{ControlProfile, RunMode, RuntimeConfig},
+    platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig},
 };
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -25,6 +26,10 @@ impl<B> RuntimeHost<B> {
 }
 
 impl<B: RuntimeBackend> RuntimeHost<B> {
+    pub(crate) fn run_cli(&self) -> anyhow::Result<()> {
+        self.backend.run_command(RuntimeCommand::AcceptedCli)
+    }
+
     pub(crate) fn run(&self, config: &RuntimeConfig) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::from_config(config))
@@ -38,6 +43,11 @@ pub(crate) trait RuntimeBackend {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RuntimeCommand {
     AcceptedCli,
+    WgpuLive {
+        input_profile: InputProfile,
+        audio_mode: LiveAudioMode,
+        cmos_path: Option<PathBuf>,
+    },
     WgpuLiveSmoke {
         input_profile: InputProfile,
         cmos_path: Option<PathBuf>,
@@ -47,12 +57,23 @@ pub(crate) enum RuntimeCommand {
 impl RuntimeCommand {
     fn from_config(config: &RuntimeConfig) -> Self {
         match config.mode {
-            RunMode::Interactive => Self::AcceptedCli,
+            RunMode::Interactive => Self::WgpuLive {
+                input_profile: input_profile(config.controls),
+                audio_mode: audio_mode(config.audio),
+                cmos_path: config.cmos_path.clone(),
+            },
             RunMode::Smoke => Self::WgpuLiveSmoke {
                 input_profile: input_profile(config.controls),
                 cmos_path: config.cmos_path.clone(),
             },
         }
+    }
+}
+
+fn audio_mode(output: AudioOutput) -> LiveAudioMode {
+    match output {
+        AudioOutput::Disabled => LiveAudioMode::Disabled,
+        AudioOutput::Null => LiveAudioMode::Null,
     }
 }
 
@@ -71,6 +92,15 @@ impl RuntimeBackend for InstalledRuntimeBackend {
     fn run_command(&self, command: RuntimeCommand) -> anyhow::Result<()> {
         match command {
             RuntimeCommand::AcceptedCli => crate::accepted_behavior::run_runtime(),
+            RuntimeCommand::WgpuLive {
+                input_profile,
+                audio_mode,
+                cmos_path,
+            } => crate::wgpu_presenter::run_wgpu_live(
+                input_profile,
+                audio_mode,
+                cmos_path.as_deref(),
+            ),
             RuntimeCommand::WgpuLiveSmoke {
                 input_profile,
                 cmos_path,
@@ -86,6 +116,10 @@ impl RuntimeBackend for InstalledRuntimeBackend {
     }
 }
 
+pub(crate) fn run_cli() -> anyhow::Result<()> {
+    RuntimeHost::current().run_cli()
+}
+
 pub(crate) fn run(config: &RuntimeConfig) -> anyhow::Result<()> {
     RuntimeHost::current().run(config)
 }
@@ -94,11 +128,12 @@ pub(crate) fn run(config: &RuntimeConfig) -> anyhow::Result<()> {
 mod tests {
     use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
-    use crate::input::InputProfile;
     use crate::platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
+    use crate::{audio::LiveAudioMode, input::InputProfile};
 
     use super::{
-        InstalledRuntimeBackend, RuntimeBackend, RuntimeCommand, RuntimeHost, input_profile,
+        InstalledRuntimeBackend, RuntimeBackend, RuntimeCommand, RuntimeHost, audio_mode,
+        input_profile,
     };
 
     #[derive(Debug, Clone, Default)]
@@ -122,7 +157,7 @@ mod tests {
         let config = RuntimeConfig {
             controls: ControlProfile::Cabinet,
             audio: AudioOutput::Disabled,
-            mode: RunMode::Smoke,
+            mode: RunMode::Interactive,
             cmos_path: Some(PathBuf::from("scores.bin")),
         };
 
@@ -131,18 +166,37 @@ mod tests {
         let observed = calls.borrow();
         assert_eq!(
             observed.as_slice(),
-            &[RuntimeCommand::WgpuLiveSmoke {
+            &[RuntimeCommand::WgpuLive {
                 input_profile: InputProfile::Cabinet,
+                audio_mode: LiveAudioMode::Disabled,
                 cmos_path: Some(PathBuf::from("scores.bin")),
             }]
         );
     }
 
     #[test]
-    fn default_config_uses_accepted_cli_launch() {
+    fn runtime_host_launches_default_cli_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_cli()
+            .expect("runtime host should run default CLI command");
+
+        let observed = calls.borrow();
+        assert_eq!(observed.as_slice(), &[RuntimeCommand::AcceptedCli]);
+    }
+
+    #[test]
+    fn default_config_uses_wgpu_live_launch() {
         assert_eq!(
             RuntimeCommand::from_config(&RuntimeConfig::default()),
-            RuntimeCommand::AcceptedCli
+            RuntimeCommand::WgpuLive {
+                input_profile: InputProfile::Planetoid,
+                audio_mode: LiveAudioMode::Null,
+                cmos_path: None,
+            }
         );
     }
 
@@ -162,6 +216,12 @@ mod tests {
                 cmos_path: Some(PathBuf::from("smoke_cmos.bin")),
             }
         );
+    }
+
+    #[test]
+    fn clean_audio_outputs_map_to_runtime_audio_modes() {
+        assert_eq!(audio_mode(AudioOutput::Disabled), LiveAudioMode::Disabled);
+        assert_eq!(audio_mode(AudioOutput::Null), LiveAudioMode::Null);
     }
 
     #[test]
@@ -190,5 +250,12 @@ mod tests {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run(&RuntimeConfig::smoke())
             .expect("installed backend should run config-driven smoke");
+    }
+
+    #[test]
+    fn installed_backend_runs_config_driven_wgpu_live() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run(&RuntimeConfig::default())
+            .expect("installed backend should run config-driven live");
     }
 }

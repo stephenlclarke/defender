@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `f05dd62`.
+- Latest accepted implementation commit before this cycle: `b10c901`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-84` are complete. `DC-85` is planned, and the standing
+`DC-42` through `DC-85` are complete. `DC-86` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2725,7 +2725,7 @@ Work log:
 
 ### DC-85: Configured Interactive Launch Handoff
 
-Status: `planned`
+Status: `complete`
 
 Goal: make configured interactive runtime launches use clean `RuntimeConfig`
 for controls, audio, and persistence without changing the default CLI entry
@@ -2748,6 +2748,71 @@ Acceptance criteria:
 - `platform::run()` preserves current command-line behavior.
 - The accepted adapter remains private to the runtime bridge until it is
   replaced by clean gameplay systems.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib runtime::tests::
+cargo test --lib platform::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 13:18:01 BST` Started `DC-85`: posted the cycle start update and
+  began separating default CLI launch from configured runtime launch so clean
+  `RuntimeConfig` can drive interactive `wgpu` controls, audio, and CMOS
+  handoff without changing command-line entry behavior.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778761092533899`
+- `2026-05-14 13:39:11 BST` Completed `DC-85`: split the private runtime
+  bridge so `platform::run()` preserves default command-line behavior through
+  the accepted adapter while `platform::run_with_config` maps clean
+  interactive controls, audio, and CMOS settings into the `wgpu` live launch
+  path. Smoke config remains directly routed to `wgpu` live smoke. Validation
+  passed with formatting; focused runtime, platform, and public API tests;
+  `cargo test --all-targets`; clippy with warnings denied; `make fidelity`;
+  live smoke; markdownlint; and `git diff --check`. `make fidelity` matched
+  10 trace fixtures covering 15452 frames and reported new Rust line coverage
+  `20/20` non-baselined added executable lines. Live smoke rendered 239 frames,
+  saw 74 distinct frame signatures, observed attract, credit, and playing
+  states, injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778762365968649`
+
+### DC-86: Clean Smoke CLI Handoff
+
+Status: `planned`
+
+Goal: let the clean platform/runtime boundary own the supported smoke-launch
+CLI path while preserving the accepted adapter for unsupported historical
+commands.
+
+Scope:
+
+- Add a narrow clean CLI handoff for `--live-smoke` and the live configuration
+  flags that already correspond to `RuntimeConfig`.
+- Keep unsupported or historical commands delegated to the accepted CLI
+  adapter.
+- Preserve existing help text and command behavior unless the clean parser
+  explicitly owns that path.
+- Keep `wgpu` live-smoke output and metrics unchanged.
+
+Acceptance criteria:
+
+- `cargo run -- --live-smoke` reaches the config-driven runtime smoke launch
+  instead of relying on accepted CLI parsing.
+- Unknown or non-runtime historical commands still follow the accepted adapter.
+- Public API guards identify the clean CLI-owned runtime path and keep legacy
+  launch adapters quarantined.
 
 Validation:
 
