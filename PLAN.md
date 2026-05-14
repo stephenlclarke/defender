@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-88` are complete. `DC-89` is planned, and the standing
+`DC-42` through `DC-89` are complete. `DC-90` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2994,7 +2994,7 @@ Work log:
 
 ### DC-89: Clean CLI Help Ownership
 
-Status: `planned`
+Status: `complete`
 
 Goal: move help handling out of accepted-adapter delegation and into the clean
 platform/runtime CLI surface while preserving current user-facing help output.
@@ -3029,6 +3029,76 @@ cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quara
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
+cargo run -- --help
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 15:22:47 BST` Started `DC-89`: began moving `--help` and `-h`
+  handling into the clean platform/runtime CLI surface while preserving the
+  current help text and keeping malformed, unsupported, and historical command
+  paths delegated to the accepted adapter. Slack start update attempted twice
+  before implementation, but the Slack connector timed out both times before
+  returning a message link. A later start/status retry also timed out before
+  completion.
+- `2026-05-14 15:45:29 BST` Completed `DC-89`: `--help` and `-h` now classify
+  as a clean help launch and dispatch through `runtime::run_help()` and
+  `RuntimeCommand::Help`, with the existing help text owned by
+  `runtime::help_text()`. Valid clean live args remain clean-runtime launches,
+  while malformed live options, unsupported flags, and historical command paths
+  still delegate to the accepted adapter. Validation passed with formatting;
+  focused platform, runtime, and public API tests; `cargo test --all-targets`;
+  clippy with warnings denied; `make fidelity`; clean help output;
+  markdownlint; and `git diff --check`. `make fidelity` matched 10 trace
+  fixtures covering 15452 frames and reported new Rust line coverage `23/23`
+  non-baselined added executable lines.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778769990105679`
+
+### DC-90: Clean CLI Error Surface
+
+Status: `planned`
+
+Goal: move malformed clean live option handling into the clean platform/runtime
+CLI surface without taking ownership of historical ROM and fidelity commands
+before their clean replacements exist.
+
+Scope:
+
+- Add typed clean CLI diagnostics for recognized clean live options with missing
+  or invalid values, including `--input-profile` and `--cmos-path`.
+- Keep default live play, valid live options, live smoke, and help owned by the
+  clean platform/runtime path.
+- Preserve accepted-adapter delegation for historical ROM/fidelity commands and
+  any unsupported compatibility paths not yet represented in clean code.
+- Update source guards and tests so accepted delegation is reserved for legacy
+  ownership, not for clean option parse failures.
+
+Acceptance criteria:
+
+- Missing or invalid values for recognized clean live options return stable
+  clean CLI errors without invoking accepted CLI delegation.
+- Historical ROM/fidelity commands still run through the accepted adapter.
+- Unknown compatibility paths remain delegated until the clean command inventory
+  explicitly takes ownership.
+- CLI exit behavior, diagnostics, and help output are covered by focused tests.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --input-profile
+cargo run -- --input-profile invalid
+cargo run -- --cmos-path
 cargo run -- --help
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
 git diff --check

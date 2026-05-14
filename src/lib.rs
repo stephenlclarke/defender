@@ -237,12 +237,15 @@ mod public_api_tests {
 
         assert!(platform_rs.contains("crate::runtime::run_cli()"));
         assert!(platform_rs.contains("crate::runtime::run(&config)"));
+        assert!(platform_rs.contains("crate::runtime::run_help()"));
         assert!(platform_rs.contains("RuntimeCliClassifier::classify(args)"));
         assert!(platform_rs.contains("fn dispatch_cli_classification"));
         assert!(platform_rs.contains("CliClassification::AcceptedAdapter"));
         assert!(platform_rs.contains("CliClassification::CleanRuntime(config)"));
+        assert!(platform_rs.contains("CliClassification::CleanHelp"));
         assert!(platform_rs.contains("RuntimeConfig::default()"));
         assert!(platform_rs.contains("config.mode = RunMode::Smoke"));
+        assert!(platform_rs.contains("\"--help\" | \"-h\" => ArgClassification::CleanHelp"));
         assert!(platform_rs.contains("\"--live-smoke\""));
         assert!(platform_rs.contains("RuntimeConfig::smoke()"));
         assert!(!platform_rs.contains(&accepted_runtime_call));
@@ -253,6 +256,8 @@ mod public_api_tests {
         assert!(runtime_rs.contains("crate::accepted_behavior::run_runtime()"));
         assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live("));
         assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live_smoke"));
+        assert!(runtime_rs.contains("RuntimeCommand::Help"));
+        assert!(runtime_rs.contains("pub(crate) fn help_text()"));
         assert!(!runtime_rs.contains(&accepted_runtime_call));
         assert!(!runtime_rs.contains(&app_runtime_call));
 

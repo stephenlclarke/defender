@@ -30,6 +30,10 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
         self.backend.run_command(RuntimeCommand::AcceptedCli)
     }
 
+    pub(crate) fn run_help(&self) -> anyhow::Result<()> {
+        self.backend.run_command(RuntimeCommand::Help)
+    }
+
     pub(crate) fn run(&self, config: &RuntimeConfig) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::from_config(config))
@@ -43,6 +47,7 @@ pub(crate) trait RuntimeBackend {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RuntimeCommand {
     AcceptedCli,
+    Help,
     WgpuLive {
         input_profile: InputProfile,
         audio_mode: LiveAudioMode,
@@ -92,6 +97,10 @@ impl RuntimeBackend for InstalledRuntimeBackend {
     fn run_command(&self, command: RuntimeCommand) -> anyhow::Result<()> {
         match command {
             RuntimeCommand::AcceptedCli => crate::accepted_behavior::run_runtime(),
+            RuntimeCommand::Help => {
+                print!("{}", help_text());
+                Ok(())
+            }
             RuntimeCommand::WgpuLive {
                 input_profile,
                 audio_mode,
@@ -120,8 +129,40 @@ pub(crate) fn run_cli() -> anyhow::Result<()> {
     RuntimeHost::current().run_cli()
 }
 
+pub(crate) fn run_help() -> anyhow::Result<()> {
+    RuntimeHost::current().run_help()
+}
+
 pub(crate) fn run(config: &RuntimeConfig) -> anyhow::Result<()> {
     RuntimeHost::current().run(config)
+}
+
+pub(crate) fn help_text() -> &'static str {
+    concat!(
+        "defender\n",
+        "  cargo run\n",
+        "  cargo run -- --live-smoke\n",
+        "  cargo run -- --mute\n",
+        "  cargo run -- --input-profile planetoid\n",
+        "  cargo run -- --input-profile cabinet\n",
+        "  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n",
+        "  cargo run -- --rom-report\n",
+        "  cargo run -- --rom-report /path/to/roms\n",
+        "  cargo run -- --verify-roms /path/to/roms\n",
+        "  cargo run -- --fidelity-trace 300\n",
+        "  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n",
+        "  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n",
+        "  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n",
+        "  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n",
+        "  cargo run -- --fidelity-list-scenarios\n",
+        "  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n",
+        "  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n",
+        "\n",
+        "Runtime assets are embedded in the binary for copy-only deployment.\n",
+        "Live play uses the windowed wgpu backend.\n",
+        "Live audio routes accepted sound commands through a non-blocking null backend; ",
+        "--mute disables that runtime path.\n",
+    )
 }
 
 #[cfg(test)]
@@ -133,7 +174,7 @@ mod tests {
 
     use super::{
         InstalledRuntimeBackend, RuntimeBackend, RuntimeCommand, RuntimeHost, audio_mode,
-        input_profile,
+        help_text, input_profile,
     };
 
     #[derive(Debug, Clone, Default)]
@@ -186,6 +227,20 @@ mod tests {
 
         let observed = calls.borrow();
         assert_eq!(observed.as_slice(), &[RuntimeCommand::AcceptedCli]);
+    }
+
+    #[test]
+    fn runtime_host_launches_help_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_help()
+            .expect("runtime host should run help command");
+
+        let observed = calls.borrow();
+        assert_eq!(observed.as_slice(), &[RuntimeCommand::Help]);
     }
 
     #[test]
@@ -257,5 +312,37 @@ mod tests {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run(&RuntimeConfig::default())
             .expect("installed backend should run config-driven live");
+    }
+
+    #[test]
+    fn installed_backend_runs_clean_help() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_help()
+            .expect("installed backend should run clean help");
+    }
+
+    #[test]
+    fn clean_help_text_preserves_current_cli_contract() {
+        let text = help_text();
+
+        assert!(text.starts_with("defender\n  cargo run\n"));
+        assert!(text.contains("--input-profile planetoid"));
+        assert!(text.contains("--input-profile cabinet"));
+        assert!(text.contains("--live-smoke"));
+        assert!(text.contains("--mute"));
+        assert!(text.contains("--verify-roms"));
+        assert!(text.contains("--fidelity-trace 300"));
+        assert!(text.contains("--fidelity-trace-inputs"));
+        assert!(text.contains("--fidelity-trace-inputs-file"));
+        assert!(text.contains("--fidelity-check-trace"));
+        assert!(text.contains("--fidelity-check-trace-dir"));
+        assert!(text.contains("--fidelity-list-scenarios"));
+        assert!(text.contains("--fidelity-write-scenario-inputs"));
+        assert!(text.contains("--fidelity-check-reference-trace-dir"));
+        assert!(text.contains("docs/fidelity/fixtures/local/rust-current"));
+        assert!(text.contains("docs/fidelity/fixtures/local/reference"));
+        assert!(text.contains("copy-only deployment"));
+        assert!(text.contains("uses the windowed wgpu"));
+        assert!(!text.contains("Kitty graphics"));
     }
 }

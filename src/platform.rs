@@ -81,6 +81,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
     match classification {
         CliClassification::AcceptedAdapter => crate::runtime::run_cli(),
         CliClassification::CleanRuntime(config) => crate::runtime::run(&config),
+        CliClassification::CleanHelp => crate::runtime::run_help(),
     }
 }
 
@@ -88,6 +89,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
 enum CliClassification {
     AcceptedAdapter,
     CleanRuntime(RuntimeConfig),
+    CleanHelp,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -102,48 +104,57 @@ impl RuntimeCliClassifier {
         let mut args = args.into_iter();
 
         while let Some(arg) = args.next() {
-            if !Self::apply_arg(&arg, &mut args, &mut config) {
-                return CliClassification::AcceptedAdapter;
+            match Self::apply_arg(&arg, &mut args, &mut config) {
+                ArgClassification::CleanRuntime => {}
+                ArgClassification::CleanHelp => return CliClassification::CleanHelp,
+                ArgClassification::AcceptedAdapter => return CliClassification::AcceptedAdapter,
             }
         }
 
         CliClassification::CleanRuntime(config)
     }
 
-    fn apply_arg<I>(arg: &str, args: &mut I, config: &mut RuntimeConfig) -> bool
+    fn apply_arg<I>(arg: &str, args: &mut I, config: &mut RuntimeConfig) -> ArgClassification
     where
         I: Iterator<Item = String>,
     {
         match arg {
             "--live-smoke" => {
                 config.mode = RunMode::Smoke;
-                true
+                ArgClassification::CleanRuntime
             }
-            "--help" | "-h" => false,
+            "--help" | "-h" => ArgClassification::CleanHelp,
             "--input-profile" => {
                 let Some(value) = args.next() else {
-                    return false;
+                    return ArgClassification::AcceptedAdapter;
                 };
                 let Some(controls) = parse_control_profile(&value) else {
-                    return false;
+                    return ArgClassification::AcceptedAdapter;
                 };
                 config.controls = controls;
-                true
+                ArgClassification::CleanRuntime
             }
             "--mute" => {
                 config.audio = AudioOutput::Disabled;
-                true
+                ArgClassification::CleanRuntime
             }
             "--cmos-path" => {
                 let Some(value) = args.next() else {
-                    return false;
+                    return ArgClassification::AcceptedAdapter;
                 };
                 config.cmos_path = Some(PathBuf::from(value));
-                true
+                ArgClassification::CleanRuntime
             }
-            _ => false,
+            _ => ArgClassification::AcceptedAdapter,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ArgClassification {
+    AcceptedAdapter,
+    CleanRuntime,
+    CleanHelp,
 }
 
 fn parse_control_profile(value: &str) -> Option<ControlProfile> {
@@ -252,11 +263,11 @@ mod tests {
     }
 
     #[test]
-    fn clean_cli_delegates_help_to_accepted_cli() {
+    fn clean_cli_owns_help_launch() {
         for values in [vec!["--help"], vec!["-h"], vec!["--mute", "--help"]] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::AcceptedAdapter
+                CliClassification::CleanHelp
             );
         }
     }
@@ -316,8 +327,14 @@ mod tests {
     }
 
     #[test]
-    fn accepted_cli_entrypoint_delegates_unsupported_args() {
+    fn clean_help_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--help"]))
+            .expect("clean help CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn accepted_cli_entrypoint_delegates_unsupported_args() {
+        super::run_with_args(args(&["--unknown"]))
             .expect("unsupported clean CLI args should delegate to accepted CLI");
     }
 
