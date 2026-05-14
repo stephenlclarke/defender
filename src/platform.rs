@@ -87,6 +87,6 @@ mod tests {
     #[test]
     fn configured_runtime_entrypoint_accepts_clean_config() {
         super::run_with_config(RuntimeConfig::smoke())
-            .expect("configured runtime bridge should run help under tests");
+            .expect("configured runtime bridge should run smoke under tests");
     }
 }

@@ -242,6 +242,7 @@ mod public_api_tests {
 
         let runtime_rs = include_str!("runtime.rs");
         assert!(runtime_rs.contains("crate::accepted_behavior::run_runtime()"));
+        assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live_smoke"));
         assert!(!runtime_rs.contains(&accepted_runtime_call));
         assert!(!runtime_rs.contains(&app_runtime_call));
 
@@ -373,6 +374,12 @@ mod public_api_tests {
 
         for (path, source) in clean_sources {
             for forbidden in low_level_legacy_imports {
+                if path == "src/runtime.rs"
+                    && matches!(forbidden, "crate::input::" | "crate::wgpu_presenter::")
+                {
+                    continue;
+                }
+
                 assert!(
                     !source.contains(forbidden),
                     "{path} must not import legacy root module {forbidden}"

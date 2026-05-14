@@ -1,6 +1,11 @@
 //! Private launch bridge for the playable runtime.
 
-use crate::platform::RuntimeConfig;
+use std::path::PathBuf;
+
+use crate::{
+    input::InputProfile,
+    platform::{ControlProfile, RunMode, RuntimeConfig},
+};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct RuntimeHost<B = InstalledRuntimeBackend> {
@@ -21,20 +26,63 @@ impl<B> RuntimeHost<B> {
 
 impl<B: RuntimeBackend> RuntimeHost<B> {
     pub(crate) fn run(&self, config: &RuntimeConfig) -> anyhow::Result<()> {
-        self.backend.run(config)
+        self.backend
+            .run_command(RuntimeCommand::from_config(config))
     }
 }
 
 pub(crate) trait RuntimeBackend {
-    fn run(&self, config: &RuntimeConfig) -> anyhow::Result<()>;
+    fn run_command(&self, command: RuntimeCommand) -> anyhow::Result<()>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RuntimeCommand {
+    AcceptedCli,
+    WgpuLiveSmoke {
+        input_profile: InputProfile,
+        cmos_path: Option<PathBuf>,
+    },
+}
+
+impl RuntimeCommand {
+    fn from_config(config: &RuntimeConfig) -> Self {
+        match config.mode {
+            RunMode::Interactive => Self::AcceptedCli,
+            RunMode::Smoke => Self::WgpuLiveSmoke {
+                input_profile: input_profile(config.controls),
+                cmos_path: config.cmos_path.clone(),
+            },
+        }
+    }
+}
+
+fn input_profile(profile: ControlProfile) -> InputProfile {
+    match profile {
+        ControlProfile::Planetoid => InputProfile::Planetoid,
+        ControlProfile::Cabinet => InputProfile::Cabinet,
+        ControlProfile::Test => InputProfile::Test,
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct InstalledRuntimeBackend;
 
 impl RuntimeBackend for InstalledRuntimeBackend {
-    fn run(&self, _config: &RuntimeConfig) -> anyhow::Result<()> {
-        crate::accepted_behavior::run_runtime()
+    fn run_command(&self, command: RuntimeCommand) -> anyhow::Result<()> {
+        match command {
+            RuntimeCommand::AcceptedCli => crate::accepted_behavior::run_runtime(),
+            RuntimeCommand::WgpuLiveSmoke {
+                input_profile,
+                cmos_path,
+            } => {
+                let report = crate::wgpu_presenter::run_wgpu_live_smoke(
+                    input_profile,
+                    cmos_path.as_deref(),
+                )?;
+                print!("{}", report.to_text());
+                Ok(())
+            }
+        }
     }
 }
 
@@ -46,24 +94,27 @@ pub(crate) fn run(config: &RuntimeConfig) -> anyhow::Result<()> {
 mod tests {
     use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
+    use crate::input::InputProfile;
     use crate::platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
 
-    use super::{InstalledRuntimeBackend, RuntimeBackend, RuntimeHost};
+    use super::{
+        InstalledRuntimeBackend, RuntimeBackend, RuntimeCommand, RuntimeHost, input_profile,
+    };
 
     #[derive(Debug, Clone, Default)]
     struct RecordingBackend {
-        calls: Rc<RefCell<Vec<RuntimeConfig>>>,
+        calls: Rc<RefCell<Vec<RuntimeCommand>>>,
     }
 
     impl RuntimeBackend for RecordingBackend {
-        fn run(&self, config: &RuntimeConfig) -> anyhow::Result<()> {
-            self.calls.borrow_mut().push(config.clone());
+        fn run_command(&self, command: RuntimeCommand) -> anyhow::Result<()> {
+            self.calls.borrow_mut().push(command);
             Ok(())
         }
     }
 
     #[test]
-    fn runtime_host_forwards_clean_config_to_backend() {
+    fn runtime_host_adapts_clean_config_to_launch_command() {
         let calls = Rc::new(RefCell::new(Vec::new()));
         let host = RuntimeHost::with_backend(RecordingBackend {
             calls: Rc::clone(&calls),
@@ -78,7 +129,52 @@ mod tests {
         host.run(&config).expect("runtime host should run backend");
 
         let observed = calls.borrow();
-        assert_eq!(observed.as_slice(), std::slice::from_ref(&config));
+        assert_eq!(
+            observed.as_slice(),
+            &[RuntimeCommand::WgpuLiveSmoke {
+                input_profile: InputProfile::Cabinet,
+                cmos_path: Some(PathBuf::from("scores.bin")),
+            }]
+        );
+    }
+
+    #[test]
+    fn default_config_uses_accepted_cli_launch() {
+        assert_eq!(
+            RuntimeCommand::from_config(&RuntimeConfig::default()),
+            RuntimeCommand::AcceptedCli
+        );
+    }
+
+    #[test]
+    fn smoke_config_uses_wgpu_live_smoke_launch() {
+        let config = RuntimeConfig {
+            controls: ControlProfile::Test,
+            audio: AudioOutput::Null,
+            mode: RunMode::Smoke,
+            cmos_path: Some(PathBuf::from("smoke_cmos.bin")),
+        };
+
+        assert_eq!(
+            RuntimeCommand::from_config(&config),
+            RuntimeCommand::WgpuLiveSmoke {
+                input_profile: InputProfile::Test,
+                cmos_path: Some(PathBuf::from("smoke_cmos.bin")),
+            }
+        );
+    }
+
+    #[test]
+    fn clean_control_profiles_map_to_runtime_input_profiles() {
+        assert_eq!(
+            input_profile(ControlProfile::Planetoid),
+            InputProfile::Planetoid
+        );
+        assert_eq!(
+            input_profile(ControlProfile::Cabinet),
+            InputProfile::Cabinet
+        );
+        assert_eq!(input_profile(ControlProfile::Test), InputProfile::Test);
     }
 
     #[test]
@@ -87,5 +183,12 @@ mod tests {
             RuntimeHost::current(),
             RuntimeHost::with_backend(InstalledRuntimeBackend)
         );
+    }
+
+    #[test]
+    fn installed_backend_runs_config_driven_wgpu_smoke() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run(&RuntimeConfig::smoke())
+            .expect("installed backend should run config-driven smoke");
     }
 }

@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `3f3b492`.
+- Latest accepted implementation commit before this cycle: `f05dd62`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-83` are complete. `DC-84` is planned, and the standing
+`DC-42` through `DC-84` are complete. `DC-85` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2665,7 +2665,7 @@ Work log:
 
 ### DC-84: Runtime Config Handoff
 
-Status: `planned`
+Status: `complete`
 
 Goal: make the private runtime bridge consume clean runtime configuration
 explicitly for the next supported launch path instead of leaving configuration
@@ -2691,6 +2691,72 @@ Validation:
 
 ```sh
 cargo fmt --check
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 12:52:55 BST` Started `DC-84`: posted the cycle start update and
+  began moving clean `RuntimeConfig` handling into the private runtime bridge,
+  with config-driven `wgpu` live smoke as the first direct launch handoff while
+  preserving default CLI behavior through the accepted adapter.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778759572099959`
+- `2026-05-14 13:15:30 BST` Completed `DC-84`: added a private runtime launch
+  command that maps clean smoke configuration to `wgpu` live smoke with clean
+  control-profile and CMOS-path handoff, kept default CLI launch on the
+  accepted runtime adapter, strengthened runtime/public API coverage for the
+  handoff, and documented the boundary in README, SPEC, and this plan.
+  Validation passed with formatting; focused runtime, platform, and public API
+  tests; `cargo test --all-targets`; clippy with warnings denied;
+  `make fidelity`; live smoke; markdownlint; and `git diff --check`.
+  `make fidelity` matched 10 trace fixtures covering 15452 frames and reported
+  new Rust line coverage `23/23` non-baselined added executable lines. Live
+  smoke rendered 240 frames, saw 74 distinct frame signatures, observed
+  attract, credit, and playing states, injected all required controls, and
+  exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778760958421079`
+
+### DC-85: Configured Interactive Launch Handoff
+
+Status: `planned`
+
+Goal: make configured interactive runtime launches use clean `RuntimeConfig`
+for controls, audio, and persistence without changing the default CLI entry
+path.
+
+Scope:
+
+- Separate default CLI launch ownership from configured interactive runtime
+  launch ownership inside the private runtime bridge.
+- Map clean control, audio, and CMOS configuration to the current `wgpu`
+  interactive runtime path.
+- Preserve `cargo run`, CLI parsing, and accepted-adapter behavior for default
+  command-line entry.
+- Keep smoke behavior and public API guards intact.
+
+Acceptance criteria:
+
+- `platform::run_with_config(RuntimeConfig::default())` can launch through
+  clean configuration instead of CLI argument parsing.
+- `platform::run()` preserves current command-line behavior.
+- The accepted adapter remains private to the runtime bridge until it is
+  replaced by clean gameplay systems.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib runtime::tests::
+cargo test --lib platform::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
