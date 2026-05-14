@@ -53,7 +53,11 @@ impl RuntimeConfig {
 }
 
 pub fn run() -> anyhow::Result<()> {
-    crate::accepted::run_runtime()
+    crate::runtime::run(&RuntimeConfig::default())
+}
+
+pub fn run_with_config(config: RuntimeConfig) -> anyhow::Result<()> {
+    crate::runtime::run(&config)
 }
 
 #[cfg(test)]
@@ -76,7 +80,13 @@ mod tests {
     }
 
     #[test]
-    fn runtime_entrypoint_delegates_to_compatibility_runtime() {
-        super::run().expect("compatibility runtime should run help under tests");
+    fn runtime_entrypoint_delegates_to_runtime_bridge() {
+        super::run().expect("runtime bridge should run help under tests");
+    }
+
+    #[test]
+    fn configured_runtime_entrypoint_accepts_clean_config() {
+        super::run_with_config(RuntimeConfig::smoke())
+            .expect("configured runtime bridge should run help under tests");
     }
 }

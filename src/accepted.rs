@@ -103,10 +103,6 @@ pub(crate) fn native_visible_size() -> (u16, u16) {
     crate::accepted_behavior::native_visible_size()
 }
 
-pub(crate) fn run_runtime() -> anyhow::Result<()> {
-    crate::accepted_behavior::run_runtime()
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{

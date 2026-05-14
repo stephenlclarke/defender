@@ -196,12 +196,12 @@ make sq
 The primary source tree is now the clean rewrite under `src/`; the converted
 implementation is parked under `src_legacy/` and remains wired through
 `src/lib.rs` as the internal gameplay oracle and runtime bridge. Clean
-runtime code and the internal oracle reach those adapters through the
-crate-private `src/accepted.rs` facade, which translates accepted behavior into
-neutral contracts before `src/oracle.rs` adapts it to gameplay state. The actual
-legacy machine bridge lives in `src_legacy/accepted_behavior.rs`, keeping
-legacy imports out of the clean accepted-behavior surface. The root legacy
-adapters remain crate-private; README media generation uses the doc-hidden
+runtime launch goes through the private `src/runtime.rs` bridge, while the
+internal oracle reaches accepted behavior through the crate-private
+`src/accepted.rs` facade before `src/oracle.rs` adapts it to gameplay state.
+The actual legacy machine bridge lives in `src_legacy/accepted_behavior.rs`,
+keeping legacy imports out of the clean accepted-behavior surface. The root
+legacy adapters remain crate-private; README media generation uses the doc-hidden
 `defender::readme_media` facade instead of low-level machine, input, or video
 exports. Machine process/state contracts, red-label math types, and low-level
 asset, board, memory, ROM, sound, live, PIA, and `wgpu` modules stay
@@ -225,6 +225,8 @@ Clean rewrite modules:
   render signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
+- `src/runtime.rs`: the crate-private launch bridge that owns the current
+  accepted runtime adapter until clean gameplay systems replace it.
 - `src/audio.rs`: gameplay-facing sound events, the bounded live-audio runtime,
   no-device backends, and worker diagnostics. It consumes clean `GameFrame`
   and `SoundEvent` contracts, not legacy frame outputs.
@@ -241,10 +243,11 @@ behavior, assets, hardware models, ROM verification, rendering, input,
 sound-board command evidence, legacy fidelity trace generation and threaded
 fixture checks, the threaded live core runtime boundary, `wgpu` window
 ownership, CMOS storage, and test helpers. `src_legacy/accepted_behavior.rs`
-owns the temporary accepted-machine adapter, and legacy-specific clean
-equivalence regressions are also wired from `src_legacy/` so `src/accepted.rs`
-and `src/oracle.rs` stay focused on clean gameplay contracts. They remain
-wired as doc-hidden legacy bridge modules rather than supported public API.
+owns the temporary accepted-machine adapter, and `src/runtime.rs` owns the only
+clean launch call into that adapter. Legacy-specific clean equivalence
+regressions are also wired from `src_legacy/` so `src/accepted.rs` and
+`src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as
+doc-hidden legacy bridge modules rather than supported public API.
 Internal clean equivalence regressions use crate-private oracle wiring, while
 clean frame-signature gates live under `src/fidelity.rs` and compare clean
 render signatures rather than exposing memory-oriented CRC labels. Legacy live

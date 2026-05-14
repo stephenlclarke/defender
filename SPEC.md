@@ -60,8 +60,7 @@ tree:
   long-trace sample fixtures must stay private to the legacy machine oracle
   instead of being root-wired here.
 - `src/accepted.rs`: crate-private accepted-behavior contracts and facade that
-  isolate clean production modules from direct legacy runtime and oracle
-  imports.
+  isolate clean oracle code from direct legacy imports.
 - `src/game.rs`: gameplay-facing `Game`, `GameState`, `GameInput`,
   `GameFrame`, `GameEvents`, score, player, direction, and sound-event
   contracts without accepted command-byte mapping. The clean `Game` shell emits
@@ -75,6 +74,8 @@ tree:
   render signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
+- `src/runtime.rs`: the crate-private launch bridge that owns the current
+  accepted runtime adapter until clean gameplay systems replace it.
 - `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
   boundary, disabled/null no-device modes, and runtime diagnostics. It consumes
   clean `GameFrame` and `SoundEvent` contracts, not legacy frame outputs.
@@ -91,13 +92,14 @@ accepted arcade behavior, hardware models, ROM verification, rendering, input,
 sound-board command evidence, legacy fidelity trace generation, the threaded
 live core runtime boundary, `wgpu` window ownership, CMOS storage, and test
 helpers until clean systems replace those responsibilities. Those root adapters
-are crate-private. Clean runtime code and the internal oracle use the crate-private
-`accepted` facade; `src_legacy/accepted_behavior.rs` performs the current
-legacy-machine adaptation into neutral accepted-behavior contracts before the
-public clean gameplay types see it. Legacy-specific clean equivalence
-regressions are also wired from `src_legacy/` so clean accepted/oracle source
-stays focused on gameplay contracts. Internal clean equivalence regressions use
-crate-private oracle wiring. Clean frame-signature gates live under
+are crate-private. Clean runtime launch goes through the private `runtime`
+bridge, while the internal oracle uses the crate-private `accepted` facade.
+`src_legacy/accepted_behavior.rs` performs the current legacy-machine
+adaptation into neutral accepted-behavior contracts before the public clean
+gameplay types see it. Legacy-specific clean equivalence regressions are also
+wired from `src_legacy/` so clean accepted/oracle source stays focused on
+gameplay contracts. Internal clean equivalence regressions use crate-private
+oracle wiring. Clean frame-signature gates live under
 `src/fidelity.rs`, compare clean render signatures rather than exposing
 memory-oriented CRC labels, and use oracle-owned reference probes for accepted
 behavior comparison, while legacy trace generation is root-wired as

@@ -12,6 +12,7 @@ pub mod game;
 mod oracle;
 pub mod platform;
 pub mod renderer;
+mod runtime;
 pub mod systems;
 
 // Legacy bridge modules are hidden from the supported clean API surface while
@@ -229,11 +230,20 @@ mod public_api_tests {
     }
 
     #[test]
-    fn clean_runtime_and_oracle_use_accepted_facade() {
+    fn clean_runtime_and_oracle_use_quarantined_adapters() {
         let platform_rs = include_str!("platform.rs");
-        assert!(platform_rs.contains("crate::accepted::run_runtime()"));
+        let accepted_runtime_call = format!("crate::{}::{}()", "accepted", "run_runtime");
+        let app_runtime_call = format!("crate::{}::{}()", "app", "run");
+
+        assert!(platform_rs.contains("crate::runtime::run("));
+        assert!(!platform_rs.contains(&accepted_runtime_call));
         assert!(!platform_rs.contains("crate::compatibility::"));
-        assert!(!platform_rs.contains("crate::app::run()"));
+        assert!(!platform_rs.contains(&app_runtime_call));
+
+        let runtime_rs = include_str!("runtime.rs");
+        assert!(runtime_rs.contains("crate::accepted_behavior::run_runtime()"));
+        assert!(!runtime_rs.contains(&accepted_runtime_call));
+        assert!(!runtime_rs.contains(&app_runtime_call));
 
         let oracle_rs = include_str!("oracle.rs");
         assert!(oracle_rs.contains("crate::accepted::"));
@@ -260,6 +270,7 @@ mod public_api_tests {
 
         let accepted_rs = include_str!("accepted.rs");
         assert!(accepted_rs.contains("crate::accepted_behavior::"));
+        assert!(!accepted_rs.contains("run_runtime"));
         for forbidden in [
             "crate::compatibility::",
             "crate::input::",
@@ -335,6 +346,7 @@ mod public_api_tests {
             ("src/oracle.rs", include_str!("oracle.rs")),
             ("src/platform.rs", include_str!("platform.rs")),
             ("src/renderer.rs", include_str!("renderer.rs")),
+            ("src/runtime.rs", include_str!("runtime.rs")),
             ("src/systems.rs", include_str!("systems.rs")),
         ];
         let low_level_legacy_imports = [
@@ -367,17 +379,14 @@ mod public_api_tests {
                 );
             }
 
-            if path != "src/accepted.rs" {
+            if !matches!(path, "src/accepted.rs" | "src/runtime.rs") {
                 assert!(
                     !source.contains("crate::accepted_behavior::"),
-                    "{path} must not bypass the accepted facade"
+                    "{path} must not bypass the accepted runtime adapter"
                 );
             }
 
-            if !matches!(
-                path,
-                "src/accepted.rs" | "src/oracle.rs" | "src/platform.rs"
-            ) {
+            if !matches!(path, "src/accepted.rs" | "src/oracle.rs") {
                 assert!(
                     !source.contains("crate::accepted::"),
                     "{path} must not depend on the temporary accepted facade"

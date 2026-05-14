@@ -5,7 +5,7 @@ Last reviewed: `2026-05-14`
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `4bd2c01`.
+- Latest accepted implementation commit before this cycle: `3f3b492`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
   preserving targeted legacy access through doc-hidden tool facades and
@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-82` are complete. `DC-83` is planned, and the standing
+`DC-42` through `DC-83` are complete. `DC-84` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -2598,17 +2598,19 @@ Work log:
 
 ### DC-83: Production Model Quarantine
 
-Status: `planned`
+Status: `complete`
 
 Goal: continue retiring the memory-oriented production model by moving the next
 remaining legacy-facing runtime dependency behind clean gameplay boundaries.
 
 Scope:
 
-- Identify one production path that still pulls machine/session memory concepts
-  across the clean runtime boundary.
-- Move that dependency behind a clean domain or fidelity adapter with
-  game-facing names.
+- Move platform launch off the temporary accepted facade and behind a private
+  clean runtime bridge.
+- Keep `src/runtime.rs` as the only clean launch owner for the current accepted
+  runtime adapter.
+- Add focused boundary tests so `src/platform.rs` depends on clean runtime
+  configuration and does not call accepted or legacy launch functions directly.
 - Keep fixture parsers and historical oracle tooling available only where they
   provide review value.
 - Preserve accepted gameplay behavior and live `wgpu` behavior.
@@ -2618,6 +2620,70 @@ Acceptance criteria:
 - The selected runtime path reads as clean gameplay code at its public boundary.
 - Any remaining memory-oriented names are explicitly quarantined in legacy or
   fidelity modules.
+- Public API and module names continue moving away from red-label, ROM, source
+  routine, and assembler process terminology.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 12:11:22 BST` Started `DC-83`: posted the cycle start update and
+  began quarantining the production launch path by moving `src/platform.rs` off
+  the accepted facade and behind a private clean runtime bridge.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778757080478579`
+- `2026-05-14 12:50:11 BST` Completed `DC-83`: added a private
+  `src/runtime.rs` runtime host, moved `src/platform.rs` to launch through that
+  clean bridge, removed runtime launch from `src/accepted.rs`, updated public
+  API guards so only the runtime bridge owns the accepted launch adapter, and
+  documented the new boundary in README, SPEC, and this plan. Validation passed
+  with formatting; focused platform, runtime, and public API tests; `cargo
+  check`; `cargo test --all-targets`; clippy with warnings denied;
+  `make fidelity`; live smoke; a boundary scan preventing direct accepted/app
+  launch calls from clean runtime-facing source; markdownlint; and
+  `git diff --check`. The `make fidelity` gate matched 10 trace fixtures
+  covering 15452 frames and reported new Rust line coverage `3/3`
+  non-baselined added executable lines. Live smoke rendered 239 frames, saw 74
+  distinct frame signatures, observed attract, credit, and playing states,
+  injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778759467260149`
+
+### DC-84: Runtime Config Handoff
+
+Status: `planned`
+
+Goal: make the private runtime bridge consume clean runtime configuration
+explicitly for the next supported launch path instead of leaving configuration
+hidden behind the accepted adapter.
+
+Scope:
+
+- Identify one live or smoke launch mode that can be selected from clean
+  `RuntimeConfig` without relying on legacy CLI parsing.
+- Add a clean launch-command adapter inside the private runtime bridge.
+- Preserve current default CLI behavior and the accepted adapter while clean
+  launch ownership expands.
+- Keep `wgpu` live behavior and smoke metrics unchanged.
+
+Acceptance criteria:
+
+- The selected launch mode is driven by clean `RuntimeConfig`.
+- The accepted adapter remains private to the runtime bridge.
 - Public API and module names continue moving away from red-label, ROM, source
   routine, and assembler process terminology.
 
