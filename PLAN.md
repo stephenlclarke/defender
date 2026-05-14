@@ -1,15 +1,15 @@
 # Defender Current Plan
 
-Last reviewed: `2026-05-13`
+Last reviewed: `2026-05-14`
 
 ## Current Baseline
 
 - Active branch: `rewrite`.
-- Latest accepted implementation commit before this cycle: `af3c700`.
+- Latest accepted implementation commit before this cycle: `173eaec`.
 - Phase 13 is complete. The converted implementation has been moved to
   `src_legacy/`; the clean rewrite now owns the primary `src/` tree while
-  preserving legacy access through the doc-hidden `compatibility` namespace.
-  Root legacy adapters should stay crate-private.
+  preserving targeted legacy access through doc-hidden tool facades and
+  crate-private adapters. Root legacy adapters should stay crate-private.
 - Live play uses the `wgpu` backend. Kitty is parked in `src_legacy/` as
   historical compatibility evidence and is no longer an active runtime path.
 - Clean `wgpu` rendering should be sprite-first: gameplay visuals should use
@@ -106,7 +106,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-73` are complete. `DC-74` is planned, and the standing
+`DC-42` through `DC-74` are complete. `DC-75` is planned, and the standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -1952,7 +1952,80 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778741426762209`
 
-### DC-74: Memory-Oriented Oracle Retirement
+### DC-74: README Media Compatibility Namespace Retirement
+
+Status: `complete`
+
+Goal: retire the final public compatibility namespace by moving README media
+generation behind a narrow high-level facade.
+
+Scope:
+
+- Add a doc-hidden `defender::readme_media` facade owned by `src_legacy/` so
+  README media generation no longer imports low-level machine, input, or video
+  contracts.
+- Update `examples/generate_readme_media.rs` to consume the high-level media
+  facade.
+- Delete the final `defender::compatibility` re-export namespace and its
+  `src_legacy/compatibility.rs` export map.
+- Strengthen public API guards so restoring the compatibility namespace or
+  README media low-level imports fails a focused test.
+- Update README, SPEC, and PLAN to describe README media as the only
+  doc-hidden tool facade left from this slice.
+
+Acceptance criteria:
+
+- `examples/generate_readme_media.rs` imports `defender::readme_media`, not
+  `defender::compatibility`.
+- `src/lib.rs` no longer wires `pub mod compatibility`, and
+  `src_legacy/compatibility.rs` is removed.
+- Root legacy machine, input, and video modules remain crate-private.
+- README and SPEC no longer describe the compatibility namespace as active
+  tool API.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib public_api_tests::compatibility_namespace_is_retired
+cargo test --lib public_api_tests::readme_media_facade_is_legacy_owned_and_doc_hidden
+cargo test --lib readme_media::tests
+cargo test --example generate_readme_media
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+! rg -n \
+  -e "defender::compatibility" \
+  -e "use defender::compatibility" \
+  -e '#\\[path = "\\.\\./src_legacy/compatibility\\.rs"\\]' \
+  src src_legacy examples README.md SPEC.md
+test ! -e src_legacy/compatibility.rs
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-14 07:53:51 BST` Started `DC-74`: posted the cycle start update and
+  began retiring the final public compatibility namespace by moving README
+  media generation to a narrow high-level facade.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778741631993389`
+- `2026-05-14 08:19:18 BST` Completed `DC-74`: added the doc-hidden
+  `defender::readme_media` facade, moved README media generation off
+  low-level machine/video imports, removed `src_legacy/compatibility.rs`, and
+  retired the public `defender::compatibility` namespace. Validation passed
+  with formatting, focused public API/readme-media tests, all-target tests,
+  clippy, `make fidelity`, live smoke, compatibility grep guard, deleted-file
+  guard, markdownlint, and `git diff --check`. `make fidelity` reported new
+  Rust line coverage `0/0` non-baselined added executable lines. Live smoke
+  rendered 239 frames, saw 74 distinct frame CRCs, observed attract, credit,
+  and playing states, injected all required controls, and exited cleanly.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778743156254659`
+
+### DC-75: Memory-Oriented Oracle Retirement
 
 Status: `planned`
 

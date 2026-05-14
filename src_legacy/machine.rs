@@ -57,12 +57,12 @@ mod red_label_trace_samples;
 #[cfg(test)]
 use self::machine_player::*;
 use self::machine_scheduler::*;
+#[allow(unused_imports)]
 pub use self::machine_sound::{
     RedLabelLoadedSoundTable, RedLabelSoundDirectCommandSequenceFixtureCheck, RedLabelSoundOutput,
     RedLabelSoundSequenceSource, RedLabelSoundSequenceStep, RedLabelSoundTableCommand,
     RedLabelSoundTableCommandSequenceFixtureCheck, RedLabelSoundTableTimedCommand,
-    RedLabelSoundTableTimeline, RedLabelSoundTableTimelineFixtureCheck,
-    RedLabelSoundThrustCommandSequenceFixtureCheck,
+    RedLabelSoundTableTimelineFixtureCheck, RedLabelSoundThrustCommandSequenceFixtureCheck,
 };
 #[cfg(test)]
 use self::machine_sound::{

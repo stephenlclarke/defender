@@ -4,11 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use defender::compatibility::{
-    input::CabinetInput,
-    machine::{ArcadeMachine, FRAME_RATE_MILLIHZ},
-    video::{RenderedImage, Renderer},
-};
+use defender::readme_media::{FRAME_RATE_MILLIHZ, ReadmeMediaFrame, ReadmeMediaFrameSource};
 use gif::{Encoder, Frame, Repeat};
 
 const OUTPUT_WIDTH: u32 = 768;
@@ -36,17 +32,15 @@ fn main() -> Result<()> {
 }
 
 fn build_start_sequence() -> Result<Vec<(RgbaImage, u16)>> {
-    let mut machine = ArcadeMachine::new();
-    let mut renderer = Renderer::with_size(OUTPUT_WIDTH, OUTPUT_HEIGHT);
+    let mut source = ReadmeMediaFrameSource::new(OUTPUT_WIDTH, OUTPUT_HEIGHT);
     let mut machine_frame = 0;
     let mut delay = DelayAccumulator::new();
     let mut frames = Vec::new();
 
     for segment in readme_segments() {
-        step_until_frame(&mut machine, &mut machine_frame, segment.start_frame);
+        step_until_frame(&mut source, &mut machine_frame, segment.start_frame);
         capture_segment(
-            &mut machine,
-            &mut renderer,
+            &mut source,
             &mut machine_frame,
             &mut delay,
             segment,
@@ -75,8 +69,7 @@ fn readme_segments() -> [ReadmeSegment; 3] {
 }
 
 fn capture_segment(
-    machine: &mut ArcadeMachine,
-    renderer: &mut Renderer,
+    source: &mut ReadmeMediaFrameSource,
     machine_frame: &mut u64,
     delay: &mut DelayAccumulator,
     segment: ReadmeSegment,
@@ -89,34 +82,31 @@ fn capture_segment(
     while *machine_frame < segment_end {
         let step_frames = SAMPLE_STEP_FRAMES.min(segment_end - *machine_frame);
         frames.push((
-            render_machine_frame(machine, renderer)?,
+            source
+                .render_frame()
+                .context("rendering README media frame")?
+                .into(),
             delay.centiseconds_for_frames(step_frames),
         ));
-        step_for_frames(machine, machine_frame, step_frames);
+        step_for_frames(source, machine_frame, step_frames);
     }
 
     Ok(())
 }
 
-fn render_machine_frame(machine: &mut ArcadeMachine, renderer: &mut Renderer) -> Result<RgbaImage> {
-    machine
-        .red_label_copy_color_mapping_to_palette_ram()
-        .map_err(anyhow::Error::msg)?;
-    let native_frame = machine
-        .red_label_visible_rgba_image()
-        .context("red-label visible frame is unavailable")?;
-    Ok(renderer.render_cabinet_frame(&native_frame).into())
-}
-
-fn step_until_frame(machine: &mut ArcadeMachine, machine_frame: &mut u64, target_frame: u64) {
+fn step_until_frame(
+    source: &mut ReadmeMediaFrameSource,
+    machine_frame: &mut u64,
+    target_frame: u64,
+) {
     if target_frame > *machine_frame {
-        step_for_frames(machine, machine_frame, target_frame - *machine_frame);
+        step_for_frames(source, machine_frame, target_frame - *machine_frame);
     }
 }
 
-fn step_for_frames(machine: &mut ArcadeMachine, machine_frame: &mut u64, frames: u64) {
+fn step_for_frames(source: &mut ReadmeMediaFrameSource, machine_frame: &mut u64, frames: u64) {
     for _ in 0..frames {
-        machine.step(CabinetInput::NONE);
+        source.step();
         *machine_frame += 1;
     }
 }
@@ -213,12 +203,12 @@ struct RgbaImage {
     pixels: Vec<u8>,
 }
 
-impl From<&RenderedImage> for RgbaImage {
-    fn from(image: &RenderedImage) -> Self {
+impl From<ReadmeMediaFrame> for RgbaImage {
+    fn from(image: ReadmeMediaFrame) -> Self {
         Self {
             width: image.width,
             height: image.height,
-            pixels: image.pixels.clone(),
+            pixels: image.pixels,
         }
     }
 }

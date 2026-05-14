@@ -2,7 +2,7 @@
 //!
 //! New source lives in this `src/` directory. The converted implementation is
 //! parked under `src_legacy/` and remains wired only as the gameplay oracle and
-//! compatibility runtime while the rewrite proves equivalent behavior.
+//! runtime bridge while the rewrite proves equivalent behavior.
 
 mod accepted;
 
@@ -13,11 +13,11 @@ pub mod platform;
 pub mod renderer;
 pub mod systems;
 
-// Compatibility modules are hidden from the supported clean API surface while
+// Legacy bridge modules are hidden from the supported clean API surface while
 // the rewrite still uses them for the CLI, oracle, fixtures, and smoke tests.
-// Parked low-level modules tolerate dead code after removal from compatibility
-// re-exports; later rewrite cycles should delete them when their evidence is
-// no longer needed.
+// Parked low-level modules tolerate dead code after removal from public tool
+// facades; later rewrite cycles should delete them when their evidence is no
+// longer needed.
 #[doc(hidden)]
 #[path = "../src_legacy/accepted_behavior.rs"]
 pub(crate) mod accepted_behavior;
@@ -42,6 +42,7 @@ pub(crate) mod cmos_storage;
 #[doc(hidden)]
 #[path = "../src_legacy/fidelity.rs"]
 pub(crate) mod fidelity;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/input.rs"]
 pub(crate) mod input;
@@ -49,12 +50,16 @@ pub(crate) mod input;
 #[doc(hidden)]
 #[path = "../src_legacy/live.rs"]
 pub(crate) mod live;
+#[allow(dead_code)]
+#[allow(clippy::enum_variant_names)]
 #[doc(hidden)]
 #[path = "../src_legacy/machine.rs"]
 pub(crate) mod machine;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/machine_process.rs"]
 pub(crate) mod machine_process;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/machine_state.rs"]
 pub(crate) mod machine_state;
@@ -86,6 +91,7 @@ pub(crate) mod rom;
 #[doc(hidden)]
 #[path = "../src_legacy/sound.rs"]
 pub(crate) mod sound;
+#[allow(dead_code)]
 #[doc(hidden)]
 #[path = "../src_legacy/video.rs"]
 pub(crate) mod video;
@@ -94,8 +100,8 @@ pub(crate) mod video;
 pub(crate) mod wgpu_presenter;
 
 #[doc(hidden)]
-#[path = "../src_legacy/compatibility.rs"]
-pub mod compatibility;
+#[path = "../src_legacy/readme_media.rs"]
+pub mod readme_media;
 
 pub use game::{
     Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameSnapshot, GameState,
@@ -145,69 +151,42 @@ mod public_api_tests {
     }
 
     #[test]
-    fn compatibility_namespace_is_legacy_owned_and_doc_hidden() {
+    fn readme_media_facade_is_legacy_owned_and_doc_hidden() {
         let lib_rs = include_str!("lib.rs");
-        let compatibility_rs = include_str!("../src_legacy/compatibility.rs");
-        let marker = "#[path = \"../src_legacy/compatibility.rs\"]";
+        let marker = "#[path = \"../src_legacy/readme_media.rs\"]";
         let Some(marker_start) = lib_rs.find(marker) else {
-            panic!("missing compatibility namespace path");
+            panic!("missing README media facade path");
         };
 
         assert!(
             lib_rs[..marker_start].ends_with("#[doc(hidden)]\n"),
-            "compatibility namespace must be hidden from supported API docs"
+            "README media facade must be hidden from supported API docs"
         );
         assert!(
-            lib_rs[marker_start..].starts_with(&format!("{marker}\npub mod compatibility;")),
-            "compatibility namespace must be owned by src_legacy"
+            lib_rs[marker_start..].starts_with(&format!("{marker}\npub mod readme_media;")),
+            "README media facade must be owned by src_legacy"
         );
         assert!(
-            !lib_rs.contains("pub mod compatibility {\n"),
-            "compatibility re-export details must stay out of clean src/lib.rs"
-        );
-        assert!(
-            !compatibility_rs.contains("pub mod terminal"),
-            "retired terminal-session code must not be re-exported through compatibility"
+            !lib_rs.contains("pub mod readme_media {\n"),
+            "README media facade details must stay out of clean src/lib.rs"
         );
     }
 
     #[test]
-    fn compatibility_namespace_exposes_only_temporary_tool_contracts() {
-        let compatibility_rs = include_str!("../src_legacy/compatibility.rs");
+    fn compatibility_namespace_is_retired() {
+        let lib_rs = include_str!("lib.rs");
+        let example_rs = include_str!("../examples/generate_readme_media.rs");
+        let compatibility_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("src_legacy/{}.rs", "compatibility"));
+        let old_module_declaration = format!("pub mod {}", "compatibility");
+        let old_path_attribute = format!("#[path = \"../src_legacy/{}.rs\"]", "compatibility");
+        let old_tool_path = format!("defender::{}", "compatibility");
 
-        for module in ["input", "machine", "video"] {
-            assert!(
-                compatibility_rs.contains(&format!(
-                    "pub mod {module} {{\n    pub use crate::{module}::*;\n}}"
-                )),
-                "compatibility namespace must keep temporary {module} tooling access"
-            );
-        }
-
-        for module in [
-            "app",
-            "assets",
-            "board",
-            "cmos_storage",
-            "fidelity",
-            "live",
-            "machine_process",
-            "machine_state",
-            "pia",
-            "red_label",
-            "red_label_memory",
-            "red_label_message",
-            "red_label_wave",
-            "rom",
-            "sound",
-            "terminal",
-            "wgpu_presenter",
-        ] {
-            assert!(
-                !compatibility_rs.contains(&format!("pub mod {module}")),
-                "low-level legacy module {module} must not be compatibility-exported"
-            );
-        }
+        assert!(!compatibility_path.exists());
+        assert!(!lib_rs.contains(&old_module_declaration));
+        assert!(!lib_rs.contains(&old_path_attribute));
+        assert!(!example_rs.contains(&old_tool_path));
+        assert!(example_rs.contains("defender::readme_media"));
     }
 
     #[test]
@@ -282,7 +261,7 @@ mod public_api_tests {
     }
 
     #[test]
-    fn legacy_compatibility_modules_are_crate_private_at_root() {
+    fn legacy_modules_are_crate_private_at_root() {
         let lib_rs = include_str!("lib.rs");
         let legacy_modules = [
             "accepted_behavior",

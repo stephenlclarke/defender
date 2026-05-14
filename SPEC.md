@@ -50,16 +50,15 @@ sources or by an accepted fixture.
 The crate is now split between a clean rewrite source tree and a legacy oracle
 tree:
 
-- `src/main.rs`: thin CLI entry point that still dispatches to the compatibility
-  runtime through the clean platform launcher while the rewrite takes over.
+- `src/main.rs`: thin CLI entry point that still dispatches to the runtime
+  bridge through the clean platform launcher while the rewrite takes over.
 - `src/lib.rs`: clean public crate wiring plus crate-private explicit
-  `#[path]` adapters to the legacy oracle tree and a doc-hidden
-  `compatibility` namespace wired from `src_legacy/compatibility.rs` for
-  temporary oracle/tool access. Compatibility exports are limited to current
-  in-repo tool contracts; machine process/state contracts, red-label math
-  types, and low-level asset, board, memory, ROM, sound, live, PIA, and `wgpu`
-  modules must remain crate-private. Generated long-trace sample fixtures must
-  stay private to the legacy machine oracle instead of being root-wired here.
+  `#[path]` adapters to the legacy oracle tree and a doc-hidden README media
+  facade wired from `src_legacy/readme_media.rs`. Machine process/state
+  contracts, red-label math types, and low-level asset, board, memory, ROM,
+  sound, live, PIA, and `wgpu` modules must remain crate-private. Generated
+  long-trace sample fixtures must stay private to the legacy machine oracle
+  instead of being root-wired here.
 - `src/accepted.rs`: crate-private accepted-behavior contracts and facade that
   isolate clean production modules from direct legacy runtime and oracle
   imports.
@@ -90,13 +89,10 @@ legacy-machine adaptation into neutral accepted-behavior contracts before the
 public clean gameplay types see it. Legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so clean accepted/oracle source
 stays focused on gameplay contracts. Internal clean equivalence regressions use
-crate-private oracle wiring. Temporary README media tooling still uses the
-doc-hidden `defender::compatibility` namespace as the boundary to the legacy
-tree; its re-export map lives in `src_legacy/compatibility.rs`, not in the
-clean crate root, and exposes only the temporary modules used by README media
-tooling. The current compatibility surface is only input, machine, and video;
-machine process/state contracts remain crate-private oracle wiring. Live
-presentation receives clean `RenderScene` data, currently with a
+crate-private oracle wiring. Temporary README media tooling uses the
+doc-hidden `defender::readme_media` facade rather than low-level legacy module
+exports. Machine process/state contracts remain crate-private oracle wiring.
+Live presentation receives clean `RenderScene` data, currently with a
 temporary raster payload for visual equivalence. Kitty graphics and
 terminal-session code remain parked there as historical
 compatibility evidence, but they are not part of the active runtime or
@@ -171,5 +167,5 @@ explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
 - New clean production callers must avoid direct legacy module imports. Code
   that still needs accepted-behavior evidence should use the crate-private
   `accepted` facade until the clean system replaces that responsibility.
-  Temporary tool callers may use the doc-hidden `compatibility::...` boundary;
+  Temporary README media tooling may use the doc-hidden `readme_media` facade;
   root legacy modules must remain crate-private.
