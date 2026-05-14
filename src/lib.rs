@@ -243,9 +243,15 @@ mod public_api_tests {
         assert!(platform_rs.contains("CliClassification::AcceptedAdapter"));
         assert!(platform_rs.contains("CliClassification::CleanRuntime(config)"));
         assert!(platform_rs.contains("CliClassification::CleanHelp"));
+        assert!(platform_rs.contains("CliClassification::CleanError(error)"));
+        assert!(platform_rs.contains("enum CleanCliError"));
+        assert!(platform_rs.contains("CleanCliError::MissingInputProfile"));
+        assert!(platform_rs.contains("CleanCliError::UnknownInputProfile"));
+        assert!(platform_rs.contains("CleanCliError::MissingCmosPath"));
         assert!(platform_rs.contains("RuntimeConfig::default()"));
         assert!(platform_rs.contains("config.mode = RunMode::Smoke"));
         assert!(platform_rs.contains("\"--help\" | \"-h\" => ArgClassification::CleanHelp"));
+        assert!(platform_rs.contains("ArgClassification::CleanError"));
         assert!(platform_rs.contains("\"--live-smoke\""));
         assert!(platform_rs.contains("RuntimeConfig::smoke()"));
         assert!(!platform_rs.contains(&accepted_runtime_call));

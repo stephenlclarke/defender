@@ -1,6 +1,6 @@
 //! Platform-facing runtime configuration and launch boundaries.
 
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ControlProfile {
@@ -82,6 +82,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
         CliClassification::AcceptedAdapter => crate::runtime::run_cli(),
         CliClassification::CleanRuntime(config) => crate::runtime::run(&config),
         CliClassification::CleanHelp => crate::runtime::run_help(),
+        CliClassification::CleanError(error) => Err(error.into()),
     }
 }
 
@@ -90,6 +91,7 @@ enum CliClassification {
     AcceptedAdapter,
     CleanRuntime(RuntimeConfig),
     CleanHelp,
+    CleanError(CleanCliError),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,6 +109,9 @@ impl RuntimeCliClassifier {
             match Self::apply_arg(&arg, &mut args, &mut config) {
                 ArgClassification::CleanRuntime => {}
                 ArgClassification::CleanHelp => return CliClassification::CleanHelp,
+                ArgClassification::CleanError(error) => {
+                    return CliClassification::CleanError(error);
+                }
                 ArgClassification::AcceptedAdapter => return CliClassification::AcceptedAdapter,
             }
         }
@@ -126,10 +131,12 @@ impl RuntimeCliClassifier {
             "--help" | "-h" => ArgClassification::CleanHelp,
             "--input-profile" => {
                 let Some(value) = args.next() else {
-                    return ArgClassification::AcceptedAdapter;
+                    return ArgClassification::CleanError(CleanCliError::MissingInputProfile);
                 };
                 let Some(controls) = parse_control_profile(&value) else {
-                    return ArgClassification::AcceptedAdapter;
+                    return ArgClassification::CleanError(CleanCliError::UnknownInputProfile(
+                        value,
+                    ));
                 };
                 config.controls = controls;
                 ArgClassification::CleanRuntime
@@ -140,7 +147,7 @@ impl RuntimeCliClassifier {
             }
             "--cmos-path" => {
                 let Some(value) = args.next() else {
-                    return ArgClassification::AcceptedAdapter;
+                    return ArgClassification::CleanError(CleanCliError::MissingCmosPath);
                 };
                 config.cmos_path = Some(PathBuf::from(value));
                 ArgClassification::CleanRuntime
@@ -150,12 +157,39 @@ impl RuntimeCliClassifier {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ArgClassification {
     AcceptedAdapter,
     CleanRuntime,
     CleanHelp,
+    CleanError(CleanCliError),
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CleanCliError {
+    MissingInputProfile,
+    UnknownInputProfile(String),
+    MissingCmosPath,
+}
+
+impl fmt::Display for CleanCliError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingInputProfile => {
+                write!(
+                    formatter,
+                    "--input-profile requires one of: planetoid, cabinet, test"
+                )
+            }
+            Self::UnknownInputProfile(value) => {
+                write!(formatter, "unknown input profile: {value}")
+            }
+            Self::MissingCmosPath => write!(formatter, "--cmos-path requires a file path"),
+        }
+    }
+}
+
+impl std::error::Error for CleanCliError {}
 
 fn parse_control_profile(value: &str) -> Option<ControlProfile> {
     match value {
@@ -171,8 +205,8 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        AudioOutput, CliClassification, ControlProfile, RunMode, RuntimeCliClassifier,
-        RuntimeConfig,
+        AudioOutput, CleanCliError, CliClassification, ControlProfile, RunMode,
+        RuntimeCliClassifier, RuntimeConfig,
     };
 
     fn args(values: &[&str]) -> Vec<String> {
@@ -285,17 +319,53 @@ mod tests {
     }
 
     #[test]
-    fn clean_cli_delegates_malformed_live_args() {
-        for values in [
-            vec!["--live-smoke", "--input-profile"],
-            vec!["--live-smoke", "--input-profile", "unknown"],
-            vec!["--live-smoke", "--cmos-path"],
-            vec!["--live-smoke", "--unknown"],
-            vec!["--input-profile"],
-            vec!["--input-profile", "unknown"],
-            vec!["--cmos-path"],
-            vec!["--unknown"],
+    fn clean_cli_rejects_malformed_live_args() {
+        for (values, error) in [
+            (
+                vec!["--live-smoke", "--input-profile"],
+                CleanCliError::MissingInputProfile,
+            ),
+            (
+                vec!["--live-smoke", "--input-profile", "unknown"],
+                CleanCliError::UnknownInputProfile(String::from("unknown")),
+            ),
+            (
+                vec!["--live-smoke", "--cmos-path"],
+                CleanCliError::MissingCmosPath,
+            ),
+            (vec!["--input-profile"], CleanCliError::MissingInputProfile),
+            (
+                vec!["--input-profile", "unknown"],
+                CleanCliError::UnknownInputProfile(String::from("unknown")),
+            ),
+            (vec!["--cmos-path"], CleanCliError::MissingCmosPath),
         ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::CleanError(error)
+            );
+        }
+    }
+
+    #[test]
+    fn clean_cli_error_messages_are_stable() {
+        assert_eq!(
+            CleanCliError::MissingInputProfile.to_string(),
+            "--input-profile requires one of: planetoid, cabinet, test"
+        );
+        assert_eq!(
+            CleanCliError::UnknownInputProfile(String::from("invalid")).to_string(),
+            "unknown input profile: invalid"
+        );
+        assert_eq!(
+            CleanCliError::MissingCmosPath.to_string(),
+            "--cmos-path requires a file path"
+        );
+    }
+
+    #[test]
+    fn clean_cli_delegates_unsupported_args() {
+        for values in [vec!["--live-smoke", "--unknown"], vec!["--unknown"]] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
                 CliClassification::AcceptedAdapter
@@ -330,6 +400,17 @@ mod tests {
     fn clean_help_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--help"]))
             .expect("clean help CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn clean_cli_entrypoint_rejects_malformed_live_args() {
+        let error = super::run_with_args(args(&["--input-profile"]))
+            .expect_err("malformed clean live args should return clean CLI error");
+
+        assert_eq!(
+            error.to_string(),
+            "--input-profile requires one of: planetoid, cabinet, test"
+        );
     }
 
     #[test]
