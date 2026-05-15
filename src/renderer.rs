@@ -399,48 +399,81 @@ pub struct AtlasRegion {
 pub struct TextureAtlas {
     pub surface: SurfaceSize,
     pub regions: Vec<AtlasRegion>,
+    pixels: Vec<u8>,
 }
 
 impl TextureAtlas {
     pub fn new(surface: SurfaceSize, regions: Vec<AtlasRegion>) -> Self {
-        Self { surface, regions }
+        let pixels = transparent_rgba_pixels(surface).unwrap_or_default();
+        Self {
+            surface,
+            regions,
+            pixels,
+        }
+    }
+
+    pub fn with_rgba(
+        surface: SurfaceSize,
+        regions: Vec<AtlasRegion>,
+        pixels: Vec<u8>,
+    ) -> Result<Self, SceneRasterError> {
+        let Some(expected) = surface.rgba_len() else {
+            return Err(SceneRasterError::PixelBufferTooLarge { surface });
+        };
+        if pixels.len() != expected {
+            return Err(SceneRasterError::PixelBufferLength {
+                expected,
+                actual: pixels.len(),
+            });
+        }
+
+        Ok(Self {
+            surface,
+            regions,
+            pixels,
+        })
     }
 
     pub fn default_sprites() -> Self {
+        let surface = SurfaceSize::new(128, 128);
+        let regions = vec![
+            AtlasRegion {
+                sprite: SpriteId::PLAYER_SHIP,
+                origin: [0, 0],
+                size: [16, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_TEXT,
+                origin: [0, 16],
+                size: [80, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::STATUS_TEXT,
+                origin: [0, 32],
+                size: [96, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::PLAYER_PROJECTILE,
+                origin: [0, 48],
+                size: [8, 2],
+            },
+            AtlasRegion {
+                sprite: SpriteId::TERRAIN_TILE,
+                origin: [0, 64],
+                size: [8, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::STAR,
+                origin: [16, 64],
+                size: [1, 1],
+            },
+        ];
+        let pixels = default_sprite_atlas_pixels(surface, &regions);
+
         Self {
-            surface: SurfaceSize::new(128, 128),
-            regions: vec![
-                AtlasRegion {
-                    sprite: SpriteId::PLAYER_SHIP,
-                    origin: [0, 0],
-                    size: [16, 8],
-                },
-                AtlasRegion {
-                    sprite: SpriteId::SCORE_TEXT,
-                    origin: [0, 16],
-                    size: [80, 8],
-                },
-                AtlasRegion {
-                    sprite: SpriteId::STATUS_TEXT,
-                    origin: [0, 32],
-                    size: [96, 8],
-                },
-                AtlasRegion {
-                    sprite: SpriteId::PLAYER_PROJECTILE,
-                    origin: [0, 48],
-                    size: [8, 2],
-                },
-                AtlasRegion {
-                    sprite: SpriteId::TERRAIN_TILE,
-                    origin: [0, 64],
-                    size: [8, 8],
-                },
-                AtlasRegion {
-                    sprite: SpriteId::STAR,
-                    origin: [16, 64],
-                    size: [1, 1],
-                },
-            ],
+            surface,
+            regions,
+            pixels,
         }
     }
 
@@ -453,6 +486,63 @@ impl TextureAtlas {
             .iter()
             .copied()
             .find(|region| region.sprite == sprite)
+    }
+
+    pub fn pixels(&self) -> &[u8] {
+        &self.pixels
+    }
+
+    pub fn is_non_blank(&self) -> bool {
+        self.pixels
+            .chunks_exact(4)
+            .any(|pixel| pixel != [0, 0, 0, 0].as_slice())
+    }
+}
+
+fn transparent_rgba_pixels(surface: SurfaceSize) -> Option<Vec<u8>> {
+    surface.rgba_len().map(|len| vec![0; len])
+}
+
+fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) -> Vec<u8> {
+    let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
+    for region in regions {
+        fill_atlas_region(
+            &mut pixels,
+            surface,
+            *region,
+            default_sprite_region_color(region.sprite),
+        );
+    }
+    pixels
+}
+
+fn default_sprite_region_color(sprite: SpriteId) -> [u8; 4] {
+    match sprite {
+        SpriteId::PLAYER_SHIP => [0xFF, 0xFF, 0xFF, 0xFF],
+        SpriteId::SCORE_TEXT => [0xFF, 0xFF, 0xFF, 0xFF],
+        SpriteId::STATUS_TEXT => [0x26, 0xAE, 0x00, 0xFF],
+        SpriteId::PLAYER_PROJECTILE => [0xFF, 0xF8, 0x80, 0xFF],
+        SpriteId::TERRAIN_TILE => [0x26, 0xAE, 0x00, 0xFF],
+        SpriteId::STAR => [0xFF, 0xFF, 0xFF, 0xFF],
+        _ => [0xD9, 0x51, 0xFF, 0xFF],
+    }
+}
+
+fn fill_atlas_region(pixels: &mut [u8], surface: SurfaceSize, region: AtlasRegion, color: [u8; 4]) {
+    let max_x = region.origin[0]
+        .saturating_add(region.size[0])
+        .min(surface.width);
+    let max_y = region.origin[1]
+        .saturating_add(region.size[1])
+        .min(surface.height);
+    for y in region.origin[1]..max_y {
+        for x in region.origin[0]..max_x {
+            let start = ((y as usize * surface.width as usize) + x as usize) * 4;
+            let end = start + 4;
+            if end <= pixels.len() {
+                pixels[start..end].copy_from_slice(&color);
+            }
+        }
     }
 }
 
@@ -1258,7 +1348,88 @@ impl SpriteSamplerBindingPlan {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpriteAtlasTextureUpload {
+    pub role: SpriteResourceBindingRole,
+    pub label: &'static str,
+    pub usage: wgpu::TextureUsages,
+    pub format: wgpu::TextureFormat,
+    pub dimension: wgpu::TextureDimension,
+    pub surface: SurfaceSize,
+    pub mip_level_count: u32,
+    pub sample_count: u32,
+    pub depth_or_array_layers: u32,
+    pub bytes_per_row: u32,
+    pub rows_per_image: u32,
+    pub byte_len: usize,
+    pub bytes: Vec<u8>,
+    pub non_blank: bool,
+}
+
+impl SpriteAtlasTextureUpload {
+    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+    pub const MIP_LEVEL_COUNT: u32 = 1;
+    pub const SAMPLE_COUNT: u32 = 1;
+    pub const DEPTH_OR_ARRAY_LAYERS: u32 = 1;
+
+    fn from_atlas(atlas: &TextureAtlas) -> Option<Self> {
+        if atlas.surface.is_empty() {
+            return None;
+        }
+        if atlas.pixels.is_empty() || atlas.pixels.len() != atlas.surface.rgba_len()? {
+            return None;
+        }
+
+        Some(Self {
+            role: SpriteResourceBindingRole::SpriteAtlasTexture,
+            label: "defender.sprite.atlas.texture",
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            format: Self::FORMAT,
+            dimension: wgpu::TextureDimension::D2,
+            surface: atlas.surface,
+            mip_level_count: Self::MIP_LEVEL_COUNT,
+            sample_count: Self::SAMPLE_COUNT,
+            depth_or_array_layers: Self::DEPTH_OR_ARRAY_LAYERS,
+            bytes_per_row: atlas.surface.width.checked_mul(4)?,
+            rows_per_image: atlas.surface.height,
+            byte_len: atlas.pixels.len(),
+            bytes: atlas.pixels.clone(),
+            non_blank: atlas.is_non_blank(),
+        })
+    }
+
+    pub const fn extent(&self) -> wgpu::Extent3d {
+        wgpu::Extent3d {
+            width: self.surface.width,
+            height: self.surface.height,
+            depth_or_array_layers: self.depth_or_array_layers,
+        }
+    }
+
+    pub fn copy_layout(&self) -> wgpu::TexelCopyBufferLayout {
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(self.bytes_per_row),
+            rows_per_image: Some(self.rows_per_image),
+        }
+    }
+
+    pub fn texture_descriptor(&self) -> wgpu::TextureDescriptor<'static> {
+        wgpu::TextureDescriptor {
+            label: Some(self.label),
+            size: self.extent(),
+            mip_level_count: self.mip_level_count,
+            sample_count: self.sample_count,
+            dimension: self.dimension,
+            format: self.format,
+            usage: self.usage,
+            view_formats: &[],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpriteResourceBindingPlan {
+    pub atlas_upload: SpriteAtlasTextureUpload,
     pub projection_upload: SceneProjectionUniformUpload,
     pub projection_layout: SpriteBindGroupLayoutPlan,
     pub atlas_layout: SpriteBindGroupLayoutPlan,
@@ -1269,17 +1440,16 @@ pub struct SpriteResourceBindingPlan {
 impl SpriteResourceBindingPlan {
     fn from_projection_and_atlas(
         projection: SceneProjectionUniforms,
-        atlas_surface: SurfaceSize,
+        atlas: &TextureAtlas,
     ) -> Option<Self> {
-        if atlas_surface.is_empty() {
-            return None;
-        }
+        let atlas_upload = SpriteAtlasTextureUpload::from_atlas(atlas)?;
 
         Some(Self {
+            atlas_upload,
             projection_upload: SceneProjectionUniformUpload::from_projection(projection),
             projection_layout: SpriteBindGroupLayoutPlan::scene_projection(),
             atlas_layout: SpriteBindGroupLayoutPlan::sprite_atlas(),
-            atlas_texture: SpriteTextureBindingPlan::atlas(atlas_surface),
+            atlas_texture: SpriteTextureBindingPlan::atlas(atlas.surface),
             atlas_sampler: SpriteSamplerBindingPlan::atlas(),
         })
     }
@@ -1460,7 +1630,7 @@ impl NativeSceneRenderer {
             gpu_pass.scene_projection.and_then(|projection| {
                 SpriteResourceBindingPlan::from_projection_and_atlas(
                     projection,
-                    self.resources.atlas.surface,
+                    &self.resources.atlas,
                 )
             })
         });
@@ -1547,14 +1717,15 @@ mod tests {
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneDrawPlan,
         SceneProjectionUniformUpload, SceneProjectionUniforms, SceneRaster, SceneRasterError,
-        SceneSprite, SpriteBindGroupLayoutPlan, SpriteBindGroupRole, SpriteBufferRole,
-        SpriteBufferUpload, SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand,
-        SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding, SpriteInstanceBuffer,
-        SpriteInstanceBufferRecord, SpriteInstanceUpload, SpritePipelinePlan, SpriteQuadGeometry,
-        SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassPlan, SpriteResourceBindingPlan,
-        SpriteResourceBindingRole, SpriteSamplerBindingPlan, SpriteShaderPlan,
-        SpriteTextureBindingPlan, SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan,
-        SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+        SceneSprite, SpriteAtlasTextureUpload, SpriteBindGroupLayoutPlan, SpriteBindGroupRole,
+        SpriteBufferRole, SpriteBufferUpload, SpriteBufferUploadPlan, SpriteDrawBatch,
+        SpriteDrawCommand, SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding,
+        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload, SpritePipelinePlan,
+        SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassPlan,
+        SpriteResourceBindingPlan, SpriteResourceBindingRole, SpriteSamplerBindingPlan,
+        SpriteShaderPlan, SpriteTextureBindingPlan, SpriteVertexBufferBinding,
+        SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan,
+        WgpuViewportCommand,
     };
 
     #[test]
@@ -2111,16 +2282,102 @@ mod tests {
     }
 
     #[test]
+    fn sprite_atlas_texture_upload_describes_wgpu_texture_copy() {
+        let atlas = TextureAtlas::default_sprites();
+        let upload = SpriteAtlasTextureUpload::from_atlas(&atlas).expect("atlas upload");
+
+        assert_eq!(
+            upload,
+            SpriteAtlasTextureUpload {
+                role: SpriteResourceBindingRole::SpriteAtlasTexture,
+                label: "defender.sprite.atlas.texture",
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                dimension: wgpu::TextureDimension::D2,
+                surface: SurfaceSize::new(128, 128),
+                mip_level_count: 1,
+                sample_count: 1,
+                depth_or_array_layers: 1,
+                bytes_per_row: 128 * 4,
+                rows_per_image: 128,
+                byte_len: 128 * 128 * 4,
+                bytes: atlas.pixels().to_vec(),
+                non_blank: true,
+            }
+        );
+        assert_eq!(
+            upload.extent(),
+            wgpu::Extent3d {
+                width: 128,
+                height: 128,
+                depth_or_array_layers: 1,
+            }
+        );
+        let copy_layout = upload.copy_layout();
+        assert_eq!(copy_layout.offset, 0);
+        assert_eq!(copy_layout.bytes_per_row, Some(128 * 4));
+        assert_eq!(copy_layout.rows_per_image, Some(128));
+        let descriptor = upload.texture_descriptor();
+        assert_eq!(descriptor.label, Some("defender.sprite.atlas.texture"));
+        assert_eq!(descriptor.size, upload.extent());
+        assert_eq!(descriptor.mip_level_count, 1);
+        assert_eq!(descriptor.sample_count, 1);
+        assert_eq!(descriptor.dimension, wgpu::TextureDimension::D2);
+        assert_eq!(descriptor.format, wgpu::TextureFormat::Rgba8UnormSrgb);
+        assert_eq!(
+            descriptor.usage,
+            wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST
+        );
+        assert_eq!(descriptor.view_formats, &[]);
+
+        assert_eq!(
+            SpriteAtlasTextureUpload::from_atlas(&TextureAtlas::new(
+                SurfaceSize::new(0, 128),
+                Vec::new()
+            )),
+            None
+        );
+        let missing_pixels = TextureAtlas {
+            surface: SurfaceSize::new(2, 2),
+            regions: Vec::new(),
+            pixels: Vec::new(),
+        };
+        assert_eq!(SpriteAtlasTextureUpload::from_atlas(&missing_pixels), None);
+    }
+
+    #[test]
     fn sprite_resource_binding_plan_describes_uniform_and_atlas_bindings() {
         let projection =
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
-
-        let plan = SpriteResourceBindingPlan::from_projection_and_atlas(
-            projection,
+        let atlas = TextureAtlas::with_rgba(
             SurfaceSize::new(128, 64),
+            Vec::new(),
+            vec![0x80; 128 * 64 * 4],
         )
-        .expect("sprite resource binding plan");
+        .expect("atlas");
 
+        let plan = SpriteResourceBindingPlan::from_projection_and_atlas(projection, &atlas)
+            .expect("sprite resource binding plan");
+
+        assert_eq!(
+            plan.atlas_upload,
+            SpriteAtlasTextureUpload {
+                role: SpriteResourceBindingRole::SpriteAtlasTexture,
+                label: "defender.sprite.atlas.texture",
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                dimension: wgpu::TextureDimension::D2,
+                surface: SurfaceSize::new(128, 64),
+                mip_level_count: 1,
+                sample_count: 1,
+                depth_or_array_layers: 1,
+                bytes_per_row: 128 * 4,
+                rows_per_image: 64,
+                byte_len: 128 * 64 * 4,
+                bytes: atlas.pixels().to_vec(),
+                non_blank: true,
+            }
+        );
         assert_eq!(
             plan.projection_upload,
             SceneProjectionUniformUpload {
@@ -2201,7 +2458,7 @@ mod tests {
         assert_eq!(
             SpriteResourceBindingPlan::from_projection_and_atlas(
                 projection,
-                SurfaceSize::new(0, 64)
+                &TextureAtlas::new(SurfaceSize::new(0, 64), Vec::new())
             ),
             None
         );
@@ -2212,11 +2469,9 @@ mod tests {
         let shader = SpriteShaderPlan::default();
         let projection =
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
-        let plan = SpriteResourceBindingPlan::from_projection_and_atlas(
-            projection,
-            SurfaceSize::new(128, 64),
-        )
-        .expect("sprite resource binding plan");
+        let atlas = TextureAtlas::default_sprites();
+        let plan = SpriteResourceBindingPlan::from_projection_and_atlas(projection, &atlas)
+            .expect("sprite resource binding plan");
 
         assert!(shader.source.contains("@group(0) @binding(0)"));
         assert_eq!(plan.projection_layout.group_index(), 0);
@@ -2422,7 +2677,7 @@ mod tests {
             plan.gpu_pass.scene_projection.and_then(|projection| {
                 SpriteResourceBindingPlan::from_projection_and_atlas(
                     projection,
-                    TextureAtlas::default_sprites().surface,
+                    &TextureAtlas::default_sprites(),
                 )
             })
         })
@@ -2639,6 +2894,8 @@ mod tests {
 
         assert!(atlas.contains(SpriteId(42)));
         assert!(!atlas.contains(SpriteId::PLAYER_SHIP));
+        assert_eq!(atlas.pixels().len(), 16 * 16 * 4);
+        assert!(!atlas.is_non_blank());
         assert_eq!(
             atlas.region(SpriteId(42)),
             Some(AtlasRegion {
@@ -2648,10 +2905,30 @@ mod tests {
             })
         );
         assert_eq!(atlas.region(SpriteId::PLAYER_SHIP), None);
-        assert!(TextureAtlas::default_sprites().contains(SpriteId::STATUS_TEXT));
-        assert!(TextureAtlas::default_sprites().contains(SpriteId::PLAYER_PROJECTILE));
-        assert!(TextureAtlas::default_sprites().contains(SpriteId::TERRAIN_TILE));
-        assert!(TextureAtlas::default_sprites().contains(SpriteId::STAR));
+        let default_atlas = TextureAtlas::default_sprites();
+        assert_eq!(default_atlas.pixels().len(), 128 * 128 * 4);
+        assert!(default_atlas.is_non_blank());
+        assert!(default_atlas.contains(SpriteId::STATUS_TEXT));
+        assert!(default_atlas.contains(SpriteId::PLAYER_PROJECTILE));
+        assert!(default_atlas.contains(SpriteId::TERRAIN_TILE));
+        assert!(default_atlas.contains(SpriteId::STAR));
+        assert_eq!(
+            TextureAtlas::with_rgba(SurfaceSize::new(2, 2), Vec::new(), vec![0; 15]),
+            Err(SceneRasterError::PixelBufferLength {
+                expected: 16,
+                actual: 15,
+            })
+        );
+        assert_eq!(
+            TextureAtlas::with_rgba(SurfaceSize::new(u32::MAX, u32::MAX), Vec::new(), Vec::new()),
+            Err(SceneRasterError::PixelBufferTooLarge {
+                surface: SurfaceSize::new(u32::MAX, u32::MAX),
+            })
+        );
+        assert_eq!(
+            super::default_sprite_region_color(SpriteId(99)),
+            [0xD9, 0x51, 0xFF, 0xFF]
+        );
     }
 
     #[test]

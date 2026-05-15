@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-113` are complete. The standing maintenance guidance in
+`DC-42` through `DC-114` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4730,6 +4730,73 @@ Work log:
   --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778827021576789`
+
+### DC-114: Clean Sprite Atlas Texture Upload Planning
+
+Status: `complete`
+
+Goal: add renderer-owned sprite atlas pixel data and `wgpu` texture upload
+metadata so future native sprite rendering can create and populate the atlas
+texture without presenter-side classification or temporary full-frame raster
+data.
+
+Scope:
+
+- Add RGBA pixel ownership to the clean sprite atlas.
+- Generate deterministic default sprite atlas pixels for the current clean
+  sprite regions.
+- Add sprite atlas texture upload metadata for texture format, usage, copy
+  layout, extent, byte length, bytes, and nonblank evidence.
+- Wire atlas texture upload metadata into sprite resource binding planning only
+  for valid drawable sprite plans.
+- Keep empty atlas surfaces, empty pixel buffers, raster-only scenes, missing
+  atlas regions, unavailable sprite pipelines, and empty command lists outside
+  atlas texture upload planning.
+- Add focused renderer tests for atlas pixel ownership, upload descriptor
+  fields, copy layout, resource-plan wiring, and absent paths.
+- Update README/SPEC module text for sprite atlas texture upload planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes sprite atlas texture upload metadata only for
+  drawable clean sprite plans.
+- The upload metadata uses `wgpu` texture format, usage flags, texture
+  dimension, copy layout, and copy extent values needed by `Queue::write_texture`.
+- Default clean sprite atlas pixels are deterministic and nonblank.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 07:40:53 BST` Started `DC-114`: adding renderer-owned sprite
+  atlas RGBA data and `wgpu` texture upload metadata, with focused renderer
+  tests and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778827268523169`
+- `2026-05-15 08:21:58 BST` Completed `DC-114`: added RGBA pixel ownership to
+  `TextureAtlas`, deterministic nonblank default sprite atlas pixels, sprite
+  atlas texture upload metadata for `wgpu` texture creation and
+  `Queue::write_texture` copy layout, and resource-plan wiring only for valid
+  drawable sprite plans. Verified with focused renderer tests (42/42),
+  `cargo test --all-targets` (1163 library tests, 2 binary tests, 2 example
+  tests), `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10
+  fixtures, 15452 frames, 103/103 non-baselined added executable Rust lines
+  covered), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
+  --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778829734086439`
 
 ## Ongoing Work
 
