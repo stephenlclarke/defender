@@ -121,9 +121,10 @@ pub use renderer::{
     SceneRasterError, SceneRasterUpload, SceneSprite, SpriteBufferRole, SpriteBufferUpload,
     SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId,
     SpriteIndexBufferBinding, SpriteInstanceBuffer, SpriteInstanceBufferRecord,
-    SpriteInstanceUpload, SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw,
-    SpriteRenderPassPlan, SpriteVertexBufferBinding, SurfaceSize, TextureAtlas, ViewportLayout,
-    WgpuPassPlan, WgpuViewportCommand,
+    SpriteInstanceUpload, SpritePipelinePlan, SpriteQuadGeometry, SpriteQuadVertex,
+    SpriteRenderPassDraw, SpriteRenderPassPlan, SpriteShaderPlan, SpriteVertexBufferBinding,
+    SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan,
+    WgpuViewportCommand,
 };
 pub use systems::{
     FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,

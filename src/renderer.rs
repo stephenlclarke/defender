@@ -943,6 +943,165 @@ impl SpriteRenderPassPlan {
     }
 }
 
+const SPRITE_SHADER_SOURCE: &str = r#"
+struct SceneProjection {
+    scale: vec2<f32>,
+    translate: vec2<f32>,
+};
+
+@group(0) @binding(0) var<uniform> scene_projection: SceneProjection;
+@group(1) @binding(0) var sprite_atlas: texture_2d<f32>;
+@group(1) @binding(1) var sprite_sampler: sampler;
+
+struct SpriteInstance {
+    @location(0) scene_origin: vec2<f32>,
+    @location(1) scene_size: vec2<f32>,
+    @location(2) atlas_uv_origin: vec2<f32>,
+    @location(3) atlas_uv_size: vec2<f32>,
+    @location(4) tint: vec4<f32>,
+};
+
+struct SpriteVertex {
+    @location(5) unit_position: vec2<f32>,
+    @location(6) unit_uv: vec2<f32>,
+};
+
+struct SpriteVertexOut {
+    @builtin(position) position: vec4<f32>,
+    @location(0) atlas_uv: vec2<f32>,
+    @location(1) tint: vec4<f32>,
+};
+
+@vertex
+fn sprite_vs(instance: SpriteInstance, vertex: SpriteVertex) -> SpriteVertexOut {
+    let scene_position = instance.scene_origin + vertex.unit_position * instance.scene_size;
+
+    var out: SpriteVertexOut;
+    out.position = vec4<f32>(
+        scene_position * scene_projection.scale + scene_projection.translate,
+        0.0,
+        1.0,
+    );
+    out.atlas_uv = instance.atlas_uv_origin + vertex.unit_uv * instance.atlas_uv_size;
+    out.tint = instance.tint;
+    return out;
+}
+
+@fragment
+fn sprite_fs(in: SpriteVertexOut) -> @location(0) vec4<f32> {
+    return textureSample(sprite_atlas, sprite_sampler, in.atlas_uv) * in.tint;
+}
+"#;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpriteShaderPlan {
+    pub label: &'static str,
+    pub source: &'static str,
+    pub vertex_entry: &'static str,
+    pub fragment_entry: &'static str,
+}
+
+impl SpriteShaderPlan {
+    pub fn shader_module_descriptor(&self) -> wgpu::ShaderModuleDescriptor<'static> {
+        wgpu::ShaderModuleDescriptor {
+            label: Some(self.label),
+            source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(self.source)),
+        }
+    }
+}
+
+impl Default for SpriteShaderPlan {
+    fn default() -> Self {
+        Self {
+            label: "defender.sprite.shader",
+            source: SPRITE_SHADER_SOURCE,
+            vertex_entry: "sprite_vs",
+            fragment_entry: "sprite_fs",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpriteVertexBufferLayoutPlan {
+    pub role: SpriteBufferRole,
+    pub slot: u32,
+    pub array_stride: wgpu::BufferAddress,
+    pub step_mode: wgpu::VertexStepMode,
+    pub attributes: &'static [wgpu::VertexAttribute],
+}
+
+impl SpriteVertexBufferLayoutPlan {
+    fn quad_vertices() -> Self {
+        let layout = SpriteQuadGeometry::vertex_buffer_layout();
+        Self {
+            role: SpriteBufferRole::QuadVertices,
+            slot: SpriteVertexBufferBinding::QUAD_VERTEX_SLOT,
+            array_stride: layout.array_stride,
+            step_mode: layout.step_mode,
+            attributes: layout.attributes,
+        }
+    }
+
+    fn instances() -> Self {
+        let layout = SpriteInstanceBufferRecord::vertex_buffer_layout();
+        Self {
+            role: SpriteBufferRole::Instances,
+            slot: SpriteVertexBufferBinding::INSTANCE_SLOT,
+            array_stride: layout.array_stride,
+            step_mode: layout.step_mode,
+            attributes: layout.attributes,
+        }
+    }
+
+    pub const fn vertex_buffer_layout(&self) -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: self.array_stride,
+            step_mode: self.step_mode,
+            attributes: self.attributes,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpritePipelinePlan {
+    pub label: &'static str,
+    pub shader: SpriteShaderPlan,
+    pub vertex_buffers: [SpriteVertexBufferLayoutPlan; 2],
+    pub primitive: wgpu::PrimitiveState,
+    pub color_target: wgpu::ColorTargetState,
+    pub multisample: wgpu::MultisampleState,
+}
+
+impl SpritePipelinePlan {
+    fn for_settings(settings: GpuRendererSettings) -> Self {
+        Self {
+            label: "defender.sprite.pipeline",
+            shader: SpriteShaderPlan::default(),
+            vertex_buffers: [
+                SpriteVertexBufferLayoutPlan::quad_vertices(),
+                SpriteVertexBufferLayoutPlan::instances(),
+            ],
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                ..wgpu::PrimitiveState::default()
+            },
+            color_target: wgpu::ColorTargetState {
+                format: settings.texture_format,
+                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                write_mask: wgpu::ColorWrites::ALL,
+            },
+            multisample: wgpu::MultisampleState::default(),
+        }
+    }
+
+    pub fn vertex_buffer_layouts(&self) -> [wgpu::VertexBufferLayout<'static>; 2] {
+        self.vertex_buffers
+            .map(|buffer| buffer.vertex_buffer_layout())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteDrawCommand {
     pub pipeline: NativeRenderPipeline,
@@ -1024,6 +1183,7 @@ pub struct SceneDrawPlan {
     pub sprite_buffer_uploads: Option<SpriteBufferUploadPlan>,
     pub sprite_draw_commands: Vec<SpriteDrawCommand>,
     pub sprite_render_pass: Option<SpriteRenderPassPlan>,
+    pub sprite_pipeline: Option<SpritePipelinePlan>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
 }
@@ -1031,11 +1191,25 @@ pub struct SceneDrawPlan {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NativeSceneRenderer {
     pub resources: NativeRendererResources,
+    pub settings: GpuRendererSettings,
 }
 
 impl NativeSceneRenderer {
     pub fn new(resources: NativeRendererResources) -> Self {
-        Self { resources }
+        Self {
+            resources,
+            settings: GpuRendererSettings::default(),
+        }
+    }
+
+    pub fn with_settings(
+        resources: NativeRendererResources,
+        settings: GpuRendererSettings,
+    ) -> Self {
+        Self {
+            resources,
+            settings,
+        }
     }
 
     pub fn prepare(&self, scene: &RenderScene) -> SceneDrawPlan {
@@ -1093,6 +1267,9 @@ impl NativeSceneRenderer {
         let sprite_render_pass = sprite_buffer_uploads.as_ref().and_then(|uploads| {
             SpriteRenderPassPlan::from_uploads_and_commands(uploads, &sprite_draw_commands)
         });
+        let sprite_pipeline = sprite_render_pass
+            .as_ref()
+            .map(|_| SpritePipelinePlan::for_settings(self.settings));
         let viewport = ViewportLayout::fit(scene.surface, target);
 
         SceneDrawPlan {
@@ -1109,6 +1286,7 @@ impl NativeSceneRenderer {
             sprite_buffer_uploads,
             sprite_draw_commands,
             sprite_render_pass,
+            sprite_pipeline,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
@@ -1177,9 +1355,10 @@ mod tests {
         SceneProjectionUniforms, SceneRaster, SceneRasterError, SceneSprite, SpriteBufferRole,
         SpriteBufferUpload, SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand,
         SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding, SpriteInstanceBuffer,
-        SpriteInstanceBufferRecord, SpriteInstanceUpload, SpriteQuadGeometry, SpriteQuadVertex,
-        SpriteRenderPassDraw, SpriteRenderPassPlan, SpriteVertexBufferBinding, SurfaceSize,
-        TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+        SpriteInstanceBufferRecord, SpriteInstanceUpload, SpritePipelinePlan, SpriteQuadGeometry,
+        SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassPlan, SpriteShaderPlan,
+        SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas,
+        ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -1654,6 +1833,88 @@ mod tests {
     }
 
     #[test]
+    fn sprite_shader_plan_exposes_wgsl_descriptor_and_entries() {
+        let shader = SpriteShaderPlan::default();
+
+        assert_eq!(shader.label, "defender.sprite.shader");
+        assert_eq!(shader.vertex_entry, "sprite_vs");
+        assert_eq!(shader.fragment_entry, "sprite_fs");
+        assert!(shader.source.contains("@vertex"));
+        assert!(shader.source.contains("@fragment"));
+        assert!(shader.source.contains("textureSample(sprite_atlas"));
+        assert!(shader.source.contains("@location(0) scene_origin"));
+        assert!(shader.source.contains("@location(6) unit_uv"));
+
+        let descriptor = shader.shader_module_descriptor();
+        assert_eq!(descriptor.label, Some("defender.sprite.shader"));
+        match descriptor.source {
+            wgpu::ShaderSource::Wgsl(source) => assert_eq!(source.as_ref(), shader.source),
+            _ => panic!("sprite shader descriptor must use WGSL"),
+        }
+    }
+
+    #[test]
+    fn sprite_pipeline_plan_describes_wgpu_state_and_vertex_layouts() {
+        let settings = GpuRendererSettings {
+            texture_format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            ..GpuRendererSettings::default()
+        };
+
+        let plan = SpritePipelinePlan::for_settings(settings);
+
+        assert_eq!(plan.label, "defender.sprite.pipeline");
+        assert_eq!(plan.shader, SpriteShaderPlan::default());
+        assert_eq!(
+            plan.vertex_buffers,
+            [
+                SpriteVertexBufferLayoutPlan {
+                    role: SpriteBufferRole::QuadVertices,
+                    slot: SpriteVertexBufferBinding::QUAD_VERTEX_SLOT,
+                    array_stride: SpriteQuadVertex::BYTE_SIZE,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &SpriteQuadVertex::VERTEX_ATTRIBUTES,
+                },
+                SpriteVertexBufferLayoutPlan {
+                    role: SpriteBufferRole::Instances,
+                    slot: SpriteVertexBufferBinding::INSTANCE_SLOT,
+                    array_stride: SpriteInstanceBufferRecord::BYTE_SIZE,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &SpriteInstanceBufferRecord::VERTEX_ATTRIBUTES,
+                },
+            ]
+        );
+
+        let layouts = plan.vertex_buffer_layouts();
+        assert_eq!(layouts[0].array_stride, SpriteQuadVertex::BYTE_SIZE);
+        assert_eq!(layouts[0].step_mode, wgpu::VertexStepMode::Vertex);
+        assert_eq!(layouts[0].attributes, SpriteQuadVertex::VERTEX_ATTRIBUTES);
+        assert_eq!(
+            layouts[1].array_stride,
+            SpriteInstanceBufferRecord::BYTE_SIZE
+        );
+        assert_eq!(layouts[1].step_mode, wgpu::VertexStepMode::Instance);
+        assert_eq!(
+            layouts[1].attributes,
+            SpriteInstanceBufferRecord::VERTEX_ATTRIBUTES
+        );
+        assert_eq!(
+            plan.primitive.topology,
+            wgpu::PrimitiveTopology::TriangleList
+        );
+        assert_eq!(plan.primitive.front_face, wgpu::FrontFace::Ccw);
+        assert_eq!(plan.primitive.cull_mode, None);
+        assert_eq!(
+            plan.color_target,
+            wgpu::ColorTargetState {
+                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                write_mask: wgpu::ColorWrites::ALL,
+            }
+        );
+        assert_eq!(plan.multisample, wgpu::MultisampleState::default());
+    }
+
+    #[test]
     fn sprite_draw_command_uses_quad_geometry_and_instance_buffer_metadata() {
         let buffer =
             test_sprite_instance_buffer(NativeRenderPipeline::Sprites, RenderLayer::Objects, 2);
@@ -1819,6 +2080,15 @@ mod tests {
         })
     }
 
+    fn expected_sprite_pipeline(
+        plan: &SceneDrawPlan,
+        settings: GpuRendererSettings,
+    ) -> Option<SpritePipelinePlan> {
+        plan.sprite_render_pass
+            .as_ref()
+            .map(|_| SpritePipelinePlan::for_settings(settings))
+    }
+
     #[test]
     fn render_scene_collects_sprites_in_order() {
         let mut scene = RenderScene::empty(7, SurfaceSize::new(320, 240));
@@ -1980,6 +2250,37 @@ mod tests {
 
         assert_eq!(settings.texture_format, wgpu::TextureFormat::Rgba8UnormSrgb);
         assert_eq!(settings.present_mode, wgpu::PresentMode::AutoVsync);
+    }
+
+    #[test]
+    fn native_scene_renderer_uses_settings_for_sprite_pipeline_plan() {
+        let settings = GpuRendererSettings {
+            texture_format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            ..GpuRendererSettings::default()
+        };
+        let renderer =
+            NativeSceneRenderer::with_settings(NativeRendererResources::default(), settings);
+        let mut scene = RenderScene::empty(31, SurfaceSize::new(292, 240));
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_SHIP,
+            layer: RenderLayer::Objects,
+            position: [128.0, 96.0],
+            size: [16.0, 8.0],
+            tint: Color::WHITE,
+        });
+
+        let plan = renderer.prepare(&scene);
+
+        assert_eq!(
+            plan.sprite_pipeline,
+            Some(SpritePipelinePlan::for_settings(settings))
+        );
+        assert_eq!(
+            plan.sprite_pipeline
+                .as_ref()
+                .map(|pipeline| pipeline.color_target.format),
+            Some(wgpu::TextureFormat::Bgra8UnormSrgb)
+        );
     }
 
     #[test]
@@ -2162,6 +2463,10 @@ mod tests {
             ]
         );
         assert_eq!(plan.sprite_render_pass, expected_sprite_render_pass(&plan));
+        assert_eq!(
+            plan.sprite_pipeline,
+            expected_sprite_pipeline(&plan, GpuRendererSettings::default())
+        );
         assert_eq!(plan.raster_upload, None);
     }
 
@@ -2187,6 +2492,7 @@ mod tests {
         assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.sprite_render_pass, None);
+        assert_eq!(plan.sprite_pipeline, None);
     }
 
     #[test]
@@ -2215,6 +2521,7 @@ mod tests {
         assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.sprite_render_pass, None);
+        assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -2278,6 +2585,7 @@ mod tests {
         assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.sprite_render_pass, None);
+        assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -2342,6 +2650,10 @@ mod tests {
             )]
         );
         assert_eq!(plan.sprite_render_pass, expected_sprite_render_pass(&plan));
+        assert_eq!(
+            plan.sprite_pipeline,
+            expected_sprite_pipeline(&plan, GpuRendererSettings::default())
+        );
     }
 
     #[test]
@@ -2378,6 +2690,7 @@ mod tests {
         assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.sprite_render_pass, None);
+        assert_eq!(plan.sprite_pipeline, None);
     }
 
     #[test]
@@ -2452,6 +2765,10 @@ mod tests {
             expected_sprite_render_pass(&sprite_plan)
         );
         assert_eq!(
+            sprite_plan.sprite_pipeline,
+            expected_sprite_pipeline(&sprite_plan, GpuRendererSettings::default())
+        );
+        assert_eq!(
             raster_plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
@@ -2462,6 +2779,7 @@ mod tests {
             Vec::<SpriteDrawCommand>::new()
         );
         assert_eq!(raster_plan.sprite_render_pass, None);
+        assert_eq!(raster_plan.sprite_pipeline, None);
         assert_eq!(
             raster_plan.raster_upload,
             Some(super::SceneRasterUpload {
@@ -2483,6 +2801,7 @@ mod tests {
         assert!(plan.viewport.is_empty());
         assert_eq!(plan.gpu_pass.viewport, None);
         assert_eq!(plan.sprite_render_pass, None);
+        assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(
             plan.gpu_pass.scene_projection,
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240))
@@ -2557,5 +2876,9 @@ mod tests {
             )]
         );
         assert_eq!(plan.sprite_render_pass, expected_sprite_render_pass(&plan));
+        assert_eq!(
+            plan.sprite_pipeline,
+            expected_sprite_pipeline(&plan, GpuRendererSettings::default())
+        );
     }
 }

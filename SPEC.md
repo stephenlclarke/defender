@@ -73,8 +73,9 @@ tree:
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
   instance GPU ABI, sprite instance upload streams, sprite draw commands,
-  sprite `wgpu` buffer upload plans, sprite render-pass plans, viewport layout,
-  GPU pass planning, scene summaries, render signatures, and draw planning.
+  sprite `wgpu` buffer upload plans, sprite render-pass plans, sprite pipeline
+  plans, viewport layout, GPU pass planning, scene summaries, render
+  signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -128,7 +129,10 @@ color, viewport command, and scene-projection constants for the target surface.
 Sprite draw plans also include `wgpu::BufferUsages` metadata and upload bytes
 for the quad vertex, quad index, and instance buffers, plus a sprite render-pass
 plan with stable vertex buffer slots, index-buffer metadata, and indexed
-instance draw ranges, while the current live path still carries a temporary
+instance draw ranges. Sprite pipeline plans describe the renderer-owned WGSL
+shader, vertex and fragment entry points, quad and instance vertex layouts,
+alpha-blended color target, primitive state, and multisample state for the
+target texture format, while the current live path still carries a temporary
 raster payload for visual equivalence. Kitty graphics and terminal-session code
 remain
 parked there as historical compatibility evidence, but they are not part of the

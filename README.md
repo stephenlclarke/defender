@@ -224,8 +224,9 @@ Clean rewrite modules:
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
   instance GPU ABI, sprite instance upload streams, sprite draw commands,
-  sprite `wgpu` buffer upload plans, sprite render-pass plans, viewport layout,
-  GPU pass planning, scene summaries, render signatures, and draw planning.
+  sprite `wgpu` buffer upload plans, sprite render-pass plans, sprite pipeline
+  plans, viewport layout, GPU pass planning, scene summaries, render
+  signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -270,8 +271,11 @@ derives indexed instanced sprite draw commands with quad/index counts, instance
 ranges, and upload byte spans into that stream. Sprite draw plans also include
 `wgpu::BufferUsages` metadata and upload bytes for the quad vertex, quad index,
 and instance buffers, plus a sprite render-pass plan with stable vertex buffer
-slots, index-buffer metadata, and indexed instance draw ranges. It also records
-the centered viewport layout plus GPU-ready clear color, viewport command, and
+slots, index-buffer metadata, and indexed instance draw ranges. Sprite pipeline
+plans describe the renderer-owned WGSL shader, vertex and fragment entry
+points, quad and instance vertex layouts, alpha-blended color target, primitive
+state, and multisample state for the target texture format. It also records the
+centered viewport layout plus GPU-ready clear color, viewport command, and
 scene-projection constants for the target surface. The live worker still wraps
 accepted visual output as a clean `RenderScene` raster payload before the
 presenter draws it. Kitty graphics and
