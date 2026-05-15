@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-107` are complete. The standing maintenance guidance in
+`DC-42` through `DC-108` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4328,6 +4328,70 @@ Work log:
   --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778816705196489`
+
+### DC-108: Clean Sprite Draw Command Planning
+
+Status: `complete`
+
+Goal: derive indexed instanced sprite draw commands from clean sprite instance
+buffers and renderer-owned quad geometry, so the future native `wgpu` renderer
+can bind clean buffers and issue sprite draws without presenter-side planning.
+
+Scope:
+
+- Add draw-command metadata for sprite pipeline, layer, instance range, vertex
+  count, index count, index format, and upload byte counts.
+- Derive sprite draw commands from `SpriteInstanceBuffer` values after atlas
+  validation and resource pipeline filtering.
+- Keep logical sprite batches, GPU instance buffers, quad geometry, and
+  temporary raster upload as separate renderer-owned contracts.
+- Add focused renderer tests for command derivation, multiple command ranges,
+  raster-only scenes, and disabled sprite pipelines.
+- Update README/SPEC module text for clean sprite draw-command planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes sprite draw commands for each drawable instance
+  buffer.
+- Sprite draw commands reference only clean renderer-owned quad geometry and
+  instance-buffer metadata.
+- Raster-only scenes and unavailable sprite pipelines do not produce sprite
+  draw commands.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 04:47:02 BST` Started `DC-108`: adding clean sprite
+  draw-command metadata derived from renderer-owned quad geometry and sprite
+  instance buffers, with focused renderer tests and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778816833640799`
+- `2026-05-15 05:29:22 BST` Completed `DC-108`: added `SpriteDrawCommand`
+  metadata to `SceneDrawPlan`, derived commands from clean sprite instance
+  buffers and renderer-owned quad/index geometry, exported the public renderer
+  contract, documented sprite draw-command planning, and covered command
+  metadata, cumulative instance ranges, disabled sprite pipelines, missing
+  atlas or empty buffers, raster-only scenes, and raster/sprite separation.
+  Validation passed with focused renderer tests (33/33), the public API guard,
+  `cargo test --all-targets` (1154 library tests plus binary/example tests),
+  clippy with warnings denied, `make fidelity` (10 local fixtures, 15452
+  frames, 39/39 new executable Rust lines), `cargo run -- --live-smoke` (239
+  rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778819363660199`
 
 ## Ongoing Work
 

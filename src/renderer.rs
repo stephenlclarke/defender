@@ -727,6 +727,72 @@ impl SpriteInstanceBuffer {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpriteDrawCommand {
+    pub pipeline: NativeRenderPipeline,
+    pub layer: RenderLayer,
+    pub vertex_count: u32,
+    pub index_count: u32,
+    pub index_format: wgpu::IndexFormat,
+    pub first_index: u32,
+    pub base_vertex: i32,
+    pub first_instance: u32,
+    pub instance_count: u32,
+    pub vertex_buffer_byte_len: wgpu::BufferAddress,
+    pub index_buffer_byte_len: wgpu::BufferAddress,
+    pub instance_buffer_byte_offset: wgpu::BufferAddress,
+    pub instance_buffer_byte_len: wgpu::BufferAddress,
+}
+
+impl SpriteDrawCommand {
+    fn from_instance_buffer(buffer: &SpriteInstanceBuffer, first_instance: u32) -> Option<Self> {
+        if buffer.records.is_empty() {
+            return None;
+        }
+
+        let instance_count = u32::try_from(buffer.records.len()).ok()?;
+        let instance_buffer_byte_offset =
+            u64::from(first_instance) * SpriteInstanceBufferRecord::BYTE_SIZE;
+        let instance_buffer_byte_len =
+            u64::from(instance_count) * SpriteInstanceBufferRecord::BYTE_SIZE;
+
+        Some(Self {
+            pipeline: buffer.pipeline,
+            layer: buffer.layer,
+            vertex_count: SpriteQuadGeometry::VERTEX_COUNT,
+            index_count: SpriteQuadGeometry::INDEX_COUNT,
+            index_format: SpriteQuadGeometry::INDEX_FORMAT,
+            first_index: 0,
+            base_vertex: 0,
+            first_instance,
+            instance_count,
+            vertex_buffer_byte_len: SpriteQuadGeometry::vertex_upload_bytes().len()
+                as wgpu::BufferAddress,
+            index_buffer_byte_len: SpriteQuadGeometry::index_upload_bytes().len()
+                as wgpu::BufferAddress,
+            instance_buffer_byte_offset,
+            instance_buffer_byte_len,
+        })
+    }
+}
+
+fn sprite_draw_commands_from_instance_buffers(
+    buffers: &[SpriteInstanceBuffer],
+) -> Vec<SpriteDrawCommand> {
+    let mut first_instance = 0;
+    let mut commands = Vec::new();
+
+    for buffer in buffers {
+        let Some(command) = SpriteDrawCommand::from_instance_buffer(buffer, first_instance) else {
+            continue;
+        };
+        commands.push(command);
+        first_instance += command.instance_count;
+    }
+
+    commands
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneDrawPlan {
     pub frame: u64,
@@ -738,6 +804,7 @@ pub struct SceneDrawPlan {
     pub missing_sprite_regions: usize,
     pub sprite_batches: Vec<SpriteDrawBatch>,
     pub sprite_instance_buffers: Vec<SpriteInstanceBuffer>,
+    pub sprite_draw_commands: Vec<SpriteDrawCommand>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
 }
@@ -796,7 +863,9 @@ impl NativeSceneRenderer {
             .filter_map(|batch| {
                 SpriteInstanceBuffer::from_batch(batch, self.resources.atlas.surface)
             })
-            .collect();
+            .collect::<Vec<_>>();
+        let sprite_draw_commands =
+            sprite_draw_commands_from_instance_buffers(&sprite_instance_buffers);
         let viewport = ViewportLayout::fit(scene.surface, target);
 
         SceneDrawPlan {
@@ -809,6 +878,7 @@ impl NativeSceneRenderer {
             missing_sprite_regions,
             sprite_batches,
             sprite_instance_buffers,
+            sprite_draw_commands,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
@@ -874,9 +944,10 @@ mod tests {
     use super::{
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneProjectionUniforms,
-        SceneRaster, SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId,
-        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteQuadGeometry, SpriteQuadVertex,
-        SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+        SceneRaster, SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawCommand,
+        SpriteDrawInstance, SpriteId, SpriteInstanceBuffer, SpriteInstanceBufferRecord,
+        SpriteQuadGeometry, SpriteQuadVertex, SurfaceSize, TextureAtlas, ViewportLayout,
+        WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -1203,6 +1274,61 @@ mod tests {
     }
 
     #[test]
+    fn sprite_draw_command_uses_quad_geometry_and_instance_buffer_metadata() {
+        let buffer =
+            test_sprite_instance_buffer(NativeRenderPipeline::Sprites, RenderLayer::Objects, 2);
+        let empty_buffer =
+            test_sprite_instance_buffer(NativeRenderPipeline::HudText, RenderLayer::Hud, 0);
+
+        assert_eq!(
+            SpriteDrawCommand::from_instance_buffer(&buffer, 7),
+            Some(expected_sprite_draw_command(
+                NativeRenderPipeline::Sprites,
+                RenderLayer::Objects,
+                7,
+                2,
+            ))
+        );
+        assert_eq!(
+            SpriteDrawCommand::from_instance_buffer(&empty_buffer, 7),
+            None
+        );
+    }
+
+    #[test]
+    fn sprite_draw_commands_track_cumulative_instance_ranges() {
+        let buffers = vec![
+            test_sprite_instance_buffer(NativeRenderPipeline::Sprites, RenderLayer::Objects, 2),
+            test_sprite_instance_buffer(NativeRenderPipeline::HudText, RenderLayer::Hud, 0),
+            test_sprite_instance_buffer(NativeRenderPipeline::HudText, RenderLayer::Hud, 1),
+            test_sprite_instance_buffer(
+                NativeRenderPipeline::Projectiles,
+                RenderLayer::Projectiles,
+                3,
+            ),
+        ];
+
+        assert_eq!(
+            super::sprite_draw_commands_from_instance_buffers(&buffers),
+            vec![
+                expected_sprite_draw_command(
+                    NativeRenderPipeline::Sprites,
+                    RenderLayer::Objects,
+                    0,
+                    2,
+                ),
+                expected_sprite_draw_command(NativeRenderPipeline::HudText, RenderLayer::Hud, 2, 1),
+                expected_sprite_draw_command(
+                    NativeRenderPipeline::Projectiles,
+                    RenderLayer::Projectiles,
+                    3,
+                    3,
+                ),
+            ]
+        );
+    }
+
+    #[test]
     fn wgpu_viewport_command_matches_non_empty_layout() {
         let layout = ViewportLayout::fit(SurfaceSize::new(292, 240), SurfaceSize::new(640, 480));
 
@@ -1254,6 +1380,57 @@ mod tests {
     fn triangle_signed_area(points: [[f32; 2]; 3]) -> f32 {
         let [a, b, c] = points;
         ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) * 0.5
+    }
+
+    fn test_sprite_instance_buffer_record(scene_origin: [f32; 2]) -> SpriteInstanceBufferRecord {
+        SpriteInstanceBufferRecord {
+            scene_origin,
+            scene_size: [8.0, 4.0],
+            atlas_uv_origin: [0.125, 0.25],
+            atlas_uv_size: [0.5, 0.75],
+            tint: [1.0, 0.5, 0.25, 1.0],
+        }
+    }
+
+    fn test_sprite_instance_buffer(
+        pipeline: NativeRenderPipeline,
+        layer: RenderLayer,
+        record_count: usize,
+    ) -> SpriteInstanceBuffer {
+        SpriteInstanceBuffer {
+            pipeline,
+            layer,
+            records: (0..record_count)
+                .map(|index| test_sprite_instance_buffer_record([index as f32, index as f32]))
+                .collect(),
+        }
+    }
+
+    fn expected_sprite_draw_command(
+        pipeline: NativeRenderPipeline,
+        layer: RenderLayer,
+        first_instance: u32,
+        instance_count: u32,
+    ) -> SpriteDrawCommand {
+        SpriteDrawCommand {
+            pipeline,
+            layer,
+            vertex_count: SpriteQuadGeometry::VERTEX_COUNT,
+            index_count: SpriteQuadGeometry::INDEX_COUNT,
+            index_format: SpriteQuadGeometry::INDEX_FORMAT,
+            first_index: 0,
+            base_vertex: 0,
+            first_instance,
+            instance_count,
+            vertex_buffer_byte_len: SpriteQuadGeometry::vertex_upload_bytes().len()
+                as wgpu::BufferAddress,
+            index_buffer_byte_len: SpriteQuadGeometry::index_upload_bytes().len()
+                as wgpu::BufferAddress,
+            instance_buffer_byte_offset: u64::from(first_instance)
+                * SpriteInstanceBufferRecord::BYTE_SIZE,
+            instance_buffer_byte_len: u64::from(instance_count)
+                * SpriteInstanceBufferRecord::BYTE_SIZE,
+        }
     }
 
     #[test]
@@ -1570,6 +1747,18 @@ mod tests {
                 },
             ]
         );
+        assert_eq!(
+            plan.sprite_draw_commands,
+            vec![
+                expected_sprite_draw_command(
+                    NativeRenderPipeline::Sprites,
+                    RenderLayer::Objects,
+                    0,
+                    1,
+                ),
+                expected_sprite_draw_command(NativeRenderPipeline::HudText, RenderLayer::Hud, 1, 1),
+            ]
+        );
         assert_eq!(plan.raster_upload, None);
     }
 
@@ -1590,6 +1779,40 @@ mod tests {
         assert_eq!(
             plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
+        );
+        assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
+    }
+
+    #[test]
+    fn native_scene_renderer_skips_sprite_commands_for_unavailable_sprite_pipelines() {
+        let mut resources = NativeRendererResources::default();
+        resources.pipelines.remove(&NativeRenderPipeline::Sprites);
+        let renderer = NativeSceneRenderer::new(resources);
+        let mut scene = RenderScene::empty(35, SurfaceSize::new(292, 240));
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_SHIP,
+            layer: RenderLayer::Objects,
+            position: [128.0, 96.0],
+            size: [16.0, 8.0],
+            tint: Color::WHITE,
+        });
+
+        let plan = renderer.prepare(&scene);
+
+        assert_eq!(plan.sprite_instances, 0);
+        assert_eq!(plan.sprite_batches, Vec::<SpriteDrawBatch>::new());
+        assert_eq!(
+            plan.sprite_instance_buffers,
+            Vec::<SpriteInstanceBuffer>::new()
+        );
+        assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
+        assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
+        assert_eq!(
+            plan.layer_counts,
+            RenderLayerCounts {
+                objects: 1,
+                ..RenderLayerCounts::default()
+            }
         );
     }
 
@@ -1642,6 +1865,7 @@ mod tests {
             plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
+        assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -1684,6 +1908,15 @@ mod tests {
             plan.sprite_instance_buffers[0].records[1].scene_origin,
             [10.0, 4.0]
         );
+        assert_eq!(
+            plan.sprite_draw_commands,
+            vec![expected_sprite_draw_command(
+                NativeRenderPipeline::Projectiles,
+                RenderLayer::Projectiles,
+                0,
+                2,
+            )]
+        );
     }
 
     #[test]
@@ -1716,6 +1949,7 @@ mod tests {
             plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
+        assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
     }
 
     #[test]
@@ -1764,8 +1998,21 @@ mod tests {
         assert_eq!(sprite_plan.sprite_instances, 1);
         assert_eq!(sprite_plan.sprite_instance_buffers.len(), 1);
         assert_eq!(
+            sprite_plan.sprite_draw_commands,
+            vec![expected_sprite_draw_command(
+                NativeRenderPipeline::Sprites,
+                RenderLayer::Objects,
+                0,
+                1,
+            )]
+        );
+        assert_eq!(
             raster_plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
+        );
+        assert_eq!(
+            raster_plan.sprite_draw_commands,
+            Vec::<SpriteDrawCommand>::new()
         );
         assert_eq!(
             raster_plan.raster_upload,
@@ -1838,6 +2085,15 @@ mod tests {
         assert_eq!(
             plan.sprite_batches[0].instances[0].sprite,
             SpriteId::STATUS_TEXT
+        );
+        assert_eq!(
+            plan.sprite_draw_commands,
+            vec![expected_sprite_draw_command(
+                NativeRenderPipeline::DebugOverlay,
+                RenderLayer::Overlay,
+                0,
+                1,
+            )]
         );
     }
 }
