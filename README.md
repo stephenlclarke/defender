@@ -220,8 +220,8 @@ Clean rewrite modules:
   command-byte mapping. The clean `Game` shell emits sprite-first scene frames
   without touching the accepted machine adapter.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
-  `Game` through scripted controls and prepares emitted scenes with the native
-  renderer draw planner.
+  `Game` through scripted controls, verifies sprite and native pipeline
+  coverage, and prepares emitted scenes with the native renderer draw planner.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, operator trigger handling,
   player-motion, enemy-motion, projectile launch/capacity/motion systems,
@@ -288,10 +288,11 @@ code adapts frame outputs into clean audio frames before submitting to
 `src/audio.rs`. README media tooling uses the narrow doc-hidden
 `defender::readme_media` facade. The binary enters through the clean platform
 boundary before delegating to the runtime bridge. `--game-smoke` steps the clean
-game through scripted controls, verifies required gameplay sprite layers and
-sprite IDs, and prepares sprite-only native draw plans plus frame-level `wgpu`
-command, resource-binding, pipeline-layout, pipeline descriptor, encoder, and
-upload plans without entering the legacy live presenter. The clean `Game` world
+game through scripted controls, verifies required gameplay sprite layers,
+sprite IDs, and native draw-command pipeline coverage, and prepares
+sprite-only native draw plans plus frame-level `wgpu` command,
+resource-binding, pipeline-layout, pipeline descriptor, encoder, and upload
+plans without entering the legacy live presenter. The clean `Game` world
 seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
 wave and renders them as atlas-backed scene sprites. Operator controls are

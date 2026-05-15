@@ -1,6 +1,6 @@
 # Defender Current Plan
 
-Last reviewed: `2026-05-15`
+Last reviewed: `2026-05-16`
 
 ## Current Baseline
 
@@ -108,8 +108,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-137` are complete. The standing
-maintenance guidance in Ongoing Work still applies.
+`DC-42` through `DC-138` are complete. The standing maintenance guidance in
+Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -6316,6 +6316,71 @@ Work log:
   `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778886613013399`
+
+### DC-138: Clean Game Smoke Sprite Pipeline Coverage Evidence
+
+Status: `complete`
+
+Goal: extend the clean game smoke so it proves required gameplay sprites reach
+the expected native `wgpu` draw pipelines, not only clean scene layers.
+
+Scope:
+
+- Add draw-command layer coverage evidence for terrain, starfield, objects,
+  projectiles, and HUD sprites to the clean game smoke report.
+- Add native pipeline coverage evidence for terrain, starfield, sprites,
+  projectiles, and HUD text draw commands.
+- Validate that the clean smoke fails when required draw-command or pipeline
+  coverage is missing.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
+  otherwise unchanged.
+
+Acceptance criteria:
+
+- `--game-smoke` reports nonzero draw-command counts for terrain, starfield,
+  object, projectile, and HUD layers.
+- `--game-smoke` reports all required clean native sprite pipelines.
+- Focused smoke and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 00:12:06 BST` Started `DC-138`: extending `--game-smoke` so it
+  verifies native draw-command coverage for terrain, starfield, object,
+  projectile, and HUD layers plus required clean sprite pipelines for terrain,
+  starfield, sprites, projectiles, and HUD text.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778886737931019`
+- `2026-05-16 00:50:25 BST` Completed `DC-138`: extended `--game-smoke` with
+  native draw-command and pipeline coverage evidence from clean `SceneDrawPlan`
+  data. The smoke report now proves 21 terrain, 21 starfield, 21 object,
+  5 projectile, and 24 HUD draw commands while covering `hud_text`,
+  `starfield`, `terrain`, `sprites`, and `projectiles` pipelines. Validation
+  passed with `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
+  `cargo test --lib public_api_tests`, `cargo test --all-targets` (1228
+  library tests before the final coverage-only branch test, 2 binary tests, and
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (1229 library tests, 2 binary tests, 2 example tests,
+  10 fixture traces, 15452 frames, and 37/37 new executable Rust lines
+  covered), `cargo run -- --game-smoke`, `cargo run -- --live-smoke`
+  (240 rendered frames), markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778889040826379`
 
 ## Ongoing Work
 

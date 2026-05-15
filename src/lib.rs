@@ -544,7 +544,13 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("plan.sprite_pipeline_layout"));
         assert!(game_smoke_rs.contains("plan.sprite_render_pipeline_descriptor"));
         assert!(game_smoke_rs.contains("plan.sprite_render_pass_encoder"));
+        assert!(game_smoke_rs.contains("plan.sprite_draw_commands"));
         assert!(game_smoke_rs.contains("frame.scene.sprites"));
+        assert!(game_smoke_rs.contains("NativeRenderPipeline::Terrain"));
+        assert!(game_smoke_rs.contains("NativeRenderPipeline::Starfield"));
+        assert!(game_smoke_rs.contains("NativeRenderPipeline::Sprites"));
+        assert!(game_smoke_rs.contains("NativeRenderPipeline::Projectiles"));
+        assert!(game_smoke_rs.contains("NativeRenderPipeline::HudText"));
         assert!(game_smoke_rs.contains("SpriteId::PLAYER_SHIP"));
         assert!(game_smoke_rs.contains("SpriteId::ENEMY_LANDER"));
         assert!(game_smoke_rs.contains("SpriteId::HUMAN"));
