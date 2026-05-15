@@ -100,6 +100,8 @@ tree:
   gameplay events, sound events, and render summaries. Clean fidelity tests use
   oracle-owned reference probes instead of importing accepted facade types
   directly.
+- `src/fidelity_manifest.rs`: the crate-private fidelity scenario manifest
+  facade that owns temporary scenario metadata and input expansion.
 - `src/oracle.rs`: the crate-private gameplay oracle, including clean state,
   event, sound, and scene-summary frames from the accepted-behavior facade for
   internal fidelity comparison.
@@ -116,8 +118,10 @@ adaptation into neutral accepted-behavior contracts before the public clean
 gameplay types see it. `src/live_wgpu.rs` owns the temporary presenter and
 input-profile bridge for config-driven `wgpu` live and smoke launches used by
 the clean runtime API. `src/roms.rs` owns the temporary ROM metadata, scan, and
-loader bridge for optional verification commands. Legacy-specific clean
-equivalence regressions are also wired from `src_legacy/` so clean
+loader bridge for optional verification commands. `src/fidelity_manifest.rs`
+owns the temporary scenario manifest and input expansion bridge for fidelity
+scenario commands. Legacy-specific clean equivalence regressions are also wired
+from `src_legacy/` so clean
 accepted/oracle source stays focused on gameplay contracts. Internal clean
 equivalence regressions use crate-private oracle wiring. Clean frame-signature
 gates live under

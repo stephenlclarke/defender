@@ -8,6 +8,7 @@ mod accepted;
 
 pub mod audio;
 pub mod fidelity;
+mod fidelity_manifest;
 mod fidelity_scenarios;
 mod fidelity_traces;
 pub mod game;
@@ -422,6 +423,7 @@ mod public_api_tests {
         let lib_rs = include_str!("lib.rs");
         let public_rom_report_module = format!("pub mod {};", "rom_report");
         let public_roms_module = format!("pub mod {};", "roms");
+        let public_fidelity_manifest_module = format!("pub mod {};", "fidelity_manifest");
         let public_fidelity_scenarios_module = format!("pub mod {};", "fidelity_scenarios");
         let public_fidelity_traces_module = format!("pub mod {};", "fidelity_traces");
         let public_live_wgpu_module = format!("pub mod {};", "live_wgpu");
@@ -429,6 +431,8 @@ mod public_api_tests {
         assert!(!lib_rs.contains(&public_rom_report_module));
         assert!(lib_rs.contains("mod roms;"));
         assert!(!lib_rs.contains(&public_roms_module));
+        assert!(lib_rs.contains("mod fidelity_manifest;"));
+        assert!(!lib_rs.contains(&public_fidelity_manifest_module));
         assert!(lib_rs.contains("mod fidelity_scenarios;"));
         assert!(!lib_rs.contains(&public_fidelity_scenarios_module));
         assert!(lib_rs.contains("mod fidelity_traces;"));
@@ -453,15 +457,22 @@ mod public_api_tests {
         assert!(roms_rs.contains("crate::rom::load_verified_dir(path)"));
         assert!(roms_rs.contains("crate::rom::RedLabelRomImages::from_verified_rom_set"));
 
+        let fidelity_manifest_rs = include_str!("fidelity_manifest.rs");
+        assert!(fidelity_manifest_rs.contains("pub(crate) struct FidelityScenario"));
+        assert!(fidelity_manifest_rs.contains("pub(crate) fn scenarios("));
+        assert!(fidelity_manifest_rs.contains("pub(crate) fn expanded_input_text("));
+        assert!(fidelity_manifest_rs.contains("crate::legacy_fidelity::TraceScenario"));
+        assert!(fidelity_manifest_rs.contains("crate::legacy_fidelity::trace_scenarios()"));
+        assert!(fidelity_manifest_rs.contains("crate::legacy_fidelity::expanded_trace_input_text"));
+
         let fidelity_scenarios_rs = include_str!("fidelity_scenarios.rs");
         assert!(fidelity_scenarios_rs.contains("pub(crate) fn run_list("));
         assert!(fidelity_scenarios_rs.contains("pub(crate) fn run_write_inputs("));
         assert!(fidelity_scenarios_rs.contains("fn listing_text()"));
         assert!(fidelity_scenarios_rs.contains("fn write_inputs_text(path: &Path)"));
-        assert!(fidelity_scenarios_rs.contains("crate::legacy_fidelity::trace_scenarios()"));
-        assert!(
-            fidelity_scenarios_rs.contains("crate::legacy_fidelity::expanded_trace_input_text")
-        );
+        assert!(fidelity_scenarios_rs.contains("crate::fidelity_manifest::scenarios()"));
+        assert!(fidelity_scenarios_rs.contains("crate::fidelity_manifest::expanded_input_text"));
+        assert!(!fidelity_scenarios_rs.contains("crate::legacy_fidelity::"));
 
         let fidelity_traces_rs = include_str!("fidelity_traces.rs");
         assert!(fidelity_traces_rs.contains("pub(crate) fn run_trace("));
@@ -597,6 +608,10 @@ mod public_api_tests {
             ("src/accepted.rs", include_str!("accepted.rs")),
             ("src/audio.rs", include_str!("audio.rs")),
             ("src/fidelity.rs", include_str!("fidelity.rs")),
+            (
+                "src/fidelity_manifest.rs",
+                include_str!("fidelity_manifest.rs"),
+            ),
             ("src/game.rs", include_str!("game.rs")),
             (
                 "src/fidelity_scenarios.rs",
@@ -645,7 +660,7 @@ mod public_api_tests {
                 if path == "src/roms.rs" && forbidden == "crate::rom::" {
                     continue;
                 }
-                if matches!(path, "src/fidelity_scenarios.rs" | "src/fidelity_traces.rs")
+                if matches!(path, "src/fidelity_manifest.rs" | "src/fidelity_traces.rs")
                     && forbidden == "crate::legacy_fidelity::"
                 {
                     continue;

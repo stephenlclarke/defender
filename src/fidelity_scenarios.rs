@@ -2,7 +2,7 @@
 
 use std::{fs, path::Path};
 
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 
 pub(crate) fn run_list() -> anyhow::Result<()> {
     print!("{}", listing_text()?);
@@ -20,7 +20,7 @@ fn listing_text() -> anyhow::Result<String> {
     for scenario in scenarios {
         text.push_str(&format!(
             "  {:<20} {:>4} frames  {}\n",
-            scenario.scenario, scenario.frames, scenario.description
+            scenario.name, scenario.frame_count, scenario.description
         ));
     }
 
@@ -37,17 +37,16 @@ fn write_inputs_text(path: &Path) -> anyhow::Result<String> {
     })?;
 
     for scenario in &scenarios {
-        let input_text = crate::legacy_fidelity::expanded_trace_input_text(&scenario.input_program)
-            .map_err(|error| anyhow!(error))
-            .with_context(|| format!("failed to expand trace scenario {}", scenario.scenario))?;
+        let input_text = crate::fidelity_manifest::expanded_input_text(&scenario.input_program)
+            .with_context(|| format!("failed to expand trace scenario {}", scenario.name))?;
         fs::write(
-            path.join(format!("{}.inputs.txt", scenario.scenario)),
+            path.join(format!("{}.inputs.txt", scenario.name)),
             input_text,
         )
         .with_context(|| {
             format!(
                 "failed to write scenario input script for {}",
-                scenario.scenario
+                scenario.name
             )
         })?;
     }
@@ -59,8 +58,8 @@ fn write_inputs_text(path: &Path) -> anyhow::Result<String> {
     ))
 }
 
-fn scenarios() -> anyhow::Result<Vec<crate::legacy_fidelity::TraceScenario>> {
-    crate::legacy_fidelity::trace_scenarios().map_err(|error| anyhow!(error))
+fn scenarios() -> anyhow::Result<Vec<crate::fidelity_manifest::FidelityScenario>> {
+    crate::fidelity_manifest::scenarios()
 }
 
 #[cfg(test)]
@@ -98,8 +97,7 @@ mod tests {
         assert!(text.contains("Wrote 12 Phase 1 trace scenario input script(s)"));
         assert_eq!(
             attract,
-            crate::legacy_fidelity::expanded_trace_input_text("none*900")
-                .expect("expanded attract")
+            crate::fidelity_manifest::expanded_input_text("none*900").expect("expanded attract")
         );
         assert!(high_score_exists);
     }

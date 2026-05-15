@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-131` are complete. The standing maintenance guidance in
+`DC-42` through `DC-132` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5925,6 +5925,68 @@ Work log:
   --live-smoke` (239 rendered frames), markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778875121767719`
+
+### DC-132: Clean Fidelity Scenario Manifest Facade
+
+Status: `complete`
+
+Goal: move fidelity scenario listing and input-script writing off direct
+legacy trace scenario types while preserving current CLI behavior.
+
+Scope:
+
+- Add a clean crate-private fidelity scenario manifest facade for scenario
+  descriptors and expanded input text.
+- Move `src/fidelity_scenarios.rs` to clean manifest contracts instead of
+  importing legacy trace scenario types/functions directly.
+- Keep `--fidelity-list-scenarios` and `--fidelity-write-scenario-inputs`
+  output and file behavior unchanged.
+- Update public guard tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- `src/fidelity_scenarios.rs` no longer references `crate::legacy_fidelity`
+  directly.
+- The only clean source files allowed to adapt to legacy fidelity trace
+  generation are the dedicated fidelity facade modules.
+- Existing scenario listing and input-writing tests pass unchanged in behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib fidelity_manifest::tests
+cargo test --lib fidelity_scenarios::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 21:01:36 BST` Started `DC-132`: adding a clean fidelity
+  scenario manifest facade, moving `fidelity_scenarios` off direct legacy trace
+  scenario imports, updating guard tests and docs, and preserving current
+  scenario listing/input-writing behavior.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778875284634339`
+- `2026-05-15 21:23:09 BST` Completed `DC-132`: added
+  `src/fidelity_manifest.rs` as the clean scenario manifest/input expansion
+  facade, moved `src/fidelity_scenarios.rs` off direct legacy fidelity imports,
+  updated public guard tests and README/SPEC module docs, and preserved the
+  current scenario listing/input-writing behavior. Validation passed with
+  focused manifest/scenario/public API tests, `cargo test --all-targets` (1207
+  library tests, 2 binary tests, 2 example tests), `cargo clippy --all-targets
+  -- -D warnings`, `make fidelity` (10 fixtures, 15452 frames, and 6/6 new
+  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
+  frames), markdownlint, `cargo fmt --check`, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778876604034919`
 
 ## Ongoing Work
 
