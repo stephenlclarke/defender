@@ -582,7 +582,7 @@ mod tests {
     use crate::{
         game::{
             Direction, GameEvents, GameFrame, GameInput, GamePhase, GameState, PlayerSnapshot,
-            ScoreSnapshot, WorldVector,
+            ScoreSnapshot, WorldSnapshot, WorldVector,
         },
         renderer::{RenderScene, SurfaceSize},
     };
@@ -864,6 +864,7 @@ mod tests {
                         high_score: 100,
                         next_bonus: 10_000,
                     },
+                    world: WorldSnapshot::default(),
                 },
             }
         }

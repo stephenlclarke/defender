@@ -56,6 +56,85 @@ pub struct ScoreSnapshot {
     pub next_bonus: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnemyKind {
+    Lander,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnemySnapshot {
+    pub kind: EnemyKind,
+    pub position: ScreenPosition,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HumanSnapshot {
+    pub position: ScreenPosition,
+    pub carried: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TerrainSegment {
+    pub position: ScreenPosition,
+    pub size: (u8, u8),
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WorldSnapshot {
+    pub terrain: Vec<TerrainSegment>,
+    pub stars: Vec<ScreenPosition>,
+    pub enemies: Vec<EnemySnapshot>,
+    pub humans: Vec<HumanSnapshot>,
+}
+
+impl WorldSnapshot {
+    fn first_wave() -> Self {
+        Self {
+            terrain: vec![
+                TerrainSegment {
+                    position: ScreenPosition::new(0, 224),
+                    size: (64, 8),
+                },
+                TerrainSegment {
+                    position: ScreenPosition::new(64, 222),
+                    size: (64, 8),
+                },
+                TerrainSegment {
+                    position: ScreenPosition::new(128, 226),
+                    size: (64, 8),
+                },
+                TerrainSegment {
+                    position: ScreenPosition::new(192, 220),
+                    size: (56, 8),
+                },
+                TerrainSegment {
+                    position: ScreenPosition::new(248, 224),
+                    size: (44, 8),
+                },
+            ],
+            stars: vec![
+                ScreenPosition::new(24, 32),
+                ScreenPosition::new(112, 56),
+                ScreenPosition::new(236, 24),
+            ],
+            enemies: vec![EnemySnapshot {
+                kind: EnemyKind::Lander,
+                position: ScreenPosition::new(204, 84),
+            }],
+            humans: vec![
+                HumanSnapshot {
+                    position: ScreenPosition::new(72, 216),
+                    carried: false,
+                },
+                HumanSnapshot {
+                    position: ScreenPosition::new(180, 218),
+                    carried: false,
+                },
+            ],
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameState {
     pub frame: u64,
@@ -65,6 +144,7 @@ pub struct GameState {
     pub wave: u8,
     pub player: PlayerSnapshot,
     pub scores: ScoreSnapshot,
+    pub world: WorldSnapshot,
 }
 
 pub type GameSnapshot = GameState;
@@ -195,6 +275,7 @@ impl Game {
             lives: 3,
             smart_bombs: 3,
         };
+        self.state.world = WorldSnapshot::first_wave();
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
         self.projectiles.clear();
@@ -256,6 +337,24 @@ impl Game {
 
     fn scene(&self) -> RenderScene {
         let mut scene = RenderScene::empty(self.state.frame, SurfaceSize::new(292, 240));
+        for star in &self.state.world.stars {
+            scene.push_sprite(SceneSprite {
+                sprite: SpriteId::STAR,
+                layer: RenderLayer::Starfield,
+                position: [f32::from(star.x), f32::from(star.y)],
+                size: [1.0, 1.0],
+                tint: Color::WHITE,
+            });
+        }
+        for terrain in &self.state.world.terrain {
+            scene.push_sprite(SceneSprite {
+                sprite: SpriteId::TERRAIN_TILE,
+                layer: RenderLayer::Terrain,
+                position: [f32::from(terrain.position.x), f32::from(terrain.position.y)],
+                size: [f32::from(terrain.size.0), f32::from(terrain.size.1)],
+                tint: Color::from_rgba(0x26, 0xAE, 0x00, 0xFF),
+            });
+        }
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::SCORE_TEXT,
             layer: RenderLayer::Hud,
@@ -265,6 +364,28 @@ impl Game {
         });
 
         if self.state.phase == GamePhase::Playing {
+            for enemy in &self.state.world.enemies {
+                scene.push_sprite(SceneSprite {
+                    sprite: enemy_sprite(enemy.kind),
+                    layer: RenderLayer::Objects,
+                    position: [f32::from(enemy.position.x), f32::from(enemy.position.y)],
+                    size: [12.0, 8.0],
+                    tint: Color::from_rgba(0xF4, 0x5B, 0x5B, 0xFF),
+                });
+            }
+            for human in &self.state.world.humans {
+                scene.push_sprite(SceneSprite {
+                    sprite: SpriteId::HUMAN,
+                    layer: RenderLayer::Objects,
+                    position: [f32::from(human.position.x), f32::from(human.position.y)],
+                    size: [6.0, 8.0],
+                    tint: if human.carried {
+                        Color::from_rgba(0xFF, 0xF8, 0x80, 0xFF)
+                    } else {
+                        Color::from_rgba(0x7C, 0xD7, 0xFF, 0xFF)
+                    },
+                });
+            }
             scene.push_sprite(SceneSprite {
                 sprite: SpriteId::PLAYER_SHIP,
                 layer: RenderLayer::Objects,
@@ -288,6 +409,12 @@ impl Game {
         }
 
         scene
+    }
+}
+
+fn enemy_sprite(kind: EnemyKind) -> SpriteId {
+    match kind {
+        EnemyKind::Lander => SpriteId::ENEMY_LANDER,
     }
 }
 
@@ -368,6 +495,7 @@ fn initial_state() -> GameState {
             high_score: 0,
             next_bonus: 10_000,
         },
+        world: WorldSnapshot::default(),
     }
 }
 
@@ -382,13 +510,13 @@ fn world_vector_pixels(vector: WorldVector) -> f32 {
 #[cfg(test)]
 mod tests {
     use crate::{
-        renderer::{RenderLayerCounts, RenderScene, SurfaceSize},
+        renderer::{Color, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize, TextureAtlas},
         systems::{GameSimulation, advance_one_frame},
     };
 
     use super::{
-        Direction, Game, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, SoundEvent,
-        WorldVector,
+        Direction, EnemyKind, Game, GameEvent, GameEvents, GameFrame, GameInput, GamePhase,
+        SoundEvent, WorldSnapshot, WorldVector,
     };
 
     #[test]
@@ -436,6 +564,7 @@ mod tests {
                     high_score: 100,
                     next_bonus: 10_000,
                 },
+                world: WorldSnapshot::default(),
             },
             events: GameEvents::default(),
             scene: RenderScene::empty(9, SurfaceSize::new(292, 240)),
@@ -456,6 +585,7 @@ mod tests {
         assert_eq!(state.current_player, 1);
         assert_eq!(state.player.direction, Direction::Right);
         assert_eq!(state.player.lives, 0);
+        assert_eq!(state.world, WorldSnapshot::default());
         assert_eq!(Game::default().state(), state);
     }
 
@@ -483,16 +613,24 @@ mod tests {
         assert_eq!(started.state.wave, 1);
         assert_eq!(started.state.player.lives, 3);
         assert_eq!(started.state.player.smart_bombs, 3);
+        assert_eq!(started.state.world.terrain.len(), 5);
+        assert_eq!(started.state.world.stars.len(), 3);
+        assert_eq!(started.state.world.enemies.len(), 1);
+        assert_eq!(started.state.world.enemies[0].kind, EnemyKind::Lander);
+        assert_eq!(started.state.world.humans.len(), 2);
         assert_eq!(started.events.gameplay(), &[GameEvent::GameStarted]);
         assert_eq!(started.events.sounds(), &[SoundEvent::GameStarted]);
         assert_eq!(
             started.scene.summary().layers,
             RenderLayerCounts {
-                objects: 1,
+                terrain: 5,
+                starfield: 3,
+                objects: 4,
                 hud: 1,
                 ..RenderLayerCounts::default()
             }
         );
+        assert_eq!(started.scene.summary().sprite_count, 13);
     }
 
     #[test]
@@ -525,13 +663,70 @@ mod tests {
         assert_eq!(
             frame.scene.summary().layers,
             RenderLayerCounts {
-                objects: 1,
+                terrain: 5,
+                starfield: 3,
+                objects: 4,
                 projectiles: 1,
                 hud: 1,
                 ..RenderLayerCounts::default()
             }
         );
         assert_eq!(frame.scene.summary().raster_count, 0);
+    }
+
+    #[test]
+    fn clean_game_world_sprites_are_atlas_backed() {
+        let mut game = credited_started_game();
+
+        let frame = game.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        let atlas = TextureAtlas::default_sprites();
+        for sprite in &frame.scene.sprites {
+            assert!(atlas.contains(sprite.sprite), "{:?}", sprite.sprite);
+        }
+        assert!(
+            frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+        );
+        assert!(
+            frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::HUMAN)
+        );
+        assert!(
+            frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::TERRAIN_TILE)
+        );
+        assert!(
+            frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::STAR)
+        );
+    }
+
+    #[test]
+    fn clean_game_highlights_carried_humans() {
+        let mut game = credited_started_game();
+        game.state.world.humans[0].carried = true;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HUMAN
+                && sprite.tint == Color::from_rgba(0xFF, 0xF8, 0x80, 0xFF)
+        }));
     }
 
     #[test]

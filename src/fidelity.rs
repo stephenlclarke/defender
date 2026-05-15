@@ -29,7 +29,7 @@ mod tests {
     use crate::{
         game::{
             Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameState,
-            PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldVector,
+            PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldSnapshot, WorldVector,
         },
         oracle::{GameplayOracle, test_support::ReferenceFrameProbe},
         renderer::{RenderScene, SurfaceSize},
@@ -66,6 +66,7 @@ mod tests {
                 high_score: 10_000,
                 next_bonus: 10_000,
             },
+            world: WorldSnapshot::default(),
         };
         let frame = GameFrame {
             state: state.clone(),

@@ -110,8 +110,9 @@ pub mod readme_media;
 
 pub use fidelity::GameplayEquivalenceSignature;
 pub use game::{
-    Direction, Game, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameSnapshot,
-    GameState, PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldVector,
+    Direction, EnemyKind, EnemySnapshot, Game, GameEvent, GameEvents, GameFrame, GameInput,
+    GamePhase, GameSnapshot, GameState, HumanSnapshot, PlayerSnapshot, ScoreSnapshot, SoundEvent,
+    TerrainSegment, WorldSnapshot, WorldVector,
 };
 pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
 pub use renderer::{

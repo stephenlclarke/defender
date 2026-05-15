@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-118` are complete. The standing maintenance guidance in
+`DC-42` through `DC-119` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5084,6 +5084,73 @@ Work log:
   frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778835971827569`
+
+### DC-119: Clean Gameplay World Sprite Surface
+
+Status: `complete`
+
+Goal: move the clean gameplay scene beyond player/HUD placeholders by giving
+the clean game domain explicit world entities for terrain, stars, enemies, and
+humans that render through renderer-owned sprite atlas IDs.
+
+Scope:
+
+- Add clean world snapshot types for terrain, starfield, enemies, and humans.
+- Seed the first clean playing wave with deterministic world entities.
+- Render those world entities through clean `RenderScene` sprites.
+- Add renderer-owned atlas entries for enemy and human sprites.
+- Update focused clean game and renderer tests for sprite-layer coverage.
+- Update README/SPEC module text for the expanded clean gameplay world surface.
+
+Acceptance criteria:
+
+- `GameState` exposes clean world entity snapshots without legacy memory labels.
+- The clean playing scene includes terrain, starfield, enemy, human, player,
+  projectile, and HUD sprites through renderer-owned sprite IDs.
+- The default sprite atlas resolves every sprite used by the clean game scene.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game::tests::
+cargo test --lib renderer::tests::texture_atlas_owns_sprite_regions
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 10:08:34 BST` Started `DC-119`: adding clean domain world
+  snapshots for terrain, stars, enemies, and humans, renderer-owned atlas
+  entries for the new sprites, and focused tests/docs for the sprite-first
+  clean gameplay scene surface.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778836113993949`
+- `2026-05-15 10:53:08 BST` Completed `DC-119`: added clean `WorldSnapshot`
+  domain data for terrain, stars, enemies, and humans on `GameState`, seeded
+  deterministic first-wave world entities when the clean game starts, and
+  rendered terrain, starfield, enemy, human, player, projectile, and HUD
+  sprites through `RenderScene`. The renderer now owns sprite IDs and atlas
+  entries for lander and human sprites, and the focused clean game tests verify
+  that emitted world sprites are atlas-backed and that carried humans use their
+  highlighted tint branch. README and SPEC now describe the expanded clean
+  gameplay world surface.
+  Validation passed with `cargo test --lib game::tests::` (11 passed),
+  `cargo test --lib renderer::tests::texture_atlas_owns_sprite_regions`,
+  `cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation`,
+  `cargo test --all-targets` (1170 library tests, 2 binary tests, and
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, 80/80 non-baselined added
+  executable Rust lines covered), `cargo run -- --live-smoke` (240 rendered
+  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778838787881489`
 
 ## Ongoing Work
 

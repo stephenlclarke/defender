@@ -164,6 +164,12 @@ impl Color {
         rgba: [0xFF, 0xFF, 0xFF, 0xFF],
     };
 
+    pub const fn from_rgba(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+        Self {
+            rgba: [red, green, blue, alpha],
+        }
+    }
+
     pub fn to_wgpu(self) -> wgpu::Color {
         wgpu::Color {
             r: f64::from(self.rgba[0]) / 255.0,
@@ -226,6 +232,8 @@ impl SpriteId {
     pub const PLAYER_PROJECTILE: Self = Self(4);
     pub const TERRAIN_TILE: Self = Self(5);
     pub const STAR: Self = Self(6);
+    pub const ENEMY_LANDER: Self = Self(7);
+    pub const HUMAN: Self = Self(8);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -467,6 +475,16 @@ impl TextureAtlas {
                 origin: [16, 64],
                 size: [1, 1],
             },
+            AtlasRegion {
+                sprite: SpriteId::ENEMY_LANDER,
+                origin: [24, 64],
+                size: [12, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::HUMAN,
+                origin: [40, 64],
+                size: [6, 8],
+            },
         ];
         let pixels = default_sprite_atlas_pixels(surface, &regions);
 
@@ -524,6 +542,8 @@ fn default_sprite_region_color(sprite: SpriteId) -> [u8; 4] {
         SpriteId::PLAYER_PROJECTILE => [0xFF, 0xF8, 0x80, 0xFF],
         SpriteId::TERRAIN_TILE => [0x26, 0xAE, 0x00, 0xFF],
         SpriteId::STAR => [0xFF, 0xFF, 0xFF, 0xFF],
+        SpriteId::ENEMY_LANDER => [0xF4, 0x5B, 0x5B, 0xFF],
+        SpriteId::HUMAN => [0x7C, 0xD7, 0xFF, 0xFF],
         _ => [0xD9, 0x51, 0xFF, 0xFF],
     }
 }
@@ -3550,6 +3570,8 @@ mod tests {
         assert!(default_atlas.contains(SpriteId::PLAYER_PROJECTILE));
         assert!(default_atlas.contains(SpriteId::TERRAIN_TILE));
         assert!(default_atlas.contains(SpriteId::STAR));
+        assert!(default_atlas.contains(SpriteId::ENEMY_LANDER));
+        assert!(default_atlas.contains(SpriteId::HUMAN));
         assert_eq!(
             TextureAtlas::with_rgba(SurfaceSize::new(2, 2), Vec::new(), vec![0; 15]),
             Err(SceneRasterError::PixelBufferLength {

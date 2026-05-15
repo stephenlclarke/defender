@@ -12,7 +12,7 @@ use crate::accepted::{
 
 use crate::game::{
     Direction, GameEvent, GameEvents, GameFrame, GamePhase, GameState, PlayerSnapshot,
-    ScoreSnapshot, SoundEvent, WorldVector,
+    ScoreSnapshot, SoundEvent, WorldSnapshot, WorldVector,
 };
 use crate::renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize};
 #[cfg(test)]
@@ -107,6 +107,7 @@ fn adapt_snapshot(snapshot: AcceptedSnapshot) -> GameState {
             high_score: snapshot.scores.high_score,
             next_bonus: snapshot.scores.next_bonus,
         },
+        world: WorldSnapshot::default(),
     }
 }
 

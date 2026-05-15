@@ -320,7 +320,7 @@ mod tests {
         },
         game::{
             Direction, GameEvents, GameFrame, GamePhase, GameState, PlayerSnapshot, ScoreSnapshot,
-            SoundEvent, WorldVector,
+            SoundEvent, WorldSnapshot, WorldVector,
         },
         renderer::{RenderScene, SurfaceSize},
     };
@@ -380,6 +380,7 @@ mod tests {
                     high_score: 0,
                     next_bonus: 10_000,
                 },
+                world: WorldSnapshot::default(),
             },
             events: GameEvents::new(Vec::new(), sounds),
             scene: RenderScene::empty(frame, SurfaceSize::new(292, 240)),

@@ -62,9 +62,10 @@ tree:
 - `src/accepted.rs`: crate-private accepted-behavior contracts and facade that
   isolate clean oracle code from direct legacy imports.
 - `src/game.rs`: gameplay-facing `Game`, `GameState`, `GameInput`,
-  `GameFrame`, `GameEvents`, score, player, direction, and sound-event
-  contracts without accepted command-byte mapping. The clean `Game` shell emits
-  sprite-first scene frames without touching the accepted machine adapter.
+  `GameFrame`, `GameEvents`, world, terrain, starfield, enemy, human, score,
+  player, direction, and sound-event contracts without accepted command-byte
+  mapping. The clean `Game` shell emits sprite-first scene frames without
+  touching the accepted machine adapter.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion and projectile
   launch/capacity systems, and the `GameSimulation` trait used by the clean game
@@ -122,7 +123,9 @@ wiring. Live presentation receives clean `RenderScene` data. Native draw
 planning resolves scene sprites through renderer-owned atlas regions into
 sprite batches and records GPU instance-buffer data with native scene
 rectangles, normalized atlas UVs, normalized tint, stable upload bytes, and the
-`wgpu` vertex layout for the instance buffer. It flattens those per-batch
+`wgpu` vertex layout for the instance buffer. The clean `Game` world seeds
+terrain, starfield, enemy, and human snapshots for the first playing wave and
+renders them as atlas-backed scene sprites. It flattens those per-batch
 records into one upload-ready instance stream. The renderer also owns unit quad
 vertices, `u16` indices, upload bytes, and the `wgpu` vertex layout used to
 draw instanced sprites, then derives indexed instanced sprite draw commands
