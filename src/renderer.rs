@@ -527,6 +527,86 @@ pub struct SceneRasterUpload {
     pub non_blank: bool,
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct SpriteQuadVertex {
+    pub unit_position: [f32; 2],
+    pub unit_uv: [f32; 2],
+}
+
+impl SpriteQuadVertex {
+    pub const FLOAT_COMPONENTS: usize = 4;
+    pub const BYTE_SIZE: wgpu::BufferAddress = std::mem::size_of::<Self>() as wgpu::BufferAddress;
+    pub const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
+        5 => Float32x2,
+        6 => Float32x2,
+    ];
+
+    pub const fn vertex_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: Self::BYTE_SIZE,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &Self::VERTEX_ATTRIBUTES,
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        bytemuck::bytes_of(self)
+    }
+}
+
+const SPRITE_QUAD_VERTICES: [SpriteQuadVertex; 4] = [
+    SpriteQuadVertex {
+        unit_position: [0.0, 0.0],
+        unit_uv: [0.0, 0.0],
+    },
+    SpriteQuadVertex {
+        unit_position: [1.0, 0.0],
+        unit_uv: [1.0, 0.0],
+    },
+    SpriteQuadVertex {
+        unit_position: [0.0, 1.0],
+        unit_uv: [0.0, 1.0],
+    },
+    SpriteQuadVertex {
+        unit_position: [1.0, 1.0],
+        unit_uv: [1.0, 1.0],
+    },
+];
+
+const SPRITE_QUAD_INDICES: [u16; 6] = [0, 2, 1, 2, 3, 1];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpriteQuadGeometry;
+
+impl SpriteQuadGeometry {
+    pub const VERTICES: [SpriteQuadVertex; 4] = SPRITE_QUAD_VERTICES;
+    pub const INDICES: [u16; 6] = SPRITE_QUAD_INDICES;
+    pub const VERTEX_COUNT: u32 = SPRITE_QUAD_VERTICES.len() as u32;
+    pub const INDEX_COUNT: u32 = SPRITE_QUAD_INDICES.len() as u32;
+    pub const INDEX_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint16;
+
+    pub const fn vertex_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
+        SpriteQuadVertex::vertex_buffer_layout()
+    }
+
+    pub fn vertices() -> &'static [SpriteQuadVertex] {
+        &SPRITE_QUAD_VERTICES
+    }
+
+    pub fn indices() -> &'static [u16] {
+        &SPRITE_QUAD_INDICES
+    }
+
+    pub fn vertex_upload_bytes() -> &'static [u8] {
+        bytemuck::cast_slice(&SPRITE_QUAD_VERTICES)
+    }
+
+    pub fn index_upload_bytes() -> &'static [u8] {
+        bytemuck::cast_slice(&SPRITE_QUAD_INDICES)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpriteDrawInstance {
     pub sprite: SpriteId,
@@ -795,8 +875,8 @@ mod tests {
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneProjectionUniforms,
         SceneRaster, SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId,
-        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SurfaceSize, TextureAtlas,
-        ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteQuadGeometry, SpriteQuadVertex,
+        SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -937,6 +1017,104 @@ mod tests {
     }
 
     #[test]
+    fn sprite_quad_vertex_declares_stable_gpu_layout() {
+        let layout = SpriteQuadGeometry::vertex_buffer_layout();
+        let expected_attributes = [
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x2,
+                offset: 0,
+                shader_location: 5,
+            },
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x2,
+                offset: 8,
+                shader_location: 6,
+            },
+        ];
+
+        assert_eq!(SpriteQuadVertex::FLOAT_COMPONENTS, 4);
+        assert_eq!(SpriteQuadVertex::BYTE_SIZE, 16);
+        assert_eq!(std::mem::size_of::<SpriteQuadVertex>(), 16);
+        assert_eq!(
+            std::mem::align_of::<SpriteQuadVertex>(),
+            std::mem::align_of::<f32>()
+        );
+        assert_eq!(layout.array_stride, 16);
+        assert_eq!(layout.step_mode, wgpu::VertexStepMode::Vertex);
+        assert_eq!(layout.attributes, expected_attributes);
+        assert!(SpriteQuadVertex::VERTEX_ATTRIBUTES.iter().all(|quad| {
+            !SpriteInstanceBufferRecord::VERTEX_ATTRIBUTES
+                .iter()
+                .any(|instance| instance.shader_location == quad.shader_location)
+        }));
+    }
+
+    #[test]
+    fn sprite_quad_geometry_exposes_upload_bytes_without_repacking() {
+        assert_eq!(SpriteQuadGeometry::VERTEX_COUNT, 4);
+        assert_eq!(SpriteQuadGeometry::INDEX_COUNT, 6);
+        assert_eq!(SpriteQuadGeometry::INDEX_FORMAT, wgpu::IndexFormat::Uint16);
+        assert_eq!(
+            SpriteQuadGeometry::vertices(),
+            SpriteQuadGeometry::VERTICES.as_slice()
+        );
+        assert_eq!(
+            SpriteQuadGeometry::indices(),
+            SpriteQuadGeometry::INDICES.as_slice()
+        );
+        assert_eq!(
+            SpriteQuadGeometry::vertex_upload_bytes().len(),
+            SpriteQuadGeometry::vertices().len() * SpriteQuadVertex::BYTE_SIZE as usize
+        );
+        assert_eq!(
+            SpriteQuadGeometry::index_upload_bytes().len(),
+            std::mem::size_of_val(SpriteQuadGeometry::indices())
+        );
+        assert_eq!(
+            SpriteQuadGeometry::vertex_upload_bytes(),
+            bytemuck::cast_slice::<SpriteQuadVertex, u8>(SpriteQuadGeometry::vertices())
+        );
+        assert_eq!(
+            SpriteQuadGeometry::index_upload_bytes(),
+            bytemuck::cast_slice::<u16, u8>(SpriteQuadGeometry::indices())
+        );
+        assert_eq!(
+            SpriteQuadGeometry::vertices()[0].as_bytes(),
+            &SpriteQuadGeometry::vertex_upload_bytes()[..SpriteQuadVertex::BYTE_SIZE as usize]
+        );
+        assert_eq!(
+            bytemuck::cast_slice::<SpriteQuadVertex, f32>(SpriteQuadGeometry::vertices()),
+            &[
+                0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            ]
+        );
+        assert_eq!(SpriteQuadGeometry::indices(), &[0, 2, 1, 2, 3, 1]);
+    }
+
+    #[test]
+    fn sprite_quad_indices_are_front_facing_after_scene_projection() {
+        let projection =
+            SceneProjectionUniforms::for_surface(SurfaceSize::new(1, 1)).expect("projection");
+        let clip_vertices = SpriteQuadGeometry::vertices()
+            .iter()
+            .map(|vertex| projection.project_point(vertex.unit_position))
+            .collect::<Vec<_>>();
+
+        for triangle in SpriteQuadGeometry::indices().chunks_exact(3) {
+            let points = [
+                clip_vertices[triangle[0] as usize],
+                clip_vertices[triangle[1] as usize],
+                clip_vertices[triangle[2] as usize],
+            ];
+
+            assert!(
+                triangle_signed_area(points) > 0.0,
+                "quad triangle {triangle:?} was not counter-clockwise in clip space"
+            );
+        }
+    }
+
+    #[test]
     fn sprite_instance_buffer_record_declares_stable_gpu_layout() {
         let layout = SpriteInstanceBufferRecord::vertex_buffer_layout();
         let expected_attributes = [
@@ -1071,6 +1249,11 @@ mod tests {
                 "clip point component {actual} was not near {expected}"
             );
         }
+    }
+
+    fn triangle_signed_area(points: [[f32; 2]; 3]) -> f32 {
+        let [a, b, c] = points;
+        ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) * 0.5
     }
 
     #[test]

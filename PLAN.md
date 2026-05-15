@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-106` are complete. The standing maintenance guidance in
+`DC-42` through `DC-107` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4267,6 +4267,67 @@ Work log:
   rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778815079514559`
+
+### DC-107: Clean Sprite Quad GPU ABI
+
+Status: `complete`
+
+Goal: add renderer-owned static quad geometry for instanced sprite draws, so
+future native `wgpu` sprite pipelines can bind both vertex and instance data
+from clean renderer contracts.
+
+Scope:
+
+- Add a stable bytemuck-safe sprite quad vertex record.
+- Expose the quad vertex `wgpu` layout without conflicting with the sprite
+  instance attribute locations.
+- Expose renderer-owned quad vertices, indices, index format, counts, and
+  upload-ready bytes.
+- Choose triangle winding that remains front-facing after the clean top-left
+  scene projection maps into `wgpu` clip space.
+- Add focused renderer tests for layout, upload bytes, index order, and winding.
+- Update README/SPEC module text for sprite quad geometry ownership.
+
+Acceptance criteria:
+
+- Sprite quad vertex/index data is owned by the clean renderer contract.
+- Sprite quad upload bytes can be used without presenter-side repacking.
+- Quad geometry and instance records have distinct vertex attribute locations.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 04:19:53 BST` Started `DC-107`: adding clean renderer-owned
+  sprite quad vertex/index geometry, GPU vertex layout, upload bytes, focused
+  renderer tests, and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778815203805089`
+- `2026-05-15 04:44:46 BST` Completed `DC-107`: added clean renderer-owned
+  `SpriteQuadVertex` and `SpriteQuadGeometry` contracts with bytemuck-safe quad
+  vertices, `u16` indices, index format/counts, upload bytes, and a distinct
+  `wgpu` vertex-buffer layout; locked the index winding as front-facing after
+  the clean top-left scene projection; exported the new renderer types; and
+  documented sprite quad geometry ownership in README/SPEC. Validation passed
+  with focused renderer tests, the public API guard, `cargo test --all-targets`
+  (1151 library tests plus binary/example tests), clippy with warnings denied,
+  `make fidelity` (10 local fixtures, 15452 frames, 17/17 new executable Rust
+  lines), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
+  --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778816705196489`
 
 ## Ongoing Work
 

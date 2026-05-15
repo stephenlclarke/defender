@@ -119,8 +119,8 @@ pub use renderer::{
     NativeRendererResources, NativeSceneRenderer, PaletteResource, RenderLayer, RenderLayerCounts,
     RenderScene, RenderSceneSummary, SceneDrawPlan, SceneProjectionUniforms, SceneRaster,
     SceneRasterError, SceneRasterUpload, SceneSprite, SpriteDrawBatch, SpriteDrawInstance,
-    SpriteId, SpriteInstanceBuffer, SpriteInstanceBufferRecord, SurfaceSize, TextureAtlas,
-    ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+    SpriteId, SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteQuadGeometry,
+    SpriteQuadVertex, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
 };
 pub use systems::{
     FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,
