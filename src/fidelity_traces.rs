@@ -47,15 +47,12 @@ fn trace_text(frame_count: usize) -> anyhow::Result<String> {
     }
 
     let input_program = format!("none*{frame_count}");
-    let input_script = crate::legacy_fidelity::expanded_trace_input_text(&input_program)
-        .map_err(|error| anyhow!(error))?;
+    let input_script = crate::fidelity_manifest::expanded_input_text(&input_program)?;
     trace_input_text(&input_script)
 }
 
 fn trace_input_text(script: &str) -> anyhow::Result<String> {
-    let inputs =
-        crate::legacy_fidelity::parse_trace_input_script(script).map_err(|error| anyhow!(error))?;
-    crate::legacy_fidelity::trace_text_for_inputs(&inputs).map_err(|error| anyhow!(error))
+    crate::fidelity_trace_engine::trace_text_for_script(script)
 }
 
 fn trace_input_file_text(path: &Path) -> anyhow::Result<String> {
@@ -78,10 +75,10 @@ fn check_trace_frames(inputs_path: &Path, expected_path: &Path) -> anyhow::Resul
     let actual = trace_input_file_text(inputs_path)?;
     let expected = fs::read_to_string(expected_path)
         .with_context(|| format!("failed to read expected trace {}", expected_path.display()))?;
-    let comparison = crate::legacy_fidelity::compare_trace_text(&expected, &actual)
-        .map_err(|mismatch| anyhow!("{}: {mismatch}", expected_path.display()))?;
+    let frames = crate::fidelity_trace_engine::compare_trace_text(&expected, &actual)
+        .map_err(|error| anyhow!("{}: {error}", expected_path.display()))?;
 
-    Ok(comparison.frames)
+    Ok(frames)
 }
 
 fn check_trace_dir_text(path: &Path) -> anyhow::Result<String> {
@@ -208,15 +205,11 @@ fn trace_fixture_pairs(path: &Path) -> anyhow::Result<Vec<TraceFixture>> {
         }
     }
 
-    let scenario_order = crate::legacy_fidelity::trace_scenarios()
-        .map(|scenarios| {
-            scenarios
-                .into_iter()
-                .enumerate()
-                .map(|(index, scenario)| (scenario.scenario, index))
-                .collect::<HashMap<_, _>>()
-        })
-        .map_err(|error| anyhow!(error))?;
+    let scenario_order = crate::fidelity_manifest::scenarios()?
+        .into_iter()
+        .enumerate()
+        .map(|(index, scenario)| (scenario.name, index))
+        .collect::<HashMap<_, _>>();
     fixtures.sort_by(|left, right| {
         let left_stem = trace_fixture_stem(&left.inputs_path);
         let right_stem = trace_fixture_stem(&right.inputs_path);
@@ -266,23 +259,22 @@ fn check_reference_trace_dir_text(path: &Path) -> anyhow::Result<String> {
         );
     }
 
-    let scenarios = crate::legacy_fidelity::trace_scenarios().map_err(|error| anyhow!(error))?;
+    let scenarios = crate::fidelity_manifest::scenarios()?;
     let scenario_names = scenarios
         .iter()
-        .map(|scenario| scenario.scenario.as_str())
+        .map(|scenario| scenario.name.as_str())
         .collect::<HashSet<_>>();
     let requirements = trace_requirements()?;
     validate_trace_requirements_reference_known_scenarios(&scenario_names, &requirements)?;
-    let expected_header = crate::legacy_fidelity::trace_header();
+    let expected_header = crate::fidelity_trace_engine::trace_header();
     let mut frames = 0;
     for scenario in &scenarios {
-        let inputs_path = path.join(format!("{}.inputs.txt", scenario.scenario));
-        let expected_path = path.join(format!("{}.expected.tsv", scenario.scenario));
+        let inputs_path = path.join(format!("{}.inputs.txt", scenario.name));
+        let expected_path = path.join(format!("{}.expected.tsv", scenario.name));
         let actual_inputs = fs::read_to_string(&inputs_path)
             .with_context(|| format!("failed to read {}", inputs_path.display()))?;
         let expected_inputs =
-            crate::legacy_fidelity::expanded_trace_input_text(&scenario.input_program)
-                .map_err(|error| anyhow!(error))?;
+            crate::fidelity_manifest::expanded_input_text(&scenario.input_program)?;
         if actual_inputs.trim_end() != expected_inputs.trim_end() {
             bail!(
                 "reference trace fixture {} does not match embedded scenario input program",
@@ -300,16 +292,16 @@ fn check_reference_trace_dir_text(path: &Path) -> anyhow::Result<String> {
             );
         }
         let trace_frames = lines.len().saturating_sub(1);
-        if trace_frames != scenario.frames {
+        if trace_frames != scenario.frame_count {
             bail!(
                 "reference trace fixture {} has {} frame(s), expected {}",
                 expected_path.display(),
                 trace_frames,
-                scenario.frames
+                scenario.frame_count
             );
         }
         check_reference_trace_required_cells(&expected_path, &lines)?;
-        if let Some(requirement) = requirements.get(&scenario.scenario) {
+        if let Some(requirement) = requirements.get(&scenario.name) {
             let input_frames = actual_inputs.trim_end().split(';').collect::<Vec<_>>();
             check_reference_trace_evidence(&expected_path, &lines, requirement, &input_frames)?;
         }
@@ -1091,7 +1083,7 @@ mod tests {
     #[test]
     fn check_reference_trace_required_cells_rejects_stale_video_crc() {
         let lines = [
-            crate::legacy_fidelity::trace_header(),
+            crate::fidelity_trace_engine::trace_header(),
             "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t0xE15D8394\t0xC4C53DA1\t0x05B7E865\t0x41D912FF\t-\t-\t-",
         ];
 
@@ -1111,7 +1103,7 @@ mod tests {
     #[test]
     fn check_reference_trace_required_cells_rejects_bad_trace_columns() {
         let lines = [
-            crate::legacy_fidelity::trace_header(),
+            crate::fidelity_trace_engine::trace_header(),
             "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t0xE15D8394\t0xC4C53DA1\t0x05B7E865\t0x41D912FF",
         ];
 
@@ -1127,7 +1119,7 @@ mod tests {
     #[test]
     fn check_reference_trace_evidence_rejects_missing_required_event() {
         let lines = [
-            crate::legacy_fidelity::trace_header(),
+            crate::fidelity_trace_engine::trace_header(),
             "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\t0xE6\t-",
         ];
         let requirement = TraceRequirement {
@@ -1153,7 +1145,7 @@ mod tests {
     #[test]
     fn check_reference_trace_evidence_rejects_bad_trace_columns() {
         let lines = [
-            crate::legacy_fidelity::trace_header(),
+            crate::fidelity_trace_engine::trace_header(),
             "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\t0xE6",
         ];
         let requirement = TraceRequirement {
@@ -1175,7 +1167,7 @@ mod tests {
     #[test]
     fn check_reference_trace_evidence_rejects_late_bad_trace_columns() {
         let lines = [
-            crate::legacy_fidelity::trace_header(),
+            crate::fidelity_trace_engine::trace_header(),
             "1\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\t0xE6\tcredit_added",
             "2\t0x0000\t0x00\t0x00\t0x00\tattract\t0\t0\t1\t3\t3\t0x00\t0x00\t0x00\t-\t-\t-\t-\t-\tlate",
         ];
@@ -1221,12 +1213,11 @@ mod tests {
 
     fn write_reference_scenario_inputs(path: &Path) {
         fs::create_dir_all(path).expect("create scenario input dir");
-        for scenario in crate::legacy_fidelity::trace_scenarios().expect("trace scenarios") {
-            let input_text =
-                crate::legacy_fidelity::expanded_trace_input_text(&scenario.input_program)
-                    .expect("expanded inputs");
+        for scenario in crate::fidelity_manifest::scenarios().expect("trace scenarios") {
+            let input_text = crate::fidelity_manifest::expanded_input_text(&scenario.input_program)
+                .expect("expanded inputs");
             fs::write(
-                path.join(format!("{}.inputs.txt", scenario.scenario)),
+                path.join(format!("{}.inputs.txt", scenario.name)),
                 input_text,
             )
             .expect("write scenario inputs");
@@ -1239,7 +1230,7 @@ mod tests {
         frame_count: usize,
         evidence_frame: Option<usize>,
     ) {
-        let mut expected = String::from(crate::legacy_fidelity::trace_header());
+        let mut expected = String::from(crate::fidelity_trace_engine::trace_header());
         expected.push('\n');
         for frame in 1..=frame_count {
             let (sound_commands, events) = if evidence_frame == Some(frame) {

@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-132` are complete. The standing maintenance guidance in
+`DC-42` through `DC-133` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5987,6 +5987,72 @@ Work log:
   frames), markdownlint, `cargo fmt --check`, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778876604034919`
+
+### DC-133: Clean Fidelity Trace Engine Facade
+
+Status: `complete`
+
+Goal: move fidelity trace command orchestration off direct legacy trace engine
+calls while preserving current CLI behavior.
+
+Scope:
+
+- Add a clean crate-private fidelity trace engine facade for trace generation,
+  trace comparison, and trace schema header access.
+- Move `src/fidelity_traces.rs` to clean trace-engine and manifest contracts
+  instead of importing legacy trace functions directly.
+- Keep `--fidelity-trace`, `--fidelity-trace-inputs`,
+  `--fidelity-check-trace`, fixture-directory checks, and reference fixture
+  validation behavior unchanged.
+- Update public guard tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- `src/fidelity_traces.rs` no longer references `crate::legacy_fidelity`
+  directly.
+- Legacy trace generation and comparison access is isolated in
+  `src/fidelity_trace_engine.rs`.
+- Existing trace command, fixture, and reference validation tests pass
+  unchanged in behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib fidelity_trace_engine::tests
+cargo test --lib fidelity_traces::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 21:25:33 BST` Started `DC-133`: adding a clean fidelity trace
+  engine facade, moving `fidelity_traces` off direct legacy trace generation
+  and comparison imports, updating guard tests and docs, and preserving current
+  trace CLI behavior.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778876729244129`
+- `2026-05-15 21:47:47 BST` Completed `DC-133`: added
+  `src/fidelity_trace_engine.rs`, moved `src/fidelity_traces.rs` to the clean
+  manifest and trace-engine contracts, refreshed public guard tests plus
+  README/SPEC/PLAN module docs, and preserved current trace command behavior.
+  Validation passed: `cargo fmt --check`,
+  `cargo test --lib fidelity_trace_engine::tests`,
+  `cargo test --lib fidelity_traces::tests`, `cargo test --lib public_api_tests`,
+  `cargo test --all-targets` (1211 library tests, 2 binary tests, and 2 example
+  tests), `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10
+  fixture traces, 15452 frames, and 16/16 new executable Rust lines covered),
+  `cargo run -- --live-smoke` (239 rendered frames), markdownlint, and
+  `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778878068481899`
 
 ## Ongoing Work
 

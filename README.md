@@ -253,6 +253,8 @@ Clean rewrite modules:
   directly.
 - `src/fidelity_manifest.rs`: the crate-private fidelity scenario manifest
   facade that owns temporary scenario metadata and input expansion.
+- `src/fidelity_trace_engine.rs`: the crate-private fidelity trace engine
+  facade that owns temporary trace generation, comparison, and schema access.
 - `src/oracle.rs`: the crate-private gameplay oracle, returning clean state,
   event, sound, and scene-summary frames from the accepted-behavior facade for
   internal fidelity comparison.
@@ -267,7 +269,9 @@ owns the temporary accepted-machine adapter for the internal oracle, and
 config-driven `wgpu` live and smoke launches. `src/roms.rs` owns the temporary
 ROM metadata, scan, and loader bridge for optional verification commands.
 `src/fidelity_manifest.rs` owns the temporary scenario manifest and input
-expansion bridge for fidelity scenario commands.
+expansion bridge for fidelity scenario commands. `src/fidelity_trace_engine.rs`
+owns the temporary trace generation, comparison, and schema bridge for fidelity
+trace commands.
 Legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so `src/accepted.rs` and
 `src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as

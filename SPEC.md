@@ -102,6 +102,8 @@ tree:
   directly.
 - `src/fidelity_manifest.rs`: the crate-private fidelity scenario manifest
   facade that owns temporary scenario metadata and input expansion.
+- `src/fidelity_trace_engine.rs`: the crate-private fidelity trace engine
+  facade that owns temporary trace generation, comparison, and schema access.
 - `src/oracle.rs`: the crate-private gameplay oracle, including clean state,
   event, sound, and scene-summary frames from the accepted-behavior facade for
   internal fidelity comparison.
@@ -120,8 +122,10 @@ input-profile bridge for config-driven `wgpu` live and smoke launches used by
 the clean runtime API. `src/roms.rs` owns the temporary ROM metadata, scan, and
 loader bridge for optional verification commands. `src/fidelity_manifest.rs`
 owns the temporary scenario manifest and input expansion bridge for fidelity
-scenario commands. Legacy-specific clean equivalence regressions are also wired
-from `src_legacy/` so clean
+scenario commands. `src/fidelity_trace_engine.rs` owns the temporary trace
+generation, comparison, and schema bridge for fidelity trace commands.
+Legacy-specific clean equivalence regressions are also wired from `src_legacy/`
+so clean
 accepted/oracle source stays focused on gameplay contracts. Internal clean
 equivalence regressions use crate-private oracle wiring. Clean frame-signature
 gates live under
