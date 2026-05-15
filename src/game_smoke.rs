@@ -8,7 +8,8 @@ use std::collections::BTreeSet;
 use anyhow::bail;
 
 use crate::{
-    Game, GameFrame, GameInput, GamePhase, NativeSceneRenderer, SceneDrawPlan, SurfaceSize,
+    Game, GameFrame, GameInput, GamePhase, NativeSceneRenderer, SceneDrawPlan, SpriteId,
+    SurfaceSize,
 };
 
 const SMOKE_FRAMES: u32 = 24;
@@ -22,6 +23,15 @@ const REQUIRED_INPUTS: [&str; 9] = [
     "smart_bomb",
     "hyperspace",
     "altitude_down",
+];
+const REQUIRED_SPRITES: [&str; 7] = [
+    "player_ship",
+    "enemy_lander",
+    "human",
+    "player_projectile",
+    "terrain_tile",
+    "star",
+    "score_text",
 ];
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -38,6 +48,12 @@ pub(crate) struct GameSmokeReport {
     pub(crate) sprite_frames: u32,
     pub(crate) sprite_instances: usize,
     pub(crate) sprite_draw_commands: usize,
+    pub(crate) terrain_sprites: usize,
+    pub(crate) starfield_sprites: usize,
+    pub(crate) object_sprites: usize,
+    pub(crate) projectile_sprites: usize,
+    pub(crate) hud_sprites: usize,
+    pub(crate) covered_sprites: Vec<String>,
     pub(crate) wgpu_frame_commands: usize,
     pub(crate) sprite_render_pass_commands: usize,
     pub(crate) temporary_raster_commands: usize,
@@ -81,6 +97,26 @@ impl GameSmokeReport {
         }
         if self.sprite_instances == 0 || self.sprite_draw_commands == 0 {
             bail!("clean game smoke did not produce sprite draw plans");
+        }
+        if self.terrain_sprites == 0 {
+            bail!("clean game smoke did not produce terrain sprites");
+        }
+        if self.starfield_sprites == 0 {
+            bail!("clean game smoke did not produce starfield sprites");
+        }
+        if self.object_sprites == 0 {
+            bail!("clean game smoke did not produce object sprites");
+        }
+        if self.projectile_sprites == 0 {
+            bail!("clean game smoke did not produce projectile sprites");
+        }
+        if self.hud_sprites == 0 {
+            bail!("clean game smoke did not produce hud sprites");
+        }
+        for required in REQUIRED_SPRITES {
+            if !self.covered_sprites.iter().any(|sprite| sprite == required) {
+                bail!("clean game smoke did not cover {required} sprite");
+            }
         }
         if self.wgpu_frame_commands == 0 {
             bail!("clean game smoke did not produce wgpu frame commands");
@@ -144,7 +180,7 @@ impl GameSmokeReport {
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  sprite_resource_binding_frames: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  terrain_sprites: {}\n  starfield_sprites: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  covered_sprites: {}\n  wgpu_frame_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  sprite_resource_binding_frames: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
             self.frames,
             frame_size,
             self.distinct_scene_signatures,
@@ -157,6 +193,12 @@ impl GameSmokeReport {
             self.sprite_frames,
             self.sprite_instances,
             self.sprite_draw_commands,
+            self.terrain_sprites,
+            self.starfield_sprites,
+            self.object_sprites,
+            self.projectile_sprites,
+            self.hud_sprites,
+            self.covered_sprites.join(","),
             self.wgpu_frame_commands,
             self.sprite_render_pass_commands,
             self.temporary_raster_commands,
@@ -200,7 +242,7 @@ pub(crate) fn smoke_report(frames: u32) -> anyhow::Result<GameSmokeReport> {
     for frame_index in 0..frames {
         let input = smoke_input(frame_index);
         if let Some(label) = input.label {
-            record_input(&mut report.injected_inputs, label);
+            record_unique_label(&mut report.injected_inputs, label);
         }
 
         let frame = game.step(input.value);
@@ -243,6 +285,22 @@ fn observe_frame(
     }
     if summary.raster_count > 0 {
         report.raster_frames = report.raster_frames.saturating_add(1);
+    }
+    report.terrain_sprites = report
+        .terrain_sprites
+        .saturating_add(summary.layers.terrain);
+    report.starfield_sprites = report
+        .starfield_sprites
+        .saturating_add(summary.layers.starfield);
+    report.object_sprites = report.object_sprites.saturating_add(summary.layers.objects);
+    report.projectile_sprites = report
+        .projectile_sprites
+        .saturating_add(summary.layers.projectiles);
+    report.hud_sprites = report.hud_sprites.saturating_add(summary.layers.hud);
+    for sprite in &frame.scene.sprites {
+        if let Some(label) = required_sprite_label(sprite.sprite) {
+            record_unique_label(&mut report.covered_sprites, label);
+        }
     }
     report.sprite_instances = report
         .sprite_instances
@@ -301,6 +359,19 @@ fn observe_frame(
 
 fn buffer_address_len(byte_len: u64) -> usize {
     usize::try_from(byte_len).unwrap_or(usize::MAX)
+}
+
+fn required_sprite_label(sprite: SpriteId) -> Option<&'static str> {
+    match sprite {
+        SpriteId::PLAYER_SHIP => Some("player_ship"),
+        SpriteId::ENEMY_LANDER => Some("enemy_lander"),
+        SpriteId::HUMAN => Some("human"),
+        SpriteId::PLAYER_PROJECTILE => Some("player_projectile"),
+        SpriteId::TERRAIN_TILE => Some("terrain_tile"),
+        SpriteId::STAR => Some("star"),
+        SpriteId::SCORE_TEXT => Some("score_text"),
+        _ => None,
+    }
 }
 
 fn surface_tuple(surface: SurfaceSize) -> (u32, u32) {
@@ -414,15 +485,15 @@ fn smoke_input(frame_index: u32) -> ScriptedInput {
     ScriptedInput { value, label }
 }
 
-fn record_input(inputs: &mut Vec<String>, label: &str) {
-    if !inputs.iter().any(|input| input == label) {
-        inputs.push(String::from(label));
+fn record_unique_label(labels: &mut Vec<String>, label: &str) {
+    if !labels.iter().any(|existing| existing == label) {
+        labels.push(String::from(label));
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{GameSmokeReport, smoke_input, smoke_report};
+    use super::{GameSmokeReport, required_sprite_label, smoke_input, smoke_report};
 
     #[test]
     fn smoke_report_exercises_clean_game_and_native_draw_plans() {
@@ -440,6 +511,23 @@ mod tests {
         assert_eq!(report.sprite_frames, report.frames);
         assert!(report.sprite_instances > 0);
         assert!(report.sprite_draw_commands > 0);
+        assert!(report.terrain_sprites > 0);
+        assert!(report.starfield_sprites > 0);
+        assert!(report.object_sprites > 0);
+        assert!(report.projectile_sprites > 0);
+        assert!(report.hud_sprites > 0);
+        assert_eq!(
+            report.covered_sprites,
+            vec![
+                "score_text",
+                "star",
+                "terrain_tile",
+                "enemy_lander",
+                "human",
+                "player_ship",
+                "player_projectile",
+            ]
+        );
         assert!(report.wgpu_frame_commands > 0);
         assert!(report.sprite_render_pass_commands >= report.frames as usize);
         assert_eq!(report.temporary_raster_commands, 0);
@@ -536,6 +624,81 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "clean game smoke unexpectedly produced temporary raster frame commands"
+        );
+    }
+
+    #[test]
+    fn smoke_report_validates_sprite_coverage_evidence() {
+        let mut report = valid_report();
+        report.terrain_sprites = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing terrain sprite coverage should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce terrain sprites"
+        );
+
+        let mut report = valid_report();
+        report.starfield_sprites = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing starfield sprite coverage should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce starfield sprites"
+        );
+
+        let mut report = valid_report();
+        report.object_sprites = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing object sprite coverage should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce object sprites"
+        );
+
+        let mut report = valid_report();
+        report.projectile_sprites = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing projectile sprite coverage should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce projectile sprites"
+        );
+
+        let mut report = valid_report();
+        report.hud_sprites = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing hud sprite coverage should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce hud sprites"
+        );
+
+        let mut report = valid_report();
+        report.covered_sprites.retain(|sprite| sprite != "human");
+
+        let error = report
+            .validate()
+            .expect_err("missing required sprite id should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not cover human sprite"
         );
     }
 
@@ -668,6 +831,20 @@ mod tests {
             sprite_frames: 2,
             sprite_instances: 4,
             sprite_draw_commands: 2,
+            terrain_sprites: 2,
+            starfield_sprites: 2,
+            object_sprites: 2,
+            projectile_sprites: 1,
+            hud_sprites: 2,
+            covered_sprites: vec![
+                String::from("star"),
+                String::from("terrain_tile"),
+                String::from("score_text"),
+                String::from("enemy_lander"),
+                String::from("human"),
+                String::from("player_ship"),
+                String::from("player_projectile"),
+            ],
             wgpu_frame_commands: 6,
             sprite_render_pass_commands: 2,
             temporary_raster_commands: 0,
@@ -699,6 +876,12 @@ mod tests {
                 "  sprite_frames: 2\n",
                 "  sprite_instances: 4\n",
                 "  sprite_draw_commands: 2\n",
+                "  terrain_sprites: 2\n",
+                "  starfield_sprites: 2\n",
+                "  object_sprites: 2\n",
+                "  projectile_sprites: 1\n",
+                "  hud_sprites: 2\n",
+                "  covered_sprites: star,terrain_tile,score_text,enemy_lander,human,player_ship,player_projectile\n",
                 "  wgpu_frame_commands: 6\n",
                 "  sprite_render_pass_commands: 2\n",
                 "  temporary_raster_commands: 0\n",
@@ -727,6 +910,11 @@ mod tests {
         assert_eq!(smoke_input(4).value, crate::GameInput::NONE);
     }
 
+    #[test]
+    fn smoke_sprite_labels_ignore_unknown_sprite_ids() {
+        assert_eq!(required_sprite_label(crate::SpriteId(99)), None);
+    }
+
     fn valid_report() -> GameSmokeReport {
         GameSmokeReport {
             frames: 3,
@@ -741,6 +929,20 @@ mod tests {
             sprite_frames: 3,
             sprite_instances: 3,
             sprite_draw_commands: 3,
+            terrain_sprites: 3,
+            starfield_sprites: 3,
+            object_sprites: 3,
+            projectile_sprites: 1,
+            hud_sprites: 3,
+            covered_sprites: vec![
+                String::from("star"),
+                String::from("terrain_tile"),
+                String::from("score_text"),
+                String::from("enemy_lander"),
+                String::from("human"),
+                String::from("player_ship"),
+                String::from("player_projectile"),
+            ],
             wgpu_frame_commands: 9,
             sprite_render_pass_commands: 3,
             sprite_resource_binding_frames: 3,

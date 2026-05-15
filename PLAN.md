@@ -108,8 +108,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-136` are complete. The standing maintenance guidance in
-Ongoing Work still applies.
+`DC-42` through `DC-137` are complete. The standing
+maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -6252,6 +6252,70 @@ Work log:
   `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778884008047749`
+
+### DC-137: Clean Game Smoke Sprite Coverage Evidence
+
+Status: `complete`
+
+Goal: extend the clean game smoke so it proves the scene path covers the
+gameplay sprite categories required by the sprite-first rewrite.
+
+Scope:
+
+- Add layer coverage evidence for terrain, starfield, objects, projectiles, and
+  HUD sprites to the clean game smoke report.
+- Add sprite-ID coverage evidence for player, lander, human, projectile,
+  terrain, star, and score text sprites.
+- Validate that the clean smoke fails when required gameplay sprite coverage is
+  missing.
+- Keep `--game-smoke` and `--live-smoke` behavior otherwise unchanged.
+
+Acceptance criteria:
+
+- `--game-smoke` reports nonzero layer counts for terrain, starfield, objects,
+  projectiles, and HUD.
+- `--game-smoke` reports all required clean gameplay sprite IDs.
+- Focused smoke and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 23:28:32 BST` Started `DC-137`: extending `--game-smoke` so it
+  verifies gameplay sprite coverage across terrain, starfield, object,
+  projectile, and HUD layers plus required sprite IDs for player, lander,
+  human, projectile, terrain, star, and score text.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778884124624519`
+- `2026-05-16 00:08:13 BST` Completed `DC-137`: extended `--game-smoke` with
+  gameplay sprite coverage evidence from clean `RenderScene` data. The smoke
+  report now proves 105 terrain sprites, 63 starfield sprites, 93 object
+  sprites, 5 projectile sprites, 24 HUD sprites, and required sprite IDs for
+  score text, stars, terrain, enemy landers, humans, the player ship, and
+  player projectiles. Validation passed with `cargo fmt --check`,
+  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
+  `cargo test --all-targets` (1226 library tests, 2 binary tests, and
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixture traces, 15452 frames, and 42/42 new executable
+  Rust lines covered), `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke` (239 rendered frames), markdownlint, and
+  `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778886613013399`
 
 ## Ongoing Work
 
