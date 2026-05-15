@@ -167,6 +167,39 @@ impl ScreenPosition {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ScreenVelocity {
+    pub dx: i8,
+    pub dy: i8,
+}
+
+impl ScreenVelocity {
+    pub const fn new(dx: i8, dy: i8) -> Self {
+        Self { dx, dy }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnemyMotionFrame {
+    pub position: ScreenPosition,
+    pub velocity: ScreenVelocity,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EnemyMotionSystem;
+
+impl EnemyMotionSystem {
+    pub fn step(position: ScreenPosition, velocity: ScreenVelocity) -> EnemyMotionFrame {
+        EnemyMotionFrame {
+            position: ScreenPosition::new(
+                position.x.wrapping_add_signed(velocity.dx),
+                position.y.wrapping_add_signed(velocity.dy),
+            ),
+            velocity,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PlayerMotionState {
     pub position: (WorldVector, WorldVector),
@@ -588,11 +621,11 @@ mod tests {
     };
 
     use super::{
-        Fixed24, FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers,
-        PlayerControlIntent, PlayerControlSystem, PlayerMotionState, PlayerMotionSystem,
-        ProjectileLaunchOutcome, ProjectileState, ProjectileSystem, ScreenPosition,
-        VerticalControl, advance_one_frame, clamp_camera_velocity_word, next_vertical_velocity,
-        scroll_adjusted_x, thrust_acceleration,
+        EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate, GameSimulation,
+        PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem, PlayerMotionState,
+        PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileState, ProjectileSystem,
+        ScreenPosition, ScreenVelocity, VerticalControl, advance_one_frame,
+        clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
     };
 
     #[test]
@@ -835,6 +868,20 @@ mod tests {
                 state: ProjectileState::new(4),
             }
         );
+    }
+
+    #[test]
+    fn enemy_motion_system_advances_and_wraps_screen_positions() {
+        let moved =
+            EnemyMotionSystem::step(ScreenPosition::new(204, 84), ScreenVelocity::new(-1, 2));
+
+        assert_eq!(moved.position, ScreenPosition::new(203, 86));
+        assert_eq!(moved.velocity, ScreenVelocity::new(-1, 2));
+
+        let wrapped =
+            EnemyMotionSystem::step(ScreenPosition::new(0, 255), ScreenVelocity::new(-2, 1));
+
+        assert_eq!(wrapped.position, ScreenPosition::new(254, 0));
     }
 
     #[derive(Debug)]

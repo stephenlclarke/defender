@@ -133,10 +133,11 @@ pub use renderer::{
     WgpuViewportCommand,
 };
 pub use systems::{
-    FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,
-    PlayerControlIntent, PlayerControlSystem, PlayerMotionFrame, PlayerMotionState,
-    PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileState, ProjectileSystem, ScreenPosition,
-    VerticalControl, advance_one_frame,
+    EnemyMotionFrame, EnemyMotionSystem, FixedStepAccumulator, FrameRate, GameSimulation,
+    PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent, PlayerControlSystem,
+    PlayerMotionFrame, PlayerMotionState, PlayerMotionSystem, ProjectileLaunchOutcome,
+    ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl,
+    advance_one_frame,
 };
 
 #[cfg(test)]

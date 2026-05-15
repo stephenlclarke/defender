@@ -3,8 +3,9 @@
 use crate::{
     renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize},
     systems::{
-        GameSimulation, PlayerControlSystem, PlayerMotionState, PlayerMotionSystem,
-        ProjectileLaunchOutcome, ProjectileState, ProjectileSystem, ScreenPosition,
+        EnemyMotionSystem, GameSimulation, PlayerControlSystem, PlayerMotionState,
+        PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileState, ProjectileSystem,
+        ScreenPosition, ScreenVelocity,
     },
 };
 
@@ -65,6 +66,7 @@ pub enum EnemyKind {
 pub struct EnemySnapshot {
     pub kind: EnemyKind,
     pub position: ScreenPosition,
+    pub velocity: ScreenVelocity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,6 +122,7 @@ impl WorldSnapshot {
             enemies: vec![EnemySnapshot {
                 kind: EnemyKind::Lander,
                 position: ScreenPosition::new(204, 84),
+                velocity: ScreenVelocity::new(-1, 0),
             }],
             humans: vec![
                 HumanSnapshot {
@@ -333,6 +336,12 @@ impl Game {
         if controls.triggers.thrust {
             sound_events.push(SoundEvent::ThrustStarted);
         }
+
+        for enemy in &mut self.state.world.enemies {
+            let motion = EnemyMotionSystem::step(enemy.position, enemy.velocity);
+            enemy.position = motion.position;
+            enemy.velocity = motion.velocity;
+        }
     }
 
     fn scene(&self) -> RenderScene {
@@ -511,7 +520,7 @@ fn world_vector_pixels(vector: WorldVector) -> f32 {
 mod tests {
     use crate::{
         renderer::{Color, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize, TextureAtlas},
-        systems::{GameSimulation, advance_one_frame},
+        systems::{GameSimulation, ScreenVelocity, advance_one_frame},
     };
 
     use super::{
@@ -617,6 +626,10 @@ mod tests {
         assert_eq!(started.state.world.stars.len(), 3);
         assert_eq!(started.state.world.enemies.len(), 1);
         assert_eq!(started.state.world.enemies[0].kind, EnemyKind::Lander);
+        assert_eq!(
+            started.state.world.enemies[0].velocity,
+            ScreenVelocity::new(-1, 0)
+        );
         assert_eq!(started.state.world.humans.len(), 2);
         assert_eq!(started.events.gameplay(), &[GameEvent::GameStarted]);
         assert_eq!(started.events.sounds(), &[SoundEvent::GameStarted]);
@@ -672,6 +685,23 @@ mod tests {
             }
         );
         assert_eq!(frame.scene.summary().raster_count, 0);
+    }
+
+    #[test]
+    fn clean_game_advances_enemy_positions_through_systems() {
+        let mut game = credited_started_game();
+        let before = game.state.world.enemies[0].position;
+
+        let frame = game.step(GameInput::NONE);
+        let enemy = frame.state.world.enemies[0];
+
+        assert_eq!(enemy.position.x, before.x.wrapping_sub(1));
+        assert_eq!(enemy.position.y, before.y);
+        assert_eq!(enemy.velocity, ScreenVelocity::new(-1, 0));
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER
+                && sprite.position == [f32::from(enemy.position.x), f32::from(enemy.position.y)]
+        }));
     }
 
     #[test]

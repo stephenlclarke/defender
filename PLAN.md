@@ -107,8 +107,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-119` are complete. The standing maintenance guidance in
-Ongoing Work still applies.
+`DC-42` through `DC-120` are complete. The standing
+maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -5151,6 +5151,70 @@ Work log:
   frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778838787881489`
+
+### DC-120: Clean Enemy Motion System
+
+Status: `complete`
+
+Goal: move clean first-wave enemies through deterministic gameplay systems
+instead of leaving them as static scene placeholders.
+
+Scope:
+
+- Add clean enemy velocity data to world enemy snapshots.
+- Add a deterministic enemy motion system in `src/systems.rs`.
+- Advance clean enemies during playing frames before scene rendering.
+- Preserve atlas-backed clean world sprite rendering.
+- Add focused systems and game tests for enemy movement and wrapping.
+- Update README/SPEC module text for clean enemy-motion ownership.
+
+Acceptance criteria:
+
+- Clean enemy movement is represented by gameplay-domain data, not legacy
+  memory tables.
+- Playing frames advance enemy positions deterministically through a system.
+- Enemy sprites continue to render through renderer-owned atlas-backed scene
+  sprites after movement.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::enemy_motion_system
+cargo test --lib game::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 10:54:30 BST` Started `DC-120`: adding clean enemy velocity,
+  deterministic enemy motion, focused systems/game tests, and docs for moving
+  clean world entities through systems rather than legacy memory tables.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778838869364999`
+- `2026-05-15 11:17:12 BST` Completed `DC-120`: added clean enemy velocity
+  to enemy snapshots, introduced `ScreenVelocity` and `EnemyMotionSystem` for
+  deterministic wrapping movement, and advanced clean first-wave enemies
+  through the system during playing frames before scene generation. README and
+  SPEC now describe clean enemy-motion ownership without relying on legacy
+  memory-table names.
+  Validation passed with
+  `cargo test --lib systems::tests::enemy_motion_system`,
+  `cargo test --lib game::tests::` (12 passed),
+  `cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation`,
+  `cargo test --all-targets` (1172 library tests, 2 binary tests, and
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, 13/13 non-baselined added
+  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
+  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778840224712949`
 
 ## Ongoing Work
 
