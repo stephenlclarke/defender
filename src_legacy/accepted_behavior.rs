@@ -5,7 +5,6 @@ use crate::{
         AcceptedDirection, AcceptedEvent, AcceptedFrame, AcceptedPhase, AcceptedPlayer,
         AcceptedScores, AcceptedSnapshot,
     },
-    app,
     machine_state::{self, MachineEvent, MachineSnapshot},
     red_label::Facing,
     video,
@@ -120,10 +119,6 @@ impl From<MachineEvent> for AcceptedEvent {
 
 pub(crate) fn native_visible_size() -> (u16, u16) {
     video::native_visible_size()
-}
-
-pub(crate) fn run_runtime() -> anyhow::Result<()> {
-    app::run()
 }
 
 #[cfg(test)]

@@ -26,10 +26,6 @@ impl<B> RuntimeHost<B> {
 }
 
 impl<B: RuntimeBackend> RuntimeHost<B> {
-    pub(crate) fn run_cli(&self) -> anyhow::Result<()> {
-        self.backend.run_command(RuntimeCommand::AcceptedCli)
-    }
-
     pub(crate) fn run_help(&self) -> anyhow::Result<()> {
         self.backend.run_command(RuntimeCommand::Help)
     }
@@ -105,7 +101,6 @@ pub(crate) trait RuntimeBackend {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RuntimeCommand {
-    AcceptedCli,
     Help,
     RomReport {
         path: Option<PathBuf>,
@@ -184,7 +179,6 @@ pub(crate) struct InstalledRuntimeBackend;
 impl RuntimeBackend for InstalledRuntimeBackend {
     fn run_command(&self, command: RuntimeCommand) -> anyhow::Result<()> {
         match command {
-            RuntimeCommand::AcceptedCli => crate::accepted_behavior::run_runtime(),
             RuntimeCommand::Help => {
                 print!("{}", help_text());
                 Ok(())
@@ -236,10 +230,6 @@ impl RuntimeBackend for InstalledRuntimeBackend {
             }
         }
     }
-}
-
-pub(crate) fn run_cli() -> anyhow::Result<()> {
-    RuntimeHost::current().run_cli()
 }
 
 pub(crate) fn run_help() -> anyhow::Result<()> {
@@ -375,20 +365,6 @@ mod tests {
                 cmos_path: Some(PathBuf::from("scores.bin")),
             }]
         );
-    }
-
-    #[test]
-    fn runtime_host_launches_default_cli_separately() {
-        let calls = Rc::new(RefCell::new(Vec::new()));
-        let host = RuntimeHost::with_backend(RecordingBackend {
-            calls: Rc::clone(&calls),
-        });
-
-        host.run_cli()
-            .expect("runtime host should run default CLI command");
-
-        let observed = calls.borrow();
-        assert_eq!(observed.as_slice(), &[RuntimeCommand::AcceptedCli]);
     }
 
     #[test]

@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-100` are complete. The standing maintenance guidance in
+`DC-42` through `DC-101` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3886,6 +3886,77 @@ Work log:
   Live smoke rendered `239` frames.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778804751380139`
+
+### DC-101: Clean Unsupported CLI Argument Ownership
+
+Status: `complete`
+
+Goal: remove the accepted CLI fallback from clean platform/runtime dispatch so
+unsupported and removed CLI arguments are reported by clean code directly.
+
+Scope:
+
+- Replace the `CompatibilityFallback` classification with clean
+  `UnknownArgument` and removed renderer-selection errors.
+- Preserve user-facing error text for unknown arguments and removed
+  `--renderer` / `--presentation` selection.
+- Remove `RuntimeCommand::AcceptedCli`, `RuntimeHost::run_cli`, and the
+  `accepted_behavior::run_runtime()` fallback from clean runtime dispatch.
+- Update public API guards so clean runtime no longer has an accepted CLI
+  escape hatch.
+- Add focused platform/runtime/API tests for unsupported arguments, removed
+  renderer selection, and absence of accepted runtime fallback wiring.
+
+Acceptance criteria:
+
+- `cargo run -- --unknown` fails through clean platform code with the existing
+  `unknown argument: --unknown` text.
+- `cargo run -- --renderer wgpu` and `cargo run -- --presentation wgpu` fail
+  through clean platform code with the existing `wgpu-only` text.
+- Clean platform/runtime no longer calls `crate::runtime::run_cli()` or
+  `crate::accepted_behavior::run_runtime()`.
+- Public API guards make the removal visible.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib platform::tests::
+cargo test --lib runtime::tests::
+cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
+cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --unknown
+cargo run -- --live-smoke --unknown
+cargo run -- --renderer wgpu
+cargo run -- --presentation wgpu
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 01:28:41 BST` Started `DC-101`: moving unsupported and
+  removed CLI argument handling fully into clean platform ownership, removing
+  the accepted CLI fallback from clean runtime dispatch, and preserving
+  user-facing unknown-argument and `wgpu-only` renderer-selection errors.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778804917918359`
+- `2026-05-15 01:53:21 BST` Completed `DC-101`: removed the clean runtime
+  accepted CLI fallback, made unknown and removed renderer-selection arguments
+  clean platform errors, deleted the unused accepted runtime helper, and
+  removed redundant `Clean` prefixes from internal CLI classification variants.
+  Validation passed with focused platform/runtime/API tests,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 local fixtures, 15452 frames, 91/91 new executable Rust
+  lines), clean CLI failure probes, `cargo run -- --live-smoke` (239 rendered
+  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778806424037359`
 
 ## Ongoing Work
 

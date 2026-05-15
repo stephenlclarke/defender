@@ -79,65 +79,51 @@ where
 
 fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Result<()> {
     match classification {
-        CliClassification::CleanRomReport(request) => crate::runtime::run_rom_report(request.path),
-        CliClassification::CleanVerifyRoms(request) => {
-            crate::runtime::run_verify_roms(request.path)
-        }
-        CliClassification::CleanFidelityTrace(request) => {
+        CliClassification::RomReport(request) => crate::runtime::run_rom_report(request.path),
+        CliClassification::VerifyRoms(request) => crate::runtime::run_verify_roms(request.path),
+        CliClassification::FidelityTrace(request) => {
             crate::runtime::run_fidelity_trace(request.frame_count)
         }
-        CliClassification::CleanFidelityTraceInputs(request) => {
+        CliClassification::FidelityTraceInputs(request) => {
             crate::runtime::run_fidelity_trace_inputs(request.script)
         }
-        CliClassification::CleanFidelityTraceInputsFile(request) => {
+        CliClassification::FidelityTraceInputsFile(request) => {
             crate::runtime::run_fidelity_trace_inputs_file(request.path)
         }
-        CliClassification::CleanFidelityTraceCheck(request) => {
+        CliClassification::FidelityTraceCheck(request) => {
             crate::runtime::run_fidelity_trace_check(request.inputs_path, request.expected_path)
         }
-        CliClassification::CleanFidelityTraceFixtureDirectory(request) => {
+        CliClassification::FidelityTraceFixtureDirectory(request) => {
             crate::runtime::run_fidelity_trace_check_dir(request.path)
         }
-        CliClassification::CleanFidelityReferenceTraceFixtureDirectory(request) => {
+        CliClassification::FidelityReferenceTraceFixtureDirectory(request) => {
             crate::runtime::run_fidelity_reference_trace_check_dir(request.path)
         }
-        CliClassification::CleanFidelityScenarioList => {
-            crate::runtime::run_fidelity_scenario_list()
-        }
-        CliClassification::CleanFidelityScenarioInputWriter(request) => {
+        CliClassification::FidelityScenarioList => crate::runtime::run_fidelity_scenario_list(),
+        CliClassification::FidelityScenarioInputWriter(request) => {
             crate::runtime::run_fidelity_scenario_input_writer(request.path)
         }
-        CliClassification::CompatibilityFallback(arg) => {
-            let _first_arg = arg.first_arg;
-            crate::runtime::run_cli()
-        }
-        CliClassification::CleanRuntime(config) => crate::runtime::run(&config),
-        CliClassification::CleanHelp => crate::runtime::run_help(),
-        CliClassification::CleanError(error) => Err(error.into()),
+        CliClassification::Runtime(config) => crate::runtime::run(&config),
+        CliClassification::Help => crate::runtime::run_help(),
+        CliClassification::Error(error) => Err(error.into()),
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CliClassification {
-    CleanRomReport(RomReportRequest),
-    CleanVerifyRoms(VerifyRomsRequest),
-    CleanFidelityTrace(FidelityTraceRequest),
-    CleanFidelityTraceInputs(FidelityTraceInputsRequest),
-    CleanFidelityTraceInputsFile(FidelityTraceInputsFileRequest),
-    CleanFidelityTraceCheck(FidelityTraceCheckRequest),
-    CleanFidelityTraceFixtureDirectory(FidelityTraceFixtureDirectoryRequest),
-    CleanFidelityReferenceTraceFixtureDirectory(FidelityReferenceTraceFixtureDirectoryRequest),
-    CleanFidelityScenarioList,
-    CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
-    CompatibilityFallback(CompatibilityCliArg),
-    CleanRuntime(RuntimeConfig),
-    CleanHelp,
-    CleanError(CleanCliError),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct CompatibilityCliArg {
-    first_arg: String,
+    RomReport(RomReportRequest),
+    VerifyRoms(VerifyRomsRequest),
+    FidelityTrace(FidelityTraceRequest),
+    FidelityTraceInputs(FidelityTraceInputsRequest),
+    FidelityTraceInputsFile(FidelityTraceInputsFileRequest),
+    FidelityTraceCheck(FidelityTraceCheckRequest),
+    FidelityTraceFixtureDirectory(FidelityTraceFixtureDirectoryRequest),
+    FidelityReferenceTraceFixtureDirectory(FidelityReferenceTraceFixtureDirectoryRequest),
+    FidelityScenarioList,
+    FidelityScenarioInputWriter(ScenarioInputWriterRequest),
+    Runtime(RuntimeConfig),
+    Help,
+    Error(CleanCliError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -200,50 +186,45 @@ impl RuntimeCliClassifier {
 
         while let Some(arg) = args.next() {
             match Self::apply_arg(&arg, &mut args, &mut config, live_option_seen) {
-                ArgClassification::CleanRuntime => live_option_seen = true,
-                ArgClassification::CleanRomReport(request) => {
-                    return CliClassification::CleanRomReport(request);
+                ArgClassification::Runtime => live_option_seen = true,
+                ArgClassification::RomReport(request) => {
+                    return CliClassification::RomReport(request);
                 }
-                ArgClassification::CleanVerifyRoms(request) => {
-                    return CliClassification::CleanVerifyRoms(request);
+                ArgClassification::VerifyRoms(request) => {
+                    return CliClassification::VerifyRoms(request);
                 }
-                ArgClassification::CleanFidelityTrace(request) => {
-                    return CliClassification::CleanFidelityTrace(request);
+                ArgClassification::FidelityTrace(request) => {
+                    return CliClassification::FidelityTrace(request);
                 }
-                ArgClassification::CleanFidelityTraceInputs(request) => {
-                    return CliClassification::CleanFidelityTraceInputs(request);
+                ArgClassification::FidelityTraceInputs(request) => {
+                    return CliClassification::FidelityTraceInputs(request);
                 }
-                ArgClassification::CleanFidelityTraceInputsFile(request) => {
-                    return CliClassification::CleanFidelityTraceInputsFile(request);
+                ArgClassification::FidelityTraceInputsFile(request) => {
+                    return CliClassification::FidelityTraceInputsFile(request);
                 }
-                ArgClassification::CleanFidelityTraceCheck(request) => {
-                    return CliClassification::CleanFidelityTraceCheck(request);
+                ArgClassification::FidelityTraceCheck(request) => {
+                    return CliClassification::FidelityTraceCheck(request);
                 }
-                ArgClassification::CleanFidelityTraceFixtureDirectory(request) => {
-                    return CliClassification::CleanFidelityTraceFixtureDirectory(request);
+                ArgClassification::FidelityTraceFixtureDirectory(request) => {
+                    return CliClassification::FidelityTraceFixtureDirectory(request);
                 }
-                ArgClassification::CleanFidelityReferenceTraceFixtureDirectory(request) => {
-                    return CliClassification::CleanFidelityReferenceTraceFixtureDirectory(request);
+                ArgClassification::FidelityReferenceTraceFixtureDirectory(request) => {
+                    return CliClassification::FidelityReferenceTraceFixtureDirectory(request);
                 }
-                ArgClassification::CleanFidelityScenarioList => {
-                    return CliClassification::CleanFidelityScenarioList;
+                ArgClassification::FidelityScenarioList => {
+                    return CliClassification::FidelityScenarioList;
                 }
-                ArgClassification::CleanFidelityScenarioInputWriter(request) => {
-                    return CliClassification::CleanFidelityScenarioInputWriter(request);
+                ArgClassification::FidelityScenarioInputWriter(request) => {
+                    return CliClassification::FidelityScenarioInputWriter(request);
                 }
-                ArgClassification::CleanHelp => return CliClassification::CleanHelp,
-                ArgClassification::CleanError(error) => {
-                    return CliClassification::CleanError(error);
-                }
-                ArgClassification::CompatibilityFallback(first_arg) => {
-                    return CliClassification::CompatibilityFallback(CompatibilityCliArg {
-                        first_arg,
-                    });
+                ArgClassification::Help => return CliClassification::Help,
+                ArgClassification::Error(error) => {
+                    return CliClassification::Error(error);
                 }
             }
         }
 
-        CliClassification::CleanRuntime(config)
+        CliClassification::Runtime(config)
     }
 
     fn apply_arg<I>(
@@ -258,167 +239,158 @@ impl RuntimeCliClassifier {
         match arg {
             "--live-smoke" => {
                 config.mode = RunMode::Smoke;
-                ArgClassification::CleanRuntime
+                ArgClassification::Runtime
             }
-            "--help" | "-h" => ArgClassification::CleanHelp,
+            "--help" | "-h" => ArgClassification::Help,
+            "--renderer" | "--presentation" => {
+                ArgClassification::Error(CleanCliError::RemovedRendererSelection)
+            }
             "--input-profile" => {
                 let Some(value) = args.next() else {
-                    return ArgClassification::CleanError(CleanCliError::MissingInputProfile);
+                    return ArgClassification::Error(CleanCliError::MissingInputProfile);
                 };
                 let Some(controls) = parse_control_profile(&value) else {
-                    return ArgClassification::CleanError(CleanCliError::UnknownInputProfile(
-                        value,
-                    ));
+                    return ArgClassification::Error(CleanCliError::UnknownInputProfile(value));
                 };
                 config.controls = controls;
-                ArgClassification::CleanRuntime
+                ArgClassification::Runtime
             }
             "--mute" => {
                 config.audio = AudioOutput::Disabled;
-                ArgClassification::CleanRuntime
+                ArgClassification::Runtime
             }
             "--cmos-path" => {
                 let Some(value) = args.next() else {
-                    return ArgClassification::CleanError(CleanCliError::MissingCmosPath);
+                    return ArgClassification::Error(CleanCliError::MissingCmosPath);
                 };
                 config.cmos_path = Some(PathBuf::from(value));
-                ArgClassification::CleanRuntime
+                ArgClassification::Runtime
             }
             "--rom-report" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--rom-report",
                     ));
                 }
                 let path = match args.next() {
                     Some(value) if value.starts_with('-') => {
-                        return ArgClassification::CleanError(
-                            CleanCliError::RomReportPathCannotBeFlag(value),
-                        );
+                        return ArgClassification::Error(CleanCliError::RomReportPathCannotBeFlag(
+                            value,
+                        ));
                     }
                     Some(value) => Some(PathBuf::from(value)),
                     None => None,
                 };
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(CleanCliError::TooManyRomReportArgs);
+                    return ArgClassification::Error(CleanCliError::TooManyRomReportArgs);
                 }
-                ArgClassification::CleanRomReport(RomReportRequest { path })
+                ArgClassification::RomReport(RomReportRequest { path })
             }
             "--verify-roms" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--verify-roms",
                     ));
                 }
                 let Some(path) = args.next() else {
-                    return ArgClassification::CleanError(CleanCliError::MissingVerifyRomsPath);
+                    return ArgClassification::Error(CleanCliError::MissingVerifyRomsPath);
                 };
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(CleanCliError::TooManyVerifyRomsArgs);
+                    return ArgClassification::Error(CleanCliError::TooManyVerifyRomsArgs);
                 }
-                ArgClassification::CleanVerifyRoms(VerifyRomsRequest {
+                ArgClassification::VerifyRoms(VerifyRomsRequest {
                     path: PathBuf::from(path),
                 })
             }
             "--fidelity-trace" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--fidelity-trace",
                     ));
                 }
                 let frame_count = match args.next() {
                     Some(value) => match parse_fidelity_trace_frame_count(&value) {
                         Ok(frame_count) => frame_count,
-                        Err(error) => return ArgClassification::CleanError(error),
+                        Err(error) => return ArgClassification::Error(error),
                     },
                     None => 1,
                 };
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(CleanCliError::TooManyFidelityTraceArgs);
+                    return ArgClassification::Error(CleanCliError::TooManyFidelityTraceArgs);
                 }
-                ArgClassification::CleanFidelityTrace(FidelityTraceRequest { frame_count })
+                ArgClassification::FidelityTrace(FidelityTraceRequest { frame_count })
             }
             "--fidelity-trace-inputs" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--fidelity-trace-inputs",
                     ));
                 }
                 let Some(script) = args.next() else {
-                    return ArgClassification::CleanError(
+                    return ArgClassification::Error(
                         CleanCliError::FidelityTraceInputsMissingScript,
                     );
                 };
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(
-                        CleanCliError::FidelityTraceInputsExtraArgs,
-                    );
+                    return ArgClassification::Error(CleanCliError::FidelityTraceInputsExtraArgs);
                 }
-                ArgClassification::CleanFidelityTraceInputs(FidelityTraceInputsRequest { script })
+                ArgClassification::FidelityTraceInputs(FidelityTraceInputsRequest { script })
             }
             "--fidelity-trace-inputs-file" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--fidelity-trace-inputs-file",
                     ));
                 }
                 let Some(path) = args.next() else {
-                    return ArgClassification::CleanError(
+                    return ArgClassification::Error(
                         CleanCliError::FidelityTraceInputsFileMissingPath,
                     );
                 };
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(
+                    return ArgClassification::Error(
                         CleanCliError::FidelityTraceInputsFileExtraArgs,
                     );
                 }
-                ArgClassification::CleanFidelityTraceInputsFile(FidelityTraceInputsFileRequest {
+                ArgClassification::FidelityTraceInputsFile(FidelityTraceInputsFileRequest {
                     path: PathBuf::from(path),
                 })
             }
             "--fidelity-check-trace" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--fidelity-check-trace",
                     ));
                 }
                 let Some(inputs_path) = args.next() else {
-                    return ArgClassification::CleanError(
-                        CleanCliError::FidelityCheckTraceMissingPaths,
-                    );
+                    return ArgClassification::Error(CleanCliError::FidelityCheckTraceMissingPaths);
                 };
                 let Some(expected_path) = args.next() else {
-                    return ArgClassification::CleanError(
-                        CleanCliError::FidelityCheckTraceMissingPaths,
-                    );
+                    return ArgClassification::Error(CleanCliError::FidelityCheckTraceMissingPaths);
                 };
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(
-                        CleanCliError::FidelityCheckTraceExtraArgs,
-                    );
+                    return ArgClassification::Error(CleanCliError::FidelityCheckTraceExtraArgs);
                 }
-                ArgClassification::CleanFidelityTraceCheck(FidelityTraceCheckRequest {
+                ArgClassification::FidelityTraceCheck(FidelityTraceCheckRequest {
                     inputs_path: PathBuf::from(inputs_path),
                     expected_path: PathBuf::from(expected_path),
                 })
             }
             "--fidelity-check-trace-dir" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--fidelity-check-trace-dir",
                     ));
                 }
                 let Some(path) = args.next() else {
-                    return ArgClassification::CleanError(
+                    return ArgClassification::Error(
                         CleanCliError::FidelityCheckTraceDirMissingPath,
                     );
                 };
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(
-                        CleanCliError::FidelityCheckTraceDirExtraArgs,
-                    );
+                    return ArgClassification::Error(CleanCliError::FidelityCheckTraceDirExtraArgs);
                 }
-                ArgClassification::CleanFidelityTraceFixtureDirectory(
+                ArgClassification::FidelityTraceFixtureDirectory(
                     FidelityTraceFixtureDirectoryRequest {
                         path: PathBuf::from(path),
                     },
@@ -426,21 +398,21 @@ impl RuntimeCliClassifier {
             }
             "--fidelity-check-reference-trace-dir" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--fidelity-check-reference-trace-dir",
                     ));
                 }
                 let Some(path) = args.next() else {
-                    return ArgClassification::CleanError(
+                    return ArgClassification::Error(
                         CleanCliError::FidelityCheckReferenceTraceDirMissingPath,
                     );
                 };
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(
+                    return ArgClassification::Error(
                         CleanCliError::FidelityCheckReferenceTraceDirExtraArgs,
                     );
                 }
-                ArgClassification::CleanFidelityReferenceTraceFixtureDirectory(
+                ArgClassification::FidelityReferenceTraceFixtureDirectory(
                     FidelityReferenceTraceFixtureDirectoryRequest {
                         path: PathBuf::from(path),
                     },
@@ -448,58 +420,55 @@ impl RuntimeCliClassifier {
             }
             "--fidelity-list-scenarios" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--fidelity-list-scenarios",
                     ));
                 }
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(
-                        CleanCliError::FidelityListScenariosExtraArgs,
-                    );
+                    return ArgClassification::Error(CleanCliError::FidelityListScenariosExtraArgs);
                 }
-                ArgClassification::CleanFidelityScenarioList
+                ArgClassification::FidelityScenarioList
             }
             "--fidelity-write-scenario-inputs" => {
                 if live_option_seen {
-                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
                         "--fidelity-write-scenario-inputs",
                     ));
                 }
                 let Some(path) = args.next() else {
-                    return ArgClassification::CleanError(
+                    return ArgClassification::Error(
                         CleanCliError::FidelityWriteScenarioInputsMissingPath,
                     );
                 };
                 if args.next().is_some() {
-                    return ArgClassification::CleanError(
+                    return ArgClassification::Error(
                         CleanCliError::FidelityWriteScenarioInputsExtraArgs,
                     );
                 }
-                ArgClassification::CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest {
+                ArgClassification::FidelityScenarioInputWriter(ScenarioInputWriterRequest {
                     path: PathBuf::from(path),
                 })
             }
-            _ => ArgClassification::CompatibilityFallback(String::from(arg)),
+            _ => ArgClassification::Error(CleanCliError::UnknownArgument(String::from(arg))),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ArgClassification {
-    CleanRomReport(RomReportRequest),
-    CleanVerifyRoms(VerifyRomsRequest),
-    CleanFidelityTrace(FidelityTraceRequest),
-    CleanFidelityTraceInputs(FidelityTraceInputsRequest),
-    CleanFidelityTraceInputsFile(FidelityTraceInputsFileRequest),
-    CleanFidelityTraceCheck(FidelityTraceCheckRequest),
-    CleanFidelityTraceFixtureDirectory(FidelityTraceFixtureDirectoryRequest),
-    CleanFidelityReferenceTraceFixtureDirectory(FidelityReferenceTraceFixtureDirectoryRequest),
-    CleanFidelityScenarioList,
-    CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
-    CompatibilityFallback(String),
-    CleanRuntime,
-    CleanHelp,
-    CleanError(CleanCliError),
+    RomReport(RomReportRequest),
+    VerifyRoms(VerifyRomsRequest),
+    FidelityTrace(FidelityTraceRequest),
+    FidelityTraceInputs(FidelityTraceInputsRequest),
+    FidelityTraceInputsFile(FidelityTraceInputsFileRequest),
+    FidelityTraceCheck(FidelityTraceCheckRequest),
+    FidelityTraceFixtureDirectory(FidelityTraceFixtureDirectoryRequest),
+    FidelityReferenceTraceFixtureDirectory(FidelityReferenceTraceFixtureDirectoryRequest),
+    FidelityScenarioList,
+    FidelityScenarioInputWriter(ScenarioInputWriterRequest),
+    Runtime,
+    Help,
+    Error(CleanCliError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -507,6 +476,8 @@ enum CleanCliError {
     MissingInputProfile,
     UnknownInputProfile(String),
     MissingCmosPath,
+    RemovedRendererSelection,
+    UnknownArgument(String),
     LiveOptionsWithCommand(&'static str),
     RomReportPathCannotBeFlag(String),
     TooManyRomReportArgs,
@@ -543,6 +514,13 @@ impl fmt::Display for CleanCliError {
                 write!(formatter, "unknown input profile: {value}")
             }
             Self::MissingCmosPath => write!(formatter, "--cmos-path requires a file path"),
+            Self::RemovedRendererSelection => {
+                write!(
+                    formatter,
+                    "renderer selection was removed; live play is wgpu-only"
+                )
+            }
+            Self::UnknownArgument(value) => write!(formatter, "unknown argument: {value}"),
             Self::LiveOptionsWithCommand(command) => {
                 write!(formatter, "live options cannot be combined with {command}")
             }
@@ -696,7 +674,7 @@ mod tests {
     };
 
     use super::{
-        AudioOutput, CleanCliError, CliClassification, CompatibilityCliArg, ControlProfile,
+        AudioOutput, CleanCliError, CliClassification, ControlProfile,
         FidelityReferenceTraceFixtureDirectoryRequest, FidelityTraceCheckRequest,
         FidelityTraceFixtureDirectoryRequest, FidelityTraceInputsFileRequest,
         FidelityTraceInputsRequest, FidelityTraceRequest, RomReportRequest, RunMode,
@@ -726,7 +704,7 @@ mod tests {
     fn clean_cli_owns_default_interactive_launch() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&[])),
-            CliClassification::CleanRuntime(RuntimeConfig::default())
+            CliClassification::Runtime(RuntimeConfig::default())
         );
     }
 
@@ -740,7 +718,7 @@ mod tests {
                 "--cmos-path",
                 "scores.bin",
             ])),
-            CliClassification::CleanRuntime(RuntimeConfig {
+            CliClassification::Runtime(RuntimeConfig {
                 controls: ControlProfile::Cabinet,
                 audio: AudioOutput::Disabled,
                 mode: RunMode::Interactive,
@@ -753,7 +731,7 @@ mod tests {
     fn clean_cli_owns_live_smoke_launch() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--live-smoke"])),
-            CliClassification::CleanRuntime(RuntimeConfig::smoke())
+            CliClassification::Runtime(RuntimeConfig::smoke())
         );
     }
 
@@ -768,7 +746,7 @@ mod tests {
                 "scores.bin",
                 "--live-smoke",
             ])),
-            CliClassification::CleanRuntime(RuntimeConfig {
+            CliClassification::Runtime(RuntimeConfig {
                 controls: ControlProfile::Cabinet,
                 audio: AudioOutput::Disabled,
                 mode: RunMode::Smoke,
@@ -781,7 +759,7 @@ mod tests {
     fn clean_cli_accepts_test_profile_for_live_smoke() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--live-smoke", "--input-profile", "test"])),
-            CliClassification::CleanRuntime(RuntimeConfig {
+            CliClassification::Runtime(RuntimeConfig {
                 controls: ControlProfile::Test,
                 audio: AudioOutput::Null,
                 mode: RunMode::Smoke,
@@ -795,7 +773,7 @@ mod tests {
         for values in [vec!["--help"], vec!["-h"], vec!["--mute", "--help"]] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanHelp
+                CliClassification::Help
             );
         }
     }
@@ -804,7 +782,7 @@ mod tests {
     fn clean_cli_has_no_historical_commands_left() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-check-reference-trace-dir"])),
-            CliClassification::CleanError(CleanCliError::FidelityCheckReferenceTraceDirMissingPath)
+            CliClassification::Error(CleanCliError::FidelityCheckReferenceTraceDirMissingPath)
         );
     }
 
@@ -816,7 +794,7 @@ mod tests {
                 "--fidelity-check-reference-trace-dir",
                 "fixtures",
             ])),
-            CliClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+            CliClassification::Error(CleanCliError::LiveOptionsWithCommand(
                 "--fidelity-check-reference-trace-dir",
             ))
         );
@@ -826,7 +804,7 @@ mod tests {
                 "--fidelity-check-reference-trace-dir",
                 "fixtures",
             ])),
-            CliClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+            CliClassification::Error(CleanCliError::LiveOptionsWithCommand(
                 "--fidelity-check-reference-trace-dir",
             ))
         );
@@ -836,11 +814,11 @@ mod tests {
     fn clean_cli_owns_rom_report_command() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--rom-report"])),
-            CliClassification::CleanRomReport(RomReportRequest { path: None })
+            CliClassification::RomReport(RomReportRequest { path: None })
         );
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--rom-report", "roms"])),
-            CliClassification::CleanRomReport(RomReportRequest {
+            CliClassification::RomReport(RomReportRequest {
                 path: Some(PathBuf::from("roms")),
             })
         );
@@ -850,7 +828,7 @@ mod tests {
     fn clean_cli_owns_verify_roms_command() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--verify-roms", "roms"])),
-            CliClassification::CleanVerifyRoms(VerifyRomsRequest {
+            CliClassification::VerifyRoms(VerifyRomsRequest {
                 path: PathBuf::from("roms"),
             })
         );
@@ -860,11 +838,11 @@ mod tests {
     fn clean_cli_owns_fidelity_trace_command() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-trace"])),
-            CliClassification::CleanFidelityTrace(FidelityTraceRequest { frame_count: 1 })
+            CliClassification::FidelityTrace(FidelityTraceRequest { frame_count: 1 })
         );
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-trace", "300"])),
-            CliClassification::CleanFidelityTrace(FidelityTraceRequest { frame_count: 300 })
+            CliClassification::FidelityTrace(FidelityTraceRequest { frame_count: 300 })
         );
     }
 
@@ -872,13 +850,13 @@ mod tests {
     fn clean_cli_owns_fidelity_trace_input_commands() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-trace-inputs", "none"])),
-            CliClassification::CleanFidelityTraceInputs(FidelityTraceInputsRequest {
+            CliClassification::FidelityTraceInputs(FidelityTraceInputsRequest {
                 script: String::from("none"),
             })
         );
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-trace-inputs-file", "inputs.txt"])),
-            CliClassification::CleanFidelityTraceInputsFile(FidelityTraceInputsFileRequest {
+            CliClassification::FidelityTraceInputsFile(FidelityTraceInputsFileRequest {
                 path: PathBuf::from("inputs.txt"),
             })
         );
@@ -892,7 +870,7 @@ mod tests {
                 "inputs.txt",
                 "expected.tsv",
             ])),
-            CliClassification::CleanFidelityTraceCheck(FidelityTraceCheckRequest {
+            CliClassification::FidelityTraceCheck(FidelityTraceCheckRequest {
                 inputs_path: PathBuf::from("inputs.txt"),
                 expected_path: PathBuf::from("expected.tsv"),
             })
@@ -903,7 +881,7 @@ mod tests {
     fn clean_cli_owns_fidelity_trace_fixture_directory_command() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-check-trace-dir", "fixtures"])),
-            CliClassification::CleanFidelityTraceFixtureDirectory(
+            CliClassification::FidelityTraceFixtureDirectory(
                 FidelityTraceFixtureDirectoryRequest {
                     path: PathBuf::from("fixtures"),
                 },
@@ -918,7 +896,7 @@ mod tests {
                 "--fidelity-check-reference-trace-dir",
                 "fixtures",
             ])),
-            CliClassification::CleanFidelityReferenceTraceFixtureDirectory(
+            CliClassification::FidelityReferenceTraceFixtureDirectory(
                 FidelityReferenceTraceFixtureDirectoryRequest {
                     path: PathBuf::from("fixtures"),
                 },
@@ -930,7 +908,7 @@ mod tests {
     fn clean_cli_owns_fidelity_scenario_listing_command() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-list-scenarios"])),
-            CliClassification::CleanFidelityScenarioList
+            CliClassification::FidelityScenarioList
         );
     }
 
@@ -941,7 +919,7 @@ mod tests {
                 "--fidelity-write-scenario-inputs",
                 "scenario-inputs",
             ])),
-            CliClassification::CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest {
+            CliClassification::FidelityScenarioInputWriter(ScenarioInputWriterRequest {
                 path: PathBuf::from("scenario-inputs"),
             })
         );
@@ -971,7 +949,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -994,7 +972,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -1014,7 +992,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -1044,7 +1022,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -1079,7 +1057,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -1116,7 +1094,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -1139,7 +1117,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -1162,7 +1140,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -1181,7 +1159,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -1204,7 +1182,7 @@ mod tests {
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CleanError(error)
+                CliClassification::Error(error)
             );
         }
     }
@@ -1222,6 +1200,14 @@ mod tests {
         assert_eq!(
             CleanCliError::MissingCmosPath.to_string(),
             "--cmos-path requires a file path"
+        );
+        assert_eq!(
+            CleanCliError::RemovedRendererSelection.to_string(),
+            "renderer selection was removed; live play is wgpu-only"
+        );
+        assert_eq!(
+            CleanCliError::UnknownArgument(String::from("--unknown")).to_string(),
+            "unknown argument: --unknown"
         );
         assert_eq!(
             CleanCliError::LiveOptionsWithCommand("--rom-report").to_string(),
@@ -1314,25 +1300,21 @@ mod tests {
     }
 
     #[test]
-    fn clean_cli_delegates_unsupported_args() {
+    fn clean_cli_rejects_unsupported_args() {
         for values in [vec!["--live-smoke", "--unknown"], vec!["--unknown"]] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CompatibilityFallback(CompatibilityCliArg {
-                    first_arg: String::from("--unknown"),
-                })
+                CliClassification::Error(CleanCliError::UnknownArgument(String::from("--unknown")))
             );
         }
     }
 
     #[test]
-    fn clean_cli_delegates_removed_renderer_selection_as_compatibility() {
+    fn clean_cli_rejects_removed_renderer_selection() {
         for values in [vec!["--renderer", "wgpu"], vec!["--presentation", "wgpu"]] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
-                CliClassification::CompatibilityFallback(CompatibilityCliArg {
-                    first_arg: String::from(values[0]),
-                })
+                CliClassification::Error(CleanCliError::RemovedRendererSelection)
             );
         }
     }
@@ -1378,9 +1360,22 @@ mod tests {
     }
 
     #[test]
-    fn accepted_cli_entrypoint_delegates_unsupported_args() {
-        super::run_with_args(args(&["--unknown"]))
-            .expect("unsupported clean CLI args should delegate to accepted CLI");
+    fn clean_cli_entrypoint_rejects_unsupported_args() {
+        let error = super::run_with_args(args(&["--unknown"]))
+            .expect_err("unsupported clean CLI args should return clean CLI error");
+
+        assert_eq!(error.to_string(), "unknown argument: --unknown");
+    }
+
+    #[test]
+    fn clean_cli_entrypoint_rejects_removed_renderer_selection() {
+        let error = super::run_with_args(args(&["--renderer", "wgpu"]))
+            .expect_err("removed renderer selection should return clean CLI error");
+
+        assert_eq!(
+            error.to_string(),
+            "renderer selection was removed; live play is wgpu-only"
+        );
     }
 
     #[test]

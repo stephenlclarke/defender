@@ -238,7 +238,6 @@ mod public_api_tests {
         let accepted_runtime_call = format!("crate::{}::{}()", "accepted", "run_runtime");
         let app_runtime_call = format!("crate::{}::{}()", "app", "run");
 
-        assert!(platform_rs.contains("crate::runtime::run_cli()"));
         assert!(platform_rs.contains("crate::runtime::run(&config)"));
         assert!(platform_rs.contains("crate::runtime::run_help()"));
         assert!(platform_rs.contains("crate::runtime::run_rom_report(request.path)"));
@@ -263,24 +262,19 @@ mod public_api_tests {
         );
         assert!(platform_rs.contains("RuntimeCliClassifier::classify(args)"));
         assert!(platform_rs.contains("fn dispatch_cli_classification"));
-        assert!(platform_rs.contains("CliClassification::CleanRomReport(request)"));
-        assert!(platform_rs.contains("CliClassification::CleanVerifyRoms(request)"));
-        assert!(platform_rs.contains("CliClassification::CleanFidelityTrace(request)"));
-        assert!(platform_rs.contains("CliClassification::CleanFidelityTraceInputs(request)"));
-        assert!(platform_rs.contains("CliClassification::CleanFidelityTraceInputsFile(request)"));
-        assert!(platform_rs.contains("CliClassification::CleanFidelityTraceCheck(request)"));
+        assert!(platform_rs.contains("CliClassification::RomReport(request)"));
+        assert!(platform_rs.contains("CliClassification::VerifyRoms(request)"));
+        assert!(platform_rs.contains("CliClassification::FidelityTrace(request)"));
+        assert!(platform_rs.contains("CliClassification::FidelityTraceInputs(request)"));
+        assert!(platform_rs.contains("CliClassification::FidelityTraceInputsFile(request)"));
+        assert!(platform_rs.contains("CliClassification::FidelityTraceCheck(request)"));
+        assert!(platform_rs.contains("CliClassification::FidelityTraceFixtureDirectory(request)"));
         assert!(
-            platform_rs.contains("CliClassification::CleanFidelityTraceFixtureDirectory(request)")
+            platform_rs
+                .contains("CliClassification::FidelityReferenceTraceFixtureDirectory(request)")
         );
-        assert!(
-            platform_rs.contains(
-                "CliClassification::CleanFidelityReferenceTraceFixtureDirectory(request)"
-            )
-        );
-        assert!(platform_rs.contains("CliClassification::CleanFidelityScenarioList"));
-        assert!(platform_rs.contains("CliClassification::CleanFidelityScenarioInputWriter"));
-        assert!(platform_rs.contains("CliClassification::CompatibilityFallback(arg)"));
-        assert!(platform_rs.contains("struct CompatibilityCliArg"));
+        assert!(platform_rs.contains("CliClassification::FidelityScenarioList"));
+        assert!(platform_rs.contains("CliClassification::FidelityScenarioInputWriter"));
         assert!(platform_rs.contains("struct RomReportRequest"));
         assert!(platform_rs.contains("struct VerifyRomsRequest"));
         assert!(platform_rs.contains("struct FidelityTraceRequest"));
@@ -335,25 +329,29 @@ mod public_api_tests {
         assert!(!platform_rs.contains("Some(HistoricalCliCommand::CompareTrace)"));
         assert!(!platform_rs.contains("Some(HistoricalCliCommand::FixtureDirectory)"));
         assert!(!platform_rs.contains("FidelityWriteScenarioInputs,"));
-        assert!(platform_rs.contains("CliClassification::CleanRuntime(config)"));
-        assert!(platform_rs.contains("CliClassification::CleanHelp"));
-        assert!(platform_rs.contains("CliClassification::CleanError(error)"));
+        assert!(platform_rs.contains("CliClassification::Runtime(config)"));
+        assert!(platform_rs.contains("CliClassification::Help"));
+        assert!(platform_rs.contains("CliClassification::Error(error)"));
         assert!(platform_rs.contains("enum CleanCliError"));
         assert!(platform_rs.contains("CleanCliError::MissingInputProfile"));
         assert!(platform_rs.contains("CleanCliError::UnknownInputProfile"));
         assert!(platform_rs.contains("CleanCliError::MissingCmosPath"));
+        assert!(platform_rs.contains("CleanCliError::RemovedRendererSelection"));
+        assert!(platform_rs.contains("CleanCliError::UnknownArgument"));
         assert!(platform_rs.contains("RuntimeConfig::default()"));
         assert!(platform_rs.contains("config.mode = RunMode::Smoke"));
-        assert!(platform_rs.contains("\"--help\" | \"-h\" => ArgClassification::CleanHelp"));
-        assert!(platform_rs.contains("ArgClassification::CleanError"));
+        assert!(platform_rs.contains("\"--help\" | \"-h\" => ArgClassification::Help"));
+        assert!(platform_rs.contains("ArgClassification::Error"));
         assert!(platform_rs.contains("\"--live-smoke\""));
         assert!(platform_rs.contains("RuntimeConfig::smoke()"));
         assert!(!platform_rs.contains(&accepted_runtime_call));
         assert!(!platform_rs.contains("crate::compatibility::"));
+        assert!(!platform_rs.contains("CompatibilityFallback"));
+        assert!(!platform_rs.contains("CompatibilityCliArg"));
+        assert!(!platform_rs.contains("crate::runtime::run_cli()"));
         assert!(!platform_rs.contains(&app_runtime_call));
 
         let runtime_rs = include_str!("runtime.rs");
-        assert!(runtime_rs.contains("crate::accepted_behavior::run_runtime()"));
         assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live("));
         assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live_smoke"));
         assert!(runtime_rs.contains("RuntimeCommand::Help"));
@@ -395,6 +393,9 @@ mod public_api_tests {
         );
         assert!(runtime_rs.contains("crate::fidelity_scenarios::run_list()"));
         assert!(runtime_rs.contains("crate::fidelity_scenarios::run_write_inputs(&path)"));
+        assert!(!runtime_rs.contains("RuntimeCommand::AcceptedCli"));
+        assert!(!runtime_rs.contains("pub(crate) fn run_cli"));
+        assert!(!runtime_rs.contains("crate::accepted_behavior::run_runtime()"));
         assert!(!runtime_rs.contains("crate::rom::"));
         assert!(!runtime_rs.contains(&accepted_runtime_call));
         assert!(!runtime_rs.contains(&app_runtime_call));
@@ -618,7 +619,7 @@ mod public_api_tests {
                 );
             }
 
-            if !matches!(path, "src/accepted.rs" | "src/runtime.rs") {
+            if path != "src/accepted.rs" {
                 assert!(
                     !source.contains("crate::accepted_behavior::"),
                     "{path} must not bypass the accepted runtime adapter"
