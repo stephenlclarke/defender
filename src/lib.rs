@@ -539,6 +539,11 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("plan.frame_plan.command_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.sprite_pass_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.temporary_raster_count()"));
+        assert!(game_smoke_rs.contains("plan.sprite_instance_upload"));
+        assert!(game_smoke_rs.contains("plan.sprite_resource_bindings"));
+        assert!(game_smoke_rs.contains("plan.sprite_pipeline_layout"));
+        assert!(game_smoke_rs.contains("plan.sprite_render_pipeline_descriptor"));
+        assert!(game_smoke_rs.contains("plan.sprite_render_pass_encoder"));
         for forbidden in [
             "crate::accepted::",
             "crate::input::",

@@ -108,7 +108,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-135` are complete. The standing maintenance guidance in
+`DC-42` through `DC-136` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -6184,6 +6184,74 @@ Work log:
   `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778882543476649`
+
+### DC-136: Clean Game Smoke GPU Resource Evidence
+
+Status: `complete`
+
+Goal: extend the clean game smoke so it proves the sprite `wgpu` resource and
+encoder plans behind the frame commands.
+
+Scope:
+
+- Add resource-binding, pipeline-layout, render-pipeline descriptor, and
+  render-pass encoder evidence to the clean game smoke report.
+- Report upload byte evidence for sprite instances, sprite atlas texture data,
+  and scene-projection uniforms.
+- Validate that every clean smoke frame produces sprite resource and encoder
+  plans without falling back to temporary raster commands.
+- Keep `--game-smoke` and `--live-smoke` behavior otherwise unchanged.
+
+Acceptance criteria:
+
+- `--game-smoke` reports sprite resource-binding frames, pipeline-layout
+  frames, render-pipeline descriptor frames, encoder frames, encoder commands,
+  encoder draws, and upload byte totals.
+- The clean smoke fails if any required sprite resource or encoder evidence is
+  missing.
+- Focused smoke and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 23:04:24 BST` Started `DC-136`: extending `--game-smoke` beyond
+  frame-command counts into sprite resource bindings, pipeline layout, render
+  pipeline descriptor, render-pass encoder commands/draws, and upload byte
+  evidence for the clean `wgpu` sprite path.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778882675313219`
+- `2026-05-15 23:26:20 BST` Completed `DC-136`: extended `--game-smoke` with
+  clean sprite resource-binding, pipeline-layout, render-pipeline descriptor,
+  render-pass encoder, and upload byte evidence. The smoke report now proves
+  24 resource-binding, pipeline-layout, render-pipeline descriptor, and
+  render-pass encoder frames; 236 sprite encoder commands; 92 encoder draws
+  matching 92 sprite draw commands; 13920 sprite instance upload bytes;
+  1572864 atlas upload bytes; 384 scene-projection upload bytes; and zero
+  temporary raster commands. Validation passed with `cargo fmt --check`,
+  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
+  `cargo test --all-targets` (1224 library tests, 2 binary tests, and
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixture traces, 15452 frames, and 49/49 new executable
+  Rust lines covered), `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke` (239 rendered frames), markdownlint, and
+  `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778884008047749`
 
 ## Ongoing Work
 

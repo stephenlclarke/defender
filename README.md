@@ -289,8 +289,9 @@ code adapts frame outputs into clean audio frames before submitting to
 `defender::readme_media` facade. The binary enters through the clean platform
 boundary before delegating to the runtime bridge. `--game-smoke` steps the clean
 game through scripted controls and prepares sprite-only native draw plans plus
-frame-level `wgpu` command plans without entering the legacy live presenter.
-The clean `Game` world seeds
+frame-level `wgpu` command, resource-binding, pipeline-layout, pipeline
+descriptor, encoder, and upload plans without entering the legacy live
+presenter. The clean `Game` world seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
 wave and renders them as atlas-backed scene sprites. Operator controls are
 sampled through `OperatorControlSystem`, emitting diagnostics, audits, and

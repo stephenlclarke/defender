@@ -41,6 +41,15 @@ pub(crate) struct GameSmokeReport {
     pub(crate) wgpu_frame_commands: usize,
     pub(crate) sprite_render_pass_commands: usize,
     pub(crate) temporary_raster_commands: usize,
+    pub(crate) sprite_resource_binding_frames: u32,
+    pub(crate) sprite_pipeline_layout_frames: u32,
+    pub(crate) sprite_render_pipeline_descriptor_frames: u32,
+    pub(crate) sprite_render_pass_encoder_frames: u32,
+    pub(crate) sprite_encoder_commands: usize,
+    pub(crate) sprite_encoder_draws: usize,
+    pub(crate) sprite_instance_upload_bytes: usize,
+    pub(crate) sprite_atlas_upload_bytes: usize,
+    pub(crate) scene_projection_upload_bytes: usize,
     pub(crate) raster_frames: u32,
     pub(crate) missing_sprite_regions: usize,
     pub(crate) injected_inputs: Vec<String>,
@@ -82,6 +91,35 @@ impl GameSmokeReport {
         if self.temporary_raster_commands != 0 {
             bail!("clean game smoke unexpectedly produced temporary raster frame commands");
         }
+        if self.sprite_resource_binding_frames != self.frames {
+            bail!("clean game smoke did not produce sprite resource bindings for every frame");
+        }
+        if self.sprite_pipeline_layout_frames != self.frames {
+            bail!("clean game smoke did not produce sprite pipeline layouts for every frame");
+        }
+        if self.sprite_render_pipeline_descriptor_frames != self.frames {
+            bail!(
+                "clean game smoke did not produce sprite render pipeline descriptors for every frame"
+            );
+        }
+        if self.sprite_render_pass_encoder_frames != self.frames {
+            bail!("clean game smoke did not produce sprite render-pass encoders for every frame");
+        }
+        if self.sprite_encoder_commands == 0 {
+            bail!("clean game smoke did not produce sprite encoder commands");
+        }
+        if self.sprite_encoder_draws != self.sprite_draw_commands {
+            bail!("clean game smoke sprite encoder draws did not match sprite draw commands");
+        }
+        if self.sprite_instance_upload_bytes == 0 {
+            bail!("clean game smoke did not produce sprite instance upload bytes");
+        }
+        if self.sprite_atlas_upload_bytes == 0 {
+            bail!("clean game smoke did not produce sprite atlas upload bytes");
+        }
+        if self.scene_projection_upload_bytes == 0 {
+            bail!("clean game smoke did not produce scene projection upload bytes");
+        }
         if self.raster_frames != 0 {
             bail!("clean game smoke unexpectedly produced raster payloads");
         }
@@ -106,7 +144,7 @@ impl GameSmokeReport {
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  sprite_resource_binding_frames: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
             self.frames,
             frame_size,
             self.distinct_scene_signatures,
@@ -122,6 +160,15 @@ impl GameSmokeReport {
             self.wgpu_frame_commands,
             self.sprite_render_pass_commands,
             self.temporary_raster_commands,
+            self.sprite_resource_binding_frames,
+            self.sprite_pipeline_layout_frames,
+            self.sprite_render_pipeline_descriptor_frames,
+            self.sprite_render_pass_encoder_frames,
+            self.sprite_encoder_commands,
+            self.sprite_encoder_draws,
+            self.sprite_instance_upload_bytes,
+            self.sprite_atlas_upload_bytes,
+            self.scene_projection_upload_bytes,
             self.raster_frames,
             self.missing_sprite_regions,
             self.injected_inputs.join(","),
@@ -212,10 +259,48 @@ fn observe_frame(
     report.temporary_raster_commands = report
         .temporary_raster_commands
         .saturating_add(plan.frame_plan.temporary_raster_count());
+    if let Some(upload) = &plan.sprite_instance_upload {
+        report.sprite_instance_upload_bytes = report
+            .sprite_instance_upload_bytes
+            .saturating_add(buffer_address_len(upload.byte_len()));
+    }
+    if let Some(bindings) = &plan.sprite_resource_bindings {
+        report.sprite_resource_binding_frames =
+            report.sprite_resource_binding_frames.saturating_add(1);
+        report.sprite_atlas_upload_bytes = report
+            .sprite_atlas_upload_bytes
+            .saturating_add(bindings.atlas_upload.byte_len);
+        report.scene_projection_upload_bytes = report
+            .scene_projection_upload_bytes
+            .saturating_add(buffer_address_len(bindings.projection_upload.byte_len));
+    }
+    if plan.sprite_pipeline_layout.is_some() {
+        report.sprite_pipeline_layout_frames =
+            report.sprite_pipeline_layout_frames.saturating_add(1);
+    }
+    if plan.sprite_render_pipeline_descriptor.is_some() {
+        report.sprite_render_pipeline_descriptor_frames = report
+            .sprite_render_pipeline_descriptor_frames
+            .saturating_add(1);
+    }
+    if let Some(encoder) = &plan.sprite_render_pass_encoder {
+        report.sprite_render_pass_encoder_frames =
+            report.sprite_render_pass_encoder_frames.saturating_add(1);
+        report.sprite_encoder_commands = report
+            .sprite_encoder_commands
+            .saturating_add(encoder.command_count());
+        report.sprite_encoder_draws = report
+            .sprite_encoder_draws
+            .saturating_add(encoder.draw_count());
+    }
     report.missing_sprite_regions = report
         .missing_sprite_regions
         .saturating_add(plan.missing_sprite_regions);
     signatures.insert(scene_signature(frame, plan));
+}
+
+fn buffer_address_len(byte_len: u64) -> usize {
+    usize::try_from(byte_len).unwrap_or(usize::MAX)
 }
 
 fn surface_tuple(surface: SurfaceSize) -> (u32, u32) {
@@ -358,6 +443,18 @@ mod tests {
         assert!(report.wgpu_frame_commands > 0);
         assert!(report.sprite_render_pass_commands >= report.frames as usize);
         assert_eq!(report.temporary_raster_commands, 0);
+        assert_eq!(report.sprite_resource_binding_frames, report.frames);
+        assert_eq!(report.sprite_pipeline_layout_frames, report.frames);
+        assert_eq!(
+            report.sprite_render_pipeline_descriptor_frames,
+            report.frames
+        );
+        assert_eq!(report.sprite_render_pass_encoder_frames, report.frames);
+        assert!(report.sprite_encoder_commands > 0);
+        assert_eq!(report.sprite_encoder_draws, report.sprite_draw_commands);
+        assert!(report.sprite_instance_upload_bytes > 0);
+        assert!(report.sprite_atlas_upload_bytes > 0);
+        assert!(report.scene_projection_upload_bytes > 0);
         assert_eq!(report.raster_frames, 0);
         assert_eq!(report.missing_sprite_regions, 0);
         assert_eq!(
@@ -443,6 +540,120 @@ mod tests {
     }
 
     #[test]
+    fn smoke_report_validates_gpu_resource_evidence() {
+        let mut report = valid_report();
+        report.sprite_resource_binding_frames = 2;
+
+        let error = report
+            .validate()
+            .expect_err("missing resource binding frame should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite resource bindings for every frame"
+        );
+
+        let mut report = valid_report();
+        report.sprite_pipeline_layout_frames = 2;
+
+        let error = report
+            .validate()
+            .expect_err("missing pipeline layout frame should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite pipeline layouts for every frame"
+        );
+
+        let mut report = valid_report();
+        report.sprite_render_pipeline_descriptor_frames = 2;
+
+        let error = report
+            .validate()
+            .expect_err("missing render pipeline descriptor frame should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite render pipeline descriptors for every frame"
+        );
+
+        let mut report = valid_report();
+        report.sprite_render_pass_encoder_frames = 2;
+
+        let error = report
+            .validate()
+            .expect_err("missing render-pass encoder frame should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite render-pass encoders for every frame"
+        );
+    }
+
+    #[test]
+    fn smoke_report_validates_gpu_upload_evidence() {
+        let mut report = valid_report();
+        report.sprite_encoder_commands = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing sprite encoder commands should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite encoder commands"
+        );
+
+        let mut report = valid_report();
+        report.sprite_encoder_draws = 2;
+
+        let error = report
+            .validate()
+            .expect_err("mismatched encoder draws should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke sprite encoder draws did not match sprite draw commands"
+        );
+
+        let mut report = valid_report();
+        report.sprite_instance_upload_bytes = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing instance upload bytes should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite instance upload bytes"
+        );
+
+        let mut report = valid_report();
+        report.sprite_atlas_upload_bytes = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing atlas upload bytes should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite atlas upload bytes"
+        );
+
+        let mut report = valid_report();
+        report.scene_projection_upload_bytes = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing projection upload bytes should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce scene projection upload bytes"
+        );
+    }
+
+    #[test]
     fn smoke_report_formats_current_cli_output() {
         let report = GameSmokeReport {
             frames: 2,
@@ -460,6 +671,15 @@ mod tests {
             wgpu_frame_commands: 6,
             sprite_render_pass_commands: 2,
             temporary_raster_commands: 0,
+            sprite_resource_binding_frames: 2,
+            sprite_pipeline_layout_frames: 2,
+            sprite_render_pipeline_descriptor_frames: 2,
+            sprite_render_pass_encoder_frames: 2,
+            sprite_encoder_commands: 12,
+            sprite_encoder_draws: 2,
+            sprite_instance_upload_bytes: 192,
+            sprite_atlas_upload_bytes: 131_072,
+            scene_projection_upload_bytes: 32,
             raster_frames: 0,
             missing_sprite_regions: 0,
             injected_inputs: vec![String::from("coin")],
@@ -482,6 +702,15 @@ mod tests {
                 "  wgpu_frame_commands: 6\n",
                 "  sprite_render_pass_commands: 2\n",
                 "  temporary_raster_commands: 0\n",
+                "  sprite_resource_binding_frames: 2\n",
+                "  sprite_pipeline_layout_frames: 2\n",
+                "  sprite_render_pipeline_descriptor_frames: 2\n",
+                "  sprite_render_pass_encoder_frames: 2\n",
+                "  sprite_encoder_commands: 12\n",
+                "  sprite_encoder_draws: 2\n",
+                "  sprite_instance_upload_bytes: 192\n",
+                "  sprite_atlas_upload_bytes: 131072\n",
+                "  scene_projection_upload_bytes: 32\n",
                 "  raster_frames: 0\n",
                 "  missing_sprite_regions: 0\n",
                 "  injected_inputs: coin\n",
@@ -514,6 +743,15 @@ mod tests {
             sprite_draw_commands: 3,
             wgpu_frame_commands: 9,
             sprite_render_pass_commands: 3,
+            sprite_resource_binding_frames: 3,
+            sprite_pipeline_layout_frames: 3,
+            sprite_render_pipeline_descriptor_frames: 3,
+            sprite_render_pass_encoder_frames: 3,
+            sprite_encoder_commands: 18,
+            sprite_encoder_draws: 3,
+            sprite_instance_upload_bytes: 144,
+            sprite_atlas_upload_bytes: 196_608,
+            scene_projection_upload_bytes: 48,
             clean_exit: true,
             injected_inputs: vec![
                 String::from("coin"),
