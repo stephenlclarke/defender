@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-109` are complete. The standing maintenance guidance in
+`DC-42` through `DC-110` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4459,6 +4459,71 @@ Work log:
   --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778820801408189`
+
+### DC-110: Clean Sprite WGPU Buffer Upload Planning
+
+Status: `complete`
+
+Goal: describe the `wgpu` buffer uploads needed by clean sprite draw plans, so
+future native renderer code can create quad vertex, quad index, and flattened
+instance buffers without presenter-side classification.
+
+Scope:
+
+- Add renderer-owned sprite buffer upload metadata for quad vertices, quad
+  indices, and flattened sprite instances.
+- Use `wgpu::BufferUsages` directly for vertex, index, and copy-destination
+  buffer creation intent.
+- Wire the sprite buffer upload plan into `SceneDrawPlan` whenever sprite
+  instance upload data exists.
+- Keep raster-only scenes, unavailable sprite pipelines, missing atlas regions,
+  and empty atlas surfaces outside sprite buffer uploads.
+- Add focused renderer tests for buffer roles, labels, byte lengths, `wgpu`
+  usage flags, upload bytes, and absent sprite paths.
+- Update README/SPEC module text for sprite `wgpu` buffer upload planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes `wgpu` buffer upload metadata for sprite draw plans.
+- Quad vertex/index and instance upload bytes remain renderer-owned and
+  presenter-ready.
+- Raster-only scenes and unavailable sprite pipelines do not produce sprite
+  buffer upload plans.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 05:55:20 BST` Started `DC-110`: adding clean sprite `wgpu`
+  buffer upload metadata for quad vertex, quad index, and flattened instance
+  data with `wgpu::BufferUsages`, focused renderer tests, and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778820931672629`
+- `2026-05-15 06:17:24 BST` Completed `DC-110`: added
+  `SpriteBufferUploadPlan` metadata for quad vertices, quad indices, and
+  flattened sprite instances, wired upload plans into `SceneDrawPlan` only
+  when sprite instance data exists, kept raster-only/unavailable/missing-atlas
+  paths outside the upload contract, exported the public renderer types, and
+  documented sprite `wgpu` buffer uploads in README/SPEC. Validation passed
+  with focused renderer tests (35/35), the public API guard,
+  `cargo test --all-targets` (1156 library tests plus binary/example tests),
+  clippy with warnings denied, `make fidelity` (10 local fixtures, 15452
+  frames, 33/33 new executable Rust lines), `cargo run -- --live-smoke` (240
+  rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778822243196599`
 
 ## Ongoing Work
 

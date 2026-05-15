@@ -118,10 +118,10 @@ pub use renderer::{
     AtlasRegion, Color, FontAtlas, GpuRendererSettings, NativeRenderPipeline,
     NativeRendererResources, NativeSceneRenderer, PaletteResource, RenderLayer, RenderLayerCounts,
     RenderScene, RenderSceneSummary, SceneDrawPlan, SceneProjectionUniforms, SceneRaster,
-    SceneRasterError, SceneRasterUpload, SceneSprite, SpriteDrawBatch, SpriteDrawCommand,
-    SpriteDrawInstance, SpriteId, SpriteInstanceBuffer, SpriteInstanceBufferRecord,
-    SpriteInstanceUpload, SpriteQuadGeometry, SpriteQuadVertex, SurfaceSize, TextureAtlas,
-    ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+    SceneRasterError, SceneRasterUpload, SceneSprite, SpriteBufferRole, SpriteBufferUpload,
+    SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId,
+    SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload, SpriteQuadGeometry,
+    SpriteQuadVertex, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
 };
 pub use systems::{
     FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,

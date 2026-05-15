@@ -224,8 +224,8 @@ Clean rewrite modules:
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
   instance GPU ABI, sprite instance upload streams, sprite draw commands,
-  viewport layout, GPU pass planning, scene summaries, render signatures, and
-  draw planning.
+  sprite `wgpu` buffer upload plans, viewport layout, GPU pass planning, scene
+  summaries, render signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -267,8 +267,10 @@ the instance buffer. It flattens those per-batch records into one upload-ready
 instance stream. The renderer also owns unit quad vertices, `u16` indices,
 upload bytes, and the `wgpu` vertex layout used to draw instanced sprites, then
 derives indexed instanced sprite draw commands with quad/index counts, instance
-ranges, and upload byte spans into that stream. It also records the centered
-viewport layout plus GPU-ready clear color, viewport command, and
+ranges, and upload byte spans into that stream. Sprite draw plans also include
+`wgpu::BufferUsages` metadata and upload bytes for the quad vertex, quad index,
+and instance buffers. It also records the centered viewport layout plus
+GPU-ready clear color, viewport command, and
 scene-projection constants for the target surface. The live worker
 still wraps accepted visual output as a clean
 `RenderScene` raster payload before the presenter draws it. Kitty graphics and

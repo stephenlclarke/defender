@@ -760,6 +760,74 @@ impl SpriteInstanceUpload {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpriteBufferRole {
+    QuadVertices,
+    QuadIndices,
+    Instances,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpriteBufferUpload {
+    pub role: SpriteBufferRole,
+    pub label: &'static str,
+    pub usage: wgpu::BufferUsages,
+    pub byte_len: wgpu::BufferAddress,
+    pub bytes: Vec<u8>,
+}
+
+impl SpriteBufferUpload {
+    fn quad_vertices() -> Self {
+        let bytes = SpriteQuadGeometry::vertex_upload_bytes().to_vec();
+        Self {
+            role: SpriteBufferRole::QuadVertices,
+            label: "defender.sprite.quad.vertices",
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            byte_len: bytes.len() as wgpu::BufferAddress,
+            bytes,
+        }
+    }
+
+    fn quad_indices() -> Self {
+        let bytes = SpriteQuadGeometry::index_upload_bytes().to_vec();
+        Self {
+            role: SpriteBufferRole::QuadIndices,
+            label: "defender.sprite.quad.indices",
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+            byte_len: bytes.len() as wgpu::BufferAddress,
+            bytes,
+        }
+    }
+
+    fn instances(upload: &SpriteInstanceUpload) -> Self {
+        let bytes = upload.upload_bytes().to_vec();
+        Self {
+            role: SpriteBufferRole::Instances,
+            label: "defender.sprite.instances",
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            byte_len: bytes.len() as wgpu::BufferAddress,
+            bytes,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpriteBufferUploadPlan {
+    pub quad_vertices: SpriteBufferUpload,
+    pub quad_indices: SpriteBufferUpload,
+    pub instances: SpriteBufferUpload,
+}
+
+impl SpriteBufferUploadPlan {
+    fn from_instance_upload(upload: &SpriteInstanceUpload) -> Self {
+        Self {
+            quad_vertices: SpriteBufferUpload::quad_vertices(),
+            quad_indices: SpriteBufferUpload::quad_indices(),
+            instances: SpriteBufferUpload::instances(upload),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteDrawCommand {
     pub pipeline: NativeRenderPipeline,
     pub layer: RenderLayer,
@@ -837,6 +905,7 @@ pub struct SceneDrawPlan {
     pub sprite_batches: Vec<SpriteDrawBatch>,
     pub sprite_instance_buffers: Vec<SpriteInstanceBuffer>,
     pub sprite_instance_upload: Option<SpriteInstanceUpload>,
+    pub sprite_buffer_uploads: Option<SpriteBufferUploadPlan>,
     pub sprite_draw_commands: Vec<SpriteDrawCommand>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
@@ -899,6 +968,9 @@ impl NativeSceneRenderer {
             .collect::<Vec<_>>();
         let sprite_instance_upload =
             SpriteInstanceUpload::from_instance_buffers(&sprite_instance_buffers);
+        let sprite_buffer_uploads = sprite_instance_upload
+            .as_ref()
+            .map(SpriteBufferUploadPlan::from_instance_upload);
         let sprite_draw_commands =
             sprite_draw_commands_from_instance_buffers(&sprite_instance_buffers);
         let viewport = ViewportLayout::fit(scene.surface, target);
@@ -914,6 +986,7 @@ impl NativeSceneRenderer {
             sprite_batches,
             sprite_instance_buffers,
             sprite_instance_upload,
+            sprite_buffer_uploads,
             sprite_draw_commands,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
@@ -980,10 +1053,11 @@ mod tests {
     use super::{
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneProjectionUniforms,
-        SceneRaster, SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawCommand,
-        SpriteDrawInstance, SpriteId, SpriteInstanceBuffer, SpriteInstanceBufferRecord,
-        SpriteInstanceUpload, SpriteQuadGeometry, SpriteQuadVertex, SurfaceSize, TextureAtlas,
-        ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+        SceneRaster, SceneRasterError, SceneSprite, SpriteBufferRole, SpriteBufferUpload,
+        SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId,
+        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload, SpriteQuadGeometry,
+        SpriteQuadVertex, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan,
+        WgpuViewportCommand,
     };
 
     #[test]
@@ -1342,6 +1416,47 @@ mod tests {
                 0,
             )]),
             None
+        );
+    }
+
+    #[test]
+    fn sprite_buffer_upload_plan_describes_wgpu_buffers_and_bytes() {
+        let buffer =
+            test_sprite_instance_buffer(NativeRenderPipeline::Sprites, RenderLayer::Objects, 2);
+        let upload =
+            SpriteInstanceUpload::from_instance_buffers(&[buffer]).expect("instance upload");
+
+        let plan = SpriteBufferUploadPlan::from_instance_upload(&upload);
+
+        assert_eq!(
+            plan.quad_vertices,
+            SpriteBufferUpload {
+                role: SpriteBufferRole::QuadVertices,
+                label: "defender.sprite.quad.vertices",
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                byte_len: SpriteQuadGeometry::vertex_upload_bytes().len() as wgpu::BufferAddress,
+                bytes: SpriteQuadGeometry::vertex_upload_bytes().to_vec(),
+            }
+        );
+        assert_eq!(
+            plan.quad_indices,
+            SpriteBufferUpload {
+                role: SpriteBufferRole::QuadIndices,
+                label: "defender.sprite.quad.indices",
+                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+                byte_len: SpriteQuadGeometry::index_upload_bytes().len() as wgpu::BufferAddress,
+                bytes: SpriteQuadGeometry::index_upload_bytes().to_vec(),
+            }
+        );
+        assert_eq!(
+            plan.instances,
+            SpriteBufferUpload {
+                role: SpriteBufferRole::Instances,
+                label: "defender.sprite.instances",
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                byte_len: upload.byte_len(),
+                bytes: upload.upload_bytes().to_vec(),
+            }
         );
     }
 
@@ -1830,6 +1945,12 @@ mod tests {
             })
         );
         assert_eq!(
+            plan.sprite_buffer_uploads,
+            plan.sprite_instance_upload
+                .as_ref()
+                .map(SpriteBufferUploadPlan::from_instance_upload)
+        );
+        assert_eq!(
             plan.sprite_draw_commands,
             vec![
                 expected_sprite_draw_command(
@@ -1863,6 +1984,7 @@ mod tests {
             Vec::<SpriteInstanceBuffer>::new()
         );
         assert_eq!(plan.sprite_instance_upload, None);
+        assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
     }
 
@@ -1889,6 +2011,7 @@ mod tests {
             Vec::<SpriteInstanceBuffer>::new()
         );
         assert_eq!(plan.sprite_instance_upload, None);
+        assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
@@ -1950,6 +2073,7 @@ mod tests {
             Vec::<SpriteInstanceBuffer>::new()
         );
         assert_eq!(plan.sprite_instance_upload, None);
+        assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
@@ -2000,6 +2124,12 @@ mod tests {
             })
         );
         assert_eq!(
+            plan.sprite_buffer_uploads,
+            plan.sprite_instance_upload
+                .as_ref()
+                .map(SpriteBufferUploadPlan::from_instance_upload)
+        );
+        assert_eq!(
             plan.sprite_draw_commands,
             vec![expected_sprite_draw_command(
                 NativeRenderPipeline::Projectiles,
@@ -2041,6 +2171,7 @@ mod tests {
             Vec::<SpriteInstanceBuffer>::new()
         );
         assert_eq!(plan.sprite_instance_upload, None);
+        assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
     }
 
@@ -2096,6 +2227,13 @@ mod tests {
             })
         );
         assert_eq!(
+            sprite_plan.sprite_buffer_uploads,
+            sprite_plan
+                .sprite_instance_upload
+                .as_ref()
+                .map(SpriteBufferUploadPlan::from_instance_upload)
+        );
+        assert_eq!(
             sprite_plan.sprite_draw_commands,
             vec![expected_sprite_draw_command(
                 NativeRenderPipeline::Sprites,
@@ -2109,6 +2247,7 @@ mod tests {
             Vec::<SpriteInstanceBuffer>::new()
         );
         assert_eq!(raster_plan.sprite_instance_upload, None);
+        assert_eq!(raster_plan.sprite_buffer_uploads, None);
         assert_eq!(
             raster_plan.sprite_draw_commands,
             Vec::<SpriteDrawCommand>::new()
@@ -2190,6 +2329,12 @@ mod tests {
             Some(SpriteInstanceUpload {
                 records: plan.sprite_instance_buffers[0].records.clone(),
             })
+        );
+        assert_eq!(
+            plan.sprite_buffer_uploads,
+            plan.sprite_instance_upload
+                .as_ref()
+                .map(SpriteBufferUploadPlan::from_instance_upload)
         );
         assert_eq!(
             plan.sprite_draw_commands,
