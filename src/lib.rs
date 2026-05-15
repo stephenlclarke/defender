@@ -128,7 +128,8 @@ pub use renderer::{
     SpriteRenderPassPlan, SpriteRenderPipelineDescriptorPlan, SpriteResourceBindingPlan,
     SpriteResourceBindingRole, SpriteSamplerBindingPlan, SpriteShaderPlan,
     SpriteTextureBindingPlan, SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize,
-    TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+    TextureAtlas, ViewportLayout, WgpuFrameCommand, WgpuFramePlan, WgpuPassPlan,
+    WgpuViewportCommand,
 };
 pub use systems::{
     FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,

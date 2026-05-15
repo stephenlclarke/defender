@@ -1640,6 +1640,87 @@ impl SpriteRenderPassEncoderPlan {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum WgpuFrameCommand {
+    BeginRenderPass {
+        clear_color: wgpu::Color,
+    },
+    SetViewport {
+        viewport: WgpuViewportCommand,
+    },
+    UploadSceneProjection {
+        byte_len: wgpu::BufferAddress,
+    },
+    UploadTemporaryRaster {
+        upload: SceneRasterUpload,
+    },
+    ExecuteSpriteRenderPass {
+        encoder_label: &'static str,
+        command_count: usize,
+        draw_count: usize,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct WgpuFramePlan {
+    pub label: &'static str,
+    pub commands: Vec<WgpuFrameCommand>,
+}
+
+impl WgpuFramePlan {
+    fn from_pass_raster_and_sprite_encoder(
+        pass: &WgpuPassPlan,
+        raster_upload: Option<SceneRasterUpload>,
+        sprite_encoder: Option<&SpriteRenderPassEncoderPlan>,
+    ) -> Self {
+        let mut commands = Vec::new();
+        commands.push(WgpuFrameCommand::BeginRenderPass {
+            clear_color: pass.clear_color,
+        });
+        if let Some(viewport) = pass.viewport {
+            commands.push(WgpuFrameCommand::SetViewport { viewport });
+        }
+        if let Some(projection) = pass.scene_projection {
+            commands.push(WgpuFrameCommand::UploadSceneProjection {
+                byte_len: projection.as_bytes().len() as wgpu::BufferAddress,
+            });
+        }
+        if let Some(upload) = raster_upload {
+            commands.push(WgpuFrameCommand::UploadTemporaryRaster { upload });
+        }
+        if let Some(encoder) = sprite_encoder {
+            commands.push(WgpuFrameCommand::ExecuteSpriteRenderPass {
+                encoder_label: encoder.label,
+                command_count: encoder.command_count(),
+                draw_count: encoder.draw_count(),
+            });
+        }
+
+        Self {
+            label: "defender.frame.commands",
+            commands,
+        }
+    }
+
+    pub fn command_count(&self) -> usize {
+        self.commands.len()
+    }
+
+    pub fn sprite_pass_count(&self) -> usize {
+        self.commands
+            .iter()
+            .filter(|command| matches!(command, WgpuFrameCommand::ExecuteSpriteRenderPass { .. }))
+            .count()
+    }
+
+    pub fn temporary_raster_count(&self) -> usize {
+        self.commands
+            .iter()
+            .filter(|command| matches!(command, WgpuFrameCommand::UploadTemporaryRaster { .. }))
+            .count()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteDrawCommand {
     pub pipeline: NativeRenderPipeline,
@@ -1712,6 +1793,7 @@ pub struct SceneDrawPlan {
     pub surface: SurfaceSize,
     pub viewport: ViewportLayout,
     pub gpu_pass: WgpuPassPlan,
+    pub frame_plan: WgpuFramePlan,
     pub pipelines: Vec<NativeRenderPipeline>,
     pub sprite_instances: usize,
     pub missing_sprite_regions: usize,
@@ -1860,12 +1942,24 @@ impl NativeSceneRenderer {
             ),
             _ => None,
         };
+        let raster_upload = scene.raster.as_ref().map(|raster| SceneRasterUpload {
+            surface: raster.surface,
+            byte_len: raster.pixels.len(),
+            visual_signature: scene.visual_signature,
+            non_blank: raster.is_non_blank(),
+        });
+        let frame_plan = WgpuFramePlan::from_pass_raster_and_sprite_encoder(
+            &gpu_pass,
+            raster_upload,
+            sprite_render_pass_encoder.as_ref(),
+        );
 
         SceneDrawPlan {
             frame: scene.frame,
             surface: scene.surface,
             viewport,
             gpu_pass,
+            frame_plan,
             pipelines,
             sprite_instances,
             missing_sprite_regions,
@@ -1881,12 +1975,7 @@ impl NativeSceneRenderer {
             sprite_render_pipeline_descriptor,
             sprite_render_pass_encoder,
             layer_counts,
-            raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
-                surface: raster.surface,
-                byte_len: raster.pixels.len(),
-                visual_signature: scene.visual_signature,
-                non_blank: raster.is_non_blank(),
-            }),
+            raster_upload,
         }
     }
 }
@@ -1946,17 +2035,17 @@ mod tests {
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneDrawPlan,
         SceneProjectionUniformUpload, SceneProjectionUniforms, SceneRaster, SceneRasterError,
-        SceneSprite, SpriteAtlasTextureUpload, SpriteBindGroupLayoutPlan, SpriteBindGroupRole,
-        SpriteBufferRole, SpriteBufferUpload, SpriteBufferUploadPlan, SpriteDrawBatch,
-        SpriteDrawCommand, SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding,
+        SceneRasterUpload, SceneSprite, SpriteAtlasTextureUpload, SpriteBindGroupLayoutPlan,
+        SpriteBindGroupRole, SpriteBufferRole, SpriteBufferUpload, SpriteBufferUploadPlan,
+        SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding,
         SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload,
         SpritePipelineLayoutBindGroup, SpritePipelineLayoutPlan, SpritePipelinePlan,
         SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassEncoderCommand,
         SpriteRenderPassEncoderPlan, SpriteRenderPassPlan, SpriteRenderPipelineDescriptorPlan,
         SpriteResourceBindingPlan, SpriteResourceBindingRole, SpriteSamplerBindingPlan,
         SpriteShaderPlan, SpriteTextureBindingPlan, SpriteVertexBufferBinding,
-        SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan,
-        WgpuViewportCommand,
+        SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuFrameCommand,
+        WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -2500,6 +2589,85 @@ mod tests {
                 },
                 SpriteRenderPassEncoderCommand::DrawIndexed {
                     draw: render_pass.draws[1].clone(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn wgpu_frame_plan_orders_pass_raster_and_sprite_commands() {
+        let pass = WgpuPassPlan {
+            clear_color: wgpu::Color {
+                r: 0.0,
+                g: 0.1,
+                b: 0.2,
+                a: 1.0,
+            },
+            viewport: Some(WgpuViewportCommand {
+                x: 28.0,
+                y: 0.0,
+                width: 584.0,
+                height: 480.0,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }),
+            scene_projection: SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)),
+        };
+        let raster_upload = SceneRasterUpload {
+            surface: SurfaceSize::new(292, 240),
+            byte_len: 292 * 240 * 4,
+            visual_signature: Some(0xCAFE_BABE),
+            non_blank: true,
+        };
+        let sprite_encoder = SpriteRenderPassEncoderPlan {
+            label: "defender.sprite.render_pass.encoder",
+            commands: vec![
+                SpriteRenderPassEncoderCommand::SetPipeline {
+                    label: "defender.sprite.pipeline",
+                },
+                SpriteRenderPassEncoderCommand::DrawIndexed {
+                    draw: SpriteRenderPassDraw {
+                        pipeline: NativeRenderPipeline::Sprites,
+                        layer: RenderLayer::Objects,
+                        indices: 0..SpriteQuadGeometry::INDEX_COUNT,
+                        base_vertex: 0,
+                        instances: 0..2,
+                        instance_buffer_byte_offset: 0,
+                        instance_buffer_byte_len: 2 * SpriteInstanceBufferRecord::BYTE_SIZE,
+                    },
+                },
+            ],
+        };
+
+        let plan = WgpuFramePlan::from_pass_raster_and_sprite_encoder(
+            &pass,
+            Some(raster_upload),
+            Some(&sprite_encoder),
+        );
+
+        assert_eq!(plan.label, "defender.frame.commands");
+        assert_eq!(plan.command_count(), 5);
+        assert_eq!(plan.temporary_raster_count(), 1);
+        assert_eq!(plan.sprite_pass_count(), 1);
+        assert_eq!(
+            plan.commands,
+            vec![
+                WgpuFrameCommand::BeginRenderPass {
+                    clear_color: pass.clear_color,
+                },
+                WgpuFrameCommand::SetViewport {
+                    viewport: pass.viewport.expect("viewport"),
+                },
+                WgpuFrameCommand::UploadSceneProjection {
+                    byte_len: SceneProjectionUniforms::BYTE_SIZE,
+                },
+                WgpuFrameCommand::UploadTemporaryRaster {
+                    upload: raster_upload,
+                },
+                WgpuFrameCommand::ExecuteSpriteRenderPass {
+                    encoder_label: "defender.sprite.render_pass.encoder",
+                    command_count: 2,
+                    draw_count: 1,
                 },
             ]
         );
@@ -3113,6 +3281,14 @@ mod tests {
         }
     }
 
+    fn expected_frame_plan(plan: &SceneDrawPlan) -> WgpuFramePlan {
+        WgpuFramePlan::from_pass_raster_and_sprite_encoder(
+            &plan.gpu_pass,
+            plan.raster_upload,
+            plan.sprite_render_pass_encoder.as_ref(),
+        )
+    }
+
     #[test]
     fn render_scene_collects_sprites_in_order() {
         let mut scene = RenderScene::empty(7, SurfaceSize::new(320, 240));
@@ -3315,6 +3491,7 @@ mod tests {
             plan.sprite_render_pass_encoder,
             expected_sprite_render_pass_encoder(&plan)
         );
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
         assert_eq!(
             plan.sprite_pipeline_layout
                 .as_ref()
@@ -3339,6 +3516,7 @@ mod tests {
                 .map(SpriteRenderPassEncoderPlan::draw_count),
             Some(1)
         );
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 1);
     }
 
     #[test]
@@ -3563,6 +3741,7 @@ mod tests {
             plan.sprite_render_pass_encoder,
             expected_sprite_render_pass_encoder(&plan)
         );
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
         assert_eq!(
             plan.sprite_render_pipeline_descriptor
                 .as_ref()
@@ -3575,6 +3754,9 @@ mod tests {
                 .map(SpriteRenderPassEncoderPlan::command_count),
             Some(8)
         );
+        assert_eq!(plan.frame_plan.command_count(), 4);
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 1);
+        assert_eq!(plan.frame_plan.temporary_raster_count(), 0);
         assert_eq!(plan.raster_upload, None);
     }
 
@@ -3605,6 +3787,9 @@ mod tests {
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(plan.sprite_render_pass_encoder, None);
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 0);
+        assert_eq!(plan.frame_plan.temporary_raster_count(), 1);
     }
 
     #[test]
@@ -3638,6 +3823,8 @@ mod tests {
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(plan.sprite_render_pass_encoder, None);
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 0);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -3706,6 +3893,8 @@ mod tests {
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(plan.sprite_render_pass_encoder, None);
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 0);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -3790,6 +3979,8 @@ mod tests {
             plan.sprite_render_pass_encoder,
             expected_sprite_render_pass_encoder(&plan)
         );
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 1);
     }
 
     #[test]
@@ -3831,6 +4022,8 @@ mod tests {
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(plan.sprite_render_pass_encoder, None);
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 0);
     }
 
     #[test]
@@ -3924,6 +4117,8 @@ mod tests {
             sprite_plan.sprite_render_pass_encoder,
             expected_sprite_render_pass_encoder(&sprite_plan)
         );
+        assert_eq!(sprite_plan.frame_plan, expected_frame_plan(&sprite_plan));
+        assert_eq!(sprite_plan.frame_plan.sprite_pass_count(), 1);
         assert_eq!(
             raster_plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
@@ -3940,6 +4135,9 @@ mod tests {
         assert_eq!(raster_plan.sprite_pipeline_layout, None);
         assert_eq!(raster_plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(raster_plan.sprite_render_pass_encoder, None);
+        assert_eq!(raster_plan.frame_plan, expected_frame_plan(&raster_plan));
+        assert_eq!(raster_plan.frame_plan.sprite_pass_count(), 0);
+        assert_eq!(raster_plan.frame_plan.temporary_raster_count(), 1);
         assert_eq!(
             raster_plan.raster_upload,
             Some(super::SceneRasterUpload {
@@ -3966,6 +4164,8 @@ mod tests {
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(plan.sprite_render_pass_encoder, None);
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 0);
         assert_eq!(
             plan.gpu_pass.scene_projection,
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240))
@@ -4000,6 +4200,8 @@ mod tests {
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(plan.sprite_render_pass_encoder, None);
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 0);
     }
 
     #[test]
@@ -4090,5 +4292,8 @@ mod tests {
             plan.sprite_render_pass_encoder,
             expected_sprite_render_pass_encoder(&plan)
         );
+        assert_eq!(plan.frame_plan, expected_frame_plan(&plan));
+        assert_eq!(plan.frame_plan.sprite_pass_count(), 1);
+        assert_eq!(plan.frame_plan.temporary_raster_count(), 1);
     }
 }

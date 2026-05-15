@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-117` are complete. The standing maintenance guidance in
+`DC-42` through `DC-118` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5013,6 +5013,77 @@ Work log:
   frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778834419221119`
+
+### DC-118: Clean Frame-Level GPU Command Planning
+
+Status: `complete`
+
+Goal: combine clean `wgpu` pass state, sprite render-pass encoder plans, and
+temporary raster evidence into one ordered scene-level frame command stream so
+presenters do not need to classify scene internals.
+
+Scope:
+
+- Add frame-level GPU command metadata for pass clear color, viewport,
+  scene-projection upload presence, sprite render-pass encoder execution, and
+  temporary raster evidence.
+- Wire the frame command plan into `SceneDrawPlan` for every prepared scene.
+- Preserve sprite command emission only when the sprite render-pass encoder plan
+  is present and the target has a nonempty viewport.
+- Preserve temporary raster upload evidence as a separate frame command without
+  treating it as the final clean sprite path.
+- Add focused renderer tests for sprite-only, raster-only, mixed sprite/raster,
+  empty-target, and invalid sprite-resource paths.
+- Update README/SPEC module text for frame-level GPU command planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes an ordered frame-level command plan.
+- Sprite scenes include pass setup and sprite render-pass execution commands
+  without presenter-side scene classification.
+- Raster-only and mixed raster paths preserve temporary raster evidence as a
+  separate command, and invalid sprite paths do not produce sprite execution
+  commands.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 09:42:00 BST` Started `DC-118`: adding ordered scene-level
+  `wgpu` frame command metadata for pass setup, optional sprite render-pass
+  encoder execution, and temporary raster evidence, with focused renderer tests
+  and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778834515838479`
+- `2026-05-15 10:06:23 BST` Completed `DC-118`: added `WgpuFramePlan` and
+  `WgpuFrameCommand` metadata so prepared draw plans expose ordered frame
+  commands for pass begin, viewport setup, scene-projection upload presence,
+  temporary raster evidence, and sprite render-pass encoder execution. Empty
+  and invalid sprite paths now keep sprite execution absent from frame command
+  planning, while mixed sprite/raster paths preserve both sprite execution and
+  temporary raster upload evidence as separate commands. README and SPEC now
+  describe the renderer's frame-level GPU command planning surface.
+  Validation passed with `cargo test --lib renderer::tests::` (47 passed),
+  `cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation`,
+  `cargo test --all-targets` (1168 library tests, 2 binary tests, and
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, 42/42 non-baselined added
+  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
+  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778835971827569`
 
 ## Ongoing Work
 

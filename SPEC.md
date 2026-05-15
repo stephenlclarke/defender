@@ -76,8 +76,9 @@ tree:
   sprite `wgpu` buffer upload plans, sprite render-pass plans, sprite pipeline
   plans, sprite resource binding plans, sprite atlas texture upload plans,
   sprite pipeline layout plans, sprite render pipeline descriptor plans,
-  sprite render-pass encoder command plans, viewport layout, GPU pass planning,
-  scene summaries, render signatures, and draw planning.
+  sprite render-pass encoder command plans, frame-level GPU command plans,
+  viewport layout, GPU pass planning, scene summaries, render signatures, and
+  draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -145,9 +146,11 @@ pipeline descriptor plans combine that layout with shader entries, vertex
 buffers, primitive state, color target, and multisample state for `wgpu` render
 pipeline creation. Sprite render-pass encoder command plans then order the
 pipeline, bind groups, vertex buffers, index buffer, and indexed draw calls for
-`wgpu::RenderPass` execution, while the current live path still carries a
-temporary raster payload for visual equivalence. Kitty graphics and
-terminal-session code remain
+`wgpu::RenderPass` execution. Frame-level GPU command plans combine pass clear
+state, viewport, scene-projection upload presence, optional sprite execution,
+and temporary raster evidence into one ordered scene command stream, while the
+current live path still carries a temporary raster payload for visual
+equivalence. Kitty graphics and terminal-session code remain
 parked there as historical compatibility evidence, but they are not part of the
 active runtime or compatibility API surface. The legacy video renderer owns its
 remaining `TerminalGeometry` value type directly instead of importing terminal
