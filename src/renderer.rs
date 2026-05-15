@@ -727,6 +727,38 @@ impl SpriteInstanceBuffer {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpriteInstanceUpload {
+    pub records: Vec<SpriteInstanceBufferRecord>,
+}
+
+impl SpriteInstanceUpload {
+    fn from_instance_buffers(buffers: &[SpriteInstanceBuffer]) -> Option<Self> {
+        let records = buffers
+            .iter()
+            .flat_map(|buffer| buffer.records.iter().copied())
+            .collect::<Vec<_>>();
+
+        if records.is_empty() {
+            return None;
+        }
+
+        Some(Self { records })
+    }
+
+    pub fn instance_count(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn byte_len(&self) -> wgpu::BufferAddress {
+        self.upload_bytes().len() as wgpu::BufferAddress
+    }
+
+    pub fn upload_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.records)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteDrawCommand {
     pub pipeline: NativeRenderPipeline,
@@ -804,6 +836,7 @@ pub struct SceneDrawPlan {
     pub missing_sprite_regions: usize,
     pub sprite_batches: Vec<SpriteDrawBatch>,
     pub sprite_instance_buffers: Vec<SpriteInstanceBuffer>,
+    pub sprite_instance_upload: Option<SpriteInstanceUpload>,
     pub sprite_draw_commands: Vec<SpriteDrawCommand>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
@@ -864,6 +897,8 @@ impl NativeSceneRenderer {
                 SpriteInstanceBuffer::from_batch(batch, self.resources.atlas.surface)
             })
             .collect::<Vec<_>>();
+        let sprite_instance_upload =
+            SpriteInstanceUpload::from_instance_buffers(&sprite_instance_buffers);
         let sprite_draw_commands =
             sprite_draw_commands_from_instance_buffers(&sprite_instance_buffers);
         let viewport = ViewportLayout::fit(scene.surface, target);
@@ -878,6 +913,7 @@ impl NativeSceneRenderer {
             missing_sprite_regions,
             sprite_batches,
             sprite_instance_buffers,
+            sprite_instance_upload,
             sprite_draw_commands,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
@@ -946,8 +982,8 @@ mod tests {
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneProjectionUniforms,
         SceneRaster, SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawCommand,
         SpriteDrawInstance, SpriteId, SpriteInstanceBuffer, SpriteInstanceBufferRecord,
-        SpriteQuadGeometry, SpriteQuadVertex, SurfaceSize, TextureAtlas, ViewportLayout,
-        WgpuPassPlan, WgpuViewportCommand,
+        SpriteInstanceUpload, SpriteQuadGeometry, SpriteQuadVertex, SurfaceSize, TextureAtlas,
+        ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -1270,6 +1306,42 @@ mod tests {
                 1.0, 2.0, 3.0, 4.0, 0.125, 0.25, 0.5, 0.75, 1.0, 0.5, 0.25, 0.125, 5.0, 6.0, 7.0,
                 8.0, 0.0, 0.5, 0.25, 0.125, 0.25, 0.5, 0.75, 1.0,
             ]
+        );
+    }
+
+    #[test]
+    fn sprite_instance_upload_flattens_buffers_without_repacking() {
+        let first =
+            test_sprite_instance_buffer(NativeRenderPipeline::Sprites, RenderLayer::Objects, 2);
+        let empty = test_sprite_instance_buffer(NativeRenderPipeline::HudText, RenderLayer::Hud, 0);
+        let second =
+            test_sprite_instance_buffer(NativeRenderPipeline::HudText, RenderLayer::Hud, 1);
+
+        let upload =
+            SpriteInstanceUpload::from_instance_buffers(&[first.clone(), empty, second.clone()])
+                .expect("sprite instance upload");
+        let expected_records = first
+            .records
+            .iter()
+            .chain(&second.records)
+            .copied()
+            .collect::<Vec<_>>();
+
+        assert_eq!(upload.instance_count(), 3);
+        assert_eq!(upload.records, expected_records);
+        assert_eq!(upload.byte_len(), 3 * SpriteInstanceBufferRecord::BYTE_SIZE);
+        assert_eq!(
+            upload.upload_bytes(),
+            bytemuck::cast_slice::<SpriteInstanceBufferRecord, u8>(&upload.records)
+        );
+        assert_eq!(SpriteInstanceUpload::from_instance_buffers(&[]), None);
+        assert_eq!(
+            SpriteInstanceUpload::from_instance_buffers(&[test_sprite_instance_buffer(
+                NativeRenderPipeline::DebugOverlay,
+                RenderLayer::Overlay,
+                0,
+            )]),
+            None
         );
     }
 
@@ -1748,6 +1820,16 @@ mod tests {
             ]
         );
         assert_eq!(
+            plan.sprite_instance_upload,
+            Some(SpriteInstanceUpload {
+                records: plan
+                    .sprite_instance_buffers
+                    .iter()
+                    .flat_map(|buffer| buffer.records.iter().copied())
+                    .collect(),
+            })
+        );
+        assert_eq!(
             plan.sprite_draw_commands,
             vec![
                 expected_sprite_draw_command(
@@ -1780,6 +1862,7 @@ mod tests {
             plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
+        assert_eq!(plan.sprite_instance_upload, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
     }
 
@@ -1805,6 +1888,7 @@ mod tests {
             plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
+        assert_eq!(plan.sprite_instance_upload, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
@@ -1865,6 +1949,7 @@ mod tests {
             plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
+        assert_eq!(plan.sprite_instance_upload, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
@@ -1909,6 +1994,12 @@ mod tests {
             [10.0, 4.0]
         );
         assert_eq!(
+            plan.sprite_instance_upload,
+            Some(SpriteInstanceUpload {
+                records: plan.sprite_instance_buffers[0].records.clone(),
+            })
+        );
+        assert_eq!(
             plan.sprite_draw_commands,
             vec![expected_sprite_draw_command(
                 NativeRenderPipeline::Projectiles,
@@ -1949,6 +2040,7 @@ mod tests {
             plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
+        assert_eq!(plan.sprite_instance_upload, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
     }
 
@@ -1998,6 +2090,12 @@ mod tests {
         assert_eq!(sprite_plan.sprite_instances, 1);
         assert_eq!(sprite_plan.sprite_instance_buffers.len(), 1);
         assert_eq!(
+            sprite_plan.sprite_instance_upload,
+            Some(SpriteInstanceUpload {
+                records: sprite_plan.sprite_instance_buffers[0].records.clone(),
+            })
+        );
+        assert_eq!(
             sprite_plan.sprite_draw_commands,
             vec![expected_sprite_draw_command(
                 NativeRenderPipeline::Sprites,
@@ -2010,6 +2108,7 @@ mod tests {
             raster_plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
+        assert_eq!(raster_plan.sprite_instance_upload, None);
         assert_eq!(
             raster_plan.sprite_draw_commands,
             Vec::<SpriteDrawCommand>::new()
@@ -2085,6 +2184,12 @@ mod tests {
         assert_eq!(
             plan.sprite_batches[0].instances[0].sprite,
             SpriteId::STATUS_TEXT
+        );
+        assert_eq!(
+            plan.sprite_instance_upload,
+            Some(SpriteInstanceUpload {
+                records: plan.sprite_instance_buffers[0].records.clone(),
+            })
         );
         assert_eq!(
             plan.sprite_draw_commands,

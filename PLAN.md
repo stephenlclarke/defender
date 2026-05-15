@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-108` are complete. The standing maintenance guidance in
+`DC-42` through `DC-109` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4392,6 +4392,73 @@ Work log:
   rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778819363660199`
+
+### DC-109: Clean Sprite Instance Upload Planning
+
+Status: `complete`
+
+Goal: flatten clean sprite instance-buffer records into one upload-ready
+instance stream, so the indexed sprite draw commands have a concrete
+renderer-owned buffer target with matching instance ranges and byte spans.
+
+Scope:
+
+- Add a `SpriteInstanceUpload` contract for concatenated sprite instance
+  records and upload-ready bytes.
+- Derive the upload stream from `SpriteInstanceBuffer` values after atlas
+  validation and resource pipeline filtering.
+- Wire sprite instance upload data into `SceneDrawPlan` alongside logical
+  batches, per-pipeline instance buffers, draw commands, quad geometry, and
+  temporary raster upload.
+- Keep raster-only scenes, unavailable sprite pipelines, missing atlas regions,
+  and empty atlas surfaces outside the sprite instance upload path.
+- Add focused renderer tests for upload concatenation, byte lengths, command
+  range alignment, raster-only scenes, and disabled sprite pipelines.
+- Update README/SPEC module text for clean sprite instance upload planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes an upload-ready sprite instance stream whenever
+  sprite draw commands exist.
+- Sprite draw-command instance ranges and byte spans index into the flattened
+  upload stream without presenter-side repacking.
+- Raster-only scenes and unavailable sprite pipelines do not produce sprite
+  instance upload data.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 05:31:40 BST` Started `DC-109`: adding clean sprite instance
+  upload planning that flattens draw-plan records into one upload-ready stream
+  matching `SpriteDrawCommand` instance ranges and byte spans.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778819514207039`
+- `2026-05-15 05:53:22 BST` Completed `DC-109`: added
+  `SpriteInstanceUpload` as the flattened upload-ready stream for sprite
+  instance records, wired it into `SceneDrawPlan`, aligned it with
+  `SpriteDrawCommand` ranges and byte spans, kept raster-only and unavailable
+  sprite paths outside the upload contract, and documented the renderer
+  instance-upload stream in README/SPEC. Validation passed with focused
+  renderer tests (34/34), the public API guard, `cargo test --all-targets`
+  (1155 library tests plus binary/example tests), clippy with warnings denied,
+  `make fidelity` (10 local fixtures, 15452 frames, 17/17 new executable Rust
+  lines), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
+  --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778820801408189`
 
 ## Ongoing Work
 
