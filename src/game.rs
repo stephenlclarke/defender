@@ -4,9 +4,10 @@ use crate::{
     renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize},
     systems::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, PlayerControlSystem,
-        PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome,
-        ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition,
-        ScreenVelocity, SmartBombSystem, WaveState, WaveStatus, WaveSystem,
+        PlayerDamageSystem, PlayerMotionState, PlayerMotionSystem, PlayerStock,
+        ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState, ProjectileSystem,
+        ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombSystem, WaveState, WaveStatus,
+        WaveSystem,
     },
 };
 
@@ -198,9 +199,11 @@ pub enum GameEvent {
     SmartBombPressed,
     HyperspacePressed,
     EnemyDestroyed,
+    PlayerDestroyed,
     WaveCleared,
     WaveStarted,
     BonusAwarded,
+    GameOver,
     HighScoreEntryStarted,
     HighScoreInitialAccepted,
     HighScoreSubmitted,
@@ -393,7 +396,11 @@ impl Game {
         }
 
         self.resolve_projectile_enemy_collisions(gameplay_events);
-        self.queue_wave_clear_if_needed(gameplay_events);
+        self.resolve_player_enemy_collision(motion.screen_position, gameplay_events);
+
+        if self.state.phase == GamePhase::Playing {
+            self.queue_wave_clear_if_needed(gameplay_events);
+        }
     }
 
     fn advance_projectiles(&mut self) {
@@ -447,6 +454,40 @@ impl Game {
         for enemy in destroyed {
             gameplay_events.push(GameEvent::EnemyDestroyed);
             self.award_enemy_score(enemy.kind, gameplay_events);
+        }
+    }
+
+    fn resolve_player_enemy_collision(
+        &mut self,
+        player_position: ScreenPosition,
+        gameplay_events: &mut Vec<GameEvent>,
+    ) {
+        let player = CollisionBox::new(player_position, PLAYER_SPRITE_SIZE);
+        let enemy_boxes = self
+            .state
+            .world
+            .enemies
+            .iter()
+            .map(|enemy| CollisionBox::new(enemy.position, enemy_sprite_size(enemy.kind)))
+            .collect::<Vec<_>>();
+
+        let Some(hit) = CollisionSystem::first_player_enemy_hit(player, &enemy_boxes) else {
+            return;
+        };
+
+        self.state.world.enemies.remove(hit.enemy_index);
+        let frame = PlayerDamageSystem::apply_hit(PlayerStock::new(
+            self.state.player.lives,
+            self.state.player.smart_bombs,
+        ));
+        self.state.player.lives = frame.stock.lives;
+        self.state.player.smart_bombs = frame.stock.smart_bombs;
+        gameplay_events.push(GameEvent::PlayerDestroyed);
+
+        if frame.game_over {
+            self.state.phase = GamePhase::GameOver;
+            self.pending_wave_start = false;
+            gameplay_events.push(GameEvent::GameOver);
         }
     }
 
@@ -547,7 +588,10 @@ impl Game {
                     world_vector_pixels(self.state.player.position.0),
                     world_vector_pixels(self.state.player.position.1),
                 ],
-                size: [16.0, 8.0],
+                size: [
+                    f32::from(PLAYER_SPRITE_SIZE.0),
+                    f32::from(PLAYER_SPRITE_SIZE.1),
+                ],
                 tint: Color::WHITE,
             });
 
@@ -579,6 +623,7 @@ fn enemy_sprite(kind: EnemyKind) -> SpriteId {
 }
 
 const PROJECTILE_SPRITE_SIZE: (u8, u8) = (8, 2);
+const PLAYER_SPRITE_SIZE: (u8, u8) = (16, 8);
 
 fn enemy_sprite_size(kind: EnemyKind) -> (u8, u8) {
     match kind {
@@ -684,7 +729,9 @@ fn world_vector_pixels(vector: WorldVector) -> f32 {
 #[cfg(test)]
 mod tests {
     use crate::{
-        renderer::{Color, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize, TextureAtlas},
+        renderer::{
+            Color, RenderLayer, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize, TextureAtlas,
+        },
         systems::{GameSimulation, ScreenPosition, ScreenVelocity, advance_one_frame},
     };
 
@@ -990,6 +1037,59 @@ mod tests {
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::PLAYER_PROJECTILE)
         );
+    }
+
+    #[test]
+    fn clean_game_player_enemy_collision_loses_life_and_removes_enemy() {
+        let mut game = credited_started_game();
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.player.lives, 2);
+        assert_eq!(frame.state.player.smart_bombs, 3);
+        assert_eq!(frame.state.scores.player_one, 0);
+        assert!(frame.state.world.enemies.is_empty());
+        assert_eq!(
+            frame.events.gameplay(),
+            &[GameEvent::PlayerDestroyed, GameEvent::WaveCleared]
+        );
+        assert!(
+            !frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+        );
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_SHIP && sprite.layer == RenderLayer::Objects
+        }));
+    }
+
+    #[test]
+    fn clean_game_player_enemy_final_collision_enters_game_over() {
+        let mut game = credited_started_game();
+        game.state.player.lives = 1;
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.phase, GamePhase::GameOver);
+        assert_eq!(frame.state.player.lives, 0);
+        assert_eq!(frame.state.player.smart_bombs, 3);
+        assert!(frame.state.world.enemies.is_empty());
+        assert_eq!(
+            frame.events.gameplay(),
+            &[GameEvent::PlayerDestroyed, GameEvent::GameOver]
+        );
+        assert!(!frame.scene.sprites.iter().any(|sprite| matches!(
+            sprite.sprite,
+            SpriteId::PLAYER_SHIP | SpriteId::ENEMY_LANDER | SpriteId::HUMAN
+        )));
+        assert_eq!(frame.scene.summary().layers.objects, 0);
     }
 
     #[test]

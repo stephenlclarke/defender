@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-125` are complete. The standing
+`DC-42` through `DC-126` are complete. The standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5539,6 +5539,74 @@ Work log:
   and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778848724960339`
+
+### DC-126: Clean Player Damage System
+
+Status: `complete`
+
+Goal: resolve player/enemy collisions and life loss through clean gameplay
+systems instead of leaving enemy contact as an unmodeled scene overlap.
+
+Scope:
+
+- Add deterministic clean player/enemy collision output in `src/systems.rs`.
+- Add a clean player-damage system for life decrement and game-over status.
+- Route playing-frame player/enemy overlap through those systems after enemy
+  and projectile updates.
+- Remove the colliding enemy from clean world state, emit player-destruction
+  output, and preserve wave-clear behavior for surviving players.
+- Update focused systems/game tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- Player damage is represented by gameplay-domain output, not renderer state or
+  temporary oracle structures.
+- A player/enemy overlap decrements clean player lives and removes the
+  colliding clean enemy in the same frame.
+- The final-life collision enters `GameOver`, emits explicit gameplay output,
+  and leaves gameplay sprites absent from the game-over scene.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::player_damage
+cargo test --lib systems::tests::collision_system_reports_first_player_enemy_hit
+cargo test --lib game::tests::clean_game_player_enemy
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 13:40:41 BST` Started `DC-126`: adding clean player/enemy
+  collision detection, deterministic player stock damage, player-destroyed and
+  game-over gameplay output, scene cleanup, and focused systems/game/docs
+  coverage.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778848852483269`
+- `2026-05-15 14:02:46 BST` Completed `DC-126`: added clean player/enemy
+  collision output and `PlayerDamageSystem`; routed contact through clean
+  gameplay state so collisions remove the colliding enemy, decrement lives,
+  emit `PlayerDestroyed`, preserve wave clear when the player survives, and
+  enter `GameOver` with gameplay sprites absent on the final life. Validation
+  passed with `cargo fmt --check`,
+  `cargo test --lib systems::tests::player_damage`,
+  `cargo test --lib systems::tests::collision_system_reports_first_player_enemy_hit`,
+  `cargo test --lib game::tests::clean_game_player_enemy`, full game and
+  systems test modules, public API guard, `cargo test --all-targets` (1191 lib,
+  2 bin, and 2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, new Rust line coverage 45/45),
+  `cargo run -- --live-smoke` (240 rendered frames), `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778850177520539`
 
 ## Ongoing Work
 

@@ -405,6 +405,11 @@ pub struct ProjectileEnemyHit {
     pub enemy_index: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerEnemyHit {
+    pub enemy_index: usize,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CollisionSystem;
 
@@ -424,6 +429,17 @@ impl CollisionSystem {
             }
         }
         None
+    }
+
+    pub fn first_player_enemy_hit(
+        player: CollisionBox,
+        enemies: &[CollisionBox],
+    ) -> Option<PlayerEnemyHit> {
+        enemies
+            .iter()
+            .copied()
+            .position(|enemy| player.overlaps(enemy))
+            .map(|enemy_index| PlayerEnemyHit { enemy_index })
     }
 }
 
@@ -480,6 +496,26 @@ pub struct PlayerStock {
 impl PlayerStock {
     pub const fn new(lives: u8, smart_bombs: u8) -> Self {
         Self { lives, smart_bombs }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerDamageFrame {
+    pub stock: PlayerStock,
+    pub game_over: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PlayerDamageSystem;
+
+impl PlayerDamageSystem {
+    pub fn apply_hit(stock: PlayerStock) -> PlayerDamageFrame {
+        let lives = stock.lives.saturating_sub(1);
+
+        PlayerDamageFrame {
+            stock: PlayerStock::new(lives, stock.smart_bombs),
+            game_over: lives == 0,
+        }
     }
 }
 
@@ -841,11 +877,11 @@ mod tests {
     use super::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate,
         GameSimulation, PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem,
-        PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome,
-        ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition,
-        ScreenVelocity, SmartBombSystem, VerticalControl, WaveState, WaveStatus, WaveSystem,
-        advance_one_frame, clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x,
-        thrust_acceleration,
+        PlayerDamageSystem, PlayerMotionState, PlayerMotionSystem, PlayerStock,
+        ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState, ProjectileSystem,
+        ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombSystem, VerticalControl, WaveState,
+        WaveStatus, WaveSystem, advance_one_frame, clamp_camera_velocity_word,
+        next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
     };
 
     #[test]
@@ -1167,6 +1203,27 @@ mod tests {
     }
 
     #[test]
+    fn collision_system_reports_first_player_enemy_hit() {
+        let player = CollisionBox::new(ScreenPosition::new(30, 40), (16, 8));
+        let enemies = [
+            CollisionBox::new(ScreenPosition::new(2, 2), (12, 8)),
+            CollisionBox::new(ScreenPosition::new(42, 44), (12, 8)),
+        ];
+
+        let hit = CollisionSystem::first_player_enemy_hit(player, &enemies)
+            .expect("player should overlap second enemy");
+
+        assert_eq!(hit.enemy_index, 1);
+        assert_eq!(
+            CollisionSystem::first_player_enemy_hit(
+                CollisionBox::new(ScreenPosition::new(100, 100), (16, 8)),
+                &enemies
+            ),
+            None
+        );
+    }
+
+    #[test]
     fn wave_system_reports_progress_or_next_wave() {
         assert_eq!(
             WaveSystem::evaluate(WaveState::new(1, 2)),
@@ -1251,6 +1308,21 @@ mod tests {
     fn smart_bomb_system_reports_all_active_enemies_destroyed() {
         assert_eq!(SmartBombSystem::detonate(3).destroyed_enemies, 3);
         assert_eq!(SmartBombSystem::detonate(0).destroyed_enemies, 0);
+    }
+
+    #[test]
+    fn player_damage_system_decrements_lives_and_reports_game_over() {
+        let survived = PlayerDamageSystem::apply_hit(PlayerStock::new(3, 2));
+        assert_eq!(survived.stock, PlayerStock::new(2, 2));
+        assert!(!survived.game_over);
+
+        let final_life = PlayerDamageSystem::apply_hit(PlayerStock::new(1, 2));
+        assert_eq!(final_life.stock, PlayerStock::new(0, 2));
+        assert!(final_life.game_over);
+
+        let already_empty = PlayerDamageSystem::apply_hit(PlayerStock::new(0, 2));
+        assert_eq!(already_empty.stock, PlayerStock::new(0, 2));
+        assert!(already_empty.game_over);
     }
 
     #[derive(Debug)]

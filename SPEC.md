@@ -69,9 +69,9 @@ tree:
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion, enemy-motion,
   projectile launch/capacity/motion systems, projectile/enemy collision
-  detection, smart-bomb resolution, wave-completion evaluation, score/bonus
-  awards, and the `GameSimulation` trait used by the clean game and internal
-  oracle implementations.
+  detection, player/enemy damage resolution, smart-bomb resolution,
+  wave-completion evaluation, score/bonus awards, and the `GameSimulation`
+  trait used by the clean game and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
@@ -137,9 +137,12 @@ through `ScoreSystem` before rendering. Crossing the clean bonus threshold
 updates player stock and emits `BonusAwarded`. Clean smart bombs consume player
 stock, clear active enemies through `SmartBombSystem`, route score through the
 same scoring system, and leave cleared enemies absent from the scene. Enemy
-exhaustion is reported through `WaveSystem`, keeping the last-hit frame empty
-and spawning the next clean wave on the following playing frame. It flattens
-those per-batch records into one upload-ready
+contact with the player is resolved through clean collision and
+`PlayerDamageSystem`, decrementing lives, removing the colliding enemy, and
+entering `GameOver` on the final life. Enemy exhaustion is reported through
+`WaveSystem`, keeping the last-hit frame empty and spawning the next clean wave
+on the following playing frame. It flattens those per-batch records into one
+upload-ready
 instance stream. The renderer also owns unit quad vertices, `u16` indices,
 upload bytes, and the `wgpu` vertex layout used to draw instanced sprites, then
 derives indexed instanced sprite draw commands with quad/index counts, instance
