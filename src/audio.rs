@@ -380,6 +380,7 @@ mod tests {
                     high_score: 0,
                     next_bonus: 10_000,
                 },
+                high_score_initials: crate::systems::HighScoreInitialsState::EMPTY,
                 world: WorldSnapshot::default(),
             },
             events: GameEvents::new(Vec::new(), sounds),

@@ -107,8 +107,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-128` are complete. The standing
-maintenance guidance in Ongoing Work still applies.
+`DC-42` through `DC-129` are complete. The standing maintenance guidance in
+Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -5737,6 +5737,71 @@ Work log:
   `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778854120229339`
+
+### DC-129: Clean High-Score Initials Entry System
+
+Status: `complete`
+
+Goal: handle high-score initials through clean gameplay state after
+`HighScoreEntry` starts.
+
+Scope:
+
+- Add deterministic clean high-score initials state and entry handling in
+  `src/systems.rs`.
+- Extend clean `GameInput` with typed initials and backspace input.
+- Route `HighScoreEntry` frames through the clean initials system.
+- Emit `HighScoreInitialAccepted` and `HighScoreSubmitted`, and return to
+  attract after submission.
+- Update focused systems/game tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- Initials entry is represented by clean gameplay-domain state and events.
+- Alphabetic inputs are normalized to uppercase, accepted up to three initials,
+  and backspace removes the previous initial without submitting.
+- The third accepted initial emits `HighScoreSubmitted` and returns the clean
+  game to `Attract`.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::high_score
+cargo test --lib game::tests::clean_game_high_score_initials
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 15:10:42 BST` Started `DC-129`: adding clean high-score initials
+  state, typed-initial and backspace input handling, accepted/submitted
+  gameplay events, attract return after submission, and focused
+  systems/game/docs coverage.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778854255315089`
+- `2026-05-15 15:37:21 BST` Completed `DC-129`: added clean high-score
+  initials state and frame output, routed typed initials and backspace through
+  `GameInput` and `Game`, emitted `HighScoreInitialAccepted` and
+  `HighScoreSubmitted`, returned submitted entries to attract, and updated
+  README/SPEC/PLAN plus compatibility constructors. Validation passed with
+  `cargo fmt --check`, `cargo test --lib systems::tests::high_score`,
+  `cargo test --lib game::tests::clean_game_high_score_initials`,
+  `cargo test --all-targets` (1198 library tests, 2 binary tests, 2 example
+  tests), `cargo clippy --all-targets -- -D warnings`, `make fidelity`
+  (10 fixtures, 15452 frames, 45/45 new executable Rust lines covered),
+  `cargo run -- --live-smoke` (239 rendered frames with attract, credit, and
+  playing evidence), `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
+  `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778855841540879`
 
 ## Ongoing Work
 

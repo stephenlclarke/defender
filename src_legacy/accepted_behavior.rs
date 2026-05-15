@@ -181,6 +181,8 @@ mod tests {
             service_auto_up: true,
             service_advance: true,
             high_score_reset: true,
+            high_score_initial: None,
+            high_score_backspace: false,
             tilt: true,
         });
 

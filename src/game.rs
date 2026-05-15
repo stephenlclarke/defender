@@ -4,10 +4,10 @@ use crate::{
     renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize},
     systems::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, HighScoreEntrySystem,
-        OperatorControlSystem, PlayerControlSystem, PlayerDamageSystem, PlayerMotionState,
-        PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome, ProjectileMotionSystem,
-        ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition, ScreenVelocity,
-        SmartBombSystem, WaveState, WaveStatus, WaveSystem,
+        HighScoreInitialsState, OperatorControlSystem, PlayerControlSystem, PlayerDamageSystem,
+        PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome,
+        ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition,
+        ScreenVelocity, SmartBombSystem, WaveState, WaveStatus, WaveSystem,
     },
 };
 
@@ -182,6 +182,7 @@ pub struct GameState {
     pub wave: u8,
     pub player: PlayerSnapshot,
     pub scores: ScoreSnapshot,
+    pub high_score_initials: HighScoreInitialsState,
     pub world: WorldSnapshot,
 }
 
@@ -303,6 +304,10 @@ impl Game {
             self.step_playing(input, &mut gameplay_events, &mut sound_events);
         }
 
+        if self.state.phase == GamePhase::HighScoreEntry {
+            self.step_high_score_entry(input, &mut gameplay_events);
+        }
+
         GameFrame {
             state: self.state.clone(),
             events: GameEvents::new(gameplay_events, sound_events),
@@ -322,6 +327,7 @@ impl Game {
             lives: 3,
             smart_bombs: 3,
         };
+        self.state.high_score_initials = HighScoreInitialsState::EMPTY;
         self.state.world = WorldSnapshot::first_wave();
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
@@ -342,6 +348,24 @@ impl Game {
         if controls.triggers.high_score_reset {
             self.state.scores.high_score = 0;
             gameplay_events.push(GameEvent::HighScoreReset);
+        }
+    }
+
+    fn step_high_score_entry(&mut self, input: GameInput, gameplay_events: &mut Vec<GameEvent>) {
+        let frame = HighScoreEntrySystem::enter_initial(
+            self.state.high_score_initials,
+            input.high_score_initial,
+            input.high_score_backspace,
+        );
+        self.state.high_score_initials = frame.state;
+
+        if frame.accepted {
+            gameplay_events.push(GameEvent::HighScoreInitialAccepted);
+        }
+
+        if frame.submitted {
+            self.state.phase = GamePhase::Attract;
+            gameplay_events.push(GameEvent::HighScoreSubmitted);
         }
     }
 
@@ -515,6 +539,7 @@ impl Game {
             .qualifies
             {
                 self.state.phase = GamePhase::HighScoreEntry;
+                self.state.high_score_initials = HighScoreInitialsState::EMPTY;
                 gameplay_events.push(GameEvent::HighScoreEntryStarted);
             } else {
                 self.state.phase = GamePhase::GameOver;
@@ -709,6 +734,8 @@ pub struct GameInput {
     pub service_auto_up: bool,
     pub service_advance: bool,
     pub high_score_reset: bool,
+    pub high_score_initial: Option<char>,
+    pub high_score_backspace: bool,
     pub tilt: bool,
 }
 
@@ -729,6 +756,8 @@ impl GameInput {
         service_auto_up: false,
         service_advance: false,
         high_score_reset: false,
+        high_score_initial: None,
+        high_score_backspace: false,
         tilt: false,
     };
 }
@@ -753,6 +782,7 @@ fn initial_state() -> GameState {
             high_score: 0,
             next_bonus: 10_000,
         },
+        high_score_initials: HighScoreInitialsState::EMPTY,
         world: WorldSnapshot::default(),
     }
 }
@@ -771,7 +801,10 @@ mod tests {
         renderer::{
             Color, RenderLayer, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize, TextureAtlas,
         },
-        systems::{GameSimulation, ScreenPosition, ScreenVelocity, advance_one_frame},
+        systems::{
+            GameSimulation, HighScoreInitialsState, ScreenPosition, ScreenVelocity,
+            advance_one_frame,
+        },
     };
 
     use super::{
@@ -824,6 +857,7 @@ mod tests {
                     high_score: 100,
                     next_bonus: 10_000,
                 },
+                high_score_initials: HighScoreInitialsState::EMPTY,
                 world: WorldSnapshot::default(),
             },
             events: GameEvents::default(),
@@ -1222,6 +1256,79 @@ mod tests {
                 GameEvent::HighScoreEntryStarted,
             ]
         );
+    }
+
+    #[test]
+    fn clean_game_high_score_initials_accept_backspace_and_submit() {
+        let mut game = credited_started_game();
+        game.state.phase = GamePhase::HighScoreEntry;
+        game.state.high_score_initials = HighScoreInitialsState::EMPTY;
+
+        let first = game.step(GameInput {
+            high_score_initial: Some('a'),
+            ..GameInput::NONE
+        });
+
+        assert_eq!(first.state.phase, GamePhase::HighScoreEntry);
+        assert_eq!(
+            first.state.high_score_initials.initials,
+            [Some('A'), None, None]
+        );
+        assert_eq!(first.state.high_score_initials.cursor, 1);
+        assert_eq!(
+            first.events.gameplay(),
+            &[GameEvent::HighScoreInitialAccepted]
+        );
+
+        let ignored = game.step(GameInput {
+            high_score_initial: Some('1'),
+            ..GameInput::NONE
+        });
+        assert_eq!(
+            ignored.state.high_score_initials,
+            first.state.high_score_initials
+        );
+        assert!(ignored.events.is_empty());
+
+        let erased = game.step(GameInput {
+            high_score_backspace: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(
+            erased.state.high_score_initials,
+            HighScoreInitialsState::EMPTY
+        );
+        assert!(erased.events.is_empty());
+
+        for initial in ['b', 'c'] {
+            let frame = game.step(GameInput {
+                high_score_initial: Some(initial),
+                ..GameInput::NONE
+            });
+            assert_eq!(
+                frame.events.gameplay(),
+                &[GameEvent::HighScoreInitialAccepted]
+            );
+        }
+
+        let submitted = game.step(GameInput {
+            high_score_initial: Some('d'),
+            ..GameInput::NONE
+        });
+
+        assert_eq!(submitted.state.phase, GamePhase::Attract);
+        assert_eq!(
+            submitted.state.high_score_initials.initials,
+            [Some('B'), Some('C'), Some('D')]
+        );
+        assert_eq!(
+            submitted.events.gameplay(),
+            &[
+                GameEvent::HighScoreInitialAccepted,
+                GameEvent::HighScoreSubmitted,
+            ]
+        );
+        assert_eq!(submitted.scene.summary().layers.objects, 0);
     }
 
     #[test]

@@ -631,6 +631,23 @@ pub struct HighScoreEntryFrame {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct HighScoreInitialsState {
+    pub initials: [Option<char>; 3],
+    pub cursor: u8,
+}
+
+impl HighScoreInitialsState {
+    pub const EMPTY: Self = Self {
+        initials: [None, None, None],
+        cursor: 0,
+    };
+
+    pub const fn is_complete(self) -> bool {
+        self.cursor >= 3
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct HighScoreEntrySystem;
 
 impl HighScoreEntrySystem {
@@ -639,6 +656,52 @@ impl HighScoreEntrySystem {
             qualifies: score > 0 && score >= high_score,
         }
     }
+
+    pub fn enter_initial(
+        state: HighScoreInitialsState,
+        initial: Option<char>,
+        backspace: bool,
+    ) -> HighScoreInitialsFrame {
+        let mut state = state;
+        let mut accepted = false;
+
+        if backspace && state.cursor > 0 {
+            state.cursor -= 1;
+            state.initials[usize::from(state.cursor)] = None;
+            return HighScoreInitialsFrame {
+                state,
+                accepted,
+                submitted: false,
+            };
+        }
+
+        if let Some(initial) = initial.and_then(normalized_initial)
+            && !state.is_complete()
+        {
+            state.initials[usize::from(state.cursor)] = Some(initial);
+            state.cursor += 1;
+            accepted = true;
+        }
+
+        HighScoreInitialsFrame {
+            state,
+            accepted,
+            submitted: accepted && state.is_complete(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreInitialsFrame {
+    pub state: HighScoreInitialsState,
+    pub accepted: bool,
+    pub submitted: bool,
+}
+
+fn normalized_initial(initial: char) -> Option<char> {
+    initial
+        .is_ascii_alphabetic()
+        .then(|| initial.to_ascii_uppercase())
 }
 
 fn bonus_awards(score: u32, next_bonus: u32) -> u8 {
@@ -954,13 +1017,13 @@ mod tests {
 
     use super::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate,
-        GameSimulation, HighScoreEntrySystem, OperatorActionTriggers, OperatorControlSystem,
-        PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem, PlayerDamageSystem,
-        PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome,
-        ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition,
-        ScreenVelocity, SmartBombSystem, VerticalControl, WaveState, WaveStatus, WaveSystem,
-        advance_one_frame, clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x,
-        thrust_acceleration,
+        GameSimulation, HighScoreEntrySystem, HighScoreInitialsState, OperatorActionTriggers,
+        OperatorControlSystem, PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem,
+        PlayerDamageSystem, PlayerMotionState, PlayerMotionSystem, PlayerStock,
+        ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState, ProjectileSystem,
+        ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombSystem, VerticalControl, WaveState,
+        WaveStatus, WaveSystem, advance_one_frame, clamp_camera_velocity_word,
+        next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
     };
 
     #[test]
@@ -1426,6 +1489,34 @@ mod tests {
     }
 
     #[test]
+    fn high_score_entry_system_accepts_backspaces_and_submits_initials() {
+        let first =
+            HighScoreEntrySystem::enter_initial(HighScoreInitialsState::EMPTY, Some('a'), false);
+        assert_eq!(first.state.initials, [Some('A'), None, None]);
+        assert_eq!(first.state.cursor, 1);
+        assert!(first.accepted);
+        assert!(!first.submitted);
+
+        let ignored = HighScoreEntrySystem::enter_initial(first.state, Some('1'), false);
+        assert_eq!(ignored.state, first.state);
+        assert!(!ignored.accepted);
+        assert!(!ignored.submitted);
+
+        let erased = HighScoreEntrySystem::enter_initial(ignored.state, None, true);
+        assert_eq!(erased.state, HighScoreInitialsState::EMPTY);
+        assert!(!erased.accepted);
+        assert!(!erased.submitted);
+
+        let second = HighScoreEntrySystem::enter_initial(erased.state, Some('b'), false).state;
+        let third = HighScoreEntrySystem::enter_initial(second, Some('c'), false).state;
+        let submitted = HighScoreEntrySystem::enter_initial(third, Some('d'), false);
+        assert_eq!(submitted.state.initials, [Some('B'), Some('C'), Some('D')]);
+        assert_eq!(submitted.state.cursor, 3);
+        assert!(submitted.accepted);
+        assert!(submitted.submitted);
+    }
+
+    #[test]
     fn smart_bomb_system_reports_all_active_enemies_destroyed() {
         assert_eq!(SmartBombSystem::detonate(3).destroyed_enemies, 3);
         assert_eq!(SmartBombSystem::detonate(0).destroyed_enemies, 0);
@@ -1473,6 +1564,7 @@ mod tests {
                         high_score: 100,
                         next_bonus: 10_000,
                     },
+                    high_score_initials: HighScoreInitialsState::EMPTY,
                     world: WorldSnapshot::default(),
                 },
             }

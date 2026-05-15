@@ -66,6 +66,7 @@ mod tests {
                 high_score: 10_000,
                 next_bonus: 10_000,
             },
+            high_score_initials: crate::systems::HighScoreInitialsState::EMPTY,
             world: WorldSnapshot::default(),
         };
         let frame = GameFrame {

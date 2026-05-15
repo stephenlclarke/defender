@@ -107,6 +107,7 @@ fn adapt_snapshot(snapshot: AcceptedSnapshot) -> GameState {
             high_score: snapshot.scores.high_score,
             next_bonus: snapshot.scores.next_bonus,
         },
+        high_score_initials: crate::systems::HighScoreInitialsState::EMPTY,
         world: WorldSnapshot::default(),
     }
 }
