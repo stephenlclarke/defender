@@ -117,9 +117,9 @@ pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
 pub use renderer::{
     AtlasRegion, Color, FontAtlas, GpuRendererSettings, NativeRenderPipeline,
     NativeRendererResources, NativeSceneRenderer, PaletteResource, RenderLayer, RenderLayerCounts,
-    RenderScene, RenderSceneSummary, SceneDrawPlan, SceneRaster, SceneRasterError,
-    SceneRasterUpload, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId, SurfaceSize,
-    TextureAtlas, ViewportLayout,
+    RenderScene, RenderSceneSummary, SceneDrawPlan, SceneProjectionUniforms, SceneRaster,
+    SceneRasterError, SceneRasterUpload, SceneSprite, SpriteDrawBatch, SpriteDrawInstance,
+    SpriteId, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
 };
 pub use systems::{
     FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,

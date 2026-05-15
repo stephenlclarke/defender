@@ -76,6 +76,76 @@ fn scaled_viewport_dimension(scene_extent: u32, scale: f64, target_extent: u32) 
         .clamp(1.0, f64::from(target_extent)) as u32
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WgpuViewportCommand {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub min_depth: f32,
+    pub max_depth: f32,
+}
+
+impl WgpuViewportCommand {
+    pub fn from_layout(layout: ViewportLayout) -> Option<Self> {
+        if layout.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            x: layout.origin[0] as f32,
+            y: layout.origin[1] as f32,
+            width: layout.size.width as f32,
+            height: layout.size.height as f32,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SceneProjectionUniforms {
+    pub scale: [f32; 2],
+    pub translate: [f32; 2],
+}
+
+impl SceneProjectionUniforms {
+    pub fn for_surface(surface: SurfaceSize) -> Option<Self> {
+        if surface.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            scale: [2.0 / surface.width as f32, -2.0 / surface.height as f32],
+            translate: [-1.0, 1.0],
+        })
+    }
+
+    pub fn project_point(self, point: [f32; 2]) -> [f32; 2] {
+        [
+            point[0].mul_add(self.scale[0], self.translate[0]),
+            point[1].mul_add(self.scale[1], self.translate[1]),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WgpuPassPlan {
+    pub clear_color: wgpu::Color,
+    pub viewport: Option<WgpuViewportCommand>,
+    pub scene_projection: Option<SceneProjectionUniforms>,
+}
+
+impl WgpuPassPlan {
+    pub fn from_scene(scene: &RenderScene, viewport: ViewportLayout) -> Self {
+        Self {
+            clear_color: scene.clear_color.to_wgpu(),
+            viewport: WgpuViewportCommand::from_layout(viewport),
+            scene_projection: SceneProjectionUniforms::for_surface(scene.surface),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color {
     pub rgba: [u8; 4],
@@ -85,6 +155,15 @@ impl Color {
     pub const WHITE: Self = Self {
         rgba: [0xFF, 0xFF, 0xFF, 0xFF],
     };
+
+    pub fn to_wgpu(self) -> wgpu::Color {
+        wgpu::Color {
+            r: f64::from(self.rgba[0]) / 255.0,
+            g: f64::from(self.rgba[1]) / 255.0,
+            b: f64::from(self.rgba[2]) / 255.0,
+            a: f64::from(self.rgba[3]) / 255.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -476,6 +555,7 @@ pub struct SceneDrawPlan {
     pub frame: u64,
     pub surface: SurfaceSize,
     pub viewport: ViewportLayout,
+    pub gpu_pass: WgpuPassPlan,
     pub pipelines: Vec<NativeRenderPipeline>,
     pub sprite_instances: usize,
     pub missing_sprite_regions: usize,
@@ -533,11 +613,13 @@ impl NativeSceneRenderer {
             .iter()
             .map(|batch: &SpriteDrawBatch| batch.instances.len())
             .sum();
+        let viewport = ViewportLayout::fit(scene.surface, target);
 
         SceneDrawPlan {
             frame: scene.frame,
             surface: scene.surface,
-            viewport: ViewportLayout::fit(scene.surface, target),
+            viewport,
+            gpu_pass: WgpuPassPlan::from_scene(scene, viewport),
             pipelines,
             sprite_instances,
             missing_sprite_regions,
@@ -606,9 +688,9 @@ impl Default for GpuRendererSettings {
 mod tests {
     use super::{
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
-        NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneRaster,
-        SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId, SurfaceSize,
-        TextureAtlas, ViewportLayout,
+        NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneProjectionUniforms,
+        SceneRaster, SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId,
+        SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -682,6 +764,71 @@ mod tests {
             }
         );
         assert!(empty_scene.is_empty());
+    }
+
+    #[test]
+    fn color_normalizes_to_wgpu_clear_color() {
+        assert_eq!(
+            Color {
+                rgba: [128, 64, 255, 0]
+            }
+            .to_wgpu(),
+            wgpu::Color {
+                r: 128.0 / 255.0,
+                g: 64.0 / 255.0,
+                b: 1.0,
+                a: 0.0,
+            }
+        );
+    }
+
+    #[test]
+    fn wgpu_viewport_command_matches_non_empty_layout() {
+        let layout = ViewportLayout::fit(SurfaceSize::new(292, 240), SurfaceSize::new(640, 480));
+
+        assert_eq!(
+            WgpuViewportCommand::from_layout(layout),
+            Some(WgpuViewportCommand {
+                x: 28.0,
+                y: 0.0,
+                width: 584.0,
+                height: 480.0,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            })
+        );
+        assert_eq!(
+            WgpuViewportCommand::from_layout(ViewportLayout::fit(
+                SurfaceSize::new(292, 240),
+                SurfaceSize::new(0, 480)
+            )),
+            None
+        );
+    }
+
+    #[test]
+    fn scene_projection_uniforms_map_scene_points_to_clip_space() {
+        let projection =
+            SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
+
+        assert_eq!(projection.scale, [2.0 / 292.0, -2.0 / 240.0]);
+        assert_eq!(projection.translate, [-1.0, 1.0]);
+        assert_eq!(projection.project_point([0.0, 0.0]), [-1.0, 1.0]);
+        assert_clip_point_near(projection.project_point([146.0, 120.0]), [0.0, 0.0]);
+        assert_clip_point_near(projection.project_point([292.0, 240.0]), [1.0, -1.0]);
+        assert_eq!(
+            SceneProjectionUniforms::for_surface(SurfaceSize::new(0, 240)),
+            None
+        );
+    }
+
+    fn assert_clip_point_near(actual: [f32; 2], expected: [f32; 2]) {
+        for (actual, expected) in actual.into_iter().zip(expected) {
+            assert!(
+                (actual - expected).abs() <= f32::EPSILON,
+                "clip point component {actual} was not near {expected}"
+            );
+        }
     }
 
     #[test]
@@ -906,6 +1053,26 @@ mod tests {
                 scale: 1.0,
             }
         );
+        assert_eq!(
+            plan.gpu_pass,
+            WgpuPassPlan {
+                clear_color: wgpu::Color {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 0.0,
+                },
+                viewport: Some(WgpuViewportCommand {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 292.0,
+                    height: 240.0,
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                }),
+                scene_projection: SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)),
+            }
+        );
         assert_eq!(plan.sprite_instances, 2);
         assert_eq!(plan.missing_sprite_regions, 0);
         assert_eq!(
@@ -1084,6 +1251,18 @@ mod tests {
 
         assert_eq!(sprite_plan.viewport, expected);
         assert_eq!(raster_plan.viewport, expected);
+        assert_eq!(
+            sprite_plan.gpu_pass.viewport,
+            Some(WgpuViewportCommand {
+                x: 28.0,
+                y: 0.0,
+                width: 584.0,
+                height: 480.0,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            })
+        );
+        assert_eq!(sprite_plan.gpu_pass, raster_plan.gpu_pass);
         assert_eq!(sprite_plan.sprite_instances, 1);
         assert_eq!(
             raster_plan.raster_upload,
@@ -1093,6 +1272,21 @@ mod tests {
                 visual_signature: Some(0xCAFE_BABE),
                 non_blank: true,
             })
+        );
+    }
+
+    #[test]
+    fn native_scene_renderer_omits_gpu_viewport_for_empty_target() {
+        let scene = RenderScene::empty(85, SurfaceSize::new(292, 240));
+
+        let plan =
+            NativeSceneRenderer::default().prepare_for_target(&scene, SurfaceSize::new(0, 0));
+
+        assert!(plan.viewport.is_empty());
+        assert_eq!(plan.gpu_pass.viewport, None);
+        assert_eq!(
+            plan.gpu_pass.scene_projection,
+            SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240))
         );
     }
 

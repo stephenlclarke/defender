@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-103` are complete. The standing maintenance guidance in
+`DC-42` through `DC-104` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4083,6 +4083,65 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778809459870549`
   Slack final validation follow-up:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778810539805979`
+
+### DC-104: Clean Renderer GPU Pass Planning
+
+Status: `complete`
+
+Goal: extend the clean renderer draw plan with GPU-ready pass constants derived
+from scene data, so the next native `wgpu` path can bind clear color, viewport,
+and scene-coordinate projection without consulting legacy video geometry.
+
+Scope:
+
+- Convert clean `Color` values into normalized `wgpu::Color` clear values.
+- Add a viewport command representation that maps `ViewportLayout` to the
+  values used by `wgpu::RenderPass::set_viewport`.
+- Add scene-to-clip projection constants for native top-left scene coordinates.
+- Attach the GPU pass constants to `SceneDrawPlan`.
+- Add focused renderer tests for color normalization, empty viewports,
+  viewport command values, projection constants, and sprite/raster draw plans.
+- Update README/SPEC module text for GPU pass planning.
+
+Acceptance criteria:
+
+- Clean draw plans expose GPU-ready pass constants from clean scene data only.
+- Empty scene or target surfaces do not request a viewport command.
+- Sprite-only and raster-backed scenes share the same GPU pass constants.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 03:04:11 BST` Started `DC-104`: adding GPU-ready renderer pass
+  constants for clear color, viewport commands, and scene-to-clip projection
+  data derived from clean scene draw plans.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778810662415339`
+- `2026-05-15 03:28:11 BST` Completed `DC-104`: added GPU-ready pass constants
+  to `SceneDrawPlan`, including normalized `wgpu::Color`, optional viewport
+  command values, and scene-to-clip projection uniforms for native top-left
+  scene coordinates; kept sprite batches and temporary raster upload separate;
+  exported the new clean renderer contracts; and refreshed README/SPEC wording.
+  Validation passed with focused renderer tests, a public API guard,
+  `cargo test --all-targets` (1144 library tests plus binary/example tests),
+  clippy with warnings denied, `make fidelity` (10 local fixtures, 15452
+  frames, 33/33 new executable Rust lines), `cargo run -- --live-smoke` (239
+  rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778812090473359`
 
 ## Ongoing Work
 

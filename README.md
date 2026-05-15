@@ -222,8 +222,8 @@ Clean rewrite modules:
   and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
-  sprite batches, viewport layout, scene summaries, render signatures, and draw
-  planning.
+  sprite batches, viewport layout, GPU pass planning, scene summaries, render
+  signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -259,7 +259,8 @@ code adapts frame outputs into clean audio frames before submitting to
 `defender::readme_media` facade. The binary enters through the clean platform
 boundary before delegating to the runtime bridge. Native draw planning resolves
 scene sprites through renderer-owned atlas regions into sprite batches and
-records the centered viewport layout for the target surface. The live worker
+records the centered viewport layout plus GPU-ready clear color, viewport
+command, and scene-projection constants for the target surface. The live worker
 still wraps accepted visual output as a clean `RenderScene` raster payload
 before the presenter draws it. Kitty graphics and terminal-session code remain
 parked there as historical compatibility evidence, but they are no longer
