@@ -34,6 +34,7 @@ cargo fmt --check
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
+cargo run -- --game-smoke
 cargo run -- --live-smoke
 ```
 
@@ -107,7 +108,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-133` are complete. The standing maintenance guidance in
+`DC-42` through `DC-134` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -6053,6 +6054,74 @@ Work log:
   `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778878068481899`
+
+### DC-134: Clean Game Smoke Command
+
+Status: `complete`
+
+Goal: add a clean smoke command that exercises `Game` and native renderer draw
+planning without entering the legacy live presenter path.
+
+Scope:
+
+- Add a crate-private clean game smoke runner that steps `Game` through a
+  deterministic input script.
+- Prepare each emitted `RenderScene` with `NativeSceneRenderer` and summarize
+  sprite-only draw-plan evidence.
+- Add a `--game-smoke` CLI/runtime command that prints a stable smoke report.
+- Update public guard tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- `--game-smoke` runs through the clean game and native renderer draw-planning
+  path without importing legacy live or presenter modules.
+- The report proves attract, credited, and playing frames, nonzero sprite
+  instances, no raster payloads, no missing sprite atlas regions, and a clean
+  exit.
+- Existing `--live-smoke` behavior remains unchanged.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game_smoke::tests
+cargo test --lib runtime::tests
+cargo test --lib platform::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 21:54:47 BST` Started `DC-134`: adding a clean `--game-smoke`
+  command that steps `Game` through scripted controls, prepares emitted scenes
+  with `NativeSceneRenderer`, reports sprite-only draw-plan evidence, and
+  preserves existing `--live-smoke` behavior.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778878489373369`
+- `2026-05-15 22:20:49 BST` Completed `DC-134`: added the clean
+  `--game-smoke` command, crate-private smoke runner, runtime/platform wiring,
+  public guard checks, and README/SPEC documentation. The smoke report proves
+  24 clean game frames, attract/credited/playing coverage, 290 sprite
+  instances, 92 sprite draw commands, zero raster frames, zero missing sprite
+  atlas regions, and clean exit. Validation passed with `cargo fmt --check`,
+  `cargo test --lib game_smoke::tests`, `cargo test --lib runtime::tests`,
+  `cargo test --lib platform::tests`, `cargo test --lib public_api_tests`,
+  `cargo test --all-targets` (1221 library tests, 2 binary tests, and
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixture traces, 15452 frames, and 16/16 new executable
+  Rust lines covered), `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke` (240 rendered frames), markdownlint, and
+  `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778880047960349`
 
 ## Ongoing Work
 

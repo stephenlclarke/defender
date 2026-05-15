@@ -48,6 +48,7 @@ cargo run -- --input-profile planetoid
 cargo run -- --input-profile cabinet
 cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin
 cargo run -- --live-smoke
+cargo run -- --game-smoke
 cargo run -- --mute
 cargo run -- --rom-report
 cargo run -- --rom-report /path/to/roms
@@ -162,6 +163,7 @@ cargo fmt --check
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
+cargo run -- --game-smoke
 cargo run -- --live-smoke
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
 ```
@@ -217,6 +219,9 @@ Clean rewrite modules:
   projectile, player, direction, and sound-event contracts without accepted
   command-byte mapping. The clean `Game` shell emits sprite-first scene frames
   without touching the accepted machine adapter.
+- `src/game_smoke.rs`: the crate-private clean game smoke command that steps
+  `Game` through scripted controls and prepares emitted scenes with the native
+  renderer draw planner.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, operator trigger handling,
   player-motion, enemy-motion, projectile launch/capacity/motion systems,
@@ -282,7 +287,9 @@ render signatures rather than exposing memory-oriented CRC labels. Legacy live
 code adapts frame outputs into clean audio frames before submitting to
 `src/audio.rs`. README media tooling uses the narrow doc-hidden
 `defender::readme_media` facade. The binary enters through the clean platform
-boundary before delegating to the runtime bridge. The clean `Game` world seeds
+boundary before delegating to the runtime bridge. `--game-smoke` steps the clean
+game through scripted controls and prepares sprite-only native draw plans
+without entering the legacy live presenter. The clean `Game` world seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
 wave and renders them as atlas-backed scene sprites. Operator controls are
 sampled through `OperatorControlSystem`, emitting diagnostics, audits, and

@@ -13,6 +13,7 @@ mod fidelity_scenarios;
 mod fidelity_trace_engine;
 mod fidelity_traces;
 pub mod game;
+mod game_smoke;
 mod live_wgpu;
 mod oracle;
 pub mod platform;
@@ -364,6 +365,7 @@ mod public_api_tests {
         assert!(platform_rs.contains("\"--help\" | \"-h\" => ArgClassification::Help"));
         assert!(platform_rs.contains("ArgClassification::Error"));
         assert!(platform_rs.contains("\"--live-smoke\""));
+        assert!(platform_rs.contains("\"--game-smoke\""));
         assert!(platform_rs.contains("RuntimeConfig::smoke()"));
         assert!(!platform_rs.contains(&accepted_runtime_call));
         assert!(!platform_rs.contains("crate::compatibility::"));
@@ -378,6 +380,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("RuntimeCommand::Help"));
         assert!(runtime_rs.contains("RuntimeCommand::RomReport { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::VerifyRoms { path }"));
+        assert!(runtime_rs.contains("RuntimeCommand::GameSmoke"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTrace { frame_count }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputs { script }"));
         assert!(runtime_rs.contains("RuntimeCommand::FidelityTraceInputsFile { path }"));
@@ -391,6 +394,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("pub(crate) fn help_text()"));
         assert!(runtime_rs.contains("pub(crate) fn run_rom_report"));
         assert!(runtime_rs.contains("pub(crate) fn run_verify_roms"));
+        assert!(runtime_rs.contains("pub(crate) fn run_game_smoke"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace_inputs"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_trace_inputs_file"));
@@ -401,6 +405,7 @@ mod public_api_tests {
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_scenario_input_writer"));
         assert!(runtime_rs.contains("crate::rom_report::run(path.as_deref())"));
         assert!(runtime_rs.contains("crate::rom_report::run_verify(&path)"));
+        assert!(runtime_rs.contains("crate::game_smoke::run()"));
         assert!(runtime_rs.contains("crate::fidelity_traces::run_trace(frame_count)"));
         assert!(runtime_rs.contains("crate::fidelity_traces::run_trace_inputs(&script)"));
         assert!(runtime_rs.contains("crate::fidelity_traces::run_trace_inputs_file(&path)"));
@@ -428,6 +433,7 @@ mod public_api_tests {
         let public_fidelity_scenarios_module = format!("pub mod {};", "fidelity_scenarios");
         let public_fidelity_trace_engine_module = format!("pub mod {};", "fidelity_trace_engine");
         let public_fidelity_traces_module = format!("pub mod {};", "fidelity_traces");
+        let public_game_smoke_module = format!("pub mod {};", "game_smoke");
         let public_live_wgpu_module = format!("pub mod {};", "live_wgpu");
         assert!(lib_rs.contains("mod rom_report;"));
         assert!(!lib_rs.contains(&public_rom_report_module));
@@ -441,6 +447,8 @@ mod public_api_tests {
         assert!(!lib_rs.contains(&public_fidelity_trace_engine_module));
         assert!(lib_rs.contains("mod fidelity_traces;"));
         assert!(!lib_rs.contains(&public_fidelity_traces_module));
+        assert!(lib_rs.contains("mod game_smoke;"));
+        assert!(!lib_rs.contains(&public_game_smoke_module));
         assert!(lib_rs.contains("mod live_wgpu;"));
         assert!(!lib_rs.contains(&public_live_wgpu_module));
 
@@ -521,6 +529,25 @@ mod public_api_tests {
         assert!(fidelity_traces_rs.contains("crate::fidelity_trace_engine::compare_trace_text"));
         assert!(fidelity_traces_rs.contains("crate::fidelity_trace_engine::trace_header()"));
         assert!(!fidelity_traces_rs.contains("crate::legacy_fidelity::"));
+
+        let game_smoke_rs = include_str!("game_smoke.rs");
+        assert!(game_smoke_rs.contains("pub(crate) fn run("));
+        assert!(game_smoke_rs.contains("pub(crate) fn smoke_report("));
+        assert!(game_smoke_rs.contains("Game::new()"));
+        assert!(game_smoke_rs.contains("NativeSceneRenderer::default()"));
+        assert!(game_smoke_rs.contains("renderer.prepare(&frame.scene)"));
+        for forbidden in [
+            "crate::accepted::",
+            "crate::input::",
+            "crate::machine::",
+            "crate::machine_state::",
+            "crate::wgpu_presenter::",
+        ] {
+            assert!(
+                !game_smoke_rs.contains(forbidden),
+                "clean game smoke must not import legacy smoke dependency {forbidden}"
+            );
+        }
 
         let live_wgpu_rs = include_str!("live_wgpu.rs");
         assert!(live_wgpu_rs.contains("crate::wgpu_presenter::run_wgpu_live("));
@@ -632,6 +659,7 @@ mod public_api_tests {
                 include_str!("fidelity_trace_engine.rs"),
             ),
             ("src/game.rs", include_str!("game.rs")),
+            ("src/game_smoke.rs", include_str!("game_smoke.rs")),
             (
                 "src/fidelity_scenarios.rs",
                 include_str!("fidelity_scenarios.rs"),

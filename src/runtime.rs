@@ -39,6 +39,10 @@ impl<B: RuntimeBackend> RuntimeHost<B> {
             .run_command(RuntimeCommand::VerifyRoms { path })
     }
 
+    pub(crate) fn run_game_smoke(&self) -> anyhow::Result<()> {
+        self.backend.run_command(RuntimeCommand::GameSmoke)
+    }
+
     pub(crate) fn run_fidelity_trace(&self, frame_count: usize) -> anyhow::Result<()> {
         self.backend
             .run_command(RuntimeCommand::FidelityTrace { frame_count })
@@ -108,6 +112,7 @@ pub(crate) enum RuntimeCommand {
     VerifyRoms {
         path: PathBuf,
     },
+    GameSmoke,
     FidelityTrace {
         frame_count: usize,
     },
@@ -185,6 +190,7 @@ impl RuntimeBackend for InstalledRuntimeBackend {
             }
             RuntimeCommand::RomReport { path } => crate::rom_report::run(path.as_deref()),
             RuntimeCommand::VerifyRoms { path } => crate::rom_report::run_verify(&path),
+            RuntimeCommand::GameSmoke => crate::game_smoke::run(),
             RuntimeCommand::FidelityTrace { frame_count } => {
                 crate::fidelity_traces::run_trace(frame_count)
             }
@@ -237,6 +243,10 @@ pub(crate) fn run_verify_roms(path: PathBuf) -> anyhow::Result<()> {
     RuntimeHost::current().run_verify_roms(path)
 }
 
+pub(crate) fn run_game_smoke() -> anyhow::Result<()> {
+    RuntimeHost::current().run_game_smoke()
+}
+
 pub(crate) fn run_fidelity_trace(frame_count: usize) -> anyhow::Result<()> {
     RuntimeHost::current().run_fidelity_trace(frame_count)
 }
@@ -281,6 +291,7 @@ pub(crate) fn help_text() -> &'static str {
         "defender\n",
         "  cargo run\n",
         "  cargo run -- --live-smoke\n",
+        "  cargo run -- --game-smoke\n",
         "  cargo run -- --mute\n",
         "  cargo run -- --input-profile planetoid\n",
         "  cargo run -- --input-profile cabinet\n",
@@ -410,6 +421,20 @@ mod tests {
                 path: PathBuf::from("roms"),
             }]
         );
+    }
+
+    #[test]
+    fn runtime_host_launches_game_smoke_separately() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let host = RuntimeHost::with_backend(RecordingBackend {
+            calls: Rc::clone(&calls),
+        });
+
+        host.run_game_smoke()
+            .expect("runtime host should run clean game smoke command");
+
+        let observed = calls.borrow();
+        assert_eq!(observed.as_slice(), &[RuntimeCommand::GameSmoke]);
     }
 
     #[test]
@@ -646,6 +671,13 @@ mod tests {
     }
 
     #[test]
+    fn installed_backend_runs_clean_game_smoke() {
+        RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_game_smoke()
+            .expect("installed backend should run clean game smoke");
+    }
+
+    #[test]
     fn installed_backend_runs_clean_fidelity_scenario_list() {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
             .run_fidelity_scenario_list()
@@ -735,6 +767,7 @@ mod tests {
         assert!(text.contains("--input-profile planetoid"));
         assert!(text.contains("--input-profile cabinet"));
         assert!(text.contains("--live-smoke"));
+        assert!(text.contains("--game-smoke"));
         assert!(text.contains("--mute"));
         assert!(text.contains("--verify-roms"));
         assert!(text.contains("--fidelity-trace 300"));

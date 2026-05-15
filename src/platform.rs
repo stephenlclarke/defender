@@ -81,6 +81,7 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
     match classification {
         CliClassification::RomReport(request) => crate::runtime::run_rom_report(request.path),
         CliClassification::VerifyRoms(request) => crate::runtime::run_verify_roms(request.path),
+        CliClassification::GameSmoke => crate::runtime::run_game_smoke(),
         CliClassification::FidelityTrace(request) => {
             crate::runtime::run_fidelity_trace(request.frame_count)
         }
@@ -122,6 +123,7 @@ enum CliClassification {
     FidelityScenarioList,
     FidelityScenarioInputWriter(ScenarioInputWriterRequest),
     Runtime(RuntimeConfig),
+    GameSmoke,
     Help,
     Error(CleanCliError),
 }
@@ -217,6 +219,7 @@ impl RuntimeCliClassifier {
                 ArgClassification::FidelityScenarioInputWriter(request) => {
                     return CliClassification::FidelityScenarioInputWriter(request);
                 }
+                ArgClassification::GameSmoke => return CliClassification::GameSmoke,
                 ArgClassification::Help => return CliClassification::Help,
                 ArgClassification::Error(error) => {
                     return CliClassification::Error(error);
@@ -240,6 +243,17 @@ impl RuntimeCliClassifier {
             "--live-smoke" => {
                 config.mode = RunMode::Smoke;
                 ArgClassification::Runtime
+            }
+            "--game-smoke" => {
+                if live_option_seen {
+                    return ArgClassification::Error(CleanCliError::LiveOptionsWithCommand(
+                        "--game-smoke",
+                    ));
+                }
+                if args.next().is_some() {
+                    return ArgClassification::Error(CleanCliError::TooManyGameSmokeArgs);
+                }
+                ArgClassification::GameSmoke
             }
             "--help" | "-h" => ArgClassification::Help,
             "--renderer" | "--presentation" => {
@@ -466,6 +480,7 @@ enum ArgClassification {
     FidelityReferenceTraceFixtureDirectory(FidelityReferenceTraceFixtureDirectoryRequest),
     FidelityScenarioList,
     FidelityScenarioInputWriter(ScenarioInputWriterRequest),
+    GameSmoke,
     Runtime,
     Help,
     Error(CleanCliError),
@@ -483,6 +498,7 @@ enum CleanCliError {
     TooManyRomReportArgs,
     MissingVerifyRomsPath,
     TooManyVerifyRomsArgs,
+    TooManyGameSmokeArgs,
     InvalidFidelityTraceFrameCount { value: String, error: String },
     NonPositiveFidelityTraceFrameCount,
     TooManyFidelityTraceArgs,
@@ -538,6 +554,12 @@ impl fmt::Display for CleanCliError {
             }
             Self::TooManyVerifyRomsArgs => {
                 write!(formatter, "--verify-roms only accepts one directory path")
+            }
+            Self::TooManyGameSmokeArgs => {
+                write!(
+                    formatter,
+                    "--game-smoke does not accept additional arguments"
+                )
             }
             Self::InvalidFidelityTraceFrameCount { value, error } => {
                 write!(
@@ -732,6 +754,14 @@ mod tests {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--live-smoke"])),
             CliClassification::Runtime(RuntimeConfig::smoke())
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_game_smoke_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&["--game-smoke"])),
+            CliClassification::GameSmoke
         );
     }
 
@@ -946,6 +976,25 @@ mod tests {
                 CleanCliError::UnknownInputProfile(String::from("unknown")),
             ),
             (vec!["--cmos-path"], CleanCliError::MissingCmosPath),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::Error(error)
+            );
+        }
+    }
+
+    #[test]
+    fn clean_cli_rejects_malformed_game_smoke_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--game-smoke"],
+                CleanCliError::LiveOptionsWithCommand("--game-smoke"),
+            ),
+            (
+                vec!["--game-smoke", "--mute"],
+                CleanCliError::TooManyGameSmokeArgs,
+            ),
         ] {
             assert_eq!(
                 RuntimeCliClassifier::classify(args(&values)),
@@ -1230,6 +1279,10 @@ mod tests {
             "--verify-roms only accepts one directory path"
         );
         assert_eq!(
+            CleanCliError::TooManyGameSmokeArgs.to_string(),
+            "--game-smoke does not accept additional arguments"
+        );
+        assert_eq!(
             CleanCliError::InvalidFidelityTraceFrameCount {
                 value: String::from("wat"),
                 error: String::from("invalid digit found in string"),
@@ -1328,6 +1381,12 @@ mod tests {
     fn live_smoke_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--live-smoke", "--input-profile", "test", "--mute"]))
             .expect("clean live-smoke CLI should run through configured runtime");
+    }
+
+    #[test]
+    fn game_smoke_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&["--game-smoke"]))
+            .expect("clean game-smoke CLI should run through configured runtime");
     }
 
     #[test]
