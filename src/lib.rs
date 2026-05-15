@@ -11,6 +11,7 @@ pub mod fidelity;
 mod fidelity_scenarios;
 mod fidelity_traces;
 pub mod game;
+mod live_wgpu;
 mod oracle;
 pub mod platform;
 pub mod renderer;
@@ -369,8 +370,8 @@ mod public_api_tests {
         assert!(!platform_rs.contains(&app_runtime_call));
 
         let runtime_rs = include_str!("runtime.rs");
-        assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live("));
-        assert!(runtime_rs.contains("crate::wgpu_presenter::run_wgpu_live_smoke"));
+        assert!(runtime_rs.contains("crate::live_wgpu::run("));
+        assert!(runtime_rs.contains("crate::live_wgpu::run_smoke"));
         assert!(runtime_rs.contains("RuntimeCommand::Help"));
         assert!(runtime_rs.contains("RuntimeCommand::RomReport { path }"));
         assert!(runtime_rs.contains("RuntimeCommand::VerifyRoms { path }"));
@@ -421,12 +422,15 @@ mod public_api_tests {
         let public_rom_report_module = format!("pub mod {};", "rom_report");
         let public_fidelity_scenarios_module = format!("pub mod {};", "fidelity_scenarios");
         let public_fidelity_traces_module = format!("pub mod {};", "fidelity_traces");
+        let public_live_wgpu_module = format!("pub mod {};", "live_wgpu");
         assert!(lib_rs.contains("mod rom_report;"));
         assert!(!lib_rs.contains(&public_rom_report_module));
         assert!(lib_rs.contains("mod fidelity_scenarios;"));
         assert!(!lib_rs.contains(&public_fidelity_scenarios_module));
         assert!(lib_rs.contains("mod fidelity_traces;"));
         assert!(!lib_rs.contains(&public_fidelity_traces_module));
+        assert!(lib_rs.contains("mod live_wgpu;"));
+        assert!(!lib_rs.contains(&public_live_wgpu_module));
 
         let rom_report_rs = include_str!("rom_report.rs");
         assert!(rom_report_rs.contains("pub(crate) fn run("));
@@ -481,6 +485,11 @@ mod public_api_tests {
         assert!(fidelity_traces_rs.contains("crate::legacy_fidelity::compare_trace_text"));
         assert!(fidelity_traces_rs.contains("crate::legacy_fidelity::trace_scenarios()"));
         assert!(fidelity_traces_rs.contains("crate::legacy_fidelity::trace_header()"));
+
+        let live_wgpu_rs = include_str!("live_wgpu.rs");
+        assert!(live_wgpu_rs.contains("crate::wgpu_presenter::run_wgpu_live("));
+        assert!(live_wgpu_rs.contains("crate::wgpu_presenter::run_wgpu_live_smoke"));
+        assert!(live_wgpu_rs.contains("crate::input::InputProfile"));
 
         let oracle_rs = include_str!("oracle.rs");
         assert!(oracle_rs.contains("crate::accepted::"));
@@ -585,6 +594,7 @@ mod public_api_tests {
             ),
             ("src/fidelity_traces.rs", include_str!("fidelity_traces.rs")),
             ("src/main.rs", include_str!("main.rs")),
+            ("src/live_wgpu.rs", include_str!("live_wgpu.rs")),
             ("src/oracle.rs", include_str!("oracle.rs")),
             ("src/platform.rs", include_str!("platform.rs")),
             ("src/renderer.rs", include_str!("renderer.rs")),
@@ -616,7 +626,7 @@ mod public_api_tests {
 
         for (path, source) in clean_sources {
             for forbidden in low_level_legacy_imports {
-                if path == "src/runtime.rs"
+                if path == "src/live_wgpu.rs"
                     && matches!(forbidden, "crate::input::" | "crate::wgpu_presenter::")
                 {
                     continue;

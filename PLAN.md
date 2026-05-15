@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-129` are complete. The standing maintenance guidance in
+`DC-42` through `DC-130` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5802,6 +5802,70 @@ Work log:
   `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778855841540879`
+
+### DC-130: Clean WGPU Live Runtime Facade
+
+Status: `complete`
+
+Goal: move the clean runtime boundary off direct legacy live presenter and
+input-profile imports while preserving current WGPU live behavior.
+
+Scope:
+
+- Add a clean `src/live_wgpu.rs` facade for interactive and smoke WGPU live
+  launch.
+- Move `src/runtime.rs` to clean live launch/profile/report contracts instead
+  of importing the temporary presenter and input-profile modules directly.
+- Keep the existing temporary presenter bridge quarantined behind the new
+  facade until the full live event loop is clean-owned.
+- Update public guard tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- `src/runtime.rs` no longer references the temporary WGPU presenter module or
+  low-level input profile module directly.
+- The only clean source file allowed to adapt to those live bridge modules is
+  `src/live_wgpu.rs`.
+- `cargo run -- --live-smoke` behavior and output stay unchanged.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib runtime::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 19:53:49 BST` Started `DC-130`: adding a clean WGPU live runtime
+  facade, moving runtime off direct temporary presenter/input imports, updating
+  guard tests and docs, and preserving current WGPU live smoke behavior.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778871226066989`
+- `2026-05-15 20:15:33 BST` Completed `DC-130`: added `src/live_wgpu.rs` as
+  the clean WGPU live launch facade, moved `src/runtime.rs` to
+  `LiveInputProfile` and `LiveSmokeReport` contracts instead of direct
+  temporary presenter/input imports, and updated README/SPEC/PLAN plus public
+  quarantine guard tests. Validation passed with `cargo fmt --check`,
+  `cargo test --lib live_wgpu::tests`, `cargo test --lib runtime::tests`,
+  `cargo test --lib public_api_tests`, `cargo test --all-targets` (1201
+  library tests, 2 binary tests, 2 example tests),
+  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
+  15452 frames, 6/6 new executable Rust lines covered),
+  `cargo run -- --live-smoke` (239 rendered frames with attract, credit, and
+  playing evidence), `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
+  `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778872547604119`
 
 ## Ongoing Work
 

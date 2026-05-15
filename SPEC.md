@@ -89,6 +89,8 @@ tree:
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
   runtime configuration into launch commands and routes config-driven `wgpu`
   live and smoke launches.
+- `src/live_wgpu.rs`: the crate-private WGPU live launch facade that owns the
+  temporary presenter/input-profile bridge for interactive and smoke runs.
 - `src/audio.rs`: gameplay-facing `SoundEvent` batches, the live audio worker
   boundary, disabled/null no-device modes, and runtime diagnostics. It consumes
   clean `GameFrame` and `SoundEvent` contracts, not legacy frame outputs.
@@ -109,8 +111,9 @@ are crate-private. Clean runtime launch goes through the private `runtime`
 bridge, while the internal oracle uses the crate-private `accepted` facade.
 `src_legacy/accepted_behavior.rs` performs the current legacy-machine
 adaptation into neutral accepted-behavior contracts before the public clean
-gameplay types see it. The runtime bridge also owns the config-driven `wgpu`
-live and smoke launches used by the clean runtime API. Legacy-specific clean
+gameplay types see it. `src/live_wgpu.rs` owns the temporary presenter and
+input-profile bridge for config-driven `wgpu` live and smoke launches used by
+the clean runtime API. Legacy-specific clean
 equivalence regressions are also wired from `src_legacy/` so clean
 accepted/oracle source stays focused on gameplay contracts. Internal clean
 equivalence regressions use crate-private oracle wiring. Clean frame-signature

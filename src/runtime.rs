@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::{
     audio::LiveAudioMode,
-    input::InputProfile,
+    live_wgpu::LiveInputProfile,
     platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig},
 };
 
@@ -132,12 +132,12 @@ pub(crate) enum RuntimeCommand {
         path: PathBuf,
     },
     WgpuLive {
-        input_profile: InputProfile,
+        input_profile: LiveInputProfile,
         audio_mode: LiveAudioMode,
         cmos_path: Option<PathBuf>,
     },
     WgpuLiveSmoke {
-        input_profile: InputProfile,
+        input_profile: LiveInputProfile,
         cmos_path: Option<PathBuf>,
     },
 }
@@ -165,11 +165,11 @@ fn audio_mode(output: AudioOutput) -> LiveAudioMode {
     }
 }
 
-fn input_profile(profile: ControlProfile) -> InputProfile {
+fn input_profile(profile: ControlProfile) -> LiveInputProfile {
     match profile {
-        ControlProfile::Planetoid => InputProfile::Planetoid,
-        ControlProfile::Cabinet => InputProfile::Cabinet,
-        ControlProfile::Test => InputProfile::Test,
+        ControlProfile::Planetoid => LiveInputProfile::Planetoid,
+        ControlProfile::Cabinet => LiveInputProfile::Cabinet,
+        ControlProfile::Test => LiveInputProfile::Test,
     }
 }
 
@@ -212,19 +212,12 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 input_profile,
                 audio_mode,
                 cmos_path,
-            } => crate::wgpu_presenter::run_wgpu_live(
-                input_profile,
-                audio_mode,
-                cmos_path.as_deref(),
-            ),
+            } => crate::live_wgpu::run(input_profile, audio_mode, cmos_path.as_deref()),
             RuntimeCommand::WgpuLiveSmoke {
                 input_profile,
                 cmos_path,
             } => {
-                let report = crate::wgpu_presenter::run_wgpu_live_smoke(
-                    input_profile,
-                    cmos_path.as_deref(),
-                )?;
+                let report = crate::live_wgpu::run_smoke(input_profile, cmos_path.as_deref())?;
                 print!("{}", report.to_text());
                 Ok(())
             }
@@ -322,7 +315,7 @@ mod tests {
     };
 
     use crate::platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
-    use crate::{audio::LiveAudioMode, input::InputProfile};
+    use crate::{audio::LiveAudioMode, live_wgpu::LiveInputProfile};
 
     use super::{
         InstalledRuntimeBackend, RuntimeBackend, RuntimeCommand, RuntimeHost, audio_mode,
@@ -360,7 +353,7 @@ mod tests {
         assert_eq!(
             observed.as_slice(),
             &[RuntimeCommand::WgpuLive {
-                input_profile: InputProfile::Cabinet,
+                input_profile: LiveInputProfile::Cabinet,
                 audio_mode: LiveAudioMode::Disabled,
                 cmos_path: Some(PathBuf::from("scores.bin")),
             }]
@@ -558,7 +551,7 @@ mod tests {
         assert_eq!(
             RuntimeCommand::from_config(&RuntimeConfig::default()),
             RuntimeCommand::WgpuLive {
-                input_profile: InputProfile::Planetoid,
+                input_profile: LiveInputProfile::Planetoid,
                 audio_mode: LiveAudioMode::Null,
                 cmos_path: None,
             }
@@ -577,7 +570,7 @@ mod tests {
         assert_eq!(
             RuntimeCommand::from_config(&config),
             RuntimeCommand::WgpuLiveSmoke {
-                input_profile: InputProfile::Test,
+                input_profile: LiveInputProfile::Test,
                 cmos_path: Some(PathBuf::from("smoke_cmos.bin")),
             }
         );
@@ -593,13 +586,13 @@ mod tests {
     fn clean_control_profiles_map_to_runtime_input_profiles() {
         assert_eq!(
             input_profile(ControlProfile::Planetoid),
-            InputProfile::Planetoid
+            LiveInputProfile::Planetoid
         );
         assert_eq!(
             input_profile(ControlProfile::Cabinet),
-            InputProfile::Cabinet
+            LiveInputProfile::Cabinet
         );
-        assert_eq!(input_profile(ControlProfile::Test), InputProfile::Test);
+        assert_eq!(input_profile(ControlProfile::Test), LiveInputProfile::Test);
     }
 
     #[test]
