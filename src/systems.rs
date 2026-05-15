@@ -374,6 +374,59 @@ impl ProjectileMotionSystem {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CollisionBox {
+    pub position: ScreenPosition,
+    pub size: (u8, u8),
+}
+
+impl CollisionBox {
+    pub const fn new(position: ScreenPosition, size: (u8, u8)) -> Self {
+        Self { position, size }
+    }
+
+    pub fn overlaps(self, other: Self) -> bool {
+        let left = i16::from(self.position.x);
+        let right = left + i16::from(self.size.0);
+        let top = i16::from(self.position.y);
+        let bottom = top + i16::from(self.size.1);
+        let other_left = i16::from(other.position.x);
+        let other_right = other_left + i16::from(other.size.0);
+        let other_top = i16::from(other.position.y);
+        let other_bottom = other_top + i16::from(other.size.1);
+
+        left < other_right && right > other_left && top < other_bottom && bottom > other_top
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectileEnemyHit {
+    pub projectile_index: usize,
+    pub enemy_index: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CollisionSystem;
+
+impl CollisionSystem {
+    pub fn first_projectile_enemy_hit(
+        projectiles: &[CollisionBox],
+        enemies: &[CollisionBox],
+    ) -> Option<ProjectileEnemyHit> {
+        for (projectile_index, projectile) in projectiles.iter().copied().enumerate() {
+            for (enemy_index, enemy) in enemies.iter().copied().enumerate() {
+                if projectile.overlaps(enemy) {
+                    return Some(ProjectileEnemyHit {
+                        projectile_index,
+                        enemy_index,
+                    });
+                }
+            }
+        }
+        None
+    }
+}
+
 const PLAYER_MIN_SCREEN_Y: u8 = 42;
 const PLAYER_DOWN_LIMIT_SCREEN_Y: u8 = 238;
 const PLAYER_RIGHT_ANCHOR_X: u8 = 0x20;
@@ -657,11 +710,12 @@ mod tests {
     };
 
     use super::{
-        EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate, GameSimulation,
-        PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem, PlayerMotionState,
-        PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState,
-        ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl, advance_one_frame,
-        clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
+        CollisionBox, CollisionSystem, EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate,
+        GameSimulation, PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem,
+        PlayerMotionState, PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileMotionSystem,
+        ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl,
+        advance_one_frame, clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x,
+        thrust_acceleration,
     };
 
     #[test]
@@ -947,6 +1001,39 @@ mod tests {
             EnemyMotionSystem::step(ScreenPosition::new(0, 255), ScreenVelocity::new(-2, 1));
 
         assert_eq!(wrapped.position, ScreenPosition::new(254, 0));
+    }
+
+    #[test]
+    fn collision_boxes_detect_overlap_without_touching_edges() {
+        let projectile = CollisionBox::new(ScreenPosition::new(40, 50), (8, 2));
+
+        assert!(projectile.overlaps(CollisionBox::new(ScreenPosition::new(47, 51), (12, 8))));
+        assert!(!projectile.overlaps(CollisionBox::new(ScreenPosition::new(48, 51), (12, 8))));
+        assert!(!projectile.overlaps(CollisionBox::new(ScreenPosition::new(47, 52), (12, 8))));
+    }
+
+    #[test]
+    fn collision_system_reports_first_projectile_enemy_hit() {
+        let projectiles = [
+            CollisionBox::new(ScreenPosition::new(10, 10), (8, 2)),
+            CollisionBox::new(ScreenPosition::new(40, 50), (8, 2)),
+        ];
+        let enemies = [
+            CollisionBox::new(ScreenPosition::new(80, 80), (12, 8)),
+            CollisionBox::new(ScreenPosition::new(47, 51), (12, 8)),
+        ];
+
+        assert_eq!(
+            CollisionSystem::first_projectile_enemy_hit(&projectiles, &enemies),
+            Some(super::ProjectileEnemyHit {
+                projectile_index: 1,
+                enemy_index: 1,
+            })
+        );
+        assert_eq!(
+            CollisionSystem::first_projectile_enemy_hit(&projectiles[..1], &enemies[..1]),
+            None
+        );
     }
 
     #[derive(Debug)]

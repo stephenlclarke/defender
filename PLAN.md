@@ -107,8 +107,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-121` are complete. The standing
-maintenance guidance in Ongoing Work still applies.
+`DC-42` through `DC-122` are complete. The standing maintenance guidance in
+Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -5279,6 +5279,70 @@ Work log:
   frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778841782224139`
+
+### DC-122: Clean Projectile Enemy Collision System
+
+Status: `complete`
+
+Goal: resolve projectile-to-enemy hits through clean collision and scoring
+systems instead of relying on hidden object-list or renderer-side state.
+
+Scope:
+
+- Add clean axis-aligned collision primitives in `src/systems.rs`.
+- Detect the first active projectile/enemy overlap deterministically.
+- Remove the hit projectile and enemy from `WorldSnapshot`.
+- Award clean score for destroyed enemies and emit a gameplay event.
+- Keep projectile and enemy sprites absent after collision resolution.
+- Update focused systems/game tests plus README/SPEC module text.
+
+Acceptance criteria:
+
+- Projectile/enemy collisions are represented by gameplay-domain systems, not
+  legacy object lists or memory labels.
+- A hit removes exactly the colliding projectile and enemy from clean world
+  state.
+- Enemy score changes are visible in `GameState` and collision output is
+  reflected in `GameEvents` and scene sprites.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::collision
+cargo test --lib game::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 11:44:28 BST` Started `DC-122`: adding clean projectile/enemy
+  collision detection, hit removal, score award, gameplay event output, and
+  docs/tests for collision ownership.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778841890018489`
+- `2026-05-15 12:26:46 BST` Completed `DC-122`: added clean AABB collision
+  primitives, deterministic first projectile/enemy hit detection, gameplay
+  removal of the hit projectile and enemy, current-player score awards,
+  `EnemyDestroyed` gameplay output, and absent hit sprites in the clean scene.
+  Added focused systems/game coverage including the second-player scoring
+  branch exposed by the first coverage run. Validation passed with
+  `cargo fmt --check`, `cargo test --lib systems::tests::collision` (2 tests),
+  `cargo test --lib game::tests::` (16 tests), `cargo test --all-targets`
+  (1179 lib tests, 2 bin tests, 2 example tests),
+  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
+  15452 frames, new Rust line coverage 63/63),
+  `cargo run -- --live-smoke` (239 rendered frames),
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778844407133399`
 
 ## Ongoing Work
 
