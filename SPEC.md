@@ -74,8 +74,8 @@ tree:
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
   instance GPU ABI, sprite instance upload streams, sprite draw commands,
   sprite `wgpu` buffer upload plans, sprite render-pass plans, sprite pipeline
-  plans, viewport layout, GPU pass planning, scene summaries, render
-  signatures, and draw planning.
+  plans, sprite resource binding plans, viewport layout, GPU pass planning,
+  scene summaries, render signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -132,9 +132,11 @@ plan with stable vertex buffer slots, index-buffer metadata, and indexed
 instance draw ranges. Sprite pipeline plans describe the renderer-owned WGSL
 shader, vertex and fragment entry points, quad and instance vertex layouts,
 alpha-blended color target, primitive state, and multisample state for the
-target texture format, while the current live path still carries a temporary
-raster payload for visual equivalence. Kitty graphics and terminal-session code
-remain
+target texture format. Sprite resource binding plans describe the
+scene-projection uniform upload, projection bind group layout, atlas texture
+binding, and atlas sampler binding used by that shader, while the current live
+path still carries a temporary raster payload for visual equivalence. Kitty
+graphics and terminal-session code remain
 parked there as historical compatibility evidence, but they are not part of the
 active runtime or compatibility API surface. The legacy video renderer owns its
 remaining `TerminalGeometry` value type directly instead of importing terminal

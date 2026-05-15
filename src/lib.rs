@@ -117,14 +117,16 @@ pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
 pub use renderer::{
     AtlasRegion, Color, FontAtlas, GpuRendererSettings, NativeRenderPipeline,
     NativeRendererResources, NativeSceneRenderer, PaletteResource, RenderLayer, RenderLayerCounts,
-    RenderScene, RenderSceneSummary, SceneDrawPlan, SceneProjectionUniforms, SceneRaster,
-    SceneRasterError, SceneRasterUpload, SceneSprite, SpriteBufferRole, SpriteBufferUpload,
+    RenderScene, RenderSceneSummary, SceneDrawPlan, SceneProjectionUniformUpload,
+    SceneProjectionUniforms, SceneRaster, SceneRasterError, SceneRasterUpload, SceneSprite,
+    SpriteBindGroupLayoutPlan, SpriteBindGroupRole, SpriteBufferRole, SpriteBufferUpload,
     SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId,
     SpriteIndexBufferBinding, SpriteInstanceBuffer, SpriteInstanceBufferRecord,
     SpriteInstanceUpload, SpritePipelinePlan, SpriteQuadGeometry, SpriteQuadVertex,
-    SpriteRenderPassDraw, SpriteRenderPassPlan, SpriteShaderPlan, SpriteVertexBufferBinding,
-    SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan,
-    WgpuViewportCommand,
+    SpriteRenderPassDraw, SpriteRenderPassPlan, SpriteResourceBindingPlan,
+    SpriteResourceBindingRole, SpriteSamplerBindingPlan, SpriteShaderPlan,
+    SpriteTextureBindingPlan, SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize,
+    TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
 };
 pub use systems::{
     FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,

@@ -103,13 +103,17 @@ impl WgpuViewportCommand {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SceneProjectionUniforms {
     pub scale: [f32; 2],
     pub translate: [f32; 2],
 }
 
 impl SceneProjectionUniforms {
+    pub const FLOAT_COMPONENTS: usize = 4;
+    pub const BYTE_SIZE: wgpu::BufferAddress = std::mem::size_of::<Self>() as wgpu::BufferAddress;
+
     pub fn for_surface(surface: SurfaceSize) -> Option<Self> {
         if surface.is_empty() {
             return None;
@@ -126,6 +130,10 @@ impl SceneProjectionUniforms {
             point[0].mul_add(self.scale[0], self.translate[0]),
             point[1].mul_add(self.scale[1], self.translate[1]),
         ]
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        bytemuck::bytes_of(self)
     }
 }
 
@@ -1103,6 +1111,181 @@ impl SpritePipelinePlan {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpriteBindGroupRole {
+    SceneProjection,
+    SpriteAtlas,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpriteResourceBindingRole {
+    SceneProjectionUniform,
+    SpriteAtlasTexture,
+    SpriteAtlasSampler,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneProjectionUniformUpload {
+    pub role: SpriteResourceBindingRole,
+    pub label: &'static str,
+    pub usage: wgpu::BufferUsages,
+    pub byte_len: wgpu::BufferAddress,
+    pub bytes: Vec<u8>,
+}
+
+impl SceneProjectionUniformUpload {
+    fn from_projection(projection: SceneProjectionUniforms) -> Self {
+        let bytes = projection.as_bytes().to_vec();
+        Self {
+            role: SpriteResourceBindingRole::SceneProjectionUniform,
+            label: "defender.sprite.scene_projection.uniform",
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            byte_len: bytes.len() as wgpu::BufferAddress,
+            bytes,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpriteBindGroupLayoutPlan {
+    pub role: SpriteBindGroupRole,
+    pub label: &'static str,
+    pub entries: Vec<wgpu::BindGroupLayoutEntry>,
+}
+
+impl SpriteBindGroupLayoutPlan {
+    pub const SCENE_PROJECTION_GROUP: u32 = 0;
+    pub const SPRITE_ATLAS_GROUP: u32 = 1;
+    pub const SCENE_PROJECTION_BINDING: u32 = 0;
+    pub const ATLAS_TEXTURE_BINDING: u32 = 0;
+    pub const ATLAS_SAMPLER_BINDING: u32 = 1;
+
+    fn scene_projection() -> Self {
+        Self {
+            role: SpriteBindGroupRole::SceneProjection,
+            label: "defender.sprite.scene_projection.bind_group_layout",
+            entries: vec![wgpu::BindGroupLayoutEntry {
+                binding: Self::SCENE_PROJECTION_BINDING,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(SceneProjectionUniforms::BYTE_SIZE),
+                },
+                count: None,
+            }],
+        }
+    }
+
+    fn sprite_atlas() -> Self {
+        Self {
+            role: SpriteBindGroupRole::SpriteAtlas,
+            label: "defender.sprite.atlas.bind_group_layout",
+            entries: vec![
+                wgpu::BindGroupLayoutEntry {
+                    binding: Self::ATLAS_TEXTURE_BINDING,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: Self::ATLAS_SAMPLER_BINDING,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        }
+    }
+
+    pub const fn group_index(&self) -> u32 {
+        match self.role {
+            SpriteBindGroupRole::SceneProjection => Self::SCENE_PROJECTION_GROUP,
+            SpriteBindGroupRole::SpriteAtlas => Self::SPRITE_ATLAS_GROUP,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpriteTextureBindingPlan {
+    pub role: SpriteResourceBindingRole,
+    pub label: &'static str,
+    pub binding: u32,
+    pub visibility: wgpu::ShaderStages,
+    pub sample_type: wgpu::TextureSampleType,
+    pub view_dimension: wgpu::TextureViewDimension,
+    pub multisampled: bool,
+    pub surface: SurfaceSize,
+}
+
+impl SpriteTextureBindingPlan {
+    fn atlas(surface: SurfaceSize) -> Self {
+        Self {
+            role: SpriteResourceBindingRole::SpriteAtlasTexture,
+            label: "defender.sprite.atlas.texture_view",
+            binding: SpriteBindGroupLayoutPlan::ATLAS_TEXTURE_BINDING,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+            view_dimension: wgpu::TextureViewDimension::D2,
+            multisampled: false,
+            surface,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpriteSamplerBindingPlan {
+    pub role: SpriteResourceBindingRole,
+    pub label: &'static str,
+    pub binding: u32,
+    pub visibility: wgpu::ShaderStages,
+    pub sampler_binding: wgpu::SamplerBindingType,
+}
+
+impl SpriteSamplerBindingPlan {
+    fn atlas() -> Self {
+        Self {
+            role: SpriteResourceBindingRole::SpriteAtlasSampler,
+            label: "defender.sprite.atlas.sampler",
+            binding: SpriteBindGroupLayoutPlan::ATLAS_SAMPLER_BINDING,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            sampler_binding: wgpu::SamplerBindingType::Filtering,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpriteResourceBindingPlan {
+    pub projection_upload: SceneProjectionUniformUpload,
+    pub projection_layout: SpriteBindGroupLayoutPlan,
+    pub atlas_layout: SpriteBindGroupLayoutPlan,
+    pub atlas_texture: SpriteTextureBindingPlan,
+    pub atlas_sampler: SpriteSamplerBindingPlan,
+}
+
+impl SpriteResourceBindingPlan {
+    fn from_projection_and_atlas(
+        projection: SceneProjectionUniforms,
+        atlas_surface: SurfaceSize,
+    ) -> Option<Self> {
+        if atlas_surface.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            projection_upload: SceneProjectionUniformUpload::from_projection(projection),
+            projection_layout: SpriteBindGroupLayoutPlan::scene_projection(),
+            atlas_layout: SpriteBindGroupLayoutPlan::sprite_atlas(),
+            atlas_texture: SpriteTextureBindingPlan::atlas(atlas_surface),
+            atlas_sampler: SpriteSamplerBindingPlan::atlas(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteDrawCommand {
     pub pipeline: NativeRenderPipeline,
     pub layer: RenderLayer,
@@ -1184,6 +1367,7 @@ pub struct SceneDrawPlan {
     pub sprite_draw_commands: Vec<SpriteDrawCommand>,
     pub sprite_render_pass: Option<SpriteRenderPassPlan>,
     pub sprite_pipeline: Option<SpritePipelinePlan>,
+    pub sprite_resource_bindings: Option<SpriteResourceBindingPlan>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
 }
@@ -1271,12 +1455,21 @@ impl NativeSceneRenderer {
             .as_ref()
             .map(|_| SpritePipelinePlan::for_settings(self.settings));
         let viewport = ViewportLayout::fit(scene.surface, target);
+        let gpu_pass = WgpuPassPlan::from_scene(scene, viewport);
+        let sprite_resource_bindings = sprite_pipeline.as_ref().and_then(|_| {
+            gpu_pass.scene_projection.and_then(|projection| {
+                SpriteResourceBindingPlan::from_projection_and_atlas(
+                    projection,
+                    self.resources.atlas.surface,
+                )
+            })
+        });
 
         SceneDrawPlan {
             frame: scene.frame,
             surface: scene.surface,
             viewport,
-            gpu_pass: WgpuPassPlan::from_scene(scene, viewport),
+            gpu_pass,
             pipelines,
             sprite_instances,
             missing_sprite_regions,
@@ -1287,6 +1480,7 @@ impl NativeSceneRenderer {
             sprite_draw_commands,
             sprite_render_pass,
             sprite_pipeline,
+            sprite_resource_bindings,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
@@ -1352,13 +1546,15 @@ mod tests {
     use super::{
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneDrawPlan,
-        SceneProjectionUniforms, SceneRaster, SceneRasterError, SceneSprite, SpriteBufferRole,
+        SceneProjectionUniformUpload, SceneProjectionUniforms, SceneRaster, SceneRasterError,
+        SceneSprite, SpriteBindGroupLayoutPlan, SpriteBindGroupRole, SpriteBufferRole,
         SpriteBufferUpload, SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand,
         SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding, SpriteInstanceBuffer,
         SpriteInstanceBufferRecord, SpriteInstanceUpload, SpritePipelinePlan, SpriteQuadGeometry,
-        SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassPlan, SpriteShaderPlan,
-        SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas,
-        ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+        SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassPlan, SpriteResourceBindingPlan,
+        SpriteResourceBindingRole, SpriteSamplerBindingPlan, SpriteShaderPlan,
+        SpriteTextureBindingPlan, SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan,
+        SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -1915,6 +2111,124 @@ mod tests {
     }
 
     #[test]
+    fn sprite_resource_binding_plan_describes_uniform_and_atlas_bindings() {
+        let projection =
+            SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
+
+        let plan = SpriteResourceBindingPlan::from_projection_and_atlas(
+            projection,
+            SurfaceSize::new(128, 64),
+        )
+        .expect("sprite resource binding plan");
+
+        assert_eq!(
+            plan.projection_upload,
+            SceneProjectionUniformUpload {
+                role: SpriteResourceBindingRole::SceneProjectionUniform,
+                label: "defender.sprite.scene_projection.uniform",
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                byte_len: SceneProjectionUniforms::BYTE_SIZE,
+                bytes: projection.as_bytes().to_vec(),
+            }
+        );
+        assert_eq!(plan.projection_layout.group_index(), 0);
+        assert_eq!(
+            plan.projection_layout,
+            SpriteBindGroupLayoutPlan {
+                role: SpriteBindGroupRole::SceneProjection,
+                label: "defender.sprite.scene_projection.bind_group_layout",
+                entries: vec![wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(SceneProjectionUniforms::BYTE_SIZE),
+                    },
+                    count: None,
+                }],
+            }
+        );
+        assert_eq!(plan.atlas_layout.group_index(), 1);
+        assert_eq!(
+            plan.atlas_layout,
+            SpriteBindGroupLayoutPlan {
+                role: SpriteBindGroupRole::SpriteAtlas,
+                label: "defender.sprite.atlas.bind_group_layout",
+                entries: vec![
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            }
+        );
+        assert_eq!(
+            plan.atlas_texture,
+            SpriteTextureBindingPlan {
+                role: SpriteResourceBindingRole::SpriteAtlasTexture,
+                label: "defender.sprite.atlas.texture_view",
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+                surface: SurfaceSize::new(128, 64),
+            }
+        );
+        assert_eq!(
+            plan.atlas_sampler,
+            SpriteSamplerBindingPlan {
+                role: SpriteResourceBindingRole::SpriteAtlasSampler,
+                label: "defender.sprite.atlas.sampler",
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                sampler_binding: wgpu::SamplerBindingType::Filtering,
+            }
+        );
+        assert_eq!(
+            SpriteResourceBindingPlan::from_projection_and_atlas(
+                projection,
+                SurfaceSize::new(0, 64)
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn sprite_shader_bindings_match_resource_binding_plan() {
+        let shader = SpriteShaderPlan::default();
+        let projection =
+            SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
+        let plan = SpriteResourceBindingPlan::from_projection_and_atlas(
+            projection,
+            SurfaceSize::new(128, 64),
+        )
+        .expect("sprite resource binding plan");
+
+        assert!(shader.source.contains("@group(0) @binding(0)"));
+        assert_eq!(plan.projection_layout.group_index(), 0);
+        assert_eq!(plan.projection_layout.entries[0].binding, 0);
+        assert!(shader.source.contains("@group(1) @binding(0)"));
+        assert!(shader.source.contains("@group(1) @binding(1)"));
+        assert_eq!(plan.atlas_layout.group_index(), 1);
+        assert_eq!(plan.atlas_texture.binding, 0);
+        assert_eq!(plan.atlas_sampler.binding, 1);
+    }
+
+    #[test]
     fn sprite_draw_command_uses_quad_geometry_and_instance_buffer_metadata() {
         let buffer =
             test_sprite_instance_buffer(NativeRenderPipeline::Sprites, RenderLayer::Objects, 2);
@@ -1998,11 +2312,23 @@ mod tests {
         let projection =
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
 
+        assert_eq!(SceneProjectionUniforms::FLOAT_COMPONENTS, 4);
+        assert_eq!(SceneProjectionUniforms::BYTE_SIZE, 16);
+        assert_eq!(std::mem::size_of::<SceneProjectionUniforms>(), 16);
+        assert_eq!(
+            std::mem::align_of::<SceneProjectionUniforms>(),
+            std::mem::align_of::<f32>()
+        );
         assert_eq!(projection.scale, [2.0 / 292.0, -2.0 / 240.0]);
         assert_eq!(projection.translate, [-1.0, 1.0]);
         assert_eq!(projection.project_point([0.0, 0.0]), [-1.0, 1.0]);
         assert_clip_point_near(projection.project_point([146.0, 120.0]), [0.0, 0.0]);
         assert_clip_point_near(projection.project_point([292.0, 240.0]), [1.0, -1.0]);
+        assert_eq!(
+            bytemuck::cast_slice::<SceneProjectionUniforms, f32>(&[projection]),
+            &[2.0 / 292.0, -2.0 / 240.0, -1.0, 1.0]
+        );
+        assert_eq!(projection.as_bytes(), bytemuck::bytes_of(&projection));
         assert_eq!(
             SceneProjectionUniforms::for_surface(SurfaceSize::new(0, 240)),
             None
@@ -2087,6 +2413,19 @@ mod tests {
         plan.sprite_render_pass
             .as_ref()
             .map(|_| SpritePipelinePlan::for_settings(settings))
+    }
+
+    fn expected_sprite_resource_bindings(
+        plan: &SceneDrawPlan,
+    ) -> Option<SpriteResourceBindingPlan> {
+        plan.sprite_pipeline.as_ref().and_then(|_| {
+            plan.gpu_pass.scene_projection.and_then(|projection| {
+                SpriteResourceBindingPlan::from_projection_and_atlas(
+                    projection,
+                    TextureAtlas::default_sprites().surface,
+                )
+            })
+        })
     }
 
     #[test]
@@ -2274,6 +2613,10 @@ mod tests {
         assert_eq!(
             plan.sprite_pipeline,
             Some(SpritePipelinePlan::for_settings(settings))
+        );
+        assert_eq!(
+            plan.sprite_resource_bindings,
+            expected_sprite_resource_bindings(&plan)
         );
         assert_eq!(
             plan.sprite_pipeline
@@ -2467,6 +2810,10 @@ mod tests {
             plan.sprite_pipeline,
             expected_sprite_pipeline(&plan, GpuRendererSettings::default())
         );
+        assert_eq!(
+            plan.sprite_resource_bindings,
+            expected_sprite_resource_bindings(&plan)
+        );
         assert_eq!(plan.raster_upload, None);
     }
 
@@ -2493,6 +2840,7 @@ mod tests {
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
+        assert_eq!(plan.sprite_resource_bindings, None);
     }
 
     #[test]
@@ -2522,6 +2870,7 @@ mod tests {
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
+        assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -2586,6 +2935,7 @@ mod tests {
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
+        assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -2654,6 +3004,10 @@ mod tests {
             plan.sprite_pipeline,
             expected_sprite_pipeline(&plan, GpuRendererSettings::default())
         );
+        assert_eq!(
+            plan.sprite_resource_bindings,
+            expected_sprite_resource_bindings(&plan)
+        );
     }
 
     #[test]
@@ -2691,6 +3045,7 @@ mod tests {
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
+        assert_eq!(plan.sprite_resource_bindings, None);
     }
 
     #[test]
@@ -2769,6 +3124,10 @@ mod tests {
             expected_sprite_pipeline(&sprite_plan, GpuRendererSettings::default())
         );
         assert_eq!(
+            sprite_plan.sprite_resource_bindings,
+            expected_sprite_resource_bindings(&sprite_plan)
+        );
+        assert_eq!(
             raster_plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
@@ -2780,6 +3139,7 @@ mod tests {
         );
         assert_eq!(raster_plan.sprite_render_pass, None);
         assert_eq!(raster_plan.sprite_pipeline, None);
+        assert_eq!(raster_plan.sprite_resource_bindings, None);
         assert_eq!(
             raster_plan.raster_upload,
             Some(super::SceneRasterUpload {
@@ -2802,6 +3162,7 @@ mod tests {
         assert_eq!(plan.gpu_pass.viewport, None);
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
+        assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(
             plan.gpu_pass.scene_projection,
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240))
@@ -2879,6 +3240,10 @@ mod tests {
         assert_eq!(
             plan.sprite_pipeline,
             expected_sprite_pipeline(&plan, GpuRendererSettings::default())
+        );
+        assert_eq!(
+            plan.sprite_resource_bindings,
+            expected_sprite_resource_bindings(&plan)
         );
     }
 }

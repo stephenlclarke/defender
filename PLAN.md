@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-112` are complete. The standing maintenance guidance in
+`DC-42` through `DC-113` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4661,6 +4661,75 @@ Work log:
   --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778825367225579`
+
+### DC-113: Clean Sprite Resource Binding Planning
+
+Status: `complete`
+
+Goal: describe the `wgpu` resource bindings needed by the clean sprite
+pipeline and render-pass plans, so future native sprite rendering can create
+projection uniform buffers and sprite atlas bind groups without presenter-side
+classification.
+
+Scope:
+
+- Add upload metadata for the scene-projection uniform buffer used by sprite
+  shaders.
+- Add renderer-owned bind group layout metadata for scene projection and sprite
+  atlas resources.
+- Add sprite atlas texture view and sampler binding metadata that matches the
+  WGSL shader bindings.
+- Wire optional sprite resource binding plans into `SceneDrawPlan` whenever
+  both sprite pipeline and render-pass plans exist.
+- Keep empty surfaces, raster-only scenes, unavailable sprite pipelines,
+  missing atlas regions, empty atlas surfaces, and empty command lists outside
+  sprite resource binding planning.
+- Add focused renderer tests for uniform upload bytes, buffer usages, bind group
+  entries, shader binding alignment, custom target plans, and absent paths.
+- Update README/SPEC module text for sprite resource binding planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes sprite resource binding metadata only for drawable
+  clean sprite plans with a valid scene projection.
+- Binding metadata uses `wgpu` shader stages, binding types, buffer usages,
+  texture sample types, texture view dimensions, and sampler binding types.
+- Raster-only scenes and invalid sprite paths do not produce sprite resource
+  binding plans.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 07:11:18 BST` Started `DC-113`: adding clean sprite resource
+  binding planning with projection uniform upload metadata, sprite bind group
+  layout entries, atlas texture/sampler bindings, focused renderer tests, and
+  docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778825476528979`
+- `2026-05-15 07:37:01 BST` Completed `DC-113`: added renderer-owned sprite
+  resource binding planning for projection uniform uploads, scene-projection
+  and sprite-atlas bind group layouts, atlas texture/sampler metadata, and
+  optional `SceneDrawPlan` wiring only for valid drawable sprite plans. Verified
+  with `cargo test --all-targets` (1162 library tests, 2 binary tests, 2
+  example tests), `cargo clippy --all-targets -- -D warnings`, `make fidelity`
+  (10 fixtures, 15452 frames, 81/81 non-baselined added executable Rust lines
+  covered), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
+  --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778827021576789`
 
 ## Ongoing Work
 
