@@ -227,8 +227,8 @@ Clean rewrite modules:
   sprite `wgpu` buffer upload plans, sprite render-pass plans, sprite pipeline
   plans, sprite resource binding plans, sprite atlas texture upload plans,
   sprite pipeline layout plans, sprite render pipeline descriptor plans,
-  viewport layout, GPU pass planning, scene summaries, render signatures, and
-  draw planning.
+  sprite render-pass encoder command plans, viewport layout, GPU pass planning,
+  scene summaries, render signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -285,11 +285,13 @@ extent, and copy layout needed to populate it. Sprite pipeline layout plans
 then order those projection and atlas bind groups for `wgpu`
 `PipelineLayoutDescriptor` creation, and sprite render pipeline descriptor
 plans combine that layout with shader entries, vertex buffers, primitive state,
-color target, and multisample state for `wgpu` render pipeline creation. It
-also records the centered viewport layout plus GPU-ready clear color, viewport
-command, and scene-projection constants for the target surface. The live worker
-still wraps accepted visual output as a clean `RenderScene` raster payload
-before the presenter draws it. Kitty graphics and
+color target, and multisample state for `wgpu` render pipeline creation. Sprite
+render-pass encoder command plans then order the pipeline, bind groups, vertex
+buffers, index buffer, and indexed draw calls for `wgpu::RenderPass` execution.
+It also records the centered viewport layout plus GPU-ready clear color,
+viewport command, and scene-projection constants for the target surface. The
+live worker still wraps accepted visual output as a clean `RenderScene` raster
+payload before the presenter draws it. Kitty graphics and
 terminal-session code remain parked there as historical compatibility evidence,
 but they are no longer active runtime or compatibility API paths. The legacy
 video renderer owns its remaining `TerminalGeometry` value type directly so it

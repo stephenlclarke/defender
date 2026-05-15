@@ -1545,6 +1545,101 @@ impl SpriteRenderPipelineDescriptorPlan {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SpriteRenderPassEncoderCommand {
+    SetPipeline {
+        label: &'static str,
+    },
+    SetBindGroup {
+        role: SpriteBindGroupRole,
+        group_index: u32,
+        layout_label: &'static str,
+    },
+    SetVertexBuffer {
+        role: SpriteBufferRole,
+        slot: u32,
+        byte_offset: wgpu::BufferAddress,
+        byte_len: wgpu::BufferAddress,
+    },
+    SetIndexBuffer {
+        role: SpriteBufferRole,
+        index_format: wgpu::IndexFormat,
+        byte_offset: wgpu::BufferAddress,
+        byte_len: wgpu::BufferAddress,
+    },
+    DrawIndexed {
+        draw: SpriteRenderPassDraw,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpriteRenderPassEncoderPlan {
+    pub label: &'static str,
+    pub commands: Vec<SpriteRenderPassEncoderCommand>,
+}
+
+impl SpriteRenderPassEncoderPlan {
+    fn from_render_pass_layout_and_descriptor(
+        render_pass: &SpriteRenderPassPlan,
+        layout: &SpritePipelineLayoutPlan,
+        descriptor: &SpriteRenderPipelineDescriptorPlan,
+    ) -> Self {
+        let mut commands =
+            Vec::with_capacity(1 + layout.bind_group_count() + 3 + render_pass.draws.len());
+        commands.push(SpriteRenderPassEncoderCommand::SetPipeline {
+            label: descriptor.label,
+        });
+        commands.extend(layout.bind_groups.iter().map(|bind_group| {
+            SpriteRenderPassEncoderCommand::SetBindGroup {
+                role: bind_group.role,
+                group_index: bind_group.group_index,
+                layout_label: bind_group.layout_label,
+            }
+        }));
+        commands.push(SpriteRenderPassEncoderCommand::SetVertexBuffer {
+            role: render_pass.quad_vertices.role,
+            slot: render_pass.quad_vertices.slot,
+            byte_offset: render_pass.quad_vertices.byte_offset,
+            byte_len: render_pass.quad_vertices.byte_len,
+        });
+        commands.push(SpriteRenderPassEncoderCommand::SetVertexBuffer {
+            role: render_pass.instances.role,
+            slot: render_pass.instances.slot,
+            byte_offset: render_pass.instances.byte_offset,
+            byte_len: render_pass.instances.byte_len,
+        });
+        commands.push(SpriteRenderPassEncoderCommand::SetIndexBuffer {
+            role: render_pass.indices.role,
+            index_format: render_pass.indices.index_format,
+            byte_offset: render_pass.indices.byte_offset,
+            byte_len: render_pass.indices.byte_len,
+        });
+        commands.extend(
+            render_pass
+                .draws
+                .iter()
+                .cloned()
+                .map(|draw| SpriteRenderPassEncoderCommand::DrawIndexed { draw }),
+        );
+
+        Self {
+            label: "defender.sprite.render_pass.encoder",
+            commands,
+        }
+    }
+
+    pub fn command_count(&self) -> usize {
+        self.commands.len()
+    }
+
+    pub fn draw_count(&self) -> usize {
+        self.commands
+            .iter()
+            .filter(|command| matches!(command, SpriteRenderPassEncoderCommand::DrawIndexed { .. }))
+            .count()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteDrawCommand {
     pub pipeline: NativeRenderPipeline,
@@ -1630,6 +1725,7 @@ pub struct SceneDrawPlan {
     pub sprite_resource_bindings: Option<SpriteResourceBindingPlan>,
     pub sprite_pipeline_layout: Option<SpritePipelineLayoutPlan>,
     pub sprite_render_pipeline_descriptor: Option<SpriteRenderPipelineDescriptorPlan>,
+    pub sprite_render_pass_encoder: Option<SpriteRenderPassEncoderPlan>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
 }
@@ -1748,6 +1844,22 @@ impl NativeSceneRenderer {
             }
             _ => None,
         };
+        let sprite_render_pass_encoder = match (
+            sprite_render_pass.as_ref(),
+            sprite_resource_bindings.as_ref(),
+            sprite_pipeline_layout.as_ref(),
+            sprite_render_pipeline_descriptor.as_ref(),
+            gpu_pass.viewport,
+        ) {
+            (Some(render_pass), Some(_), Some(layout), Some(descriptor), Some(_)) => Some(
+                SpriteRenderPassEncoderPlan::from_render_pass_layout_and_descriptor(
+                    render_pass,
+                    layout,
+                    descriptor,
+                ),
+            ),
+            _ => None,
+        };
 
         SceneDrawPlan {
             frame: scene.frame,
@@ -1767,6 +1879,7 @@ impl NativeSceneRenderer {
             sprite_resource_bindings,
             sprite_pipeline_layout,
             sprite_render_pipeline_descriptor,
+            sprite_render_pass_encoder,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
@@ -1838,11 +1951,12 @@ mod tests {
         SpriteDrawCommand, SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding,
         SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload,
         SpritePipelineLayoutBindGroup, SpritePipelineLayoutPlan, SpritePipelinePlan,
-        SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassPlan,
-        SpriteRenderPipelineDescriptorPlan, SpriteResourceBindingPlan, SpriteResourceBindingRole,
-        SpriteSamplerBindingPlan, SpriteShaderPlan, SpriteTextureBindingPlan,
-        SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas,
-        ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+        SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassEncoderCommand,
+        SpriteRenderPassEncoderPlan, SpriteRenderPassPlan, SpriteRenderPipelineDescriptorPlan,
+        SpriteResourceBindingPlan, SpriteResourceBindingRole, SpriteSamplerBindingPlan,
+        SpriteShaderPlan, SpriteTextureBindingPlan, SpriteVertexBufferBinding,
+        SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan,
+        WgpuViewportCommand,
     };
 
     #[test]
@@ -2313,6 +2427,81 @@ mod tests {
         assert_eq!(
             SpriteRenderPassPlan::from_uploads_and_commands(&uploads, &[]),
             None
+        );
+    }
+
+    #[test]
+    fn sprite_render_pass_encoder_plan_orders_wgpu_commands() {
+        let buffers = vec![
+            test_sprite_instance_buffer(NativeRenderPipeline::Sprites, RenderLayer::Objects, 2),
+            test_sprite_instance_buffer(NativeRenderPipeline::HudText, RenderLayer::Hud, 1),
+        ];
+        let upload = SpriteInstanceUpload::from_instance_buffers(&buffers).expect("upload");
+        let uploads = SpriteBufferUploadPlan::from_instance_upload(&upload);
+        let draw_commands = super::sprite_draw_commands_from_instance_buffers(&buffers);
+        let render_pass = SpriteRenderPassPlan::from_uploads_and_commands(&uploads, &draw_commands)
+            .expect("sprite render pass plan");
+        let projection =
+            SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
+        let atlas = TextureAtlas::default_sprites();
+        let bindings = SpriteResourceBindingPlan::from_projection_and_atlas(projection, &atlas)
+            .expect("sprite resource binding plan");
+        let layout = SpritePipelineLayoutPlan::from_resource_bindings(&bindings);
+        let pipeline = SpritePipelinePlan::for_settings(GpuRendererSettings::default());
+        let descriptor =
+            SpriteRenderPipelineDescriptorPlan::from_pipeline_and_layout(&pipeline, &layout);
+
+        let plan = SpriteRenderPassEncoderPlan::from_render_pass_layout_and_descriptor(
+            &render_pass,
+            &layout,
+            &descriptor,
+        );
+
+        assert_eq!(plan.label, "defender.sprite.render_pass.encoder");
+        assert_eq!(plan.command_count(), 8);
+        assert_eq!(plan.draw_count(), 2);
+        assert_eq!(
+            plan.commands,
+            vec![
+                SpriteRenderPassEncoderCommand::SetPipeline {
+                    label: "defender.sprite.pipeline",
+                },
+                SpriteRenderPassEncoderCommand::SetBindGroup {
+                    role: SpriteBindGroupRole::SceneProjection,
+                    group_index: 0,
+                    layout_label: "defender.sprite.scene_projection.bind_group_layout",
+                },
+                SpriteRenderPassEncoderCommand::SetBindGroup {
+                    role: SpriteBindGroupRole::SpriteAtlas,
+                    group_index: 1,
+                    layout_label: "defender.sprite.atlas.bind_group_layout",
+                },
+                SpriteRenderPassEncoderCommand::SetVertexBuffer {
+                    role: SpriteBufferRole::QuadVertices,
+                    slot: SpriteVertexBufferBinding::QUAD_VERTEX_SLOT,
+                    byte_offset: 0,
+                    byte_len: SpriteQuadGeometry::vertex_upload_bytes().len()
+                        as wgpu::BufferAddress,
+                },
+                SpriteRenderPassEncoderCommand::SetVertexBuffer {
+                    role: SpriteBufferRole::Instances,
+                    slot: SpriteVertexBufferBinding::INSTANCE_SLOT,
+                    byte_offset: 0,
+                    byte_len: 3 * SpriteInstanceBufferRecord::BYTE_SIZE,
+                },
+                SpriteRenderPassEncoderCommand::SetIndexBuffer {
+                    role: SpriteBufferRole::QuadIndices,
+                    index_format: wgpu::IndexFormat::Uint16,
+                    byte_offset: 0,
+                    byte_len: SpriteQuadGeometry::index_upload_bytes().len() as wgpu::BufferAddress,
+                },
+                SpriteRenderPassEncoderCommand::DrawIndexed {
+                    draw: render_pass.draws[0].clone(),
+                },
+                SpriteRenderPassEncoderCommand::DrawIndexed {
+                    draw: render_pass.draws[1].clone(),
+                },
+            ]
         );
     }
 
@@ -2903,6 +3092,27 @@ mod tests {
         }
     }
 
+    fn expected_sprite_render_pass_encoder(
+        plan: &SceneDrawPlan,
+    ) -> Option<SpriteRenderPassEncoderPlan> {
+        match (
+            plan.sprite_render_pass.as_ref(),
+            plan.sprite_resource_bindings.as_ref(),
+            plan.sprite_pipeline_layout.as_ref(),
+            plan.sprite_render_pipeline_descriptor.as_ref(),
+            plan.gpu_pass.viewport,
+        ) {
+            (Some(render_pass), Some(_), Some(layout), Some(descriptor), Some(_)) => Some(
+                SpriteRenderPassEncoderPlan::from_render_pass_layout_and_descriptor(
+                    render_pass,
+                    layout,
+                    descriptor,
+                ),
+            ),
+            _ => None,
+        }
+    }
+
     #[test]
     fn render_scene_collects_sprites_in_order() {
         let mut scene = RenderScene::empty(7, SurfaceSize::new(320, 240));
@@ -3102,6 +3312,10 @@ mod tests {
             expected_sprite_render_pipeline_descriptor(&plan)
         );
         assert_eq!(
+            plan.sprite_render_pass_encoder,
+            expected_sprite_render_pass_encoder(&plan)
+        );
+        assert_eq!(
             plan.sprite_pipeline_layout
                 .as_ref()
                 .map(SpritePipelineLayoutPlan::bind_group_count),
@@ -3118,6 +3332,12 @@ mod tests {
                 .as_ref()
                 .map(|descriptor| descriptor.color_target.format),
             Some(wgpu::TextureFormat::Bgra8UnormSrgb)
+        );
+        assert_eq!(
+            plan.sprite_render_pass_encoder
+                .as_ref()
+                .map(SpriteRenderPassEncoderPlan::draw_count),
+            Some(1)
         );
     }
 
@@ -3340,10 +3560,20 @@ mod tests {
             expected_sprite_render_pipeline_descriptor(&plan)
         );
         assert_eq!(
+            plan.sprite_render_pass_encoder,
+            expected_sprite_render_pass_encoder(&plan)
+        );
+        assert_eq!(
             plan.sprite_render_pipeline_descriptor
                 .as_ref()
                 .map(|descriptor| descriptor.vertex_buffer_layouts().len()),
             Some(2)
+        );
+        assert_eq!(
+            plan.sprite_render_pass_encoder
+                .as_ref()
+                .map(SpriteRenderPassEncoderPlan::command_count),
+            Some(8)
         );
         assert_eq!(plan.raster_upload, None);
     }
@@ -3374,6 +3604,7 @@ mod tests {
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
+        assert_eq!(plan.sprite_render_pass_encoder, None);
     }
 
     #[test]
@@ -3406,6 +3637,7 @@ mod tests {
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
+        assert_eq!(plan.sprite_render_pass_encoder, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -3473,6 +3705,7 @@ mod tests {
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
+        assert_eq!(plan.sprite_render_pass_encoder, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -3553,6 +3786,10 @@ mod tests {
             plan.sprite_render_pipeline_descriptor,
             expected_sprite_render_pipeline_descriptor(&plan)
         );
+        assert_eq!(
+            plan.sprite_render_pass_encoder,
+            expected_sprite_render_pass_encoder(&plan)
+        );
     }
 
     #[test]
@@ -3593,6 +3830,7 @@ mod tests {
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
+        assert_eq!(plan.sprite_render_pass_encoder, None);
     }
 
     #[test]
@@ -3683,6 +3921,10 @@ mod tests {
             expected_sprite_render_pipeline_descriptor(&sprite_plan)
         );
         assert_eq!(
+            sprite_plan.sprite_render_pass_encoder,
+            expected_sprite_render_pass_encoder(&sprite_plan)
+        );
+        assert_eq!(
             raster_plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
@@ -3697,6 +3939,7 @@ mod tests {
         assert_eq!(raster_plan.sprite_resource_bindings, None);
         assert_eq!(raster_plan.sprite_pipeline_layout, None);
         assert_eq!(raster_plan.sprite_render_pipeline_descriptor, None);
+        assert_eq!(raster_plan.sprite_render_pass_encoder, None);
         assert_eq!(
             raster_plan.raster_upload,
             Some(super::SceneRasterUpload {
@@ -3722,6 +3965,7 @@ mod tests {
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
+        assert_eq!(plan.sprite_render_pass_encoder, None);
         assert_eq!(
             plan.gpu_pass.scene_projection,
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240))
@@ -3755,6 +3999,7 @@ mod tests {
         );
         assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.sprite_render_pipeline_descriptor, None);
+        assert_eq!(plan.sprite_render_pass_encoder, None);
     }
 
     #[test]
@@ -3840,6 +4085,10 @@ mod tests {
         assert_eq!(
             plan.sprite_render_pipeline_descriptor,
             expected_sprite_render_pipeline_descriptor(&plan)
+        );
+        assert_eq!(
+            plan.sprite_render_pass_encoder,
+            expected_sprite_render_pass_encoder(&plan)
         );
     }
 }

@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-116` are complete. The standing maintenance guidance in
+`DC-42` through `DC-117` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4939,6 +4939,80 @@ Work log:
   frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778832895406269`
+
+### DC-117: Clean Sprite Render-Pass Encoder Command Planning
+
+Status: `complete`
+
+Goal: connect clean sprite render-pass, resource binding, pipeline layout, and
+render pipeline descriptor plans into ordered `wgpu` render-pass encoder command
+metadata without presenter-side scene classification.
+
+Scope:
+
+- Add sprite render-pass encoder command metadata for setting the render
+  pipeline, projection and atlas bind groups, quad and instance vertex buffers,
+  index buffer, and indexed draw ranges.
+- Preserve command ordering needed by `wgpu::RenderPass`: bind pipeline and
+  resources before draw commands.
+- Wire optional encoder command plans into `SceneDrawPlan` only when the sprite
+  render pass, sprite resource bindings, sprite pipeline layout, sprite render
+  pipeline descriptor, and nonempty viewport are all present.
+- Keep raster-only scenes, missing atlas regions, empty atlas surfaces, invalid
+  atlas pixel data, unavailable sprite pipelines, empty command lists, and empty
+  targets outside sprite render-pass encoder command planning.
+- Add focused renderer tests for command ordering, buffer/bind-group metadata,
+  draw range preservation, custom target settings, and absent paths.
+- Update README/SPEC module text for sprite render-pass encoder command
+  planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes sprite render-pass encoder command metadata only for
+  drawable clean sprite plans.
+- Encoder command metadata orders pipeline, bind groups, vertex buffers, index
+  buffer, and draw commands in the sequence expected by `wgpu::RenderPass`.
+- Raster-only scenes and invalid sprite paths do not produce sprite render-pass
+  encoder command plans.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 09:17:11 BST` Started `DC-117`: adding ordered `wgpu`
+  render-pass encoder command metadata for clean sprite draws, covering
+  pipeline, projection and atlas bind groups, vertex and index buffers, indexed
+  draw ranges, focused renderer tests, and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778833031980069`
+- `2026-05-15 09:40:19 BST` Completed `DC-117`: added ordered sprite
+  `wgpu::RenderPass` encoder command metadata for setting the render pipeline,
+  projection and atlas bind groups, quad and instance vertex buffers, index
+  buffer, and indexed draw ranges; wired optional encoder command plans into
+  `SceneDrawPlan` only when sprite render pass, sprite resource bindings,
+  sprite pipeline layout, sprite render pipeline descriptor, and a nonempty
+  viewport are present; and kept raster-only, invalid sprite-resource,
+  empty-command, unavailable-pipeline, and empty-target paths outside encoder
+  command planning. Verified with focused renderer tests (46/46), public API
+  guard (1/1), `cargo test --all-targets` (1167 library tests, 2 binary tests,
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, 58/58 non-baselined added
+  executable Rust lines covered), `cargo run -- --live-smoke` (240 rendered
+  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778834419221119`
 
 ## Ongoing Work
 
