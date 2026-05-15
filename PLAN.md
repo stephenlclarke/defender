@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-127` are complete. The standing
+`DC-42` through `DC-128` are complete. The standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5671,6 +5671,72 @@ Work log:
   and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778851591636559`
+
+### DC-128: Clean High-Score Entry Start System
+
+Status: `complete`
+
+Goal: activate the clean high-score entry phase at game over instead of leaving
+the `HighScoreEntry` phase and entry-start event dormant.
+
+Scope:
+
+- Add a deterministic clean high-score qualification system in `src/systems.rs`.
+- Route final-life game-over through high-score qualification.
+- Enter `HighScoreEntry` and emit `HighScoreEntryStarted` for qualifying
+  scores.
+- Preserve `GameOver` for non-qualifying scores and keep gameplay sprites
+  absent from both terminal scenes.
+- Update focused systems/game tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- High-score entry start is represented by clean gameplay-domain state and
+  events.
+- A positive current-player score that matches or exceeds the tracked high
+  score enters `HighScoreEntry` after the final life is lost.
+- A zero or non-qualifying score remains in `GameOver`.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::high_score
+cargo test --lib game::tests::clean_game_high_score_entry
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 14:27:33 BST` Started `DC-128`: adding clean high-score
+  qualification, routing final-life game-over through `HighScoreEntry` for
+  qualifying scores, preserving non-qualifying `GameOver`, and updating focused
+  systems/game/docs coverage.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778851664328309`
+- `2026-05-15 15:08:25 BST` Completed `DC-128`: added
+  `HighScoreEntrySystem` and routed final-life game-over through clean
+  high-score qualification. Qualifying current-player scores now enter
+  `HighScoreEntry` and emit `HighScoreEntryStarted`; zero and non-qualifying
+  scores remain in `GameOver`, with gameplay sprites absent from terminal
+  scenes. Validation passed with `cargo fmt --check`,
+  `cargo test --lib systems::tests::high_score`,
+  `cargo test --lib game::tests::clean_game_high_score_entry`, full game and
+  systems test modules, public API guard, `cargo test --all-targets` (1196 lib,
+  2 bin, and 2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, new Rust line coverage 13/13
+  after adding second-player qualification coverage), `cargo run -- --live-smoke`
+  (239 rendered frames), `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
+  `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778854120229339`
 
 ## Ongoing Work
 

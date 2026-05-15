@@ -3,11 +3,11 @@
 use crate::{
     renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize},
     systems::{
-        CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, OperatorControlSystem,
-        PlayerControlSystem, PlayerDamageSystem, PlayerMotionState, PlayerMotionSystem,
-        PlayerStock, ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState,
-        ProjectileSystem, ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombSystem, WaveState,
-        WaveStatus, WaveSystem,
+        CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, HighScoreEntrySystem,
+        OperatorControlSystem, PlayerControlSystem, PlayerDamageSystem, PlayerMotionState,
+        PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome, ProjectileMotionSystem,
+        ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition, ScreenVelocity,
+        SmartBombSystem, WaveState, WaveStatus, WaveSystem,
     },
 };
 
@@ -506,9 +506,19 @@ impl Game {
         gameplay_events.push(GameEvent::PlayerDestroyed);
 
         if frame.game_over {
-            self.state.phase = GamePhase::GameOver;
             self.pending_wave_start = false;
             gameplay_events.push(GameEvent::GameOver);
+            if HighScoreEntrySystem::evaluate(
+                self.current_player_score(),
+                self.state.scores.high_score,
+            )
+            .qualifies
+            {
+                self.state.phase = GamePhase::HighScoreEntry;
+                gameplay_events.push(GameEvent::HighScoreEntryStarted);
+            } else {
+                self.state.phase = GamePhase::GameOver;
+            }
         }
     }
 
@@ -547,6 +557,14 @@ impl Game {
 
         if frame.bonus_awards > 0 {
             gameplay_events.push(GameEvent::BonusAwarded);
+        }
+    }
+
+    fn current_player_score(&self) -> u32 {
+        if self.state.current_player == 2 {
+            self.state.scores.player_two
+        } else {
+            self.state.scores.player_one
         }
     }
 
@@ -1156,6 +1174,54 @@ mod tests {
             SpriteId::PLAYER_SHIP | SpriteId::ENEMY_LANDER | SpriteId::HUMAN
         )));
         assert_eq!(frame.scene.summary().layers.objects, 0);
+    }
+
+    #[test]
+    fn clean_game_high_score_entry_starts_after_qualifying_game_over() {
+        let mut game = credited_started_game();
+        game.state.player.lives = 1;
+        game.state.scores.player_one = 500;
+        game.state.scores.high_score = 500;
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.phase, GamePhase::HighScoreEntry);
+        assert_eq!(frame.state.player.lives, 0);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[
+                GameEvent::PlayerDestroyed,
+                GameEvent::GameOver,
+                GameEvent::HighScoreEntryStarted,
+            ]
+        );
+        assert_eq!(frame.scene.summary().layers.objects, 0);
+    }
+
+    #[test]
+    fn clean_game_high_score_entry_uses_current_second_player_score() {
+        let mut game = credited_started_game();
+        game.state.current_player = 2;
+        game.state.player.lives = 1;
+        game.state.scores.player_one = 1_000;
+        game.state.scores.player_two = 2_000;
+        game.state.scores.high_score = 2_000;
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.phase, GamePhase::HighScoreEntry);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[
+                GameEvent::PlayerDestroyed,
+                GameEvent::GameOver,
+                GameEvent::HighScoreEntryStarted,
+            ]
+        );
     }
 
     #[test]

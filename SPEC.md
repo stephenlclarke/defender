@@ -70,9 +70,9 @@ tree:
   player-control intent/trigger systems, operator trigger handling,
   player-motion, enemy-motion, projectile launch/capacity/motion systems,
   projectile/enemy collision detection, player/enemy damage resolution,
-  smart-bomb resolution, wave-completion evaluation, score/bonus awards, and
-  the `GameSimulation` trait used by the clean game and internal oracle
-  implementations.
+  smart-bomb resolution, wave-completion evaluation, score/bonus awards,
+  high-score entry qualification, and the `GameSimulation` trait used by the
+  clean game and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
@@ -143,10 +143,12 @@ smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave
 cleared enemies absent from the scene. Enemy contact with the player is
 resolved through clean collision and `PlayerDamageSystem`, decrementing lives,
-removing the colliding enemy, and entering `GameOver` on the final life. Enemy
-exhaustion is reported through `WaveSystem`, keeping the last-hit frame empty
-and spawning the next clean wave on the following playing frame. It flattens
-those per-batch records into one upload-ready
+removing the colliding enemy, and entering `GameOver` on the final life.
+Qualifying final scores are routed through `HighScoreEntrySystem` into
+`HighScoreEntry` with `HighScoreEntryStarted` output. Enemy exhaustion is
+reported through `WaveSystem`, keeping the last-hit frame empty and spawning the
+next clean wave on the following playing frame. It flattens those per-batch
+records into one upload-ready
 instance stream. The renderer also owns unit quad vertices, `u16` indices,
 upload bytes, and the `wgpu` vertex layout used to draw instanced sprites, then
 derives indexed instanced sprite draw commands with quad/index counts, instance

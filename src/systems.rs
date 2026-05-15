@@ -625,6 +625,22 @@ impl ScoreSystem {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreEntryFrame {
+    pub qualifies: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct HighScoreEntrySystem;
+
+impl HighScoreEntrySystem {
+    pub const fn evaluate(score: u32, high_score: u32) -> HighScoreEntryFrame {
+        HighScoreEntryFrame {
+            qualifies: score > 0 && score >= high_score,
+        }
+    }
+}
+
 fn bonus_awards(score: u32, next_bonus: u32) -> u8 {
     if next_bonus == u32::MAX || score < next_bonus {
         return 0;
@@ -938,12 +954,13 @@ mod tests {
 
     use super::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate,
-        GameSimulation, OperatorActionTriggers, OperatorControlSystem, PlayerActionTriggers,
-        PlayerControlIntent, PlayerControlSystem, PlayerDamageSystem, PlayerMotionState,
-        PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome, ProjectileMotionSystem,
-        ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition, ScreenVelocity,
-        SmartBombSystem, VerticalControl, WaveState, WaveStatus, WaveSystem, advance_one_frame,
-        clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
+        GameSimulation, HighScoreEntrySystem, OperatorActionTriggers, OperatorControlSystem,
+        PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem, PlayerDamageSystem,
+        PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome,
+        ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition,
+        ScreenVelocity, SmartBombSystem, VerticalControl, WaveState, WaveStatus, WaveSystem,
+        advance_one_frame, clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x,
+        thrust_acceleration,
     };
 
     #[test]
@@ -1398,6 +1415,14 @@ mod tests {
         let max_bonus = ScoreSystem::award_points(frame.scores, PlayerStock::new(3, 3), 1, 1_000);
         assert_eq!(max_bonus.bonus_awards, 0);
         assert_eq!(max_bonus.stock, PlayerStock::new(3, 3));
+    }
+
+    #[test]
+    fn high_score_entry_system_qualifies_positive_scores_at_or_above_high_score() {
+        assert!(HighScoreEntrySystem::evaluate(10_000, 10_000).qualifies);
+        assert!(HighScoreEntrySystem::evaluate(10_100, 10_000).qualifies);
+        assert!(!HighScoreEntrySystem::evaluate(9_900, 10_000).qualifies);
+        assert!(!HighScoreEntrySystem::evaluate(0, 0).qualifies);
     }
 
     #[test]
