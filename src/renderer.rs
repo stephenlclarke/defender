@@ -164,6 +164,15 @@ impl Color {
             a: f64::from(self.rgba[3]) / 255.0,
         }
     }
+
+    pub fn to_normalized_rgba(self) -> [f32; 4] {
+        [
+            f32::from(self.rgba[0]) / 255.0,
+            f32::from(self.rgba[1]) / 255.0,
+            f32::from(self.rgba[2]) / 255.0,
+            f32::from(self.rgba[3]) / 255.0,
+        ]
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -543,11 +552,72 @@ impl SpriteDrawInstance {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpriteInstanceBufferRecord {
+    pub scene_origin: [f32; 2],
+    pub scene_size: [f32; 2],
+    pub atlas_uv_origin: [f32; 2],
+    pub atlas_uv_size: [f32; 2],
+    pub tint: [f32; 4],
+}
+
+impl SpriteInstanceBufferRecord {
+    pub fn from_instance(instance: SpriteDrawInstance, atlas_surface: SurfaceSize) -> Option<Self> {
+        if atlas_surface.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            scene_origin: instance.position,
+            scene_size: instance.size,
+            atlas_uv_origin: [
+                instance.atlas_origin[0] as f32 / atlas_surface.width as f32,
+                instance.atlas_origin[1] as f32 / atlas_surface.height as f32,
+            ],
+            atlas_uv_size: [
+                instance.atlas_size[0] as f32 / atlas_surface.width as f32,
+                instance.atlas_size[1] as f32 / atlas_surface.height as f32,
+            ],
+            tint: instance.tint.to_normalized_rgba(),
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpriteDrawBatch {
     pub pipeline: NativeRenderPipeline,
     pub layer: RenderLayer,
     pub instances: Vec<SpriteDrawInstance>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpriteInstanceBuffer {
+    pub pipeline: NativeRenderPipeline,
+    pub layer: RenderLayer,
+    pub records: Vec<SpriteInstanceBufferRecord>,
+}
+
+impl SpriteInstanceBuffer {
+    fn from_batch(batch: &SpriteDrawBatch, atlas_surface: SurfaceSize) -> Option<Self> {
+        let records = batch
+            .instances
+            .iter()
+            .copied()
+            .filter_map(|instance| {
+                SpriteInstanceBufferRecord::from_instance(instance, atlas_surface)
+            })
+            .collect::<Vec<_>>();
+
+        if records.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            pipeline: batch.pipeline,
+            layer: batch.layer,
+            records,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -560,6 +630,7 @@ pub struct SceneDrawPlan {
     pub sprite_instances: usize,
     pub missing_sprite_regions: usize,
     pub sprite_batches: Vec<SpriteDrawBatch>,
+    pub sprite_instance_buffers: Vec<SpriteInstanceBuffer>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
 }
@@ -613,6 +684,12 @@ impl NativeSceneRenderer {
             .iter()
             .map(|batch: &SpriteDrawBatch| batch.instances.len())
             .sum();
+        let sprite_instance_buffers = sprite_batches
+            .iter()
+            .filter_map(|batch| {
+                SpriteInstanceBuffer::from_batch(batch, self.resources.atlas.surface)
+            })
+            .collect();
         let viewport = ViewportLayout::fit(scene.surface, target);
 
         SceneDrawPlan {
@@ -624,6 +701,7 @@ impl NativeSceneRenderer {
             sprite_instances,
             missing_sprite_regions,
             sprite_batches,
+            sprite_instance_buffers,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
@@ -690,7 +768,8 @@ mod tests {
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneProjectionUniforms,
         SceneRaster, SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId,
-        SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
+        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SurfaceSize, TextureAtlas,
+        ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -768,17 +847,65 @@ mod tests {
 
     #[test]
     fn color_normalizes_to_wgpu_clear_color() {
+        let color = Color {
+            rgba: [128, 64, 255, 0],
+        };
+
         assert_eq!(
-            Color {
-                rgba: [128, 64, 255, 0]
-            }
-            .to_wgpu(),
+            color.to_wgpu(),
             wgpu::Color {
                 r: 128.0 / 255.0,
                 g: 64.0 / 255.0,
                 b: 1.0,
                 a: 0.0,
             }
+        );
+        assert_eq!(
+            color.to_normalized_rgba(),
+            [128.0 / 255.0, 64.0 / 255.0, 1.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn sprite_instance_buffer_record_normalizes_atlas_and_tint() {
+        let record = SpriteInstanceBufferRecord::from_instance(
+            SpriteDrawInstance {
+                sprite: SpriteId::PLAYER_SHIP,
+                atlas_origin: [16, 32],
+                atlas_size: [8, 16],
+                layer: RenderLayer::Objects,
+                position: [12.0, 34.0],
+                size: [16.0, 8.0],
+                tint: Color {
+                    rgba: [255, 128, 64, 32],
+                },
+            },
+            SurfaceSize::new(128, 64),
+        )
+        .expect("instance buffer record");
+
+        assert_eq!(record.scene_origin, [12.0, 34.0]);
+        assert_eq!(record.scene_size, [16.0, 8.0]);
+        assert_eq!(record.atlas_uv_origin, [0.125, 0.5]);
+        assert_eq!(record.atlas_uv_size, [0.0625, 0.25]);
+        assert_eq!(
+            record.tint,
+            [1.0, 128.0 / 255.0, 64.0 / 255.0, 32.0 / 255.0]
+        );
+        assert_eq!(
+            SpriteInstanceBufferRecord::from_instance(
+                SpriteDrawInstance {
+                    sprite: SpriteId::PLAYER_SHIP,
+                    atlas_origin: [0, 0],
+                    atlas_size: [16, 8],
+                    layer: RenderLayer::Objects,
+                    position: [0.0, 0.0],
+                    size: [16.0, 8.0],
+                    tint: Color::WHITE,
+                },
+                SurfaceSize::new(0, 64),
+            ),
+            None
         );
     }
 
@@ -1118,6 +1245,33 @@ mod tests {
                 },
             ]
         );
+        assert_eq!(
+            plan.sprite_instance_buffers,
+            vec![
+                SpriteInstanceBuffer {
+                    pipeline: NativeRenderPipeline::Sprites,
+                    layer: RenderLayer::Objects,
+                    records: vec![SpriteInstanceBufferRecord {
+                        scene_origin: [128.0, 96.0],
+                        scene_size: [16.0, 8.0],
+                        atlas_uv_origin: [0.0, 0.0],
+                        atlas_uv_size: [0.125, 0.0625],
+                        tint: [1.0, 1.0, 1.0, 1.0],
+                    }],
+                },
+                SpriteInstanceBuffer {
+                    pipeline: NativeRenderPipeline::HudText,
+                    layer: RenderLayer::Hud,
+                    records: vec![SpriteInstanceBufferRecord {
+                        scene_origin: [0.0, 0.0],
+                        scene_size: [80.0, 8.0],
+                        atlas_uv_origin: [0.0, 0.125],
+                        atlas_uv_size: [0.625, 0.0625],
+                        tint: [1.0, 1.0, 1.0, 1.0],
+                    }],
+                },
+            ]
+        );
         assert_eq!(plan.raster_upload, None);
     }
 
@@ -1135,6 +1289,10 @@ mod tests {
 
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert!(plan.raster_upload.is_some());
+        assert_eq!(
+            plan.sprite_instance_buffers,
+            Vec::<SpriteInstanceBuffer>::new()
+        );
     }
 
     #[test]
@@ -1182,6 +1340,10 @@ mod tests {
         assert_eq!(plan.sprite_instances, 0);
         assert_eq!(plan.missing_sprite_regions, 1);
         assert_eq!(plan.sprite_batches, Vec::<SpriteDrawBatch>::new());
+        assert_eq!(
+            plan.sprite_instance_buffers,
+            Vec::<SpriteInstanceBuffer>::new()
+        );
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -1218,6 +1380,44 @@ mod tests {
         assert_eq!(plan.sprite_batches[0].instances[0].atlas_origin, [0, 48]);
         assert_eq!(plan.sprite_batches[0].instances[0].atlas_size, [8, 2]);
         assert_eq!(plan.sprite_batches[0].instances[1].position, [10.0, 4.0]);
+        assert_eq!(plan.sprite_instance_buffers.len(), 1);
+        assert_eq!(plan.sprite_instance_buffers[0].records.len(), 2);
+        assert_eq!(
+            plan.sprite_instance_buffers[0].records[1].scene_origin,
+            [10.0, 4.0]
+        );
+    }
+
+    #[test]
+    fn native_scene_renderer_skips_instance_buffers_when_atlas_surface_is_empty() {
+        let resources = NativeRendererResources {
+            atlas: TextureAtlas::new(
+                SurfaceSize::new(0, 128),
+                vec![AtlasRegion {
+                    sprite: SpriteId::PLAYER_SHIP,
+                    origin: [0, 0],
+                    size: [16, 8],
+                }],
+            ),
+            ..NativeRendererResources::default()
+        };
+        let mut scene = RenderScene::empty(86, SurfaceSize::new(292, 240));
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_SHIP,
+            layer: RenderLayer::Objects,
+            position: [128.0, 96.0],
+            size: [16.0, 8.0],
+            tint: Color::WHITE,
+        });
+
+        let plan = NativeSceneRenderer::new(resources).prepare(&scene);
+
+        assert_eq!(plan.sprite_instances, 1);
+        assert_eq!(plan.sprite_batches.len(), 1);
+        assert_eq!(
+            plan.sprite_instance_buffers,
+            Vec::<SpriteInstanceBuffer>::new()
+        );
     }
 
     #[test]
@@ -1264,6 +1464,11 @@ mod tests {
         );
         assert_eq!(sprite_plan.gpu_pass, raster_plan.gpu_pass);
         assert_eq!(sprite_plan.sprite_instances, 1);
+        assert_eq!(sprite_plan.sprite_instance_buffers.len(), 1);
+        assert_eq!(
+            raster_plan.sprite_instance_buffers,
+            Vec::<SpriteInstanceBuffer>::new()
+        );
         assert_eq!(
             raster_plan.raster_upload,
             Some(super::SceneRasterUpload {

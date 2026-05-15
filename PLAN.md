@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-104` are complete. The standing maintenance guidance in
+`DC-42` through `DC-105` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4142,6 +4142,70 @@ Work log:
   rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778812090473359`
+
+### DC-105: Clean Sprite Instance Buffer Planning
+
+Status: `complete`
+
+Goal: extend clean sprite draw planning with GPU instance-buffer records derived
+from renderer-owned atlas batches, so a later native `wgpu` renderer can upload
+sprite instance data without consulting legacy video state.
+
+Scope:
+
+- Add GPU instance-buffer records for sprite draw instances.
+- Preserve native scene coordinates for sprite rectangles.
+- Convert atlas regions into normalized UV origin/size using the
+  renderer-owned atlas surface.
+- Convert tint colors into normalized RGBA instance data.
+- Keep temporary raster upload separate from sprite instance buffers.
+- Add focused renderer tests for UV normalization, tint normalization,
+  batch-to-buffer conversion, and empty atlas handling.
+- Update README/SPEC module text for sprite instance-buffer planning.
+
+Acceptance criteria:
+
+- Clean draw plans expose GPU instance-buffer data alongside logical sprite
+  batches.
+- Sprite instance-buffer records are derived only from clean scene sprites and
+  renderer-owned atlas metadata.
+- Raster-backed scenes do not create sprite instance buffers unless they also
+  include drawable sprites.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 03:29:54 BST` Started `DC-105`: adding clean GPU instance-buffer
+  records for sprite batches, with native scene rectangles, normalized atlas
+  UVs, and normalized tint data.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778812209675969`
+- `2026-05-15 03:53:46 BST` Completed `DC-105`: added public
+  `SpriteInstanceBuffer` and `SpriteInstanceBufferRecord` draw-plan data
+  derived from renderer-owned atlas batches, preserved scene-space sprite
+  rectangles, normalized atlas UVs and tint colors for GPU upload, skipped
+  instance buffers for empty atlases or raster-only scenes, and documented the
+  clean renderer contract in README/SPEC. Validation passed with focused
+  renderer tests, the public API guard, `cargo test --all-targets` (1146
+  library tests plus binary/example tests), clippy with warnings denied,
+  `make fidelity` (10 local fixtures, 15452 frames, 38/38 new executable Rust
+  lines), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
+  --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778813618499279`
 
 ## Ongoing Work
 
