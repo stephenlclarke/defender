@@ -16,6 +16,7 @@ mod oracle;
 pub mod platform;
 pub mod renderer;
 mod rom_report;
+mod roms;
 mod runtime;
 pub mod systems;
 
@@ -420,11 +421,14 @@ mod public_api_tests {
 
         let lib_rs = include_str!("lib.rs");
         let public_rom_report_module = format!("pub mod {};", "rom_report");
+        let public_roms_module = format!("pub mod {};", "roms");
         let public_fidelity_scenarios_module = format!("pub mod {};", "fidelity_scenarios");
         let public_fidelity_traces_module = format!("pub mod {};", "fidelity_traces");
         let public_live_wgpu_module = format!("pub mod {};", "live_wgpu");
         assert!(lib_rs.contains("mod rom_report;"));
         assert!(!lib_rs.contains(&public_rom_report_module));
+        assert!(lib_rs.contains("mod roms;"));
+        assert!(!lib_rs.contains(&public_roms_module));
         assert!(lib_rs.contains("mod fidelity_scenarios;"));
         assert!(!lib_rs.contains(&public_fidelity_scenarios_module));
         assert!(lib_rs.contains("mod fidelity_traces;"));
@@ -437,11 +441,17 @@ mod public_api_tests {
         assert!(rom_report_rs.contains("pub(crate) fn run_verify("));
         assert!(rom_report_rs.contains("fn listing_text()"));
         assert!(rom_report_rs.contains("fn verification_text("));
-        assert!(rom_report_rs.contains("fn report_text(report: &crate::rom::RomReport)"));
-        assert!(rom_report_rs.contains("crate::rom::expected_roms()"));
-        assert!(rom_report_rs.contains("crate::rom::scan_dir(path)"));
-        assert!(rom_report_rs.contains("crate::rom::load_verified_dir(path)"));
-        assert!(rom_report_rs.contains("crate::rom::RedLabelRomImages::from_verified_rom_set"));
+        assert!(rom_report_rs.contains("fn report_text(report: &RomScanReport)"));
+        assert!(rom_report_rs.contains("crate::roms::expected_roms()"));
+        assert!(rom_report_rs.contains("crate::roms::scan_dir(path)"));
+        assert!(rom_report_rs.contains("crate::roms::verify_dir(path)"));
+        assert!(!rom_report_rs.contains("crate::rom::"));
+
+        let roms_rs = include_str!("roms.rs");
+        assert!(roms_rs.contains("crate::rom::expected_roms()"));
+        assert!(roms_rs.contains("crate::rom::scan_dir(path)"));
+        assert!(roms_rs.contains("crate::rom::load_verified_dir(path)"));
+        assert!(roms_rs.contains("crate::rom::RedLabelRomImages::from_verified_rom_set"));
 
         let fidelity_scenarios_rs = include_str!("fidelity_scenarios.rs");
         assert!(fidelity_scenarios_rs.contains("pub(crate) fn run_list("));
@@ -599,6 +609,7 @@ mod public_api_tests {
             ("src/platform.rs", include_str!("platform.rs")),
             ("src/renderer.rs", include_str!("renderer.rs")),
             ("src/rom_report.rs", include_str!("rom_report.rs")),
+            ("src/roms.rs", include_str!("roms.rs")),
             ("src/runtime.rs", include_str!("runtime.rs")),
             ("src/systems.rs", include_str!("systems.rs")),
         ];
@@ -631,7 +642,7 @@ mod public_api_tests {
                 {
                     continue;
                 }
-                if path == "src/rom_report.rs" && forbidden == "crate::rom::" {
+                if path == "src/roms.rs" && forbidden == "crate::rom::" {
                     continue;
                 }
                 if matches!(path, "src/fidelity_scenarios.rs" | "src/fidelity_traces.rs")

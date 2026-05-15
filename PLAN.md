@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-130` are complete. The standing maintenance guidance in
+`DC-42` through `DC-131` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5866,6 +5866,65 @@ Work log:
   `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778872547604119`
+
+### DC-131: Clean ROM Verification Facade
+
+Status: `complete`
+
+Goal: move optional ROM listing, scan, and verification command code off direct
+legacy ROM module types while preserving current CLI behavior.
+
+Scope:
+
+- Add a clean `src/roms.rs` facade for optional ROM descriptors, scan reports,
+  and verification summaries.
+- Move `src/rom_report.rs` to clean ROM facade contracts instead of importing
+  legacy ROM types/functions directly.
+- Keep `--rom-report` and `--verify-roms` text and error behavior unchanged.
+- Update public guard tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- `src/rom_report.rs` no longer references the legacy ROM module directly.
+- The only clean source file allowed to adapt to the legacy ROM module is
+  `src/roms.rs`.
+- Existing ROM listing, report, and verification tests pass unchanged in
+  behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib roms::tests
+cargo test --lib rom_report::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 20:17:21 BST` Started `DC-131`: adding a clean ROM verification
+  facade, moving `rom_report` off direct legacy ROM imports, updating guard
+  tests and docs, and preserving optional ROM command output.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778872635858059`
+- `2026-05-15 20:58:43 BST` Completed `DC-131`: added `src/roms.rs` as the
+  clean optional ROM verification facade, moved `src/rom_report.rs` off direct
+  legacy ROM imports, updated guard tests and README/SPEC module docs, and
+  preserved the current `--rom-report`/`--verify-roms` behavior. Validation
+  passed with focused ROM facade/report/public API tests, `cargo test
+  --all-targets` (1205 library tests, 2 binary tests, 2 example tests),
+  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
+  15452 frames, and 6/6 new executable Rust lines covered), `cargo run --
+  --live-smoke` (239 rendered frames), markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778875121767719`
 
 ## Ongoing Work
 

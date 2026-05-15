@@ -4,13 +4,15 @@ use std::path::Path;
 
 use anyhow::{Context, anyhow};
 
+use crate::roms::{RomScanReport, VerifiedRomSummary};
+
 pub(crate) fn run(path: Option<&Path>) -> anyhow::Result<()> {
     let Some(path) = path else {
         print!("{}", listing_text());
         return Ok(());
     };
 
-    let report = crate::rom::scan_dir(path)
+    let report = crate::roms::scan_dir(path)
         .with_context(|| format!("failed to inspect ROM directory {}", path.display()))?;
     print!("{}", report_text(&report));
 
@@ -18,19 +20,17 @@ pub(crate) fn run(path: Option<&Path>) -> anyhow::Result<()> {
 }
 
 pub(crate) fn run_verify(path: &Path) -> anyhow::Result<()> {
-    let verified = crate::rom::load_verified_dir(path)
+    let summary = crate::roms::verify_dir(path)
         .with_context(|| format!("failed to inspect ROM directory {}", path.display()))?
         .map_err(|report| anyhow!("{}", report_text(&report).trim_end()))?;
-    let images = crate::rom::RedLabelRomImages::from_verified_rom_set(&verified)
-        .map_err(|error| anyhow!("verified ROM set could not be mapped: {error}"))?;
 
-    print!("{}", verification_text(path, &verified, &images));
+    print!("{}", verification_text(path, summary));
 
     Ok(())
 }
 
 fn listing_text() -> String {
-    let descriptors = crate::rom::expected_roms();
+    let descriptors = crate::roms::expected_roms();
     let mut text = format!(
         "Expected Williams Defender red-label ROM filenames ({} files):\n",
         descriptors.len()
@@ -49,22 +49,18 @@ fn listing_text() -> String {
     text
 }
 
-fn verification_text(
-    path: &Path,
-    verified: &crate::rom::VerifiedRomSet,
-    images: &crate::rom::RedLabelRomImages,
-) -> String {
+fn verification_text(path: &Path, summary: VerifiedRomSummary) -> String {
     format!(
         "ROM set {} verified: {} files, {} bytes, {} mapped regions, {} mapped loads\n",
         path.display(),
-        verified.files().len(),
-        verified.total_bytes(),
-        images.regions().len(),
-        images.loads().len()
+        summary.file_count,
+        summary.total_bytes,
+        summary.region_count,
+        summary.load_count
     )
 }
 
-fn report_text(report: &crate::rom::RomReport) -> String {
+fn report_text(report: &RomScanReport) -> String {
     let mut text = format!("{}\n", report.summary_line());
     if !report.missing.is_empty() {
         text.push_str(&format!("Missing: {}\n", report.missing.join(", ")));
@@ -85,7 +81,9 @@ fn report_text(report: &crate::rom::RomReport) -> String {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{listing_text, report_text, run_verify, verification_text};
+    use crate::roms::{RomScanReport, VerifiedRomSummary};
+
+    use super::{listing_text, report_text, run, run_verify, verification_text};
 
     #[test]
     fn listing_text_preserves_current_contract() {
@@ -102,7 +100,7 @@ mod tests {
 
     #[test]
     fn report_text_preserves_current_sections() {
-        let report = crate::rom::RomReport {
+        let report = RomScanReport {
             directory: PathBuf::from("roms"),
             expected: 2,
             found: vec![String::from("defend.1")],
@@ -123,38 +121,24 @@ mod tests {
 
     #[test]
     fn verification_text_preserves_current_success_contract() {
-        let descriptor = crate::rom::RomDescriptor {
-            name: "main.rom",
-            size: 2,
-            crc32: "00000000",
-        };
-        let verified =
-            crate::rom::VerifiedRomSet::from_files_for_test(vec![crate::rom::VerifiedRomFile {
-                descriptor,
-                crc32: 0,
-                bytes: vec![0x12, 0x34],
-            }]);
-        let region = crate::rom::RomRegion {
-            name: "maincpu",
-            size: 2,
-            source: "test",
-        };
-        let load = crate::rom::RomLoad {
-            name: "main.rom",
-            region: "maincpu",
-            region_offset: 0,
-            size: 2,
-            view: crate::rom::RomView::Fixed,
-            cpu_start: Some(0x8000),
-        };
-        let images =
-            crate::rom::RedLabelRomImages::from_parts_for_test(&verified, &[region], &[load])
-                .expect("test ROM image should build");
-
         assert_eq!(
-            verification_text(Path::new("roms"), &verified, &images),
+            verification_text(
+                Path::new("roms"),
+                VerifiedRomSummary {
+                    file_count: 1,
+                    total_bytes: 2,
+                    region_count: 1,
+                    load_count: 1,
+                },
+            ),
             "ROM set roms verified: 1 files, 2 bytes, 1 mapped regions, 1 mapped loads\n"
         );
+    }
+
+    #[test]
+    fn run_accepts_complete_rom_fixture_report_path() {
+        run(Some(Path::new("assets/roms/defender")))
+            .expect("complete checked-in ROM fixture should report");
     }
 
     #[test]

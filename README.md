@@ -242,6 +242,8 @@ Clean rewrite modules:
   live and smoke launches.
 - `src/live_wgpu.rs`: the crate-private WGPU live launch facade that owns the
   temporary presenter/input-profile bridge for interactive and smoke runs.
+- `src/roms.rs`: the crate-private optional ROM verification facade that owns
+  the temporary ROM metadata, scan, and loader bridge.
 - `src/audio.rs`: gameplay-facing sound events, the bounded live-audio runtime,
   no-device backends, and worker diagnostics. It consumes clean `GameFrame`
   and `SoundEvent` contracts, not legacy frame outputs.
@@ -260,7 +262,9 @@ fixture checks, the threaded live core runtime boundary, `wgpu` window
 ownership, CMOS storage, and test helpers. `src_legacy/accepted_behavior.rs`
 owns the temporary accepted-machine adapter for the internal oracle, and
 `src/live_wgpu.rs` owns the temporary presenter/input-profile bridge used by
-config-driven `wgpu` live and smoke launches. Legacy-specific clean equivalence
+config-driven `wgpu` live and smoke launches. `src/roms.rs` owns the temporary
+ROM metadata, scan, and loader bridge for optional verification commands.
+Legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so `src/accepted.rs` and
 `src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as
 doc-hidden legacy bridge modules rather than supported public API.
