@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-101` are complete. The standing maintenance guidance in
+`DC-42` through `DC-102` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -3957,6 +3957,69 @@ Work log:
   frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778806424037359`
+
+### DC-102: Clean Sprite Batch Draw Planning
+
+Status: `complete`
+
+Goal: make the clean renderer draw plan resolve sprite instances through the
+renderer-owned texture atlas while keeping temporary raster upload separate as
+fidelity evidence.
+
+Scope:
+
+- Add a sprite batch representation to `SceneDrawPlan` that records each
+  sprite's atlas region, layer, position, size, and tint.
+- Resolve scene sprites through `NativeRendererResources::atlas` during
+  `NativeSceneRenderer::prepare`.
+- Report missing atlas entries as explicit draw-plan evidence instead of
+  silently treating every sprite as drawable.
+- Preserve the temporary raster upload path as separate from sprite batches.
+- Add focused renderer tests for atlas-backed batching, missing sprite regions,
+  and mixed raster/sprite plans.
+- Update README/SPEC module text for atlas-backed sprite batches and the
+  current clean runtime bridge wording.
+
+Acceptance criteria:
+
+- Sprite-first clean scenes produce atlas-backed sprite batches in the native
+  renderer plan.
+- Missing sprite atlas regions are counted and do not request sprite
+  pipelines.
+- Raster upload remains an independent temporary fidelity payload.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 01:56:13 BST` Started `DC-102`: adding atlas-backed sprite
+  batch draw-plan evidence to the clean renderer while preserving temporary
+  raster upload as a separate fidelity path.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778806586742169`
+- `2026-05-15 02:18:57 BST` Completed `DC-102`: added atlas-backed sprite
+  draw batches to `SceneDrawPlan`, recorded missing sprite atlas regions,
+  kept temporary raster upload separate, added default terrain/star atlas
+  entries, exported the new sprite-batch plan types, and refreshed README/SPEC
+  module wording. Validation passed with focused renderer tests, a public API
+  guard, `cargo test --all-targets`, clippy with warnings denied,
+  `make fidelity` (10 local fixtures, 15452 frames, 58/58 new executable Rust
+  lines), `cargo run -- --live-smoke` (239 rendered frames),
+  `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778807950561589`
 
 ## Ongoing Work
 

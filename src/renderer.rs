@@ -75,6 +75,8 @@ impl SpriteId {
     pub const SCORE_TEXT: Self = Self(2);
     pub const STATUS_TEXT: Self = Self(3);
     pub const PLAYER_PROJECTILE: Self = Self(4);
+    pub const TERRAIN_TILE: Self = Self(5);
+    pub const STAR: Self = Self(6);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -279,12 +281,29 @@ impl TextureAtlas {
                     origin: [0, 48],
                     size: [8, 2],
                 },
+                AtlasRegion {
+                    sprite: SpriteId::TERRAIN_TILE,
+                    origin: [0, 64],
+                    size: [8, 8],
+                },
+                AtlasRegion {
+                    sprite: SpriteId::STAR,
+                    origin: [16, 64],
+                    size: [1, 1],
+                },
             ],
         }
     }
 
     pub fn contains(&self, sprite: SpriteId) -> bool {
-        self.regions.iter().any(|region| region.sprite == sprite)
+        self.region(sprite).is_some()
+    }
+
+    pub fn region(&self, sprite: SpriteId) -> Option<AtlasRegion> {
+        self.regions
+            .iter()
+            .copied()
+            .find(|region| region.sprite == sprite)
     }
 }
 
@@ -367,12 +386,46 @@ pub struct SceneRasterUpload {
     pub non_blank: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpriteDrawInstance {
+    pub sprite: SpriteId,
+    pub atlas_origin: [u32; 2],
+    pub atlas_size: [u32; 2],
+    pub layer: RenderLayer,
+    pub position: [f32; 2],
+    pub size: [f32; 2],
+    pub tint: Color,
+}
+
+impl SpriteDrawInstance {
+    fn from_sprite(sprite: SceneSprite, region: AtlasRegion) -> Self {
+        Self {
+            sprite: sprite.sprite,
+            atlas_origin: region.origin,
+            atlas_size: region.size,
+            layer: sprite.layer,
+            position: sprite.position,
+            size: sprite.size,
+            tint: sprite.tint,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpriteDrawBatch {
+    pub pipeline: NativeRenderPipeline,
+    pub layer: RenderLayer,
+    pub instances: Vec<SpriteDrawInstance>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct SceneDrawPlan {
     pub frame: u64,
     pub surface: SurfaceSize,
     pub pipelines: Vec<NativeRenderPipeline>,
     pub sprite_instances: usize,
+    pub missing_sprite_regions: usize,
+    pub sprite_batches: Vec<SpriteDrawBatch>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
 }
@@ -394,21 +447,42 @@ impl NativeSceneRenderer {
         }
 
         let mut layer_counts = RenderLayerCounts::default();
+        let mut missing_sprite_regions = 0;
+        let mut sprite_batches = Vec::new();
         for sprite in &scene.sprites {
             layer_counts.add(sprite.layer);
-            requested.insert(pipeline_for_layer(sprite.layer));
+            let pipeline = pipeline_for_layer(sprite.layer);
+            let Some(region) = self.resources.atlas.region(sprite.sprite) else {
+                missing_sprite_regions += 1;
+                continue;
+            };
+            if self.resources.pipelines.contains(&pipeline) {
+                requested.insert(pipeline);
+                push_sprite_instance(
+                    &mut sprite_batches,
+                    pipeline,
+                    sprite.layer,
+                    SpriteDrawInstance::from_sprite(*sprite, region),
+                );
+            }
         }
 
         let pipelines = requested
             .into_iter()
             .filter(|pipeline| self.resources.pipelines.contains(pipeline))
             .collect();
+        let sprite_instances = sprite_batches
+            .iter()
+            .map(|batch: &SpriteDrawBatch| batch.instances.len())
+            .sum();
 
         SceneDrawPlan {
             frame: scene.frame,
             surface: scene.surface,
             pipelines,
-            sprite_instances: scene.sprites.len(),
+            sprite_instances,
+            missing_sprite_regions,
+            sprite_batches,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
@@ -418,6 +492,27 @@ impl NativeSceneRenderer {
             }),
         }
     }
+}
+
+fn push_sprite_instance(
+    batches: &mut Vec<SpriteDrawBatch>,
+    pipeline: NativeRenderPipeline,
+    layer: RenderLayer,
+    instance: SpriteDrawInstance,
+) {
+    if let Some(batch) = batches
+        .iter_mut()
+        .find(|batch| batch.pipeline == pipeline && batch.layer == layer)
+    {
+        batch.instances.push(instance);
+        return;
+    }
+
+    batches.push(SpriteDrawBatch {
+        pipeline,
+        layer,
+        instances: vec![instance],
+    });
 }
 
 fn pipeline_for_layer(layer: RenderLayer) -> NativeRenderPipeline {
@@ -453,7 +548,8 @@ mod tests {
     use super::{
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneRaster,
-        SceneRasterError, SceneSprite, SpriteId, SurfaceSize, TextureAtlas,
+        SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId, SurfaceSize,
+        TextureAtlas,
     };
 
     #[test]
@@ -639,8 +735,19 @@ mod tests {
 
         assert!(atlas.contains(SpriteId(42)));
         assert!(!atlas.contains(SpriteId::PLAYER_SHIP));
+        assert_eq!(
+            atlas.region(SpriteId(42)),
+            Some(AtlasRegion {
+                sprite: SpriteId(42),
+                origin: [1, 2],
+                size: [3, 4],
+            })
+        );
+        assert_eq!(atlas.region(SpriteId::PLAYER_SHIP), None);
         assert!(TextureAtlas::default_sprites().contains(SpriteId::STATUS_TEXT));
         assert!(TextureAtlas::default_sprites().contains(SpriteId::PLAYER_PROJECTILE));
+        assert!(TextureAtlas::default_sprites().contains(SpriteId::TERRAIN_TILE));
+        assert!(TextureAtlas::default_sprites().contains(SpriteId::STAR));
     }
 
     #[test]
@@ -665,6 +772,7 @@ mod tests {
 
         assert_eq!(plan.frame, 34);
         assert_eq!(plan.sprite_instances, 2);
+        assert_eq!(plan.missing_sprite_regions, 0);
         assert_eq!(
             plan.pipelines,
             vec![NativeRenderPipeline::Sprites, NativeRenderPipeline::HudText]
@@ -676,6 +784,37 @@ mod tests {
                 hud: 1,
                 ..RenderLayerCounts::default()
             }
+        );
+        assert_eq!(
+            plan.sprite_batches,
+            vec![
+                SpriteDrawBatch {
+                    pipeline: NativeRenderPipeline::Sprites,
+                    layer: RenderLayer::Objects,
+                    instances: vec![SpriteDrawInstance {
+                        sprite: SpriteId::PLAYER_SHIP,
+                        atlas_origin: [0, 0],
+                        atlas_size: [16, 8],
+                        layer: RenderLayer::Objects,
+                        position: [128.0, 96.0],
+                        size: [16.0, 8.0],
+                        tint: Color::WHITE,
+                    }],
+                },
+                SpriteDrawBatch {
+                    pipeline: NativeRenderPipeline::HudText,
+                    layer: RenderLayer::Hud,
+                    instances: vec![SpriteDrawInstance {
+                        sprite: SpriteId::SCORE_TEXT,
+                        atlas_origin: [0, 16],
+                        atlas_size: [80, 8],
+                        layer: RenderLayer::Hud,
+                        position: [0.0, 0.0],
+                        size: [80.0, 8.0],
+                        tint: Color::WHITE,
+                    }],
+                },
+            ]
         );
         assert_eq!(plan.raster_upload, None);
     }
@@ -700,9 +839,9 @@ mod tests {
     fn native_scene_renderer_maps_all_domain_layers_to_pipelines() {
         let mut scene = RenderScene::empty(80, SurfaceSize::new(292, 240));
         for (layer, sprite) in [
-            (RenderLayer::Terrain, SpriteId(10)),
-            (RenderLayer::Starfield, SpriteId(11)),
-            (RenderLayer::Projectiles, SpriteId(12)),
+            (RenderLayer::Terrain, SpriteId::TERRAIN_TILE),
+            (RenderLayer::Starfield, SpriteId::STAR),
+            (RenderLayer::Projectiles, SpriteId::PLAYER_PROJECTILE),
         ] {
             scene.push_sprite(SceneSprite {
                 sprite,
@@ -723,6 +862,60 @@ mod tests {
                 NativeRenderPipeline::Projectiles
             ]
         );
+    }
+
+    #[test]
+    fn native_scene_renderer_counts_missing_sprite_atlas_regions() {
+        let mut scene = RenderScene::empty(81, SurfaceSize::new(292, 240));
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId(900),
+            layer: RenderLayer::Objects,
+            position: [12.0, 34.0],
+            size: [16.0, 8.0],
+            tint: Color::WHITE,
+        });
+
+        let plan = NativeSceneRenderer::default().prepare(&scene);
+
+        assert_eq!(plan.sprite_instances, 0);
+        assert_eq!(plan.missing_sprite_regions, 1);
+        assert_eq!(plan.sprite_batches, Vec::<SpriteDrawBatch>::new());
+        assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
+        assert_eq!(
+            plan.layer_counts,
+            RenderLayerCounts {
+                objects: 1,
+                ..RenderLayerCounts::default()
+            }
+        );
+    }
+
+    #[test]
+    fn native_scene_renderer_batches_multiple_sprites_by_pipeline_and_layer() {
+        let mut scene = RenderScene::empty(82, SurfaceSize::new(292, 240));
+        for position in [[2.0, 4.0], [10.0, 4.0]] {
+            scene.push_sprite(SceneSprite {
+                sprite: SpriteId::PLAYER_PROJECTILE,
+                layer: RenderLayer::Projectiles,
+                position,
+                size: [8.0, 2.0],
+                tint: Color::WHITE,
+            });
+        }
+
+        let plan = NativeSceneRenderer::default().prepare(&scene);
+
+        assert_eq!(plan.sprite_instances, 2);
+        assert_eq!(plan.sprite_batches.len(), 1);
+        assert_eq!(
+            plan.sprite_batches[0].pipeline,
+            NativeRenderPipeline::Projectiles
+        );
+        assert_eq!(plan.sprite_batches[0].layer, RenderLayer::Projectiles);
+        assert_eq!(plan.sprite_batches[0].instances.len(), 2);
+        assert_eq!(plan.sprite_batches[0].instances[0].atlas_origin, [0, 48]);
+        assert_eq!(plan.sprite_batches[0].instances[0].atlas_size, [8, 2]);
+        assert_eq!(plan.sprite_batches[0].instances[1].position, [10.0, 4.0]);
     }
 
     #[test]
@@ -761,5 +954,15 @@ mod tests {
             })
         );
         assert_eq!(plan.sprite_instances, 1);
+        assert_eq!(plan.missing_sprite_regions, 0);
+        assert_eq!(plan.sprite_batches.len(), 1);
+        assert_eq!(
+            plan.sprite_batches[0].pipeline,
+            NativeRenderPipeline::DebugOverlay
+        );
+        assert_eq!(
+            plan.sprite_batches[0].instances[0].sprite,
+            SpriteId::STATUS_TEXT
+        );
     }
 }

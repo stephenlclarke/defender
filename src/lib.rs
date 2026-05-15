@@ -118,7 +118,8 @@ pub use renderer::{
     AtlasRegion, Color, FontAtlas, GpuRendererSettings, NativeRenderPipeline,
     NativeRendererResources, NativeSceneRenderer, PaletteResource, RenderLayer, RenderLayerCounts,
     RenderScene, RenderSceneSummary, SceneDrawPlan, SceneRaster, SceneRasterError,
-    SceneRasterUpload, SceneSprite, SpriteId, SurfaceSize, TextureAtlas,
+    SceneRasterUpload, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId, SurfaceSize,
+    TextureAtlas,
 };
 pub use systems::{
     FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,

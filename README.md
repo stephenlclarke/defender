@@ -221,14 +221,13 @@ Clean rewrite modules:
   launch/capacity systems, and the `GameSimulation` trait used by the clean game
   and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
-  layers, temporary raster evidence, renderer-owned resources, scene summaries,
-  render signatures, and draw planning.
+  layers, temporary raster evidence, renderer-owned resources, atlas-backed
+  sprite batches, scene summaries, render signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
-  runtime configuration into launch commands, owns the current accepted runtime
-  adapter for default CLI behavior, and routes config-driven `wgpu` live and
-  smoke launches.
+  runtime configuration into launch commands and routes config-driven `wgpu`
+  live and smoke launches.
 - `src/audio.rs`: gameplay-facing sound events, the bounded live-audio runtime,
   no-device backends, and worker diagnostics. It consumes clean `GameFrame`
   and `SoundEvent` contracts, not legacy frame outputs.
@@ -245,9 +244,9 @@ behavior, assets, hardware models, ROM verification, rendering, input,
 sound-board command evidence, legacy fidelity trace generation and threaded
 fixture checks, the threaded live core runtime boundary, `wgpu` window
 ownership, CMOS storage, and test helpers. `src_legacy/accepted_behavior.rs`
-owns the temporary accepted-machine adapter, and `src/runtime.rs` owns the only
-clean launch call into that adapter plus the config-driven `wgpu` live and
-smoke launches used by the clean runtime API. Legacy-specific clean equivalence
+owns the temporary accepted-machine adapter for the internal oracle, and
+`src/runtime.rs` owns the config-driven `wgpu` live and smoke launches used by
+the clean runtime API. Legacy-specific clean equivalence
 regressions are also wired from `src_legacy/` so `src/accepted.rs` and
 `src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as
 doc-hidden legacy bridge modules rather than supported public API.
@@ -257,17 +256,19 @@ render signatures rather than exposing memory-oriented CRC labels. Legacy live
 code adapts frame outputs into clean audio frames before submitting to
 `src/audio.rs`. README media tooling uses the narrow doc-hidden
 `defender::readme_media` facade. The binary enters through the clean platform
-boundary before delegating to the runtime bridge. The live
-worker now wraps accepted visual output as a clean `RenderScene` raster payload
-before the presenter draws it. Kitty graphics and terminal-session code remain
-parked there as historical compatibility evidence, but they are no longer
-active runtime or compatibility API paths. The legacy video renderer owns its
-remaining `TerminalGeometry` value type directly so it does not pull terminal
-session setup into active builds. Generated long-trace sample data is nested
-under the legacy machine oracle because it is historical fixture evidence, not
-a clean root adapter. A public API guard scans clean module sources so new
-production code cannot import low-level legacy root modules, bypass the
-accepted-behavior facade, or reintroduce legacy implementation terminology.
+boundary before delegating to the runtime bridge. Native draw planning resolves
+scene sprites through renderer-owned atlas regions into sprite batches. The
+live worker still wraps accepted visual output as a clean `RenderScene` raster
+payload before the presenter draws it. Kitty graphics and terminal-session code
+remain parked there as historical compatibility evidence, but they are no
+longer active runtime or compatibility API paths. The legacy video renderer
+owns its remaining `TerminalGeometry` value type directly so it does not pull
+terminal session setup into active builds. Generated long-trace sample data is
+nested under the legacy machine oracle because it is historical fixture
+evidence, not a clean root adapter. A public API guard scans clean module
+sources so new production code cannot import low-level legacy root modules,
+bypass the accepted-behavior facade, or reintroduce legacy implementation
+terminology.
 
 ## Assets And ROMs
 
