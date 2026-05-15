@@ -536,6 +536,9 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("Game::new()"));
         assert!(game_smoke_rs.contains("NativeSceneRenderer::default()"));
         assert!(game_smoke_rs.contains("renderer.prepare(&frame.scene)"));
+        assert!(game_smoke_rs.contains("plan.frame_plan.command_count()"));
+        assert!(game_smoke_rs.contains("plan.frame_plan.sprite_pass_count()"));
+        assert!(game_smoke_rs.contains("plan.frame_plan.temporary_raster_count()"));
         for forbidden in [
             "crate::accepted::",
             "crate::input::",

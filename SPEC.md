@@ -145,8 +145,9 @@ planning resolves scene sprites through renderer-owned atlas regions into
 sprite batches and records GPU instance-buffer data with native scene
 rectangles, normalized atlas UVs, normalized tint, stable upload bytes, and the
 `wgpu` vertex layout for the instance buffer. `--game-smoke` steps the clean
-game through scripted controls and prepares sprite-only native draw plans
-without entering the legacy live presenter. The clean `Game` world seeds
+game through scripted controls and prepares sprite-only native draw plans plus
+frame-level `wgpu` command plans without entering the legacy live presenter.
+The clean `Game` world seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
 wave and renders them as atlas-backed scene sprites. Operator controls are
 sampled through `OperatorControlSystem`, emitting diagnostics, audits, and
@@ -213,8 +214,8 @@ reintroduce legacy implementation terminology.
 ## Current Behavior Surface
 
 - Live play uses the windowed `wgpu` backend.
-- `--game-smoke` runs a clean game and native draw-plan smoke without the
-  legacy live presenter.
+- `--game-smoke` runs a clean game, native draw-plan, and `wgpu` frame-plan
+  smoke without the legacy live presenter.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.

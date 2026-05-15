@@ -108,7 +108,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-134` are complete. The standing maintenance guidance in
+`DC-42` through `DC-135` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -6122,6 +6122,68 @@ Work log:
   `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778880047960349`
+
+### DC-135: Clean Game Smoke WGPU Frame-Plan Evidence
+
+Status: `complete`
+
+Goal: extend the clean game smoke so it proves frame-level `wgpu` command
+planning, not only scene sprite and draw-plan counts.
+
+Scope:
+
+- Add `WgpuFramePlan` evidence to the clean game smoke report.
+- Validate sprite render-pass command coverage for the clean smoke frames.
+- Validate that the clean smoke path emits no temporary raster frame commands.
+- Keep the existing `--game-smoke` and `--live-smoke` behavior otherwise
+  unchanged.
+
+Acceptance criteria:
+
+- `--game-smoke` reports nonzero frame commands and sprite render-pass command
+  coverage.
+- `--game-smoke` fails if a temporary raster frame command appears in the clean
+  smoke path.
+- Focused smoke and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 22:23:00 BST` Started `DC-135`: extending `--game-smoke` so it
+  verifies frame-level `wgpu` command plans, reports sprite render-pass command
+  coverage, and keeps temporary raster commands out of the clean smoke path.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778880191445779`
+- `2026-05-15 23:01:48 BST` Completed `DC-135`: extended `--game-smoke` with
+  `wgpu` frame-command evidence, sprite render-pass command coverage, and
+  temporary raster command validation. The smoke report now proves 96 frame
+  commands, 24 sprite render-pass commands, zero temporary raster commands,
+  290 sprite instances, and 92 sprite draw commands across 24 clean frames.
+  Validation passed with `cargo fmt --check`,
+  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
+  `cargo test --all-targets` (1222 library tests, 2 binary tests, and
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixture traces, 15452 frames, and 15/15 new executable
+  Rust lines covered), `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke` (240 rendered frames), markdownlint, and
+  `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778882543476649`
 
 ## Ongoing Work
 

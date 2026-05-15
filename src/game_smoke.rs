@@ -38,6 +38,9 @@ pub(crate) struct GameSmokeReport {
     pub(crate) sprite_frames: u32,
     pub(crate) sprite_instances: usize,
     pub(crate) sprite_draw_commands: usize,
+    pub(crate) wgpu_frame_commands: usize,
+    pub(crate) sprite_render_pass_commands: usize,
+    pub(crate) temporary_raster_commands: usize,
     pub(crate) raster_frames: u32,
     pub(crate) missing_sprite_regions: usize,
     pub(crate) injected_inputs: Vec<String>,
@@ -70,6 +73,15 @@ impl GameSmokeReport {
         if self.sprite_instances == 0 || self.sprite_draw_commands == 0 {
             bail!("clean game smoke did not produce sprite draw plans");
         }
+        if self.wgpu_frame_commands == 0 {
+            bail!("clean game smoke did not produce wgpu frame commands");
+        }
+        if self.sprite_render_pass_commands < self.frames as usize {
+            bail!("clean game smoke did not produce sprite render-pass commands for every frame");
+        }
+        if self.temporary_raster_commands != 0 {
+            bail!("clean game smoke unexpectedly produced temporary raster frame commands");
+        }
         if self.raster_frames != 0 {
             bail!("clean game smoke unexpectedly produced raster payloads");
         }
@@ -94,7 +106,7 @@ impl GameSmokeReport {
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  wgpu_frame_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
             self.frames,
             frame_size,
             self.distinct_scene_signatures,
@@ -107,6 +119,9 @@ impl GameSmokeReport {
             self.sprite_frames,
             self.sprite_instances,
             self.sprite_draw_commands,
+            self.wgpu_frame_commands,
+            self.sprite_render_pass_commands,
+            self.temporary_raster_commands,
             self.raster_frames,
             self.missing_sprite_regions,
             self.injected_inputs.join(","),
@@ -188,6 +203,15 @@ fn observe_frame(
     report.sprite_draw_commands = report
         .sprite_draw_commands
         .saturating_add(plan.sprite_draw_commands.len());
+    report.wgpu_frame_commands = report
+        .wgpu_frame_commands
+        .saturating_add(plan.frame_plan.command_count());
+    report.sprite_render_pass_commands = report
+        .sprite_render_pass_commands
+        .saturating_add(plan.frame_plan.sprite_pass_count());
+    report.temporary_raster_commands = report
+        .temporary_raster_commands
+        .saturating_add(plan.frame_plan.temporary_raster_count());
     report.missing_sprite_regions = report
         .missing_sprite_regions
         .saturating_add(plan.missing_sprite_regions);
@@ -331,6 +355,9 @@ mod tests {
         assert_eq!(report.sprite_frames, report.frames);
         assert!(report.sprite_instances > 0);
         assert!(report.sprite_draw_commands > 0);
+        assert!(report.wgpu_frame_commands > 0);
+        assert!(report.sprite_render_pass_commands >= report.frames as usize);
+        assert_eq!(report.temporary_raster_commands, 0);
         assert_eq!(report.raster_frames, 0);
         assert_eq!(report.missing_sprite_regions, 0);
         assert_eq!(
@@ -362,37 +389,56 @@ mod tests {
 
     #[test]
     fn smoke_report_validates_required_play_states() {
-        let error = GameSmokeReport {
-            frames: 3,
-            first_frame_size: Some((292, 240)),
-            distinct_scene_signatures: 3,
-            saw_attract: true,
-            saw_credit: true,
-            attract_frames: 2,
-            credited_frames: 1,
-            sprite_frames: 3,
-            sprite_instances: 3,
-            sprite_draw_commands: 3,
-            clean_exit: true,
-            injected_inputs: vec![
-                String::from("coin"),
-                String::from("start_one"),
-                String::from("altitude_up"),
-                String::from("thrust"),
-                String::from("fire"),
-                String::from("reverse"),
-                String::from("smart_bomb"),
-                String::from("hyperspace"),
-                String::from("altitude_down"),
-            ],
-            ..GameSmokeReport::default()
-        }
-        .validate()
-        .expect_err("missing playing evidence should fail");
+        let mut report = valid_report();
+        report.saw_playing = false;
+        report.playing_frames = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing playing evidence should fail");
 
         assert_eq!(
             error.to_string(),
             "clean game smoke did not observe playing frames"
+        );
+    }
+
+    #[test]
+    fn smoke_report_validates_frame_command_evidence() {
+        let mut report = valid_report();
+        report.wgpu_frame_commands = 0;
+
+        let error = report
+            .validate()
+            .expect_err("missing wgpu frame command evidence should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce wgpu frame commands"
+        );
+
+        let mut report = valid_report();
+        report.sprite_render_pass_commands = 2;
+
+        let error = report
+            .validate()
+            .expect_err("missing sprite render-pass command coverage should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite render-pass commands for every frame"
+        );
+
+        let mut report = valid_report();
+        report.temporary_raster_commands = 1;
+
+        let error = report
+            .validate()
+            .expect_err("temporary raster frame command should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke unexpectedly produced temporary raster frame commands"
         );
     }
 
@@ -411,6 +457,9 @@ mod tests {
             sprite_frames: 2,
             sprite_instances: 4,
             sprite_draw_commands: 2,
+            wgpu_frame_commands: 6,
+            sprite_render_pass_commands: 2,
+            temporary_raster_commands: 0,
             raster_frames: 0,
             missing_sprite_regions: 0,
             injected_inputs: vec![String::from("coin")],
@@ -430,6 +479,9 @@ mod tests {
                 "  sprite_frames: 2\n",
                 "  sprite_instances: 4\n",
                 "  sprite_draw_commands: 2\n",
+                "  wgpu_frame_commands: 6\n",
+                "  sprite_render_pass_commands: 2\n",
+                "  temporary_raster_commands: 0\n",
                 "  raster_frames: 0\n",
                 "  missing_sprite_regions: 0\n",
                 "  injected_inputs: coin\n",
@@ -444,5 +496,37 @@ mod tests {
         assert_eq!(smoke_input(2).value, crate::GameInput::NONE);
         assert!(smoke_input(3).value.start_one);
         assert_eq!(smoke_input(4).value, crate::GameInput::NONE);
+    }
+
+    fn valid_report() -> GameSmokeReport {
+        GameSmokeReport {
+            frames: 3,
+            first_frame_size: Some((292, 240)),
+            distinct_scene_signatures: 3,
+            saw_attract: true,
+            saw_credit: true,
+            saw_playing: true,
+            attract_frames: 2,
+            credited_frames: 1,
+            playing_frames: 1,
+            sprite_frames: 3,
+            sprite_instances: 3,
+            sprite_draw_commands: 3,
+            wgpu_frame_commands: 9,
+            sprite_render_pass_commands: 3,
+            clean_exit: true,
+            injected_inputs: vec![
+                String::from("coin"),
+                String::from("start_one"),
+                String::from("altitude_up"),
+                String::from("thrust"),
+                String::from("fire"),
+                String::from("reverse"),
+                String::from("smart_bomb"),
+                String::from("hyperspace"),
+                String::from("altitude_down"),
+            ],
+            ..GameSmokeReport::default()
+        }
     }
 }
