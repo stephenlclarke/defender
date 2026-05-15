@@ -214,13 +214,13 @@ Clean rewrite modules:
   the temporary adapter.
 - `src/game.rs`: gameplay-facing `Game`, `GameState`, `GameInput`,
   `GameFrame`, `GameEvents`, world, terrain, starfield, enemy, human, score,
-  player, direction, and sound-event contracts without accepted command-byte
-  mapping. The clean `Game` shell emits sprite-first scene frames without
-  touching the accepted machine adapter.
+  projectile, player, direction, and sound-event contracts without accepted
+  command-byte mapping. The clean `Game` shell emits sprite-first scene frames
+  without touching the accepted machine adapter.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion, enemy-motion,
-  projectile launch/capacity systems, and the `GameSimulation` trait used by
-  the clean game and internal oracle implementations.
+  projectile launch/capacity/motion systems, and the `GameSimulation` trait
+  used by the clean game and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
@@ -265,13 +265,16 @@ code adapts frame outputs into clean audio frames before submitting to
 `src/audio.rs`. README media tooling uses the narrow doc-hidden
 `defender::readme_media` facade. The binary enters through the clean platform
 boundary before delegating to the runtime bridge. The clean `Game` world seeds
-terrain, starfield, enemy, and human snapshots for the first playing wave and
-renders them as atlas-backed scene sprites. Clean enemy snapshots carry
-gameplay-domain velocity and advance through `EnemyMotionSystem` during playing
-frames. Native draw planning resolves scene sprites through renderer-owned atlas
-regions into sprite batches and records GPU instance-buffer data with native
-scene rectangles, normalized atlas UVs, normalized tint, stable upload bytes,
-and the `wgpu` vertex layout for the instance buffer. It flattens those
+terrain, starfield, enemy, human, and projectile snapshots for the first playing
+wave and renders them as atlas-backed scene sprites. Clean enemy snapshots
+carry gameplay-domain velocity and advance through `EnemyMotionSystem` during
+playing frames. Clean projectile snapshots carry direction-derived velocity,
+advance through `ProjectileMotionSystem`, and are culled through gameplay state
+before rendering. Native draw planning resolves scene sprites through
+renderer-owned atlas regions into sprite batches and records GPU
+instance-buffer data with native scene rectangles, normalized atlas UVs,
+normalized tint, stable upload bytes, and the `wgpu` vertex layout for the
+instance buffer. It flattens those
 per-batch records into one upload-ready
 instance stream. The renderer also owns unit quad vertices, `u16` indices,
 upload bytes, and the `wgpu` vertex layout used to draw instanced sprites, then

@@ -111,8 +111,8 @@ pub mod readme_media;
 pub use fidelity::GameplayEquivalenceSignature;
 pub use game::{
     Direction, EnemyKind, EnemySnapshot, Game, GameEvent, GameEvents, GameFrame, GameInput,
-    GamePhase, GameSnapshot, GameState, HumanSnapshot, PlayerSnapshot, ScoreSnapshot, SoundEvent,
-    TerrainSegment, WorldSnapshot, WorldVector,
+    GamePhase, GameSnapshot, GameState, HumanSnapshot, PlayerSnapshot, ProjectileSnapshot,
+    ScoreSnapshot, SoundEvent, TerrainSegment, WorldSnapshot, WorldVector,
 };
 pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
 pub use renderer::{
@@ -136,8 +136,8 @@ pub use systems::{
     EnemyMotionFrame, EnemyMotionSystem, FixedStepAccumulator, FrameRate, GameSimulation,
     PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent, PlayerControlSystem,
     PlayerMotionFrame, PlayerMotionState, PlayerMotionSystem, ProjectileLaunchOutcome,
-    ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl,
-    advance_one_frame,
+    ProjectileMotionFrame, ProjectileMotionSystem, ProjectileState, ProjectileSystem,
+    ScreenPosition, ScreenVelocity, VerticalControl, advance_one_frame,
 };
 
 #[cfg(test)]

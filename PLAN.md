@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-120` are complete. The standing
+`DC-42` through `DC-121` are complete. The standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5215,6 +5215,70 @@ Work log:
   frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778840224712949`
+
+### DC-121: Clean Projectile World Motion Surface
+
+Status: `complete`
+
+Goal: move active projectiles into the clean gameplay world snapshot and update
+them through deterministic motion instead of keeping them as private renderer
+bookkeeping inside `Game`.
+
+Scope:
+
+- Add clean projectile snapshot data to `WorldSnapshot`.
+- Add deterministic projectile velocity and movement in `src/systems.rs`.
+- Launch projectiles into the clean world snapshot with direction-derived
+  velocity.
+- Advance and cull active projectiles during playing frames.
+- Render projectile sprites from clean world data.
+- Update focused systems/game tests plus README/SPEC module text.
+
+Acceptance criteria:
+
+- Active projectiles are visible in `GameState` as gameplay-domain world data.
+- Projectile movement and culling are represented by a deterministic system.
+- Projectile sprites continue to render through renderer-owned atlas-backed
+  scene sprites.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::projectile
+cargo test --lib game::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 11:20:04 BST` Started `DC-121`: moving active projectiles into
+  clean world snapshots, adding projectile velocity/motion/culling systems,
+  and keeping projectile rendering atlas-backed from gameplay-domain data.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778840426841509`
+- `2026-05-15 11:43:01 BST` Completed `DC-121`: added
+  `ProjectileSnapshot` to `WorldSnapshot`, moved active projectile ownership
+  out of private `Game` bookkeeping, and introduced `ProjectileMotionSystem`
+  for direction-derived velocity, deterministic advancement, and screen-exit
+  culling. `Game` now launches projectiles into clean world state and renders
+  projectile sprites from that gameplay-domain data.
+  Validation passed with `cargo test --lib systems::tests::projectile`
+  (2 passed), `cargo test --lib game::tests::` (14 passed),
+  `cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation`,
+  `cargo test --all-targets` (1175 library tests, 2 binary tests, and
+  2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, 32/32 non-baselined added
+  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
+  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778841782224139`
 
 ## Ongoing Work
 

@@ -63,13 +63,13 @@ tree:
   isolate clean oracle code from direct legacy imports.
 - `src/game.rs`: gameplay-facing `Game`, `GameState`, `GameInput`,
   `GameFrame`, `GameEvents`, world, terrain, starfield, enemy, human, score,
-  player, direction, and sound-event contracts without accepted command-byte
-  mapping. The clean `Game` shell emits sprite-first scene frames without
-  touching the accepted machine adapter.
+  projectile, player, direction, and sound-event contracts without accepted
+  command-byte mapping. The clean `Game` shell emits sprite-first scene frames
+  without touching the accepted machine adapter.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion, enemy-motion,
-  projectile launch/capacity systems, and the `GameSimulation` trait used by
-  the clean game and internal oracle implementations.
+  projectile launch/capacity/motion systems, and the `GameSimulation` trait
+  used by the clean game and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
@@ -124,16 +124,18 @@ planning resolves scene sprites through renderer-owned atlas regions into
 sprite batches and records GPU instance-buffer data with native scene
 rectangles, normalized atlas UVs, normalized tint, stable upload bytes, and the
 `wgpu` vertex layout for the instance buffer. The clean `Game` world seeds
-terrain, starfield, enemy, and human snapshots for the first playing wave and
-renders them as atlas-backed scene sprites. Clean enemy snapshots carry
-gameplay-domain velocity and advance through `EnemyMotionSystem` during playing
-frames. It flattens those per-batch records into one upload-ready instance
-stream. The renderer also owns unit quad vertices, `u16` indices, upload bytes,
-and the `wgpu` vertex layout used to draw instanced sprites, then derives
-indexed instanced sprite draw commands with quad/index counts, instance ranges,
-and upload byte spans into that stream. It also records the centered viewport
-layout plus GPU-ready clear color, viewport command, and scene-projection
-constants for the target surface.
+terrain, starfield, enemy, human, and projectile snapshots for the first playing
+wave and renders them as atlas-backed scene sprites. Clean enemy snapshots
+carry gameplay-domain velocity and advance through `EnemyMotionSystem` during
+playing frames. Clean projectile snapshots carry direction-derived velocity,
+advance through `ProjectileMotionSystem`, and are culled through gameplay state
+before rendering. It flattens those per-batch records into one upload-ready
+instance stream. The renderer also owns unit quad vertices, `u16` indices,
+upload bytes, and the `wgpu` vertex layout used to draw instanced sprites, then
+derives indexed instanced sprite draw commands with quad/index counts, instance
+ranges, and upload byte spans into that stream. It also records the centered
+viewport layout plus GPU-ready clear color, viewport command, and
+scene-projection constants for the target surface.
 Sprite draw plans also include `wgpu::BufferUsages` metadata and upload bytes
 for the quad vertex, quad index, and instance buffers, plus a sprite render-pass
 plan with stable vertex buffer slots, index-buffer metadata, and indexed

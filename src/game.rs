@@ -4,8 +4,8 @@ use crate::{
     renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize},
     systems::{
         EnemyMotionSystem, GameSimulation, PlayerControlSystem, PlayerMotionState,
-        PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileState, ProjectileSystem,
-        ScreenPosition, ScreenVelocity,
+        PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState,
+        ProjectileSystem, ScreenPosition, ScreenVelocity,
     },
 };
 
@@ -76,6 +76,12 @@ pub struct HumanSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectileSnapshot {
+    pub position: ScreenPosition,
+    pub velocity: ScreenVelocity,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TerrainSegment {
     pub position: ScreenPosition,
     pub size: (u8, u8),
@@ -87,6 +93,7 @@ pub struct WorldSnapshot {
     pub stars: Vec<ScreenPosition>,
     pub enemies: Vec<EnemySnapshot>,
     pub humans: Vec<HumanSnapshot>,
+    pub projectiles: Vec<ProjectileSnapshot>,
 }
 
 impl WorldSnapshot {
@@ -134,6 +141,7 @@ impl WorldSnapshot {
                     carried: false,
                 },
             ],
+            projectiles: Vec::new(),
         }
     }
 }
@@ -221,7 +229,6 @@ pub struct Game {
     state: GameState,
     controls: PlayerControlSystem,
     camera_left: WorldVector,
-    projectiles: Vec<ScreenPosition>,
 }
 
 impl Game {
@@ -230,7 +237,6 @@ impl Game {
             state: initial_state(),
             controls: PlayerControlSystem::new(),
             camera_left: WorldVector::default(),
-            projectiles: Vec::new(),
         }
     }
 
@@ -281,7 +287,6 @@ impl Game {
         self.state.world = WorldSnapshot::first_wave();
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
-        self.projectiles.clear();
     }
 
     fn step_playing(
@@ -313,14 +318,21 @@ impl Game {
         self.state.player.velocity = motion.state.velocity;
         self.camera_left = motion.state.camera_left;
 
+        self.advance_projectiles();
+
         if controls.triggers.fire {
             gameplay_events.push(GameEvent::FirePressed);
-            if let ProjectileLaunchOutcome::Started { spawn, .. } = ProjectileSystem::try_launch(
-                ProjectileState::new(self.projectiles.len() as u8),
+            if let ProjectileLaunchOutcome::Started {
+                direction, spawn, ..
+            } = ProjectileSystem::try_launch(
+                ProjectileState::new(self.state.world.projectiles.len() as u8),
                 motion.screen_position,
                 self.state.player.direction,
             ) {
-                self.projectiles.push(spawn);
+                self.state.world.projectiles.push(ProjectileSnapshot {
+                    position: spawn,
+                    velocity: ProjectileMotionSystem::velocity_for_direction(direction),
+                });
             }
         }
 
@@ -342,6 +354,17 @@ impl Game {
             enemy.position = motion.position;
             enemy.velocity = motion.velocity;
         }
+    }
+
+    fn advance_projectiles(&mut self) {
+        self.state.world.projectiles.retain_mut(|projectile| {
+            let motion = ProjectileMotionSystem::step(projectile.position, projectile.velocity);
+            if motion.active {
+                projectile.position = motion.position;
+                projectile.velocity = motion.velocity;
+            }
+            motion.active
+        });
     }
 
     fn scene(&self) -> RenderScene {
@@ -406,11 +429,14 @@ impl Game {
                 tint: Color::WHITE,
             });
 
-            for projectile in &self.projectiles {
+            for projectile in &self.state.world.projectiles {
                 scene.push_sprite(SceneSprite {
                     sprite: SpriteId::PLAYER_PROJECTILE,
                     layer: RenderLayer::Projectiles,
-                    position: [f32::from(projectile.x), f32::from(projectile.y)],
+                    position: [
+                        f32::from(projectile.position.x),
+                        f32::from(projectile.position.y),
+                    ],
                     size: [8.0, 2.0],
                     tint: Color::WHITE,
                 });
@@ -520,12 +546,12 @@ fn world_vector_pixels(vector: WorldVector) -> f32 {
 mod tests {
     use crate::{
         renderer::{Color, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize, TextureAtlas},
-        systems::{GameSimulation, ScreenVelocity, advance_one_frame},
+        systems::{GameSimulation, ScreenPosition, ScreenVelocity, advance_one_frame},
     };
 
     use super::{
         Direction, EnemyKind, Game, GameEvent, GameEvents, GameFrame, GameInput, GamePhase,
-        SoundEvent, WorldSnapshot, WorldVector,
+        ProjectileSnapshot, SoundEvent, WorldSnapshot, WorldVector,
     };
 
     #[test]
@@ -631,6 +657,7 @@ mod tests {
             ScreenVelocity::new(-1, 0)
         );
         assert_eq!(started.state.world.humans.len(), 2);
+        assert!(started.state.world.projectiles.is_empty());
         assert_eq!(started.events.gameplay(), &[GameEvent::GameStarted]);
         assert_eq!(started.events.sounds(), &[SoundEvent::GameStarted]);
         assert_eq!(
@@ -663,6 +690,11 @@ mod tests {
         assert_eq!(frame.state.player.direction, Direction::Left);
         assert_eq!(frame.state.player.smart_bombs, 2);
         assert!(frame.state.player.velocity.1.subpixels() < 0);
+        assert_eq!(frame.state.world.projectiles.len(), 1);
+        assert_eq!(
+            frame.state.world.projectiles[0].velocity,
+            ScreenVelocity::new(-8, 0)
+        );
         assert_eq!(
             frame.events.gameplay(),
             &[
@@ -685,6 +717,57 @@ mod tests {
             }
         );
         assert_eq!(frame.scene.summary().raster_count, 0);
+    }
+
+    #[test]
+    fn clean_game_advances_projectiles_through_world_snapshots() {
+        let mut game = credited_started_game();
+
+        let fired = game.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        let projectile = fired.state.world.projectiles[0];
+
+        assert_eq!(projectile.velocity, ScreenVelocity::new(8, 0));
+        assert!(fired.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                && sprite.position
+                    == [
+                        f32::from(projectile.position.x),
+                        f32::from(projectile.position.y),
+                    ]
+        }));
+
+        let moved = game.step(GameInput::NONE);
+        let moved_projectile = moved.state.world.projectiles[0];
+
+        assert_eq!(
+            moved_projectile.position.x,
+            projectile.position.x.wrapping_add(8)
+        );
+        assert_eq!(moved_projectile.position.y, projectile.position.y);
+        assert_eq!(moved_projectile.velocity, projectile.velocity);
+    }
+
+    #[test]
+    fn clean_game_culls_projectiles_that_leave_the_screen() {
+        let mut game = credited_started_game();
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(252, 80),
+            velocity: ScreenVelocity::new(8, 0),
+        });
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.projectiles.is_empty());
+        assert!(
+            !frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::PLAYER_PROJECTILE)
+        );
     }
 
     #[test]

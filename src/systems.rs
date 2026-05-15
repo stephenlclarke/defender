@@ -338,6 +338,42 @@ impl ProjectileSystem {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectileMotionFrame {
+    pub position: ScreenPosition,
+    pub velocity: ScreenVelocity,
+    pub active: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ProjectileMotionSystem;
+
+impl ProjectileMotionSystem {
+    pub const fn velocity_for_direction(direction: Direction) -> ScreenVelocity {
+        match direction {
+            Direction::Left => ScreenVelocity::new(-8, 0),
+            Direction::Right => ScreenVelocity::new(8, 0),
+        }
+    }
+
+    pub fn step(position: ScreenPosition, velocity: ScreenVelocity) -> ProjectileMotionFrame {
+        let next_x = i16::from(position.x) + i16::from(velocity.dx);
+        let next_y = i16::from(position.y) + i16::from(velocity.dy);
+        let active = (0..=i16::from(u8::MAX)).contains(&next_x)
+            && (0..=i16::from(u8::MAX)).contains(&next_y);
+
+        ProjectileMotionFrame {
+            position: if active {
+                ScreenPosition::new(next_x as u8, next_y as u8)
+            } else {
+                position
+            },
+            velocity,
+            active,
+        }
+    }
+}
+
 const PLAYER_MIN_SCREEN_Y: u8 = 42;
 const PLAYER_DOWN_LIMIT_SCREEN_Y: u8 = 238;
 const PLAYER_RIGHT_ANCHOR_X: u8 = 0x20;
@@ -623,8 +659,8 @@ mod tests {
     use super::{
         EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate, GameSimulation,
         PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem, PlayerMotionState,
-        PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileState, ProjectileSystem,
-        ScreenPosition, ScreenVelocity, VerticalControl, advance_one_frame,
+        PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState,
+        ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl, advance_one_frame,
         clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
     };
 
@@ -868,6 +904,35 @@ mod tests {
                 state: ProjectileState::new(4),
             }
         );
+    }
+
+    #[test]
+    fn projectile_motion_system_advances_directional_velocity_and_culls_screen_exit() {
+        assert_eq!(
+            ProjectileMotionSystem::velocity_for_direction(Direction::Right),
+            ScreenVelocity::new(8, 0)
+        );
+        assert_eq!(
+            ProjectileMotionSystem::velocity_for_direction(Direction::Left),
+            ScreenVelocity::new(-8, 0)
+        );
+
+        let moved = ProjectileMotionSystem::step(
+            ScreenPosition::new(0x40, 0x50),
+            ScreenVelocity::new(8, 0),
+        );
+
+        assert_eq!(moved.position, ScreenPosition::new(0x48, 0x50));
+        assert_eq!(moved.velocity, ScreenVelocity::new(8, 0));
+        assert!(moved.active);
+
+        let off_right =
+            ProjectileMotionSystem::step(ScreenPosition::new(252, 0x50), ScreenVelocity::new(8, 0));
+        let off_left =
+            ProjectileMotionSystem::step(ScreenPosition::new(3, 0x50), ScreenVelocity::new(-8, 0));
+
+        assert!(!off_right.active);
+        assert!(!off_left.active);
     }
 
     #[test]
