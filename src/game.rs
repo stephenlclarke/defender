@@ -4,9 +4,9 @@ use crate::{
     renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize},
     systems::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, PlayerControlSystem,
-        PlayerMotionState, PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileMotionSystem,
-        ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, WaveState, WaveStatus,
-        WaveSystem,
+        PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome,
+        ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition,
+        ScreenVelocity, WaveState, WaveStatus, WaveSystem,
     },
 };
 
@@ -430,8 +430,8 @@ impl Game {
 
         let enemy = self.state.world.enemies.remove(hit.enemy_index);
         self.state.world.projectiles.remove(hit.projectile_index);
-        self.award_enemy_score(enemy.kind);
         gameplay_events.push(GameEvent::EnemyDestroyed);
+        self.award_enemy_score(enemy.kind, gameplay_events);
     }
 
     fn queue_wave_clear_if_needed(&mut self, gameplay_events: &mut Vec<GameEvent>) {
@@ -456,12 +456,19 @@ impl Game {
         gameplay_events.push(GameEvent::WaveStarted);
     }
 
-    fn award_enemy_score(&mut self, kind: EnemyKind) {
-        let score = enemy_score(kind);
-        if self.state.current_player == 2 {
-            self.state.scores.player_two = self.state.scores.player_two.saturating_add(score);
-        } else {
-            self.state.scores.player_one = self.state.scores.player_one.saturating_add(score);
+    fn award_enemy_score(&mut self, kind: EnemyKind, gameplay_events: &mut Vec<GameEvent>) {
+        let frame = ScoreSystem::award_points(
+            self.state.scores,
+            PlayerStock::new(self.state.player.lives, self.state.player.smart_bombs),
+            self.state.current_player,
+            enemy_score(kind),
+        );
+        self.state.scores = frame.scores;
+        self.state.player.lives = frame.stock.lives;
+        self.state.player.smart_bombs = frame.stock.smart_bombs;
+
+        if frame.bonus_awards > 0 {
+            gameplay_events.push(GameEvent::BonusAwarded);
         }
     }
 
@@ -940,6 +947,38 @@ mod tests {
         assert_eq!(
             frame.events.gameplay(),
             &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
+        );
+    }
+
+    #[test]
+    fn clean_game_bonus_award_updates_stock_threshold_and_events() {
+        let mut game = credited_started_game();
+        game.state.scores.player_one = 9_900;
+        game.state.scores.high_score = 9_900;
+        game.state.scores.next_bonus = 10_000;
+        game.state.player.lives = 3;
+        game.state.player.smart_bombs = 1;
+        game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, 83),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.scores.player_one, 10_050);
+        assert_eq!(frame.state.scores.high_score, 10_050);
+        assert_eq!(frame.state.scores.next_bonus, 20_000);
+        assert_eq!(frame.state.player.lives, 4);
+        assert_eq!(frame.state.player.smart_bombs, 2);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[
+                GameEvent::EnemyDestroyed,
+                GameEvent::BonusAwarded,
+                GameEvent::WaveCleared,
+            ]
         );
     }
 

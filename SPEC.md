@@ -69,8 +69,9 @@ tree:
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion, enemy-motion,
   projectile launch/capacity/motion systems, projectile/enemy collision
-  detection, wave-completion evaluation, and the `GameSimulation` trait used
-  by the clean game and internal oracle implementations.
+  detection, wave-completion evaluation, score/bonus awards, and the
+  `GameSimulation` trait used by the clean game and internal oracle
+  implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
@@ -132,9 +133,11 @@ playing frames. Clean projectile snapshots carry direction-derived velocity,
 advance through `ProjectileMotionSystem`, and are culled through gameplay state
 before rendering. Clean collision boxes resolve projectile/enemy hits through
 `CollisionSystem`, remove the hit entities from world state, and award score
-before rendering. Enemy exhaustion is reported through `WaveSystem`, keeping
-the last-hit frame empty and spawning the next clean wave on the following
-playing frame. It flattens those per-batch records into one upload-ready
+through `ScoreSystem` before rendering. Crossing the clean bonus threshold
+updates player stock and emits `BonusAwarded`. Enemy exhaustion is reported
+through `WaveSystem`, keeping the last-hit frame empty and spawning the next
+clean wave on the following playing frame. It flattens those per-batch records
+into one upload-ready
 instance stream. The renderer also owns unit quad vertices, `u16` indices,
 upload bytes, and the `wgpu` vertex layout used to draw instanced sprites, then
 derives indexed instanced sprite draw commands with quad/index counts, instance

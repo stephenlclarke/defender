@@ -1,6 +1,6 @@
 //! Deterministic fixed-step system utilities.
 
-use crate::game::{Direction, GameFrame, GameInput, GameState, WorldVector};
+use crate::game::{Direction, GameFrame, GameInput, GameState, ScoreSnapshot, WorldVector};
 
 pub trait GameSimulation {
     fn state(&self) -> GameState;
@@ -471,6 +471,75 @@ impl WaveSystem {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerStock {
+    pub lives: u8,
+    pub smart_bombs: u8,
+}
+
+impl PlayerStock {
+    pub const fn new(lives: u8, smart_bombs: u8) -> Self {
+        Self { lives, smart_bombs }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScoreFrame {
+    pub scores: ScoreSnapshot,
+    pub stock: PlayerStock,
+    pub bonus_awards: u8,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ScoreSystem;
+
+impl ScoreSystem {
+    pub const BONUS_INTERVAL: u32 = 10_000;
+
+    pub fn award_points(
+        scores: ScoreSnapshot,
+        stock: PlayerStock,
+        current_player: u8,
+        points: u32,
+    ) -> ScoreFrame {
+        let mut scores = scores;
+        let mut stock = stock;
+        let active_score = if current_player == 2 {
+            &mut scores.player_two
+        } else {
+            &mut scores.player_one
+        };
+        *active_score = active_score.saturating_add(points);
+        scores.high_score = scores.high_score.max(*active_score);
+
+        let bonus_awards = bonus_awards(*active_score, scores.next_bonus);
+        if bonus_awards > 0 {
+            stock.lives = stock.lives.saturating_add(bonus_awards);
+            stock.smart_bombs = stock.smart_bombs.saturating_add(bonus_awards);
+            scores.next_bonus = advance_bonus_threshold(scores.next_bonus, bonus_awards);
+        }
+
+        ScoreFrame {
+            scores,
+            stock,
+            bonus_awards,
+        }
+    }
+}
+
+fn bonus_awards(score: u32, next_bonus: u32) -> u8 {
+    if next_bonus == u32::MAX || score < next_bonus {
+        return 0;
+    }
+
+    let thresholds = 1 + (score - next_bonus) / ScoreSystem::BONUS_INTERVAL;
+    thresholds.min(u32::from(u8::MAX)) as u8
+}
+
+fn advance_bonus_threshold(next_bonus: u32, bonus_awards: u8) -> u32 {
+    next_bonus.saturating_add(ScoreSystem::BONUS_INTERVAL.saturating_mul(u32::from(bonus_awards)))
+}
+
 const PLAYER_MIN_SCREEN_Y: u8 = 42;
 const PLAYER_DOWN_LIMIT_SCREEN_Y: u8 = 238;
 const PLAYER_RIGHT_ANCHOR_X: u8 = 0x20;
@@ -756,10 +825,10 @@ mod tests {
     use super::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate,
         GameSimulation, PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem,
-        PlayerMotionState, PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileMotionSystem,
-        ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl,
-        WaveState, WaveStatus, WaveSystem, advance_one_frame, clamp_camera_velocity_word,
-        next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
+        PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome,
+        ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition,
+        ScreenVelocity, VerticalControl, WaveState, WaveStatus, WaveSystem, advance_one_frame,
+        clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
     };
 
     #[test]
@@ -1098,6 +1167,67 @@ mod tests {
             WaveSystem::evaluate(WaveState::new(u8::MAX, 0)),
             WaveStatus::Cleared { next_wave: u8::MAX }
         );
+    }
+
+    #[test]
+    fn score_system_awards_points_to_current_player_and_tracks_high_score() {
+        let scores = ScoreSnapshot {
+            player_one: 1_000,
+            player_two: 2_000,
+            high_score: 2_000,
+            next_bonus: 10_000,
+        };
+
+        let player_one = ScoreSystem::award_points(scores, PlayerStock::new(3, 3), 1, 150);
+        assert_eq!(player_one.scores.player_one, 1_150);
+        assert_eq!(player_one.scores.player_two, 2_000);
+        assert_eq!(player_one.scores.high_score, 2_000);
+        assert_eq!(player_one.bonus_awards, 0);
+
+        let player_two = ScoreSystem::award_points(scores, PlayerStock::new(3, 3), 2, 150);
+        assert_eq!(player_two.scores.player_one, 1_000);
+        assert_eq!(player_two.scores.player_two, 2_150);
+        assert_eq!(player_two.scores.high_score, 2_150);
+    }
+
+    #[test]
+    fn score_system_awards_bonus_stock_when_thresholds_are_crossed() {
+        let scores = ScoreSnapshot {
+            player_one: 9_900,
+            player_two: 0,
+            high_score: 9_900,
+            next_bonus: 10_000,
+        };
+
+        let frame = ScoreSystem::award_points(scores, PlayerStock::new(3, 2), 1, 20_250);
+
+        assert_eq!(frame.scores.player_one, 30_150);
+        assert_eq!(frame.scores.high_score, 30_150);
+        assert_eq!(frame.scores.next_bonus, 40_000);
+        assert_eq!(frame.stock, PlayerStock::new(6, 5));
+        assert_eq!(frame.bonus_awards, 3);
+    }
+
+    #[test]
+    fn score_system_saturates_scores_bonus_stock_and_thresholds() {
+        let scores = ScoreSnapshot {
+            player_one: u32::MAX - 10,
+            player_two: 0,
+            high_score: u32::MAX - 20,
+            next_bonus: u32::MAX - 1,
+        };
+
+        let frame = ScoreSystem::award_points(scores, PlayerStock::new(u8::MAX, 254), 1, 50);
+
+        assert_eq!(frame.scores.player_one, u32::MAX);
+        assert_eq!(frame.scores.high_score, u32::MAX);
+        assert_eq!(frame.scores.next_bonus, u32::MAX);
+        assert_eq!(frame.stock, PlayerStock::new(u8::MAX, u8::MAX));
+        assert_eq!(frame.bonus_awards, 1);
+
+        let max_bonus = ScoreSystem::award_points(frame.scores, PlayerStock::new(3, 3), 1, 1_000);
+        assert_eq!(max_bonus.bonus_awards, 0);
+        assert_eq!(max_bonus.stock, PlayerStock::new(3, 3));
     }
 
     #[derive(Debug)]

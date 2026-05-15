@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-123` are complete. The standing maintenance guidance in
+`DC-42` through `DC-124` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5411,6 +5411,72 @@ Work log:
   docs/fidelity/live-audio.md`, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778845846596549`
+
+### DC-124: Clean Bonus Award System
+
+Status: `complete`
+
+Goal: move score mutation, high-score tracking, and bonus-threshold awards into
+clean gameplay systems instead of mutating score fields directly in `Game`.
+
+Scope:
+
+- Add a deterministic clean scoring/bonus system in `src/systems.rs`.
+- Route enemy score awards through that system.
+- Update the current player's score, high score, next bonus threshold, lives,
+  and smart bombs through clean domain output.
+- Emit `BonusAwarded` when a point award crosses the configured bonus
+  threshold.
+- Update focused systems/game tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- Enemy scoring is represented by gameplay-domain scoring output, not direct
+  field mutation in collision handling.
+- Crossing `ScoreSnapshot.next_bonus` awards clean player stock and emits a
+  gameplay event on the same frame as the score award.
+- Scores, high score, next bonus, lives, smart bombs, and collision/wave events
+  remain visible through `GameState` and `GameEvents`.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::score
+cargo test --lib game::tests::clean_game_bonus
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 12:53:05 BST` Started `DC-124`: adding clean score/bonus
+  evaluation, routing enemy score awards through it, emitting bonus gameplay
+  output, and updating focused systems/game/docs coverage.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778845983462809`
+- `2026-05-15 13:15:06 BST` Completed `DC-124`: added clean `ScoreSystem`
+  scoring output for current-player point awards, high-score tracking, bonus
+  threshold advancement, and player stock updates; routed enemy score awards
+  through it; and emitted `BonusAwarded` when a collision score crosses
+  `next_bonus` while preserving collision and wave event ordering. Validation
+  passed with `cargo fmt --check`, `cargo test --lib systems::tests::score`
+  (3 tests), `cargo test --lib game::tests::clean_game_bonus` (1 test),
+  `cargo test --lib game::tests::` (18 tests),
+  `cargo test --lib systems::tests::` (18 tests), `cargo test --all-targets`
+  (1185 lib tests, 2 bin tests, 2 example tests),
+  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
+  15452 frames, new Rust line coverage 43/43),
+  `cargo run -- --live-smoke` (239 rendered frames),
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778847304885369`
 
 ## Ongoing Work
 

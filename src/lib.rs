@@ -135,10 +135,10 @@ pub use renderer::{
 pub use systems::{
     CollisionBox, CollisionSystem, EnemyMotionFrame, EnemyMotionSystem, FixedStepAccumulator,
     FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent,
-    PlayerControlSystem, PlayerMotionFrame, PlayerMotionState, PlayerMotionSystem,
+    PlayerControlSystem, PlayerMotionFrame, PlayerMotionState, PlayerMotionSystem, PlayerStock,
     ProjectileEnemyHit, ProjectileLaunchOutcome, ProjectileMotionFrame, ProjectileMotionSystem,
-    ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl, WaveState,
-    WaveStatus, WaveSystem, advance_one_frame,
+    ProjectileState, ProjectileSystem, ScoreFrame, ScoreSystem, ScreenPosition, ScreenVelocity,
+    VerticalControl, WaveState, WaveStatus, WaveSystem, advance_one_frame,
 };
 
 #[cfg(test)]
