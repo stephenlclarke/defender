@@ -98,15 +98,14 @@ fn dispatch_cli_classification(classification: CliClassification) -> anyhow::Res
         CliClassification::CleanFidelityTraceFixtureDirectory(request) => {
             crate::runtime::run_fidelity_trace_check_dir(request.path)
         }
+        CliClassification::CleanFidelityReferenceTraceFixtureDirectory(request) => {
+            crate::runtime::run_fidelity_reference_trace_check_dir(request.path)
+        }
         CliClassification::CleanFidelityScenarioList => {
             crate::runtime::run_fidelity_scenario_list()
         }
         CliClassification::CleanFidelityScenarioInputWriter(request) => {
             crate::runtime::run_fidelity_scenario_input_writer(request.path)
-        }
-        CliClassification::HistoricalCommand(command) => {
-            let _command = command;
-            crate::runtime::run_cli()
         }
         CliClassification::CompatibilityFallback(arg) => {
             let _first_arg = arg.first_arg;
@@ -127,18 +126,13 @@ enum CliClassification {
     CleanFidelityTraceInputsFile(FidelityTraceInputsFileRequest),
     CleanFidelityTraceCheck(FidelityTraceCheckRequest),
     CleanFidelityTraceFixtureDirectory(FidelityTraceFixtureDirectoryRequest),
+    CleanFidelityReferenceTraceFixtureDirectory(FidelityReferenceTraceFixtureDirectoryRequest),
     CleanFidelityScenarioList,
     CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
-    HistoricalCommand(HistoricalCliCommand),
     CompatibilityFallback(CompatibilityCliArg),
     CleanRuntime(RuntimeConfig),
     CleanHelp,
     CleanError(CleanCliError),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HistoricalCliCommand {
-    ReferenceFixtureDirectory,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -183,6 +177,11 @@ struct FidelityTraceFixtureDirectoryRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct FidelityReferenceTraceFixtureDirectoryRequest {
+    path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ScenarioInputWriterRequest {
     path: PathBuf,
 }
@@ -223,6 +222,9 @@ impl RuntimeCliClassifier {
                 ArgClassification::CleanFidelityTraceFixtureDirectory(request) => {
                     return CliClassification::CleanFidelityTraceFixtureDirectory(request);
                 }
+                ArgClassification::CleanFidelityReferenceTraceFixtureDirectory(request) => {
+                    return CliClassification::CleanFidelityReferenceTraceFixtureDirectory(request);
+                }
                 ArgClassification::CleanFidelityScenarioList => {
                     return CliClassification::CleanFidelityScenarioList;
                 }
@@ -232,9 +234,6 @@ impl RuntimeCliClassifier {
                 ArgClassification::CleanHelp => return CliClassification::CleanHelp,
                 ArgClassification::CleanError(error) => {
                     return CliClassification::CleanError(error);
-                }
-                ArgClassification::HistoricalCommand(command) => {
-                    return CliClassification::HistoricalCommand(command);
                 }
                 ArgClassification::CompatibilityFallback(first_arg) => {
                     return CliClassification::CompatibilityFallback(CompatibilityCliArg {
@@ -425,6 +424,28 @@ impl RuntimeCliClassifier {
                     },
                 )
             }
+            "--fidelity-check-reference-trace-dir" => {
+                if live_option_seen {
+                    return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                        "--fidelity-check-reference-trace-dir",
+                    ));
+                }
+                let Some(path) = args.next() else {
+                    return ArgClassification::CleanError(
+                        CleanCliError::FidelityCheckReferenceTraceDirMissingPath,
+                    );
+                };
+                if args.next().is_some() {
+                    return ArgClassification::CleanError(
+                        CleanCliError::FidelityCheckReferenceTraceDirExtraArgs,
+                    );
+                }
+                ArgClassification::CleanFidelityReferenceTraceFixtureDirectory(
+                    FidelityReferenceTraceFixtureDirectoryRequest {
+                        path: PathBuf::from(path),
+                    },
+                )
+            }
             "--fidelity-list-scenarios" => {
                 if live_option_seen {
                     return ArgClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
@@ -458,9 +479,7 @@ impl RuntimeCliClassifier {
                     path: PathBuf::from(path),
                 })
             }
-            _ => historical_cli_command(arg)
-                .map(ArgClassification::HistoricalCommand)
-                .unwrap_or_else(|| ArgClassification::CompatibilityFallback(String::from(arg))),
+            _ => ArgClassification::CompatibilityFallback(String::from(arg)),
         }
     }
 }
@@ -474,9 +493,9 @@ enum ArgClassification {
     CleanFidelityTraceInputsFile(FidelityTraceInputsFileRequest),
     CleanFidelityTraceCheck(FidelityTraceCheckRequest),
     CleanFidelityTraceFixtureDirectory(FidelityTraceFixtureDirectoryRequest),
+    CleanFidelityReferenceTraceFixtureDirectory(FidelityReferenceTraceFixtureDirectoryRequest),
     CleanFidelityScenarioList,
     CleanFidelityScenarioInputWriter(ScenarioInputWriterRequest),
-    HistoricalCommand(HistoricalCliCommand),
     CompatibilityFallback(String),
     CleanRuntime,
     CleanHelp,
@@ -504,6 +523,8 @@ enum CleanCliError {
     FidelityCheckTraceExtraArgs,
     FidelityCheckTraceDirMissingPath,
     FidelityCheckTraceDirExtraArgs,
+    FidelityCheckReferenceTraceDirMissingPath,
+    FidelityCheckReferenceTraceDirExtraArgs,
     FidelityListScenariosExtraArgs,
     FidelityWriteScenarioInputsMissingPath,
     FidelityWriteScenarioInputsExtraArgs,
@@ -606,6 +627,18 @@ impl fmt::Display for CleanCliError {
                     "--fidelity-check-trace-dir only accepts one fixture directory path"
                 )
             }
+            Self::FidelityCheckReferenceTraceDirMissingPath => {
+                write!(
+                    formatter,
+                    "--fidelity-check-reference-trace-dir requires a reference fixture directory path"
+                )
+            }
+            Self::FidelityCheckReferenceTraceDirExtraArgs => {
+                write!(
+                    formatter,
+                    "--fidelity-check-reference-trace-dir only accepts one reference fixture directory path"
+                )
+            }
             Self::FidelityListScenariosExtraArgs => {
                 write!(
                     formatter,
@@ -654,15 +687,6 @@ fn parse_control_profile(value: &str) -> Option<ControlProfile> {
     }
 }
 
-fn historical_cli_command(arg: &str) -> Option<HistoricalCliCommand> {
-    match arg {
-        "--fidelity-check-reference-trace-dir" => {
-            Some(HistoricalCliCommand::ReferenceFixtureDirectory)
-        }
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{
@@ -673,10 +697,10 @@ mod tests {
 
     use super::{
         AudioOutput, CleanCliError, CliClassification, CompatibilityCliArg, ControlProfile,
-        FidelityTraceCheckRequest, FidelityTraceFixtureDirectoryRequest,
-        FidelityTraceInputsFileRequest, FidelityTraceInputsRequest, FidelityTraceRequest,
-        HistoricalCliCommand, RomReportRequest, RunMode, RuntimeCliClassifier, RuntimeConfig,
-        ScenarioInputWriterRequest, VerifyRomsRequest,
+        FidelityReferenceTraceFixtureDirectoryRequest, FidelityTraceCheckRequest,
+        FidelityTraceFixtureDirectoryRequest, FidelityTraceInputsFileRequest,
+        FidelityTraceInputsRequest, FidelityTraceRequest, RomReportRequest, RunMode,
+        RuntimeCliClassifier, RuntimeConfig, ScenarioInputWriterRequest, VerifyRomsRequest,
     };
 
     fn args(values: &[&str]) -> Vec<String> {
@@ -777,22 +801,24 @@ mod tests {
     }
 
     #[test]
-    fn clean_cli_delegates_historical_commands() {
+    fn clean_cli_has_no_historical_commands_left() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&["--fidelity-check-reference-trace-dir"])),
-            CliClassification::HistoricalCommand(HistoricalCliCommand::ReferenceFixtureDirectory)
+            CliClassification::CleanError(CleanCliError::FidelityCheckReferenceTraceDirMissingPath)
         );
     }
 
     #[test]
-    fn clean_cli_delegates_historical_commands_after_clean_live_flags() {
+    fn clean_cli_rejects_reference_fixture_directory_after_clean_live_flags() {
         assert_eq!(
             RuntimeCliClassifier::classify(args(&[
                 "--live-smoke",
                 "--fidelity-check-reference-trace-dir",
                 "fixtures",
             ])),
-            CliClassification::HistoricalCommand(HistoricalCliCommand::ReferenceFixtureDirectory)
+            CliClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                "--fidelity-check-reference-trace-dir",
+            ))
         );
         assert_eq!(
             RuntimeCliClassifier::classify(args(&[
@@ -800,7 +826,9 @@ mod tests {
                 "--fidelity-check-reference-trace-dir",
                 "fixtures",
             ])),
-            CliClassification::HistoricalCommand(HistoricalCliCommand::ReferenceFixtureDirectory)
+            CliClassification::CleanError(CleanCliError::LiveOptionsWithCommand(
+                "--fidelity-check-reference-trace-dir",
+            ))
         );
     }
 
@@ -877,6 +905,21 @@ mod tests {
             RuntimeCliClassifier::classify(args(&["--fidelity-check-trace-dir", "fixtures"])),
             CliClassification::CleanFidelityTraceFixtureDirectory(
                 FidelityTraceFixtureDirectoryRequest {
+                    path: PathBuf::from("fixtures"),
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn clean_cli_owns_fidelity_reference_trace_fixture_directory_command() {
+        assert_eq!(
+            RuntimeCliClassifier::classify(args(&[
+                "--fidelity-check-reference-trace-dir",
+                "fixtures",
+            ])),
+            CliClassification::CleanFidelityReferenceTraceFixtureDirectory(
+                FidelityReferenceTraceFixtureDirectoryRequest {
                     path: PathBuf::from("fixtures"),
                 },
             )
@@ -1102,6 +1145,29 @@ mod tests {
     }
 
     #[test]
+    fn clean_cli_rejects_malformed_fidelity_reference_trace_fixture_directory_args() {
+        for (values, error) in [
+            (
+                vec!["--mute", "--fidelity-check-reference-trace-dir", "fixtures"],
+                CleanCliError::LiveOptionsWithCommand("--fidelity-check-reference-trace-dir"),
+            ),
+            (
+                vec!["--fidelity-check-reference-trace-dir"],
+                CleanCliError::FidelityCheckReferenceTraceDirMissingPath,
+            ),
+            (
+                vec!["--fidelity-check-reference-trace-dir", "fixtures", "extra"],
+                CleanCliError::FidelityCheckReferenceTraceDirExtraArgs,
+            ),
+        ] {
+            assert_eq!(
+                RuntimeCliClassifier::classify(args(&values)),
+                CliClassification::CleanError(error)
+            );
+        }
+    }
+
+    #[test]
     fn clean_cli_rejects_malformed_fidelity_scenario_listing_args() {
         for (values, error) in [
             (
@@ -1224,6 +1290,14 @@ mod tests {
         assert_eq!(
             CleanCliError::FidelityCheckTraceDirExtraArgs.to_string(),
             "--fidelity-check-trace-dir only accepts one fixture directory path"
+        );
+        assert_eq!(
+            CleanCliError::FidelityCheckReferenceTraceDirMissingPath.to_string(),
+            "--fidelity-check-reference-trace-dir requires a reference fixture directory path"
+        );
+        assert_eq!(
+            CleanCliError::FidelityCheckReferenceTraceDirExtraArgs.to_string(),
+            "--fidelity-check-reference-trace-dir only accepts one reference fixture directory path"
         );
         assert_eq!(
             CleanCliError::FidelityListScenariosExtraArgs.to_string(),
@@ -1391,6 +1465,15 @@ mod tests {
     }
 
     #[test]
+    fn clean_fidelity_reference_trace_fixture_directory_cli_entrypoint_accepts_supported_args() {
+        super::run_with_args(args(&[
+            "--fidelity-check-reference-trace-dir",
+            "docs/fidelity/fixtures/local/reference",
+        ]))
+        .expect("clean reference trace fixture directory CLI should run through runtime");
+    }
+
+    #[test]
     fn clean_fidelity_scenario_input_writer_cli_entrypoint_accepts_supported_args() {
         let path = unique_temp_dir("defender-clean-platform-scenario-inputs");
         let _ = fs::remove_dir_all(&path);
@@ -1404,15 +1487,6 @@ mod tests {
 
         assert!(path.join("attract_boot.inputs.txt").is_file());
         let _ = fs::remove_dir_all(path);
-    }
-
-    #[test]
-    fn accepted_cli_entrypoint_delegates_historical_commands() {
-        super::run_with_args(args(&[
-            "--fidelity-check-reference-trace-dir",
-            "docs/fidelity/fixtures/local/reference",
-        ]))
-        .expect("historical CLI commands should delegate to accepted CLI");
     }
 
     #[test]
