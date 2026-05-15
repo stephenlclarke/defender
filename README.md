@@ -226,8 +226,8 @@ Clean rewrite modules:
   instance GPU ABI, sprite instance upload streams, sprite draw commands,
   sprite `wgpu` buffer upload plans, sprite render-pass plans, sprite pipeline
   plans, sprite resource binding plans, sprite atlas texture upload plans,
-  viewport layout, GPU pass planning, scene summaries, render signatures, and
-  draw planning.
+  sprite pipeline layout plans, viewport layout, GPU pass planning, scene
+  summaries, render signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -280,11 +280,13 @@ binding plans describe the scene-projection uniform upload, projection bind
 group layout, atlas texture binding, atlas sampler binding, and atlas texture
 upload metadata used by that shader. The default clean sprite atlas owns
 deterministic nonblank RGBA pixels plus the `wgpu` texture format, usage,
-extent, and copy layout needed to populate it. It also records the centered
-viewport layout plus GPU-ready clear color, viewport command, and
-scene-projection constants for the target surface. The live worker still wraps
-accepted visual output as a clean `RenderScene` raster payload before the
-presenter draws it. Kitty graphics and
+extent, and copy layout needed to populate it. Sprite pipeline layout plans
+then order those projection and atlas bind groups for `wgpu`
+`PipelineLayoutDescriptor` creation. It also records the centered viewport
+layout plus GPU-ready clear color, viewport command, and scene-projection
+constants for the target surface. The live worker still wraps accepted visual
+output as a clean `RenderScene` raster payload before the presenter draws it.
+Kitty graphics and
 terminal-session code remain parked there as historical compatibility evidence,
 but they are no longer active runtime or compatibility API paths. The legacy
 video renderer owns its remaining `TerminalGeometry` value type directly so it

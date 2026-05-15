@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-114` are complete. The standing maintenance guidance in
+`DC-42` through `DC-115` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4797,6 +4797,76 @@ Work log:
   --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778829734086439`
+
+### DC-115: Clean Sprite Pipeline Layout Planning
+
+Status: `complete`
+
+Goal: connect the clean sprite pipeline plan with the sprite resource binding
+plans by describing the ordered `wgpu` pipeline layout metadata needed to bind
+scene projection and sprite atlas resources without presenter-side
+classification.
+
+Scope:
+
+- Add sprite pipeline layout metadata with stable bind group ordering.
+- Preserve scene-projection and sprite-atlas bind group roles, labels, group
+  indices, and entry counts in the layout plan.
+- Include the `wgpu` immediate-size value needed by `PipelineLayoutDescriptor`.
+- Wire optional sprite pipeline layout plans into `SceneDrawPlan` only when
+  sprite pipeline and sprite resource binding plans are both present.
+- Keep raster-only scenes, missing atlas regions, empty atlas surfaces, invalid
+  atlas pixel data, unavailable sprite pipelines, empty command lists, and empty
+  targets outside sprite pipeline layout planning.
+- Add focused renderer tests for layout ordering, descriptor-ready metadata,
+  resource-plan alignment, custom target settings, and absent paths.
+- Update README/SPEC module text for sprite pipeline layout planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes sprite pipeline layout metadata only for drawable
+  clean sprite plans.
+- The layout plan orders scene projection at group 0 and sprite atlas at group
+  1, matching the WGSL shader and resource binding plan.
+- Raster-only scenes and invalid sprite paths do not produce sprite pipeline
+  layout plans.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 08:24:21 BST` Started `DC-115`: adding renderer-owned sprite
+  pipeline layout metadata with ordered scene-projection and sprite-atlas bind
+  group layout slots, descriptor-ready immediate size, focused renderer tests,
+  and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778829878218629`
+- `2026-05-15 08:49:08 BST` Completed `DC-115`: added descriptor-ready sprite
+  pipeline layout metadata with ordered scene-projection group 0 and sprite
+  atlas group 1, wired optional layout plans into `SceneDrawPlan` only for
+  drawable sprite plans with sprite pipeline, sprite resource bindings, and a
+  nonempty viewport, and kept raster-only, invalid sprite-resource, empty
+  command, unavailable-pipeline, and empty-target paths outside layout
+  planning. Verified with focused renderer tests (44/44), public API guard
+  (1/1), `cargo test --all-targets` (1165 library tests, 2 binary tests, 2
+  example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, 23/23 non-baselined added
+  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
+  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778831347938799`
 
 ## Ongoing Work
 

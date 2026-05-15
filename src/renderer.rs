@@ -1456,6 +1456,51 @@ impl SpriteResourceBindingPlan {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpritePipelineLayoutBindGroup {
+    pub role: SpriteBindGroupRole,
+    pub group_index: u32,
+    pub layout_label: &'static str,
+    pub entry_count: usize,
+}
+
+impl SpritePipelineLayoutBindGroup {
+    fn from_layout(layout: &SpriteBindGroupLayoutPlan) -> Self {
+        Self {
+            role: layout.role,
+            group_index: layout.group_index(),
+            layout_label: layout.label,
+            entry_count: layout.entries.len(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpritePipelineLayoutPlan {
+    pub label: &'static str,
+    pub bind_groups: Vec<SpritePipelineLayoutBindGroup>,
+    pub immediate_size: u32,
+}
+
+impl SpritePipelineLayoutPlan {
+    pub const IMMEDIATE_SIZE: u32 = 0;
+
+    fn from_resource_bindings(bindings: &SpriteResourceBindingPlan) -> Self {
+        Self {
+            label: "defender.sprite.pipeline_layout",
+            bind_groups: vec![
+                SpritePipelineLayoutBindGroup::from_layout(&bindings.projection_layout),
+                SpritePipelineLayoutBindGroup::from_layout(&bindings.atlas_layout),
+            ],
+            immediate_size: Self::IMMEDIATE_SIZE,
+        }
+    }
+
+    pub fn bind_group_count(&self) -> usize {
+        self.bind_groups.len()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteDrawCommand {
     pub pipeline: NativeRenderPipeline,
     pub layer: RenderLayer,
@@ -1538,6 +1583,7 @@ pub struct SceneDrawPlan {
     pub sprite_render_pass: Option<SpriteRenderPassPlan>,
     pub sprite_pipeline: Option<SpritePipelinePlan>,
     pub sprite_resource_bindings: Option<SpriteResourceBindingPlan>,
+    pub sprite_pipeline_layout: Option<SpritePipelineLayoutPlan>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
 }
@@ -1634,6 +1680,16 @@ impl NativeSceneRenderer {
                 )
             })
         });
+        let sprite_pipeline_layout = match (
+            sprite_pipeline.as_ref(),
+            sprite_resource_bindings.as_ref(),
+            gpu_pass.viewport,
+        ) {
+            (Some(_), Some(bindings), Some(_)) => {
+                Some(SpritePipelineLayoutPlan::from_resource_bindings(bindings))
+            }
+            _ => None,
+        };
 
         SceneDrawPlan {
             frame: scene.frame,
@@ -1651,6 +1707,7 @@ impl NativeSceneRenderer {
             sprite_render_pass,
             sprite_pipeline,
             sprite_resource_bindings,
+            sprite_pipeline_layout,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
@@ -1720,7 +1777,8 @@ mod tests {
         SceneSprite, SpriteAtlasTextureUpload, SpriteBindGroupLayoutPlan, SpriteBindGroupRole,
         SpriteBufferRole, SpriteBufferUpload, SpriteBufferUploadPlan, SpriteDrawBatch,
         SpriteDrawCommand, SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding,
-        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload, SpritePipelinePlan,
+        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload,
+        SpritePipelineLayoutBindGroup, SpritePipelineLayoutPlan, SpritePipelinePlan,
         SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassPlan,
         SpriteResourceBindingPlan, SpriteResourceBindingRole, SpriteSamplerBindingPlan,
         SpriteShaderPlan, SpriteTextureBindingPlan, SpriteVertexBufferBinding,
@@ -2465,22 +2523,57 @@ mod tests {
     }
 
     #[test]
+    fn sprite_pipeline_layout_plan_orders_resource_bind_groups() {
+        let projection =
+            SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
+        let atlas = TextureAtlas::default_sprites();
+        let bindings = SpriteResourceBindingPlan::from_projection_and_atlas(projection, &atlas)
+            .expect("sprite resource binding plan");
+
+        let plan = SpritePipelineLayoutPlan::from_resource_bindings(&bindings);
+
+        assert_eq!(plan.label, "defender.sprite.pipeline_layout");
+        assert_eq!(plan.immediate_size, 0);
+        assert_eq!(plan.bind_group_count(), 2);
+        assert_eq!(
+            plan.bind_groups,
+            vec![
+                SpritePipelineLayoutBindGroup {
+                    role: SpriteBindGroupRole::SceneProjection,
+                    group_index: 0,
+                    layout_label: "defender.sprite.scene_projection.bind_group_layout",
+                    entry_count: 1,
+                },
+                SpritePipelineLayoutBindGroup {
+                    role: SpriteBindGroupRole::SpriteAtlas,
+                    group_index: 1,
+                    layout_label: "defender.sprite.atlas.bind_group_layout",
+                    entry_count: 2,
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn sprite_shader_bindings_match_resource_binding_plan() {
         let shader = SpriteShaderPlan::default();
         let projection =
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
         let atlas = TextureAtlas::default_sprites();
-        let plan = SpriteResourceBindingPlan::from_projection_and_atlas(projection, &atlas)
+        let bindings = SpriteResourceBindingPlan::from_projection_and_atlas(projection, &atlas)
             .expect("sprite resource binding plan");
+        let pipeline_layout = SpritePipelineLayoutPlan::from_resource_bindings(&bindings);
 
         assert!(shader.source.contains("@group(0) @binding(0)"));
-        assert_eq!(plan.projection_layout.group_index(), 0);
-        assert_eq!(plan.projection_layout.entries[0].binding, 0);
+        assert_eq!(bindings.projection_layout.group_index(), 0);
+        assert_eq!(bindings.projection_layout.entries[0].binding, 0);
+        assert_eq!(pipeline_layout.bind_groups[0].group_index, 0);
         assert!(shader.source.contains("@group(1) @binding(0)"));
         assert!(shader.source.contains("@group(1) @binding(1)"));
-        assert_eq!(plan.atlas_layout.group_index(), 1);
-        assert_eq!(plan.atlas_texture.binding, 0);
-        assert_eq!(plan.atlas_sampler.binding, 1);
+        assert_eq!(bindings.atlas_layout.group_index(), 1);
+        assert_eq!(bindings.atlas_texture.binding, 0);
+        assert_eq!(bindings.atlas_sampler.binding, 1);
+        assert_eq!(pipeline_layout.bind_groups[1].group_index, 1);
     }
 
     #[test]
@@ -2683,6 +2776,19 @@ mod tests {
         })
     }
 
+    fn expected_sprite_pipeline_layout(plan: &SceneDrawPlan) -> Option<SpritePipelineLayoutPlan> {
+        match (
+            plan.sprite_pipeline.as_ref(),
+            plan.sprite_resource_bindings.as_ref(),
+            plan.gpu_pass.viewport,
+        ) {
+            (Some(_), Some(bindings), Some(_)) => {
+                Some(SpritePipelineLayoutPlan::from_resource_bindings(bindings))
+            }
+            _ => None,
+        }
+    }
+
     #[test]
     fn render_scene_collects_sprites_in_order() {
         let mut scene = RenderScene::empty(7, SurfaceSize::new(320, 240));
@@ -2872,6 +2978,16 @@ mod tests {
         assert_eq!(
             plan.sprite_resource_bindings,
             expected_sprite_resource_bindings(&plan)
+        );
+        assert_eq!(
+            plan.sprite_pipeline_layout,
+            expected_sprite_pipeline_layout(&plan)
+        );
+        assert_eq!(
+            plan.sprite_pipeline_layout
+                .as_ref()
+                .map(SpritePipelineLayoutPlan::bind_group_count),
+            Some(2)
         );
         assert_eq!(
             plan.sprite_pipeline
@@ -3091,6 +3207,10 @@ mod tests {
             plan.sprite_resource_bindings,
             expected_sprite_resource_bindings(&plan)
         );
+        assert_eq!(
+            plan.sprite_pipeline_layout,
+            expected_sprite_pipeline_layout(&plan)
+        );
         assert_eq!(plan.raster_upload, None);
     }
 
@@ -3118,6 +3238,7 @@ mod tests {
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
+        assert_eq!(plan.sprite_pipeline_layout, None);
     }
 
     #[test]
@@ -3148,6 +3269,7 @@ mod tests {
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
+        assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -3213,6 +3335,7 @@ mod tests {
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
+        assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -3285,6 +3408,10 @@ mod tests {
             plan.sprite_resource_bindings,
             expected_sprite_resource_bindings(&plan)
         );
+        assert_eq!(
+            plan.sprite_pipeline_layout,
+            expected_sprite_pipeline_layout(&plan)
+        );
     }
 
     #[test]
@@ -3323,6 +3450,7 @@ mod tests {
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
+        assert_eq!(plan.sprite_pipeline_layout, None);
     }
 
     #[test]
@@ -3405,6 +3533,10 @@ mod tests {
             expected_sprite_resource_bindings(&sprite_plan)
         );
         assert_eq!(
+            sprite_plan.sprite_pipeline_layout,
+            expected_sprite_pipeline_layout(&sprite_plan)
+        );
+        assert_eq!(
             raster_plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
@@ -3417,6 +3549,7 @@ mod tests {
         assert_eq!(raster_plan.sprite_render_pass, None);
         assert_eq!(raster_plan.sprite_pipeline, None);
         assert_eq!(raster_plan.sprite_resource_bindings, None);
+        assert_eq!(raster_plan.sprite_pipeline_layout, None);
         assert_eq!(
             raster_plan.raster_upload,
             Some(super::SceneRasterUpload {
@@ -3440,10 +3573,39 @@ mod tests {
         assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
+        assert_eq!(plan.sprite_pipeline_layout, None);
         assert_eq!(
             plan.gpu_pass.scene_projection,
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240))
         );
+    }
+
+    #[test]
+    fn native_scene_renderer_omits_sprite_pipeline_layout_for_empty_target() {
+        let mut scene = RenderScene::empty(87, SurfaceSize::new(292, 240));
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_SHIP,
+            layer: RenderLayer::Objects,
+            position: [128.0, 96.0],
+            size: [16.0, 8.0],
+            tint: Color::WHITE,
+        });
+
+        let plan =
+            NativeSceneRenderer::default().prepare_for_target(&scene, SurfaceSize::new(0, 0));
+
+        assert!(plan.viewport.is_empty());
+        assert_eq!(plan.gpu_pass.viewport, None);
+        assert_eq!(plan.sprite_render_pass, expected_sprite_render_pass(&plan));
+        assert_eq!(
+            plan.sprite_pipeline,
+            expected_sprite_pipeline(&plan, GpuRendererSettings::default())
+        );
+        assert_eq!(
+            plan.sprite_resource_bindings,
+            expected_sprite_resource_bindings(&plan)
+        );
+        assert_eq!(plan.sprite_pipeline_layout, None);
     }
 
     #[test]
@@ -3521,6 +3683,10 @@ mod tests {
         assert_eq!(
             plan.sprite_resource_bindings,
             expected_sprite_resource_bindings(&plan)
+        );
+        assert_eq!(
+            plan.sprite_pipeline_layout,
+            expected_sprite_pipeline_layout(&plan)
         );
     }
 }
