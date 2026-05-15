@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-122` are complete. The standing maintenance guidance in
+`DC-42` through `DC-123` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5343,6 +5343,74 @@ Work log:
   docs/fidelity/live-audio.md`, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778844407133399`
+
+### DC-123: Clean Wave Completion System
+
+Status: `complete`
+
+Goal: move wave clear and next-wave spawning into clean gameplay systems
+instead of leaving enemy exhaustion as an inert world state.
+
+Scope:
+
+- Add a deterministic clean wave-completion system in `src/systems.rs`.
+- When the last clean enemy is destroyed, emit wave-clear gameplay output
+  without immediately respawning over the hit frame.
+- Start the next wave on the following playing frame with clean world
+  repopulation and sprite-visible enemies.
+- Keep player, score, lives, smart bombs, terrain, humans, projectiles, and
+  enemy wave state owned by clean domain structures.
+- Update focused systems/game tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- Enemy exhaustion is represented by gameplay-domain wave output, not renderer
+  state or legacy object lists.
+- The frame that destroys the last enemy shows the hit projectile and enemy
+  absent and reports wave-clear output.
+- The following playing frame advances `GameState.wave`, repopulates clean
+  enemies deterministically, and renders those enemies as atlas-backed sprites.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::wave
+cargo test --lib game::tests::clean_game_wave
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 12:28:19 BST` Started `DC-123`: adding clean wave-completion
+  evaluation, delayed next-wave spawning, wave gameplay events, and focused
+  systems/game/docs coverage.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778844499996319`
+- `2026-05-15 12:50:46 BST` Completed `DC-123`: added clean `WaveSystem`
+  progress/clear evaluation, saturating next-wave numbering, `WaveCleared`
+  output on the last-enemy destruction frame, delayed `WaveStarted` output, and
+  deterministic clean enemy repopulation on the following playing frame. The
+  last-hit frame keeps the hit projectile/enemy absent while the next wave
+  renders atlas-backed enemies from clean world state. Validation passed with
+  `cargo fmt --check`, `cargo test --lib systems::tests::wave` (1 test),
+  `cargo test --lib game::tests::clean_game_wave` (1 test),
+  `cargo test --lib game::tests::` (17 tests),
+  `cargo test --lib systems::tests::` (15 tests), `cargo test --all-targets`
+  (1181 lib tests, 2 bin tests, 2 example tests),
+  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
+  15452 frames, new Rust line coverage 36/36),
+  `cargo run -- --live-smoke` (239 rendered frames),
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778845846596549`
 
 ## Ongoing Work
 

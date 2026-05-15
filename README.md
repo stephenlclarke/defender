@@ -220,8 +220,8 @@ Clean rewrite modules:
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, player-motion, enemy-motion,
   projectile launch/capacity/motion systems, projectile/enemy collision
-  detection, and the `GameSimulation` trait used by the clean game and internal
-  oracle implementations.
+  detection, wave-completion evaluation, and the `GameSimulation` trait used
+  by the clean game and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
@@ -273,7 +273,9 @@ playing frames. Clean projectile snapshots carry direction-derived velocity,
 advance through `ProjectileMotionSystem`, and are culled through gameplay state
 before rendering. Clean collision boxes resolve projectile/enemy hits through
 `CollisionSystem`, remove the hit entities from world state, and award score
-before rendering. Native draw planning resolves scene sprites through
+before rendering. Enemy exhaustion is reported through `WaveSystem`, keeping
+the last-hit frame empty and spawning the next clean wave on the following
+playing frame. Native draw planning resolves scene sprites through
 renderer-owned atlas regions into sprite batches and records GPU
 instance-buffer data with native scene rectangles, normalized atlas UVs,
 normalized tint, stable upload bytes, and the `wgpu` vertex layout for the

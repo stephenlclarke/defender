@@ -5,7 +5,8 @@ use crate::{
     systems::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, PlayerControlSystem,
         PlayerMotionState, PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileMotionSystem,
-        ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity,
+        ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, WaveState, WaveStatus,
+        WaveSystem,
     },
 };
 
@@ -98,6 +99,11 @@ pub struct WorldSnapshot {
 
 impl WorldSnapshot {
     fn first_wave() -> Self {
+        Self::for_wave(1)
+    }
+
+    fn for_wave(wave: u8) -> Self {
+        let enemy_count = usize::from(wave.clamp(1, MAX_CLEAN_WAVE_ENEMIES));
         Self {
             terrain: vec![
                 TerrainSegment {
@@ -126,11 +132,7 @@ impl WorldSnapshot {
                 ScreenPosition::new(112, 56),
                 ScreenPosition::new(236, 24),
             ],
-            enemies: vec![EnemySnapshot {
-                kind: EnemyKind::Lander,
-                position: ScreenPosition::new(204, 84),
-                velocity: ScreenVelocity::new(-1, 0),
-            }],
+            enemies: CLEAN_WAVE_LANDER_SPAWNS[..enemy_count].to_vec(),
             humans: vec![
                 HumanSnapshot {
                     position: ScreenPosition::new(72, 216),
@@ -145,6 +147,30 @@ impl WorldSnapshot {
         }
     }
 }
+
+const MAX_CLEAN_WAVE_ENEMIES: u8 = 4;
+const CLEAN_WAVE_LANDER_SPAWNS: [EnemySnapshot; MAX_CLEAN_WAVE_ENEMIES as usize] = [
+    EnemySnapshot {
+        kind: EnemyKind::Lander,
+        position: ScreenPosition::new(204, 84),
+        velocity: ScreenVelocity::new(-1, 0),
+    },
+    EnemySnapshot {
+        kind: EnemyKind::Lander,
+        position: ScreenPosition::new(228, 104),
+        velocity: ScreenVelocity::new(-1, 0),
+    },
+    EnemySnapshot {
+        kind: EnemyKind::Lander,
+        position: ScreenPosition::new(184, 72),
+        velocity: ScreenVelocity::new(1, 0),
+    },
+    EnemySnapshot {
+        kind: EnemyKind::Lander,
+        position: ScreenPosition::new(148, 96),
+        velocity: ScreenVelocity::new(1, 0),
+    },
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameState {
@@ -172,6 +198,8 @@ pub enum GameEvent {
     SmartBombPressed,
     HyperspacePressed,
     EnemyDestroyed,
+    WaveCleared,
+    WaveStarted,
     BonusAwarded,
     HighScoreEntryStarted,
     HighScoreInitialAccepted,
@@ -230,6 +258,7 @@ pub struct Game {
     state: GameState,
     controls: PlayerControlSystem,
     camera_left: WorldVector,
+    pending_wave_start: bool,
 }
 
 impl Game {
@@ -238,6 +267,7 @@ impl Game {
             state: initial_state(),
             controls: PlayerControlSystem::new(),
             camera_left: WorldVector::default(),
+            pending_wave_start: false,
         }
     }
 
@@ -288,6 +318,7 @@ impl Game {
         self.state.world = WorldSnapshot::first_wave();
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
+        self.pending_wave_start = false;
     }
 
     fn step_playing(
@@ -296,6 +327,10 @@ impl Game {
         gameplay_events: &mut Vec<GameEvent>,
         sound_events: &mut Vec<SoundEvent>,
     ) {
+        if self.pending_wave_start {
+            self.start_pending_wave(gameplay_events);
+        }
+
         let controls = self.controls.step(input);
 
         if controls.triggers.reverse {
@@ -357,6 +392,7 @@ impl Game {
         }
 
         self.resolve_projectile_enemy_collisions(gameplay_events);
+        self.queue_wave_clear_if_needed(gameplay_events);
     }
 
     fn advance_projectiles(&mut self) {
@@ -396,6 +432,28 @@ impl Game {
         self.state.world.projectiles.remove(hit.projectile_index);
         self.award_enemy_score(enemy.kind);
         gameplay_events.push(GameEvent::EnemyDestroyed);
+    }
+
+    fn queue_wave_clear_if_needed(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        if matches!(
+            WaveSystem::evaluate(WaveState::new(
+                self.state.wave,
+                self.state.world.enemies.len()
+            )),
+            WaveStatus::Cleared { .. }
+        ) {
+            self.pending_wave_start = true;
+            gameplay_events.push(GameEvent::WaveCleared);
+        }
+    }
+
+    fn start_pending_wave(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        let next_wave = WaveSystem::next_wave(self.state.wave);
+
+        self.state.wave = next_wave;
+        self.state.world = WorldSnapshot::for_wave(next_wave);
+        self.pending_wave_start = false;
+        gameplay_events.push(GameEvent::WaveStarted);
     }
 
     fn award_enemy_score(&mut self, kind: EnemyKind) {
@@ -842,8 +900,12 @@ mod tests {
 
         assert!(frame.state.world.enemies.is_empty());
         assert!(frame.state.world.projectiles.is_empty());
+        assert_eq!(frame.state.wave, 1);
         assert_eq!(frame.state.scores.player_one, 150);
-        assert_eq!(frame.events.gameplay(), &[GameEvent::EnemyDestroyed]);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
+        );
         assert!(
             !frame
                 .scene
@@ -875,7 +937,55 @@ mod tests {
 
         assert_eq!(frame.state.scores.player_one, 0);
         assert_eq!(frame.state.scores.player_two, 150);
-        assert_eq!(frame.events.gameplay(), &[GameEvent::EnemyDestroyed]);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
+        );
+    }
+
+    #[test]
+    fn clean_game_wave_clear_delays_next_wave_spawn_until_following_frame() {
+        let mut game = credited_started_game();
+        game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, 83),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+
+        let cleared = game.step(GameInput::NONE);
+
+        assert_eq!(cleared.state.wave, 1);
+        assert!(cleared.state.world.enemies.is_empty());
+        assert_eq!(
+            cleared.events.gameplay(),
+            &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
+        );
+        assert!(
+            !cleared
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+        );
+
+        let next_wave = game.step(GameInput::NONE);
+
+        assert_eq!(next_wave.state.wave, 2);
+        assert_eq!(next_wave.state.world.enemies.len(), 2);
+        assert!(next_wave.state.world.projectiles.is_empty());
+        assert_eq!(next_wave.state.world.terrain.len(), 5);
+        assert_eq!(next_wave.state.world.humans.len(), 2);
+        assert_eq!(next_wave.events.gameplay(), &[GameEvent::WaveStarted]);
+        assert_eq!(
+            next_wave
+                .scene
+                .sprites
+                .iter()
+                .filter(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+                .count(),
+            2
+        );
     }
 
     #[test]

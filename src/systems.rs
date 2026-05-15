@@ -427,6 +427,50 @@ impl CollisionSystem {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WaveState {
+    pub wave: u8,
+    pub active_enemies: usize,
+}
+
+impl WaveState {
+    pub const fn new(wave: u8, active_enemies: usize) -> Self {
+        Self {
+            wave,
+            active_enemies,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WaveStatus {
+    InProgress,
+    Cleared { next_wave: u8 },
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WaveSystem;
+
+impl WaveSystem {
+    pub fn evaluate(state: WaveState) -> WaveStatus {
+        if state.active_enemies == 0 {
+            WaveStatus::Cleared {
+                next_wave: Self::next_wave(state.wave),
+            }
+        } else {
+            WaveStatus::InProgress
+        }
+    }
+
+    pub const fn next_wave(current_wave: u8) -> u8 {
+        if current_wave == 0 {
+            1
+        } else {
+            current_wave.saturating_add(1)
+        }
+    }
+}
+
 const PLAYER_MIN_SCREEN_Y: u8 = 42;
 const PLAYER_DOWN_LIMIT_SCREEN_Y: u8 = 238;
 const PLAYER_RIGHT_ANCHOR_X: u8 = 0x20;
@@ -714,8 +758,8 @@ mod tests {
         GameSimulation, PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem,
         PlayerMotionState, PlayerMotionSystem, ProjectileLaunchOutcome, ProjectileMotionSystem,
         ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl,
-        advance_one_frame, clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x,
-        thrust_acceleration,
+        WaveState, WaveStatus, WaveSystem, advance_one_frame, clamp_camera_velocity_word,
+        next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
     };
 
     #[test]
@@ -1033,6 +1077,26 @@ mod tests {
         assert_eq!(
             CollisionSystem::first_projectile_enemy_hit(&projectiles[..1], &enemies[..1]),
             None
+        );
+    }
+
+    #[test]
+    fn wave_system_reports_progress_or_next_wave() {
+        assert_eq!(
+            WaveSystem::evaluate(WaveState::new(1, 2)),
+            WaveStatus::InProgress
+        );
+        assert_eq!(
+            WaveSystem::evaluate(WaveState::new(1, 0)),
+            WaveStatus::Cleared { next_wave: 2 }
+        );
+        assert_eq!(
+            WaveSystem::evaluate(WaveState::new(0, 0)),
+            WaveStatus::Cleared { next_wave: 1 }
+        );
+        assert_eq!(
+            WaveSystem::evaluate(WaveState::new(u8::MAX, 0)),
+            WaveStatus::Cleared { next_wave: u8::MAX }
         );
     }
 

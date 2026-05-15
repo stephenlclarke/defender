@@ -137,8 +137,8 @@ pub use systems::{
     FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent,
     PlayerControlSystem, PlayerMotionFrame, PlayerMotionState, PlayerMotionSystem,
     ProjectileEnemyHit, ProjectileLaunchOutcome, ProjectileMotionFrame, ProjectileMotionSystem,
-    ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl,
-    advance_one_frame,
+    ProjectileState, ProjectileSystem, ScreenPosition, ScreenVelocity, VerticalControl, WaveState,
+    WaveStatus, WaveSystem, advance_one_frame,
 };
 
 #[cfg(test)]
