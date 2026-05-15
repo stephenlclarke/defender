@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-102` are complete. The standing maintenance guidance in
+`DC-42` through `DC-103` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4020,6 +4020,69 @@ Work log:
   `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778807950561589`
+
+### DC-103: Clean Renderer Viewport Draw Planning
+
+Status: `complete`
+
+Goal: make the clean renderer draw plan describe how native scene coordinates
+fit into a target `wgpu` surface without falling back to legacy video geometry.
+
+Scope:
+
+- Add an aspect-preserving viewport layout to the clean renderer plan.
+- Keep `NativeSceneRenderer::prepare` as the scene-sized convenience path and
+  add a target-surface preparation path for real `wgpu` surfaces.
+- Handle empty scene or target surfaces without division-by-zero or misleading
+  scale values.
+- Use the same viewport calculation for sprite-batch plans and temporary raster
+  upload plans.
+- Add focused renderer tests for centered scaling, empty surfaces, sprite
+  scenes, and raster scenes.
+- Update README/SPEC module text for viewport-aware draw planning.
+
+Acceptance criteria:
+
+- Scene draw plans record the native scene surface, target surface, centered
+  viewport rectangle, and scale.
+- Empty scene or target surfaces produce an empty viewport plan.
+- Sprite-only and raster-backed scenes use the same viewport calculation.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 02:21:12 BST` Started `DC-103`: adding clean viewport layout
+  evidence to `SceneDrawPlan` so native scene coordinates can map into a target
+  `wgpu` surface without relying on legacy video geometry.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778808084056079`
+- `2026-05-15 02:44:19 BST` Completed `DC-103`: added `ViewportLayout` to the
+  clean renderer plan, implemented target-aware preparation through
+  `NativeSceneRenderer::prepare_for_target`, kept `prepare` as the scene-sized
+  convenience path, applied the same viewport fit to sprite and temporary
+  raster plans, exported the viewport type, and refreshed README/SPEC wording.
+  Validation passed with focused renderer tests, a public API guard,
+  `cargo test --all-targets`, clippy with warnings denied, `make fidelity` (10
+  local fixtures, 15452 frames, 31/31 new executable Rust lines),
+  `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt --check`,
+  markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778809459870549`
+  Slack final validation follow-up:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778810539805979`
 
 ## Ongoing Work
 

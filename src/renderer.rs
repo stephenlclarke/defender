@@ -23,6 +23,59 @@ impl SurfaceSize {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ViewportLayout {
+    pub target: SurfaceSize,
+    pub scene: SurfaceSize,
+    pub origin: [u32; 2],
+    pub size: SurfaceSize,
+    pub scale: f32,
+}
+
+impl ViewportLayout {
+    pub fn fit(scene: SurfaceSize, target: SurfaceSize) -> Self {
+        if scene.is_empty() || target.is_empty() {
+            return Self::empty(scene, target);
+        }
+
+        let scale = (f64::from(target.width) / f64::from(scene.width))
+            .min(f64::from(target.height) / f64::from(scene.height));
+        let width = scaled_viewport_dimension(scene.width, scale, target.width);
+        let height = scaled_viewport_dimension(scene.height, scale, target.height);
+
+        Self {
+            target,
+            scene,
+            origin: [
+                target.width.saturating_sub(width) / 2,
+                target.height.saturating_sub(height) / 2,
+            ],
+            size: SurfaceSize::new(width, height),
+            scale: scale as f32,
+        }
+    }
+
+    pub const fn empty(scene: SurfaceSize, target: SurfaceSize) -> Self {
+        Self {
+            target,
+            scene,
+            origin: [0, 0],
+            size: SurfaceSize::new(0, 0),
+            scale: 0.0,
+        }
+    }
+
+    pub const fn is_empty(self) -> bool {
+        self.size.is_empty() || self.scale == 0.0
+    }
+}
+
+fn scaled_viewport_dimension(scene_extent: u32, scale: f64, target_extent: u32) -> u32 {
+    (f64::from(scene_extent) * scale)
+        .round()
+        .clamp(1.0, f64::from(target_extent)) as u32
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color {
     pub rgba: [u8; 4],
@@ -422,6 +475,7 @@ pub struct SpriteDrawBatch {
 pub struct SceneDrawPlan {
     pub frame: u64,
     pub surface: SurfaceSize,
+    pub viewport: ViewportLayout,
     pub pipelines: Vec<NativeRenderPipeline>,
     pub sprite_instances: usize,
     pub missing_sprite_regions: usize,
@@ -441,6 +495,10 @@ impl NativeSceneRenderer {
     }
 
     pub fn prepare(&self, scene: &RenderScene) -> SceneDrawPlan {
+        self.prepare_for_target(scene, scene.surface)
+    }
+
+    pub fn prepare_for_target(&self, scene: &RenderScene, target: SurfaceSize) -> SceneDrawPlan {
         let mut requested = BTreeSet::new();
         if scene.raster.is_some() {
             requested.insert(NativeRenderPipeline::TemporaryRaster);
@@ -479,6 +537,7 @@ impl NativeSceneRenderer {
         SceneDrawPlan {
             frame: scene.frame,
             surface: scene.surface,
+            viewport: ViewportLayout::fit(scene.surface, target),
             pipelines,
             sprite_instances,
             missing_sprite_regions,
@@ -549,7 +608,7 @@ mod tests {
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
         NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneRaster,
         SceneRasterError, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId, SurfaceSize,
-        TextureAtlas,
+        TextureAtlas, ViewportLayout,
     };
 
     #[test]
@@ -557,6 +616,72 @@ mod tests {
         assert!(SurfaceSize::new(0, 240).is_empty());
         assert!(SurfaceSize::new(320, 0).is_empty());
         assert!(!SurfaceSize::new(320, 240).is_empty());
+    }
+
+    #[test]
+    fn viewport_layout_preserves_scene_aspect_and_centers() {
+        let scene = SurfaceSize::new(292, 240);
+
+        assert_eq!(
+            ViewportLayout::fit(scene, SurfaceSize::new(640, 480)),
+            ViewportLayout {
+                scene,
+                target: SurfaceSize::new(640, 480),
+                origin: [28, 0],
+                size: SurfaceSize::new(584, 480),
+                scale: 2.0,
+            }
+        );
+        assert_eq!(
+            ViewportLayout::fit(scene, SurfaceSize::new(800, 600)),
+            ViewportLayout {
+                scene,
+                target: SurfaceSize::new(800, 600),
+                origin: [35, 0],
+                size: SurfaceSize::new(730, 600),
+                scale: 2.5,
+            }
+        );
+        assert_eq!(
+            ViewportLayout::fit(scene, SurfaceSize::new(320, 240)),
+            ViewportLayout {
+                scene,
+                target: SurfaceSize::new(320, 240),
+                origin: [14, 0],
+                size: SurfaceSize::new(292, 240),
+                scale: 1.0,
+            }
+        );
+    }
+
+    #[test]
+    fn viewport_layout_reports_empty_scene_or_target() {
+        let empty_target =
+            ViewportLayout::fit(SurfaceSize::new(292, 240), SurfaceSize::new(0, 480));
+        let empty_scene = ViewportLayout::fit(SurfaceSize::new(0, 240), SurfaceSize::new(640, 480));
+
+        assert_eq!(
+            empty_target,
+            ViewportLayout {
+                scene: SurfaceSize::new(292, 240),
+                target: SurfaceSize::new(0, 480),
+                origin: [0, 0],
+                size: SurfaceSize::new(0, 0),
+                scale: 0.0,
+            }
+        );
+        assert!(empty_target.is_empty());
+        assert_eq!(
+            empty_scene,
+            ViewportLayout {
+                scene: SurfaceSize::new(0, 240),
+                target: SurfaceSize::new(640, 480),
+                origin: [0, 0],
+                size: SurfaceSize::new(0, 0),
+                scale: 0.0,
+            }
+        );
+        assert!(empty_scene.is_empty());
     }
 
     #[test]
@@ -771,6 +896,16 @@ mod tests {
         let plan = NativeSceneRenderer::default().prepare(&scene);
 
         assert_eq!(plan.frame, 34);
+        assert_eq!(
+            plan.viewport,
+            ViewportLayout {
+                scene: SurfaceSize::new(292, 240),
+                target: SurfaceSize::new(292, 240),
+                origin: [0, 0],
+                size: SurfaceSize::new(292, 240),
+                scale: 1.0,
+            }
+        );
         assert_eq!(plan.sprite_instances, 2);
         assert_eq!(plan.missing_sprite_regions, 0);
         assert_eq!(
@@ -916,6 +1051,49 @@ mod tests {
         assert_eq!(plan.sprite_batches[0].instances[0].atlas_origin, [0, 48]);
         assert_eq!(plan.sprite_batches[0].instances[0].atlas_size, [8, 2]);
         assert_eq!(plan.sprite_batches[0].instances[1].position, [10.0, 4.0]);
+    }
+
+    #[test]
+    fn native_scene_renderer_uses_target_viewport_for_sprite_and_raster_plans() {
+        let mut sprite_scene = RenderScene::empty(83, SurfaceSize::new(292, 240));
+        sprite_scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_SHIP,
+            layer: RenderLayer::Objects,
+            position: [128.0, 96.0],
+            size: [16.0, 8.0],
+            tint: Color::WHITE,
+        });
+        let mut pixels = vec![0; 292 * 240 * 4];
+        pixels[0] = 1;
+        pixels[3] = 255;
+        let raster_scene =
+            RenderScene::from_rgba(84, SurfaceSize::new(292, 240), pixels, Some(0xCAFE_BABE))
+                .expect("raster scene");
+        let target = SurfaceSize::new(640, 480);
+        let expected = ViewportLayout {
+            scene: SurfaceSize::new(292, 240),
+            target,
+            origin: [28, 0],
+            size: SurfaceSize::new(584, 480),
+            scale: 2.0,
+        };
+        let renderer = NativeSceneRenderer::default();
+
+        let sprite_plan = renderer.prepare_for_target(&sprite_scene, target);
+        let raster_plan = renderer.prepare_for_target(&raster_scene, target);
+
+        assert_eq!(sprite_plan.viewport, expected);
+        assert_eq!(raster_plan.viewport, expected);
+        assert_eq!(sprite_plan.sprite_instances, 1);
+        assert_eq!(
+            raster_plan.raster_upload,
+            Some(super::SceneRasterUpload {
+                surface: SurfaceSize::new(292, 240),
+                byte_len: 292 * 240 * 4,
+                visual_signature: Some(0xCAFE_BABE),
+                non_blank: true,
+            })
+        );
     }
 
     #[test]

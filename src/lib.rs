@@ -119,7 +119,7 @@ pub use renderer::{
     NativeRendererResources, NativeSceneRenderer, PaletteResource, RenderLayer, RenderLayerCounts,
     RenderScene, RenderSceneSummary, SceneDrawPlan, SceneRaster, SceneRasterError,
     SceneRasterUpload, SceneSprite, SpriteDrawBatch, SpriteDrawInstance, SpriteId, SurfaceSize,
-    TextureAtlas,
+    TextureAtlas, ViewportLayout,
 };
 pub use systems::{
     FixedStepAccumulator, FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame,
