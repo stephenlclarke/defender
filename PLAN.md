@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-115` are complete. The standing maintenance guidance in
+`DC-42` through `DC-116` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4867,6 +4867,78 @@ Work log:
   frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778831347938799`
+
+### DC-116: Clean Sprite Render Pipeline Descriptor Planning
+
+Status: `complete`
+
+Goal: connect the clean sprite pipeline, layout, shader, and target state into
+descriptor-ready metadata for `wgpu` render pipeline creation without
+presenter-side classification.
+
+Scope:
+
+- Add sprite render pipeline descriptor metadata that names the shader entries,
+  layout, vertex buffers, primitive state, color target, and multisample state.
+- Preserve the ordered sprite pipeline layout and `wgpu` immediate-size value in
+  the descriptor plan.
+- Wire optional descriptor plans into `SceneDrawPlan` only when the sprite render
+  pass, sprite pipeline, sprite resource bindings, sprite pipeline layout, and
+  nonempty viewport are all present.
+- Keep raster-only scenes, missing atlas regions, empty atlas surfaces, invalid
+  atlas pixel data, unavailable sprite pipelines, empty command lists, and empty
+  targets outside sprite render pipeline descriptor planning.
+- Add focused renderer tests for descriptor-ready metadata, layout/pipeline
+  alignment, custom target settings, and absent paths.
+- Update README/SPEC module text for sprite render pipeline descriptor planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes sprite render pipeline descriptor metadata only for
+  drawable clean sprite plans.
+- Descriptor metadata matches the WGSL shader entries, layout label, ordered
+  bind group count, vertex-buffer count, color target format, and primitive
+  state used by the sprite pipeline.
+- Raster-only scenes and invalid sprite paths do not produce sprite render
+  pipeline descriptor plans.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 08:52:00 BST` Started `DC-116`: adding descriptor-ready sprite
+  render pipeline metadata that combines shader entries, ordered pipeline
+  layout slots, vertex buffers, primitive state, color target, and multisample
+  state, with focused renderer tests and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778831518959189`
+- `2026-05-15 09:14:57 BST` Completed `DC-116`: added descriptor-ready sprite
+  render pipeline metadata that combines shader entries, ordered pipeline
+  layout slots, vertex buffers, primitive state, color target, and multisample
+  state; wired optional descriptor plans into `SceneDrawPlan` only when sprite
+  render pass, sprite pipeline, sprite resource bindings, sprite pipeline
+  layout, and a nonempty viewport are present; and kept raster-only, invalid
+  sprite-resource, empty-command, unavailable-pipeline, and empty-target paths
+  outside descriptor planning. Verified with focused renderer tests (45/45),
+  public API guard (1/1), `cargo test --all-targets` (1166 library tests, 2
+  binary tests, 2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, 31/31 non-baselined added
+  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
+  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778832895406269`
 
 ## Ongoing Work
 

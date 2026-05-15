@@ -1500,6 +1500,51 @@ impl SpritePipelineLayoutPlan {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpriteRenderPipelineDescriptorPlan {
+    pub label: &'static str,
+    pub layout_label: &'static str,
+    pub layout_bind_group_count: usize,
+    pub immediate_size: u32,
+    pub shader_label: &'static str,
+    pub vertex_entry: &'static str,
+    pub fragment_entry: &'static str,
+    pub vertex_buffers: [SpriteVertexBufferLayoutPlan; 2],
+    pub primitive: wgpu::PrimitiveState,
+    pub color_target: wgpu::ColorTargetState,
+    pub multisample: wgpu::MultisampleState,
+}
+
+impl SpriteRenderPipelineDescriptorPlan {
+    fn from_pipeline_and_layout(
+        pipeline: &SpritePipelinePlan,
+        layout: &SpritePipelineLayoutPlan,
+    ) -> Self {
+        Self {
+            label: pipeline.label,
+            layout_label: layout.label,
+            layout_bind_group_count: layout.bind_group_count(),
+            immediate_size: layout.immediate_size,
+            shader_label: pipeline.shader.label,
+            vertex_entry: pipeline.shader.vertex_entry,
+            fragment_entry: pipeline.shader.fragment_entry,
+            vertex_buffers: pipeline.vertex_buffers,
+            primitive: pipeline.primitive,
+            color_target: pipeline.color_target.clone(),
+            multisample: pipeline.multisample,
+        }
+    }
+
+    pub fn vertex_buffer_layouts(&self) -> [wgpu::VertexBufferLayout<'static>; 2] {
+        self.vertex_buffers
+            .map(|buffer| buffer.vertex_buffer_layout())
+    }
+
+    pub fn color_targets(&self) -> [Option<wgpu::ColorTargetState>; 1] {
+        [Some(self.color_target.clone())]
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteDrawCommand {
     pub pipeline: NativeRenderPipeline,
@@ -1584,6 +1629,7 @@ pub struct SceneDrawPlan {
     pub sprite_pipeline: Option<SpritePipelinePlan>,
     pub sprite_resource_bindings: Option<SpriteResourceBindingPlan>,
     pub sprite_pipeline_layout: Option<SpritePipelineLayoutPlan>,
+    pub sprite_render_pipeline_descriptor: Option<SpriteRenderPipelineDescriptorPlan>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
 }
@@ -1690,6 +1736,18 @@ impl NativeSceneRenderer {
             }
             _ => None,
         };
+        let sprite_render_pipeline_descriptor = match (
+            sprite_render_pass.as_ref(),
+            sprite_pipeline.as_ref(),
+            sprite_resource_bindings.as_ref(),
+            sprite_pipeline_layout.as_ref(),
+            gpu_pass.viewport,
+        ) {
+            (Some(_), Some(pipeline), Some(_), Some(layout), Some(_)) => {
+                Some(SpriteRenderPipelineDescriptorPlan::from_pipeline_and_layout(pipeline, layout))
+            }
+            _ => None,
+        };
 
         SceneDrawPlan {
             frame: scene.frame,
@@ -1708,6 +1766,7 @@ impl NativeSceneRenderer {
             sprite_pipeline,
             sprite_resource_bindings,
             sprite_pipeline_layout,
+            sprite_render_pipeline_descriptor,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
@@ -1780,10 +1839,10 @@ mod tests {
         SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload,
         SpritePipelineLayoutBindGroup, SpritePipelineLayoutPlan, SpritePipelinePlan,
         SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassPlan,
-        SpriteResourceBindingPlan, SpriteResourceBindingRole, SpriteSamplerBindingPlan,
-        SpriteShaderPlan, SpriteTextureBindingPlan, SpriteVertexBufferBinding,
-        SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan,
-        WgpuViewportCommand,
+        SpriteRenderPipelineDescriptorPlan, SpriteResourceBindingPlan, SpriteResourceBindingRole,
+        SpriteSamplerBindingPlan, SpriteShaderPlan, SpriteTextureBindingPlan,
+        SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas,
+        ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -2555,6 +2614,44 @@ mod tests {
     }
 
     #[test]
+    fn sprite_render_pipeline_descriptor_plan_combines_pipeline_and_layout() {
+        let settings = GpuRendererSettings {
+            texture_format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            ..GpuRendererSettings::default()
+        };
+        let pipeline = SpritePipelinePlan::for_settings(settings);
+        let projection =
+            SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240)).expect("projection");
+        let atlas = TextureAtlas::default_sprites();
+        let bindings = SpriteResourceBindingPlan::from_projection_and_atlas(projection, &atlas)
+            .expect("sprite resource binding plan");
+        let layout = SpritePipelineLayoutPlan::from_resource_bindings(&bindings);
+
+        let descriptor =
+            SpriteRenderPipelineDescriptorPlan::from_pipeline_and_layout(&pipeline, &layout);
+
+        assert_eq!(descriptor.label, "defender.sprite.pipeline");
+        assert_eq!(descriptor.layout_label, "defender.sprite.pipeline_layout");
+        assert_eq!(descriptor.layout_bind_group_count, 2);
+        assert_eq!(descriptor.immediate_size, 0);
+        assert_eq!(descriptor.shader_label, "defender.sprite.shader");
+        assert_eq!(descriptor.vertex_entry, "sprite_vs");
+        assert_eq!(descriptor.fragment_entry, "sprite_fs");
+        assert_eq!(descriptor.vertex_buffers, pipeline.vertex_buffers);
+        assert_eq!(descriptor.primitive, pipeline.primitive);
+        assert_eq!(descriptor.color_target, pipeline.color_target);
+        assert_eq!(descriptor.multisample, pipeline.multisample);
+        assert_eq!(
+            descriptor.vertex_buffer_layouts(),
+            pipeline.vertex_buffer_layouts()
+        );
+        assert_eq!(
+            descriptor.color_targets(),
+            [Some(pipeline.color_target.clone())]
+        );
+    }
+
+    #[test]
     fn sprite_shader_bindings_match_resource_binding_plan() {
         let shader = SpriteShaderPlan::default();
         let projection =
@@ -2789,6 +2886,23 @@ mod tests {
         }
     }
 
+    fn expected_sprite_render_pipeline_descriptor(
+        plan: &SceneDrawPlan,
+    ) -> Option<SpriteRenderPipelineDescriptorPlan> {
+        match (
+            plan.sprite_render_pass.as_ref(),
+            plan.sprite_pipeline.as_ref(),
+            plan.sprite_resource_bindings.as_ref(),
+            plan.sprite_pipeline_layout.as_ref(),
+            plan.gpu_pass.viewport,
+        ) {
+            (Some(_), Some(pipeline), Some(_), Some(layout), Some(_)) => {
+                Some(SpriteRenderPipelineDescriptorPlan::from_pipeline_and_layout(pipeline, layout))
+            }
+            _ => None,
+        }
+    }
+
     #[test]
     fn render_scene_collects_sprites_in_order() {
         let mut scene = RenderScene::empty(7, SurfaceSize::new(320, 240));
@@ -2984,6 +3098,10 @@ mod tests {
             expected_sprite_pipeline_layout(&plan)
         );
         assert_eq!(
+            plan.sprite_render_pipeline_descriptor,
+            expected_sprite_render_pipeline_descriptor(&plan)
+        );
+        assert_eq!(
             plan.sprite_pipeline_layout
                 .as_ref()
                 .map(SpritePipelineLayoutPlan::bind_group_count),
@@ -2993,6 +3111,12 @@ mod tests {
             plan.sprite_pipeline
                 .as_ref()
                 .map(|pipeline| pipeline.color_target.format),
+            Some(wgpu::TextureFormat::Bgra8UnormSrgb)
+        );
+        assert_eq!(
+            plan.sprite_render_pipeline_descriptor
+                .as_ref()
+                .map(|descriptor| descriptor.color_target.format),
             Some(wgpu::TextureFormat::Bgra8UnormSrgb)
         );
     }
@@ -3211,6 +3335,16 @@ mod tests {
             plan.sprite_pipeline_layout,
             expected_sprite_pipeline_layout(&plan)
         );
+        assert_eq!(
+            plan.sprite_render_pipeline_descriptor,
+            expected_sprite_render_pipeline_descriptor(&plan)
+        );
+        assert_eq!(
+            plan.sprite_render_pipeline_descriptor
+                .as_ref()
+                .map(|descriptor| descriptor.vertex_buffer_layouts().len()),
+            Some(2)
+        );
         assert_eq!(plan.raster_upload, None);
     }
 
@@ -3239,6 +3373,7 @@ mod tests {
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
+        assert_eq!(plan.sprite_render_pipeline_descriptor, None);
     }
 
     #[test]
@@ -3270,6 +3405,7 @@ mod tests {
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
+        assert_eq!(plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -3336,6 +3472,7 @@ mod tests {
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
+        assert_eq!(plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -3412,6 +3549,10 @@ mod tests {
             plan.sprite_pipeline_layout,
             expected_sprite_pipeline_layout(&plan)
         );
+        assert_eq!(
+            plan.sprite_render_pipeline_descriptor,
+            expected_sprite_render_pipeline_descriptor(&plan)
+        );
     }
 
     #[test]
@@ -3451,6 +3592,7 @@ mod tests {
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
+        assert_eq!(plan.sprite_render_pipeline_descriptor, None);
     }
 
     #[test]
@@ -3537,6 +3679,10 @@ mod tests {
             expected_sprite_pipeline_layout(&sprite_plan)
         );
         assert_eq!(
+            sprite_plan.sprite_render_pipeline_descriptor,
+            expected_sprite_render_pipeline_descriptor(&sprite_plan)
+        );
+        assert_eq!(
             raster_plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
@@ -3550,6 +3696,7 @@ mod tests {
         assert_eq!(raster_plan.sprite_pipeline, None);
         assert_eq!(raster_plan.sprite_resource_bindings, None);
         assert_eq!(raster_plan.sprite_pipeline_layout, None);
+        assert_eq!(raster_plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(
             raster_plan.raster_upload,
             Some(super::SceneRasterUpload {
@@ -3574,6 +3721,7 @@ mod tests {
         assert_eq!(plan.sprite_pipeline, None);
         assert_eq!(plan.sprite_resource_bindings, None);
         assert_eq!(plan.sprite_pipeline_layout, None);
+        assert_eq!(plan.sprite_render_pipeline_descriptor, None);
         assert_eq!(
             plan.gpu_pass.scene_projection,
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240))
@@ -3606,6 +3754,7 @@ mod tests {
             expected_sprite_resource_bindings(&plan)
         );
         assert_eq!(plan.sprite_pipeline_layout, None);
+        assert_eq!(plan.sprite_render_pipeline_descriptor, None);
     }
 
     #[test]
@@ -3687,6 +3836,10 @@ mod tests {
         assert_eq!(
             plan.sprite_pipeline_layout,
             expected_sprite_pipeline_layout(&plan)
+        );
+        assert_eq!(
+            plan.sprite_render_pipeline_descriptor,
+            expected_sprite_render_pipeline_descriptor(&plan)
         );
     }
 }
