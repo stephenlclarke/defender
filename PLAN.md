@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-105` are complete. The standing maintenance guidance in
+`DC-42` through `DC-106` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4206,6 +4206,67 @@ Work log:
   --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778813618499279`
+
+### DC-106: Clean Sprite Instance GPU ABI
+
+Status: `complete`
+
+Goal: make clean sprite instance-buffer records directly usable as a stable
+`wgpu` instance vertex buffer, so native rendering can upload and bind sprite
+instance data without ad hoc conversion at the presenter boundary.
+
+Scope:
+
+- Give `SpriteInstanceBufferRecord` a stable GPU byte layout.
+- Expose byte stride and `wgpu` vertex attributes for scene origin, scene size,
+  atlas UV origin, atlas UV size, and tint.
+- Expose upload-ready bytes from `SpriteInstanceBuffer`.
+- Keep logical sprite batches and temporary raster upload separate from the GPU
+  instance ABI.
+- Add focused renderer tests for byte layout, vertex attributes, and upload
+  bytes.
+- Update README/SPEC module text for the sprite instance GPU ABI.
+
+Acceptance criteria:
+
+- Sprite instance records can be safely cast to upload bytes.
+- The renderer owns the instance-buffer vertex layout used by future `wgpu`
+  sprite pipelines.
+- Raster-only scenes still do not expose sprite instance upload bytes.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 03:56:02 BST` Started `DC-106`: adding a stable GPU ABI for
+  clean sprite instance buffers, including byte layout, `wgpu` vertex
+  attributes, upload bytes, focused renderer tests, and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778813773647089`
+- `2026-05-15 04:17:47 BST` Completed `DC-106`: made
+  `SpriteInstanceBufferRecord` a stable `repr(C)` bytemuck-safe GPU record,
+  exposed its `wgpu` instance vertex-buffer layout, added upload-ready bytes
+  for `SpriteInstanceBuffer`, kept raster-only scenes outside the sprite upload
+  path, and documented the clean sprite instance GPU ABI in README/SPEC.
+  Validation passed with focused renderer tests, the public API guard,
+  `cargo test --all-targets` (1148 library tests plus binary/example tests),
+  clippy with warnings denied, `make fidelity` (10 local fixtures, 15452
+  frames, 9/9 new executable Rust lines), `cargo run -- --live-smoke` (240
+  rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778815079514559`
 
 ## Ongoing Work
 

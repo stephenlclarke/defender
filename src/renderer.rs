@@ -552,7 +552,8 @@ impl SpriteDrawInstance {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SpriteInstanceBufferRecord {
     pub scene_origin: [f32; 2],
     pub scene_size: [f32; 2],
@@ -562,6 +563,16 @@ pub struct SpriteInstanceBufferRecord {
 }
 
 impl SpriteInstanceBufferRecord {
+    pub const FLOAT_COMPONENTS: usize = 12;
+    pub const BYTE_SIZE: wgpu::BufferAddress = std::mem::size_of::<Self>() as wgpu::BufferAddress;
+    pub const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
+        0 => Float32x2,
+        1 => Float32x2,
+        2 => Float32x2,
+        3 => Float32x2,
+        4 => Float32x4,
+    ];
+
     pub fn from_instance(instance: SpriteDrawInstance, atlas_surface: SurfaceSize) -> Option<Self> {
         if atlas_surface.is_empty() {
             return None;
@@ -580,6 +591,18 @@ impl SpriteInstanceBufferRecord {
             ],
             tint: instance.tint.to_normalized_rgba(),
         })
+    }
+
+    pub const fn vertex_buffer_layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: Self::BYTE_SIZE,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &Self::VERTEX_ATTRIBUTES,
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        bytemuck::bytes_of(self)
     }
 }
 
@@ -617,6 +640,10 @@ impl SpriteInstanceBuffer {
             layer: batch.layer,
             records,
         })
+    }
+
+    pub fn upload_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.records)
     }
 }
 
@@ -906,6 +933,94 @@ mod tests {
                 SurfaceSize::new(0, 64),
             ),
             None
+        );
+    }
+
+    #[test]
+    fn sprite_instance_buffer_record_declares_stable_gpu_layout() {
+        let layout = SpriteInstanceBufferRecord::vertex_buffer_layout();
+        let expected_attributes = [
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x2,
+                offset: 0,
+                shader_location: 0,
+            },
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x2,
+                offset: 8,
+                shader_location: 1,
+            },
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x2,
+                offset: 16,
+                shader_location: 2,
+            },
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x2,
+                offset: 24,
+                shader_location: 3,
+            },
+            wgpu::VertexAttribute {
+                format: wgpu::VertexFormat::Float32x4,
+                offset: 32,
+                shader_location: 4,
+            },
+        ];
+
+        assert_eq!(SpriteInstanceBufferRecord::FLOAT_COMPONENTS, 12);
+        assert_eq!(SpriteInstanceBufferRecord::BYTE_SIZE, 48);
+        assert_eq!(std::mem::size_of::<SpriteInstanceBufferRecord>(), 48);
+        assert_eq!(
+            std::mem::align_of::<SpriteInstanceBufferRecord>(),
+            std::mem::align_of::<f32>()
+        );
+        assert_eq!(layout.array_stride, 48);
+        assert_eq!(layout.step_mode, wgpu::VertexStepMode::Instance);
+        assert_eq!(layout.attributes, expected_attributes);
+    }
+
+    #[test]
+    fn sprite_instance_buffer_exposes_upload_bytes_without_repacking() {
+        let records = vec![
+            SpriteInstanceBufferRecord {
+                scene_origin: [1.0, 2.0],
+                scene_size: [3.0, 4.0],
+                atlas_uv_origin: [0.125, 0.25],
+                atlas_uv_size: [0.5, 0.75],
+                tint: [1.0, 0.5, 0.25, 0.125],
+            },
+            SpriteInstanceBufferRecord {
+                scene_origin: [5.0, 6.0],
+                scene_size: [7.0, 8.0],
+                atlas_uv_origin: [0.0, 0.5],
+                atlas_uv_size: [0.25, 0.125],
+                tint: [0.25, 0.5, 0.75, 1.0],
+            },
+        ];
+        let buffer = SpriteInstanceBuffer {
+            pipeline: NativeRenderPipeline::Sprites,
+            layer: RenderLayer::Objects,
+            records,
+        };
+
+        assert_eq!(
+            buffer.upload_bytes().len(),
+            buffer.records.len() * SpriteInstanceBufferRecord::BYTE_SIZE as usize
+        );
+        assert_eq!(
+            buffer.upload_bytes(),
+            bytemuck::cast_slice::<SpriteInstanceBufferRecord, u8>(&buffer.records)
+        );
+        assert_eq!(
+            buffer.records[0].as_bytes(),
+            &buffer.upload_bytes()[..SpriteInstanceBufferRecord::BYTE_SIZE as usize]
+        );
+        assert_eq!(
+            bytemuck::cast_slice::<SpriteInstanceBufferRecord, f32>(&buffer.records),
+            &[
+                1.0, 2.0, 3.0, 4.0, 0.125, 0.25, 0.5, 0.75, 1.0, 0.5, 0.25, 0.125, 5.0, 6.0, 7.0,
+                8.0, 0.0, 0.5, 0.25, 0.125, 0.25, 0.5, 0.75, 1.0,
+            ]
         );
     }
 

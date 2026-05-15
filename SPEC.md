@@ -71,8 +71,9 @@ tree:
   and internal oracle implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
-  sprite batches, sprite instance buffers, viewport layout, GPU pass planning,
-  scene summaries, render signatures, and draw planning.
+  sprite batches, sprite instance buffers, the sprite instance GPU ABI,
+  viewport layout, GPU pass planning, scene summaries, render signatures, and
+  draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -115,8 +116,9 @@ module exports. Machine process/state contracts remain crate-private oracle
 wiring. Live presentation receives clean `RenderScene` data. Native draw
 planning resolves scene sprites through renderer-owned atlas regions into
 sprite batches and records GPU instance-buffer data with native scene
-rectangles, normalized atlas UVs, and normalized tint. It also records the
-centered viewport layout plus GPU-ready clear color, viewport command, and
+rectangles, normalized atlas UVs, normalized tint, stable upload bytes, and the
+`wgpu` vertex layout for the instance buffer. It also records the centered
+viewport layout plus GPU-ready clear color, viewport command, and
 scene-projection constants for the target surface, while the current live path
 still carries a temporary raster payload for visual equivalence. Kitty graphics
 and terminal-session code remain parked there as historical compatibility
