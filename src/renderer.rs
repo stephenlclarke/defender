@@ -828,6 +828,122 @@ impl SpriteBufferUploadPlan {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpriteVertexBufferBinding {
+    pub role: SpriteBufferRole,
+    pub slot: u32,
+    pub byte_offset: wgpu::BufferAddress,
+    pub byte_len: wgpu::BufferAddress,
+}
+
+impl SpriteVertexBufferBinding {
+    pub const QUAD_VERTEX_SLOT: u32 = 0;
+    pub const INSTANCE_SLOT: u32 = 1;
+
+    fn quad_vertices(upload: &SpriteBufferUpload) -> Self {
+        Self {
+            role: upload.role,
+            slot: Self::QUAD_VERTEX_SLOT,
+            byte_offset: 0,
+            byte_len: upload.byte_len,
+        }
+    }
+
+    fn instances(upload: &SpriteBufferUpload) -> Self {
+        Self {
+            role: upload.role,
+            slot: Self::INSTANCE_SLOT,
+            byte_offset: 0,
+            byte_len: upload.byte_len,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpriteIndexBufferBinding {
+    pub role: SpriteBufferRole,
+    pub index_format: wgpu::IndexFormat,
+    pub byte_offset: wgpu::BufferAddress,
+    pub byte_len: wgpu::BufferAddress,
+}
+
+impl SpriteIndexBufferBinding {
+    fn quad_indices(upload: &SpriteBufferUpload) -> Self {
+        Self {
+            role: upload.role,
+            index_format: SpriteQuadGeometry::INDEX_FORMAT,
+            byte_offset: 0,
+            byte_len: upload.byte_len,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpriteRenderPassDraw {
+    pub pipeline: NativeRenderPipeline,
+    pub layer: RenderLayer,
+    pub indices: std::ops::Range<u32>,
+    pub base_vertex: i32,
+    pub instances: std::ops::Range<u32>,
+    pub instance_buffer_byte_offset: wgpu::BufferAddress,
+    pub instance_buffer_byte_len: wgpu::BufferAddress,
+}
+
+impl SpriteRenderPassDraw {
+    fn from_command(command: SpriteDrawCommand) -> Self {
+        Self {
+            pipeline: command.pipeline,
+            layer: command.layer,
+            indices: command.first_index..command.first_index + command.index_count,
+            base_vertex: command.base_vertex,
+            instances: command.first_instance..command.first_instance + command.instance_count,
+            instance_buffer_byte_offset: command.instance_buffer_byte_offset,
+            instance_buffer_byte_len: command.instance_buffer_byte_len,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpriteRenderPassPlan {
+    pub quad_vertices: SpriteVertexBufferBinding,
+    pub instances: SpriteVertexBufferBinding,
+    pub indices: SpriteIndexBufferBinding,
+    pub draws: Vec<SpriteRenderPassDraw>,
+}
+
+impl SpriteRenderPassPlan {
+    fn from_uploads_and_commands(
+        uploads: &SpriteBufferUploadPlan,
+        commands: &[SpriteDrawCommand],
+    ) -> Option<Self> {
+        if commands.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            quad_vertices: SpriteVertexBufferBinding::quad_vertices(&uploads.quad_vertices),
+            instances: SpriteVertexBufferBinding::instances(&uploads.instances),
+            indices: SpriteIndexBufferBinding::quad_indices(&uploads.quad_indices),
+            draws: commands
+                .iter()
+                .copied()
+                .map(SpriteRenderPassDraw::from_command)
+                .collect(),
+        })
+    }
+
+    pub fn draw_count(&self) -> usize {
+        self.draws.len()
+    }
+
+    pub fn instance_count(&self) -> u32 {
+        self.draws
+            .iter()
+            .map(|draw| draw.instances.end - draw.instances.start)
+            .sum()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpriteDrawCommand {
     pub pipeline: NativeRenderPipeline,
     pub layer: RenderLayer,
@@ -907,6 +1023,7 @@ pub struct SceneDrawPlan {
     pub sprite_instance_upload: Option<SpriteInstanceUpload>,
     pub sprite_buffer_uploads: Option<SpriteBufferUploadPlan>,
     pub sprite_draw_commands: Vec<SpriteDrawCommand>,
+    pub sprite_render_pass: Option<SpriteRenderPassPlan>,
     pub layer_counts: RenderLayerCounts,
     pub raster_upload: Option<SceneRasterUpload>,
 }
@@ -973,6 +1090,9 @@ impl NativeSceneRenderer {
             .map(SpriteBufferUploadPlan::from_instance_upload);
         let sprite_draw_commands =
             sprite_draw_commands_from_instance_buffers(&sprite_instance_buffers);
+        let sprite_render_pass = sprite_buffer_uploads.as_ref().and_then(|uploads| {
+            SpriteRenderPassPlan::from_uploads_and_commands(uploads, &sprite_draw_commands)
+        });
         let viewport = ViewportLayout::fit(scene.surface, target);
 
         SceneDrawPlan {
@@ -988,6 +1108,7 @@ impl NativeSceneRenderer {
             sprite_instance_upload,
             sprite_buffer_uploads,
             sprite_draw_commands,
+            sprite_render_pass,
             layer_counts,
             raster_upload: scene.raster.as_ref().map(|raster| SceneRasterUpload {
                 surface: raster.surface,
@@ -1052,12 +1173,13 @@ impl Default for GpuRendererSettings {
 mod tests {
     use super::{
         AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
-        NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneProjectionUniforms,
-        SceneRaster, SceneRasterError, SceneSprite, SpriteBufferRole, SpriteBufferUpload,
-        SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId,
-        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload, SpriteQuadGeometry,
-        SpriteQuadVertex, SurfaceSize, TextureAtlas, ViewportLayout, WgpuPassPlan,
-        WgpuViewportCommand,
+        NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneDrawPlan,
+        SceneProjectionUniforms, SceneRaster, SceneRasterError, SceneSprite, SpriteBufferRole,
+        SpriteBufferUpload, SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand,
+        SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding, SpriteInstanceBuffer,
+        SpriteInstanceBufferRecord, SpriteInstanceUpload, SpriteQuadGeometry, SpriteQuadVertex,
+        SpriteRenderPassDraw, SpriteRenderPassPlan, SpriteVertexBufferBinding, SurfaceSize,
+        TextureAtlas, ViewportLayout, WgpuPassPlan, WgpuViewportCommand,
     };
 
     #[test]
@@ -1461,6 +1583,77 @@ mod tests {
     }
 
     #[test]
+    fn sprite_render_pass_plan_describes_bindings_and_indexed_draws() {
+        let buffers = vec![
+            test_sprite_instance_buffer(NativeRenderPipeline::Sprites, RenderLayer::Objects, 2),
+            test_sprite_instance_buffer(NativeRenderPipeline::HudText, RenderLayer::Hud, 1),
+        ];
+        let upload = SpriteInstanceUpload::from_instance_buffers(&buffers).expect("upload");
+        let uploads = SpriteBufferUploadPlan::from_instance_upload(&upload);
+        let commands = super::sprite_draw_commands_from_instance_buffers(&buffers);
+
+        let plan = SpriteRenderPassPlan::from_uploads_and_commands(&uploads, &commands)
+            .expect("sprite render pass plan");
+
+        assert_eq!(
+            plan.quad_vertices,
+            SpriteVertexBufferBinding {
+                role: SpriteBufferRole::QuadVertices,
+                slot: SpriteVertexBufferBinding::QUAD_VERTEX_SLOT,
+                byte_offset: 0,
+                byte_len: uploads.quad_vertices.byte_len,
+            }
+        );
+        assert_eq!(
+            plan.instances,
+            SpriteVertexBufferBinding {
+                role: SpriteBufferRole::Instances,
+                slot: SpriteVertexBufferBinding::INSTANCE_SLOT,
+                byte_offset: 0,
+                byte_len: uploads.instances.byte_len,
+            }
+        );
+        assert_eq!(
+            plan.indices,
+            SpriteIndexBufferBinding {
+                role: SpriteBufferRole::QuadIndices,
+                index_format: wgpu::IndexFormat::Uint16,
+                byte_offset: 0,
+                byte_len: uploads.quad_indices.byte_len,
+            }
+        );
+        assert_eq!(plan.draw_count(), 2);
+        assert_eq!(plan.instance_count(), 3);
+        assert_eq!(
+            plan.draws,
+            vec![
+                SpriteRenderPassDraw {
+                    pipeline: NativeRenderPipeline::Sprites,
+                    layer: RenderLayer::Objects,
+                    indices: 0..SpriteQuadGeometry::INDEX_COUNT,
+                    base_vertex: 0,
+                    instances: 0..2,
+                    instance_buffer_byte_offset: 0,
+                    instance_buffer_byte_len: 2 * SpriteInstanceBufferRecord::BYTE_SIZE,
+                },
+                SpriteRenderPassDraw {
+                    pipeline: NativeRenderPipeline::HudText,
+                    layer: RenderLayer::Hud,
+                    indices: 0..SpriteQuadGeometry::INDEX_COUNT,
+                    base_vertex: 0,
+                    instances: 2..3,
+                    instance_buffer_byte_offset: 2 * SpriteInstanceBufferRecord::BYTE_SIZE,
+                    instance_buffer_byte_len: SpriteInstanceBufferRecord::BYTE_SIZE,
+                },
+            ]
+        );
+        assert_eq!(
+            SpriteRenderPassPlan::from_uploads_and_commands(&uploads, &[]),
+            None
+        );
+    }
+
+    #[test]
     fn sprite_draw_command_uses_quad_geometry_and_instance_buffer_metadata() {
         let buffer =
             test_sprite_instance_buffer(NativeRenderPipeline::Sprites, RenderLayer::Objects, 2);
@@ -1618,6 +1811,12 @@ mod tests {
             instance_buffer_byte_len: u64::from(instance_count)
                 * SpriteInstanceBufferRecord::BYTE_SIZE,
         }
+    }
+
+    fn expected_sprite_render_pass(plan: &SceneDrawPlan) -> Option<SpriteRenderPassPlan> {
+        plan.sprite_buffer_uploads.as_ref().and_then(|uploads| {
+            SpriteRenderPassPlan::from_uploads_and_commands(uploads, &plan.sprite_draw_commands)
+        })
     }
 
     #[test]
@@ -1962,6 +2161,7 @@ mod tests {
                 expected_sprite_draw_command(NativeRenderPipeline::HudText, RenderLayer::Hud, 1, 1),
             ]
         );
+        assert_eq!(plan.sprite_render_pass, expected_sprite_render_pass(&plan));
         assert_eq!(plan.raster_upload, None);
     }
 
@@ -1986,6 +2186,7 @@ mod tests {
         assert_eq!(plan.sprite_instance_upload, None);
         assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
+        assert_eq!(plan.sprite_render_pass, None);
     }
 
     #[test]
@@ -2013,6 +2214,7 @@ mod tests {
         assert_eq!(plan.sprite_instance_upload, None);
         assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
+        assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -2075,6 +2277,7 @@ mod tests {
         assert_eq!(plan.sprite_instance_upload, None);
         assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
+        assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(plan.pipelines, Vec::<NativeRenderPipeline>::new());
         assert_eq!(
             plan.layer_counts,
@@ -2138,6 +2341,7 @@ mod tests {
                 2,
             )]
         );
+        assert_eq!(plan.sprite_render_pass, expected_sprite_render_pass(&plan));
     }
 
     #[test]
@@ -2173,6 +2377,7 @@ mod tests {
         assert_eq!(plan.sprite_instance_upload, None);
         assert_eq!(plan.sprite_buffer_uploads, None);
         assert_eq!(plan.sprite_draw_commands, Vec::<SpriteDrawCommand>::new());
+        assert_eq!(plan.sprite_render_pass, None);
     }
 
     #[test]
@@ -2243,6 +2448,10 @@ mod tests {
             )]
         );
         assert_eq!(
+            sprite_plan.sprite_render_pass,
+            expected_sprite_render_pass(&sprite_plan)
+        );
+        assert_eq!(
             raster_plan.sprite_instance_buffers,
             Vec::<SpriteInstanceBuffer>::new()
         );
@@ -2252,6 +2461,7 @@ mod tests {
             raster_plan.sprite_draw_commands,
             Vec::<SpriteDrawCommand>::new()
         );
+        assert_eq!(raster_plan.sprite_render_pass, None);
         assert_eq!(
             raster_plan.raster_upload,
             Some(super::SceneRasterUpload {
@@ -2272,6 +2482,7 @@ mod tests {
 
         assert!(plan.viewport.is_empty());
         assert_eq!(plan.gpu_pass.viewport, None);
+        assert_eq!(plan.sprite_render_pass, None);
         assert_eq!(
             plan.gpu_pass.scene_projection,
             SceneProjectionUniforms::for_surface(SurfaceSize::new(292, 240))
@@ -2345,5 +2556,6 @@ mod tests {
                 1,
             )]
         );
+        assert_eq!(plan.sprite_render_pass, expected_sprite_render_pass(&plan));
     }
 }

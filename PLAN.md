@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-110` are complete. The standing maintenance guidance in
+`DC-42` through `DC-111` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -4524,6 +4524,74 @@ Work log:
   rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778822243196599`
+
+### DC-111: Clean Sprite Render Pass Planning
+
+Status: `complete`
+
+Goal: derive clean sprite render-pass binding and draw metadata from the sprite
+buffer upload plan and indexed draw commands, so future native `wgpu` code can
+bind renderer-owned buffers and issue indexed instanced draws without
+presenter-side classification.
+
+Scope:
+
+- Add renderer-owned sprite vertex/index buffer binding metadata with stable
+  `wgpu` vertex buffer slots.
+- Derive indexed draw ranges from existing sprite draw commands.
+- Wire an optional sprite render-pass plan into `SceneDrawPlan` whenever sprite
+  buffer uploads and draw commands exist.
+- Keep raster-only scenes, unavailable sprite pipelines, missing atlas regions,
+  empty atlas surfaces, and empty command lists outside sprite render-pass
+  planning.
+- Add focused renderer tests for buffer slots, byte spans, index format, draw
+  ranges, and absent sprite paths.
+- Update README/SPEC module text for sprite render-pass planning.
+
+Acceptance criteria:
+
+- `SceneDrawPlan` exposes sprite render-pass metadata only for drawable clean
+  sprite plans.
+- The pass plan identifies quad vertex, instance vertex, and index buffer
+  bindings with `wgpu`-compatible slots and byte spans.
+- Indexed draw ranges match the existing sprite draw commands exactly.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests::
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 06:20:38 BST` Started `DC-111`: adding clean sprite render-pass
+  planning on top of the sprite `wgpu` upload plan, including stable vertex
+  buffer slots, index binding metadata, indexed draw ranges, focused renderer
+  tests, and docs.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778822438553379`
+- `2026-05-15 06:43:23 BST` Completed `DC-111`: added renderer-owned sprite
+  render-pass metadata for quad vertex, instance vertex, and index bindings,
+  derived indexed draw ranges from existing sprite draw commands, wired the
+  optional pass plan into `SceneDrawPlan` only for drawable sprite plans, kept
+  raster-only/unavailable/missing-atlas/empty-atlas paths outside pass
+  planning, exported the public renderer types, and documented sprite
+  render-pass planning in README/SPEC. Validation passed with focused renderer
+  tests (36/36), the public API guard, `cargo test --all-targets` (1157
+  library tests plus binary/example tests), clippy with warnings denied,
+  `make fidelity` (10 local fixtures, 15452 frames, 52/52 new executable Rust
+  lines), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
+  --check`, markdownlint, and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778823804345559`
 
 ## Ongoing Work
 

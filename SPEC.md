@@ -73,8 +73,8 @@ tree:
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
   instance GPU ABI, sprite instance upload streams, sprite draw commands,
-  sprite `wgpu` buffer upload plans, viewport layout, GPU pass planning, scene
-  summaries, render signatures, and draw planning.
+  sprite `wgpu` buffer upload plans, sprite render-pass plans, viewport layout,
+  GPU pass planning, scene summaries, render signatures, and draw planning.
 - `src/platform.rs`: the clean runtime launch boundary plus configuration for
   controls, audio, run mode, and persistence.
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
@@ -126,9 +126,11 @@ with quad/index counts, instance ranges, and upload byte spans into that
 stream. It also records the centered viewport layout plus GPU-ready clear
 color, viewport command, and scene-projection constants for the target surface.
 Sprite draw plans also include `wgpu::BufferUsages` metadata and upload bytes
-for the quad vertex, quad index, and instance buffers, while the current live
-path still carries a temporary raster payload for visual equivalence. Kitty
-graphics and terminal-session code remain
+for the quad vertex, quad index, and instance buffers, plus a sprite render-pass
+plan with stable vertex buffer slots, index-buffer metadata, and indexed
+instance draw ranges, while the current live path still carries a temporary
+raster payload for visual equivalence. Kitty graphics and terminal-session code
+remain
 parked there as historical compatibility evidence, but they are not part of the
 active runtime or compatibility API surface. The legacy video renderer owns its
 remaining `TerminalGeometry` value type directly instead of importing terminal
