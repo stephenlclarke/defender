@@ -218,11 +218,12 @@ Clean rewrite modules:
   command-byte mapping. The clean `Game` shell emits sprite-first scene frames
   without touching the accepted machine adapter.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
-  player-control intent/trigger systems, player-motion, enemy-motion,
-  projectile launch/capacity/motion systems, projectile/enemy collision
-  detection, player/enemy damage resolution, smart-bomb resolution,
-  wave-completion evaluation, score/bonus awards, and the `GameSimulation`
-  trait used by the clean game and internal oracle implementations.
+  player-control intent/trigger systems, operator trigger handling,
+  player-motion, enemy-motion, projectile launch/capacity/motion systems,
+  projectile/enemy collision detection, player/enemy damage resolution,
+  smart-bomb resolution, wave-completion evaluation, score/bonus awards, and
+  the `GameSimulation` trait used by the clean game and internal oracle
+  implementations.
 - `src/renderer.rs`: native `wgpu` scene contracts, surface sizing, sprite
   layers, temporary raster evidence, renderer-owned resources, atlas-backed
   sprite batches, sprite quad geometry, sprite instance buffers, the sprite
@@ -268,21 +269,25 @@ code adapts frame outputs into clean audio frames before submitting to
 `defender::readme_media` facade. The binary enters through the clean platform
 boundary before delegating to the runtime bridge. The clean `Game` world seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
-wave and renders them as atlas-backed scene sprites. Clean enemy snapshots
-carry gameplay-domain velocity and advance through `EnemyMotionSystem` during
-playing frames. Clean projectile snapshots carry direction-derived velocity,
-advance through `ProjectileMotionSystem`, and are culled through gameplay state
-before rendering. Clean collision boxes resolve projectile/enemy hits through
-`CollisionSystem`, remove the hit entities from world state, and award score
-through `ScoreSystem` before rendering. Crossing the clean bonus threshold
-updates player stock and emits `BonusAwarded`. Clean smart bombs consume player
-stock, clear active enemies through `SmartBombSystem`, route score through the
-same scoring system, and leave cleared enemies absent from the scene. Enemy
-contact with the player is resolved through clean collision and
-`PlayerDamageSystem`, decrementing lives, removing the colliding enemy, and
-entering `GameOver` on the final life. Enemy exhaustion is reported through
-`WaveSystem`, keeping the last-hit frame empty and spawning the next clean wave
-on the following playing frame. Native draw planning resolves scene sprites
+wave and renders them as atlas-backed scene sprites. Operator controls are
+sampled through `OperatorControlSystem`, emitting diagnostics, audits, and
+high-score reset gameplay events on button edges while preserving current
+player scores and bonus thresholds during high-score reset. Clean enemy
+snapshots carry gameplay-domain velocity and advance through
+`EnemyMotionSystem` during playing frames. Clean projectile snapshots carry
+direction-derived velocity, advance through `ProjectileMotionSystem`, and are
+culled through gameplay state before rendering. Clean collision boxes resolve
+projectile/enemy hits through `CollisionSystem`, remove the hit entities from
+world state, and award score through `ScoreSystem` before rendering. Crossing
+the clean bonus threshold updates player stock and emits `BonusAwarded`. Clean
+smart bombs consume player stock, clear active enemies through
+`SmartBombSystem`, route score through the same scoring system, and leave
+cleared enemies absent from the scene. Enemy contact with the player is
+resolved through clean collision and `PlayerDamageSystem`, decrementing lives,
+removing the colliding enemy, and entering `GameOver` on the final life. Enemy
+exhaustion is reported through `WaveSystem`, keeping the last-hit frame empty
+and spawning the next clean wave on the following playing frame. Native draw
+planning resolves scene sprites
 through
 renderer-owned atlas regions into sprite batches and records GPU
 instance-buffer data with native scene rectangles, normalized atlas UVs,

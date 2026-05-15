@@ -134,12 +134,13 @@ pub use renderer::{
 };
 pub use systems::{
     CollisionBox, CollisionSystem, EnemyMotionFrame, EnemyMotionSystem, FixedStepAccumulator,
-    FrameRate, GameSimulation, PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent,
-    PlayerControlSystem, PlayerDamageFrame, PlayerDamageSystem, PlayerEnemyHit, PlayerMotionFrame,
-    PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileEnemyHit,
-    ProjectileLaunchOutcome, ProjectileMotionFrame, ProjectileMotionSystem, ProjectileState,
-    ProjectileSystem, ScoreFrame, ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombFrame,
-    SmartBombSystem, VerticalControl, WaveState, WaveStatus, WaveSystem, advance_one_frame,
+    FrameRate, GameSimulation, OperatorActionTriggers, OperatorControlFrame, OperatorControlSystem,
+    PlayerActionTriggers, PlayerControlFrame, PlayerControlIntent, PlayerControlSystem,
+    PlayerDamageFrame, PlayerDamageSystem, PlayerEnemyHit, PlayerMotionFrame, PlayerMotionState,
+    PlayerMotionSystem, PlayerStock, ProjectileEnemyHit, ProjectileLaunchOutcome,
+    ProjectileMotionFrame, ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreFrame,
+    ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombFrame, SmartBombSystem, VerticalControl,
+    WaveState, WaveStatus, WaveSystem, advance_one_frame,
 };
 
 #[cfg(test)]

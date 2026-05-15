@@ -3,11 +3,11 @@
 use crate::{
     renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize},
     systems::{
-        CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, PlayerControlSystem,
-        PlayerDamageSystem, PlayerMotionState, PlayerMotionSystem, PlayerStock,
-        ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState, ProjectileSystem,
-        ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombSystem, WaveState, WaveStatus,
-        WaveSystem,
+        CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, OperatorControlSystem,
+        PlayerControlSystem, PlayerDamageSystem, PlayerMotionState, PlayerMotionSystem,
+        PlayerStock, ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState,
+        ProjectileSystem, ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombSystem, WaveState,
+        WaveStatus, WaveSystem,
     },
 };
 
@@ -260,6 +260,7 @@ pub struct GameFrame {
 pub struct Game {
     state: GameState,
     controls: PlayerControlSystem,
+    operator_controls: OperatorControlSystem,
     camera_left: WorldVector,
     pending_wave_start: bool,
 }
@@ -269,6 +270,7 @@ impl Game {
         Self {
             state: initial_state(),
             controls: PlayerControlSystem::new(),
+            operator_controls: OperatorControlSystem::new(),
             camera_left: WorldVector::default(),
             pending_wave_start: false,
         }
@@ -288,6 +290,8 @@ impl Game {
             gameplay_events.push(GameEvent::CreditAdded);
             sound_events.push(SoundEvent::CreditAdded);
         }
+
+        self.step_operator_controls(input, &mut gameplay_events);
 
         if self.state.phase == GamePhase::Attract && input.start_one && self.state.credits > 0 {
             self.start_one_player_game();
@@ -322,6 +326,23 @@ impl Game {
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
         self.pending_wave_start = false;
+    }
+
+    fn step_operator_controls(&mut self, input: GameInput, gameplay_events: &mut Vec<GameEvent>) {
+        let controls = self.operator_controls.step(input);
+
+        if controls.triggers.diagnostics {
+            gameplay_events.push(GameEvent::DiagnosticsSelected);
+        }
+
+        if controls.triggers.audits {
+            gameplay_events.push(GameEvent::AuditsSelected);
+        }
+
+        if controls.triggers.high_score_reset {
+            self.state.scores.high_score = 0;
+            gameplay_events.push(GameEvent::HighScoreReset);
+        }
     }
 
     fn step_playing(
@@ -857,6 +878,51 @@ mod tests {
             }
         );
         assert_eq!(started.scene.summary().sprite_count, 13);
+    }
+
+    #[test]
+    fn clean_game_operator_controls_reset_high_score_and_debounce_events() {
+        let mut game = Game::new();
+        game.state.scores.player_one = 1_200;
+        game.state.scores.high_score = 5_000;
+        game.state.scores.next_bonus = 10_000;
+        let operator_input = GameInput {
+            service_auto_up: true,
+            service_advance: true,
+            high_score_reset: true,
+            ..GameInput::NONE
+        };
+
+        let first = game.step(operator_input);
+
+        assert_eq!(first.state.scores.player_one, 1_200);
+        assert_eq!(first.state.scores.high_score, 0);
+        assert_eq!(first.state.scores.next_bonus, 10_000);
+        assert_eq!(
+            first.events.gameplay(),
+            &[
+                GameEvent::DiagnosticsSelected,
+                GameEvent::AuditsSelected,
+                GameEvent::HighScoreReset,
+            ]
+        );
+        assert!(first.events.sounds().is_empty());
+
+        game.state.scores.high_score = 4_000;
+        let held = game.step(operator_input);
+        assert_eq!(held.state.scores.high_score, 4_000);
+        assert!(held.events.is_empty());
+
+        let released = game.step(GameInput::NONE);
+        assert_eq!(released.state.scores.high_score, 4_000);
+        assert!(released.events.is_empty());
+
+        let reset_again = game.step(GameInput {
+            high_score_reset: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(reset_again.state.scores.high_score, 0);
+        assert_eq!(reset_again.events.gameplay(), &[GameEvent::HighScoreReset]);
     }
 
     #[test]

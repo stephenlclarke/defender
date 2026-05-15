@@ -107,7 +107,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-126` are complete. The standing
+`DC-42` through `DC-127` are complete. The standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -5607,6 +5607,70 @@ Work log:
   and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778850177520539`
+
+### DC-127: Clean Operator Control System
+
+Status: `complete`
+
+Goal: route operator-facing clean inputs through deterministic gameplay-domain
+handling instead of leaving diagnostics, audits, and high-score reset fields as
+unused input surface.
+
+Scope:
+
+- Add a clean operator trigger system in `src/systems.rs`.
+- Debounce diagnostics, audits, and high-score reset inputs at the clean game
+  boundary.
+- Emit clean gameplay events for diagnostics/audits selection.
+- Reset the clean high-score field through gameplay state when requested.
+- Update focused systems/game tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- Operator inputs are represented by clean gameplay-domain output rather than
+  ad hoc renderer or runtime behavior.
+- Holding an operator input does not emit repeated gameplay events every frame.
+- High-score reset updates `ScoreSnapshot.high_score` without changing current
+  player scores or bonus thresholds.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::operator_control
+cargo test --lib game::tests::clean_game_operator
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 14:04:00 BST` Started `DC-127`: adding clean operator trigger
+  handling for diagnostics, audits, and high-score reset, including debounce
+  behavior, gameplay events, docs, and focused systems/game coverage.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778850249279209`
+- `2026-05-15 14:26:17 BST` Completed `DC-127`: added
+  `OperatorControlSystem` and routed diagnostics, audits, and high-score reset
+  through clean `Game` state. Operator controls now emit edge-triggered
+  gameplay events, held inputs do not repeat every frame, and high-score reset
+  clears only `ScoreSnapshot.high_score` while preserving current player scores
+  and bonus thresholds. Validation passed with `cargo fmt --check`,
+  `cargo test --lib systems::tests::operator_control`,
+  `cargo test --lib game::tests::clean_game_operator`, full game and systems
+  test modules, public API guard, `cargo test --all-targets` (1193 lib, 2 bin,
+  and 2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, new Rust line coverage 31/31),
+  `cargo run -- --live-smoke` (239 rendered frames), `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778851591636559`
 
 ## Ongoing Work
 

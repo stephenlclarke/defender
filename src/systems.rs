@@ -139,6 +139,68 @@ impl PlayerControlSystem {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OperatorActionTriggers {
+    pub diagnostics: bool,
+    pub audits: bool,
+    pub high_score_reset: bool,
+}
+
+impl OperatorActionTriggers {
+    pub const NONE: Self = Self {
+        diagnostics: false,
+        audits: false,
+        high_score_reset: false,
+    };
+
+    pub const fn any(self) -> bool {
+        self.diagnostics || self.audits || self.high_score_reset
+    }
+
+    const fn from_input(input: GameInput) -> Self {
+        Self {
+            diagnostics: input.service_auto_up,
+            audits: input.service_advance,
+            high_score_reset: input.high_score_reset,
+        }
+    }
+
+    const fn newly_pressed(self, previous: Self) -> Self {
+        Self {
+            diagnostics: self.diagnostics && !previous.diagnostics,
+            audits: self.audits && !previous.audits,
+            high_score_reset: self.high_score_reset && !previous.high_score_reset,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OperatorControlFrame {
+    pub triggers: OperatorActionTriggers,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OperatorControlSystem {
+    previous: OperatorActionTriggers,
+}
+
+impl OperatorControlSystem {
+    pub const fn new() -> Self {
+        Self {
+            previous: OperatorActionTriggers::NONE,
+        }
+    }
+
+    pub fn step(&mut self, input: GameInput) -> OperatorControlFrame {
+        let current = OperatorActionTriggers::from_input(input);
+        let frame = OperatorControlFrame {
+            triggers: current.newly_pressed(self.previous),
+        };
+        self.previous = current;
+        frame
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScreenPosition {
     pub x: u8,
@@ -876,12 +938,12 @@ mod tests {
 
     use super::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, Fixed24, FixedStepAccumulator, FrameRate,
-        GameSimulation, PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem,
-        PlayerDamageSystem, PlayerMotionState, PlayerMotionSystem, PlayerStock,
-        ProjectileLaunchOutcome, ProjectileMotionSystem, ProjectileState, ProjectileSystem,
-        ScoreSystem, ScreenPosition, ScreenVelocity, SmartBombSystem, VerticalControl, WaveState,
-        WaveStatus, WaveSystem, advance_one_frame, clamp_camera_velocity_word,
-        next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
+        GameSimulation, OperatorActionTriggers, OperatorControlSystem, PlayerActionTriggers,
+        PlayerControlIntent, PlayerControlSystem, PlayerDamageSystem, PlayerMotionState,
+        PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome, ProjectileMotionSystem,
+        ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition, ScreenVelocity,
+        SmartBombSystem, VerticalControl, WaveState, WaveStatus, WaveSystem, advance_one_frame,
+        clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
     };
 
     #[test]
@@ -990,6 +1052,40 @@ mod tests {
             }
         );
         assert!(frame.triggers.any());
+    }
+
+    #[test]
+    fn operator_control_system_reports_edges_without_repeating_held_inputs() {
+        let mut controls = OperatorControlSystem::new();
+        let input = GameInput {
+            service_auto_up: true,
+            service_advance: true,
+            high_score_reset: true,
+            ..GameInput::NONE
+        };
+
+        assert_eq!(
+            controls.step(input).triggers,
+            OperatorActionTriggers {
+                diagnostics: true,
+                audits: true,
+                high_score_reset: true,
+            }
+        );
+        assert_eq!(controls.step(input).triggers, OperatorActionTriggers::NONE);
+        assert!(!controls.step(input).triggers.any());
+        assert_eq!(
+            controls.step(GameInput::NONE).triggers,
+            OperatorActionTriggers::NONE
+        );
+        assert_eq!(
+            controls.step(input).triggers,
+            OperatorActionTriggers {
+                diagnostics: true,
+                audits: true,
+                high_score_reset: true,
+            }
+        );
     }
 
     #[test]
