@@ -107,8 +107,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-124` are complete. The standing maintenance guidance in
-Ongoing Work still applies.
+`DC-42` through `DC-125` are complete. The standing
+maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -5477,6 +5477,68 @@ Work log:
   docs/fidelity/live-audio.md`, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778847304885369`
+
+### DC-125: Clean Smart Bomb Resolution System
+
+Status: `complete`
+
+Goal: resolve smart bomb enemy clearing through clean gameplay systems instead
+of treating smart bomb input as a stock-only event.
+
+Scope:
+
+- Add deterministic clean smart-bomb resolution in `src/systems.rs`.
+- Route `SmartBombPressed` handling through that system after stock
+  consumption.
+- Remove affected enemies from clean world state.
+- Award enemy score through `ScoreSystem`, emit enemy/bonus/wave gameplay
+  output, and keep cleared enemies absent from scene sprites.
+- Update focused systems/game tests plus README/SPEC/PLAN docs.
+
+Acceptance criteria:
+
+- Smart bomb effects are represented by gameplay-domain output, not renderer
+  state or legacy object lists.
+- A smart bomb with active enemies clears those clean enemies, awards score,
+  and emits enemy-destroyed gameplay output in the same frame.
+- Cleared enemies are absent from the frame scene, and wave clear still uses
+  the clean wave system.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib systems::tests::smart_bomb
+cargo test --lib game::tests::clean_game_smart_bomb
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-15 13:16:15 BST` Started `DC-125`: adding clean smart-bomb enemy
+  clear output, routing smart-bomb scoring through `ScoreSystem`, preserving
+  clean wave-clear handling, and updating focused systems/game/docs coverage.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778847373539249`
+- `2026-05-15 13:38:48 BST` Completed `DC-125`: added `SmartBombSystem` and
+  routed smart-bomb input through clean enemy clearing, score/bonus awards,
+  wave-clear output, and scene sprite removal. Validation passed with
+  `cargo fmt --check`, `cargo test --lib systems::tests::smart_bomb`,
+  `cargo test --lib game::tests::clean_game_smart_bomb`, full game and systems
+  test modules, public API guard, `cargo test --all-targets` (1187 lib, 2 bin,
+  and 2 example tests), `cargo clippy --all-targets -- -D warnings`,
+  `make fidelity` (10 fixtures, 15452 frames, new Rust line coverage 15/15),
+  `cargo run -- --live-smoke` (240 rendered frames), `markdownlint README.md
+  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  and `git diff --check`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778848724960339`
 
 ## Ongoing Work
 

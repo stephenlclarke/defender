@@ -138,7 +138,8 @@ pub use systems::{
     PlayerControlSystem, PlayerMotionFrame, PlayerMotionState, PlayerMotionSystem, PlayerStock,
     ProjectileEnemyHit, ProjectileLaunchOutcome, ProjectileMotionFrame, ProjectileMotionSystem,
     ProjectileState, ProjectileSystem, ScoreFrame, ScoreSystem, ScreenPosition, ScreenVelocity,
-    VerticalControl, WaveState, WaveStatus, WaveSystem, advance_one_frame,
+    SmartBombFrame, SmartBombSystem, VerticalControl, WaveState, WaveStatus, WaveSystem,
+    advance_one_frame,
 };
 
 #[cfg(test)]

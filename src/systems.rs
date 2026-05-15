@@ -540,6 +540,22 @@ fn advance_bonus_threshold(next_bonus: u32, bonus_awards: u8) -> u32 {
     next_bonus.saturating_add(ScoreSystem::BONUS_INTERVAL.saturating_mul(u32::from(bonus_awards)))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SmartBombFrame {
+    pub destroyed_enemies: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SmartBombSystem;
+
+impl SmartBombSystem {
+    pub const fn detonate(active_enemies: usize) -> SmartBombFrame {
+        SmartBombFrame {
+            destroyed_enemies: active_enemies,
+        }
+    }
+}
+
 const PLAYER_MIN_SCREEN_Y: u8 = 42;
 const PLAYER_DOWN_LIMIT_SCREEN_Y: u8 = 238;
 const PLAYER_RIGHT_ANCHOR_X: u8 = 0x20;
@@ -827,8 +843,9 @@ mod tests {
         GameSimulation, PlayerActionTriggers, PlayerControlIntent, PlayerControlSystem,
         PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome,
         ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition,
-        ScreenVelocity, VerticalControl, WaveState, WaveStatus, WaveSystem, advance_one_frame,
-        clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x, thrust_acceleration,
+        ScreenVelocity, SmartBombSystem, VerticalControl, WaveState, WaveStatus, WaveSystem,
+        advance_one_frame, clamp_camera_velocity_word, next_vertical_velocity, scroll_adjusted_x,
+        thrust_acceleration,
     };
 
     #[test]
@@ -1228,6 +1245,12 @@ mod tests {
         let max_bonus = ScoreSystem::award_points(frame.scores, PlayerStock::new(3, 3), 1, 1_000);
         assert_eq!(max_bonus.bonus_awards, 0);
         assert_eq!(max_bonus.stock, PlayerStock::new(3, 3));
+    }
+
+    #[test]
+    fn smart_bomb_system_reports_all_active_enemies_destroyed() {
+        assert_eq!(SmartBombSystem::detonate(3).destroyed_enemies, 3);
+        assert_eq!(SmartBombSystem::detonate(0).destroyed_enemies, 0);
     }
 
     #[derive(Debug)]

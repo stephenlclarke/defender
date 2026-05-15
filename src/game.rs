@@ -6,7 +6,7 @@ use crate::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, PlayerControlSystem,
         PlayerMotionState, PlayerMotionSystem, PlayerStock, ProjectileLaunchOutcome,
         ProjectileMotionSystem, ProjectileState, ProjectileSystem, ScoreSystem, ScreenPosition,
-        ScreenVelocity, WaveState, WaveStatus, WaveSystem,
+        ScreenVelocity, SmartBombSystem, WaveState, WaveStatus, WaveSystem,
     },
 };
 
@@ -375,6 +375,7 @@ impl Game {
         if controls.triggers.smart_bomb && self.state.player.smart_bombs > 0 {
             self.state.player.smart_bombs -= 1;
             gameplay_events.push(GameEvent::SmartBombPressed);
+            self.resolve_smart_bomb(gameplay_events);
         }
 
         if controls.triggers.hyperspace {
@@ -432,6 +433,21 @@ impl Game {
         self.state.world.projectiles.remove(hit.projectile_index);
         gameplay_events.push(GameEvent::EnemyDestroyed);
         self.award_enemy_score(enemy.kind, gameplay_events);
+    }
+
+    fn resolve_smart_bomb(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        let outcome = SmartBombSystem::detonate(self.state.world.enemies.len());
+        let destroyed = self
+            .state
+            .world
+            .enemies
+            .drain(..outcome.destroyed_enemies)
+            .collect::<Vec<_>>();
+
+        for enemy in destroyed {
+            gameplay_events.push(GameEvent::EnemyDestroyed);
+            self.award_enemy_score(enemy.kind, gameplay_events);
+        }
     }
 
     fn queue_wave_clear_if_needed(&mut self, gameplay_events: &mut Vec<GameEvent>) {
@@ -673,8 +689,8 @@ mod tests {
     };
 
     use super::{
-        Direction, EnemyKind, Game, GameEvent, GameEvents, GameFrame, GameInput, GamePhase,
-        ProjectileSnapshot, SoundEvent, WorldSnapshot, WorldVector,
+        Direction, EnemyKind, EnemySnapshot, Game, GameEvent, GameEvents, GameFrame, GameInput,
+        GamePhase, ProjectileSnapshot, SoundEvent, WorldSnapshot, WorldVector,
     };
 
     #[test]
@@ -812,8 +828,10 @@ mod tests {
 
         assert_eq!(frame.state.player.direction, Direction::Left);
         assert_eq!(frame.state.player.smart_bombs, 2);
+        assert_eq!(frame.state.scores.player_one, 150);
         assert!(frame.state.player.velocity.1.subpixels() < 0);
         assert_eq!(frame.state.world.projectiles.len(), 1);
+        assert!(frame.state.world.enemies.is_empty());
         assert_eq!(
             frame.state.world.projectiles[0].velocity,
             ScreenVelocity::new(-8, 0)
@@ -824,7 +842,9 @@ mod tests {
                 GameEvent::ReversePressed,
                 GameEvent::FirePressed,
                 GameEvent::SmartBombPressed,
+                GameEvent::EnemyDestroyed,
                 GameEvent::HyperspacePressed,
+                GameEvent::WaveCleared,
             ]
         );
         assert_eq!(frame.events.sounds(), &[SoundEvent::ThrustStarted]);
@@ -833,13 +853,56 @@ mod tests {
             RenderLayerCounts {
                 terrain: 5,
                 starfield: 3,
-                objects: 4,
+                objects: 3,
                 projectiles: 1,
                 hud: 1,
                 ..RenderLayerCounts::default()
             }
         );
         assert_eq!(frame.scene.summary().raster_count, 0);
+    }
+
+    #[test]
+    fn clean_game_smart_bomb_clears_enemies_scores_and_updates_scene() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.push(EnemySnapshot {
+            kind: EnemyKind::Lander,
+            position: ScreenPosition::new(132, 92),
+            velocity: ScreenVelocity::new(1, 0),
+        });
+        game.state.scores.player_one = 9_800;
+        game.state.scores.high_score = 9_800;
+        game.state.scores.next_bonus = 10_000;
+        game.state.player.smart_bombs = 1;
+
+        let frame = game.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+
+        assert!(frame.state.world.enemies.is_empty());
+        assert_eq!(frame.state.scores.player_one, 10_100);
+        assert_eq!(frame.state.scores.high_score, 10_100);
+        assert_eq!(frame.state.scores.next_bonus, 20_000);
+        assert_eq!(frame.state.player.lives, 4);
+        assert_eq!(frame.state.player.smart_bombs, 1);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[
+                GameEvent::SmartBombPressed,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
+                GameEvent::BonusAwarded,
+                GameEvent::WaveCleared,
+            ]
+        );
+        assert!(
+            !frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+        );
     }
 
     #[test]
