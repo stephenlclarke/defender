@@ -1754,6 +1754,13 @@ impl WgpuFramePlan {
             .count()
     }
 
+    pub fn begin_render_pass_count(&self) -> usize {
+        self.commands
+            .iter()
+            .filter(|command| matches!(command, WgpuFrameCommand::BeginRenderPass { .. }))
+            .count()
+    }
+
     pub fn viewport_command_count(&self) -> usize {
         self.commands
             .iter()
@@ -2731,6 +2738,7 @@ mod tests {
         assert_eq!(plan.command_count(), 5);
         assert_eq!(plan.temporary_raster_count(), 1);
         assert_eq!(plan.sprite_pass_count(), 1);
+        assert_eq!(plan.begin_render_pass_count(), 1);
         assert_eq!(plan.viewport_command_count(), 1);
         assert_eq!(
             plan.scene_projection_upload_byte_len(),

@@ -150,11 +150,11 @@ upload bytes, and the `wgpu` vertex layout for the instance buffer.
 `--game-smoke` steps the clean game through scripted controls, verifies
 required gameplay sprite layers, sprite IDs, native draw-command pipeline and
 instance coverage, sprite buffer upload-plan coverage, render-pass plan
-coverage, and frame-command sprite command/draw/instance plus viewport and
-projection upload coverage, and prepares sprite-only native draw plans plus
-frame-level `wgpu` command, resource-binding, pipeline-layout, pipeline
-descriptor, encoder, and upload plans without entering the legacy live
-presenter. The clean `Game` world
+coverage, and frame-command sprite command/draw/instance plus begin-pass,
+viewport, and projection upload coverage, and prepares sprite-only
+native draw plans plus frame-level `wgpu` command, resource-binding,
+pipeline-layout, pipeline descriptor, encoder, and upload plans without
+entering the legacy live presenter. The clean `Game` world
 seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
 wave and renders them as atlas-backed scene sprites. Operator controls are
@@ -207,11 +207,11 @@ pipeline descriptor plans combine that layout with shader entries, vertex
 buffers, primitive state, color target, and multisample state for `wgpu` render
 pipeline creation. Sprite render-pass encoder command plans then order the
 pipeline, bind groups, vertex buffers, index buffer, and indexed draw calls for
-`wgpu::RenderPass` execution. Frame-level GPU command plans combine pass clear
-state, viewport command presence, scene-projection upload presence, optional
-sprite execution with command, draw, and instance totals, and temporary raster
-evidence into one ordered scene command stream, while the current live path
-still carries a temporary raster payload for visual
+`wgpu::RenderPass` execution. Frame-level GPU command plans combine begin-pass
+clear state, viewport command presence, scene-projection upload presence,
+optional sprite execution with command, draw, and instance totals, and
+temporary raster evidence into one ordered scene command stream, while the
+current live path still carries a temporary raster payload for visual
 equivalence. Kitty graphics and terminal-session code remain
 parked there as historical compatibility evidence, but they are not part of the
 active runtime or compatibility API surface. The legacy video renderer owns its
@@ -228,8 +228,8 @@ reintroduce legacy implementation terminology.
 - Live play uses the windowed `wgpu` backend.
 - `--game-smoke` runs a clean game, gameplay sprite coverage, native
   draw-command pipeline and instance coverage, native draw-plan, `wgpu`
-  frame-plan viewport/projection and sprite command/draw/instance evidence,
-  and GPU resource-plan smoke without the legacy live presenter.
+  frame-plan begin-pass/viewport/projection and sprite command/draw/instance
+  evidence, and GPU resource-plan smoke without the legacy live presenter.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.

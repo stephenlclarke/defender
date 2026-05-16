@@ -537,6 +537,7 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("NativeSceneRenderer::default()"));
         assert!(game_smoke_rs.contains("renderer.prepare(&frame.scene)"));
         assert!(game_smoke_rs.contains("plan.frame_plan.command_count()"));
+        assert!(game_smoke_rs.contains("plan.frame_plan.begin_render_pass_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.viewport_command_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.sprite_pass_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.temporary_raster_count()"));
@@ -559,6 +560,7 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("plan.sprite_render_pass_encoder"));
         assert!(game_smoke_rs.contains("plan.sprite_draw_commands"));
         assert!(game_smoke_rs.contains("command.instance_count"));
+        assert!(game_smoke_rs.contains("frame_plan_begin_render_pass_commands"));
         assert!(game_smoke_rs.contains("frame_plan_viewport_commands"));
         assert!(game_smoke_rs.contains("frame_plan_scene_projection_upload_bytes"));
         assert!(game_smoke_rs.contains("sprite_frame_plan_encoder_commands"));

@@ -69,6 +69,7 @@ pub(crate) struct GameSmokeReport {
     pub(crate) hud_draw_instances: usize,
     pub(crate) covered_pipelines: Vec<String>,
     pub(crate) wgpu_frame_commands: usize,
+    pub(crate) frame_plan_begin_render_pass_commands: usize,
     pub(crate) frame_plan_viewport_commands: usize,
     pub(crate) sprite_render_pass_commands: usize,
     pub(crate) temporary_raster_commands: usize,
@@ -195,6 +196,9 @@ impl GameSmokeReport {
         if self.wgpu_frame_commands == 0 {
             bail!("clean game smoke did not produce wgpu frame commands");
         }
+        if self.frame_plan_begin_render_pass_commands != self.frames as usize {
+            bail!("clean game smoke did not produce begin-pass frame commands for every frame");
+        }
         if self.frame_plan_viewport_commands != self.frames as usize {
             bail!("clean game smoke did not produce viewport frame commands for every frame");
         }
@@ -303,7 +307,7 @@ impl GameSmokeReport {
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  terrain_sprites: {}\n  starfield_sprites: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  covered_sprites: {}\n  terrain_draw_commands: {}\n  starfield_draw_commands: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  drawn_sprite_instances: {}\n  terrain_draw_instances: {}\n  starfield_draw_instances: {}\n  object_draw_instances: {}\n  projectile_draw_instances: {}\n  hud_draw_instances: {}\n  covered_pipelines: {}\n  wgpu_frame_commands: {}\n  frame_plan_viewport_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  frame_plan_scene_projection_upload_bytes: {}\n  sprite_frame_plan_encoder_commands: {}\n  sprite_frame_plan_draws: {}\n  sprite_frame_plan_instances: {}\n  sprite_render_pass_plan_frames: {}\n  sprite_render_pass_plan_draws: {}\n  sprite_render_pass_plan_instances: {}\n  sprite_resource_binding_frames: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_buffer_upload_frames: {}\n  sprite_quad_vertex_upload_bytes: {}\n  sprite_quad_index_upload_bytes: {}\n  sprite_buffer_instance_upload_bytes: {}\n  sprite_instance_upload_records: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  terrain_sprites: {}\n  starfield_sprites: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  covered_sprites: {}\n  terrain_draw_commands: {}\n  starfield_draw_commands: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  drawn_sprite_instances: {}\n  terrain_draw_instances: {}\n  starfield_draw_instances: {}\n  object_draw_instances: {}\n  projectile_draw_instances: {}\n  hud_draw_instances: {}\n  covered_pipelines: {}\n  wgpu_frame_commands: {}\n  frame_plan_begin_render_pass_commands: {}\n  frame_plan_viewport_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  frame_plan_scene_projection_upload_bytes: {}\n  sprite_frame_plan_encoder_commands: {}\n  sprite_frame_plan_draws: {}\n  sprite_frame_plan_instances: {}\n  sprite_render_pass_plan_frames: {}\n  sprite_render_pass_plan_draws: {}\n  sprite_render_pass_plan_instances: {}\n  sprite_resource_binding_frames: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_buffer_upload_frames: {}\n  sprite_quad_vertex_upload_bytes: {}\n  sprite_quad_index_upload_bytes: {}\n  sprite_buffer_instance_upload_bytes: {}\n  sprite_instance_upload_records: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
             self.frames,
             frame_size,
             self.distinct_scene_signatures,
@@ -335,6 +339,7 @@ impl GameSmokeReport {
             self.hud_draw_instances,
             self.covered_pipelines.join(","),
             self.wgpu_frame_commands,
+            self.frame_plan_begin_render_pass_commands,
             self.frame_plan_viewport_commands,
             self.sprite_render_pass_commands,
             self.temporary_raster_commands,
@@ -465,6 +470,9 @@ fn observe_frame(
     report.wgpu_frame_commands = report
         .wgpu_frame_commands
         .saturating_add(plan.frame_plan.command_count());
+    report.frame_plan_begin_render_pass_commands = report
+        .frame_plan_begin_render_pass_commands
+        .saturating_add(plan.frame_plan.begin_render_pass_count());
     report.frame_plan_viewport_commands = report
         .frame_plan_viewport_commands
         .saturating_add(plan.frame_plan.viewport_command_count());
@@ -797,6 +805,10 @@ mod tests {
             vec!["hud_text", "starfield", "terrain", "sprites", "projectiles",]
         );
         assert!(report.wgpu_frame_commands > 0);
+        assert_eq!(
+            report.frame_plan_begin_render_pass_commands,
+            report.frames as usize
+        );
         assert_eq!(report.frame_plan_viewport_commands, report.frames as usize);
         assert!(report.sprite_render_pass_commands >= report.frames as usize);
         assert_eq!(report.temporary_raster_commands, 0);
@@ -906,6 +918,20 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "clean game smoke did not produce wgpu frame commands"
+        );
+
+        let mut report = valid_report();
+        report.frame_plan_begin_render_pass_commands = report
+            .frame_plan_begin_render_pass_commands
+            .saturating_sub(1);
+
+        let error = report
+            .validate()
+            .expect_err("missing begin-pass frame command coverage should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce begin-pass frame commands for every frame"
         );
 
         let mut report = valid_report();
@@ -1509,6 +1535,7 @@ mod tests {
                 String::from("hud_text"),
             ],
             wgpu_frame_commands: 6,
+            frame_plan_begin_render_pass_commands: 2,
             frame_plan_viewport_commands: 2,
             sprite_render_pass_commands: 2,
             temporary_raster_commands: 0,
@@ -1571,6 +1598,7 @@ mod tests {
                 "  hud_draw_instances: 2\n",
                 "  covered_pipelines: terrain,starfield,sprites,projectiles,hud_text\n",
                 "  wgpu_frame_commands: 6\n",
+                "  frame_plan_begin_render_pass_commands: 2\n",
                 "  frame_plan_viewport_commands: 2\n",
                 "  sprite_render_pass_commands: 2\n",
                 "  temporary_raster_commands: 0\n",
@@ -1690,6 +1718,7 @@ mod tests {
                 String::from("hud_text"),
             ],
             wgpu_frame_commands: 9,
+            frame_plan_begin_render_pass_commands: 3,
             frame_plan_viewport_commands: 3,
             sprite_render_pass_commands: 3,
             frame_plan_scene_projection_upload_bytes: 48,

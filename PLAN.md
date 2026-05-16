@@ -108,8 +108,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-146` are complete. The standing maintenance guidance in
-Ongoing Work still applies.
+`DC-42` through `DC-147` are complete. The standing
+maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -6931,6 +6931,81 @@ Work log:
   `new Rust line coverage: 10/10 non-baselined added executable line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778900577365789`
+
+### DC-147: Clean Game Smoke WGPU Frame Begin-Pass Command Evidence
+
+Status: `complete`
+
+Goal: extend the final frame-level `wgpu` command evidence so clean smoke
+proves each clean frame begins an ordered render pass before viewport,
+projection, and sprite execution commands.
+
+Scope:
+
+- Add aggregate begin-render-pass command totals to `WgpuFramePlan`.
+- Expose frame-plan begin-pass command totals through `--game-smoke`.
+- Validate that every clean smoke frame carries exactly one begin-pass command
+  in the ordered frame command stream.
+- Keep the existing frame-plan viewport, projection, sprite command, draw, and
+  instance evidence intact.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
+  unchanged.
+
+Acceptance criteria:
+
+- `WgpuFramePlan` reports aggregate begin-render-pass command totals.
+- `--game-smoke` reports frame-plan begin-pass command totals.
+- `--game-smoke` fails if frame-level begin-pass command totals diverge from
+  the number of clean smoke frames.
+- Focused renderer, smoke, and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 04:04:56 BST` Started `DC-147`: extending final frame-level
+  `wgpu` command evidence so it reports begin-pass command totals and
+  validates that every clean smoke frame starts the ordered frame command
+  stream with a render-pass begin command.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778900706383839`
+- `2026-05-16 04:26:40 BST` Completed `DC-147`: `WgpuFramePlan` now exposes
+  aggregate begin-render-pass command totals from ordered `BeginRenderPass`
+  frame commands, and `--game-smoke` reports
+  `frame_plan_begin_render_pass_commands: 24`, matching the 24 clean smoke
+  frames. Validation now fails if frame-plan begin-pass command totals diverge
+  from the frame count. The smoke evidence also preserved
+  `frame_plan_viewport_commands: 24`,
+  `frame_plan_scene_projection_upload_bytes: 384`,
+  `sprite_frame_plan_encoder_commands: 236`,
+  `sprite_frame_plan_draws: 92`, and `sprite_frame_plan_instances: 290`.
+  Validation passed with `cargo fmt --check`,
+  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
+  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, `git diff --check`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --live-smoke`,
+  and `make fidelity`; coverage artifacts were refreshed at
+  `2026-05-16 04:25:57 BST` and `2026-05-16 04:25:59 BST`, and the coverage
+  checker reported
+  `new Rust line coverage: 10/10 non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778901986517359`
 
 ## Ongoing Work
 
