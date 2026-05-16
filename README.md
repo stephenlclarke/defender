@@ -221,8 +221,8 @@ Clean rewrite modules:
   without touching the accepted machine adapter.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
-  draw-instance coverage, and prepares emitted scenes with the native renderer
-  draw planner.
+  draw-instance coverage, verifies sprite buffer upload-plan evidence, and
+  prepares emitted scenes with the native renderer draw planner.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, operator trigger handling,
   player-motion, enemy-motion, projectile launch/capacity/motion systems,
@@ -327,9 +327,10 @@ normalized tint, stable record counts and upload bytes, and the `wgpu` vertex
 layout for the instance buffer. It flattens those
 per-batch records into one upload-ready
 instance stream. The renderer also owns unit quad vertices, `u16` indices,
-upload bytes, and the `wgpu` vertex layout used to draw instanced sprites, then
-derives indexed instanced sprite draw commands with quad/index counts, instance
-ranges, and upload byte spans into that stream. Sprite draw plans also include
+record counts, upload bytes, and the `wgpu` vertex layout used to draw
+instanced sprites, then derives indexed instanced sprite draw commands with
+quad/index counts, instance ranges, and upload byte spans into that stream.
+Sprite draw plans also include
 `wgpu::BufferUsages` metadata and upload bytes for the quad vertex, quad index,
 and instance buffers, plus a sprite render-pass plan with stable vertex buffer
 slots, index-buffer metadata, and indexed instance draw ranges. Sprite pipeline

@@ -108,7 +108,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-140` are complete. The standing
+`DC-42` through `DC-141` are complete. The standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -6513,6 +6513,76 @@ Work log:
   non-baselined added executable line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778891966098949`
+
+### DC-141: Clean Game Smoke Sprite Buffer Upload-Plan Evidence
+
+Status: `complete`
+
+Goal: extend the clean game smoke so it proves renderer-owned sprite buffer
+upload plans are present and aligned with the flattened sprite instance upload
+stream.
+
+Scope:
+
+- Add sprite buffer upload-plan frame and byte-count evidence to the clean game
+  smoke report.
+- Report quad vertex, quad index, and instance buffer upload bytes.
+- Validate that sprite buffer upload plans exist for every clean smoke frame.
+- Validate that sprite buffer instance upload bytes match flattened sprite
+  instance upload bytes.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
+  otherwise unchanged.
+
+Acceptance criteria:
+
+- `--game-smoke` reports sprite buffer upload-plan frames and buffer byte
+  totals.
+- `--game-smoke` fails if sprite buffer upload plans are missing from any
+  frame.
+- `--game-smoke` fails if sprite buffer instance bytes diverge from flattened
+  instance upload bytes.
+- Focused smoke and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 01:41:10 BST` Started `DC-141`: extending `--game-smoke` so it
+  reports sprite buffer upload-plan frames, quad vertex/index upload bytes, and
+  instance buffer upload bytes, then validates those uploads against the
+  flattened sprite instance upload stream.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778892078200859`
+- `2026-05-16 02:02:20 BST` Completed `DC-141`: `--game-smoke` now reports
+  sprite buffer upload-plan frames plus quad vertex, quad index, and instance
+  buffer upload bytes. The current smoke run reports
+  `sprite_buffer_upload_frames: 24`, `sprite_quad_vertex_upload_bytes: 1536`,
+  `sprite_quad_index_upload_bytes: 288`,
+  `sprite_buffer_instance_upload_bytes: 13920`, and
+  `sprite_instance_upload_bytes: 13920`. Validation passed with
+  `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
+  `cargo test --lib public_api_tests`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  `git diff --check`, and `make fidelity` with `new Rust line coverage: 21/21
+  non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778893353769969`
 
 ## Ongoing Work
 
