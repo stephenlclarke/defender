@@ -221,9 +221,9 @@ Clean rewrite modules:
   without touching the accepted machine adapter.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
-  draw-instance coverage, verifies sprite buffer upload-plan and render-pass
-  plan evidence, and prepares emitted scenes with the native renderer draw
-  planner.
+  draw-instance coverage, verifies sprite buffer upload-plan, render-pass plan,
+  and frame-command evidence, and prepares emitted scenes with the native
+  renderer draw planner.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, operator trigger handling,
   player-motion, enemy-motion, projectile launch/capacity/motion systems,
@@ -291,11 +291,12 @@ code adapts frame outputs into clean audio frames before submitting to
 `defender::readme_media` facade. The binary enters through the clean platform
 boundary before delegating to the runtime bridge. `--game-smoke` steps the clean
 game through scripted controls, verifies required gameplay sprite layers,
-sprite IDs, and native draw-command pipeline and instance coverage, and prepares
-sprite-only native draw plans plus frame-level `wgpu` command,
-resource-binding, pipeline-layout, pipeline descriptor, encoder, and upload
-plans without entering the legacy live presenter. The clean `Game` world
-seeds
+sprite IDs, native draw-command pipeline and instance coverage, sprite buffer
+upload-plan coverage, render-pass plan coverage, and frame-command
+draw/instance coverage, and prepares sprite-only native draw plans plus
+frame-level `wgpu` command, resource-binding, pipeline-layout, pipeline
+descriptor, encoder, and upload plans without entering the legacy live
+presenter. The clean `Game` world seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
 wave and renders them as atlas-backed scene sprites. Operator controls are
 sampled through `OperatorControlSystem`, emitting diagnostics, audits, and
@@ -351,10 +352,11 @@ color target, and multisample state for `wgpu` render pipeline creation. Sprite
 render-pass encoder command plans then order the pipeline, bind groups, vertex
 buffers, index buffer, and indexed draw calls for `wgpu::RenderPass` execution.
 Frame-level GPU command plans combine pass clear state, viewport,
-scene-projection upload presence, optional sprite execution, and temporary
-raster evidence into one ordered scene command stream. It also records the
-centered viewport layout plus GPU-ready clear color, viewport command, and
-scene-projection constants for the target surface. The live worker still wraps
+scene-projection upload presence, optional sprite execution with command, draw,
+and instance totals, and temporary raster evidence into one ordered scene
+command stream. It also records the centered viewport layout plus GPU-ready
+clear color, viewport command, and scene-projection constants for the target
+surface. The live worker still wraps
 accepted visual output as a clean `RenderScene` raster payload before the
 presenter draws it. Kitty graphics and
 terminal-session code remain parked there as historical compatibility evidence,

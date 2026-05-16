@@ -1658,6 +1658,18 @@ impl SpriteRenderPassEncoderPlan {
             .filter(|command| matches!(command, SpriteRenderPassEncoderCommand::DrawIndexed { .. }))
             .count()
     }
+
+    pub fn instance_count(&self) -> usize {
+        self.commands
+            .iter()
+            .map(|command| match command {
+                SpriteRenderPassEncoderCommand::DrawIndexed { draw } => {
+                    (draw.instances.end - draw.instances.start) as usize
+                }
+                _ => 0,
+            })
+            .sum()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1678,6 +1690,7 @@ pub enum WgpuFrameCommand {
         encoder_label: &'static str,
         command_count: usize,
         draw_count: usize,
+        instance_count: usize,
     },
 }
 
@@ -1713,6 +1726,7 @@ impl WgpuFramePlan {
                 encoder_label: encoder.label,
                 command_count: encoder.command_count(),
                 draw_count: encoder.draw_count(),
+                instance_count: encoder.instance_count(),
             });
         }
 
@@ -1738,6 +1752,26 @@ impl WgpuFramePlan {
             .iter()
             .filter(|command| matches!(command, WgpuFrameCommand::UploadTemporaryRaster { .. }))
             .count()
+    }
+
+    pub fn sprite_draw_count(&self) -> usize {
+        self.commands
+            .iter()
+            .map(|command| match command {
+                WgpuFrameCommand::ExecuteSpriteRenderPass { draw_count, .. } => *draw_count,
+                _ => 0,
+            })
+            .sum()
+    }
+
+    pub fn sprite_instance_count(&self) -> usize {
+        self.commands
+            .iter()
+            .map(|command| match command {
+                WgpuFrameCommand::ExecuteSpriteRenderPass { instance_count, .. } => *instance_count,
+                _ => 0,
+            })
+            .sum()
     }
 }
 
@@ -2569,6 +2603,7 @@ mod tests {
         assert_eq!(plan.label, "defender.sprite.render_pass.encoder");
         assert_eq!(plan.command_count(), 8);
         assert_eq!(plan.draw_count(), 2);
+        assert_eq!(plan.instance_count(), 3);
         assert_eq!(
             plan.commands,
             vec![
@@ -2669,6 +2704,8 @@ mod tests {
         assert_eq!(plan.command_count(), 5);
         assert_eq!(plan.temporary_raster_count(), 1);
         assert_eq!(plan.sprite_pass_count(), 1);
+        assert_eq!(plan.sprite_draw_count(), 1);
+        assert_eq!(plan.sprite_instance_count(), 2);
         assert_eq!(
             plan.commands,
             vec![
@@ -2688,6 +2725,7 @@ mod tests {
                     encoder_label: "defender.sprite.render_pass.encoder",
                     command_count: 2,
                     draw_count: 1,
+                    instance_count: 2,
                 },
             ]
         );

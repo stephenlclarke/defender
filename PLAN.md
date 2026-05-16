@@ -108,7 +108,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-142` are complete. The standing
+`DC-42` through `DC-143` are complete. The standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -6655,6 +6655,76 @@ Work log:
   line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778894748207669`
+
+### DC-143: Clean Game Smoke WGPU Frame Sprite Instance Evidence
+
+Status: `complete`
+
+Goal: extend the frame-level `wgpu` command plan so clean smoke proves sprite
+execution carries both draw and instance totals through to the final frame
+command stream.
+
+Scope:
+
+- Add sprite instance totals to the frame-level `ExecuteSpriteRenderPass`
+  command plan.
+- Expose frame-plan sprite draw and instance totals through `--game-smoke`.
+- Validate that frame-plan sprite draw totals match native sprite draw
+  commands.
+- Validate that frame-plan sprite instance totals match native drawn sprite
+  instances.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
+  otherwise unchanged.
+
+Acceptance criteria:
+
+- `WgpuFramePlan` records sprite pass draw and instance totals.
+- `--game-smoke` reports frame-plan sprite draws and instances.
+- `--game-smoke` fails if frame-level sprite draw or instance totals diverge
+  from native draw-command evidence.
+- Focused renderer, smoke, and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 02:27:56 BST` Started `DC-143`: extending the final frame-level
+  `wgpu` sprite execution command so it carries sprite instance totals as well
+  as draw totals, then validating those totals in `--game-smoke`.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778894887533839`
+- `2026-05-16 02:50:24 BST` Completed `DC-143`: `ExecuteSpriteRenderPass`
+  now carries sprite instance totals alongside command and draw counts,
+  `WgpuFramePlan` exposes aggregate sprite draw and instance totals, and
+  `--game-smoke` now reports `sprite_frame_plan_draws: 92` plus
+  `sprite_frame_plan_instances: 290`, matching `sprite_draw_commands: 92` and
+  `drawn_sprite_instances: 290`. Validation passed with
+  `cargo fmt --check`, `cargo test --lib renderer::tests`,
+  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
+  `cargo run -- --game-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  `git diff --check`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --live-smoke`,
+  and `make fidelity`; coverage artifacts were refreshed at
+  `2026-05-16 02:50 BST`, and the coverage checker reported
+  `new Rust line coverage: 33/33 non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778896239989579`
 
 ## Ongoing Work
 
