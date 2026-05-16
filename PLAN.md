@@ -108,8 +108,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-150` are complete. The standing
-maintenance guidance in Ongoing Work still applies.
+`DC-42` through `DC-151` are complete. The standing maintenance guidance in
+Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -7233,6 +7233,89 @@ Work log:
   `new Rust line coverage: 16/16 non-baselined added executable line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778906585665669`
+
+### DC-151: Clean Game Smoke Sprite Render Pipeline Descriptor Evidence
+
+Status: `complete`
+
+Goal: extend the `wgpu` render pipeline descriptor evidence so clean smoke
+proves every clean frame carries the expected descriptor shape, not only a
+descriptor plan object.
+
+Scope:
+
+- Add aggregate layout bind-group, vertex-buffer, and color-target totals to
+  `SpriteRenderPipelineDescriptorPlan`.
+- Expose sprite render pipeline descriptor layout, vertex-buffer, and
+  color-target totals through `--game-smoke`.
+- Validate those totals against the clean smoke frame count and pipeline-layout
+  evidence.
+- Keep existing frame command, sprite command, upload, resource, layout, and
+  encoder evidence intact.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
+  unchanged.
+
+Acceptance criteria:
+
+- `SpriteRenderPipelineDescriptorPlan` reports expected layout bind-group,
+  vertex-buffer, and color-target totals.
+- `--game-smoke` reports sprite render pipeline descriptor shape totals.
+- `--game-smoke` fails if those totals diverge from the per-frame expected
+  values or from the pipeline-layout totals.
+- Focused renderer, smoke, and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 05:45:13 BST` Started `DC-151`: extending clean smoke render
+  pipeline descriptor evidence so it reports and validates WGPU descriptor
+  layout bind-group, vertex-buffer, and color-target totals for every clean
+  frame.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778906721909189`
+- `2026-05-16 06:07:13 BST` Completed `DC-151`:
+  `SpriteRenderPipelineDescriptorPlan` now exposes expected layout bind-group,
+  vertex-buffer, and color-target totals, and `--game-smoke` reports
+  `sprite_render_pipeline_descriptor_frames: 24`,
+  `sprite_render_pipeline_descriptor_layout_bind_groups: 48`,
+  `sprite_render_pipeline_descriptor_vertex_buffers: 48`, and
+  `sprite_render_pipeline_descriptor_color_targets: 24`. The descriptor layout
+  bind-group evidence matches `sprite_pipeline_layout_bind_groups: 48`, while
+  existing clean renderer evidence remains intact with
+  `temporary_raster_commands: 0`,
+  `frame_plan_ordered_sprite_only_frames: 24`,
+  `sprite_frame_plan_draws: 92`, and `sprite_frame_plan_instances: 290`.
+  Validation now fails if descriptor layout bind-group totals diverge from the
+  pipeline-layout totals, or if descriptor vertex-buffer/color-target totals
+  diverge from the per-frame expectations. Validation passed with
+  `cargo fmt --check`, `cargo test --lib renderer::tests`,
+  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
+  `cargo run -- --game-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, `git diff --check`,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo run -- --live-smoke`, and `make fidelity`; coverage artifacts were
+  refreshed at `2026-05-16 06:07:03 BST` and
+  `2026-05-16 06:07:04 BST`, and the coverage checker reported
+  `new Rust line coverage: 25/25 non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778908047112119`
 
 ## Ongoing Work
 

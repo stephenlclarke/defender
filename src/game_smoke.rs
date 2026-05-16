@@ -9,7 +9,8 @@ use anyhow::bail;
 
 use crate::{
     Game, GameFrame, GameInput, GamePhase, NativeRenderPipeline, NativeSceneRenderer, RenderLayer,
-    SceneDrawPlan, SpriteId, SpriteResourceBindingPlan, SurfaceSize,
+    SceneDrawPlan, SpriteId, SpriteRenderPipelineDescriptorPlan, SpriteResourceBindingPlan,
+    SurfaceSize,
 };
 
 const SMOKE_FRAMES: u32 = 24;
@@ -88,6 +89,9 @@ pub(crate) struct GameSmokeReport {
     pub(crate) sprite_pipeline_layout_bind_groups: usize,
     pub(crate) sprite_pipeline_layout_binding_entries: usize,
     pub(crate) sprite_render_pipeline_descriptor_frames: u32,
+    pub(crate) sprite_render_pipeline_descriptor_layout_bind_groups: usize,
+    pub(crate) sprite_render_pipeline_descriptor_vertex_buffers: usize,
+    pub(crate) sprite_render_pipeline_descriptor_color_targets: usize,
     pub(crate) sprite_render_pass_encoder_frames: u32,
     pub(crate) sprite_encoder_commands: usize,
     pub(crate) sprite_encoder_draws: usize,
@@ -278,6 +282,27 @@ impl GameSmokeReport {
                 "clean game smoke did not produce sprite render pipeline descriptors for every frame"
             );
         }
+        if self.sprite_render_pipeline_descriptor_layout_bind_groups
+            != self.sprite_pipeline_layout_bind_groups
+        {
+            bail!(
+                "clean game smoke sprite render pipeline descriptor bind groups did not match pipeline layout bind groups"
+            );
+        }
+        if self.sprite_render_pipeline_descriptor_vertex_buffers
+            != self.frames as usize * SpriteRenderPipelineDescriptorPlan::VERTEX_BUFFER_COUNT
+        {
+            bail!(
+                "clean game smoke did not produce sprite render pipeline descriptor vertex buffers for every frame"
+            );
+        }
+        if self.sprite_render_pipeline_descriptor_color_targets
+            != self.frames as usize * SpriteRenderPipelineDescriptorPlan::COLOR_TARGET_COUNT
+        {
+            bail!(
+                "clean game smoke did not produce sprite render pipeline descriptor color targets for every frame"
+            );
+        }
         if self.sprite_render_pass_encoder_frames != self.frames {
             bail!("clean game smoke did not produce sprite render-pass encoders for every frame");
         }
@@ -339,7 +364,7 @@ impl GameSmokeReport {
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  terrain_sprites: {}\n  starfield_sprites: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  covered_sprites: {}\n  terrain_draw_commands: {}\n  starfield_draw_commands: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  drawn_sprite_instances: {}\n  terrain_draw_instances: {}\n  starfield_draw_instances: {}\n  object_draw_instances: {}\n  projectile_draw_instances: {}\n  hud_draw_instances: {}\n  covered_pipelines: {}\n  wgpu_frame_commands: {}\n  frame_plan_begin_render_pass_commands: {}\n  frame_plan_ordered_sprite_only_frames: {}\n  frame_plan_viewport_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  frame_plan_scene_projection_upload_bytes: {}\n  sprite_frame_plan_encoder_commands: {}\n  sprite_frame_plan_draws: {}\n  sprite_frame_plan_instances: {}\n  sprite_render_pass_plan_frames: {}\n  sprite_render_pass_plan_draws: {}\n  sprite_render_pass_plan_instances: {}\n  sprite_resource_binding_frames: {}\n  sprite_resource_bind_groups: {}\n  sprite_resource_binding_entries: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_pipeline_layout_bind_groups: {}\n  sprite_pipeline_layout_binding_entries: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_buffer_upload_frames: {}\n  sprite_quad_vertex_upload_bytes: {}\n  sprite_quad_index_upload_bytes: {}\n  sprite_buffer_instance_upload_bytes: {}\n  sprite_instance_upload_records: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  terrain_sprites: {}\n  starfield_sprites: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  covered_sprites: {}\n  terrain_draw_commands: {}\n  starfield_draw_commands: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  drawn_sprite_instances: {}\n  terrain_draw_instances: {}\n  starfield_draw_instances: {}\n  object_draw_instances: {}\n  projectile_draw_instances: {}\n  hud_draw_instances: {}\n  covered_pipelines: {}\n  wgpu_frame_commands: {}\n  frame_plan_begin_render_pass_commands: {}\n  frame_plan_ordered_sprite_only_frames: {}\n  frame_plan_viewport_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  frame_plan_scene_projection_upload_bytes: {}\n  sprite_frame_plan_encoder_commands: {}\n  sprite_frame_plan_draws: {}\n  sprite_frame_plan_instances: {}\n  sprite_render_pass_plan_frames: {}\n  sprite_render_pass_plan_draws: {}\n  sprite_render_pass_plan_instances: {}\n  sprite_resource_binding_frames: {}\n  sprite_resource_bind_groups: {}\n  sprite_resource_binding_entries: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_pipeline_layout_bind_groups: {}\n  sprite_pipeline_layout_binding_entries: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pipeline_descriptor_layout_bind_groups: {}\n  sprite_render_pipeline_descriptor_vertex_buffers: {}\n  sprite_render_pipeline_descriptor_color_targets: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_buffer_upload_frames: {}\n  sprite_quad_vertex_upload_bytes: {}\n  sprite_quad_index_upload_bytes: {}\n  sprite_buffer_instance_upload_bytes: {}\n  sprite_instance_upload_records: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
             self.frames,
             frame_size,
             self.distinct_scene_signatures,
@@ -390,6 +415,9 @@ impl GameSmokeReport {
             self.sprite_pipeline_layout_bind_groups,
             self.sprite_pipeline_layout_binding_entries,
             self.sprite_render_pipeline_descriptor_frames,
+            self.sprite_render_pipeline_descriptor_layout_bind_groups,
+            self.sprite_render_pipeline_descriptor_vertex_buffers,
+            self.sprite_render_pipeline_descriptor_color_targets,
             self.sprite_render_pass_encoder_frames,
             self.sprite_encoder_commands,
             self.sprite_encoder_draws,
@@ -594,10 +622,19 @@ fn observe_frame(
             .sprite_pipeline_layout_binding_entries
             .saturating_add(layout.binding_entry_count());
     }
-    if plan.sprite_render_pipeline_descriptor.is_some() {
+    if let Some(descriptor) = &plan.sprite_render_pipeline_descriptor {
         report.sprite_render_pipeline_descriptor_frames = report
             .sprite_render_pipeline_descriptor_frames
             .saturating_add(1);
+        report.sprite_render_pipeline_descriptor_layout_bind_groups = report
+            .sprite_render_pipeline_descriptor_layout_bind_groups
+            .saturating_add(descriptor.layout_bind_group_count());
+        report.sprite_render_pipeline_descriptor_vertex_buffers = report
+            .sprite_render_pipeline_descriptor_vertex_buffers
+            .saturating_add(descriptor.vertex_buffer_count());
+        report.sprite_render_pipeline_descriptor_color_targets = report
+            .sprite_render_pipeline_descriptor_color_targets
+            .saturating_add(descriptor.color_target_count());
     }
     if let Some(encoder) = &plan.sprite_render_pass_encoder {
         report.sprite_render_pass_encoder_frames =
@@ -809,7 +846,9 @@ mod tests {
         GameSmokeReport, record_draw_command, required_pipeline_label, required_sprite_label,
         smoke_input, smoke_report,
     };
-    use crate::{SpritePipelineLayoutPlan, SpriteResourceBindingPlan};
+    use crate::{
+        SpritePipelineLayoutPlan, SpriteRenderPipelineDescriptorPlan, SpriteResourceBindingPlan,
+    };
 
     #[test]
     fn smoke_report_exercises_clean_game_and_native_draw_plans() {
@@ -919,6 +958,22 @@ mod tests {
         assert_eq!(
             report.sprite_render_pipeline_descriptor_frames,
             report.frames
+        );
+        assert_eq!(
+            report.sprite_render_pipeline_descriptor_layout_bind_groups,
+            report.frames as usize * SpriteRenderPipelineDescriptorPlan::LAYOUT_BIND_GROUP_COUNT
+        );
+        assert_eq!(
+            report.sprite_render_pipeline_descriptor_layout_bind_groups,
+            report.sprite_pipeline_layout_bind_groups
+        );
+        assert_eq!(
+            report.sprite_render_pipeline_descriptor_vertex_buffers,
+            report.frames as usize * SpriteRenderPipelineDescriptorPlan::VERTEX_BUFFER_COUNT
+        );
+        assert_eq!(
+            report.sprite_render_pipeline_descriptor_color_targets,
+            report.frames as usize * SpriteRenderPipelineDescriptorPlan::COLOR_TARGET_COUNT
         );
         assert_eq!(report.sprite_render_pass_encoder_frames, report.frames);
         assert!(report.sprite_encoder_commands > 0);
@@ -1472,6 +1527,48 @@ mod tests {
         );
 
         let mut report = valid_report();
+        report.sprite_render_pipeline_descriptor_layout_bind_groups = report
+            .sprite_render_pipeline_descriptor_layout_bind_groups
+            .saturating_sub(1);
+
+        let error = report
+            .validate()
+            .expect_err("render pipeline descriptor bind group mismatch should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke sprite render pipeline descriptor bind groups did not match pipeline layout bind groups"
+        );
+
+        let mut report = valid_report();
+        report.sprite_render_pipeline_descriptor_vertex_buffers = report
+            .sprite_render_pipeline_descriptor_vertex_buffers
+            .saturating_sub(1);
+
+        let error = report
+            .validate()
+            .expect_err("missing render pipeline descriptor vertex buffer should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite render pipeline descriptor vertex buffers for every frame"
+        );
+
+        let mut report = valid_report();
+        report.sprite_render_pipeline_descriptor_color_targets = report
+            .sprite_render_pipeline_descriptor_color_targets
+            .saturating_sub(1);
+
+        let error = report
+            .validate()
+            .expect_err("missing render pipeline descriptor color target should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke did not produce sprite render pipeline descriptor color targets for every frame"
+        );
+
+        let mut report = valid_report();
         report.sprite_render_pass_encoder_frames = 2;
 
         let error = report
@@ -1700,6 +1797,9 @@ mod tests {
             sprite_pipeline_layout_bind_groups: 4,
             sprite_pipeline_layout_binding_entries: 6,
             sprite_render_pipeline_descriptor_frames: 2,
+            sprite_render_pipeline_descriptor_layout_bind_groups: 4,
+            sprite_render_pipeline_descriptor_vertex_buffers: 4,
+            sprite_render_pipeline_descriptor_color_targets: 2,
             sprite_render_pass_encoder_frames: 2,
             sprite_encoder_commands: 12,
             sprite_encoder_draws: 5,
@@ -1768,6 +1868,9 @@ mod tests {
                 "  sprite_pipeline_layout_bind_groups: 4\n",
                 "  sprite_pipeline_layout_binding_entries: 6\n",
                 "  sprite_render_pipeline_descriptor_frames: 2\n",
+                "  sprite_render_pipeline_descriptor_layout_bind_groups: 4\n",
+                "  sprite_render_pipeline_descriptor_vertex_buffers: 4\n",
+                "  sprite_render_pipeline_descriptor_color_targets: 2\n",
                 "  sprite_render_pass_encoder_frames: 2\n",
                 "  sprite_encoder_commands: 12\n",
                 "  sprite_encoder_draws: 5\n",
@@ -1892,6 +1995,9 @@ mod tests {
             sprite_pipeline_layout_bind_groups: 6,
             sprite_pipeline_layout_binding_entries: 9,
             sprite_render_pipeline_descriptor_frames: 3,
+            sprite_render_pipeline_descriptor_layout_bind_groups: 6,
+            sprite_render_pipeline_descriptor_vertex_buffers: 6,
+            sprite_render_pipeline_descriptor_color_targets: 3,
             sprite_render_pass_encoder_frames: 3,
             sprite_encoder_commands: 18,
             sprite_encoder_draws: 5,

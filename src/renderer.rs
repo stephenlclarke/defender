@@ -1556,6 +1556,10 @@ pub struct SpriteRenderPipelineDescriptorPlan {
 }
 
 impl SpriteRenderPipelineDescriptorPlan {
+    pub const LAYOUT_BIND_GROUP_COUNT: usize = SpritePipelineLayoutPlan::BIND_GROUP_COUNT;
+    pub const VERTEX_BUFFER_COUNT: usize = 2;
+    pub const COLOR_TARGET_COUNT: usize = 1;
+
     fn from_pipeline_and_layout(
         pipeline: &SpritePipelinePlan,
         layout: &SpritePipelineLayoutPlan,
@@ -1578,6 +1582,18 @@ impl SpriteRenderPipelineDescriptorPlan {
     pub fn vertex_buffer_layouts(&self) -> [wgpu::VertexBufferLayout<'static>; 2] {
         self.vertex_buffers
             .map(|buffer| buffer.vertex_buffer_layout())
+    }
+
+    pub fn layout_bind_group_count(&self) -> usize {
+        self.layout_bind_group_count
+    }
+
+    pub fn vertex_buffer_count(&self) -> usize {
+        self.vertex_buffers.len()
+    }
+
+    pub fn color_target_count(&self) -> usize {
+        Self::COLOR_TARGET_COUNT
     }
 
     pub fn color_targets(&self) -> [Option<wgpu::ColorTargetState>; 1] {
@@ -3142,7 +3158,18 @@ mod tests {
 
         assert_eq!(descriptor.label, "defender.sprite.pipeline");
         assert_eq!(descriptor.layout_label, "defender.sprite.pipeline_layout");
-        assert_eq!(descriptor.layout_bind_group_count, 2);
+        assert_eq!(
+            descriptor.layout_bind_group_count(),
+            SpriteRenderPipelineDescriptorPlan::LAYOUT_BIND_GROUP_COUNT
+        );
+        assert_eq!(
+            descriptor.vertex_buffer_count(),
+            SpriteRenderPipelineDescriptorPlan::VERTEX_BUFFER_COUNT
+        );
+        assert_eq!(
+            descriptor.color_target_count(),
+            SpriteRenderPipelineDescriptorPlan::COLOR_TARGET_COUNT
+        );
         assert_eq!(descriptor.immediate_size, 0);
         assert_eq!(descriptor.shader_label, "defender.sprite.shader");
         assert_eq!(descriptor.vertex_entry, "sprite_vs");
