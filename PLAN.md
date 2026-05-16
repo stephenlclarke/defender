@@ -108,8 +108,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-144` are complete. The standing
-maintenance guidance in Ongoing Work still applies.
+`DC-42` through `DC-145` are complete. The standing maintenance guidance in
+Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -6793,6 +6793,75 @@ Work log:
   `new Rust line coverage: 12/12 non-baselined added executable line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778897775341499`
+
+### DC-145: Clean Game Smoke WGPU Frame Projection Upload Evidence
+
+Status: `complete`
+
+Goal: extend the final frame-level `wgpu` command evidence so clean smoke proves
+scene-projection upload bytes survive into the ordered frame command stream.
+
+Scope:
+
+- Add aggregate scene-projection upload byte totals to `WgpuFramePlan`.
+- Expose frame-plan scene-projection upload bytes through `--game-smoke`.
+- Validate that frame-plan projection bytes match sprite resource-binding
+  projection upload evidence.
+- Keep the existing frame-plan sprite command, draw, and instance evidence
+  intact.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
+  unchanged.
+
+Acceptance criteria:
+
+- `WgpuFramePlan` reports aggregate scene-projection upload bytes.
+- `--game-smoke` reports frame-plan scene-projection upload bytes.
+- `--game-smoke` fails if frame-level projection bytes diverge from resource
+  binding projection upload evidence.
+- Focused renderer, smoke, and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 03:17:39 BST` Started `DC-145`: extending final frame-level
+  `wgpu` command evidence so it reports scene-projection upload bytes and
+  validating those bytes against resource-binding projection upload evidence
+  in `--game-smoke`.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778897895059149`
+- `2026-05-16 03:38:58 BST` Completed `DC-145`: `WgpuFramePlan` now exposes
+  aggregate scene-projection upload bytes from ordered
+  `UploadSceneProjection` frame commands, and `--game-smoke` reports
+  `frame_plan_scene_projection_upload_bytes: 384`, matching
+  `scene_projection_upload_bytes: 384`. Validation now fails if the frame-plan
+  projection upload total diverges from the resource-binding projection upload
+  evidence. Validation passed with `cargo fmt --check`,
+  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
+  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, `git diff --check`,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo run -- --live-smoke`, and `make fidelity`; coverage artifacts were
+  refreshed at `2026-05-16 03:38 BST`, and the coverage checker reported
+  `new Rust line coverage: 13/13 non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778899153140279`
 
 ## Ongoing Work
 

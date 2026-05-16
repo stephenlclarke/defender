@@ -150,10 +150,10 @@ upload bytes, and the `wgpu` vertex layout for the instance buffer.
 `--game-smoke` steps the clean game through scripted controls, verifies
 required gameplay sprite layers, sprite IDs, native draw-command pipeline and
 instance coverage, sprite buffer upload-plan coverage, render-pass plan
-coverage, and frame-command sprite command/draw/instance coverage, and prepares
-sprite-only native draw plans plus frame-level `wgpu` command,
-resource-binding, pipeline-layout, pipeline descriptor, encoder, and upload
-plans without entering the legacy live presenter. The clean `Game` world
+coverage, and frame-command sprite command/draw/instance plus projection upload
+coverage, and prepares sprite-only native draw plans plus frame-level `wgpu`
+command, resource-binding, pipeline-layout, pipeline descriptor, encoder, and
+upload plans without entering the legacy live presenter. The clean `Game` world
 seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
 wave and renders them as atlas-backed scene sprites. Operator controls are
@@ -227,8 +227,8 @@ reintroduce legacy implementation terminology.
 - Live play uses the windowed `wgpu` backend.
 - `--game-smoke` runs a clean game, gameplay sprite coverage, native
   draw-command pipeline and instance coverage, native draw-plan, `wgpu`
-  frame-plan sprite command/draw/instance evidence, and GPU resource-plan smoke
-  without the legacy live presenter.
+  frame-plan projection and sprite command/draw/instance evidence, and GPU
+  resource-plan smoke without the legacy live presenter.
 - Runtime renderer selection has been removed.
 - `--input-profile planetoid` is the default input profile.
 - `--input-profile cabinet` exposes a MAME-style cabinet keyboard profile.
