@@ -295,7 +295,7 @@ sprite IDs, native draw-command pipeline and instance coverage, sprite buffer
 upload-plan coverage, render-pass plan coverage, and frame-command sprite
 command/draw/instance plus ordered sprite-only begin-pass, viewport, and
 projection upload coverage, and prepares sprite-only native draw plans plus
-frame-level `wgpu` command, resource-binding, pipeline-layout, pipeline
+frame-level `wgpu` command, resource bind-group, pipeline-layout, pipeline
 descriptor, encoder, and upload plans without entering the legacy live
 presenter. The clean `Game` world seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
@@ -342,8 +342,9 @@ vertex and fragment entry points, quad and instance vertex layouts,
 alpha-blended color target, primitive state, and multisample state for the
 target texture format. Sprite resource
 binding plans describe the scene-projection uniform upload, projection bind
-group layout, atlas texture binding, atlas sampler binding, and atlas texture
-upload metadata used by that shader. The default clean sprite atlas owns
+group layout, atlas texture binding, atlas sampler binding, atlas texture
+upload metadata, and expected bind-group and binding-entry totals used by that
+shader. The default clean sprite atlas owns
 deterministic nonblank RGBA pixels plus the `wgpu` texture format, usage,
 extent, and copy layout needed to populate it. Sprite pipeline layout plans
 then order those projection and atlas bind groups for `wgpu`

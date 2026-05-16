@@ -556,6 +556,8 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("render_pass.draw_count()"));
         assert!(game_smoke_rs.contains("render_pass.instance_count()"));
         assert!(game_smoke_rs.contains("plan.sprite_resource_bindings"));
+        assert!(game_smoke_rs.contains("bindings.bind_group_count()"));
+        assert!(game_smoke_rs.contains("bindings.binding_entry_count()"));
         assert!(game_smoke_rs.contains("plan.sprite_pipeline_layout"));
         assert!(game_smoke_rs.contains("plan.sprite_render_pipeline_descriptor"));
         assert!(game_smoke_rs.contains("plan.sprite_render_pass_encoder"));
@@ -570,6 +572,8 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("sprite_frame_plan_instances"));
         assert!(game_smoke_rs.contains("sprite_render_pass_plan_frames"));
         assert!(game_smoke_rs.contains("sprite_render_pass_plan_instances"));
+        assert!(game_smoke_rs.contains("sprite_resource_bind_groups"));
+        assert!(game_smoke_rs.contains("sprite_resource_binding_entries"));
         assert!(game_smoke_rs.contains("sprite_buffer_upload_frames"));
         assert!(game_smoke_rs.contains("sprite_buffer_instance_upload_bytes"));
         assert!(game_smoke_rs.contains("sprite_instance_upload_records"));

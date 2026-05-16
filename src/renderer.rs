@@ -1458,6 +1458,9 @@ pub struct SpriteResourceBindingPlan {
 }
 
 impl SpriteResourceBindingPlan {
+    pub const BIND_GROUP_COUNT: usize = 2;
+    pub const BINDING_ENTRY_COUNT: usize = 3;
+
     fn from_projection_and_atlas(
         projection: SceneProjectionUniforms,
         atlas: &TextureAtlas,
@@ -1472,6 +1475,14 @@ impl SpriteResourceBindingPlan {
             atlas_texture: SpriteTextureBindingPlan::atlas(atlas.surface),
             atlas_sampler: SpriteSamplerBindingPlan::atlas(),
         })
+    }
+
+    pub fn bind_group_count(&self) -> usize {
+        Self::BIND_GROUP_COUNT
+    }
+
+    pub fn binding_entry_count(&self) -> usize {
+        self.projection_layout.entries.len() + self.atlas_layout.entries.len()
     }
 }
 
@@ -2981,6 +2992,14 @@ mod tests {
             }
         );
         assert_eq!(plan.projection_layout.group_index(), 0);
+        assert_eq!(
+            plan.bind_group_count(),
+            SpriteResourceBindingPlan::BIND_GROUP_COUNT
+        );
+        assert_eq!(
+            plan.binding_entry_count(),
+            SpriteResourceBindingPlan::BINDING_ENTRY_COUNT
+        );
         assert_eq!(
             plan.projection_layout,
             SpriteBindGroupLayoutPlan {
