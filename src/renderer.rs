@@ -1513,6 +1513,8 @@ pub struct SpritePipelineLayoutPlan {
 }
 
 impl SpritePipelineLayoutPlan {
+    pub const BIND_GROUP_COUNT: usize = SpriteResourceBindingPlan::BIND_GROUP_COUNT;
+    pub const BINDING_ENTRY_COUNT: usize = SpriteResourceBindingPlan::BINDING_ENTRY_COUNT;
     pub const IMMEDIATE_SIZE: u32 = 0;
 
     fn from_resource_bindings(bindings: &SpriteResourceBindingPlan) -> Self {
@@ -1528,6 +1530,13 @@ impl SpritePipelineLayoutPlan {
 
     pub fn bind_group_count(&self) -> usize {
         self.bind_groups.len()
+    }
+
+    pub fn binding_entry_count(&self) -> usize {
+        self.bind_groups
+            .iter()
+            .map(|bind_group| bind_group.entry_count)
+            .sum()
     }
 }
 
@@ -3087,7 +3096,14 @@ mod tests {
 
         assert_eq!(plan.label, "defender.sprite.pipeline_layout");
         assert_eq!(plan.immediate_size, 0);
-        assert_eq!(plan.bind_group_count(), 2);
+        assert_eq!(
+            plan.bind_group_count(),
+            SpritePipelineLayoutPlan::BIND_GROUP_COUNT
+        );
+        assert_eq!(
+            plan.binding_entry_count(),
+            SpritePipelineLayoutPlan::BINDING_ENTRY_COUNT
+        );
         assert_eq!(
             plan.bind_groups,
             vec![

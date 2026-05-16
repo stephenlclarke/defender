@@ -108,8 +108,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-149` are complete. The standing maintenance guidance in
-Ongoing Work still applies.
+`DC-42` through `DC-150` are complete. The standing
+maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -7154,6 +7154,85 @@ Work log:
   `new Rust line coverage: 16/16 non-baselined added executable line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778905091907579`
+
+### DC-150: Clean Game Smoke Sprite Pipeline-Layout Bind-Group Evidence
+
+Status: `complete`
+
+Goal: extend the `wgpu` pipeline-layout evidence so clean smoke proves every
+clean frame carries the expected sprite pipeline-layout bind groups and binding
+entries, not only a pipeline-layout plan object.
+
+Scope:
+
+- Add aggregate bind-group and binding-entry totals to
+  `SpritePipelineLayoutPlan`.
+- Expose sprite pipeline-layout bind-group and binding-entry totals through
+  `--game-smoke`.
+- Validate those totals against the clean smoke frame count and the sprite
+  resource-binding evidence.
+- Keep existing frame command, sprite command, upload, resource, descriptor,
+  and encoder evidence intact.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
+  unchanged.
+
+Acceptance criteria:
+
+- `SpritePipelineLayoutPlan` reports expected bind-group and binding-entry
+  totals.
+- `--game-smoke` reports sprite pipeline-layout bind-group and binding-entry
+  totals.
+- `--game-smoke` fails if those totals diverge from the per-frame expected
+  values or from the resource-binding totals.
+- Focused renderer, smoke, and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 05:20:26 BST` Started `DC-150`: extending clean smoke
+  pipeline-layout evidence so it reports and validates WGPU sprite
+  pipeline-layout bind-group and binding-entry totals for every clean frame.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778905235441659`
+- `2026-05-16 05:43:16 BST` Completed `DC-150`:
+  `SpritePipelineLayoutPlan` now exposes expected bind-group and binding-entry
+  totals, and `--game-smoke` reports `sprite_pipeline_layout_frames: 24`,
+  `sprite_pipeline_layout_bind_groups: 48`, and
+  `sprite_pipeline_layout_binding_entries: 72` while matching
+  `sprite_resource_bind_groups: 48` and
+  `sprite_resource_binding_entries: 72`. Existing clean renderer evidence
+  remains intact with `temporary_raster_commands: 0`,
+  `frame_plan_ordered_sprite_only_frames: 24`,
+  `sprite_frame_plan_draws: 92`, and `sprite_frame_plan_instances: 290`.
+  Validation now fails if the pipeline-layout bind-group or binding-entry
+  totals diverge from the resource-binding totals. Validation passed with
+  `cargo fmt --check`, `cargo test --lib renderer::tests`,
+  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo run -- --game-smoke`, `cargo run -- --live-smoke`, `make fidelity`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, and `git diff --check`; coverage artifacts
+  were refreshed at `2026-05-16 05:42:37 BST` and
+  `2026-05-16 05:42:38 BST`, and the coverage checker reported
+  `new Rust line coverage: 16/16 non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778906585665669`
 
 ## Ongoing Work
 

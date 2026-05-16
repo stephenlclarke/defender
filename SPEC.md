@@ -153,8 +153,8 @@ instance coverage, sprite buffer upload-plan coverage, render-pass plan
 coverage, and frame-command sprite command/draw/instance plus ordered
 sprite-only begin-pass, viewport, and projection upload coverage, and prepares
 sprite-only native draw plans plus frame-level `wgpu` command, resource
-bind-group, pipeline-layout, pipeline descriptor, encoder, and upload plans without
-entering the legacy live presenter. The clean `Game` world
+bind-group, pipeline-layout bind-group, pipeline descriptor, encoder, and
+upload plans without entering the legacy live presenter. The clean `Game` world
 seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
 wave and renders them as atlas-backed scene sprites. Operator controls are
@@ -203,10 +203,11 @@ bind-group and binding-entry totals used by that shader. The default clean
 sprite atlas owns deterministic nonblank RGBA pixels plus the `wgpu` texture
 format, usage, extent, and copy layout needed to
 populate it. Sprite pipeline layout plans then order those projection and atlas
-bind groups for `wgpu` `PipelineLayoutDescriptor` creation, and sprite render
-pipeline descriptor plans combine that layout with shader entries, vertex
-buffers, primitive state, color target, and multisample state for `wgpu` render
-pipeline creation. Sprite render-pass encoder command plans then order the
+bind groups for `wgpu` `PipelineLayoutDescriptor` creation and expose the
+expected bind-group and binding-entry totals carried into that layout. Sprite
+render pipeline descriptor plans combine that layout with shader entries,
+vertex buffers, primitive state, color target, and multisample state for `wgpu`
+render pipeline creation. Sprite render-pass encoder command plans then order the
 pipeline, bind groups, vertex buffers, index buffer, and indexed draw calls for
 `wgpu::RenderPass` execution. Frame-level GPU command plans combine begin-pass
 clear state, viewport command presence, scene-projection upload presence,
