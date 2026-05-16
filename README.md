@@ -221,8 +221,9 @@ Clean rewrite modules:
   without touching the accepted machine adapter.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
-  draw-instance coverage, verifies sprite buffer upload-plan evidence, and
-  prepares emitted scenes with the native renderer draw planner.
+  draw-instance coverage, verifies sprite buffer upload-plan and render-pass
+  plan evidence, and prepares emitted scenes with the native renderer draw
+  planner.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, operator trigger handling,
   player-motion, enemy-motion, projectile launch/capacity/motion systems,
@@ -333,10 +334,11 @@ quad/index counts, instance ranges, and upload byte spans into that stream.
 Sprite draw plans also include
 `wgpu::BufferUsages` metadata and upload bytes for the quad vertex, quad index,
 and instance buffers, plus a sprite render-pass plan with stable vertex buffer
-slots, index-buffer metadata, and indexed instance draw ranges. Sprite pipeline
-plans describe the renderer-owned WGSL shader, vertex and fragment entry
-points, quad and instance vertex layouts, alpha-blended color target, primitive
-state, and multisample state for the target texture format. Sprite resource
+slots, index-buffer metadata, indexed instance draw ranges, draw counts, and
+instance counts. Sprite pipeline plans describe the renderer-owned WGSL shader,
+vertex and fragment entry points, quad and instance vertex layouts,
+alpha-blended color target, primitive state, and multisample state for the
+target texture format. Sprite resource
 binding plans describe the scene-projection uniform upload, projection bind
 group layout, atlas texture binding, atlas sampler binding, and atlas texture
 upload metadata used by that shader. The default clean sprite atlas owns

@@ -108,7 +108,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-141` are complete. The standing
+`DC-42` through `DC-142` are complete. The standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -6583,6 +6583,78 @@ Work log:
   non-baselined added executable line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778893353769969`
+
+### DC-142: Clean Game Smoke Sprite Render-Pass Plan Evidence
+
+Status: `complete`
+
+Goal: extend the clean game smoke so it proves renderer-owned sprite
+render-pass plans are present and aligned with native sprite draw commands.
+
+Scope:
+
+- Add sprite render-pass plan frame, draw, and instance evidence to the clean
+  game smoke report.
+- Validate that sprite render-pass plans exist for every clean smoke frame.
+- Validate that sprite render-pass draw counts match native sprite draw
+  command totals.
+- Validate that sprite render-pass instance counts match native drawn sprite
+  instance totals.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
+  otherwise unchanged.
+
+Acceptance criteria:
+
+- `--game-smoke` reports sprite render-pass plan frames, draws, and instances.
+- `--game-smoke` fails if sprite render-pass plans are missing from any frame.
+- `--game-smoke` fails if render-pass draw or instance totals diverge from
+  native draw-command evidence.
+- Focused smoke and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 02:03:55 BST` Started `DC-142`: extending `--game-smoke` so it
+  reports sprite render-pass plan frames, draw counts, and instance counts,
+  then validates those values against native sprite draw commands and drawn
+  sprite instances.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778893444143389`
+- `2026-05-16 02:25:23 BST` Completed `DC-142`: `--game-smoke` now reports
+  `sprite_render_pass_plan_frames: 24`,
+  `sprite_render_pass_plan_draws: 92`, and
+  `sprite_render_pass_plan_instances: 290`, with render-pass draw and instance
+  totals validated against `sprite_draw_commands: 92` and
+  `drawn_sprite_instances: 290`. Validation passed with
+  `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
+  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  `git diff --check`, `cargo run -- --live-smoke`,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  and `make fidelity`; coverage artifacts were refreshed at
+  `2026-05-16 02:24 BST`, and
+  `python3 tools/check_new_rust_coverage.py --lcov target/coverage/lcov.info
+  --base HEAD --uncovered-baseline tools/new_rust_coverage_baseline.txt`
+  reported `new Rust line coverage: 15/15 non-baselined added executable
+  line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778894748207669`
 
 ## Ongoing Work
 

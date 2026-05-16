@@ -68,8 +68,9 @@ tree:
   without touching the accepted machine adapter.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
-  draw-instance coverage, verifies sprite buffer upload-plan evidence, and
-  prepares emitted scenes with the native renderer draw planner.
+  draw-instance coverage, verifies sprite buffer upload-plan and render-pass
+  plan evidence, and prepares emitted scenes with the native renderer draw
+  planner.
 - `src/systems.rs`: deterministic fixed-step timing utilities, clean
   player-control intent/trigger systems, operator trigger handling,
   player-motion, enemy-motion, projectile launch/capacity/motion systems,
@@ -148,7 +149,8 @@ rectangles, normalized atlas UVs, normalized tint, stable record counts and
 upload bytes, and the `wgpu` vertex layout for the instance buffer.
 `--game-smoke` steps the clean game through scripted controls, verifies
 required gameplay sprite layers, sprite IDs, native draw-command pipeline and
-instance coverage, and sprite buffer upload-plan coverage, and prepares
+instance coverage, sprite buffer upload-plan coverage, and render-pass plan
+coverage, and prepares
 sprite-only native draw plans plus frame-level `wgpu` command,
 resource-binding, pipeline-layout, pipeline descriptor, encoder, and upload
 plans without entering the legacy live presenter. The clean `Game` world
@@ -187,9 +189,11 @@ viewport layout plus GPU-ready clear color, viewport command, and
 scene-projection constants for the target surface.
 Sprite draw plans also include `wgpu::BufferUsages` metadata and upload bytes
 for the quad vertex, quad index, and instance buffers, plus a sprite render-pass
-plan with stable vertex buffer slots, index-buffer metadata, and indexed
-instance draw ranges. Sprite pipeline plans describe the renderer-owned WGSL
-shader, vertex and fragment entry points, quad and instance vertex layouts,
+plan with stable vertex buffer slots, index-buffer metadata, indexed
+instance draw ranges, draw counts, and instance counts. Sprite render-pass
+plans prove native draw command ranges are ready to encode without presenter
+side regrouping. Sprite pipeline plans describe the renderer-owned WGSL shader,
+vertex and fragment entry points, quad and instance vertex layouts,
 alpha-blended color target, primitive state, and multisample state for the
 target texture format. Sprite resource binding plans describe the
 scene-projection uniform upload, projection bind group layout, atlas texture
