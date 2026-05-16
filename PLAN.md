@@ -108,7 +108,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-145` are complete. The standing maintenance guidance in
+`DC-42` through `DC-146` are complete. The standing maintenance guidance in
 Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -6862,6 +6862,75 @@ Work log:
   `new Rust line coverage: 13/13 non-baselined added executable line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778899153140279`
+
+### DC-146: Clean Game Smoke WGPU Frame Viewport Command Evidence
+
+Status: `complete`
+
+Goal: extend the final frame-level `wgpu` command evidence so clean smoke
+proves viewport setup reaches the ordered frame command stream for every clean
+frame.
+
+Scope:
+
+- Add aggregate viewport command totals to `WgpuFramePlan`.
+- Expose frame-plan viewport command totals through `--game-smoke`.
+- Validate that every clean smoke frame carries exactly one viewport command in
+  the ordered frame command stream.
+- Keep the existing frame-plan projection, sprite command, draw, and instance
+  evidence intact.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
+  unchanged.
+
+Acceptance criteria:
+
+- `WgpuFramePlan` reports aggregate viewport command totals.
+- `--game-smoke` reports frame-plan viewport command totals.
+- `--game-smoke` fails if frame-level viewport command totals diverge from the
+  number of clean smoke frames.
+- Focused renderer, smoke, and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 03:41:40 BST` Started `DC-146`: extending final frame-level
+  `wgpu` command evidence so it reports viewport command totals and validates
+  that every clean smoke frame carries viewport setup in the ordered frame
+  command stream.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778899298772809`
+- `2026-05-16 04:02:42 BST` Completed `DC-146`: `WgpuFramePlan` now exposes
+  aggregate viewport command totals from ordered `SetViewport` frame commands,
+  and `--game-smoke` reports `frame_plan_viewport_commands: 24`, matching the
+  24 clean smoke frames. Validation now fails if frame-plan viewport command
+  totals diverge from the frame count. Validation passed with
+  `cargo fmt --check`, `cargo test --lib renderer::tests`,
+  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
+  `cargo run -- --game-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  `git diff --check`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --live-smoke`,
+  and `make fidelity`; coverage artifacts were refreshed at
+  `2026-05-16 04:02 BST`, and the coverage checker reported
+  `new Rust line coverage: 10/10 non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778900577365789`
 
 ## Ongoing Work
 

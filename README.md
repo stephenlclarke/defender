@@ -293,8 +293,9 @@ boundary before delegating to the runtime bridge. `--game-smoke` steps the clean
 game through scripted controls, verifies required gameplay sprite layers,
 sprite IDs, native draw-command pipeline and instance coverage, sprite buffer
 upload-plan coverage, render-pass plan coverage, and frame-command sprite
-command/draw/instance plus projection upload coverage, and prepares sprite-only
-native draw plans plus frame-level `wgpu` command, resource-binding,
+command/draw/instance plus viewport and projection upload coverage, and
+prepares sprite-only native draw plans plus frame-level `wgpu` command,
+resource-binding,
 pipeline-layout, pipeline
 descriptor, encoder, and upload plans without entering the legacy live
 presenter. The clean `Game` world seeds
@@ -352,9 +353,10 @@ plans combine that layout with shader entries, vertex buffers, primitive state,
 color target, and multisample state for `wgpu` render pipeline creation. Sprite
 render-pass encoder command plans then order the pipeline, bind groups, vertex
 buffers, index buffer, and indexed draw calls for `wgpu::RenderPass` execution.
-Frame-level GPU command plans combine pass clear state, viewport,
-scene-projection upload presence, optional sprite execution with command, draw,
-and instance totals, and temporary raster evidence into one ordered scene
+Frame-level GPU command plans combine pass clear state, viewport command
+presence, scene-projection upload presence, optional sprite execution with
+command, draw, and instance totals, and temporary raster evidence into one
+ordered scene
 command stream. It also records the centered viewport layout plus GPU-ready
 clear color, viewport command, and scene-projection constants for the target
 surface. The live worker still wraps
