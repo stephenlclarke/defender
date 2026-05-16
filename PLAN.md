@@ -108,7 +108,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-139` are complete. The standing
+`DC-42` through `DC-140` are complete. The standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -6447,6 +6447,72 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778889599148589`
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778890523940999`
+
+### DC-140: Clean Game Smoke Sprite Upload-Instance Coverage Evidence
+
+Status: `complete`
+
+Goal: extend the clean game smoke so it proves the native sprite instance
+upload contains the same clean sprite instances that are represented by native
+draw commands.
+
+Scope:
+
+- Add sprite instance upload record-count evidence to the clean game smoke
+  report.
+- Validate that uploaded sprite instance records match clean sprite instance
+  totals.
+- Validate that uploaded sprite instance records match the drawn sprite
+  instance totals.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
+  otherwise unchanged.
+
+Acceptance criteria:
+
+- `--game-smoke` reports uploaded sprite instance records.
+- `--game-smoke` fails if uploaded sprite instance records diverge from clean
+  sprite instances or native draw-command instance totals.
+- Focused smoke and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 01:17:28 BST` Started `DC-140`: extending `--game-smoke` so it
+  reports uploaded sprite instance records and validates that the native
+  instance upload matches both clean sprite instances and drawn sprite
+  instances.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778890666333329`
+- `2026-05-16 01:39:28 BST` Completed `DC-140`: `--game-smoke` now reports
+  `sprite_instance_upload_records`; validation fails if uploaded sprite
+  records diverge from native draw-command instance totals; the current smoke
+  run reports `sprite_instances: 290`, `drawn_sprite_instances: 290`,
+  `sprite_instance_upload_records: 290`, and
+  `sprite_instance_upload_bytes: 13920`. Validation passed with
+  `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
+  `cargo test --lib public_api_tests`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
+  `git diff --check`, and `make fidelity` with `new Rust line coverage: 5/5
+  non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778891966098949`
 
 ## Ongoing Work
 

@@ -77,6 +77,7 @@ pub(crate) struct GameSmokeReport {
     pub(crate) sprite_render_pass_encoder_frames: u32,
     pub(crate) sprite_encoder_commands: usize,
     pub(crate) sprite_encoder_draws: usize,
+    pub(crate) sprite_instance_upload_records: usize,
     pub(crate) sprite_instance_upload_bytes: usize,
     pub(crate) sprite_atlas_upload_bytes: usize,
     pub(crate) scene_projection_upload_bytes: usize,
@@ -165,6 +166,11 @@ impl GameSmokeReport {
         if self.hud_draw_instances != self.hud_sprites {
             bail!("clean game smoke hud draw instances did not match hud sprites");
         }
+        if self.sprite_instance_upload_records != self.drawn_sprite_instances {
+            bail!(
+                "clean game smoke sprite instance upload records did not match drawn sprite instances"
+            );
+        }
         for required in REQUIRED_PIPELINES {
             if !self
                 .covered_pipelines
@@ -236,7 +242,7 @@ impl GameSmokeReport {
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  terrain_sprites: {}\n  starfield_sprites: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  covered_sprites: {}\n  terrain_draw_commands: {}\n  starfield_draw_commands: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  drawn_sprite_instances: {}\n  terrain_draw_instances: {}\n  starfield_draw_instances: {}\n  object_draw_instances: {}\n  projectile_draw_instances: {}\n  hud_draw_instances: {}\n  covered_pipelines: {}\n  wgpu_frame_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  sprite_resource_binding_frames: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  terrain_sprites: {}\n  starfield_sprites: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  covered_sprites: {}\n  terrain_draw_commands: {}\n  starfield_draw_commands: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  drawn_sprite_instances: {}\n  terrain_draw_instances: {}\n  starfield_draw_instances: {}\n  object_draw_instances: {}\n  projectile_draw_instances: {}\n  hud_draw_instances: {}\n  covered_pipelines: {}\n  wgpu_frame_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  sprite_resource_binding_frames: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_instance_upload_records: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
             self.frames,
             frame_size,
             self.distinct_scene_signatures,
@@ -276,6 +282,7 @@ impl GameSmokeReport {
             self.sprite_render_pass_encoder_frames,
             self.sprite_encoder_commands,
             self.sprite_encoder_draws,
+            self.sprite_instance_upload_records,
             self.sprite_instance_upload_bytes,
             self.sprite_atlas_upload_bytes,
             self.scene_projection_upload_bytes,
@@ -392,6 +399,9 @@ fn observe_frame(
         .temporary_raster_commands
         .saturating_add(plan.frame_plan.temporary_raster_count());
     if let Some(upload) = &plan.sprite_instance_upload {
+        report.sprite_instance_upload_records = report
+            .sprite_instance_upload_records
+            .saturating_add(upload.instance_count());
         report.sprite_instance_upload_bytes = report
             .sprite_instance_upload_bytes
             .saturating_add(buffer_address_len(upload.byte_len()));
@@ -686,6 +696,14 @@ mod tests {
         assert_eq!(report.sprite_render_pass_encoder_frames, report.frames);
         assert!(report.sprite_encoder_commands > 0);
         assert_eq!(report.sprite_encoder_draws, report.sprite_draw_commands);
+        assert_eq!(
+            report.sprite_instance_upload_records,
+            report.sprite_instances
+        );
+        assert_eq!(
+            report.sprite_instance_upload_records,
+            report.drawn_sprite_instances
+        );
         assert!(report.sprite_instance_upload_bytes > 0);
         assert!(report.sprite_atlas_upload_bytes > 0);
         assert!(report.scene_projection_upload_bytes > 0);
@@ -1078,6 +1096,19 @@ mod tests {
         );
 
         let mut report = valid_report();
+        report.sprite_instance_upload_records =
+            report.sprite_instance_upload_records.saturating_sub(1);
+
+        let error = report
+            .validate()
+            .expect_err("mismatched instance upload records should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke sprite instance upload records did not match drawn sprite instances"
+        );
+
+        let mut report = valid_report();
         report.sprite_instance_upload_bytes = 0;
 
         let error = report
@@ -1170,7 +1201,8 @@ mod tests {
             sprite_render_pass_encoder_frames: 2,
             sprite_encoder_commands: 12,
             sprite_encoder_draws: 5,
-            sprite_instance_upload_bytes: 192,
+            sprite_instance_upload_records: 9,
+            sprite_instance_upload_bytes: 432,
             sprite_atlas_upload_bytes: 131_072,
             scene_projection_upload_bytes: 32,
             raster_frames: 0,
@@ -1219,7 +1251,8 @@ mod tests {
                 "  sprite_render_pass_encoder_frames: 2\n",
                 "  sprite_encoder_commands: 12\n",
                 "  sprite_encoder_draws: 5\n",
-                "  sprite_instance_upload_bytes: 192\n",
+                "  sprite_instance_upload_records: 9\n",
+                "  sprite_instance_upload_bytes: 432\n",
                 "  sprite_atlas_upload_bytes: 131072\n",
                 "  scene_projection_upload_bytes: 32\n",
                 "  raster_frames: 0\n",
@@ -1324,7 +1357,8 @@ mod tests {
             sprite_render_pass_encoder_frames: 3,
             sprite_encoder_commands: 18,
             sprite_encoder_draws: 5,
-            sprite_instance_upload_bytes: 144,
+            sprite_instance_upload_records: 13,
+            sprite_instance_upload_bytes: 624,
             sprite_atlas_upload_bytes: 196_608,
             scene_projection_upload_bytes: 48,
             clean_exit: true,

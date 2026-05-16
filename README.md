@@ -323,8 +323,8 @@ resolves scene sprites
 through
 renderer-owned atlas regions into sprite batches and records GPU
 instance-buffer data with native scene rectangles, normalized atlas UVs,
-normalized tint, stable upload bytes, and the `wgpu` vertex layout for the
-instance buffer. It flattens those
+normalized tint, stable record counts and upload bytes, and the `wgpu` vertex
+layout for the instance buffer. It flattens those
 per-batch records into one upload-ready
 instance stream. The renderer also owns unit quad vertices, `u16` indices,
 upload bytes, and the `wgpu` vertex layout used to draw instanced sprites, then

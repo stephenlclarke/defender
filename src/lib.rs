@@ -540,12 +540,14 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("plan.frame_plan.sprite_pass_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.temporary_raster_count()"));
         assert!(game_smoke_rs.contains("plan.sprite_instance_upload"));
+        assert!(game_smoke_rs.contains("upload.instance_count()"));
         assert!(game_smoke_rs.contains("plan.sprite_resource_bindings"));
         assert!(game_smoke_rs.contains("plan.sprite_pipeline_layout"));
         assert!(game_smoke_rs.contains("plan.sprite_render_pipeline_descriptor"));
         assert!(game_smoke_rs.contains("plan.sprite_render_pass_encoder"));
         assert!(game_smoke_rs.contains("plan.sprite_draw_commands"));
         assert!(game_smoke_rs.contains("command.instance_count"));
+        assert!(game_smoke_rs.contains("sprite_instance_upload_records"));
         assert!(game_smoke_rs.contains("drawn_sprite_instances"));
         assert!(game_smoke_rs.contains("terrain_draw_instances"));
         assert!(game_smoke_rs.contains("starfield_draw_instances"));
