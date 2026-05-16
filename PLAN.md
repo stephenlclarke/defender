@@ -108,8 +108,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-138` are complete. The standing maintenance guidance in
-Ongoing Work still applies.
+`DC-42` through `DC-139` are complete. The standing
+maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -6381,6 +6381,72 @@ Work log:
   (240 rendered frames), markdownlint, and `git diff --check`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778889040826379`
+
+### DC-139: Clean Game Smoke Sprite Draw-Instance Coverage Evidence
+
+Status: `complete`
+
+Goal: extend the clean game smoke so it proves clean sprite instances are
+actually covered by native `wgpu` draw commands, not only that each layer has a
+draw command.
+
+Scope:
+
+- Add draw-instance coverage evidence for terrain, starfield, objects,
+  projectiles, and HUD sprites to the clean game smoke report.
+- Validate that drawn sprite instance totals match clean sprite instance totals.
+- Validate that per-layer drawn sprite instance totals match the clean scene
+  sprite layer totals.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
+  otherwise unchanged.
+
+Acceptance criteria:
+
+- `--game-smoke` reports drawn sprite instance totals for terrain, starfield,
+  object, projectile, and HUD layers.
+- `--game-smoke` fails if any clean sprite instances are not represented by
+  native draw commands.
+- Focused smoke and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 00:52:22 BST` Started `DC-139`: extending `--game-smoke` so it
+  verifies drawn sprite instance coverage for terrain, starfield, object,
+  projectile, and HUD layers, and so total drawn instances must match clean
+  sprite instances.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778889152440539`
+- `2026-05-16 01:15:07 BST` Completed `DC-139`: `--game-smoke` now reports
+  290 drawn sprite instances matching 290 clean sprite instances, with terrain
+  105, starfield 63, object 93, projectile 5, and HUD 24 draw instances. Added
+  mismatch validation, focused smoke regression tests, and a public guard that
+  requires the smoke path to consume native draw-command instance counts.
+  Validation: `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
+  `cargo test --lib public_api_tests`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke` (239 rendered frames), markdownlint,
+  `git diff --check`, and `make fidelity` (42/42 non-baselined added
+  executable Rust lines covered).
+  Slack in-flight update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778889599148589`
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778890523940999`
 
 ## Ongoing Work
 
