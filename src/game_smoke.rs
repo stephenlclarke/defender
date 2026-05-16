@@ -71,6 +71,7 @@ pub(crate) struct GameSmokeReport {
     pub(crate) wgpu_frame_commands: usize,
     pub(crate) sprite_render_pass_commands: usize,
     pub(crate) temporary_raster_commands: usize,
+    pub(crate) sprite_frame_plan_encoder_commands: usize,
     pub(crate) sprite_frame_plan_draws: usize,
     pub(crate) sprite_frame_plan_instances: usize,
     pub(crate) sprite_render_pass_plan_frames: u32,
@@ -198,6 +199,14 @@ impl GameSmokeReport {
         if self.temporary_raster_commands != 0 {
             bail!("clean game smoke unexpectedly produced temporary raster frame commands");
         }
+        if self.sprite_encoder_commands == 0 {
+            bail!("clean game smoke did not produce sprite encoder commands");
+        }
+        if self.sprite_frame_plan_encoder_commands != self.sprite_encoder_commands {
+            bail!(
+                "clean game smoke frame-plan sprite encoder commands did not match sprite encoder commands"
+            );
+        }
         if self.sprite_frame_plan_draws != self.sprite_draw_commands {
             bail!("clean game smoke frame-plan sprite draws did not match sprite draw commands");
         }
@@ -230,9 +239,6 @@ impl GameSmokeReport {
         }
         if self.sprite_render_pass_encoder_frames != self.frames {
             bail!("clean game smoke did not produce sprite render-pass encoders for every frame");
-        }
-        if self.sprite_encoder_commands == 0 {
-            bail!("clean game smoke did not produce sprite encoder commands");
         }
         if self.sprite_encoder_draws != self.sprite_draw_commands {
             bail!("clean game smoke sprite encoder draws did not match sprite draw commands");
@@ -287,7 +293,7 @@ impl GameSmokeReport {
             .map(|(width, height)| format!("{width}x{height}"))
             .unwrap_or_else(|| String::from("unrecorded"));
         format!(
-            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  terrain_sprites: {}\n  starfield_sprites: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  covered_sprites: {}\n  terrain_draw_commands: {}\n  starfield_draw_commands: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  drawn_sprite_instances: {}\n  terrain_draw_instances: {}\n  starfield_draw_instances: {}\n  object_draw_instances: {}\n  projectile_draw_instances: {}\n  hud_draw_instances: {}\n  covered_pipelines: {}\n  wgpu_frame_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  sprite_frame_plan_draws: {}\n  sprite_frame_plan_instances: {}\n  sprite_render_pass_plan_frames: {}\n  sprite_render_pass_plan_draws: {}\n  sprite_render_pass_plan_instances: {}\n  sprite_resource_binding_frames: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_buffer_upload_frames: {}\n  sprite_quad_vertex_upload_bytes: {}\n  sprite_quad_index_upload_bytes: {}\n  sprite_buffer_instance_upload_bytes: {}\n  sprite_instance_upload_records: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
+            "clean game smoke passed\n  frames: {}\n  first_frame_size: {}\n  distinct_scene_signatures: {}\n  saw_attract: {} (frames: {})\n  saw_credit: {} (frames: {})\n  saw_playing: {} (frames: {})\n  sprite_frames: {}\n  sprite_instances: {}\n  sprite_draw_commands: {}\n  terrain_sprites: {}\n  starfield_sprites: {}\n  object_sprites: {}\n  projectile_sprites: {}\n  hud_sprites: {}\n  covered_sprites: {}\n  terrain_draw_commands: {}\n  starfield_draw_commands: {}\n  object_draw_commands: {}\n  projectile_draw_commands: {}\n  hud_draw_commands: {}\n  drawn_sprite_instances: {}\n  terrain_draw_instances: {}\n  starfield_draw_instances: {}\n  object_draw_instances: {}\n  projectile_draw_instances: {}\n  hud_draw_instances: {}\n  covered_pipelines: {}\n  wgpu_frame_commands: {}\n  sprite_render_pass_commands: {}\n  temporary_raster_commands: {}\n  sprite_frame_plan_encoder_commands: {}\n  sprite_frame_plan_draws: {}\n  sprite_frame_plan_instances: {}\n  sprite_render_pass_plan_frames: {}\n  sprite_render_pass_plan_draws: {}\n  sprite_render_pass_plan_instances: {}\n  sprite_resource_binding_frames: {}\n  sprite_pipeline_layout_frames: {}\n  sprite_render_pipeline_descriptor_frames: {}\n  sprite_render_pass_encoder_frames: {}\n  sprite_encoder_commands: {}\n  sprite_encoder_draws: {}\n  sprite_buffer_upload_frames: {}\n  sprite_quad_vertex_upload_bytes: {}\n  sprite_quad_index_upload_bytes: {}\n  sprite_buffer_instance_upload_bytes: {}\n  sprite_instance_upload_records: {}\n  sprite_instance_upload_bytes: {}\n  sprite_atlas_upload_bytes: {}\n  scene_projection_upload_bytes: {}\n  raster_frames: {}\n  missing_sprite_regions: {}\n  injected_inputs: {}\n  clean_exit: {}\n",
             self.frames,
             frame_size,
             self.distinct_scene_signatures,
@@ -321,6 +327,7 @@ impl GameSmokeReport {
             self.wgpu_frame_commands,
             self.sprite_render_pass_commands,
             self.temporary_raster_commands,
+            self.sprite_frame_plan_encoder_commands,
             self.sprite_frame_plan_draws,
             self.sprite_frame_plan_instances,
             self.sprite_render_pass_plan_frames,
@@ -452,6 +459,9 @@ fn observe_frame(
     report.temporary_raster_commands = report
         .temporary_raster_commands
         .saturating_add(plan.frame_plan.temporary_raster_count());
+    report.sprite_frame_plan_encoder_commands = report
+        .sprite_frame_plan_encoder_commands
+        .saturating_add(plan.frame_plan.sprite_encoder_command_count());
     report.sprite_frame_plan_draws = report
         .sprite_frame_plan_draws
         .saturating_add(plan.frame_plan.sprite_draw_count());
@@ -769,6 +779,10 @@ mod tests {
         assert!(report.wgpu_frame_commands > 0);
         assert!(report.sprite_render_pass_commands >= report.frames as usize);
         assert_eq!(report.temporary_raster_commands, 0);
+        assert_eq!(
+            report.sprite_frame_plan_encoder_commands,
+            report.sprite_encoder_commands
+        );
         assert_eq!(report.sprite_frame_plan_draws, report.sprite_draw_commands);
         assert_eq!(
             report.sprite_frame_plan_instances,
@@ -891,6 +905,19 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "clean game smoke unexpectedly produced temporary raster frame commands"
+        );
+
+        let mut report = valid_report();
+        report.sprite_frame_plan_encoder_commands =
+            report.sprite_frame_plan_encoder_commands.saturating_sub(1);
+
+        let error = report
+            .validate()
+            .expect_err("mismatched frame-plan sprite encoder commands should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "clean game smoke frame-plan sprite encoder commands did not match sprite encoder commands"
         );
 
         let mut report = valid_report();
@@ -1421,6 +1448,7 @@ mod tests {
             wgpu_frame_commands: 6,
             sprite_render_pass_commands: 2,
             temporary_raster_commands: 0,
+            sprite_frame_plan_encoder_commands: 12,
             sprite_frame_plan_draws: 5,
             sprite_frame_plan_instances: 9,
             sprite_render_pass_plan_frames: 2,
@@ -1480,6 +1508,7 @@ mod tests {
                 "  wgpu_frame_commands: 6\n",
                 "  sprite_render_pass_commands: 2\n",
                 "  temporary_raster_commands: 0\n",
+                "  sprite_frame_plan_encoder_commands: 12\n",
                 "  sprite_frame_plan_draws: 5\n",
                 "  sprite_frame_plan_instances: 9\n",
                 "  sprite_render_pass_plan_frames: 2\n",
@@ -1595,6 +1624,7 @@ mod tests {
             ],
             wgpu_frame_commands: 9,
             sprite_render_pass_commands: 3,
+            sprite_frame_plan_encoder_commands: 18,
             sprite_frame_plan_draws: 5,
             sprite_frame_plan_instances: 13,
             sprite_render_pass_plan_frames: 3,

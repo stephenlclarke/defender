@@ -292,8 +292,8 @@ code adapts frame outputs into clean audio frames before submitting to
 boundary before delegating to the runtime bridge. `--game-smoke` steps the clean
 game through scripted controls, verifies required gameplay sprite layers,
 sprite IDs, native draw-command pipeline and instance coverage, sprite buffer
-upload-plan coverage, render-pass plan coverage, and frame-command
-draw/instance coverage, and prepares sprite-only native draw plans plus
+upload-plan coverage, render-pass plan coverage, and frame-command sprite
+command/draw/instance coverage, and prepares sprite-only native draw plans plus
 frame-level `wgpu` command, resource-binding, pipeline-layout, pipeline
 descriptor, encoder, and upload plans without entering the legacy live
 presenter. The clean `Game` world seeds

@@ -1754,6 +1754,16 @@ impl WgpuFramePlan {
             .count()
     }
 
+    pub fn sprite_encoder_command_count(&self) -> usize {
+        self.commands
+            .iter()
+            .map(|command| match command {
+                WgpuFrameCommand::ExecuteSpriteRenderPass { command_count, .. } => *command_count,
+                _ => 0,
+            })
+            .sum()
+    }
+
     pub fn sprite_draw_count(&self) -> usize {
         self.commands
             .iter()
@@ -2704,6 +2714,7 @@ mod tests {
         assert_eq!(plan.command_count(), 5);
         assert_eq!(plan.temporary_raster_count(), 1);
         assert_eq!(plan.sprite_pass_count(), 1);
+        assert_eq!(plan.sprite_encoder_command_count(), 2);
         assert_eq!(plan.sprite_draw_count(), 1);
         assert_eq!(plan.sprite_instance_count(), 2);
         assert_eq!(

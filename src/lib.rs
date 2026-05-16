@@ -539,6 +539,7 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("plan.frame_plan.command_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.sprite_pass_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.temporary_raster_count()"));
+        assert!(game_smoke_rs.contains("plan.frame_plan.sprite_encoder_command_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.sprite_draw_count()"));
         assert!(game_smoke_rs.contains("plan.frame_plan.sprite_instance_count()"));
         assert!(game_smoke_rs.contains("plan.sprite_instance_upload"));
@@ -556,6 +557,7 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("plan.sprite_render_pass_encoder"));
         assert!(game_smoke_rs.contains("plan.sprite_draw_commands"));
         assert!(game_smoke_rs.contains("command.instance_count"));
+        assert!(game_smoke_rs.contains("sprite_frame_plan_encoder_commands"));
         assert!(game_smoke_rs.contains("sprite_frame_plan_draws"));
         assert!(game_smoke_rs.contains("sprite_frame_plan_instances"));
         assert!(game_smoke_rs.contains("sprite_render_pass_plan_frames"));
