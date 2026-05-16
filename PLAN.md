@@ -108,7 +108,7 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-147` are complete. The standing
+`DC-42` through `DC-148` are complete. The standing
 maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
@@ -7006,6 +7006,79 @@ Work log:
   `new Rust line coverage: 10/10 non-baselined added executable line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778901986517359`
+
+### DC-148: Clean Game Smoke Ordered Sprite-Only WGPU Frame Stream Evidence
+
+Status: `complete`
+
+Goal: extend the final frame-level `wgpu` command evidence so clean smoke
+proves every clean frame uses the expected ordered sprite-only command stream:
+begin render pass, set viewport, upload scene projection, then execute the
+sprite render pass.
+
+Scope:
+
+- Add an explicit ordered sprite-only frame-stream predicate to `WgpuFramePlan`.
+- Expose ordered sprite-only frame-stream totals through `--game-smoke`.
+- Validate that every clean smoke frame carries the expected ordered
+  sprite-only frame command stream.
+- Keep temporary raster frame commands rejected in clean gameplay smoke.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
+  unchanged.
+
+Acceptance criteria:
+
+- `WgpuFramePlan` can identify the expected ordered sprite-only command stream.
+- `--game-smoke` reports ordered sprite-only frame-stream totals.
+- `--game-smoke` fails if ordered sprite-only frame-stream totals diverge from
+  the number of clean smoke frames.
+- Focused renderer, smoke, and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 04:29:11 BST` Started `DC-148`: extending final frame-level
+  `wgpu` command evidence so clean smoke reports and validates ordered
+  sprite-only frame command streams for every clean frame.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778902161201349`
+- `2026-05-16 04:51:08 BST` Completed `DC-148`: `WgpuFramePlan` now exposes
+  an ordered sprite-only frame command predicate for the expected begin-pass,
+  viewport, scene-projection upload, and sprite render-pass execution stream.
+  `--game-smoke` reports `frame_plan_ordered_sprite_only_frames: 24`, matching
+  the 24 clean smoke frames, while preserving
+  `frame_plan_begin_render_pass_commands: 24`,
+  `frame_plan_viewport_commands: 24`, `temporary_raster_commands: 0`,
+  `sprite_frame_plan_draws: 92`, and `sprite_frame_plan_instances: 290`.
+  Validation now fails if ordered sprite-only frame-stream totals diverge from
+  the frame count. Validation passed with `cargo fmt --check`,
+  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
+  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
+  docs/fidelity/live-audio.md`, `git diff --check`, `cargo test --all-targets`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --live-smoke`,
+  and `make fidelity`; coverage artifacts were refreshed at
+  `2026-05-16 04:50:37 BST` and `2026-05-16 04:50:38 BST`, and the coverage
+  checker reported
+  `new Rust line coverage: 13/13 non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778903465313059`
 
 ## Ongoing Work
 

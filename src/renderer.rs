@@ -1740,6 +1740,18 @@ impl WgpuFramePlan {
         self.commands.len()
     }
 
+    pub fn has_ordered_sprite_only_commands(&self) -> bool {
+        matches!(
+            self.commands.as_slice(),
+            [
+                WgpuFrameCommand::BeginRenderPass { .. },
+                WgpuFrameCommand::SetViewport { .. },
+                WgpuFrameCommand::UploadSceneProjection { .. },
+                WgpuFrameCommand::ExecuteSpriteRenderPass { .. },
+            ]
+        )
+    }
+
     pub fn sprite_pass_count(&self) -> usize {
         self.commands
             .iter()
@@ -2736,6 +2748,7 @@ mod tests {
 
         assert_eq!(plan.label, "defender.frame.commands");
         assert_eq!(plan.command_count(), 5);
+        assert!(!plan.has_ordered_sprite_only_commands());
         assert_eq!(plan.temporary_raster_count(), 1);
         assert_eq!(plan.sprite_pass_count(), 1);
         assert_eq!(plan.begin_render_pass_count(), 1);
@@ -2770,6 +2783,12 @@ mod tests {
                 },
             ]
         );
+
+        let sprite_only_plan =
+            WgpuFramePlan::from_pass_raster_and_sprite_encoder(&pass, None, Some(&sprite_encoder));
+
+        assert_eq!(sprite_only_plan.command_count(), 4);
+        assert!(sprite_only_plan.has_ordered_sprite_only_commands());
     }
 
     #[test]
