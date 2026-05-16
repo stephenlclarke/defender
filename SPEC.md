@@ -153,9 +153,9 @@ instance coverage, sprite buffer upload-plan coverage, render-pass plan
 coverage, and frame-command sprite command/draw/instance plus ordered
 sprite-only begin-pass, viewport, and projection upload coverage, and prepares
 sprite-only native draw plans plus frame-level `wgpu` command, resource
-bind-group, pipeline-layout bind-group, pipeline descriptor shape, encoder, and
-upload plans without entering the legacy live presenter. The clean `Game` world
-seeds
+bind-group, pipeline-layout bind-group, pipeline descriptor shape, encoder
+command-shape, and upload plans without entering the legacy live presenter. The
+clean `Game` world seeds
 terrain, starfield, enemy, human, and projectile snapshots for the first playing
 wave and renders them as atlas-backed scene sprites. Operator controls are
 sampled through `OperatorControlSystem`, emitting diagnostics, audits, and
@@ -210,11 +210,13 @@ vertex buffers, primitive state, color target, and multisample state for `wgpu`
 render pipeline creation, and expose the layout bind-group, vertex-buffer, and
 color-target totals carried into the descriptor. Sprite render-pass encoder
 command plans then order the pipeline, bind groups, vertex buffers, index
-buffer, and indexed draw calls for `wgpu::RenderPass` execution. Frame-level
-GPU command plans combine begin-pass clear state, viewport command presence,
-scene-projection upload presence, optional sprite execution with command, draw,
-and instance totals, and an ordered sprite-only stream predicate plus temporary
-raster evidence into one ordered scene command stream, while the current live
+buffer, and indexed draw calls for `wgpu::RenderPass` execution, and expose
+the set-pipeline, set-bind-group, set-vertex-buffer, and set-index-buffer
+command totals carried into the encoder. Frame-level GPU command plans combine
+begin-pass clear state, viewport command presence, scene-projection upload
+presence, optional sprite execution with command, draw, and instance totals,
+and an ordered sprite-only stream predicate plus temporary raster evidence into
+one ordered scene command stream, while the current live
 path still carries a temporary raster payload for visual
 equivalence. Kitty graphics and terminal-session code remain
 parked there as historical compatibility evidence, but they are not part of the

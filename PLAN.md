@@ -108,8 +108,8 @@ Rewrite rules:
 
 ## Completed Development Cycles
 
-`DC-42` through `DC-151` are complete. The standing maintenance guidance in
-Ongoing Work still applies.
+`DC-42` through `DC-152` are complete. The standing
+maintenance guidance in Ongoing Work still applies.
 
 ### DC-42: Documentation Reset
 
@@ -7316,6 +7316,88 @@ Work log:
   `new Rust line coverage: 25/25 non-baselined added executable line(s)`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778908047112119`
+
+### DC-152: Clean Game Smoke Sprite Render-Pass Encoder Command-Shape Evidence
+
+Status: `complete`
+
+Goal: extend the `wgpu` render-pass encoder evidence so clean smoke proves
+every clean frame carries the expected encoder command mix, not only aggregate
+encoder command and draw counts.
+
+Scope:
+
+- Add set-pipeline, set-bind-group, set-vertex-buffer, and set-index-buffer
+  command totals to `SpriteRenderPassEncoderPlan`.
+- Expose sprite render-pass encoder command-shape totals through
+  `--game-smoke`.
+- Validate those totals against the clean smoke frame count, pipeline-layout
+  bind-group evidence, and descriptor vertex-buffer evidence.
+- Keep existing frame command, sprite command, upload, resource, layout,
+  descriptor, and draw evidence intact.
+- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
+  unchanged.
+
+Acceptance criteria:
+
+- `SpriteRenderPassEncoderPlan` reports expected set-pipeline, set-bind-group,
+  set-vertex-buffer, and set-index-buffer command totals.
+- `--game-smoke` reports sprite render-pass encoder command-shape totals.
+- `--game-smoke` fails if those totals diverge from per-frame expectations or
+  upstream layout/descriptor evidence.
+- Focused renderer, smoke, and public guard tests cover the updated behavior.
+
+Validation:
+
+```sh
+cargo fmt --check
+cargo test --lib renderer::tests
+cargo test --lib game_smoke::tests
+cargo test --lib public_api_tests
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+make fidelity
+cargo run -- --game-smoke
+cargo run -- --live-smoke
+markdownlint README.md SPEC.md PLAN.md \
+  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+git diff --check
+```
+
+Work log:
+
+- `2026-05-16 06:09:27 BST` Started `DC-152`: extending clean smoke
+  render-pass encoder evidence so it reports and validates WGPU encoder
+  set-pipeline, set-bind-group, set-vertex-buffer, and set-index-buffer command
+  totals for every clean frame.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778908176756169`
+- `2026-05-16 06:31:13 BST` Completed `DC-152`:
+  `SpriteRenderPassEncoderPlan` now exposes set-pipeline, set-bind-group,
+  set-vertex-buffer, and set-index-buffer command totals, and `--game-smoke`
+  reports `sprite_render_pass_encoder_frames: 24`,
+  `sprite_encoder_set_pipeline_commands: 24`,
+  `sprite_encoder_set_bind_group_commands: 48`,
+  `sprite_encoder_set_vertex_buffer_commands: 48`, and
+  `sprite_encoder_set_index_buffer_commands: 24`. The bind-group command
+  evidence matches `sprite_pipeline_layout_bind_groups: 48`, and the
+  vertex-buffer command evidence matches
+  `sprite_render_pipeline_descriptor_vertex_buffers: 48`, while existing
+  sprite-only evidence remains intact with `temporary_raster_commands: 0`,
+  `frame_plan_ordered_sprite_only_frames: 24`,
+  `sprite_encoder_commands: 236`, `sprite_encoder_draws: 92`, and
+  `sprite_frame_plan_instances: 290`. Validation now fails if encoder
+  command-shape totals diverge from per-frame expectations or upstream
+  layout/descriptor evidence. Validation passed with `cargo fmt --check`,
+  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
+  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
+  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo run -- --live-smoke`, and `make fidelity`; coverage artifacts were
+  refreshed at `2026-05-16 06:31:01 BST` and
+  `2026-05-16 06:31:02 BST`, and the coverage checker reported
+  `new Rust line coverage: 48/48 non-baselined added executable line(s)`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778909540882489`
 
 ## Ongoing Work
 

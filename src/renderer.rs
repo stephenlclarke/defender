@@ -1635,6 +1635,12 @@ pub struct SpriteRenderPassEncoderPlan {
 }
 
 impl SpriteRenderPassEncoderPlan {
+    pub const SET_PIPELINE_COMMAND_COUNT: usize = 1;
+    pub const SET_BIND_GROUP_COMMAND_COUNT: usize = SpritePipelineLayoutPlan::BIND_GROUP_COUNT;
+    pub const SET_VERTEX_BUFFER_COMMAND_COUNT: usize =
+        SpriteRenderPipelineDescriptorPlan::VERTEX_BUFFER_COUNT;
+    pub const SET_INDEX_BUFFER_COMMAND_COUNT: usize = 1;
+
     fn from_render_pass_layout_and_descriptor(
         render_pass: &SpriteRenderPassPlan,
         layout: &SpritePipelineLayoutPlan,
@@ -1686,6 +1692,46 @@ impl SpriteRenderPassEncoderPlan {
 
     pub fn command_count(&self) -> usize {
         self.commands.len()
+    }
+
+    pub fn set_pipeline_command_count(&self) -> usize {
+        self.commands
+            .iter()
+            .filter(|command| matches!(command, SpriteRenderPassEncoderCommand::SetPipeline { .. }))
+            .count()
+    }
+
+    pub fn set_bind_group_command_count(&self) -> usize {
+        self.commands
+            .iter()
+            .filter(|command| {
+                matches!(command, SpriteRenderPassEncoderCommand::SetBindGroup { .. })
+            })
+            .count()
+    }
+
+    pub fn set_vertex_buffer_command_count(&self) -> usize {
+        self.commands
+            .iter()
+            .filter(|command| {
+                matches!(
+                    command,
+                    SpriteRenderPassEncoderCommand::SetVertexBuffer { .. }
+                )
+            })
+            .count()
+    }
+
+    pub fn set_index_buffer_command_count(&self) -> usize {
+        self.commands
+            .iter()
+            .filter(|command| {
+                matches!(
+                    command,
+                    SpriteRenderPassEncoderCommand::SetIndexBuffer { .. }
+                )
+            })
+            .count()
     }
 
     pub fn draw_count(&self) -> usize {
@@ -2684,6 +2730,22 @@ mod tests {
 
         assert_eq!(plan.label, "defender.sprite.render_pass.encoder");
         assert_eq!(plan.command_count(), 8);
+        assert_eq!(
+            plan.set_pipeline_command_count(),
+            SpriteRenderPassEncoderPlan::SET_PIPELINE_COMMAND_COUNT
+        );
+        assert_eq!(
+            plan.set_bind_group_command_count(),
+            SpriteRenderPassEncoderPlan::SET_BIND_GROUP_COMMAND_COUNT
+        );
+        assert_eq!(
+            plan.set_vertex_buffer_command_count(),
+            SpriteRenderPassEncoderPlan::SET_VERTEX_BUFFER_COMMAND_COUNT
+        );
+        assert_eq!(
+            plan.set_index_buffer_command_count(),
+            SpriteRenderPassEncoderPlan::SET_INDEX_BUFFER_COMMAND_COUNT
+        );
         assert_eq!(plan.draw_count(), 2);
         assert_eq!(plan.instance_count(), 3);
         assert_eq!(

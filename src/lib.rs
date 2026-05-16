@@ -566,6 +566,10 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("descriptor.vertex_buffer_count()"));
         assert!(game_smoke_rs.contains("descriptor.color_target_count()"));
         assert!(game_smoke_rs.contains("plan.sprite_render_pass_encoder"));
+        assert!(game_smoke_rs.contains("encoder.set_pipeline_command_count()"));
+        assert!(game_smoke_rs.contains("encoder.set_bind_group_command_count()"));
+        assert!(game_smoke_rs.contains("encoder.set_vertex_buffer_command_count()"));
+        assert!(game_smoke_rs.contains("encoder.set_index_buffer_command_count()"));
         assert!(game_smoke_rs.contains("plan.sprite_draw_commands"));
         assert!(game_smoke_rs.contains("command.instance_count"));
         assert!(game_smoke_rs.contains("frame_plan_begin_render_pass_commands"));
@@ -584,6 +588,10 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("sprite_render_pipeline_descriptor_layout_bind_groups"));
         assert!(game_smoke_rs.contains("sprite_render_pipeline_descriptor_vertex_buffers"));
         assert!(game_smoke_rs.contains("sprite_render_pipeline_descriptor_color_targets"));
+        assert!(game_smoke_rs.contains("sprite_encoder_set_pipeline_commands"));
+        assert!(game_smoke_rs.contains("sprite_encoder_set_bind_group_commands"));
+        assert!(game_smoke_rs.contains("sprite_encoder_set_vertex_buffer_commands"));
+        assert!(game_smoke_rs.contains("sprite_encoder_set_index_buffer_commands"));
         assert!(game_smoke_rs.contains("sprite_buffer_upload_frames"));
         assert!(game_smoke_rs.contains("sprite_buffer_instance_upload_bytes"));
         assert!(game_smoke_rs.contains("sprite_instance_upload_records"));
