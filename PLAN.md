@@ -1058,6 +1058,9 @@ Object-ecology progress after R9-C4 slices:
   evidence when the source-shaped allocation succeeds: landers use `LSHSND`,
   mutants use `SSHSND`, baiters use `USHSND`, and mini-swarmers use `SWSSND`.
   Bomber `BOMBST` allocations remain silent, matching the covered source path.
+- Clean player action edges now emit source-backed sound command evidence:
+  successful `LFIRE` laser launches surface `LASSND`, and accepted `SBOMB`
+  inputs surface the first `SBSND` command before the enemy destruction sounds.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -1072,8 +1075,8 @@ Object-ecology progress after R9-C4 slices:
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
   is remaining per-family movement/projectile behavior beyond the covered
-  enemy-hit, enemy-shot, lander-abduction, and astronaut command evidence plus
-  focused source ecology fixtures for those transitions.
+  enemy-hit, enemy-shot, player-action, lander-abduction, and astronaut command
+  evidence plus focused source ecology fixtures for those transitions.
 
 Work log:
 
@@ -2325,6 +2328,28 @@ Work log:
   broader shared-contract risk appears, or R9 finalization begins. Slack start
   update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779320546837389`.
+
+- `2026-05-21 00:53:56 BST` R9-C4 progress slice
+  `source player action sound commands`. Successful clean laser launches now
+  emit the source `LASSND` command, capped fire attempts remain silent, and
+  accepted clean smart-bomb inputs emit the first source `SBSND` command before
+  per-enemy destruction sounds. Focused validation passed: `cargo fmt
+  --check`, `cargo check`, `cargo test
+  clean_game_advances_projectiles_through_world_snapshots --lib`, `cargo test
+  clean_game_capped_fire_does_not_emit_laser_sound --lib`, `cargo test
+  clean_game_smart_bomb_clears_enemies_scores_and_updates_scene --lib`,
+  `cargo test
+  clean_game_smart_bomb_pod_spawns_swarmers_after_destroyed_batch --lib`,
+  `cargo test clean_game_applies_playing_controls_through_systems --lib`,
+  targeted `make clean-fidelity SCENARIOS="firing smart_bomb"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
+  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
+  clippy remain deferred because this is a bounded Step 50 player-action
+  sound-command slice, not Step 50 or Phase 3 closure, and it does not change
+  the public API. The next full gate should run when Step 50 closes, another
+  broader shared-contract risk appears, or R9 finalization begins. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779321089267019`.
 
 ## Archived Completed History
 

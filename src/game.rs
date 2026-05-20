@@ -67,6 +67,8 @@ const SOURCE_USHSND_SOUND_COMMAND: u8 = 0xFC;
 const SOURCE_SWSSND_SOUND_COMMAND: u8 = 0xF3;
 const SOURCE_LPKSND_SOUND_COMMAND: u8 = 0xF4;
 const SOURCE_LSKSND_SOUND_COMMAND: u8 = 0xF1;
+const SOURCE_LASSND_SOUND_COMMAND: u8 = 0xEB;
+const SOURCE_SBSND_SOUND_COMMAND: u8 = 0xEE;
 const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
 const SOURCE_ALSND_SOUND_COMMAND: u8 = 0xE0;
 const SOURCE_ASCSND_SOUND_COMMAND: u8 = 0xE5;
@@ -5955,12 +5957,14 @@ impl Game {
                     position: spawn,
                     velocity: ProjectileMotionSystem::velocity_for_direction(direction),
                 });
+                sound_events.push(source_laser_fire_sound_event());
             }
         }
 
         if controls.triggers.smart_bomb && self.state.player.smart_bombs > 0 {
             self.state.player.smart_bombs -= 1;
             gameplay_events.push(GameEvent::SmartBombPressed);
+            sound_events.push(source_smart_bomb_sound_event());
             self.resolve_smart_bomb(gameplay_events, sound_events);
         }
 
@@ -7610,6 +7614,18 @@ fn source_lander_suck_sound_event() -> SoundEvent {
     }
 }
 
+fn source_laser_fire_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_LASSND_SOUND_COMMAND,
+    }
+}
+
+fn source_smart_bomb_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_SBSND_SOUND_COMMAND,
+    }
+}
+
 fn source_astronaut_release_sound_event() -> SoundEvent {
     SoundEvent::UnmappedSoundCommand {
         command: SOURCE_ASCSND_SOUND_COMMAND,
@@ -8079,6 +8095,7 @@ mod tests {
         source_astronaut_release_sound_event, source_astronaut_safe_landing_sound_event,
         source_enemy_hit_sound_event, source_enemy_shot_sound_event,
         source_lander_pickup_sound_event, source_lander_suck_sound_event,
+        source_laser_fire_sound_event, source_smart_bomb_sound_event,
     };
 
     #[test]
@@ -9330,7 +9347,11 @@ mod tests {
                 GameEvent::HyperspacePressed,
             ]
         );
-        let mut expected_sounds = vec![source_enemy_hit_sound_event(EnemyKind::Lander); 5];
+        let mut expected_sounds = vec![
+            source_laser_fire_sound_event(),
+            source_smart_bomb_sound_event(),
+        ];
+        expected_sounds.extend(vec![source_enemy_hit_sound_event(EnemyKind::Lander); 5]);
         expected_sounds.push(SoundEvent::ThrustStarted);
         assert_eq!(frame.events.sounds(), expected_sounds.as_slice());
         assert_eq!(
@@ -9522,6 +9543,9 @@ mod tests {
                 GameEvent::EnemyDestroyed,
             ]
         );
+        let mut expected_sounds = vec![source_smart_bomb_sound_event()];
+        expected_sounds.extend(vec![source_enemy_hit_sound_event(EnemyKind::Lander); 5]);
+        assert_eq!(frame.events.sounds(), expected_sounds.as_slice());
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_LANDER
                 && sprite.layer == RenderLayer::Objects
@@ -9570,6 +9594,13 @@ mod tests {
             frame.events.gameplay(),
             &[GameEvent::SmartBombPressed, GameEvent::EnemyDestroyed]
         );
+        assert_eq!(
+            frame.events.sounds(),
+            &[
+                source_smart_bomb_sound_event(),
+                source_enemy_hit_sound_event(EnemyKind::Pod),
+            ]
+        );
     }
 
     #[test]
@@ -9605,6 +9636,7 @@ mod tests {
         let projectile = fired.state.world.projectiles[0];
 
         assert_eq!(projectile.velocity, ScreenVelocity::new(8, 0));
+        assert_eq!(fired.events.sounds(), &[source_laser_fire_sound_event()]);
         assert!(fired.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_PROJECTILE
                 && sprite.position
@@ -9623,6 +9655,26 @@ mod tests {
         );
         assert_eq!(moved_projectile.position.y, projectile.position.y);
         assert_eq!(moved_projectile.velocity, projectile.velocity);
+    }
+
+    #[test]
+    fn clean_game_capped_fire_does_not_emit_laser_sound() {
+        let mut game = credited_started_game();
+        game.state.world.projectiles = (0..4)
+            .map(|index| ProjectileSnapshot {
+                position: ScreenPosition::new(32 + index, 80),
+                velocity: ScreenVelocity::new(0, 0),
+            })
+            .collect();
+
+        let frame = game.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(frame.state.world.projectiles.len(), 4);
+        assert_eq!(frame.events.gameplay(), &[GameEvent::FirePressed]);
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]

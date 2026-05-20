@@ -334,7 +334,10 @@ Clean
 smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave
 destroyed active enemy sprites absent from the scene while source reserves can
-enter as the next active batch. One-player credited starts consume one credit,
+enter as the next active batch. Successful clean laser launches emit source
+`LASSND` command evidence, and accepted smart-bomb inputs emit the first source
+`SBSND` command before enemy destruction sounds. One-player credited starts
+consume one credit,
 while two-player starts require and consume two credits, set
 `player_count` to two, enter play as player one, and expose the player-one and
 player-two top-display fields immediately. Scenes draw player-one and player-two

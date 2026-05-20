@@ -517,7 +517,10 @@ Clean
 smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave
 destroyed active enemy sprites absent from the scene while source reserves can
-enter as the next active batch. Playing scenes draw current-player
+enter as the next active batch. Successful clean laser launches emit source
+`LASSND` command evidence, and accepted smart-bomb inputs emit the first source
+`SBSND` command before enemy destruction sounds. Playing scenes draw
+current-player
 life-stock and smart-bomb-stock HUD sprites with source-backed display caps,
 positions, and the reclassified stock sprite targets. Enemy contact with the
 player is resolved through clean collision and `PlayerDamageSystem`,

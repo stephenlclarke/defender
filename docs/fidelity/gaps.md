@@ -659,6 +659,14 @@ post-acceptance validation records.
   per-family movement/projectile behavior beyond the covered enemy-hit,
   enemy-shot, lander-abduction, and astronaut command evidence plus focused
   source ecology fixtures for those transitions.
+- `2026-05-21 00:53:56 BST`: R9-C4 adds bounded source player-action
+  sound-command evidence for the covered clean fire and smart-bomb edges.
+  Successful clean laser launches now surface `LASSND` (`0xEB`), while
+  accepted smart-bomb inputs surface the first `SBSND` command (`0xEE`) before
+  per-enemy destruction sounds. Remaining B08 work is exact per-family
+  movement/projectile behavior beyond the covered enemy-hit, enemy-shot,
+  player-action, lander-abduction, and astronaut command evidence plus focused
+  source ecology fixtures for those transitions.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain
