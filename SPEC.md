@@ -262,7 +262,9 @@ Clean landers now abduct aligned humans, keep carried passengers associated
 with the lander that captured them while it flees, seed source-shaped
 `LANDG` flee vector/sleep state on capture, pull the passenger upward through
 the source `LANDF` / `LNDFXA` top-edge shape before conversion, and release
-the passenger when that lander is destroyed. Released, uncarried humans
+the passenger when that lander is destroyed. Source landers already in the
+pull phase give up and return to reserve if the passenger target is cleared.
+Released, uncarried humans
 above terrain now use source-shaped `AFALL` fixed-point acceleration, settle
 safely at or below the source threshold with the 250-point safe-landing score
 and existing `P250` score-popup lifecycle, or die on over-speed impact with an

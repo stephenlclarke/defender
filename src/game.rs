@@ -2137,6 +2137,7 @@ impl WorldSnapshot {
         player_velocity: (WorldVector, WorldVector),
     ) {
         self.sync_carried_humans_to_landers();
+        self.restore_landers_with_cleared_pull_targets();
         self.convert_completed_lander_abductions(profile, player_position, player_velocity);
         if self.humans.is_empty() {
             self.convert_all_active_landers_to_mutants(profile, player_position, player_velocity);
@@ -2151,6 +2152,19 @@ impl WorldSnapshot {
         self.humans[human_index].carried = true;
         self.humans[human_index].position = clean_carried_human_position(lander_position);
         self.humans[human_index].clear_source_fall();
+    }
+
+    fn restore_landers_with_cleared_pull_targets(&mut self) {
+        let humans = &self.humans;
+        let mut restored = 0u8;
+        self.enemies.retain(|enemy| {
+            let gave_up = source_lander_pull_target_cleared(enemy, humans);
+            if gave_up {
+                restored = restored.saturating_add(1);
+            }
+            !gave_up
+        });
+        self.enemy_reserve.landers = self.enemy_reserve.landers.saturating_add(restored);
     }
 
     fn convert_completed_lander_abductions(
@@ -4466,6 +4480,22 @@ fn start_lander_human_capture(
         lander.velocity.dy = CLEAN_LANDER_CAPTURE_Y_VELOCITY;
     }
     lander_position
+}
+
+fn source_lander_pull_target_cleared(enemy: &EnemySnapshot, humans: &[HumanSnapshot]) -> bool {
+    if enemy.kind != EnemyKind::Lander {
+        return false;
+    }
+    let Some(source_lander) = enemy.source_lander else {
+        return false;
+    };
+    if source_lander.y_velocity != 0 || !source_lander_pull_edge(enemy.position) {
+        return false;
+    }
+
+    !humans
+        .iter()
+        .any(|human| clean_lander_pull_position_matches(enemy.position, *human))
 }
 
 fn clean_human_ground_y(terrain: &[TerrainSegment], human_x: u8) -> Option<u8> {
@@ -10863,6 +10893,42 @@ mod tests {
         assert_eq!(mutant.source_mutant, Some(expected_source));
         assert!(frame.state.world.enemy_projectiles.is_empty());
         assert!(frame.state.world.terrain_blow.is_some());
+    }
+
+    #[test]
+    fn clean_game_source_lander_gives_up_when_pull_target_cleared() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, SOURCE_PLAYFIELD_Y_MIN + 8);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 1,
+            picture_frame: 0,
+        };
+        game.state.world.enemies = vec![
+            EnemySnapshot::source_lander(lander_start, ScreenVelocity::new(0, 0), source_lander),
+            EnemySnapshot::new(
+                EnemyKind::Baiter,
+                ScreenPosition::new(220, 80),
+                ScreenVelocity::new(0, 0),
+            ),
+        ];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        let humans = game.state.world.humans.clone();
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemies.len(), 1);
+        assert_eq!(frame.state.world.enemies[0].kind, EnemyKind::Baiter);
+        assert_eq!(frame.state.world.enemy_reserve.landers, 1);
+        assert_eq!(frame.state.world.humans, humans);
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+        assert!(frame.state.world.terrain_blow.is_none());
+        assert!(frame.events.gameplay().is_empty());
     }
 
     #[test]

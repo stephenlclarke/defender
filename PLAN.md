@@ -2018,6 +2018,27 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312210142199`.
 
+- `2026-05-20 22:29:08 BST` R9-C4 progress slice
+  `LNDFXA cleared-target give-up`. Source-shaped clean landers already at the
+  top pull edge now leave active play and return to the lander reserve when no
+  matching carried passenger remains, instead of falling through the generic
+  no-human mutation path. Added focused clean-game coverage for the
+  cleared-target pull-edge edge case while preserving existing source pull-in
+  and conversion behavior. Focused validation passed: `cargo fmt --check`,
+  `cargo check`, `cargo check --features legacy-tools`, the focused
+  source-lander give-up regression test, `cargo test clean_game_source_lander --lib`,
+  `cargo test clean_game --lib`, targeted `make clean-fidelity SCENARIOS="abduction"`,
+  touched-doc markdownlint, and `git diff --check`.
+  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  Step 50 lander pull-edge slice, not Step 50 or Phase 3 closure and it does
+  not change public snapshots. The next full gate should run when Step 50
+  closes, another broader shared-contract risk appears, or R9 finalization
+  begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312466672089`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312683572769`.
+
 ## Archived Completed History
 
 Detailed closed-step and completed-cycle history has been moved to

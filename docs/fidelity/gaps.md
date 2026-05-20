@@ -582,6 +582,11 @@ post-acceptance validation records.
   capture transition. Source-shaped clean landers now seed the source flee
   vector and `LANDF` sleep countdown on the capture frame before carrying the
   passenger toward the pull-in edge.
+- `2026-05-20 22:29:08 BST`: R9-C4 adds the bounded source `LNDFXA`
+  cleared-target give-up edge. Source-shaped clean landers already at the
+  top pull edge now leave active play and return to the lander reserve when no
+  matching carried passenger remains, instead of falling through the generic
+  no-human mutation path.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain
