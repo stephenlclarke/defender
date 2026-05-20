@@ -1008,9 +1008,10 @@ Object-ecology progress after R9-C4 slices:
   guard, deterministic clean spawn, and source active-baiter cap. Spawned
   baiters retain source shot-timer, picture-cycle, sleep, and velocity state,
   pursue the player through the source `UFONV` seek rules, fire source-shaped
-  `SHOOT` fireball shells, and those enemy projectiles now use source lifetime,
-  scroll-adjusted fixed-point motion, offscreen culling, collision scoring,
-  player-damage handling, and source `BMBP1` shell descriptor evidence.
+  `SHOOT` fireball shells, and those enemy projectiles now use source `SHSCAN`
+  lifetime decrement/wrap behavior, scroll-adjusted fixed-point motion,
+  offscreen culling, collision scoring, player-damage handling, and source
+  `BMBP1` shell descriptor evidence.
 - Clean mutant runtime now carries source-shaped state for active mutants.
   Completed carried-lander abductions consume the passenger and convert that
   lander into a mutant, no-target/no-human landers convert through the same
@@ -1933,6 +1934,26 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310138116479`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310437026419`.
+
+- `2026-05-20 21:58:01 BST` R9-C4 progress slice
+  `SHSCAN shell lifetime wrap parity`. Clean hostile shell scans now decrement
+  `source_lifetime_ticks` with source `SHSCAN` wrapping arithmetic, so a live
+  shell timer byte of `0x00` becomes `0xFF` and remains linked until a later
+  scan reaches zero. Added focused clean-game coverage for the zero-lifetime
+  edge and updated README, SPEC, and the fidelity gap ledger. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, the focused zero-lifetime regression test,
+  `cargo test clean_game_enemy_projectile --lib`, `cargo test clean_game
+  --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance"`,
+  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
+  --all-targets`, clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` remain deferred because this is a bounded Step 50
+  hostile-shell edge slice, not Step 50 or Phase 3 closure. The next full gate
+  should run when Step 50 closes, another broader shared-contract risk appears,
+  or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310644890279`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310880556849`.
 
 ## Archived Completed History
 

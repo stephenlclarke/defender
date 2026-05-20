@@ -679,6 +679,10 @@ post-acceptance validation records.
   picture/Y/bomb step only for the selected source squad slot, so empty
   selected slots sleep without changing bomber state while active bomber
   positions still advance through source velocity.
+- `2026-05-20 21:58:01 BST`: R9-C4 aligns clean enemy shell lifetime scanning
+  with source `SHSCAN` decrement/wrap behavior. Live clean hostile shells now
+  decrement `source_lifetime_ticks` with wrapping arithmetic, so a timer byte
+  of `0x00` becomes `0xFF` and remains linked until a later scan reaches zero.
 - `2026-05-20 21:32:03 BST`: R9-C4 aligns clean enemy shell movement with the
   source `SHELL` scroll delta. Clean hostile shells now add
   `(previous BGL - current BGL) << 2` to fixed-point X motion when the

@@ -5323,7 +5323,7 @@ impl Game {
 
     fn advance_enemy_projectiles(&mut self, shell_scroll_delta: u16) {
         self.state.world.enemy_projectiles.retain_mut(|projectile| {
-            projectile.source_lifetime_ticks = projectile.source_lifetime_ticks.saturating_sub(1);
+            projectile.source_lifetime_ticks = projectile.source_lifetime_ticks.wrapping_sub(1);
             if projectile.source_lifetime_ticks == 0 {
                 return false;
             }
@@ -10017,6 +10017,30 @@ mod tests {
 
         assert!(offscreen.state.world.enemy_projectiles.is_empty());
         assert!(offscreen.events.gameplay().is_empty());
+    }
+
+    #[test]
+    fn clean_game_enemy_projectile_wraps_zero_lifetime_like_shscan() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(200, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+        let mut projectile =
+            super::EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(80, 80), 0x0100, 0);
+        projectile.source_lifetime_ticks = 0;
+        game.state.world.enemy_projectiles = vec![projectile];
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemy_projectiles.len(), 1);
+        let projectile = frame.state.world.enemy_projectiles[0];
+        assert_eq!(projectile.source_lifetime_ticks, 0xFF);
+        assert_eq!(projectile.position, ScreenPosition::new(81, 80));
+        assert!(frame.events.gameplay().is_empty());
     }
 
     #[test]

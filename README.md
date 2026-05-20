@@ -443,9 +443,9 @@ baiter entry now advances on the source game-exec pacing cadence, accelerates
 when the remaining enemy total is low, and respects the source active-baiter
 cap. Spawned baiters retain source shot-timer, picture-cycle, sleep, and
 velocity state, pursue the player through source seek rules, fire source-shaped
-fireball shells, and those enemy projectiles use source lifetime,
-scroll-adjusted fixed-point motion, offscreen culling, collision scoring, and
-player-damage handling.
+fireball shells, and those enemy projectiles use source `SHSCAN` lifetime
+decrement/wrap behavior, scroll-adjusted fixed-point motion, offscreen culling,
+collision scoring, and player-damage handling.
 Clean landers now abduct aligned humans, carry them with the fleeing lander,
 and release the passenger when that lander is destroyed. Released, uncarried
 humans above terrain now use source-shaped `AFALL` fixed-point acceleration,
