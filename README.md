@@ -466,10 +466,12 @@ fixed-point fractions, X velocity, vertical velocity, picture frame, cruise
 altitude, and sleep state, then advance through source `TIE` image cycling,
 random vertical drift/damping, player-Y steering, off-screen cruise steering,
 and bounded `BOMBST` bomb-shell projection with source `GETSHL` placement
-bounds. Pod reserve activation now uses
-source `PRBST`/`PRBRES` placement, fixed-point fractions, and velocity bytes
-before entering source fixed-point X/Y motion with the same source `VELO`
-Y-bound wrap, and reserve bombers now use source `TIEST`
+bounds. Bomber picture/Y/bomb state updates now honor the source `TIE`
+`SEED & 0x06` squad-slot selection, leaving empty selected slots sleeping while
+active bomber positions continue through source velocity. Pod reserve
+activation now uses source `PRBST`/`PRBRES` placement, fixed-point fractions,
+and velocity bytes before entering source fixed-point X/Y motion with the same
+source `VELO` Y-bound wrap, and reserve bombers now use source `TIEST`
 player-relative squad placement and alternating X velocity before entering the
 source bomber runtime. Enemy projectile evidence now carries source `BMBP1`
 shell descriptor fields for the standalone mine/source-shell fixture, and

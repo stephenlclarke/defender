@@ -277,10 +277,13 @@ fixed-point fractions, X velocity, vertical velocity, picture frame, cruise
 altitude, and sleep state, then advance through source `TIE` image cycling,
 random vertical drift/damping, player-Y steering, off-screen cruise steering,
 and bounded `BOMBST` bomb-shell projection with source `GETSHL` placement
-bounds. Reserve bombers now use source `TIEST`
-player-relative squad placement and alternating X velocity before entering the
-source bomber runtime. Enemy projectile evidence now carries source `BMBP1`
-shell descriptor fields for the standalone mine/source-shell fixture, and
+bounds. Bomber picture/Y/bomb state updates now honor the source `TIE`
+`SEED & 0x06` squad-slot selection, leaving empty selected slots sleeping while
+active bomber positions continue through source velocity. Reserve bombers now
+use source `TIEST` player-relative squad placement and alternating X velocity
+before entering the source bomber runtime. Enemy projectile evidence now
+carries source `BMBP1` shell descriptor fields for the standalone
+mine/source-shell fixture, and
 active clean enemy evidence now carries source object-picture descriptor
 labels, addresses, dimensions, and primary/alternate image pointers for the
 current lander, baiter, bomber, mutant, pod, and swarmer presentations. Clean

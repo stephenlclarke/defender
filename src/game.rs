@@ -1919,6 +1919,8 @@ impl WorldSnapshot {
         let enemy_projectiles = &mut self.enemy_projectiles;
         let terrain = &self.terrain;
         let lander_carrying_passenger = self.humans.iter().any(|human| human.carried);
+        let selected_bomber_slot = source_tie_selected_slot(source_rng.seed);
+        let mut bomber_slot = 0usize;
         for enemy in &mut self.enemies {
             if enemy.kind == EnemyKind::Lander
                 && let Some(source_lander) = enemy.source_lander.as_mut()
@@ -1972,13 +1974,17 @@ impl WorldSnapshot {
             if enemy.kind == EnemyKind::Bomber
                 && let Some(source_bomber) = enemy.source_bomber.as_mut()
             {
-                advance_source_bomber(
-                    enemy.position,
-                    source_bomber,
-                    player_position,
-                    *source_rng,
-                    enemy_projectiles,
-                );
+                let should_run_tie_step = bomber_slot == selected_bomber_slot;
+                bomber_slot = (bomber_slot + 1) % SOURCE_BOMBER_SQUAD_SIZE;
+                if should_run_tie_step {
+                    advance_source_bomber(
+                        enemy.position,
+                        source_bomber,
+                        player_position,
+                        *source_rng,
+                        enemy_projectiles,
+                    );
+                }
                 let (x, x_fraction) = source_fixed_axis_step(
                     enemy.position.x,
                     source_bomber.x_fraction,
@@ -2960,6 +2966,7 @@ const SOURCE_MINI_SWARMER_TURN_WINDOW_HALF: u16 = 150 * 32;
 const SOURCE_MINI_SWARMER_RESTORE_X_LOW: u8 = 0x07;
 const SOURCE_BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
 const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
+const SOURCE_BOMBER_SQUAD_SIZE: usize = 3;
 const SOURCE_BOMBER_CRUISE_ALTITUDE: u8 = 0x50;
 const SOURCE_BOMBER_MIN_CRUISE_ALTITUDE: u8 = 0x40;
 const SOURCE_BOMBER_MAX_CRUISE_ALTITUDE: u8 = 0x68;
@@ -3460,6 +3467,10 @@ fn source_bomber_x_velocity(source_x_velocity: u8, spawn_index: usize) -> u16 {
         source_x_velocity
     };
     source_sign_extend_u8_to_u16(velocity_low)
+}
+
+fn source_tie_selected_slot(seed: u8) -> usize {
+    usize::from((seed & 0x06) >> 1)
 }
 
 fn source_bomber_restore_spawns(
@@ -9276,6 +9287,60 @@ mod tests {
                 && sprite.layer == RenderLayer::Projectiles
                 && sprite.position == [8.0, 96.0]
         }));
+    }
+
+    #[test]
+    fn clean_game_bomber_tie_selection_sleeps_empty_source_slot() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x5000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::source_bomber(
+            ScreenPosition::new(0x40, 0x60),
+            ScreenVelocity::new(1, 1),
+            SourceBomberSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0x0100,
+                y_velocity: 0x0100,
+                picture_frame: 2,
+                cruise_altitude: 0x50,
+                sleep_ticks: 0,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans.clear();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x06,
+            hseed: 0x40,
+            lseed: 0,
+        };
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+        let bomber = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source bomber should remain active");
+        let expected_source = SourceBomberSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0x0100,
+            y_velocity: 0x0100,
+            picture_frame: 2,
+            cruise_altitude: 0x50,
+            sleep_ticks: 0,
+        };
+        assert_eq!(bomber.kind, EnemyKind::Bomber);
+        assert_eq!(bomber.position, ScreenPosition::new(0x41, 0x61));
+        assert_eq!(
+            bomber.velocity,
+            super::source_bomber_screen_velocity(expected_source)
+        );
+        assert_eq!(bomber.source_bomber, Some(expected_source));
     }
 
     #[test]

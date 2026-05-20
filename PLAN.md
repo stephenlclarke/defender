@@ -996,6 +996,9 @@ Object-ecology progress after R9-C4 slices:
   advance through the source `TIE` image cycle, random vertical drift/damping,
   on-screen player-Y steering, off-screen cruise-altitude steering, and bounded
   `BOMBST` bomb-shell projection state with source `GETSHL` placement bounds.
+  The clean bomber state update now honors the source `TIE` `SEED & 0x06`
+  squad-slot selection so empty selected slots sleep while active bomber
+  positions still advance through source velocity.
   Reserve bomber activation now mirrors
   source `TIEST` squad placement: up to three bombers per squad, X positions
   spaced from the current player X, fixed cruise altitude, and alternating
@@ -1911,6 +1914,25 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309445529489`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309785054869`.
+- `2026-05-20 21:54:00 BST` R9-C4 progress slice
+  `bomber TIE slot-selection parity`. Clean bomber picture/Y/bomb state updates
+  now honor the source `TIE` `SEED & 0x06` squad-slot selection, so an empty
+  selected source slot sleeps without changing bomber state while active bomber
+  positions continue through source velocity. Added focused clean-game coverage
+  for the empty selected-slot path and updated README, SPEC, and the fidelity
+  gap ledger. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo check --features legacy-tools`, the focused bomber slot-selection
+  regression test, `cargo test clean_game_bomber --lib`, `cargo test
+  clean_game --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance"`,
+  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
+  --all-targets`, clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` remain deferred because this is a bounded Step 50
+  bomber-family cadence slice, not Step 50 or Phase 3 closure. The next full
+  gate should run when Step 50 closes, another broader shared-contract risk
+  appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310138116479`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310437026419`.
 
 ## Archived Completed History
 
