@@ -2147,8 +2147,7 @@ impl WorldSnapshot {
             return;
         };
 
-        let lander_position = self.enemies[lander_index].position;
-        self.enemies[lander_index].velocity.dy = CLEAN_LANDER_CAPTURE_Y_VELOCITY;
+        let lander_position = start_lander_human_capture(&mut self.enemies[lander_index], profile);
         self.humans[human_index].carried = true;
         self.humans[human_index].position = clean_carried_human_position(lander_position);
         self.humans[human_index].clear_source_fall();
@@ -4447,6 +4446,26 @@ fn clean_lander_capture_aligned(
     let y_delta = (target_y - i16::from(human_position.y)).abs();
 
     x_delta <= CLEAN_LANDER_CAPTURE_X_TOLERANCE && y_delta <= CLEAN_LANDER_CAPTURE_Y_TOLERANCE
+}
+
+fn start_lander_human_capture(
+    lander: &mut EnemySnapshot,
+    profile: WaveProfileSnapshot,
+) -> ScreenPosition {
+    let lander_position = lander.position;
+    if let Some(source_lander) = lander.source_lander.as_mut() {
+        if source_lander_pull_edge(lander_position) {
+            source_lander.y_velocity = 0;
+            source_lander.sleep_ticks = 0;
+        } else {
+            source_lander.y_velocity = !source_lander_base_y_velocity(profile);
+            source_lander.sleep_ticks = SOURCE_LANDER_FLEE_SLEEP_TICKS;
+        }
+        lander.velocity = source_lander_screen_velocity(*source_lander);
+    } else {
+        lander.velocity.dy = CLEAN_LANDER_CAPTURE_Y_VELOCITY;
+    }
+    lander_position
 }
 
 fn clean_human_ground_y(terrain: &[TerrainSegment], human_x: u8) -> Option<u8> {
@@ -10595,6 +10614,58 @@ mod tests {
             super::clean_carried_human_position(ScreenPosition::new(100, 79))
         );
         assert!(carried.state.world.humans[0].carried);
+    }
+
+    #[test]
+    fn clean_game_source_lander_capture_seeds_source_flee_state() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, 80);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 5,
+            sleep_ticks: 1,
+            picture_frame: 0,
+        };
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            lander_start,
+            ScreenVelocity::new(0, 0),
+            source_lander,
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(100, 92))];
+        game.baiter_timer_ticks = None;
+
+        let expected_source = SourceLanderSnapshot {
+            y_velocity: !super::source_lander_base_y_velocity(game.state.wave_profile),
+            sleep_ticks: super::SOURCE_LANDER_FLEE_SLEEP_TICKS,
+            ..source_lander
+        };
+
+        let captured = game.step(GameInput::NONE);
+
+        let lander = captured
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("capturing source lander");
+        assert_eq!(lander.position, lander_start);
+        assert_eq!(
+            lander.velocity,
+            super::source_lander_screen_velocity(expected_source)
+        );
+        assert_eq!(lander.source_lander, Some(expected_source));
+        assert_eq!(
+            captured.state.world.humans[0],
+            HumanSnapshot {
+                carried: true,
+                ..HumanSnapshot::new(super::clean_carried_human_position(lander_start))
+            }
+        );
+        assert!(captured.state.world.enemy_projectiles.is_empty());
     }
 
     #[test]

@@ -1998,6 +1998,26 @@ Work log:
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311737383869`.
 
+- `2026-05-20 22:21:05 BST` R9-C4 progress slice
+  `LANDG capture flee-state parity`. Source-shaped clean landers now seed the
+  source `LANDG` split flee vector and `LANDF` sleep countdown on the capture
+  frame instead of leaving source landers on the generic clean capture velocity
+  state. Added focused clean-game coverage for the source-lander capture frame
+  while preserving the existing pull-in and conversion behavior. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, the focused source-lander capture regression test,
+  `cargo test clean_game_source_lander --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
+  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded Step 50 lander capture-state slice, not
+  Step 50 or Phase 3 closure and it does not change public snapshots. The next
+  full gate should run when Step 50 closes, another broader shared-contract
+  risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311983611809`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312210142199`.
+
 ## Archived Completed History
 
 Detailed closed-step and completed-cycle history has been moved to

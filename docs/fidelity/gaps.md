@@ -578,6 +578,10 @@ post-acceptance validation records.
   fleeing at the upper pull edge, pull the carried passenger upward one screen
   row at a time, and only consume the passenger/convert to a mutant once the
   passenger has reached the lander.
+- `2026-05-20 22:21:05 BST`: R9-C4 tightens the clean source `LANDG`
+  capture transition. Source-shaped clean landers now seed the source flee
+  vector and `LANDF` sleep countdown on the capture frame before carrying the
+  passenger toward the pull-in edge.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain
