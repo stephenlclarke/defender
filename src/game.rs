@@ -61,6 +61,10 @@ const SOURCE_UFHSND_SOUND_COMMAND: u8 = 0xF8;
 const SOURCE_TIHSND_SOUND_COMMAND: u8 = 0xFE;
 const SOURCE_LHSND_SOUND_COMMAND: u8 = 0xF9;
 const SOURCE_SWHSND_SOUND_COMMAND: u8 = 0xF8;
+const SOURCE_LSHSND_SOUND_COMMAND: u8 = 0xFC;
+const SOURCE_SSHSND_SOUND_COMMAND: u8 = 0xF6;
+const SOURCE_USHSND_SOUND_COMMAND: u8 = 0xFC;
+const SOURCE_SWSSND_SOUND_COMMAND: u8 = 0xF3;
 pub(crate) const SOURCE_EXPLOSION_INITIAL_SIZE: u16 = 0x0100;
 pub(crate) const SOURCE_EXPLOSION_SIZE_DELTA: u16 = 0x00AA;
 pub(crate) const SOURCE_EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30;
@@ -1967,6 +1971,7 @@ impl WorldSnapshot {
         profile: WaveProfileSnapshot,
         player_position: ScreenPosition,
         player_velocity: (WorldVector, WorldVector),
+        sound_events: &mut Vec<SoundEvent>,
     ) {
         let source_rng = &mut self.source_rng;
         let enemy_projectiles = &mut self.enemy_projectiles;
@@ -1998,6 +2003,7 @@ impl WorldSnapshot {
                         && (source_lander_grab_active(*source_lander)
                             || source_lander_grab_x_matches(enemy.position, *target_position))
                 });
+                let projectile_count = enemy_projectiles.len();
                 let advance = advance_source_lander(
                     enemy.position,
                     source_lander,
@@ -2009,6 +2015,12 @@ impl WorldSnapshot {
                     player_velocity,
                     source_rng,
                     enemy_projectiles,
+                );
+                push_source_enemy_shot_sound_if_fired(
+                    EnemyKind::Lander,
+                    projectile_count,
+                    enemy_projectiles.len(),
+                    sound_events,
                 );
                 if let Some(position) = advance.direct_position {
                     enemy.position = position;
@@ -2097,6 +2109,7 @@ impl WorldSnapshot {
             if enemy.kind == EnemyKind::Mutant
                 && let Some(source_mutant) = enemy.source_mutant.as_mut()
             {
+                let projectile_count = enemy_projectiles.len();
                 advance_source_mutant(
                     &mut enemy.position,
                     source_mutant,
@@ -2105,6 +2118,12 @@ impl WorldSnapshot {
                     player_velocity,
                     source_rng,
                     enemy_projectiles,
+                );
+                push_source_enemy_shot_sound_if_fired(
+                    EnemyKind::Mutant,
+                    projectile_count,
+                    enemy_projectiles.len(),
+                    sound_events,
                 );
                 let (x, x_fraction) = source_fixed_axis_step(
                     enemy.position.x,
@@ -2125,6 +2144,7 @@ impl WorldSnapshot {
             if enemy.kind == EnemyKind::Swarmer
                 && let Some(source_swarmer) = enemy.source_swarmer.as_mut()
             {
+                let projectile_count = enemy_projectiles.len();
                 advance_source_mini_swarmer(
                     enemy.position,
                     source_swarmer,
@@ -2132,6 +2152,12 @@ impl WorldSnapshot {
                     player_position,
                     source_rng,
                     enemy_projectiles,
+                );
+                push_source_enemy_shot_sound_if_fired(
+                    EnemyKind::Swarmer,
+                    projectile_count,
+                    enemy_projectiles.len(),
+                    sound_events,
                 );
                 let (x, x_fraction) = source_fixed_axis_step(
                     enemy.position.x,
@@ -2153,6 +2179,7 @@ impl WorldSnapshot {
             if enemy.kind == EnemyKind::Baiter
                 && let Some(source_baiter) = enemy.source_baiter.as_mut()
             {
+                let projectile_count = enemy_projectiles.len();
                 advance_source_baiter(
                     enemy.position,
                     source_baiter,
@@ -2161,6 +2188,12 @@ impl WorldSnapshot {
                     player_velocity,
                     source_rng,
                     enemy_projectiles,
+                );
+                push_source_enemy_shot_sound_if_fired(
+                    EnemyKind::Baiter,
+                    projectile_count,
+                    enemy_projectiles.len(),
+                    sound_events,
                 );
                 let (x, x_fraction) = source_fixed_axis_step(
                     enemy.position.x,
@@ -5930,6 +5963,7 @@ impl Game {
             self.state.wave_profile,
             motion.screen_position,
             motion.state.velocity,
+            sound_events,
         );
 
         self.state.world.resolve_lander_human_abductions(
@@ -7508,6 +7542,36 @@ fn source_enemy_hit_sound_command(kind: EnemyKind) -> u8 {
     }
 }
 
+fn push_source_enemy_shot_sound_if_fired(
+    kind: EnemyKind,
+    projectile_count_before: usize,
+    projectile_count_after: usize,
+    sound_events: &mut Vec<SoundEvent>,
+) {
+    if projectile_count_after <= projectile_count_before {
+        return;
+    }
+
+    if let Some(event) = source_enemy_shot_sound_event(kind) {
+        sound_events.push(event);
+    }
+}
+
+fn source_enemy_shot_sound_event(kind: EnemyKind) -> Option<SoundEvent> {
+    source_enemy_shot_sound_command(kind)
+        .map(|command| SoundEvent::UnmappedSoundCommand { command })
+}
+
+fn source_enemy_shot_sound_command(kind: EnemyKind) -> Option<u8> {
+    match kind {
+        EnemyKind::Lander => Some(SOURCE_LSHSND_SOUND_COMMAND),
+        EnemyKind::Mutant => Some(SOURCE_SSHSND_SOUND_COMMAND),
+        EnemyKind::Swarmer => Some(SOURCE_SWSSND_SOUND_COMMAND),
+        EnemyKind::Baiter => Some(SOURCE_USHSND_SOUND_COMMAND),
+        EnemyKind::Bomber | EnemyKind::Pod => None,
+    }
+}
+
 impl Default for Game {
     fn default() -> Self {
         Self::new()
@@ -7956,6 +8020,7 @@ mod tests {
         SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
         SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage,
         WaveProfileSnapshot, WorldSnapshot, WorldVector, source_enemy_hit_sound_event,
+        source_enemy_shot_sound_event,
     };
 
     #[test]
@@ -9902,6 +9967,10 @@ mod tests {
                 expected_projectile_y_velocity
             )
         );
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_enemy_shot_sound_event(EnemyKind::Swarmer).expect("swarmer shot sound")]
+        );
         assert_eq!(frame.state.world.object_evidence.active_count, 2);
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
         assert_eq!(
@@ -9994,6 +10063,7 @@ mod tests {
                 .iter()
                 .all(|projectile| projectile.position != ScreenPosition::new(32, 96))
         );
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]
@@ -10191,6 +10261,10 @@ mod tests {
             frame.state.world.enemy_projectiles,
             vec![expected_projectile]
         );
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_enemy_shot_sound_event(EnemyKind::Baiter).expect("baiter shot sound")]
+        );
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_BOMB
@@ -10279,6 +10353,7 @@ mod tests {
             frame.state.world.enemy_projectiles,
             vec![expected_projectile]
         );
+        assert!(frame.events.sounds().is_empty());
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_BOMB
@@ -10494,6 +10569,10 @@ mod tests {
         assert_eq!(
             frame.state.world.enemy_projectiles,
             vec![expected_projectile]
+        );
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_enemy_shot_sound_event(EnemyKind::Lander).expect("lander shot sound")]
         );
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
     }
@@ -10939,6 +11018,10 @@ mod tests {
         assert_eq!(
             frame.state.world.enemy_projectiles,
             vec![expected_projectile]
+        );
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_enemy_shot_sound_event(EnemyKind::Mutant).expect("mutant shot sound")]
         );
     }
 

@@ -250,15 +250,16 @@ source `VELO` Y-bound wrap. Mini-swarmers advance through the source entry
 seek, fixed-point loop, vertical
 acceleration/damping, turnback, and enemy-bomb projection shape while sharing
 the source shell free-list cap with the other fireball paths, including source
-`RMAX` RNG consumption on shot-timer resets when allocation fails. Clean baiter
-entry now advances on the source
+`RMAX` RNG consumption on shot-timer resets when allocation fails, and emit
+source `SWSSND` command evidence when allocation succeeds. Clean baiter entry
+now advances on the source
 game-exec pacing cadence, accelerates the timer when the remaining enemy total
 is low, and respects the source active-baiter cap. Spawned baiters
 retain source shot-timer, picture-cycle, sleep, and velocity state, pursue the
-player through source seek rules, fire source-shaped fireball shells, and those
-enemy projectiles use source `SHSCAN` lifetime decrement/wrap behavior,
-scroll-adjusted fixed-point motion, offscreen culling, collision scoring, and
-player-damage handling.
+player through source seek rules, fire source-shaped fireball shells with
+source `USHSND` command evidence, and those enemy projectiles use source
+`SHSCAN` lifetime decrement/wrap behavior, scroll-adjusted fixed-point motion,
+offscreen culling, collision scoring, and player-damage handling.
 Clean landers now abduct aligned humans, can carry explicit selected-human
 target state for source-shaped landers, enter the source `LANDG`
 target-approach step only when that selected target passes the source `LANDS0`
@@ -273,7 +274,8 @@ through the source grouping rules and retain slot addresses from the `0xA11A`
 target-list base with a two-byte stride. Clean source lander spawns now advance
 the source `TPTR`-shaped cursor through those `TLIST` slots for initial,
 reserve, and retarget selection while preserving the separate source enemy RNG
-cadence.
+cadence. Source lander fireball allocation now emits `LSHSND` command
+evidence.
 Released, uncarried humans
 above terrain now use source-shaped `AFALL` fixed-point acceleration, settle
 safely at or below the source threshold with the 250-point safe-landing score
@@ -289,12 +291,14 @@ enter the same mutation path, and active clean mutants retain source
 shot-timer, sleep,
 fixed-point fractions, X seek, vertical seek/avoid, random Y hop, and shared
 fireball projection state; reserve mutants now restore through source-shaped
-placement fractions and shot-timer RNG state. Clean bombers now retain source
-fixed-point fractions, X velocity, vertical velocity, picture frame, cruise
-altitude, and sleep state, then advance through source `TIE` image cycling,
-random vertical drift/damping, player-Y steering, off-screen cruise steering,
-and bounded `BOMBST` bomb-shell projection with source `GETSHL` placement
-bounds. Bomber picture/Y/bomb state updates now honor the source `TIE`
+placement fractions, shot-timer RNG state, and source `SSHSND` command
+evidence when shared `SHOOT` shell allocation succeeds. Clean bombers now
+retain source fixed-point fractions, X velocity, vertical velocity, picture
+frame, cruise altitude, and sleep state, then advance through source `TIE`
+image cycling, random vertical drift/damping, player-Y steering, off-screen
+cruise steering, and bounded silent `BOMBST` bomb-shell projection with source
+`GETSHL` placement bounds. Bomber picture/Y/bomb state updates now honor the
+source `TIE`
 `SEED & 0x06` squad-slot selection, leaving empty selected slots sleeping while
 active bomber positions continue through source velocity. Reserve bombers now
 use source `TIEST` player-relative squad placement and alternating X velocity

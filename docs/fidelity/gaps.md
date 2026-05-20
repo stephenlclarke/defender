@@ -632,6 +632,16 @@ post-acceptance validation records.
   (`0xF8`), and baiters use `UFHSND` (`0xF8`). Remaining B08 work is exact
   per-family movement/projectile behavior beyond the covered enemy-hit command
   evidence and focused source ecology fixtures for those transitions.
+- `2026-05-21 00:25:05 BST`: R9-C4 adds bounded source enemy shot sound-command
+  evidence. Clean lander, mutant, baiter, and mini-swarmer projectile launches
+  now surface the source shot sound command byte only when the source-shaped
+  shell allocation succeeds: landers use `LSHSND` (`0xFC`), mutants use
+  `SSHSND` (`0xF6`), baiters use `USHSND` (`0xFC`), and mini-swarmers use
+  `SWSSND` (`0xF3`). Full mini-swarmer shell-list attempts and bomber
+  `BOMBST` shell allocations remain silent. Remaining B08 work is exact
+  per-family movement/projectile behavior beyond the covered enemy-hit and
+  enemy-shot command evidence and focused source ecology fixtures for those
+  transitions.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain

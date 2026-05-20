@@ -1050,6 +1050,10 @@ Object-ecology progress after R9-C4 slices:
   `SWHSND`, and `UFHSND` are surfaced through the existing sound-event
   command byte contract for landers, mutants, bombers, pods, swarmers, and
   baiters respectively.
+- Clean enemy projectile launches now emit source-backed shot sound command
+  evidence when the source-shaped allocation succeeds: landers use `LSHSND`,
+  mutants use `SSHSND`, baiters use `USHSND`, and mini-swarmers use `SWSSND`.
+  Bomber `BOMBST` allocations remain silent, matching the covered source path.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -1063,8 +1067,8 @@ Object-ecology progress after R9-C4 slices:
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
   is remaining per-family movement/projectile behavior beyond the covered
-  enemy-hit command evidence and focused source ecology fixtures for those
-  transitions.
+  enemy-hit and enemy-shot command evidence and focused source ecology fixtures
+  for those transitions.
 
 Work log:
 
@@ -2245,6 +2249,32 @@ Work log:
   The next full gate should run when Step 50 closes, another broader
   shared-contract risk appears, or R9 finalization begins. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779318773964509`.
+
+- `2026-05-21 00:25:05 BST` R9-C4 progress slice
+  `source enemy shot sound commands`. Clean lander, mutant, baiter, and
+  mini-swarmer projectile launches now emit their source shot sound command
+  bytes through the existing `SoundEvent::UnmappedSoundCommand` surface only
+  when the source-shaped shell allocation succeeds: `LSHSND` for landers,
+  `SSHSND` for mutants, `USHSND` for baiters, and `SWSSND` for mini-swarmers.
+  Bomber `BOMBST` shell allocation remains silent. Focused validation passed:
+  `cargo fmt --check`, `cargo check`, `cargo test
+  clean_game_lander_source_loop_orbits_cycles_and_fires --lib`, `cargo test
+  clean_game_mutant_source_loop_hops_fires_and_sleeps --lib`, `cargo test
+  clean_game_baiter_source_loop_cycles_fires_and_updates_velocity --lib`,
+  `cargo test
+  clean_game_mini_swarmer_loop_updates_y_velocity_and_projects_enemy_bomb
+  --lib`, `cargo test clean_game_mini_swarmer_bomb_respects_source_shell_limit
+  --lib`, and `cargo test
+  clean_game_bomber_source_loop_cycles_picture_and_projects_bomb --lib`,
+  targeted `make clean-fidelity SCENARIOS="firing abduction wave_advance"`,
+  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
+  --all-targets`, full `make fidelity`, full all-scenario `make
+  clean-fidelity`, and full clippy remain deferred because this is a bounded
+  Step 50 source shot-sound slice, not Step 50 or Phase 3 closure, and it does
+  not change the public API. The next full gate should run when Step 50 closes,
+  another broader shared-contract risk appears, or R9 finalization begins.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779319291545789`.
 
 ## Archived Completed History
 
