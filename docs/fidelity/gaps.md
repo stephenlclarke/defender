@@ -642,6 +642,15 @@ post-acceptance validation records.
   per-family movement/projectile behavior beyond the covered enemy-hit and
   enemy-shot command evidence and focused source ecology fixtures for those
   transitions.
+- `2026-05-21 00:36:04 BST`: R9-C4 adds bounded source astronaut sound-command
+  evidence for the covered clean human ecology transitions. Killed carrying
+  landers now release passengers from the source carried/pull positions and
+  surface `ASCSND` (`0xE5`) instead of the ordinary lander hit command when a
+  passenger is released; player catches surface `ACSND` (`0xF7`); safe landings
+  surface `ALSND` (`0xE0`). Remaining B08 work is exact per-family
+  movement/projectile behavior beyond the covered enemy-hit, enemy-shot, and
+  astronaut command evidence plus focused source ecology fixtures for those
+  transitions.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain

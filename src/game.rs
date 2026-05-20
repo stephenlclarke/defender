@@ -65,6 +65,9 @@ const SOURCE_LSHSND_SOUND_COMMAND: u8 = 0xFC;
 const SOURCE_SSHSND_SOUND_COMMAND: u8 = 0xF6;
 const SOURCE_USHSND_SOUND_COMMAND: u8 = 0xFC;
 const SOURCE_SWSSND_SOUND_COMMAND: u8 = 0xF3;
+const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
+const SOURCE_ALSND_SOUND_COMMAND: u8 = 0xE0;
+const SOURCE_ASCSND_SOUND_COMMAND: u8 = 0xE5;
 pub(crate) const SOURCE_EXPLOSION_INITIAL_SIZE: u16 = 0x0100;
 pub(crate) const SOURCE_EXPLOSION_SIZE_DELTA: u16 = 0x00AA;
 pub(crate) const SOURCE_EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30;
@@ -2530,14 +2533,16 @@ impl WorldSnapshot {
         None
     }
 
-    fn release_passenger_for_lander(&mut self, lander_position: ScreenPosition) {
-        let carried_position = clean_carried_human_position(lander_position);
+    fn release_passenger_for_lander(&mut self, lander_position: ScreenPosition) -> bool {
+        let mut released = false;
         for human in &mut self.humans {
-            if human.carried && human.position == carried_position {
+            if clean_carried_human_matches_lander(lander_position, *human) {
                 human.carried = false;
                 human.clear_source_fall();
+                released = true;
             }
         }
+        released
     }
 
     fn refresh_object_evidence(&mut self) {
@@ -5978,6 +5983,7 @@ impl Game {
                 clean_rescue_score_popup_position(landing_position),
             );
             self.award_safe_landing_score(gameplay_events);
+            sound_events.push(source_astronaut_safe_landing_sound_event());
         }
         for landing_position in falling_advance.fatal_landings {
             self.state
@@ -5990,6 +5996,7 @@ impl Game {
             .resolve_player_human_rescue(motion.screen_position)
         {
             self.award_rescue_score(gameplay_events);
+            sound_events.push(source_astronaut_catch_sound_event());
         }
         self.advance_baiter_entry(motion.screen_position, motion.state.velocity);
         self.resolve_projectile_enemy_collisions(gameplay_events, sound_events);
@@ -6149,18 +6156,26 @@ impl Game {
         gameplay_events: &mut Vec<GameEvent>,
         sound_events: &mut Vec<SoundEvent>,
     ) {
+        let released_lander_passenger = if enemy.kind == EnemyKind::Lander {
+            self.state
+                .world
+                .release_passenger_for_lander(enemy.position)
+        } else {
+            false
+        };
         self.state
             .world
             .spawn_explosion(ExplosionKind::for_enemy(enemy.kind), enemy.position);
         gameplay_events.push(GameEvent::EnemyDestroyed);
         self.award_enemy_score(enemy.kind, gameplay_events);
-        sound_events.push(source_enemy_hit_sound_event(enemy.kind));
+        if released_lander_passenger {
+            sound_events.push(source_astronaut_release_sound_event());
+        } else {
+            sound_events.push(source_enemy_hit_sound_event(enemy.kind));
+        }
 
         match enemy.kind {
-            EnemyKind::Lander => self
-                .state
-                .world
-                .release_passenger_for_lander(enemy.position),
+            EnemyKind::Lander => {}
             EnemyKind::Pod => {
                 self.state
                     .world
@@ -7572,6 +7587,24 @@ fn source_enemy_shot_sound_command(kind: EnemyKind) -> Option<u8> {
     }
 }
 
+fn source_astronaut_release_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_ASCSND_SOUND_COMMAND,
+    }
+}
+
+fn source_astronaut_catch_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_ACSND_SOUND_COMMAND,
+    }
+}
+
+fn source_astronaut_safe_landing_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_ALSND_SOUND_COMMAND,
+    }
+}
+
 impl Default for Game {
     fn default() -> Self {
         Self::new()
@@ -8019,8 +8052,9 @@ mod tests {
         ScannerRadarBlipKind, ScannerRadarSnapshot, ScannerRadarStage, ScorePopupKind, SoundEvent,
         SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
         SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage,
-        WaveProfileSnapshot, WorldSnapshot, WorldVector, source_enemy_hit_sound_event,
-        source_enemy_shot_sound_event,
+        WaveProfileSnapshot, WorldSnapshot, WorldVector, source_astronaut_catch_sound_event,
+        source_astronaut_release_sound_event, source_astronaut_safe_landing_sound_event,
+        source_enemy_hit_sound_event, source_enemy_shot_sound_event,
     };
 
     #[test]
@@ -12142,6 +12176,59 @@ mod tests {
             frame.events.gameplay(),
             &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
         );
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_astronaut_release_sound_event()]
+        );
+    }
+
+    #[test]
+    fn clean_game_killed_source_lander_pull_passenger_releases_human() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, SOURCE_PLAYFIELD_Y_MIN + 8);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(0),
+        };
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            lander_start,
+            ScreenVelocity::new(0, 0),
+            source_lander,
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot {
+            carried: true,
+            ..HumanSnapshot::new(ScreenPosition::new(
+                super::clean_carried_human_position(lander_start).x,
+                lander_start.y.saturating_add(2),
+            ))
+        }];
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, lander_start.y.saturating_add(3)),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.enemies.is_empty());
+        assert_eq!(
+            frame.state.world.humans[0],
+            HumanSnapshot::new(ScreenPosition::new(
+                super::clean_carried_human_position(lander_start).x,
+                lander_start.y.saturating_add(1),
+            ))
+        );
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_astronaut_release_sound_event()]
+        );
     }
 
     #[test]
@@ -12225,6 +12312,10 @@ mod tests {
         assert_eq!(
             frame.state.world.score_popups[0].position,
             super::clean_rescue_score_popup_position(ScreenPosition::new(104, 98))
+        );
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_astronaut_catch_sound_event()]
         );
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCORE_POPUP_500
@@ -12315,11 +12406,15 @@ mod tests {
             }
         );
 
+        let mut landing_sounds = None;
         for _ in 0..100 {
             if game.state.world.humans[0].position.y == ground_y {
                 break;
             }
-            game.step(GameInput::NONE);
+            let frame = game.step(GameInput::NONE);
+            if frame.state.world.humans[0].position.y == ground_y {
+                landing_sounds = Some(frame.events.sounds().to_vec());
+            }
         }
 
         assert_eq!(
@@ -12335,6 +12430,10 @@ mod tests {
         assert_eq!(
             game.state.world.score_popups[0].position,
             super::clean_rescue_score_popup_position(ScreenPosition::new(100, ground_y))
+        );
+        assert_eq!(
+            landing_sounds.as_deref(),
+            Some(&[source_astronaut_safe_landing_sound_event()][..])
         );
 
         let settled = game.step(GameInput::NONE);
@@ -12373,6 +12472,7 @@ mod tests {
             explosion.kind == ExplosionKind::Astronaut
                 && explosion.position == ScreenPosition::new(100, ground_y)
         }));
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]

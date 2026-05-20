@@ -1049,7 +1049,9 @@ Object-ecology progress after R9-C4 slices:
   evidence on the shared kill path: `LHSND`, `SCHSND`, `TIHSND`, `PRHSND`,
   `SWHSND`, and `UFHSND` are surfaced through the existing sound-event
   command byte contract for landers, mutants, bombers, pods, swarmers, and
-  baiters respectively.
+  baiters respectively; killed carrying landers now surface source `ASCSND`
+  passenger-release command evidence instead of the ordinary lander hit
+  command when the passenger is released.
 - Clean enemy projectile launches now emit source-backed shot sound command
   evidence when the source-shaped allocation succeeds: landers use `LSHSND`,
   mutants use `SSHSND`, baiters use `USHSND`, and mini-swarmers use `SWSSND`.
@@ -1057,12 +1059,13 @@ Object-ecology progress after R9-C4 slices:
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
-  `P250` score-popup lifecycle; over-speed impacts remove the human, spawn the
-  astronaut explosion lifecycle, and feed the existing last-human planet-loss
-  handoff.
+  `P250` score-popup lifecycle with source `ALSND` command evidence;
+  over-speed impacts remove the human, spawn the astronaut explosion lifecycle,
+  and feed the existing last-human planet-loss handoff.
 - Falling humans caught by the player now enter the clean player-carried state,
   award the source-backed 500-point rescue score, and start the existing `P500`
-  score-popup lifecycle from the caught astronaut position.
+  score-popup lifecycle from the caught astronaut position with source `ACSND`
+  command evidence.
 - Player-carried humans now follow the source AFALL2 carried offset and settle
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
@@ -2275,6 +2278,29 @@ Work log:
   another broader shared-contract risk appears, or R9 finalization begins.
   Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779319291545789`.
+
+- `2026-05-21 00:36:04 BST` R9-C4 progress slice
+  `source astronaut sound commands`. Clean killed carrying-lander destruction
+  now releases passengers from the source carried/pull positions and emits the
+  source `ASCSND` command instead of the ordinary lander hit command when a
+  passenger is released. Clean player catches now emit source `ACSND`, and safe
+  landings now emit source `ALSND`. Focused validation passed: `cargo
+  fmt --check`, `cargo check`, `cargo test clean_game_killed --lib`, `cargo
+  test clean_game_player_catches_falling_human_scores_and_starts_p500_popup
+  --lib`, `cargo test clean_game_released_human_falls_until_terrain_landing
+  --lib`, `cargo test
+  clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss
+  --lib`, `cargo test clean_game_standing_humans_do_not_fall --lib`, `cargo
+  test clean_game_enemy_destroy_emits_source_hit_sound_commands --lib`, `cargo
+  test clean_game_resolves_projectile_enemy_collision_and_scores --lib`, and
+  targeted `make clean-fidelity SCENARIOS="abduction planet_destruction"`.
+  Broad `cargo test --all-targets`, full `make fidelity`, full all-scenario
+  `make clean-fidelity`, and full clippy remain deferred because this is a
+  bounded Step 50 astronaut sound-command slice, not Step 50 or Phase 3
+  closure, and it does not change the public API. The next full gate should
+  run when Step 50 closes, another broader shared-contract risk appears, or R9
+  finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779319957438009`.
 
 ## Archived Completed History
 
