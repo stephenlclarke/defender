@@ -1022,7 +1022,8 @@ Object-ecology progress after R9-C4 slices:
   shot-timer RNG state.
 - Clean lander abduction now covers the first carry transition: aligned humans
   enter the carried state, stay associated with the lander that captured them
-  while it flees, and are released when that lander is destroyed.
+  while it flees, pull upward through the source `LANDF` / `LNDFXA` top-edge
+  shape before conversion, and are released when that lander is destroyed.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -1975,6 +1976,27 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311047651329`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311314055159`.
+
+- `2026-05-20 22:14:47 BST` R9-C4 progress slice
+  `LANDF/LNDFXA passenger pull-in`. Source-shaped clean landers now enter a
+  top-edge pull phase: carrying landers stop at the upper pull edge, pull the
+  passenger upward one row at a time, and only consume the passenger/convert to
+  a mutant after the passenger reaches the lander. Added focused clean-game
+  coverage for top-edge pulling and post-pull conversion, and updated README,
+  SPEC, and the fidelity gap ledger. Focused validation passed: `cargo fmt
+  --check`, `cargo check`, `cargo check --features legacy-tools`, the focused
+  top-edge pull regression test, the focused post-pull conversion regression
+  test, `cargo test clean_game_source_lander --lib`, `cargo test clean_game
+  --lib`, targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
+  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded Step 50 lander pull-in slice, not Step 50
+  or Phase 3 closure and it does not change public snapshots. The next full
+  gate should run when Step 50 closes, another broader shared-contract risk
+  appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311473175939`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311737383869`.
 
 ## Archived Completed History
 

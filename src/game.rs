@@ -1927,7 +1927,7 @@ impl WorldSnapshot {
             {
                 let carried_human_index =
                     clean_carried_human_index_for_lander(humans, enemy.position);
-                advance_source_lander(
+                let advance_phase = advance_source_lander(
                     enemy.position,
                     source_lander,
                     profile,
@@ -1953,7 +1953,18 @@ impl WorldSnapshot {
                 source_lander.y_fraction = y_fraction;
                 enemy.velocity = source_lander_screen_velocity(*source_lander);
                 if let Some(human_index) = carried_human_index {
-                    humans[human_index].position = clean_carried_human_position(enemy.position);
+                    if advance_phase == SourceLanderAdvancePhase::PullingPassenger
+                        || clean_lander_pull_position_matches(enemy.position, humans[human_index])
+                    {
+                        if advance_phase == SourceLanderAdvancePhase::PullingPassenger {
+                            humans[human_index].position = clean_lander_pull_passenger_position(
+                                enemy.position,
+                                humans[human_index].position,
+                            );
+                        }
+                    } else {
+                        humans[human_index].position = clean_carried_human_position(enemy.position);
+                    }
                     humans[human_index].clear_source_fall();
                 }
                 continue;
@@ -2170,9 +2181,15 @@ impl WorldSnapshot {
             if lander.position.y > SOURCE_PLAYFIELD_Y_MIN.saturating_add(8) {
                 continue;
             }
-            let carried_position = clean_carried_human_position(lander.position);
+            let is_source_lander = lander.source_lander.is_some();
             if let Some(human_index) = self.humans.iter().position(|human| {
-                human.carried && !human.carried_by_player && human.position == carried_position
+                if is_source_lander {
+                    clean_lander_passenger_ready_for_conversion(lander.position, *human)
+                } else {
+                    human.carried
+                        && !human.carried_by_player
+                        && human.position == clean_carried_human_position(lander.position)
+                }
             }) {
                 return Some((lander_index, human_index));
             }
@@ -2314,23 +2331,24 @@ impl WorldSnapshot {
     }
 
     fn sync_carried_humans_to_landers(&mut self) {
-        let lander_carried_positions = self
+        let lander_positions = self
             .enemies
             .iter()
             .filter(|enemy| enemy.kind == EnemyKind::Lander)
             .map(|enemy| enemy.position)
-            .map(clean_carried_human_position)
             .collect::<Vec<_>>();
-        if lander_carried_positions.is_empty() {
+        if lander_positions.is_empty() {
             return;
         }
 
         for human in &mut self.humans {
             if human.carried && !human.carried_by_player {
-                if let Some(carried_position) =
-                    clean_nearest_carried_position(&lander_carried_positions, human.position)
+                if let Some(lander_position) =
+                    clean_nearest_lander_for_carried_human(&lander_positions, human.position)
                 {
-                    human.position = carried_position;
+                    if !clean_lander_pull_position_matches(lander_position, *human) {
+                        human.position = clean_carried_human_position(lander_position);
+                    }
                     human.clear_source_fall();
                 }
             }
@@ -3356,6 +3374,14 @@ fn source_lander_initial_x_velocity(source_x_velocity: u8, spawn_index: usize) -
     source_sign_extend_u8_to_u16(velocity_low)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SourceLanderAdvancePhase {
+    Sleeping,
+    Orbiting,
+    Fleeing,
+    PullingPassenger,
+}
+
 fn advance_source_lander(
     position: ScreenPosition,
     source_lander: &mut SourceLanderSnapshot,
@@ -3366,10 +3392,15 @@ fn advance_source_lander(
     player_velocity: (WorldVector, WorldVector),
     source_rng: &mut SourceRandSnapshot,
     enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
-) {
+) -> SourceLanderAdvancePhase {
     if source_lander.sleep_ticks > 0 {
         source_lander.sleep_ticks = source_lander.sleep_ticks.saturating_sub(1);
-        return;
+        return SourceLanderAdvancePhase::Sleeping;
+    }
+
+    if carrying_passenger && source_lander_pull_edge(position) {
+        source_lander.y_velocity = 0;
+        return SourceLanderAdvancePhase::PullingPassenger;
     }
 
     source_lander.y_velocity = if carrying_passenger {
@@ -3389,10 +3420,12 @@ fn advance_source_lander(
 
     if carrying_passenger {
         source_lander.sleep_ticks = SOURCE_LANDER_FLEE_SLEEP_TICKS;
+        SourceLanderAdvancePhase::Fleeing
     } else {
         source_lander.picture_frame =
             (source_lander.picture_frame + 1) % SOURCE_LANDER_PICTURE_FRAME_COUNT;
         source_lander.sleep_ticks = SOURCE_LANDER_ORBIT_SLEEP_TICKS;
+        SourceLanderAdvancePhase::Orbiting
     }
 }
 
@@ -4337,22 +4370,61 @@ fn clean_carried_human_index_for_lander(
 ) -> Option<usize> {
     let carried_position = clean_carried_human_position(lander_position);
     humans.iter().position(|human| {
-        human.carried && !human.carried_by_player && human.position == carried_position
+        human.carried
+            && !human.carried_by_player
+            && (human.position == carried_position
+                || clean_lander_pull_position_matches(lander_position, *human))
     })
 }
 
-fn clean_nearest_carried_position(
-    carried_positions: &[ScreenPosition],
+fn clean_nearest_lander_for_carried_human(
+    lander_positions: &[ScreenPosition],
     human_position: ScreenPosition,
 ) -> Option<ScreenPosition> {
-    carried_positions
-        .iter()
-        .copied()
-        .min_by_key(|position| clean_carried_position_distance(*position, human_position))
+    lander_positions.iter().copied().min_by_key(|position| {
+        clean_carried_position_distance(clean_carried_human_position(*position), human_position)
+    })
 }
 
 fn clean_carried_position_distance(lhs: ScreenPosition, rhs: ScreenPosition) -> u16 {
     u16::from(lhs.x.abs_diff(rhs.x)) + u16::from(lhs.y.abs_diff(rhs.y))
+}
+
+fn source_lander_pull_edge(lander_position: ScreenPosition) -> bool {
+    lander_position.y <= SOURCE_PLAYFIELD_Y_MIN.saturating_add(8)
+}
+
+fn clean_lander_pull_position_matches(
+    lander_position: ScreenPosition,
+    human: HumanSnapshot,
+) -> bool {
+    if !source_lander_pull_edge(lander_position) || !human.carried || human.carried_by_player {
+        return false;
+    }
+
+    let carried_position = clean_carried_human_position(lander_position);
+    human.position.x == carried_position.x
+        && human.position.y >= lander_position.y
+        && human.position.y <= carried_position.y
+}
+
+fn clean_lander_pull_passenger_position(
+    lander_position: ScreenPosition,
+    human_position: ScreenPosition,
+) -> ScreenPosition {
+    let carried_position = clean_carried_human_position(lander_position);
+    ScreenPosition::new(
+        carried_position.x,
+        human_position.y.saturating_sub(1).max(lander_position.y),
+    )
+}
+
+fn clean_lander_passenger_ready_for_conversion(
+    lander_position: ScreenPosition,
+    human: HumanSnapshot,
+) -> bool {
+    clean_lander_pull_position_matches(lander_position, human)
+        && human.position.y <= lander_position.y
 }
 
 fn clean_player_carried_human_position(player_position: ScreenPosition) -> ScreenPosition {
@@ -10565,6 +10637,136 @@ mod tests {
         let expected_position = ScreenPosition::new(
             object_position_after_motion.x,
             object_position_after_motion
+                .y
+                .wrapping_sub(game.state.wave_profile.mutant_random_y),
+        );
+        let expected_source = SourceMutantSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: expected_x_velocity,
+            y_velocity: expected_y_velocity,
+            shot_timer: game.state.wave_profile.mutant_shot_time as u8 - 1,
+            sleep_ticks: SOURCE_MUTANT_LOOP_SLEEP_TICKS,
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.humans.is_empty());
+        let mutant = frame.state.world.enemies.first().expect("converted mutant");
+        assert_eq!(mutant.kind, EnemyKind::Mutant);
+        assert_eq!(mutant.position, expected_position);
+        assert_eq!(
+            mutant.velocity,
+            super::source_mutant_screen_velocity(expected_source)
+        );
+        assert_eq!(mutant.source_mutant, Some(expected_source));
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+        assert!(frame.state.world.terrain_blow.is_some());
+    }
+
+    #[test]
+    fn clean_game_source_lander_pulls_passenger_at_top_edge() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, SOURCE_PLAYFIELD_Y_MIN + 8);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: !super::source_lander_base_y_velocity(game.state.wave_profile),
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+        };
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            lander_start,
+            super::source_lander_screen_velocity(source_lander),
+            source_lander,
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot {
+            carried: true,
+            ..HumanSnapshot::new(super::clean_carried_human_position(lander_start))
+        }];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        let lander = frame.state.world.enemies.first().expect("pulling lander");
+        assert_eq!(lander.kind, EnemyKind::Lander);
+        assert_eq!(lander.position, lander_start);
+        assert_eq!(
+            lander.source_lander,
+            Some(SourceLanderSnapshot {
+                y_velocity: 0,
+                ..source_lander
+            })
+        );
+        assert_eq!(
+            frame.state.world.humans[0],
+            HumanSnapshot {
+                carried: true,
+                ..HumanSnapshot::new(ScreenPosition::new(
+                    super::clean_carried_human_position(lander_start).x,
+                    super::clean_carried_human_position(lander_start)
+                        .y
+                        .saturating_sub(1),
+                ))
+            }
+        );
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+    }
+
+    #[test]
+    fn clean_game_source_lander_converts_after_passenger_pulled_inside() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, SOURCE_PLAYFIELD_Y_MIN + 8);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+        };
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            lander_start,
+            ScreenVelocity::new(0, 0),
+            source_lander,
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot {
+            carried: true,
+            ..HumanSnapshot::new(ScreenPosition::new(
+                super::clean_carried_human_position(lander_start).x,
+                lander_start.y,
+            ))
+        }];
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0,
+            hseed: 0xA5,
+            lseed: 0x5A,
+        };
+        game.baiter_timer_ticks = None;
+
+        let player_position = ScreenPosition::new(0x20, 0x80);
+        let object_absolute_x = u16::from(lander_start.x) << 8;
+        let player_absolute_x = u16::from(player_position.x) << 8;
+        let expected_x_velocity = super::source_mutant_x_velocity(
+            game.state.wave_profile.mutant_x_velocity,
+            player_absolute_x,
+            object_absolute_x,
+        );
+        let expected_y_velocity = super::source_mutant_y_velocity(
+            game.state.wave_profile,
+            player_position.y,
+            player_absolute_x,
+            object_absolute_x,
+            lander_start,
+        );
+        let expected_position = ScreenPosition::new(
+            lander_start.x,
+            lander_start
                 .y
                 .wrapping_sub(game.state.wave_profile.mutant_random_y),
         );

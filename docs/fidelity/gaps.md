@@ -573,6 +573,11 @@ post-acceptance validation records.
   association. Source-shaped lander flee/orbit decisions now use the passenger
   carried by that lander instead of a global "any carried human" flag, and
   carried human positions stay with the matching lander in multi-lander scenes.
+- `2026-05-20 22:14:47 BST`: R9-C4 adds the bounded source `LANDF` /
+  `LNDFXA` passenger pull-in slice. Source-shaped clean landers now stop
+  fleeing at the upper pull edge, pull the carried passenger upward one screen
+  row at a time, and only consume the passenger/convert to a mutant once the
+  passenger has reached the lander.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain
