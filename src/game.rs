@@ -3609,7 +3609,10 @@ fn source_bomber_bomb_shell(
     source_rng: SourceRandSnapshot,
     active_shells: usize,
 ) -> Option<EnemyProjectileSnapshot> {
-    if active_shells >= SOURCE_BOMBER_BOMB_SHELL_LIMIT {
+    if active_shells >= SOURCE_BOMBER_BOMB_SHELL_LIMIT
+        || position.x >= SOURCE_SHELL_X_MAX
+        || position.y <= SOURCE_PLAYFIELD_Y_MIN
+    {
         return None;
     }
 
@@ -9249,6 +9252,73 @@ mod tests {
                 && sprite.layer == RenderLayer::Projectiles
                 && sprite.position == [8.0, 96.0]
         }));
+    }
+
+    #[test]
+    fn clean_game_bomber_bomb_respects_source_getshl_bounds() {
+        let mut game = credited_started_game();
+        let player_position = ScreenPosition::new(0x20, 0x50);
+        game.state.player.position = (
+            super::world_word(u16::from(player_position.x) << 8),
+            super::world_word(u16::from(player_position.y) << 8),
+        );
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::source_bomber(
+            ScreenPosition::new(super::SOURCE_SHELL_X_MAX, 0x60),
+            ScreenVelocity::new(0, 0),
+            SourceBomberSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: 0x50,
+                sleep_ticks: 0,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans.clear();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0,
+            hseed: 0x80,
+            lseed: 0,
+        };
+        game.baiter_timer_ticks = None;
+
+        let expected_y_velocity = super::source_bomber_onscreen_y_velocity_delta(0x60, 0x50)
+            .expect("onscreen y delta")
+            .wrapping_add(super::source_bomber_random_y_velocity(0, 0));
+        let (expected_y, expected_y_fraction) =
+            super::source_fixed_axis_step(0x60, 0, expected_y_velocity);
+        let expected_source = SourceBomberSnapshot {
+            x_fraction: 0,
+            y_fraction: expected_y_fraction,
+            x_velocity: 0,
+            y_velocity: expected_y_velocity,
+            picture_frame: 1,
+            cruise_altitude: 0x50,
+            sleep_ticks: super::SOURCE_BOMBER_LOOP_SLEEP_TICKS,
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        let bomber = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source bomber should remain active");
+        assert_eq!(
+            bomber.position,
+            ScreenPosition::new(super::SOURCE_SHELL_X_MAX, expected_y)
+        );
+        assert_eq!(
+            bomber.velocity,
+            super::source_bomber_screen_velocity(expected_source)
+        );
+        assert_eq!(bomber.source_bomber, Some(expected_source));
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 0);
     }
 
     #[test]

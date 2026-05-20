@@ -992,7 +992,8 @@ Object-ecology progress after R9-C4 slices:
   vertical velocity, picture frame, cruise altitude, and sleep state, then
   advance through the source `TIE` image cycle, random vertical drift/damping,
   on-screen player-Y steering, off-screen cruise-altitude steering, and bounded
-  `BOMBST` bomb-shell projection state. Reserve bomber activation now mirrors
+  `BOMBST` bomb-shell projection state with source `GETSHL` placement bounds.
+  Reserve bomber activation now mirrors
   source `TIEST` squad placement: up to three bombers per squad, X positions
   spaced from the current player X, fixed cruise altitude, and alternating
   source X velocity per restored squad.
@@ -1852,6 +1853,24 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308272642439`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308516667089`.
+- `2026-05-20 21:27:46 BST` R9-C4 progress slice
+  `bomber BOMBST GETSHL bounds`. Clean bomber `BOMBST` shell allocation now
+  applies the source `GETSHL` placement bounds as well as the existing
+  ten-shell cap: bomb shells are refused when the firing bomber is outside the
+  source shell screen range or at/above the source playfield top. Added focused
+  clean-game coverage for the out-of-range bomber allocation edge. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, `cargo test clean_game_bomber --lib`, `cargo test
+  clean_game --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance"`,
+  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
+  --all-targets`, clippy, `make fidelity`, and full all-scenario `make
+  clean-fidelity` remain deferred because this is a bounded Step 50 bomber
+  shell-allocation edge slice, not Step 50 or Phase 3 closure. The next full
+  gate should run when Step 50 closes, another broader shared-contract risk
+  appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308693691909`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308862431699`.
 
 ## Archived Completed History
 

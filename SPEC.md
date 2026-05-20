@@ -273,7 +273,8 @@ placement fractions and shot-timer RNG state. Clean bombers now retain source
 fixed-point fractions, X velocity, vertical velocity, picture frame, cruise
 altitude, and sleep state, then advance through source `TIE` image cycling,
 random vertical drift/damping, player-Y steering, off-screen cruise steering,
-and bounded `BOMBST` bomb-shell projection. Reserve bombers now use source `TIEST`
+and bounded `BOMBST` bomb-shell projection with source `GETSHL` placement
+bounds. Reserve bombers now use source `TIEST`
 player-relative squad placement and alternating X velocity before entering the
 source bomber runtime. Enemy projectile evidence now carries source `BMBP1`
 shell descriptor fields for the standalone mine/source-shell fixture, and

@@ -462,7 +462,8 @@ placement fractions and shot-timer RNG state. Clean bombers now retain source
 fixed-point fractions, X velocity, vertical velocity, picture frame, cruise
 altitude, and sleep state, then advance through source `TIE` image cycling,
 random vertical drift/damping, player-Y steering, off-screen cruise steering,
-and bounded `BOMBST` bomb-shell projection. Pod reserve activation now uses
+and bounded `BOMBST` bomb-shell projection with source `GETSHL` placement
+bounds. Pod reserve activation now uses
 source `PRBST`/`PRBRES` placement, fixed-point fractions, and velocity bytes
 before entering source fixed-point X/Y motion, and reserve bombers now use
 source `TIEST`

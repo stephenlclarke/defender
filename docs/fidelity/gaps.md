@@ -669,6 +669,11 @@ post-acceptance validation records.
   movement/projectile behavior, mutant reserve/restore fixtures, standalone
   mine/source-shell fixtures, and focused source ecology fixtures for those
   transitions.
+- `2026-05-20 21:25:50 BST`: R9-C4 tightens clean bomber `BOMBST` shell
+  allocation with source `GETSHL` placement bounds. Clean bomber bomb attempts
+  now refuse allocation when the firing bomber is outside the source shell
+  screen range or at/above the source playfield top, in addition to the
+  existing ten-shell `BOMBST` cap.
 - `2026-05-17 22:38:04 BST`: R9-C4 adds the bounded source mutant reserve
   restore fixture slice. Clean reserve activation now restores active mutants
   through source-shaped placement fractions and shot-timer RNG state, carrying
