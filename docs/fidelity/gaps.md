@@ -624,6 +624,14 @@ post-acceptance validation records.
   process cursor/sleep state, advance one restored uncarried `TLIST` human per
   source cadence, apply source fixed-point X steps and terrain-relative Y
   steps, and cycle object-detail evidence from `ASTP1` through `ASTP4`.
+- `2026-05-21 00:17:03 BST`: R9-C4 adds bounded source enemy hit sound-command
+  evidence. Clean projectile and smart-bomb enemy destruction now surface the
+  source family sound command byte through `SoundEvent::UnmappedSoundCommand`:
+  landers use `LHSND` (`0xF9`), mutants use `SCHSND` (`0xE8`), bombers use
+  `TIHSND` (`0xFE`), pods use `PRHSND` (`0xFA`), swarmers use `SWHSND`
+  (`0xF8`), and baiters use `UFHSND` (`0xF8`). Remaining B08 work is exact
+  per-family movement/projectile behavior beyond the covered enemy-hit command
+  evidence and focused source ecology fixtures for those transitions.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain

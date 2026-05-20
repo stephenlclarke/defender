@@ -55,6 +55,12 @@ pub(crate) const SOURCE_SCORE_POPUP_LIFETIME_TICKS: u8 = 50;
 const SOURCE_SAFE_LANDING_SCORE_POINTS: u32 = 250;
 const SOURCE_RESCUE_SCORE_POINTS: u32 = 500;
 const SOURCE_RESCUE_SCORE_POPUP_Y_OFFSET: u8 = 0x18;
+const SOURCE_PRHSND_SOUND_COMMAND: u8 = 0xFA;
+const SOURCE_SCHSND_SOUND_COMMAND: u8 = 0xE8;
+const SOURCE_UFHSND_SOUND_COMMAND: u8 = 0xF8;
+const SOURCE_TIHSND_SOUND_COMMAND: u8 = 0xFE;
+const SOURCE_LHSND_SOUND_COMMAND: u8 = 0xF9;
+const SOURCE_SWHSND_SOUND_COMMAND: u8 = 0xF8;
 pub(crate) const SOURCE_EXPLOSION_INITIAL_SIZE: u16 = 0x0100;
 pub(crate) const SOURCE_EXPLOSION_SIZE_DELTA: u16 = 0x00AA;
 pub(crate) const SOURCE_EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30;
@@ -5907,7 +5913,7 @@ impl Game {
         if controls.triggers.smart_bomb && self.state.player.smart_bombs > 0 {
             self.state.player.smart_bombs -= 1;
             gameplay_events.push(GameEvent::SmartBombPressed);
-            self.resolve_smart_bomb(gameplay_events);
+            self.resolve_smart_bomb(gameplay_events, sound_events);
         }
 
         if controls.triggers.hyperspace {
@@ -5952,7 +5958,7 @@ impl Game {
             self.award_rescue_score(gameplay_events);
         }
         self.advance_baiter_entry(motion.screen_position, motion.state.velocity);
-        self.resolve_projectile_enemy_collisions(gameplay_events);
+        self.resolve_projectile_enemy_collisions(gameplay_events, sound_events);
         let hit_enemy =
             self.resolve_player_enemy_collision(motion.screen_position, gameplay_events);
         if !hit_enemy && self.state.phase == GamePhase::Playing {
@@ -6054,7 +6060,11 @@ impl Game {
         });
     }
 
-    fn resolve_projectile_enemy_collisions(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+    fn resolve_projectile_enemy_collisions(
+        &mut self,
+        gameplay_events: &mut Vec<GameEvent>,
+        sound_events: &mut Vec<SoundEvent>,
+    ) {
         let projectile_boxes = self
             .state
             .world
@@ -6078,10 +6088,14 @@ impl Game {
 
         let enemy = self.state.world.enemies.remove(hit.enemy_index);
         self.state.world.projectiles.remove(hit.projectile_index);
-        self.destroy_enemy(enemy, gameplay_events);
+        self.destroy_enemy(enemy, gameplay_events, sound_events);
     }
 
-    fn resolve_smart_bomb(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+    fn resolve_smart_bomb(
+        &mut self,
+        gameplay_events: &mut Vec<GameEvent>,
+        sound_events: &mut Vec<SoundEvent>,
+    ) {
         let outcome = SmartBombSystem::detonate(self.state.world.enemies.len());
         let destroyed = self
             .state
@@ -6091,16 +6105,22 @@ impl Game {
             .collect::<Vec<_>>();
 
         for enemy in destroyed {
-            self.destroy_enemy(enemy, gameplay_events);
+            self.destroy_enemy(enemy, gameplay_events, sound_events);
         }
     }
 
-    fn destroy_enemy(&mut self, enemy: EnemySnapshot, gameplay_events: &mut Vec<GameEvent>) {
+    fn destroy_enemy(
+        &mut self,
+        enemy: EnemySnapshot,
+        gameplay_events: &mut Vec<GameEvent>,
+        sound_events: &mut Vec<SoundEvent>,
+    ) {
         self.state
             .world
             .spawn_explosion(ExplosionKind::for_enemy(enemy.kind), enemy.position);
         gameplay_events.push(GameEvent::EnemyDestroyed);
         self.award_enemy_score(enemy.kind, gameplay_events);
+        sound_events.push(source_enemy_hit_sound_event(enemy.kind));
 
         match enemy.kind {
             EnemyKind::Lander => self
@@ -7471,6 +7491,23 @@ fn enemy_score(kind: EnemyKind) -> u32 {
     }
 }
 
+fn source_enemy_hit_sound_event(kind: EnemyKind) -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: source_enemy_hit_sound_command(kind),
+    }
+}
+
+fn source_enemy_hit_sound_command(kind: EnemyKind) -> u8 {
+    match kind {
+        EnemyKind::Lander => SOURCE_LHSND_SOUND_COMMAND,
+        EnemyKind::Mutant => SOURCE_SCHSND_SOUND_COMMAND,
+        EnemyKind::Bomber => SOURCE_TIHSND_SOUND_COMMAND,
+        EnemyKind::Pod => SOURCE_PRHSND_SOUND_COMMAND,
+        EnemyKind::Swarmer => SOURCE_SWHSND_SOUND_COMMAND,
+        EnemyKind::Baiter => SOURCE_UFHSND_SOUND_COMMAND,
+    }
+}
+
 impl Default for Game {
     fn default() -> Self {
         Self::new()
@@ -7909,14 +7946,16 @@ mod tests {
         ProjectileSnapshot, SOURCE_ACTIVE_BAITER_LIMIT, SOURCE_ACTIVE_SWARMER_LIMIT,
         SOURCE_BAITER_LOOP_SLEEP_TICKS, SOURCE_EXPLOSION_INITIAL_SIZE,
         SOURCE_EXPLOSION_LIFETIME_FRAMES, SOURCE_EXPLOSION_SIZE_DELTA,
-        SOURCE_GAME_EXEC_SLEEP_FRAMES, SOURCE_LANDER_ORBIT_SLEEP_TICKS,
+        SOURCE_GAME_EXEC_SLEEP_FRAMES, SOURCE_LANDER_ORBIT_SLEEP_TICKS, SOURCE_LHSND_SOUND_COMMAND,
         SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS, SOURCE_MUTANT_LOOP_SLEEP_TICKS,
-        SOURCE_PLAYFIELD_Y_MIN, SOURCE_POD_SWARMER_REQUEST_LIMIT,
-        SOURCE_SCORE_POPUP_LIFETIME_TICKS, SOURCE_VISUAL_STATE, START_PLAYFIELD_DELAY_FRAMES,
-        START_SOUND_DELAY_FRAMES, ScannerRadarBlipKind, ScannerRadarSnapshot, ScannerRadarStage,
-        ScorePopupKind, SoundEvent, SourceBaiterSnapshot, SourceBomberSnapshot,
-        SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
-        SourceSwarmerSnapshot, TerrainBlowStage, WaveProfileSnapshot, WorldSnapshot, WorldVector,
+        SOURCE_PLAYFIELD_Y_MIN, SOURCE_POD_SWARMER_REQUEST_LIMIT, SOURCE_PRHSND_SOUND_COMMAND,
+        SOURCE_SCHSND_SOUND_COMMAND, SOURCE_SCORE_POPUP_LIFETIME_TICKS,
+        SOURCE_SWHSND_SOUND_COMMAND, SOURCE_TIHSND_SOUND_COMMAND, SOURCE_UFHSND_SOUND_COMMAND,
+        SOURCE_VISUAL_STATE, START_PLAYFIELD_DELAY_FRAMES, START_SOUND_DELAY_FRAMES,
+        ScannerRadarBlipKind, ScannerRadarSnapshot, ScannerRadarStage, ScorePopupKind, SoundEvent,
+        SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
+        SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage,
+        WaveProfileSnapshot, WorldSnapshot, WorldVector, source_enemy_hit_sound_event,
     };
 
     #[test]
@@ -9168,7 +9207,9 @@ mod tests {
                 GameEvent::HyperspacePressed,
             ]
         );
-        assert_eq!(frame.events.sounds(), &[SoundEvent::ThrustStarted]);
+        let mut expected_sounds = vec![source_enemy_hit_sound_event(EnemyKind::Lander); 5];
+        expected_sounds.push(SoundEvent::ThrustStarted);
+        assert_eq!(frame.events.sounds(), expected_sounds.as_slice());
         assert_eq!(
             frame.scene.summary().layers,
             RenderLayerCounts {
@@ -9505,6 +9546,10 @@ mod tests {
             frame.events.gameplay(),
             &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
         );
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_enemy_hit_sound_event(EnemyKind::Lander)]
+        );
         assert_eq!(frame.state.world.expanded_objects.active_count, 1);
         assert_eq!(frame.state.world.expanded_objects.detail_count, 1);
         assert_eq!(
@@ -9612,6 +9657,10 @@ mod tests {
         assert!(frame.state.world.projectiles.is_empty());
         assert_eq!(frame.state.scores.player_one, 1_000);
         assert_eq!(frame.events.gameplay(), &[GameEvent::EnemyDestroyed]);
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_enemy_hit_sound_event(EnemyKind::Pod)]
+        );
         assert_eq!(frame.state.world.object_evidence.active_count, 16);
         assert_eq!(frame.state.world.object_evidence.projectile_count, 0);
         assert_eq!(
@@ -9636,6 +9685,40 @@ mod tests {
                 && sprite.layer == RenderLayer::Objects
                 && sprite.size == [4.0, 8.0]
         }));
+    }
+
+    #[test]
+    fn clean_game_enemy_destroy_emits_source_hit_sound_commands() {
+        for (kind, command) in [
+            (EnemyKind::Lander, SOURCE_LHSND_SOUND_COMMAND),
+            (EnemyKind::Mutant, SOURCE_SCHSND_SOUND_COMMAND),
+            (EnemyKind::Bomber, SOURCE_TIHSND_SOUND_COMMAND),
+            (EnemyKind::Pod, SOURCE_PRHSND_SOUND_COMMAND),
+            (EnemyKind::Swarmer, SOURCE_SWHSND_SOUND_COMMAND),
+            (EnemyKind::Baiter, SOURCE_UFHSND_SOUND_COMMAND),
+        ] {
+            let mut game = credited_started_game();
+            game.state.world.enemies = vec![EnemySnapshot::new(
+                kind,
+                ScreenPosition::new(100, 80),
+                ScreenVelocity::new(0, 0),
+            )];
+            game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+            game.state.world.source_astronaut_sleep_ticks = SOURCE_GAME_EXEC_SLEEP_FRAMES;
+            game.baiter_timer_ticks = None;
+            game.state.world.projectiles.push(ProjectileSnapshot {
+                position: ScreenPosition::new(101, 83),
+                velocity: ScreenVelocity::new(0, 0),
+            });
+
+            let frame = game.step(GameInput::NONE);
+
+            assert_eq!(
+                frame.events.sounds(),
+                &[SoundEvent::UnmappedSoundCommand { command }],
+                "{kind:?} should emit its source hit sound command",
+            );
+        }
     }
 
     #[test]

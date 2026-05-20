@@ -1,6 +1,6 @@
 # Defender Current Specification
 
-Last reviewed: `2026-05-17`
+Last reviewed: `2026-05-21`
 
 ## Purpose
 
@@ -94,8 +94,9 @@ tree:
   controls, wave-completion status message-glyph and survivor bonus icon scene
   sprites, high-score entry prompt
   message-glyph scene sprites,
-  hall-of-fame display heading/table scene sprites, and sound-event contracts
-  without accepted command-byte mapping.
+  hall-of-fame display heading/table scene sprites, and sound-event contracts,
+  including source-backed per-family enemy hit command bytes surfaced through
+  `UnmappedSoundCommand`.
   The clean
   `Game` shell emits sprite-first scene frames without touching the accepted
   machine adapter.

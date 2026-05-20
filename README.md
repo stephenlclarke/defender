@@ -198,10 +198,11 @@ projection, source-backed score-popup lifetime/value/position evidence, and
 source-backed expanded-object explosion frame/lifetime/size-scale evidence,
 source-backed player-death bank-7 pixel-cloud color/counter/piece evidence,
 source-backed terrain-blow mutation/process evidence with `TEREX` presentation,
-and source `BORDER` top-display frame geometry; lifecycle transitions outside
-the score-popup, `EXST`/`EXPU` expanded-object explosion, player-death
-pixel-cloud, and terrain-blow surfaces, remaining two-player session flow
-beyond the source-backed final-life switch/respawn slice,
+source-backed per-family enemy hit sound-command evidence, and source `BORDER`
+top-display frame geometry; lifecycle transitions outside the score-popup,
+`EXST`/`EXPU` expanded-object explosion, player-death pixel-cloud,
+terrain-blow, and covered enemy-hit command surfaces, remaining two-player
+session flow beyond the source-backed final-life switch/respawn slice,
 wave-completion survivor-bonus loop/cadence beyond current presentation, live
 Williams logo table-walker animation, hardware palette/RGB render audit
 residuals, and full visual presentation remain strict R9 blockers.

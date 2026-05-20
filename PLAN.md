@@ -1045,6 +1045,11 @@ Object-ecology progress after R9-C4 slices:
   separate source enemy RNG cadence. A separate source `ASTRO` process cursor
   now walks restored, uncarried `TLIST` humans over terrain and cycles their
   `ASTP1`-`ASTP4` evidence on its source sleep cadence.
+- Clean enemy destruction now emits source-backed per-family hit sound command
+  evidence on the shared kill path: `LHSND`, `SCHSND`, `TIHSND`, `PRHSND`,
+  `SWHSND`, and `UFHSND` are surfaced through the existing sound-event
+  command byte contract for landers, mutants, bombers, pods, swarmers, and
+  baiters respectively.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -1057,8 +1062,9 @@ Object-ecology progress after R9-C4 slices:
 - Player-carried humans now follow the source AFALL2 carried offset and settle
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
-  is remaining per-family movement/projectile behavior and focused source
-  ecology fixtures for those transitions.
+  is remaining per-family movement/projectile behavior beyond the covered
+  enemy-hit command evidence and focused source ecology fixtures for those
+  transitions.
 
 Work log:
 
@@ -2216,6 +2222,29 @@ Work log:
   The next full gate should run when Step 50 closes, another broader
   shared-contract risk appears, or R9 finalization begins. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779318051909159`.
+
+- `2026-05-21 00:17:03 BST` R9-C4 progress slice
+  `source enemy kill sound commands`. Clean projectile and smart-bomb enemy
+  destruction now emits the source family hit sound command bytes through the
+  existing `SoundEvent::UnmappedSoundCommand` surface: `LHSND` for landers,
+  `SCHSND` for mutants, `TIHSND` for bombers, `PRHSND` for pods, `SWHSND` for
+  swarmers, and `UFHSND` for baiters. Focused validation passed: `cargo
+  fmt --check`, `cargo check`, `cargo test
+  clean_game_enemy_destroy_emits_source_hit_sound_commands --lib`, `cargo test
+  clean_game_resolves_projectile_enemy_collision_and_scores --lib`, `cargo
+  test clean_game_applies_playing_controls_through_systems --lib`, `cargo test
+  clean_game_pod_projectile_collision_spawns_source_bounded_swarmers --lib`,
+  `cargo test clean_game_smart_bomb_clears_enemies_scores_and_updates_scene
+  --lib`, and `cargo test
+  clean_game_smart_bomb_pod_spawns_swarmers_after_destroyed_batch --lib`,
+  targeted `make clean-fidelity SCENARIOS="firing smart_bomb"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
+  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
+  clippy remain deferred because this is a bounded Step 50 source kill-sound
+  slice, not Step 50 or Phase 3 closure, and it does not change the public API.
+  The next full gate should run when Step 50 closes, another broader
+  shared-contract risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779318773964509`.
 
 ## Archived Completed History
 
