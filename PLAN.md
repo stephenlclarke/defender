@@ -980,9 +980,10 @@ Object-ecology progress after R9-C4 slices:
   acceleration, sleep, and shot-timer state, then advance through the source
   entry seek, fixed-point loop, vertical acceleration/damping, turnback, and
   `SWBMB` enemy-bomb projection shape with the same source shell free-list cap
-  as other fireball paths. Reserve mini-swarmer activation now mirrors the
-  source `PLRES`/`RSW0` phony-object placement and carries the source placement
-  fractions into the same source swarmer runtime. Pod reserve
+  as other fireball paths, including source `RMAX` RNG consumption on
+  shot-timer resets when allocation fails. Reserve mini-swarmer activation now
+  mirrors the source `PLRES`/`RSW0` phony-object placement and carries the
+  source placement fractions into the same source swarmer runtime. Pod reserve
   activation now mirrors the source `PRBST`/`PRBRES` restore placement and
   velocity bytes, then carries restored pods through source fixed-point
   X/Y motion.
@@ -1832,6 +1833,25 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779306259354109`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779307987920709`.
+- `2026-05-20 21:22:01 BST` R9-C4 progress slice
+  `mini-swarmer full-shell RMAX parity`. The clean `SWBMB` fireball attempt
+  now resets the mini-swarmer shot timer through `source_advance_rmax`, so
+  source RNG is consumed on every shot reset path, including when the shell
+  free-list is full and no fireball cell is allocated. The bomb helper now
+  only decides whether a projectile is allocated; the caller owns the source
+  `RMAX` reseed just like the source fall-through path. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
+  legacy-tools`, `cargo test clean_game_mini_swarmer --lib`, `cargo test
+  clean_game --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance"`,
+  touched-doc markdownlint, and `git diff --check`. Broad `cargo test
+  --all-targets`, clippy, `make fidelity`, and full all-scenario `make
+  clean-fidelity` remain deferred because this is a bounded Step 50
+  mini-swarmer RNG edge slice, not Step 50 or Phase 3 closure. The next full
+  gate should run when Step 50 closes, another broader shared-contract risk
+  appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308272642439`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308516667089`.
 
 ## Archived Completed History
 

@@ -435,7 +435,8 @@ shot-timer state, and reserve mini-swarmer activation now uses source
 `PLRES`/`RSW0` phony-object placement before the same source swarmer runtime.
 Mini-swarmers advance through the source entry seek, fixed-point loop, vertical
 acceleration/damping, turnback, and enemy-bomb projection shape while sharing
-the source shell free-list cap with the other fireball paths. Clean
+the source shell free-list cap with the other fireball paths, including source
+`RMAX` RNG consumption on shot-timer resets when allocation fails. Clean
 baiter entry now advances on the source game-exec pacing cadence, accelerates
 when the remaining enemy total is low, and respects the source active-baiter
 cap. Spawned baiters retain source shot-timer, picture-cycle, sleep, and

@@ -630,11 +630,15 @@ post-acceptance validation records.
 - `2026-05-20 20:44:12 BST`: R9-C4 adds the bounded mini-swarmer source shell
   cap slice. The clean `SWBMB` fireball path now receives the current active
   enemy-projectile count and refuses to append another shell when the source
-  shell free-list cap is already full, preserving the existing direction gate,
-  shot-timer reset, and source RNG behavior. Runtime behavior changes only for
-  the full-shell edge case. Remaining B08 work is remaining per-family
-  movement/projectile behavior and focused source ecology fixtures for those
-  transitions.
+  shell free-list cap is already full, preserving the existing direction gate
+  and shot-timer reset. Runtime behavior changes only for the full-shell edge
+  case. Remaining B08 work is remaining per-family movement/projectile
+  behavior and focused source ecology fixtures for those transitions.
+- `2026-05-20 21:18:05 BST`: R9-C4 aligns the mini-swarmer full-shell reset
+  with source `SWBMB`/`RMAX` RNG behavior. Clean mini-swarmer bomb attempts now
+  consume source RNG through the shot-timer reset even when the source shell
+  free-list is full and no fireball cell is allocated. Runtime behavior changes
+  only for the full-shell allocation-failure edge case.
 - `2026-05-17 22:10:48 BST`: R9-C4 adds the bounded source baiter
   movement/fireball slice. Clean baiters now retain source shot-timer,
   picture-cycle, sleep, and velocity state after the source-paced runtime entry;

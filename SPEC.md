@@ -245,7 +245,8 @@ activation now uses source `PRBST`/`PRBRES` placement, fixed-point fractions,
 and velocity bytes before entering source fixed-point X/Y motion. Mini-swarmers
 advance through the source entry seek, fixed-point loop, vertical
 acceleration/damping, turnback, and enemy-bomb projection shape while sharing
-the source shell free-list cap with the other fireball paths. Clean baiter
+the source shell free-list cap with the other fireball paths, including source
+`RMAX` RNG consumption on shot-timer resets when allocation fails. Clean baiter
 entry now advances on the source
 game-exec pacing cadence, accelerates the timer when the remaining enemy total
 is low, and respects the source active-baiter cap. Spawned baiters

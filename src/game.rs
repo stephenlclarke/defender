@@ -3966,13 +3966,12 @@ fn advance_source_mini_swarmer(
                 position,
                 *source_swarmer,
                 player_position,
-                source_rng,
                 enemy_projectiles.len(),
             ) {
                 enemy_projectiles.push(projectile);
             }
             source_swarmer.shot_timer =
-                source_rmax(profile.swarmer_shot_time as u8, source_rng.seed);
+                source_advance_rmax(source_rng, profile.swarmer_shot_time as u8);
         }
     }
 
@@ -4029,13 +4028,11 @@ fn source_mini_swarmer_bomb(
     position: ScreenPosition,
     source_swarmer: SourceSwarmerSnapshot,
     player_position: ScreenPosition,
-    source_rng: &mut SourceRandSnapshot,
     active_shells: usize,
 ) -> Option<EnemyProjectileSnapshot> {
     let player_delta = (u16::from(player_position.x) << 8)
         .wrapping_sub(u16::from_be_bytes([position.x, source_swarmer.x_fraction]));
     if (player_delta.to_be_bytes()[0] ^ source_swarmer.x_velocity.to_be_bytes()[0]) & 0x80 != 0 {
-        source_rng.advance();
         return None;
     }
 
@@ -4048,7 +4045,6 @@ fn source_mini_swarmer_bomb(
         u16::from_be_bytes([player_position.y.wrapping_sub(position.y), 0]),
         5,
     );
-    source_rng.advance();
     Some(EnemyProjectileSnapshot::source_fireball(
         position, x_velocity, y_velocity,
     ))
@@ -8924,7 +8920,8 @@ mod tests {
             lseed: 0x40,
         };
         game.baiter_timer_ticks = None;
-        let expected_rng = game.state.world.source_rng;
+        let mut expected_rng = game.state.world.source_rng;
+        expected_rng.advance();
 
         let frame = game.step(GameInput::NONE);
 
