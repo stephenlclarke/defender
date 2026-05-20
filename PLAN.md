@@ -1021,9 +1021,12 @@ Object-ecology progress after R9-C4 slices:
   restores active mutants through source-shaped placement fractions and
   shot-timer RNG state.
 - Clean lander abduction now covers the first carry transition: aligned humans
-  enter the carried state, stay associated with the lander that captured them
-  while it flees, pull upward through the source `LANDF` / `LNDFXA` top-edge
-  shape before conversion, and are released when that lander is destroyed.
+  enter the carried state, source-shaped landers already in the `LANDG` grab
+  state take the source one-step target approach toward aligned uncarried
+  humans, carried passengers stay associated with the lander that captured
+  them while it flees, pull upward through the source `LANDF` / `LNDFXA`
+  top-edge shape before conversion, give up from the top pull edge when the
+  passenger target is cleared, and are released when that lander is destroyed.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -2038,6 +2041,31 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312466672089`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312683572769`.
+
+- `2026-05-20 22:43:43 BST` R9-C4 progress slice
+  `LANDG grab-state target approach`. Source-shaped clean landers already in
+  the `LANDG` grab state now take the bounded source one-step approach toward
+  the aligned uncarried human, clear active velocity, sleep for one frame, and
+  keep running the source lander shot timer before capture. Normal `LANDS0`
+  orbit target association remains intentionally out of this slice until the
+  clean runtime carries explicit source target state. Focused validation
+  passed: `cargo fmt --check`, `cargo check`,
+  `cargo check --features legacy-tools`,
+  `cargo test clean_game_source_lander --lib`,
+  `cargo test clean_game --lib`, targeted
+  `make clean-fidelity SCENARIOS="abduction wave_advance"`, touched-doc
+  markdownlint, and `git diff --check`. The
+  targeted clean-fidelity run also confirmed the earlier over-broad first pass
+  no longer regresses `wave_advance`.
+  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  Step 50 lander grab-state slice, not Step 50 or Phase 3 closure and it does
+  not change public snapshots. The next full gate should run when Step 50
+  closes, another broader shared-contract risk appears, or R9 finalization
+  begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312865691409`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779313419246769`.
 
 ## Archived Completed History
 

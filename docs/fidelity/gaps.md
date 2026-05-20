@@ -587,6 +587,11 @@ post-acceptance validation records.
   top pull edge now leave active play and return to the lander reserve when no
   matching carried passenger remains, instead of falling through the generic
   no-human mutation path.
+- `2026-05-20 22:43:43 BST`: R9-C4 adds the bounded source `LANDG`
+  target-approach slice. Source-shaped clean landers already in the grab state
+  now perform the one-step source approach toward the aligned uncarried human,
+  clear active velocity, sleep for one frame, and keep running the lander shot
+  timer before capture.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain
