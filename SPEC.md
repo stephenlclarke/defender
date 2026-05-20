@@ -306,9 +306,13 @@ current lander, baiter, bomber, mutant, pod, and swarmer presentations. Clean
 human evidence carries per-human source astronaut picture descriptors: default
 `ASTP1` rows and source-restored `ASTP3` rows selected from the `PLRES`
 `LSEED` low bit, with restored `LSEED` X low bytes retained as source X
-fractions for world-position evidence. Clean player projectile evidence now
-carries the source `LASP1` descriptor label, address, 8x1 size, and primary
-image pointer while the direct runtime projectile renderer remains unchanged.
+fractions for world-position evidence. Clean worlds also carry source `ASTRO`
+process cursor/sleep state that walks one restored, uncarried target-list human
+per source cadence, applies source fixed-point X motion, steps Y toward
+terrain-relative source targets, and cycles evidence from `ASTP1` through
+`ASTP4`. Clean player projectile evidence now carries the source `LASP1`
+descriptor label, address, 8x1 size, and primary image pointer while the direct
+runtime projectile renderer remains unchanged.
 Clean enemy, human, player-projectile, and enemy-projectile object evidence
 also carries source-style 8.8 world-position words, velocity words, and
 deterministic source object-table identity evidence from the clean source

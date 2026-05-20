@@ -1778,6 +1778,8 @@ pub struct WorldSnapshot {
     pub enemy_reserve: EnemyReserveSnapshot,
     pub humans: Vec<HumanSnapshot>,
     pub source_target_list_cursor_address: Option<u16>,
+    pub source_astronaut_cursor_address: Option<u16>,
+    pub source_astronaut_sleep_ticks: u8,
     pub projectiles: Vec<ProjectileSnapshot>,
     pub enemy_projectiles: Vec<EnemyProjectileSnapshot>,
     pub score_popups: Vec<ScorePopupSnapshot>,
@@ -1846,6 +1848,8 @@ impl WorldSnapshot {
             enemy_reserve,
             humans,
             source_target_list_cursor_address,
+            source_astronaut_cursor_address: Some(SOURCE_TARGET_LIST_BASE),
+            source_astronaut_sleep_ticks: 0,
             projectiles: Vec::new(),
             enemy_projectiles: Vec::new(),
             score_popups: Vec::new(),
@@ -1913,6 +1917,30 @@ impl WorldSnapshot {
         }
 
         spawn_count
+    }
+
+    fn advance_source_astronaut_process(&mut self) -> bool {
+        if self.source_astronaut_sleep_ticks > 0 {
+            self.source_astronaut_sleep_ticks = self.source_astronaut_sleep_ticks.saturating_sub(1);
+            return false;
+        }
+
+        let current_cursor = self
+            .source_astronaut_cursor_address
+            .unwrap_or(SOURCE_TARGET_LIST_BASE);
+        let next_cursor = source_astronaut_next_cursor_address(current_cursor);
+        self.source_astronaut_cursor_address = Some(next_cursor);
+        self.source_astronaut_sleep_ticks = SOURCE_ASTRONAUT_PROCESS_SLEEP_TICKS;
+
+        let Some(human) = self.humans.iter_mut().find(|human| {
+            human.source_target_slot_address == Some(next_cursor)
+                && source_lander_targetable_human(human)
+        }) else {
+            return false;
+        };
+
+        source_walk_astronaut(human, &self.terrain, self.source_rng.seed);
+        true
     }
 
     fn source_enemy_total(&self) -> usize {
@@ -3109,6 +3137,14 @@ const SOURCE_ASTRO_RESTORE_Y: u8 = 0xE0;
 const SOURCE_TARGET_LIST_BASE: u16 = 0xA11A;
 const SOURCE_TARGET_LIST_ENTRY_STRIDE: u16 = 2;
 const SOURCE_TARGET_LIST_ENTRY_COUNT: usize = 32;
+const SOURCE_ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT: usize = 16;
+const SOURCE_ASTRONAUT_PROCESS_SLEEP_TICKS: u8 = 2;
+const SOURCE_ASTRONAUT_TURN_SEED_MAX: u8 = 8;
+const SOURCE_ASTRONAUT_LEFT_TARGET_Y_OFFSET: u8 = 4;
+const SOURCE_ASTRONAUT_RIGHT_TARGET_Y_OFFSET: u8 = 15;
+const SOURCE_ASTRONAUT_MAX_TARGET_Y: u8 = 0xE8;
+const SOURCE_ASTRONAUT_LEFT_X_VELOCITY: u16 = 0xFFE0;
+const SOURCE_ASTRONAUT_RIGHT_X_VELOCITY: u16 = 0x0020;
 const SOURCE_OBJECT_TABLE_BASE: u16 = 0xA23C;
 const SOURCE_OBJECT_TABLE_STRIDE: u16 = 0x17;
 const SOURCE_OBJECT_DEFAULT_TYPE: u8 = 0x00;
@@ -3209,6 +3245,16 @@ fn source_target_list_next_slot_address(cursor_address: u16) -> u16 {
     }
 }
 
+fn source_astronaut_next_cursor_address(cursor_address: u16) -> u16 {
+    let cursor_index = source_target_list_slot_index(cursor_address).unwrap_or(0);
+    let next_index = cursor_index + 1;
+    if next_index < SOURCE_ASTRONAUT_TARGET_CURSOR_ENTRY_COUNT {
+        source_target_list_slot_address(next_index)
+    } else {
+        SOURCE_TARGET_LIST_BASE
+    }
+}
+
 fn source_select_lander_target_index(
     source_target_list_cursor_address: &mut Option<u16>,
     humans: &[HumanSnapshot],
@@ -3242,6 +3288,63 @@ fn source_select_lander_target_index(
 
 fn source_lander_targetable_human(human: &HumanSnapshot) -> bool {
     human.source_target_slot_address.is_some() && !human.carried && !human.carried_by_player
+}
+
+fn source_walk_astronaut(human: &mut HumanSnapshot, terrain: &[TerrainSegment], seed: u8) {
+    let frame = human.source_picture_frame % 4;
+    let walking_left = frame <= 1;
+    let (next_frame, target_y, x_velocity) = if walking_left {
+        if seed <= SOURCE_ASTRONAUT_TURN_SEED_MAX {
+            (2, None, SOURCE_ASTRONAUT_RIGHT_X_VELOCITY)
+        } else {
+            (
+                1 - frame,
+                source_astronaut_target_y(
+                    terrain,
+                    human.position.x,
+                    SOURCE_ASTRONAUT_LEFT_TARGET_Y_OFFSET,
+                ),
+                SOURCE_ASTRONAUT_LEFT_X_VELOCITY,
+            )
+        }
+    } else if seed <= SOURCE_ASTRONAUT_TURN_SEED_MAX {
+        (0, None, SOURCE_ASTRONAUT_LEFT_X_VELOCITY)
+    } else {
+        (
+            if frame == 2 { 3 } else { 2 },
+            source_astronaut_target_y(
+                terrain,
+                human.position.x,
+                SOURCE_ASTRONAUT_RIGHT_TARGET_Y_OFFSET,
+            ),
+            SOURCE_ASTRONAUT_RIGHT_X_VELOCITY,
+        )
+    };
+
+    if let Some(target_y) = target_y {
+        human.position.y = source_step_astronaut_y(human.position.y, target_y);
+    }
+    let (x, x_fraction) =
+        source_fixed_axis_step(human.position.x, human.source_x_fraction, x_velocity);
+    human.position.x = x;
+    human.source_x_fraction = x_fraction;
+    human.source_picture_frame = next_frame;
+}
+
+fn source_astronaut_target_y(terrain: &[TerrainSegment], position_x: u8, offset: u8) -> Option<u8> {
+    clean_source_terrain_altitude(terrain, position_x).map(|altitude| {
+        altitude
+            .wrapping_add(offset)
+            .min(SOURCE_ASTRONAUT_MAX_TARGET_Y)
+    })
+}
+
+fn source_step_astronaut_y(position_y: u8, target_y: u8) -> u8 {
+    match target_y.cmp(&position_y) {
+        std::cmp::Ordering::Greater => position_y.wrapping_add(1),
+        std::cmp::Ordering::Less => position_y.wrapping_sub(1),
+        std::cmp::Ordering::Equal => position_y,
+    }
 }
 
 fn source_target_list_human(
@@ -5815,6 +5918,8 @@ impl Game {
             sound_events.push(SoundEvent::ThrustStarted);
         }
 
+        self.state.world.advance_source_astronaut_process();
+
         self.state.world.advance_enemies(
             self.state.wave_profile,
             motion.screen_position,
@@ -7896,6 +8001,93 @@ mod tests {
             );
         }
         assert_eq!(super::source_target_list_slot_address(31), 0xA158);
+    }
+
+    #[test]
+    fn clean_source_astronaut_process_walks_target_list_human() {
+        let mut world = WorldSnapshot {
+            terrain: vec![super::TerrainSegment {
+                position: ScreenPosition::new(0x20, 0xD4),
+                size: (0x80, 8),
+            }],
+            humans: vec![
+                super::source_target_list_human(ScreenPosition::new(0x30, 0xD0), 0, 0, 0),
+                super::source_target_list_human(ScreenPosition::new(0x40, 0xD0), 0x10, 0, 1),
+                super::source_target_list_human(ScreenPosition::new(0x50, 0xD0), 0xF0, 2, 2),
+            ],
+            source_rng: SourceRandSnapshot {
+                seed: 0x09,
+                ..SourceRandSnapshot::default()
+            },
+            source_astronaut_cursor_address: Some(super::SOURCE_TARGET_LIST_BASE),
+            ..WorldSnapshot::default()
+        };
+
+        assert!(world.advance_source_astronaut_process());
+        assert_eq!(
+            world.source_astronaut_cursor_address,
+            Some(super::source_target_list_slot_address(1))
+        );
+        assert_eq!(
+            world.source_astronaut_sleep_ticks,
+            super::SOURCE_ASTRONAUT_PROCESS_SLEEP_TICKS
+        );
+        assert_eq!(world.humans[0].position, ScreenPosition::new(0x30, 0xD0));
+        assert_eq!(world.humans[1].position, ScreenPosition::new(0x3F, 0xD1));
+        assert_eq!(world.humans[1].source_x_fraction, 0xF0);
+        assert_eq!(world.humans[1].source_picture_frame, 1);
+
+        assert!(!world.advance_source_astronaut_process());
+        assert_eq!(world.source_astronaut_sleep_ticks, 1);
+        assert_eq!(world.humans[2].position, ScreenPosition::new(0x50, 0xD0));
+
+        world.source_astronaut_sleep_ticks = 0;
+        world.source_rng.seed = 0x05;
+        assert!(world.advance_source_astronaut_process());
+        assert_eq!(
+            world.source_astronaut_cursor_address,
+            Some(super::source_target_list_slot_address(2))
+        );
+        assert_eq!(world.humans[2].position, ScreenPosition::new(0x50, 0xD0));
+        assert_eq!(world.humans[2].source_x_fraction, 0xD0);
+        assert_eq!(world.humans[2].source_picture_frame, 0);
+    }
+
+    #[test]
+    fn clean_game_source_astronaut_walk_updates_picture_evidence() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+        game.state.world.terrain = vec![super::TerrainSegment {
+            position: ScreenPosition::new(0x20, 0xD4),
+            size: (0x80, 8),
+        }];
+        game.state.world.humans = vec![
+            super::source_target_list_human(ScreenPosition::new(0x30, 0xD0), 0, 0, 0),
+            super::source_target_list_human(ScreenPosition::new(0x40, 0xD0), 0x10, 0, 1),
+        ];
+        game.state.world.source_astronaut_cursor_address = Some(super::SOURCE_TARGET_LIST_BASE);
+        game.state.world.source_astronaut_sleep_ticks = 0;
+        game.state.world.source_rng.seed = 0x09;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame.state.world.source_astronaut_cursor_address,
+            Some(super::source_target_list_slot_address(1))
+        );
+        assert_eq!(
+            frame.state.world.humans[1].position,
+            ScreenPosition::new(0x3F, 0xD1)
+        );
+        assert_eq!(frame.state.world.humans[1].source_picture_frame, 1);
+        let detail = frame.state.world.object_evidence.details[1];
+        assert_eq!(detail.world_position, Some((0x3FF0, 0xD100)));
+        assert_eq!(detail.picture_label, Some("ASTP2"));
+        assert_eq!(detail.picture_address, Some(0xF90B));
+        assert_eq!(detail.primary_image_address, Some(0xFAEB));
+        assert_eq!(detail.alternate_image_address, Some(0xFAFB));
     }
 
     #[test]
@@ -11735,6 +11927,7 @@ mod tests {
             ),
         ];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.source_astronaut_sleep_ticks = 1;
         let humans = game.state.world.humans.clone();
         game.baiter_timer_ticks = None;
 
@@ -12023,7 +12216,17 @@ mod tests {
 
         let frame = game.step(GameInput::NONE);
 
-        assert_eq!(frame.state.world.humans, humans);
+        assert_eq!(frame.state.world.humans.len(), humans.len());
+        for human in &frame.state.world.humans {
+            assert!(!human.carried);
+            assert!(!human.carried_by_player);
+            assert_eq!(human.source_fall_velocity, 0);
+            assert_eq!(human.source_fall_y_fraction, 0);
+            assert!(
+                super::clean_human_ground_y(&frame.state.world.terrain, human.position.x)
+                    .map_or(true, |ground_y| human.position.y >= ground_y)
+            );
+        }
     }
 
     #[test]

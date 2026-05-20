@@ -619,6 +619,11 @@ post-acceptance validation records.
   `LSEED` X low byte as the source X fraction and carry the odd-`LSEED`
   `ASTP3` astronaut picture choice in clean object-detail evidence, while
   default clean human rows continue to report `ASTP1`.
+- `2026-05-21 00:06:59 BST`: R9-C4 adds the bounded source `ASTRO`
+  target-list walk slice. Clean worlds now carry a separate source `ASTRO`
+  process cursor/sleep state, advance one restored uncarried `TLIST` human per
+  source cadence, apply source fixed-point X steps and terrain-relative Y
+  steps, and cycle object-detail evidence from `ASTP1` through `ASTP4`.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain

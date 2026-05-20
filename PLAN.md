@@ -946,8 +946,12 @@ Object-ecology progress after R9-C4 slices:
   direct runtime renderer keeps the existing clean 6x8 astronaut sprite.
   Initial clean humans also carry deterministic source `TLIST` slot addresses
   from `0xA11A` with a two-byte stride and source X low-byte fractions from the
-  same `PLRES` restore state. The clean player projectile row now carries the
-  source `LASP1`
+  same `PLRES` restore state. Clean worlds also carry a separate source
+  `ASTRO` process cursor/sleep state; that process advances one target-list
+  slot per source cadence, skips carried/untargetable humans, nudges the
+  selected standing astronaut through source fixed-point X motion and
+  terrain-relative Y steps, and cycles the `ASTP1`-`ASTP4` descriptor evidence.
+  The clean player projectile row now carries the source `LASP1`
   descriptor label, address, 8x1 picture size, and primary image pointer while
   the direct runtime renderer keeps the existing clean projectile sprite size.
   Clean enemy, human, player-projectile, and enemy-projectile rows now also
@@ -1038,7 +1042,9 @@ Object-ecology progress after R9-C4 slices:
   the initial active object/sprite evidence accordingly. Clean source lander
   spawns now advance the source `TPTR`-shaped cursor through those `TLIST`
   slots for initial, reserve, and retarget selection while preserving the
-  separate source enemy RNG cadence.
+  separate source enemy RNG cadence. A separate source `ASTRO` process cursor
+  now walks restored, uncarried `TLIST` humans over terrain and cycles their
+  `ASTP1`-`ASTP4` evidence on its source sleep cadence.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -2187,6 +2193,29 @@ Work log:
   another broader shared-contract risk appears, or R9 finalization begins.
   Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779317273545259`.
+
+- `2026-05-21 00:09:19 BST` R9-C4 progress slice
+  `source ASTRO human walk`. Clean `WorldSnapshot` now carries a separate
+  source `ASTRO` process cursor and sleep timer. During play, the clean runtime
+  advances one restored, uncarried `TLIST` human on the source cadence, skips
+  untargetable slots, applies source fixed-point X steps and terrain-relative
+  Y steps, and cycles object-detail picture evidence from `ASTP1` through
+  `ASTP4`. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo test clean_source_astronaut_process_walks_target_list_human --lib`,
+  `cargo test clean_game_source_astronaut_walk_updates_picture_evidence
+  --lib`, `cargo test clean_initial_humans_carry_source_target_list_slots
+  --lib`, `cargo test clean_game_human_evidence_uses_source_astronaut_picture
+  --lib`, `cargo test
+  clean_game_source_lander_gives_up_when_pull_target_cleared --lib`, `cargo
+  test clean_game_standing_humans_do_not_fall --lib`, targeted `make
+  clean-fidelity SCENARIOS="start_game abduction wave_advance"`, broad `cargo
+  test --all-targets` for the public `WorldSnapshot` field change, touched-doc
+  markdownlint, and `git diff --check`. Full `make fidelity`, full
+  all-scenario `make clean-fidelity`, and full clippy remain deferred because
+  this is a bounded Step 50 source-ASTRO slice, not Step 50 or Phase 3 closure.
+  The next full gate should run when Step 50 closes, another broader
+  shared-contract risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779318051909159`.
 
 ## Archived Completed History
 

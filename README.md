@@ -649,9 +649,12 @@ size, primary/alternate image pointers, and mapped clean human sprite evidence
 while the runtime playfield keeps drawing the clean 6x8 astronaut sprite.
 Source-restored clean humans also retain the `PLRES` `LSEED` X low byte as the
 source X fraction used in object-detail world-position evidence. Clean
-object-detail rows also carry source-layout object addresses, slots, and
-neutral `OTYP` evidence while the clean scene path skips those source-detail
-rows to avoid duplicate runtime sprites.
+worlds carry a separate source `ASTRO` process cursor/sleep state that walks
+one restored, uncarried target-list human per source cadence, updates source
+fixed-point X motion and terrain-relative Y position, and cycles evidence from
+`ASTP1` through `ASTP4`. Clean object-detail rows also carry source-layout object
+addresses, slots, and neutral `OTYP` evidence while the clean scene path skips
+those source-detail rows to avoid duplicate runtime sprites.
 HUD, attract title, top-display border, Hall of Fame logo/text, underline, and
 blink-adjacent surfaces now share a source visual-state contract for the
 source PCRAM/color indices, border words, underline words, Williams restore
