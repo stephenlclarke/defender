@@ -1021,8 +1021,8 @@ Object-ecology progress after R9-C4 slices:
   restores active mutants through source-shaped placement fractions and
   shot-timer RNG state.
 - Clean lander abduction now covers the first carry transition: aligned humans
-  enter the carried state, move with the fleeing lander, and are released when
-  that lander is destroyed.
+  enter the carried state, stay associated with the lander that captured them
+  while it flees, and are released when that lander is destroyed.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -1954,6 +1954,27 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310644890279`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779310880556849`.
+
+- `2026-05-20 22:06:29 BST` R9-C4 progress slice
+  `lander passenger association`. Clean source lander flee/orbit decisions now
+  use the passenger carried by that specific lander instead of a global
+  carried-human flag, and carried human positions stay with the matching lander
+  in multi-lander scenes while generic clean lander carry still follows the
+  nearest lander carried position. Added focused two-lander clean-game coverage
+  and updated README, SPEC, and the fidelity gap ledger. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
+  legacy-tools`, the focused two-lander regression test, `cargo test
+  clean_game_lander --lib`, `cargo test clean_game --lib`, targeted
+  `make clean-fidelity SCENARIOS="abduction"`, touched-doc markdownlint, and
+  `git diff --check`. Broad `cargo test --all-targets`, clippy, `make
+  fidelity`, and full all-scenario `make clean-fidelity` remain deferred
+  because this is a bounded Step 50 lander carry slice, not Step 50 or Phase 3
+  closure and it does not change public snapshots. The next full gate should
+  run when Step 50 closes, another broader shared-contract risk appears, or R9
+  finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311047651329`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779311314055159`.
 
 ## Archived Completed History
 

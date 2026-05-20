@@ -446,16 +446,17 @@ velocity state, pursue the player through source seek rules, fire source-shaped
 fireball shells, and those enemy projectiles use source `SHSCAN` lifetime
 decrement/wrap behavior, scroll-adjusted fixed-point motion, offscreen culling,
 collision scoring, and player-damage handling.
-Clean landers now abduct aligned humans, carry them with the fleeing lander,
-and release the passenger when that lander is destroyed. Released, uncarried
-humans above terrain now use source-shaped `AFALL` fixed-point acceleration,
-settle safely at or below the source threshold with the 250-point safe-landing
-score and existing `P250` score-popup lifecycle, or die on over-speed impact
-with an astronaut explosion and the existing last-human planet-loss handoff;
-falling humans caught by the player enter the clean player-carried state, award
-the source-backed 500-point rescue score, and start the existing `P500`
-score-popup lifecycle; player-carried humans settle on terrain when the
-player-carried offset reaches the local terrain line.
+Clean landers now abduct aligned humans, keep carried passengers associated
+with the lander that captured them while it flees, and release the passenger
+when that lander is destroyed. Released, uncarried humans above terrain now use
+source-shaped `AFALL` fixed-point acceleration, settle safely at or below the
+source threshold with the 250-point safe-landing score and existing `P250`
+score-popup lifecycle, or die on over-speed impact with an astronaut explosion
+and the existing last-human planet-loss handoff; falling humans caught by the
+player enter the clean player-carried state, award the source-backed 500-point
+rescue score, and start the existing `P500` score-popup lifecycle;
+player-carried humans settle on terrain when the player-carried offset reaches
+the local terrain line.
 Completed carried-lander abductions now consume the passenger and convert the
 lander into a source-shaped mutant. No-target/no-human landers enter the same
 mutation path, and active clean mutants retain source shot-timer, sleep,

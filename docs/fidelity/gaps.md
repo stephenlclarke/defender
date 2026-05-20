@@ -569,6 +569,10 @@ post-acceptance validation records.
   source RNG/velocity/sleep/shot-timer parity for mini-swarmers, exact baiter
   velocity/shot behavior, falling astronaut motion, player catch, rescue
   scoring, safe/fatal landing, and human-loss transitions.
+- `2026-05-20 22:06:29 BST`: R9-C4 tightens the clean lander carry
+  association. Source-shaped lander flee/orbit decisions now use the passenger
+  carried by that lander instead of a global "any carried human" flag, and
+  carried human positions stay with the matching lander in multi-lander scenes.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain

@@ -1918,19 +1918,21 @@ impl WorldSnapshot {
         let source_rng = &mut self.source_rng;
         let enemy_projectiles = &mut self.enemy_projectiles;
         let terrain = &self.terrain;
-        let lander_carrying_passenger = self.humans.iter().any(|human| human.carried);
+        let humans = &mut self.humans;
         let selected_bomber_slot = source_tie_selected_slot(source_rng.seed);
         let mut bomber_slot = 0usize;
         for enemy in &mut self.enemies {
             if enemy.kind == EnemyKind::Lander
                 && let Some(source_lander) = enemy.source_lander.as_mut()
             {
+                let carried_human_index =
+                    clean_carried_human_index_for_lander(humans, enemy.position);
                 advance_source_lander(
                     enemy.position,
                     source_lander,
                     profile,
                     terrain,
-                    lander_carrying_passenger,
+                    carried_human_index.is_some(),
                     player_position,
                     player_velocity,
                     source_rng,
@@ -1950,6 +1952,10 @@ impl WorldSnapshot {
                 source_lander.x_fraction = x_fraction;
                 source_lander.y_fraction = y_fraction;
                 enemy.velocity = source_lander_screen_velocity(*source_lander);
+                if let Some(human_index) = carried_human_index {
+                    humans[human_index].position = clean_carried_human_position(enemy.position);
+                    humans[human_index].clear_source_fall();
+                }
                 continue;
             }
             if enemy.kind == EnemyKind::Pod
@@ -2308,19 +2314,25 @@ impl WorldSnapshot {
     }
 
     fn sync_carried_humans_to_landers(&mut self) {
-        let Some(lander_position) = self
+        let lander_carried_positions = self
             .enemies
             .iter()
-            .find(|enemy| enemy.kind == EnemyKind::Lander)
+            .filter(|enemy| enemy.kind == EnemyKind::Lander)
             .map(|enemy| enemy.position)
-        else {
+            .map(clean_carried_human_position)
+            .collect::<Vec<_>>();
+        if lander_carried_positions.is_empty() {
             return;
-        };
-        let carried_position = clean_carried_human_position(lander_position);
+        }
+
         for human in &mut self.humans {
             if human.carried && !human.carried_by_player {
-                human.position = carried_position;
-                human.clear_source_fall();
+                if let Some(carried_position) =
+                    clean_nearest_carried_position(&lander_carried_positions, human.position)
+                {
+                    human.position = carried_position;
+                    human.clear_source_fall();
+                }
             }
         }
     }
@@ -4317,6 +4329,30 @@ fn clean_carried_human_position(lander_position: ScreenPosition) -> ScreenPositi
         CLEAN_LANDER_PASSENGER_OFFSET_X,
         CLEAN_LANDER_PASSENGER_OFFSET_Y,
     )
+}
+
+fn clean_carried_human_index_for_lander(
+    humans: &[HumanSnapshot],
+    lander_position: ScreenPosition,
+) -> Option<usize> {
+    let carried_position = clean_carried_human_position(lander_position);
+    humans.iter().position(|human| {
+        human.carried && !human.carried_by_player && human.position == carried_position
+    })
+}
+
+fn clean_nearest_carried_position(
+    carried_positions: &[ScreenPosition],
+    human_position: ScreenPosition,
+) -> Option<ScreenPosition> {
+    carried_positions
+        .iter()
+        .copied()
+        .min_by_key(|position| clean_carried_position_distance(*position, human_position))
+}
+
+fn clean_carried_position_distance(lhs: ScreenPosition, rhs: ScreenPosition) -> u16 {
+    u16::from(lhs.x.abs_diff(rhs.x)) + u16::from(lhs.y.abs_diff(rhs.y))
 }
 
 fn clean_player_carried_human_position(player_position: ScreenPosition) -> ScreenPosition {
@@ -9496,6 +9532,88 @@ mod tests {
             vec![expected_projectile]
         );
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+    }
+
+    #[test]
+    fn clean_game_source_lander_flee_state_stays_with_carried_passenger() {
+        let mut game = credited_started_game();
+        let player_position = ScreenPosition::new(0x20, 0x80);
+        let player_velocity = (WorldVector::default(), WorldVector::default());
+        game.state.player.position = (
+            super::world_word(u16::from(player_position.x) << 8),
+            super::world_word(u16::from(player_position.y) << 8),
+        );
+        game.state.player.velocity = player_velocity;
+        let first_start = ScreenPosition::new(0x40, 0x60);
+        let second_start = ScreenPosition::new(0x70, 0x60);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 5,
+            sleep_ticks: 0,
+            picture_frame: 0,
+        };
+        game.state.world.enemies = vec![
+            EnemySnapshot::source_lander(first_start, ScreenVelocity::new(0, 0), source_lander),
+            EnemySnapshot::source_lander(second_start, ScreenVelocity::new(0, 0), source_lander),
+        ];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot {
+            carried: true,
+            ..HumanSnapshot::new(super::clean_carried_human_position(second_start))
+        }];
+        game.baiter_timer_ticks = None;
+
+        let first_y_velocity = super::source_lander_orbit_y_velocity(
+            game.state.wave_profile,
+            first_start,
+            &game.state.world.terrain,
+        );
+        let second_y_velocity = !super::source_lander_base_y_velocity(game.state.wave_profile);
+        let (first_y, first_y_fraction) =
+            super::source_active_object_y_step(first_start.y, 0, first_y_velocity);
+        let (second_y, second_y_fraction) =
+            super::source_active_object_y_step(second_start.y, 0, second_y_velocity);
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame.state.world.enemies[0].position,
+            ScreenPosition::new(first_start.x, first_y)
+        );
+        assert_eq!(
+            frame.state.world.enemies[0].source_lander,
+            Some(SourceLanderSnapshot {
+                y_fraction: first_y_fraction,
+                y_velocity: first_y_velocity,
+                shot_timer: 4,
+                sleep_ticks: SOURCE_LANDER_ORBIT_SLEEP_TICKS,
+                picture_frame: 1,
+                ..source_lander
+            })
+        );
+        assert_eq!(
+            frame.state.world.enemies[1].position,
+            ScreenPosition::new(second_start.x, second_y)
+        );
+        assert_eq!(
+            frame.state.world.enemies[1].source_lander,
+            Some(SourceLanderSnapshot {
+                y_fraction: second_y_fraction,
+                y_velocity: second_y_velocity,
+                shot_timer: 4,
+                sleep_ticks: super::SOURCE_LANDER_FLEE_SLEEP_TICKS,
+                ..source_lander
+            })
+        );
+        assert_eq!(
+            frame.state.world.humans[0].position,
+            super::clean_carried_human_position(ScreenPosition::new(second_start.x, second_y))
+        );
+        assert!(frame.state.world.humans[0].carried);
+        assert!(frame.state.world.enemy_projectiles.is_empty());
     }
 
     #[test]
