@@ -939,12 +939,15 @@ Object-ecology progress after R9-C4 slices:
   picture descriptor labels, addresses, sizes, and primary/alternate image
   pointers for the static mutant/pod/swarmer descriptors and the current
   `LNDP`/`UFOP`/`TIEP` frame-cycled lander, baiter, and bomber descriptors. The
-  clean human row now carries the source `ASTP1` descriptor label, address,
-  2x8 picture size, primary/alternate image pointers, and mapped human sprite
-  while the direct runtime renderer keeps the existing clean 6x8 astronaut
-  sprite. Initial clean humans also carry deterministic source `TLIST` slot
-  addresses from `0xA11A` with a two-byte stride. The clean player projectile
-  row now carries the source `LASP1`
+  clean human row now carries per-human source astronaut picture descriptor
+  evidence: default `ASTP1` rows and source-restored `ASTP3` rows selected from
+  the `PLRES` `LSEED` low bit, with descriptor labels, addresses, 2x8 picture
+  size, primary/alternate image pointers, and mapped human sprite while the
+  direct runtime renderer keeps the existing clean 6x8 astronaut sprite.
+  Initial clean humans also carry deterministic source `TLIST` slot addresses
+  from `0xA11A` with a two-byte stride and source X low-byte fractions from the
+  same `PLRES` restore state. The clean player projectile row now carries the
+  source `LASP1`
   descriptor label, address, 8x1 picture size, and primary image pointer while
   the direct runtime renderer keeps the existing clean projectile sprite size.
   Clean enemy, human, player-projectile, and enemy-projectile rows now also
@@ -2165,6 +2168,25 @@ Work log:
   closure. The next full gate should run when Step 50 closes, another broader
   shared-contract risk appears, or R9 finalization begins. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779316591648309`.
+
+- `2026-05-20 23:56:58 BST` R9-C4 progress slice
+  `source human restore evidence`. Source-restored clean humans now retain the
+  `PLRES` `LSEED` X low byte as the source X fraction for object-detail
+  world-position evidence and carry the odd-`LSEED` `ASTP3` astronaut picture
+  descriptor choice, while default human evidence keeps reporting `ASTP1`.
+  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
+  clean_initial_humans_carry_source_target_list_slots --lib`, `cargo test
+  clean_game_human_evidence_uses_source_astronaut_picture --lib`, `cargo test
+  clean_world_object_evidence_carries_source_motion_words --lib`, targeted
+  `make clean-fidelity SCENARIOS="start_game abduction wave_advance"`, broad
+  `cargo test --all-targets` for the public `HumanSnapshot` field change,
+  touched-doc markdownlint, and `git diff --check`. Full `make fidelity`,
+  full all-scenario `make clean-fidelity`, and full clippy remain deferred
+  because this is a bounded Step 50 human restore-evidence slice, not Step 50
+  or Phase 3 closure. The next full gate should run when Step 50 closes,
+  another broader shared-contract risk appears, or R9 finalization begins.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779317273545259`.
 
 ## Archived Completed History
 

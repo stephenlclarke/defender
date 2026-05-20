@@ -642,12 +642,16 @@ Scanner/radar object and player blips use small atlas-backed HUD sprites at the
 source scanner screen positions. Object blips are derived from bounded
 active/inactive object evidence and source scanner color words; projectile rows
 remain non-scanner rows.
-Clean human object-detail rows now carry the source `ASTP1` descriptor label,
-address, 2x8 picture size, primary/alternate image pointers, and mapped clean
-human sprite evidence while the runtime playfield keeps drawing the clean 6x8
-astronaut sprite. Clean object-detail rows also carry source-layout object
-addresses, slots, and neutral `OTYP` evidence while the clean scene path skips
-those source-detail rows to avoid duplicate runtime sprites.
+Clean human object-detail rows now carry per-human source astronaut descriptor
+evidence: default `ASTP1` rows and source-restored `ASTP3` rows selected from
+the `PLRES` `LSEED` low bit, including descriptor label, address, 2x8 picture
+size, primary/alternate image pointers, and mapped clean human sprite evidence
+while the runtime playfield keeps drawing the clean 6x8 astronaut sprite.
+Source-restored clean humans also retain the `PLRES` `LSEED` X low byte as the
+source X fraction used in object-detail world-position evidence. Clean
+object-detail rows also carry source-layout object addresses, slots, and
+neutral `OTYP` evidence while the clean scene path skips those source-detail
+rows to avoid duplicate runtime sprites.
 HUD, attract title, top-display border, Hall of Fame logo/text, underline, and
 blink-adjacent surfaces now share a source visual-state contract for the
 source PCRAM/color indices, border words, underline words, Williams restore

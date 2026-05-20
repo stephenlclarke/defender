@@ -958,6 +958,8 @@ pub struct HumanSnapshot {
     pub position: ScreenPosition,
     pub carried: bool,
     pub carried_by_player: bool,
+    pub source_x_fraction: u8,
+    pub source_picture_frame: u8,
     pub source_fall_velocity: u16,
     pub source_fall_y_fraction: u8,
     pub source_target_slot_address: Option<u16>,
@@ -969,6 +971,8 @@ impl HumanSnapshot {
             position,
             carried: false,
             carried_by_player: false,
+            source_x_fraction: 0,
+            source_picture_frame: 0,
             source_fall_velocity: 0,
             source_fall_y_fraction: 0,
             source_target_slot_address: None,
@@ -981,7 +985,11 @@ impl HumanSnapshot {
     }
 
     fn source_world_position(self) -> (u16, u16) {
-        source_world_position(self.position, 0, self.source_fall_y_fraction)
+        source_world_position(
+            self.position,
+            self.source_x_fraction,
+            self.source_fall_y_fraction,
+        )
     }
 
     fn source_velocity_words(self) -> (u16, u16) {
@@ -2696,7 +2704,7 @@ impl ObjectEvidenceSnapshot {
         if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
             return;
         }
-        let descriptor = SOURCE_HUMAN_PICTURE_DESCRIPTOR;
+        let descriptor = source_human_picture_descriptor(human.source_picture_frame);
         let identity = source_object_table_identity(index);
         self.details[index] = ObjectEvidenceDetailSnapshot {
             list: ObjectEvidenceList::Active,
@@ -2883,6 +2891,15 @@ fn source_reserve_picture_descriptor(kind: EnemyKind) -> SourceObjectPictureDesc
     }
 }
 
+fn source_human_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor {
+    match frame % 4 {
+        1 => SOURCE_HUMAN_ASTP2_PICTURE_DESCRIPTOR,
+        2 => SOURCE_HUMAN_ASTP3_PICTURE_DESCRIPTOR,
+        3 => SOURCE_HUMAN_ASTP4_PICTURE_DESCRIPTOR,
+        _ => SOURCE_HUMAN_ASTP1_PICTURE_DESCRIPTOR,
+    }
+}
+
 fn scanner_color_for_object_category(category: ObjectEvidenceCategory) -> Option<u16> {
     match category {
         ObjectEvidenceCategory::Lander
@@ -2919,13 +2936,40 @@ const SOURCE_PLAYER_PROJECTILE_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor
         alternate_image_address: None,
         mapped_sprite: SpriteId::PLAYER_PROJECTILE,
     };
-const SOURCE_HUMAN_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
+const SOURCE_HUMAN_ASTP1_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
     SourceObjectPictureDescriptor {
         label: "ASTP1",
         address: 0xF901,
         size: (2, 8),
         primary_image_address: 0xFACB,
         alternate_image_address: Some(0xFADB),
+        mapped_sprite: SpriteId::HUMAN,
+    };
+const SOURCE_HUMAN_ASTP2_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
+    SourceObjectPictureDescriptor {
+        label: "ASTP2",
+        address: 0xF90B,
+        size: (2, 8),
+        primary_image_address: 0xFAEB,
+        alternate_image_address: Some(0xFAFB),
+        mapped_sprite: SpriteId::HUMAN,
+    };
+const SOURCE_HUMAN_ASTP3_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
+    SourceObjectPictureDescriptor {
+        label: "ASTP3",
+        address: 0xF915,
+        size: (2, 8),
+        primary_image_address: 0xFB0B,
+        alternate_image_address: Some(0xFB1B),
+        mapped_sprite: SpriteId::HUMAN,
+    };
+const SOURCE_HUMAN_ASTP4_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
+    SourceObjectPictureDescriptor {
+        label: "ASTP4",
+        address: 0xF91F,
+        size: (2, 8),
+        primary_image_address: 0xFB2B,
+        alternate_image_address: Some(0xFB3B),
         mapped_sprite: SpriteId::HUMAN,
     };
 const SOURCE_MUTANT_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
@@ -3200,8 +3244,15 @@ fn source_lander_targetable_human(human: &HumanSnapshot) -> bool {
     human.source_target_slot_address.is_some() && !human.carried && !human.carried_by_player
 }
 
-fn source_target_list_human(position: ScreenPosition, slot_index: usize) -> HumanSnapshot {
+fn source_target_list_human(
+    position: ScreenPosition,
+    source_x_fraction: u8,
+    source_picture_frame: u8,
+    slot_index: usize,
+) -> HumanSnapshot {
     HumanSnapshot {
+        source_x_fraction,
+        source_picture_frame,
         source_target_slot_address: Some(source_target_list_slot_address(slot_index)),
         ..HumanSnapshot::new(position)
     }
@@ -3253,8 +3304,11 @@ fn source_target_list_restore_human_group(
     for _ in 0..count {
         let state = source_rng.advance();
         let source_x = (state.hseed & 0x1F).wrapping_add(x_bank);
+        let source_picture_frame = if state.lseed & 0x01 != 0 { 2 } else { 0 };
         humans.push(source_target_list_human(
             ScreenPosition::new(source_x, SOURCE_ASTRO_RESTORE_Y),
+            state.lseed,
+            source_picture_frame,
             slot_index,
         ));
         slot_index += 1;
@@ -7804,6 +7858,8 @@ mod tests {
             ScreenPosition::new(0x09, super::SOURCE_ASTRO_RESTORE_Y),
             ScreenPosition::new(0x14, super::SOURCE_ASTRO_RESTORE_Y),
         ];
+        let expected_x_fractions = [0xAD, 0x56, 0xAB, 0x55, 0x2A, 0x95, 0x4A, 0xA5, 0xD2, 0x69];
+        let expected_picture_frames = [2, 0, 2, 2, 0, 2, 0, 2, 0, 2];
 
         assert_eq!(
             first.humans.len(),
@@ -7816,6 +7872,22 @@ mod tests {
                 .map(|human| human.position)
                 .collect::<Vec<_>>(),
             expected_positions.to_vec()
+        );
+        assert_eq!(
+            first
+                .humans
+                .iter()
+                .map(|human| human.source_x_fraction)
+                .collect::<Vec<_>>(),
+            expected_x_fractions.to_vec()
+        );
+        assert_eq!(
+            first
+                .humans
+                .iter()
+                .map(|human| human.source_picture_frame)
+                .collect::<Vec<_>>(),
+            expected_picture_frames.to_vec()
         );
         for (index, human) in first.humans.iter().enumerate() {
             assert_eq!(
@@ -11181,12 +11253,19 @@ mod tests {
         game.state.world.enemy_projectiles.clear();
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.baiter_timer_ticks = None;
-        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(0x44, 0xD8))];
+        game.state.world.humans = vec![
+            HumanSnapshot::new(ScreenPosition::new(0x44, 0xD8)),
+            HumanSnapshot {
+                source_x_fraction: 0xAD,
+                source_picture_frame: 2,
+                ..HumanSnapshot::new(ScreenPosition::new(0x12, 0xE0))
+            },
+        ];
 
         game.sync_world_presentation();
 
-        assert_eq!(game.state.world.object_evidence.active_count, 1);
-        assert_eq!(game.state.world.object_evidence.detail_count, 1);
+        assert_eq!(game.state.world.object_evidence.active_count, 2);
+        assert_eq!(game.state.world.object_evidence.detail_count, 2);
         let detail = game.state.world.object_evidence.details[0];
         assert_eq!(detail.list, ObjectEvidenceList::Active);
         assert_eq!(detail.object_category, Some(ObjectEvidenceCategory::Human));
@@ -11204,6 +11283,14 @@ mod tests {
             detail.scanner_color,
             Some(super::SOURCE_SCANNER_HUMAN_COLOR_WORD)
         );
+        let restored_detail = game.state.world.object_evidence.details[1];
+        assert_eq!(restored_detail.world_position, Some((0x12AD, 0xE000)));
+        assert_eq!(restored_detail.picture_address, Some(0xF915));
+        assert_eq!(restored_detail.picture_label, Some("ASTP3"));
+        assert_eq!(restored_detail.picture_size, Some((2, 8)));
+        assert_eq!(restored_detail.primary_image_address, Some(0xFB0B));
+        assert_eq!(restored_detail.alternate_image_address, Some(0xFB1B));
+        assert_eq!(restored_detail.mapped_sprite, Some(SpriteId::HUMAN));
 
         let scene = game.scene();
         assert!(scene.sprites.iter().any(|sprite| {
@@ -11245,6 +11332,7 @@ mod tests {
                 },
             )],
             humans: vec![HumanSnapshot {
+                source_x_fraction: 0x33,
                 source_fall_velocity: 0x00E0,
                 source_fall_y_fraction: 0x44,
                 ..HumanSnapshot::new(ScreenPosition::new(0x22, 0xD0))
@@ -11277,7 +11365,7 @@ mod tests {
             details[1].object_category,
             Some(ObjectEvidenceCategory::Human)
         );
-        assert_eq!(details[1].world_position, Some((0x2200, 0xD044)));
+        assert_eq!(details[1].world_position, Some((0x2233, 0xD044)));
         assert_eq!(details[1].velocity, Some((0x0000, 0x00E0)));
         assert_eq!(
             details[2].object_category,

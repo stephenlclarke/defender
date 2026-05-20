@@ -303,14 +303,18 @@ mine/source-shell fixture, and
 active clean enemy evidence now carries source object-picture descriptor
 labels, addresses, dimensions, and primary/alternate image pointers for the
 current lander, baiter, bomber, mutant, pod, and swarmer presentations. Clean
-player projectile evidence now carries the source `LASP1` descriptor label,
-address, 8x1 size, and primary image pointer while the direct runtime
-projectile renderer remains unchanged. Clean enemy, human, player-projectile,
-and enemy-projectile object evidence also carries source-style 8.8
-world-position words, velocity words, and deterministic source object-table
-identity evidence from the clean source fixed-point state and source layout:
-addresses from `0xA23C` plus `0x17` per slot, source slot numbers, and neutral
-`OTYP` `0x00`. Runtime scene sprites remain on the direct clean render path.
+human evidence carries per-human source astronaut picture descriptors: default
+`ASTP1` rows and source-restored `ASTP3` rows selected from the `PLRES`
+`LSEED` low bit, with restored `LSEED` X low bytes retained as source X
+fractions for world-position evidence. Clean player projectile evidence now
+carries the source `LASP1` descriptor label, address, 8x1 size, and primary
+image pointer while the direct runtime projectile renderer remains unchanged.
+Clean enemy, human, player-projectile, and enemy-projectile object evidence
+also carries source-style 8.8 world-position words, velocity words, and
+deterministic source object-table identity evidence from the clean source
+fixed-point state and source layout: addresses from `0xA23C` plus `0x17` per
+slot, source slot numbers, and neutral `OTYP` `0x00`. Runtime scene sprites
+remain on the direct clean render path.
 Remaining per-family movement/projectile behavior and focused source ecology
 fixtures remain later object-ecology work.
 Clean

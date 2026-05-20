@@ -614,6 +614,11 @@ post-acceptance validation records.
   initial and reserve source lander spawns select restored `TLIST` humans by
   advancing that cursor before scanning, and retargeting reuses the same cursor
   when a selected target is no longer live.
+- `2026-05-20 23:53:49 BST`: R9-C4 adds the bounded source human
+  restore-evidence slice. Source-restored clean humans now retain the `PLRES`
+  `LSEED` X low byte as the source X fraction and carry the odd-`LSEED`
+  `ASTP3` astronaut picture choice in clean object-detail evidence, while
+  default clean human rows continue to report `ASTP1`.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain
