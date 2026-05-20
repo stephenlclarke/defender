@@ -653,7 +653,7 @@ pub struct HighScoreEntrySystem;
 impl HighScoreEntrySystem {
     pub const fn evaluate(score: u32, high_score: u32) -> HighScoreEntryFrame {
         HighScoreEntryFrame {
-            qualifies: score > 0 && score >= high_score,
+            qualifies: score > 0 && score > high_score,
         }
     }
 
@@ -1481,8 +1481,8 @@ mod tests {
     }
 
     #[test]
-    fn high_score_entry_system_qualifies_positive_scores_at_or_above_high_score() {
-        assert!(HighScoreEntrySystem::evaluate(10_000, 10_000).qualifies);
+    fn high_score_entry_system_qualifies_positive_scores_above_high_score() {
+        assert!(!HighScoreEntrySystem::evaluate(10_000, 10_000).qualifies);
         assert!(HighScoreEntrySystem::evaluate(10_100, 10_000).qualifies);
         assert!(!HighScoreEntrySystem::evaluate(9_900, 10_000).qualifies);
         assert!(!HighScoreEntrySystem::evaluate(0, 0).qualifies);
@@ -1550,7 +1550,9 @@ mod tests {
                     phase: GamePhase::Attract,
                     credits: 0,
                     current_player: 1,
+                    player_count: 1,
                     wave: 0,
+                    wave_profile: crate::game::WaveProfileSnapshot::for_wave(0),
                     player: PlayerSnapshot {
                         position: (WorldVector::default(), WorldVector::default()),
                         velocity: (WorldVector::default(), WorldVector::default()),
@@ -1558,13 +1560,19 @@ mod tests {
                         lives: 3,
                         smart_bombs: 3,
                     },
+                    player_stocks: [crate::game::PlayerStockSnapshot::new(3, 3); 2],
                     scores: ScoreSnapshot {
                         player_one: 0,
                         player_two: 0,
                         high_score: 100,
                         next_bonus: 10_000,
                     },
+                    attract: crate::game::AttractPresentationSnapshot::for_page_frame(0),
                     high_score_initials: HighScoreInitialsState::EMPTY,
+                    high_score_entry: None,
+                    high_score_submission: None,
+                    high_score_tables: crate::game::HighScoreTablesSnapshot::DEFAULT,
+                    game_over: crate::game::GameOverSnapshot::NONE,
                     world: WorldSnapshot::default(),
                 },
             }

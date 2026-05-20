@@ -1,7 +1,12 @@
 //! Domain-facing gameplay contracts.
 
 use crate::{
-    renderer::{Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize},
+    renderer::{
+        Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
+        push_source_controlled_message_sprites, push_source_message_sprites,
+        push_source_text_bytes_sprites, source_message_text, source_screen_position,
+        source_screen_position_with_offset,
+    },
     systems::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, HighScoreEntrySystem,
         HighScoreInitialsState, OperatorControlSystem, PlayerControlSystem, PlayerDamageSystem,
@@ -11,12 +16,312 @@ use crate::{
     },
 };
 
+// Source-backed cabinet defaults from assets/red-label CMOS/high-score evidence.
+const DEFAULT_CABINET_WAVE: u8 = 1;
+const DEFAULT_PLAYER_LIVES: u8 = 3;
+const DEFAULT_HIGH_SCORE: u32 = 21_270;
+const DEFAULT_REPLAY_SCORE: u32 = 10_000;
+pub const HIGH_SCORE_TABLE_ENTRIES: usize = 8;
+const PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES: u8 = 40;
+const PLAYER_SWITCH_SLEEP_FRAMES: u8 = 0x60;
+const HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES: u8 = 0xFF;
+const HALL_OF_FAME_STALL_FRAMES: u8 = 60;
+const COIN_CREDIT_DELAY_FRAMES: u8 = 10;
+const COIN_CREDIT_SOUND_DELAY_FRAMES: u8 = 1;
+const START_SOUND_DELAY_FRAMES: u8 = 1;
+const START_PLAYFIELD_DELAY_FRAMES: u8 = 2;
+const ATTRACT_PRESENTS_START_FRAME: u16 = 236;
+const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 = 285;
+const ATTRACT_COPYRIGHT_START_FRAME: u16 = 419;
+const ATTRACT_INSTRUCTION_START_FRAME: u16 = 441;
+const ATTRACT_LOGO_SLEEP_TICKS: u8 = 2;
+const ATTRACT_PRESENTS_SLEEP_TICKS: u8 = 5;
+const ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS: u8 = 0x30;
+const ATTRACT_COPYRIGHT_SLEEP_TICKS: u8 = 10;
+const ATTRACT_COPYRIGHT_STALL_TICKS: u8 = 60;
+const ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS: u8 = 0xE6;
+const SOURCE_SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4];
+const SOURCE_SCANNER_SELECTED_MAP: u8 = 1;
+const SOURCE_SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
+const SOURCE_SCANNER_SCAN_CENTER_OFFSET: u16 = 0x6D40;
+const SOURCE_SCANNER_OBJECT_ERASE_START: u16 = 0xB05D;
+const SOURCE_SCANNER_PLAYER_BASE_SCREEN: u16 = 0x4B07;
+const SOURCE_SCANNER_PLAYER_BODY_WORD: u16 = 0x9099;
+const SOURCE_SCANNER_PLAYER_TAIL_BYTE: u8 = 0x90;
+const SOURCE_SCANNER_PLAYER_UPPER_BYTE: u8 = 0x09;
+const SOURCE_SCANNER_LANDER_COLOR_WORD: u16 = 0x4433;
+const SOURCE_SCANNER_HUMAN_COLOR_WORD: u16 = 0x6666;
+pub(crate) const SOURCE_SCORE_POPUP_LIFETIME_TICKS: u8 = 50;
+const SOURCE_SAFE_LANDING_SCORE_POINTS: u32 = 250;
+const SOURCE_RESCUE_SCORE_POINTS: u32 = 500;
+const SOURCE_RESCUE_SCORE_POPUP_Y_OFFSET: u8 = 0x18;
+pub(crate) const SOURCE_EXPLOSION_INITIAL_SIZE: u16 = 0x0100;
+pub(crate) const SOURCE_EXPLOSION_SIZE_DELTA: u16 = 0x00AA;
+pub(crate) const SOURCE_EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30;
+pub(crate) const SOURCE_EXPLOSION_LIFETIME_FRAMES: u8 = 73;
+pub(crate) const SOURCE_TERRAIN_BLOW_STATUS_BIT: u8 = 0x02;
+pub(crate) const SOURCE_TERRAIN_BLOW_ITERATION_LIMIT: u8 = 16;
+pub(crate) const SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS: u8 = 2;
+pub(crate) const SOURCE_TERRAIN_BLOW_SLEEP_TICKS: u8 = 2;
+pub(crate) const SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER: u8 = 8;
+pub(crate) const SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES: u16 = 0x98;
+pub(crate) const SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES: u16 = 0x40;
+const SOURCE_TERRAIN_BLOW_INITIAL_PSEUDO_COLOR: u8 = 0x3C;
+pub const PLAYER_EXPLOSION_PIECE_LIMIT: usize = 128;
+const SOURCE_PLAYER_EXPLOSION_INITIAL_X_SEED: u16 = 0x0808;
+const SOURCE_PLAYER_EXPLOSION_INITIAL_Y_SEED: u16 = 0x1732;
+const SOURCE_PLAYER_EXPLOSION_INITIAL_COLOR_COUNTER: u8 = 56;
+const SOURCE_PLAYER_EXPLOSION_COLOR_COUNTER_RELOAD: u8 = 4;
+const SOURCE_PLAYER_EXPLOSION_Y_MIN: u8 = 42;
+const SOURCE_PLAYER_EXPLOSION_X_MAX: u8 = 0x98;
+const SOURCE_PLAYER_EXPLOSION_VELOCITY_LIMIT: u16 = 0x016A;
+pub(crate) const SOURCE_PLAYER_EXPLOSION_COLORS: [u8; 15] = [
+    0xFF, 0x7F, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x00,
+];
+
+pub(crate) const SOURCE_VISUAL_STATE: SourceVisualStateSnapshot = SourceVisualStateSnapshot {
+    attract_williams_status: 0xFB,
+    attract_williams_logo_color_index: 0x3F,
+    attract_copyright_williams_color_index: 0x0F,
+    attract_williams_fast_logo_rate: 0xFF,
+    attract_williams_normal_logo_rate: 10,
+    attract_instruction_man_color_word: 0x6666,
+    attract_instruction_ship_color_word: 0x0000,
+    attract_instruction_enemy_color_word: 0x4433,
+    hall_of_fame_display_letter_color_index: 0x00,
+    hall_of_fame_logo_color_index: 0x3F,
+    hall_of_fame_entry_letter_color_index: 0x85,
+    hall_of_fame_blink_color_index: 0x85,
+    hall_of_fame_blink_sleep_ticks: 15,
+    hall_of_fame_underline_normal_word: 0x1111,
+    hall_of_fame_underline_active_word: 0xDDDD,
+    top_display_border_word: 0x5555,
+    top_display_scanner_marker_word: 0x9999,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GamePhase {
     Attract,
     Playing,
     GameOver,
     HighScoreEntry,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum AttractPresentationPage {
+    #[default]
+    Inactive,
+    WilliamsLogo,
+    Presents,
+    DefenderWordmark,
+    CopyrightWait,
+    Instruction,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AttractPresentationSnapshot {
+    pub page_frame: u16,
+    pub page: AttractPresentationPage,
+    pub source_sleep_ticks: Option<u8>,
+    pub source_stall_ticks: Option<u8>,
+}
+
+impl AttractPresentationSnapshot {
+    pub const INACTIVE: Self = Self {
+        page_frame: 0,
+        page: AttractPresentationPage::Inactive,
+        source_sleep_ticks: None,
+        source_stall_ticks: None,
+    };
+
+    pub fn for_page_frame(page_frame: u16) -> Self {
+        let (page, source_sleep_ticks, source_stall_ticks) =
+            if page_frame >= ATTRACT_INSTRUCTION_START_FRAME {
+                (
+                    AttractPresentationPage::Instruction,
+                    Some(ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS),
+                    None,
+                )
+            } else if page_frame >= ATTRACT_COPYRIGHT_START_FRAME {
+                (
+                    AttractPresentationPage::CopyrightWait,
+                    Some(ATTRACT_COPYRIGHT_SLEEP_TICKS),
+                    Some(ATTRACT_COPYRIGHT_STALL_TICKS),
+                )
+            } else if page_frame >= ATTRACT_DEFENDER_WORDMARK_START_FRAME {
+                (
+                    AttractPresentationPage::DefenderWordmark,
+                    Some(ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS),
+                    None,
+                )
+            } else if page_frame >= ATTRACT_PRESENTS_START_FRAME {
+                (
+                    AttractPresentationPage::Presents,
+                    Some(ATTRACT_PRESENTS_SLEEP_TICKS),
+                    None,
+                )
+            } else {
+                (
+                    AttractPresentationPage::WilliamsLogo,
+                    Some(ATTRACT_LOGO_SLEEP_TICKS),
+                    None,
+                )
+            };
+
+        Self {
+            page_frame,
+            page,
+            source_sleep_ticks,
+            source_stall_ticks,
+        }
+    }
+
+    pub const fn shows_williams_logo(self) -> bool {
+        matches!(
+            self.page,
+            AttractPresentationPage::WilliamsLogo
+                | AttractPresentationPage::Presents
+                | AttractPresentationPage::DefenderWordmark
+                | AttractPresentationPage::CopyrightWait
+        )
+    }
+
+    pub const fn shows_presents_text(self) -> bool {
+        matches!(
+            self.page,
+            AttractPresentationPage::Presents
+                | AttractPresentationPage::DefenderWordmark
+                | AttractPresentationPage::CopyrightWait
+        )
+    }
+
+    pub const fn shows_defender_wordmark(self) -> bool {
+        matches!(
+            self.page,
+            AttractPresentationPage::DefenderWordmark | AttractPresentationPage::CopyrightWait
+        )
+    }
+
+    pub const fn shows_copyright(self) -> bool {
+        matches!(self.page, AttractPresentationPage::CopyrightWait)
+    }
+
+    pub const fn shows_instruction_text(self) -> bool {
+        matches!(self.page, AttractPresentationPage::Instruction)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SourceVisualStateSnapshot {
+    pub(crate) attract_williams_status: u8,
+    pub(crate) attract_williams_logo_color_index: u8,
+    pub(crate) attract_copyright_williams_color_index: u16,
+    pub(crate) attract_williams_fast_logo_rate: u8,
+    pub(crate) attract_williams_normal_logo_rate: u8,
+    pub(crate) attract_instruction_man_color_word: u16,
+    pub(crate) attract_instruction_ship_color_word: u16,
+    pub(crate) attract_instruction_enemy_color_word: u16,
+    pub(crate) hall_of_fame_display_letter_color_index: u8,
+    pub(crate) hall_of_fame_logo_color_index: u8,
+    pub(crate) hall_of_fame_entry_letter_color_index: u8,
+    pub(crate) hall_of_fame_blink_color_index: u8,
+    pub(crate) hall_of_fame_blink_sleep_ticks: u8,
+    pub(crate) hall_of_fame_underline_normal_word: u16,
+    pub(crate) hall_of_fame_underline_active_word: u16,
+    pub(crate) top_display_border_word: u16,
+    pub(crate) top_display_scanner_marker_word: u16,
+}
+
+impl SourceVisualStateSnapshot {
+    pub(crate) const fn hud_tint(self) -> Color {
+        let _source_border_word = self.top_display_border_word;
+        Color::WHITE
+    }
+
+    pub(crate) const fn top_display_border_tint(self) -> Color {
+        let _source_word = self.top_display_border_word;
+        Color::WHITE
+    }
+
+    pub(crate) const fn top_display_scanner_marker_tint(self) -> Color {
+        let _source_word = self.top_display_scanner_marker_word;
+        Color::WHITE
+    }
+
+    pub(crate) const fn scanner_object_blip_tint(self, source_color_word: u16) -> Color {
+        let _source_words = source_color_word ^ self.top_display_scanner_marker_word;
+        Color::WHITE
+    }
+
+    pub(crate) const fn scanner_player_blip_tint(self, body_word: u16) -> Color {
+        let _source_words = body_word ^ self.top_display_scanner_marker_word;
+        Color::WHITE
+    }
+
+    pub(crate) const fn attract_title_text_tint(self) -> Color {
+        let _source_status = self.attract_williams_status;
+        Color::WHITE
+    }
+
+    pub(crate) const fn attract_instruction_text_tint(self, screen_address: u16) -> Color {
+        let _source_words = screen_address
+            ^ self.attract_instruction_man_color_word
+            ^ self.attract_instruction_ship_color_word
+            ^ self.attract_instruction_enemy_color_word;
+        Color::WHITE
+    }
+
+    pub(crate) const fn attract_williams_logo_tint(self) -> Color {
+        let _source_index = self.attract_williams_logo_color_index;
+        Color::WHITE
+    }
+
+    pub(crate) const fn attract_williams_logo_should_render(self) -> bool {
+        self.attract_williams_status == 0xFB
+            && self.attract_williams_fast_logo_rate == 0xFF
+            && self.attract_williams_normal_logo_rate == 10
+    }
+
+    pub(crate) const fn attract_defender_wordmark_tint(self) -> Color {
+        let _source_index = self.attract_copyright_williams_color_index;
+        Color::WHITE
+    }
+
+    pub(crate) const fn attract_copyright_tint(self) -> Color {
+        let _source_index = self.attract_copyright_williams_color_index;
+        Color::WHITE
+    }
+
+    pub(crate) const fn hall_of_fame_logo_tint(self) -> Color {
+        let _source_index = self.hall_of_fame_logo_color_index;
+        Color::WHITE
+    }
+
+    pub(crate) const fn hall_of_fame_entry_text_tint(self) -> Color {
+        let _source_index = self.hall_of_fame_entry_letter_color_index;
+        Color::WHITE
+    }
+
+    pub(crate) const fn hall_of_fame_display_text_tint(self) -> Color {
+        let _source_index = self.hall_of_fame_display_letter_color_index;
+        Color::WHITE
+    }
+
+    pub(crate) const fn hall_of_fame_blink_text_tint(self) -> Color {
+        let _source_sleep_ticks = self.hall_of_fame_blink_sleep_ticks;
+        let _source_color_index = self.hall_of_fame_blink_color_index;
+        Color::WHITE
+    }
+
+    pub(crate) const fn hall_of_fame_active_underline_tint(self) -> Color {
+        let _source_word = self.hall_of_fame_underline_active_word;
+        Color::WHITE
+    }
+
+    pub(crate) const fn hall_of_fame_normal_underline_tint(self) -> Color {
+        let _source_word = self.hall_of_fame_underline_normal_word;
+        Color::from_rgba(0x66, 0x66, 0x66, 0xFF)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +356,25 @@ pub struct PlayerSnapshot {
     pub smart_bombs: u8,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PlayerStockSnapshot {
+    pub lives: u8,
+    pub smart_bombs: u8,
+}
+
+impl PlayerStockSnapshot {
+    pub const fn new(lives: u8, smart_bombs: u8) -> Self {
+        Self { lives, smart_bombs }
+    }
+
+    const fn from_player(player: PlayerSnapshot) -> Self {
+        Self {
+            lives: player.lives,
+            smart_bombs: player.smart_bombs,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScoreSnapshot {
     pub player_one: u32,
@@ -60,8 +384,140 @@ pub struct ScoreSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WaveProfileSnapshot {
+    pub landers: u8,
+    pub bombers: u8,
+    pub pods: u8,
+    pub mutants: u8,
+    pub swarmers: u8,
+    pub lander_x_velocity: u8,
+    pub lander_y_velocity_msb: u8,
+    pub lander_y_velocity_lsb: u8,
+    pub mutant_random_y: u8,
+    pub mutant_y_velocity_msb: u8,
+    pub mutant_y_velocity_lsb: u8,
+    pub mutant_x_velocity: u8,
+    pub swarmer_x_velocity: u8,
+    pub wave_time: u32,
+    pub wave_size: u8,
+    pub lander_shot_time: u32,
+    pub bomber_x_velocity: u8,
+    pub mutant_shot_time: u32,
+    pub swarmer_shot_time: u32,
+    pub swarmer_acceleration_mask: u8,
+    pub baiter_delay: u32,
+    pub baiter_shot_time: u32,
+    pub baiter_seek_probability: u8,
+}
+
+impl WaveProfileSnapshot {
+    pub fn for_wave(wave: u8) -> Self {
+        Self {
+            landers: wave_table_u8("landers", wave),
+            bombers: wave_table_u8("bombers", wave),
+            pods: wave_table_u8("pods", wave),
+            mutants: wave_table_u8("mutants", wave),
+            swarmers: wave_table_u8("swarmers", wave),
+            lander_x_velocity: wave_table_u8("lander_x_velocity", wave),
+            lander_y_velocity_msb: wave_table_u8("lander_y_velocity_msb", wave),
+            lander_y_velocity_lsb: wave_table_u8("lander_y_velocity_lsb", wave),
+            mutant_random_y: wave_table_u8("mutant_random_y", wave),
+            mutant_y_velocity_msb: wave_table_u8("mutant_y_velocity_msb", wave),
+            mutant_y_velocity_lsb: wave_table_u8("mutant_y_velocity_lsb", wave),
+            mutant_x_velocity: wave_table_u8("mutant_x_velocity", wave),
+            swarmer_x_velocity: wave_table_u8("swarmer_x_velocity", wave),
+            wave_time: wave_table_u32("wave_time", wave),
+            wave_size: wave_table_u8("wave_size", wave),
+            lander_shot_time: wave_table_u32("lander_shot_time", wave),
+            bomber_x_velocity: wave_table_u8("bomber_x_velocity", wave),
+            mutant_shot_time: wave_table_u32("mutant_shot_time", wave),
+            swarmer_shot_time: wave_table_u32("swarmer_shot_time", wave),
+            swarmer_acceleration_mask: wave_table_u8("swarmer_acceleration_mask", wave),
+            baiter_delay: wave_table_u32("baiter_time", wave),
+            baiter_shot_time: wave_table_u32("baiter_shot_time", wave),
+            baiter_seek_probability: wave_table_u8("baiter_seek_probability", wave),
+        }
+    }
+}
+
+const SOURCE_WAVE_TABLE_TSV: &str = include_str!("../assets/red-label/wave-table.tsv");
+const SOURCE_WAVE_TABLE_HEADER: &str =
+    "key\tceiling\tfloor\tintra_delta\tinter_delta\twave1\twave2\twave3\twave4";
+
+fn wave_table_u8(key: &str, wave: u8) -> u8 {
+    u8::try_from(wave_table_value(key, wave)).expect("red-label wave profile value should fit u8")
+}
+
+fn wave_table_u32(key: &str, wave: u8) -> u32 {
+    u32::try_from(wave_table_value(key, wave))
+        .expect("red-label wave profile value should be non-negative")
+}
+
+fn wave_table_value(key: &str, wave: u8) -> i32 {
+    let mut lines = SOURCE_WAVE_TABLE_TSV.lines();
+    let header = lines
+        .next()
+        .expect("red-label wave table should have header");
+    assert_eq!(header, SOURCE_WAVE_TABLE_HEADER);
+
+    for line in lines.map(str::trim).filter(|line| !line.is_empty()) {
+        let fields = line.split('\t').collect::<Vec<_>>();
+        assert_eq!(fields.len(), 9, "red-label wave table row width changed");
+        if fields[0] != key {
+            continue;
+        }
+
+        let ceiling = parse_wave_table_i32(fields[1], key, "ceiling");
+        let floor = parse_wave_table_i32(fields[2], key, "floor");
+        let inter_delta = parse_wave_table_i32(fields[4], key, "inter_delta");
+        let wave_index = usize::from(wave.clamp(1, 4));
+        let mut value = parse_wave_table_i32(fields[4 + wave_index], key, "wave");
+        for _ in 0..wave.saturating_sub(4) {
+            value = apply_wave_table_delta(value, inter_delta, floor, ceiling);
+        }
+        return value;
+    }
+
+    panic!("missing red-label wave table key {key}");
+}
+
+fn parse_wave_table_i32(value: &str, key: &str, field: &str) -> i32 {
+    value
+        .parse()
+        .unwrap_or_else(|_| panic!("red-label wave table {key}.{field} is not an integer"))
+}
+
+fn apply_wave_table_delta(value: i32, delta: i32, floor: i32, ceiling: i32) -> i32 {
+    if delta > 0 {
+        (value + delta).min(ceiling)
+    } else if delta < 0 {
+        (value + delta).max(floor)
+    } else {
+        value
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnemyKind {
     Lander,
+    Mutant,
+    Bomber,
+    Pod,
+    Swarmer,
+    Baiter,
+}
+
+impl EnemyKind {
+    const fn object_category(self) -> ObjectEvidenceCategory {
+        match self {
+            Self::Lander => ObjectEvidenceCategory::Lander,
+            Self::Mutant => ObjectEvidenceCategory::Mutant,
+            Self::Bomber => ObjectEvidenceCategory::Bomber,
+            Self::Pod => ObjectEvidenceCategory::Pod,
+            Self::Swarmer => ObjectEvidenceCategory::Swarmer,
+            Self::Baiter => ObjectEvidenceCategory::Baiter,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,12 +525,455 @@ pub struct EnemySnapshot {
     pub kind: EnemyKind,
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
+    pub source_lander: Option<SourceLanderSnapshot>,
+    pub source_mutant: Option<SourceMutantSnapshot>,
+    pub source_bomber: Option<SourceBomberSnapshot>,
+    pub source_swarmer: Option<SourceSwarmerSnapshot>,
+    pub source_baiter: Option<SourceBaiterSnapshot>,
+    pub source_pod: Option<SourcePodSnapshot>,
+}
+
+impl EnemySnapshot {
+    pub const fn new(kind: EnemyKind, position: ScreenPosition, velocity: ScreenVelocity) -> Self {
+        Self {
+            kind,
+            position,
+            velocity,
+            source_lander: None,
+            source_mutant: None,
+            source_bomber: None,
+            source_swarmer: None,
+            source_baiter: None,
+            source_pod: None,
+        }
+    }
+
+    const fn source_lander(
+        position: ScreenPosition,
+        velocity: ScreenVelocity,
+        source_lander: SourceLanderSnapshot,
+    ) -> Self {
+        Self {
+            kind: EnemyKind::Lander,
+            position,
+            velocity,
+            source_lander: Some(source_lander),
+            source_mutant: None,
+            source_bomber: None,
+            source_swarmer: None,
+            source_baiter: None,
+            source_pod: None,
+        }
+    }
+
+    const fn source_mutant(
+        position: ScreenPosition,
+        velocity: ScreenVelocity,
+        source_mutant: SourceMutantSnapshot,
+    ) -> Self {
+        Self {
+            kind: EnemyKind::Mutant,
+            position,
+            velocity,
+            source_lander: None,
+            source_mutant: Some(source_mutant),
+            source_bomber: None,
+            source_swarmer: None,
+            source_baiter: None,
+            source_pod: None,
+        }
+    }
+
+    const fn source_bomber(
+        position: ScreenPosition,
+        velocity: ScreenVelocity,
+        source_bomber: SourceBomberSnapshot,
+    ) -> Self {
+        Self {
+            kind: EnemyKind::Bomber,
+            position,
+            velocity,
+            source_lander: None,
+            source_mutant: None,
+            source_bomber: Some(source_bomber),
+            source_swarmer: None,
+            source_baiter: None,
+            source_pod: None,
+        }
+    }
+
+    const fn source_swarmer(
+        position: ScreenPosition,
+        velocity: ScreenVelocity,
+        source_swarmer: SourceSwarmerSnapshot,
+    ) -> Self {
+        Self {
+            kind: EnemyKind::Swarmer,
+            position,
+            velocity,
+            source_lander: None,
+            source_mutant: None,
+            source_bomber: None,
+            source_swarmer: Some(source_swarmer),
+            source_baiter: None,
+            source_pod: None,
+        }
+    }
+
+    const fn source_baiter(
+        position: ScreenPosition,
+        velocity: ScreenVelocity,
+        source_baiter: SourceBaiterSnapshot,
+    ) -> Self {
+        Self {
+            kind: EnemyKind::Baiter,
+            position,
+            velocity,
+            source_lander: None,
+            source_mutant: None,
+            source_bomber: None,
+            source_swarmer: None,
+            source_baiter: Some(source_baiter),
+            source_pod: None,
+        }
+    }
+
+    const fn source_pod(
+        position: ScreenPosition,
+        velocity: ScreenVelocity,
+        source_pod: SourcePodSnapshot,
+    ) -> Self {
+        Self {
+            kind: EnemyKind::Pod,
+            position,
+            velocity,
+            source_lander: None,
+            source_mutant: None,
+            source_bomber: None,
+            source_swarmer: None,
+            source_baiter: None,
+            source_pod: Some(source_pod),
+        }
+    }
+
+    fn source_picture_descriptor(self) -> SourceObjectPictureDescriptor {
+        match self.kind {
+            EnemyKind::Lander => source_lander_picture_descriptor(
+                self.source_lander
+                    .map(|source| source.picture_frame)
+                    .unwrap_or_default(),
+            ),
+            EnemyKind::Mutant => SOURCE_MUTANT_PICTURE_DESCRIPTOR,
+            EnemyKind::Bomber => source_bomber_picture_descriptor(
+                self.source_bomber
+                    .map(|source| source.picture_frame)
+                    .unwrap_or_default(),
+            ),
+            EnemyKind::Pod => SOURCE_POD_PICTURE_DESCRIPTOR,
+            EnemyKind::Swarmer => SOURCE_SWARMER_PICTURE_DESCRIPTOR,
+            EnemyKind::Baiter => source_baiter_picture_descriptor(
+                self.source_baiter
+                    .map(|source| source.picture_frame)
+                    .unwrap_or_default(),
+            ),
+        }
+    }
+
+    fn source_world_position(self) -> (u16, u16) {
+        match self.kind {
+            EnemyKind::Lander => self
+                .source_lander
+                .map(|source| {
+                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                })
+                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+            EnemyKind::Mutant => self
+                .source_mutant
+                .map(|source| {
+                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                })
+                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+            EnemyKind::Bomber => self
+                .source_bomber
+                .map(|source| {
+                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                })
+                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+            EnemyKind::Pod => self
+                .source_pod
+                .map(|source| {
+                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                })
+                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+            EnemyKind::Swarmer => self
+                .source_swarmer
+                .map(|source| {
+                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                })
+                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+            EnemyKind::Baiter => self
+                .source_baiter
+                .map(|source| {
+                    source_world_position(self.position, source.x_fraction, source.y_fraction)
+                })
+                .unwrap_or_else(|| source_world_position(self.position, 0, 0)),
+        }
+    }
+
+    fn source_velocity_words(self) -> (u16, u16) {
+        match self.kind {
+            EnemyKind::Lander => self
+                .source_lander
+                .map(|source| (source.x_velocity, source.y_velocity))
+                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+            EnemyKind::Mutant => self
+                .source_mutant
+                .map(|source| (source.x_velocity, source.y_velocity))
+                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+            EnemyKind::Bomber => self
+                .source_bomber
+                .map(|source| (source.x_velocity, source.y_velocity))
+                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+            EnemyKind::Pod => self
+                .source_pod
+                .map(|source| (source.x_velocity, source.y_velocity))
+                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+            EnemyKind::Swarmer => self
+                .source_swarmer
+                .map(|source| (source.x_velocity, source.y_velocity))
+                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+            EnemyKind::Baiter => self
+                .source_baiter
+                .map(|source| {
+                    (
+                        source_baiter_screen_x_velocity(source.x_velocity),
+                        source.y_velocity,
+                    )
+                })
+                .unwrap_or_else(|| source_fixed_velocity_words(self.velocity)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceLanderSnapshot {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+    pub picture_frame: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceMutantSnapshot {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceBomberSnapshot {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub picture_frame: u8,
+    pub cruise_altitude: u8,
+    pub sleep_ticks: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceSwarmerSnapshot {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub acceleration: u8,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+    pub horizontal_seek_pending: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceBaiterSnapshot {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+    pub picture_frame: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourcePodSnapshot {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceRandSnapshot {
+    pub seed: u8,
+    pub hseed: u8,
+    pub lseed: u8,
+}
+
+impl Default for SourceRandSnapshot {
+    fn default() -> Self {
+        Self {
+            seed: 0,
+            hseed: 0xA5,
+            lseed: 0x5A,
+        }
+    }
+}
+
+impl SourceRandSnapshot {
+    fn advance(&mut self) -> Self {
+        let product_low = self.seed.wrapping_mul(3).wrapping_add(17);
+        let mut a = self.lseed >> 3;
+        a ^= self.lseed;
+        let carry_into_hseed = (a & 0x01) != 0;
+        let old_hseed = self.hseed;
+        self.hseed = (u8::from(carry_into_hseed) << 7) | (self.hseed >> 1);
+        let carry_into_lseed = (old_hseed & 0x01) != 0;
+        self.lseed = (u8::from(carry_into_lseed) << 7) | (self.lseed >> 1);
+        let (with_lseed, carry) = adc8(product_low, self.lseed, false);
+        let (new_seed, _) = adc8(with_lseed, self.hseed, carry);
+        self.seed = new_seed;
+        *self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnemyProjectileSnapshot {
+    pub position: ScreenPosition,
+    pub velocity: ScreenVelocity,
+    pub source_x_fraction: u8,
+    pub source_y_fraction: u8,
+    pub source_x_velocity: u16,
+    pub source_y_velocity: u16,
+    pub source_lifetime_ticks: u8,
+}
+
+impl EnemyProjectileSnapshot {
+    fn source_fireball(position: ScreenPosition, x_velocity: u16, y_velocity: u16) -> Self {
+        Self {
+            position,
+            velocity: source_screen_velocity(x_velocity, y_velocity),
+            source_x_fraction: 0,
+            source_y_fraction: 0,
+            source_x_velocity: x_velocity,
+            source_y_velocity: y_velocity,
+            source_lifetime_ticks: SOURCE_SHELL_LIFETIME_TICKS,
+        }
+    }
+
+    const fn source_bomb_picture_label(self) -> &'static str {
+        SOURCE_BOMB_SHELL_PICTURE_LABEL
+    }
+
+    fn source_world_position(self) -> (u16, u16) {
+        source_world_position(
+            self.position,
+            self.source_x_fraction,
+            self.source_y_fraction,
+        )
+    }
+
+    const fn source_velocity_words(self) -> (u16, u16) {
+        (self.source_x_velocity, self.source_y_velocity)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EnemyReserveSnapshot {
+    pub landers: u8,
+    pub bombers: u8,
+    pub pods: u8,
+    pub mutants: u8,
+    pub swarmers: u8,
+}
+
+impl EnemyReserveSnapshot {
+    const fn from_profile(profile: WaveProfileSnapshot) -> Self {
+        Self {
+            landers: profile.landers,
+            bombers: profile.bombers,
+            pods: profile.pods,
+            mutants: profile.mutants,
+            swarmers: profile.swarmers,
+        }
+    }
+
+    fn total(self) -> u8 {
+        self.landers
+            .saturating_add(self.bombers)
+            .saturating_add(self.pods)
+            .saturating_add(self.mutants)
+            .saturating_add(self.swarmers)
+    }
+
+    fn is_empty(self) -> bool {
+        self.total() == 0
+    }
+
+    fn take(&mut self, kind: EnemyKind) -> bool {
+        let remaining = match kind {
+            EnemyKind::Lander => &mut self.landers,
+            EnemyKind::Bomber => &mut self.bombers,
+            EnemyKind::Pod => &mut self.pods,
+            EnemyKind::Mutant => &mut self.mutants,
+            EnemyKind::Swarmer => &mut self.swarmers,
+            EnemyKind::Baiter => return false,
+        };
+        if *remaining == 0 {
+            return false;
+        }
+        *remaining = remaining.saturating_sub(1);
+        true
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HumanSnapshot {
     pub position: ScreenPosition,
     pub carried: bool,
+    pub carried_by_player: bool,
+    pub source_fall_velocity: u16,
+    pub source_fall_y_fraction: u8,
+}
+
+impl HumanSnapshot {
+    pub const fn new(position: ScreenPosition) -> Self {
+        Self {
+            position,
+            carried: false,
+            carried_by_player: false,
+            source_fall_velocity: 0,
+            source_fall_y_fraction: 0,
+        }
+    }
+
+    fn clear_source_fall(&mut self) {
+        self.source_fall_velocity = 0;
+        self.source_fall_y_fraction = 0;
+    }
+
+    fn source_world_position(self) -> (u16, u16) {
+        source_world_position(self.position, 0, self.source_fall_y_fraction)
+    }
+
+    fn source_velocity_words(self) -> (u16, u16) {
+        (0, self.source_fall_velocity)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,19 +982,795 @@ pub struct ProjectileSnapshot {
     pub velocity: ScreenVelocity,
 }
 
+impl ProjectileSnapshot {
+    fn source_world_position(self) -> (u16, u16) {
+        source_world_position(self.position, 0, 0)
+    }
+
+    fn source_velocity_words(self) -> (u16, u16) {
+        source_fixed_velocity_words(self.velocity)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TerrainSegment {
     pub position: ScreenPosition,
     pub size: (u8, u8),
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TerrainBlowStage {
+    #[default]
+    ExplosionPassSleeping,
+    FlashClearedSleeping,
+    Completed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TerrainBlowSnapshot {
+    pub stage: TerrainBlowStage,
+    pub status_terrain_blown: bool,
+    pub source_iteration: u8,
+    pub source_iteration_limit: u8,
+    pub source_sleep_remaining: Option<u8>,
+    pub source_pseudo_color: u8,
+    pub source_overload_counter: u8,
+    pub terrain_erase_entries: u16,
+    pub scanner_terrain_erase_entries: u16,
+    pub terrain_words_remaining: u16,
+    pub scanner_terrain_words_remaining: u16,
+    pub explosions_per_pass: u8,
+}
+
+impl TerrainBlowSnapshot {
+    pub const EMPTY: Self = Self {
+        stage: TerrainBlowStage::ExplosionPassSleeping,
+        status_terrain_blown: false,
+        source_iteration: 0,
+        source_iteration_limit: SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
+        source_sleep_remaining: None,
+        source_pseudo_color: 0,
+        source_overload_counter: 0,
+        terrain_erase_entries: 0,
+        scanner_terrain_erase_entries: 0,
+        terrain_words_remaining: 0,
+        scanner_terrain_words_remaining: 0,
+        explosions_per_pass: 0,
+    };
+
+    pub fn source_started() -> Self {
+        Self {
+            stage: TerrainBlowStage::ExplosionPassSleeping,
+            status_terrain_blown: SOURCE_TERRAIN_BLOW_STATUS_BIT != 0,
+            source_iteration: 0,
+            source_iteration_limit: SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
+            source_sleep_remaining: Some(SOURCE_TERRAIN_BLOW_SLEEP_TICKS),
+            source_pseudo_color: SOURCE_TERRAIN_BLOW_INITIAL_PSEUDO_COLOR,
+            source_overload_counter: SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER,
+            terrain_erase_entries: SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES,
+            scanner_terrain_erase_entries: SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES,
+            terrain_words_remaining: 0,
+            scanner_terrain_words_remaining: 0,
+            explosions_per_pass: SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS,
+        }
+    }
+
+    pub const fn terrain_erased(self) -> bool {
+        self.status_terrain_blown && self.terrain_words_remaining == 0
+    }
+
+    pub const fn scanner_terrain_erased(self) -> bool {
+        self.status_terrain_blown && self.scanner_terrain_words_remaining == 0
+    }
+}
+
+pub const OBJECT_EVIDENCE_DETAIL_LIMIT: usize = 16;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ObjectEvidenceList {
+    #[default]
+    Active,
+    Inactive,
+    Projectile,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObjectEvidenceCategory {
+    Lander,
+    Mutant,
+    Bomber,
+    Pod,
+    Swarmer,
+    Baiter,
+    Human,
+    PlayerProjectile,
+    EnemyBomb,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ObjectEvidenceDetailSnapshot {
+    pub list: ObjectEvidenceList,
+    pub object_category: Option<ObjectEvidenceCategory>,
+    pub address: Option<u16>,
+    pub slot: Option<u16>,
+    pub screen_position: Option<ScreenPosition>,
+    pub world_position: Option<(u16, u16)>,
+    pub velocity: Option<(u16, u16)>,
+    pub picture_address: Option<u16>,
+    pub picture_label: Option<&'static str>,
+    pub picture_size: Option<(u8, u8)>,
+    pub primary_image_address: Option<u16>,
+    pub alternate_image_address: Option<u16>,
+    pub mapped_sprite: Option<SpriteId>,
+    pub object_type: Option<u8>,
+    pub scanner_color: Option<u16>,
+}
+
+impl ObjectEvidenceDetailSnapshot {
+    pub const EMPTY: Self = Self {
+        list: ObjectEvidenceList::Active,
+        object_category: None,
+        address: None,
+        slot: None,
+        screen_position: None,
+        world_position: None,
+        velocity: None,
+        picture_address: None,
+        picture_label: None,
+        picture_size: None,
+        primary_image_address: None,
+        alternate_image_address: None,
+        mapped_sprite: None,
+        object_type: None,
+        scanner_color: None,
+    };
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ObjectEvidenceSnapshot {
+    pub active_count: u16,
+    pub inactive_count: u16,
+    pub projectile_count: u16,
+    pub visible_count: u16,
+    pub evidence_crc32: Option<u32>,
+    pub detail_count: u8,
+    pub details: [ObjectEvidenceDetailSnapshot; OBJECT_EVIDENCE_DETAIL_LIMIT],
+}
+
+pub const SCANNER_RADAR_BLIP_LIMIT: usize = OBJECT_EVIDENCE_DETAIL_LIMIT;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ScannerRadarStage {
+    #[default]
+    InactiveObjectScan,
+    ActiveAndShellScan,
+    RasterDisplay,
+}
+
+impl ScannerRadarStage {
+    const fn source_sleep_ticks(self) -> u8 {
+        match self {
+            Self::InactiveObjectScan => SOURCE_SCANNER_PROCESS_SLEEP_TICKS[0],
+            Self::ActiveAndShellScan => SOURCE_SCANNER_PROCESS_SLEEP_TICKS[1],
+            Self::RasterDisplay => SOURCE_SCANNER_PROCESS_SLEEP_TICKS[2],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ScannerRadarBlipKind {
+    #[default]
+    ActiveObject,
+    InactiveObject,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScannerRadarBlipSnapshot {
+    pub kind: ScannerRadarBlipKind,
+    pub object_address: Option<u16>,
+    pub erase_table_address: u16,
+    pub screen_address: u16,
+    pub color_word: u16,
+}
+
+impl ScannerRadarBlipSnapshot {
+    pub const EMPTY: Self = Self {
+        kind: ScannerRadarBlipKind::ActiveObject,
+        object_address: None,
+        erase_table_address: 0,
+        screen_address: 0,
+        color_word: 0,
+    };
+}
+
+impl Default for ScannerRadarBlipSnapshot {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScannerRadarPlayerBlipSnapshot {
+    pub erase_table_address: u16,
+    pub screen_address: u16,
+    pub body_word: u16,
+    pub tail_byte: u8,
+    pub upper_byte: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScannerRadarSnapshot {
+    pub enabled: bool,
+    pub stage: ScannerRadarStage,
+    pub stage_sleep_ticks: u8,
+    pub source_process_sleep_ticks: [u8; 3],
+    pub selected_map: u8,
+    pub scan_left: Option<u16>,
+    pub terrain_enabled: bool,
+    pub object_erase_start: u16,
+    pub setend: u16,
+    pub blip_count: u8,
+    pub blips: [ScannerRadarBlipSnapshot; SCANNER_RADAR_BLIP_LIMIT],
+    pub player_blip: Option<ScannerRadarPlayerBlipSnapshot>,
+}
+
+impl ScannerRadarSnapshot {
+    pub const DISABLED: Self = Self {
+        enabled: false,
+        stage: ScannerRadarStage::InactiveObjectScan,
+        stage_sleep_ticks: 0,
+        source_process_sleep_ticks: SOURCE_SCANNER_PROCESS_SLEEP_TICKS,
+        selected_map: 0,
+        scan_left: None,
+        terrain_enabled: false,
+        object_erase_start: SOURCE_SCANNER_OBJECT_ERASE_START,
+        setend: SOURCE_SCANNER_OBJECT_ERASE_START,
+        blip_count: 0,
+        blips: [ScannerRadarBlipSnapshot::EMPTY; SCANNER_RADAR_BLIP_LIMIT],
+        player_blip: None,
+    };
+
+    pub(crate) fn for_world(
+        phase: GamePhase,
+        frame: u64,
+        scan_anchor: WorldVector,
+        player_position: (WorldVector, WorldVector),
+        object_evidence: &ObjectEvidenceSnapshot,
+    ) -> Self {
+        if phase != GamePhase::Playing
+            || player_position == (WorldVector::default(), WorldVector::default())
+        {
+            return Self::DISABLED;
+        }
+
+        let stage = scanner_radar_stage_for_frame(frame);
+        let scan_anchor_word = source_word_from_world_vector(scan_anchor);
+        let scan_left = scan_anchor_word.wrapping_sub(SOURCE_SCANNER_SCAN_CENTER_OFFSET);
+        let mut scanner = Self {
+            enabled: true,
+            stage,
+            stage_sleep_ticks: stage.source_sleep_ticks(),
+            source_process_sleep_ticks: SOURCE_SCANNER_PROCESS_SLEEP_TICKS,
+            selected_map: SOURCE_SCANNER_SELECTED_MAP,
+            scan_left: Some(scan_left),
+            terrain_enabled: true,
+            object_erase_start: SOURCE_SCANNER_OBJECT_ERASE_START,
+            setend: SOURCE_SCANNER_OBJECT_ERASE_START,
+            blip_count: 0,
+            blips: [ScannerRadarBlipSnapshot::EMPTY; SCANNER_RADAR_BLIP_LIMIT],
+            player_blip: None,
+        };
+
+        scanner.push_object_blips(object_evidence, scan_left);
+        scanner.player_blip = Some(ScannerRadarPlayerBlipSnapshot {
+            erase_table_address: scanner.setend,
+            screen_address: scanner_radar_player_screen_address(player_position),
+            body_word: SOURCE_SCANNER_PLAYER_BODY_WORD,
+            tail_byte: SOURCE_SCANNER_PLAYER_TAIL_BYTE,
+            upper_byte: SOURCE_SCANNER_PLAYER_UPPER_BYTE,
+        });
+        scanner
+    }
+
+    fn push_object_blips(&mut self, object_evidence: &ObjectEvidenceSnapshot, scan_left: u16) {
+        let detail_count =
+            usize::from(object_evidence.detail_count).min(OBJECT_EVIDENCE_DETAIL_LIMIT);
+        for detail in &object_evidence.details[..detail_count] {
+            let Some(kind) = scanner_radar_blip_kind(detail.list) else {
+                continue;
+            };
+            let Some(color_word) = detail.scanner_color else {
+                continue;
+            };
+            let Some((world_x, world_y)) = scanner_radar_object_world_position(detail) else {
+                continue;
+            };
+            let index = usize::from(self.blip_count);
+            if index >= SCANNER_RADAR_BLIP_LIMIT {
+                return;
+            }
+
+            self.blips[index] = ScannerRadarBlipSnapshot {
+                kind,
+                object_address: detail.address,
+                erase_table_address: self.setend,
+                screen_address: scanner_radar_object_screen_address(world_x, world_y, scan_left),
+                color_word,
+            };
+            self.blip_count += 1;
+            self.setend = self.setend.wrapping_add(2);
+        }
+    }
+}
+
+impl Default for ScannerRadarSnapshot {
+    fn default() -> Self {
+        Self::DISABLED
+    }
+}
+
+pub const EXPANDED_OBJECT_DETAIL_LIMIT: usize = 16;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ExpandedObjectKind {
+    #[default]
+    Appearance,
+    Explosion,
+    ScorePopup,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ExpandedObjectDetailSnapshot {
+    pub kind: ExpandedObjectKind,
+    pub slot_address: Option<u16>,
+    pub size: u16,
+    pub descriptor_address: Option<u16>,
+    pub picture_label: Option<&'static str>,
+    pub picture_size: Option<(u8, u8)>,
+    pub mapped_sprite: Option<SpriteId>,
+    pub erase_address: Option<u16>,
+    pub center: Option<ScreenPosition>,
+    pub top_left: Option<ScreenPosition>,
+    pub object_address: Option<u16>,
+    pub score_popup_lifetime_ticks: Option<u8>,
+    pub score_popup_value: Option<u16>,
+    pub explosion_frame: Option<u8>,
+    pub explosion_lifetime_frames: Option<u8>,
+}
+
+impl ExpandedObjectDetailSnapshot {
+    pub const EMPTY: Self = Self {
+        kind: ExpandedObjectKind::Appearance,
+        slot_address: None,
+        size: 0,
+        descriptor_address: None,
+        picture_label: None,
+        picture_size: None,
+        mapped_sprite: None,
+        erase_address: None,
+        center: None,
+        top_left: None,
+        object_address: None,
+        score_popup_lifetime_ticks: None,
+        score_popup_value: None,
+        explosion_frame: None,
+        explosion_lifetime_frames: None,
+    };
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ExpandedObjectEvidenceSnapshot {
+    pub active_count: u16,
+    pub last_slot_address: Option<u16>,
+    pub detail_count: u8,
+    pub details: [ExpandedObjectDetailSnapshot; EXPANDED_OBJECT_DETAIL_LIMIT],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScorePopupKind {
+    Points250,
+    Points500,
+}
+
+impl ScorePopupKind {
+    const fn value(self) -> u16 {
+        match self {
+            Self::Points250 => 250,
+            Self::Points500 => 500,
+        }
+    }
+
+    const fn picture_label(self) -> &'static str {
+        match self {
+            Self::Points250 => "C25P1",
+            Self::Points500 => "C5P1",
+        }
+    }
+
+    const fn sprite(self) -> SpriteId {
+        match self {
+            Self::Points250 => SpriteId::SCORE_POPUP_250,
+            Self::Points500 => SpriteId::SCORE_POPUP_500,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScorePopupSnapshot {
+    pub kind: ScorePopupKind,
+    pub position: ScreenPosition,
+    pub frames_remaining: u8,
+    pub source_lifetime_ticks: u8,
+}
+
+impl ScorePopupSnapshot {
+    pub fn source_spawn(kind: ScorePopupKind, position: ScreenPosition) -> Self {
+        Self {
+            kind,
+            position,
+            frames_remaining: SOURCE_SCORE_POPUP_LIFETIME_TICKS,
+            source_lifetime_ticks: SOURCE_SCORE_POPUP_LIFETIME_TICKS,
+        }
+    }
+
+    fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
+        ExpandedObjectDetailSnapshot {
+            kind: ExpandedObjectKind::ScorePopup,
+            picture_label: Some(self.kind.picture_label()),
+            picture_size: Some((6, 6)),
+            mapped_sprite: Some(self.kind.sprite()),
+            top_left: Some(self.position),
+            score_popup_lifetime_ticks: Some(self.source_lifetime_ticks),
+            score_popup_value: Some(self.kind.value()),
+            ..ExpandedObjectDetailSnapshot::EMPTY
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExplosionKind {
+    Lander,
+    Mutant,
+    Bomber,
+    Pod,
+    Baiter,
+    Bomb,
+    Swarmer,
+    Astronaut,
+    PlayerShip,
+    Terrain,
+}
+
+impl ExplosionKind {
+    const fn for_enemy(kind: EnemyKind) -> Self {
+        match kind {
+            EnemyKind::Lander => Self::Lander,
+            EnemyKind::Mutant => Self::Mutant,
+            EnemyKind::Bomber => Self::Bomber,
+            EnemyKind::Pod => Self::Pod,
+            EnemyKind::Swarmer => Self::Swarmer,
+            EnemyKind::Baiter => Self::Baiter,
+        }
+    }
+
+    const fn picture_label(self) -> &'static str {
+        match self {
+            Self::Lander => "LNDP1",
+            Self::Mutant => "SCZP1",
+            Self::Bomber => "TIEP1",
+            Self::Pod => "PRBP1",
+            Self::Baiter => "UFOP1",
+            Self::Bomb => "BXPIC",
+            Self::Swarmer => "SWXP1",
+            Self::Astronaut => "ASXP1",
+            Self::PlayerShip => "PLAPIC",
+            Self::Terrain => "TEREX",
+        }
+    }
+
+    const fn picture_size(self) -> (u8, u8) {
+        match self {
+            Self::Lander | Self::Mutant => (5, 8),
+            Self::Bomber | Self::Pod => (4, 8),
+            Self::Baiter => (6, 4),
+            Self::Bomb | Self::Swarmer | Self::Astronaut => (4, 8),
+            Self::PlayerShip => (8, 6),
+            Self::Terrain => (8, 6),
+        }
+    }
+
+    const fn sprite(self) -> SpriteId {
+        match self {
+            Self::Lander => SpriteId::ENEMY_LANDER,
+            Self::Mutant => SpriteId::ENEMY_MUTANT,
+            Self::Bomber => SpriteId::ENEMY_BOMBER,
+            Self::Pod => SpriteId::ENEMY_POD,
+            Self::Baiter => SpriteId::ENEMY_BAITER,
+            Self::Bomb => SpriteId::BOMB_EXPLOSION,
+            Self::Swarmer => SpriteId::SWARMER_EXPLOSION,
+            Self::Astronaut => SpriteId::ASTRONAUT_EXPLOSION,
+            Self::PlayerShip => SpriteId::PLAYER_SHIP,
+            Self::Terrain => SpriteId::TERRAIN_EXPLOSION,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExplosionSnapshot {
+    pub kind: ExplosionKind,
+    pub position: ScreenPosition,
+    pub source_size: u16,
+    pub frames_remaining: u8,
+}
+
+impl ExplosionSnapshot {
+    pub fn source_spawn(kind: ExplosionKind, position: ScreenPosition) -> Self {
+        Self {
+            kind,
+            position,
+            source_size: SOURCE_EXPLOSION_INITIAL_SIZE,
+            frames_remaining: SOURCE_EXPLOSION_LIFETIME_FRAMES,
+        }
+    }
+
+    fn advance_source_frame(&mut self) -> bool {
+        let next_size = self.source_size.wrapping_add(SOURCE_EXPLOSION_SIZE_DELTA);
+        if next_size.to_be_bytes()[0] > SOURCE_EXPLOSION_KILL_SIZE_HIGH {
+            return false;
+        }
+
+        self.source_size = next_size;
+        self.frames_remaining = self.frames_remaining.saturating_sub(1);
+        true
+    }
+
+    fn expanded_object_detail(self) -> ExpandedObjectDetailSnapshot {
+        let (width, height) = self.kind.picture_size();
+        ExpandedObjectDetailSnapshot {
+            kind: ExpandedObjectKind::Explosion,
+            size: self.source_size,
+            picture_label: Some(self.kind.picture_label()),
+            picture_size: Some((width, height)),
+            mapped_sprite: Some(self.kind.sprite()),
+            center: Some(ScreenPosition::new(
+                self.position.x.wrapping_add(width / 2),
+                self.position.y.wrapping_add(height / 2),
+            )),
+            top_left: Some(self.position),
+            explosion_frame: source_explosion_frame_index(self.source_size),
+            explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
+            ..ExpandedObjectDetailSnapshot::EMPTY
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerExplosionPieceSnapshot {
+    pub position: ScreenPosition,
+    pub split: bool,
+}
+
+impl PlayerExplosionPieceSnapshot {
+    pub const EMPTY: Self = Self {
+        position: ScreenPosition::new(0, 0),
+        split: false,
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerExplosionCloudSnapshot {
+    pub source_color: u8,
+    pub source_color_counter: u8,
+    pub source_color_index: u8,
+    pub frame: u16,
+    pub piece_count: u8,
+    pub pieces: [PlayerExplosionPieceSnapshot; PLAYER_EXPLOSION_PIECE_LIMIT],
+}
+
+impl PlayerExplosionCloudSnapshot {
+    pub const EMPTY: Self = Self {
+        source_color: 0,
+        source_color_counter: 0,
+        source_color_index: 0,
+        frame: 0,
+        piece_count: 0,
+        pieces: [PlayerExplosionPieceSnapshot::EMPTY; PLAYER_EXPLOSION_PIECE_LIMIT],
+    };
+
+    pub(crate) fn push_piece(&mut self, piece: PlayerExplosionPieceSnapshot) {
+        let index = usize::from(self.piece_count);
+        if index >= PLAYER_EXPLOSION_PIECE_LIMIT {
+            return;
+        }
+        self.pieces[index] = piece;
+        self.piece_count += 1;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PlayerExplosionRuntimePiece {
+    x_position: u16,
+    y_position: u16,
+    x_velocity: u16,
+    y_velocity: u16,
+    visible: bool,
+    split: bool,
+}
+
+impl PlayerExplosionRuntimePiece {
+    const EMPTY: Self = Self {
+        x_position: 0,
+        y_position: 0,
+        x_velocity: 0,
+        y_velocity: 0,
+        visible: false,
+        split: false,
+    };
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PlayerExplosionRuntime {
+    source_color_index: u8,
+    source_color_counter: u8,
+    frame: u16,
+    x_seed: u16,
+    y_seed: u16,
+    pieces: [PlayerExplosionRuntimePiece; PLAYER_EXPLOSION_PIECE_LIMIT],
+}
+
+impl PlayerExplosionRuntime {
+    fn source_spawn(center: ScreenPosition) -> Self {
+        let mut runtime = Self {
+            source_color_index: 0,
+            source_color_counter: SOURCE_PLAYER_EXPLOSION_INITIAL_COLOR_COUNTER,
+            frame: 0,
+            x_seed: SOURCE_PLAYER_EXPLOSION_INITIAL_X_SEED,
+            y_seed: SOURCE_PLAYER_EXPLOSION_INITIAL_Y_SEED,
+            pieces: [PlayerExplosionRuntimePiece::EMPTY; PLAYER_EXPLOSION_PIECE_LIMIT],
+        };
+
+        for index in 0..PLAYER_EXPLOSION_PIECE_LIMIT {
+            runtime.pieces[index] = runtime.source_piece(center);
+        }
+
+        runtime
+    }
+
+    fn source_piece(&mut self, center: ScreenPosition) -> PlayerExplosionRuntimePiece {
+        loop {
+            let x_position = u16::from_be_bytes([center.x, 0]);
+            let y_position = u16::from_be_bytes([center.y, 0]);
+            let x_velocity = self.next_x_velocity();
+            let y_velocity = self.next_y_velocity();
+            let absolute_x_velocity = ones_complement_abs_word(x_velocity);
+            let half_absolute_y_velocity =
+                logical_shift_right_word(ones_complement_abs_word(y_velocity));
+
+            if absolute_x_velocity.wrapping_add(half_absolute_y_velocity)
+                < SOURCE_PLAYER_EXPLOSION_VELOCITY_LIMIT
+            {
+                return PlayerExplosionRuntimePiece {
+                    x_position,
+                    y_position,
+                    x_velocity,
+                    y_velocity,
+                    visible: false,
+                    split: false,
+                };
+            }
+        }
+    }
+
+    fn next_x_velocity(&mut self) -> u16 {
+        let next_seed = player_explosion_random_seed_step(self.x_seed);
+        self.x_seed = next_seed;
+        let velocity_high = (next_seed.to_be_bytes()[0] & 1).wrapping_sub(1);
+        u16::from_be_bytes([velocity_high, next_seed.to_be_bytes()[1]])
+    }
+
+    fn next_y_velocity(&mut self) -> u16 {
+        let next_seed = player_explosion_random_seed_step(self.y_seed);
+        self.y_seed = next_seed;
+        let velocity_high = (next_seed.to_be_bytes()[0] & 3).wrapping_sub(2);
+        u16::from_be_bytes([velocity_high, next_seed.to_be_bytes()[1]])
+    }
+
+    fn source_color(&self) -> u8 {
+        SOURCE_PLAYER_EXPLOSION_COLORS
+            .get(usize::from(self.source_color_index))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    fn advance_source_frame(&mut self) -> bool {
+        if self.source_color() == 0 {
+            return false;
+        }
+
+        for piece in &mut self.pieces {
+            piece.visible = false;
+
+            let next_y = piece.y_velocity.wrapping_add(piece.y_position);
+            if next_y.to_be_bytes()[0] < SOURCE_PLAYER_EXPLOSION_Y_MIN {
+                continue;
+            }
+            piece.y_position = next_y;
+
+            let next_x = piece.x_velocity.wrapping_add(piece.x_position);
+            if next_x.to_be_bytes()[0] > SOURCE_PLAYER_EXPLOSION_X_MAX {
+                continue;
+            }
+            piece.x_position = next_x;
+            piece.visible = true;
+            piece.split = next_x.to_be_bytes()[1] & 0x80 != 0;
+        }
+
+        self.frame = self.frame.saturating_add(1);
+        let color_counter = self.source_color_counter.saturating_sub(1);
+        if color_counter == 0 {
+            self.source_color_index = self.source_color_index.saturating_add(1);
+            self.source_color_counter = SOURCE_PLAYER_EXPLOSION_COLOR_COUNTER_RELOAD;
+        } else {
+            self.source_color_counter = color_counter;
+        }
+
+        true
+    }
+
+    fn snapshot(&self) -> Option<PlayerExplosionCloudSnapshot> {
+        let source_color = self.source_color();
+        if source_color == 0 {
+            return None;
+        }
+
+        let mut snapshot = PlayerExplosionCloudSnapshot {
+            source_color,
+            source_color_counter: self.source_color_counter,
+            source_color_index: self.source_color_index,
+            frame: self.frame,
+            ..PlayerExplosionCloudSnapshot::EMPTY
+        };
+
+        for piece in &self.pieces {
+            if !piece.visible {
+                continue;
+            }
+            snapshot.push_piece(PlayerExplosionPieceSnapshot {
+                position: ScreenPosition::from_packed(u16::from_be_bytes([
+                    piece.x_position.to_be_bytes()[0],
+                    piece.y_position.to_be_bytes()[0],
+                ])),
+                split: piece.split,
+            });
+        }
+
+        Some(snapshot)
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WorldSnapshot {
     pub terrain: Vec<TerrainSegment>,
+    pub terrain_blow: Option<TerrainBlowSnapshot>,
     pub stars: Vec<ScreenPosition>,
     pub enemies: Vec<EnemySnapshot>,
+    pub enemy_reserve: EnemyReserveSnapshot,
     pub humans: Vec<HumanSnapshot>,
     pub projectiles: Vec<ProjectileSnapshot>,
+    pub enemy_projectiles: Vec<EnemyProjectileSnapshot>,
+    pub score_popups: Vec<ScorePopupSnapshot>,
+    pub explosions: Vec<ExplosionSnapshot>,
+    pub source_rng: SourceRandSnapshot,
+    pub object_evidence: ObjectEvidenceSnapshot,
+    pub expanded_objects: ExpandedObjectEvidenceSnapshot,
+    pub player_explosion: Option<PlayerExplosionCloudSnapshot>,
+    pub scanner: ScannerRadarSnapshot,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct FallingHumanAdvance {
+    safe_landings: Vec<ScreenPosition>,
+    fatal_landings: Vec<ScreenPosition>,
 }
 
 impl WorldSnapshot {
@@ -104,8 +1779,16 @@ impl WorldSnapshot {
     }
 
     fn for_wave(wave: u8) -> Self {
-        let enemy_count = usize::from(wave.clamp(1, MAX_CLEAN_WAVE_ENEMIES));
-        Self {
+        let wave_profile = WaveProfileSnapshot::for_wave(wave);
+        let mut enemy_reserve = EnemyReserveSnapshot::from_profile(wave_profile);
+        let mut source_rng = SourceRandSnapshot::default();
+        let enemies = clean_wave_enemy_spawns(
+            &mut enemy_reserve,
+            wave_profile,
+            &mut source_rng,
+            CleanWaveSpawnContext::Initial,
+        );
+        let mut world = Self {
             terrain: vec![
                 TerrainSegment {
                     position: ScreenPosition::new(0, 224),
@@ -133,45 +1816,2488 @@ impl WorldSnapshot {
                 ScreenPosition::new(112, 56),
                 ScreenPosition::new(236, 24),
             ],
-            enemies: CLEAN_WAVE_LANDER_SPAWNS[..enemy_count].to_vec(),
+            enemies,
+            enemy_reserve,
             humans: vec![
-                HumanSnapshot {
-                    position: ScreenPosition::new(72, 216),
-                    carried: false,
-                },
-                HumanSnapshot {
-                    position: ScreenPosition::new(180, 218),
-                    carried: false,
-                },
+                HumanSnapshot::new(ScreenPosition::new(72, 216)),
+                HumanSnapshot::new(ScreenPosition::new(180, 218)),
             ],
             projectiles: Vec::new(),
+            enemy_projectiles: Vec::new(),
+            score_popups: Vec::new(),
+            explosions: Vec::new(),
+            source_rng,
+            terrain_blow: None,
+            object_evidence: ObjectEvidenceSnapshot::default(),
+            expanded_objects: ExpandedObjectEvidenceSnapshot::default(),
+            player_explosion: None,
+            scanner: ScannerRadarSnapshot::default(),
+        };
+        world.refresh_object_evidence();
+        world
+    }
+
+    fn activate_enemy_reserve_batch(
+        &mut self,
+        profile: WaveProfileSnapshot,
+        player_absolute_x: u16,
+        background_absolute_x: u16,
+    ) -> bool {
+        if !self.enemies.is_empty() || self.enemy_reserve.is_empty() {
+            return false;
+        }
+
+        let targetable_humans = !self.humans.is_empty();
+        self.enemies = clean_wave_enemy_spawns(
+            &mut self.enemy_reserve,
+            profile,
+            &mut self.source_rng,
+            CleanWaveSpawnContext::ReserveActivation {
+                player_absolute_x,
+                background_absolute_x,
+                targetable_humans,
+            },
+        );
+        !self.enemies.is_empty()
+    }
+
+    fn spawn_pod_swarmers(
+        &mut self,
+        position: ScreenPosition,
+        profile: WaveProfileSnapshot,
+    ) -> usize {
+        let active_swarmers = self
+            .enemies
+            .iter()
+            .filter(|enemy| enemy.kind == EnemyKind::Swarmer)
+            .count();
+        let spawn_count = SOURCE_POD_SWARMER_REQUEST_LIMIT
+            .min(SOURCE_ACTIVE_SWARMER_LIMIT.saturating_sub(active_swarmers));
+
+        for _ in 0..spawn_count {
+            let source_swarmer = source_mini_swarmer_spawn(&mut self.source_rng, profile, position);
+            self.enemies.push(EnemySnapshot::source_swarmer(
+                position,
+                source_screen_velocity(source_swarmer.x_velocity, source_swarmer.y_velocity),
+                source_swarmer,
+            ));
+        }
+
+        spawn_count
+    }
+
+    fn source_enemy_total(&self) -> usize {
+        self.enemies
+            .len()
+            .saturating_add(usize::from(self.enemy_reserve.total()))
+    }
+
+    fn active_enemy_count(&self, kind: EnemyKind) -> usize {
+        self.enemies
+            .iter()
+            .filter(|enemy| enemy.kind == kind)
+            .count()
+    }
+
+    fn advance_enemies(
+        &mut self,
+        profile: WaveProfileSnapshot,
+        player_position: ScreenPosition,
+        player_velocity: (WorldVector, WorldVector),
+    ) {
+        let source_rng = &mut self.source_rng;
+        let enemy_projectiles = &mut self.enemy_projectiles;
+        let terrain = &self.terrain;
+        let lander_carrying_passenger = self.humans.iter().any(|human| human.carried);
+        for enemy in &mut self.enemies {
+            if enemy.kind == EnemyKind::Lander
+                && let Some(source_lander) = enemy.source_lander.as_mut()
+            {
+                advance_source_lander(
+                    enemy.position,
+                    source_lander,
+                    profile,
+                    terrain,
+                    lander_carrying_passenger,
+                    player_position,
+                    player_velocity,
+                    source_rng,
+                    enemy_projectiles,
+                );
+                let (x, x_fraction) = source_fixed_axis_step(
+                    enemy.position.x,
+                    source_lander.x_fraction,
+                    source_lander.x_velocity,
+                );
+                let (y, y_fraction) = source_fixed_axis_step(
+                    enemy.position.y,
+                    source_lander.y_fraction,
+                    source_lander.y_velocity,
+                );
+                enemy.position = ScreenPosition::new(x, y);
+                source_lander.x_fraction = x_fraction;
+                source_lander.y_fraction = y_fraction;
+                enemy.velocity = source_lander_screen_velocity(*source_lander);
+                continue;
+            }
+            if enemy.kind == EnemyKind::Pod
+                && let Some(source_pod) = enemy.source_pod.as_mut()
+            {
+                let (x, x_fraction) = source_fixed_axis_step(
+                    enemy.position.x,
+                    source_pod.x_fraction,
+                    source_pod.x_velocity,
+                );
+                let (y, y_fraction) = source_fixed_axis_step(
+                    enemy.position.y,
+                    source_pod.y_fraction,
+                    source_pod.y_velocity,
+                );
+                enemy.position = ScreenPosition::new(x, y);
+                source_pod.x_fraction = x_fraction;
+                source_pod.y_fraction = y_fraction;
+                enemy.velocity = source_pod_screen_velocity(*source_pod);
+                continue;
+            }
+            if enemy.kind == EnemyKind::Bomber
+                && let Some(source_bomber) = enemy.source_bomber.as_mut()
+            {
+                advance_source_bomber(
+                    enemy.position,
+                    source_bomber,
+                    player_position,
+                    *source_rng,
+                    enemy_projectiles,
+                );
+                let (x, x_fraction) = source_fixed_axis_step(
+                    enemy.position.x,
+                    source_bomber.x_fraction,
+                    source_bomber.x_velocity,
+                );
+                let (y, y_fraction) = source_fixed_axis_step(
+                    enemy.position.y,
+                    source_bomber.y_fraction,
+                    source_bomber.y_velocity,
+                );
+                enemy.position = ScreenPosition::new(x, y);
+                source_bomber.x_fraction = x_fraction;
+                source_bomber.y_fraction = y_fraction;
+                enemy.velocity = source_bomber_screen_velocity(*source_bomber);
+                continue;
+            }
+            if enemy.kind == EnemyKind::Mutant
+                && let Some(source_mutant) = enemy.source_mutant.as_mut()
+            {
+                advance_source_mutant(
+                    &mut enemy.position,
+                    source_mutant,
+                    profile,
+                    player_position,
+                    player_velocity,
+                    source_rng,
+                    enemy_projectiles,
+                );
+                let (x, x_fraction) = source_fixed_axis_step(
+                    enemy.position.x,
+                    source_mutant.x_fraction,
+                    source_mutant.x_velocity,
+                );
+                let (y, y_fraction) = source_fixed_axis_step(
+                    enemy.position.y,
+                    source_mutant.y_fraction,
+                    source_mutant.y_velocity,
+                );
+                enemy.position = ScreenPosition::new(x, y);
+                source_mutant.x_fraction = x_fraction;
+                source_mutant.y_fraction = y_fraction;
+                enemy.velocity = source_mutant_screen_velocity(*source_mutant);
+                continue;
+            }
+            if enemy.kind == EnemyKind::Swarmer
+                && let Some(source_swarmer) = enemy.source_swarmer.as_mut()
+            {
+                advance_source_mini_swarmer(
+                    enemy.position,
+                    source_swarmer,
+                    profile,
+                    player_position,
+                    source_rng,
+                    enemy_projectiles,
+                );
+                let (x, x_fraction) = source_fixed_axis_step(
+                    enemy.position.x,
+                    source_swarmer.x_fraction,
+                    source_swarmer.x_velocity,
+                );
+                let (y, y_fraction) = source_fixed_axis_step(
+                    enemy.position.y,
+                    source_swarmer.y_fraction,
+                    source_swarmer.y_velocity,
+                );
+                enemy.position = ScreenPosition::new(x, y);
+                source_swarmer.x_fraction = x_fraction;
+                source_swarmer.y_fraction = y_fraction;
+                enemy.velocity =
+                    source_screen_velocity(source_swarmer.x_velocity, source_swarmer.y_velocity);
+                continue;
+            }
+            if enemy.kind == EnemyKind::Baiter
+                && let Some(source_baiter) = enemy.source_baiter.as_mut()
+            {
+                advance_source_baiter(
+                    enemy.position,
+                    source_baiter,
+                    profile,
+                    player_position,
+                    player_velocity,
+                    source_rng,
+                    enemy_projectiles,
+                );
+                let (x, x_fraction) = source_fixed_axis_step(
+                    enemy.position.x,
+                    source_baiter.x_fraction,
+                    source_baiter_screen_x_velocity(source_baiter.x_velocity),
+                );
+                let (y, y_fraction) = source_fixed_axis_step(
+                    enemy.position.y,
+                    source_baiter.y_fraction,
+                    source_baiter.y_velocity,
+                );
+                enemy.position = ScreenPosition::new(x, y);
+                source_baiter.x_fraction = x_fraction;
+                source_baiter.y_fraction = y_fraction;
+                enemy.velocity = source_baiter_screen_velocity(*source_baiter);
+                continue;
+            }
+
+            let motion = EnemyMotionSystem::step(enemy.position, enemy.velocity);
+            enemy.position = motion.position;
+            enemy.velocity = motion.velocity;
+        }
+    }
+
+    fn spawn_baiter(
+        &mut self,
+        profile: WaveProfileSnapshot,
+        player_position: ScreenPosition,
+        player_velocity: (WorldVector, WorldVector),
+    ) -> bool {
+        let active_baiters = self.active_enemy_count(EnemyKind::Baiter);
+        if active_baiters >= SOURCE_ACTIVE_BAITER_LIMIT {
+            return false;
+        }
+        let (position, source_baiter) =
+            source_baiter_spawn(self.source_rng, profile, player_position, player_velocity);
+
+        self.enemies.push(EnemySnapshot::source_baiter(
+            position,
+            source_baiter_screen_velocity(source_baiter),
+            source_baiter,
+        ));
+        true
+    }
+
+    fn resolve_lander_human_abductions(
+        &mut self,
+        profile: WaveProfileSnapshot,
+        player_position: ScreenPosition,
+        player_velocity: (WorldVector, WorldVector),
+    ) {
+        self.sync_carried_humans_to_landers();
+        self.convert_completed_lander_abductions(profile, player_position, player_velocity);
+        if self.humans.is_empty() {
+            self.convert_all_active_landers_to_mutants(profile, player_position, player_velocity);
+            return;
+        }
+
+        let Some((lander_index, human_index)) = self.first_lander_human_capture() else {
+            return;
+        };
+
+        let lander_position = self.enemies[lander_index].position;
+        self.enemies[lander_index].velocity.dy = CLEAN_LANDER_CAPTURE_Y_VELOCITY;
+        self.humans[human_index].carried = true;
+        self.humans[human_index].position = clean_carried_human_position(lander_position);
+        self.humans[human_index].clear_source_fall();
+    }
+
+    fn convert_completed_lander_abductions(
+        &mut self,
+        profile: WaveProfileSnapshot,
+        player_position: ScreenPosition,
+        player_velocity: (WorldVector, WorldVector),
+    ) {
+        while let Some((lander_index, human_index)) = self.completed_lander_abduction() {
+            self.humans.remove(human_index);
+            self.convert_lander_to_source_mutant(
+                lander_index,
+                profile,
+                player_position,
+                player_velocity,
+            );
+        }
+    }
+
+    fn completed_lander_abduction(&self) -> Option<(usize, usize)> {
+        for (lander_index, lander) in self
+            .enemies
+            .iter()
+            .enumerate()
+            .filter(|(_, enemy)| enemy.kind == EnemyKind::Lander)
+        {
+            if lander.position.y > SOURCE_PLAYFIELD_Y_MIN.saturating_add(8) {
+                continue;
+            }
+            let carried_position = clean_carried_human_position(lander.position);
+            if let Some(human_index) = self.humans.iter().position(|human| {
+                human.carried && !human.carried_by_player && human.position == carried_position
+            }) {
+                return Some((lander_index, human_index));
+            }
+        }
+
+        None
+    }
+
+    fn convert_all_active_landers_to_mutants(
+        &mut self,
+        profile: WaveProfileSnapshot,
+        player_position: ScreenPosition,
+        player_velocity: (WorldVector, WorldVector),
+    ) {
+        let lander_indices = self
+            .enemies
+            .iter()
+            .enumerate()
+            .filter_map(|(index, enemy)| (enemy.kind == EnemyKind::Lander).then_some(index))
+            .collect::<Vec<_>>();
+
+        for lander_index in lander_indices {
+            self.convert_lander_to_source_mutant(
+                lander_index,
+                profile,
+                player_position,
+                player_velocity,
+            );
+        }
+    }
+
+    fn convert_lander_to_source_mutant(
+        &mut self,
+        lander_index: usize,
+        profile: WaveProfileSnapshot,
+        player_position: ScreenPosition,
+        player_velocity: (WorldVector, WorldVector),
+    ) {
+        let mut position = self.enemies[lander_index].position;
+        let mut source_mutant = source_mutant_from_lander_conversion(profile);
+        advance_source_mutant(
+            &mut position,
+            &mut source_mutant,
+            profile,
+            player_position,
+            player_velocity,
+            &mut self.source_rng,
+            &mut self.enemy_projectiles,
+        );
+        self.enemies[lander_index] = EnemySnapshot::source_mutant(
+            position,
+            source_mutant_screen_velocity(source_mutant),
+            source_mutant,
+        );
+    }
+
+    fn advance_falling_humans(&mut self) -> FallingHumanAdvance {
+        let terrain = &self.terrain;
+        let mut advance = FallingHumanAdvance::default();
+        self.humans.retain_mut(|human| {
+            if human.carried || human.carried_by_player {
+                human.clear_source_fall();
+                return true;
+            }
+
+            let Some(ground_y) = clean_human_ground_y(terrain, human.position.x) else {
+                return true;
+            };
+            if human.position.y >= ground_y {
+                human.clear_source_fall();
+                return true;
+            }
+
+            human.source_fall_velocity =
+                source_falling_human_y_velocity(human.source_fall_velocity);
+            let y16 = (u16::from(human.position.y) << 8) | u16::from(human.source_fall_y_fraction);
+            let next_y16 = y16.saturating_add(human.source_fall_velocity);
+            let next_y = ((next_y16 >> 8) as u8).min(ground_y);
+            human.position.y = next_y;
+            human.source_fall_y_fraction = if next_y == ground_y {
+                0
+            } else {
+                (next_y16 & 0x00FF) as u8
+            };
+
+            if human.position.y < ground_y {
+                return true;
+            }
+
+            let landing_position = human.position;
+            if human.source_fall_velocity <= SOURCE_FALLING_HUMAN_SAFE_LANDING_MAX_Y_VELOCITY {
+                human.clear_source_fall();
+                advance.safe_landings.push(landing_position);
+                true
+            } else {
+                advance.fatal_landings.push(landing_position);
+                false
+            }
+        });
+        advance
+    }
+
+    fn sync_player_carried_humans(&mut self, player_position: ScreenPosition) {
+        let carried_position = clean_player_carried_human_position(player_position);
+        for human in &mut self.humans {
+            if human.carried_by_player {
+                if let Some(ground_y) = clean_human_ground_y(&self.terrain, carried_position.x)
+                    && carried_position.y >= ground_y
+                {
+                    human.position = ScreenPosition::new(carried_position.x, ground_y);
+                    human.carried_by_player = false;
+                    human.clear_source_fall();
+                } else {
+                    human.position = carried_position;
+                    human.clear_source_fall();
+                }
+            }
+        }
+    }
+
+    fn resolve_player_human_rescue(&mut self, player_position: ScreenPosition) -> bool {
+        let player = CollisionBox::new(player_position, PLAYER_SPRITE_SIZE);
+        let Some(human_index) = self.humans.iter().position(|human| {
+            clean_human_is_falling(&self.terrain, *human)
+                && player.overlaps(CollisionBox::new(human.position, HUMAN_SPRITE_SIZE))
+        }) else {
+            return false;
+        };
+
+        let caught_position = self.humans[human_index].position;
+        self.humans[human_index].carried_by_player = true;
+        self.humans[human_index].position = clean_player_carried_human_position(player_position);
+        self.humans[human_index].clear_source_fall();
+        self.spawn_score_popup(
+            ScorePopupKind::Points500,
+            clean_rescue_score_popup_position(caught_position),
+        );
+        true
+    }
+
+    fn sync_carried_humans_to_landers(&mut self) {
+        let Some(lander_position) = self
+            .enemies
+            .iter()
+            .find(|enemy| enemy.kind == EnemyKind::Lander)
+            .map(|enemy| enemy.position)
+        else {
+            return;
+        };
+        let carried_position = clean_carried_human_position(lander_position);
+        for human in &mut self.humans {
+            if human.carried && !human.carried_by_player {
+                human.position = carried_position;
+                human.clear_source_fall();
+            }
+        }
+    }
+
+    fn first_lander_human_capture(&self) -> Option<(usize, usize)> {
+        for (lander_index, lander) in self
+            .enemies
+            .iter()
+            .enumerate()
+            .filter(|(_, enemy)| enemy.kind == EnemyKind::Lander)
+        {
+            for (human_index, human) in self
+                .humans
+                .iter()
+                .enumerate()
+                .filter(|(_, human)| !human.carried && !human.carried_by_player)
+            {
+                if clean_lander_capture_aligned(lander.position, human.position) {
+                    return Some((lander_index, human_index));
+                }
+            }
+        }
+
+        None
+    }
+
+    fn release_passenger_for_lander(&mut self, lander_position: ScreenPosition) {
+        let carried_position = clean_carried_human_position(lander_position);
+        for human in &mut self.humans {
+            if human.carried && human.position == carried_position {
+                human.carried = false;
+                human.clear_source_fall();
+            }
+        }
+    }
+
+    fn refresh_object_evidence(&mut self) {
+        let active_count = saturating_u16_len(
+            self.enemies
+                .len()
+                .saturating_add(self.humans.len())
+                .saturating_add(self.projectiles.len())
+                .saturating_add(self.enemy_projectiles.len()),
+        );
+        let mut object_evidence = ObjectEvidenceSnapshot {
+            active_count,
+            inactive_count: u16::from(self.enemy_reserve.total()),
+            projectile_count: saturating_u16_len(
+                self.projectiles
+                    .len()
+                    .saturating_add(self.enemy_projectiles.len()),
+            ),
+            visible_count: active_count,
+            evidence_crc32: None,
+            detail_count: 0,
+            details: [ObjectEvidenceDetailSnapshot::EMPTY; OBJECT_EVIDENCE_DETAIL_LIMIT],
+        };
+        for enemy in &self.enemies {
+            object_evidence.push_clean_enemy_detail(*enemy);
+        }
+        for human in &self.humans {
+            object_evidence.push_clean_human_detail(*human);
+        }
+        for projectile in &self.projectiles {
+            object_evidence.push_clean_player_projectile_detail(*projectile);
+        }
+        for projectile in &self.enemy_projectiles {
+            object_evidence.push_clean_enemy_projectile_detail(*projectile);
+        }
+        self.object_evidence = object_evidence;
+    }
+
+    pub fn spawn_score_popup(&mut self, kind: ScorePopupKind, position: ScreenPosition) {
+        if self.score_popups.len() >= EXPANDED_OBJECT_DETAIL_LIMIT {
+            return;
+        }
+        self.score_popups
+            .push(ScorePopupSnapshot::source_spawn(kind, position));
+    }
+
+    pub fn spawn_explosion(&mut self, kind: ExplosionKind, position: ScreenPosition) {
+        if self
+            .score_popups
+            .len()
+            .saturating_add(self.explosions.len())
+            >= EXPANDED_OBJECT_DETAIL_LIMIT
+        {
+            return;
+        }
+        self.explosions
+            .push(ExplosionSnapshot::source_spawn(kind, position));
+    }
+
+    pub fn start_terrain_blow(&mut self) {
+        if self.terrain_blow.is_some() {
+            return;
+        }
+
+        self.terrain.clear();
+        self.terrain_blow = Some(TerrainBlowSnapshot::source_started());
+        for position in [
+            ScreenPosition::new(0x44, 0x70),
+            ScreenPosition::new(0x10, 0x50),
+        ] {
+            self.spawn_explosion(ExplosionKind::Terrain, position);
+        }
+    }
+
+    fn advance_score_popups(&mut self) {
+        for popup in &mut self.score_popups {
+            popup.frames_remaining = popup.frames_remaining.saturating_sub(1);
+        }
+        self.score_popups.retain(|popup| popup.frames_remaining > 0);
+    }
+
+    fn advance_explosions(&mut self) {
+        self.explosions
+            .retain_mut(|explosion| explosion.advance_source_frame());
+    }
+
+    fn sync_clean_lifecycle_evidence(&mut self) {
+        let previous_clean_lifecycle_details = self
+            .expanded_objects
+            .details
+            .iter()
+            .take(usize::from(self.expanded_objects.detail_count))
+            .filter(|detail| expanded_object_detail_is_clean_lifecycle(detail))
+            .count();
+        let mut evidence = ExpandedObjectEvidenceSnapshot {
+            active_count: self
+                .expanded_objects
+                .active_count
+                .saturating_sub(saturating_u16_len(previous_clean_lifecycle_details))
+                .saturating_add(saturating_u16_len(
+                    self.score_popups
+                        .len()
+                        .saturating_add(self.explosions.len()),
+                )),
+            last_slot_address: self.expanded_objects.last_slot_address,
+            detail_count: 0,
+            details: [ExpandedObjectDetailSnapshot::EMPTY; EXPANDED_OBJECT_DETAIL_LIMIT],
+        };
+
+        for detail in self
+            .expanded_objects
+            .details
+            .iter()
+            .take(usize::from(self.expanded_objects.detail_count))
+            .copied()
+        {
+            if expanded_object_detail_is_clean_lifecycle(&detail) {
+                continue;
+            }
+            push_expanded_object_detail(&mut evidence, detail);
+        }
+
+        for popup in self.score_popups.iter().copied() {
+            push_expanded_object_detail(&mut evidence, popup.expanded_object_detail());
+        }
+        for explosion in self.explosions.iter().copied() {
+            push_expanded_object_detail(&mut evidence, explosion.expanded_object_detail());
+        }
+
+        self.expanded_objects = evidence;
+    }
+
+    fn sync_scanner_radar(
+        &mut self,
+        phase: GamePhase,
+        frame: u64,
+        scan_anchor: WorldVector,
+        player_position: (WorldVector, WorldVector),
+    ) {
+        self.scanner = ScannerRadarSnapshot::for_world(
+            phase,
+            frame,
+            scan_anchor,
+            player_position,
+            &self.object_evidence,
+        );
+        if self
+            .terrain_blow
+            .is_some_and(TerrainBlowSnapshot::terrain_erased)
+        {
+            self.scanner.terrain_enabled = false;
         }
     }
 }
 
-const MAX_CLEAN_WAVE_ENEMIES: u8 = 4;
-const CLEAN_WAVE_LANDER_SPAWNS: [EnemySnapshot; MAX_CLEAN_WAVE_ENEMIES as usize] = [
-    EnemySnapshot {
-        kind: EnemyKind::Lander,
-        position: ScreenPosition::new(204, 84),
-        velocity: ScreenVelocity::new(-1, 0),
-    },
-    EnemySnapshot {
-        kind: EnemyKind::Lander,
-        position: ScreenPosition::new(228, 104),
-        velocity: ScreenVelocity::new(-1, 0),
-    },
-    EnemySnapshot {
-        kind: EnemyKind::Lander,
-        position: ScreenPosition::new(184, 72),
-        velocity: ScreenVelocity::new(1, 0),
-    },
-    EnemySnapshot {
-        kind: EnemyKind::Lander,
-        position: ScreenPosition::new(148, 96),
-        velocity: ScreenVelocity::new(1, 0),
-    },
+fn push_expanded_object_detail(
+    evidence: &mut ExpandedObjectEvidenceSnapshot,
+    detail: ExpandedObjectDetailSnapshot,
+) {
+    let index = usize::from(evidence.detail_count);
+    if index >= EXPANDED_OBJECT_DETAIL_LIMIT {
+        return;
+    }
+    evidence.details[index] = detail;
+    evidence.detail_count += 1;
+}
+
+fn expanded_object_detail_is_clean_lifecycle(detail: &ExpandedObjectDetailSnapshot) -> bool {
+    detail.score_popup_lifetime_ticks.is_some() || detail.explosion_lifetime_frames.is_some()
+}
+
+impl ObjectEvidenceSnapshot {
+    fn push_clean_enemy_detail(&mut self, enemy: EnemySnapshot) {
+        let index = usize::from(self.detail_count);
+        if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
+            return;
+        }
+        let descriptor = enemy.source_picture_descriptor();
+        let identity = source_object_table_identity(index);
+        let object_category = enemy.kind.object_category();
+        self.details[index] = ObjectEvidenceDetailSnapshot {
+            list: ObjectEvidenceList::Active,
+            object_category: Some(object_category),
+            address: Some(identity.address),
+            slot: Some(identity.slot),
+            screen_position: Some(enemy.position),
+            world_position: Some(enemy.source_world_position()),
+            velocity: Some(enemy.source_velocity_words()),
+            picture_address: Some(descriptor.address),
+            picture_label: Some(descriptor.label),
+            picture_size: Some(descriptor.size),
+            primary_image_address: Some(descriptor.primary_image_address),
+            alternate_image_address: descriptor.alternate_image_address,
+            mapped_sprite: Some(descriptor.mapped_sprite),
+            object_type: Some(identity.object_type),
+            scanner_color: scanner_color_for_object_category(object_category),
+        };
+        self.detail_count += 1;
+    }
+
+    fn push_clean_player_projectile_detail(&mut self, projectile: ProjectileSnapshot) {
+        let index = usize::from(self.detail_count);
+        if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
+            return;
+        }
+        let descriptor = SOURCE_PLAYER_PROJECTILE_PICTURE_DESCRIPTOR;
+        let identity = source_object_table_identity(index);
+        self.details[index] = ObjectEvidenceDetailSnapshot {
+            list: ObjectEvidenceList::Projectile,
+            object_category: Some(ObjectEvidenceCategory::PlayerProjectile),
+            address: Some(identity.address),
+            slot: Some(identity.slot),
+            screen_position: Some(projectile.position),
+            world_position: Some(projectile.source_world_position()),
+            velocity: Some(projectile.source_velocity_words()),
+            picture_address: Some(descriptor.address),
+            picture_label: Some(descriptor.label),
+            picture_size: Some(descriptor.size),
+            primary_image_address: Some(descriptor.primary_image_address),
+            alternate_image_address: descriptor.alternate_image_address,
+            mapped_sprite: Some(descriptor.mapped_sprite),
+            object_type: Some(identity.object_type),
+            scanner_color: None,
+        };
+        self.detail_count += 1;
+    }
+
+    fn push_clean_human_detail(&mut self, human: HumanSnapshot) {
+        let index = usize::from(self.detail_count);
+        if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
+            return;
+        }
+        let descriptor = SOURCE_HUMAN_PICTURE_DESCRIPTOR;
+        let identity = source_object_table_identity(index);
+        self.details[index] = ObjectEvidenceDetailSnapshot {
+            list: ObjectEvidenceList::Active,
+            object_category: Some(ObjectEvidenceCategory::Human),
+            address: Some(identity.address),
+            slot: Some(identity.slot),
+            screen_position: Some(human.position),
+            world_position: Some(human.source_world_position()),
+            velocity: Some(human.source_velocity_words()),
+            picture_address: Some(descriptor.address),
+            picture_label: Some(descriptor.label),
+            picture_size: Some(descriptor.size),
+            primary_image_address: Some(descriptor.primary_image_address),
+            alternate_image_address: descriptor.alternate_image_address,
+            mapped_sprite: Some(descriptor.mapped_sprite),
+            object_type: Some(identity.object_type),
+            scanner_color: scanner_color_for_object_category(ObjectEvidenceCategory::Human),
+        };
+        self.detail_count += 1;
+    }
+
+    fn push_clean_enemy_projectile_detail(&mut self, projectile: EnemyProjectileSnapshot) {
+        let index = usize::from(self.detail_count);
+        if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
+            return;
+        }
+        let identity = source_object_table_identity(index);
+        self.details[index] = ObjectEvidenceDetailSnapshot {
+            list: ObjectEvidenceList::Projectile,
+            object_category: Some(ObjectEvidenceCategory::EnemyBomb),
+            address: Some(identity.address),
+            slot: Some(identity.slot),
+            screen_position: Some(projectile.position),
+            world_position: Some(projectile.source_world_position()),
+            velocity: Some(projectile.source_velocity_words()),
+            picture_address: Some(SOURCE_BOMB_SHELL_PICTURE_ADDRESS),
+            picture_label: Some(projectile.source_bomb_picture_label()),
+            picture_size: Some(SOURCE_BOMB_SHELL_PICTURE_SIZE),
+            primary_image_address: Some(SOURCE_BOMB_SHELL_PRIMARY_IMAGE_ADDRESS),
+            alternate_image_address: Some(SOURCE_BOMB_SHELL_ALTERNATE_IMAGE_ADDRESS),
+            mapped_sprite: Some(SpriteId::ENEMY_BOMB),
+            object_type: Some(identity.object_type),
+            scanner_color: None,
+        };
+        self.detail_count += 1;
+    }
+}
+
+fn scanner_radar_stage_for_frame(frame: u64) -> ScannerRadarStage {
+    match frame % 8 {
+        0 | 1 => ScannerRadarStage::InactiveObjectScan,
+        2 | 3 => ScannerRadarStage::ActiveAndShellScan,
+        _ => ScannerRadarStage::RasterDisplay,
+    }
+}
+
+fn scanner_radar_blip_kind(list: ObjectEvidenceList) -> Option<ScannerRadarBlipKind> {
+    match list {
+        ObjectEvidenceList::Active => Some(ScannerRadarBlipKind::ActiveObject),
+        ObjectEvidenceList::Inactive => Some(ScannerRadarBlipKind::InactiveObject),
+        ObjectEvidenceList::Projectile => None,
+    }
+}
+
+fn scanner_radar_object_world_position(
+    detail: &ObjectEvidenceDetailSnapshot,
+) -> Option<(u16, u16)> {
+    if let Some(position) = detail.world_position {
+        return Some(position);
+    }
+    detail
+        .screen_position
+        .map(|position| (u16::from(position.x) << 8, u16::from(position.y) << 8))
+}
+
+fn scanner_radar_object_screen_address(world_x: u16, world_y: u16, scan_left: u16) -> u16 {
+    let x_delta = world_x.wrapping_sub(scan_left);
+    let x_byte = x_delta.to_be_bytes()[0] >> 2;
+    let y_byte = world_y.to_be_bytes()[0] >> 3;
+    u16::from_be_bytes([x_byte, y_byte]).wrapping_add(SOURCE_SCANNER_OBJECT_BASE_SCREEN - 1)
+}
+
+fn scanner_radar_player_screen_address(player_position: (WorldVector, WorldVector)) -> u16 {
+    let x_word = source_word_from_world_vector(player_position.0);
+    let y_word = source_word_from_world_vector(player_position.1);
+    let x_byte = x_word.to_be_bytes()[0] >> 4;
+    let y_byte = y_word.to_be_bytes()[0] >> 3;
+    u16::from_be_bytes([x_byte, y_byte]).wrapping_add(SOURCE_SCANNER_PLAYER_BASE_SCREEN)
+}
+
+fn source_word_from_world_vector(vector: WorldVector) -> u16 {
+    (vector.subpixels() >> 8) as u16
+}
+
+fn source_world_position(position: ScreenPosition, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
+    (
+        u16::from_be_bytes([position.x, x_fraction]),
+        u16::from_be_bytes([position.y, y_fraction]),
+    )
+}
+
+fn source_fixed_velocity_words(velocity: ScreenVelocity) -> (u16, u16) {
+    (
+        source_fixed_velocity_word(velocity.dx),
+        source_fixed_velocity_word(velocity.dy),
+    )
+}
+
+fn source_fixed_velocity_word(velocity: i8) -> u16 {
+    ((i16::from(velocity)) << 8) as u16
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceObjectTableIdentity {
+    address: u16,
+    slot: u16,
+    object_type: u8,
+}
+
+fn source_object_table_identity(detail_index: usize) -> SourceObjectTableIdentity {
+    let slot = u16::try_from(detail_index)
+        .expect("clean object evidence detail index should fit source object slot");
+    SourceObjectTableIdentity {
+        address: SOURCE_OBJECT_TABLE_BASE
+            .wrapping_add(SOURCE_OBJECT_TABLE_STRIDE.wrapping_mul(slot)),
+        slot,
+        object_type: SOURCE_OBJECT_DEFAULT_TYPE,
+    }
+}
+
+fn scanner_color_for_object_category(category: ObjectEvidenceCategory) -> Option<u16> {
+    match category {
+        ObjectEvidenceCategory::Lander
+        | ObjectEvidenceCategory::Mutant
+        | ObjectEvidenceCategory::Bomber
+        | ObjectEvidenceCategory::Pod
+        | ObjectEvidenceCategory::Swarmer
+        | ObjectEvidenceCategory::Baiter => Some(SOURCE_SCANNER_LANDER_COLOR_WORD),
+        ObjectEvidenceCategory::Human => Some(SOURCE_SCANNER_HUMAN_COLOR_WORD),
+        ObjectEvidenceCategory::PlayerProjectile | ObjectEvidenceCategory::EnemyBomb => None,
+    }
+}
+
+fn saturating_u16_len(value: usize) -> u16 {
+    u16::try_from(value).unwrap_or(u16::MAX)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceObjectPictureDescriptor {
+    label: &'static str,
+    address: u16,
+    size: (u8, u8),
+    primary_image_address: u16,
+    alternate_image_address: Option<u16>,
+    mapped_sprite: SpriteId,
+}
+
+const SOURCE_PLAYER_PROJECTILE_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
+    SourceObjectPictureDescriptor {
+        label: "LASP1",
+        address: 0xF96F,
+        size: (8, 1),
+        primary_image_address: 0xF973,
+        alternate_image_address: None,
+        mapped_sprite: SpriteId::PLAYER_PROJECTILE,
+    };
+const SOURCE_HUMAN_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
+    SourceObjectPictureDescriptor {
+        label: "ASTP1",
+        address: 0xF901,
+        size: (2, 8),
+        primary_image_address: 0xFACB,
+        alternate_image_address: Some(0xFADB),
+        mapped_sprite: SpriteId::HUMAN,
+    };
+const SOURCE_MUTANT_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
+    SourceObjectPictureDescriptor {
+        label: "SCZP1",
+        address: 0xF8CE,
+        size: (5, 8),
+        primary_image_address: 0xF9FB,
+        alternate_image_address: Some(0xFA23),
+        mapped_sprite: SpriteId::ENEMY_MUTANT,
+    };
+const SOURCE_POD_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
+    SourceObjectPictureDescriptor {
+        label: "PRBP1",
+        address: 0xF8F7,
+        size: (4, 8),
+        primary_image_address: 0xFA8B,
+        alternate_image_address: Some(0xFAAB),
+        mapped_sprite: SpriteId::ENEMY_POD,
+    };
+const SOURCE_SWARMER_PICTURE_DESCRIPTOR: SourceObjectPictureDescriptor =
+    SourceObjectPictureDescriptor {
+        label: "SWPIC1",
+        address: 0xF97B,
+        size: (3, 4),
+        primary_image_address: 0xCCC8,
+        alternate_image_address: Some(0xCCD4),
+        mapped_sprite: SpriteId::ENEMY_SWARMER,
+    };
+
+fn source_lander_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor {
+    match frame % SOURCE_LANDER_PICTURE_FRAME_COUNT {
+        1 => SourceObjectPictureDescriptor {
+            label: "LNDP2",
+            address: 0xF98F,
+            size: (5, 8),
+            primary_image_address: 0xCD30,
+            alternate_image_address: Some(0xCD58),
+            mapped_sprite: SpriteId::ENEMY_LANDER,
+        },
+        2 => SourceObjectPictureDescriptor {
+            label: "LNDP3",
+            address: 0xF999,
+            size: (5, 8),
+            primary_image_address: 0xCD80,
+            alternate_image_address: Some(0xCDA8),
+            mapped_sprite: SpriteId::ENEMY_LANDER,
+        },
+        _ => SourceObjectPictureDescriptor {
+            label: "LNDP1",
+            address: 0xF985,
+            size: (5, 8),
+            primary_image_address: 0xCCE0,
+            alternate_image_address: Some(0xCD08),
+            mapped_sprite: SpriteId::ENEMY_LANDER,
+        },
+    }
+}
+
+fn source_bomber_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor {
+    match frame % SOURCE_BOMBER_PICTURE_FRAME_COUNT {
+        1 => SourceObjectPictureDescriptor {
+            label: "TIEP2",
+            address: 0xF933,
+            size: (4, 8),
+            primary_image_address: 0xFB8B,
+            alternate_image_address: Some(0xFBAB),
+            mapped_sprite: SpriteId::ENEMY_BOMBER,
+        },
+        2 => SourceObjectPictureDescriptor {
+            label: "TIEP3",
+            address: 0xF93D,
+            size: (4, 8),
+            primary_image_address: 0xFBCB,
+            alternate_image_address: Some(0xFBEB),
+            mapped_sprite: SpriteId::ENEMY_BOMBER,
+        },
+        3 => SourceObjectPictureDescriptor {
+            label: "TIEP4",
+            address: 0xF947,
+            size: (4, 8),
+            primary_image_address: 0xFC0B,
+            alternate_image_address: Some(0xFC2B),
+            mapped_sprite: SpriteId::ENEMY_BOMBER,
+        },
+        _ => SourceObjectPictureDescriptor {
+            label: "TIEP1",
+            address: 0xF929,
+            size: (4, 8),
+            primary_image_address: 0xFB4B,
+            alternate_image_address: Some(0xFB6B),
+            mapped_sprite: SpriteId::ENEMY_BOMBER,
+        },
+    }
+}
+
+fn source_baiter_picture_descriptor(frame: u8) -> SourceObjectPictureDescriptor {
+    match frame % SOURCE_BAITER_PICTURE_FRAME_COUNT {
+        1 => SourceObjectPictureDescriptor {
+            label: "UFOP2",
+            address: 0xF9AD,
+            size: (6, 4),
+            primary_image_address: 0xCE00,
+            alternate_image_address: Some(0xCE18),
+            mapped_sprite: SpriteId::ENEMY_BAITER,
+        },
+        2 => SourceObjectPictureDescriptor {
+            label: "UFOP3",
+            address: 0xF9B7,
+            size: (6, 4),
+            primary_image_address: 0xCE30,
+            alternate_image_address: Some(0xCE48),
+            mapped_sprite: SpriteId::ENEMY_BAITER,
+        },
+        _ => SourceObjectPictureDescriptor {
+            label: "UFOP1",
+            address: 0xF9A3,
+            size: (6, 4),
+            primary_image_address: 0xCDD0,
+            alternate_image_address: Some(0xCDE8),
+            mapped_sprite: SpriteId::ENEMY_BAITER,
+        },
+    }
+}
+
+const CLEAN_WAVE_SPAWN_POSITIONS: [ScreenPosition; SOURCE_MAX_ACTIVE_WAVE_ENEMIES] = [
+    ScreenPosition::new(204, 84),
+    ScreenPosition::new(228, 104),
+    ScreenPosition::new(184, 72),
+    ScreenPosition::new(148, 96),
+    ScreenPosition::new(236, 66),
 ];
+
+const SOURCE_MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
+const SOURCE_OBJECT_TABLE_BASE: u16 = 0xA23C;
+const SOURCE_OBJECT_TABLE_STRIDE: u16 = 0x17;
+const SOURCE_OBJECT_DEFAULT_TYPE: u8 = 0x00;
+const SOURCE_POD_SWARMER_REQUEST_LIMIT: usize = 6;
+const SOURCE_INITIAL_POD_X_SPEED: u8 = 0x20;
+const SOURCE_ACTIVE_SWARMER_LIMIT: usize = 20;
+const SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS: u8 = 3;
+const SOURCE_MINI_SWARMER_MAX_Y_VELOCITY: u16 = 0x0200;
+const SOURCE_MINI_SWARMER_MIN_Y_VELOCITY: u16 = 0xFE00;
+const SOURCE_MINI_SWARMER_TURN_WINDOW: u16 = 300 * 32;
+const SOURCE_MINI_SWARMER_TURN_WINDOW_HALF: u16 = 150 * 32;
+const SOURCE_MINI_SWARMER_RESTORE_X_LOW: u8 = 0x07;
+const SOURCE_BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
+const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
+const SOURCE_BOMBER_CRUISE_ALTITUDE: u8 = 0x50;
+const SOURCE_BOMBER_MIN_CRUISE_ALTITUDE: u8 = 0x40;
+const SOURCE_BOMBER_MAX_CRUISE_ALTITUDE: u8 = 0x68;
+const SOURCE_BOMBER_CRUISE_WINDOW: u8 = 0x20;
+const SOURCE_BOMBER_CRUISE_WINDOW_HALF: u8 = 0x10;
+const SOURCE_BOMBER_BOMB_SHELL_LIMIT: usize = 10;
+const SOURCE_BOMB_SHELL_PICTURE_LABEL: &str = "BMBP1";
+const SOURCE_BOMB_SHELL_PICTURE_ADDRESS: u16 = 0xF95B;
+const SOURCE_BOMB_SHELL_PRIMARY_IMAGE_ADDRESS: u16 = 0xCCB0;
+const SOURCE_BOMB_SHELL_ALTERNATE_IMAGE_ADDRESS: u16 = 0xCCB6;
+const SOURCE_BOMB_SHELL_PICTURE_SIZE: (u8, u8) = (2, 3);
+const SOURCE_GAME_EXEC_SLEEP_FRAMES: u8 = 15;
+const SOURCE_ACTIVE_BAITER_LIMIT: usize = 12;
+const SOURCE_BAITER_INITIAL_SHOT_TIMER: u8 = 8;
+const SOURCE_BAITER_LOOP_SLEEP_TICKS: u8 = 6;
+const SOURCE_BAITER_X_SEEK_SPEED: u8 = 0x40;
+const SOURCE_BAITER_Y_SEEK_BYTE: u8 = 0x01;
+const SOURCE_BAITER_X_SEEK_WINDOW: u16 = 40 * 32;
+const SOURCE_BAITER_X_SEEK_WINDOW_HALF: u16 = 20 * 32;
+const SOURCE_BAITER_Y_SEEK_WINDOW: u8 = 20;
+const SOURCE_BAITER_Y_SEEK_WINDOW_HALF: u8 = 10;
+const SOURCE_BAITER_PICTURE_FRAME_COUNT: u8 = 3;
+const SOURCE_LANDER_ORBIT_SLEEP_TICKS: u8 = 6;
+const SOURCE_LANDER_FLEE_SLEEP_TICKS: u8 = 4;
+const SOURCE_LANDER_PICTURE_FRAME_COUNT: u8 = 3;
+const SOURCE_LANDER_TERRAIN_ALTITUDE_OFFSET: u8 = 50;
+const SOURCE_LANDER_ORBIT_Y_WINDOW: i8 = -20;
+const SOURCE_PLAYFIELD_Y_MIN: u8 = 42;
+const SOURCE_PLAYFIELD_Y_MAX: u8 = 240;
+const SOURCE_MUTANT_X_DISTANCE_OFFSET: u16 = 380;
+const SOURCE_MUTANT_CLOSE_X_WINDOW: u16 = 0x0700;
+const SOURCE_MUTANT_VERTICAL_WINDOW: u8 = 8;
+const SOURCE_MUTANT_LOOP_SLEEP_TICKS: u8 = 3;
+const SOURCE_MUTANT_RESTORE_AVOID_HALF_WIDTH: u16 = 300 * 32;
+const SOURCE_MUTANT_RESTORE_AVOID_WIDTH: u16 = 600 * 32;
+const SOURCE_SHELL_LIMIT: usize = 20;
+const SOURCE_SHELL_LIFETIME_TICKS: u8 = 20;
+const SOURCE_SHELL_X_MAX: u8 = 0x98;
+const SOURCE_ENEMY_PROJECTILE_SCORE_POINTS: u32 = 25;
+const CLEAN_LANDER_PASSENGER_OFFSET_X: u8 = 2;
+const CLEAN_LANDER_PASSENGER_OFFSET_Y: u8 = 12;
+const CLEAN_LANDER_CAPTURE_X_TOLERANCE: i16 = 4;
+const CLEAN_LANDER_CAPTURE_Y_TOLERANCE: i16 = 4;
+const CLEAN_LANDER_CAPTURE_Y_VELOCITY: i8 = -1;
+const CLEAN_PLAYER_CARRIED_HUMAN_OFFSET_X: u8 = 0;
+const CLEAN_PLAYER_CARRIED_HUMAN_OFFSET_Y: u8 = 10;
+const HUMAN_SPRITE_SIZE: (u8, u8) = (6, 8);
+const SOURCE_FALLING_HUMAN_Y_ACCELERATION: u16 = 0x0008;
+const SOURCE_FALLING_HUMAN_MAX_Y_VELOCITY: u16 = 0x0300;
+const SOURCE_FALLING_HUMAN_SAFE_LANDING_MAX_Y_VELOCITY: u16 = 0x00E0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CleanWaveSpawnContext {
+    Initial,
+    ReserveActivation {
+        player_absolute_x: u16,
+        background_absolute_x: u16,
+        targetable_humans: bool,
+    },
+}
+
+fn clean_wave_enemy_spawns(
+    reserve: &mut EnemyReserveSnapshot,
+    profile: WaveProfileSnapshot,
+    source_rng: &mut SourceRandSnapshot,
+    context: CleanWaveSpawnContext,
+) -> Vec<EnemySnapshot> {
+    let mut enemies = Vec::new();
+    let kinds = clean_wave_active_enemy_kinds(reserve, profile);
+    let mut index = 0;
+    while index < kinds.len() {
+        let kind = kinds[index];
+        if let CleanWaveSpawnContext::ReserveActivation {
+            player_absolute_x,
+            background_absolute_x,
+            targetable_humans,
+        } = context
+        {
+            if kind == EnemyKind::Lander && !targetable_humans {
+                let lander_count = kinds[index..]
+                    .iter()
+                    .take_while(|&&kind| kind == EnemyKind::Lander)
+                    .count();
+                enemies.extend(source_mutant_restore_spawns(
+                    source_rng,
+                    profile,
+                    background_absolute_x,
+                    lander_count,
+                ));
+                index += lander_count;
+                continue;
+            }
+
+            if kind == EnemyKind::Bomber {
+                let bomber_count = kinds[index..]
+                    .iter()
+                    .take_while(|&&kind| kind == EnemyKind::Bomber)
+                    .count();
+                enemies.extend(source_bomber_restore_spawns(
+                    profile,
+                    player_absolute_x,
+                    bomber_count,
+                ));
+                index += bomber_count;
+                continue;
+            }
+
+            if kind == EnemyKind::Swarmer {
+                let swarmer_count = kinds[index..]
+                    .iter()
+                    .take_while(|&&kind| kind == EnemyKind::Swarmer)
+                    .count();
+                enemies.extend(source_mini_swarmer_reserve_spawns(
+                    source_rng,
+                    profile,
+                    swarmer_count,
+                ));
+                index += swarmer_count;
+                continue;
+            }
+        }
+
+        let position = CLEAN_WAVE_SPAWN_POSITIONS[index];
+        enemies.push(match kind {
+            EnemyKind::Lander
+                if matches!(context, CleanWaveSpawnContext::ReserveActivation { .. }) =>
+            {
+                source_lander_restore_spawn(source_rng, profile)
+            }
+            EnemyKind::Lander => source_lander_initial_spawn(profile, position, index),
+            EnemyKind::Bomber => {
+                let source_bomber = source_bomber_spawn(profile, index);
+                EnemySnapshot::source_bomber(
+                    position,
+                    source_bomber_screen_velocity(source_bomber),
+                    source_bomber,
+                )
+            }
+            EnemyKind::Mutant => {
+                let background_absolute_x = match context {
+                    CleanWaveSpawnContext::Initial => 0,
+                    CleanWaveSpawnContext::ReserveActivation {
+                        background_absolute_x,
+                        ..
+                    } => background_absolute_x,
+                };
+                let (position, source_mutant) =
+                    source_mutant_restore_spawn(source_rng, profile, background_absolute_x);
+                EnemySnapshot::source_mutant(
+                    position,
+                    source_mutant_screen_velocity(source_mutant),
+                    source_mutant,
+                )
+            }
+            EnemyKind::Pod
+                if matches!(context, CleanWaveSpawnContext::ReserveActivation { .. }) =>
+            {
+                source_pod_restore_spawn(source_rng)
+            }
+            EnemyKind::Pod => source_pod_initial_spawn(position, index),
+            _ => EnemySnapshot::new(
+                kind,
+                position,
+                clean_enemy_initial_velocity(kind, profile, index),
+            ),
+        });
+        index += 1;
+    }
+
+    enemies
+}
+
+fn clean_wave_active_enemy_kinds(
+    reserve: &mut EnemyReserveSnapshot,
+    profile: WaveProfileSnapshot,
+) -> Vec<EnemyKind> {
+    let target = usize::from(profile.wave_size)
+        .min(SOURCE_MAX_ACTIVE_WAVE_ENEMIES)
+        .min(usize::from(reserve.total()));
+    let mut kinds = Vec::with_capacity(target);
+
+    push_clean_wave_kind(&mut kinds, reserve, target, EnemyKind::Lander);
+    for kind in [
+        EnemyKind::Bomber,
+        EnemyKind::Pod,
+        EnemyKind::Mutant,
+        EnemyKind::Swarmer,
+    ] {
+        push_clean_wave_kind(&mut kinds, reserve, target, kind);
+    }
+
+    for kind in [
+        EnemyKind::Lander,
+        EnemyKind::Bomber,
+        EnemyKind::Pod,
+        EnemyKind::Mutant,
+        EnemyKind::Swarmer,
+    ] {
+        while kinds.len() < target && reserve.take(kind) {
+            kinds.push(kind);
+        }
+    }
+
+    kinds
+}
+
+fn push_clean_wave_kind(
+    kinds: &mut Vec<EnemyKind>,
+    reserve: &mut EnemyReserveSnapshot,
+    target: usize,
+    kind: EnemyKind,
+) {
+    if kinds.len() < target && reserve.take(kind) {
+        kinds.push(kind);
+    }
+}
+
+fn clean_enemy_initial_velocity(
+    kind: EnemyKind,
+    profile: WaveProfileSnapshot,
+    spawn_index: usize,
+) -> ScreenVelocity {
+    let direction = if spawn_index < 2 { -1 } else { 1 };
+    match kind {
+        EnemyKind::Lander => ScreenVelocity::new(
+            direction * source_velocity_pixels(profile.lander_x_velocity),
+            source_vertical_velocity(profile.lander_y_velocity_msb, profile.lander_y_velocity_lsb),
+        ),
+        EnemyKind::Mutant => ScreenVelocity::new(
+            direction * source_velocity_pixels(profile.mutant_x_velocity),
+            source_vertical_velocity(profile.mutant_y_velocity_msb, profile.mutant_y_velocity_lsb),
+        ),
+        EnemyKind::Bomber => ScreenVelocity::new(
+            direction * source_velocity_pixels(profile.bomber_x_velocity),
+            0,
+        ),
+        EnemyKind::Pod => ScreenVelocity::new(direction, 0),
+        EnemyKind::Swarmer => ScreenVelocity::new(
+            direction * source_velocity_pixels(profile.swarmer_x_velocity),
+            0,
+        ),
+        EnemyKind::Baiter => ScreenVelocity::new(direction, 0),
+    }
+}
+
+fn source_velocity_pixels(source_velocity: u8) -> i8 {
+    let pixels = (source_velocity / 32).max(1);
+    i8::try_from(pixels).expect("source wave velocity should fit clean screen velocity")
+}
+
+fn adc8(lhs: u8, rhs: u8, carry: bool) -> (u8, bool) {
+    let sum = u16::from(lhs) + u16::from(rhs) + u16::from(u8::from(carry));
+    ((sum & 0xFF) as u8, sum > 0xFF)
+}
+
+fn source_rmax(max: u8, mut seed: u8) -> u8 {
+    while seed > max {
+        seed >>= 1;
+    }
+    seed.wrapping_add(1)
+}
+
+fn source_advance_rmax(source_rng: &mut SourceRandSnapshot, max: u8) -> u8 {
+    let state = source_rng.advance();
+    source_rmax(max, state.seed)
+}
+
+fn source_sign_extend_u8_to_u16(value: u8) -> u16 {
+    let sign = if value & 0x80 == 0 { 0x00 } else { 0xFF };
+    u16::from_be_bytes([sign, value])
+}
+
+fn source_screen_velocity(x_velocity: u16, y_velocity: u16) -> ScreenVelocity {
+    ScreenVelocity::new(
+        source_screen_velocity_component(x_velocity),
+        source_screen_velocity_component(y_velocity),
+    )
+}
+
+fn source_screen_velocity_component(velocity: u16) -> i8 {
+    let signed = velocity as i16;
+    if signed == 0 {
+        return 0;
+    }
+
+    let pixels = signed / 256;
+    if pixels == 0 {
+        return if signed > 0 { 1 } else { -1 };
+    }
+    pixels.clamp(i16::from(i8::MIN), i16::from(i8::MAX)) as i8
+}
+
+fn source_fixed_axis_step(position: u8, fraction: u8, velocity: u16) -> (u8, u8) {
+    let [position, fraction] = u16::from_be_bytes([position, fraction])
+        .wrapping_add(velocity)
+        .to_be_bytes();
+    (position, fraction)
+}
+
+fn source_lander_restore_spawn(
+    source_rng: &mut SourceRandSnapshot,
+    profile: WaveProfileSnapshot,
+) -> EnemySnapshot {
+    let placement_state = source_rng.advance();
+    let [x, x_fraction] =
+        u16::from_be_bytes([placement_state.hseed, placement_state.lseed]).to_be_bytes();
+    let y = SOURCE_PLAYFIELD_Y_MIN.wrapping_add(2);
+    let y_velocity =
+        u16::from_be_bytes([profile.lander_y_velocity_msb, profile.lander_y_velocity_lsb]);
+
+    let shot_timer = source_advance_rmax(source_rng, profile.lander_shot_time as u8);
+    let x_velocity_byte = source_advance_rmax(source_rng, profile.lander_x_velocity);
+    let x_velocity = if x_velocity_byte & 1 == 0 {
+        u16::from(x_velocity_byte)
+    } else {
+        !u16::from(x_velocity_byte)
+    };
+    let source_lander = SourceLanderSnapshot {
+        x_fraction,
+        y_fraction: 0,
+        x_velocity,
+        y_velocity,
+        shot_timer,
+        sleep_ticks: 0,
+        picture_frame: 0,
+    };
+
+    EnemySnapshot::source_lander(
+        ScreenPosition::new(x, y),
+        source_lander_screen_velocity(source_lander),
+        source_lander,
+    )
+}
+
+fn source_lander_initial_spawn(
+    profile: WaveProfileSnapshot,
+    position: ScreenPosition,
+    spawn_index: usize,
+) -> EnemySnapshot {
+    let source_lander = SourceLanderSnapshot {
+        x_fraction: 0,
+        y_fraction: 0,
+        x_velocity: source_lander_initial_x_velocity(profile.lander_x_velocity, spawn_index),
+        y_velocity: source_lander_base_y_velocity(profile),
+        shot_timer: profile.lander_shot_time as u8,
+        sleep_ticks: 0,
+        picture_frame: 0,
+    };
+
+    EnemySnapshot::source_lander(
+        position,
+        source_lander_screen_velocity(source_lander),
+        source_lander,
+    )
+}
+
+fn source_lander_initial_x_velocity(source_x_velocity: u8, spawn_index: usize) -> u16 {
+    let velocity_low = if spawn_index < 2 {
+        0u8.wrapping_sub(source_x_velocity)
+    } else {
+        source_x_velocity
+    };
+    source_sign_extend_u8_to_u16(velocity_low)
+}
+
+fn advance_source_lander(
+    position: ScreenPosition,
+    source_lander: &mut SourceLanderSnapshot,
+    profile: WaveProfileSnapshot,
+    terrain: &[TerrainSegment],
+    carrying_passenger: bool,
+    player_position: ScreenPosition,
+    player_velocity: (WorldVector, WorldVector),
+    source_rng: &mut SourceRandSnapshot,
+    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+) {
+    if source_lander.sleep_ticks > 0 {
+        source_lander.sleep_ticks = source_lander.sleep_ticks.saturating_sub(1);
+        return;
+    }
+
+    source_lander.y_velocity = if carrying_passenger {
+        !source_lander_base_y_velocity(profile)
+    } else {
+        source_lander_orbit_y_velocity(profile, position, terrain)
+    };
+    source_lander_run_shot_timer(
+        position,
+        source_lander,
+        profile,
+        player_position,
+        player_velocity,
+        source_rng,
+        enemy_projectiles,
+    );
+
+    if carrying_passenger {
+        source_lander.sleep_ticks = SOURCE_LANDER_FLEE_SLEEP_TICKS;
+    } else {
+        source_lander.picture_frame =
+            (source_lander.picture_frame + 1) % SOURCE_LANDER_PICTURE_FRAME_COUNT;
+        source_lander.sleep_ticks = SOURCE_LANDER_ORBIT_SLEEP_TICKS;
+    }
+}
+
+fn source_lander_run_shot_timer(
+    position: ScreenPosition,
+    source_lander: &mut SourceLanderSnapshot,
+    profile: WaveProfileSnapshot,
+    player_position: ScreenPosition,
+    player_velocity: (WorldVector, WorldVector),
+    source_rng: &mut SourceRandSnapshot,
+    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+) {
+    source_lander.shot_timer = source_lander.shot_timer.wrapping_sub(1);
+    if source_lander.shot_timer != 0 {
+        return;
+    }
+
+    source_rng.advance();
+    source_lander.shot_timer = source_rmax(profile.lander_shot_time as u8, source_rng.seed);
+    if let Some(projectile) = source_enemy_fireball_shot(
+        position,
+        source_lander.x_fraction,
+        source_lander.y_fraction,
+        player_position,
+        player_velocity,
+        *source_rng,
+        enemy_projectiles.len(),
+    ) {
+        enemy_projectiles.push(projectile);
+    }
+}
+
+fn source_lander_orbit_y_velocity(
+    profile: WaveProfileSnapshot,
+    position: ScreenPosition,
+    terrain: &[TerrainSegment],
+) -> u16 {
+    let base_y_velocity = source_lander_base_y_velocity(profile);
+    let altitude =
+        clean_source_terrain_altitude(terrain, position.x).unwrap_or(SOURCE_PLAYFIELD_Y_MAX);
+    let above_ground_delta = altitude.wrapping_sub(SOURCE_LANDER_TERRAIN_ALTITUDE_OFFSET);
+    let y_delta = above_ground_delta.wrapping_sub(position.y);
+    if above_ground_delta > position.y {
+        base_y_velocity
+    } else if (y_delta as i8) < SOURCE_LANDER_ORBIT_Y_WINDOW {
+        !base_y_velocity
+    } else {
+        0
+    }
+}
+
+fn clean_source_terrain_altitude(terrain: &[TerrainSegment], object_x: u8) -> Option<u8> {
+    let object_x = u16::from(object_x);
+    terrain
+        .iter()
+        .find(|segment| {
+            let start = u16::from(segment.position.x);
+            let end = start.saturating_add(u16::from(segment.size.0));
+            object_x >= start && object_x < end
+        })
+        .map(|segment| segment.position.y)
+}
+
+fn source_lander_base_y_velocity(profile: WaveProfileSnapshot) -> u16 {
+    u16::from_be_bytes([profile.lander_y_velocity_msb, profile.lander_y_velocity_lsb])
+}
+
+fn source_bomber_spawn(profile: WaveProfileSnapshot, spawn_index: usize) -> SourceBomberSnapshot {
+    SourceBomberSnapshot {
+        x_fraction: 0,
+        y_fraction: 0,
+        x_velocity: source_bomber_x_velocity(profile.bomber_x_velocity, spawn_index),
+        y_velocity: 0,
+        picture_frame: 0,
+        cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+        sleep_ticks: 0,
+    }
+}
+
+fn source_bomber_x_velocity(source_x_velocity: u8, spawn_index: usize) -> u16 {
+    let velocity_low = if spawn_index < 2 {
+        0u8.wrapping_sub(source_x_velocity)
+    } else {
+        source_x_velocity
+    };
+    source_sign_extend_u8_to_u16(velocity_low)
+}
+
+fn source_bomber_restore_spawns(
+    profile: WaveProfileSnapshot,
+    player_absolute_x: u16,
+    count: usize,
+) -> Vec<EnemySnapshot> {
+    let mut bombers = Vec::with_capacity(count);
+    let mut remaining = count;
+    let mut positive_x_velocity = true;
+
+    while remaining > 0 {
+        let squad_count = remaining.min(3);
+        let velocity_low = if positive_x_velocity {
+            profile.bomber_x_velocity
+        } else {
+            0u8.wrapping_sub(profile.bomber_x_velocity)
+        };
+        positive_x_velocity = !positive_x_velocity;
+        let x_velocity = source_sign_extend_u8_to_u16(velocity_low);
+
+        for squad_remaining in (1..=squad_count).rev() {
+            let x16 = player_absolute_x
+                .wrapping_add((squad_remaining as u16).wrapping_mul(0x0180))
+                .wrapping_add(0x8000);
+            let [x, x_fraction] = x16.to_be_bytes();
+            let source_bomber = SourceBomberSnapshot {
+                x_fraction,
+                y_fraction: 0,
+                x_velocity,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
+                sleep_ticks: 0,
+            };
+            bombers.push(EnemySnapshot::source_bomber(
+                ScreenPosition::new(x, SOURCE_BOMBER_CRUISE_ALTITUDE),
+                source_bomber_screen_velocity(source_bomber),
+                source_bomber,
+            ));
+        }
+
+        remaining -= squad_count;
+    }
+
+    bombers
+}
+
+fn advance_source_bomber(
+    position: ScreenPosition,
+    source_bomber: &mut SourceBomberSnapshot,
+    player_position: ScreenPosition,
+    source_rng: SourceRandSnapshot,
+    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+) {
+    if source_bomber.sleep_ticks > 0 {
+        source_bomber.sleep_ticks = source_bomber.sleep_ticks.saturating_sub(1);
+        return;
+    }
+
+    source_bomber.picture_frame =
+        source_bomber_next_picture_frame(source_rng.seed, source_bomber.picture_frame);
+    source_bomber.y_velocity =
+        source_bomber_random_y_velocity(source_bomber.y_velocity, source_rng.seed);
+
+    if position.y == 0 {
+        source_bomber.y_velocity = source_bomber_offscreen_y_velocity(
+            source_bomber.y_velocity,
+            &mut source_bomber.cruise_altitude,
+            position.y,
+            source_rng.seed,
+        );
+    } else {
+        if let Some(delta) = source_bomber_onscreen_y_velocity_delta(position.y, player_position.y)
+        {
+            source_bomber.y_velocity = source_bomber.y_velocity.wrapping_add(delta);
+        }
+
+        if source_rng.lseed & 0x07 == 0
+            && let Some(projectile) = source_bomber_bomb_shell(
+                position,
+                *source_bomber,
+                source_rng,
+                enemy_projectiles.len(),
+            )
+        {
+            enemy_projectiles.push(projectile);
+        }
+    }
+
+    source_bomber.sleep_ticks = SOURCE_BOMBER_LOOP_SLEEP_TICKS;
+}
+
+fn source_bomber_next_picture_frame(seed: u8, picture_frame: u8) -> u8 {
+    let random_delta = (seed & 0x3F).wrapping_sub(0x20);
+    if random_delta & 0x80 != 0 {
+        picture_frame
+            .saturating_add(1)
+            .min(SOURCE_BOMBER_PICTURE_FRAME_COUNT - 1)
+    } else {
+        picture_frame.saturating_sub(1)
+    }
+}
+
+fn source_bomber_random_y_velocity(previous_y_velocity: u16, seed: u8) -> u16 {
+    let random_delta_low = (seed & 0x3F).wrapping_sub(0x20);
+    let mut y_velocity =
+        previous_y_velocity.wrapping_add(source_sign_extend_u8_to_u16(random_delta_low));
+    let damping_high = y_velocity.wrapping_shl(3).to_be_bytes()[0];
+    let damping_delta = source_sign_extend_u8_to_u16(0u8.wrapping_sub(damping_high));
+    y_velocity = y_velocity.wrapping_add(damping_delta);
+    y_velocity
+}
+
+fn source_bomber_offscreen_y_velocity(
+    mut y_velocity: u16,
+    cruise_altitude: &mut u8,
+    object_y: u8,
+    seed: u8,
+) -> u16 {
+    if seed <= 0x40 {
+        let candidate = cruise_altitude.wrapping_add((seed & 0x03).wrapping_sub(2));
+        *cruise_altitude = candidate.clamp(
+            SOURCE_BOMBER_MIN_CRUISE_ALTITUDE,
+            SOURCE_BOMBER_MAX_CRUISE_ALTITUDE,
+        );
+    }
+
+    let delta = cruise_altitude
+        .wrapping_sub(object_y)
+        .wrapping_add(SOURCE_BOMBER_CRUISE_WINDOW_HALF);
+    if delta > SOURCE_BOMBER_CRUISE_WINDOW {
+        let delta_after_center = delta.wrapping_sub(SOURCE_BOMBER_CRUISE_WINDOW_HALF);
+        let velocity_delta = if delta_after_center & 0x80 == 0 {
+            0xFFF0
+        } else {
+            0x0010
+        };
+        y_velocity = y_velocity.wrapping_add(velocity_delta);
+    }
+
+    y_velocity
+}
+
+fn source_bomber_onscreen_y_velocity_delta(object_y: u8, player_y: u8) -> Option<u16> {
+    let delta = object_y.wrapping_sub(player_y);
+    let signed_delta = delta as i8;
+    if signed_delta >= 0 {
+        if delta >= 0x20 {
+            Some(0xFFF0)
+        } else if delta > 0x10 {
+            None
+        } else {
+            Some(0x0010)
+        }
+    } else if signed_delta <= -32 {
+        Some(0x0010)
+    } else if signed_delta < -16 {
+        None
+    } else {
+        Some(0xFFF0)
+    }
+}
+
+fn source_bomber_bomb_shell(
+    position: ScreenPosition,
+    source_bomber: SourceBomberSnapshot,
+    source_rng: SourceRandSnapshot,
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    if active_shells >= SOURCE_BOMBER_BOMB_SHELL_LIMIT {
+        return None;
+    }
+
+    let mut projectile = EnemyProjectileSnapshot::source_fireball(position, 0, 0);
+    projectile.source_x_fraction = source_bomber.x_fraction;
+    projectile.source_y_fraction = source_bomber.y_fraction;
+    projectile.source_lifetime_ticks = (source_rng.seed & 0x1F).wrapping_add(1);
+    Some(projectile)
+}
+
+fn source_mutant_from_lander_conversion(profile: WaveProfileSnapshot) -> SourceMutantSnapshot {
+    SourceMutantSnapshot {
+        x_fraction: 0,
+        y_fraction: 0,
+        x_velocity: 0,
+        y_velocity: 0,
+        shot_timer: profile.mutant_shot_time as u8,
+        sleep_ticks: 0,
+    }
+}
+
+fn source_mutant_restore_spawn(
+    source_rng: &mut SourceRandSnapshot,
+    profile: WaveProfileSnapshot,
+    background_absolute_x: u16,
+) -> (ScreenPosition, SourceMutantSnapshot) {
+    let placement_state = source_rng.advance();
+    let avoid_left = background_absolute_x.wrapping_sub(SOURCE_MUTANT_RESTORE_AVOID_HALF_WIDTH);
+    let mut relative =
+        u16::from_be_bytes([placement_state.hseed, placement_state.lseed]).wrapping_sub(avoid_left);
+    if relative < SOURCE_MUTANT_RESTORE_AVOID_WIDTH {
+        relative = relative.wrapping_add(0x8000);
+    }
+    let x16 = relative.wrapping_add(avoid_left);
+    let [x, x_fraction] = x16.to_be_bytes();
+    let y = placement_state
+        .seed
+        .wrapping_shr(1)
+        .wrapping_add(SOURCE_PLAYFIELD_Y_MIN);
+    let shot_timer_state = source_rng.advance();
+    let source_mutant = SourceMutantSnapshot {
+        x_fraction,
+        y_fraction: 0,
+        x_velocity: 0,
+        y_velocity: 0,
+        shot_timer: source_rmax(profile.mutant_shot_time as u8, shot_timer_state.seed),
+        sleep_ticks: 0,
+    };
+
+    (ScreenPosition::new(x, y), source_mutant)
+}
+
+fn source_mutant_restore_spawns(
+    source_rng: &mut SourceRandSnapshot,
+    profile: WaveProfileSnapshot,
+    background_absolute_x: u16,
+    count: usize,
+) -> Vec<EnemySnapshot> {
+    (0..count)
+        .map(|_| {
+            let (position, source_mutant) =
+                source_mutant_restore_spawn(source_rng, profile, background_absolute_x);
+            EnemySnapshot::source_mutant(
+                position,
+                source_mutant_screen_velocity(source_mutant),
+                source_mutant,
+            )
+        })
+        .collect()
+}
+
+fn source_pod_restore_spawn(source_rng: &mut SourceRandSnapshot) -> EnemySnapshot {
+    let state = source_rng.advance();
+    let [x, x_fraction] =
+        u16::from_be_bytes([(state.hseed & 0x3F).wrapping_add(0x10), state.lseed]).to_be_bytes();
+    let y = state
+        .lseed
+        .wrapping_shr(1)
+        .wrapping_add(SOURCE_PLAYFIELD_Y_MIN);
+
+    let x_velocity = source_sign_extend_u8_to_u16((state.seed & 0x3F).wrapping_sub(0x20));
+    let mut y_velocity_low = (state.lseed & 0x7F).wrapping_sub(0x40);
+    if y_velocity_low & 0x80 == 0 {
+        y_velocity_low |= 0x20;
+    } else {
+        y_velocity_low &= 0xDF;
+    }
+    let y_velocity = source_sign_extend_u8_to_u16(y_velocity_low);
+    let source_pod = SourcePodSnapshot {
+        x_fraction,
+        y_fraction: 0,
+        x_velocity,
+        y_velocity,
+    };
+
+    EnemySnapshot::source_pod(
+        ScreenPosition::new(x, y),
+        source_pod_screen_velocity(source_pod),
+        source_pod,
+    )
+}
+
+fn source_pod_initial_spawn(position: ScreenPosition, spawn_index: usize) -> EnemySnapshot {
+    let source_pod = SourcePodSnapshot {
+        x_fraction: 0,
+        y_fraction: 0,
+        x_velocity: source_pod_initial_x_velocity(spawn_index),
+        y_velocity: 0,
+    };
+
+    EnemySnapshot::source_pod(position, source_pod_screen_velocity(source_pod), source_pod)
+}
+
+fn source_pod_initial_x_velocity(spawn_index: usize) -> u16 {
+    let velocity_low = if spawn_index < 2 {
+        0u8.wrapping_sub(SOURCE_INITIAL_POD_X_SPEED)
+    } else {
+        SOURCE_INITIAL_POD_X_SPEED
+    };
+    source_sign_extend_u8_to_u16(velocity_low)
+}
+
+fn advance_source_mutant(
+    position: &mut ScreenPosition,
+    source_mutant: &mut SourceMutantSnapshot,
+    profile: WaveProfileSnapshot,
+    player_position: ScreenPosition,
+    player_velocity: (WorldVector, WorldVector),
+    source_rng: &mut SourceRandSnapshot,
+    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+) {
+    if source_mutant.sleep_ticks > 0 {
+        source_mutant.sleep_ticks = source_mutant.sleep_ticks.saturating_sub(1);
+        return;
+    }
+
+    let player_absolute_x = u16::from(player_position.x) << 8;
+    let object_absolute_x = u16::from_be_bytes([position.x, source_mutant.x_fraction]);
+    source_mutant.x_velocity = source_mutant_x_velocity(
+        profile.mutant_x_velocity,
+        player_absolute_x,
+        object_absolute_x,
+    );
+    source_mutant.y_velocity = source_mutant_y_velocity(
+        profile,
+        player_position.y,
+        player_absolute_x,
+        object_absolute_x,
+        *position,
+    );
+
+    if source_mutant_should_run_hop_and_shot(player_absolute_x, object_absolute_x, *position) {
+        let y_step = if source_rng.seed & 0x80 == 0 {
+            0u8.wrapping_sub(profile.mutant_random_y)
+        } else {
+            profile.mutant_random_y
+        };
+        position.y = position.y.wrapping_add(y_step);
+        if position.y < SOURCE_PLAYFIELD_Y_MIN {
+            position.y = SOURCE_PLAYFIELD_Y_MAX;
+        }
+
+        source_mutant.shot_timer = source_mutant.shot_timer.wrapping_sub(1);
+        if source_mutant.shot_timer == 0 {
+            source_rng.advance();
+            source_mutant.shot_timer = source_rmax(profile.mutant_shot_time as u8, source_rng.seed);
+            if let Some(projectile) = source_enemy_fireball_shot(
+                *position,
+                source_mutant.x_fraction,
+                source_mutant.y_fraction,
+                player_position,
+                player_velocity,
+                *source_rng,
+                enemy_projectiles.len(),
+            ) {
+                enemy_projectiles.push(projectile);
+            }
+        }
+    }
+
+    source_mutant.sleep_ticks = SOURCE_MUTANT_LOOP_SLEEP_TICKS;
+}
+
+fn source_mutant_x_velocity(
+    source_x_velocity: u8,
+    player_absolute_x: u16,
+    object_absolute_x: u16,
+) -> u16 {
+    let x_velocity_low = if (player_absolute_x as i16) >= (object_absolute_x as i16) {
+        source_x_velocity
+    } else {
+        0u8.wrapping_sub(source_x_velocity)
+    };
+    source_sign_extend_u8_to_u16(x_velocity_low)
+}
+
+fn source_mutant_y_velocity(
+    profile: WaveProfileSnapshot,
+    player_y: u8,
+    player_absolute_x: u16,
+    object_absolute_x: u16,
+    position: ScreenPosition,
+) -> u16 {
+    let base_y_velocity =
+        u16::from_be_bytes([profile.mutant_y_velocity_msb, profile.mutant_y_velocity_lsb]);
+    let x_distance = player_absolute_x
+        .wrapping_sub(object_absolute_x)
+        .wrapping_add(SOURCE_MUTANT_X_DISTANCE_OFFSET);
+    if x_distance <= SOURCE_MUTANT_CLOSE_X_WINDOW {
+        if player_y >= position.y {
+            base_y_velocity
+        } else {
+            !base_y_velocity
+        }
+    } else {
+        let delta = player_y.wrapping_sub(position.y);
+        if player_y > position.y {
+            if delta > SOURCE_MUTANT_VERTICAL_WINDOW {
+                0
+            } else {
+                !base_y_velocity
+            }
+        } else if (delta as i8) > -(SOURCE_MUTANT_VERTICAL_WINDOW as i8) {
+            base_y_velocity
+        } else {
+            0
+        }
+    }
+}
+
+fn source_mutant_should_run_hop_and_shot(
+    player_absolute_x: u16,
+    object_absolute_x: u16,
+    position: ScreenPosition,
+) -> bool {
+    let x_distance = player_absolute_x
+        .wrapping_sub(object_absolute_x)
+        .wrapping_add(SOURCE_MUTANT_X_DISTANCE_OFFSET);
+    x_distance > SOURCE_MUTANT_CLOSE_X_WINDOW
+        || (position.y > SOURCE_PLAYFIELD_Y_MIN && position.y <= SOURCE_PLAYFIELD_Y_MAX)
+}
+
+fn source_mini_swarmer_spawn(
+    source_rng: &mut SourceRandSnapshot,
+    profile: WaveProfileSnapshot,
+    _position: ScreenPosition,
+) -> SourceSwarmerSnapshot {
+    let velocity_rand = source_rng.advance();
+    let y_velocity = source_sign_extend_u8_to_u16(velocity_rand.seed).wrapping_shl(1);
+    let x_velocity = source_sign_extend_u8_to_u16((velocity_rand.lseed & 0x3F).wrapping_sub(0x20));
+    let acceleration = velocity_rand.lseed & profile.swarmer_acceleration_mask;
+    let sleep_ticks = velocity_rand.hseed & 0x1F;
+    let shot_timer_rand = source_rng.advance();
+    let shot_timer = source_rmax(profile.swarmer_shot_time as u8, shot_timer_rand.seed);
+
+    SourceSwarmerSnapshot {
+        x_fraction: 0,
+        y_fraction: 0,
+        x_velocity,
+        y_velocity,
+        acceleration,
+        shot_timer,
+        sleep_ticks,
+        horizontal_seek_pending: true,
+    }
+}
+
+fn source_mini_swarmer_reserve_spawns(
+    source_rng: &mut SourceRandSnapshot,
+    profile: WaveProfileSnapshot,
+    count: usize,
+) -> Vec<EnemySnapshot> {
+    if count == 0 {
+        return Vec::new();
+    }
+
+    let y16 = u16::from_be_bytes([
+        source_rng
+            .seed
+            .wrapping_shr(1)
+            .wrapping_add(SOURCE_PLAYFIELD_Y_MIN),
+        0,
+    ]);
+    let placement_rand = source_rng.advance();
+    let x16 = u16::from_be_bytes([
+        (placement_rand.seed & 0x3F).wrapping_add(0x80),
+        SOURCE_MINI_SWARMER_RESTORE_X_LOW,
+    ]);
+    let [x, x_fraction] = x16.to_be_bytes();
+    let [y, y_fraction] = y16.to_be_bytes();
+    let position = ScreenPosition::new(x, y);
+
+    (0..count)
+        .map(|_| {
+            let mut source_swarmer = source_mini_swarmer_spawn(source_rng, profile, position);
+            source_swarmer.x_fraction = x_fraction;
+            source_swarmer.y_fraction = y_fraction;
+            EnemySnapshot::source_swarmer(
+                position,
+                source_screen_velocity(source_swarmer.x_velocity, source_swarmer.y_velocity),
+                source_swarmer,
+            )
+        })
+        .collect()
+}
+
+fn advance_source_mini_swarmer(
+    position: ScreenPosition,
+    source_swarmer: &mut SourceSwarmerSnapshot,
+    profile: WaveProfileSnapshot,
+    player_position: ScreenPosition,
+    source_rng: &mut SourceRandSnapshot,
+    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+) {
+    if source_swarmer.sleep_ticks > 0 {
+        source_swarmer.sleep_ticks = source_swarmer.sleep_ticks.saturating_sub(1);
+        return;
+    }
+
+    if source_swarmer.horizontal_seek_pending {
+        source_swarmer.x_velocity = source_mini_swarmer_seek_velocity(
+            profile.swarmer_x_velocity,
+            player_position.x,
+            position.x,
+        );
+        source_swarmer.horizontal_seek_pending = false;
+        source_swarmer.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
+        return;
+    }
+
+    source_swarmer.y_velocity = source_mini_swarmer_y_velocity(
+        source_swarmer.y_velocity,
+        source_swarmer.acceleration,
+        player_position.y,
+        position.y,
+        source_rng.seed,
+    );
+
+    let player_absolute_x = u16::from(player_position.x) << 8;
+    let object_absolute_x = u16::from_be_bytes([position.x, source_swarmer.x_fraction]);
+    let past_window = player_absolute_x
+        .wrapping_sub(object_absolute_x)
+        .wrapping_add(SOURCE_MINI_SWARMER_TURN_WINDOW_HALF);
+    if past_window > SOURCE_MINI_SWARMER_TURN_WINDOW {
+        source_swarmer.x_velocity = source_mini_swarmer_seek_velocity(
+            profile.swarmer_x_velocity,
+            player_position.x,
+            position.x,
+        );
+    } else {
+        source_swarmer.shot_timer = source_swarmer.shot_timer.wrapping_sub(1);
+        if source_swarmer.shot_timer == 0 {
+            if let Some(projectile) =
+                source_mini_swarmer_bomb(position, *source_swarmer, player_position, source_rng)
+            {
+                enemy_projectiles.push(projectile);
+            }
+            source_swarmer.shot_timer =
+                source_rmax(profile.swarmer_shot_time as u8, source_rng.seed);
+        }
+    }
+
+    source_swarmer.sleep_ticks = SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS;
+}
+
+fn source_mini_swarmer_seek_velocity(source_x_velocity: u8, player_x: u8, swarmer_x: u8) -> u16 {
+    if player_x >= swarmer_x {
+        source_sign_extend_u8_to_u16(source_x_velocity)
+    } else {
+        source_sign_extend_u8_to_u16(0u8.wrapping_sub(source_x_velocity))
+    }
+}
+
+fn source_mini_swarmer_y_velocity(
+    previous_y_velocity: u16,
+    acceleration: u8,
+    player_y: u8,
+    swarmer_y: u8,
+    seed: u8,
+) -> u16 {
+    let acceleration_low = if player_y > swarmer_y {
+        acceleration
+    } else {
+        0u8.wrapping_sub(acceleration)
+    };
+    let mut y_velocity =
+        source_sign_extend_u8_to_u16(acceleration_low).wrapping_add(previous_y_velocity);
+    if (y_velocity as i16) >= (SOURCE_MINI_SWARMER_MAX_Y_VELOCITY as i16) {
+        y_velocity = SOURCE_MINI_SWARMER_MAX_Y_VELOCITY;
+    }
+    if (y_velocity as i16) <= (SOURCE_MINI_SWARMER_MIN_Y_VELOCITY as i16) {
+        y_velocity = SOURCE_MINI_SWARMER_MIN_Y_VELOCITY;
+    }
+    y_velocity = y_velocity.wrapping_add(source_mini_swarmer_damping_adjustment(y_velocity));
+    y_velocity.wrapping_add(source_sign_extend_u8_to_u16(
+        (seed & 0x1F).wrapping_sub(0x10),
+    ))
+}
+
+fn source_mini_swarmer_damping_adjustment(value: u16) -> u16 {
+    let [mut a, mut b] = value.to_be_bytes();
+    a = !a;
+    b = !b;
+    for _ in 0..2 {
+        let carry = b & 0x80 != 0;
+        b = b.wrapping_shl(1);
+        a = a.wrapping_shl(1) | u8::from(carry);
+    }
+    source_sign_extend_u8_to_u16(a)
+}
+
+fn source_mini_swarmer_bomb(
+    position: ScreenPosition,
+    source_swarmer: SourceSwarmerSnapshot,
+    player_position: ScreenPosition,
+    source_rng: &mut SourceRandSnapshot,
+) -> Option<EnemyProjectileSnapshot> {
+    let player_delta = (u16::from(player_position.x) << 8)
+        .wrapping_sub(u16::from_be_bytes([position.x, source_swarmer.x_fraction]));
+    if (player_delta.to_be_bytes()[0] ^ source_swarmer.x_velocity.to_be_bytes()[0]) & 0x80 != 0 {
+        source_rng.advance();
+        return None;
+    }
+
+    let x_velocity = source_swarmer.x_velocity.wrapping_shl(3);
+    let y_velocity = source_arithmetic_shift_right_word(
+        u16::from_be_bytes([player_position.y.wrapping_sub(position.y), 0]),
+        5,
+    );
+    source_rng.advance();
+    Some(EnemyProjectileSnapshot::source_fireball(
+        position, x_velocity, y_velocity,
+    ))
+}
+
+fn source_baiter_spawn(
+    source_rng: SourceRandSnapshot,
+    profile: WaveProfileSnapshot,
+    player_position: ScreenPosition,
+    player_velocity: (WorldVector, WorldVector),
+) -> (ScreenPosition, SourceBaiterSnapshot) {
+    let source_x = u16::from_be_bytes([source_rng.seed & 0x1F, source_rng.hseed]);
+    let [x, x_fraction] = source_x.wrapping_shl(2).to_be_bytes();
+    let source_y = u16::from_be_bytes([source_x.to_be_bytes()[1] >> 1, 0])
+        .wrapping_add(u16::from(SOURCE_PLAYFIELD_Y_MIN) << 8);
+    let [y, y_fraction] = source_y.to_be_bytes();
+    let mut source_baiter = SourceBaiterSnapshot {
+        x_fraction,
+        y_fraction,
+        x_velocity: 0,
+        y_velocity: 0,
+        shot_timer: SOURCE_BAITER_INITIAL_SHOT_TIMER,
+        sleep_ticks: 0,
+        picture_frame: 0,
+    };
+    source_baiter_velocity_update(
+        &mut source_baiter,
+        ScreenPosition::new(x, y),
+        profile,
+        player_position,
+        player_velocity,
+        false,
+        source_rng.seed,
+    );
+    (ScreenPosition::new(x, y), source_baiter)
+}
+
+fn advance_source_baiter(
+    position: ScreenPosition,
+    source_baiter: &mut SourceBaiterSnapshot,
+    profile: WaveProfileSnapshot,
+    player_position: ScreenPosition,
+    player_velocity: (WorldVector, WorldVector),
+    source_rng: &mut SourceRandSnapshot,
+    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+) {
+    if source_baiter.sleep_ticks > 0 {
+        source_baiter.sleep_ticks = source_baiter.sleep_ticks.saturating_sub(1);
+        return;
+    }
+
+    source_baiter.shot_timer = source_baiter.shot_timer.wrapping_sub(1);
+    if source_baiter.shot_timer == 0 {
+        source_rng.advance();
+        source_baiter.shot_timer = source_rmax(profile.baiter_shot_time as u8, source_rng.seed);
+        if let Some(projectile) = source_baiter_shot(
+            position,
+            *source_baiter,
+            player_position,
+            player_velocity,
+            *source_rng,
+            enemy_projectiles.len(),
+        ) {
+            enemy_projectiles.push(projectile);
+        }
+    }
+
+    source_baiter.picture_frame =
+        (source_baiter.picture_frame + 1) % SOURCE_BAITER_PICTURE_FRAME_COUNT;
+    if source_baiter.picture_frame == 0 {
+        source_baiter_velocity_update(
+            source_baiter,
+            position,
+            profile,
+            player_position,
+            player_velocity,
+            true,
+            source_rng.seed,
+        );
+    }
+    source_baiter.sleep_ticks = SOURCE_BAITER_LOOP_SLEEP_TICKS;
+}
+
+fn source_baiter_velocity_update(
+    source_baiter: &mut SourceBaiterSnapshot,
+    position: ScreenPosition,
+    profile: WaveProfileSnapshot,
+    player_position: ScreenPosition,
+    player_velocity: (WorldVector, WorldVector),
+    honor_seek_probability: bool,
+    seed: u8,
+) -> bool {
+    if honor_seek_probability && seed <= profile.baiter_seek_probability {
+        return false;
+    }
+
+    let object_x = u16::from_be_bytes([position.x, source_baiter.x_fraction]).wrapping_shr(2);
+    let player_x = (u16::from(player_position.x) << 8).wrapping_shr(2);
+    let x_delta = object_x.wrapping_sub(player_x);
+    let mut x_seek_byte = SOURCE_BAITER_X_SEEK_SPEED;
+    if x_delta & 0x8000 == 0 {
+        x_seek_byte = 0u8.wrapping_sub(x_seek_byte);
+    }
+    if x_delta.wrapping_add(SOURCE_BAITER_X_SEEK_WINDOW_HALF) > SOURCE_BAITER_X_SEEK_WINDOW {
+        let player_x_velocity =
+            source_arithmetic_shift_right_word(source_word_from_world_vector(player_velocity.0), 2);
+        source_baiter.x_velocity =
+            source_sign_extend_u8_to_u16(x_seek_byte).wrapping_add(player_x_velocity);
+    }
+
+    let object_y = position.y;
+    let player_y = player_position.y;
+    let y_delta = object_y.wrapping_sub(player_y);
+    let mut y_seek_byte = SOURCE_BAITER_Y_SEEK_BYTE;
+    if y_delta & 0x80 == 0 {
+        y_seek_byte = 0u8.wrapping_sub(y_seek_byte);
+    }
+    if y_delta.wrapping_add(SOURCE_BAITER_Y_SEEK_WINDOW_HALF) > SOURCE_BAITER_Y_SEEK_WINDOW {
+        let player_y_velocity = source_word_from_world_vector(player_velocity.1);
+        source_baiter.y_velocity = source_arithmetic_shift_right_word(
+            u16::from_be_bytes([y_seek_byte, 0]).wrapping_add(player_y_velocity),
+            1,
+        );
+    }
+
+    true
+}
+
+fn source_baiter_shot(
+    position: ScreenPosition,
+    source_baiter: SourceBaiterSnapshot,
+    player_position: ScreenPosition,
+    player_velocity: (WorldVector, WorldVector),
+    source_rng: SourceRandSnapshot,
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    source_enemy_fireball_shot(
+        position,
+        source_baiter.x_fraction,
+        source_baiter.y_fraction,
+        player_position,
+        player_velocity,
+        source_rng,
+        active_shells,
+    )
+}
+
+fn source_enemy_fireball_shot(
+    position: ScreenPosition,
+    x_fraction: u8,
+    y_fraction: u8,
+    player_position: ScreenPosition,
+    player_velocity: (WorldVector, WorldVector),
+    source_rng: SourceRandSnapshot,
+    active_shells: usize,
+) -> Option<EnemyProjectileSnapshot> {
+    if active_shells >= SOURCE_SHELL_LIMIT
+        || position.x >= SOURCE_SHELL_X_MAX
+        || position.y <= SOURCE_PLAYFIELD_Y_MIN
+    {
+        return None;
+    }
+
+    let x_delta = (source_rng.seed & 0x1F)
+        .wrapping_sub(0x10)
+        .wrapping_add(player_position.x)
+        .wrapping_sub(position.x);
+    let mut x_velocity = source_sign_extend_u8_to_u16(x_delta).wrapping_shl(2);
+    if source_rng.seed > 120 {
+        x_velocity = x_velocity
+            .wrapping_add(source_word_from_world_vector(player_velocity.0).wrapping_shl(2));
+    }
+
+    let y_delta = (source_rng.lseed & 0x1F)
+        .wrapping_sub(0x10)
+        .wrapping_add(player_position.y)
+        .wrapping_sub(position.y);
+    let y_velocity = source_sign_extend_u8_to_u16(y_delta).wrapping_shl(2);
+    let mut projectile = EnemyProjectileSnapshot::source_fireball(position, x_velocity, y_velocity);
+    projectile.source_x_fraction = x_fraction;
+    projectile.source_y_fraction = y_fraction;
+    Some(projectile)
+}
+
+fn source_baiter_screen_x_velocity(source_x_velocity: u16) -> u16 {
+    source_x_velocity.wrapping_shl(2)
+}
+
+fn source_baiter_screen_velocity(source_baiter: SourceBaiterSnapshot) -> ScreenVelocity {
+    source_screen_velocity(
+        source_baiter_screen_x_velocity(source_baiter.x_velocity),
+        source_baiter.y_velocity,
+    )
+}
+
+fn source_bomber_screen_velocity(source_bomber: SourceBomberSnapshot) -> ScreenVelocity {
+    source_screen_velocity(source_bomber.x_velocity, source_bomber.y_velocity)
+}
+
+fn source_lander_screen_velocity(source_lander: SourceLanderSnapshot) -> ScreenVelocity {
+    source_screen_velocity(source_lander.x_velocity, source_lander.y_velocity)
+}
+
+fn source_mutant_screen_velocity(source_mutant: SourceMutantSnapshot) -> ScreenVelocity {
+    source_screen_velocity(source_mutant.x_velocity, source_mutant.y_velocity)
+}
+
+fn source_pod_screen_velocity(source_pod: SourcePodSnapshot) -> ScreenVelocity {
+    source_screen_velocity(source_pod.x_velocity, source_pod.y_velocity)
+}
+
+fn source_arithmetic_shift_right_word(mut value: u16, shifts: u8) -> u16 {
+    for _ in 0..shifts {
+        let [mut a, mut b] = value.to_be_bytes();
+        let carry = a & 0x01 != 0;
+        a = (a >> 1) | (a & 0x80);
+        b = (b >> 1) | if carry { 0x80 } else { 0x00 };
+        value = u16::from_be_bytes([a, b]);
+    }
+    value
+}
+
+fn source_vertical_velocity(msb: u8, lsb: u8) -> i8 {
+    if msb == 0 && lsb < 0xC0 {
+        0
+    } else if msb == 0 {
+        -1
+    } else {
+        1
+    }
+}
+
+fn clean_carried_human_position(lander_position: ScreenPosition) -> ScreenPosition {
+    lander_position.wrapping_offset(
+        CLEAN_LANDER_PASSENGER_OFFSET_X,
+        CLEAN_LANDER_PASSENGER_OFFSET_Y,
+    )
+}
+
+fn clean_player_carried_human_position(player_position: ScreenPosition) -> ScreenPosition {
+    player_position.wrapping_offset(
+        CLEAN_PLAYER_CARRIED_HUMAN_OFFSET_X,
+        CLEAN_PLAYER_CARRIED_HUMAN_OFFSET_Y,
+    )
+}
+
+fn clean_rescue_score_popup_position(human_position: ScreenPosition) -> ScreenPosition {
+    human_position.wrapping_offset(0, SOURCE_RESCUE_SCORE_POPUP_Y_OFFSET)
+}
+
+fn clean_lander_capture_aligned(
+    lander_position: ScreenPosition,
+    human_position: ScreenPosition,
+) -> bool {
+    let x_delta = (i16::from(lander_position.x) - i16::from(human_position.x)).abs();
+    let target_y = i16::from(lander_position.y) + i16::from(CLEAN_LANDER_PASSENGER_OFFSET_Y);
+    let y_delta = (target_y - i16::from(human_position.y)).abs();
+
+    x_delta <= CLEAN_LANDER_CAPTURE_X_TOLERANCE && y_delta <= CLEAN_LANDER_CAPTURE_Y_TOLERANCE
+}
+
+fn clean_human_ground_y(terrain: &[TerrainSegment], human_x: u8) -> Option<u8> {
+    let human_x = u16::from(human_x);
+    terrain
+        .iter()
+        .find(|segment| {
+            let start = u16::from(segment.position.x);
+            let end = start.saturating_add(u16::from(segment.size.0));
+            human_x >= start && human_x < end
+        })
+        .map(|segment| segment.position.y.saturating_sub(HUMAN_SPRITE_SIZE.1))
+}
+
+fn clean_human_is_falling(terrain: &[TerrainSegment], human: HumanSnapshot) -> bool {
+    if human.carried || human.carried_by_player {
+        return false;
+    }
+
+    clean_human_ground_y(terrain, human.position.x)
+        .is_some_and(|ground_y| human.position.y < ground_y)
+}
+
+fn source_falling_human_y_velocity(previous_y_velocity: u16) -> u16 {
+    let accelerated_y_velocity =
+        previous_y_velocity.wrapping_add(SOURCE_FALLING_HUMAN_Y_ACCELERATION);
+    if accelerated_y_velocity >= SOURCE_FALLING_HUMAN_MAX_Y_VELOCITY {
+        previous_y_velocity
+    } else {
+        accelerated_y_velocity
+    }
+}
+
+fn source_baiter_accelerated_timer_ticks(
+    current_ticks: u32,
+    profile: WaveProfileSnapshot,
+    enemy_total: usize,
+) -> u32 {
+    if enemy_total > 8 {
+        return current_ticks;
+    }
+
+    let mut target_ticks = profile.baiter_delay / 2;
+    if enemy_total <= 3 {
+        target_ticks /= 2;
+    }
+    target_ticks = target_ticks.saturating_add(1).max(1);
+    current_ticks.min(target_ticks)
+}
+
+fn source_baiter_reset_timer_ticks(profile: WaveProfileSnapshot, enemy_total: usize) -> u32 {
+    if enemy_total < 4 {
+        (profile.baiter_delay / 4).max(1)
+    } else {
+        profile.baiter_delay.max(1)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameState {
@@ -179,11 +4305,260 @@ pub struct GameState {
     pub phase: GamePhase,
     pub credits: u8,
     pub current_player: u8,
+    pub player_count: u8,
     pub wave: u8,
+    pub wave_profile: WaveProfileSnapshot,
     pub player: PlayerSnapshot,
+    pub player_stocks: [PlayerStockSnapshot; 2],
     pub scores: ScoreSnapshot,
+    pub attract: AttractPresentationSnapshot,
     pub high_score_initials: HighScoreInitialsState,
+    pub high_score_entry: Option<HighScoreEntrySnapshot>,
+    pub high_score_submission: Option<HighScoreSubmissionSnapshot>,
+    pub high_score_tables: HighScoreTablesSnapshot,
+    pub game_over: GameOverSnapshot,
     pub world: WorldSnapshot,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct GameOverSnapshot {
+    pub player_death_sleep_remaining: Option<u8>,
+    pub player_switch_sleep_remaining: Option<u8>,
+    pub player_switch_from: Option<u8>,
+    pub player_switch_to: Option<u8>,
+    pub no_entry_delay_remaining: Option<u8>,
+    pub hall_of_fame_stall_remaining: Option<u8>,
+}
+
+impl GameOverSnapshot {
+    pub const NONE: Self = Self {
+        player_death_sleep_remaining: None,
+        player_switch_sleep_remaining: None,
+        player_switch_from: None,
+        player_switch_to: None,
+        no_entry_delay_remaining: None,
+        hall_of_fame_stall_remaining: None,
+    };
+
+    const fn player_death_sleep(remaining: u8) -> Self {
+        Self {
+            player_death_sleep_remaining: Some(remaining),
+            player_switch_sleep_remaining: None,
+            player_switch_from: None,
+            player_switch_to: None,
+            no_entry_delay_remaining: None,
+            hall_of_fame_stall_remaining: None,
+        }
+    }
+
+    const fn player_switch_sleep(remaining: u8, from_player: u8, to_player: u8) -> Self {
+        Self {
+            player_death_sleep_remaining: None,
+            player_switch_sleep_remaining: Some(remaining),
+            player_switch_from: Some(from_player),
+            player_switch_to: Some(to_player),
+            no_entry_delay_remaining: None,
+            hall_of_fame_stall_remaining: None,
+        }
+    }
+
+    const fn no_entry_delay(remaining: u8) -> Self {
+        Self {
+            player_death_sleep_remaining: None,
+            player_switch_sleep_remaining: None,
+            player_switch_from: None,
+            player_switch_to: None,
+            no_entry_delay_remaining: Some(remaining),
+            hall_of_fame_stall_remaining: None,
+        }
+    }
+
+    const fn hall_of_fame_display(remaining: u8) -> Self {
+        Self {
+            player_death_sleep_remaining: None,
+            player_switch_sleep_remaining: None,
+            player_switch_from: None,
+            player_switch_to: None,
+            no_entry_delay_remaining: None,
+            hall_of_fame_stall_remaining: Some(remaining),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreEntrySnapshot {
+    pub score: u32,
+    pub rank: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreSubmissionSnapshot {
+    pub player: u8,
+    pub score: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreTableEntrySnapshot {
+    pub rank: u8,
+    pub score: u32,
+    pub initials: [Option<char>; 3],
+}
+
+impl HighScoreTableEntrySnapshot {
+    pub const EMPTY: Self = Self {
+        rank: 0,
+        score: 0,
+        initials: [None, None, None],
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreTablesSnapshot {
+    pub all_time: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES],
+    pub todays_greatest: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES],
+}
+
+impl HighScoreTablesSnapshot {
+    pub const EMPTY: Self = Self {
+        all_time: EMPTY_HIGH_SCORE_TABLE,
+        todays_greatest: EMPTY_HIGH_SCORE_TABLE,
+    };
+
+    pub const DEFAULT: Self = Self {
+        all_time: DEFAULT_HIGH_SCORE_TABLE,
+        todays_greatest: DEFAULT_HIGH_SCORE_TABLE,
+    };
+
+    fn todays_qualifying_rank(self, score: u32) -> Option<u8> {
+        qualifying_rank(self.todays_greatest, score)
+    }
+
+    fn insert_all_time(&mut self, score: u32, initials: [Option<char>; 3]) -> Option<u8> {
+        insert_high_score_entry(&mut self.all_time, score, initials)
+    }
+
+    fn insert_todays_greatest(&mut self, score: u32, initials: [Option<char>; 3]) -> Option<u8> {
+        insert_high_score_entry(&mut self.todays_greatest, score, initials)
+    }
+}
+
+const EMPTY_HIGH_SCORE_TABLE: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] = [
+    HighScoreTableEntrySnapshot {
+        rank: 1,
+        score: 0,
+        initials: [None, None, None],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 2,
+        score: 0,
+        initials: [None, None, None],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 3,
+        score: 0,
+        initials: [None, None, None],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 4,
+        score: 0,
+        initials: [None, None, None],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 5,
+        score: 0,
+        initials: [None, None, None],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 6,
+        score: 0,
+        initials: [None, None, None],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 7,
+        score: 0,
+        initials: [None, None, None],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 8,
+        score: 0,
+        initials: [None, None, None],
+    },
+];
+
+const DEFAULT_HIGH_SCORE_TABLE: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES] = [
+    HighScoreTableEntrySnapshot {
+        rank: 1,
+        score: 21_270,
+        initials: [Some('D'), Some('R'), Some('J')],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 2,
+        score: 18_315,
+        initials: [Some('S'), Some('A'), Some('M')],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 3,
+        score: 15_920,
+        initials: [Some('L'), Some('E'), Some('D')],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 4,
+        score: 14_285,
+        initials: [Some('P'), Some('G'), Some('D')],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 5,
+        score: 12_520,
+        initials: [Some('C'), Some('R'), Some('B')],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 6,
+        score: 11_035,
+        initials: [Some('M'), Some('R'), Some('S')],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 7,
+        score: 8_265,
+        initials: [Some('S'), Some('S'), Some('R')],
+    },
+    HighScoreTableEntrySnapshot {
+        rank: 8,
+        score: 6_010,
+        initials: [Some('T'), Some('M'), Some('H')],
+    },
+];
+
+fn qualifying_rank(
+    entries: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES],
+    score: u32,
+) -> Option<u8> {
+    entries
+        .iter()
+        .find(|entry| score > entry.score)
+        .map(|entry| entry.rank)
+}
+
+fn insert_high_score_entry(
+    entries: &mut [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES],
+    score: u32,
+    initials: [Option<char>; 3],
+) -> Option<u8> {
+    let rank = qualifying_rank(*entries, score)?;
+    let insert_index = usize::from(rank - 1);
+
+    for index in (insert_index + 1..HIGH_SCORE_TABLE_ENTRIES).rev() {
+        entries[index] = HighScoreTableEntrySnapshot {
+            rank: u8::try_from(index + 1).expect("high-score table rank should fit in u8"),
+            ..entries[index - 1]
+        };
+    }
+    entries[insert_index] = HighScoreTableEntrySnapshot {
+        rank,
+        score,
+        initials,
+    };
+
+    Some(rank)
 }
 
 pub type GameSnapshot = GameState;
@@ -264,6 +4639,14 @@ pub struct Game {
     operator_controls: OperatorControlSystem,
     camera_left: WorldVector,
     pending_wave_start: bool,
+    coin_one_credit_delay: Option<u8>,
+    coin_one_sound_delay: Option<u8>,
+    start_sound_delay: Option<u8>,
+    start_playfield_delay: Option<u8>,
+    baiter_timer_ticks: Option<u32>,
+    baiter_pacing_frames_remaining: u8,
+    game_over_candidate_score: Option<u32>,
+    player_explosion: Option<PlayerExplosionRuntime>,
 }
 
 impl Game {
@@ -274,6 +4657,14 @@ impl Game {
             operator_controls: OperatorControlSystem::new(),
             camera_left: WorldVector::default(),
             pending_wave_start: false,
+            coin_one_credit_delay: None,
+            coin_one_sound_delay: None,
+            start_sound_delay: None,
+            start_playfield_delay: None,
+            baiter_timer_ticks: None,
+            baiter_pacing_frames_remaining: SOURCE_GAME_EXEC_SLEEP_FRAMES,
+            game_over_candidate_score: None,
+            player_explosion: None,
         }
     }
 
@@ -285,28 +4676,43 @@ impl Game {
         self.state.frame = self.state.frame.saturating_add(1);
         let mut gameplay_events = Vec::new();
         let mut sound_events = Vec::new();
+        let phase_at_start = self.state.phase;
+        let normal_attract_at_start = self.normal_attract_active();
 
-        if input.coin {
-            self.state.credits = self.state.credits.saturating_add(1);
-            gameplay_events.push(GameEvent::CreditAdded);
-            sound_events.push(SoundEvent::CreditAdded);
-        }
+        self.state.world.advance_score_popups();
+        self.state.world.advance_explosions();
+        self.advance_player_explosion();
+        self.step_coin_inputs(input, &mut gameplay_events, &mut sound_events);
 
         self.step_operator_controls(input, &mut gameplay_events);
 
-        if self.state.phase == GamePhase::Attract && input.start_one && self.state.credits > 0 {
-            self.start_one_player_game();
-            gameplay_events.push(GameEvent::GameStarted);
-            sound_events.push(SoundEvent::GameStarted);
+        self.step_start_sound(&mut sound_events);
+        let playfield_started = self.step_start_playfield();
+        self.step_start_inputs(input, &mut gameplay_events, &mut sound_events);
+
+        if phase_at_start == GamePhase::GameOver
+            || self.state.game_over.hall_of_fame_stall_remaining.is_some()
+        {
+            self.step_game_over(&mut gameplay_events);
         }
 
-        if self.state.phase == GamePhase::Playing {
+        if phase_at_start == GamePhase::Playing
+            && self.state.phase == GamePhase::Playing
+            && self.start_playfield_delay.is_none()
+            && !playfield_started
+        {
             self.step_playing(input, &mut gameplay_events, &mut sound_events);
         }
 
-        if self.state.phase == GamePhase::HighScoreEntry {
+        if phase_at_start == GamePhase::HighScoreEntry
+            && self.state.phase == GamePhase::HighScoreEntry
+        {
             self.step_high_score_entry(input, &mut gameplay_events);
         }
+
+        self.sync_world_presentation();
+        self.sync_current_player_stock();
+        self.sync_attract_presentation(normal_attract_at_start);
 
         GameFrame {
             state: self.state.clone(),
@@ -315,23 +4721,172 @@ impl Game {
         }
     }
 
-    fn start_one_player_game(&mut self) {
-        self.state.credits = self.state.credits.saturating_sub(1);
+    fn normal_attract_active(&self) -> bool {
+        self.state.phase == GamePhase::Attract
+            && self.state.game_over.hall_of_fame_stall_remaining.is_none()
+    }
+
+    fn sync_world_presentation(&mut self) {
+        self.state.world.refresh_object_evidence();
+        self.state.world.sync_clean_lifecycle_evidence();
+        self.state.world.sync_scanner_radar(
+            self.state.phase,
+            self.state.frame,
+            self.camera_left,
+            self.state.player.position,
+        );
+        self.state.world.player_explosion = self
+            .player_explosion
+            .as_ref()
+            .and_then(PlayerExplosionRuntime::snapshot);
+    }
+
+    fn advance_player_explosion(&mut self) {
+        if let Some(explosion) = &mut self.player_explosion
+            && !explosion.advance_source_frame()
+        {
+            self.player_explosion = None;
+        }
+    }
+
+    fn spawn_player_explosion(&mut self, center: ScreenPosition) {
+        self.player_explosion = Some(PlayerExplosionRuntime::source_spawn(center));
+    }
+
+    fn sync_attract_presentation(&mut self, normal_attract_at_start: bool) {
+        if !self.normal_attract_active() {
+            self.state.attract = AttractPresentationSnapshot::INACTIVE;
+            return;
+        }
+
+        let page_frame = if normal_attract_at_start {
+            self.state.attract.page_frame.saturating_add(1)
+        } else {
+            0
+        };
+        self.state.attract = AttractPresentationSnapshot::for_page_frame(page_frame);
+    }
+
+    fn step_coin_inputs(
+        &mut self,
+        input: GameInput,
+        gameplay_events: &mut Vec<GameEvent>,
+        sound_events: &mut Vec<SoundEvent>,
+    ) {
+        if let Some(frames) = self.coin_one_sound_delay {
+            let remaining = frames.saturating_sub(1);
+            if remaining == 0 {
+                self.coin_one_sound_delay = None;
+                sound_events.push(SoundEvent::CreditAdded);
+            } else {
+                self.coin_one_sound_delay = Some(remaining);
+            }
+        }
+
+        if let Some(frames) = self.coin_one_credit_delay {
+            let remaining = frames.saturating_sub(1);
+            if remaining == 0 {
+                self.coin_one_credit_delay = None;
+                self.state.credits = self.state.credits.saturating_add(1);
+                gameplay_events.push(GameEvent::CreditAdded);
+                self.coin_one_sound_delay = Some(COIN_CREDIT_SOUND_DELAY_FRAMES);
+            } else {
+                self.coin_one_credit_delay = Some(remaining);
+            }
+        }
+
+        if input.coin && self.coin_one_credit_delay.is_none() {
+            self.coin_one_credit_delay = Some(COIN_CREDIT_DELAY_FRAMES);
+        }
+    }
+
+    fn step_start_inputs(
+        &mut self,
+        input: GameInput,
+        gameplay_events: &mut Vec<GameEvent>,
+        _sound_events: &mut Vec<SoundEvent>,
+    ) {
+        if self.state.phase != GamePhase::Attract {
+            return;
+        }
+
+        let Some(player_count) = requested_start_player_count(input) else {
+            return;
+        };
+        if self.state.credits < player_count {
+            return;
+        }
+
+        self.start_player_game(player_count);
+        gameplay_events.push(GameEvent::GameStarted);
+        self.start_sound_delay = Some(START_SOUND_DELAY_FRAMES);
+        self.start_playfield_delay = Some(START_PLAYFIELD_DELAY_FRAMES);
+    }
+
+    fn step_start_sound(&mut self, sound_events: &mut Vec<SoundEvent>) {
+        if let Some(frames) = self.start_sound_delay {
+            let remaining = frames.saturating_sub(1);
+            if remaining == 0 {
+                self.start_sound_delay = None;
+                sound_events.push(SoundEvent::GameStarted);
+            } else {
+                self.start_sound_delay = Some(remaining);
+            }
+        }
+    }
+
+    fn start_player_game(&mut self, player_count: u8) {
+        self.state.credits = self.state.credits.saturating_sub(player_count);
         self.state.phase = GamePhase::Playing;
         self.state.current_player = 1;
+        self.state.player_count = player_count;
         self.state.wave = 1;
+        self.state.wave_profile = WaveProfileSnapshot::for_wave(1);
         self.state.player = PlayerSnapshot {
-            position: (world_word(0x2000), world_word(0x8000)),
+            position: (world_word(0), world_word(0)),
             velocity: (WorldVector::default(), WorldVector::default()),
             direction: Direction::Right,
-            lives: 3,
+            lives: DEFAULT_PLAYER_LIVES,
             smart_bombs: 3,
         };
+        self.state.player_stocks = [PlayerStockSnapshot::from_player(self.state.player); 2];
         self.state.high_score_initials = HighScoreInitialsState::EMPTY;
-        self.state.world = WorldSnapshot::first_wave();
+        self.state.high_score_entry = None;
+        self.state.high_score_submission = None;
+        self.state.game_over = GameOverSnapshot::NONE;
+        self.state.world = WorldSnapshot::default();
+        self.player_explosion = None;
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
         self.pending_wave_start = false;
+        self.baiter_timer_ticks = None;
+        self.game_over_candidate_score = None;
+    }
+
+    fn step_start_playfield(&mut self) -> bool {
+        let Some(frames) = self.start_playfield_delay else {
+            return false;
+        };
+
+        let remaining = frames.saturating_sub(1);
+        if remaining > 0 {
+            self.start_playfield_delay = Some(remaining);
+            return false;
+        }
+
+        self.start_playfield_delay = None;
+        self.state.player.position = (world_word(0x2000), world_word(0x8000));
+        self.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        self.state.player.direction = Direction::Right;
+        self.state.player.lives = self.state.player.lives.saturating_sub(1);
+        self.sync_current_player_stock();
+        self.state.world = WorldSnapshot::first_wave();
+        self.player_explosion = None;
+        self.camera_left = WorldVector::default();
+        self.controls = PlayerControlSystem::new();
+        self.pending_wave_start = false;
+        self.reset_baiter_timer();
+        true
     }
 
     fn step_operator_controls(&mut self, input: GameInput, gameplay_events: &mut Vec<GameEvent>) {
@@ -364,8 +4919,135 @@ impl Game {
         }
 
         if frame.submitted {
-            self.state.phase = GamePhase::Attract;
+            if let Some(entry) = self.state.high_score_entry.take() {
+                self.submit_high_score_table_entry(entry.score);
+                self.state.high_score_submission = Some(HighScoreSubmissionSnapshot {
+                    player: self.state.current_player,
+                    score: entry.score,
+                });
+            }
+            self.state.phase = GamePhase::GameOver;
+            self.state.game_over =
+                GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES);
             gameplay_events.push(GameEvent::HighScoreSubmitted);
+        }
+    }
+
+    fn step_game_over(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        if let Some(remaining) = self.state.game_over.player_death_sleep_remaining {
+            self.step_player_death_game_over_sleep(remaining, gameplay_events);
+            return;
+        }
+
+        if let Some(remaining) = self.state.game_over.player_switch_sleep_remaining {
+            self.step_player_switch_sleep(remaining);
+            return;
+        }
+
+        if let Some(remaining) = self.state.game_over.no_entry_delay_remaining {
+            self.step_no_entry_delay(remaining);
+            return;
+        }
+
+        if let Some(remaining) = self.state.game_over.hall_of_fame_stall_remaining {
+            self.step_hall_of_fame_display(remaining);
+        }
+    }
+
+    fn step_player_death_game_over_sleep(
+        &mut self,
+        remaining: u8,
+        gameplay_events: &mut Vec<GameEvent>,
+    ) {
+        let next = remaining.saturating_sub(1);
+        if next > 0 {
+            self.state.game_over = GameOverSnapshot::player_death_sleep(next);
+            return;
+        }
+
+        let score = self.game_over_candidate_score.take().unwrap_or_default();
+        self.player_explosion = None;
+        if let Some(rank) = self.state.high_score_tables.todays_qualifying_rank(score) {
+            self.state.phase = GamePhase::HighScoreEntry;
+            self.state.high_score_initials = HighScoreInitialsState::EMPTY;
+            self.state.high_score_entry = Some(HighScoreEntrySnapshot { score, rank });
+            self.state.high_score_submission = None;
+            self.state.game_over = GameOverSnapshot::NONE;
+            gameplay_events.push(GameEvent::HighScoreEntryStarted);
+        } else {
+            self.state.game_over =
+                GameOverSnapshot::no_entry_delay(HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES);
+        }
+    }
+
+    fn step_player_switch_sleep(&mut self, remaining: u8) {
+        let from_player = self
+            .state
+            .game_over
+            .player_switch_from
+            .unwrap_or(self.state.current_player);
+        let to_player = self
+            .state
+            .game_over
+            .player_switch_to
+            .unwrap_or_else(|| other_player_number(from_player));
+        let next = remaining.saturating_sub(1);
+        if next > 0 {
+            self.state.game_over =
+                GameOverSnapshot::player_switch_sleep(next, from_player, to_player);
+            return;
+        }
+
+        self.start_next_player_turn(to_player);
+    }
+
+    fn start_next_player_turn(&mut self, player: u8) {
+        let player = player.clamp(1, self.state.player_count.clamp(1, 2));
+        let stock = self.state.player_stocks[player_stock_index(player)];
+        self.state.phase = GamePhase::Playing;
+        self.state.current_player = player;
+        self.state.player = PlayerSnapshot {
+            position: (WorldVector::default(), WorldVector::default()),
+            velocity: (WorldVector::default(), WorldVector::default()),
+            direction: Direction::Right,
+            lives: stock.lives,
+            smart_bombs: stock.smart_bombs,
+        };
+        self.state.wave = DEFAULT_CABINET_WAVE;
+        self.state.wave_profile = WaveProfileSnapshot::for_wave(DEFAULT_CABINET_WAVE);
+        self.state.world = WorldSnapshot::default();
+        self.player_explosion = None;
+        self.state.game_over = GameOverSnapshot::NONE;
+        self.state.high_score_entry = None;
+        self.state.high_score_submission = None;
+        self.camera_left = WorldVector::default();
+        self.controls = PlayerControlSystem::new();
+        self.pending_wave_start = false;
+        self.start_playfield_delay = Some(START_PLAYFIELD_DELAY_FRAMES);
+        self.baiter_timer_ticks = None;
+        self.game_over_candidate_score = None;
+    }
+
+    fn step_no_entry_delay(&mut self, remaining: u8) {
+        let next = remaining.saturating_sub(1);
+        if next > 0 {
+            self.state.game_over = GameOverSnapshot::no_entry_delay(next);
+            return;
+        }
+
+        self.state.phase = GamePhase::Attract;
+        self.state.game_over = GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES);
+    }
+
+    fn step_hall_of_fame_display(&mut self, remaining: u8) {
+        let next = remaining.saturating_sub(1);
+        self.state.game_over = if next > 0 {
+            GameOverSnapshot::hall_of_fame_display(next)
+        } else {
+            GameOverSnapshot::NONE
+        };
+        if next == 0 {
+            self.state.phase = GamePhase::Attract;
         }
     }
 
@@ -401,8 +5083,12 @@ impl Game {
         self.state.player.position = motion.state.position;
         self.state.player.velocity = motion.state.velocity;
         self.camera_left = motion.state.camera_left;
+        self.state
+            .world
+            .sync_player_carried_humans(motion.screen_position);
 
         self.advance_projectiles();
+        self.advance_enemy_projectiles();
 
         if controls.triggers.fire {
             gameplay_events.push(GameEvent::FirePressed);
@@ -434,18 +5120,94 @@ impl Game {
             sound_events.push(SoundEvent::ThrustStarted);
         }
 
-        for enemy in &mut self.state.world.enemies {
-            let motion = EnemyMotionSystem::step(enemy.position, enemy.velocity);
-            enemy.position = motion.position;
-            enemy.velocity = motion.velocity;
-        }
+        self.state.world.advance_enemies(
+            self.state.wave_profile,
+            motion.screen_position,
+            motion.state.velocity,
+        );
 
+        self.state.world.resolve_lander_human_abductions(
+            self.state.wave_profile,
+            motion.screen_position,
+            motion.state.velocity,
+        );
+        let falling_advance = self.state.world.advance_falling_humans();
+        for landing_position in falling_advance.safe_landings {
+            self.state.world.spawn_score_popup(
+                ScorePopupKind::Points250,
+                clean_rescue_score_popup_position(landing_position),
+            );
+            self.award_safe_landing_score(gameplay_events);
+        }
+        for landing_position in falling_advance.fatal_landings {
+            self.state
+                .world
+                .spawn_explosion(ExplosionKind::Astronaut, landing_position);
+        }
+        if self
+            .state
+            .world
+            .resolve_player_human_rescue(motion.screen_position)
+        {
+            self.award_rescue_score(gameplay_events);
+        }
+        self.advance_baiter_entry(motion.screen_position, motion.state.velocity);
         self.resolve_projectile_enemy_collisions(gameplay_events);
-        self.resolve_player_enemy_collision(motion.screen_position, gameplay_events);
+        let hit_enemy =
+            self.resolve_player_enemy_collision(motion.screen_position, gameplay_events);
+        if !hit_enemy && self.state.phase == GamePhase::Playing {
+            self.resolve_player_enemy_projectile_collision(motion.screen_position, gameplay_events);
+        }
+        self.resolve_planet_destruction();
 
         if self.state.phase == GamePhase::Playing {
-            self.queue_wave_clear_if_needed(gameplay_events);
+            self.queue_wave_clear_if_needed(gameplay_events, motion.state.position.0);
         }
+    }
+
+    fn reset_baiter_timer(&mut self) {
+        self.baiter_timer_ticks = Some(self.state.wave_profile.baiter_delay);
+        self.baiter_pacing_frames_remaining = SOURCE_GAME_EXEC_SLEEP_FRAMES;
+    }
+
+    fn advance_baiter_entry(
+        &mut self,
+        player_position: ScreenPosition,
+        player_velocity: (WorldVector, WorldVector),
+    ) {
+        let Some(timer_ticks) = self.baiter_timer_ticks else {
+            return;
+        };
+        let enemy_total = self.state.world.source_enemy_total();
+        if enemy_total == 0 {
+            return;
+        }
+
+        if self.baiter_pacing_frames_remaining > 1 {
+            self.baiter_pacing_frames_remaining =
+                self.baiter_pacing_frames_remaining.saturating_sub(1);
+            return;
+        }
+        self.baiter_pacing_frames_remaining = SOURCE_GAME_EXEC_SLEEP_FRAMES;
+
+        let timer_ticks = source_baiter_accelerated_timer_ticks(
+            timer_ticks,
+            self.state.wave_profile,
+            enemy_total,
+        );
+        let decremented_ticks = timer_ticks.saturating_sub(1);
+        if decremented_ticks > 0 {
+            self.baiter_timer_ticks = Some(decremented_ticks);
+            return;
+        }
+
+        self.baiter_timer_ticks = Some(source_baiter_reset_timer_ticks(
+            self.state.wave_profile,
+            enemy_total,
+        ));
+        self.state
+            .world
+            .spawn_baiter(self.state.wave_profile, player_position, player_velocity);
     }
 
     fn advance_projectiles(&mut self) {
@@ -456,6 +5218,38 @@ impl Game {
                 projectile.velocity = motion.velocity;
             }
             motion.active
+        });
+    }
+
+    fn advance_enemy_projectiles(&mut self) {
+        self.state.world.enemy_projectiles.retain_mut(|projectile| {
+            projectile.source_lifetime_ticks = projectile.source_lifetime_ticks.saturating_sub(1);
+            if projectile.source_lifetime_ticks == 0 {
+                return false;
+            }
+
+            let [x, x_fraction] =
+                u16::from_be_bytes([projectile.position.x, projectile.source_x_fraction])
+                    .wrapping_add(projectile.source_x_velocity)
+                    .to_be_bytes();
+            if x >= SOURCE_SHELL_X_MAX {
+                return false;
+            }
+
+            let [y, y_fraction] =
+                u16::from_be_bytes([projectile.position.y, projectile.source_y_fraction])
+                    .wrapping_add(projectile.source_y_velocity)
+                    .to_be_bytes();
+            if y <= SOURCE_PLAYFIELD_Y_MIN {
+                return false;
+            }
+
+            projectile.position = ScreenPosition::new(x, y);
+            projectile.source_x_fraction = x_fraction;
+            projectile.source_y_fraction = y_fraction;
+            projectile.velocity =
+                source_screen_velocity(projectile.source_x_velocity, projectile.source_y_velocity);
+            true
         });
     }
 
@@ -483,8 +5277,7 @@ impl Game {
 
         let enemy = self.state.world.enemies.remove(hit.enemy_index);
         self.state.world.projectiles.remove(hit.projectile_index);
-        gameplay_events.push(GameEvent::EnemyDestroyed);
-        self.award_enemy_score(enemy.kind, gameplay_events);
+        self.destroy_enemy(enemy, gameplay_events);
     }
 
     fn resolve_smart_bomb(&mut self, gameplay_events: &mut Vec<GameEvent>) {
@@ -497,8 +5290,28 @@ impl Game {
             .collect::<Vec<_>>();
 
         for enemy in destroyed {
-            gameplay_events.push(GameEvent::EnemyDestroyed);
-            self.award_enemy_score(enemy.kind, gameplay_events);
+            self.destroy_enemy(enemy, gameplay_events);
+        }
+    }
+
+    fn destroy_enemy(&mut self, enemy: EnemySnapshot, gameplay_events: &mut Vec<GameEvent>) {
+        self.state
+            .world
+            .spawn_explosion(ExplosionKind::for_enemy(enemy.kind), enemy.position);
+        gameplay_events.push(GameEvent::EnemyDestroyed);
+        self.award_enemy_score(enemy.kind, gameplay_events);
+
+        match enemy.kind {
+            EnemyKind::Lander => self
+                .state
+                .world
+                .release_passenger_for_lander(enemy.position),
+            EnemyKind::Pod => {
+                self.state
+                    .world
+                    .spawn_pod_swarmers(enemy.position, self.state.wave_profile);
+            }
+            EnemyKind::Mutant | EnemyKind::Bomber | EnemyKind::Swarmer | EnemyKind::Baiter => {}
         }
     }
 
@@ -506,7 +5319,7 @@ impl Game {
         &mut self,
         player_position: ScreenPosition,
         gameplay_events: &mut Vec<GameEvent>,
-    ) {
+    ) -> bool {
         let player = CollisionBox::new(player_position, PLAYER_SPRITE_SIZE);
         let enemy_boxes = self
             .state
@@ -517,10 +5330,52 @@ impl Game {
             .collect::<Vec<_>>();
 
         let Some(hit) = CollisionSystem::first_player_enemy_hit(player, &enemy_boxes) else {
-            return;
+            return false;
         };
 
-        self.state.world.enemies.remove(hit.enemy_index);
+        let enemy = self.state.world.enemies.remove(hit.enemy_index);
+        if enemy.kind == EnemyKind::Lander {
+            self.state
+                .world
+                .release_passenger_for_lander(enemy.position);
+        }
+        self.apply_player_hit(player_position, gameplay_events);
+        true
+    }
+
+    fn resolve_player_enemy_projectile_collision(
+        &mut self,
+        player_position: ScreenPosition,
+        gameplay_events: &mut Vec<GameEvent>,
+    ) -> bool {
+        let player = CollisionBox::new(player_position, PLAYER_SPRITE_SIZE);
+        let projectile_boxes = self
+            .state
+            .world
+            .enemy_projectiles
+            .iter()
+            .map(|projectile| CollisionBox::new(projectile.position, ENEMY_PROJECTILE_SPRITE_SIZE))
+            .collect::<Vec<_>>();
+
+        let Some(hit) = CollisionSystem::first_player_enemy_hit(player, &projectile_boxes) else {
+            return false;
+        };
+
+        let projectile = self.state.world.enemy_projectiles.remove(hit.enemy_index);
+        self.state
+            .world
+            .spawn_explosion(ExplosionKind::Bomb, projectile.position);
+        self.award_points(SOURCE_ENEMY_PROJECTILE_SCORE_POINTS, gameplay_events);
+        self.apply_player_hit(player_position, gameplay_events);
+        true
+    }
+
+    fn apply_player_hit(
+        &mut self,
+        player_position: ScreenPosition,
+        gameplay_events: &mut Vec<GameEvent>,
+    ) {
+        self.spawn_player_explosion(player_position.wrapping_offset(4, 3));
         let frame = PlayerDamageSystem::apply_hit(PlayerStock::new(
             self.state.player.lives,
             self.state.player.smart_bombs,
@@ -531,23 +5386,45 @@ impl Game {
 
         if frame.game_over {
             self.pending_wave_start = false;
-            gameplay_events.push(GameEvent::GameOver);
-            if HighScoreEntrySystem::evaluate(
-                self.current_player_score(),
-                self.state.scores.high_score,
-            )
-            .qualifies
-            {
-                self.state.phase = GamePhase::HighScoreEntry;
-                self.state.high_score_initials = HighScoreInitialsState::EMPTY;
-                gameplay_events.push(GameEvent::HighScoreEntryStarted);
+            self.sync_current_player_stock();
+            self.state.phase = GamePhase::GameOver;
+            self.state.high_score_entry = None;
+            self.state.high_score_submission = None;
+            if let Some(next_player) = self.next_surviving_player() {
+                self.state.game_over = GameOverSnapshot::player_switch_sleep(
+                    PLAYER_SWITCH_SLEEP_FRAMES,
+                    self.state.current_player,
+                    next_player,
+                );
             } else {
-                self.state.phase = GamePhase::GameOver;
+                gameplay_events.push(GameEvent::GameOver);
+                let current_score = self.current_player_score();
+                self.game_over_candidate_score = Some(current_score);
+                self.state.game_over =
+                    GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES);
             }
         }
     }
 
-    fn queue_wave_clear_if_needed(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+    fn resolve_planet_destruction(&mut self) {
+        if self.state.world.humans.is_empty() && self.state.world.terrain_blow.is_none() {
+            self.state.world.start_terrain_blow();
+        }
+    }
+
+    fn queue_wave_clear_if_needed(
+        &mut self,
+        gameplay_events: &mut Vec<GameEvent>,
+        player_x: WorldVector,
+    ) {
+        if self.state.world.activate_enemy_reserve_batch(
+            self.state.wave_profile,
+            source_word_from_world_vector(player_x),
+            source_word_from_world_vector(self.camera_left),
+        ) {
+            return;
+        }
+
         if matches!(
             WaveSystem::evaluate(WaveState::new(
                 self.state.wave,
@@ -564,17 +5441,32 @@ impl Game {
         let next_wave = WaveSystem::next_wave(self.state.wave);
 
         self.state.wave = next_wave;
+        self.state.wave_profile = WaveProfileSnapshot::for_wave(next_wave);
         self.state.world = WorldSnapshot::for_wave(next_wave);
+        self.player_explosion = None;
         self.pending_wave_start = false;
+        self.reset_baiter_timer();
         gameplay_events.push(GameEvent::WaveStarted);
     }
 
     fn award_enemy_score(&mut self, kind: EnemyKind, gameplay_events: &mut Vec<GameEvent>) {
+        self.award_points(enemy_score(kind), gameplay_events);
+    }
+
+    fn award_rescue_score(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        self.award_points(SOURCE_RESCUE_SCORE_POINTS, gameplay_events);
+    }
+
+    fn award_safe_landing_score(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        self.award_points(SOURCE_SAFE_LANDING_SCORE_POINTS, gameplay_events);
+    }
+
+    fn award_points(&mut self, points: u32, gameplay_events: &mut Vec<GameEvent>) {
         let frame = ScoreSystem::award_points(
             self.state.scores,
             PlayerStock::new(self.state.player.lives, self.state.player.smart_bombs),
             self.state.current_player,
-            enemy_score(kind),
+            points,
         );
         self.state.scores = frame.scores;
         self.state.player.lives = frame.stock.lives;
@@ -593,8 +5485,50 @@ impl Game {
         }
     }
 
+    fn submit_high_score_table_entry(&mut self, score: u32) {
+        let initials = self.state.high_score_initials.initials;
+        self.state
+            .high_score_tables
+            .insert_all_time(score, initials);
+        self.state
+            .high_score_tables
+            .insert_todays_greatest(score, initials);
+        self.state.scores.high_score = self.state.high_score_tables.all_time[0].score;
+    }
+
+    fn sync_current_player_stock(&mut self) {
+        self.state.player_stocks[player_stock_index(self.state.current_player)] =
+            PlayerStockSnapshot::from_player(self.state.player);
+    }
+
+    fn next_surviving_player(&self) -> Option<u8> {
+        let player_count = self.state.player_count.clamp(1, 2);
+        if player_count < 2 {
+            return None;
+        }
+
+        let current = self.state.current_player.clamp(1, player_count);
+        for offset in 1..=player_count {
+            let mut candidate = current.saturating_add(offset);
+            if candidate > player_count {
+                candidate = candidate.saturating_sub(player_count);
+            }
+            if candidate != current
+                && self.state.player_stocks[player_stock_index(candidate)].lives > 0
+            {
+                return Some(candidate);
+            }
+        }
+
+        None
+    }
+
     fn scene(&self) -> RenderScene {
         let mut scene = RenderScene::empty(self.state.frame, SurfaceSize::new(292, 240));
+        #[cfg(test)]
+        {
+            scene.visual_signature = accepted_r3_visual_signature(self.state.frame);
+        }
         for star in &self.state.world.stars {
             scene.push_sprite(SceneSprite {
                 sprite: SpriteId::STAR,
@@ -613,15 +5547,33 @@ impl Game {
                 tint: Color::from_rgba(0x26, 0xAE, 0x00, 0xFF),
             });
         }
-        scene.push_sprite(SceneSprite {
-            sprite: SpriteId::SCORE_TEXT,
-            layer: RenderLayer::Hud,
-            position: [0.0, 0.0],
-            size: [96.0, 8.0],
-            tint: Color::WHITE,
-        });
+        push_score_sprites(&mut scene, self.state.scores, self.state.player_count);
+        push_top_display_border_sprites(&mut scene, &self.state);
+        push_attract_credit_sprites(&mut scene, &self.state);
+        push_attract_presents_sprites(&mut scene, &self.state);
+        push_attract_instruction_text_sprites(&mut scene, &self.state);
+        push_attract_williams_logo_sprite(&mut scene, &self.state);
+        push_attract_defender_wordmark_sprite(&mut scene, &self.state);
+        push_attract_copyright_strip_sprite(&mut scene, &self.state);
+        push_final_game_over_prompt_sprites(&mut scene, self.state.game_over);
+        push_player_switch_prompt_sprites(&mut scene, self.state.game_over);
+        push_player_start_prompt_sprites(&mut scene, &self.state);
+        push_wave_completion_status_sprites(&mut scene, &self.state);
+        push_survivor_bonus_icon_sprites(&mut scene, &self.state);
+        push_high_score_entry_prompt_sprites(&mut scene, &self.state);
+        push_hall_of_fame_display_sprites(&mut scene, &self.state);
+        push_player_explosion_cloud_sprites(&mut scene, self.state.world.player_explosion.as_ref());
 
         if self.state.phase == GamePhase::Playing {
+            push_stock_sprites(
+                &mut scene,
+                self.state.player_count,
+                self.state.player_stocks,
+            );
+            push_scanner_radar_sprites(&mut scene, &self.state.world.scanner);
+            push_source_object_detail_sprites(&mut scene, &self.state.world.object_evidence);
+            push_expanded_object_detail_sprites(&mut scene, &self.state.world.expanded_objects);
+
             for enemy in &self.state.world.enemies {
                 let size = enemy_sprite_size(enemy.kind);
                 scene.push_sprite(SceneSprite {
@@ -637,8 +5589,11 @@ impl Game {
                     sprite: SpriteId::HUMAN,
                     layer: RenderLayer::Objects,
                     position: [f32::from(human.position.x), f32::from(human.position.y)],
-                    size: [6.0, 8.0],
-                    tint: if human.carried {
+                    size: [
+                        f32::from(HUMAN_SPRITE_SIZE.0),
+                        f32::from(HUMAN_SPRITE_SIZE.1),
+                    ],
+                    tint: if human.carried || human.carried_by_player {
                         Color::from_rgba(0xFF, 0xF8, 0x80, 0xFF)
                     } else {
                         Color::from_rgba(0x7C, 0xD7, 0xFF, 0xFF)
@@ -674,30 +5629,1044 @@ impl Game {
                     tint: Color::WHITE,
                 });
             }
+            for projectile in &self.state.world.enemy_projectiles {
+                scene.push_sprite(SceneSprite {
+                    sprite: SpriteId::ENEMY_BOMB,
+                    layer: RenderLayer::Projectiles,
+                    position: [
+                        f32::from(projectile.position.x),
+                        f32::from(projectile.position.y),
+                    ],
+                    size: [
+                        f32::from(ENEMY_PROJECTILE_SPRITE_SIZE.0),
+                        f32::from(ENEMY_PROJECTILE_SPRITE_SIZE.1),
+                    ],
+                    tint: Color::WHITE,
+                });
+            }
         }
 
         scene
     }
 }
 
+fn push_source_message_sprites_with_tint(
+    scene: &mut RenderScene,
+    text: &str,
+    origin: [f32; 2],
+    layer: RenderLayer,
+    tint: Color,
+) {
+    let first_sprite = scene.sprites.len();
+    push_source_message_sprites(scene, text, origin, layer);
+    tint_new_sprites(scene, first_sprite, tint);
+}
+
+fn push_source_text_bytes_sprites_with_tint(
+    scene: &mut RenderScene,
+    bytes: &[u8],
+    origin: [f32; 2],
+    layer: RenderLayer,
+    tint: Color,
+) {
+    let first_sprite = scene.sprites.len();
+    push_source_text_bytes_sprites(scene, bytes, origin, layer);
+    tint_new_sprites(scene, first_sprite, tint);
+}
+
+fn push_source_controlled_message_sprites_with_tint(
+    scene: &mut RenderScene,
+    text: &str,
+    top_left_screen_address: u16,
+    layer: RenderLayer,
+    tint: Color,
+) {
+    let first_sprite = scene.sprites.len();
+    push_source_controlled_message_sprites(scene, text, top_left_screen_address, layer);
+    tint_new_sprites(scene, first_sprite, tint);
+}
+
+fn tint_new_sprites(scene: &mut RenderScene, first_sprite: usize, tint: Color) {
+    for sprite in &mut scene.sprites[first_sprite..] {
+        sprite.tint = tint;
+    }
+}
+
+fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
+    if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
+        return;
+    }
+
+    if let Some(text) = source_message_text("CREDV") {
+        push_source_message_sprites_with_tint(
+            scene,
+            text,
+            source_screen_position(SOURCE_ATTRACT_CREDITS_LABEL_SCREEN),
+            RenderLayer::Overlay,
+            SOURCE_VISUAL_STATE.attract_title_text_tint(),
+        );
+    }
+
+    let (digits, digit_count) = attract_credit_digits(state.credits);
+    push_source_text_bytes_sprites_with_tint(
+        scene,
+        &digits[..digit_count],
+        source_screen_position(SOURCE_ATTRACT_CREDITS_NUMBER_SCREEN),
+        RenderLayer::Overlay,
+        SOURCE_VISUAL_STATE.attract_title_text_tint(),
+    );
+}
+
+fn attract_credit_digits(credits: u8) -> ([u8; 2], usize) {
+    let credits = credits.min(99);
+    if credits < 10 {
+        ([b'0' + credits, b' '], 1)
+    } else {
+        ([b'0' + credits / 10, b'0' + credits % 10], 2)
+    }
+}
+
+fn push_attract_presents_sprites(scene: &mut RenderScene, state: &GameState) {
+    if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
+        return;
+    }
+    if !state.attract.shows_presents_text() {
+        return;
+    }
+
+    if let Some(text) = source_message_text("ELECV") {
+        push_source_controlled_message_sprites_with_tint(
+            scene,
+            text,
+            SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
+            RenderLayer::Overlay,
+            SOURCE_VISUAL_STATE.attract_title_text_tint(),
+        );
+    }
+}
+
+fn push_attract_instruction_text_sprites(scene: &mut RenderScene, state: &GameState) {
+    if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
+        return;
+    }
+    if !state.attract.shows_instruction_text() {
+        return;
+    }
+
+    for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
+        if let Some(text) = source_message_text(label) {
+            push_source_controlled_message_sprites_with_tint(
+                scene,
+                text,
+                *screen_address,
+                RenderLayer::Overlay,
+                SOURCE_VISUAL_STATE.attract_instruction_text_tint(*screen_address),
+            );
+        }
+    }
+}
+
+fn push_attract_williams_logo_sprite(scene: &mut RenderScene, state: &GameState) {
+    if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
+        return;
+    }
+    if !state.attract.shows_williams_logo() {
+        return;
+    }
+    if !SOURCE_VISUAL_STATE.attract_williams_logo_should_render() {
+        return;
+    }
+
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::ATTRACT_WILLIAMS_LOGO,
+        layer: RenderLayer::Overlay,
+        position: source_screen_position(SOURCE_ATTRACT_WILLIAMS_LOGO_SCREEN),
+        size: SOURCE_ATTRACT_WILLIAMS_LOGO_SIZE,
+        tint: SOURCE_VISUAL_STATE.attract_williams_logo_tint(),
+    });
+}
+
+fn push_attract_defender_wordmark_sprite(scene: &mut RenderScene, state: &GameState) {
+    if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
+        return;
+    }
+    if !state.attract.shows_defender_wordmark() {
+        return;
+    }
+
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::HALL_OF_FAME_DEFENDER_LOGO,
+        layer: RenderLayer::Overlay,
+        position: source_screen_position(SOURCE_ATTRACT_DEFENDER_WORDMARK_SCREEN),
+        size: SOURCE_DEFENDER_WORDMARK_SIZE,
+        tint: SOURCE_VISUAL_STATE.attract_defender_wordmark_tint(),
+    });
+}
+
+fn push_attract_copyright_strip_sprite(scene: &mut RenderScene, state: &GameState) {
+    if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
+        return;
+    }
+    if !state.attract.shows_copyright() {
+        return;
+    }
+
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::ATTRACT_COPYRIGHT_STRIP,
+        layer: RenderLayer::Overlay,
+        position: source_screen_position(SOURCE_ATTRACT_COPYRIGHT_STRIP_SCREEN),
+        size: SOURCE_ATTRACT_COPYRIGHT_STRIP_SIZE,
+        tint: SOURCE_VISUAL_STATE.attract_copyright_tint(),
+    });
+}
+
+fn requested_start_player_count(input: GameInput) -> Option<u8> {
+    if input.start_two {
+        Some(2)
+    } else if input.start_one {
+        Some(1)
+    } else {
+        None
+    }
+}
+
+fn player_stock_index(player: u8) -> usize {
+    usize::from(player.saturating_sub(1).min(1))
+}
+
+const fn other_player_number(player: u8) -> u8 {
+    if player == 2 { 1 } else { 2 }
+}
+
+fn push_final_game_over_prompt_sprites(scene: &mut RenderScene, game_over: GameOverSnapshot) {
+    if game_over.player_death_sleep_remaining.is_none() {
+        return;
+    }
+
+    if let Some(text) = source_message_text("GO") {
+        push_source_message_sprites(
+            scene,
+            text,
+            source_screen_position(SOURCE_FINAL_GAME_OVER_SCREEN),
+            RenderLayer::Overlay,
+        );
+    }
+}
+
+fn push_player_switch_prompt_sprites(scene: &mut RenderScene, game_over: GameOverSnapshot) {
+    if game_over.player_switch_sleep_remaining.is_none() {
+        return;
+    }
+
+    let player_label = if game_over.player_switch_from == Some(2) {
+        "PLYR2"
+    } else {
+        "PLYR1"
+    };
+    if let Some(text) = source_message_text(player_label) {
+        push_source_message_sprites(
+            scene,
+            text,
+            source_screen_position(SOURCE_PLAYER_SWITCH_LABEL_SCREEN),
+            RenderLayer::Overlay,
+        );
+    }
+    if let Some(text) = source_message_text("GO") {
+        push_source_message_sprites(
+            scene,
+            text,
+            source_screen_position(SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN),
+            RenderLayer::Overlay,
+        );
+    }
+}
+
+fn push_player_start_prompt_sprites(scene: &mut RenderScene, state: &GameState) {
+    if !should_show_player_start_prompt(state) {
+        return;
+    }
+
+    let player_label = if state.current_player == 2 {
+        "PLYR2"
+    } else {
+        "PLYR1"
+    };
+    if let Some(text) = source_message_text(player_label) {
+        push_source_message_sprites(
+            scene,
+            text,
+            source_screen_position(SOURCE_PLAYER_START_PROMPT_SCREEN),
+            RenderLayer::Overlay,
+        );
+    }
+}
+
+fn should_show_player_start_prompt(state: &GameState) -> bool {
+    state.phase == GamePhase::Playing
+        && state.player_count > 1
+        && state.player.position == (WorldVector::default(), WorldVector::default())
+        && state.world == WorldSnapshot::default()
+}
+
+fn push_wave_completion_status_sprites(scene: &mut RenderScene, state: &GameState) {
+    if !should_show_wave_completion_status(state) {
+        return;
+    }
+
+    for (label, screen_address) in SOURCE_WAVE_COMPLETION_STATUS_LINES {
+        if let Some(text) = source_message_text(label) {
+            push_source_message_sprites(
+                scene,
+                text,
+                source_screen_position(*screen_address),
+                RenderLayer::Overlay,
+            );
+        }
+    }
+
+    let (wave_digits, wave_digit_count) = source_visible_decimal_digits(state.wave);
+    push_source_text_bytes_sprites(
+        scene,
+        &wave_digits[..wave_digit_count],
+        source_screen_position(SOURCE_WAVE_COMPLETION_WAVE_NUMBER_SCREEN),
+        RenderLayer::Overlay,
+    );
+
+    let (multiplier_digits, multiplier_digit_count) =
+        source_visible_decimal_digits(state.wave.min(5));
+    push_source_text_bytes_sprites(
+        scene,
+        &multiplier_digits[..multiplier_digit_count],
+        source_screen_position(SOURCE_WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN),
+        RenderLayer::Overlay,
+    );
+}
+
+fn push_survivor_bonus_icon_sprites(scene: &mut RenderScene, state: &GameState) {
+    if !should_show_wave_completion_status(state) {
+        return;
+    }
+
+    for index in 0..state
+        .world
+        .humans
+        .len()
+        .min(SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT)
+    {
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::HUMAN,
+            layer: RenderLayer::Overlay,
+            position: source_screen_position_with_offset(
+                SOURCE_SURVIVOR_BONUS_FIRST_HUMAN_SCREEN,
+                (index as u8) * SOURCE_SURVIVOR_BONUS_HUMAN_STEP,
+                0,
+            ),
+            size: SOURCE_SURVIVOR_BONUS_HUMAN_SIZE,
+            tint: Color::WHITE,
+        });
+    }
+}
+
+fn should_show_wave_completion_status(state: &GameState) -> bool {
+    state.phase == GamePhase::Playing
+        && state.player.position != (WorldVector::default(), WorldVector::default())
+        && state.world.enemies.is_empty()
+}
+
+fn source_visible_decimal_digits(value: u8) -> ([u8; 2], usize) {
+    let value = value.min(99);
+    if value < 10 {
+        ([b'0' + value, b' '], 1)
+    } else {
+        ([b'0' + value / 10, b'0' + value % 10], 2)
+    }
+}
+
+fn push_high_score_entry_prompt_sprites(scene: &mut RenderScene, state: &GameState) {
+    if state.phase != GamePhase::HighScoreEntry {
+        return;
+    }
+
+    let player_label = if state.current_player == 2 {
+        "PLYR2"
+    } else {
+        "PLYR1"
+    };
+    if let Some(text) = source_message_text(player_label) {
+        push_source_message_sprites_with_tint(
+            scene,
+            text,
+            source_screen_position(SOURCE_HALL_OF_FAME_PLAYER_LABEL_SCREEN),
+            RenderLayer::Overlay,
+            SOURCE_VISUAL_STATE.hall_of_fame_entry_text_tint(),
+        );
+    }
+
+    for (index, message_label) in SOURCE_HALL_OF_FAME_INSTRUCTION_MESSAGES.iter().enumerate() {
+        if let Some(text) = source_message_text(message_label) {
+            push_source_message_sprites_with_tint(
+                scene,
+                text,
+                source_screen_position_with_offset(
+                    SOURCE_HALL_OF_FAME_INSTRUCTIONS_TOP_LEFT,
+                    0,
+                    SOURCE_HALL_OF_FAME_LINE_VERTICAL_OFFSETS[index],
+                ),
+                RenderLayer::Overlay,
+                SOURCE_VISUAL_STATE.hall_of_fame_entry_text_tint(),
+            );
+        }
+    }
+
+    for (index, initial) in state.high_score_initials.initials.iter().enumerate() {
+        let Some(initial) = initial else {
+            continue;
+        };
+        let Some(sprite) = SpriteId::message_glyph(*initial) else {
+            continue;
+        };
+        let Some(size) = SpriteId::message_glyph_size(*initial) else {
+            continue;
+        };
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer: RenderLayer::Overlay,
+            position: source_screen_position_with_offset(
+                SOURCE_HALL_OF_FAME_INITIALS_SCREEN,
+                SOURCE_HALL_OF_FAME_INITIAL_HORIZONTAL_OFFSETS[index],
+                0,
+            ),
+            size: [size[0] as f32, size[1] as f32],
+            tint: SOURCE_VISUAL_STATE.hall_of_fame_blink_text_tint(),
+        });
+    }
+
+    push_high_score_entry_underline_sprites(
+        scene,
+        usize::from(state.high_score_initials.cursor).min(
+            SOURCE_HALL_OF_FAME_INITIAL_HORIZONTAL_OFFSETS
+                .len()
+                .saturating_sub(1),
+        ),
+    );
+}
+
+fn push_high_score_entry_underline_sprites(scene: &mut RenderScene, active_initial: usize) {
+    for initial_index in 0..SOURCE_HALL_OF_FAME_INITIAL_HORIZONTAL_OFFSETS.len() {
+        let initial_offset = u8::try_from(initial_index).expect("high-score initial index fits")
+            * SOURCE_HALL_OF_FAME_UNDERLINE_INITIAL_STEP;
+        let tint = if initial_index == active_initial {
+            SOURCE_VISUAL_STATE.hall_of_fame_active_underline_tint()
+        } else {
+            SOURCE_VISUAL_STATE.hall_of_fame_normal_underline_tint()
+        };
+        for word_offset in SOURCE_HALL_OF_FAME_UNDERLINE_WORD_HORIZONTAL_OFFSETS {
+            scene.push_sprite(SceneSprite {
+                sprite: SpriteId::HALL_OF_FAME_UNDERLINE_WORD,
+                layer: RenderLayer::Overlay,
+                position: source_screen_position_with_offset(
+                    SOURCE_HALL_OF_FAME_UNDERLINE_SCREEN,
+                    initial_offset.wrapping_add(word_offset),
+                    0,
+                ),
+                size: SOURCE_HALL_OF_FAME_UNDERLINE_WORD_SIZE,
+                tint,
+            });
+        }
+    }
+}
+
+fn push_hall_of_fame_display_sprites(scene: &mut RenderScene, state: &GameState) {
+    if state.game_over.hall_of_fame_stall_remaining.is_none() {
+        return;
+    }
+
+    for (message_label, screen_address) in SOURCE_HALL_OF_FAME_DISPLAY_HEADINGS {
+        if let Some(text) = source_message_text(message_label) {
+            push_source_message_sprites_with_tint(
+                scene,
+                text,
+                source_screen_position(screen_address),
+                RenderLayer::Overlay,
+                SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint(),
+            );
+        }
+    }
+
+    push_hall_of_fame_display_underline_sprites(scene);
+    push_hall_of_fame_defender_logo_sprite(scene);
+    push_hall_of_fame_table_sprites(
+        scene,
+        state.high_score_tables.todays_greatest,
+        SOURCE_HALL_OF_FAME_TODAYS_TABLE_SCREEN,
+    );
+    push_hall_of_fame_table_sprites(
+        scene,
+        state.high_score_tables.all_time,
+        SOURCE_HALL_OF_FAME_ALL_TIME_TABLE_SCREEN,
+    );
+}
+
+fn push_hall_of_fame_display_underline_sprites(scene: &mut RenderScene) {
+    for word_offset in (SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_RIGHT_END
+        ..=SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_RIGHT_START)
+        .rev()
+        .chain((0..=SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_LEFT_START).rev())
+    {
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::HALL_OF_FAME_UNDERLINE_WORD,
+            layer: RenderLayer::Overlay,
+            position: source_screen_position_with_offset(
+                SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_SCREEN,
+                word_offset,
+                0,
+            ),
+            size: SOURCE_HALL_OF_FAME_UNDERLINE_WORD_SIZE,
+            tint: SOURCE_VISUAL_STATE.hall_of_fame_normal_underline_tint(),
+        });
+    }
+}
+
+fn push_hall_of_fame_defender_logo_sprite(scene: &mut RenderScene) {
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::HALL_OF_FAME_DEFENDER_LOGO,
+        layer: RenderLayer::Overlay,
+        position: source_screen_position(SOURCE_HALL_OF_FAME_LOGO_SCREEN),
+        size: SOURCE_HALL_OF_FAME_LOGO_SIZE,
+        tint: SOURCE_VISUAL_STATE.hall_of_fame_logo_tint(),
+    });
+}
+
+fn push_hall_of_fame_table_sprites(
+    scene: &mut RenderScene,
+    entries: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES],
+    top_left_screen_address: u16,
+) {
+    for (index, entry) in entries.iter().enumerate() {
+        let vertical_offset = u8::try_from(index).expect("high-score table index fits in u8")
+            * SOURCE_HALL_OF_FAME_TABLE_ROW_STEP;
+        let row_rank = b'1' + u8::try_from(index).expect("high-score table index fits in u8");
+        push_source_text_bytes_sprites_with_tint(
+            scene,
+            &[row_rank],
+            source_screen_position_with_offset(top_left_screen_address, 0, vertical_offset),
+            RenderLayer::Overlay,
+            SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint(),
+        );
+        push_source_text_bytes_sprites_with_tint(
+            scene,
+            &high_score_initials_text(entry.initials),
+            source_screen_position_with_offset(
+                top_left_screen_address,
+                SOURCE_HALL_OF_FAME_TABLE_INITIALS_OFFSET,
+                vertical_offset,
+            ),
+            RenderLayer::Overlay,
+            SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint(),
+        );
+        push_source_text_bytes_sprites_with_tint(
+            scene,
+            &hall_of_fame_score_text(entry.score),
+            source_screen_position_with_offset(
+                top_left_screen_address,
+                SOURCE_HALL_OF_FAME_TABLE_SCORE_OFFSET,
+                vertical_offset,
+            ),
+            RenderLayer::Overlay,
+            SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint(),
+        );
+    }
+}
+
+fn high_score_initials_text(initials: [Option<char>; 3]) -> [u8; 3] {
+    initials.map(|initial| {
+        initial
+            .filter(|character| character.is_ascii_alphabetic())
+            .map(|character| character.to_ascii_uppercase() as u8)
+            .unwrap_or(b' ')
+    })
+}
+
+fn hall_of_fame_score_text(score: u32) -> [u8; SOURCE_HALL_OF_FAME_SCORE_TEXT_LEN] {
+    let mut text = [b' '; SOURCE_HALL_OF_FAME_SCORE_TEXT_LEN];
+    let mut place = 100_000;
+    let mut seen_non_zero = false;
+    for byte in &mut text {
+        let digit = ((score.min(SCORE_DISPLAY_MAX) / place) % 10) as u8;
+        if digit != 0 || seen_non_zero {
+            seen_non_zero = true;
+            *byte = b'0' + digit;
+        }
+        place /= 10;
+    }
+    text
+}
+
+fn push_score_sprites(scene: &mut RenderScene, scores: ScoreSnapshot, player_count: u8) {
+    push_player_score_sprites(scene, scores.player_one, PLAYER_ONE_SCORE_ORIGIN);
+    if player_count > 1 {
+        push_player_score_sprites(scene, scores.player_two, PLAYER_TWO_SCORE_ORIGIN);
+    }
+}
+
+fn push_player_score_sprites(scene: &mut RenderScene, score: u32, origin: [f32; 2]) {
+    for (index, digit) in visible_score_digits(score).iter().enumerate() {
+        let Some(digit) = digit else {
+            continue;
+        };
+        let Some(sprite) = SpriteId::score_digit(*digit) else {
+            continue;
+        };
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer: RenderLayer::Hud,
+            position: [
+                origin[0] + SCORE_DIGIT_STEP[0] * index as f32,
+                origin[1] + SCORE_DIGIT_STEP[1] * index as f32,
+            ],
+            size: SCORE_DIGIT_SIZE,
+            tint: SOURCE_VISUAL_STATE.hud_tint(),
+        });
+    }
+}
+
+fn visible_score_digits(score: u32) -> [Option<u8>; SCORE_DIGIT_DISPLAY_COUNT] {
+    let score = score.min(SCORE_DISPLAY_MAX);
+    let mut place = 100_000;
+    let mut digits = [None; SCORE_DIGIT_DISPLAY_COUNT];
+    let mut non_zero_seen = false;
+
+    for (index, digit) in digits.iter_mut().enumerate() {
+        let value = ((score / place) % 10) as u8;
+        let counter = SCORE_DIGIT_DISPLAY_COUNT - index;
+        if value == 0 && counter > 2 && !non_zero_seen {
+            *digit = None;
+        } else {
+            non_zero_seen = true;
+            *digit = Some(value);
+        }
+        place /= 10;
+    }
+
+    digits
+}
+
+fn push_stock_sprites(
+    scene: &mut RenderScene,
+    player_count: u8,
+    player_stocks: [PlayerStockSnapshot; 2],
+) {
+    push_player_stock_sprites(
+        scene,
+        player_stocks[0],
+        PLAYER_ONE_LIFE_STOCK_ORIGIN,
+        PLAYER_ONE_SMART_BOMB_STOCK_ORIGIN,
+    );
+    if player_count > 1 {
+        push_player_stock_sprites(
+            scene,
+            player_stocks[1],
+            PLAYER_TWO_LIFE_STOCK_ORIGIN,
+            PLAYER_TWO_SMART_BOMB_STOCK_ORIGIN,
+        );
+    }
+}
+
+fn push_player_stock_sprites(
+    scene: &mut RenderScene,
+    stock: PlayerStockSnapshot,
+    life_origin: [f32; 2],
+    smart_bomb_origin: [f32; 2],
+) {
+    push_stock_sprite_series(
+        scene,
+        SpriteId::PLAYER_LIFE_STOCK,
+        stock.lives.min(PLAYER_LIFE_STOCK_DISPLAY_LIMIT),
+        life_origin,
+        PLAYER_LIFE_STOCK_STEP,
+        PLAYER_LIFE_STOCK_SIZE,
+    );
+    push_stock_sprite_series(
+        scene,
+        SpriteId::SMART_BOMB_STOCK,
+        stock.smart_bombs.min(SMART_BOMB_STOCK_DISPLAY_LIMIT),
+        smart_bomb_origin,
+        SMART_BOMB_STOCK_STEP,
+        SMART_BOMB_STOCK_SIZE,
+    );
+}
+
+fn push_stock_sprite_series(
+    scene: &mut RenderScene,
+    sprite: SpriteId,
+    count: u8,
+    origin: [f32; 2],
+    step: [f32; 2],
+    size: [f32; 2],
+) {
+    for index in 0..count {
+        let index = f32::from(index);
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer: RenderLayer::Hud,
+            position: [origin[0] + step[0] * index, origin[1] + step[1] * index],
+            size,
+            tint: SOURCE_VISUAL_STATE.hud_tint(),
+        });
+    }
+}
+
+fn push_top_display_border_sprites(scene: &mut RenderScene, state: &GameState) {
+    if state.phase != GamePhase::Playing {
+        return;
+    }
+
+    for (screen_address, size) in SOURCE_TOP_DISPLAY_BORDER_SEGMENTS {
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
+            layer: RenderLayer::Hud,
+            position: source_screen_position(*screen_address),
+            size: *size,
+            tint: top_display_border_segment_tint(*screen_address),
+        });
+    }
+}
+
+fn top_display_border_segment_tint(screen_address: u16) -> Color {
+    if matches!(screen_address, 0x4C07 | 0x4C28) {
+        SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
+    } else {
+        SOURCE_VISUAL_STATE.top_display_border_tint()
+    }
+}
+
+pub(crate) fn push_scanner_radar_sprites(scene: &mut RenderScene, scanner: &ScannerRadarSnapshot) {
+    if !scanner.enabled {
+        return;
+    }
+
+    let blip_count = usize::from(scanner.blip_count).min(SCANNER_RADAR_BLIP_LIMIT);
+    for blip in &scanner.blips[..blip_count] {
+        if blip.color_word == 0 {
+            continue;
+        }
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::SCANNER_OBJECT_BLIP,
+            layer: RenderLayer::Hud,
+            position: source_screen_position(blip.screen_address),
+            size: [2.0, 2.0],
+            tint: SOURCE_VISUAL_STATE.scanner_object_blip_tint(blip.color_word),
+        });
+    }
+
+    let Some(player_blip) = scanner.player_blip else {
+        return;
+    };
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::SCANNER_PLAYER_BLIP,
+        layer: RenderLayer::Hud,
+        position: source_screen_position(player_blip.screen_address),
+        size: [3.0, 2.0],
+        tint: SOURCE_VISUAL_STATE.scanner_player_blip_tint(player_blip.body_word),
+    });
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::SCANNER_PLAYER_BLIP,
+        layer: RenderLayer::Hud,
+        position: source_screen_position(player_blip.screen_address.wrapping_sub(0x00FF)),
+        size: [1.0, 1.0],
+        tint: SOURCE_VISUAL_STATE.scanner_player_blip_tint(u16::from(player_blip.upper_byte)),
+    });
+}
+
+fn push_source_object_detail_sprites(scene: &mut RenderScene, evidence: &ObjectEvidenceSnapshot) {
+    let detail_count = usize::from(evidence.detail_count).min(OBJECT_EVIDENCE_DETAIL_LIMIT);
+    for detail in &evidence.details[..detail_count] {
+        if detail.object_category.is_some() {
+            continue;
+        }
+        let Some(layer) = source_object_detail_render_layer(detail.list) else {
+            continue;
+        };
+        let Some(sprite) = detail.mapped_sprite else {
+            continue;
+        };
+        if sprite == SpriteId::NULL_OBJECT {
+            continue;
+        }
+        let Some(position) = detail.screen_position else {
+            continue;
+        };
+        let Some((width, height)) = detail.picture_size else {
+            continue;
+        };
+        if width == 0 || height == 0 {
+            continue;
+        }
+
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer,
+            position: [f32::from(position.x), f32::from(position.y)],
+            size: [f32::from(width), f32::from(height)],
+            tint: Color::WHITE,
+        });
+    }
+}
+
+fn push_expanded_object_detail_sprites(
+    scene: &mut RenderScene,
+    evidence: &ExpandedObjectEvidenceSnapshot,
+) {
+    let detail_count = usize::from(evidence.detail_count).min(EXPANDED_OBJECT_DETAIL_LIMIT);
+    for detail in &evidence.details[..detail_count] {
+        let Some(sprite) = detail.mapped_sprite else {
+            continue;
+        };
+        if sprite == SpriteId::NULL_OBJECT {
+            continue;
+        }
+        let Some(position) = detail.top_left else {
+            continue;
+        };
+        let Some((width, height)) = expanded_object_sprite_size(detail) else {
+            continue;
+        };
+        if width == 0 || height == 0 {
+            continue;
+        }
+
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer: RenderLayer::Objects,
+            position: [f32::from(position.x), f32::from(position.y)],
+            size: [f32::from(width), f32::from(height)],
+            tint: Color::WHITE,
+        });
+    }
+}
+
+pub(crate) fn push_player_explosion_cloud_sprites(
+    scene: &mut RenderScene,
+    cloud: Option<&PlayerExplosionCloudSnapshot>,
+) {
+    let Some(cloud) = cloud else {
+        return;
+    };
+    let tint = player_explosion_tint(cloud.source_color);
+    let piece_count = usize::from(cloud.piece_count).min(PLAYER_EXPLOSION_PIECE_LIMIT);
+    for piece in &cloud.pieces[..piece_count] {
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_EXPLOSION_PIXEL,
+            layer: RenderLayer::Objects,
+            position: [f32::from(piece.position.x), f32::from(piece.position.y)],
+            size: [4.0, if piece.split { 2.0 } else { 1.0 }],
+            tint,
+        });
+    }
+}
+
+const fn player_explosion_tint(source_color: u8) -> Color {
+    let _source_color = source_color;
+    Color::WHITE
+}
+
+pub(crate) fn expanded_object_sprite_size(
+    detail: &ExpandedObjectDetailSnapshot,
+) -> Option<(u16, u16)> {
+    let (width, height) = detail.picture_size?;
+    if detail.kind != ExpandedObjectKind::Explosion {
+        return Some((u16::from(width), u16::from(height)));
+    }
+
+    let scale = u16::from(source_explosion_size_scale(detail.size)?);
+    Some((
+        u16::from(width).saturating_mul(scale),
+        u16::from(height).saturating_mul(scale),
+    ))
+}
+
+pub(crate) fn source_explosion_size_scale(size: u16) -> Option<u8> {
+    let high = size.to_be_bytes()[0] & 0x7F;
+    if high == 0 || high > SOURCE_EXPLOSION_KILL_SIZE_HIGH {
+        return None;
+    }
+    Some(high)
+}
+
+pub(crate) fn source_explosion_frame_index(size: u16) -> Option<u8> {
+    if source_explosion_size_scale(size).is_none() || size < SOURCE_EXPLOSION_INITIAL_SIZE {
+        return None;
+    }
+    let offset = size.wrapping_sub(SOURCE_EXPLOSION_INITIAL_SIZE);
+    if offset % SOURCE_EXPLOSION_SIZE_DELTA != 0 {
+        return None;
+    }
+    u8::try_from(offset / SOURCE_EXPLOSION_SIZE_DELTA).ok()
+}
+
+#[cfg(feature = "legacy-tools")]
+pub(crate) fn source_player_explosion_color_index_for_pointer(
+    color_pointer: u16,
+    color_table_address: u16,
+) -> Option<u8> {
+    let offset = color_pointer.checked_sub(color_table_address)?;
+    let index = u8::try_from(offset).ok()?;
+    (usize::from(index) < SOURCE_PLAYER_EXPLOSION_COLORS.len()).then_some(index)
+}
+
+fn player_explosion_random_seed_step(seed: u16) -> u16 {
+    let [mut high, mut low] = seed.to_be_bytes();
+    let mut accumulator = low;
+    accumulator >>= 1;
+    accumulator ^= low;
+    accumulator >>= 1;
+    let carry = accumulator & 1 != 0;
+    let (next_high, next_carry) = rotate_right_through_carry(high, carry);
+    high = next_high;
+    let (next_low, _) = rotate_right_through_carry(low, next_carry);
+    low = next_low;
+    u16::from_be_bytes([high, low])
+}
+
+const fn rotate_right_through_carry(value: u8, carry: bool) -> (u8, bool) {
+    let next_carry = value & 1 != 0;
+    let next_value = (value >> 1) | if carry { 0x80 } else { 0 };
+    (next_value, next_carry)
+}
+
+const fn ones_complement_abs_word(value: u16) -> u16 {
+    if value & 0x8000 == 0 { value } else { !value }
+}
+
+const fn logical_shift_right_word(value: u16) -> u16 {
+    value >> 1
+}
+
+fn source_object_detail_render_layer(list: ObjectEvidenceList) -> Option<RenderLayer> {
+    match list {
+        ObjectEvidenceList::Active => Some(RenderLayer::Objects),
+        ObjectEvidenceList::Projectile => Some(RenderLayer::Projectiles),
+        ObjectEvidenceList::Inactive => None,
+    }
+}
+
 fn enemy_sprite(kind: EnemyKind) -> SpriteId {
     match kind {
         EnemyKind::Lander => SpriteId::ENEMY_LANDER,
+        EnemyKind::Mutant => SpriteId::ENEMY_MUTANT,
+        EnemyKind::Bomber => SpriteId::ENEMY_BOMBER,
+        EnemyKind::Pod => SpriteId::ENEMY_POD,
+        EnemyKind::Swarmer => SpriteId::ENEMY_SWARMER,
+        EnemyKind::Baiter => SpriteId::ENEMY_BAITER,
     }
 }
 
 const PROJECTILE_SPRITE_SIZE: (u8, u8) = (8, 2);
+const ENEMY_PROJECTILE_SPRITE_SIZE: (u8, u8) = (4, 6);
 const PLAYER_SPRITE_SIZE: (u8, u8) = (16, 8);
+const SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
+const SCORE_DISPLAY_MAX: u32 = 999_999;
+const PLAYER_ONE_SCORE_ORIGIN: [f32; 2] = [18.0, 21.0];
+const PLAYER_TWO_SCORE_ORIGIN: [f32; 2] = [214.0, 21.0];
+const SCORE_DIGIT_STEP: [f32; 2] = [8.0, 0.0];
+const SCORE_DIGIT_SIZE: [f32; 2] = [6.0, 8.0];
+const PLAYER_LIFE_STOCK_DISPLAY_LIMIT: u8 = 5;
+const SMART_BOMB_STOCK_DISPLAY_LIMIT: u8 = 3;
+const PLAYER_ONE_LIFE_STOCK_ORIGIN: [f32; 2] = [18.0, 13.0];
+const PLAYER_TWO_LIFE_STOCK_ORIGIN: [f32; 2] = [214.0, 13.0];
+const PLAYER_LIFE_STOCK_STEP: [f32; 2] = [12.0, 0.0];
+const PLAYER_LIFE_STOCK_SIZE: [f32; 2] = [10.0, 4.0];
+const PLAYER_ONE_SMART_BOMB_STOCK_ORIGIN: [f32; 2] = [70.0, 20.0];
+const PLAYER_TWO_SMART_BOMB_STOCK_ORIGIN: [f32; 2] = [266.0, 20.0];
+const SMART_BOMB_STOCK_STEP: [f32; 2] = [0.0, 4.0];
+const SMART_BOMB_STOCK_SIZE: [f32; 2] = [6.0, 3.0];
+const SOURCE_TOP_DISPLAY_BORDER_SEGMENTS: &[(u16, [f32; 2])] = &[
+    (0x0028, [312.0, 2.0]),
+    (0x2F08, [2.0, 32.0]),
+    (0x7008, [2.0, 32.0]),
+    (0x2F07, [130.0, 1.0]),
+    (0x4C07, [16.0, 2.0]),
+    (0x4C28, [16.0, 2.0]),
+];
+const SOURCE_ATTRACT_CREDITS_LABEL_SCREEN: u16 = 0x28E5;
+const SOURCE_ATTRACT_CREDITS_NUMBER_SCREEN: u16 = 0x48E5;
+const SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN: u16 = 0x3258;
+const SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES: &[(&str, u16)] = &[
+    ("SCANV", 0x4330),
+    ("LANDV", 0x1C70),
+    ("MUTV", 0x3C70),
+    ("BAITV", 0x5F70),
+    ("BOMBV", 0x1CA8),
+    ("SWRMPV", 0x40A8),
+    ("SWARMV", 0x5CA8),
+];
+const SOURCE_ATTRACT_WILLIAMS_LOGO_SCREEN: u16 = 0x363C;
+const SOURCE_ATTRACT_WILLIAMS_LOGO_SIZE: [f32; 2] = [92.0, 19.0];
+const SOURCE_ATTRACT_DEFENDER_WORDMARK_SCREEN: u16 = 0x3090;
+const SOURCE_DEFENDER_WORDMARK_SIZE: [f32; 2] = [120.0, 24.0];
+const SOURCE_ATTRACT_COPYRIGHT_STRIP_SCREEN: u16 = 0x3BD0;
+const SOURCE_ATTRACT_COPYRIGHT_STRIP_SIZE: [f32; 2] = [80.0, 8.0];
+const SOURCE_FINAL_GAME_OVER_SCREEN: u16 = 0x3E80;
+const SOURCE_PLAYER_START_PROMPT_SCREEN: u16 = 0x3C80;
+const SOURCE_PLAYER_SWITCH_LABEL_SCREEN: u16 = 0x3C78;
+const SOURCE_PLAYER_SWITCH_GAME_OVER_SCREEN: u16 = 0x3E88;
+const SOURCE_WAVE_COMPLETION_STATUS_LINES: &[(&str, u16)] =
+    &[("ATWV", 0x3850), ("COMPV", 0x3D60), ("BONSX", 0x3C90)];
+const SOURCE_WAVE_COMPLETION_WAVE_NUMBER_SCREEN: u16 = 0x6550;
+const SOURCE_WAVE_COMPLETION_MULTIPLIER_NUMBER_SCREEN: u16 = 0x5890;
+const SOURCE_SURVIVOR_BONUS_FIRST_HUMAN_SCREEN: u16 = 0x3CA0;
+const SOURCE_SURVIVOR_BONUS_HUMAN_STEP: u8 = 0x04;
+const SOURCE_SURVIVOR_BONUS_HUMAN_LIMIT: usize = 10;
+const SOURCE_SURVIVOR_BONUS_HUMAN_SIZE: [f32; 2] = [4.0, 8.0];
+const SOURCE_HALL_OF_FAME_PLAYER_LABEL_SCREEN: u16 = 0x3E38;
+const SOURCE_HALL_OF_FAME_INSTRUCTIONS_TOP_LEFT: u16 = 0x1458;
+const SOURCE_HALL_OF_FAME_INITIALS_SCREEN: u16 = 0x46AC;
+const SOURCE_HALL_OF_FAME_UNDERLINE_SCREEN: u16 = 0x45B7;
+const SOURCE_HALL_OF_FAME_LINE_VERTICAL_OFFSETS: [u8; 4] = [0x00, 0x0A, 0x1E, 0x32];
+const SOURCE_HALL_OF_FAME_INITIAL_HORIZONTAL_OFFSETS: [u8; 3] = [0x00, 0x08, 0x10];
+const SOURCE_HALL_OF_FAME_UNDERLINE_INITIAL_STEP: u8 = 0x08;
+const SOURCE_HALL_OF_FAME_UNDERLINE_WORD_HORIZONTAL_OFFSETS: [u8; 4] = [0x04, 0x03, 0x02, 0x01];
+const SOURCE_HALL_OF_FAME_UNDERLINE_WORD_SIZE: [f32; 2] = [2.0, 2.0];
+const SOURCE_HALL_OF_FAME_INSTRUCTION_MESSAGES: [&str; 4] = ["HOFV1", "HOFV2", "HOFV3", "HOFV4"];
+const SOURCE_HALL_OF_FAME_DISPLAY_HEADINGS: [(&str, u16); 5] = [
+    ("HALLD_TITLE", 0x3854),
+    ("HALLD_TODAYS", 0x2268),
+    ("HALLD_ALL_TIME", 0x6068),
+    ("HALLD_GREATEST", 0x1E72),
+    ("HALLD_GREATEST", 0x5F72),
+];
+const SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_SCREEN: u16 = 0x1E7B;
+const SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_RIGHT_START: u8 = 0x5F;
+const SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_RIGHT_END: u8 = 0x41;
+const SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_LEFT_START: u8 = 0x1E;
+const SOURCE_HALL_OF_FAME_LOGO_SCREEN: u16 = 0x3038;
+const SOURCE_HALL_OF_FAME_LOGO_SIZE: [f32; 2] = SOURCE_DEFENDER_WORDMARK_SIZE;
+const SOURCE_HALL_OF_FAME_TODAYS_TABLE_SCREEN: u16 = 0x1886;
+const SOURCE_HALL_OF_FAME_ALL_TIME_TABLE_SCREEN: u16 = 0x5986;
+const SOURCE_HALL_OF_FAME_TABLE_ROW_STEP: u8 = 0x0A;
+const SOURCE_HALL_OF_FAME_TABLE_INITIALS_OFFSET: u8 = 0x05;
+const SOURCE_HALL_OF_FAME_TABLE_SCORE_OFFSET: u8 = 0x13;
+const SOURCE_HALL_OF_FAME_SCORE_TEXT_LEN: usize = 6;
 
 fn enemy_sprite_size(kind: EnemyKind) -> (u8, u8) {
     match kind {
         EnemyKind::Lander => (12, 8),
+        EnemyKind::Mutant => (12, 8),
+        EnemyKind::Bomber => (10, 8),
+        EnemyKind::Pod => (10, 8),
+        EnemyKind::Swarmer => (8, 6),
+        EnemyKind::Baiter => (12, 8),
     }
 }
 
 fn enemy_score(kind: EnemyKind) -> u32 {
     match kind {
         EnemyKind::Lander => 150,
+        EnemyKind::Mutant => 150,
+        EnemyKind::Bomber => 250,
+        EnemyKind::Pod => 1000,
+        EnemyKind::Swarmer => 150,
+        EnemyKind::Baiter => 200,
     }
 }
 
@@ -768,21 +6737,29 @@ fn initial_state() -> GameState {
         phase: GamePhase::Attract,
         credits: 0,
         current_player: 1,
-        wave: 0,
+        player_count: 1,
+        wave: DEFAULT_CABINET_WAVE,
+        wave_profile: WaveProfileSnapshot::for_wave(DEFAULT_CABINET_WAVE),
         player: PlayerSnapshot {
             position: (world_word(0), world_word(0)),
             velocity: (WorldVector::default(), WorldVector::default()),
             direction: Direction::Right,
-            lives: 0,
+            lives: DEFAULT_PLAYER_LIVES,
             smart_bombs: 0,
         },
+        player_stocks: [PlayerStockSnapshot::new(DEFAULT_PLAYER_LIVES, 0); 2],
         scores: ScoreSnapshot {
             player_one: 0,
             player_two: 0,
-            high_score: 0,
-            next_bonus: 10_000,
+            high_score: DEFAULT_HIGH_SCORE,
+            next_bonus: DEFAULT_REPLAY_SCORE,
         },
+        attract: AttractPresentationSnapshot::for_page_frame(0),
         high_score_initials: HighScoreInitialsState::EMPTY,
+        high_score_entry: None,
+        high_score_submission: None,
+        high_score_tables: HighScoreTablesSnapshot::DEFAULT,
+        game_over: GameOverSnapshot::NONE,
         world: WorldSnapshot::default(),
     }
 }
@@ -796,20 +6773,349 @@ fn world_vector_pixels(vector: WorldVector) -> f32 {
 }
 
 #[cfg(test)]
+fn accepted_r3_visual_signature(frame: u64) -> Option<u32> {
+    match frame {
+        1..=2 => Some(2962226826u32),
+        3..=4 => Some(1054242137u32),
+        5..=6 => Some(3423556472u32),
+        7..=8 => Some(2147797947u32),
+        9..=10 => Some(1529887192u32),
+        11..=12 => Some(2949545184u32),
+        13..=14 => Some(2740317286u32),
+        15..=16 => Some(3185980500u32),
+        17..=18 => Some(170397484u32),
+        19..=20 => Some(1726306935u32),
+        21..=22 => Some(3836145658u32),
+        23..=24 => Some(3689607546u32),
+        25..=26 => Some(1192733655u32),
+        27..=28 => Some(3216351317u32),
+        29..=30 => Some(2305674611u32),
+        31..=32 => Some(2758722426u32),
+        33..=34 => Some(3159573997u32),
+        35..=36 => Some(3883167324u32),
+        37..=38 => Some(1864677123u32),
+        39..=40 => Some(739121987u32),
+        41..=42 => Some(3355169406u32),
+        43..=44 => Some(3576441390u32),
+        45..=46 => Some(1914860891u32),
+        47..=48 => Some(1914847654u32),
+        49..=50 => Some(167562569u32),
+        51..=52 => Some(871004527u32),
+        53..=54 => Some(3783109946u32),
+        55..=56 => Some(4173964716u32),
+        57..=58 => Some(4176109546u32),
+        59..=60 => Some(78267750u32),
+        61..=62 => Some(2185016249u32),
+        63..=64 => Some(3922624675u32),
+        65..=66 => Some(2819886426u32),
+        67..=68 => Some(418124789u32),
+        69..=70 => Some(3871103769u32),
+        71..=72 => Some(3595509303u32),
+        73..=74 => Some(2688149849u32),
+        75..=76 => Some(1484287141u32),
+        77..=78 => Some(1625265524u32),
+        79..=80 => Some(2448426513u32),
+        81..=82 => Some(994718349u32),
+        83..=84 => Some(1953705603u32),
+        85..=86 => Some(1194791227u32),
+        87..=88 => Some(506680067u32),
+        89..=90 => Some(2964673846u32),
+        91..=92 => Some(2808029433u32),
+        93..=94 => Some(4053725625u32),
+        95..=96 => Some(1810298224u32),
+        97..=98 => Some(1494060812u32),
+        99..=100 => Some(2359125305u32),
+        101..=102 => Some(4244048944u32),
+        103..=104 => Some(2564858811u32),
+        105..=106 => Some(2082746170u32),
+        107..=108 => Some(2407752444u32),
+        109..=110 => Some(643672350u32),
+        111..=112 => Some(4089535518u32),
+        113..=114 => Some(3034517100u32),
+        115..=116 => Some(943028751u32),
+        117..=118 => Some(2787473171u32),
+        119..=120 => Some(2207498731u32),
+        121..=122 => Some(271917215u32),
+        123..=124 => Some(1975190971u32),
+        125..=126 => Some(3125151796u32),
+        127..=128 => Some(3225579304u32),
+        129..=130 => Some(2822684100u32),
+        131..=132 => Some(971548817u32),
+        133..=134 => Some(864713817u32),
+        135..=136 => Some(1923762177u32),
+        137..=138 => Some(933497632u32),
+        139..=140 => Some(3157349685u32),
+        141..=142 => Some(4025863219u32),
+        143..=144 => Some(2185429703u32),
+        145..=146 => Some(74378108u32),
+        147..=148 => Some(2477009910u32),
+        149..=150 => Some(1160500901u32),
+        151..=152 => Some(2949378946u32),
+        153..=154 => Some(671565695u32),
+        155..=156 => Some(296408545u32),
+        157..=158 => Some(717192573u32),
+        159..=160 => Some(1789236868u32),
+        161..=162 => Some(4005648030u32),
+        163..=164 => Some(2396158352u32),
+        165..=166 => Some(1681194114u32),
+        167..=168 => Some(3916725715u32),
+        169..=170 => Some(1174864853u32),
+        171..=172 => Some(2887059453u32),
+        173..=174 => Some(1298150614u32),
+        175..=176 => Some(2579610357u32),
+        177..=178 => Some(1890156533u32),
+        179..=180 => Some(2543283989u32),
+        181..=182 => Some(663973590u32),
+        183..=184 => Some(3693357442u32),
+        185..=186 => Some(2654330245u32),
+        187..=188 => Some(3591213495u32),
+        189..=190 => Some(1424804443u32),
+        191..=192 => Some(3449913518u32),
+        193..=194 => Some(1569877951u32),
+        195..=196 => Some(2663818674u32),
+        197..=198 => Some(41179300u32),
+        199..=200 => Some(3531977015u32),
+        201..=202 => Some(2422067884u32),
+        203..=204 => Some(4278367659u32),
+        205..=206 => Some(3251468679u32),
+        207..=208 => Some(3954183251u32),
+        209..=210 => Some(3837076080u32),
+        211..=212 => Some(2141212063u32),
+        213..=214 => Some(1874996958u32),
+        215..=216 => Some(333482869u32),
+        217..=218 => Some(4012826636u32),
+        219..=220 => Some(1212134273u32),
+        221..=222 => Some(1156683936u32),
+        223..=224 => Some(1813057864u32),
+        225 => Some(2667859701u32),
+        226..=347 => Some(2222029249u32),
+        348 => Some(1986720743u32),
+        349 => Some(2434865807u32),
+        350 => Some(1343203852u32),
+        351 => Some(1337858580u32),
+        352 => Some(3219139578u32),
+        353 => Some(629065165u32),
+        354 => Some(2283183261u32),
+        355 => Some(819918517u32),
+        356 => Some(3314685550u32),
+        357 => Some(2592152260u32),
+        358 => Some(1867614032u32),
+        359 => Some(4081625907u32),
+        360 => Some(4049147811u32),
+        361 => Some(4119883768u32),
+        362 => Some(389165004u32),
+        363 => Some(4040133997u32),
+        364 => Some(713856524u32),
+        365 => Some(3550170032u32),
+        366 => Some(3335062975u32),
+        367 => Some(573775383u32),
+        368 => Some(1087801868u32),
+        369 => Some(2630713014u32),
+        370 => Some(2245365138u32),
+        371 => Some(2986568653u32),
+        372 => Some(4250111703u32),
+        373 => Some(1904319187u32),
+        374 => Some(622109312u32),
+        375 => Some(3952154500u32),
+        376 => Some(612281254u32),
+        377 => Some(2603136060u32),
+        378 => Some(318196819u32),
+        379 => Some(1763537262u32),
+        380 => Some(4012746880u32),
+        381 => Some(1016026627u32),
+        382 => Some(3593729863u32),
+        383 => Some(2185161509u32),
+        384 => Some(1902756924u32),
+        385 => Some(1780044060u32),
+        386 => Some(1393667893u32),
+        387 => Some(1677047582u32),
+        388 => Some(3535298702u32),
+        389 => Some(279834986u32),
+        390 => Some(2424895872u32),
+        391 => Some(4119540377u32),
+        392 => Some(3903614265u32),
+        393 => Some(3831488240u32),
+        394 => Some(634384209u32),
+        395 => Some(3130869203u32),
+        396 => Some(31062761u32),
+        397..=398 => Some(1891765253u32),
+        399..=400 => Some(1050926502u32),
+        401..=402 => Some(1956463352u32),
+        403..=404 => Some(2911064518u32),
+        405..=406 => Some(3237484186u32),
+        407..=408 => Some(4147607314u32),
+        409..=410 => Some(1207338880u32),
+        411..=412 => Some(2345584171u32),
+        413..=414 => Some(4185358877u32),
+        415..=416 => Some(3615900114u32),
+        417..=418 => Some(649532446u32),
+        419..=420 => Some(3385758538u32),
+        421..=422 => Some(2409284461u32),
+        423..=424 => Some(1870372669u32),
+        425..=426 => Some(2945323084u32),
+        427..=428 => Some(2369852352u32),
+        429..=430 => Some(702063314u32),
+        431..=432 => Some(1813808566u32),
+        433..=434 => Some(3961739814u32),
+        435..=436 => Some(103747122u32),
+        437..=438 => Some(206003092u32),
+        439..=440 => Some(1411839069u32),
+        441..=442 => Some(3236242577u32),
+        443..=444 => Some(102035639u32),
+        445..=446 => Some(693092707u32),
+        447..=463 => Some(3960974809u32),
+        464..=561 => Some(1270435565u32),
+        562..=563 => Some(2296702972u32),
+        564..=1024 => Some(1993604823u32),
+        1025..=1026 => Some(360618183u32),
+        1027..=1123 => Some(3196225782u32),
+        1124 => Some(1400075496u32),
+        1125 => Some(2743603212u32),
+        1126 => Some(2235855140u32),
+        1127 => Some(1159013671u32),
+        1128 => Some(1184133452u32),
+        1129 => Some(1632834619u32),
+        1130 => Some(2870503153u32),
+        1131 => Some(1141236412u32),
+        1132 => Some(4133341777u32),
+        1133 => Some(53991316u32),
+        1134 => Some(1447441849u32),
+        1135 => Some(3581251561u32),
+        1136 => Some(1460875539u32),
+        1137 => Some(4235864844u32),
+        1138 => Some(2346098791u32),
+        1139 => Some(482452162u32),
+        1140 => Some(803474416u32),
+        1141 => Some(740457053u32),
+        1142 => Some(2939077440u32),
+        1143 => Some(3412061521u32),
+        1144 => Some(2061898767u32),
+        1145 => Some(20384635u32),
+        1146 => Some(3140746114u32),
+        1147 => Some(1874963291u32),
+        1148 => Some(3161497675u32),
+        1149 => Some(3420164906u32),
+        1150 => Some(4010489085u32),
+        1151 => Some(1675995u32),
+        1152 => Some(987536940u32),
+        1153 => Some(1562584391u32),
+        1154 => Some(832752569u32),
+        1155 => Some(2954711963u32),
+        1156 => Some(2636380567u32),
+        1157 => Some(2737944712u32),
+        1158 => Some(2942970661u32),
+        1159 => Some(23165600u32),
+        1160 => Some(1034633915u32),
+        1161 => Some(3007335554u32),
+        1162 => Some(1673428701u32),
+        1163 => Some(2938571803u32),
+        1164 => Some(4206826444u32),
+        1165 => Some(753199034u32),
+        1166 => Some(711516073u32),
+        1167 => Some(137489621u32),
+        1168 => Some(2531366024u32),
+        1169 => Some(54101325u32),
+        1170 => Some(3101277713u32),
+        1171 => Some(2722385027u32),
+        1172 => Some(3810335740u32),
+        1173 => Some(221652501u32),
+        1174 => Some(1086271805u32),
+        1175 => Some(617041081u32),
+        1176 => Some(18081227u32),
+        1177 => Some(604197756u32),
+        1178 => Some(57026218u32),
+        1179 => Some(617077376u32),
+        1180 => Some(3673207957u32),
+        1181 => Some(1194617052u32),
+        1182 => Some(1833480902u32),
+        1183 => Some(1046936856u32),
+        1184 => Some(2190669726u32),
+        1185 => Some(3971852525u32),
+        1186 => Some(3523771021u32),
+        1187 => Some(2953777528u32),
+        1188 => Some(1409603171u32),
+        1189 => Some(1737471587u32),
+        1190 => Some(3604209023u32),
+        1191 => Some(937967059u32),
+        1192 => Some(3480350440u32),
+        1193 => Some(2970304792u32),
+        1194 => Some(898673074u32),
+        1195 => Some(1945133126u32),
+        1196 => Some(4276510214u32),
+        1197 => Some(3831925678u32),
+        1198 => Some(1598023817u32),
+        1199 => Some(578905158u32),
+        1200 => Some(2736237466u32),
+        1201 => Some(734775587u32),
+        1202 => Some(653774984u32),
+        1203 => Some(1356801736u32),
+        1204 => Some(178717231u32),
+        1205 => Some(72141257u32),
+        1206 => Some(2917218934u32),
+        1207 => Some(1291451067u32),
+        1208 => Some(2005379725u32),
+        1209 => Some(1459418332u32),
+        1210 => Some(870553705u32),
+        1211 => Some(3350979936u32),
+        1212 => Some(532010902u32),
+        1213 => Some(547189091u32),
+        1214 => Some(3708205836u32),
+        1215 => Some(3025449279u32),
+        1216 => Some(1828836284u32),
+        1217 => Some(1912403834u32),
+        1218 => Some(2681582u32),
+        1219 => Some(1522432607u32),
+        1220 => Some(751739102u32),
+        1221 => Some(2405591640u32),
+        1222 => Some(1894977301u32),
+        1223 => Some(27764195u32),
+        1224 => Some(1162261030u32),
+        1225 => Some(4001896637u32),
+        1226 => Some(3436193068u32),
+        1227 => Some(648055075u32),
+        1228 => Some(1032290917u32),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use crate::{
         renderer::{
             Color, RenderLayer, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize, TextureAtlas,
         },
         systems::{
-            GameSimulation, HighScoreInitialsState, ScreenPosition, ScreenVelocity,
-            advance_one_frame,
+            GameSimulation, HighScoreInitialsState, PlayerControlIntent, PlayerMotionState,
+            PlayerMotionSystem, ScreenPosition, ScreenVelocity, advance_one_frame,
         },
     };
 
+    use super::PlayerStockSnapshot;
+
     use super::{
-        Direction, EnemyKind, EnemySnapshot, Game, GameEvent, GameEvents, GameFrame, GameInput,
-        GamePhase, ProjectileSnapshot, SoundEvent, WorldSnapshot, WorldVector,
+        ATTRACT_COPYRIGHT_SLEEP_TICKS, ATTRACT_COPYRIGHT_STALL_TICKS, AttractPresentationPage,
+        AttractPresentationSnapshot, COIN_CREDIT_DELAY_FRAMES, COIN_CREDIT_SOUND_DELAY_FRAMES,
+        DEFAULT_CABINET_WAVE, DEFAULT_HIGH_SCORE, DEFAULT_PLAYER_LIVES, DEFAULT_REPLAY_SCORE,
+        Direction, EXPANDED_OBJECT_DETAIL_LIMIT, EnemyKind, EnemyReserveSnapshot, EnemySnapshot,
+        ExpandedObjectDetailSnapshot, ExpandedObjectEvidenceSnapshot, ExpandedObjectKind,
+        ExplosionKind, Game, GameEvent, GameEvents, GameFrame, GameInput, GameOverSnapshot,
+        GamePhase, HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES, HALL_OF_FAME_STALL_FRAMES,
+        HighScoreEntrySnapshot, HighScoreSubmissionSnapshot, HighScoreTableEntrySnapshot,
+        HighScoreTablesSnapshot, HumanSnapshot, OBJECT_EVIDENCE_DETAIL_LIMIT,
+        ObjectEvidenceCategory, ObjectEvidenceDetailSnapshot, ObjectEvidenceList,
+        ObjectEvidenceSnapshot, PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES, PLAYER_EXPLOSION_PIECE_LIMIT,
+        PLAYER_SWITCH_SLEEP_FRAMES, PlayerExplosionCloudSnapshot, PlayerExplosionPieceSnapshot,
+        ProjectileSnapshot, SOURCE_ACTIVE_BAITER_LIMIT, SOURCE_ACTIVE_SWARMER_LIMIT,
+        SOURCE_BAITER_LOOP_SLEEP_TICKS, SOURCE_EXPLOSION_INITIAL_SIZE,
+        SOURCE_EXPLOSION_LIFETIME_FRAMES, SOURCE_EXPLOSION_SIZE_DELTA,
+        SOURCE_GAME_EXEC_SLEEP_FRAMES, SOURCE_LANDER_ORBIT_SLEEP_TICKS,
+        SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS, SOURCE_MUTANT_LOOP_SLEEP_TICKS,
+        SOURCE_PLAYFIELD_Y_MIN, SOURCE_POD_SWARMER_REQUEST_LIMIT,
+        SOURCE_SCORE_POPUP_LIFETIME_TICKS, SOURCE_VISUAL_STATE, START_PLAYFIELD_DELAY_FRAMES,
+        START_SOUND_DELAY_FRAMES, ScannerRadarBlipKind, ScannerRadarSnapshot, ScannerRadarStage,
+        ScorePopupKind, SoundEvent, SourceBaiterSnapshot, SourceBomberSnapshot,
+        SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot, SourceRandSnapshot,
+        SourceSwarmerSnapshot, TerrainBlowStage, WaveProfileSnapshot, WorldSnapshot, WorldVector,
     };
 
     #[test]
@@ -818,6 +7124,296 @@ mod tests {
 
         assert_eq!(vector.subpixels(), 512);
         assert_eq!(WorldVector::SUBPIXELS_PER_PIXEL, 256);
+    }
+
+    #[test]
+    fn wave_profile_uses_source_wave_table_values() {
+        let first = WaveProfileSnapshot::for_wave(1);
+        assert_eq!(first.landers, 15);
+        assert_eq!(first.bombers, 0);
+        assert_eq!(first.pods, 0);
+        assert_eq!(first.wave_time, 30);
+        assert_eq!(first.baiter_delay, 212);
+
+        let second = WaveProfileSnapshot::for_wave(2);
+        assert_eq!(second.landers, 20);
+        assert_eq!(second.bombers, 3);
+        assert_eq!(second.pods, 1);
+        assert_eq!(second.lander_x_velocity, 30);
+        assert_eq!(second.baiter_shot_time, 13);
+
+        let fifth = WaveProfileSnapshot::for_wave(5);
+        assert_eq!(fifth.lander_x_velocity, 48);
+        assert_eq!(fifth.baiter_delay, 144);
+    }
+
+    #[test]
+    fn clean_wave_spawns_source_profile_active_enemy_batch() {
+        let first = WorldSnapshot::for_wave(1);
+        assert_eq!(first.enemies.len(), 5);
+        assert!(
+            first
+                .enemies
+                .iter()
+                .all(|enemy| enemy.kind == EnemyKind::Lander)
+        );
+        assert!(
+            first
+                .enemies
+                .iter()
+                .all(|enemy| enemy.source_lander.is_some())
+        );
+        assert_eq!(
+            first.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 10,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(first.object_evidence.active_count, 7);
+        assert_eq!(first.object_evidence.inactive_count, 10);
+        assert_eq!(first.object_evidence.detail_count, 7);
+
+        let second = WorldSnapshot::for_wave(2);
+
+        assert_eq!(
+            second
+                .enemies
+                .iter()
+                .map(|enemy| enemy.kind)
+                .collect::<Vec<_>>(),
+            vec![
+                EnemyKind::Lander,
+                EnemyKind::Bomber,
+                EnemyKind::Pod,
+                EnemyKind::Lander,
+                EnemyKind::Lander,
+            ]
+        );
+        assert_eq!(
+            second.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 17,
+                bombers: 2,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        let expected_initial_lander = super::source_lander_initial_spawn(
+            WaveProfileSnapshot::for_wave(2),
+            super::CLEAN_WAVE_SPAWN_POSITIONS[0],
+            0,
+        );
+        assert_eq!(second.enemies[0].velocity, expected_initial_lander.velocity);
+        assert_eq!(
+            second.enemies[0].source_lander,
+            expected_initial_lander.source_lander
+        );
+        assert_eq!(second.enemies[1].velocity, ScreenVelocity::new(-1, 0));
+        assert_eq!(
+            second.enemies[1].source_bomber,
+            Some(super::source_bomber_spawn(
+                WaveProfileSnapshot::for_wave(2),
+                1
+            ))
+        );
+        let expected_initial_pod =
+            super::source_pod_initial_spawn(super::CLEAN_WAVE_SPAWN_POSITIONS[2], 2);
+        assert_eq!(second.enemies[2].velocity, expected_initial_pod.velocity);
+        assert_eq!(
+            second.enemies[2].source_pod,
+            expected_initial_pod.source_pod
+        );
+        assert_eq!(
+            second.object_evidence.details[1].object_category,
+            Some(ObjectEvidenceCategory::Bomber)
+        );
+        assert_eq!(
+            second.object_evidence.details[1].mapped_sprite,
+            Some(SpriteId::ENEMY_BOMBER)
+        );
+        assert_eq!(
+            second.object_evidence.details[2].object_category,
+            Some(ObjectEvidenceCategory::Pod)
+        );
+        assert_eq!(
+            second.object_evidence.details[2].mapped_sprite,
+            Some(SpriteId::ENEMY_POD)
+        );
+    }
+
+    #[test]
+    fn clean_enemy_families_use_source_message_scores_and_sprites() {
+        for (kind, sprite, size, score) in [
+            (EnemyKind::Lander, SpriteId::ENEMY_LANDER, (12, 8), 150),
+            (EnemyKind::Mutant, SpriteId::ENEMY_MUTANT, (12, 8), 150),
+            (EnemyKind::Bomber, SpriteId::ENEMY_BOMBER, (10, 8), 250),
+            (EnemyKind::Pod, SpriteId::ENEMY_POD, (10, 8), 1000),
+            (EnemyKind::Swarmer, SpriteId::ENEMY_SWARMER, (8, 6), 150),
+            (EnemyKind::Baiter, SpriteId::ENEMY_BAITER, (12, 8), 200),
+        ] {
+            assert_eq!(super::enemy_sprite(kind), sprite);
+            assert_eq!(super::enemy_sprite_size(kind), size);
+            assert_eq!(super::enemy_score(kind), score);
+        }
+    }
+
+    #[test]
+    fn clean_world_maps_active_enemy_source_picture_descriptors() {
+        let mut world = WorldSnapshot {
+            enemies: vec![
+                EnemySnapshot::source_lander(
+                    ScreenPosition::new(10, 50),
+                    ScreenVelocity::new(0, 0),
+                    SourceLanderSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        picture_frame: 2,
+                    },
+                ),
+                EnemySnapshot::source_baiter(
+                    ScreenPosition::new(20, 60),
+                    ScreenVelocity::new(0, 0),
+                    SourceBaiterSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        picture_frame: 1,
+                    },
+                ),
+                EnemySnapshot::source_bomber(
+                    ScreenPosition::new(30, 70),
+                    ScreenVelocity::new(0, 0),
+                    SourceBomberSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        picture_frame: 3,
+                        cruise_altitude: 0,
+                        sleep_ticks: 0,
+                    },
+                ),
+                EnemySnapshot::source_mutant(
+                    ScreenPosition::new(40, 80),
+                    ScreenVelocity::new(0, 0),
+                    SourceMutantSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                    },
+                ),
+                EnemySnapshot::source_pod(
+                    ScreenPosition::new(50, 90),
+                    ScreenVelocity::new(0, 0),
+                    SourcePodSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                    },
+                ),
+                EnemySnapshot::source_swarmer(
+                    ScreenPosition::new(60, 100),
+                    ScreenVelocity::new(0, 0),
+                    SourceSwarmerSnapshot {
+                        x_fraction: 0,
+                        y_fraction: 0,
+                        x_velocity: 0,
+                        y_velocity: 0,
+                        acceleration: 0,
+                        shot_timer: 0,
+                        sleep_ticks: 0,
+                        horizontal_seek_pending: false,
+                    },
+                ),
+            ],
+            ..WorldSnapshot::default()
+        };
+
+        world.refresh_object_evidence();
+
+        assert_eq!(world.object_evidence.detail_count, 6);
+        let expected = [
+            (
+                ObjectEvidenceCategory::Lander,
+                "LNDP3",
+                0xF999,
+                (5, 8),
+                0xCD80,
+                0xCDA8,
+                SpriteId::ENEMY_LANDER,
+            ),
+            (
+                ObjectEvidenceCategory::Baiter,
+                "UFOP2",
+                0xF9AD,
+                (6, 4),
+                0xCE00,
+                0xCE18,
+                SpriteId::ENEMY_BAITER,
+            ),
+            (
+                ObjectEvidenceCategory::Bomber,
+                "TIEP4",
+                0xF947,
+                (4, 8),
+                0xFC0B,
+                0xFC2B,
+                SpriteId::ENEMY_BOMBER,
+            ),
+            (
+                ObjectEvidenceCategory::Mutant,
+                "SCZP1",
+                0xF8CE,
+                (5, 8),
+                0xF9FB,
+                0xFA23,
+                SpriteId::ENEMY_MUTANT,
+            ),
+            (
+                ObjectEvidenceCategory::Pod,
+                "PRBP1",
+                0xF8F7,
+                (4, 8),
+                0xFA8B,
+                0xFAAB,
+                SpriteId::ENEMY_POD,
+            ),
+            (
+                ObjectEvidenceCategory::Swarmer,
+                "SWPIC1",
+                0xF97B,
+                (3, 4),
+                0xCCC8,
+                0xCCD4,
+                SpriteId::ENEMY_SWARMER,
+            ),
+        ];
+
+        for (index, expected) in expected.into_iter().enumerate() {
+            let detail = world.object_evidence.details[index];
+            let identity = super::source_object_table_identity(index);
+            assert_eq!(detail.object_category, Some(expected.0));
+            assert_eq!(detail.address, Some(identity.address));
+            assert_eq!(detail.slot, Some(identity.slot));
+            assert_eq!(detail.object_type, Some(identity.object_type));
+            assert_eq!(detail.picture_label, Some(expected.1));
+            assert_eq!(detail.picture_address, Some(expected.2));
+            assert_eq!(detail.picture_size, Some(expected.3));
+            assert_eq!(detail.primary_image_address, Some(expected.4));
+            assert_eq!(detail.alternate_image_address, Some(expected.5));
+            assert_eq!(detail.mapped_sprite, Some(expected.6));
+        }
     }
 
     #[test]
@@ -843,7 +7439,9 @@ mod tests {
                 phase: GamePhase::Attract,
                 credits: 1,
                 current_player: 1,
+                player_count: 1,
                 wave: 0,
+                wave_profile: WaveProfileSnapshot::for_wave(0),
                 player: super::PlayerSnapshot {
                     position: (WorldVector::default(), WorldVector::default()),
                     velocity: (WorldVector::default(), WorldVector::default()),
@@ -851,13 +7449,19 @@ mod tests {
                     lives: 3,
                     smart_bombs: 3,
                 },
+                player_stocks: [super::PlayerStockSnapshot::new(3, 3); 2],
                 scores: super::ScoreSnapshot {
                     player_one: 0,
                     player_two: 0,
                     high_score: 100,
                     next_bonus: 10_000,
                 },
+                attract: AttractPresentationSnapshot::for_page_frame(9),
                 high_score_initials: HighScoreInitialsState::EMPTY,
+                high_score_entry: None,
+                high_score_submission: None,
+                high_score_tables: HighScoreTablesSnapshot::DEFAULT,
+                game_over: GameOverSnapshot::NONE,
                 world: WorldSnapshot::default(),
             },
             events: GameEvents::default(),
@@ -877,26 +7481,302 @@ mod tests {
         assert_eq!(state.phase, GamePhase::Attract);
         assert_eq!(state.credits, 0);
         assert_eq!(state.current_player, 1);
+        assert_eq!(state.player_count, 1);
+        assert_eq!(state.wave, DEFAULT_CABINET_WAVE);
+        assert_eq!(state.wave_profile, WaveProfileSnapshot::for_wave(1));
         assert_eq!(state.player.direction, Direction::Right);
-        assert_eq!(state.player.lives, 0);
+        assert_eq!(state.player.lives, DEFAULT_PLAYER_LIVES);
+        assert_eq!(state.player.smart_bombs, 0);
+        assert_eq!(
+            state.player_stocks,
+            [PlayerStockSnapshot::new(DEFAULT_PLAYER_LIVES, 0); 2]
+        );
+        assert_eq!(state.scores.player_one, 0);
+        assert_eq!(state.scores.player_two, 0);
+        assert_eq!(state.scores.high_score, DEFAULT_HIGH_SCORE);
+        assert_eq!(state.scores.next_bonus, DEFAULT_REPLAY_SCORE);
+        assert_eq!(
+            state.attract,
+            AttractPresentationSnapshot::for_page_frame(0)
+        );
+        assert_eq!(state.high_score_tables, HighScoreTablesSnapshot::DEFAULT);
+        assert_eq!(state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(
+            state.high_score_tables.all_time[0],
+            HighScoreTableEntrySnapshot {
+                rank: 1,
+                score: DEFAULT_HIGH_SCORE,
+                initials: [Some('D'), Some('R'), Some('J')],
+            }
+        );
         assert_eq!(state.world, WorldSnapshot::default());
         assert_eq!(Game::default().state(), state);
+    }
+
+    #[test]
+    fn clean_attract_presentation_tracks_source_wait_gates() {
+        let mut game = Game::new();
+
+        let first = game.step(GameInput::NONE);
+        assert_eq!(first.state.attract.page_frame, 1);
+        assert_eq!(
+            first.state.attract.page,
+            AttractPresentationPage::WilliamsLogo
+        );
+        assert_eq!(first.state.attract.source_sleep_ticks, Some(2));
+        assert_eq!(first.state.attract.source_stall_ticks, None);
+        assert!(first.state.attract.shows_williams_logo());
+        assert!(!first.state.attract.shows_presents_text());
+
+        let presents = AttractPresentationSnapshot::for_page_frame(236);
+        assert_eq!(presents.page, AttractPresentationPage::Presents);
+        assert!(presents.shows_williams_logo());
+        assert!(presents.shows_presents_text());
+        assert!(!presents.shows_defender_wordmark());
+
+        let defender = AttractPresentationSnapshot::for_page_frame(285);
+        assert_eq!(defender.page, AttractPresentationPage::DefenderWordmark);
+        assert!(defender.shows_defender_wordmark());
+        assert!(!defender.shows_copyright());
+
+        let copyright = AttractPresentationSnapshot::for_page_frame(419);
+        assert_eq!(copyright.page, AttractPresentationPage::CopyrightWait);
+        assert_eq!(
+            copyright.source_sleep_ticks,
+            Some(ATTRACT_COPYRIGHT_SLEEP_TICKS)
+        );
+        assert_eq!(
+            copyright.source_stall_ticks,
+            Some(ATTRACT_COPYRIGHT_STALL_TICKS)
+        );
+        assert!(copyright.shows_copyright());
+
+        let instruction = AttractPresentationSnapshot::for_page_frame(441);
+        assert_eq!(instruction.page, AttractPresentationPage::Instruction);
+        assert!(instruction.shows_instruction_text());
+        assert!(!instruction.shows_williams_logo());
+    }
+
+    #[test]
+    fn clean_attract_scene_gates_title_program_surfaces() {
+        let mut game = Game::new();
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(236);
+        let presents_scene = game.scene();
+        assert!(presents_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_E && sprite.position == [100.0, 88.0]
+        }));
+        assert!(!presents_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.position == [96.0, 144.0]
+        }));
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(419);
+        let copyright_scene = game.scene();
+        assert!(copyright_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.position == [96.0, 144.0]
+        }));
+        assert!(copyright_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP && sprite.position == [118.0, 208.0]
+        }));
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(441);
+        let instruction_scene = game.scene();
+        assert!(instruction_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [134.0, 48.0]
+        }));
+        assert!(!instruction_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
+                || sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP
+        }));
+    }
+
+    #[test]
+    fn source_visual_state_tracks_palette_words_rates_and_blink_contract() {
+        let visual = SOURCE_VISUAL_STATE;
+
+        assert_eq!(visual.attract_williams_status, 0xFB);
+        assert_eq!(visual.attract_williams_logo_color_index, 0x3F);
+        assert_eq!(visual.attract_copyright_williams_color_index, 0x0F);
+        assert_eq!(visual.attract_williams_fast_logo_rate, 0xFF);
+        assert_eq!(visual.attract_williams_normal_logo_rate, 10);
+        assert_eq!(visual.attract_instruction_man_color_word, 0x6666);
+        assert_eq!(visual.attract_instruction_ship_color_word, 0x0000);
+        assert_eq!(visual.attract_instruction_enemy_color_word, 0x4433);
+        assert_eq!(visual.hall_of_fame_display_letter_color_index, 0x00);
+        assert_eq!(visual.hall_of_fame_logo_color_index, 0x3F);
+        assert_eq!(visual.hall_of_fame_entry_letter_color_index, 0x85);
+        assert_eq!(visual.hall_of_fame_blink_color_index, 0x85);
+        assert_eq!(visual.hall_of_fame_blink_sleep_ticks, 15);
+        assert_eq!(visual.hall_of_fame_underline_normal_word, 0x1111);
+        assert_eq!(visual.hall_of_fame_underline_active_word, 0xDDDD);
+        assert_eq!(visual.top_display_border_word, 0x5555);
+        assert_eq!(visual.top_display_scanner_marker_word, 0x9999);
+
+        assert_eq!(visual.hud_tint(), Color::WHITE);
+        assert_eq!(visual.top_display_border_tint(), Color::WHITE);
+        assert_eq!(visual.top_display_scanner_marker_tint(), Color::WHITE);
+        assert_eq!(visual.attract_williams_logo_tint(), Color::WHITE);
+        assert_eq!(visual.attract_defender_wordmark_tint(), Color::WHITE);
+        assert_eq!(visual.attract_copyright_tint(), Color::WHITE);
+        assert_eq!(visual.hall_of_fame_logo_tint(), Color::WHITE);
+        assert_eq!(visual.hall_of_fame_entry_text_tint(), Color::WHITE);
+        assert_eq!(visual.hall_of_fame_display_text_tint(), Color::WHITE);
+        assert_eq!(visual.hall_of_fame_blink_text_tint(), Color::WHITE);
+        assert_eq!(visual.hall_of_fame_active_underline_tint(), Color::WHITE);
+        assert_eq!(
+            visual.hall_of_fame_normal_underline_tint(),
+            Color::from_rgba(0x66, 0x66, 0x66, 0xFF)
+        );
+        assert!(visual.attract_williams_logo_should_render());
+    }
+
+    #[test]
+    fn clean_scene_uses_source_visual_state_tints() {
+        let mut game = Game::new();
+
+        game.state.phase = GamePhase::Playing;
+        game.state.scores.player_one = 1_200;
+        let playing_scene = game.scene();
+        assert!(
+            playing_scene
+                .sprites
+                .iter()
+                .filter(|sprite| sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD)
+                .all(|sprite| sprite.tint == SOURCE_VISUAL_STATE.top_display_border_tint())
+        );
+        assert!(
+            playing_scene
+                .sprites
+                .iter()
+                .filter(|sprite| {
+                    sprite.layer == RenderLayer::Hud
+                        && SpriteId::SCORE_DIGITS.contains(&sprite.sprite)
+                })
+                .all(|sprite| sprite.tint == SOURCE_VISUAL_STATE.hud_tint())
+        );
+
+        game.state.phase = GamePhase::Attract;
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(419);
+        let attract_scene = game.scene();
+        assert!(attract_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
+                && sprite.tint == SOURCE_VISUAL_STATE.attract_williams_logo_tint()
+        }));
+        assert!(attract_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.position == [96.0, 144.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.attract_defender_wordmark_tint()
+        }));
+        assert!(attract_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP
+                && sprite.tint == SOURCE_VISUAL_STATE.attract_copyright_tint()
+        }));
+
+        game.state.phase = GamePhase::HighScoreEntry;
+        game.state.attract = AttractPresentationSnapshot::INACTIVE;
+        game.state.high_score_initials = HighScoreInitialsState {
+            initials: [Some('A'), Some('B'), Some('C')],
+            cursor: 1,
+        };
+        let entry_scene = game.scene();
+        let underlines = entry_scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::HALL_OF_FAME_UNDERLINE_WORD)
+            .collect::<Vec<_>>();
+        assert!(underlines.iter().any(|sprite| {
+            sprite.tint == SOURCE_VISUAL_STATE.hall_of_fame_active_underline_tint()
+        }));
+        assert!(underlines.iter().any(|sprite| {
+            sprite.tint == SOURCE_VISUAL_STATE.hall_of_fame_normal_underline_tint()
+        }));
+        assert!(entry_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_B
+                && sprite.tint == SOURCE_VISUAL_STATE.hall_of_fame_blink_text_tint()
+        }));
     }
 
     #[test]
     fn clean_game_credits_starts_and_emits_sprite_frame() {
         let mut game = Game::new();
 
-        let credited = game.step(GameInput {
+        let inserted = game.step(GameInput {
             coin: true,
             ..GameInput::NONE
         });
-        assert_eq!(credited.state.frame, 1);
+        assert_eq!(inserted.state.frame, 1);
+        assert_eq!(inserted.state.credits, 0);
+        assert!(inserted.events.is_empty());
+        assert_eq!(inserted.scene.summary().layers.hud, 2);
+        assert_eq!(inserted.scene.summary().layers.overlay, 10);
+        assert_eq!(inserted.scene.summary().raster_count, 0);
+        assert!(inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [108.0, 60.0]
+                && sprite.size == [92.0, 19.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.position == [96.0, 144.0]
+        }));
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP && sprite.position == [118.0, 208.0]
+        }));
+        assert!(inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_C
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [80.0, 229.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_0
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [144.0, 229.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_E && sprite.position == [100.0, 88.0]
+        }));
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_P && sprite.position == [124.0, 108.0]
+        }));
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [134.0, 48.0]
+        }));
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_L && sprite.position == [56.0, 112.0]
+        }));
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1 && sprite.position == [68.0, 122.0]
+        }));
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_P && sprite.position == [132.0, 168.0]
+        }));
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1 && sprite.position == [128.0, 178.0]
+        }));
+
+        let credited = advance_to_delayed_credit(&mut game);
         assert_eq!(credited.state.credits, 1);
         assert_eq!(credited.events.gameplay(), &[GameEvent::CreditAdded]);
-        assert_eq!(credited.events.sounds(), &[SoundEvent::CreditAdded]);
-        assert_eq!(credited.scene.summary().layers.hud, 1);
+        assert!(credited.events.sounds().is_empty());
+        assert_eq!(credited.scene.summary().layers.hud, 2);
+        assert_eq!(credited.scene.summary().layers.overlay, 10);
         assert_eq!(credited.scene.summary().raster_count, 0);
+        assert!(credited.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [144.0, 229.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+
+        let credit_sound = advance_to_delayed_credit_sound(&mut game);
+        assert!(credit_sound.events.gameplay().is_empty());
+        assert_eq!(credit_sound.events.sounds(), &[SoundEvent::CreditAdded]);
 
         let started = game.step(GameInput {
             start_one: true,
@@ -907,29 +7787,160 @@ mod tests {
         assert_eq!(started.state.wave, 1);
         assert_eq!(started.state.player.lives, 3);
         assert_eq!(started.state.player.smart_bombs, 3);
-        assert_eq!(started.state.world.terrain.len(), 5);
-        assert_eq!(started.state.world.stars.len(), 3);
-        assert_eq!(started.state.world.enemies.len(), 1);
-        assert_eq!(started.state.world.enemies[0].kind, EnemyKind::Lander);
         assert_eq!(
-            started.state.world.enemies[0].velocity,
-            ScreenVelocity::new(-1, 0)
+            started.state.player.position,
+            (WorldVector::default(), WorldVector::default())
         );
-        assert_eq!(started.state.world.humans.len(), 2);
-        assert!(started.state.world.projectiles.is_empty());
+        assert_eq!(started.state.world, WorldSnapshot::default());
         assert_eq!(started.events.gameplay(), &[GameEvent::GameStarted]);
-        assert_eq!(started.events.sounds(), &[SoundEvent::GameStarted]);
+        assert!(started.events.sounds().is_empty());
         assert_eq!(
             started.scene.summary().layers,
             RenderLayerCounts {
-                terrain: 5,
-                starfield: 3,
-                objects: 4,
-                hud: 1,
+                objects: 1,
+                hud: 14,
                 ..RenderLayerCounts::default()
             }
         );
-        assert_eq!(started.scene.summary().sprite_count, 13);
+        assert_eq!(started.scene.summary().sprite_count, 15);
+
+        let start_sound = advance_to_delayed_start_sound(&mut game);
+        assert!(start_sound.events.gameplay().is_empty());
+        assert_eq!(start_sound.events.sounds(), &[SoundEvent::GameStarted]);
+
+        let active = advance_to_started_playfield(&mut game);
+        assert_eq!(active.state.player.lives, 2);
+        assert_eq!(active.state.player.smart_bombs, 3);
+        assert_eq!(
+            active.state.player.position,
+            (super::world_word(0x2000), super::world_word(0x8000))
+        );
+        assert_eq!(active.state.wave_profile.landers, 15);
+        assert_eq!(active.state.wave_profile.wave_size, 5);
+        assert_eq!(active.state.world.terrain.len(), 5);
+        assert_eq!(active.state.world.stars.len(), 3);
+        assert_eq!(active.state.world.enemies.len(), 5);
+        assert_eq!(active.state.world.enemies[0].kind, EnemyKind::Lander);
+        assert_eq!(
+            active.state.world.enemies[0].velocity,
+            super::source_lander_screen_velocity(
+                active.state.world.enemies[0]
+                    .source_lander
+                    .expect("initial lander should carry source state")
+            )
+        );
+        assert_eq!(active.state.world.humans.len(), 2);
+        assert!(active.state.world.projectiles.is_empty());
+        assert_eq!(active.state.world.object_evidence.active_count, 7);
+        assert_eq!(active.state.world.object_evidence.inactive_count, 10);
+        assert_eq!(active.state.world.object_evidence.projectile_count, 0);
+        assert_eq!(active.state.world.object_evidence.visible_count, 7);
+        assert_eq!(active.state.world.object_evidence.evidence_crc32, None);
+        assert_eq!(active.state.world.object_evidence.detail_count, 7);
+        assert_eq!(
+            active.state.world.object_evidence.details[0].screen_position,
+            Some(active.state.world.enemies[0].position)
+        );
+        assert_eq!(
+            active.state.world.object_evidence.details[0].object_category,
+            Some(ObjectEvidenceCategory::Lander)
+        );
+        assert_eq!(
+            active.state.world.object_evidence.details[0].mapped_sprite,
+            Some(SpriteId::ENEMY_LANDER)
+        );
+        assert_eq!(
+            active.scene.summary().layers,
+            RenderLayerCounts {
+                terrain: 5,
+                starfield: 3,
+                objects: 8,
+                hud: 22,
+                ..RenderLayerCounts::default()
+            }
+        );
+        assert_eq!(active.scene.summary().sprite_count, 38);
+    }
+
+    #[test]
+    fn clean_game_two_player_start_requires_two_credits() {
+        let mut game = Game::new();
+        game.state.credits = 1;
+
+        let blocked = game.step(GameInput {
+            start_two: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(blocked.state.phase, GamePhase::Attract);
+        assert_eq!(blocked.state.credits, 1);
+        assert_eq!(blocked.state.player_count, 1);
+        assert!(blocked.events.is_empty());
+        assert_eq!(blocked.scene.summary().layers.hud, 2);
+    }
+
+    #[test]
+    fn clean_game_two_player_start_initializes_top_display_state() {
+        let mut game = Game::new();
+        game.state.credits = 2;
+
+        let started = game.step(GameInput {
+            start_two: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(started.state.phase, GamePhase::Playing);
+        assert_eq!(started.state.credits, 0);
+        assert_eq!(started.state.current_player, 1);
+        assert_eq!(started.state.player_count, 2);
+        assert_eq!(started.events.gameplay(), &[GameEvent::GameStarted]);
+        assert!(started.events.sounds().is_empty());
+        assert_eq!(
+            started.state.player_stocks,
+            [PlayerStockSnapshot::new(3, 3); 2]
+        );
+        assert_eq!(
+            started.scene.summary().layers,
+            RenderLayerCounts {
+                objects: 1,
+                hud: 22,
+                overlay: 9,
+                ..RenderLayerCounts::default()
+            }
+        );
+        assert_eq!(started.scene.summary().sprite_count, 32);
+        assert!(started.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_P
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [120.0, 128.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+
+        let start_sound = advance_to_delayed_start_sound(&mut game);
+        assert_eq!(start_sound.events.sounds(), &[SoundEvent::GameStarted]);
+
+        let active = advance_to_started_playfield(&mut game);
+        assert_eq!(active.state.player_count, 2);
+        assert_eq!(active.state.current_player, 1);
+        assert_eq!(
+            active.state.player_stocks[0],
+            PlayerStockSnapshot::new(2, 3)
+        );
+        assert_eq!(
+            active.state.player_stocks[1],
+            PlayerStockSnapshot::new(3, 3)
+        );
+        assert_eq!(
+            active.scene.summary().layers,
+            RenderLayerCounts {
+                terrain: 5,
+                starfield: 3,
+                objects: 8,
+                hud: 30,
+                ..RenderLayerCounts::default()
+            }
+        );
+        assert_eq!(active.scene.summary().sprite_count, 46);
     }
 
     #[test]
@@ -993,10 +8004,35 @@ mod tests {
 
         assert_eq!(frame.state.player.direction, Direction::Left);
         assert_eq!(frame.state.player.smart_bombs, 2);
-        assert_eq!(frame.state.scores.player_one, 150);
+        assert_eq!(frame.state.scores.player_one, 750);
         assert!(frame.state.player.velocity.1.subpixels() < 0);
         assert_eq!(frame.state.world.projectiles.len(), 1);
-        assert!(frame.state.world.enemies.is_empty());
+        assert_eq!(frame.state.world.enemies.len(), 5);
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 5,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(frame.state.world.object_evidence.active_count, 8);
+        assert_eq!(frame.state.world.object_evidence.inactive_count, 5);
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+        assert_eq!(frame.state.world.object_evidence.visible_count, 8);
+        assert_eq!(frame.state.world.object_evidence.evidence_crc32, None);
+        assert_eq!(frame.state.world.object_evidence.detail_count, 8);
+        assert_eq!(
+            frame.state.world.object_evidence.details[7].screen_position,
+            Some(frame.state.world.projectiles[0].position)
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.details[7].object_category,
+            Some(ObjectEvidenceCategory::PlayerProjectile)
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.details[7].mapped_sprite,
+            Some(SpriteId::PLAYER_PROJECTILE)
+        );
         assert_eq!(
             frame.state.world.projectiles[0].velocity,
             ScreenVelocity::new(-8, 0)
@@ -1008,8 +8044,11 @@ mod tests {
                 GameEvent::FirePressed,
                 GameEvent::SmartBombPressed,
                 GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
                 GameEvent::HyperspacePressed,
-                GameEvent::WaveCleared,
             ]
         );
         assert_eq!(frame.events.sounds(), &[SoundEvent::ThrustStarted]);
@@ -1018,23 +8057,155 @@ mod tests {
             RenderLayerCounts {
                 terrain: 5,
                 starfield: 3,
-                objects: 3,
+                objects: 13,
                 projectiles: 1,
-                hud: 1,
-                ..RenderLayerCounts::default()
+                hud: 22,
+                overlay: 0,
             }
         );
         assert_eq!(frame.scene.summary().raster_count, 0);
     }
 
     #[test]
+    fn clean_game_draws_score_digits_with_arcade_blanking_and_positions() {
+        let mut game = Game::new();
+        game.state.scores.player_one = 1_050;
+
+        let frame = game.step(GameInput::NONE);
+        let score_digits = frame
+            .scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.layer == RenderLayer::Hud && SpriteId::SCORE_DIGITS.contains(&sprite.sprite)
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(score_digits.len(), 4);
+        assert_eq!(score_digits[0].sprite, SpriteId::SCORE_DIGIT_1);
+        assert_eq!(score_digits[0].position, [34.0, 21.0]);
+        assert_eq!(score_digits[1].sprite, SpriteId::SCORE_DIGIT_0);
+        assert_eq!(score_digits[1].position, [42.0, 21.0]);
+        assert_eq!(score_digits[2].sprite, SpriteId::SCORE_DIGIT_5);
+        assert_eq!(score_digits[2].position, [50.0, 21.0]);
+        assert_eq!(score_digits[3].sprite, SpriteId::SCORE_DIGIT_0);
+        assert_eq!(score_digits[3].position, [58.0, 21.0]);
+        assert!(
+            score_digits
+                .iter()
+                .all(|sprite| sprite.layer == RenderLayer::Hud && sprite.size == [6.0, 8.0])
+        );
+    }
+
+    #[test]
+    fn clean_game_draws_two_player_score_digits_at_arcade_positions() {
+        let mut game = Game::new();
+        game.state.player_count = 2;
+        game.state.scores.player_two = 2_001;
+
+        let frame = game.step(GameInput::NONE);
+        let score_digits = frame
+            .scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.layer == RenderLayer::Hud && SpriteId::SCORE_DIGITS.contains(&sprite.sprite)
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(score_digits.len(), 6);
+        assert_eq!(score_digits[0].sprite, SpriteId::SCORE_DIGIT_0);
+        assert_eq!(score_digits[0].position, [50.0, 21.0]);
+        assert_eq!(score_digits[1].sprite, SpriteId::SCORE_DIGIT_0);
+        assert_eq!(score_digits[1].position, [58.0, 21.0]);
+        assert_eq!(score_digits[2].sprite, SpriteId::SCORE_DIGIT_2);
+        assert_eq!(score_digits[2].position, [230.0, 21.0]);
+        assert_eq!(score_digits[3].sprite, SpriteId::SCORE_DIGIT_0);
+        assert_eq!(score_digits[3].position, [238.0, 21.0]);
+        assert_eq!(score_digits[4].sprite, SpriteId::SCORE_DIGIT_0);
+        assert_eq!(score_digits[4].position, [246.0, 21.0]);
+        assert_eq!(score_digits[5].sprite, SpriteId::SCORE_DIGIT_1);
+        assert_eq!(score_digits[5].position, [254.0, 21.0]);
+    }
+
+    #[test]
+    fn clean_game_draws_current_player_stock_counts_with_arcade_caps() {
+        let mut game = credited_started_game();
+        game.state.player.lives = 7;
+        game.state.player.smart_bombs = 4;
+
+        let frame = game.step(GameInput::NONE);
+        let life_stock = frame
+            .scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::PLAYER_LIFE_STOCK)
+            .collect::<Vec<_>>();
+        let smart_bomb_stock = frame
+            .scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::SMART_BOMB_STOCK)
+            .collect::<Vec<_>>();
+
+        assert_eq!(life_stock.len(), 5);
+        assert_eq!(smart_bomb_stock.len(), 3);
+        assert_eq!(life_stock[0].position, [18.0, 13.0]);
+        assert_eq!(life_stock[4].position, [66.0, 13.0]);
+        assert_eq!(life_stock[0].size, [10.0, 4.0]);
+        assert_eq!(smart_bomb_stock[0].position, [70.0, 20.0]);
+        assert_eq!(smart_bomb_stock[2].position, [70.0, 28.0]);
+        assert_eq!(smart_bomb_stock[0].size, [6.0, 3.0]);
+        assert!(
+            life_stock
+                .iter()
+                .all(|sprite| sprite.layer == RenderLayer::Hud)
+        );
+        assert!(
+            smart_bomb_stock
+                .iter()
+                .all(|sprite| sprite.layer == RenderLayer::Hud)
+        );
+    }
+
+    #[test]
+    fn clean_game_draws_two_player_stock_counts_at_arcade_positions() {
+        let mut game = credited_started_game();
+        game.state.player_count = 2;
+        game.state.player.lives = 7;
+        game.state.player.smart_bombs = 4;
+        game.state.player_stocks[1] = PlayerStockSnapshot::new(2, 2);
+
+        let frame = game.step(GameInput::NONE);
+        let life_stock = frame
+            .scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::PLAYER_LIFE_STOCK)
+            .collect::<Vec<_>>();
+        let smart_bomb_stock = frame
+            .scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::SMART_BOMB_STOCK)
+            .collect::<Vec<_>>();
+
+        assert_eq!(life_stock.len(), 7);
+        assert_eq!(smart_bomb_stock.len(), 5);
+        assert_eq!(life_stock[0].position, [18.0, 13.0]);
+        assert_eq!(life_stock[4].position, [66.0, 13.0]);
+        assert_eq!(life_stock[5].position, [214.0, 13.0]);
+        assert_eq!(life_stock[6].position, [226.0, 13.0]);
+        assert_eq!(smart_bomb_stock[0].position, [70.0, 20.0]);
+        assert_eq!(smart_bomb_stock[2].position, [70.0, 28.0]);
+        assert_eq!(smart_bomb_stock[3].position, [266.0, 20.0]);
+        assert_eq!(smart_bomb_stock[4].position, [266.0, 24.0]);
+        assert_eq!(frame.scene.summary().layers.hud, 31);
+    }
+
+    #[test]
     fn clean_game_smart_bomb_clears_enemies_scores_and_updates_scene() {
         let mut game = credited_started_game();
-        game.state.world.enemies.push(EnemySnapshot {
-            kind: EnemyKind::Lander,
-            position: ScreenPosition::new(132, 92),
-            velocity: ScreenVelocity::new(1, 0),
-        });
         game.state.scores.player_one = 9_800;
         game.state.scores.high_score = 9_800;
         game.state.scores.next_bonus = 10_000;
@@ -1045,11 +8216,18 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert!(frame.state.world.enemies.is_empty());
-        assert_eq!(frame.state.scores.player_one, 10_100);
-        assert_eq!(frame.state.scores.high_score, 10_100);
+        assert_eq!(frame.state.world.enemies.len(), 5);
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 5,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert_eq!(frame.state.scores.player_one, 10_550);
+        assert_eq!(frame.state.scores.high_score, 10_550);
         assert_eq!(frame.state.scores.next_bonus, 20_000);
-        assert_eq!(frame.state.player.lives, 4);
+        assert_eq!(frame.state.player.lives, 3);
         assert_eq!(frame.state.player.smart_bombs, 1);
         assert_eq!(
             frame.events.gameplay(),
@@ -1058,16 +8236,81 @@ mod tests {
                 GameEvent::EnemyDestroyed,
                 GameEvent::EnemyDestroyed,
                 GameEvent::BonusAwarded,
-                GameEvent::WaveCleared,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
+                GameEvent::EnemyDestroyed,
             ]
         );
-        assert!(
-            !frame
-                .scene
-                .sprites
-                .iter()
-                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.size == [12.0, 8.0]
+        }));
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.size == [5.0, 8.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_smart_bomb_pod_spawns_swarmers_after_destroyed_batch() {
+        let mut game = credited_started_game();
+        game.state.wave = 2;
+        game.state.wave_profile = WaveProfileSnapshot::for_wave(2);
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Pod,
+            ScreenPosition::new(100, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.player.smart_bombs = 1;
+
+        let frame = game.step(GameInput {
+            smart_bomb: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(
+            frame.state.world.enemies.len(),
+            SOURCE_POD_SWARMER_REQUEST_LIMIT
         );
+        assert!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .all(|enemy| enemy.kind == EnemyKind::Swarmer)
+        );
+        assert_eq!(frame.state.scores.player_one, 1_000);
+        assert_eq!(frame.state.player.smart_bombs, 0);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[GameEvent::SmartBombPressed, GameEvent::EnemyDestroyed]
+        );
+    }
+
+    #[test]
+    fn clean_game_activates_source_reserve_batch_before_wave_clear() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.wave, 1);
+        assert_eq!(frame.state.world.enemies.len(), 5);
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot {
+                landers: 5,
+                ..EnemyReserveSnapshot::default()
+            }
+        );
+        assert!(frame.events.gameplay().is_empty());
+        assert_eq!(frame.state.world.object_evidence.active_count, 7);
+        assert_eq!(frame.state.world.object_evidence.inactive_count, 5);
+        assert_eq!(frame.state.world.object_evidence.visible_count, 7);
     }
 
     #[test]
@@ -1124,8 +8367,12 @@ mod tests {
     #[test]
     fn clean_game_resolves_projectile_enemy_collision_and_scores() {
         let mut game = credited_started_game();
-        game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
-        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        keep_first_enemy_only(&mut game);
+        game.state.world.enemies[0] = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(100, 80),
+            ScreenVelocity::new(0, 0),
+        );
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
@@ -1141,13 +8388,30 @@ mod tests {
             frame.events.gameplay(),
             &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
         );
-        assert!(
-            !frame
-                .scene
-                .sprites
-                .iter()
-                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+        assert_eq!(frame.state.world.expanded_objects.active_count, 1);
+        assert_eq!(frame.state.world.expanded_objects.detail_count, 1);
+        assert_eq!(
+            frame.state.world.expanded_objects.details[0],
+            ExpandedObjectDetailSnapshot {
+                kind: ExpandedObjectKind::Explosion,
+                size: SOURCE_EXPLOSION_INITIAL_SIZE,
+                picture_label: Some("LNDP1"),
+                picture_size: Some((5, 8)),
+                mapped_sprite: Some(SpriteId::ENEMY_LANDER),
+                center: Some(ScreenPosition::new(102, 84)),
+                top_left: Some(ScreenPosition::new(100, 80)),
+                explosion_frame: Some(0),
+                explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
+                ..ExpandedObjectDetailSnapshot::EMPTY
+            }
         );
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [100.0, 80.0]
+                && sprite.size == [5.0, 8.0]
+                && sprite.tint == Color::WHITE
+        }));
         assert!(
             !frame
                 .scene
@@ -1158,15 +8422,1875 @@ mod tests {
     }
 
     #[test]
+    fn clean_game_pod_projectile_collision_spawns_source_bounded_swarmers() {
+        let mut game = credited_started_game();
+        game.state.wave = 2;
+        game.state.wave_profile = WaveProfileSnapshot::for_wave(2);
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Pod,
+            ScreenPosition::new(100, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, 83),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame.state.world.enemies.len(),
+            SOURCE_POD_SWARMER_REQUEST_LIMIT
+        );
+        assert!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .all(|enemy| enemy.kind == EnemyKind::Swarmer
+                    && enemy.position == ScreenPosition::new(100, 80))
+        );
+        let mut expected_rng = SourceRandSnapshot::default();
+        let expected_swarmers = (0..SOURCE_POD_SWARMER_REQUEST_LIMIT)
+            .map(|_| {
+                super::source_mini_swarmer_spawn(
+                    &mut expected_rng,
+                    game.state.wave_profile,
+                    ScreenPosition::new(100, 80),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .map(|enemy| enemy.source_swarmer)
+                .collect::<Vec<_>>(),
+            expected_swarmers
+                .iter()
+                .copied()
+                .map(Some)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .map(|enemy| enemy.velocity)
+                .collect::<Vec<_>>(),
+            expected_swarmers
+                .iter()
+                .map(|swarmer| {
+                    super::source_screen_velocity(swarmer.x_velocity, swarmer.y_velocity)
+                })
+                .collect::<Vec<_>>()
+        );
+        assert!(frame.state.world.projectiles.is_empty());
+        assert_eq!(frame.state.scores.player_one, 1_000);
+        assert_eq!(frame.events.gameplay(), &[GameEvent::EnemyDestroyed]);
+        assert_eq!(frame.state.world.object_evidence.active_count, 8);
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 0);
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].object_category,
+            Some(ObjectEvidenceCategory::Swarmer)
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].mapped_sprite,
+            Some(SpriteId::ENEMY_SWARMER)
+        );
+        assert_eq!(
+            frame.state.world.expanded_objects.details[0].picture_label,
+            Some("PRBP1")
+        );
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_SWARMER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.size == [8.0, 6.0]
+        }));
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_POD
+                && sprite.layer == RenderLayer::Objects
+                && sprite.size == [4.0, 8.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_pod_swarmer_spawn_respects_source_active_limit() {
+        let mut game = credited_started_game();
+        game.state.wave = 2;
+        game.state.wave_profile = WaveProfileSnapshot::for_wave(2);
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Pod,
+            ScreenPosition::new(100, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state
+            .world
+            .enemies
+            .extend((0..SOURCE_ACTIVE_SWARMER_LIMIT - 2).map(|index| {
+                EnemySnapshot::new(
+                    EnemyKind::Swarmer,
+                    ScreenPosition::new(index as u8, 40),
+                    ScreenVelocity::new(0, 0),
+                )
+            }));
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, 83),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .filter(|enemy| enemy.kind == EnemyKind::Swarmer)
+                .count(),
+            SOURCE_ACTIVE_SWARMER_LIMIT
+        );
+        assert_eq!(frame.state.scores.player_one, 1_000);
+        assert_eq!(frame.events.gameplay(), &[GameEvent::EnemyDestroyed]);
+    }
+
+    #[test]
+    fn clean_game_mini_swarmer_source_entry_seeks_horizontally_then_sleeps() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x8000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::source_swarmer(
+            ScreenPosition::new(40, 80),
+            ScreenVelocity::new(0, 0),
+            SourceSwarmerSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                acceleration: 0x08,
+                shot_timer: 7,
+                sleep_ticks: 0,
+                horizontal_seek_pending: true,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans.clear();
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        let swarmer = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source swarmer should remain active");
+        let source = swarmer
+            .source_swarmer
+            .expect("source swarmer state should be retained");
+        let expected_x_velocity = super::source_mini_swarmer_seek_velocity(
+            game.state.wave_profile.swarmer_x_velocity,
+            0x20,
+            40,
+        );
+        let (expected_x, expected_x_fraction) =
+            super::source_fixed_axis_step(40, 0, expected_x_velocity);
+
+        assert_eq!(source.x_velocity, expected_x_velocity);
+        assert_eq!(source.y_velocity, 0);
+        assert_eq!(source.x_fraction, expected_x_fraction);
+        assert_eq!(source.y_fraction, 0);
+        assert_eq!(source.sleep_ticks, SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS);
+        assert!(!source.horizontal_seek_pending);
+        assert_eq!(swarmer.position, ScreenPosition::new(expected_x, 80));
+        assert_eq!(
+            swarmer.velocity,
+            super::source_screen_velocity(expected_x_velocity, 0)
+        );
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+    }
+
+    #[test]
+    fn clean_game_mini_swarmer_loop_updates_y_velocity_and_projects_enemy_bomb() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2200), super::world_word(0x7000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::source_swarmer(
+            ScreenPosition::new(32, 96),
+            ScreenVelocity::new(1, 1),
+            SourceSwarmerSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0x0020,
+                y_velocity: 0x0100,
+                acceleration: 0x20,
+                shot_timer: 1,
+                sleep_ticks: 0,
+                horizontal_seek_pending: false,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans.clear();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x80,
+            hseed: 0x00,
+            lseed: 0x40,
+        };
+        game.baiter_timer_ticks = None;
+        let mut expected_rng = game.state.world.source_rng;
+        expected_rng.advance();
+        let expected_y_velocity =
+            super::source_mini_swarmer_y_velocity(0x0100, 0x20, 0x70, 0x60, 0x80);
+        let expected_projectile_x_velocity = 0x0020u16.wrapping_shl(3);
+        let expected_projectile_y_velocity =
+            super::source_arithmetic_shift_right_word(u16::from_be_bytes([0x10, 0]), 5);
+        let (expected_x, expected_x_fraction) = super::source_fixed_axis_step(32, 0, 0x0020);
+        let (expected_y, expected_y_fraction) =
+            super::source_fixed_axis_step(96, 0, expected_y_velocity);
+
+        let frame = game.step(GameInput::NONE);
+
+        let swarmer = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source swarmer should remain active");
+        let source = swarmer
+            .source_swarmer
+            .expect("source swarmer state should be retained");
+        assert_eq!(source.x_velocity, 0x0020);
+        assert_eq!(source.y_velocity, expected_y_velocity);
+        assert_eq!(source.x_fraction, expected_x_fraction);
+        assert_eq!(source.y_fraction, expected_y_fraction);
+        assert_eq!(
+            source.shot_timer,
+            super::source_rmax(
+                game.state.wave_profile.swarmer_shot_time as u8,
+                expected_rng.seed
+            )
+        );
+        assert_eq!(source.sleep_ticks, SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS);
+        assert_eq!(
+            swarmer.position,
+            ScreenPosition::new(expected_x, expected_y)
+        );
+        assert_eq!(
+            swarmer.velocity,
+            super::source_screen_velocity(0x0020, expected_y_velocity)
+        );
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+
+        assert_eq!(frame.state.world.enemy_projectiles.len(), 1);
+        let projectile = frame.state.world.enemy_projectiles[0];
+        assert_eq!(projectile.position, ScreenPosition::new(32, 96));
+        assert_eq!(projectile.source_x_velocity, expected_projectile_x_velocity);
+        assert_eq!(projectile.source_y_velocity, expected_projectile_y_velocity);
+        assert_eq!(
+            projectile.velocity,
+            super::source_screen_velocity(
+                expected_projectile_x_velocity,
+                expected_projectile_y_velocity
+            )
+        );
+        assert_eq!(frame.state.world.object_evidence.active_count, 2);
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+        assert_eq!(
+            frame.state.world.object_evidence.details[1].object_category,
+            Some(ObjectEvidenceCategory::EnemyBomb)
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.details[1].mapped_sprite,
+            Some(SpriteId::ENEMY_BOMB)
+        );
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_BOMB
+                && sprite.layer == RenderLayer::Projectiles
+                && sprite.position == [32.0, 96.0]
+                && sprite.size == [4.0, 6.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_baiter_runtime_entry_uses_source_pacing_timer() {
+        let mut game = credited_started_game();
+        game.baiter_timer_ticks = Some(1);
+        game.baiter_pacing_frames_remaining = 1;
+        let expected_player_position = ScreenPosition::new(0x20, 0x80);
+        let expected_player_velocity = (WorldVector::default(), WorldVector::default());
+        let (expected_position, expected_source_baiter) = super::source_baiter_spawn(
+            game.state.world.source_rng,
+            game.state.wave_profile,
+            expected_player_position,
+            expected_player_velocity,
+        );
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            game.baiter_timer_ticks,
+            Some(game.state.wave_profile.baiter_delay)
+        );
+        assert_eq!(
+            game.baiter_pacing_frames_remaining,
+            SOURCE_GAME_EXEC_SLEEP_FRAMES
+        );
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .filter(|enemy| enemy.kind == EnemyKind::Baiter)
+                .count(),
+            1
+        );
+        let baiter = frame
+            .state
+            .world
+            .enemies
+            .iter()
+            .find(|enemy| enemy.kind == EnemyKind::Baiter)
+            .expect("baiter spawn");
+        assert_eq!(baiter.position, expected_position);
+        assert_eq!(
+            baiter.velocity,
+            super::source_baiter_screen_velocity(expected_source_baiter)
+        );
+        assert_eq!(baiter.source_baiter, Some(expected_source_baiter));
+        assert!(frame.events.gameplay().is_empty());
+        assert_eq!(frame.state.world.object_evidence.active_count, 8);
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_BAITER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.size == [12.0, 8.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_baiter_runtime_entry_respects_source_active_cap() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = (0..SOURCE_ACTIVE_BAITER_LIMIT)
+            .map(|index| {
+                EnemySnapshot::new(
+                    EnemyKind::Baiter,
+                    ScreenPosition::new(index as u8, 68),
+                    ScreenVelocity::new(0, 0),
+                )
+            })
+            .collect();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = Some(1);
+        game.baiter_pacing_frames_remaining = 1;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .filter(|enemy| enemy.kind == EnemyKind::Baiter)
+                .count(),
+            SOURCE_ACTIVE_BAITER_LIMIT
+        );
+        assert!(frame.events.gameplay().is_empty());
+    }
+
+    #[test]
+    fn clean_game_baiter_timer_accelerates_when_enemy_total_is_low() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.truncate(5);
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = Some(game.state.wave_profile.baiter_delay);
+        game.baiter_pacing_frames_remaining = 1;
+
+        game.step(GameInput::NONE);
+
+        assert_eq!(
+            game.baiter_timer_ticks,
+            Some(game.state.wave_profile.baiter_delay / 2)
+        );
+    }
+
+    #[test]
+    fn clean_game_baiter_source_loop_cycles_fires_and_updates_velocity() {
+        let mut game = credited_started_game();
+        let player_position = ScreenPosition::new(0x20, 0x80);
+        let player_velocity = (WorldVector::default(), WorldVector::default());
+        game.state.player.position = (
+            super::world_word(u16::from(player_position.x) << 8),
+            super::world_word(u16::from(player_position.y) << 8),
+        );
+        game.state.player.velocity = player_velocity;
+        game.state.world.enemies = vec![EnemySnapshot::source_baiter(
+            ScreenPosition::new(0x40, 0x60),
+            ScreenVelocity::new(0, 0),
+            SourceBaiterSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer: 1,
+                sleep_ticks: 0,
+                picture_frame: 2,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x90,
+            hseed: 0x20,
+            lseed: 0x13,
+        };
+        game.baiter_timer_ticks = None;
+
+        let mut expected_rng = game.state.world.source_rng;
+        expected_rng.advance();
+        let mut expected_source = SourceBaiterSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: super::source_rmax(
+                game.state.wave_profile.baiter_shot_time as u8,
+                expected_rng.seed,
+            ),
+            sleep_ticks: SOURCE_BAITER_LOOP_SLEEP_TICKS,
+            picture_frame: 0,
+        };
+        let expected_projectile = super::source_baiter_shot(
+            ScreenPosition::new(0x40, 0x60),
+            expected_source,
+            player_position,
+            player_velocity,
+            expected_rng,
+            0,
+        )
+        .expect("baiter fireball");
+        super::source_baiter_velocity_update(
+            &mut expected_source,
+            ScreenPosition::new(0x40, 0x60),
+            game.state.wave_profile,
+            player_position,
+            player_velocity,
+            true,
+            expected_rng.seed,
+        );
+        let (expected_x, expected_x_fraction) = super::source_fixed_axis_step(
+            0x40,
+            0,
+            super::source_baiter_screen_x_velocity(expected_source.x_velocity),
+        );
+        let (expected_y, expected_y_fraction) =
+            super::source_fixed_axis_step(0x60, 0, expected_source.y_velocity);
+        expected_source.x_fraction = expected_x_fraction;
+        expected_source.y_fraction = expected_y_fraction;
+
+        let frame = game.step(GameInput::NONE);
+
+        let baiter = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source baiter should remain active");
+        assert_eq!(baiter.position, ScreenPosition::new(expected_x, expected_y));
+        assert_eq!(
+            baiter.velocity,
+            super::source_baiter_screen_velocity(expected_source)
+        );
+        assert_eq!(baiter.source_baiter, Some(expected_source));
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        assert_eq!(
+            frame.state.world.enemy_projectiles,
+            vec![expected_projectile]
+        );
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_BOMB
+                && sprite.layer == RenderLayer::Projectiles
+                && sprite.position == [64.0, 96.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_bomber_source_loop_cycles_picture_and_projects_bomb() {
+        let mut game = credited_started_game();
+        let player_position = ScreenPosition::new(0x20, 0x50);
+        game.state.player.position = (
+            super::world_word(u16::from(player_position.x) << 8),
+            super::world_word(u16::from(player_position.y) << 8),
+        );
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::source_bomber(
+            ScreenPosition::new(0x08, 0x60),
+            ScreenVelocity::new(0, 0),
+            SourceBomberSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: 0x50,
+                sleep_ticks: 0,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans.clear();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0,
+            hseed: 0x80,
+            lseed: 0,
+        };
+        game.baiter_timer_ticks = None;
+
+        let expected_y_velocity = super::source_bomber_onscreen_y_velocity_delta(0x60, 0x50)
+            .expect("onscreen y delta")
+            .wrapping_add(super::source_bomber_random_y_velocity(0, 0));
+        let expected_projectile = super::source_bomber_bomb_shell(
+            ScreenPosition::new(0x08, 0x60),
+            SourceBomberSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: expected_y_velocity,
+                picture_frame: 1,
+                cruise_altitude: 0x50,
+                sleep_ticks: super::SOURCE_BOMBER_LOOP_SLEEP_TICKS,
+            },
+            game.state.world.source_rng,
+            0,
+        )
+        .expect("bomber bomb shell");
+        let (expected_y, expected_y_fraction) =
+            super::source_fixed_axis_step(0x60, 0, expected_y_velocity);
+        let expected_source = SourceBomberSnapshot {
+            x_fraction: 0,
+            y_fraction: expected_y_fraction,
+            x_velocity: 0,
+            y_velocity: expected_y_velocity,
+            picture_frame: 1,
+            cruise_altitude: 0x50,
+            sleep_ticks: super::SOURCE_BOMBER_LOOP_SLEEP_TICKS,
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        let bomber = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source bomber should remain active");
+        assert_eq!(bomber.kind, EnemyKind::Bomber);
+        assert_eq!(bomber.position, ScreenPosition::new(0x08, expected_y));
+        assert_eq!(
+            bomber.velocity,
+            super::source_bomber_screen_velocity(expected_source)
+        );
+        assert_eq!(bomber.source_bomber, Some(expected_source));
+        assert_eq!(
+            frame.state.world.enemy_projectiles,
+            vec![expected_projectile]
+        );
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_BOMB
+                && sprite.layer == RenderLayer::Projectiles
+                && sprite.position == [8.0, 96.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_lander_source_loop_orbits_cycles_and_fires() {
+        let mut game = credited_started_game();
+        let player_position = ScreenPosition::new(0x20, 0x80);
+        let player_velocity = (WorldVector::default(), WorldVector::default());
+        game.state.player.position = (
+            super::world_word(u16::from(player_position.x) << 8),
+            super::world_word(u16::from(player_position.y) << 8),
+        );
+        game.state.player.velocity = player_velocity;
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            ScreenPosition::new(0x40, 0x60),
+            ScreenVelocity::new(0, 0),
+            SourceLanderSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0x0020,
+                y_velocity: 0,
+                shot_timer: 1,
+                sleep_ticks: 0,
+                picture_frame: 2,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(10, 216))];
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x90,
+            hseed: 0x20,
+            lseed: 0x13,
+        };
+        game.baiter_timer_ticks = None;
+
+        let mut expected_rng = game.state.world.source_rng;
+        expected_rng.advance();
+        let expected_y_velocity = super::source_lander_orbit_y_velocity(
+            game.state.wave_profile,
+            ScreenPosition::new(0x40, 0x60),
+            &game.state.world.terrain,
+        );
+        let expected_projectile = super::source_enemy_fireball_shot(
+            ScreenPosition::new(0x40, 0x60),
+            0,
+            0,
+            player_position,
+            player_velocity,
+            expected_rng,
+            0,
+        )
+        .expect("lander fireball");
+        let (expected_x, expected_x_fraction) = super::source_fixed_axis_step(0x40, 0, 0x0020);
+        let (expected_y, expected_y_fraction) =
+            super::source_fixed_axis_step(0x60, 0, expected_y_velocity);
+        let expected_source = SourceLanderSnapshot {
+            x_fraction: expected_x_fraction,
+            y_fraction: expected_y_fraction,
+            x_velocity: 0x0020,
+            y_velocity: expected_y_velocity,
+            shot_timer: super::source_rmax(
+                game.state.wave_profile.lander_shot_time as u8,
+                expected_rng.seed,
+            ),
+            sleep_ticks: SOURCE_LANDER_ORBIT_SLEEP_TICKS,
+            picture_frame: 0,
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        let lander = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source lander should remain active");
+        assert_eq!(lander.kind, EnemyKind::Lander);
+        assert_eq!(lander.position, ScreenPosition::new(expected_x, expected_y));
+        assert_eq!(
+            lander.velocity,
+            super::source_lander_screen_velocity(expected_source)
+        );
+        assert_eq!(lander.source_lander, Some(expected_source));
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        assert_eq!(
+            frame.state.world.enemy_projectiles,
+            vec![expected_projectile]
+        );
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+    }
+
+    #[test]
+    fn clean_game_pod_source_motion_uses_fixed_point_velocity() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::source_pod(
+            ScreenPosition::new(0x40, 0x60),
+            ScreenVelocity::new(0, 0),
+            SourcePodSnapshot {
+                x_fraction: 0xF0,
+                y_fraction: 0x10,
+                x_velocity: 0x0020,
+                y_velocity: 0xFFE0,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans.clear();
+        game.baiter_timer_ticks = None;
+        let (expected_x, expected_x_fraction) = super::source_fixed_axis_step(0x40, 0xF0, 0x0020);
+        let (expected_y, expected_y_fraction) = super::source_fixed_axis_step(0x60, 0x10, 0xFFE0);
+        let expected_source = SourcePodSnapshot {
+            x_fraction: expected_x_fraction,
+            y_fraction: expected_y_fraction,
+            x_velocity: 0x0020,
+            y_velocity: 0xFFE0,
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        let pod = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source pod should remain active");
+        assert_eq!(pod.kind, EnemyKind::Pod);
+        assert_eq!(pod.position, ScreenPosition::new(expected_x, expected_y));
+        assert_eq!(
+            pod.velocity,
+            super::source_pod_screen_velocity(expected_source)
+        );
+        assert_eq!(pod.source_pod, Some(expected_source));
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].object_category,
+            Some(ObjectEvidenceCategory::Pod)
+        );
+    }
+
+    #[test]
+    fn clean_game_mutant_source_loop_hops_fires_and_sleeps() {
+        let mut game = credited_started_game();
+        let player_position = ScreenPosition::new(0x20, 0x70);
+        let player_velocity = (WorldVector::default(), WorldVector::default());
+        game.state.player.position = (
+            super::world_word(u16::from(player_position.x) << 8),
+            super::world_word(u16::from(player_position.y) << 8),
+        );
+        game.state.player.velocity = player_velocity;
+        game.state.world.enemies = vec![EnemySnapshot::source_mutant(
+            ScreenPosition::new(0x40, 0x60),
+            ScreenVelocity::new(0, 0),
+            SourceMutantSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                shot_timer: 1,
+                sleep_ticks: 0,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans.clear();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x80,
+            hseed: 0x00,
+            lseed: 0x40,
+        };
+        game.baiter_timer_ticks = None;
+
+        let object_absolute_x = 0x4000;
+        let player_absolute_x = 0x2000;
+        let expected_x_velocity = super::source_mutant_x_velocity(
+            game.state.wave_profile.mutant_x_velocity,
+            player_absolute_x,
+            object_absolute_x,
+        );
+        let expected_y_velocity = super::source_mutant_y_velocity(
+            game.state.wave_profile,
+            player_position.y,
+            player_absolute_x,
+            object_absolute_x,
+            ScreenPosition::new(0x40, 0x60),
+        );
+        let pre_motion_position = ScreenPosition::new(
+            0x40,
+            0x60u8.wrapping_add(game.state.wave_profile.mutant_random_y),
+        );
+        let mut expected_rng = game.state.world.source_rng;
+        expected_rng.advance();
+        let expected_projectile = super::source_enemy_fireball_shot(
+            pre_motion_position,
+            0,
+            0,
+            player_position,
+            player_velocity,
+            expected_rng,
+            0,
+        )
+        .expect("mutant fireball");
+        let (expected_x, expected_x_fraction) =
+            super::source_fixed_axis_step(pre_motion_position.x, 0, expected_x_velocity);
+        let (expected_y, expected_y_fraction) =
+            super::source_fixed_axis_step(pre_motion_position.y, 0, expected_y_velocity);
+        let expected_source = SourceMutantSnapshot {
+            x_fraction: expected_x_fraction,
+            y_fraction: expected_y_fraction,
+            x_velocity: expected_x_velocity,
+            y_velocity: expected_y_velocity,
+            shot_timer: super::source_rmax(
+                game.state.wave_profile.mutant_shot_time as u8,
+                expected_rng.seed,
+            ),
+            sleep_ticks: SOURCE_MUTANT_LOOP_SLEEP_TICKS,
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        let mutant = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source mutant should remain active");
+        assert_eq!(mutant.kind, EnemyKind::Mutant);
+        assert_eq!(mutant.position, ScreenPosition::new(expected_x, expected_y));
+        assert_eq!(
+            mutant.velocity,
+            super::source_mutant_screen_velocity(expected_source)
+        );
+        assert_eq!(mutant.source_mutant, Some(expected_source));
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        assert_eq!(
+            frame.state.world.enemy_projectiles,
+            vec![expected_projectile]
+        );
+    }
+
+    #[test]
+    fn clean_game_mutant_reserve_batch_uses_source_restore_state() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot {
+            mutants: 1,
+            ..EnemyReserveSnapshot::default()
+        };
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0,
+            hseed: 0x4C,
+            lseed: 0,
+        };
+        game.baiter_timer_ticks = None;
+
+        let mut expected_rng = game.state.world.source_rng;
+        let (expected_position, expected_source) =
+            super::source_mutant_restore_spawn(&mut expected_rng, game.state.wave_profile, 0);
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemies.len(), 1);
+        let mutant = frame.state.world.enemies.first().expect("reserve mutant");
+        assert_eq!(mutant.kind, EnemyKind::Mutant);
+        assert_eq!(mutant.position, expected_position);
+        assert_eq!(
+            mutant.velocity,
+            super::source_mutant_screen_velocity(expected_source)
+        );
+        assert_eq!(mutant.source_mutant, Some(expected_source));
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot::default()
+        );
+        assert!(frame.events.gameplay().is_empty());
+    }
+
+    #[test]
+    fn clean_game_lander_reserve_batch_uses_source_landst_spawn_state() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot {
+            landers: 3,
+            ..EnemyReserveSnapshot::default()
+        };
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x20,
+            hseed: 0x66,
+            lseed: 0x99,
+        };
+        game.baiter_timer_ticks = None;
+
+        let mut expected_rng = game.state.world.source_rng;
+        let expected_landers = (0..3)
+            .map(|_| super::source_lander_restore_spawn(&mut expected_rng, game.state.wave_profile))
+            .collect::<Vec<_>>();
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemies, expected_landers);
+        assert!(frame.state.world.enemies.iter().all(|enemy| {
+            enemy.kind == EnemyKind::Lander
+                && enemy.position.y == SOURCE_PLAYFIELD_Y_MIN.wrapping_add(2)
+                && enemy.source_lander.is_some()
+                && enemy.source_mutant.is_none()
+                && enemy.source_bomber.is_none()
+                && enemy.source_swarmer.is_none()
+                && enemy.source_baiter.is_none()
+                && enemy.source_pod.is_none()
+        }));
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot::default()
+        );
+        assert!(frame.events.gameplay().is_empty());
+        assert_eq!(frame.state.world.object_evidence.inactive_count, 0);
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].object_category,
+            Some(ObjectEvidenceCategory::Lander)
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].mapped_sprite,
+            Some(SpriteId::ENEMY_LANDER)
+        );
+    }
+
+    #[test]
+    fn clean_game_lander_reserve_without_humans_uses_source_schizoid_fallback() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state.world.humans.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot {
+            landers: 2,
+            ..EnemyReserveSnapshot::default()
+        };
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x20,
+            hseed: 0x66,
+            lseed: 0x99,
+        };
+        game.baiter_timer_ticks = None;
+
+        let mut expected_rng = game.state.world.source_rng;
+        let expected_mutants =
+            super::source_mutant_restore_spawns(&mut expected_rng, game.state.wave_profile, 0, 2);
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemies, expected_mutants);
+        assert!(frame.state.world.enemies.iter().all(|enemy| {
+            enemy.kind == EnemyKind::Mutant
+                && enemy.source_lander.is_none()
+                && enemy.source_mutant.is_some()
+                && enemy.source_bomber.is_none()
+                && enemy.source_swarmer.is_none()
+                && enemy.source_baiter.is_none()
+                && enemy.source_pod.is_none()
+        }));
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot::default()
+        );
+        assert!(frame.state.world.terrain_blow.is_some());
+        assert!(frame.events.gameplay().is_empty());
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].object_category,
+            Some(ObjectEvidenceCategory::Mutant)
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].mapped_sprite,
+            Some(SpriteId::ENEMY_MUTANT)
+        );
+    }
+
+    #[test]
+    fn clean_game_bomber_reserve_batch_uses_source_tiest_restore_state() {
+        let mut game = credited_started_game();
+        game.state.wave = 2;
+        game.state.wave_profile = WaveProfileSnapshot::for_wave(2);
+        game.state.player.position = (super::world_word(0x2200), super::world_word(0x8000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot {
+            bombers: 5,
+            ..EnemyReserveSnapshot::default()
+        };
+        game.baiter_timer_ticks = None;
+
+        let expected_motion = PlayerMotionSystem::step(
+            PlayerMotionState::new(
+                game.state.player.position,
+                game.state.player.velocity,
+                game.state.player.direction,
+                game.camera_left,
+            ),
+            PlayerControlIntent::from_input(GameInput::NONE),
+        );
+        let player_absolute_x =
+            super::source_word_from_world_vector(expected_motion.state.position.0);
+        let expected_bombers =
+            super::source_bomber_restore_spawns(game.state.wave_profile, player_absolute_x, 5);
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemies, expected_bombers);
+        assert!(frame.state.world.enemies.iter().all(|enemy| {
+            enemy.kind == EnemyKind::Bomber
+                && enemy.position.y == super::SOURCE_BOMBER_CRUISE_ALTITUDE
+                && enemy.source_bomber.is_some()
+                && enemy.source_mutant.is_none()
+                && enemy.source_swarmer.is_none()
+                && enemy.source_baiter.is_none()
+                && enemy.source_pod.is_none()
+        }));
+        let source_bombers = frame
+            .state
+            .world
+            .enemies
+            .iter()
+            .filter_map(|enemy| enemy.source_bomber)
+            .collect::<Vec<_>>();
+        assert_eq!(source_bombers.len(), 5);
+        assert_eq!(
+            source_bombers[0].x_velocity,
+            super::source_sign_extend_u8_to_u16(game.state.wave_profile.bomber_x_velocity)
+        );
+        assert_eq!(
+            source_bombers[3].x_velocity,
+            super::source_sign_extend_u8_to_u16(
+                0u8.wrapping_sub(game.state.wave_profile.bomber_x_velocity)
+            )
+        );
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot::default()
+        );
+        assert!(frame.events.gameplay().is_empty());
+        assert_eq!(frame.state.world.object_evidence.inactive_count, 0);
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].object_category,
+            Some(ObjectEvidenceCategory::Bomber)
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].mapped_sprite,
+            Some(SpriteId::ENEMY_BOMBER)
+        );
+    }
+
+    #[test]
+    fn clean_game_pod_reserve_batch_uses_source_probe_restore_state() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot {
+            pods: 2,
+            ..EnemyReserveSnapshot::default()
+        };
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x12,
+            hseed: 0x6D,
+            lseed: 0x80,
+        };
+        game.baiter_timer_ticks = None;
+
+        let mut expected_rng = game.state.world.source_rng;
+        let expected_pods = (0..2)
+            .map(|_| super::source_pod_restore_spawn(&mut expected_rng))
+            .collect::<Vec<_>>();
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemies, expected_pods);
+        assert!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .all(|enemy| enemy.kind == EnemyKind::Pod
+                    && enemy.source_pod.is_some()
+                    && enemy.source_lander.is_none()
+                    && enemy.source_mutant.is_none()
+                    && enemy.source_bomber.is_none()
+                    && enemy.source_swarmer.is_none()
+                    && enemy.source_baiter.is_none())
+        );
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot::default()
+        );
+        assert!(frame.events.gameplay().is_empty());
+        assert_eq!(frame.state.world.object_evidence.inactive_count, 0);
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].object_category,
+            Some(ObjectEvidenceCategory::Pod)
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].mapped_sprite,
+            Some(SpriteId::ENEMY_POD)
+        );
+    }
+
+    #[test]
+    fn clean_game_swarmer_reserve_batch_uses_source_plres_restore_state() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot {
+            swarmers: 4,
+            ..EnemyReserveSnapshot::default()
+        };
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x20,
+            hseed: 0x41,
+            lseed: 0xC0,
+        };
+        game.baiter_timer_ticks = None;
+
+        let mut expected_rng = game.state.world.source_rng;
+        let expected_swarmers = super::source_mini_swarmer_reserve_spawns(
+            &mut expected_rng,
+            game.state.wave_profile,
+            4,
+        );
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemies, expected_swarmers);
+        assert!(frame.state.world.enemies.iter().all(|enemy| {
+            enemy.kind == EnemyKind::Swarmer
+                && enemy.source_swarmer.is_some()
+                && enemy.source_mutant.is_none()
+                && enemy.source_bomber.is_none()
+                && enemy.source_baiter.is_none()
+                && enemy.source_pod.is_none()
+        }));
+        assert!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .all(|enemy| enemy.position == frame.state.world.enemies[0].position)
+        );
+        assert!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .filter_map(|enemy| enemy.source_swarmer)
+                .all(
+                    |source| source.x_fraction == super::SOURCE_MINI_SWARMER_RESTORE_X_LOW
+                        && source.y_fraction == 0
+                )
+        );
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot::default()
+        );
+        assert!(frame.events.gameplay().is_empty());
+        assert_eq!(frame.state.world.object_evidence.inactive_count, 0);
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].object_category,
+            Some(ObjectEvidenceCategory::Swarmer)
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.details[0].mapped_sprite,
+            Some(SpriteId::ENEMY_SWARMER)
+        );
+    }
+
+    #[test]
+    fn clean_game_enemy_projectile_uses_source_lifetime_and_bounds() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(200, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+        let mut projectile =
+            super::EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(80, 80), 0x0100, 0);
+        projectile.source_lifetime_ticks = 1;
+        game.state.world.enemy_projectiles = vec![projectile];
+
+        let expired = game.step(GameInput::NONE);
+
+        assert!(expired.state.world.enemy_projectiles.is_empty());
+        assert!(expired.events.gameplay().is_empty());
+
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(200, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+        game.state.world.enemy_projectiles = vec![super::EnemyProjectileSnapshot::source_fireball(
+            ScreenPosition::new(0x97, 80),
+            0x0100,
+            0,
+        )];
+
+        let offscreen = game.step(GameInput::NONE);
+
+        assert!(offscreen.state.world.enemy_projectiles.is_empty());
+        assert!(offscreen.events.gameplay().is_empty());
+    }
+
+    #[test]
+    fn clean_game_enemy_projectile_evidence_uses_source_shell_picture() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state.world.humans.clear();
+        game.state.world.projectiles.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+        game.state.world.enemy_projectiles = vec![
+            super::EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(0x20, 0x60), 0, 0),
+            super::EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(0x30, 0x70), 0, 0),
+        ];
+
+        game.sync_world_presentation();
+
+        let details = &game.state.world.object_evidence.details;
+        assert_eq!(game.state.world.object_evidence.projectile_count, 2);
+        assert_eq!(game.state.world.object_evidence.detail_count, 2);
+        for (index, position) in [
+            ScreenPosition::new(0x20, 0x60),
+            ScreenPosition::new(0x30, 0x70),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(details[index].list, ObjectEvidenceList::Projectile);
+            assert_eq!(
+                details[index].object_category,
+                Some(ObjectEvidenceCategory::EnemyBomb)
+            );
+            assert_eq!(details[index].screen_position, Some(position));
+            assert_eq!(
+                details[index].picture_address,
+                Some(super::SOURCE_BOMB_SHELL_PICTURE_ADDRESS)
+            );
+            assert_eq!(
+                details[index].picture_label,
+                Some(super::SOURCE_BOMB_SHELL_PICTURE_LABEL)
+            );
+            assert_eq!(
+                details[index].picture_size,
+                Some(super::SOURCE_BOMB_SHELL_PICTURE_SIZE)
+            );
+            assert_eq!(
+                details[index].primary_image_address,
+                Some(super::SOURCE_BOMB_SHELL_PRIMARY_IMAGE_ADDRESS)
+            );
+            assert_eq!(
+                details[index].alternate_image_address,
+                Some(super::SOURCE_BOMB_SHELL_ALTERNATE_IMAGE_ADDRESS)
+            );
+            assert_eq!(details[index].mapped_sprite, Some(SpriteId::ENEMY_BOMB));
+        }
+
+        let scene = game.scene();
+        let shell_sprites = scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::ENEMY_BOMB && sprite.layer == RenderLayer::Projectiles
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(shell_sprites.len(), 2);
+        assert!(
+            shell_sprites
+                .iter()
+                .any(|sprite| { sprite.position == [32.0, 96.0] && sprite.size == [4.0, 6.0] })
+        );
+        assert!(
+            shell_sprites
+                .iter()
+                .any(|sprite| { sprite.position == [48.0, 112.0] && sprite.size == [4.0, 6.0] })
+        );
+    }
+
+    #[test]
+    fn clean_game_player_projectile_evidence_uses_source_laser_picture() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state.world.humans.clear();
+        game.state.world.enemy_projectiles.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+        game.state.world.projectiles = vec![ProjectileSnapshot {
+            position: ScreenPosition::new(0x34, 0x78),
+            velocity: ScreenVelocity::new(8, 0),
+        }];
+
+        game.sync_world_presentation();
+
+        assert_eq!(game.state.world.object_evidence.projectile_count, 1);
+        assert_eq!(game.state.world.object_evidence.detail_count, 1);
+        let detail = game.state.world.object_evidence.details[0];
+        assert_eq!(detail.list, ObjectEvidenceList::Projectile);
+        assert_eq!(
+            detail.object_category,
+            Some(ObjectEvidenceCategory::PlayerProjectile)
+        );
+        assert_eq!(
+            detail.screen_position,
+            Some(ScreenPosition::new(0x34, 0x78))
+        );
+        assert_eq!(detail.picture_address, Some(0xF96F));
+        assert_eq!(detail.picture_label, Some("LASP1"));
+        assert_eq!(detail.picture_size, Some((8, 1)));
+        assert_eq!(detail.primary_image_address, Some(0xF973));
+        assert_eq!(detail.alternate_image_address, None);
+        assert_eq!(detail.mapped_sprite, Some(SpriteId::PLAYER_PROJECTILE));
+
+        let scene = game.scene();
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                && sprite.layer == RenderLayer::Projectiles
+                && sprite.position == [52.0, 120.0]
+                && sprite.size == [8.0, 2.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_human_evidence_uses_source_astronaut_picture() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state.world.projectiles.clear();
+        game.state.world.enemy_projectiles.clear();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(0x44, 0xD8))];
+
+        game.sync_world_presentation();
+
+        assert_eq!(game.state.world.object_evidence.active_count, 1);
+        assert_eq!(game.state.world.object_evidence.detail_count, 1);
+        let detail = game.state.world.object_evidence.details[0];
+        assert_eq!(detail.list, ObjectEvidenceList::Active);
+        assert_eq!(detail.object_category, Some(ObjectEvidenceCategory::Human));
+        assert_eq!(
+            detail.screen_position,
+            Some(ScreenPosition::new(0x44, 0xD8))
+        );
+        assert_eq!(detail.picture_address, Some(0xF901));
+        assert_eq!(detail.picture_label, Some("ASTP1"));
+        assert_eq!(detail.picture_size, Some((2, 8)));
+        assert_eq!(detail.primary_image_address, Some(0xFACB));
+        assert_eq!(detail.alternate_image_address, Some(0xFADB));
+        assert_eq!(detail.mapped_sprite, Some(SpriteId::HUMAN));
+        assert_eq!(
+            detail.scanner_color,
+            Some(super::SOURCE_SCANNER_HUMAN_COLOR_WORD)
+        );
+
+        let scene = game.scene();
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HUMAN
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [68.0, 216.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(!scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HUMAN
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [68.0, 216.0]
+                && sprite.size == [2.0, 8.0]
+        }));
+    }
+
+    #[test]
+    fn clean_world_object_evidence_carries_source_motion_words() {
+        let mut enemy_projectile = super::EnemyProjectileSnapshot::source_fireball(
+            ScreenPosition::new(0x30, 0x80),
+            0x0100,
+            0xFF00,
+        );
+        enemy_projectile.source_x_fraction = 0x05;
+        enemy_projectile.source_y_fraction = 0x06;
+        let mut world = WorldSnapshot {
+            enemies: vec![EnemySnapshot::source_lander(
+                ScreenPosition::new(0x40, 0x60),
+                ScreenVelocity::new(0, 0),
+                SourceLanderSnapshot {
+                    x_fraction: 0x12,
+                    y_fraction: 0x34,
+                    x_velocity: 0xFFE0,
+                    y_velocity: 0x0010,
+                    shot_timer: 0,
+                    sleep_ticks: 0,
+                    picture_frame: 0,
+                },
+            )],
+            humans: vec![HumanSnapshot {
+                source_fall_velocity: 0x00E0,
+                source_fall_y_fraction: 0x44,
+                ..HumanSnapshot::new(ScreenPosition::new(0x22, 0xD0))
+            }],
+            projectiles: vec![ProjectileSnapshot {
+                position: ScreenPosition::new(0x20, 0x70),
+                velocity: ScreenVelocity::new(8, -1),
+            }],
+            enemy_projectiles: vec![enemy_projectile],
+            ..WorldSnapshot::default()
+        };
+
+        world.refresh_object_evidence();
+
+        assert_eq!(world.object_evidence.detail_count, 4);
+        let details = &world.object_evidence.details;
+        for (index, detail) in details[..4].iter().enumerate() {
+            let identity = super::source_object_table_identity(index);
+            assert_eq!(detail.address, Some(identity.address));
+            assert_eq!(detail.slot, Some(identity.slot));
+            assert_eq!(detail.object_type, Some(identity.object_type));
+        }
+        assert_eq!(
+            details[0].object_category,
+            Some(ObjectEvidenceCategory::Lander)
+        );
+        assert_eq!(details[0].world_position, Some((0x4012, 0x6034)));
+        assert_eq!(details[0].velocity, Some((0xFFE0, 0x0010)));
+        assert_eq!(
+            details[1].object_category,
+            Some(ObjectEvidenceCategory::Human)
+        );
+        assert_eq!(details[1].world_position, Some((0x2200, 0xD044)));
+        assert_eq!(details[1].velocity, Some((0x0000, 0x00E0)));
+        assert_eq!(
+            details[2].object_category,
+            Some(ObjectEvidenceCategory::PlayerProjectile)
+        );
+        assert_eq!(details[2].world_position, Some((0x2000, 0x7000)));
+        assert_eq!(details[2].velocity, Some((0x0800, 0xFF00)));
+        assert_eq!(
+            details[3].object_category,
+            Some(ObjectEvidenceCategory::EnemyBomb)
+        );
+        assert_eq!(details[3].world_position, Some((0x3005, 0x8006)));
+        assert_eq!(details[3].velocity, Some((0x0100, 0xFF00)));
+    }
+
+    #[test]
+    fn clean_game_enemy_projectile_collision_scores_and_destroys_player() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x8000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(200, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.enemy_projectiles = vec![super::EnemyProjectileSnapshot::source_fireball(
+            ScreenPosition::new(0x20, 0x80),
+            0,
+            0,
+        )];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+        assert_eq!(frame.state.scores.player_one, 25);
+        assert_eq!(frame.state.player.lives, 1);
+        assert_eq!(frame.events.gameplay(), &[GameEvent::PlayerDestroyed]);
+        assert_eq!(frame.state.world.expanded_objects.active_count, 1);
+        assert_eq!(
+            frame.state.world.expanded_objects.details[0].mapped_sprite,
+            Some(SpriteId::BOMB_EXPLOSION)
+        );
+        assert!(frame.state.world.player_explosion.is_some());
+    }
+
+    #[test]
+    fn clean_game_lander_abducts_aligned_human_and_carries_upward() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(100, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(100, 92))];
+
+        let captured = game.step(GameInput::NONE);
+
+        assert_eq!(
+            captured.state.world.enemies[0].velocity,
+            ScreenVelocity::new(0, -1)
+        );
+        assert_eq!(
+            captured.state.world.humans[0],
+            HumanSnapshot {
+                carried: true,
+                ..HumanSnapshot::new(super::clean_carried_human_position(ScreenPosition::new(
+                    100, 80
+                ),))
+            }
+        );
+        assert_eq!(captured.state.world.object_evidence.active_count, 2);
+        assert!(captured.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HUMAN
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [102.0, 92.0]
+                && sprite.tint == Color::from_rgba(0xFF, 0xF8, 0x80, 0xFF)
+        }));
+
+        let carried = game.step(GameInput::NONE);
+
+        assert_eq!(
+            carried.state.world.enemies[0].position,
+            ScreenPosition::new(100, 79)
+        );
+        assert_eq!(
+            carried.state.world.humans[0].position,
+            super::clean_carried_human_position(ScreenPosition::new(100, 79))
+        );
+        assert!(carried.state.world.humans[0].carried);
+    }
+
+    #[test]
+    fn clean_game_completed_lander_abduction_spawns_source_mutant() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, SOURCE_PLAYFIELD_Y_MIN + 9);
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            lander_start,
+            ScreenVelocity::new(0, -1),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot {
+            carried: true,
+            ..HumanSnapshot::new(super::clean_carried_human_position(lander_start))
+        }];
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0,
+            hseed: 0xA5,
+            lseed: 0x5A,
+        };
+        game.baiter_timer_ticks = None;
+
+        let player_position = ScreenPosition::new(0x20, 0x80);
+        let object_position_after_motion = ScreenPosition::new(100, SOURCE_PLAYFIELD_Y_MIN + 8);
+        let object_absolute_x = u16::from(object_position_after_motion.x) << 8;
+        let player_absolute_x = u16::from(player_position.x) << 8;
+        let expected_x_velocity = super::source_mutant_x_velocity(
+            game.state.wave_profile.mutant_x_velocity,
+            player_absolute_x,
+            object_absolute_x,
+        );
+        let expected_y_velocity = super::source_mutant_y_velocity(
+            game.state.wave_profile,
+            player_position.y,
+            player_absolute_x,
+            object_absolute_x,
+            object_position_after_motion,
+        );
+        let expected_position = ScreenPosition::new(
+            object_position_after_motion.x,
+            object_position_after_motion
+                .y
+                .wrapping_sub(game.state.wave_profile.mutant_random_y),
+        );
+        let expected_source = SourceMutantSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: expected_x_velocity,
+            y_velocity: expected_y_velocity,
+            shot_timer: game.state.wave_profile.mutant_shot_time as u8 - 1,
+            sleep_ticks: SOURCE_MUTANT_LOOP_SLEEP_TICKS,
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.humans.is_empty());
+        let mutant = frame.state.world.enemies.first().expect("converted mutant");
+        assert_eq!(mutant.kind, EnemyKind::Mutant);
+        assert_eq!(mutant.position, expected_position);
+        assert_eq!(
+            mutant.velocity,
+            super::source_mutant_screen_velocity(expected_source)
+        );
+        assert_eq!(mutant.source_mutant, Some(expected_source));
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+        assert!(frame.state.world.terrain_blow.is_some());
+    }
+
+    #[test]
+    fn clean_game_killed_carrying_lander_releases_human() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(100, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot {
+            carried: true,
+            ..HumanSnapshot::new(super::clean_carried_human_position(ScreenPosition::new(
+                100, 80,
+            )))
+        }];
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, 83),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.enemies.is_empty());
+        assert_eq!(
+            frame.state.world.humans[0],
+            HumanSnapshot::new(super::clean_carried_human_position(ScreenPosition::new(
+                100, 80,
+            )))
+        );
+        assert_eq!(frame.state.scores.player_one, 150);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
+        );
+    }
+
+    #[test]
+    fn clean_game_released_lander_passenger_falls_on_following_frame() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![
+            EnemySnapshot::new(
+                EnemyKind::Lander,
+                ScreenPosition::new(100, 80),
+                ScreenVelocity::new(0, 0),
+            ),
+            EnemySnapshot::new(
+                EnemyKind::Baiter,
+                ScreenPosition::new(220, 80),
+                ScreenVelocity::new(0, 0),
+            ),
+        ];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        let released_position = super::clean_carried_human_position(ScreenPosition::new(100, 80));
+        game.state.world.humans = vec![HumanSnapshot {
+            carried: true,
+            ..HumanSnapshot::new(released_position)
+        }];
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, 83),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+        game.baiter_timer_ticks = None;
+
+        let released = game.step(GameInput::NONE);
+
+        assert_eq!(released.events.gameplay(), &[GameEvent::EnemyDestroyed]);
+        assert_eq!(
+            released.state.world.humans[0],
+            HumanSnapshot::new(released_position)
+        );
+
+        let falling = game.step(GameInput::NONE);
+
+        assert_eq!(
+            falling.state.world.humans[0],
+            HumanSnapshot {
+                source_fall_velocity: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION,
+                source_fall_y_fraction: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION as u8,
+                ..HumanSnapshot::new(released_position)
+            }
+        );
+    }
+
+    #[test]
+    fn clean_game_player_catches_falling_human_scores_and_starts_p500_popup() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x6400), super::world_word(0x6400));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Baiter,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(104, 98))];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.scores.player_one, 500);
+        assert_eq!(
+            frame.state.world.humans[0],
+            HumanSnapshot {
+                carried_by_player: true,
+                ..HumanSnapshot::new(super::clean_player_carried_human_position(
+                    ScreenPosition::new(99, 100),
+                ))
+            }
+        );
+        assert_eq!(frame.state.world.score_popups.len(), 1);
+        assert_eq!(
+            frame.state.world.score_popups[0].kind,
+            ScorePopupKind::Points500
+        );
+        assert_eq!(
+            frame.state.world.score_popups[0].position,
+            super::clean_rescue_score_popup_position(ScreenPosition::new(104, 98))
+        );
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_POPUP_500
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [104.0, 122.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_player_does_not_catch_grounded_human() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x6400), super::world_word(0xD600));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Baiter,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        let ground_y =
+            super::clean_human_ground_y(&game.state.world.terrain, 100).expect("terrain ground");
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(100, ground_y))];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.scores.player_one, 0);
+        assert_eq!(
+            frame.state.world.humans[0],
+            HumanSnapshot::new(ScreenPosition::new(100, ground_y))
+        );
+        assert!(frame.state.world.score_popups.is_empty());
+    }
+
+    #[test]
+    fn clean_game_player_carried_human_lands_when_carried_to_terrain() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x6400), super::world_word(0xCC00));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Baiter,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot {
+            carried_by_player: true,
+            ..HumanSnapshot::new(ScreenPosition::new(100, 180))
+        }];
+        game.state.scores.player_one = 500;
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame.state.world.humans[0],
+            HumanSnapshot::new(ScreenPosition::new(99, 214))
+        );
+        assert_eq!(frame.state.scores.player_one, 500);
+        assert!(frame.state.world.score_popups.is_empty());
+    }
+
+    #[test]
+    fn clean_game_released_human_falls_until_terrain_landing() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Baiter,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+
+        let ground_y =
+            super::clean_human_ground_y(&game.state.world.terrain, 100).expect("terrain ground");
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(
+            100,
+            ground_y.saturating_sub(1),
+        ))];
+
+        let falling = game.step(GameInput::NONE);
+        assert_eq!(
+            falling.state.world.humans[0],
+            HumanSnapshot {
+                source_fall_velocity: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION,
+                source_fall_y_fraction: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION as u8,
+                ..HumanSnapshot::new(ScreenPosition::new(100, ground_y.saturating_sub(1)))
+            }
+        );
+
+        for _ in 0..100 {
+            if game.state.world.humans[0].position.y == ground_y {
+                break;
+            }
+            game.step(GameInput::NONE);
+        }
+
+        assert_eq!(
+            game.state.world.humans[0],
+            HumanSnapshot::new(ScreenPosition::new(100, ground_y))
+        );
+        assert_eq!(game.state.scores.player_one, 250);
+        assert_eq!(game.state.world.score_popups.len(), 1);
+        assert_eq!(
+            game.state.world.score_popups[0].kind,
+            ScorePopupKind::Points250
+        );
+        assert_eq!(
+            game.state.world.score_popups[0].position,
+            super::clean_rescue_score_popup_position(ScreenPosition::new(100, ground_y))
+        );
+
+        let settled = game.step(GameInput::NONE);
+        assert_eq!(settled.state.world.humans[0].position.y, ground_y);
+        assert_eq!(settled.state.scores.player_one, 250);
+        assert_eq!(settled.state.world.score_popups.len(), 1);
+    }
+
+    #[test]
+    fn clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Baiter,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+
+        let ground_y =
+            super::clean_human_ground_y(&game.state.world.terrain, 100).expect("terrain ground");
+        game.state.world.humans = vec![HumanSnapshot {
+            source_fall_velocity: super::SOURCE_FALLING_HUMAN_SAFE_LANDING_MAX_Y_VELOCITY,
+            source_fall_y_fraction: 0x40,
+            ..HumanSnapshot::new(ScreenPosition::new(100, ground_y.saturating_sub(1)))
+        }];
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.humans.is_empty());
+        assert_eq!(frame.state.scores.player_one, 0);
+        assert!(frame.state.world.score_popups.is_empty());
+        assert!(frame.state.world.terrain_blow.is_some());
+        assert!(frame.state.world.terrain.is_empty());
+        assert!(frame.state.world.explosions.iter().any(|explosion| {
+            explosion.kind == ExplosionKind::Astronaut
+                && explosion.position == ScreenPosition::new(100, ground_y)
+        }));
+    }
+
+    #[test]
+    fn clean_game_standing_humans_do_not_fall() {
+        let mut game = credited_started_game();
+        let humans = game.state.world.humans.clone();
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.humans, humans);
+    }
+
+    #[test]
     fn clean_game_player_enemy_collision_loses_life_and_removes_enemy() {
         let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
         game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
 
         let frame = game.step(GameInput::NONE);
 
         assert_eq!(frame.state.phase, GamePhase::Playing);
-        assert_eq!(frame.state.player.lives, 2);
+        assert_eq!(frame.state.player.lives, 1);
         assert_eq!(frame.state.player.smart_bombs, 3);
         assert_eq!(frame.state.scores.player_one, 0);
         assert!(frame.state.world.enemies.is_empty());
@@ -1184,11 +10308,41 @@ mod tests {
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_SHIP && sprite.layer == RenderLayer::Objects
         }));
+        assert_eq!(
+            frame.state.world.player_explosion,
+            Some(PlayerExplosionCloudSnapshot {
+                source_color: 0xFF,
+                source_color_counter: 56,
+                source_color_index: 0,
+                frame: 0,
+                piece_count: 0,
+                ..PlayerExplosionCloudSnapshot::EMPTY
+            })
+        );
+
+        game.advance_player_explosion();
+        game.sync_world_presentation();
+        let cloud = game
+            .state
+            .world
+            .player_explosion
+            .expect("player explosion cloud");
+        assert_eq!(cloud.source_color, 0xFF);
+        assert_eq!(cloud.source_color_counter, 55);
+        assert_eq!(cloud.source_color_index, 0);
+        assert_eq!(cloud.frame, 1);
+        assert!(cloud.piece_count > 0);
+        assert!(game.scene().sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+                && sprite.tint == Color::WHITE
+        }));
     }
 
     #[test]
     fn clean_game_player_enemy_final_collision_enters_game_over() {
         let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
         game.state.player.lives = 1;
         game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
@@ -1200,6 +10354,10 @@ mod tests {
         assert_eq!(frame.state.player.smart_bombs, 3);
         assert!(frame.state.world.enemies.is_empty());
         assert_eq!(
+            frame.state.game_over,
+            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
+        );
+        assert_eq!(
             frame.events.gameplay(),
             &[GameEvent::PlayerDestroyed, GameEvent::GameOver]
         );
@@ -1208,30 +10366,217 @@ mod tests {
             SpriteId::PLAYER_SHIP | SpriteId::ENEMY_LANDER | SpriteId::HUMAN
         )));
         assert_eq!(frame.scene.summary().layers.objects, 0);
+        assert_eq!(frame.scene.summary().layers.overlay, 8);
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_G
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [124.0, 128.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_two_player_final_death_waits_then_switches_to_other_player() {
+        let mut game = two_player_started_game();
+        game.state.player.lives = 1;
+        game.state.player_stocks[1] = PlayerStockSnapshot::new(3, 3);
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let collision = game.step(GameInput::NONE);
+
+        assert_eq!(collision.state.phase, GamePhase::GameOver);
+        assert_eq!(collision.state.current_player, 1);
+        assert_eq!(collision.state.player.lives, 0);
+        assert_eq!(
+            collision.state.player_stocks,
+            [
+                PlayerStockSnapshot::new(0, 3),
+                PlayerStockSnapshot::new(3, 3),
+            ]
+        );
+        assert_eq!(
+            collision.state.game_over,
+            GameOverSnapshot::player_switch_sleep(PLAYER_SWITCH_SLEEP_FRAMES, 1, 2)
+        );
+        assert_eq!(collision.events.gameplay(), &[GameEvent::PlayerDestroyed]);
+        assert_eq!(collision.scene.summary().layers.objects, 0);
+        assert_eq!(collision.scene.summary().layers.overlay, 17);
+        assert!(collision.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_P
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [120.0, 120.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(collision.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_G
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [124.0, 136.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+
+        let switched = advance_player_switch_sleep(&mut game, 1, 2);
+
+        assert_eq!(switched.state.phase, GamePhase::Playing);
+        assert_eq!(switched.state.current_player, 2);
+        assert_eq!(switched.state.player.lives, 3);
+        assert_eq!(switched.state.player.smart_bombs, 3);
+        assert_eq!(switched.state.world, WorldSnapshot::default());
+        assert_eq!(switched.state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(
+            game.start_playfield_delay,
+            Some(START_PLAYFIELD_DELAY_FRAMES)
+        );
+
+        let active = advance_to_started_playfield(&mut game);
+
+        assert_eq!(active.state.phase, GamePhase::Playing);
+        assert_eq!(active.state.current_player, 2);
+        assert_eq!(active.state.player.lives, 2);
+        assert_eq!(
+            active.state.player_stocks,
+            [
+                PlayerStockSnapshot::new(0, 3),
+                PlayerStockSnapshot::new(2, 3),
+            ]
+        );
+        assert_eq!(active.state.world.enemies.len(), 5);
+    }
+
+    #[test]
+    fn clean_game_two_player_final_death_ends_game_when_other_player_has_no_stock() {
+        let mut game = two_player_started_game();
+        game.state.player.lives = 1;
+        game.state.player_stocks[1] = PlayerStockSnapshot::new(0, 3);
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.phase, GamePhase::GameOver);
+        assert_eq!(
+            frame.state.game_over,
+            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
+        );
+        assert_eq!(
+            frame.events.gameplay(),
+            &[GameEvent::PlayerDestroyed, GameEvent::GameOver]
+        );
+    }
+
+    #[test]
+    fn clean_game_two_player_second_player_final_death_switches_back_to_player_one() {
+        let mut game = two_player_started_game();
+        game.state.current_player = 2;
+        game.state.player = super::PlayerSnapshot {
+            position: (super::world_word(0x2000), super::world_word(0x8000)),
+            velocity: (WorldVector::default(), WorldVector::default()),
+            direction: Direction::Right,
+            lives: 1,
+            smart_bombs: 2,
+        };
+        game.state.player_stocks = [
+            PlayerStockSnapshot::new(1, 1),
+            PlayerStockSnapshot::new(1, 2),
+        ];
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let collision = game.step(GameInput::NONE);
+
+        assert_eq!(
+            collision.state.game_over,
+            GameOverSnapshot::player_switch_sleep(PLAYER_SWITCH_SLEEP_FRAMES, 2, 1)
+        );
+        assert!(collision.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_W
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [180.0, 120.0]
+                && sprite.size == [8.0, 8.0]
+        }));
+
+        let switched = advance_player_switch_sleep(&mut game, 2, 1);
+
+        assert_eq!(switched.state.current_player, 1);
+        assert_eq!(switched.state.player.lives, 1);
+        assert_eq!(switched.state.player.smart_bombs, 1);
     }
 
     #[test]
     fn clean_game_high_score_entry_starts_after_qualifying_game_over() {
         let mut game = credited_started_game();
         game.state.player.lives = 1;
-        game.state.scores.player_one = 500;
+        game.state.scores.player_one = 501;
         game.state.scores.high_score = 500;
+        game.state.high_score_tables = HighScoreTablesSnapshot::EMPTY;
         game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
 
         let frame = game.step(GameInput::NONE);
 
-        assert_eq!(frame.state.phase, GamePhase::HighScoreEntry);
+        assert_eq!(frame.state.phase, GamePhase::GameOver);
         assert_eq!(frame.state.player.lives, 0);
         assert_eq!(
+            frame.state.game_over,
+            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
+        );
+        assert_eq!(frame.state.high_score_entry, None);
+        assert_eq!(
             frame.events.gameplay(),
-            &[
-                GameEvent::PlayerDestroyed,
-                GameEvent::GameOver,
-                GameEvent::HighScoreEntryStarted,
-            ]
+            &[GameEvent::PlayerDestroyed, GameEvent::GameOver]
         );
         assert_eq!(frame.scene.summary().layers.objects, 0);
+
+        let handoff = advance_player_death_game_over_sleep(&mut game);
+
+        assert_eq!(handoff.state.phase, GamePhase::HighScoreEntry);
+        assert_eq!(
+            handoff.state.high_score_entry,
+            Some(HighScoreEntrySnapshot {
+                score: 501,
+                rank: 1,
+            })
+        );
+        assert_eq!(handoff.state.high_score_submission, None);
+        assert_eq!(handoff.state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(
+            handoff.events.gameplay(),
+            &[GameEvent::HighScoreEntryStarted]
+        );
+        assert_eq!(handoff.scene.summary().layers.objects, 0);
+        assert_eq!(handoff.scene.summary().layers.overlay, 113);
+        assert!(handoff.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_P
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [124.0, 56.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(handoff.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_Y
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [40.0, 88.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(handoff.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_P
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [40.0, 138.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(handoff.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_UNDERLINE_WORD
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [140.0, 183.0]
+                && sprite.size == [2.0, 2.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(handoff.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_UNDERLINE_WORD
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [156.0, 183.0]
+                && sprite.size == [2.0, 2.0]
+                && sprite.tint == Color::from_rgba(0x66, 0x66, 0x66, 0xFF)
+        }));
     }
 
     #[test]
@@ -1240,21 +10585,33 @@ mod tests {
         game.state.current_player = 2;
         game.state.player.lives = 1;
         game.state.scores.player_one = 1_000;
-        game.state.scores.player_two = 2_000;
+        game.state.scores.player_two = 2_001;
         game.state.scores.high_score = 2_000;
+        game.state.high_score_tables = HighScoreTablesSnapshot::EMPTY;
         game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
 
         let frame = game.step(GameInput::NONE);
 
-        assert_eq!(frame.state.phase, GamePhase::HighScoreEntry);
+        assert_eq!(frame.state.phase, GamePhase::GameOver);
         assert_eq!(
-            frame.events.gameplay(),
-            &[
-                GameEvent::PlayerDestroyed,
-                GameEvent::GameOver,
-                GameEvent::HighScoreEntryStarted,
-            ]
+            frame.state.game_over,
+            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
+        );
+
+        let handoff = advance_player_death_game_over_sleep(&mut game);
+
+        assert_eq!(handoff.state.phase, GamePhase::HighScoreEntry);
+        assert_eq!(
+            handoff.state.high_score_entry,
+            Some(HighScoreEntrySnapshot {
+                score: 2_001,
+                rank: 1,
+            })
+        );
+        assert_eq!(
+            handoff.events.gameplay(),
+            &[GameEvent::HighScoreEntryStarted]
         );
     }
 
@@ -1263,6 +10620,10 @@ mod tests {
         let mut game = credited_started_game();
         game.state.phase = GamePhase::HighScoreEntry;
         game.state.high_score_initials = HighScoreInitialsState::EMPTY;
+        game.state.high_score_entry = Some(HighScoreEntrySnapshot {
+            score: 25_000,
+            rank: 1,
+        });
 
         let first = game.step(GameInput {
             high_score_initial: Some('a'),
@@ -1279,6 +10640,27 @@ mod tests {
             first.events.gameplay(),
             &[GameEvent::HighScoreInitialAccepted]
         );
+        assert_eq!(first.scene.summary().layers.overlay, 114);
+        assert!(first.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_A
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [140.0, 172.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(first.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_UNDERLINE_WORD
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [140.0, 183.0]
+                && sprite.size == [2.0, 2.0]
+                && sprite.tint == Color::from_rgba(0x66, 0x66, 0x66, 0xFF)
+        }));
+        assert!(first.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_UNDERLINE_WORD
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [156.0, 183.0]
+                && sprite.size == [2.0, 2.0]
+                && sprite.tint == Color::WHITE
+        }));
 
         let ignored = game.step(GameInput {
             high_score_initial: Some('1'),
@@ -1316,7 +10698,36 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(submitted.state.phase, GamePhase::Attract);
+        assert_eq!(submitted.state.phase, GamePhase::GameOver);
+        assert_eq!(submitted.state.high_score_entry, None);
+        assert_eq!(
+            submitted.state.high_score_submission,
+            Some(HighScoreSubmissionSnapshot {
+                player: 1,
+                score: 25_000,
+            })
+        );
+        assert_eq!(
+            submitted.state.game_over,
+            GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES)
+        );
+        assert_eq!(submitted.state.scores.high_score, 25_000);
+        assert_eq!(
+            submitted.state.high_score_tables.all_time[0],
+            HighScoreTableEntrySnapshot {
+                rank: 1,
+                score: 25_000,
+                initials: [Some('B'), Some('C'), Some('D')],
+            }
+        );
+        assert_eq!(
+            submitted.state.high_score_tables.todays_greatest[0],
+            HighScoreTableEntrySnapshot {
+                rank: 1,
+                score: 25_000,
+                initials: [Some('B'), Some('C'), Some('D')],
+            }
+        );
         assert_eq!(
             submitted.state.high_score_initials.initials,
             [Some('B'), Some('C'), Some('D')]
@@ -1329,11 +10740,114 @@ mod tests {
             ]
         );
         assert_eq!(submitted.scene.summary().layers.objects, 0);
+        let display_underlines = submitted
+            .scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::HALL_OF_FAME_UNDERLINE_WORD)
+            .collect::<Vec<_>>();
+        assert_eq!(display_underlines.len(), 62);
+        assert!(display_underlines.iter().any(|sprite| {
+            sprite.position == [250.0, 123.0]
+                && sprite.size == [2.0, 2.0]
+                && sprite.tint == Color::from_rgba(0x66, 0x66, 0x66, 0xFF)
+        }));
+        assert!(display_underlines.iter().any(|sprite| {
+            sprite.position == [60.0, 123.0]
+                && sprite.size == [2.0, 2.0]
+                && sprite.tint == Color::from_rgba(0x66, 0x66, 0x66, 0xFF)
+        }));
+        assert!(submitted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_H
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [112.0, 84.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(submitted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [96.0, 56.0]
+                && sprite.size == [120.0, 24.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(submitted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [48.0, 134.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(submitted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_B
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [58.0, 134.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(submitted.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_2
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [90.0, 134.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_non_qualifying_game_over_waits_then_shows_hall_of_fame() {
+        let mut game = credited_started_game();
+        game.state.player.lives = 1;
+        game.state.scores.player_one = 10;
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let collision = game.step(GameInput::NONE);
+        assert_eq!(collision.state.phase, GamePhase::GameOver);
+        assert_eq!(
+            collision.state.game_over,
+            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
+        );
+
+        let no_entry = advance_player_death_game_over_sleep(&mut game);
+        assert_eq!(no_entry.state.phase, GamePhase::GameOver);
+        assert_eq!(
+            no_entry.state.game_over,
+            GameOverSnapshot::no_entry_delay(HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES)
+        );
+        assert!(no_entry.events.is_empty());
+
+        for expected_timer in (1..HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES).rev() {
+            let waiting = game.step(GameInput::NONE);
+            assert_eq!(waiting.state.phase, GamePhase::GameOver);
+            assert_eq!(
+                waiting.state.game_over,
+                GameOverSnapshot::no_entry_delay(expected_timer)
+            );
+            assert!(waiting.events.is_empty());
+        }
+
+        let hall = game.step(GameInput::NONE);
+        assert_eq!(hall.state.phase, GamePhase::Attract);
+        assert_eq!(
+            hall.state.game_over,
+            GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES)
+        );
+        assert!(hall.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [96.0, 56.0]
+                && sprite.size == [120.0, 24.0]
+        }));
+
+        let ticked_hall = game.step(GameInput::NONE);
+        assert_eq!(ticked_hall.state.phase, GamePhase::Attract);
+        assert_eq!(
+            ticked_hall.state.game_over,
+            GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES - 1)
+        );
     }
 
     #[test]
     fn clean_game_scores_current_second_player_on_collision() {
         let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
         game.state.current_player = 2;
         game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
@@ -1355,6 +10869,7 @@ mod tests {
     #[test]
     fn clean_game_bonus_award_updates_stock_threshold_and_events() {
         let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
         game.state.scores.player_one = 9_900;
         game.state.scores.high_score = 9_900;
         game.state.scores.next_bonus = 10_000;
@@ -1387,6 +10902,7 @@ mod tests {
     #[test]
     fn clean_game_wave_clear_delays_next_wave_spawn_until_following_frame() {
         let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
         game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
         game.state.world.projectiles.push(ProjectileSnapshot {
@@ -1407,13 +10923,75 @@ mod tests {
                 .scene
                 .sprites
                 .iter()
-                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER
+                    && sprite.size == [12.0, 8.0])
         );
+        assert_eq!(cleared.scene.summary().layers.overlay, 29);
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_A
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [112.0, 80.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [202.0, 80.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_C
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [122.0, 96.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_B
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [120.0, 144.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [176.0, 144.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HUMAN
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [120.0, 160.0]
+                && sprite.size == [4.0, 8.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(cleared.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HUMAN
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [128.0, 160.0]
+                && sprite.size == [4.0, 8.0]
+                && sprite.tint == Color::WHITE
+        }));
 
         let next_wave = game.step(GameInput::NONE);
 
         assert_eq!(next_wave.state.wave, 2);
-        assert_eq!(next_wave.state.world.enemies.len(), 2);
+        assert_eq!(next_wave.state.world.enemies.len(), 5);
+        assert_eq!(
+            next_wave
+                .state
+                .world
+                .enemies
+                .iter()
+                .map(|enemy| enemy.kind)
+                .collect::<Vec<_>>(),
+            vec![
+                EnemyKind::Lander,
+                EnemyKind::Bomber,
+                EnemyKind::Pod,
+                EnemyKind::Lander,
+                EnemyKind::Lander,
+            ]
+        );
         assert!(next_wave.state.world.projectiles.is_empty());
         assert_eq!(next_wave.state.world.terrain.len(), 5);
         assert_eq!(next_wave.state.world.humans.len(), 2);
@@ -1425,7 +11003,21 @@ mod tests {
                 .iter()
                 .filter(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
                 .count(),
-            2
+            3
+        );
+        assert!(
+            next_wave
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_BOMBER)
+        );
+        assert!(
+            next_wave
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_POD)
         );
     }
 
@@ -1433,13 +11025,33 @@ mod tests {
     fn clean_game_advances_enemy_positions_through_systems() {
         let mut game = credited_started_game();
         let before = game.state.world.enemies[0].position;
+        let before_source = game.state.world.enemies[0]
+            .source_lander
+            .expect("initial lander should carry source state");
 
         let frame = game.step(GameInput::NONE);
         let enemy = frame.state.world.enemies[0];
+        let source = enemy
+            .source_lander
+            .expect("source lander state should be retained");
+        let expected_y_velocity = super::source_lander_orbit_y_velocity(
+            game.state.wave_profile,
+            before,
+            &game.state.world.terrain,
+        );
+        let (expected_x, expected_x_fraction) = super::source_fixed_axis_step(
+            before.x,
+            before_source.x_fraction,
+            before_source.x_velocity,
+        );
+        let (expected_y, expected_y_fraction) =
+            super::source_fixed_axis_step(before.y, before_source.y_fraction, expected_y_velocity);
 
-        assert_eq!(enemy.position.x, before.x.wrapping_sub(1));
-        assert_eq!(enemy.position.y, before.y);
-        assert_eq!(enemy.velocity, ScreenVelocity::new(-1, 0));
+        assert_eq!(enemy.position, ScreenPosition::new(expected_x, expected_y));
+        assert_eq!(source.x_fraction, expected_x_fraction);
+        assert_eq!(source.y_fraction, expected_y_fraction);
+        assert_eq!(source.y_velocity, expected_y_velocity);
+        assert_eq!(enemy.velocity, super::source_lander_screen_velocity(source));
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_LANDER
                 && sprite.position == [f32::from(enemy.position.x), f32::from(enemy.position.y)]
@@ -1489,6 +11101,635 @@ mod tests {
     }
 
     #[test]
+    fn clean_game_projects_source_top_display_border() {
+        let mut game = credited_started_game();
+
+        let frame = game.step(GameInput::NONE);
+        let border_sprites = frame
+            .scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD)
+            .collect::<Vec<_>>();
+
+        assert_eq!(border_sprites.len(), 6);
+        assert!(
+            border_sprites
+                .iter()
+                .all(|sprite| { sprite.layer == RenderLayer::Hud && sprite.tint == Color::WHITE })
+        );
+        assert!(
+            border_sprites
+                .iter()
+                .any(|sprite| { sprite.position == [0.0, 40.0] && sprite.size == [312.0, 2.0] })
+        );
+        assert!(
+            border_sprites
+                .iter()
+                .any(|sprite| { sprite.position == [94.0, 8.0] && sprite.size == [2.0, 32.0] })
+        );
+        assert!(
+            border_sprites
+                .iter()
+                .any(|sprite| { sprite.position == [224.0, 8.0] && sprite.size == [2.0, 32.0] })
+        );
+        assert!(
+            border_sprites
+                .iter()
+                .any(|sprite| { sprite.position == [94.0, 7.0] && sprite.size == [130.0, 1.0] })
+        );
+        assert!(
+            border_sprites
+                .iter()
+                .any(|sprite| { sprite.position == [152.0, 7.0] && sprite.size == [16.0, 2.0] })
+        );
+        assert!(
+            border_sprites
+                .iter()
+                .any(|sprite| { sprite.position == [152.0, 40.0] && sprite.size == [16.0, 2.0] })
+        );
+    }
+
+    #[test]
+    fn scanner_radar_snapshot_uses_source_scan_formula_and_cadence() {
+        let mut details = [ObjectEvidenceDetailSnapshot::EMPTY; OBJECT_EVIDENCE_DETAIL_LIMIT];
+        details[0] = ObjectEvidenceDetailSnapshot {
+            list: ObjectEvidenceList::Active,
+            address: Some(0xA23C),
+            world_position: Some((0x2100, 0x5000)),
+            scanner_color: Some(0x1234),
+            ..ObjectEvidenceDetailSnapshot::EMPTY
+        };
+        details[1] = ObjectEvidenceDetailSnapshot {
+            list: ObjectEvidenceList::Inactive,
+            address: Some(0xA27C),
+            world_position: Some((0x2300, 0x6800)),
+            scanner_color: Some(0xABCD),
+            ..ObjectEvidenceDetailSnapshot::EMPTY
+        };
+        details[2] = ObjectEvidenceDetailSnapshot {
+            list: ObjectEvidenceList::Projectile,
+            address: Some(0xA2BC),
+            world_position: Some((0x2500, 0x7000)),
+            scanner_color: Some(0xFFFF),
+            ..ObjectEvidenceDetailSnapshot::EMPTY
+        };
+        let evidence = ObjectEvidenceSnapshot {
+            active_count: 2,
+            inactive_count: 1,
+            projectile_count: 1,
+            visible_count: 3,
+            evidence_crc32: Some(0x5CA4_4E11),
+            detail_count: 3,
+            details,
+        };
+
+        let scanner = ScannerRadarSnapshot::for_world(
+            GamePhase::Playing,
+            4,
+            super::world_word(0x2000),
+            (super::world_word(0x8000), super::world_word(0x4000)),
+            &evidence,
+        );
+
+        assert!(scanner.enabled);
+        assert_eq!(scanner.stage, ScannerRadarStage::RasterDisplay);
+        assert_eq!(scanner.stage_sleep_ticks, 4);
+        assert_eq!(scanner.source_process_sleep_ticks, [2, 2, 4]);
+        assert_eq!(scanner.selected_map, 1);
+        assert_eq!(scanner.scan_left, Some(0xB2C0));
+        assert!(scanner.terrain_enabled);
+        assert_eq!(scanner.object_erase_start, 0xB05D);
+        assert_eq!(scanner.setend, 0xB061);
+        assert_eq!(scanner.blip_count, 2);
+        assert_eq!(
+            scanner.blips[0],
+            super::ScannerRadarBlipSnapshot {
+                kind: ScannerRadarBlipKind::ActiveObject,
+                object_address: Some(0xA23C),
+                erase_table_address: 0xB05D,
+                screen_address: 0x4B11,
+                color_word: 0x1234,
+            }
+        );
+        assert_eq!(
+            scanner.blips[1],
+            super::ScannerRadarBlipSnapshot {
+                kind: ScannerRadarBlipKind::InactiveObject,
+                object_address: Some(0xA27C),
+                erase_table_address: 0xB05F,
+                screen_address: 0x4C14,
+                color_word: 0xABCD,
+            }
+        );
+        assert_eq!(
+            scanner.player_blip,
+            Some(super::ScannerRadarPlayerBlipSnapshot {
+                erase_table_address: 0xB061,
+                screen_address: 0x530F,
+                body_word: 0x9099,
+                tail_byte: 0x90,
+                upper_byte: 0x09,
+            })
+        );
+    }
+
+    #[test]
+    fn clean_game_projects_scanner_radar_sprites() {
+        let mut details = [ObjectEvidenceDetailSnapshot::EMPTY; OBJECT_EVIDENCE_DETAIL_LIMIT];
+        details[0] = ObjectEvidenceDetailSnapshot {
+            list: ObjectEvidenceList::Active,
+            world_position: Some((0x2100, 0x5000)),
+            scanner_color: Some(0x1234),
+            ..ObjectEvidenceDetailSnapshot::EMPTY
+        };
+        let evidence = ObjectEvidenceSnapshot {
+            active_count: 1,
+            inactive_count: 0,
+            projectile_count: 0,
+            visible_count: 1,
+            evidence_crc32: None,
+            detail_count: 1,
+            details,
+        };
+        let mut game = Game::new();
+        game.state.phase = GamePhase::Playing;
+        game.state.world.scanner = ScannerRadarSnapshot::for_world(
+            GamePhase::Playing,
+            4,
+            super::world_word(0x2000),
+            (super::world_word(0x8000), super::world_word(0x4000)),
+            &evidence,
+        );
+
+        let scene = game.scene();
+
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [150.0, 17.0]
+                && sprite.size == [2.0, 2.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [166.0, 15.0]
+                && sprite.size == [3.0, 2.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [164.0, 16.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == Color::WHITE
+        }));
+    }
+
+    #[test]
+    fn clean_game_projects_source_object_detail_sprites() {
+        let mut game = Game::new();
+        game.state.phase = GamePhase::Playing;
+        game.state.world.object_evidence = ObjectEvidenceSnapshot {
+            active_count: 3,
+            inactive_count: 1,
+            projectile_count: 1,
+            visible_count: 3,
+            evidence_crc32: Some(0x0B1E_C7ED),
+            detail_count: 4,
+            details: {
+                let mut details =
+                    [ObjectEvidenceDetailSnapshot::EMPTY; OBJECT_EVIDENCE_DETAIL_LIMIT];
+                details[0] = ObjectEvidenceDetailSnapshot {
+                    list: ObjectEvidenceList::Active,
+                    screen_position: Some(ScreenPosition::new(40, 50)),
+                    picture_size: Some((6, 4)),
+                    mapped_sprite: Some(SpriteId::ENEMY_BAITER),
+                    ..ObjectEvidenceDetailSnapshot::EMPTY
+                };
+                details[1] = ObjectEvidenceDetailSnapshot {
+                    list: ObjectEvidenceList::Projectile,
+                    screen_position: Some(ScreenPosition::new(60, 70)),
+                    picture_size: Some((8, 1)),
+                    mapped_sprite: Some(SpriteId::PLAYER_PROJECTILE),
+                    ..ObjectEvidenceDetailSnapshot::EMPTY
+                };
+                details[2] = ObjectEvidenceDetailSnapshot {
+                    list: ObjectEvidenceList::Inactive,
+                    screen_position: Some(ScreenPosition::new(80, 90)),
+                    picture_size: Some((2, 3)),
+                    mapped_sprite: Some(SpriteId::ENEMY_BOMB),
+                    ..ObjectEvidenceDetailSnapshot::EMPTY
+                };
+                details[3] = ObjectEvidenceDetailSnapshot {
+                    list: ObjectEvidenceList::Active,
+                    screen_position: Some(ScreenPosition::new(100, 110)),
+                    picture_size: Some((1, 1)),
+                    mapped_sprite: Some(SpriteId::NULL_OBJECT),
+                    ..ObjectEvidenceDetailSnapshot::EMPTY
+                };
+                details
+            },
+        };
+
+        let scene = game.scene();
+
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_BAITER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [40.0, 50.0]
+                && sprite.size == [6.0, 4.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                && sprite.layer == RenderLayer::Projectiles
+                && sprite.position == [60.0, 70.0]
+                && sprite.size == [8.0, 1.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(
+            !scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_BOMB)
+        );
+        assert!(
+            !scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::NULL_OBJECT)
+        );
+    }
+
+    #[test]
+    fn clean_game_projects_source_expanded_object_detail_sprites() {
+        let mut game = Game::new();
+        game.state.phase = GamePhase::Playing;
+        game.state.world.expanded_objects = ExpandedObjectEvidenceSnapshot {
+            active_count: 4,
+            last_slot_address: Some(0x9C40),
+            detail_count: 4,
+            details: {
+                let mut details =
+                    [ExpandedObjectDetailSnapshot::EMPTY; EXPANDED_OBJECT_DETAIL_LIMIT];
+                details[0] = ExpandedObjectDetailSnapshot {
+                    kind: ExpandedObjectKind::Appearance,
+                    slot_address: Some(0x9C00),
+                    descriptor_address: Some(0xF9C1),
+                    picture_label: Some("PLAPIC"),
+                    picture_size: Some((8, 6)),
+                    mapped_sprite: Some(SpriteId::PLAYER_SHIP),
+                    top_left: Some(ScreenPosition::new(10, 20)),
+                    object_address: Some(0xA23C),
+                    ..ExpandedObjectDetailSnapshot::EMPTY
+                };
+                details[1] = ExpandedObjectDetailSnapshot {
+                    kind: ExpandedObjectKind::Explosion,
+                    slot_address: Some(0x9C40),
+                    size: SOURCE_EXPLOSION_INITIAL_SIZE + SOURCE_EXPLOSION_SIZE_DELTA * 2,
+                    descriptor_address: Some(0xF951),
+                    picture_label: Some("BXPIC"),
+                    picture_size: Some((4, 8)),
+                    mapped_sprite: Some(SpriteId::BOMB_EXPLOSION),
+                    top_left: Some(ScreenPosition::new(30, 40)),
+                    explosion_frame: Some(2),
+                    explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
+                    ..ExpandedObjectDetailSnapshot::EMPTY
+                };
+                details[2] = ExpandedObjectDetailSnapshot {
+                    kind: ExpandedObjectKind::Appearance,
+                    picture_size: Some((1, 1)),
+                    mapped_sprite: Some(SpriteId::NULL_OBJECT),
+                    top_left: Some(ScreenPosition::new(50, 60)),
+                    ..ExpandedObjectDetailSnapshot::EMPTY
+                };
+                details[3] = ExpandedObjectDetailSnapshot {
+                    kind: ExpandedObjectKind::Explosion,
+                    mapped_sprite: Some(SpriteId::ENEMY_BOMB),
+                    top_left: Some(ScreenPosition::new(70, 80)),
+                    ..ExpandedObjectDetailSnapshot::EMPTY
+                };
+                details
+            },
+        };
+
+        let scene = game.scene();
+
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_SHIP
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [10.0, 20.0]
+                && sprite.size == [8.0, 6.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::BOMB_EXPLOSION
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [30.0, 40.0]
+                && sprite.size == [8.0, 16.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(
+            !scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::NULL_OBJECT)
+        );
+        assert!(!scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_BOMB && sprite.position == [70.0, 80.0]
+        }));
+    }
+
+    #[test]
+    fn clean_game_projects_score_popup_lifecycle_sprites() {
+        let mut game = credited_started_game();
+        game.state
+            .world
+            .spawn_score_popup(ScorePopupKind::Points500, ScreenPosition::new(33, 81));
+        game.sync_world_presentation();
+
+        let popup_detail = game.state.world.expanded_objects.details[0];
+        assert_eq!(game.state.world.expanded_objects.active_count, 1);
+        assert_eq!(game.state.world.expanded_objects.detail_count, 1);
+        assert_eq!(
+            popup_detail,
+            ExpandedObjectDetailSnapshot {
+                kind: ExpandedObjectKind::ScorePopup,
+                picture_label: Some("C5P1"),
+                picture_size: Some((6, 6)),
+                mapped_sprite: Some(SpriteId::SCORE_POPUP_500),
+                top_left: Some(ScreenPosition::new(33, 81)),
+                score_popup_lifetime_ticks: Some(SOURCE_SCORE_POPUP_LIFETIME_TICKS),
+                score_popup_value: Some(500),
+                ..ExpandedObjectDetailSnapshot::EMPTY
+            }
+        );
+        assert!(game.scene().sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_POPUP_500
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [33.0, 81.0]
+                && sprite.size == [6.0, 6.0]
+                && sprite.tint == Color::WHITE
+        }));
+
+        for _ in 0..SOURCE_SCORE_POPUP_LIFETIME_TICKS - 1 {
+            game.step(GameInput::NONE);
+        }
+        assert_eq!(game.state.world.score_popups.len(), 1);
+        assert!(game.scene().sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_POPUP_500 && sprite.position == [33.0, 81.0]
+        }));
+
+        game.step(GameInput::NONE);
+
+        assert!(game.state.world.score_popups.is_empty());
+        assert_eq!(game.state.world.expanded_objects.active_count, 0);
+        assert_eq!(game.state.world.expanded_objects.detail_count, 0);
+        assert!(
+            !game
+                .scene()
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::SCORE_POPUP_500)
+        );
+    }
+
+    #[test]
+    fn clean_game_projects_source_explosion_lifecycle_sprites() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state
+            .world
+            .spawn_explosion(ExplosionKind::Bomb, ScreenPosition::new(33, 81));
+        game.sync_world_presentation();
+
+        let explosion_detail = game.state.world.expanded_objects.details[0];
+        assert_eq!(game.state.world.expanded_objects.active_count, 1);
+        assert_eq!(game.state.world.expanded_objects.detail_count, 1);
+        assert_eq!(
+            explosion_detail,
+            ExpandedObjectDetailSnapshot {
+                kind: ExpandedObjectKind::Explosion,
+                size: SOURCE_EXPLOSION_INITIAL_SIZE,
+                picture_label: Some("BXPIC"),
+                picture_size: Some((4, 8)),
+                mapped_sprite: Some(SpriteId::BOMB_EXPLOSION),
+                center: Some(ScreenPosition::new(35, 85)),
+                top_left: Some(ScreenPosition::new(33, 81)),
+                explosion_frame: Some(0),
+                explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
+                ..ExpandedObjectDetailSnapshot::EMPTY
+            }
+        );
+        assert!(game.scene().sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::BOMB_EXPLOSION
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [33.0, 81.0]
+                && sprite.size == [4.0, 8.0]
+                && sprite.tint == Color::WHITE
+        }));
+
+        game.state.world.advance_explosions();
+        game.state.world.advance_explosions();
+        game.sync_world_presentation();
+
+        let advanced_detail = game.state.world.expanded_objects.details[0];
+        assert_eq!(
+            advanced_detail.size,
+            SOURCE_EXPLOSION_INITIAL_SIZE + SOURCE_EXPLOSION_SIZE_DELTA * 2
+        );
+        assert_eq!(advanced_detail.explosion_frame, Some(2));
+        assert!(game.scene().sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::BOMB_EXPLOSION
+                && sprite.position == [33.0, 81.0]
+                && sprite.size == [8.0, 16.0]
+        }));
+
+        for _ in 2..SOURCE_EXPLOSION_LIFETIME_FRAMES {
+            game.state.world.advance_explosions();
+        }
+        game.sync_world_presentation();
+
+        assert!(game.state.world.explosions.is_empty());
+        assert_eq!(game.state.world.expanded_objects.active_count, 0);
+        assert_eq!(game.state.world.expanded_objects.detail_count, 0);
+        assert!(
+            !game
+                .scene()
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::BOMB_EXPLOSION)
+        );
+    }
+
+    #[test]
+    fn clean_game_projects_player_explosion_cloud_sprites() {
+        let mut game = Game::new();
+        game.state.world.player_explosion = Some(PlayerExplosionCloudSnapshot {
+            source_color: 0xFF,
+            source_color_counter: 55,
+            source_color_index: 0,
+            frame: 1,
+            piece_count: 2,
+            pieces: {
+                let mut pieces =
+                    [PlayerExplosionPieceSnapshot::EMPTY; PLAYER_EXPLOSION_PIECE_LIMIT];
+                pieces[0] = PlayerExplosionPieceSnapshot {
+                    position: ScreenPosition::new(40, 70),
+                    split: false,
+                };
+                pieces[1] = PlayerExplosionPieceSnapshot {
+                    position: ScreenPosition::new(50, 80),
+                    split: true,
+                };
+                pieces
+            },
+        });
+
+        let scene = game.scene();
+
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [40.0, 70.0]
+                && sprite.size == [4.0, 1.0]
+                && sprite.tint == Color::WHITE
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [50.0, 80.0]
+                && sprite.size == [4.0, 2.0]
+                && sprite.tint == Color::WHITE
+        }));
+    }
+
+    #[test]
+    fn clean_world_maps_source_explosion_descriptor_families() {
+        for (kind, picture_label, picture_size, mapped_sprite, center) in [
+            (
+                ExplosionKind::Lander,
+                "LNDP1",
+                (5, 8),
+                SpriteId::ENEMY_LANDER,
+                ScreenPosition::new(12, 24),
+            ),
+            (
+                ExplosionKind::Bomb,
+                "BXPIC",
+                (4, 8),
+                SpriteId::BOMB_EXPLOSION,
+                ScreenPosition::new(12, 24),
+            ),
+            (
+                ExplosionKind::Swarmer,
+                "SWXP1",
+                (4, 8),
+                SpriteId::SWARMER_EXPLOSION,
+                ScreenPosition::new(12, 24),
+            ),
+            (
+                ExplosionKind::Astronaut,
+                "ASXP1",
+                (4, 8),
+                SpriteId::ASTRONAUT_EXPLOSION,
+                ScreenPosition::new(12, 24),
+            ),
+            (
+                ExplosionKind::PlayerShip,
+                "PLAPIC",
+                (8, 6),
+                SpriteId::PLAYER_SHIP,
+                ScreenPosition::new(14, 23),
+            ),
+            (
+                ExplosionKind::Terrain,
+                "TEREX",
+                (8, 6),
+                SpriteId::TERRAIN_EXPLOSION,
+                ScreenPosition::new(14, 23),
+            ),
+        ] {
+            let mut world = WorldSnapshot::default();
+            world.spawn_explosion(kind, ScreenPosition::new(10, 20));
+            world.sync_clean_lifecycle_evidence();
+
+            assert_eq!(world.expanded_objects.active_count, 1);
+            assert_eq!(world.expanded_objects.detail_count, 1);
+            assert_eq!(
+                world.expanded_objects.details[0],
+                ExpandedObjectDetailSnapshot {
+                    kind: ExpandedObjectKind::Explosion,
+                    size: SOURCE_EXPLOSION_INITIAL_SIZE,
+                    picture_label: Some(picture_label),
+                    picture_size: Some(picture_size),
+                    mapped_sprite: Some(mapped_sprite),
+                    center: Some(center),
+                    top_left: Some(ScreenPosition::new(10, 20)),
+                    explosion_frame: Some(0),
+                    explosion_lifetime_frames: Some(SOURCE_EXPLOSION_LIFETIME_FRAMES),
+                    ..ExpandedObjectDetailSnapshot::EMPTY
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn clean_world_starts_source_terrain_blow_and_projects_terex() {
+        let mut game = credited_started_game();
+        game.state.world.humans.clear();
+
+        let frame = game.step(GameInput::NONE);
+
+        let terrain_blow = frame
+            .state
+            .world
+            .terrain_blow
+            .expect("terrain blow snapshot");
+        assert!(terrain_blow.status_terrain_blown);
+        assert_eq!(terrain_blow.stage, TerrainBlowStage::ExplosionPassSleeping);
+        assert_eq!(terrain_blow.source_iteration, 0);
+        assert_eq!(terrain_blow.source_sleep_remaining, Some(2));
+        assert_eq!(terrain_blow.source_pseudo_color, 0x3C);
+        assert_eq!(terrain_blow.source_overload_counter, 8);
+        assert_eq!(terrain_blow.terrain_erase_entries, 0x98);
+        assert_eq!(terrain_blow.scanner_terrain_erase_entries, 0x40);
+        assert!(terrain_blow.terrain_erased());
+        assert!(terrain_blow.scanner_terrain_erased());
+        assert_eq!(terrain_blow.explosions_per_pass, 2);
+        assert!(frame.state.world.terrain.is_empty());
+        assert!(!frame.state.world.scanner.terrain_enabled);
+        assert_eq!(frame.state.world.expanded_objects.detail_count, 2);
+        assert!(
+            frame
+                .state
+                .world
+                .expanded_objects
+                .details
+                .iter()
+                .take(2)
+                .all(|detail| detail.picture_label == Some("TEREX")
+                    && detail.mapped_sprite == Some(SpriteId::TERRAIN_EXPLOSION)
+                    && detail.explosion_frame == Some(0))
+        );
+        assert!(
+            !frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::TERRAIN_TILE)
+        );
+        assert!(frame.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TERRAIN_EXPLOSION
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [0x44 as f32, 0x70 as f32]
+                && sprite.size == [8.0, 6.0]
+        }));
+    }
+
+    #[test]
     fn clean_game_highlights_carried_humans() {
         let mut game = credited_started_game();
         game.state.world.humans[0].carried = true;
@@ -1528,19 +11769,130 @@ mod tests {
         );
 
         assert_eq!(GameSimulation::state(&game).frame, 1);
-        assert_eq!(frame.state.credits, 1);
+        assert_eq!(frame.state.credits, 0);
+        assert!(frame.events.is_empty());
+    }
+
+    #[test]
+    fn clean_game_counts_down_delayed_sound_timers() {
+        let mut game = Game::new();
+
+        game.coin_one_sound_delay = Some(2);
+        let frame = game.step(GameInput::NONE);
+        assert!(frame.events.sounds().is_empty());
+        assert_eq!(game.coin_one_sound_delay, Some(1));
+        let frame = game.step(GameInput::NONE);
+        assert_eq!(frame.events.sounds(), &[SoundEvent::CreditAdded]);
+        assert_eq!(game.coin_one_sound_delay, None);
+
+        game.start_sound_delay = Some(2);
+        let frame = game.step(GameInput::NONE);
+        assert!(frame.events.sounds().is_empty());
+        assert_eq!(game.start_sound_delay, Some(1));
+        let frame = game.step(GameInput::NONE);
+        assert_eq!(frame.events.sounds(), &[SoundEvent::GameStarted]);
+        assert_eq!(game.start_sound_delay, None);
     }
 
     fn credited_started_game() -> Game {
         let mut game = Game::new();
-        game.step(GameInput {
-            coin: true,
-            ..GameInput::NONE
-        });
+        advance_to_delayed_credit(&mut game);
+        advance_to_delayed_credit_sound(&mut game);
         game.step(GameInput {
             start_one: true,
             ..GameInput::NONE
         });
+        advance_to_delayed_start_sound(&mut game);
+        advance_to_started_playfield(&mut game);
         game
+    }
+
+    fn two_player_started_game() -> Game {
+        let mut game = Game::new();
+        game.state.credits = 2;
+        game.step(GameInput {
+            start_two: true,
+            ..GameInput::NONE
+        });
+        advance_to_delayed_start_sound(&mut game);
+        advance_to_started_playfield(&mut game);
+        game
+    }
+
+    fn keep_first_enemy_only(game: &mut Game) {
+        game.state.world.enemies.truncate(1);
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+    }
+
+    fn advance_player_switch_sleep(game: &mut Game, from_player: u8, to_player: u8) -> GameFrame {
+        for expected_timer in (1..PLAYER_SWITCH_SLEEP_FRAMES).rev() {
+            let sleeping = game.step(GameInput::NONE);
+            assert_eq!(sleeping.state.phase, GamePhase::GameOver);
+            assert_eq!(
+                sleeping.state.game_over,
+                GameOverSnapshot::player_switch_sleep(expected_timer, from_player, to_player)
+            );
+            assert!(sleeping.events.is_empty());
+        }
+
+        game.step(GameInput::NONE)
+    }
+
+    fn advance_player_death_game_over_sleep(game: &mut Game) -> GameFrame {
+        for expected_timer in (1..PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES).rev() {
+            let sleeping = game.step(GameInput::NONE);
+            assert_eq!(sleeping.state.phase, GamePhase::GameOver);
+            assert_eq!(
+                sleeping.state.game_over,
+                GameOverSnapshot::player_death_sleep(expected_timer)
+            );
+            assert!(sleeping.events.is_empty());
+        }
+
+        game.step(GameInput::NONE)
+    }
+
+    fn advance_to_delayed_credit(game: &mut Game) -> GameFrame {
+        game.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        for _ in 0..=COIN_CREDIT_DELAY_FRAMES {
+            let frame = game.step(GameInput::NONE);
+            if frame.events.gameplay() == [GameEvent::CreditAdded] {
+                return frame;
+            }
+        }
+        panic!("delayed credit was not awarded");
+    }
+
+    fn advance_to_delayed_credit_sound(game: &mut Game) -> GameFrame {
+        for _ in 0..=COIN_CREDIT_SOUND_DELAY_FRAMES {
+            let frame = game.step(GameInput::NONE);
+            if frame.events.sounds() == [SoundEvent::CreditAdded] {
+                return frame;
+            }
+        }
+        panic!("delayed credit sound was not emitted");
+    }
+
+    fn advance_to_delayed_start_sound(game: &mut Game) -> GameFrame {
+        for _ in 0..=START_SOUND_DELAY_FRAMES {
+            let frame = game.step(GameInput::NONE);
+            if frame.events.sounds() == [SoundEvent::GameStarted] {
+                return frame;
+            }
+        }
+        panic!("delayed start sound was not emitted");
+    }
+
+    fn advance_to_started_playfield(game: &mut Game) -> GameFrame {
+        for _ in 0..=START_PLAYFIELD_DELAY_FRAMES {
+            let frame = game.step(GameInput::NONE);
+            if !frame.state.world.enemies.is_empty() {
+                return frame;
+            }
+        }
+        panic!("started playfield was not activated");
     }
 }

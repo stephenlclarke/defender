@@ -26,12 +26,16 @@ impl GameplayEquivalenceSignature {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "legacy-tools")]
+    use crate::{
+        game::GameInput,
+        oracle::{GameplayOracle, test_support::ReferenceFrameProbe},
+    };
     use crate::{
         game::{
-            Direction, GameEvent, GameEvents, GameFrame, GameInput, GamePhase, GameState,
-            PlayerSnapshot, ScoreSnapshot, SoundEvent, WorldSnapshot, WorldVector,
+            Direction, GameEvent, GameEvents, GameFrame, GamePhase, GameState, PlayerSnapshot,
+            PlayerStockSnapshot, ScoreSnapshot, SoundEvent, WorldSnapshot, WorldVector,
         },
-        oracle::{GameplayOracle, test_support::ReferenceFrameProbe},
         renderer::{RenderScene, SurfaceSize},
     };
 
@@ -46,7 +50,9 @@ mod tests {
             phase: GamePhase::Playing,
             credits: 1,
             current_player: 1,
+            player_count: 1,
             wave: 2,
+            wave_profile: crate::WaveProfileSnapshot::for_wave(2),
             player: PlayerSnapshot {
                 position: (
                     WorldVector::from_subpixels(0x2000),
@@ -60,13 +66,19 @@ mod tests {
                 lives: 3,
                 smart_bombs: 2,
             },
+            player_stocks: [PlayerStockSnapshot::new(3, 2); 2],
             scores: ScoreSnapshot {
                 player_one: 1_000,
                 player_two: 0,
                 high_score: 10_000,
                 next_bonus: 10_000,
             },
+            attract: crate::AttractPresentationSnapshot::INACTIVE,
             high_score_initials: crate::systems::HighScoreInitialsState::EMPTY,
+            high_score_entry: None,
+            high_score_submission: None,
+            high_score_tables: crate::HighScoreTablesSnapshot::DEFAULT,
+            game_over: crate::GameOverSnapshot::NONE,
             world: WorldSnapshot::default(),
         };
         let frame = GameFrame {
@@ -84,6 +96,7 @@ mod tests {
         assert_eq!(signature.render.visual_signature, Some(0x1234_5678));
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_frame_signatures_match_reference_probe_for_start_and_controls() {
         let mut clean = GameplayOracle::new();
@@ -113,6 +126,7 @@ mod tests {
         assert!(saw_playing_render);
     }
 
+    #[cfg(feature = "legacy-tools")]
     fn credited_start_and_controls_inputs() -> Vec<GameInput> {
         let mut inputs = vec![GameInput {
             coin: true,

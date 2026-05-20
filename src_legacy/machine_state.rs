@@ -1,7 +1,7 @@
 //! Data-only machine state and frame-output contracts.
 
 use crate::{
-    board::PALETTE_RAM_SIZE,
+    board::{PALETTE_RAM_SIZE, RED_LABEL_HIGH_SCORE_ENTRIES},
     input::DefenderInputPorts,
     red_label::{Facing, Fixed16, RandState, bonus_stock_score, default_high_scores, defaults},
     red_label_wave::WaveProfile,
@@ -39,6 +39,21 @@ impl Default for PlayerState {
             facing: Facing::Right,
             lives: defaults().lives,
             smart_bombs: defaults().smart_bombs,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PlayerStockState {
+    pub lives: u8,
+    pub smart_bombs: u8,
+}
+
+impl From<PlayerState> for PlayerStockState {
+    fn from(player: PlayerState) -> Self {
+        Self {
+            lives: player.lives,
+            smart_bombs: player.smart_bombs,
         }
     }
 }
@@ -92,14 +107,198 @@ pub struct HighScoreSubmissionState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreTableEntryState {
+    pub rank: u8,
+    pub score: u32,
+    pub initials: [u8; RED_LABEL_INITIALS_ENTRY_CHARS],
+}
+
+impl HighScoreTableEntryState {
+    pub const EMPTY: Self = Self {
+        rank: 0,
+        score: 0,
+        initials: [b' '; RED_LABEL_INITIALS_ENTRY_CHARS],
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HighScoreTablesState {
+    pub all_time: [HighScoreTableEntryState; RED_LABEL_HIGH_SCORE_ENTRIES],
+    pub todays_greatest: [HighScoreTableEntryState; RED_LABEL_HIGH_SCORE_ENTRIES],
+}
+
+impl Default for HighScoreTablesState {
+    fn default() -> Self {
+        let mut entries = [HighScoreTableEntryState::EMPTY; RED_LABEL_HIGH_SCORE_ENTRIES];
+
+        for (index, seed) in default_high_scores()
+            .iter()
+            .take(RED_LABEL_HIGH_SCORE_ENTRIES)
+            .enumerate()
+        {
+            let initials = seed.initials.as_bytes();
+            let mut entry_initials = [b' '; RED_LABEL_INITIALS_ENTRY_CHARS];
+            entry_initials.copy_from_slice(initials);
+            entries[index] = HighScoreTableEntryState {
+                rank: u8::try_from(index + 1).expect("red-label high-score rank should fit in u8"),
+                score: seed.score,
+                initials: entry_initials,
+            };
+        }
+
+        Self {
+            all_time: entries,
+            todays_greatest: entries,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct GameOverState {
+    pub player_death_sleep_remaining: Option<u8>,
+    pub player_switch_sleep_remaining: Option<u8>,
+    pub player_switch_from: Option<u8>,
+    pub player_switch_to: Option<u8>,
+    pub no_entry_delay_remaining: Option<u8>,
+    pub hall_of_fame_stall_remaining: Option<u8>,
+}
+
+pub const OBJECT_LIST_DETAIL_LIMIT: usize = crate::game::OBJECT_EVIDENCE_DETAIL_LIMIT;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ObjectListNameState {
+    #[default]
+    Active,
+    Inactive,
+    Projectile,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ObjectListDetailState {
+    pub list: ObjectListNameState,
+    pub address: u16,
+    pub slot: u16,
+    pub screen_x: u8,
+    pub screen_y: u8,
+    pub world_x: u16,
+    pub world_y: u16,
+    pub velocity_x: u16,
+    pub velocity_y: u16,
+    pub picture_address: u16,
+    pub picture_label: Option<&'static str>,
+    pub picture_size: Option<(u8, u8)>,
+    pub primary_image_address: Option<u16>,
+    pub alternate_image_address: Option<u16>,
+    pub mapped_sprite: Option<u16>,
+    pub object_type: u8,
+    pub scanner_color: u16,
+}
+
+impl ObjectListDetailState {
+    pub const EMPTY: Self = Self {
+        list: ObjectListNameState::Active,
+        address: 0,
+        slot: 0,
+        screen_x: 0,
+        screen_y: 0,
+        world_x: 0,
+        world_y: 0,
+        velocity_x: 0,
+        velocity_y: 0,
+        picture_address: 0,
+        picture_label: None,
+        picture_size: None,
+        primary_image_address: None,
+        alternate_image_address: None,
+        mapped_sprite: None,
+        object_type: 0,
+        scanner_color: 0,
+    };
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ObjectListState {
+    pub active_count: u16,
+    pub inactive_count: u16,
+    pub projectile_count: u16,
+    pub visible_count: u16,
+    pub evidence_crc32: u32,
+    pub detail_count: u8,
+    pub details: [ObjectListDetailState; OBJECT_LIST_DETAIL_LIMIT],
+}
+
+pub const EXPANDED_OBJECT_DETAIL_LIMIT: usize = crate::game::EXPANDED_OBJECT_DETAIL_LIMIT;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ExpandedObjectKindState {
+    #[default]
+    Appearance,
+    Explosion,
+    ScorePopup,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ExpandedObjectDetailState {
+    pub kind: ExpandedObjectKindState,
+    pub slot_address: u16,
+    pub size: u16,
+    pub descriptor_address: u16,
+    pub picture_label: Option<&'static str>,
+    pub picture_size: Option<(u8, u8)>,
+    pub mapped_sprite: Option<u16>,
+    pub erase_address: u16,
+    pub center_x: u8,
+    pub center_y: u8,
+    pub top_left_x: u8,
+    pub top_left_y: u8,
+    pub object_address: Option<u16>,
+    pub score_popup_lifetime_ticks: Option<u8>,
+    pub score_popup_value: Option<u16>,
+    pub explosion_frame: Option<u8>,
+    pub explosion_lifetime_frames: Option<u8>,
+}
+
+impl ExpandedObjectDetailState {
+    pub const EMPTY: Self = Self {
+        kind: ExpandedObjectKindState::Appearance,
+        slot_address: 0,
+        size: 0,
+        descriptor_address: 0,
+        picture_label: None,
+        picture_size: None,
+        mapped_sprite: None,
+        erase_address: 0,
+        center_x: 0,
+        center_y: 0,
+        top_left_x: 0,
+        top_left_y: 0,
+        object_address: None,
+        score_popup_lifetime_ticks: None,
+        score_popup_value: None,
+        explosion_frame: None,
+        explosion_lifetime_frames: None,
+    };
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ExpandedObjectState {
+    pub active_count: u16,
+    pub last_slot_address: Option<u16>,
+    pub detail_count: u8,
+    pub details: [ExpandedObjectDetailState; EXPANDED_OBJECT_DETAIL_LIMIT],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MachineSnapshot {
     pub frame: u64,
     pub phase: GamePhase,
     pub credits: u8,
     pub current_player: u8,
+    pub player_count: u8,
     pub wave: u8,
     pub rng: RandState,
     pub player: PlayerState,
+    pub player_stocks: [PlayerStockState; 2],
     pub scores: ScoreState,
     pub last_input_bits: u16,
     pub wave_profile: WaveProfile,
@@ -108,6 +307,12 @@ pub struct MachineSnapshot {
     pub xyzzy_auto_fire: bool,
     pub high_score_entry: Option<HighScoreEntryState>,
     pub high_score_submission: Option<HighScoreSubmissionState>,
+    pub high_score_tables: HighScoreTablesState,
+    pub game_over: GameOverState,
+    pub object_lists: ObjectListState,
+    pub expanded_objects: ExpandedObjectState,
+    pub player_explosion: Option<crate::game::PlayerExplosionCloudSnapshot>,
+    pub terrain_blow: Option<crate::game::TerrainBlowSnapshot>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

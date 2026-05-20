@@ -32,7 +32,7 @@ const REQUIRED_SPRITES: [&str; 7] = [
     "player_projectile",
     "terrain_tile",
     "star",
-    "score_text",
+    "score_digit_0",
 ];
 const REQUIRED_PIPELINES: [&str; 5] =
     ["terrain", "starfield", "sprites", "projectiles", "hud_text"];
@@ -472,10 +472,24 @@ impl GameSmokeReport {
 }
 
 pub(crate) fn run() -> anyhow::Result<()> {
-    let report = smoke_report(SMOKE_FRAMES)?;
+    let report = default_smoke_report()?;
 
     print!("{}", report.to_text());
     Ok(())
+}
+
+pub(crate) fn default_smoke_report() -> anyhow::Result<GameSmokeReport> {
+    smoke_report(SMOKE_FRAMES)
+}
+
+#[cfg(all(not(test), not(coverage)))]
+pub(crate) const fn smoke_frame_count() -> u32 {
+    SMOKE_FRAMES
+}
+
+#[cfg(all(not(test), not(coverage)))]
+pub(crate) fn smoke_game_input(frame_index: u32) -> GameInput {
+    smoke_input(frame_index).value
 }
 
 pub(crate) fn smoke_report(frames: u32) -> anyhow::Result<GameSmokeReport> {
@@ -710,7 +724,7 @@ fn required_sprite_label(sprite: SpriteId) -> Option<&'static str> {
         SpriteId::PLAYER_PROJECTILE => Some("player_projectile"),
         SpriteId::TERRAIN_TILE => Some("terrain_tile"),
         SpriteId::STAR => Some("star"),
-        SpriteId::SCORE_TEXT => Some("score_text"),
+        SpriteId::SCORE_DIGIT_0 => Some("score_digit_0"),
         _ => None,
     }
 }
@@ -765,7 +779,10 @@ fn record_draw_command(report: &mut GameSmokeReport, layer: RenderLayer, instanc
             report.drawn_sprite_instances =
                 report.drawn_sprite_instances.saturating_add(instance_count);
         }
-        RenderLayer::Overlay => {}
+        RenderLayer::Overlay => {
+            report.drawn_sprite_instances =
+                report.drawn_sprite_instances.saturating_add(instance_count);
+        }
     }
 }
 
@@ -818,56 +835,56 @@ fn smoke_input(frame_index: u32) -> ScriptedInput {
             },
             Some("coin"),
         ),
-        3 => (
+        13 => (
             GameInput {
                 start_one: true,
                 ..GameInput::NONE
             },
             Some("start_one"),
         ),
-        5 => (
+        15 => (
             GameInput {
                 altitude_up: true,
                 ..GameInput::NONE
             },
             Some("altitude_up"),
         ),
-        7 => (
+        16 => (
             GameInput {
                 thrust: true,
                 ..GameInput::NONE
             },
             Some("thrust"),
         ),
-        9 => (
+        17 => (
             GameInput {
                 fire: true,
                 ..GameInput::NONE
             },
             Some("fire"),
         ),
-        11 => (
+        18 => (
             GameInput {
                 reverse: true,
                 ..GameInput::NONE
             },
             Some("reverse"),
         ),
-        13 => (
+        19 => (
             GameInput {
                 smart_bomb: true,
                 ..GameInput::NONE
             },
             Some("smart_bomb"),
         ),
-        15 => (
+        20 => (
             GameInput {
                 hyperspace: true,
                 ..GameInput::NONE
             },
             Some("hyperspace"),
         ),
-        17 => (
+        21 => (
             GameInput {
                 altitude_down: true,
                 ..GameInput::NONE
@@ -921,12 +938,12 @@ mod tests {
         assert_eq!(
             report.covered_sprites,
             vec![
-                "score_text",
+                "score_digit_0",
+                "player_ship",
                 "star",
                 "terrain_tile",
                 "enemy_lander",
                 "human",
-                "player_ship",
                 "player_projectile",
             ]
         );
@@ -943,7 +960,7 @@ mod tests {
         assert_eq!(report.hud_draw_instances, report.hud_sprites);
         assert_eq!(
             report.covered_pipelines,
-            vec!["hud_text", "starfield", "terrain", "sprites", "projectiles",]
+            vec!["hud_text", "sprites", "starfield", "terrain", "projectiles",]
         );
         assert!(report.wgpu_frame_commands > 0);
         assert_eq!(
@@ -1872,7 +1889,7 @@ mod tests {
             covered_sprites: vec![
                 String::from("star"),
                 String::from("terrain_tile"),
-                String::from("score_text"),
+                String::from("score_digit_0"),
                 String::from("enemy_lander"),
                 String::from("human"),
                 String::from("player_ship"),
@@ -1958,7 +1975,7 @@ mod tests {
                 "  object_sprites: 2\n",
                 "  projectile_sprites: 1\n",
                 "  hud_sprites: 2\n",
-                "  covered_sprites: star,terrain_tile,score_text,enemy_lander,human,player_ship,player_projectile\n",
+                "  covered_sprites: star,terrain_tile,score_digit_0,enemy_lander,human,player_ship,player_projectile\n",
                 "  terrain_draw_commands: 1\n",
                 "  starfield_draw_commands: 1\n",
                 "  object_draw_commands: 1\n",
@@ -2021,8 +2038,9 @@ mod tests {
     fn smoke_script_uses_release_frames_between_edge_inputs() {
         assert!(smoke_input(1).value.coin);
         assert_eq!(smoke_input(2).value, crate::GameInput::NONE);
-        assert!(smoke_input(3).value.start_one);
-        assert_eq!(smoke_input(4).value, crate::GameInput::NONE);
+        assert_eq!(smoke_input(12).value, crate::GameInput::NONE);
+        assert!(smoke_input(13).value.start_one);
+        assert_eq!(smoke_input(14).value, crate::GameInput::NONE);
     }
 
     #[test]
@@ -2039,7 +2057,7 @@ mod tests {
     }
 
     #[test]
-    fn smoke_draw_command_counter_ignores_overlay_layer() {
+    fn smoke_draw_command_counter_counts_overlay_only_as_drawn_instances() {
         let mut report = GameSmokeReport::default();
 
         record_draw_command(&mut report, crate::RenderLayer::Overlay, 4);
@@ -2049,7 +2067,7 @@ mod tests {
         assert_eq!(report.object_draw_commands, 0);
         assert_eq!(report.projectile_draw_commands, 0);
         assert_eq!(report.hud_draw_commands, 0);
-        assert_eq!(report.drawn_sprite_instances, 0);
+        assert_eq!(report.drawn_sprite_instances, 4);
         assert_eq!(report.terrain_draw_instances, 0);
         assert_eq!(report.starfield_draw_instances, 0);
         assert_eq!(report.object_draw_instances, 0);
@@ -2079,7 +2097,7 @@ mod tests {
             covered_sprites: vec![
                 String::from("star"),
                 String::from("terrain_tile"),
-                String::from("score_text"),
+                String::from("score_digit_0"),
                 String::from("enemy_lander"),
                 String::from("human"),
                 String::from("player_ship"),

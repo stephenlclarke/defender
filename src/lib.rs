@@ -1,123 +1,134 @@
 //! Clean Defender rewrite entry point.
 //!
 //! New source lives in this `src/` directory. The converted implementation is
-//! parked under `src_legacy/` and remains wired only as the gameplay oracle and
-//! runtime bridge while the rewrite proves equivalent behavior.
+//! parked under `src_legacy/` and remains wired only behind the explicit
+//! `legacy-tools` feature while the rewrite proves equivalent behavior.
 
+#[cfg(all(test, feature = "legacy-tools"))]
 mod accepted;
 
 pub mod audio;
+#[cfg(all(test, feature = "legacy-tools"))]
+mod clean_fidelity;
 pub mod fidelity;
+#[cfg(feature = "legacy-tools")]
 mod fidelity_manifest;
+#[cfg(feature = "legacy-tools")]
 mod fidelity_scenarios;
+#[cfg(feature = "legacy-tools")]
 mod fidelity_trace_engine;
+#[cfg(feature = "legacy-tools")]
 mod fidelity_traces;
 pub mod game;
 mod game_smoke;
 mod live_wgpu;
+#[cfg(all(test, feature = "legacy-tools"))]
 mod oracle;
 pub mod platform;
 pub mod renderer;
+#[cfg(feature = "legacy-tools")]
 mod rom_report;
+#[cfg(feature = "legacy-tools")]
 mod roms;
 mod runtime;
 pub mod systems;
 
-// Legacy bridge modules are hidden from the supported clean API surface while
-// the rewrite still uses them for the CLI, oracle, fixtures, and smoke tests.
-// Parked low-level modules tolerate dead code after removal from public tool
-// facades; later rewrite cycles should delete them when their evidence is no
-// longer needed.
+// Legacy bridge modules are compiled only for explicit developer tooling.
 #[doc(hidden)]
+#[cfg(all(test, feature = "legacy-tools"))]
 #[path = "../src_legacy/accepted_behavior.rs"]
 pub(crate) mod accepted_behavior;
 #[allow(dead_code)]
 #[doc(hidden)]
-#[path = "../src_legacy/app.rs"]
-pub(crate) mod app;
-#[allow(dead_code)]
-#[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/assets.rs"]
 pub(crate) mod assets;
 #[allow(dead_code)]
 #[allow(clippy::enum_variant_names)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/board.rs"]
 pub(crate) mod board;
 #[allow(dead_code)]
 #[doc(hidden)]
-#[path = "../src_legacy/cmos_storage.rs"]
-pub(crate) mod cmos_storage;
-#[allow(dead_code)]
-#[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/input.rs"]
 pub(crate) mod input;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/fidelity.rs"]
 pub(crate) mod legacy_fidelity;
 #[allow(dead_code)]
 #[doc(hidden)]
-#[path = "../src_legacy/live.rs"]
-pub(crate) mod live;
-#[allow(dead_code)]
+#[cfg(feature = "legacy-tools")]
 #[allow(clippy::enum_variant_names)]
-#[doc(hidden)]
 #[path = "../src_legacy/machine.rs"]
 pub(crate) mod machine;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/machine_process.rs"]
 pub(crate) mod machine_process;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/machine_state.rs"]
 pub(crate) mod machine_state;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/pia.rs"]
 pub(crate) mod pia;
+#[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
+#[path = "../src_legacy/readme_media.rs"]
+pub mod readme_media;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/red_label.rs"]
 pub(crate) mod red_label;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/red_label_memory.rs"]
 pub(crate) mod red_label_memory;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/red_label_message.rs"]
 pub(crate) mod red_label_message;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/red_label_wave.rs"]
 pub(crate) mod red_label_wave;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/rom.rs"]
 pub(crate) mod rom;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/sound.rs"]
 pub(crate) mod sound;
 #[allow(dead_code)]
 #[doc(hidden)]
+#[cfg(feature = "legacy-tools")]
 #[path = "../src_legacy/video.rs"]
 pub(crate) mod video;
-#[doc(hidden)]
-#[path = "../src_legacy/wgpu_presenter.rs"]
-pub(crate) mod wgpu_presenter;
-
-#[doc(hidden)]
-#[path = "../src_legacy/readme_media.rs"]
-pub mod readme_media;
 
 pub use fidelity::GameplayEquivalenceSignature;
 pub use game::{
-    Direction, EnemyKind, EnemySnapshot, Game, GameEvent, GameEvents, GameFrame, GameInput,
-    GamePhase, GameSnapshot, GameState, HumanSnapshot, PlayerSnapshot, ProjectileSnapshot,
-    ScoreSnapshot, SoundEvent, TerrainSegment, WorldSnapshot, WorldVector,
+    AttractPresentationPage, AttractPresentationSnapshot, Direction, EnemyKind,
+    EnemyReserveSnapshot, EnemySnapshot, Game, GameEvent, GameEvents, GameFrame, GameInput,
+    GameOverSnapshot, GamePhase, GameSnapshot, GameState, HighScoreEntrySnapshot,
+    HighScoreSubmissionSnapshot, HighScoreTableEntrySnapshot, HighScoreTablesSnapshot,
+    HumanSnapshot, PlayerExplosionCloudSnapshot, PlayerExplosionPieceSnapshot, PlayerSnapshot,
+    PlayerStockSnapshot, ProjectileSnapshot, ScoreSnapshot, SoundEvent, TerrainBlowSnapshot,
+    TerrainBlowStage, TerrainSegment, WaveProfileSnapshot, WorldSnapshot, WorldVector,
 };
 pub use platform::{AudioOutput, ControlProfile, RunMode, RuntimeConfig};
 pub use renderer::{
@@ -149,11 +160,11 @@ pub use systems::{
     WaveState, WaveStatus, WaveSystem, advance_one_frame,
 };
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-tools"))]
 #[path = "../src_legacy/test_support.rs"]
 pub(crate) mod test_support;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-tools"))]
 #[path = "../src_legacy/oracle_equivalence_tests.rs"]
 mod oracle_equivalence_tests;
 
@@ -166,9 +177,10 @@ mod public_api_tests {
 
         assert_eq!(frame.state.frame, 1);
         assert_eq!(frame.state.phase, crate::GamePhase::Attract);
-        assert_eq!(frame.scene.summary().layers.hud, 1);
+        assert_eq!(frame.scene.summary().layers.hud, 2);
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn gameplay_oracle_is_internal_fidelity_wiring() {
         let lib_rs = include_str!("lib.rs");
@@ -201,8 +213,9 @@ mod public_api_tests {
         };
 
         assert!(
-            lib_rs[..marker_start].ends_with("#[doc(hidden)]\n"),
-            "README media facade must be hidden from supported API docs"
+            lib_rs[..marker_start]
+                .ends_with("#[doc(hidden)]\n#[cfg(feature = \"legacy-tools\")]\n"),
+            "README media facade must be hidden and legacy-tool gated"
         );
         assert!(
             lib_rs[marker_start..].starts_with(&format!("{marker}\npub mod readme_media;")),
@@ -403,22 +416,22 @@ mod public_api_tests {
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_reference_trace_check_dir"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_scenario_list"));
         assert!(runtime_rs.contains("pub(crate) fn run_fidelity_scenario_input_writer"));
-        assert!(runtime_rs.contains("crate::rom_report::run(path.as_deref())"));
-        assert!(runtime_rs.contains("crate::rom_report::run_verify(&path)"));
+        assert!(runtime_rs.contains("run_rom_report_command(path)"));
+        assert!(runtime_rs.contains("run_verify_roms_command(path)"));
         assert!(runtime_rs.contains("crate::game_smoke::run()"));
-        assert!(runtime_rs.contains("crate::fidelity_traces::run_trace(frame_count)"));
-        assert!(runtime_rs.contains("crate::fidelity_traces::run_trace_inputs(&script)"));
-        assert!(runtime_rs.contains("crate::fidelity_traces::run_trace_inputs_file(&path)"));
+        assert!(runtime_rs.contains("run_fidelity_trace_command(frame_count)"));
+        assert!(runtime_rs.contains("run_fidelity_trace_inputs_command(script)"));
+        assert!(runtime_rs.contains("run_fidelity_trace_inputs_file_command(path)"));
         assert!(
-            runtime_rs
-                .contains("crate::fidelity_traces::run_check_trace(&inputs_path, &expected_path)")
+            runtime_rs.contains("run_fidelity_trace_check_command(inputs_path, expected_path)")
         );
-        assert!(runtime_rs.contains("crate::fidelity_traces::run_check_trace_dir(&path)"));
-        assert!(
-            runtime_rs.contains("crate::fidelity_traces::run_check_reference_trace_dir(&path)")
-        );
-        assert!(runtime_rs.contains("crate::fidelity_scenarios::run_list()"));
-        assert!(runtime_rs.contains("crate::fidelity_scenarios::run_write_inputs(&path)"));
+        assert!(runtime_rs.contains("run_fidelity_trace_check_dir_command(path)"));
+        assert!(runtime_rs.contains("run_fidelity_reference_trace_check_dir_command(path)"));
+        assert!(runtime_rs.contains("run_fidelity_scenario_list_command()"));
+        assert!(runtime_rs.contains("run_fidelity_scenario_input_writer_command(path)"));
+        assert!(runtime_rs.contains("#[cfg(feature = \"legacy-tools\")]"));
+        assert!(runtime_rs.contains("#[cfg(not(feature = \"legacy-tools\"))]"));
+        assert!(runtime_rs.contains("legacy_tools_disabled"));
         assert!(!runtime_rs.contains("RuntimeCommand::AcceptedCli"));
         assert!(!runtime_rs.contains("pub(crate) fn run_cli"));
         assert!(!runtime_rs.contains("crate::accepted_behavior::run_runtime()"));
@@ -435,17 +448,17 @@ mod public_api_tests {
         let public_fidelity_traces_module = format!("pub mod {};", "fidelity_traces");
         let public_game_smoke_module = format!("pub mod {};", "game_smoke");
         let public_live_wgpu_module = format!("pub mod {};", "live_wgpu");
-        assert!(lib_rs.contains("mod rom_report;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"legacy-tools\")]\nmod rom_report;"));
         assert!(!lib_rs.contains(&public_rom_report_module));
-        assert!(lib_rs.contains("mod roms;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"legacy-tools\")]\nmod roms;"));
         assert!(!lib_rs.contains(&public_roms_module));
-        assert!(lib_rs.contains("mod fidelity_manifest;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"legacy-tools\")]\nmod fidelity_manifest;"));
         assert!(!lib_rs.contains(&public_fidelity_manifest_module));
-        assert!(lib_rs.contains("mod fidelity_scenarios;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"legacy-tools\")]\nmod fidelity_scenarios;"));
         assert!(!lib_rs.contains(&public_fidelity_scenarios_module));
-        assert!(lib_rs.contains("mod fidelity_trace_engine;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"legacy-tools\")]\nmod fidelity_trace_engine;"));
         assert!(!lib_rs.contains(&public_fidelity_trace_engine_module));
-        assert!(lib_rs.contains("mod fidelity_traces;"));
+        assert!(lib_rs.contains("#[cfg(feature = \"legacy-tools\")]\nmod fidelity_traces;"));
         assert!(!lib_rs.contains(&public_fidelity_traces_module));
         assert!(lib_rs.contains("mod game_smoke;"));
         assert!(!lib_rs.contains(&public_game_smoke_module));
@@ -613,7 +626,7 @@ mod public_api_tests {
         assert!(game_smoke_rs.contains("SpriteId::PLAYER_PROJECTILE"));
         assert!(game_smoke_rs.contains("SpriteId::TERRAIN_TILE"));
         assert!(game_smoke_rs.contains("SpriteId::STAR"));
-        assert!(game_smoke_rs.contains("SpriteId::SCORE_TEXT"));
+        assert!(game_smoke_rs.contains("SpriteId::SCORE_DIGIT_0"));
         for forbidden in [
             "crate::accepted::",
             "crate::input::",
@@ -628,9 +641,11 @@ mod public_api_tests {
         }
 
         let live_wgpu_rs = include_str!("live_wgpu.rs");
-        assert!(live_wgpu_rs.contains("crate::wgpu_presenter::run_wgpu_live("));
-        assert!(live_wgpu_rs.contains("crate::wgpu_presenter::run_wgpu_live_smoke"));
-        assert!(live_wgpu_rs.contains("crate::input::InputProfile"));
+        assert!(!live_wgpu_rs.contains("crate::wgpu_presenter::"));
+        assert!(live_wgpu_rs.contains("crate::game_smoke::default_smoke_report()"));
+        assert!(live_wgpu_rs.contains("NativeSceneRenderer"));
+        assert!(live_wgpu_rs.contains("LiveAudioRuntime"));
+        assert!(live_wgpu_rs.contains("draw_indexed"));
 
         let oracle_rs = include_str!("oracle.rs");
         assert!(oracle_rs.contains("crate::accepted::"));
@@ -777,11 +792,6 @@ mod public_api_tests {
 
         for (path, source) in clean_sources {
             for forbidden in low_level_legacy_imports {
-                if path == "src/live_wgpu.rs"
-                    && matches!(forbidden, "crate::input::" | "crate::wgpu_presenter::")
-                {
-                    continue;
-                }
                 if path == "src/roms.rs" && forbidden == "crate::rom::" {
                     continue;
                 }
@@ -821,6 +831,16 @@ mod public_api_tests {
                 "memory",
                 "FrameOutput",
             ] {
+                if path == "src/live_wgpu.rs" && forbidden == "memory" {
+                    let wgpu_api_terms = source
+                        .replace("memory_hints", "")
+                        .replace("MemoryHints", "");
+                    assert!(
+                        !wgpu_api_terms.contains(forbidden),
+                        "{path} must not expose legacy implementation terminology {forbidden}"
+                    );
+                    continue;
+                }
                 assert!(
                     !source.contains(forbidden),
                     "{path} must not expose legacy implementation terminology {forbidden}"
@@ -830,17 +850,14 @@ mod public_api_tests {
     }
 
     #[test]
-    fn legacy_modules_are_crate_private_at_root() {
+    fn legacy_tool_modules_are_feature_gated_and_crate_private_at_root() {
         let lib_rs = include_str!("lib.rs");
         let legacy_modules = [
             ("accepted_behavior", "accepted_behavior"),
-            ("app", "app"),
             ("assets", "assets"),
             ("board", "board"),
-            ("cmos_storage", "cmos_storage"),
             ("legacy_fidelity", "fidelity"),
             ("input", "input"),
-            ("live", "live"),
             ("machine", "machine"),
             ("machine_process", "machine_process"),
             ("machine_state", "machine_state"),
@@ -852,7 +869,6 @@ mod public_api_tests {
             ("rom", "rom"),
             ("sound", "sound"),
             ("video", "video"),
-            ("wgpu_presenter", "wgpu_presenter"),
         ];
 
         for (module, path) in legacy_modules {
@@ -860,13 +876,42 @@ mod public_api_tests {
             let Some(marker_start) = lib_rs.find(&marker) else {
                 panic!("missing legacy module path for {module}");
             };
+            let attributes_start = lib_rs[..marker_start]
+                .rfind("\n\n")
+                .map_or(0, |index| index + 2);
+            let attributes = &lib_rs[attributes_start..marker_start];
             assert!(
-                lib_rs[..marker_start].ends_with("#[doc(hidden)]\n"),
-                "legacy module {module} must be hidden from supported API docs"
+                attributes.contains("#[doc(hidden)]\n"),
+                "legacy module {module} must be hidden and legacy-tool gated"
+            );
+            assert!(
+                attributes.contains("feature = \"legacy-tools\""),
+                "legacy module {module} must be compiled only for explicit legacy tooling"
             );
             assert!(
                 lib_rs[marker_start..].starts_with(&format!("{marker}\npub(crate) mod {module};")),
                 "legacy module {module} must be crate-private at the root"
+            );
+        }
+    }
+
+    #[test]
+    fn retired_runtime_legacy_adapters_are_not_active_crate_wiring() {
+        let lib_rs = include_str!("lib.rs");
+
+        for (module, path) in [
+            ("app", "app"),
+            ("cmos_storage", "cmos_storage"),
+            ("live", "live"),
+            ("wgpu_presenter", "wgpu_presenter"),
+        ] {
+            assert!(
+                !lib_rs.contains(&format!("#[path = \"../src_legacy/{path}.rs\"]")),
+                "retired runtime adapter {module} must not be compiled from clean src/lib.rs"
+            );
+            assert!(
+                !lib_rs.contains(&format!("mod {module};")),
+                "retired runtime adapter {module} must not be an active root module"
             );
         }
     }

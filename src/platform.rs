@@ -14,6 +14,7 @@ pub enum ControlProfile {
 pub enum AudioOutput {
     Disabled,
     #[default]
+    Device,
     Null,
 }
 
@@ -36,7 +37,7 @@ impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
             controls: ControlProfile::Planetoid,
-            audio: AudioOutput::Null,
+            audio: AudioOutput::Device,
             mode: RunMode::Interactive,
             cmos_path: None,
         }
@@ -689,9 +690,11 @@ fn parse_control_profile(value: &str) -> Option<ControlProfile> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    #[cfg(feature = "legacy-tools")]
     use std::{
         fs,
-        path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -712,7 +715,7 @@ mod tests {
         let config = RuntimeConfig::default();
 
         assert_eq!(config.controls, ControlProfile::Planetoid);
-        assert_eq!(config.audio, AudioOutput::Null);
+        assert_eq!(config.audio, AudioOutput::Device);
         assert_eq!(config.mode, RunMode::Interactive);
         assert!(config.cmos_path.is_none());
     }
@@ -791,7 +794,7 @@ mod tests {
             RuntimeCliClassifier::classify(args(&["--live-smoke", "--input-profile", "test"])),
             CliClassification::Runtime(RuntimeConfig {
                 controls: ControlProfile::Test,
-                audio: AudioOutput::Null,
+                audio: AudioOutput::Device,
                 mode: RunMode::Smoke,
                 cmos_path: None,
             })
@@ -1437,12 +1440,38 @@ mod tests {
         );
     }
 
+    #[cfg(not(feature = "legacy-tools"))]
+    #[test]
+    fn clean_cli_legacy_tool_entrypoints_require_explicit_feature() {
+        for command in [
+            &["--rom-report"][..],
+            &["--verify-roms", "roms"],
+            &["--fidelity-list-scenarios"],
+            &["--fidelity-trace", "1"],
+            &["--fidelity-trace-inputs", "none"],
+            &["--fidelity-trace-inputs-file", "inputs.txt"],
+            &["--fidelity-check-trace", "inputs.txt", "expected.tsv"],
+            &["--fidelity-check-trace-dir", "fixtures"],
+            &["--fidelity-check-reference-trace-dir", "reference"],
+            &["--fidelity-write-scenario-inputs", "out"],
+        ] {
+            let error = super::run_with_args(args(command))
+                .expect_err("legacy developer tooling must be feature-gated");
+            let message = error.to_string();
+
+            assert!(message.contains("developer legacy tooling"));
+            assert!(message.contains("--features legacy-tools"));
+        }
+    }
+
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_rom_report_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--rom-report"]))
             .expect("clean ROM report CLI should run through configured runtime");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_verify_roms_cli_entrypoint_rejects_incomplete_rom_set_through_clean_runtime() {
         let path = unique_temp_dir("defender-clean-platform-verify-roms");
@@ -1457,18 +1486,21 @@ mod tests {
         let _ = fs::remove_dir_all(path);
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_fidelity_scenario_listing_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--fidelity-list-scenarios"]))
             .expect("clean scenario listing CLI should run through configured runtime");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_fidelity_trace_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&["--fidelity-trace", "1"]))
             .expect("clean fidelity trace CLI should run through configured runtime");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_fidelity_trace_input_cli_entrypoints_accept_supported_args() {
         let path = unique_temp_dir("defender-clean-platform-trace-inputs");
@@ -1484,6 +1516,7 @@ mod tests {
         let _ = fs::remove_dir_all(path);
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_fidelity_trace_check_cli_entrypoint_accepts_supported_args() {
         let path = unique_temp_dir("defender-clean-platform-trace-check");
@@ -1504,6 +1537,7 @@ mod tests {
         let _ = fs::remove_dir_all(path);
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_fidelity_trace_fixture_directory_cli_entrypoint_accepts_supported_args() {
         let path = unique_temp_dir("defender-clean-platform-trace-fixtures");
@@ -1518,6 +1552,7 @@ mod tests {
         let _ = fs::remove_dir_all(path);
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_fidelity_reference_trace_fixture_directory_cli_entrypoint_accepts_supported_args() {
         super::run_with_args(args(&[
@@ -1527,6 +1562,7 @@ mod tests {
         .expect("clean reference trace fixture directory CLI should run through runtime");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn clean_fidelity_scenario_input_writer_cli_entrypoint_accepts_supported_args() {
         let path = unique_temp_dir("defender-clean-platform-scenario-inputs");
@@ -1555,6 +1591,7 @@ mod tests {
             .expect("configured runtime bridge should run smoke under tests");
     }
 
+    #[cfg(feature = "legacy-tools")]
     fn unique_temp_dir(prefix: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1564,6 +1601,7 @@ mod tests {
         std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()))
     }
 
+    #[cfg(feature = "legacy-tools")]
     fn one_frame_idle_trace_text() -> &'static str {
         concat!(
             "frame\tinput_bits\tinput_in0\tinput_in1\tinput_in2\tphase\t",

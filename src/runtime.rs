@@ -166,6 +166,7 @@ impl RuntimeCommand {
 fn audio_mode(output: AudioOutput) -> LiveAudioMode {
     match output {
         AudioOutput::Disabled => LiveAudioMode::Disabled,
+        AudioOutput::Device => LiveAudioMode::Device,
         AudioOutput::Null => LiveAudioMode::Null,
     }
 }
@@ -188,31 +189,31 @@ impl RuntimeBackend for InstalledRuntimeBackend {
                 print!("{}", help_text());
                 Ok(())
             }
-            RuntimeCommand::RomReport { path } => crate::rom_report::run(path.as_deref()),
-            RuntimeCommand::VerifyRoms { path } => crate::rom_report::run_verify(&path),
+            RuntimeCommand::RomReport { path } => run_rom_report_command(path),
+            RuntimeCommand::VerifyRoms { path } => run_verify_roms_command(path),
             RuntimeCommand::GameSmoke => crate::game_smoke::run(),
             RuntimeCommand::FidelityTrace { frame_count } => {
-                crate::fidelity_traces::run_trace(frame_count)
+                run_fidelity_trace_command(frame_count)
             }
             RuntimeCommand::FidelityTraceInputs { script } => {
-                crate::fidelity_traces::run_trace_inputs(&script)
+                run_fidelity_trace_inputs_command(script)
             }
             RuntimeCommand::FidelityTraceInputsFile { path } => {
-                crate::fidelity_traces::run_trace_inputs_file(&path)
+                run_fidelity_trace_inputs_file_command(path)
             }
             RuntimeCommand::FidelityTraceCheck {
                 inputs_path,
                 expected_path,
-            } => crate::fidelity_traces::run_check_trace(&inputs_path, &expected_path),
+            } => run_fidelity_trace_check_command(inputs_path, expected_path),
             RuntimeCommand::FidelityTraceFixtureDirectory { path } => {
-                crate::fidelity_traces::run_check_trace_dir(&path)
+                run_fidelity_trace_check_dir_command(path)
             }
             RuntimeCommand::FidelityReferenceTraceFixtureDirectory { path } => {
-                crate::fidelity_traces::run_check_reference_trace_dir(&path)
+                run_fidelity_reference_trace_check_dir_command(path)
             }
-            RuntimeCommand::FidelityScenarioList => crate::fidelity_scenarios::run_list(),
+            RuntimeCommand::FidelityScenarioList => run_fidelity_scenario_list_command(),
             RuntimeCommand::FidelityScenarioInputWriter { path } => {
-                crate::fidelity_scenarios::run_write_inputs(&path)
+                run_fidelity_scenario_input_writer_command(path)
             }
             RuntimeCommand::WgpuLive {
                 input_profile,
@@ -229,6 +230,121 @@ impl RuntimeBackend for InstalledRuntimeBackend {
             }
         }
     }
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_rom_report_command(path: Option<PathBuf>) -> anyhow::Result<()> {
+    crate::rom_report::run(path.as_deref())
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_rom_report_command(_path: Option<PathBuf>) -> anyhow::Result<()> {
+    Err(legacy_tools_disabled("--rom-report"))
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_verify_roms_command(path: PathBuf) -> anyhow::Result<()> {
+    crate::rom_report::run_verify(&path)
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_verify_roms_command(_path: PathBuf) -> anyhow::Result<()> {
+    Err(legacy_tools_disabled("--verify-roms"))
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_fidelity_trace_command(frame_count: usize) -> anyhow::Result<()> {
+    crate::fidelity_traces::run_trace(frame_count)
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_fidelity_trace_command(_frame_count: usize) -> anyhow::Result<()> {
+    Err(legacy_tools_disabled("--fidelity-trace"))
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_fidelity_trace_inputs_command(script: String) -> anyhow::Result<()> {
+    crate::fidelity_traces::run_trace_inputs(&script)
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_fidelity_trace_inputs_command(_script: String) -> anyhow::Result<()> {
+    Err(legacy_tools_disabled("--fidelity-trace-inputs"))
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_fidelity_trace_inputs_file_command(path: PathBuf) -> anyhow::Result<()> {
+    crate::fidelity_traces::run_trace_inputs_file(&path)
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_fidelity_trace_inputs_file_command(_path: PathBuf) -> anyhow::Result<()> {
+    Err(legacy_tools_disabled("--fidelity-trace-inputs-file"))
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_fidelity_trace_check_command(
+    inputs_path: PathBuf,
+    expected_path: PathBuf,
+) -> anyhow::Result<()> {
+    crate::fidelity_traces::run_check_trace(&inputs_path, &expected_path)
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_fidelity_trace_check_command(
+    _inputs_path: PathBuf,
+    _expected_path: PathBuf,
+) -> anyhow::Result<()> {
+    Err(legacy_tools_disabled("--fidelity-check-trace"))
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_fidelity_trace_check_dir_command(path: PathBuf) -> anyhow::Result<()> {
+    crate::fidelity_traces::run_check_trace_dir(&path)
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_fidelity_trace_check_dir_command(_path: PathBuf) -> anyhow::Result<()> {
+    Err(legacy_tools_disabled("--fidelity-check-trace-dir"))
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_fidelity_reference_trace_check_dir_command(path: PathBuf) -> anyhow::Result<()> {
+    crate::fidelity_traces::run_check_reference_trace_dir(&path)
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_fidelity_reference_trace_check_dir_command(_path: PathBuf) -> anyhow::Result<()> {
+    Err(legacy_tools_disabled(
+        "--fidelity-check-reference-trace-dir",
+    ))
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_fidelity_scenario_list_command() -> anyhow::Result<()> {
+    crate::fidelity_scenarios::run_list()
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_fidelity_scenario_list_command() -> anyhow::Result<()> {
+    Err(legacy_tools_disabled("--fidelity-list-scenarios"))
+}
+
+#[cfg(feature = "legacy-tools")]
+fn run_fidelity_scenario_input_writer_command(path: PathBuf) -> anyhow::Result<()> {
+    crate::fidelity_scenarios::run_write_inputs(&path)
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn run_fidelity_scenario_input_writer_command(_path: PathBuf) -> anyhow::Result<()> {
+    Err(legacy_tools_disabled("--fidelity-write-scenario-inputs"))
+}
+
+#[cfg(not(feature = "legacy-tools"))]
+fn legacy_tools_disabled(command: &'static str) -> anyhow::Error {
+    anyhow::anyhow!(
+        "{command} is developer legacy tooling; rebuild with --features legacy-tools to use it"
+    )
 }
 
 pub(crate) fn run_help() -> anyhow::Result<()> {
@@ -296,32 +412,33 @@ pub(crate) fn help_text() -> &'static str {
         "  cargo run -- --input-profile planetoid\n",
         "  cargo run -- --input-profile cabinet\n",
         "  cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin\n",
-        "  cargo run -- --rom-report\n",
-        "  cargo run -- --rom-report /path/to/roms\n",
-        "  cargo run -- --verify-roms /path/to/roms\n",
-        "  cargo run -- --fidelity-trace 300\n",
-        "  cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n",
-        "  cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt\n",
-        "  cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n",
-        "  cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n",
-        "  cargo run -- --fidelity-list-scenarios\n",
-        "  cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n",
-        "  cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n",
+        "  cargo run --features legacy-tools -- --rom-report\n",
+        "  cargo run --features legacy-tools -- --rom-report /path/to/roms\n",
+        "  cargo run --features legacy-tools -- --verify-roms /path/to/roms\n",
+        "  cargo run --features legacy-tools -- --fidelity-trace 300\n",
+        "  cargo run --features legacy-tools -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'\n",
+        "  cargo run --features legacy-tools -- --fidelity-trace-inputs-file /path/to/inputs.txt\n",
+        "  cargo run --features legacy-tools -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv\n",
+        "  cargo run --features legacy-tools -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current\n",
+        "  cargo run --features legacy-tools -- --fidelity-list-scenarios\n",
+        "  cargo run --features legacy-tools -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference\n",
+        "  cargo run --features legacy-tools -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference\n",
         "\n",
         "Runtime assets are embedded in the binary for copy-only deployment.\n",
         "Live play uses the windowed wgpu backend.\n",
-        "Live audio routes accepted sound commands through a non-blocking null backend; ",
+        "ROM and accepted-trace commands are explicit legacy developer tooling.\n",
+        "Live audio routes accepted sound commands through a non-blocking synthesized device backend; ",
         "--mute disables that runtime path.\n",
     )
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{cell::RefCell, path::PathBuf, rc::Rc};
+
+    #[cfg(feature = "legacy-tools")]
     use std::{
-        cell::RefCell,
         fs,
-        path::PathBuf,
-        rc::Rc,
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -577,7 +694,7 @@ mod tests {
             RuntimeCommand::from_config(&RuntimeConfig::default()),
             RuntimeCommand::WgpuLive {
                 input_profile: LiveInputProfile::Planetoid,
-                audio_mode: LiveAudioMode::Null,
+                audio_mode: LiveAudioMode::Device,
                 cmos_path: None,
             }
         );
@@ -604,6 +721,7 @@ mod tests {
     #[test]
     fn clean_audio_outputs_map_to_runtime_audio_modes() {
         assert_eq!(audio_mode(AudioOutput::Disabled), LiveAudioMode::Disabled);
+        assert_eq!(audio_mode(AudioOutput::Device), LiveAudioMode::Device);
         assert_eq!(audio_mode(AudioOutput::Null), LiveAudioMode::Null);
     }
 
@@ -649,6 +767,7 @@ mod tests {
             .expect("installed backend should run clean help");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn installed_backend_runs_clean_rom_listing_report() {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
@@ -656,6 +775,7 @@ mod tests {
             .expect("installed backend should run clean ROM listing report");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn installed_backend_runs_clean_verify_roms_report() {
         let path = unique_temp_dir("defender-clean-runtime-verify-roms");
@@ -677,6 +797,7 @@ mod tests {
             .expect("installed backend should run clean game smoke");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn installed_backend_runs_clean_fidelity_scenario_list() {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
@@ -684,6 +805,7 @@ mod tests {
             .expect("installed backend should run clean scenario list");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn installed_backend_runs_clean_fidelity_trace() {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
@@ -691,6 +813,7 @@ mod tests {
             .expect("installed backend should run clean fidelity trace");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn installed_backend_runs_clean_fidelity_trace_inputs() {
         let path = unique_temp_dir("defender-clean-runtime-trace-inputs");
@@ -707,6 +830,7 @@ mod tests {
         let _ = fs::remove_dir_all(path);
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn installed_backend_runs_clean_fidelity_trace_check() {
         let path = unique_temp_dir("defender-clean-runtime-trace-check");
@@ -722,6 +846,7 @@ mod tests {
         let _ = fs::remove_dir_all(path);
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn installed_backend_runs_clean_fidelity_trace_fixture_directory() {
         let path = unique_temp_dir("defender-clean-runtime-trace-fixtures");
@@ -736,6 +861,7 @@ mod tests {
         let _ = fs::remove_dir_all(path);
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn installed_backend_runs_clean_fidelity_reference_trace_fixture_directory() {
         RuntimeHost::with_backend(InstalledRuntimeBackend)
@@ -745,6 +871,7 @@ mod tests {
             .expect("installed backend should run clean reference trace fixture directory");
     }
 
+    #[cfg(feature = "legacy-tools")]
     #[test]
     fn installed_backend_runs_clean_fidelity_scenario_input_writer() {
         let path = unique_temp_dir("defender-clean-runtime-scenario-inputs");
@@ -756,6 +883,17 @@ mod tests {
 
         assert!(path.join("attract_boot.inputs.txt").is_file());
         let _ = fs::remove_dir_all(path);
+    }
+
+    #[cfg(not(feature = "legacy-tools"))]
+    #[test]
+    fn installed_backend_keeps_legacy_tooling_out_of_default_runtime() {
+        let error = RuntimeHost::with_backend(InstalledRuntimeBackend)
+            .run_rom_report(None)
+            .expect_err("default runtime should not compile legacy ROM tooling");
+
+        assert!(error.to_string().contains("legacy tooling"));
+        assert!(error.to_string().contains("--features legacy-tools"));
     }
 
     #[test]
@@ -785,6 +923,7 @@ mod tests {
         assert!(!text.contains("Kitty graphics"));
     }
 
+    #[cfg(feature = "legacy-tools")]
     fn unique_temp_dir(prefix: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -794,6 +933,7 @@ mod tests {
         std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()))
     }
 
+    #[cfg(feature = "legacy-tools")]
     fn one_frame_idle_trace_text() -> &'static str {
         concat!(
             "frame\tinput_bits\tinput_in0\tinput_in1\tinput_in2\tphase\t",

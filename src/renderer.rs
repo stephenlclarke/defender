@@ -234,6 +234,191 @@ impl SpriteId {
     pub const STAR: Self = Self(6);
     pub const ENEMY_LANDER: Self = Self(7);
     pub const HUMAN: Self = Self(8);
+    pub const ENEMY_MUTANT: Self = Self(9);
+    pub const ENEMY_BAITER: Self = Self(10);
+    pub const ENEMY_BOMBER: Self = Self(11);
+    pub const ENEMY_POD: Self = Self(12);
+    pub const ENEMY_SWARMER: Self = Self(13);
+    pub const ENEMY_BOMB: Self = Self(14);
+    pub const BOMB_EXPLOSION: Self = Self(15);
+    pub const SWARMER_EXPLOSION: Self = Self(16);
+    pub const SCORE_POPUP_250: Self = Self(17);
+    pub const SCORE_POPUP_500: Self = Self(18);
+    pub const PLAYER_LIFE_STOCK: Self = Self(19);
+    pub const SMART_BOMB_STOCK: Self = Self(20);
+    pub const ASTRONAUT_EXPLOSION: Self = Self(21);
+    pub const NULL_OBJECT: Self = Self(22);
+    pub const TERRAIN_EXPLOSION: Self = Self(23);
+    pub const SCORE_DIGIT_0: Self = Self(24);
+    pub const SCORE_DIGIT_1: Self = Self(25);
+    pub const SCORE_DIGIT_2: Self = Self(26);
+    pub const SCORE_DIGIT_3: Self = Self(27);
+    pub const SCORE_DIGIT_4: Self = Self(28);
+    pub const SCORE_DIGIT_5: Self = Self(29);
+    pub const SCORE_DIGIT_6: Self = Self(30);
+    pub const SCORE_DIGIT_7: Self = Self(31);
+    pub const SCORE_DIGIT_8: Self = Self(32);
+    pub const SCORE_DIGIT_9: Self = Self(33);
+    pub const MESSAGE_GLYPH_SPACE: Self = Self(34);
+    pub const MESSAGE_GLYPH_COMMA: Self = Self(35);
+    pub const MESSAGE_GLYPH_PERIOD: Self = Self(36);
+    pub const MESSAGE_GLYPH_COLON: Self = Self(37);
+    pub const MESSAGE_GLYPH_QUESTION: Self = Self(38);
+    pub const MESSAGE_GLYPH_A: Self = Self(39);
+    pub const MESSAGE_GLYPH_B: Self = Self(40);
+    pub const MESSAGE_GLYPH_C: Self = Self(41);
+    pub const MESSAGE_GLYPH_D: Self = Self(42);
+    pub const MESSAGE_GLYPH_E: Self = Self(43);
+    pub const MESSAGE_GLYPH_F: Self = Self(44);
+    pub const MESSAGE_GLYPH_G: Self = Self(45);
+    pub const MESSAGE_GLYPH_H: Self = Self(46);
+    pub const MESSAGE_GLYPH_I: Self = Self(47);
+    pub const MESSAGE_GLYPH_J: Self = Self(48);
+    pub const MESSAGE_GLYPH_K: Self = Self(49);
+    pub const MESSAGE_GLYPH_L: Self = Self(50);
+    pub const MESSAGE_GLYPH_M: Self = Self(51);
+    pub const MESSAGE_GLYPH_N: Self = Self(52);
+    pub const MESSAGE_GLYPH_O: Self = Self(53);
+    pub const MESSAGE_GLYPH_P: Self = Self(54);
+    pub const MESSAGE_GLYPH_Q: Self = Self(55);
+    pub const MESSAGE_GLYPH_R: Self = Self(56);
+    pub const MESSAGE_GLYPH_S: Self = Self(57);
+    pub const MESSAGE_GLYPH_T: Self = Self(58);
+    pub const MESSAGE_GLYPH_U: Self = Self(59);
+    pub const MESSAGE_GLYPH_V: Self = Self(60);
+    pub const MESSAGE_GLYPH_W: Self = Self(61);
+    pub const MESSAGE_GLYPH_X: Self = Self(62);
+    pub const MESSAGE_GLYPH_Y: Self = Self(63);
+    pub const MESSAGE_GLYPH_Z: Self = Self(64);
+    pub const HALL_OF_FAME_UNDERLINE_WORD: Self = Self(65);
+    pub const HALL_OF_FAME_DEFENDER_LOGO: Self = Self(66);
+    pub const ATTRACT_COPYRIGHT_STRIP: Self = Self(67);
+    pub const ATTRACT_WILLIAMS_LOGO: Self = Self(68);
+    pub const TOP_DISPLAY_BORDER_WORD: Self = Self(69);
+    pub const SCANNER_OBJECT_BLIP: Self = Self(70);
+    pub const SCANNER_PLAYER_BLIP: Self = Self(71);
+    pub const PLAYER_EXPLOSION_PIXEL: Self = Self(72);
+    pub const SCORE_DIGITS: [Self; 10] = [
+        Self::SCORE_DIGIT_0,
+        Self::SCORE_DIGIT_1,
+        Self::SCORE_DIGIT_2,
+        Self::SCORE_DIGIT_3,
+        Self::SCORE_DIGIT_4,
+        Self::SCORE_DIGIT_5,
+        Self::SCORE_DIGIT_6,
+        Self::SCORE_DIGIT_7,
+        Self::SCORE_DIGIT_8,
+        Self::SCORE_DIGIT_9,
+    ];
+    pub const MESSAGE_GLYPHS: [Self; 31] = [
+        Self::MESSAGE_GLYPH_SPACE,
+        Self::MESSAGE_GLYPH_COMMA,
+        Self::MESSAGE_GLYPH_PERIOD,
+        Self::MESSAGE_GLYPH_COLON,
+        Self::MESSAGE_GLYPH_QUESTION,
+        Self::MESSAGE_GLYPH_A,
+        Self::MESSAGE_GLYPH_B,
+        Self::MESSAGE_GLYPH_C,
+        Self::MESSAGE_GLYPH_D,
+        Self::MESSAGE_GLYPH_E,
+        Self::MESSAGE_GLYPH_F,
+        Self::MESSAGE_GLYPH_G,
+        Self::MESSAGE_GLYPH_H,
+        Self::MESSAGE_GLYPH_I,
+        Self::MESSAGE_GLYPH_J,
+        Self::MESSAGE_GLYPH_K,
+        Self::MESSAGE_GLYPH_L,
+        Self::MESSAGE_GLYPH_M,
+        Self::MESSAGE_GLYPH_N,
+        Self::MESSAGE_GLYPH_O,
+        Self::MESSAGE_GLYPH_P,
+        Self::MESSAGE_GLYPH_Q,
+        Self::MESSAGE_GLYPH_R,
+        Self::MESSAGE_GLYPH_S,
+        Self::MESSAGE_GLYPH_T,
+        Self::MESSAGE_GLYPH_U,
+        Self::MESSAGE_GLYPH_V,
+        Self::MESSAGE_GLYPH_W,
+        Self::MESSAGE_GLYPH_X,
+        Self::MESSAGE_GLYPH_Y,
+        Self::MESSAGE_GLYPH_Z,
+    ];
+    const MESSAGE_GLYPH_SPECS: [(char, Self, [u32; 2]); 31] = [
+        (' ', Self::MESSAGE_GLYPH_SPACE, [2, 8]),
+        (',', Self::MESSAGE_GLYPH_COMMA, [2, 8]),
+        ('.', Self::MESSAGE_GLYPH_PERIOD, [2, 8]),
+        (':', Self::MESSAGE_GLYPH_COLON, [2, 8]),
+        ('?', Self::MESSAGE_GLYPH_QUESTION, [6, 8]),
+        ('A', Self::MESSAGE_GLYPH_A, [6, 8]),
+        ('B', Self::MESSAGE_GLYPH_B, [6, 8]),
+        ('C', Self::MESSAGE_GLYPH_C, [6, 8]),
+        ('D', Self::MESSAGE_GLYPH_D, [6, 8]),
+        ('E', Self::MESSAGE_GLYPH_E, [6, 8]),
+        ('F', Self::MESSAGE_GLYPH_F, [6, 8]),
+        ('G', Self::MESSAGE_GLYPH_G, [6, 8]),
+        ('H', Self::MESSAGE_GLYPH_H, [6, 8]),
+        ('I', Self::MESSAGE_GLYPH_I, [4, 8]),
+        ('J', Self::MESSAGE_GLYPH_J, [6, 8]),
+        ('K', Self::MESSAGE_GLYPH_K, [6, 8]),
+        ('L', Self::MESSAGE_GLYPH_L, [6, 8]),
+        ('M', Self::MESSAGE_GLYPH_M, [8, 8]),
+        ('N', Self::MESSAGE_GLYPH_N, [6, 8]),
+        ('O', Self::MESSAGE_GLYPH_O, [6, 8]),
+        ('P', Self::MESSAGE_GLYPH_P, [6, 8]),
+        ('Q', Self::MESSAGE_GLYPH_Q, [6, 8]),
+        ('R', Self::MESSAGE_GLYPH_R, [6, 8]),
+        ('S', Self::MESSAGE_GLYPH_S, [6, 8]),
+        ('T', Self::MESSAGE_GLYPH_T, [6, 8]),
+        ('U', Self::MESSAGE_GLYPH_U, [6, 8]),
+        ('V', Self::MESSAGE_GLYPH_V, [6, 8]),
+        ('W', Self::MESSAGE_GLYPH_W, [8, 8]),
+        ('X', Self::MESSAGE_GLYPH_X, [6, 8]),
+        ('Y', Self::MESSAGE_GLYPH_Y, [6, 8]),
+        ('Z', Self::MESSAGE_GLYPH_Z, [6, 8]),
+    ];
+
+    pub fn score_digit(digit: u8) -> Option<Self> {
+        Self::SCORE_DIGITS.get(usize::from(digit)).copied()
+    }
+
+    pub fn message_glyph(character: char) -> Option<Self> {
+        Self::MESSAGE_GLYPH_SPECS
+            .iter()
+            .find(|(glyph_character, _, _)| *glyph_character == character)
+            .map(|(_, sprite, _)| *sprite)
+    }
+
+    pub fn message_glyph_size(character: char) -> Option<[u32; 2]> {
+        Self::MESSAGE_GLYPH_SPECS
+            .iter()
+            .find(|(glyph_character, _, _)| *glyph_character == character)
+            .map(|(_, _, size)| *size)
+    }
+
+    pub fn for_object_picture_label(label: &str) -> Option<Self> {
+        match label {
+            "PLAPIC" | "PLBPIC" => Some(Self::PLAYER_SHIP),
+            "LNDP1" | "LNDP2" | "LNDP3" => Some(Self::ENEMY_LANDER),
+            "ASTP1" | "ASTP2" | "ASTP3" | "ASTP4" => Some(Self::HUMAN),
+            "LASP1" => Some(Self::PLAYER_PROJECTILE),
+            "SCZP1" => Some(Self::ENEMY_MUTANT),
+            "UFOP1" | "UFOP2" | "UFOP3" => Some(Self::ENEMY_BAITER),
+            "TIEP1" | "TIEP2" | "TIEP3" | "TIEP4" => Some(Self::ENEMY_BOMBER),
+            "PRBP1" => Some(Self::ENEMY_POD),
+            "SWPIC1" => Some(Self::ENEMY_SWARMER),
+            "BMBP1" | "BMBP2" => Some(Self::ENEMY_BOMB),
+            "BXPIC" => Some(Self::BOMB_EXPLOSION),
+            "SWXP1" => Some(Self::SWARMER_EXPLOSION),
+            "C25P1" => Some(Self::SCORE_POPUP_250),
+            "C5P1" => Some(Self::SCORE_POPUP_500),
+            "PLAMIN" => Some(Self::PLAYER_LIFE_STOCK),
+            "SBPIC" => Some(Self::SMART_BOMB_STOCK),
+            "ASXP1" => Some(Self::ASTRONAUT_EXPLOSION),
+            "NULOB" => Some(Self::NULL_OBJECT),
+            "TEREX" => Some(Self::TERRAIN_EXPLOSION),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -384,6 +569,243 @@ impl RenderScene {
     }
 }
 
+pub fn source_message_text(label: &str) -> Option<&'static str> {
+    SOURCE_MESSAGES_TSV.lines().skip(1).find_map(|line| {
+        if line.trim().is_empty() {
+            return None;
+        }
+        let mut fields = line.split('\t');
+        let row_label = fields.next()?;
+        let _vector_address = fields.next()?;
+        let words = fields.next()?;
+        if row_label == label {
+            Some(words)
+        } else {
+            None
+        }
+    })
+}
+
+pub fn source_screen_position(screen_address: u16) -> [f32; 2] {
+    let [column, row] = screen_address.to_be_bytes();
+    [
+        f32::from(column) * SOURCE_SCREEN_COLUMN_PIXELS,
+        f32::from(row),
+    ]
+}
+
+pub fn source_screen_position_with_offset(
+    top_left_screen_address: u16,
+    horizontal: u8,
+    vertical: u8,
+) -> [f32; 2] {
+    let [column, row] = top_left_screen_address.to_be_bytes();
+    source_screen_position(u16::from_be_bytes([
+        column.wrapping_add(horizontal),
+        row.wrapping_add(vertical),
+    ]))
+}
+
+pub fn push_source_message_sprites(
+    scene: &mut RenderScene,
+    text: &str,
+    origin: [f32; 2],
+    layer: RenderLayer,
+) {
+    let mut cursor_x = origin[0];
+    for character in text.chars() {
+        let Some(size) = SpriteId::message_glyph_size(character) else {
+            continue;
+        };
+        if character != ' '
+            && let Some(sprite) = SpriteId::message_glyph(character)
+        {
+            scene.push_sprite(SceneSprite {
+                sprite,
+                layer,
+                position: [cursor_x, origin[1]],
+                size: [size[0] as f32, size[1] as f32],
+                tint: Color::WHITE,
+            });
+        }
+        cursor_x += size[0] as f32 + SOURCE_SCREEN_COLUMN_PIXELS;
+    }
+}
+
+pub fn push_source_text_bytes_sprites(
+    scene: &mut RenderScene,
+    bytes: &[u8],
+    origin: [f32; 2],
+    layer: RenderLayer,
+) {
+    let mut cursor_x = origin[0];
+    for byte in bytes {
+        let Some((sprite, size)) = source_text_byte_sprite(*byte) else {
+            continue;
+        };
+        if let Some(sprite) = sprite {
+            scene.push_sprite(SceneSprite {
+                sprite,
+                layer,
+                position: [cursor_x, origin[1]],
+                size: [size[0] as f32, size[1] as f32],
+                tint: Color::WHITE,
+            });
+        }
+        cursor_x += size[0] as f32 + SOURCE_SCREEN_COLUMN_PIXELS;
+    }
+}
+
+pub fn push_source_controlled_message_sprites(
+    scene: &mut RenderScene,
+    text: &str,
+    top_left_screen_address: u16,
+    layer: RenderLayer,
+) {
+    let mut layout = SourceMessageTextLayout {
+        top_left: top_left_screen_address,
+        cursor: top_left_screen_address,
+        line_spacing: SOURCE_MESSAGE_LINE_SPACING,
+    };
+
+    for word in text.split_whitespace() {
+        if let Some(control) = source_message_control(word) {
+            layout.apply(control);
+            continue;
+        }
+        if source_message_control_body(word).is_some() {
+            continue;
+        }
+
+        let bytes = word.as_bytes();
+        push_source_text_bytes_sprites(scene, bytes, source_screen_position(layout.cursor), layer);
+        layout.cursor = source_text_cursor_after_bytes(layout.cursor, bytes);
+        layout.cursor = source_text_cursor_after_bytes(layout.cursor, b" ");
+    }
+}
+
+fn source_text_byte_sprite(byte: u8) -> Option<(Option<SpriteId>, [u32; 2])> {
+    if byte == b' ' {
+        return Some((None, SpriteId::message_glyph_size(' ')?));
+    }
+
+    if byte.is_ascii_digit() {
+        return Some((SpriteId::score_digit(byte - b'0'), SOURCE_SCORE_DIGIT_SIZE));
+    }
+
+    let character = char::from(byte);
+    let size = SpriteId::message_glyph_size(character)?;
+    Some((SpriteId::message_glyph(character), size))
+}
+
+fn source_text_cursor_after_bytes(mut cursor: u16, bytes: &[u8]) -> u16 {
+    for byte in bytes {
+        let Some((_sprite, size)) = source_text_byte_sprite(*byte) else {
+            continue;
+        };
+        cursor = source_text_cursor_advance(cursor, size[0]);
+    }
+    cursor
+}
+
+fn source_text_cursor_advance(cursor: u16, width_pixels: u32) -> u16 {
+    let [column, row] = cursor.to_be_bytes();
+    let width_columns = u8::try_from(width_pixels / u32::from(SOURCE_SCREEN_COLUMN_PIXELS_U8))
+        .expect("source glyph width fits in u8");
+    u16::from_be_bytes([column.wrapping_add(width_columns).wrapping_add(1), row])
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceMessageTextLayout {
+    top_left: u16,
+    cursor: u16,
+    line_spacing: u8,
+}
+
+impl SourceMessageTextLayout {
+    fn apply(&mut self, control: SourceMessageControl) {
+        match control {
+            SourceMessageControl::HorizontalFromTopLeft(delta) => {
+                let [top_x, cursor_y] =
+                    [self.top_left.to_be_bytes()[0], self.cursor.to_be_bytes()[1]];
+                self.cursor = u16::from_be_bytes([top_x.wrapping_add(delta), cursor_y]);
+            }
+            SourceMessageControl::HorizontalFromCursor(delta) => {
+                let [cursor_x, cursor_y] = self.cursor.to_be_bytes();
+                self.cursor = u16::from_be_bytes([cursor_x.wrapping_add(delta), cursor_y]);
+            }
+            SourceMessageControl::VerticalFromTopLeft(delta) => {
+                let [cursor_x, _cursor_y] = self.cursor.to_be_bytes();
+                let top_y = self.top_left.to_be_bytes()[1];
+                self.cursor = u16::from_be_bytes([cursor_x, top_y.wrapping_add(delta)]);
+            }
+            SourceMessageControl::VerticalFromCursor(delta) => {
+                let [cursor_x, cursor_y] = self.cursor.to_be_bytes();
+                self.cursor = u16::from_be_bytes([cursor_x, cursor_y.wrapping_add(delta)]);
+            }
+            SourceMessageControl::ResetTopLeftAndCursor(address) => {
+                self.top_left = address;
+                self.cursor = address;
+            }
+            SourceMessageControl::ReturnLineFeed => {
+                let [top_x, _top_y] = self.top_left.to_be_bytes();
+                let cursor_y = self.cursor.to_be_bytes()[1];
+                self.cursor = u16::from_be_bytes([top_x, cursor_y.wrapping_add(self.line_spacing)]);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SourceMessageControl {
+    HorizontalFromTopLeft(u8),
+    HorizontalFromCursor(u8),
+    VerticalFromTopLeft(u8),
+    VerticalFromCursor(u8),
+    ResetTopLeftAndCursor(u16),
+    ReturnLineFeed,
+}
+
+fn source_message_control(word: &str) -> Option<SourceMessageControl> {
+    let body = source_message_control_body(word)?;
+    let (name, arguments) = body.split_once(':').unwrap_or((body, ""));
+    match name {
+        "HMT" => Some(SourceMessageControl::HorizontalFromTopLeft(
+            source_message_control_byte(arguments)?,
+        )),
+        "HMC" => Some(SourceMessageControl::HorizontalFromCursor(
+            source_message_control_byte(arguments)?,
+        )),
+        "VMT" => Some(SourceMessageControl::VerticalFromTopLeft(
+            source_message_control_byte(arguments)?,
+        )),
+        "VMC" => Some(SourceMessageControl::VerticalFromCursor(
+            source_message_control_byte(arguments)?,
+        )),
+        "RTC" => {
+            let (x, y) = arguments.split_once(',')?;
+            Some(SourceMessageControl::ResetTopLeftAndCursor(
+                u16::from_be_bytes([
+                    source_message_control_byte(x)?,
+                    source_message_control_byte(y)?,
+                ]),
+            ))
+        }
+        "RLF" if arguments.is_empty() => Some(SourceMessageControl::ReturnLineFeed),
+        _ => None,
+    }
+}
+
+fn source_message_control_body(word: &str) -> Option<&str> {
+    word.strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+}
+
+fn source_message_control_byte(value: &str) -> Option<u8> {
+    let hex = value.strip_prefix("0x")?;
+    u8::from_str_radix(hex, 16).ok()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NativeRenderPipeline {
     TemporaryRaster,
@@ -409,6 +831,192 @@ pub struct TextureAtlas {
     pub regions: Vec<AtlasRegion>,
     pixels: Vec<u8>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct EmbeddedSprite {
+    surface: SurfaceSize,
+    pixels: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SpriteAssetSource {
+    origin: [u32; 2],
+    size: [u32; 2],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ObjectPictureGrid {
+    rows: u8,
+    bytes_per_row: u8,
+    bytes: &'static [u8],
+    palette: ObjectPicturePalette,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ObjectPicturePalette {
+    one: [u8; 4],
+    a: [u8; 4],
+    c: [u8; 4],
+    d: [u8; 4],
+    e: [u8; 4],
+    f: [u8; 4],
+}
+
+impl ObjectPicturePalette {
+    const fn white() -> Self {
+        Self {
+            one: WHITE_RGBA,
+            a: WHITE_RGBA,
+            c: WHITE_RGBA,
+            d: WHITE_RGBA,
+            e: WHITE_RGBA,
+            f: WHITE_RGBA,
+        }
+    }
+
+    const fn burst() -> Self {
+        Self {
+            one: WHITE_RGBA,
+            a: WHITE_RGBA,
+            c: YELLOW_RGBA,
+            d: RED_RGBA,
+            e: BLUE_RGBA,
+            f: WHITE_RGBA,
+        }
+    }
+}
+
+const WHITE_RGBA: [u8; 4] = [255, 255, 255, 255];
+const YELLOW_RGBA: [u8; 4] = [255, 188, 0, 255];
+const RED_RGBA: [u8; 4] = [255, 80, 80, 255];
+const BLUE_RGBA: [u8; 4] = [40, 56, 220, 255];
+const GRAY_RGBA: [u8; 4] = [170, 170, 186, 255];
+const TRANSPARENT_RGBA: [u8; 4] = [0, 0, 0, 0];
+const PICTURE_COLOR_TABLE: [u8; 16] = [
+    0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+const PLAYER_SHIP_PNG: &[u8] = include_bytes!("../assets/sprites/ship1.png");
+const PLAYER_PROJECTILE_PNG: &[u8] = include_bytes!("../assets/sprites/player-shot.png");
+const ENEMY_LANDER_PNG: &[u8] = include_bytes!("../assets/sprites/lander1.png");
+const HUMAN_PNG: &[u8] = include_bytes!("../assets/sprites/humanoid1.png");
+const ENEMY_MUTANT_PNG: &[u8] = include_bytes!("../assets/sprites/mutant1.png");
+const ENEMY_BAITER_PNG: &[u8] = include_bytes!("../assets/sprites/baiter1.png");
+const ENEMY_BOMBER_PNG: &[u8] = include_bytes!("../assets/sprites/bomber1.png");
+const ENEMY_POD_PNG: &[u8] = include_bytes!("../assets/sprites/pod1.png");
+const ENEMY_SWARMER_PNG: &[u8] = include_bytes!("../assets/sprites/swarmer1.png");
+const ENEMY_BOMB_PNG: &[u8] = include_bytes!("../assets/sprites/bomb1.png");
+const BOMB_EXPLOSION_PNG: &[u8] = include_bytes!("../assets/sprites/podexpl.png");
+const SWARMER_EXPLOSION_PNG: &[u8] = include_bytes!("../assets/sprites/swarmexpl.png");
+const SCORE_POPUP_250_PNG: &[u8] = include_bytes!("../assets/sprites/score250_1.png");
+const SCORE_POPUP_500_PNG: &[u8] = include_bytes!("../assets/sprites/score500_1.png");
+const PLAYER_LIFE_STOCK_PNG: &[u8] = include_bytes!("../assets/sprites/littleship.png");
+const SMART_BOMB_STOCK_PNG: &[u8] = include_bytes!("../assets/sprites/smartbomb.png");
+const FONT_SHEET_PNG: &[u8] = include_bytes!("../assets/sprites/font-sheet.png");
+const ARCADE_SCORE_DIGITS_TSV: &str = include_str!("../assets/red-label/score-digits.tsv");
+const SOURCE_MESSAGE_GLYPHS_TSV: &str = include_str!("../assets/red-label/message-glyphs.tsv");
+const SOURCE_MESSAGES_TSV: &str = include_str!("../assets/red-label/messages.tsv");
+const SOURCE_SCORE_DIGIT_SIZE: [u32; 2] = [6, 8];
+const MESSAGE_GLYPH_ATLAS_START: [u32; 2] = [0, 104];
+const MESSAGE_GLYPH_ATLAS_ROW_STEP: u32 = 16;
+const MESSAGE_GLYPH_ATLAS_GAP: u32 = 2;
+const SOURCE_SCREEN_COLUMN_PIXELS_U8: u8 = 2;
+const SOURCE_SCREEN_COLUMN_PIXELS: f32 = SOURCE_SCREEN_COLUMN_PIXELS_U8 as f32;
+const SOURCE_MESSAGE_LINE_SPACING: u8 = 0x0A;
+const ASTRONAUT_EXPLOSION_BYTES: [u8; 32] = [
+    0x00, 0x00, 0x0D, 0x6C, 0x6C, 0x0D, 0x00, 0x00, 0x06, 0xE6, 0xC8, 0x83, 0x82, 0xC8, 0xEC, 0x06,
+    0x60, 0x6D, 0x8C, 0x28, 0x28, 0x8C, 0x6D, 0x60, 0x00, 0x00, 0xE0, 0xC6, 0xC6, 0xE0, 0x00, 0x00,
+];
+const NULL_OBJECT_BYTES: [u8; 1] = [0x00];
+const TERRAIN_EXPLOSION_BYTES: [u8; 48] = [
+    0x1C, 0x0D, 0x7F, 0xE7, 0x70, 0x00, 0x0F, 0x71, 0x71, 0x07, 0xDC, 0x77, 0x7C, 0x0D, 0x71, 0xC7,
+    0x77, 0xDE, 0x07, 0x71, 0x17, 0x17, 0xDE, 0xF7, 0x71, 0x17, 0x71, 0x7C, 0xDE, 0xF0, 0x07, 0x77,
+    0xC7, 0x71, 0x17, 0x70, 0x70, 0x7C, 0xD7, 0x77, 0x77, 0x70, 0x01, 0xCD, 0xFF, 0xD7, 0x70, 0xF0,
+];
+const ASTRONAUT_EXPLOSION_GRID: ObjectPictureGrid = ObjectPictureGrid {
+    rows: 4,
+    bytes_per_row: 8,
+    bytes: &ASTRONAUT_EXPLOSION_BYTES,
+    palette: ObjectPicturePalette::burst(),
+};
+const NULL_OBJECT_GRID: ObjectPictureGrid = ObjectPictureGrid {
+    rows: 1,
+    bytes_per_row: 1,
+    bytes: &NULL_OBJECT_BYTES,
+    palette: ObjectPicturePalette::white(),
+};
+const TERRAIN_EXPLOSION_GRID: ObjectPictureGrid = ObjectPictureGrid {
+    rows: 8,
+    bytes_per_row: 6,
+    bytes: &TERRAIN_EXPLOSION_BYTES,
+    palette: ObjectPicturePalette::burst(),
+};
+const SOURCE_DEFENDER_LOGO_COLUMNS: u8 = 0x3C;
+const SOURCE_DEFENDER_LOGO_ROWS: u8 = 0x18;
+const SOURCE_DEFENDER_LOGO_BYTES: usize =
+    SOURCE_DEFENDER_LOGO_COLUMNS as usize * SOURCE_DEFENDER_LOGO_ROWS as usize;
+const SOURCE_ATTRACT_COPYRIGHT_COLUMNS: u8 = 40;
+const SOURCE_ATTRACT_COPYRIGHT_ROWS: u8 = 8;
+const SOURCE_ATTRACT_COPYRIGHT_BYTES: [u8; 80] = [
+    0x3E, 0x41, 0x41, 0x22, 0x00, 0x3E, 0x41, 0x41, 0x3E, 0x00, 0x7F, 0x09, 0x09, 0x06, 0x00, 0x03,
+    0x04, 0x78, 0x04, 0x03, 0x00, 0x7F, 0x09, 0x19, 0x66, 0x00, 0x41, 0x7F, 0x41, 0x00, 0x3E, 0x41,
+    0x49, 0x3A, 0x00, 0x7F, 0x08, 0x08, 0x7F, 0x00, 0x01, 0x01, 0x7F, 0x01, 0x01, 0x00, 0x1C, 0x22,
+    0x5D, 0x63, 0x55, 0x22, 0x1C, 0x22, 0x7F, 0x4B, 0x45, 0x22, 0x1C, 0x00, 0x00, 0x00, 0x42, 0x7F,
+    0x40, 0x00, 0x26, 0x49, 0x49, 0x3E, 0x00, 0x36, 0x49, 0x49, 0x36, 0x00, 0x3E, 0x41, 0x41, 0x3E,
+];
+const SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS: u8 = 46;
+const SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS: u8 = 19;
+const SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_COLUMN: u8 = 0x36;
+const SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_ROW: u8 = 0x3C;
+const SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE: [u8; 351] = [
+    0xFE, 0x74, 0x40, 0x11, 0x11, 0x85, 0x81, 0x81, 0x81, 0x88, 0x82, 0x82, 0x22, 0x24, 0x22, 0x42,
+    0x24, 0x24, 0x24, 0x44, 0x24, 0x44, 0x49, 0x44, 0x94, 0x41, 0x88, 0x14, 0x41, 0x88, 0x14, 0x41,
+    0x88, 0x94, 0x41, 0x88, 0x94, 0x49, 0x88, 0x14, 0x98, 0x58, 0x94, 0x98, 0x18, 0x94, 0x46, 0x66,
+    0x62, 0x42, 0x42, 0x42, 0x42, 0x25, 0x24, 0x24, 0x68, 0x24, 0x24, 0x24, 0x26, 0x11, 0x18, 0x18,
+    0x58, 0x18, 0x58, 0x81, 0x44, 0x98, 0x81, 0x44, 0x98, 0x81, 0x44, 0x98, 0x14, 0x94, 0x94, 0x16,
+    0x22, 0x24, 0x24, 0xA4, 0x24, 0xA4, 0x24, 0x24, 0x24, 0x24, 0x24, 0xFE, 0x81, 0x4A, 0x42, 0x42,
+    0x42, 0x42, 0x44, 0x99, 0x99, 0x41, 0x88, 0x14, 0x41, 0x88, 0x14, 0x46, 0x24, 0x24, 0x24, 0x24,
+    0x24, 0x24, 0xA4, 0x24, 0x24, 0xA4, 0x22, 0x42, 0x4A, 0x42, 0x42, 0x44, 0x99, 0x19, 0x91, 0x19,
+    0x91, 0x91, 0x81, 0x81, 0x41, 0x81, 0x49, 0x46, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x24, 0x22,
+    0x42, 0x62, 0x62, 0x42, 0x24, 0x49, 0x19, 0x91, 0x91, 0x91, 0x91, 0x91, 0x85, 0x88, 0x14, 0x94,
+    0x14, 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0xA4, 0x24, 0x24, 0x41, 0x81, 0x81, 0x18, 0x18, 0x94,
+    0x41, 0x88, 0x14, 0x14, 0x24, 0x42, 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0x44, 0x98, 0x18,
+    0x18, 0x18, 0x58, 0x89, 0x44, 0x18, 0x85, 0x14, 0x24, 0x14, 0x24, 0xA4, 0x24, 0x24, 0x24, 0xA4,
+    0x24, 0x28, 0x24, 0x44, 0x18, 0x19, 0x19, 0x81, 0x41, 0x81, 0x14, 0x24, 0x24, 0x24, 0x24, 0x22,
+    0x42, 0x42, 0x64, 0x41, 0x85, 0x81, 0x81, 0x18, 0x19, 0x41, 0x89, 0x44, 0x42, 0x22, 0x42, 0x24,
+    0x24, 0x24, 0x24, 0x24, 0x44, 0x18, 0x14, 0x98, 0x11, 0x81, 0x81, 0x41, 0x89, 0x44, 0x42, 0x22,
+    0x42, 0x24, 0x24, 0x24, 0x24, 0x24, 0x44, 0x18, 0x94, 0x41, 0x88, 0x89, 0x44, 0x49, 0x88, 0x14,
+    0x41, 0x88, 0x14, 0x14, 0x24, 0x24, 0x24, 0x26, 0x62, 0x66, 0x26, 0x24, 0x18, 0x91, 0x91, 0x19,
+    0x18, 0x14, 0x18, 0x14, 0x14, 0x24, 0x14, 0x2A, 0x45, 0x24, 0x68, 0x88, 0x24, 0x44, 0x42, 0x18,
+    0xA8, 0x82, 0x44, 0xA8, 0x22, 0x20, 0xFE, 0x87, 0x40, 0x44, 0x11, 0x88, 0x24, 0xFE, 0x9A, 0x3F,
+    0x44, 0x11, 0x88, 0x24, 0xFE, 0xC1, 0x3F, 0x44, 0x44, 0x44, 0x11, 0x11, 0x11, 0x11, 0x88, 0x88,
+    0x88, 0x22, 0x22, 0x22, 0x20, 0xFE, 0xC3, 0x45, 0x22, 0x22, 0x44, 0x11, 0x81, 0x50, 0xFD,
+];
+const SOURCE_DEFENDER_LOGO_COMPRESSED: [u8; 366] = [
+    0x10, 0xD1, 0xBD, 0x29, 0xC2, 0x9C, 0x29, 0xCB, 0xEA, 0xC2, 0x8C, 0x29, 0xC2, 0x81, 0x0D, 0x10,
+    0xC2, 0x8D, 0x29, 0xC2, 0x9C, 0x29, 0xCB, 0xEA, 0x42, 0x94, 0x29, 0x42, 0x81, 0x0C, 0x3F, 0x29,
+    0xC2, 0x94, 0xC2, 0x9C, 0x29, 0xC1, 0x8D, 0xA4, 0x29, 0x42, 0x94, 0x29, 0x3F, 0x3E, 0x29, 0x42,
+    0xA4, 0x29, 0x4C, 0x29, 0xC1, 0x8D, 0xA4, 0x2A, 0x42, 0x94, 0x29, 0x3E, 0x3D, 0xB6, 0xB4, 0xA2,
+    0x4A, 0x17, 0xCA, 0x16, 0xC1, 0x9C, 0xB4, 0xA7, 0xA4, 0xB1, 0x7A, 0x7A, 0x3D, 0x3C, 0xB6, 0xB4,
+    0xB1, 0x71, 0x81, 0x6B, 0x16, 0xC1, 0xAC, 0xA4, 0xB6, 0xB4, 0xA2, 0x4A, 0x6B, 0x3C, 0x2F, 0xB6,
+    0xB4, 0x29, 0x62, 0x85, 0xC2, 0x85, 0xC1, 0xAC, 0xA4, 0xB6, 0xB4, 0x28, 0x62, 0xA2, 0xF2, 0xEB,
+    0x61, 0x84, 0x29, 0x62, 0x8E, 0x28, 0xE2, 0xA4, 0xB7, 0xB4, 0x28, 0x62, 0xA2, 0xE2, 0xDB, 0x7B,
+    0x42, 0x96, 0x28, 0x4E, 0x28, 0xE2, 0xB4, 0xB6, 0xB4, 0x29, 0x62, 0x92, 0xE2, 0xCB, 0x7B, 0x52,
+    0x96, 0x28, 0x4E, 0x28, 0xEB, 0x41, 0xA4, 0xB7, 0xB4, 0x28, 0x62, 0x92, 0xE1, 0xFB, 0x7B, 0x5B,
+    0x24, 0xB1, 0x6D, 0x18, 0x14, 0xEB, 0x51, 0x94, 0xB7, 0xB4, 0x18, 0x17, 0x29, 0x2D, 0x1E, 0xB1,
+    0x4B, 0x4B, 0x25, 0xB1, 0x6D, 0xB1, 0x5E, 0xB5, 0x1A, 0x4B, 0x61, 0x84, 0xB2, 0x4B, 0x41, 0x82,
+    0xC1, 0xDB, 0x14, 0xB5, 0x18, 0x17, 0x18, 0x16, 0xD1, 0x81, 0x4E, 0xB6, 0x19, 0x4B, 0x61, 0x84,
+    0x18, 0x24, 0xB4, 0x18, 0x1F, 0x1C, 0x38, 0x53, 0x84, 0xB1, 0x6E, 0x2B, 0xCB, 0x61, 0x94, 0x38,
+    0x42, 0xB4, 0x18, 0x41, 0x81, 0xEF, 0x39, 0x43, 0x85, 0xB1, 0x6E, 0x2B, 0xCB, 0x71, 0x84, 0x38,
+    0x43, 0x84, 0xB6, 0x18, 0x1C, 0xE3, 0x95, 0x38, 0x41, 0x81, 0x6D, 0x38, 0xCB, 0xC6, 0x19, 0x42,
+    0xB5, 0x38, 0x4B, 0x61, 0x8F, 0xD3, 0x95, 0x38, 0x5B, 0x51, 0xF3, 0x8C, 0xBD, 0x61, 0x84, 0x2A,
+    0x63, 0x85, 0xB6, 0x18, 0xED, 0x38, 0x53, 0x94, 0x18, 0x51, 0xF3, 0x8C, 0xBD, 0x7B, 0x42, 0x91,
+    0x42, 0xB5, 0x18, 0x7B, 0xDC, 0x21, 0x51, 0xF3, 0x4C, 0x7E, 0x30, 0x6C, 0xC2, 0x14, 0x2C, 0x34,
+    0xC7, 0xE1, 0x07, 0xC1, 0x35, 0xCC, 0x21, 0x42, 0xC3, 0x4C, 0x7F, 0x10, 0x6C, 0x13, 0x5C, 0xC1,
+    0x35, 0xC1, 0x52, 0xC3, 0x4C, 0x7F, 0x15, 0xC2, 0x7D, 0x34, 0xC1, 0x5C, 0x17, 0xCC, 0x36, 0xC3,
+    0x5C, 0x14, 0x2D, 0x34, 0xC7, 0x1C, 0x14, 0xC2, 0x6E, 0x34, 0xD1, 0x4E, 0x15, 0xCC, 0x36, 0xC3,
+    0x5C, 0x14, 0x2D, 0x34, 0xC7, 0x1C, 0x14, 0xC2, 0x51, 0xC2, 0x7D, 0x14, 0xF1, 0x4C,
+];
 
 impl TextureAtlas {
     pub fn new(surface: SurfaceSize, regions: Vec<AtlasRegion>) -> Self {
@@ -443,8 +1051,8 @@ impl TextureAtlas {
     }
 
     pub fn default_sprites() -> Self {
-        let surface = SurfaceSize::new(128, 128);
-        let regions = vec![
+        let surface = SurfaceSize::new(128, 192);
+        let mut regions = vec![
             AtlasRegion {
                 sprite: SpriteId::PLAYER_SHIP,
                 origin: [0, 0],
@@ -485,7 +1093,173 @@ impl TextureAtlas {
                 origin: [40, 64],
                 size: [6, 8],
             },
+            AtlasRegion {
+                sprite: SpriteId::ENEMY_MUTANT,
+                origin: [56, 64],
+                size: [12, 10],
+            },
+            AtlasRegion {
+                sprite: SpriteId::ENEMY_BAITER,
+                origin: [72, 64],
+                size: [14, 6],
+            },
+            AtlasRegion {
+                sprite: SpriteId::ENEMY_BOMBER,
+                origin: [88, 64],
+                size: [8, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::ENEMY_POD,
+                origin: [104, 64],
+                size: [8, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::ENEMY_SWARMER,
+                origin: [116, 64],
+                size: [6, 6],
+            },
+            AtlasRegion {
+                sprite: SpriteId::ENEMY_BOMB,
+                origin: [0, 80],
+                size: [4, 6],
+            },
+            AtlasRegion {
+                sprite: SpriteId::BOMB_EXPLOSION,
+                origin: [8, 80],
+                size: [10, 10],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SWARMER_EXPLOSION,
+                origin: [24, 80],
+                size: [10, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_POPUP_250,
+                origin: [40, 80],
+                size: [12, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_POPUP_500,
+                origin: [56, 80],
+                size: [12, 6],
+            },
+            AtlasRegion {
+                sprite: SpriteId::PLAYER_LIFE_STOCK,
+                origin: [72, 80],
+                size: [12, 6],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SMART_BOMB_STOCK,
+                origin: [88, 80],
+                size: [8, 6],
+            },
+            AtlasRegion {
+                sprite: SpriteId::ASTRONAUT_EXPLOSION,
+                origin: [0, 96],
+                size: [16, 4],
+            },
+            AtlasRegion {
+                sprite: SpriteId::NULL_OBJECT,
+                origin: [20, 96],
+                size: [2, 1],
+            },
+            AtlasRegion {
+                sprite: SpriteId::TERRAIN_EXPLOSION,
+                origin: [24, 96],
+                size: [12, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_0,
+                origin: [0, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_1,
+                origin: [8, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_2,
+                origin: [16, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_3,
+                origin: [24, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_4,
+                origin: [32, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_5,
+                origin: [40, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_6,
+                origin: [48, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_7,
+                origin: [56, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_8,
+                origin: [64, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCORE_DIGIT_9,
+                origin: [72, 112],
+                size: [6, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::HALL_OF_FAME_UNDERLINE_WORD,
+                origin: [80, 112],
+                size: [2, 2],
+            },
+            AtlasRegion {
+                sprite: SpriteId::HALL_OF_FAME_DEFENDER_LOGO,
+                origin: [0, 128],
+                size: [120, 24],
+            },
+            AtlasRegion {
+                sprite: SpriteId::ATTRACT_COPYRIGHT_STRIP,
+                origin: [0, 152],
+                size: [80, 8],
+            },
+            AtlasRegion {
+                sprite: SpriteId::ATTRACT_WILLIAMS_LOGO,
+                origin: [0, 160],
+                size: [92, 19],
+            },
+            AtlasRegion {
+                sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
+                origin: [96, 160],
+                size: [2, 2],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCANNER_OBJECT_BLIP,
+                origin: [100, 160],
+                size: [2, 2],
+            },
+            AtlasRegion {
+                sprite: SpriteId::SCANNER_PLAYER_BLIP,
+                origin: [104, 160],
+                size: [3, 2],
+            },
+            AtlasRegion {
+                sprite: SpriteId::PLAYER_EXPLOSION_PIXEL,
+                origin: [108, 160],
+                size: [4, 2],
+            },
         ];
+        regions.extend(message_glyph_atlas_regions(surface));
         let pixels = default_sprite_atlas_pixels(surface, &regions);
 
         Self {
@@ -521,49 +1295,956 @@ fn transparent_rgba_pixels(surface: SurfaceSize) -> Option<Vec<u8>> {
     surface.rgba_len().map(|len| vec![0; len])
 }
 
+fn message_glyph_atlas_regions(surface: SurfaceSize) -> Vec<AtlasRegion> {
+    let mut regions = Vec::with_capacity(SpriteId::MESSAGE_GLYPHS.len());
+    let mut origin = MESSAGE_GLYPH_ATLAS_START;
+    for (_, sprite, size) in SpriteId::MESSAGE_GLYPH_SPECS {
+        if origin[0] != MESSAGE_GLYPH_ATLAS_START[0] && origin[0] + size[0] > surface.width {
+            origin[0] = MESSAGE_GLYPH_ATLAS_START[0];
+            origin[1] += MESSAGE_GLYPH_ATLAS_ROW_STEP;
+        }
+        assert!(
+            origin[0] + size[0] <= surface.width && origin[1] + size[1] <= surface.height,
+            "message glyph atlas regions must fit in the default atlas"
+        );
+        regions.push(AtlasRegion {
+            sprite,
+            origin,
+            size,
+        });
+        origin[0] += size[0] + MESSAGE_GLYPH_ATLAS_GAP;
+    }
+    regions
+}
+
 fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) -> Vec<u8> {
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
-    for region in regions {
-        fill_atlas_region(
+
+    let player_ship = decode_embedded_png_rgba("ship1.png", PLAYER_SHIP_PNG);
+    let player_projectile = decode_embedded_png_rgba("player-shot.png", PLAYER_PROJECTILE_PNG);
+    let enemy_lander = decode_embedded_png_rgba("lander1.png", ENEMY_LANDER_PNG);
+    let human = decode_embedded_png_rgba("humanoid1.png", HUMAN_PNG);
+    let enemy_mutant = decode_embedded_png_rgba("mutant1.png", ENEMY_MUTANT_PNG);
+    let enemy_baiter = decode_embedded_png_rgba("baiter1.png", ENEMY_BAITER_PNG);
+    let enemy_bomber = decode_embedded_png_rgba("bomber1.png", ENEMY_BOMBER_PNG);
+    let enemy_pod = decode_embedded_png_rgba("pod1.png", ENEMY_POD_PNG);
+    let enemy_swarmer = decode_embedded_png_rgba("swarmer1.png", ENEMY_SWARMER_PNG);
+    let enemy_bomb = decode_embedded_png_rgba("bomb1.png", ENEMY_BOMB_PNG);
+    let bomb_explosion = decode_embedded_png_rgba("podexpl.png", BOMB_EXPLOSION_PNG);
+    let swarmer_explosion = decode_embedded_png_rgba("swarmexpl.png", SWARMER_EXPLOSION_PNG);
+    let score_popup_250 = decode_embedded_png_rgba("score250_1.png", SCORE_POPUP_250_PNG);
+    let score_popup_500 = decode_embedded_png_rgba("score500_1.png", SCORE_POPUP_500_PNG);
+    let player_life_stock = decode_embedded_png_rgba("littleship.png", PLAYER_LIFE_STOCK_PNG);
+    let smart_bomb_stock = decode_embedded_png_rgba("smartbomb.png", SMART_BOMB_STOCK_PNG);
+    let astronaut_explosion = decode_picture_grid_rgba("ASXP1", ASTRONAUT_EXPLOSION_GRID);
+    let null_object = decode_picture_grid_rgba("NULOB", NULL_OBJECT_GRID);
+    let terrain_explosion = decode_picture_grid_rgba("TEREX", TERRAIN_EXPLOSION_GRID);
+    let score_digits = decode_score_digit_sprites("score-digits.tsv", ARCADE_SCORE_DIGITS_TSV);
+    let message_glyphs =
+        decode_message_glyph_sprites("message-glyphs.tsv", SOURCE_MESSAGE_GLYPHS_TSV);
+    let hall_of_fame_logo = decode_source_defender_logo_rgba();
+    let attract_copyright_strip = decode_source_attract_copyright_strip_rgba();
+    let attract_williams_logo = decode_source_attract_williams_logo_rgba();
+    let font_sheet = decode_embedded_png_rgba("font-sheet.png", FONT_SHEET_PNG);
+
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::PLAYER_SHIP,
+        &player_ship,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::PLAYER_PROJECTILE,
+        &player_projectile,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ENEMY_LANDER,
+        &enemy_lander,
+    );
+    blit_default_region(&mut pixels, surface, regions, SpriteId::HUMAN, &human);
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ENEMY_MUTANT,
+        &enemy_mutant,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ENEMY_BAITER,
+        &enemy_baiter,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ENEMY_BOMBER,
+        &enemy_bomber,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ENEMY_POD,
+        &enemy_pod,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ENEMY_SWARMER,
+        &enemy_swarmer,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ENEMY_BOMB,
+        &enemy_bomb,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::BOMB_EXPLOSION,
+        &bomb_explosion,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::SWARMER_EXPLOSION,
+        &swarmer_explosion,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::SCORE_POPUP_250,
+        &score_popup_250,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::SCORE_POPUP_500,
+        &score_popup_500,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::PLAYER_LIFE_STOCK,
+        &player_life_stock,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::SMART_BOMB_STOCK,
+        &smart_bomb_stock,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ASTRONAUT_EXPLOSION,
+        &astronaut_explosion,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::NULL_OBJECT,
+        &null_object,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::TERRAIN_EXPLOSION,
+        &terrain_explosion,
+    );
+    for (digit, sprite) in score_digits.iter().enumerate() {
+        blit_default_region(
             &mut pixels,
             surface,
-            *region,
-            default_sprite_region_color(region.sprite),
+            regions,
+            SpriteId::score_digit(u8::try_from(digit).expect("score digit index fits"))
+                .expect("score digit sprite"),
+            sprite,
         );
     }
+    fill_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::HALL_OF_FAME_UNDERLINE_WORD,
+        WHITE_RGBA,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::HALL_OF_FAME_DEFENDER_LOGO,
+        &hall_of_fame_logo,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ATTRACT_COPYRIGHT_STRIP,
+        &attract_copyright_strip,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ATTRACT_WILLIAMS_LOGO,
+        &attract_williams_logo,
+    );
+    fill_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::TOP_DISPLAY_BORDER_WORD,
+        WHITE_RGBA,
+    );
+    fill_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::SCANNER_OBJECT_BLIP,
+        WHITE_RGBA,
+    );
+    fill_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::SCANNER_PLAYER_BLIP,
+        WHITE_RGBA,
+    );
+    fill_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::PLAYER_EXPLOSION_PIXEL,
+        WHITE_RGBA,
+    );
+    for (character, sprite) in &message_glyphs {
+        if let Some(sprite_id) = SpriteId::message_glyph(*character) {
+            blit_default_region(&mut pixels, surface, regions, sprite_id, sprite);
+        }
+    }
+    blit_default_region_from_source(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::SCORE_TEXT,
+        &font_sheet,
+        SpriteAssetSource {
+            origin: [0, 0],
+            size: [64, 8],
+        },
+    );
+    blit_default_region_from_source(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::STATUS_TEXT,
+        &font_sheet,
+        SpriteAssetSource {
+            origin: [0, 8],
+            size: [64, 8],
+        },
+    );
+    blit_default_region_from_source(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::TERRAIN_TILE,
+        &font_sheet,
+        SpriteAssetSource {
+            origin: [0, 16],
+            size: [8, 8],
+        },
+    );
+    blit_star_region(&mut pixels, surface, regions, &font_sheet);
+
     pixels
 }
 
-fn default_sprite_region_color(sprite: SpriteId) -> [u8; 4] {
-    match sprite {
-        SpriteId::PLAYER_SHIP => [0xFF, 0xFF, 0xFF, 0xFF],
-        SpriteId::SCORE_TEXT => [0xFF, 0xFF, 0xFF, 0xFF],
-        SpriteId::STATUS_TEXT => [0x26, 0xAE, 0x00, 0xFF],
-        SpriteId::PLAYER_PROJECTILE => [0xFF, 0xF8, 0x80, 0xFF],
-        SpriteId::TERRAIN_TILE => [0x26, 0xAE, 0x00, 0xFF],
-        SpriteId::STAR => [0xFF, 0xFF, 0xFF, 0xFF],
-        SpriteId::ENEMY_LANDER => [0xF4, 0x5B, 0x5B, 0xFF],
-        SpriteId::HUMAN => [0x7C, 0xD7, 0xFF, 0xFF],
-        _ => [0xD9, 0x51, 0xFF, 0xFF],
+fn decode_embedded_png_rgba(name: &'static str, bytes: &[u8]) -> EmbeddedSprite {
+    let decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+    let mut reader = decoder
+        .read_info()
+        .unwrap_or_else(|error| panic!("embedded sprite asset {name} must decode: {error}"));
+    let mut pixels = vec![
+        0;
+        reader.output_buffer_size().unwrap_or_else(|| panic!(
+            "embedded sprite asset {name} output buffer must fit"
+        ))
+    ];
+    let info = reader.next_frame(&mut pixels).unwrap_or_else(|error| {
+        panic!("embedded sprite asset {name} must contain a frame: {error}")
+    });
+
+    if info.color_type != png::ColorType::Rgba || info.bit_depth != png::BitDepth::Eight {
+        panic!(
+            "embedded sprite asset {name} must be 8-bit RGBA, got {:?} {:?}",
+            info.color_type, info.bit_depth
+        );
+    }
+
+    pixels.truncate(info.buffer_size());
+    EmbeddedSprite {
+        surface: SurfaceSize::new(info.width, info.height),
+        pixels,
     }
 }
 
-fn fill_atlas_region(pixels: &mut [u8], surface: SurfaceSize, region: AtlasRegion, color: [u8; 4]) {
-    let max_x = region.origin[0]
-        .saturating_add(region.size[0])
-        .min(surface.width);
-    let max_y = region.origin[1]
-        .saturating_add(region.size[1])
-        .min(surface.height);
-    for y in region.origin[1]..max_y {
-        for x in region.origin[0]..max_x {
-            let start = ((y as usize * surface.width as usize) + x as usize) * 4;
-            let end = start + 4;
-            if end <= pixels.len() {
-                pixels[start..end].copy_from_slice(&color);
+fn decode_picture_grid_rgba(name: &'static str, grid: ObjectPictureGrid) -> EmbeddedSprite {
+    let expected = usize::from(grid.rows) * usize::from(grid.bytes_per_row);
+    assert_eq!(
+        grid.bytes.len(),
+        expected,
+        "object picture {name} byte grid must match its declared dimensions"
+    );
+    let surface = SurfaceSize::new(u32::from(grid.bytes_per_row) * 2, u32::from(grid.rows));
+    let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
+
+    for row in 0..usize::from(grid.rows) {
+        for byte_index in 0..usize::from(grid.bytes_per_row) {
+            let value = grid.bytes[row * usize::from(grid.bytes_per_row) + byte_index];
+            let left = picture_palette_color(value >> 4, grid.palette);
+            let right = picture_palette_color(value & 0x0F, grid.palette);
+            let offset = ((row * surface.width as usize) + byte_index * 2) * 4;
+            pixels[offset..offset + 4].copy_from_slice(&left);
+            pixels[offset + 4..offset + 8].copy_from_slice(&right);
+        }
+    }
+
+    EmbeddedSprite { surface, pixels }
+}
+
+fn decode_score_digit_sprites(name: &'static str, tsv: &str) -> Vec<EmbeddedSprite> {
+    let mut rows = Vec::new();
+    for (line_index, line) in tsv.lines().enumerate().skip(1) {
+        if line.trim().is_empty() {
+            continue;
+        }
+        rows.push(decode_score_digit_sprite_row(name, line_index + 1, line));
+    }
+    rows.sort_by_key(|(digit, _)| *digit);
+    assert_eq!(rows.len(), 10, "{name} must define ten score digit sprites");
+    for (expected, (digit, _)) in rows.iter().enumerate() {
+        assert_eq!(
+            usize::from(*digit),
+            expected,
+            "{name} score digit rows must cover 0 through 9 once"
+        );
+    }
+    rows.into_iter().map(|(_, sprite)| sprite).collect()
+}
+
+fn decode_score_digit_sprite_row(
+    name: &'static str,
+    line_index: usize,
+    line: &str,
+) -> (u8, EmbeddedSprite) {
+    let fields = line.split('\t').collect::<Vec<_>>();
+    assert_eq!(
+        fields.len(),
+        7,
+        "{name}:{line_index} score digit row must have seven TSV fields"
+    );
+    let digit = fields[1]
+        .parse::<u8>()
+        .unwrap_or_else(|error| panic!("{name}:{line_index} digit must parse: {error}"));
+    assert!(
+        digit < 10,
+        "{name}:{line_index} digit must be in the range 0..=9"
+    );
+    let bytes_per_row = fields[3]
+        .parse::<u8>()
+        .unwrap_or_else(|error| panic!("{name}:{line_index} width must parse: {error}"));
+    let rows = fields[4]
+        .parse::<u8>()
+        .unwrap_or_else(|error| panic!("{name}:{line_index} height must parse: {error}"));
+    let hex = fields[5].trim();
+    let expected_hex_len = usize::from(bytes_per_row) * usize::from(rows) * 2;
+    assert_eq!(
+        hex.len(),
+        expected_hex_len,
+        "{name}:{line_index} digit byte string must match the declared dimensions"
+    );
+    let mut bytes = Vec::with_capacity(expected_hex_len / 2);
+    for pair in hex.as_bytes().chunks_exact(2) {
+        let pair = std::str::from_utf8(pair)
+            .unwrap_or_else(|error| panic!("{name}:{line_index} hex pair must parse: {error}"));
+        bytes
+            .push(u8::from_str_radix(pair, 16).unwrap_or_else(|error| {
+                panic!("{name}:{line_index} hex byte must parse: {error}")
+            }));
+    }
+    (
+        digit,
+        decode_score_digit_rgba(name, digit, rows, bytes_per_row, &bytes),
+    )
+}
+
+fn decode_score_digit_rgba(
+    name: &'static str,
+    digit: u8,
+    rows: u8,
+    bytes_per_row: u8,
+    bytes: &[u8],
+) -> EmbeddedSprite {
+    let expected = usize::from(rows) * usize::from(bytes_per_row);
+    assert_eq!(
+        bytes.len(),
+        expected,
+        "{name} digit {digit} byte grid must match its declared dimensions"
+    );
+    let surface = SurfaceSize::new(u32::from(bytes_per_row) * 2, u32::from(rows));
+    let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
+    let palette = ObjectPicturePalette::white();
+
+    for row in 0..usize::from(rows) {
+        for byte_index in 0..usize::from(bytes_per_row) {
+            let value = bytes[row * usize::from(bytes_per_row) + byte_index];
+            let left = picture_palette_color(value >> 4, palette);
+            let right = picture_palette_color(value & 0x0F, palette);
+            let offset = ((row * surface.width as usize) + byte_index * 2) * 4;
+            pixels[offset..offset + 4].copy_from_slice(&left);
+            pixels[offset + 4..offset + 8].copy_from_slice(&right);
+        }
+    }
+
+    EmbeddedSprite { surface, pixels }
+}
+
+fn decode_message_glyph_sprites(name: &'static str, tsv: &str) -> Vec<(char, EmbeddedSprite)> {
+    let mut rows = Vec::new();
+    for (line_index, line) in tsv.lines().enumerate().skip(1) {
+        if line.trim().is_empty() {
+            continue;
+        }
+        rows.push(decode_message_glyph_sprite_row(name, line_index + 1, line));
+    }
+    assert_eq!(
+        rows.len(),
+        SpriteId::MESSAGE_GLYPHS.len(),
+        "{name} must define the clean renderer message glyph set"
+    );
+    for (character, _) in &rows {
+        assert!(
+            SpriteId::message_glyph(*character).is_some(),
+            "{name} glyph `{character}` must have a clean sprite mapping"
+        );
+    }
+    rows
+}
+
+fn decode_message_glyph_sprite_row(
+    name: &'static str,
+    line_index: usize,
+    line: &str,
+) -> (char, EmbeddedSprite) {
+    let fields = line.split('\t').collect::<Vec<_>>();
+    assert_eq!(
+        fields.len(),
+        7,
+        "{name}:{line_index} message glyph row must have seven TSV fields"
+    );
+    let character = match fields[1] {
+        "SPACE" => ' ',
+        value => {
+            let mut chars = value.chars();
+            let character = chars
+                .next()
+                .unwrap_or_else(|| panic!("{name}:{line_index} glyph character must not be empty"));
+            assert!(
+                chars.next().is_none(),
+                "{name}:{line_index} glyph character must be one character"
+            );
+            character
+        }
+    };
+    let width = fields[3]
+        .parse::<u8>()
+        .unwrap_or_else(|error| panic!("{name}:{line_index} glyph width must parse: {error}"));
+    let height = fields[4]
+        .parse::<u8>()
+        .unwrap_or_else(|error| panic!("{name}:{line_index} glyph height must parse: {error}"));
+    let hex = fields[5].trim();
+    let expected_hex_len = usize::from(width) * usize::from(height) * 2;
+    assert_eq!(
+        hex.len(),
+        expected_hex_len,
+        "{name}:{line_index} glyph byte string must match the declared dimensions"
+    );
+    let mut bytes = Vec::with_capacity(expected_hex_len / 2);
+    for pair in hex.as_bytes().chunks_exact(2) {
+        let pair = std::str::from_utf8(pair)
+            .unwrap_or_else(|error| panic!("{name}:{line_index} hex pair must parse: {error}"));
+        bytes
+            .push(u8::from_str_radix(pair, 16).unwrap_or_else(|error| {
+                panic!("{name}:{line_index} hex byte must parse: {error}")
+            }));
+    }
+    (
+        character,
+        decode_message_glyph_rgba(name, character, width, height, &bytes),
+    )
+}
+
+fn decode_message_glyph_rgba(
+    name: &'static str,
+    character: char,
+    columns: u8,
+    rows: u8,
+    bytes: &[u8],
+) -> EmbeddedSprite {
+    let expected = usize::from(columns) * usize::from(rows);
+    assert_eq!(
+        bytes.len(),
+        expected,
+        "{name} glyph `{character}` byte grid must match its declared dimensions"
+    );
+    let surface = SurfaceSize::new(u32::from(columns) * 2, u32::from(rows));
+    let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
+    let palette = ObjectPicturePalette::white();
+
+    for column in 0..usize::from(columns) {
+        let source_column = column * usize::from(rows);
+        for row in 0..usize::from(rows) {
+            let value = bytes[source_column + row];
+            let left = picture_palette_color(value >> 4, palette);
+            let right = picture_palette_color(value & 0x0F, palette);
+            let offset = ((row * surface.width as usize) + column * 2) * 4;
+            pixels[offset..offset + 4].copy_from_slice(&left);
+            pixels[offset + 4..offset + 8].copy_from_slice(&right);
+        }
+    }
+
+    EmbeddedSprite { surface, pixels }
+}
+
+fn picture_palette_color(index: u8, palette: ObjectPicturePalette) -> [u8; 4] {
+    match index {
+        0x0 => TRANSPARENT_RGBA,
+        0x1 => palette.one,
+        0x2..=0x9 => pseudo_color_rgba(PICTURE_COLOR_TABLE[index as usize]),
+        0xA => palette.a,
+        0xB => GRAY_RGBA,
+        0xC => palette.c,
+        0xD => palette.d,
+        0xE => palette.e,
+        0xF => palette.f,
+        _ => unreachable!(),
+    }
+}
+
+fn decode_source_defender_logo_rgba() -> EmbeddedSprite {
+    let bytes = expand_source_defender_logo_bytes();
+    let surface = SurfaceSize::new(
+        u32::from(SOURCE_DEFENDER_LOGO_COLUMNS) * 2,
+        u32::from(SOURCE_DEFENDER_LOGO_ROWS),
+    );
+    let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
+    let palette = ObjectPicturePalette::white();
+
+    for column in 0..usize::from(SOURCE_DEFENDER_LOGO_COLUMNS) {
+        let source_column = column * usize::from(SOURCE_DEFENDER_LOGO_ROWS);
+        for row in 0..usize::from(SOURCE_DEFENDER_LOGO_ROWS) {
+            let value = bytes[source_column + row];
+            let left = picture_palette_color(value >> 4, palette);
+            let right = picture_palette_color(value & 0x0F, palette);
+            let offset = ((row * surface.width as usize) + column * 2) * 4;
+            pixels[offset..offset + 4].copy_from_slice(&left);
+            pixels[offset + 4..offset + 8].copy_from_slice(&right);
+        }
+    }
+
+    EmbeddedSprite { surface, pixels }
+}
+
+fn decode_source_attract_copyright_strip_rgba() -> EmbeddedSprite {
+    let surface = SurfaceSize::new(
+        u32::from(SOURCE_ATTRACT_COPYRIGHT_COLUMNS) * 2,
+        u32::from(SOURCE_ATTRACT_COPYRIGHT_ROWS),
+    );
+    let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
+
+    for column in 0..usize::from(SOURCE_ATTRACT_COPYRIGHT_COLUMNS) {
+        let left_bits = SOURCE_ATTRACT_COPYRIGHT_BYTES[column * 2];
+        let right_bits = SOURCE_ATTRACT_COPYRIGHT_BYTES[column * 2 + 1];
+        for row in 0..usize::from(SOURCE_ATTRACT_COPYRIGHT_ROWS) {
+            let mask = 1u8 << row;
+            let offset = ((row * surface.width as usize) + column * 2) * 4;
+            if left_bits & mask != 0 {
+                pixels[offset..offset + 4].copy_from_slice(&WHITE_RGBA);
+            }
+            if right_bits & mask != 0 {
+                pixels[offset + 4..offset + 8].copy_from_slice(&WHITE_RGBA);
             }
         }
     }
+
+    EmbeddedSprite { surface, pixels }
+}
+
+fn decode_source_attract_williams_logo_rgba() -> EmbeddedSprite {
+    let surface = SurfaceSize::new(
+        u32::from(SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS) * 2,
+        u32::from(SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS),
+    );
+    let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
+    let mut pointer = 0usize;
+    let mut cursor = 0u16;
+
+    while let Some(opcode) = SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE.get(pointer).copied() {
+        pointer += 1;
+        if opcode > 0xAA {
+            let complemented = !opcode;
+            if complemented == 0 {
+                continue;
+            }
+            if complemented.wrapping_sub(1) != 0 {
+                break;
+            }
+            let Some(cursor_high) = SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE.get(pointer).copied() else {
+                break;
+            };
+            let Some(cursor_low) = SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE.get(pointer + 1).copied()
+            else {
+                break;
+            };
+            pointer += 2;
+            cursor = u16::from_be_bytes([cursor_high, cursor_low]);
+            plot_source_attract_williams_logo_pixel(&mut pixels, surface, cursor);
+        } else {
+            let mut accumulator = opcode;
+            loop {
+                accumulator =
+                    source_attract_williams_logo_horizontal_bit(accumulator, &mut cursor, true);
+                accumulator =
+                    source_attract_williams_logo_horizontal_bit(accumulator, &mut cursor, false);
+                accumulator =
+                    source_attract_williams_logo_vertical_bit(accumulator, &mut cursor, true);
+                accumulator =
+                    source_attract_williams_logo_vertical_bit(accumulator, &mut cursor, false);
+                plot_source_attract_williams_logo_pixel(&mut pixels, surface, cursor);
+                if accumulator == 0 {
+                    break;
+                }
+            }
+        }
+    }
+
+    EmbeddedSprite { surface, pixels }
+}
+
+fn source_attract_williams_logo_horizontal_bit(
+    mut accumulator: u8,
+    cursor: &mut u16,
+    decrement: bool,
+) -> u8 {
+    let carry = accumulator & 0x80 != 0;
+    accumulator = accumulator.wrapping_shl(1);
+    if carry {
+        let [x, y] = cursor.to_be_bytes();
+        let x = if decrement {
+            x.wrapping_sub(1)
+        } else {
+            x.wrapping_add(1)
+        };
+        *cursor = u16::from_be_bytes([x, y]);
+    }
+    accumulator
+}
+
+fn source_attract_williams_logo_vertical_bit(
+    mut accumulator: u8,
+    cursor: &mut u16,
+    decrement: bool,
+) -> u8 {
+    let carry = accumulator & 0x80 != 0;
+    accumulator = accumulator.wrapping_shl(1);
+    if carry {
+        let [x, y] = cursor.to_be_bytes();
+        let y = if decrement {
+            y.wrapping_sub(1)
+        } else {
+            y.wrapping_add(1)
+        };
+        *cursor = u16::from_be_bytes([x, y]);
+    }
+    accumulator
+}
+
+fn plot_source_attract_williams_logo_pixel(pixels: &mut [u8], surface: SurfaceSize, cursor: u16) {
+    let [x, y] = cursor.to_be_bytes();
+    let column = x >> 1;
+    let Some(relative_column) = column.checked_sub(SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_COLUMN)
+    else {
+        return;
+    };
+    let Some(relative_row) = y.checked_sub(SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_ROW) else {
+        return;
+    };
+    if relative_column >= SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS
+        || relative_row >= SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS
+    {
+        return;
+    }
+
+    let pixel_x = usize::from(relative_column) * 2 + usize::from(x & 1);
+    let pixel_y = usize::from(relative_row);
+    let offset = ((pixel_y * surface.width as usize) + pixel_x) * 4;
+    pixels[offset..offset + 4].copy_from_slice(&WHITE_RGBA);
+}
+
+fn expand_source_defender_logo_bytes() -> [u8; SOURCE_DEFENDER_LOGO_BYTES] {
+    let mut output = [0; SOURCE_DEFENDER_LOGO_BYTES];
+    let mut cursor = 0usize;
+    let mut length = 0u8;
+    let mut right_pixel_next = false;
+
+    for byte in SOURCE_DEFENDER_LOGO_COMPRESSED {
+        for nibble in [byte >> 4, byte & 0x0F] {
+            if nibble & 0x0C == 0 {
+                length = nibble.wrapping_add(length).wrapping_shl(2);
+                continue;
+            }
+
+            length = (nibble & 0x03).wrapping_add(length);
+            let color = source_defender_logo_color_byte(nibble);
+            if cursor >= SOURCE_DEFENDER_LOGO_BYTES {
+                cursor = cursor + 1 - SOURCE_DEFENDER_LOGO_BYTES;
+            }
+
+            if right_pixel_next {
+                output[cursor] = (output[cursor] & 0xF0) | (color & 0x0F);
+                cursor += usize::from(SOURCE_DEFENDER_LOGO_ROWS);
+                length = length.wrapping_sub(1);
+                if length & 0x80 != 0 {
+                    right_pixel_next = false;
+                    length = 0;
+                    continue;
+                }
+            } else {
+                right_pixel_next = true;
+            }
+
+            loop {
+                output[cursor] = color;
+                length = length.wrapping_sub(1);
+                if length & 0x80 != 0 {
+                    break;
+                }
+
+                cursor += usize::from(SOURCE_DEFENDER_LOGO_ROWS);
+                length = length.wrapping_sub(1);
+                if length & 0x80 != 0 {
+                    right_pixel_next = false;
+                    break;
+                }
+            }
+            length = 0;
+        }
+    }
+
+    output
+}
+
+const fn source_defender_logo_color_byte(nibble: u8) -> u8 {
+    match (nibble & 0x0C) >> 2 {
+        1 => 0x22,
+        2 => 0xCC,
+        3 => 0x00,
+        _ => 0x00,
+    }
+}
+
+fn pseudo_color_rgba(value: u8) -> [u8; 4] {
+    if value == 0 {
+        return TRANSPARENT_RGBA;
+    }
+
+    [
+        scale_color_channel(value & 0x07, 7),
+        scale_color_channel((value >> 3) & 0x07, 7),
+        scale_color_channel((value >> 6) & 0x03, 3),
+        255,
+    ]
+}
+
+fn scale_color_channel(value: u8, max: u8) -> u8 {
+    ((u16::from(value) * 255) / u16::from(max.max(1))) as u8
+}
+
+fn blit_default_region(
+    atlas_pixels: &mut [u8],
+    atlas_surface: SurfaceSize,
+    regions: &[AtlasRegion],
+    sprite: SpriteId,
+    source: &EmbeddedSprite,
+) {
+    blit_default_region_from_source(
+        atlas_pixels,
+        atlas_surface,
+        regions,
+        sprite,
+        source,
+        SpriteAssetSource {
+            origin: [0, 0],
+            size: [source.surface.width, source.surface.height],
+        },
+    );
+}
+
+fn blit_default_region_from_source(
+    atlas_pixels: &mut [u8],
+    atlas_surface: SurfaceSize,
+    regions: &[AtlasRegion],
+    sprite: SpriteId,
+    source: &EmbeddedSprite,
+    source_region: SpriteAssetSource,
+) {
+    let Some(region) = regions
+        .iter()
+        .copied()
+        .find(|region| region.sprite == sprite)
+    else {
+        return;
+    };
+    blit_scaled_region(atlas_pixels, atlas_surface, region, source, source_region);
+}
+
+fn fill_default_region(
+    atlas_pixels: &mut [u8],
+    atlas_surface: SurfaceSize,
+    regions: &[AtlasRegion],
+    sprite: SpriteId,
+    color: [u8; 4],
+) {
+    let Some(region) = regions
+        .iter()
+        .copied()
+        .find(|region| region.sprite == sprite)
+    else {
+        return;
+    };
+    let width = region.size[0].min(atlas_surface.width.saturating_sub(region.origin[0]));
+    let height = region.size[1].min(atlas_surface.height.saturating_sub(region.origin[1]));
+    for dest_y in 0..height {
+        for dest_x in 0..width {
+            let start = atlas_pixel_offset(
+                atlas_surface,
+                [region.origin[0] + dest_x, region.origin[1] + dest_y],
+            );
+            let end = start + 4;
+            if end <= atlas_pixels.len() {
+                atlas_pixels[start..end].copy_from_slice(&color);
+            }
+        }
+    }
+}
+
+fn blit_scaled_region(
+    atlas_pixels: &mut [u8],
+    atlas_surface: SurfaceSize,
+    region: AtlasRegion,
+    source: &EmbeddedSprite,
+    source_region: SpriteAssetSource,
+) {
+    if region.size[0] == 0
+        || region.size[1] == 0
+        || source_region.size[0] == 0
+        || source_region.size[1] == 0
+    {
+        return;
+    }
+
+    let width = region.size[0].min(atlas_surface.width.saturating_sub(region.origin[0]));
+    let height = region.size[1].min(atlas_surface.height.saturating_sub(region.origin[1]));
+    for dest_y in 0..height {
+        let src_y = source_region.origin[1]
+            .saturating_add(dest_y.saturating_mul(source_region.size[1]) / region.size[1]);
+        for dest_x in 0..width {
+            let src_x = source_region.origin[0]
+                .saturating_add(dest_x.saturating_mul(source_region.size[0]) / region.size[0]);
+            copy_source_pixel(
+                atlas_pixels,
+                atlas_surface,
+                [region.origin[0] + dest_x, region.origin[1] + dest_y],
+                source,
+                [src_x, src_y],
+            );
+        }
+    }
+}
+
+fn blit_star_region(
+    atlas_pixels: &mut [u8],
+    atlas_surface: SurfaceSize,
+    regions: &[AtlasRegion],
+    source: &EmbeddedSprite,
+) {
+    let Some(region) = regions
+        .iter()
+        .copied()
+        .find(|region| region.sprite == SpriteId::STAR)
+    else {
+        return;
+    };
+    let Some(pixel) = first_visible_pixel(source) else {
+        return;
+    };
+    let start = atlas_pixel_offset(atlas_surface, region.origin);
+    let end = start + 4;
+    if end <= atlas_pixels.len() {
+        atlas_pixels[start..end].copy_from_slice(pixel);
+    }
+}
+
+fn first_visible_pixel(source: &EmbeddedSprite) -> Option<&[u8]> {
+    source.pixels.chunks_exact(4).find(|pixel| pixel[3] != 0)
+}
+
+fn copy_source_pixel(
+    atlas_pixels: &mut [u8],
+    atlas_surface: SurfaceSize,
+    atlas_position: [u32; 2],
+    source: &EmbeddedSprite,
+    source_position: [u32; 2],
+) {
+    if source_position[0] >= source.surface.width || source_position[1] >= source.surface.height {
+        return;
+    }
+    let source_start = atlas_pixel_offset(source.surface, source_position);
+    let source_end = source_start + 4;
+    let dest_start = atlas_pixel_offset(atlas_surface, atlas_position);
+    let dest_end = dest_start + 4;
+    if source_end <= source.pixels.len() && dest_end <= atlas_pixels.len() {
+        atlas_pixels[dest_start..dest_end]
+            .copy_from_slice(&source.pixels[source_start..source_end]);
+    }
+}
+
+fn atlas_pixel_offset(surface: SurfaceSize, position: [u32; 2]) -> usize {
+    ((position[1] as usize * surface.width as usize) + position[0] as usize) * 4
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2227,8 +3908,11 @@ mod tests {
         SpriteResourceBindingPlan, SpriteResourceBindingRole, SpriteSamplerBindingPlan,
         SpriteShaderPlan, SpriteTextureBindingPlan, SpriteVertexBufferBinding,
         SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuFrameCommand,
-        WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand,
+        WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand, push_source_controlled_message_sprites,
+        push_source_text_bytes_sprites, source_message_text, source_screen_position,
+        source_screen_position_with_offset,
     };
+    use crate::renderer::{EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba};
 
     #[test]
     fn surface_size_reports_empty_edges() {
@@ -2984,13 +4668,13 @@ mod tests {
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                 format: wgpu::TextureFormat::Rgba8UnormSrgb,
                 dimension: wgpu::TextureDimension::D2,
-                surface: SurfaceSize::new(128, 128),
+                surface: SurfaceSize::new(128, 192),
                 mip_level_count: 1,
                 sample_count: 1,
                 depth_or_array_layers: 1,
                 bytes_per_row: 128 * 4,
-                rows_per_image: 128,
-                byte_len: 128 * 128 * 4,
+                rows_per_image: 192,
+                byte_len: 128 * 192 * 4,
                 bytes: atlas.pixels().to_vec(),
                 non_blank: true,
             }
@@ -2999,14 +4683,14 @@ mod tests {
             upload.extent(),
             wgpu::Extent3d {
                 width: 128,
-                height: 128,
+                height: 192,
                 depth_or_array_layers: 1,
             }
         );
         let copy_layout = upload.copy_layout();
         assert_eq!(copy_layout.offset, 0);
         assert_eq!(copy_layout.bytes_per_row, Some(128 * 4));
-        assert_eq!(copy_layout.rows_per_image, Some(128));
+        assert_eq!(copy_layout.rows_per_image, Some(192));
         let descriptor = upload.texture_descriptor();
         assert_eq!(descriptor.label, Some("defender.sprite.atlas.texture"));
         assert_eq!(descriptor.size, upload.extent());
@@ -3786,7 +5470,7 @@ mod tests {
         );
         assert_eq!(atlas.region(SpriteId::PLAYER_SHIP), None);
         let default_atlas = TextureAtlas::default_sprites();
-        assert_eq!(default_atlas.pixels().len(), 128 * 128 * 4);
+        assert_eq!(default_atlas.pixels().len(), 128 * 192 * 4);
         assert!(default_atlas.is_non_blank());
         assert!(default_atlas.contains(SpriteId::STATUS_TEXT));
         assert!(default_atlas.contains(SpriteId::PLAYER_PROJECTILE));
@@ -3794,6 +5478,31 @@ mod tests {
         assert!(default_atlas.contains(SpriteId::STAR));
         assert!(default_atlas.contains(SpriteId::ENEMY_LANDER));
         assert!(default_atlas.contains(SpriteId::HUMAN));
+        assert!(default_atlas.contains(SpriteId::ENEMY_MUTANT));
+        assert!(default_atlas.contains(SpriteId::ENEMY_BAITER));
+        assert!(default_atlas.contains(SpriteId::ENEMY_BOMBER));
+        assert!(default_atlas.contains(SpriteId::ENEMY_POD));
+        assert!(default_atlas.contains(SpriteId::ENEMY_SWARMER));
+        assert!(default_atlas.contains(SpriteId::ENEMY_BOMB));
+        assert!(default_atlas.contains(SpriteId::BOMB_EXPLOSION));
+        assert!(default_atlas.contains(SpriteId::SWARMER_EXPLOSION));
+        assert!(default_atlas.contains(SpriteId::SCORE_POPUP_250));
+        assert!(default_atlas.contains(SpriteId::SCORE_POPUP_500));
+        assert!(default_atlas.contains(SpriteId::PLAYER_LIFE_STOCK));
+        assert!(default_atlas.contains(SpriteId::SMART_BOMB_STOCK));
+        assert!(default_atlas.contains(SpriteId::ASTRONAUT_EXPLOSION));
+        assert!(default_atlas.contains(SpriteId::NULL_OBJECT));
+        assert!(default_atlas.contains(SpriteId::TERRAIN_EXPLOSION));
+        for sprite in SpriteId::SCORE_DIGITS {
+            assert!(default_atlas.contains(sprite));
+        }
+        assert!(default_atlas.contains(SpriteId::HALL_OF_FAME_UNDERLINE_WORD));
+        assert!(default_atlas.contains(SpriteId::HALL_OF_FAME_DEFENDER_LOGO));
+        assert!(default_atlas.contains(SpriteId::ATTRACT_COPYRIGHT_STRIP));
+        assert!(default_atlas.contains(SpriteId::TOP_DISPLAY_BORDER_WORD));
+        assert!(default_atlas.contains(SpriteId::SCANNER_OBJECT_BLIP));
+        assert!(default_atlas.contains(SpriteId::SCANNER_PLAYER_BLIP));
+        assert!(default_atlas.contains(SpriteId::PLAYER_EXPLOSION_PIXEL));
         assert_eq!(
             TextureAtlas::with_rgba(SurfaceSize::new(2, 2), Vec::new(), vec![0; 15]),
             Err(SceneRasterError::PixelBufferLength {
@@ -3807,10 +5516,575 @@ mod tests {
                 surface: SurfaceSize::new(u32::MAX, u32::MAX),
             })
         );
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_png_backed_regions() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_png_backed_region(&atlas, SpriteId::PLAYER_SHIP);
+        assert_png_backed_region(&atlas, SpriteId::SCORE_TEXT);
+        assert_png_backed_region(&atlas, SpriteId::STATUS_TEXT);
+        assert_png_backed_region(&atlas, SpriteId::PLAYER_PROJECTILE);
+        assert_png_backed_region(&atlas, SpriteId::TERRAIN_TILE);
+        assert_png_backed_region(&atlas, SpriteId::ENEMY_LANDER);
+        assert_png_backed_region(&atlas, SpriteId::HUMAN);
+        assert_png_backed_region(&atlas, SpriteId::ENEMY_MUTANT);
+        assert_png_backed_region(&atlas, SpriteId::ENEMY_BAITER);
+        assert_png_backed_region(&atlas, SpriteId::ENEMY_BOMBER);
+        assert_png_backed_region(&atlas, SpriteId::ENEMY_POD);
+        assert_png_backed_region(&atlas, SpriteId::ENEMY_SWARMER);
+        assert_png_backed_region(&atlas, SpriteId::ENEMY_BOMB);
+        assert_png_backed_region(&atlas, SpriteId::BOMB_EXPLOSION);
+        assert_png_backed_region(&atlas, SpriteId::SWARMER_EXPLOSION);
+        assert_png_backed_region(&atlas, SpriteId::SCORE_POPUP_250);
+        assert_png_backed_region(&atlas, SpriteId::SCORE_POPUP_500);
+        assert_png_backed_region(&atlas, SpriteId::PLAYER_LIFE_STOCK);
+        assert_png_backed_region(&atlas, SpriteId::SMART_BOMB_STOCK);
+        assert_visible_region(&atlas, SpriteId::STAR);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_object_picture_grid_regions() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_visible_region(&atlas, SpriteId::ASTRONAUT_EXPLOSION);
+        assert_transparent_region(&atlas, SpriteId::NULL_OBJECT);
+        assert_visible_region(&atlas, SpriteId::TERRAIN_EXPLOSION);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_score_digit_regions() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(SpriteId::score_digit(0), Some(SpriteId::SCORE_DIGIT_0));
+        assert_eq!(SpriteId::score_digit(9), Some(SpriteId::SCORE_DIGIT_9));
+        assert_eq!(SpriteId::score_digit(10), None);
+        for (index, sprite) in SpriteId::SCORE_DIGITS.iter().enumerate() {
+            assert_eq!(
+                atlas.region(*sprite),
+                Some(AtlasRegion {
+                    sprite: *sprite,
+                    origin: [u32::try_from(index).expect("digit index fits") * 8, 112],
+                    size: [6, 8],
+                })
+            );
+            assert_visible_region(&atlas, *sprite);
+        }
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_high_score_underline_word_region() {
+        let atlas = TextureAtlas::default_sprites();
+
         assert_eq!(
-            super::default_sprite_region_color(SpriteId(99)),
-            [0xD9, 0x51, 0xFF, 0xFF]
+            atlas.region(SpriteId::HALL_OF_FAME_UNDERLINE_WORD),
+            Some(AtlasRegion {
+                sprite: SpriteId::HALL_OF_FAME_UNDERLINE_WORD,
+                origin: [80, 112],
+                size: [2, 2],
+            })
         );
+        assert_visible_region(&atlas, SpriteId::HALL_OF_FAME_UNDERLINE_WORD);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_hall_of_fame_defender_logo_region() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(
+            atlas.region(SpriteId::HALL_OF_FAME_DEFENDER_LOGO),
+            Some(AtlasRegion {
+                sprite: SpriteId::HALL_OF_FAME_DEFENDER_LOGO,
+                origin: [0, 128],
+                size: [120, 24],
+            })
+        );
+        assert_visible_region(&atlas, SpriteId::HALL_OF_FAME_DEFENDER_LOGO);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_attract_copyright_strip_region() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(
+            atlas.region(SpriteId::ATTRACT_COPYRIGHT_STRIP),
+            Some(AtlasRegion {
+                sprite: SpriteId::ATTRACT_COPYRIGHT_STRIP,
+                origin: [0, 152],
+                size: [80, 8],
+            })
+        );
+        assert_visible_region(&atlas, SpriteId::ATTRACT_COPYRIGHT_STRIP);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_attract_williams_logo_region() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(
+            atlas.region(SpriteId::ATTRACT_WILLIAMS_LOGO),
+            Some(AtlasRegion {
+                sprite: SpriteId::ATTRACT_WILLIAMS_LOGO,
+                origin: [0, 160],
+                size: [92, 19],
+            })
+        );
+        assert_visible_region(&atlas, SpriteId::ATTRACT_WILLIAMS_LOGO);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_top_display_border_word_region() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(
+            atlas.region(SpriteId::TOP_DISPLAY_BORDER_WORD),
+            Some(AtlasRegion {
+                sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
+                origin: [96, 160],
+                size: [2, 2],
+            })
+        );
+        assert_visible_region(&atlas, SpriteId::TOP_DISPLAY_BORDER_WORD);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_scanner_blip_regions() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(
+            atlas.region(SpriteId::SCANNER_OBJECT_BLIP),
+            Some(AtlasRegion {
+                sprite: SpriteId::SCANNER_OBJECT_BLIP,
+                origin: [100, 160],
+                size: [2, 2],
+            })
+        );
+        assert_eq!(
+            atlas.region(SpriteId::SCANNER_PLAYER_BLIP),
+            Some(AtlasRegion {
+                sprite: SpriteId::SCANNER_PLAYER_BLIP,
+                origin: [104, 160],
+                size: [3, 2],
+            })
+        );
+        assert_visible_region(&atlas, SpriteId::SCANNER_OBJECT_BLIP);
+        assert_visible_region(&atlas, SpriteId::SCANNER_PLAYER_BLIP);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_player_explosion_pixel_region() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(
+            atlas.region(SpriteId::PLAYER_EXPLOSION_PIXEL),
+            Some(AtlasRegion {
+                sprite: SpriteId::PLAYER_EXPLOSION_PIXEL,
+                origin: [108, 160],
+                size: [4, 2],
+            })
+        );
+        assert_visible_region(&atlas, SpriteId::PLAYER_EXPLOSION_PIXEL);
+    }
+
+    #[test]
+    fn source_attract_williams_logo_decodes_table_pixels() {
+        let sprite = decode_source_attract_williams_logo_rgba();
+
+        assert_eq!(sprite.surface, SurfaceSize::new(92, 19));
+        assert_eq!(
+            sprite
+                .pixels
+                .chunks_exact(4)
+                .filter(|pixel| pixel[3] != 0)
+                .count(),
+            660
+        );
+        assert_eq!(source_sprite_pixel(&sprite, 8, 4), WHITE_RGBA);
+        assert_eq!(source_sprite_pixel(&sprite, 89, 9), WHITE_RGBA);
+        assert_eq!(source_sprite_pixel(&sprite, 0, 0), [0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_message_glyph_regions() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(source_message_text("PLYR1"), Some("PLAYER ONE"));
+        assert_eq!(source_message_text("PLYR2"), Some("PLAYER TWO"));
+        assert_eq!(source_message_text("GO"), Some("GAME OVER"));
+        assert_eq!(source_message_text("MISSING"), None);
+        assert_eq!(source_screen_position(0x3C78), [120.0, 120.0]);
+        assert_eq!(
+            source_screen_position_with_offset(0x1458, 0, 0x0A),
+            [40.0, 98.0]
+        );
+        assert_eq!(
+            SpriteId::message_glyph('P'),
+            Some(SpriteId::MESSAGE_GLYPH_P)
+        );
+        assert_eq!(
+            SpriteId::message_glyph('W'),
+            Some(SpriteId::MESSAGE_GLYPH_W)
+        );
+        assert_eq!(SpriteId::message_glyph('a'), None);
+        assert_eq!(SpriteId::message_glyph_size('P'), Some([6, 8]));
+        assert_eq!(SpriteId::message_glyph_size('W'), Some([8, 8]));
+
+        for sprite in SpriteId::MESSAGE_GLYPHS {
+            assert!(atlas.contains(sprite));
+        }
+        assert_transparent_region(&atlas, SpriteId::MESSAGE_GLYPH_SPACE);
+        assert_visible_region(&atlas, SpriteId::MESSAGE_GLYPH_P);
+        assert_visible_region(&atlas, SpriteId::MESSAGE_GLYPH_G);
+        assert_visible_region(&atlas, SpriteId::MESSAGE_GLYPH_W);
+    }
+
+    #[test]
+    fn source_text_bytes_render_mixed_score_digits_and_message_glyphs() {
+        let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
+
+        push_source_text_bytes_sprites(
+            &mut scene,
+            b" 2A",
+            source_screen_position(0x2B86),
+            RenderLayer::Overlay,
+        );
+
+        assert_eq!(scene.sprites.len(), 2);
+        assert_eq!(scene.sprites[0].sprite, SpriteId::SCORE_DIGIT_2);
+        assert_eq!(scene.sprites[0].position, [90.0, 134.0]);
+        assert_eq!(scene.sprites[0].size, [6.0, 8.0]);
+        assert_eq!(scene.sprites[1].sprite, SpriteId::MESSAGE_GLYPH_A);
+        assert_eq!(scene.sprites[1].position, [98.0, 134.0]);
+        assert_eq!(scene.sprites[1].size, [6.0, 8.0]);
+        assert!(
+            scene
+                .sprites
+                .iter()
+                .all(|sprite| sprite.layer == RenderLayer::Overlay)
+        );
+    }
+
+    #[test]
+    fn source_controlled_message_sprites_apply_source_cursor_controls() {
+        let mut scene = RenderScene::empty(0, SurfaceSize::new(292, 240));
+        let text = source_message_text("ELECV").expect("ELECV message text");
+
+        push_source_controlled_message_sprites(&mut scene, text, 0x3258, RenderLayer::Overlay);
+
+        assert_eq!(scene.sprites.len(), 23);
+        assert!(scene.sprites.iter().all(|sprite| {
+            sprite.layer == RenderLayer::Overlay
+                && SpriteId::MESSAGE_GLYPHS.contains(&sprite.sprite)
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_E
+                && sprite.position == [100.0, 88.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_I
+                && sprite.position == [190.0, 88.0]
+                && sprite.size == [4.0, 8.0]
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_PERIOD
+                && sprite.position == [212.0, 88.0]
+                && sprite.size == [2.0, 8.0]
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_P
+                && sprite.position == [124.0, 108.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+    }
+
+    #[test]
+    fn object_picture_labels_map_reclassified_clean_sprite_assets() {
+        for label in ["PLAPIC", "PLBPIC"] {
+            assert_eq!(
+                SpriteId::for_object_picture_label(label),
+                Some(SpriteId::PLAYER_SHIP)
+            );
+        }
+        for label in ["LNDP1", "LNDP2", "LNDP3"] {
+            assert_eq!(
+                SpriteId::for_object_picture_label(label),
+                Some(SpriteId::ENEMY_LANDER)
+            );
+        }
+        for label in ["ASTP1", "ASTP2", "ASTP3", "ASTP4"] {
+            assert_eq!(
+                SpriteId::for_object_picture_label(label),
+                Some(SpriteId::HUMAN)
+            );
+        }
+        assert_eq!(
+            SpriteId::for_object_picture_label("LASP1"),
+            Some(SpriteId::PLAYER_PROJECTILE)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("SCZP1"),
+            Some(SpriteId::ENEMY_MUTANT)
+        );
+        for label in ["UFOP1", "UFOP2", "UFOP3"] {
+            assert_eq!(
+                SpriteId::for_object_picture_label(label),
+                Some(SpriteId::ENEMY_BAITER)
+            );
+        }
+        for label in ["TIEP1", "TIEP2", "TIEP3", "TIEP4"] {
+            assert_eq!(
+                SpriteId::for_object_picture_label(label),
+                Some(SpriteId::ENEMY_BOMBER)
+            );
+        }
+        assert_eq!(
+            SpriteId::for_object_picture_label("PRBP1"),
+            Some(SpriteId::ENEMY_POD)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("SWPIC1"),
+            Some(SpriteId::ENEMY_SWARMER)
+        );
+        for label in ["BMBP1", "BMBP2"] {
+            assert_eq!(
+                SpriteId::for_object_picture_label(label),
+                Some(SpriteId::ENEMY_BOMB)
+            );
+        }
+        assert_eq!(
+            SpriteId::for_object_picture_label("BXPIC"),
+            Some(SpriteId::BOMB_EXPLOSION)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("SWXP1"),
+            Some(SpriteId::SWARMER_EXPLOSION)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("C25P1"),
+            Some(SpriteId::SCORE_POPUP_250)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("C5P1"),
+            Some(SpriteId::SCORE_POPUP_500)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("PLAMIN"),
+            Some(SpriteId::PLAYER_LIFE_STOCK)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("SBPIC"),
+            Some(SpriteId::SMART_BOMB_STOCK)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("ASXP1"),
+            Some(SpriteId::ASTRONAUT_EXPLOSION)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("NULOB"),
+            Some(SpriteId::NULL_OBJECT)
+        );
+        assert_eq!(
+            SpriteId::for_object_picture_label("TEREX"),
+            Some(SpriteId::TERRAIN_EXPLOSION)
+        );
+        assert_eq!(SpriteId::for_object_picture_label("UNKNOWN"), None);
+    }
+
+    #[test]
+    fn embedded_png_decoder_rejects_truncated_or_unsupported_assets() {
+        let rgba_png = encode_test_png(png::ColorType::Rgba, &[255, 0, 0, 255]);
+        let truncated = truncate_first_idat_payload(rgba_png);
+
+        assert_panic_message(
+            || {
+                let _ = super::decode_embedded_png_rgba("truncated-test", &truncated);
+            },
+            "must contain a frame",
+        );
+
+        let rgb_png = encode_test_png(png::ColorType::Rgb, &[255, 0, 0]);
+        assert_panic_message(
+            || {
+                let _ = super::decode_embedded_png_rgba("rgb-test", &rgb_png);
+            },
+            "must be 8-bit RGBA",
+        );
+    }
+
+    #[test]
+    fn default_sprite_blitters_skip_missing_or_empty_sources() {
+        let atlas_surface = SurfaceSize::new(2, 2);
+        let source = super::EmbeddedSprite {
+            surface: SurfaceSize::new(1, 1),
+            pixels: vec![10, 20, 30, 255],
+        };
+        let mut atlas_pixels = vec![0; atlas_surface.rgba_len().expect("atlas byte length")];
+        let unchanged = atlas_pixels.clone();
+
+        super::blit_default_region_from_source(
+            &mut atlas_pixels,
+            atlas_surface,
+            &[],
+            SpriteId::PLAYER_SHIP,
+            &source,
+            super::SpriteAssetSource {
+                origin: [0, 0],
+                size: [1, 1],
+            },
+        );
+        assert_eq!(atlas_pixels, unchanged);
+
+        super::blit_scaled_region(
+            &mut atlas_pixels,
+            atlas_surface,
+            AtlasRegion {
+                sprite: SpriteId::PLAYER_SHIP,
+                origin: [0, 0],
+                size: [0, 1],
+            },
+            &source,
+            super::SpriteAssetSource {
+                origin: [0, 0],
+                size: [1, 1],
+            },
+        );
+        assert_eq!(atlas_pixels, unchanged);
+
+        super::copy_source_pixel(&mut atlas_pixels, atlas_surface, [0, 0], &source, [1, 0]);
+        assert_eq!(atlas_pixels, unchanged);
+    }
+
+    #[test]
+    fn star_blitter_skips_missing_region_or_transparent_source() {
+        let atlas_surface = SurfaceSize::new(2, 2);
+        let source = super::EmbeddedSprite {
+            surface: SurfaceSize::new(1, 1),
+            pixels: vec![10, 20, 30, 255],
+        };
+        let mut atlas_pixels = vec![0; atlas_surface.rgba_len().expect("atlas byte length")];
+        let unchanged = atlas_pixels.clone();
+
+        super::blit_star_region(&mut atlas_pixels, atlas_surface, &[], &source);
+        assert_eq!(atlas_pixels, unchanged);
+
+        let transparent_source = super::EmbeddedSprite {
+            surface: SurfaceSize::new(1, 1),
+            pixels: vec![10, 20, 30, 0],
+        };
+        super::blit_star_region(
+            &mut atlas_pixels,
+            atlas_surface,
+            &[AtlasRegion {
+                sprite: SpriteId::STAR,
+                origin: [0, 0],
+                size: [1, 1],
+            }],
+            &transparent_source,
+        );
+        assert_eq!(atlas_pixels, unchanged);
+    }
+
+    fn encode_test_png(color_type: png::ColorType, pixels: &[u8]) -> Vec<u8> {
+        let mut png_bytes = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut png_bytes, 1, 1);
+            encoder.set_color(color_type);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().expect("write png header");
+            writer.write_image_data(pixels).expect("write png data");
+        }
+        png_bytes
+    }
+
+    fn truncate_first_idat_payload(mut png_bytes: Vec<u8>) -> Vec<u8> {
+        let mut offset = 8;
+        while offset + 8 <= png_bytes.len() {
+            let length = u32::from_be_bytes(
+                png_bytes[offset..offset + 4]
+                    .try_into()
+                    .expect("png chunk length"),
+            ) as usize;
+            let kind = &png_bytes[offset + 4..offset + 8];
+            if kind == b"IDAT" {
+                assert!(length > 1);
+                png_bytes.truncate(offset + 8 + length - 1);
+                return png_bytes;
+            }
+            offset += 12 + length;
+        }
+        panic!("test png must contain IDAT");
+    }
+
+    fn assert_panic_message(run: impl FnOnce() + std::panic::UnwindSafe, expected: &str) {
+        let panic = std::panic::catch_unwind(run).expect_err("expected panic");
+        let message = panic
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| panic.downcast_ref::<&'static str>().copied())
+            .expect("panic message");
+        assert!(
+            message.contains(expected),
+            "panic message {message:?} must contain {expected:?}"
+        );
+    }
+
+    fn assert_png_backed_region(atlas: &TextureAtlas, sprite: SpriteId) {
+        let pixels = atlas_region_pixels(atlas, sprite);
+        assert!(
+            pixels.iter().any(|pixel| pixel[3] != 0),
+            "sprite {:?} region must contain visible PNG pixels",
+            sprite
+        );
+        let distinct_pixels = pixels
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            distinct_pixels.len() > 1,
+            "sprite {:?} region must not be one solid placeholder color",
+            sprite
+        );
+    }
+
+    fn assert_visible_region(atlas: &TextureAtlas, sprite: SpriteId) {
+        assert!(
+            atlas_region_pixels(atlas, sprite)
+                .iter()
+                .any(|pixel| pixel[3] != 0),
+            "sprite {:?} region must contain visible pixels",
+            sprite
+        );
+    }
+
+    fn assert_transparent_region(atlas: &TextureAtlas, sprite: SpriteId) {
+        assert!(
+            atlas_region_pixels(atlas, sprite)
+                .iter()
+                .all(|pixel| pixel[3] == 0),
+            "sprite {:?} region must stay transparent",
+            sprite
+        );
+    }
+
+    fn source_sprite_pixel(sprite: &EmbeddedSprite, x: u32, y: u32) -> [u8; 4] {
+        let start = ((y as usize * sprite.surface.width as usize) + x as usize) * 4;
+        let pixel = &sprite.pixels[start..start + 4];
+        [pixel[0], pixel[1], pixel[2], pixel[3]]
+    }
+
+    fn atlas_region_pixels(atlas: &TextureAtlas, sprite: SpriteId) -> Vec<[u8; 4]> {
+        let region = atlas.region(sprite).expect("sprite region");
+        let mut pixels = Vec::new();
+        for y in region.origin[1]..region.origin[1] + region.size[1] {
+            for x in region.origin[0]..region.origin[0] + region.size[0] {
+                let start = ((y as usize * atlas.surface.width as usize) + x as usize) * 4;
+                let pixel = &atlas.pixels()[start..start + 4];
+                pixels.push([pixel[0], pixel[1], pixel[2], pixel[3]]);
+            }
+        }
+        pixels
     }
 
     #[test]
@@ -3919,7 +6193,7 @@ mod tests {
                         scene_origin: [128.0, 96.0],
                         scene_size: [16.0, 8.0],
                         atlas_uv_origin: [0.0, 0.0],
-                        atlas_uv_size: [0.125, 0.0625],
+                        atlas_uv_size: [0.125, 0.041666668],
                         tint: [1.0, 1.0, 1.0, 1.0],
                     }],
                 },
@@ -3929,8 +6203,8 @@ mod tests {
                     records: vec![SpriteInstanceBufferRecord {
                         scene_origin: [0.0, 0.0],
                         scene_size: [80.0, 8.0],
-                        atlas_uv_origin: [0.0, 0.125],
-                        atlas_uv_size: [0.625, 0.0625],
+                        atlas_uv_origin: [0.0, 0.083333336],
+                        atlas_uv_size: [0.625, 0.041666668],
                         tint: [1.0, 1.0, 1.0, 1.0],
                     }],
                 },

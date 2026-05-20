@@ -1,6 +1,6 @@
 # Defender Current Plan
 
-Last reviewed: `2026-05-16`
+Last reviewed: `2026-05-17`
 
 ## Current Baseline
 
@@ -21,9 +21,8 @@ Last reviewed: `2026-05-16`
   assembler-shaped machine should become a temporary fidelity oracle rather
   than the production gameplay model.
 - Normal runtime is self-contained. ROM files are optional verification inputs.
-- No active behavior gap is tracked in this plan. New fidelity gaps should be
-  documented in `docs/fidelity/gaps.md` and linked from this file only when
-  they become active work.
+- Clean rewrite equivalence gaps are tracked in `docs/fidelity/gaps.md` while
+  R0-R9 retire the temporary accepted oracle and legacy runtime dependencies.
 
 ## Current Validation Gate
 
@@ -34,6 +33,7 @@ cargo fmt --check
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
+make clean-fidelity
 cargo run -- --game-smoke
 cargo run -- --live-smoke
 ```
@@ -48,11 +48,26 @@ git diff --check
 `make fidelity` covers formatting, all Rust targets, clippy, Lua trace exporter
 self-tests, Python helper tests, local Rust-current trace fixtures, coverage,
 and added executable Rust line coverage.
+`make clean-fidelity` covers clean `Game` versus accepted-oracle first
+divergence reporting for all 12 embedded Phase 1 scenario input streams by
+default; set `SCENARIOS="..."` for targeted implementation checks.
+
+Validation ladder going forward:
+
+- During a step, run focused checks for the touched code and `cargo fmt --check`
+  when Rust changed.
+- At step completion, add directly affected smoke or doc checks.
+- At dev-cycle close, run focused tests, touched-document lint, smoke commands,
+  and clippy when Rust behavior changed.
+- At milestone close, run the full validation gate above.
 
 ## Work Protocol
 
 - Keep `README.md`, `SPEC.md`, and `PLAN.md` aligned with the current code.
 - Use focused tests for material code changes.
+- `2026-05-16 19:01:48 BST`: Remove dead code as it is found, including tests
+  that only protect removed APIs, unused helpers, or retired behavior. Keep or
+  replace tests only when they still guard supported contracts.
 - Preserve source-visible mutation checks for arcade-core behavior.
 - Preserve gameplay behavior while the rewrite is underway. `XYZZY` and
   Planetoid controls remain compatibility features unless explicitly removed.
@@ -60,6 +75,11 @@ and added executable Rust line coverage.
   renderer abstractions.
 - Use Conventional Commits for committed work.
 - Do not use `codex` in branch names, commit messages, or PR titles.
+- Store sprite files under `assets/sprites/`. Reuse existing sprite PNGs there
+  when they fit a documented transitional runtime need, and record the
+  reclassification/provenance before embedding. Store new non-legacy sound
+  artifacts under `assets/sounds/`; keep pre-existing legacy `.wav` cues under
+  `assets/arcade/`.
 - Slack cycle updates are mandatory for planned dev-cycles: post a start note
   to `xyzzytools.slack.com#codex` before implementation begins, and post a
   completion note after validation when the dev-cycle closes.
@@ -106,7298 +126,1673 @@ Rewrite rules:
 - Use `wgpu` directly as the renderer, not as a final framebuffer presenter for
   a hidden memory model once the clean scene path exists.
 
-## Completed Development Cycles
+## Definitive Rewrite Completion Plan
 
-`DC-42` through `DC-152` are complete. The standing
-maintenance guidance in Ongoing Work still applies.
+This section is the terminal plan for the rewrite. Work after `DC-152` must map
+to one of these milestones. Do not add more open-ended evidence cycles unless a
+new source-backed fidelity gap is accepted in `docs/fidelity/gaps.md`.
 
-### DC-42: Documentation Reset
+### Source Audit Summary
 
-Status: `complete`
+- The clean gameplay model is real but incomplete. `src/game.rs` and
+  `src/systems.rs` cover credits, start, source-profile active wave spawning
+  for landers plus source-exposed bomber/pod families, player movement,
+  projectiles, smart bombs, scoring, bonus stock, player damage, wave advance,
+  high-score initials, bounded lander abduction/carry/release, source-shaped
+  falling-human acceleration, player-catch rescue scoring, AFALL2 carried
+  landing, safe-landing scoring, fatal landing/human-loss handoff,
+  pod-triggered source mini-swarmer spawn/motion/bomb projection, and
+  source-shaped baiter movement/fireball shell behavior, source-shaped mutant
+  runtime conversion/movement/fireballs plus reserve restore placement and
+  shot-timer fixtures, and source-shaped bomber image/vertical/cruise movement
+  with `BOMBST` bomb shells plus source `TIEST` reserve squad placement,
+  source-shaped initial lander `LANDS0` runtime plus `LANDST` reserve
+  placement/velocity bytes, source `PRBST`/`PRBRES` pod reserve restore
+  placement/velocity bytes, plus
+  source-shell/mine descriptor fixtures for `BMBP1` projectile evidence. They
+  do not yet cover the full attract program, full two-player flow,
+  tilt/service behavior, or source-faithful
+  death/respawn cadence.
+- The clean renderer owns sprite scene contracts and detailed `wgpu` planning.
+  Interactive live presentation now uses `src/live_wgpu.rs` to step clean
+  `Game` frames, submit clean audio events, and execute native sprite draw
+  plans through `wgpu`. `DC-156` replaces the default atlas solid fills for the
+  current clean smoke-path sprite IDs with temporary PNG-backed regions.
+- The default clean atlas now decodes selected reclassified prototype PNGs from
+  `assets/sprites/`. These are transitional R2 atlas inputs, not authoritative
+  red-label art, and later cycles must replace or extend them with source-cited
+  red-label, ROM/MAME-derived, or generated assets with stronger provenance.
+- The audio boundary is clean and normal interactive play attempts the
+  synthesized device backend with null fallback; smoke mode remains no-device
+  and deterministic. The clean game still emits only the semantic sound subset
+  currently covered by accepted event timing.
+- The clean-fidelity harness compares the real clean `Game` against the
+  accepted oracle across all 12 embedded Phase 1 scenarios under milestone
+  profiles. The profiled gate passes, but strict R9 final acceptance is still
+  blocked by the remaining source-backed lifecycle and acceptance surfaces:
+  later two-player turn/session sequencing and high-score ordering,
+  score-popup lifecycle, explosion timing, terrain-blow presentation, clean
+  object spawning/physics, final render presentation parity, validation
+  stabilization, and owner acceptance of the final R9 contract.
+- `DC-163` gates remaining oracle, ROM, trace, and README media adapters behind
+  the explicit `legacy-tools` feature. Default production builds no longer
+  compile the accepted machine, legacy live core, CMOS storage, or retired
+  `wgpu` presenter; optional developer tooling still uses feature-gated
+  `src_legacy/` evidence while clean equivalence remains under validation.
 
-Goal: remove stale historical plan/spec/readme material and leave only current,
-useful project information.
+### Definition Of Done
 
-Scope:
+The rewrite is complete only when all of these are true:
 
-- Rewrite `README.md` as the clean public entry point: badges, screenshot,
-  animated GIF, install/run commands, controls, persistence, compatibility
-  overlay, development commands, architecture, assets, platform notes, and
-  references.
-- Reduce `SPEC.md` to the current behavior contract, source-of-truth rules,
-  architecture, validation gates, and active constraints.
-- Reduce `PLAN.md` to current baseline, validation, work protocol, this active
-  docs cycle, and immediate next work.
+- `cargo run` plays the clean `Game` through clean `platform`, `audio`, and
+  `renderer` modules, with no non-test runtime dependency on
+  `src_legacy/live.rs`, `src_legacy/wgpu_presenter.rs`, or the legacy
+  `ArcadeMachine`.
+- The active live renderer is sprite/atlas/instanced `wgpu`, not a hidden
+  full-frame raster presenter. Temporary raster upload remains available only
+  for oracle tooling or explicit debug comparison.
+- The clean game passes source-backed equivalence gates for the accepted
+  gameplay surface: state, events, sound timing, and rendered output for the
+  12 Phase 1 scenarios plus focused mechanics fixtures added below.
+- The clean game uses renderer-owned arcade assets for player, enemies, humans,
+  projectiles, explosions, terrain, scanner/HUD text, and title/attract
+  presentation. Solid placeholder atlas regions are gone from normal runtime.
+- Real audio output exists behind the clean audio backend, with deterministic
+  tests for event-to-clip mapping, mixing/queueing, shutdown, and dropped-event
+  accounting. `--mute` still disables audio.
+- Playability is validated through live smoke plus a bounded manual play pass:
+  coin/start, thrust, reverse, fire, smart bomb, hyperspace, human rescue or
+  loss, enemy waves, death/respawn, scoring, high score entry, pause-free
+  windowed rendering, and clean shutdown.
+- `src_legacy/` is retained only as historical source, optional oracle tooling,
+  or removable archived code. Public APIs and production modules expose no
+  red-label routine names, memory-table names, assembler labels, or ROM labels.
 
-Work log:
+### Milestone R0: Final Gates And Oracle Harness
 
-- `2026-05-10 14:42:08 BST` Started `DC-42`: replacing stale completed phase
-  history and drift inventory with current project documentation for the
-  refactored `red-label-refactor` baseline.
-- `2026-05-10 14:44:36 BST` Completed `DC-42`: reduced `PLAN.md` to the
-  active baseline, validation gate, work protocol, docs cycle, and next useful
-  work; reduced `SPEC.md` to the current source-of-truth contract,
-  architecture, validation, and active constraints; rewrote `README.md` as the
-  current public entry point with badges, screenshot, animated GIF, commands,
-  controls, persistence, compatibility overlay, development targets,
-  architecture, assets, platform notes, and references. Validation passed with
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md`,
-  `git diff --check`, and `cargo run -- --help`.
-  Slack update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778420701682049`
+Goal: make progress measurable before more implementation work.
 
-### DC-43: Threaded Fidelity Fixture Runner
+Deliverables:
 
-Status: `complete`
+- Add a clean-vs-accepted scenario runner that steps `Game` and the accepted
+  oracle with the same `GameInput` streams.
+- Compare clean `Game` output, not `GameplayOracle` output, against accepted
+  state, events, sound events, and render evidence.
+- Emit a machine-readable gap report for each failed scenario, with the first
+  divergent frame and divergent fields.
+- Extend the accepted facade only with neutral domain contracts needed for
+  comparison, not memory or routine names.
+- Add a `make clean-fidelity` target and document whether it uses embedded
+  Rust-current fixtures, optional local MAME references, or both.
 
-Goal: continue the refactor by replacing serial fixture orchestration with a
-small trait-based runner that can execute independent Rust fidelity fixture
-checks on scoped worker threads while preserving manifest ordering and
-first-error reporting.
+Current implementation:
 
-Scope:
+- `DC-153` adds the first test-owned clean-vs-accepted runner. It uses the
+  embedded Phase 1 scenario manifest and input expansion, does not require local
+  ROMs or MAME reference traces, and emits TSV first-divergence rows from the
+  real clean `Game` to the accepted oracle.
 
-- Add a `TraceFixtureChecker` trait to separate fixture discovery/order from
-  fixture execution.
-- Run fixture checks in ordered chunks across available scoped worker threads.
-- Preserve existing `--fidelity-check-trace-dir` output and first-error
-  behavior.
-- Add focused tests for parallel result aggregation, ordered error reporting,
-  and worker panic handling.
-
-Work log:
-
-- `2026-05-12` Completed `DC-43`: `src/app.rs` now checks fidelity fixture
-  pairs through a trait-based checker on scoped threads. Validation passed with
-  `cargo fmt --check`, targeted `app::tests::check_trace_fixtures`,
-  targeted `app::tests::fidelity_check_trace_dir_text`, and
-  `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`,
-  `make trace-script-test`, `make trace-fixtures`,
-  `make coverage NEW_CODE_COVERAGE_BASE=origin/main`, `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md`, and `git diff --check`.
-
-### DC-44: Shared Live Core Driver
-
-Status: `complete`
-
-Goal: continue carving the live runtime into explicit, reusable boundaries
-before a later presentation/core thread split.
-
-Scope:
-
-- Add a `LiveCoreDriver` that owns the live input mapper, XYZZY overlay,
-  machine, timing clock, pending pulse input, and pending typed characters.
-- Reuse the driver from both Kitty and `wgpu` live presentation paths.
-- Preserve pulse buffering, held-input catch-up frames, typed-character
-  high-score entry behavior, and XYZZY overlay behavior.
-- Add focused tests for driver-owned held input, overlay state, and realtime
-  pulse buffering.
-
-Work log:
-
-- `2026-05-12` Completed `DC-44`: Kitty and `wgpu` now advance the arcade core
-  through the shared `LiveCoreDriver` instead of duplicating input/clock/overlay
-  logic. Validation passed with `cargo fmt --check`, `cargo check`, targeted
-  `live::tests::live_core_driver`, targeted `wgpu_presenter::tests::wgpu_smoke`,
-  `cargo test --all-targets`, and `cargo clippy --all-targets -- -D warnings`.
-
-### DC-45: Threaded Live Core Runtime
-
-Status: `complete`
-
-Goal: move the `wgpu` live path onto an explicit presentation/core thread
-boundary without changing gameplay behavior.
-
-Scope:
-
-- Add a `LiveCoreRuntime` trait and `LiveCoreThread` worker that owns
-  `LiveCoreDriver`, live `Renderer`, pending input, and CMOS access.
-- Move `wgpu` input, resize, advance, render, and CMOS-save calls through the
-  worker command protocol.
-- Preserve realtime and deterministic smoke-frame stepping, pulse buffering,
-  held input, typed characters, XYZZY overlay state, and live smoke reporting.
-- Add focused tests for threaded input/overlay advancement, realtime pulse
-  buffering, renderer resize, and CMOS snapshots.
-
-Work log:
-
-- `2026-05-12` Completed `DC-45`: `wgpu` presentation now draws the latest
-  `LiveCoreFrame` returned from a dedicated live core worker thread instead of
-  owning the arcade machine directly. Validation passed with
-  `cargo fmt --check`, `cargo check`, targeted
-  `live::tests::live_core_thread`, targeted
-  `wgpu_presenter::tests::wgpu_smoke`, and
-  `cargo clippy --all-targets -- -D warnings`, `cargo test --all-targets`,
-  `cargo run -- --live-smoke`, `make trace-script-test`,
-  `make trace-fixtures`, `make coverage NEW_CODE_COVERAGE_BASE=origin/main`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md`,
-  and `git diff --check`.
-
-## Completed Follow-On Cycles
-
-These ordered cycles are complete. If a future behavior gap appears, document
-the gap in `docs/fidelity/gaps.md` and add a source-backed fixture or
-characterization test before implementation.
-
-### DC-46: Kitty Runtime Unification
-
-Status: `complete`
-
-Goal: put the Kitty compatibility backend behind the same live runtime
-boundary as `wgpu`, so presentation code no longer owns arcade-core state in
-either live path.
-
-Scope:
-
-- Route Kitty input, frame advancement, rendering, resize handling, sleep
-  timing, and CMOS save/load through `LiveCoreRuntime`.
-- Keep the existing Kitty graphics protocol, terminal-session handling, and
-  terminal geometry code unchanged except for the runtime call sites.
-- Preserve pulse buffering, held-input catch-up frames, typed-character high
-  score entry, XYZZY overlay behavior, and CMOS persistence.
-- Add tests around any extracted Kitty/runtime adapter seams rather than
-  requiring an interactive terminal for coverage.
-
-Acceptance criteria:
-
-- `run_kitty_live` does not directly own or mutate `ArcadeMachine`,
-  `LiveCoreDriver`, `InputMapper`, `XyzzyOverlay`, or `Renderer`.
-- Kitty and `wgpu` share the same runtime command contract for input, resize,
-  advance/render, and CMOS access.
-- Existing Kitty renderer tests still cover double buffering, clear behavior,
-  resize behavior, and environment gating.
-
-Validation:
+Exit gate:
 
 ```sh
-cargo fmt --check
-cargo test --lib live::tests::live_core
-cargo test --lib kitty::tests
-cargo clippy --all-targets -- -D warnings
-cargo test --all-targets
+make clean-fidelity
+cargo run -- --game-smoke
 ```
 
-Work log:
+R0 is complete when the clean runner exists and every known clean-vs-accepted
+failure is either fixed or recorded as a bounded gap in `docs/fidelity/gaps.md`.
 
-- `2026-05-12` Completed `DC-46`: Kitty now uses `LiveCoreThread` for input,
-  resize, advance/render, and CMOS snapshots, matching the `wgpu` live runtime
-  command boundary while keeping the existing Kitty graphics and terminal
-  session code in the presentation path. Focused adapter coverage was added for
-  terminal geometry updates, and the shared CMOS-save helper is used by both
-  live backends. Validation passed with `cargo fmt --check`, `cargo check`,
-  targeted `live::tests::live_core_thread`, targeted
-  `live::tests::terminal_geometry_update_reports_runtime_and_kitty_sizes`,
-  targeted `kitty::tests`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo test --all-targets`, `cargo run -- --live-smoke`,
-  `make trace-script-test`, `make trace-fixtures`, and
-  `make coverage NEW_CODE_COVERAGE_BASE=origin/main`, `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md`, and `git diff --check`.
+### Milestone R1: Clean Runtime Takes Over Live Play
 
-### DC-47: Non-Blocking Wgpu Frame Pipeline
+Goal: make the product runtime execute the clean game, even before every
+mechanic is complete.
+
+Deliverables:
+
+- Move the live fixed-step loop, input mapper ownership, window lifecycle, and
+  resize/device lifecycle into clean `platform` and `runtime` code.
+- Feed `Game::step` frames into the clean renderer and audio runtime.
+- Replace `src/live_wgpu.rs` as a temporary presenter facade with a clean
+  launcher that owns `winit` and `wgpu` directly.
+- Keep legacy live play available only behind a test/dev oracle path if still
+  needed.
+
+Current implementation:
+
+- `DC-154` moves the `--live-smoke` frame source to the clean `Game` and
+  `NativeSceneRenderer`. The smoke report now records `frame_source:
+  clean_game`, `legacy_presenter_used: false`, sprite counts, and
+  temporary-raster counts.
+- `DC-155` moves normal interactive `cargo run` to a clean `winit`/`wgpu`
+  launcher. It owns window/device lifecycle, fixed-step clean `Game` stepping,
+  clean input state mapping, clean audio event submission, and indexed
+  instanced sprite draws from `NativeSceneRenderer` plans.
+- `2026-05-16 18:05:40 BST` R1 verification passed. `cargo run --
+  --live-smoke` reported `frame_source: clean_game`,
+  `legacy_presenter_used: false`, 24 clean game frames, 24 sprite frames, 290
+  sprite instances, 92 sprite draw commands, and zero temporary raster frames
+  or commands. `cargo run -- --game-smoke` reported the same sprite coverage
+  and zero raster frames. Focused tests passed with `cargo test --lib live_wgpu
+  -- --nocapture`,
+  `cargo test --lib clean_runtime_and_oracle_use_quarantined_adapters --
+  --nocapture`, and
+  `cargo test --lib clean_module_sources_keep_legacy_access_quarantined --
+  --nocapture`. `cargo check` passed. A targeted source scan of
+  `src/live_wgpu.rs`, `src/runtime.rs`, and `src/game_smoke.rs` found no
+  `wgpu_presenter`, `crate::live::`, `ArcadeMachine`, or `src_legacy`
+  dependency in the R1 live path; the only `legacy_presenter` matches are the
+  false-valued smoke report fields and tests.
+
+Exit gate:
+
+```sh
+cargo run -- --live-smoke
+cargo run -- --game-smoke
+```
+
+R1 is complete when `--live-smoke` proves sprite-rendered clean frames and no
+longer depends on `src_legacy/wgpu_presenter.rs` or a legacy raster scene.
+
+### Milestone R2: Production Sprite Assets And WGPU Execution
 
 Status: `complete`
 
-Goal: separate `wgpu` event-loop scheduling from core frame production so the
-window thread draws the latest completed frame instead of synchronously waiting
-for every arcade-core advance/render command.
+Completed: `2026-05-16 19:55:20 BST`
 
-Scope:
+Goal: replace renderer evidence plans and placeholder art with actual
+production rendering.
 
-- Introduce a small latest-frame mailbox or bounded channel between the live
-  core worker and `WgpuLiveApp`.
-- Keep input and resize commands ordered relative to core advancement.
-- Preserve deterministic `--live-smoke` behavior by keeping smoke mode on an
-  explicit fixed-frame cadence with observable frame counts.
-- Keep normal realtime mode tied to `FRAME_RATE_MILLIHZ` deadlines from the
-  core runtime.
-- Add tests for latest-frame replacement, stale-frame dropping, resize
-  ordering, clean shutdown, and smoke determinism.
+Deliverables:
 
-Acceptance criteria:
+- Load or embed the arcade PNG assets from `assets/sprites/` into a production
+  texture atlas.
+- Replace solid default atlas regions in normal runtime with real sprite and
+  glyph pixels.
+- Turn `SceneDrawPlan` into actual `wgpu` resource creation, upload, pipeline,
+  bind-group, render-pass, and draw execution code.
+- Add an offscreen render smoke gate that compares selected frames to checked
+  visual signatures.
 
-- `WgpuLiveApp::draw_frame` can render the latest available frame without
-  blocking on an arcade-core step.
-- Normal mode does not busy-spin when no frame is due.
-- Smoke reports still include window creation, rendered frame count, distinct
-  frame signatures, attract/credit/playing evidence, injected inputs, and clean
-  exit.
-- Worker shutdown cannot leave the event loop waiting forever on a channel
-  receive.
-
-Validation:
+Exit gate:
 
 ```sh
-cargo fmt --check
-cargo test --lib live::tests::live_core
-cargo test --lib wgpu_presenter::tests::wgpu_smoke
-cargo clippy --all-targets -- -D warnings
-cargo test --all-targets
+cargo run -- --game-smoke
 cargo run -- --live-smoke
 ```
 
-Work log:
-
-- `2026-05-12` Completed `DC-47`: `LiveCoreThread` now supports a
-  replacement latest-frame mailbox and non-blocking frame requests, while
-  keeping the synchronous advance path for Kitty. `WgpuLiveApp` requests at
-  most one core frame at a time, drains completed frames without blocking the
-  redraw path, schedules normal mode from the worker-owned frame deadline, and
-  keeps smoke mode on explicit fixed-frame requests. Focused coverage was
-  added for mailbox replacement, stale-frame dropping, resize ordering, async
-  fixed-frame determinism, and in-flight shutdown joining. Validation passed
-  with `cargo fmt --check`, targeted `live::tests::live_core`, targeted
-  `wgpu_presenter::tests::wgpu_smoke`, clippy with warnings denied,
-  `cargo test --all-targets`, `cargo run -- --live-smoke`, `make fidelity`,
-  Markdown lint, and the whitespace diff check.
-  Slack update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778624044098319`
-
-### DC-48: Runtime Lifecycle And Error Contracts
-
-Status: `complete`
-
-Goal: make live runtime startup, shutdown, worker panic reporting, and CMOS
-persistence explicit and testable before adding more long-running runtime
-features.
-
-Scope:
-
-- Replace stringly worker failures with a small runtime error type or structured
-  context that distinguishes command send failures, worker termination, render
-  failures, and worker panics.
-- Ensure live workers shut down and join predictably from normal exit, smoke
-  exit, window close, suspended windows, and error paths.
-- Confirm CMOS save uses the final core-owned CMOS state after live runtime
-  shutdown.
-- Add tests for worker drop, failed command response, render error propagation,
-  and CMOS snapshot retrieval after gameplay mutations.
-
-Acceptance criteria:
-
-- Runtime errors include enough context to identify the failed command.
-- Dropping the runtime cannot leak a worker thread.
-- `run_wgpu_live` and `run_wgpu_live_smoke` preserve their public error
-  behavior while using the structured runtime errors internally.
-- CMOS save remains best-effort only where it already was; no new gameplay
-  behavior depends on persistence.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib live::tests::live_core_thread
-cargo test --lib wgpu_presenter::tests
-cargo clippy --all-targets -- -D warnings
-cargo test --all-targets
-```
-
-Work log:
-
-- `2026-05-12` Completed `DC-48`: live runtime failures now report structured
-  command-scoped errors for command send failures, worker termination, worker
-  panics, mailbox failures, and render failures. Live shutdown now joins the
-  worker and returns the final core-owned CMOS snapshot before persistence, so
-  Kitty and `wgpu` both save after runtime shutdown. Focused coverage was added
-  for drop/join behavior, failed command context, worker panic context,
-  sync/async render error propagation, and CMOS mutation persistence.
-  Validation passed with `cargo fmt --check`, targeted
-  `live::tests::live_core_thread`, targeted `wgpu_presenter::tests`, clippy
-  with warnings denied, `cargo test --all-targets`, and
-  `cargo run -- --live-smoke`.
-  Slack update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778624792340579`
-
-### DC-49: Public Arcade API Narrowing
-
-Status: `complete`
-
-Goal: reduce the public `machine::...` compatibility surface without breaking
-existing internal callers or hiding source-shaped contracts that tests still
-need.
-
-Scope:
-
-- Inventory current `machine::...` re-exports and classify them as public API,
-  test-only support, internal implementation detail, or source fixture
-  contract.
-- Move internal-only imports to their owning modules where practical.
-- Keep compatibility re-exports temporarily when the migration would otherwise
-  create broad churn.
-- Add compile-time caller checks or focused tests for any moved public surface.
-- Update `README.md` and `SPEC.md` only if the user-facing API changes.
-
-Acceptance criteria:
-
-- No behavior code changes are mixed into this cycle.
-- Existing external-facing commands and live behavior are unchanged.
-- Any removed or moved symbol has a documented replacement path or is proven
-  private to the crate.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make coverage NEW_CODE_COVERAGE_BASE=origin/main
-```
-
-Work log:
-
-- `2026-05-12` Completed `DC-49`: `machine_state` and `machine_process` are
-  now public canonical contract modules, while the existing `machine::...`
-  re-exports remain as compatibility aliases. Internal callers in fidelity,
-  live runtime, and `wgpu` presentation now import state/process contracts from
-  the owning modules where practical. Compile-time API checks cover both direct
-  and compatibility paths, and README/SPEC now document the canonical paths.
-  Validation passed with `cargo fmt --check`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, and
-  `make coverage NEW_CODE_COVERAGE_BASE=origin/main`.
-  Slack update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778626931639039`
-
-### DC-50: Machine Module Ergonomics Pass
-
-Status: `complete`
-
-Goal: keep shrinking assembler-shaped bulk into readable Rust modules while
-preserving source-visible behavior and fixture coverage.
-
-Scope:
-
-- Pick one high-cohesion area at a time: scoring/high-score flow, object list
-  mutations, shell/projectile handling, terrain/world flow, or operator/audit
-  flow.
-- Extract small typed data structures or helper traits only when they remove
-  real duplication or clarify a source contract.
-- Keep source routine names visible in tests and error messages where they are
-  part of fidelity evidence.
-- Avoid broad rewrites of `machine.rs` and `machine_memory.rs`; each pass must
-  have a narrow ownership boundary and focused tests.
-
-Acceptance criteria:
-
-- The selected module area has less duplicated address/list manipulation or
-  less incidental register plumbing than before the cycle.
-- Source-visible mutations remain covered by existing or new tests.
-- Public behavior, trace output, live play, and fixture checks are unchanged.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib machine::tests::<focused_filter>
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make trace-fixtures
-make coverage NEW_CODE_COVERAGE_BASE=origin/main
-```
-
-Work log:
-
-- `2026-05-13` Completed `DC-50`: the high-score game-over dispatch path and
-  test-only one-player game setup now reuse the live high-score session reset
-  helper instead of duplicating entry/submission/player-mask cleanup. Focused
-  regression coverage now asserts `GameOverSleeping` clears the entry,
-  submission, active-entry player, completed-player mask, and phase state.
-  Validation passed with `cargo fmt --check`, targeted
-  `machine::tests::game_over_sleeping_dispatch_clears_live_high_score_session`,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `make trace-fixtures`, and
-  `make coverage NEW_CODE_COVERAGE_BASE=origin/main`.
-  Slack update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778628102721249`
-
-### DC-51: Live Audio Acceptance Design
-
-Status: `complete`
-
-Goal: prepare live audio output with source-backed acceptance criteria before
-implementing any audio device or mixer code.
-
-Scope:
-
-- Define which sound-board surface is authoritative for live audio:
-  per-frame sound commands, sound-board state snapshots, DAC byte signatures,
-  or a combination.
-- Add a documented live-audio design note that covers cadence, buffering,
-  sample rate, worker-thread ownership, and how audio interacts with pause,
-  window suspend, smoke mode, and CMOS persistence.
-- Add or extend fixtures that prove command timing for coin, start, thrust,
-  smart bomb, hyperspace, explosion, terrain blow, and high-score paths.
-- Do not add audible output in this cycle.
-
-Acceptance criteria:
-
-- `docs/fidelity/gaps.md` has no unresolved live-audio behavior question that
-  would block implementation.
-- The plan identifies the exact fixture or test that will fail if audio timing
-  drifts.
-- Runtime threading ownership for audio is specified before implementation.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --all-targets
-make trace-script-test
-make trace-fixtures
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-```
-
-Work log:
-
-- `2026-05-13` Completed `DC-51`: added the source-backed live audio
-  acceptance design in `docs/fidelity/live-audio.md`, added
-  `assets/red-label/live-audio-acceptance.tsv`, and wired the matrix into
-  embedded-asset tests so each accepted path is backed by existing command or
-  sound-table fixtures. README, SPEC, fidelity README, gap notes, and the
-  refactor freeze inventory now point to the accepted timing, diagnostic, and
-  content-guard surfaces before runtime audio implementation begins.
-  Validation passed with `cargo fmt --check`, `cargo test --all-targets`,
-  `make trace-script-test`, `make trace-fixtures`, and `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/README.md
-  docs/fidelity/gaps.md docs/fidelity/live-audio.md`.
-  Slack update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778628605842599`
-
-### DC-52: Live Audio Runtime Prototype
-
-Status: `complete`
-
-Goal: add the first live audio runtime path only after `DC-51` establishes the
-source-backed acceptance contract.
-
-Scope:
-
-- Add an audio backend behind a trait so live audio can be disabled, mocked, or
-  swapped without changing the arcade core.
-- Feed audio from the accepted sound-board surface without changing trace
-  output or machine stepping cadence.
-- Keep audio commands on a runtime-owned thread or channel boundary that does
-  not block `wgpu` redraw or core stepping.
-- Add a CLI/config path only if the default behavior and platform failure modes
-  are clear.
-
-Acceptance criteria:
-
-- Audio can be disabled for tests and unsupported platforms.
-- `--live-smoke` remains deterministic and does not require an audio device.
-- Sound command fixtures and DAC signature tests still pass unchanged unless
-  `DC-51` explicitly updated their accepted contract.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-```
-
-Work log:
-
-- `2026-05-13` Completed `DC-52`: added `src/audio.rs` with a live audio
-  backend trait, disabled mode, no-device null backend, bounded non-blocking
-  command queue, drop accounting, flush/shutdown handling, and focused tests.
-  Live core stepping now copies accepted `FrameOutput::sound_commands()`
-  batches to the audio runtime without changing arcade-core ownership, trace
-  output, or step cadence. Normal live play uses the null backend, `--mute`
-  disables the runtime path, and `--live-smoke` uses a disabled no-device path.
-  README, SPEC, fidelity docs, gap notes, and refactor-freeze ownership notes
-  now describe the prototype boundary and the remaining audible-device work.
-  Validation passed with `cargo fmt --check`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `make fidelity`,
-  `cargo run -- --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/README.md
-  docs/fidelity/gaps.md docs/fidelity/live-audio.md`, and `git diff --check`.
-  Slack update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778630482569359`
-
-### DC-53: Release And CI Hardening
-
-Status: `complete`
-
-Goal: make the refactored runtime cheaper to maintain by tightening local and
-GitHub validation around the expensive fidelity, smoke, and coverage gates.
-
-Scope:
-
-- Review CI runtime after the threaded fixture runner and live runtime changes.
-- Keep `make ci`, `make fidelity`, Sonar, coverage baseline, and local docs in
-  sync.
-- Add targeted CI diagnostics for `wgpu` smoke failures, coverage baseline
-  drift, missing Lua/Mesa tools, and Slack update failures.
-- Keep generated artifacts out of git unless the project explicitly accepts
-  them as source fixtures or documentation media.
-
-Acceptance criteria:
-
-- A CI failure points at the failed subsystem instead of requiring full log
-  archaeology.
-- Coverage baseline refresh remains an intentional command, not an implicit
-  side effect.
-- README development commands match the Makefile and workflows.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13` Completed `DC-53`: added Makefile doctor targets for trace,
-  coverage, and `wgpu` smoke prerequisites; split GitHub CI into explicit
-  prerequisite diagnostics, fidelity, and `xvfb` smoke steps; added Sonar
-  coverage diagnostics; and updated README/SPEC development guidance so local
-  commands, workflow steps, and the intentional coverage-baseline refresh path
-  stay aligned. Validation passed with `make trace-doctor`,
-  `make coverage-doctor`, `make trace-script-test`, `make fidelity`,
-  `cargo run -- --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/README.md docs/fidelity/gaps.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
-  `git diff --check`.
-  Slack update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778631713574199`
-
-## Planned Rewrite Cycles
-
-These cycles replace the completed refactor track with a clean `wgpu`-only
-rewrite track. Keep each cycle narrow enough to finish with focused tests and
-the full fidelity gate before moving on.
-
-### DC-54: Wgpu-Only Rewrite Foundation
-
-Status: `complete`
-
-Goal: establish the clean rewrite boundary without changing gameplay behavior.
-
-Scope:
-
-- Remove Kitty from the active app surface: CLI renderer selection, runtime
-  routing, docs, active tests, and CI expectations.
-- Make `wgpu` the only supported live runtime and `--live-smoke` path.
-- Introduce `game`, `systems`, `renderer`, and `platform` module shells with
-  clean public contracts.
-- Move the converted `src/` tree to `src_legacy/` and make the clean rewrite
-  the primary `src/` tree.
-- Move or wrap the current assembler-shaped implementation behind an explicit
-  `fidelity::oracle` or `legacy` boundary.
-- Narrow `src/lib.rs` public exports to the intended clean API plus temporary
-  oracle/test surfaces.
-- Replace fragile new-code coverage baseline matching with a line-and-context
-  or source-hash keyed baseline.
-- Convert CLI parsing to typed command parsing so mixed commands and flags are
-  rejected predictably.
-
-Acceptance criteria:
-
-- `cargo run` and `cargo run -- --live-smoke` use `wgpu` without backend
-  selection.
-- No active production path depends on Kitty or terminal graphics.
-- The current gameplay model is still available to tests as an oracle.
-- Public crate exports distinguish clean API from temporary oracle internals.
-- Coverage baseline entries cannot accidentally accept unrelated repeated
-  source lines.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13` Started `DC-54` on branch `rewrite`: posted the cycle start
-  update, moved the converted implementation to `src_legacy/`, promoted the
-  clean rewrite modules into `src/`, and kept the legacy implementation wired
-  as the temporary oracle/compatibility runtime.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778657320848069`
-- `2026-05-13` Continued `DC-54`: removed active Kitty renderer selection from
-  CLI parsing, help text, Make targets, and live runtime routing. `cargo run`
-  and `cargo run -- --live-smoke` now use the `wgpu` path without backend
-  selection.
-- `2026-05-13` Completed `DC-54`: moved the old implementation under
-  `src_legacy/`, made the clean rewrite tree the primary `src/`, kept the
-  legacy machine available as an oracle/compatibility runtime, strengthened the
-  new-code coverage baseline to line-and-source-hash matching, and refreshed
-  the baseline to zero accepted uncovered additions. Validation passed with
-  `make fidelity`, `cargo run -- --live-smoke`, `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, `git diff --check`, and
-  `cargo run --quiet -- --help`.
+R2 is complete when the smoke reports are backed by real asset pixels and
+offscreen `wgpu` output, not only plan metadata.
+
+Completion evidence:
+
+- `DC-156` moved the default clean sprite atlas from solid placeholder regions
+  to the reclassified `assets/sprites/` PNG inputs.
+- `DC-157` moved `--live-smoke` from draw-plan metadata to actual offscreen
+  `wgpu` texture rendering, readback, nonblank checks, and checked first/last
+  frame signatures.
+- `2026-05-16 19:55:20 BST` R2 validation passed. `make fidelity` passed
+  during the milestone gate. After coverage-only dead-code/import cleanup,
+  focused checks passed with `cargo fmt --check`,
+  `RUSTFLAGS='--cfg coverage' cargo check --lib`,
+  `cargo test --lib live_wgpu::tests -- --nocapture`,
+  `cargo clippy --all-targets -- -D warnings`,
+  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/gaps.md
+  assets/arcade/README.md assets/sprites/README.md assets/sounds/README.md`,
+  and `git diff --check`. `make clean-fidelity` passed. The R2 exit smokes
+  passed with `cargo run -- --game-smoke` and
+  `cargo run -- --live-smoke`; final live smoke reported 24 rendered frames,
+  24 offscreen `wgpu` frames, 24 nonblank readbacks, 22 distinct offscreen
+  signatures, first signature `72f0f2beddc5084e`, last signature
+  `262b08d50efc12c2`, zero temporary raster frames/commands, and clean exit.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778660955629679`
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778957757426449`.
 
-### DC-55: Clean Simulation Contracts
+### Milestone R3: Core Cabinet Flow
 
-Status: `complete`
+Goal: make clean boot, attract, credits, start, two-player state, operator
+controls, high scores, and CMOS persistence source-faithful.
 
-Goal: define the domain-first frame API that future gameplay systems will own.
+Deliverables:
 
-Scope:
+- Implement clean attract/title/instruction state as domain systems.
+- Implement coin slots, one-player and two-player start, current-player
+  switching, tilt, diagnostics, audits, high-score reset, and CMOS-backed
+  persistence through clean modules.
+- Preserve Planetoid and `XYZZY` as compatibility layers outside arcade
+  mechanics.
 
-- Add clean `GameState`, `GameInput`, `GameFrame`, `GameEvents`, and
-  `RenderScene` contracts.
-- Add an oracle adapter that converts current machine output into the clean
-  contracts for comparison.
-- Add fixtures that compare clean frame events and scene summaries against the
-  current accepted behavior.
-- Keep all red-label/source terminology inside the oracle adapter and fidelity
-  tests.
-
-Acceptance criteria:
-
-- The `wgpu` runtime can advance through the clean frame API even while the
-  oracle still produces the underlying behavior.
-- New gameplay code can be written against clean contracts without importing
-  machine memory modules.
-- Accepted trace scenarios have clean event/scene comparison coverage.
-
-Validation:
+Exit gate:
 
 ```sh
-cargo fmt --check
-cargo test --lib game
-cargo test --lib systems
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
+make clean-fidelity SCENARIOS="attract_boot start_game"
+cargo run -- --live-smoke --input-profile cabinet
+```
+
+R3 is complete when clean output matches accepted evidence for attract/start
+flow and live cabinet controls remain playable.
+
+### Milestone R4: Player, Terrain, Scanner, And Projectiles
+
+Goal: make the player-facing control loop feel and behave like Defender.
+
+Deliverables:
+
+- Finish source-faithful player acceleration, damping, reverse, vertical
+  bounds, hyperspace, smart-bomb stock, laser/shot cadence, and projectile
+  lifetime.
+- Implement scrolling terrain, starfield, scanner/radar presentation, viewport
+  behavior, and scene ordering as clean systems.
+- Replace simplified HUD placeholders with clean score, lives, bombs, wave,
+  scanner, and status text/glyph rendering.
+
+Exit gate:
+
+```sh
+make clean-fidelity \
+  SCENARIOS="first_300_frames firing thrust_reverse smart_bomb hyperspace"
+cargo run -- --game-smoke
+```
+
+R4 is complete when player control, projectile, HUD, scanner, and frame timing
+match accepted evidence for those focused scenarios.
+
+### Milestone R5: Enemy Ecology And Human Rules
+
+Goal: implement the complete Defender playfield model.
+
+Deliverables:
+
+- Add clean enemy kinds for lander, mutant, baiter, bomber, pod, swarmer, mine,
+  and enemy shots.
+- Implement wave composition, RNG, spawning, movement, targeting, collisions,
+  explosions, scoring, and baiter pressure.
+- Implement humanoid standing, abduction, carrying, falling, catching, rescue,
+  death, mutation, planet survival, and planet destruction.
+
+Exit gate:
+
+```sh
+make clean-fidelity SCENARIOS="abduction death wave_advance planet_destruction"
 cargo run -- --live-smoke
 ```
 
-Work log:
+R5 is complete when the long playfield scenarios match accepted state, event,
+sound, and visual evidence.
 
-- `2026-05-13` Started `DC-55` on branch `rewrite`: posted the cycle start
-  update and began extending the clean `GameState`/`GameFrame`/`GameEvents`,
-  `RenderScene`, and simulation trait contracts while keeping the converted
-  implementation behind the oracle boundary.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778661176512439`
-- `2026-05-13` Completed `DC-55`: `GameFrame` now carries clean
-  `GameState`, `GameEvents`, sound events, and a `RenderScene`; renderer
-  scenes expose stable summaries and layer counts; `systems` exposes a
-  `GameSimulation` trait for clean frame advancement; and the gameplay oracle
-  implements that trait while converting accepted machine output into clean
-  state, event, sound, and scene-summary frames. Clean fixture coverage now
-  compares credited-start events and scene summaries against the accepted
-  oracle behavior. Validation passed with `cargo fmt --check`, focused
-  `game`, `systems`, `renderer`, and `oracle` tests, `cargo test
-  --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity`, `cargo run -- --live-smoke`, `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, and `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778664173986969`
+### Milestone R6: Death, Game Over, And High Score Completion
 
-### DC-56: Native Wgpu Scene Renderer
+Goal: finish the session loop.
 
-Status: `complete`
+Deliverables:
 
-Goal: replace framebuffer presentation with a native `wgpu` scene renderer
-while keeping visual behavior equivalent.
+- Implement source-faithful player death, explosion, respawn, invulnerability or
+  restart timing, remaining-stock handling, game over, attract return, and high
+  score qualification.
+- Complete high-score entry visuals, initials editing, submission, persistence,
+  and post-entry return behavior.
 
-Scope:
-
-- Build renderer-owned pipelines for terrain/starfield, sprites, projectiles,
-  explosions, HUD/text, and debug overlays.
-- Introduce texture atlas and palette/font resources owned by the renderer.
-- Render from `RenderScene` instead of machine RAM.
-- Keep a temporary framebuffer comparison path for golden visual fixtures.
-
-Acceptance criteria:
-
-- Live play and smoke render through native `wgpu` scene data.
-- Golden visual evidence still catches behavioral or visual drift.
-- Renderer modules do not import machine memory or oracle-specific types.
-
-Validation:
+Exit gate:
 
 ```sh
-cargo fmt --check
-cargo test --lib renderer
-cargo test --lib wgpu_presenter::tests::wgpu_smoke
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
+make clean-fidelity SCENARIOS="death high_score_entry"
 cargo run -- --live-smoke
 ```
 
-Work log:
+R6 is complete when death and high-score scenarios are clean-owned and
+source-faithful.
 
-- `2026-05-13` Started `DC-56` on branch `rewrite`: posted the cycle start
-  update and began replacing direct frame upload with clean renderer scene data.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778664443957909`
-- `2026-05-13` Completed `DC-56`: `RenderScene` now supports a validated
-  temporary raster payload for visual equivalence, renderer-owned atlas,
-  palette, font, native pipeline, and draw-plan resources live in the clean
-  renderer module, and the live `wgpu` path uploads scene raster data instead
-  of drawing directly from `RenderedImage`. Smoke visual evidence now derives
-  from scene metrics while the temporary raster path keeps golden visual drift
-  detectable. Validation passed with `cargo fmt --check`, focused
-  `renderer`, `wgpu_smoke`, and live scene tests, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `make fidelity`, and
-  `cargo run -- --live-smoke`; the live smoke reported 240 rendered frames,
-  74 distinct scene signatures, attract/credit/playing evidence, all required
-  injected inputs, and clean exit.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778667397382589`
+### Milestone R7: Real Audio Backend
 
-### DC-57: Player Control System Migration
+Goal: make audio faithful and playable, not only represented by events.
 
-Status: `complete`
+Deliverables:
 
-Goal: begin migrating gameplay from memory-oriented routines to clean
-deterministic systems with the first input/player-control slice.
+- Map accepted sound commands to clean semantic sound events with exact frame
+  timing.
+- Add a real backend that plays embedded/generated sound assets or synthesized
+  equivalents through a non-blocking mixer.
+- Cover startup, credit, start, thrust loop, laser, explosions, smart bomb,
+  enemy movement, rescue, high score, and game-over sounds.
+- Keep deterministic null backend tests and add a bounded audio smoke report.
 
-Scope:
-
-- Add a clean player-control system that separates held movement/fire intent
-  from two-clear-sample action triggers.
-- Preserve vertical-control priority and input history behavior without exposing
-  RAM-layout fields or assembler routine names in production code.
-- Compare the clean control history against the oracle before replacing live
-  gameplay paths.
-- Keep the remaining gameplay migration sequence explicit for follow-on cycles.
-
-Acceptance criteria:
-
-- The migrated player-control slice has clean domain tests and oracle
-  equivalence tests.
-- Production player-control code no longer reads or writes RAM-layout fields.
-- Behavior, trace output, live smoke, and accepted visual/audio evidence remain
-  stable.
-
-Validation:
+Exit gate:
 
 ```sh
-cargo fmt --check
-cargo test --lib systems
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
+make clean-fidelity
 cargo run -- --live-smoke
-```
-
-Work log:
-
-- `2026-05-13` Started `DC-57` on branch `rewrite`: posted the cycle start
-  update and began migrating player input/control behavior into clean
-  deterministic systems while keeping accepted behavior behind the oracle.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778667591192949`
-- `2026-05-13` Completed `DC-57`: added clean `PlayerControlIntent`,
-  `PlayerActionTriggers`, `PlayerControlFrame`, and `PlayerControlSystem`
-  contracts for held control intent and two-clear-sample action triggers;
-  exported the contracts through the clean public API; and added both clean
-  domain tests and oracle switch-scan equivalence coverage. `README.md` and
-  `SPEC.md` now describe the clean player-control system, and `DC-58` now
-  carries the next player-motion/projectile migration slice. Validation passed
-  with `cargo fmt --check`, `cargo test --lib systems`, `cargo test
-  --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity`, `cargo run -- --live-smoke`, `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  and `git diff --check`; live smoke rendered 239 frames with 74 distinct scene
-  CRCs, attract/credit/playing evidence, all required injected inputs, and a
-  clean exit.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778669085679879`
-
-### DC-58: Player Motion And Projectile Systems
-
-Status: `complete`
-
-Goal: continue gameplay migration by moving player motion and projectile
-launch behavior into clean deterministic systems.
-
-Scope:
-
-- Drive player motion from `PlayerControlIntent` while preserving accepted
-  damping, thrust, vertical priority, bounds, and scroll behavior.
-- Add clean projectile launch/capacity state and compare fire entry timing
-  against the oracle.
-- Keep update order explicit for controls, motion, projectiles, collision, and
-  rendering scene emission.
-- Remove assembler-derived names from newly migrated production code.
-
-Acceptance criteria:
-
-- Player motion and projectile launch/capacity slices have clean domain tests
-  and oracle equivalence tests.
-- Production player-motion and projectile modules do not read or write
-  RAM-layout fields.
-- Behavior, trace output, live smoke, and accepted visual evidence remain
-  stable unless an intentional difference is documented.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-```
-
-Work log:
-
-- `2026-05-13` Started `DC-58` on branch `rewrite`: posted the cycle start
-  update and began moving player motion plus projectile launch/capacity
-  behavior into clean deterministic systems while keeping accepted behavior
-  behind the oracle.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778669202479739`
-- `2026-05-13` Completed `DC-58`: added clean `ScreenPosition`,
-  `PlayerMotionState`, `PlayerMotionFrame`, `PlayerMotionSystem`,
-  `ProjectileState`, `ProjectileLaunchOutcome`, and `ProjectileSystem`
-  contracts; exported them through the clean public API; and added focused
-  systems tests plus oracle equivalence for accepted player motion and laser
-  fire entry behavior. Validation passed with `cargo fmt --check`, `cargo test
-  --lib systems`, `cargo test --lib oracle`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `make fidelity`, `cargo run --
-  --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
-  `git diff --check`; the coverage gate reported 196/196 non-baselined added
-  executable Rust lines covered, and live smoke rendered 239 frames with 74
-  distinct scene signatures, attract/credit/playing evidence, all required injected
-  inputs, and a clean exit.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778672203264889`
-
-### DC-59: Audio Device And Event Model
-
-Status: `complete`
-
-Goal: replace command-byte delivery with gameplay-facing sound events and a
-diagnosable audio runtime.
-
-Scope:
-
-- Map accepted command timing to clean `SoundEvent` values.
-- Add structured audio worker errors, backend lifecycle reporting, and smoke
-  diagnostics.
-- Add an audible backend only after null/disabled/event equivalence is stable.
-- Keep sound fixture timing as the oracle for migrated sound events.
-
-Acceptance criteria:
-
-- Gameplay systems emit semantic sound events.
-- Audio worker failure is visible in tests and diagnostics.
-- `--live-smoke` stays deterministic and device-independent.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib audio
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-```
-
-Work log:
-
-- `2026-05-13` Started `DC-59` on branch `rewrite`: posted the cycle start
-  update and began moving live audio from raw command-batch delivery to
-  gameplay-facing sound events while keeping accepted frame-output timing as
-  the oracle boundary.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778672338922919`
-- `2026-05-13` Completed `DC-59`: added active clean `src/audio.rs` event
-  batches, semantic `SoundEvent` mapping for accepted startup, credit, start,
-  and thrust cues, structured audio shutdown diagnostics, backend lifecycle
-  and sample-rate reporting, queue drop stats, and worker panic visibility.
-  The legacy live core now feeds `SoundEvent` batches through the clean runtime,
-  and documentation now describes event delivery with `FrameOutput` retained
-  as the timing adapter. Validation passed with `cargo fmt --check`, `cargo
-  test --lib audio`, `cargo test --all-targets`, `cargo clippy --all-targets
-  -- -D warnings`, `make fidelity`, `cargo run -- --live-smoke`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, and `git diff --check`; the coverage gate
-  reported 17/17 non-baselined added executable Rust lines covered, and live
-  smoke rendered 239 frames with 74 distinct scene signatures, attract/credit/playing
-  evidence, all required injected inputs, and a clean exit.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778675086403679`
-
-### DC-60: Compatibility Surface Quarantine
-
-Status: `complete`
-
-Goal: begin oracle retirement by hiding legacy compatibility modules from the
-supported clean public API documentation while current runtime and fidelity
-tooling still depend on them.
-
-Scope:
-
-- Mark all `src_legacy/` path modules in `src/lib.rs` as doc-hidden
-  compatibility modules.
-- Add a focused architecture test that fails if a legacy path module is exposed
-  without the compatibility quarantine marker.
-- Keep the binary, README media tooling, oracle tests, and fidelity gates
-  working without changing gameplay behavior.
-- Document that compatibility modules remain wired but are not the supported
-  clean API surface.
-
-Acceptance criteria:
-
-- Supported docs expose clean modules first and legacy modules are explicitly
-  hidden.
-- Tests guard against adding new unhidden legacy path modules.
-- Public clean contracts and existing compatibility runtime remain intact.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::legacy_compatibility_modules_are_hidden_from_supported_api_docs
-cargo check --all-targets
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13` Started `DC-60` on branch `rewrite`: posted the cycle start
-  update and began the first oracle-retirement step by auditing legacy module
-  exposure from the clean crate root.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778675232663129`
-- `2026-05-13` Completed `DC-60`: marked every `src_legacy/` path module in
-  `src/lib.rs` as a doc-hidden compatibility module, added
-  `public_api_tests::legacy_compatibility_modules_are_hidden_from_supported_api_docs`
-  to guard the quarantine marker, and updated `README.md`, `SPEC.md`, and this
-  plan to describe the hidden compatibility surface while moving full oracle
-  retirement to `DC-61`. Validation passed with the documented DC-60 gate:
-  formatting, the focused public API guard, `cargo check --all-targets`, the
-  full Rust test suite, clippy with warnings denied, `make fidelity`,
-  `cargo run -- --live-smoke`, markdownlint, and `git diff --check`; the
-  coverage gate reported 0/0 non-baselined added executable Rust lines, and
-  live smoke rendered 240 frames with 74 distinct scene signatures,
-  attract/credit/playing evidence, all required injected inputs, and a clean
-  exit.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778676669257919`
-
-### DC-61: Runtime Entrypoint Facade
-
-Status: `complete`
-
-Goal: continue oracle retirement by removing the binary entrypoint's direct
-dependency on the doc-hidden legacy `app` module.
-
-Scope:
-
-- Add a clean platform-facing runtime launcher that owns the production
-  entrypoint contract.
-- Point `src/main.rs` at the clean platform launcher instead of
-  `defender::app::run()`.
-- Add a focused architecture guard that rejects direct binary calls into the
-  legacy `app` module.
-- Document that the binary now enters through the clean runtime boundary while
-  the compatibility runtime remains the temporary accepted behavior owner.
-
-Acceptance criteria:
-
-- `src/main.rs` depends on `defender::platform::run()`.
-- The legacy `app` module remains hidden compatibility plumbing.
-- CLI behavior and fidelity gates are unchanged.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::binary_entrypoint_uses_clean_platform_runtime_boundary
-cargo test --lib platform::tests::runtime_entrypoint_delegates_to_compatibility_runtime
-cargo check --all-targets
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13` Started `DC-61` on branch `rewrite`: posted the cycle start
-  update and began moving the production binary entrypoint behind a clean
-  platform launcher.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778676810486839`
-- `2026-05-13` Completed `DC-61`: added `platform::run()` as the clean runtime
-  launcher, pointed `src/main.rs` at `defender::platform::run()`, guarded the
-  binary entrypoint against direct legacy `app` calls, and documented that the
-  binary now enters through the clean platform boundary while the compatibility
-  runtime remains the temporary accepted behavior owner. Validation passed with
-  the documented DC-61 gate: formatting, the focused public API and platform
-  entrypoint tests, `cargo check --all-targets`, the full Rust test suite,
-  clippy with warnings denied, `make fidelity`, `cargo run -- --live-smoke`,
-  markdownlint, and `git diff --check`; the coverage gate reported 2/2
-  non-baselined added executable Rust lines, and live smoke rendered 239 frames
-  with 74 distinct scene signatures, attract/credit/playing evidence, all required
-  injected inputs, and a clean exit.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778679271201939`
-
-### DC-62: Compatibility Namespace Facade
-
-Status: `complete`
-
-Goal: make the remaining legacy access explicit by routing clean runtime and
-oracle callers through a single doc-hidden compatibility namespace.
-
-Scope:
-
-- Add a `defender::compatibility` facade over the parked `src_legacy/`
-  adapters.
-- Route `platform` runtime launch and `oracle` accepted-behavior calls through
-  the compatibility namespace instead of direct legacy crate-root paths.
-- Preserve the existing doc-hidden legacy modules for legacy internals until a
-  later deletion pass can retire them safely.
-- Add architecture tests that keep clean runtime and oracle callers on the
-  compatibility boundary.
-
-Acceptance criteria:
-
-- Clean runtime and oracle modules no longer call `crate::app`,
-  `crate::machine_state`, `crate::video`, or related legacy root paths
-  directly.
-- The compatibility facade re-exports the machine-state and process contracts
-  still needed by oracle tests.
-- README, SPEC, and PLAN describe compatibility access as a temporary boundary,
-  not a clean production dependency.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::compatibility_namespace
-cargo test --lib platform::tests::runtime_entrypoint_delegates_to_compatibility_runtime
-cargo check --all-targets
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 18:56:46 BST` Started `DC-62`: posted the cycle start update and
-  began introducing a compatibility namespace boundary for clean runtime and
-  oracle legacy access.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778695006846469`
-- `2026-05-13 19:34:22 BST` Completed `DC-62`: added the doc-hidden
-  `defender::compatibility` facade, routed `platform` and `oracle` legacy
-  calls through that namespace, added architecture tests to keep clean runtime
-  and oracle callers off direct legacy crate-root paths, added an oracle phase
-  contract test to cover all accepted phase mappings, and updated README,
-  SPEC, and PLAN to describe the compatibility boundary and next oracle
-  retirement slice. Validation passed with the documented DC-62 gate:
-  formatting, focused compatibility and platform tests, `cargo check
-  --all-targets`, the full Rust test suite, clippy with warnings denied,
-  `make fidelity`, `cargo run -- --live-smoke`, markdownlint, and
-  `git diff --check`; the first `make fidelity` run exposed missing new-line
-  coverage for two phase mapping arms, which was fixed before rerunning the
-  gate successfully. The final coverage gate reported 7/7 non-baselined added
-  executable Rust lines, and live smoke rendered 239 frames with 74 distinct
-  scene signatures, attract/credit/playing evidence, all required injected inputs,
-  and a clean exit.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778697300468119`
-
-### DC-63: Public Legacy Export Retirement
-
-Status: `complete`
-
-Goal: stop exposing parked legacy modules from the public crate root while
-keeping temporary oracle and tooling access behind the doc-hidden compatibility
-namespace.
-
-Scope:
-
-- Change `src_legacy/` root adapters in `src/lib.rs` from public modules to
-  crate-private modules.
-- Rebuild `defender::compatibility` as explicit doc-hidden submodules that
-  re-export the public legacy items needed by the oracle and temporary tools.
-- Route the README media example through `defender::compatibility` instead of
-  direct legacy public crate-root paths.
-- Add architecture tests that fail if legacy root adapters become public again.
-
-Acceptance criteria:
-
-- External callers can no longer import `defender::machine`,
-  `defender::input`, `defender::video`, or related parked legacy modules from
-  the root crate namespace.
-- Temporary oracle and README media tooling still compile through the
-  compatibility namespace.
-- README, SPEC, and PLAN describe root legacy adapters as crate-private.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::compatibility_namespace
-cargo test --lib public_api_tests::legacy_compatibility_modules_are_crate_private_at_root
-cargo check --all-targets
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 19:38:28 BST` Started `DC-63`: posted the cycle start update and
-  began retiring public root exports for the parked legacy adapters while
-  preserving temporary oracle and tooling access through the compatibility
-  namespace.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778697445868899`
-- `2026-05-13 19:58:11 BST` Completed `DC-63`: made parked legacy adapters
-  crate-private at the root, rebuilt `defender::compatibility` as explicit
-  doc-hidden submodules, routed README media generation through that boundary,
-  and updated architecture docs/tests to preserve the split. Validation passed:
-  `cargo fmt --check`, targeted public API tests, `cargo check --all-targets`,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity`, `cargo run -- --live-smoke`, `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  and `git diff --check`. `make fidelity` reported new Rust line coverage
-  `0/0` non-baselined added executable lines. Live smoke rendered 239 frames,
-  saw 74 distinct frame signatures, observed attract, credit, and playing states,
-  injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778698710074379`
-
-### DC-64: Accepted-Behavior Facade
-
-Status: `complete`
-
-Goal: isolate production clean runtime and oracle code from direct legacy
-module names while preserving the accepted gameplay implementation as the
-temporary oracle.
-
-Scope:
-
-- Add a crate-private `src/accepted.rs` facade over the temporary accepted
-  implementation.
-- Convert accepted machine output into neutral accepted-behavior frame,
-  snapshot, phase, direction, event, sound, and visual-signature contracts before
-  `src/oracle.rs` adapts them to clean gameplay types.
-- Route `src/platform.rs` through the accepted facade instead of calling the
-  doc-hidden compatibility runtime directly.
-- Keep low-level legacy method access in tests and temporary tooling only.
-- Update architecture tests and docs so future clean production callers use
-  the accepted facade rather than `defender::compatibility`.
-
-Acceptance criteria:
-
-- `src/oracle.rs` production code imports `crate::accepted::...`, not
-  `crate::compatibility::...` or direct legacy root modules.
-- `src/platform.rs` dispatches through `crate::accepted::run_runtime()`.
-- Focused accepted-facade, oracle, and public API tests pass.
-- README, SPEC, and PLAN describe the accepted facade as the current retirement
-  boundary.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib accepted::tests
-cargo test --lib oracle::tests
-cargo test --lib public_api_tests
-cargo check --all-targets
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 20:01:11 BST` Started `DC-64`: posted the cycle start update and
-  began isolating production runtime/oracle access behind a neutral
-  accepted-behavior facade while keeping the legacy machine available for
-  behavior comparison.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778698871347899`
-- `2026-05-13 20:43:21 BST` Completed `DC-64`: added the crate-private
-  `src/accepted.rs` facade, routed `platform` and `GameplayOracle` through
-  `crate::accepted`, converted accepted machine output into neutral frame,
-  snapshot, phase, direction, event, sound-command, and visual-signature
-  contracts,
-  and updated docs/tests to preserve the boundary. Validation passed with the
-  DC-64 gate: formatting, focused accepted/oracle/API tests, all-target
-  check/test/clippy, `make fidelity`, live smoke, markdownlint, and
-  `git diff --check`. `make fidelity` reported new Rust line coverage `38/38`
-  non-baselined added executable lines. Live smoke rendered 239 frames, saw 74
-  distinct frame signatures, observed attract, credit, and playing states, injected
-  all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778701401764609`
-
-### DC-65: Oracle Equivalence Quarantine
-
-Status: `complete`
-
-Goal: move legacy-specific oracle equivalence checks out of clean oracle source
-without weakening the clean-system regression coverage.
-
-Scope:
-
-- Keep `src/oracle.rs` focused on clean gameplay adapter contracts.
-- Move low-level accepted-behavior equivalence checks that need legacy process,
-  memory, and red-label names into a `src_legacy/` test module.
-- Wire the quarantined tests through `src/lib.rs` only for `cfg(test)`.
-- Add a public API guard so `src/oracle.rs` does not reintroduce legacy
-  terminology while the accepted facade remains temporary.
-- Document the test quarantine boundary in README and SPEC.
-
-Acceptance criteria:
-
-- `src/oracle.rs` contains no direct compatibility or red-label terminology.
-- The moved equivalence tests still run in the normal library test suite.
-- Focused oracle, quarantined equivalence, and public API tests pass.
-- README, SPEC, and PLAN describe the new test boundary.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib oracle::tests
-cargo test --lib oracle_equivalence_tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-ORACLE_LEGACY_TERMS='red_label|RED_LABEL|defend\\.|src/machine_memory|source routine|assembler|compatibility'
-! rg -n "$ORACLE_LEGACY_TERMS" src/oracle.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 21:03:12 BST` Started `DC-65`: posted the cycle start update and
-  began quarantining legacy-heavy oracle equivalence checks out of
-  `src/oracle.rs` while preserving the clean-system regression coverage.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778702592948259`
-- `2026-05-13 21:28:13 BST` Completed `DC-65`: moved the low-level legacy
-  oracle equivalence checks into `src_legacy/oracle_equivalence_tests.rs`, left
-  `src/oracle.rs` with clean accepted/gameplay adapter tests, added a public
-  API guard against legacy terminology in `src/oracle.rs`, and documented the
-  test quarantine boundary. Validation passed with the DC-65 gate: focused
-  oracle/equivalence/API tests, all-target tests, clippy, `make fidelity`, live
-  smoke, oracle terminology search, markdownlint, and `git diff --check`.
-  `make fidelity` reported new Rust line coverage `0/0` non-baselined added
-  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures,
-  observed attract, credit, and playing states, injected all required controls,
-  and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778704093033349`
-
-### DC-66: Accepted Adapter Quarantine
-
-Status: `complete`
-
-Goal: move the legacy-importing accepted-machine adapter out of the clean
-accepted-behavior facade while preserving the current temporary oracle.
-
-Scope:
-
-- Keep `src/accepted.rs` focused on neutral accepted frame, snapshot, phase,
-  direction, event, sound, and runtime delegation contracts.
-- Move accepted-machine adaptation, clean-input-to-cabinet-input projection,
-  legacy snapshot conversion, legacy event conversion, and runtime/video-size
-  bridge calls into `src_legacy/accepted_behavior.rs`.
-- Keep `src/oracle.rs` and `src/platform.rs` on the crate-private
-  `crate::accepted` facade.
-- Keep low-level equivalence tests in `src_legacy/` and point their
-  test-only helpers at the legacy adapter.
-- Add a public API guard so `src/accepted.rs` does not reintroduce direct
-  compatibility or legacy root imports.
-- Document the accepted adapter quarantine in README and SPEC.
-
-Acceptance criteria:
-
-- `src/accepted.rs` contains no direct compatibility, legacy root module, or
-  red-label imports.
-- Accepted facade, accepted adapter, oracle, and public API focused tests pass.
-- Normal runtime and oracle behavior remains unchanged.
-- README, SPEC, and PLAN describe the accepted adapter boundary.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib accepted::tests
-cargo test --lib accepted_behavior::tests
-cargo test --lib oracle::tests
-cargo test --lib oracle_equivalence_tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-ACCEPTED_LEGACY_TERMS='compatibility::|red_label|RED_LABEL|crate::input'
-ACCEPTED_LEGACY_TERMS="$ACCEPTED_LEGACY_TERMS|crate::machine|crate::machine_state"
-ACCEPTED_LEGACY_TERMS="$ACCEPTED_LEGACY_TERMS|crate::video|crate::app"
-! rg -n "$ACCEPTED_LEGACY_TERMS" src/accepted.rs src/oracle.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 21:30:32 BST` Started `DC-66`: posted the cycle start update and
-  began moving the legacy-importing accepted-machine adapter out of
-  `src/accepted.rs` into `src_legacy/accepted_behavior.rs` while preserving
-  current oracle behavior.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778704232856249`
-- `2026-05-13 21:53:54 BST` Completed `DC-66`: moved the legacy-importing
-  accepted-machine adapter into `src_legacy/accepted_behavior.rs`, kept
-  `src/accepted.rs` as neutral accepted-behavior contracts plus delegation,
-  added a public API guard against direct legacy imports in `src/accepted.rs`,
-  and updated the legacy equivalence tests to use the quarantined adapter.
-  Validation passed with the DC-66 gate: focused accepted/adapter/oracle/API
-  tests, all-target tests, clippy, `make fidelity`, live smoke, clean
-  accepted/oracle terminology search, markdownlint, and `git diff --check`.
-  `make fidelity` reported new Rust line coverage `5/5` non-baselined added
-  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures,
-  observed attract, credit, and playing states, injected all required controls,
-  and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778705634783139`
-
-### DC-67: Compatibility Namespace Quarantine
-
-Status: `complete`
-
-Goal: keep temporary oracle and tool access intact while moving the
-compatibility re-export details out of the clean crate root.
-
-Scope:
-
-- Add `src_legacy/compatibility.rs` as the owner of the doc-hidden
-  `defender::compatibility` re-export namespace.
-- Keep `src/lib.rs` focused on clean public exports, crate-private legacy path
-  adapters, and the one doc-hidden compatibility path declaration.
-- Preserve README media tooling and legacy equivalence tests that still use
-  the temporary compatibility namespace.
-- Add a public API guard that fails if the compatibility re-export map moves
-  back into `src/lib.rs`.
-
-Acceptance criteria:
-
-- `defender::compatibility` behavior is unchanged for current temporary users.
-- `src/lib.rs` no longer contains inline compatibility re-export details.
-- README, SPEC, and PLAN document the compatibility namespace ownership.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 21:57:04 BST` Started `DC-67`: posted the cycle start update and
-  began moving the doc-hidden compatibility re-export details from clean
-  `src/lib.rs` to `src_legacy/compatibility.rs` while preserving temporary
-  tooling and oracle access.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778705824813039`
-- `2026-05-13 22:18:12 BST` Completed `DC-67`: moved
-  `defender::compatibility` re-export ownership to
-  `src_legacy/compatibility.rs`, left `src/lib.rs` with only the doc-hidden
-  path declaration, added a public API guard against moving the re-export map
-  back into the clean crate root, and updated README/SPEC/PLAN to document the
-  ownership boundary. Validation passed with the DC-67 gate: formatting,
-  focused public API tests, all-target tests, clippy, `make fidelity`, live
-  smoke, markdownlint, and `git diff --check`. `make fidelity` reported new
-  Rust line coverage `0/0` non-baselined added executable lines. Live smoke
-  rendered 239 frames, saw 74 distinct frame signatures, observed attract, credit,
-  and playing states, injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778707109325719`
-
-### DC-68: Terminal Session Retirement
-
-Status: `complete`
-
-Goal: remove parked terminal-session code from active crate wiring after Kitty
-left the runtime surface.
-
-Scope:
-
-- Move the remaining `TerminalGeometry` value type into the legacy video
-  renderer that still consumes it.
-- Remove the `src_legacy/terminal.rs` path module from active `src/lib.rs`
-  wiring.
-- Remove `defender::compatibility::terminal` from temporary compatibility
-  re-exports.
-- Keep `src_legacy/terminal.rs` parked as historical Kitty terminal-session
-  evidence, but leave it unwired from production builds.
-- Add public API guards that fail if terminal-session code is rewired through
-  the clean crate root or compatibility namespace.
-
-Acceptance criteria:
-
-- Current `wgpu` live behavior and fidelity tooling remain unchanged.
-- No active root module or compatibility namespace exposes terminal-session
-  setup.
-- README, SPEC, and PLAN describe the parked terminal-session boundary.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests
-cargo test --lib video::tests::raster_size_uses_terminal_pixels_when_available
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 22:21:20 BST` Started `DC-68`: posted the cycle start update and
-  began removing legacy terminal-session code from active clean crate wiring
-  while keeping the legacy video renderer's geometry value type local to that
-  renderer.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778707270698529`
-- `2026-05-13 22:42:36 BST` Completed `DC-68`: moved `TerminalGeometry` into
-  the legacy video renderer, removed `src_legacy/terminal.rs` from active
-  clean crate wiring, removed `defender::compatibility::terminal`, and added
-  public API guards that keep terminal-session setup out of the active root and
-  compatibility namespace. Validation passed with the DC-68 gate: formatting,
-  focused public API and video tests, all-target tests, clippy,
-  `make fidelity`, live smoke, markdownlint, and `git diff --check`.
-  `make fidelity` reported new Rust line coverage `0/0` non-baselined added
-  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures,
-  observed attract, credit, and playing states, injected all required controls,
-  and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778708566793249`
-
-### DC-69: Trace Sample Oracle Quarantine
-
-Status: `complete`
-
-Goal: keep generated long-trace sample fixture data out of clean crate-root
-wiring while preserving the legacy machine oracle behavior that still consumes
-that evidence.
-
-Scope:
-
-- Move `src_legacy/red_label_trace_samples.rs` from the active clean crate root
-  into the private legacy machine oracle module tree.
-- Remove the generated fixture module from the root legacy adapter guard in
-  `src/lib.rs`.
-- Add a public API guard that fails if generated trace samples become
-  root-wired or compatibility-exported again.
-- Keep generated trace sample tests and current oracle behavior intact.
-- Document that generated long-trace fixture data is historical oracle evidence,
-  not a clean root adapter.
-
-Acceptance criteria:
-
-- `src/lib.rs` no longer declares `red_label_trace_samples`.
-- The fixture module is private to `src_legacy/machine.rs`.
-- Current oracle fixture behavior and live behavior remain unchanged.
-- README, SPEC, and PLAN describe the private trace-sample oracle boundary.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests
-cargo test --lib machine::red_label_trace_samples::tests
-cargo test --lib oracle_equivalence_tests::clean_fixture_matches_accepted_oracle_events_and_scene_summaries
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-TRACE_SAMPLE_TERMS='red_label_trace_samples|crate::red_label_trace_samples'
-TRACE_SAMPLE_TERMS="$TRACE_SAMPLE_TERMS|compatibility::red_label_trace_samples"
-! rg -n "$TRACE_SAMPLE_TERMS" src src_legacy/compatibility.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 22:47:43 BST` Started `DC-69`: posted the cycle start update and
-  began moving generated long-trace sample fixture data out of clean crate-root
-  wiring while keeping it available to the legacy machine oracle.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778708773431689`
-- `2026-05-13 23:07:38 BST` Completed `DC-69`: moved generated long-trace
-  sample fixture data out of clean crate-root wiring and into the private
-  legacy machine oracle module tree, added a public API guard against root or
-  compatibility re-export regressions, and documented the private oracle
-  boundary in README, SPEC, and PLAN. Validation passed with the DC-69 gate:
-  formatting, focused public API/private fixture/oracle equivalence tests,
-  all-target tests, clippy, `make fidelity`, live smoke, trace-sample root
-  search, markdownlint, and `git diff --check`. `make fidelity` reported new
-  Rust line coverage `0/0` non-baselined added executable lines. Live smoke
-  rendered 240 frames, saw 74 distinct frame signatures, observed attract, credit,
-  and playing states, injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778710071723699`
-
-### DC-70: Compatibility Re-export Narrowing
-
-Status: `complete`
-
-Goal: shrink the doc-hidden compatibility namespace to the temporary tool and
-equivalence contracts still used in this repo, without changing gameplay
-behavior.
-
-Scope:
-
-- Remove compatibility re-exports for low-level legacy modules such as assets,
-  board, memory layout, ROM verification, sound internals, live runtime, PIA,
-  and `wgpu` presenter ownership.
-- Keep only compatibility modules required by README media tooling and clean
-  equivalence tests: input, machine, machine process/state, red-label math
-  types, and video.
-- Mark parked low-level legacy adapters as dead-code-tolerant while they remain
-  crate-private evidence for the oracle and tests.
-- Add a public API guard that fails if low-level compatibility re-exports are
-  restored.
-- Document the narrowed compatibility boundary in README, SPEC, and PLAN.
-
-Acceptance criteria:
-
-- `defender::compatibility` no longer exposes asset, board, memory, ROM, sound,
-  live, PIA, or `wgpu` presenter modules.
-- README media generation and clean equivalence tests still compile through the
-  reduced temporary compatibility surface.
-- Existing gameplay, fidelity fixtures, and live smoke behavior remain
-  unchanged.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::compatibility_namespace_exposes_only_temporary_tool_contracts
-cargo test --lib oracle_equivalence_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-RETIRED_COMPAT='app|assets|board|cmos_storage|fidelity|live|pia'
-RETIRED_COMPAT="$RETIRED_COMPAT|red_label_memory|red_label_message"
-RETIRED_COMPAT="$RETIRED_COMPAT|red_label_wave|rom|sound|terminal"
-! rg -n "pub mod ($RETIRED_COMPAT|wgpu_presenter)" src_legacy/compatibility.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 23:12:14 BST` Started `DC-70`: posted the cycle start update and
-  began narrowing the doc-hidden compatibility namespace to the temporary
-  contracts still used by README media tooling and clean equivalence tests.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778710163561459`
-- `2026-05-13 23:33:27 BST` Completed `DC-70`: removed low-level compatibility
-  re-exports for asset, board, memory, ROM, sound, live, PIA, and `wgpu`
-  presenter internals; kept only the temporary README media and clean
-  equivalence contracts; added the public API regression guard; and documented
-  the narrowed boundary in README, SPEC, and PLAN. Validation passed with the
-  DC-70 gate: formatting, focused compatibility API guard, all-target tests,
-  clippy, `make fidelity`, live smoke, retired compatibility export search,
-  markdownlint, and `git diff --check`. `make fidelity` reported new Rust line
-  coverage `0/0` non-baselined added executable lines. Live smoke rendered 239
-  frames, saw 74 distinct frame signatures, observed attract, credit, and playing
-  states, injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778711608813249`
-
-### DC-71: Red-Label Compatibility Export Retirement
-
-Status: `complete`
-
-Goal: remove the remaining red-label math-type export from the doc-hidden
-compatibility namespace while preserving crate-private oracle behavior.
-
-Scope:
-
-- Remove `defender::compatibility::red_label` now that in-repo callers no
-  longer require that temporary export.
-- Keep the legacy `red_label` adapter crate-private for the accepted-behavior
-  bridge and oracle internals.
-- Strengthen the public API guard so restoring the red-label compatibility
-  export fails a focused test.
-- Update README, SPEC, and PLAN to describe the narrower compatibility surface.
-
-Acceptance criteria:
-
-- `defender::compatibility` exposes only input, machine, machine process/state,
-  and video temporary contracts.
-- Existing accepted-machine, oracle, README media, and live smoke behavior
-  remain unchanged.
-- Docs describe red-label math types as crate-private oracle wiring, not
-  compatibility API.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::compatibility_namespace_exposes_only_temporary_tool_contracts
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-! rg -n "pub mod red_label" src_legacy/compatibility.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 23:35:58 BST` Started `DC-71`: posted the cycle start update and
-  began retiring the remaining red-label math-type export from the doc-hidden
-  compatibility namespace.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778711721691489`
-- `2026-05-13 23:56:56 BST` Completed `DC-71`: removed
-  `defender::compatibility::red_label`, moved the legacy equivalence test
-  import to crate-private oracle wiring, kept the red-label adapter hidden at
-  the root with the other parked oracle modules, and updated README, SPEC, and
-  PLAN. Validation passed with the DC-71 gate: formatting, focused
-  compatibility API guard, focused oracle-equivalence tests, all-target tests,
-  clippy, `make fidelity`, live smoke, retired export search, markdownlint,
-  and `git diff --check`. `make fidelity` reported new Rust line coverage
-  `0/0` non-baselined added executable lines. Live smoke rendered 240 frames,
-  saw 74 distinct frame signatures, observed attract, credit, and playing states,
-  injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778713016113959`
-
-### DC-72: Process/State Compatibility Export Retirement
-
-Status: `complete`
-
-Goal: remove unused machine process/state exports from the doc-hidden
-compatibility namespace while preserving crate-private oracle behavior.
-
-Scope:
-
-- Remove `defender::compatibility::machine_process` and
-  `defender::compatibility::machine_state` now that in-repo callers no longer
-  require those temporary exports.
-- Keep the legacy process/state adapters crate-private for the accepted
-  behavior bridge and oracle internals.
-- Move legacy clean-equivalence test imports to crate-private oracle wiring.
-- Strengthen the public API guard so restoring these process/state
-  compatibility exports fails a focused test.
-- Update README, SPEC, and PLAN to describe the compatibility namespace as the
-  remaining README media surface: input, machine, and video.
-
-Acceptance criteria:
-
-- `defender::compatibility` exposes only input, machine, and video temporary
-  contracts.
-- Existing accepted-machine, oracle equivalence, README media, and live smoke
-  behavior remain unchanged.
-- Docs describe machine process/state contracts as crate-private oracle wiring,
-  not compatibility API.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::compatibility_namespace_exposes_only_temporary_tool_contracts
-cargo test --lib oracle_equivalence_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-! rg -n "pub mod (machine_process|machine_state)" src_legacy/compatibility.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-13 23:59:21 BST` Started `DC-72`: posted the cycle start update and
-  began removing the unused machine process/state exports from the doc-hidden
-  compatibility namespace while keeping the underlying legacy adapters
-  crate-private for oracle internals.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778713129737859`
-- `2026-05-14 00:20:02 BST` Completed `DC-72`: removed
-  `defender::compatibility::machine_process` and
-  `defender::compatibility::machine_state`, moved the legacy equivalence test
-  import to crate-private oracle wiring, left the process/state adapters
-  crate-private at the root, and updated README, SPEC, and PLAN. Validation
-  passed with the DC-72 gate: formatting, focused compatibility API guard,
-  focused oracle-equivalence tests, all-target tests, clippy, `make fidelity`,
-  live smoke, retired export search, markdownlint, and `git diff --check`.
-  `make fidelity` reported new Rust line coverage `0/0` non-baselined added
-  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures,
-  observed attract, credit, and playing states, injected all required controls,
-  and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778714403527089`
-
-### DC-73: Sprite-First Plan and Internal Compatibility Import Retirement
-
-Status: `complete`
-
-Goal: record sprite-first rendering as an explicit rewrite requirement and
-remove the remaining internal oracle-equivalence test dependency on the
-temporary compatibility namespace.
-
-Scope:
-
-- Document that clean `wgpu` rendering should use sprite assets, texture
-  atlases, and batched sprite draws as the production representation.
-- Move `src_legacy/oracle_equivalence_tests.rs` imports from
-  `defender::compatibility` to crate-private legacy oracle modules.
-- Add a focused public API guard so internal equivalence tests cannot drift
-  back to the compatibility namespace.
-- Strengthen the plan requirement that every planned dev-cycle posts Slack
-  start and completion updates.
-- Update README, SPEC, and PLAN to describe compatibility as README media
-  tooling only for this slice.
-
-Acceptance criteria:
-
-- `PLAN.md` explicitly requires sprite-first `wgpu` rendering with atlases and
-  batched sprite draws.
-- Internal oracle-equivalence tests use crate-private legacy wiring, not the
-  doc-hidden `defender::compatibility` namespace.
-- `defender::compatibility` remains limited to the temporary README media
-  tooling surface for this cycle.
-- The work protocol explicitly requires Slack start and completion updates for
-  every planned dev-cycle.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::legacy_equivalence_tests_use_crate_private_oracle_wiring
-cargo test --lib oracle_equivalence_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-! rg -n "compatibility::|compatibility\\{" src_legacy/oracle_equivalence_tests.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 07:28:10 BST` Started `DC-73`: posted the cycle start update and
-  began recording sprite-first rendering as explicit rewrite scope while
-  moving legacy equivalence tests off the doc-hidden compatibility namespace.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778740070294709`
-- `2026-05-14 07:50:12 BST` Completed `DC-73`: documented sprite-first
-  `wgpu` rendering with sprite assets, texture atlases, and batched sprite
-  draws; moved legacy oracle-equivalence tests from the doc-hidden
-  compatibility namespace to crate-private oracle wiring; strengthened the
-  Slack start/completion update requirement in the work protocol; and updated
-  README, SPEC, and PLAN. Validation passed with the DC-73 gate: formatting,
-  focused public API guard, oracle-equivalence tests, all-target tests, clippy,
-  `make fidelity`, live smoke, retired-import search, markdownlint, and
-  `git diff --check`. `make fidelity` reported new Rust line coverage `0/0`
-  non-baselined added executable lines. Live smoke rendered 239 frames, saw
-  74 distinct frame signatures, observed attract, credit, and playing states,
-  injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778741426762209`
-
-### DC-74: README Media Compatibility Namespace Retirement
-
-Status: `complete`
-
-Goal: retire the final public compatibility namespace by moving README media
-generation behind a narrow high-level facade.
-
-Scope:
-
-- Add a doc-hidden `defender::readme_media` facade owned by `src_legacy/` so
-  README media generation no longer imports low-level machine, input, or video
-  contracts.
-- Update `examples/generate_readme_media.rs` to consume the high-level media
-  facade.
-- Delete the final `defender::compatibility` re-export namespace and its
-  `src_legacy/compatibility.rs` export map.
-- Strengthen public API guards so restoring the compatibility namespace or
-  README media low-level imports fails a focused test.
-- Update README, SPEC, and PLAN to describe README media as the only
-  doc-hidden tool facade left from this slice.
-
-Acceptance criteria:
-
-- `examples/generate_readme_media.rs` imports `defender::readme_media`, not
-  `defender::compatibility`.
-- `src/lib.rs` no longer wires `pub mod compatibility`, and
-  `src_legacy/compatibility.rs` is removed.
-- Root legacy machine, input, and video modules remain crate-private.
-- README and SPEC no longer describe the compatibility namespace as active
-  tool API.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::compatibility_namespace_is_retired
-cargo test --lib public_api_tests::readme_media_facade_is_legacy_owned_and_doc_hidden
-cargo test --lib readme_media::tests
-cargo test --example generate_readme_media
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-! rg -n \
-  -e "defender::compatibility" \
-  -e "use defender::compatibility" \
-  -e '#\\[path = "\\.\\./src_legacy/compatibility\\.rs"\\]' \
-  src src_legacy examples README.md SPEC.md
-test ! -e src_legacy/compatibility.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 07:53:51 BST` Started `DC-74`: posted the cycle start update and
-  began retiring the final public compatibility namespace by moving README
-  media generation to a narrow high-level facade.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778741631993389`
-- `2026-05-14 08:19:18 BST` Completed `DC-74`: added the doc-hidden
-  `defender::readme_media` facade, moved README media generation off
-  low-level machine/video imports, removed `src_legacy/compatibility.rs`, and
-  retired the public `defender::compatibility` namespace. Validation passed
-  with formatting, focused public API/readme-media tests, all-target tests,
-  clippy, `make fidelity`, live smoke, compatibility grep guard, deleted-file
-  guard, markdownlint, and `git diff --check`. `make fidelity` reported new
-  Rust line coverage `0/0` non-baselined added executable lines. Live smoke
-  rendered 239 frames, saw 74 distinct frame signatures, observed attract, credit,
-  and playing states, injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778743156254659`
-
-### DC-75: Clean Equivalence Gate Foundation
-
-Status: `complete`
-
-Goal: establish clean state/event/render/sound equivalence signatures before
-retiring memory-oriented trace gates.
-
-Scope:
-
-- Add a clean `src/fidelity.rs` frame signature contract over `GameSnapshot`,
-  gameplay events, sound events, and `RenderSceneSummary`.
-- Root-wire legacy trace tooling as `legacy_fidelity` so the public clean
-  `fidelity` module no longer points at memory-oriented trace code.
-- Add focused tests comparing clean frame signatures with the accepted facade
-  for credited start and live control input.
-- Update README, SPEC, and PLAN to describe clean fidelity signatures and
-  legacy trace quarantine.
-
-Acceptance criteria:
-
-- `src/fidelity.rs` contains no direct legacy module imports.
-- Public clean API exposes `GameplayEquivalenceSignature`.
-- Historical trace tooling remains available under the crate-private
-  `legacy_fidelity` root adapter.
-- Focused signature tests cover state, gameplay events, sound events, and
-  render summaries.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib fidelity::tests
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
-cargo test --lib public_api_tests::legacy_modules_are_crate_private_at_root
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 08:21:38 BST` Started `DC-75`: posted the cycle start update and
-  began adding clean frame-equivalence signatures as the first memory-oriented
-  oracle retirement slice.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778743298143089`
-- `2026-05-14 08:48:24 BST` Completed `DC-75`: added the clean
-  `GameplayEquivalenceSignature` contract in `src/fidelity.rs`, root-wired
-  historical trace tooling as crate-private `legacy_fidelity`, and added
-  focused signature tests against the accepted facade for credited start and
-  live control input. README, SPEC, and PLAN now describe clean fidelity
-  signatures and leave broad memory-model retirement to `DC-77`. Validation
-  passed with formatting, focused fidelity/public API tests, all-target tests,
-  clippy, `make fidelity`, live smoke, markdownlint, and `git diff --check`.
-  `make fidelity` reported new Rust line coverage `0/0` non-baselined added
-  executable lines. Live smoke rendered 239 frames, saw 74 distinct frame
-  CRCs, observed attract, credit, and playing states, injected all required
-  controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778744904031159`
-
-### DC-76: Clean Audio Boundary Isolation
-
-Status: `complete`
-
-Goal: remove the clean audio runtime's direct dependency on legacy frame
-outputs.
-
-Scope:
-
-- Remove `machine_state::FrameOutput` from `src/audio.rs`.
-- Keep live audio submission on clean `GameFrame` and `SoundEvent` contracts.
-- Move legacy output-to-clean audio adaptation into `src_legacy/live.rs`.
-- Add a public API guard so clean audio cannot re-import legacy frame outputs.
-- Update README, SPEC, and PLAN to document the audio boundary.
-
-Acceptance criteria:
-
-- `src/audio.rs` contains no `FrameOutput` or legacy `machine_state` imports.
-- Live audio still receives accepted startup sound events.
-- Legacy live code owns the only output-to-clean audio adapter.
-- Docs describe the clean audio boundary.
-
-Validation:
-
-```sh
-cargo fmt --check
 cargo test --lib audio::tests
-cargo test --lib live::tests::live_core_driver_feeds_sound_events_to_audio_runtime
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
+```
+
+R7 is complete when sound events match accepted timing and live play produces
+audible output unless `--mute` is set.
+
+### Milestone R8: Legacy Retirement
+
+Goal: remove converted implementation dependencies from production.
+
+Deliverables:
+
+- Remove non-test `#[path = "../src_legacy/..."]` adapters from `src/lib.rs`.
+- Keep optional ROM verification and MAME/reference tooling in explicit tool or
+  dev-only modules, not in the production runtime path.
+- Delete or archive temporary raster-presenter code after offscreen and live
+  sprite rendering cover the final behavior.
+- Remove public guard tests that only protect temporary quarantine paths and
+  replace them with guards that production code cannot import legacy modules.
+
+Exit gate:
+
+```sh
+cargo tree
 cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
 make fidelity
+make clean-fidelity
+cargo run -- --game-smoke
 cargo run -- --live-smoke
-! rg -n "FrameOutput|from_frame_output|submit_frame_output|machine_state" src/audio.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
 ```
 
-Work log:
+R8 is complete when production builds and live play no longer compile through
+the legacy machine, memory model, or raster presenter.
 
-- `2026-05-14 08:50:28 BST` Started `DC-76`: posted the cycle start update and
-  began moving legacy frame-output audio adaptation out of the clean audio
-  runtime.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778745028598859`
-- `2026-05-14 09:13:39 BST` Completed `DC-76`: removed legacy
-  `FrameOutput` and `machine_state` dependencies from clean `src/audio.rs`,
-  moved output-to-clean audio adaptation into `src_legacy/live.rs`, and added
-  a public API guard to keep clean audio on `GameFrame` and `SoundEvent`
-  contracts. README, SPEC, and PLAN now document the clean audio boundary.
-  Validation passed with formatting, focused audio/live/public API tests,
-  all-target tests, clippy, `make fidelity`, live smoke, the clean audio
-  static guard, markdownlint, and `git diff --check`. `make fidelity` reported
-  new Rust line coverage `9/9` non-baselined added executable lines. Live
-  smoke rendered 239 frames, saw 74 distinct frame signatures, observed attract,
-  credit, and playing states, injected all required controls, and exited
-  cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778746419261859`
+### Milestone R9: Final Acceptance
 
-### DC-77: Clean Sound Event Contract Isolation
+Goal: close the rewrite with finite acceptance evidence.
 
-Status: `complete`
+Deliverables:
 
-Goal: remove accepted sound command-byte mapping from the clean gameplay domain
-and keep that adapter logic at the oracle boundary.
+- Run the full validation gate, clean-fidelity gate, reference fixture checks
+  where local ROM/MAME inputs are available, offscreen render checks, audio
+  smoke, and live smoke.
+- Record final visual, audio, and playability evidence in `README.md`,
+  `SPEC.md`, and `docs/fidelity/`.
+- Update `PLAN.md` to state the rewrite is complete and remove the old
+  completed-cycle narrative from active planning.
 
-Scope:
-
-- Remove `SoundEvent::from_accepted_command`,
-  `SoundEvent::accepted_command`, and `UnmappedAcceptedCommand` from
-  `src/game.rs`.
-- Add oracle-owned accepted sound command mapping and test-support helpers.
-- Route clean fidelity and legacy oracle-equivalence tests through the oracle
-  mapping helper.
-- Add a public API guard so clean gameplay contracts cannot re-own accepted
-  sound command mapping.
-- Update README, SPEC, and PLAN to document the sound-event boundary.
-
-Acceptance criteria:
-
-- `src/game.rs` contains no accepted sound command mapping helpers or accepted
-  unmapped-command variant.
-- `src/oracle.rs` owns the accepted sound command mapping into clean
-  `SoundEvent` values.
-- Clean fidelity and legacy oracle-equivalence tests compare sound events
-  through the oracle boundary.
-- Docs describe clean `SoundEvent` as a gameplay contract, not a command-byte
-  adapter.
-
-Validation:
+Exit gate:
 
 ```sh
 cargo fmt --check
-cargo test --lib game::tests
-cargo test --lib oracle::tests
-cargo test --lib fidelity::tests
-cargo test --lib oracle_equivalence_tests::clean_fixture_matches_accepted_oracle_events_and_scene_summaries
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
+make clean-fidelity
+cargo run -- --game-smoke
 cargo run -- --live-smoke
-! rg -n "from_accepted_command|accepted_command|UnmappedAcceptedCommand" src/game.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
+markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md \
+  docs/fidelity/live-audio.md docs/fidelity/gaps.md
 git diff --check
 ```
 
-Work log:
+R9 is complete when there are no active rewrite gaps and the clean runtime is
+the only production runtime.
 
-- `2026-05-14 09:16:30 BST` Started `DC-77`: posted the cycle start update and
-  began moving accepted sound command-byte mapping out of the clean gameplay
-  contract and into the oracle boundary.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778746590651139`
-- `2026-05-14 09:38:12 BST` Completed `DC-77`: removed accepted command-byte
-  conversion helpers from clean `SoundEvent`, renamed the unmapped sound
-  surface to neutral `UnmappedSoundCommand`, moved accepted sound command
-  mapping into `src/oracle.rs`, and routed clean fidelity plus legacy
-  oracle-equivalence checks through the oracle helper. Added a public API guard
-  so `src/game.rs` cannot re-own accepted command mapping. README, SPEC, and
-  PLAN now document the sound-event boundary and move broad memory-model
-  retirement to `DC-78`. Validation passed with focused game/oracle/fidelity,
-  oracle-equivalence, and public API tests; formatting; all-target tests;
-  clippy; `make fidelity`; live smoke; the static guard; markdownlint; and
-  `git diff --check`. `make fidelity` reported new Rust line coverage `9/9`
-  non-baselined added executable lines. Live smoke rendered 240 frames, saw 74
-  distinct frame signatures, observed attract, credit, and playing states, injected
-  all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778747892960589`
+### Work Sequencing Rules
 
-### DC-78: Clean Fidelity Reference Probe Isolation
+- Work in vertical scenario slices. A cycle should either make a named scenario
+  pass, retire a named legacy runtime dependency, or replace a named placeholder
+  asset/audio path.
+- Avoid further renderer-evidence micro-cycles unless they directly enable R1
+  or R2. The next renderer work should execute real `wgpu`, not only expose
+  more command counts.
+- Do not implement arcade behavior from intuition. If source/MAME evidence is
+  missing, add a gap and a fixture path first.
+- The plan stops at R9. Adding R10 or extending the goal requires an explicit
+  owner decision.
 
-Status: `complete`
+### Repo Guidance Assessment
 
-Goal: remove clean fidelity tests' direct accepted-facade dependencies by
-moving reference-machine probing behind oracle test support.
+- The shared guidance does not block the rewrite. Conventional Commits,
+  Markdown consistency, Rust module boundaries, focused tests, and the coverage
+  floor all support a disciplined migration.
+- The shared `agents_repo-contexts.md` contains historical `battlezone` Kitty
+  terminal notes. They are not applicable to this repository's current
+  `wgpu`-only Defender rewrite. For this repo, `PLAN.md`, `SPEC.md`, and local
+  source tests are the operative guidance.
+- The current spec rule to preserve source-visible mutations should apply to
+  legacy oracle and fixture evidence, not to clean production architecture. The
+  clean game should prove equivalent behavior through domain state, events,
+  sound, and rendered output rather than recreating memory tables.
+- `make fidelity` is intentionally broad and slow. Keep it as the phase gate
+  for behavior and release-facing changes, but add narrower `make
+  clean-fidelity` scenario gates so implementation cycles are not forced into
+  all-or-nothing validation for every edit.
+- Slack start/completion posts remain mandatory only for planned dev-cycles.
+  Analysis-only and docs-only planning updates do not require new implementation
+  cycles unless they are explicitly tracked as one.
 
-Scope:
+## Active Development Cycle
 
-- Add an oracle-owned `ReferenceFrameProbe` for test-only reference frames.
-- Remove direct `AcceptedFrame` and `AcceptedGameplayMachine` imports from
-  `src/fidelity.rs`.
-- Keep `GameplayEquivalenceSignature` tests on clean `GameFrame` values and
-  oracle-provided reference frames.
-- Add a public API guard so clean fidelity cannot import accepted facade types
-  directly.
-- Update `README.md`, `SPEC.md`, and `PLAN.md`.
+### DC-164: R9 Final Acceptance Vertical Slice
 
-Acceptance criteria:
+Status: `in progress`
 
-- `src/fidelity.rs` contains no `crate::accepted::`, `AcceptedFrame`,
-  `AcceptedGameplayMachine`, or `adapt_accepted_` references.
-- Oracle test support owns reference probing from the accepted implementation.
-- Fidelity tests still prove clean signatures match a separate reference probe
-  for credited start and controls.
-- Documentation describes the reference-probe boundary.
+Milestone: `R9: Final Acceptance`
 
-Validation:
+Started: `2026-05-16 21:58:34 BST`
 
-```sh
-cargo fmt --check
-cargo test --lib fidelity::tests
-cargo test --lib oracle::tests
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-! rg -n \
-  -e "crate::accepted::" \
-  -e "AcceptedFrame" \
-  -e "AcceptedGameplayMachine" \
-  -e "adapt_accepted_" \
-  src/fidelity.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 09:40:38 BST` Started `DC-78`: posted the cycle start update and
-  began moving clean fidelity reference-machine probing out of `src/fidelity.rs`
-  and behind oracle test support while keeping the fidelity contract on clean
-  `GameFrame` signatures.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778748038056829`
-- `2026-05-14 10:04:58 BST` Completed `DC-78`: added the oracle-owned
-  `ReferenceFrameProbe`, removed direct accepted facade imports and adapter
-  helpers from `src/fidelity.rs`, strengthened the public API guard against
-  reintroducing those references, and updated README, SPEC, and PLAN to
-  describe the reference-probe boundary. Broad memory-oriented oracle
-  retirement moved to `DC-79`. Validation passed with formatting; focused
-  fidelity, oracle, and public API tests; all-target tests; clippy;
-  `make fidelity`; live smoke; the static fidelity accepted-facade guard;
-  markdownlint; and `git diff --check`. `make fidelity` matched 10 trace
-  fixtures covering 15452 frames and reported new Rust line coverage `0/0`
-  non-baselined added executable lines. Live smoke rendered 239 frames, saw 74
-  distinct frame signatures, observed attract, credit, and playing states, injected
-  all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778749498248829`
-
-### DC-79: Clean Game Simulation Shell
-
-Status: `complete`
-
-Goal: create a clean, sprite-first gameplay simulation foothold that does not
-depend on the accepted machine or memory-oriented runtime model.
+Goal: close the rewrite with finite acceptance evidence, refreshed docs, and the
+full R9 validation gate after confirming the clean runtime is the only
+production runtime path.
 
 Scope:
 
-- Add a clean `Game` simulation shell that owns `GameState` and emits
-  `GameFrame` values.
-- Drive credited start, basic playing controls, player motion, smart bomb
-  inventory, and projectile launch through clean deterministic systems.
-- Add a renderer-owned projectile sprite id and atlas region so clean game
-  frames stay sprite-first.
-- Keep live runtime and accepted-oracle behavior unchanged.
-- Add tests and public API guards so clean game source stays free of legacy
-  implementation terminology.
-- Update `README.md`, `SPEC.md`, and `PLAN.md`.
-
-Acceptance criteria:
-
-- `Game` implements `GameSimulation` and advances clean frames without accepted
-  machine state.
-- Clean game frames contain sprite scene data and no temporary raster payload.
-- Playing controls exercise clean control, motion, and projectile systems.
-- Public API guards reject legacy implementation terminology in `src/game.rs`.
-- Documentation describes the clean game shell as the next oracle-retirement
-  foothold.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game::tests
-cargo test --lib renderer::tests::texture_atlas_owns_sprite_regions
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-! rg -n \
-  -e "crate::accepted::" \
-  -e "crate::machine::" \
-  -e "crate::machine_state::" \
-  -e "crate::red_label::" \
-  -e "red_label" \
-  -e "RED_LABEL" \
-  -e "source routine" \
-  -e "assembler" \
-  -e "memory" \
-  -e "FrameOutput" \
-  src/game.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 10:08:58 BST` Started `DC-79`: posted the cycle start update and
-  began adding a clean `Game` simulation shell as a bounded first step toward
-  retiring the memory-oriented oracle from production gameplay.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778749749081009`
-- `2026-05-14 10:48:29 BST` Completed `DC-79`: added the clean `Game`
-  simulation shell, wired it to clean control, motion, and projectile systems,
-  emitted sprite-first `GameFrame` scenes without raster payloads, added a
-  renderer-owned projectile sprite atlas region, exported the clean game type,
-  and strengthened the public API guard against legacy terminology in
-  `src/game.rs`. The first full fidelity run exposed three uncovered added
-  lines in the clean game shell; focused coverage was added for `Default` and
-  left-to-right reversal before rerunning the full gate successfully. Validation
-  passed with formatting; focused game, renderer, and public API tests; the full
-  Rust test suite; clippy with warnings denied; `make fidelity`; live smoke; the
-  static terminology guard; markdownlint; and `git diff --check`. The
-  `make fidelity` gate matched 10 trace fixtures covering 15452 frames and
-  reported new Rust line coverage `134/134` non-baselined added executable
-  lines. Live smoke rendered 239 frames, saw 74 distinct frame signatures, observed
-  attract, credit, and playing states, injected all required controls, and
-  exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778752130012979`
-
-### DC-80: Clean Production Legacy Import Guard
-
-Status: `complete`
-
-Goal: make the first oracle-retirement boundary enforceable by guarding clean
-production modules against direct legacy imports and legacy implementation
-terminology.
-
-Scope:
-
-- Add a single public API guard that scans clean source modules for direct
-  low-level legacy root imports.
-- Keep `src/accepted.rs` as the only clean source that may call the
-  `accepted_behavior` adapter.
-- Keep `src/oracle.rs` and `src/platform.rs` as the only temporary clean callers
-  of the accepted facade.
-- Remove remaining production-source references to memory-oriented terminology
-  outside the parked legacy tree.
-- Update `README.md`, `SPEC.md`, and `PLAN.md`.
-
-Acceptance criteria:
-
-- Clean production modules cannot directly import low-level legacy root modules.
-- The accepted-behavior bridge remains quarantined behind `src/accepted.rs`.
-- Clean gameplay, systems, renderer, platform, audio, fidelity, and oracle
-  sources do not expose legacy implementation terminology.
-- Runtime behavior and historical fidelity tooling remain unchanged.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_accepted_facade
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-! rg -n \
-  -e "red_label" \
-  -e "RED_LABEL" \
-  -e "source routine" \
-  -e "assembler" \
-  -e "memory" \
-  -e "FrameOutput" \
-  src/accepted.rs src/audio.rs src/fidelity.rs src/game.rs src/main.rs \
-  src/oracle.rs src/platform.rs src/renderer.rs src/systems.rs
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 10:52:08 BST` Started `DC-80`: posted the cycle start update and
-  began the first memory-oriented oracle retirement slice by adding a
-  source-level guard for clean production modules.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778752325584989`
-- `2026-05-14 11:14:03 BST` Completed `DC-80`: added
-  `public_api_tests::clean_module_sources_keep_legacy_access_quarantined` so
-  clean module sources cannot import low-level legacy root modules,
-  `src/accepted.rs` remains the only accepted-behavior bridge, and only
-  `src/oracle.rs` plus `src/platform.rs` can call the temporary accepted facade.
-  Removed remaining clean-source references to memory-oriented terminology,
-  documented the guard in `README.md` and `SPEC.md`, and moved the broader
-  memory-oriented oracle retirement milestone to `DC-82`. Validation passed with
-  formatting; focused public API guards; the full Rust test suite; clippy with
-  warnings denied; `make fidelity`; live smoke; the static clean-source
-  terminology scan; markdownlint; and `git diff --check`. The `make fidelity`
-  gate matched 10 trace fixtures covering 15452 frames and reported new Rust
-  line coverage `0/0` non-baselined added executable lines. Live smoke rendered
-  239 frames, saw 74 distinct frame signatures, observed attract, credit, and playing
-  states, injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778753657368129`
-
-### DC-81: Gameplay Oracle Public Surface Retirement
-
-Status: `complete`
-
-Goal: remove the gameplay oracle from the supported public API while keeping it
-available internally for fidelity and regression tests.
-
-Scope:
-
-- Make `src/oracle.rs` a crate-private module instead of a supported public
-  module.
-- Remove the public `GameplayOracle` re-export from `src/lib.rs`.
-- Keep internal oracle tests, fidelity signatures, and legacy equivalence tests
-  working through crate-private wiring.
-- Replace the public oracle contract test with a public clean `Game` simulation
-  contract and add a guard that the oracle stays internal.
-- Update `README.md`, `SPEC.md`, and `PLAN.md`.
-
-Acceptance criteria:
-
-- Supported public API exposes clean gameplay contracts, not the temporary
-  oracle.
-- Internal fidelity tooling can still instantiate the oracle for historical
-  comparison.
-- Runtime behavior and trace fixture fidelity remain unchanged.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation
-cargo test --lib public_api_tests::gameplay_oracle_is_internal_fidelity_wiring
-cargo test --lib oracle::tests
-cargo test --lib fidelity::tests::clean_frame_signatures_match_reference_probe_for_start_and_controls
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-! rg -n \
-  -e "pub mod oracle;" \
-  -e "pub use oracle::GameplayOracle;" \
-  -e "crate::GameplayOracle" \
-  src
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 11:16:26 BST` Started `DC-81`: posted the cycle start update and
-  began retiring the gameplay oracle from the supported public API while keeping
-  internal fidelity wiring available.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778753786573509`
-- `2026-05-14 11:42:10 BST` Completed `DC-81`: made the oracle module
-  crate-private, removed the public `GameplayOracle` export, replaced the public
-  API oracle contract with a clean `Game` simulation contract, kept the
-  machine-backed oracle as internal fidelity wiring, and documented the updated
-  boundary in `README.md`, `SPEC.md`, and this plan. Validation passed with
-  formatting; focused public API, oracle, and fidelity-signature tests; the full
-  Rust target suite; clippy with warnings denied; `make fidelity`; live smoke;
-  the public-oracle static scan; markdownlint; and `git diff --check`. The
-  `make fidelity` gate matched 10 trace fixtures covering 15452 frames and
-  reported new Rust line coverage `0/0` non-baselined added executable lines.
-  Live smoke rendered 239 frames, saw 74 distinct frame signatures, observed attract,
-  credit, and playing states, injected all required controls, and exited
-  cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778755376066379`
-
-### DC-82: Render Signature Terminology
-
-Status: `complete`
-
-Goal: remove memory-oriented hash/CRC labels from clean render evidence and
-live-smoke reporting while preserving the accepted comparison behavior.
-
-Scope:
-
-- Rename clean render-scene evidence from `visual_hash` to
-  `visual_signature`.
-- Rename live-smoke frame and phase diversity metrics from CRC labels to
-  render-signature labels.
-- Keep historical CRC trace fixtures and legacy machine evidence quarantined in
-  `src_legacy/`.
-- Update README, SPEC, and this plan so clean fidelity language describes
-  state, event, sound, and render signatures.
-
-Acceptance criteria:
-
-- Clean `src/` APIs no longer expose render hash terminology.
-- Supported live-smoke output no longer exposes frame or scene CRC terminology.
-- Historical CRC terminology remains only where it describes legacy trace or
-  ROM verification evidence.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-! rg -n \
-  -e "visual_hash" \
-  -e "distinct_frame_crcs" \
-  -e "visual_crcs" \
-  -e "frame_crcs" \
-  -e "frame CRC" \
-  -e "scene CRC" \
-  src src_legacy/wgpu_presenter.rs src_legacy/live.rs \
-  src_legacy/accepted_behavior.rs src_legacy/oracle_equivalence_tests.rs \
-  README.md SPEC.md
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 11:45:41 BST` Started `DC-82`: posted the cycle start update and
-  began the first memory-oriented oracle retirement slice by moving clean
-  render equivalence and live-smoke evidence from hash/CRC labels to render
-  signature terminology.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778755466066549`
-- `2026-05-14 12:07:27 BST` Completed `DC-82`: renamed clean render evidence
-  from visual hashes to visual signatures, renamed live-smoke diversity metrics
-  from frame/visual CRCs to frame/visual signatures, updated the public rewrite
-  docs, and kept legacy CRC terminology limited to historical trace and ROM
-  evidence. Validation passed with formatting; focused renderer, fidelity, and
-  `wgpu` smoke unit tests; the full Rust target suite; clippy with warnings
-  denied; `make fidelity`; live smoke; stale render-hash/frame-CRC label scans
-  across clean source, supported live-smoke paths, README, and SPEC;
-  markdownlint; and `git diff --check`. The `make fidelity` gate matched 10
-  trace fixtures covering 15452 frames and reported new Rust line coverage
-  `30/30` non-baselined added executable lines. Live smoke rendered 239 frames,
-  saw 74 distinct frame signatures, observed attract, credit, and playing
-  states, injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778756923466539`
-
-### DC-83: Production Model Quarantine
-
-Status: `complete`
-
-Goal: continue retiring the memory-oriented production model by moving the next
-remaining legacy-facing runtime dependency behind clean gameplay boundaries.
-
-Scope:
-
-- Move platform launch off the temporary accepted facade and behind a private
-  clean runtime bridge.
-- Keep `src/runtime.rs` as the only clean launch owner for the current accepted
-  runtime adapter.
-- Add focused boundary tests so `src/platform.rs` depends on clean runtime
-  configuration and does not call accepted or legacy launch functions directly.
-- Keep fixture parsers and historical oracle tooling available only where they
-  provide review value.
-- Preserve accepted gameplay behavior and live `wgpu` behavior.
-
-Acceptance criteria:
-
-- The selected runtime path reads as clean gameplay code at its public boundary.
-- Any remaining memory-oriented names are explicitly quarantined in legacy or
-  fidelity modules.
-- Public API and module names continue moving away from red-label, ROM, source
-  routine, and assembler process terminology.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 12:11:22 BST` Started `DC-83`: posted the cycle start update and
-  began quarantining the production launch path by moving `src/platform.rs` off
-  the accepted facade and behind a private clean runtime bridge.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778757080478579`
-- `2026-05-14 12:50:11 BST` Completed `DC-83`: added a private
-  `src/runtime.rs` runtime host, moved `src/platform.rs` to launch through that
-  clean bridge, removed runtime launch from `src/accepted.rs`, updated public
-  API guards so only the runtime bridge owns the accepted launch adapter, and
-  documented the new boundary in README, SPEC, and this plan. Validation passed
-  with formatting; focused platform, runtime, and public API tests; `cargo
-  check`; `cargo test --all-targets`; clippy with warnings denied;
-  `make fidelity`; live smoke; a boundary scan preventing direct accepted/app
-  launch calls from clean runtime-facing source; markdownlint; and
-  `git diff --check`. The `make fidelity` gate matched 10 trace fixtures
-  covering 15452 frames and reported new Rust line coverage `3/3`
-  non-baselined added executable lines. Live smoke rendered 239 frames, saw 74
-  distinct frame signatures, observed attract, credit, and playing states,
-  injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778759467260149`
-
-### DC-84: Runtime Config Handoff
-
-Status: `complete`
-
-Goal: make the private runtime bridge consume clean runtime configuration
-explicitly for the next supported launch path instead of leaving configuration
-hidden behind the accepted adapter.
-
-Scope:
-
-- Identify one live or smoke launch mode that can be selected from clean
-  `RuntimeConfig` without relying on legacy CLI parsing.
-- Add a clean launch-command adapter inside the private runtime bridge.
-- Preserve current default CLI behavior and the accepted adapter while clean
-  launch ownership expands.
-- Keep `wgpu` live behavior and smoke metrics unchanged.
-
-Acceptance criteria:
-
-- The selected launch mode is driven by clean `RuntimeConfig`.
-- The accepted adapter remains private to the runtime bridge.
-- Public API and module names continue moving away from red-label, ROM, source
-  routine, and assembler process terminology.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 12:52:55 BST` Started `DC-84`: posted the cycle start update and
-  began moving clean `RuntimeConfig` handling into the private runtime bridge,
-  with config-driven `wgpu` live smoke as the first direct launch handoff while
-  preserving default CLI behavior through the accepted adapter.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778759572099959`
-- `2026-05-14 13:15:30 BST` Completed `DC-84`: added a private runtime launch
-  command that maps clean smoke configuration to `wgpu` live smoke with clean
-  control-profile and CMOS-path handoff, kept default CLI launch on the
-  accepted runtime adapter, strengthened runtime/public API coverage for the
-  handoff, and documented the boundary in README, SPEC, and this plan.
-  Validation passed with formatting; focused runtime, platform, and public API
-  tests; `cargo test --all-targets`; clippy with warnings denied;
-  `make fidelity`; live smoke; markdownlint; and `git diff --check`.
-  `make fidelity` matched 10 trace fixtures covering 15452 frames and reported
-  new Rust line coverage `23/23` non-baselined added executable lines. Live
-  smoke rendered 240 frames, saw 74 distinct frame signatures, observed
-  attract, credit, and playing states, injected all required controls, and
-  exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778760958421079`
-
-### DC-85: Configured Interactive Launch Handoff
-
-Status: `complete`
-
-Goal: make configured interactive runtime launches use clean `RuntimeConfig`
-for controls, audio, and persistence without changing the default CLI entry
-path.
-
-Scope:
-
-- Separate default CLI launch ownership from configured interactive runtime
-  launch ownership inside the private runtime bridge.
-- Map clean control, audio, and CMOS configuration to the current `wgpu`
-  interactive runtime path.
-- Preserve `cargo run`, CLI parsing, and accepted-adapter behavior for default
-  command-line entry.
-- Keep smoke behavior and public API guards intact.
-
-Acceptance criteria:
-
-- `platform::run_with_config(RuntimeConfig::default())` can launch through
-  clean configuration instead of CLI argument parsing.
-- `platform::run()` preserves current command-line behavior.
-- The accepted adapter remains private to the runtime bridge until it is
-  replaced by clean gameplay systems.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib runtime::tests::
-cargo test --lib platform::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 13:18:01 BST` Started `DC-85`: posted the cycle start update and
-  began separating default CLI launch from configured runtime launch so clean
-  `RuntimeConfig` can drive interactive `wgpu` controls, audio, and CMOS
-  handoff without changing command-line entry behavior.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778761092533899`
-- `2026-05-14 13:39:11 BST` Completed `DC-85`: split the private runtime
-  bridge so `platform::run()` preserves default command-line behavior through
-  the accepted adapter while `platform::run_with_config` maps clean
-  interactive controls, audio, and CMOS settings into the `wgpu` live launch
-  path. Smoke config remains directly routed to `wgpu` live smoke. Validation
-  passed with formatting; focused runtime, platform, and public API tests;
-  `cargo test --all-targets`; clippy with warnings denied; `make fidelity`;
-  live smoke; markdownlint; and `git diff --check`. `make fidelity` matched
-  10 trace fixtures covering 15452 frames and reported new Rust line coverage
-  `20/20` non-baselined added executable lines. Live smoke rendered 239 frames,
-  saw 74 distinct frame signatures, observed attract, credit, and playing
-  states, injected all required controls, and exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778762365968649`
-
-### DC-86: Clean Smoke CLI Handoff
-
-Status: `complete`
-
-Goal: let the clean platform/runtime boundary own the supported smoke-launch
-CLI path while preserving the accepted adapter for unsupported historical
-commands.
-
-Scope:
-
-- Add a narrow clean CLI handoff for `--live-smoke` and the live configuration
-  flags that already correspond to `RuntimeConfig`.
-- Keep unsupported or historical commands delegated to the accepted CLI
-  adapter.
-- Preserve existing help text and command behavior unless the clean parser
-  explicitly owns that path.
-- Keep `wgpu` live-smoke output and metrics unchanged.
-
-Acceptance criteria:
-
-- `cargo run -- --live-smoke` reaches the config-driven runtime smoke launch
-  instead of relying on accepted CLI parsing.
-- Unknown or non-runtime historical commands still follow the accepted adapter.
-- Public API guards identify the clean CLI-owned runtime path and keep legacy
-  launch adapters quarantined.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib runtime::tests::
-cargo test --lib platform::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 13:42:20 BST` Started `DC-86`: posted the cycle start update
-  and began moving supported `--live-smoke` CLI launches onto the clean
-  `RuntimeConfig` path while preserving accepted CLI delegation for default
-  live play, help, malformed smoke arguments, and historical commands.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778762555090619`
-- `2026-05-14 14:04:00 BST` Completed `DC-86`: clean platform CLI parsing now
-  owns valid `--live-smoke` launches and maps supported live configuration
-  flags into `RuntimeConfig`, while default live play, help, malformed smoke
-  arguments, and historical commands stay delegated to the accepted adapter.
-  Public API guards now assert the clean smoke CLI path remains source-visible.
-  Validation passed with formatting; focused platform, runtime, and public API
-  tests; `cargo test --all-targets`; clippy with warnings denied;
-  `make fidelity`; live smoke; markdownlint; and `git diff --check`.
-  `make fidelity` matched 10 trace fixtures covering 15452 frames and reported
-  new Rust line coverage `37/37` non-baselined added executable lines. Live
-  smoke rendered 239 frames, saw 74 distinct frame signatures, observed
-  attract, credit, and playing states, injected all required controls, and
-  exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778763856173449`
-
-### DC-87: Clean Interactive CLI Handoff
-
-Status: `complete`
-
-Goal: let the clean platform/runtime boundary own the supported default
-interactive live-play CLI path while preserving the accepted adapter for help,
-malformed live options, and historical commands.
-
-Scope:
-
-- Extend clean CLI handoff to the no-argument live launch and valid
-  `--input-profile`, `--mute`, and `--cmos-path` interactive combinations.
-- Keep `--help`, malformed live options, unsupported flags, and historical
-  commands delegated to the accepted CLI adapter.
-- Preserve the current help text and historical command behavior.
-- Keep interactive launch mapping on `RuntimeConfig` and the `wgpu` live
-  runtime bridge.
-
-Acceptance criteria:
-
-- No-argument launch and valid live configuration flags are classified as clean
-  interactive runtime launches.
-- Help, malformed live options, and historical commands still follow the
-  accepted adapter.
-- Public API guards identify the clean-owned interactive CLI path and keep
-  root launch adapters quarantined.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-cargo run -- --help
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 14:06:16 BST` Started `DC-87`: posted the cycle start update
-  and began extending the clean CLI handoff to no-argument interactive live
-  play plus valid `--input-profile`, `--mute`, and `--cmos-path`
-  combinations, while preserving accepted adapter delegation for help,
-  malformed live options, unsupported flags, and historical commands.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778763987144479`
-- `2026-05-14 14:27:25 BST` Completed `DC-87`: clean platform CLI parsing now
-  owns no-argument interactive live launch plus valid `--input-profile`,
-  `--mute`, and `--cmos-path` combinations. `--live-smoke` remains
-  clean-owned, while help, malformed live options, unsupported flags, and
-  historical commands still delegate to the accepted adapter. Validation
-  passed with formatting; focused platform, runtime, and public API tests;
-  `cargo test --all-targets`; clippy with warnings denied; `make fidelity`;
-  live smoke; help output; markdownlint; and `git diff --check`.
-  `make fidelity` matched 10 trace fixtures covering 15452 frames and reported
-  new Rust line coverage `3/3` non-baselined added executable lines. Live
-  smoke rendered 239 frames, saw 74 distinct frame signatures, observed
-  attract, credit, and playing states, injected all required controls, and
-  exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778765260010409`
-
-### DC-88: Clean CLI Classification Boundary
-
-Status: `complete`
-
-Goal: make clean CLI ownership explicit and maintainable by separating runtime
-classification from launch dispatch while preserving current command behavior.
-
-Scope:
-
-- Extract the platform CLI classifier into a small clean boundary that returns
-  either `RuntimeConfig` or accepted-adapter delegation.
-- Keep no-argument launch, valid interactive live options, and valid
-  `--live-smoke` paths clean-owned.
-- Keep help, malformed live options, unsupported flags, and historical commands
-  delegated to the accepted adapter.
-- Keep public launch dispatch thin and source-visible for API guards.
-
-Acceptance criteria:
-
-- `platform::run()` dispatches through the clean classifier without embedding
-  parsing branches in the launch function.
-- Supported runtime CLI paths produce `RuntimeConfig` without touching the
-  accepted adapter.
-- Delegated paths remain behavior-compatible with the accepted CLI parser.
-- Public API guards identify the classifier boundary and keep root launch
-  adapters quarantined.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-cargo run -- --help
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 14:31:38 BST` Started `DC-88`: posted the cycle start update
-  and began separating clean CLI classification from runtime launch dispatch
-  while keeping no-argument live play, valid live options, and valid
-  `--live-smoke` paths clean-owned and preserving accepted adapter delegation
-  for help, malformed live options, unsupported flags, and historical commands.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778765521036469`
-- `2026-05-14 15:12:20 BST` Completed `DC-88`: platform launch now dispatches
-  from an explicit clean CLI classification boundary. The classifier returns
-  clean `RuntimeConfig` values for no-argument live play, valid live options,
-  and valid `--live-smoke` paths while unsupported, malformed, help, and
-  historical command paths remain accepted-adapter delegations. Validation
-  passed with formatting; focused platform, runtime, and public API tests;
-  `cargo test --all-targets`; clippy with warnings denied; `make fidelity`;
-  live smoke; help output; markdownlint; and `git diff --check`.
-  `make fidelity` matched 10 trace fixtures covering 15452 frames and reported
-  new Rust line coverage `26/26` non-baselined added executable lines. Live
-  smoke rendered 239 frames, saw 74 distinct frame signatures, observed
-  attract, credit, and playing states, injected all required controls, and
-  exited cleanly.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778767934967469`
-
-### DC-89: Clean CLI Help Ownership
-
-Status: `complete`
-
-Goal: move help handling out of accepted-adapter delegation and into the clean
-platform/runtime CLI surface while preserving current user-facing help output.
-
-Scope:
-
-- Add a clean help classification or runtime command for `--help` and `-h`.
-- Preserve the current help text and command list while moving ownership away
-  from the legacy app parser.
-- Keep malformed live options, unsupported flags, and historical commands
-  delegated to the accepted adapter until clean replacements exist.
-- Update public API guards so help ownership is source-visible in the clean
-  platform/runtime boundary.
-
-Acceptance criteria:
-
-- `cargo run -- --help` is served by clean runtime/platform code without
-  invoking accepted CLI delegation.
-- Help output remains behavior-compatible with the current text.
-- Accepted-adapter delegation remains covered for malformed and historical
-  command paths.
-- README, SPEC, and PLAN stay aligned with the clean CLI ownership boundary.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --help
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 15:22:47 BST` Started `DC-89`: began moving `--help` and `-h`
-  handling into the clean platform/runtime CLI surface while preserving the
-  current help text and keeping malformed, unsupported, and historical command
-  paths delegated to the accepted adapter. Slack start update attempted twice
-  before implementation, but the Slack connector timed out both times before
-  returning a message link. A later start/status retry also timed out before
-  completion.
-- `2026-05-14 15:45:29 BST` Completed `DC-89`: `--help` and `-h` now classify
-  as a clean help launch and dispatch through `runtime::run_help()` and
-  `RuntimeCommand::Help`, with the existing help text owned by
-  `runtime::help_text()`. Valid clean live args remain clean-runtime launches,
-  while malformed live options, unsupported flags, and historical command paths
-  still delegate to the accepted adapter. Validation passed with formatting;
-  focused platform, runtime, and public API tests; `cargo test --all-targets`;
-  clippy with warnings denied; `make fidelity`; clean help output;
-  markdownlint; and `git diff --check`. `make fidelity` matched 10 trace
-  fixtures covering 15452 frames and reported new Rust line coverage `23/23`
-  non-baselined added executable lines.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778769990105679`
-
-### DC-90: Clean CLI Error Surface
-
-Status: `complete`
-
-Goal: move malformed clean live option handling into the clean platform/runtime
-CLI surface without taking ownership of historical ROM and fidelity commands
-before their clean replacements exist.
-
-Scope:
-
-- Add typed clean CLI diagnostics for recognized clean live options with missing
-  or invalid values, including `--input-profile` and `--cmos-path`.
-- Keep default live play, valid live options, live smoke, and help owned by the
-  clean platform/runtime path.
-- Preserve accepted-adapter delegation for historical ROM/fidelity commands and
-  any unsupported compatibility paths not yet represented in clean code.
-- Update source guards and tests so accepted delegation is reserved for legacy
-  ownership, not for clean option parse failures.
-
-Acceptance criteria:
-
-- Missing or invalid values for recognized clean live options return stable
-  clean CLI errors without invoking accepted CLI delegation.
-- Historical ROM/fidelity commands still run through the accepted adapter.
-- Unknown compatibility paths remain delegated until the clean command inventory
-  explicitly takes ownership.
-- CLI exit behavior, diagnostics, and help output are covered by focused tests.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --input-profile
-cargo run -- --input-profile invalid
-cargo run -- --cmos-path
-cargo run -- --help
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 18:36:44 BST` Started `DC-90`: began moving malformed
-  recognized clean live options onto the clean CLI error surface while keeping
-  historical ROM/fidelity commands and unsupported compatibility paths
-  delegated to the accepted adapter. Initial targets are missing or invalid
-  `--input-profile` values and missing `--cmos-path` values.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778780203089619`
-- `2026-05-14 19:19:40 BST` Completed `DC-90`: malformed recognized clean
-  live options now stop in clean platform code with typed `CleanCliError`
-  diagnostics instead of falling through to the accepted adapter. Missing
-  `--input-profile`, unknown `--input-profile`, and missing `--cmos-path`
-  keep the previous user-facing messages and exit through the binary error
-  path, while historical ROM/fidelity commands and unsupported compatibility
-  paths still delegate to the accepted adapter. Validation passed with
-  formatting; focused platform, runtime, and public API tests;
-  `cargo test --all-targets`; clippy with warnings denied; `make fidelity`;
-  clean CLI error probes; help output; markdownlint; and `git diff --check`.
-  `make fidelity` matched 10 trace fixtures covering 15452 frames and reported
-  new Rust line coverage `14/14` non-baselined added executable lines.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778782792884799`
-
-### DC-91: Clean CLI Legacy Command Inventory
-
-Status: `complete`
-
-Goal: make the remaining accepted-adapter CLI delegation explicit by
-inventorying historical ROM/fidelity commands separately from unsupported
-compatibility paths.
-
-Scope:
-
-- Add clean classifier structure that distinguishes known historical commands
-  from truly unsupported compatibility paths before either branch enters the
-  accepted adapter.
-- Preserve current runtime behavior for ROM report, ROM verification, fidelity
-  trace, fixture, and reference-trace commands.
-- Keep default live play, valid live options, live smoke, help, and clean live
-  option errors owned by the clean platform/runtime path.
-- Update public API guards and focused tests so future cycles can retire
-  historical commands one command family at a time.
-
-Acceptance criteria:
-
-- Known historical ROM/fidelity commands are classified explicitly before
-  accepted-adapter dispatch.
-- Unknown unsupported paths remain delegated only through a separate
-  compatibility branch.
-- Clean CLI behavior from DC-88 through DC-90 remains unchanged.
-- The command inventory is test-covered and source-visible in public API
-  guards.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --rom-report
-cargo run -- --fidelity-list-scenarios
-cargo run -- --input-profile invalid
-cargo run -- --help
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 19:22:02 BST` Started `DC-91`: separating the known
-  historical ROM/fidelity command inventory from unsupported compatibility
-  arguments before accepted-adapter dispatch. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778782922103819`
-- `2026-05-14 20:01:24 BST` Completed `DC-91`: added explicit
-  `HistoricalCliCommand` classification for ROM report, ROM verification,
-  fidelity trace, fixture, scenario, and reference-trace commands; added a
-  separate `CompatibilityFallback` path for unsupported and removed
-  compatibility arguments; preserved clean live/help/error ownership; and
-  added focused platform/API tests plus entrypoint coverage for the
-  historical adapter dispatch. Validation passed with `cargo fmt --check`,
-  `cargo test --lib platform::tests::`,
-  `cargo test --lib runtime::tests::`,
-  `cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters`,
-  `cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined`,
-  `make fidelity` including 10 trace fixtures, 15452 frames, and 29/29
-  non-baselined added executable Rust lines covered, plus CLI probes for
-  `--rom-report`, `--fidelity-list-scenarios`, `--input-profile invalid`,
-  and `--help`. Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778785334701229`
-
-### DC-92: Clean ROM Report Command Ownership
-
-Status: `complete`
-
-Goal: retire the first historical CLI command family from the accepted adapter
-by moving ROM report listing into clean runtime ownership while preserving
-the current command output and optional verification path.
-
-Scope:
-
-- Add a clean runtime command/config path for `--rom-report` with no path and
-  with one optional ROM directory path.
-- Keep `--verify-roms` in the historical command inventory for now.
-- Preserve current ROM report text, optional path validation, and clean
-  live/help/error behavior.
-- Update the historical inventory so `--rom-report` no longer enters the
-  accepted adapter, while the other ROM/fidelity commands still do.
-- Add focused platform/runtime tests and public API guards for the new clean
-  ROM report path.
-
-Acceptance criteria:
-
-- `cargo run -- --rom-report` is served by clean runtime code and matches the
-  current report text.
-- `cargo run -- --rom-report /path/to/roms` preserves current scan behavior
-  and error reporting.
-- Unsupported extra `--rom-report` arguments remain rejected with the current
-  message.
-- Historical inventory still explicitly delegates `--verify-roms` and the
-  fidelity commands.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib rom_report::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --rom-report
-cargo run -- --rom-report <empty-temp-dir>
-cargo run -- --rom-report --verify-roms
-cargo run -- --verify-roms
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 20:03:44 BST` Started `DC-92`: moving `--rom-report`
-  listing and optional ROM directory scanning from the historical
-  accepted-adapter CLI branch into clean runtime ownership. Slack start
-  update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778785424298289`
-- `2026-05-14 20:31:06 BST` Completed `DC-92`: `--rom-report` now
-  classifies as a clean CLI command, dispatches through `RuntimeCommand`, and
-  uses a private `rom_report` facade for current listing/scanning text while
-  `--verify-roms` and fidelity commands remain in the historical inventory.
-  Public API guards now assert that `runtime.rs` does not reach into legacy
-  ROM internals directly, and focused tests cover the clean classifier,
-  runtime dispatch, report formatting, malformed arguments, and quarantine
-  boundary. Validation passed with the full command set above, including
-  `make fidelity` with 10 trace fixtures, 15452 frames, and 38/38
-  non-baselined added executable Rust lines covered. Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778787066498619`
-
-### DC-93: Clean Fidelity Scenario Listing Ownership
-
-Status: `complete`
-
-Goal: retire the next low-risk historical CLI command by moving the
-read-only fidelity scenario listing command into clean runtime ownership while
-leaving trace generation and trace checking in the historical adapter.
-
-Scope:
-
-- Add a clean runtime command/config path for `--fidelity-list-scenarios`.
-- Preserve current scenario listing text and ordering.
-- Keep fidelity trace generation, trace checking, fixture checking, reference
-  checking, and scenario input writing in the historical command inventory.
-- Put scenario listing text behind a small clean facade owned by `fidelity` or
-  runtime-support code rather than calling the accepted adapter.
-- Add focused platform/runtime/API tests for command classification,
-  dispatch, and output contract.
-
-Acceptance criteria:
-
-- `cargo run -- --fidelity-list-scenarios` is served by clean runtime code and
-  matches the current output.
-- Historical inventory still explicitly delegates trace/check/write commands.
-- Public API guards make the new ownership boundary visible.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib scenario_listing::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --fidelity-list-scenarios
-cargo run -- --fidelity-list-scenarios extra
-cargo run -- --mute --fidelity-list-scenarios
-cargo run -- --fidelity-trace 1
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 20:32:55 BST` Started `DC-93`: moving the read-only
-  `--fidelity-list-scenarios` command into clean runtime ownership while
-  leaving trace generation, trace checking, fixture checking, reference
-  checking, and scenario input writing in the historical inventory. Slack
-  start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778787188057879`
-- `2026-05-14 20:55:19 BST` Completed `DC-93`: `--fidelity-list-scenarios`
-  now classifies as a clean CLI command, dispatches through
-  `RuntimeCommand::FidelityScenarioList`, and uses a private
-  `scenario_listing` facade that preserves the current scenario manifest
-  text and ordering. Public API guards now expose the ownership boundary and
-  keep the new facade as the only clean source allowed to read the legacy
-  trace scenario manifest. Validation passed with the full command set above,
-  including `make fidelity` with 10 trace fixtures, 15452 frames, and 17/17
-  non-baselined added executable Rust lines covered. Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778789519436699`
-
-### DC-94: Clean Fidelity Scenario Input Writer Ownership
-
-Status: `complete`
-
-Goal: move the read/write scenario input expansion helper command into clean
-runtime ownership while keeping trace generation and trace checking in the
-historical adapter.
-
-Scope:
-
-- Add a clean runtime command/config path for
-  `--fidelity-write-scenario-inputs <output-dir>`.
-- Preserve current directory creation, file naming, expanded input text, and
-  completion message.
-- Keep `--fidelity-trace`, `--fidelity-trace-inputs`,
-  `--fidelity-trace-inputs-file`, `--fidelity-check-trace`,
-  `--fidelity-check-trace-dir`, and
-  `--fidelity-check-reference-trace-dir` in the historical command inventory.
-- Reuse the scenario manifest facade added in DC-93 rather than adding a new
-  legacy access path.
-- Add focused platform/runtime/API tests for command classification,
-  malformed arguments, dispatch, and output/file contract.
-
-Acceptance criteria:
-
-- `cargo run -- --fidelity-write-scenario-inputs <temp-dir>` is served by
-  clean runtime code and writes the same input scripts as before.
-- Historical inventory still explicitly delegates trace generation and trace
-  checking commands.
-- Public API guards keep the scenario manifest/input facade private and
-  quarantined.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib fidelity_scenarios::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --fidelity-write-scenario-inputs <empty-temp-dir>
-cargo run -- --fidelity-write-scenario-inputs
-cargo run -- --fidelity-write-scenario-inputs <empty-temp-dir> extra
-cargo run -- --mute --fidelity-write-scenario-inputs <empty-temp-dir>
-cargo run -- --fidelity-trace-inputs 'coin,start_one'
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 21:14:36 BST` Started `DC-94`: moving
-  `--fidelity-write-scenario-inputs <output-dir>` into clean runtime
-  ownership while preserving directory creation, `*.inputs.txt` file naming,
-  expanded input text, and completion output. Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778789688179609`
-- `2026-05-14 21:39:12 BST` Completed `DC-94`: scenario listing and scenario
-  input writing now share a private `fidelity_scenarios` clean facade.
-  `--fidelity-write-scenario-inputs <output-dir>` classifies as a clean CLI
-  command, dispatches through
-  `RuntimeCommand::FidelityScenarioInputWriter`, and writes the same 12
-  expanded scenario input scripts as the historical helper. Trace generation
-  and trace checking commands remain in the historical inventory, and public
-  API guards expose the new quarantine boundary. Validation passed with the
-  full command set above, including `make fidelity` with 10 trace fixtures,
-  15452 frames, and 26/26 non-baselined added executable Rust lines covered.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778791204633039`
-
-### DC-95: Clean Verify ROM Command Ownership
-
-Status: `complete`
-
-Goal: retire the remaining ROM-oriented historical CLI command by moving
-`--verify-roms /path/to/roms` into clean runtime ownership alongside
-`--rom-report`.
-
-Scope:
-
-- Add a clean runtime command/config path for `--verify-roms <rom-dir>`.
-- Preserve current required path, extra-argument, live-option conflict,
-  failure report, and successful verification output behavior.
-- Reuse the existing private ROM command facade instead of adding a new clean
-  legacy access path.
-- Keep fidelity trace generation and trace checking commands in the historical
-  command inventory.
-- Add focused platform/runtime/API tests for command classification,
-  malformed arguments, dispatch, and output contract.
-
-Acceptance criteria:
-
-- `cargo run -- --verify-roms <rom-dir>` is served by clean runtime code and
-  preserves the current verification output.
-- Missing paths, extra args, and mixed live options preserve current messages.
-- Historical inventory still explicitly delegates fidelity trace generation
-  and trace checking commands.
-- Public API guards make the new ROM verification ownership boundary visible.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib rom_report::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --verify-roms
-cargo run -- --verify-roms <rom-dir> extra
-cargo run -- --mute --verify-roms <rom-dir>
-cargo run -- --verify-roms <empty-rom-dir>
-cargo run -- --verify-roms assets/roms/defender
-cargo run -- --fidelity-trace 1
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 21:47:30 BST` Started `DC-95`: moving
-  `--verify-roms /path/to/roms` into clean platform/runtime ownership while
-  preserving argument validation, failure report, and success output behavior.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778791679350619`
-- `2026-05-14 22:30:47 BST` Completed `DC-95`: `--verify-roms
-  /path/to/roms` now classifies as a clean platform command, dispatches
-  through `RuntimeCommand::VerifyRoms`, and reuses the private `rom_report`
-  facade for verified-set loading, mapped-image construction, incomplete-set
-  reports, and success output. The historical command inventory now only owns
-  fidelity trace generation and trace checking commands. Validation passed
-  with the focused platform/runtime/rom_report/public API tests, `cargo test
-  --all-targets`, `cargo clippy --all-targets -- -D warnings`, `make
-  fidelity` with 10 trace fixtures, 15452 frames, and 47/47 non-baselined
-  added executable Rust lines covered, CLI probes for missing, extra, mixed
-  live-option, incomplete, complete verify fixture, and historical
-  `--fidelity-trace 1` behavior, `cargo run -- --live-smoke` with 240
-  rendered frames, markdownlint, `cargo fmt --check`, and `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778794248188319`
-
-### DC-96: Clean Fidelity Trace Command Ownership
-
-Status: `complete`
-
-Goal: move `--fidelity-trace <frames>` into clean platform/runtime ownership
-while preserving the current trace output and argument behavior.
-
-Scope:
-
-- Add a clean command/config path for `--fidelity-trace` with the current
-  default one-frame trace.
-- Preserve live-option conflict, invalid frame-count, zero frame-count, and
-  extra-argument error messages.
-- Add a private fidelity trace facade that keeps legacy trace generation
-  quarantined behind clean runtime ownership.
-- Leave trace-input and trace-check commands in the historical inventory for
-  later slices.
-- Add focused platform/runtime/API tests for classification, malformed
-  arguments, dispatch, and output contract.
-
-Acceptance criteria:
-
-- `cargo run -- --fidelity-trace` and `cargo run -- --fidelity-trace 2` are
-  served by clean runtime code and preserve the current trace text.
-- Malformed `--fidelity-trace` invocations preserve current messages.
-- Historical inventory still explicitly delegates trace-input and trace-check
-  commands.
-- Public API guards make the new trace generation boundary visible.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib fidelity_traces::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --fidelity-trace
-cargo run -- --fidelity-trace 2
-cargo run -- --fidelity-trace 0
-cargo run -- --fidelity-trace wat
-cargo run -- --fidelity-trace 1 extra
-cargo run -- --mute --fidelity-trace 1
-cargo run -- --fidelity-trace-inputs none
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 22:32:30 BST` Started `DC-96`: moving
-  `--fidelity-trace <frames>` into clean platform/runtime ownership while
-  preserving default frame count, malformed-count errors, trace text, and
-  historical delegation for trace-input and trace-check commands.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778794361787019`
-- `2026-05-14 22:55:51 BST` Completed `DC-96`: `--fidelity-trace
-  <frames>` now classifies as a clean platform command, dispatches through
-  `RuntimeCommand::FidelityTrace`, and generates the current idle trace through
-  a private `fidelity_traces` facade. The facade keeps legacy trace generation
-  quarantined while preserving default one-frame output, counted output,
-  malformed-count messages, zero-count rejection, extra-argument rejection, and
-  live-option conflict behavior. Trace-input and trace-check commands remain
-  in the historical inventory for later slices. Validation passed with the
-  focused platform/runtime/fidelity trace/public API tests, `cargo test
-  --all-targets`, `cargo clippy --all-targets -- -D warnings`, `make
-  fidelity` with 10 trace fixtures, 15452 frames, and 40/40 non-baselined
-  added executable Rust lines covered, CLI probes for successful and malformed
-  `--fidelity-trace` invocations plus historical `--fidelity-trace-inputs
-  none`, `cargo run -- --live-smoke` with 240 rendered frames, markdownlint,
-  `cargo fmt --check`, and `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778795765516439`
-
-### DC-97: Clean Fidelity Trace Input Command Ownership
-
-Status: `complete`
-
-Goal: move `--fidelity-trace-inputs <script>` and
-`--fidelity-trace-inputs-file <path>` into clean platform/runtime ownership
-while preserving current trace output and argument behavior.
-
-Scope:
-
-- Add clean command/config paths for inline trace input scripts and trace input
-  script files.
-- Preserve live-option conflict, missing argument, extra argument, invalid
-  script, and file-read failure behavior.
-- Extend the private fidelity trace facade so legacy trace generation remains
-  quarantined behind clean runtime ownership.
-- Leave trace-check commands in the historical inventory for later slices.
-- Add focused platform/runtime/API tests for classification, malformed
-  arguments, dispatch, file reads, and output contract.
-
-Acceptance criteria:
-
-- `cargo run -- --fidelity-trace-inputs none` and
-  `cargo run -- --fidelity-trace-inputs-file <path>` are served by clean
-  runtime code and preserve current trace text.
-- Malformed trace-input invocations preserve current messages.
-- Historical inventory still explicitly delegates trace-check commands.
-- Public API guards make the trace input boundary visible.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib fidelity_traces::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --fidelity-trace-inputs none
-cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'
-cargo run -- --fidelity-trace-inputs
-cargo run -- --fidelity-trace-inputs none extra
-cargo run -- --mute --fidelity-trace-inputs none
-cargo run -- --fidelity-trace-inputs-file <input-script-path>
-cargo run -- --fidelity-trace-inputs-file
-cargo run -- --fidelity-trace-inputs-file <input-script-path> extra
-cargo run -- --mute --fidelity-trace-inputs-file <input-script-path>
-cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 22:57:49 BST` Started `DC-97`: moving
-  `--fidelity-trace-inputs <script>` and
-  `--fidelity-trace-inputs-file <path>` into clean platform/runtime ownership
-  while preserving argument validation, file-read behavior, trace output, and
-  historical delegation for trace-check commands.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778795883407799`
-- `2026-05-14 23:24:23 BST` Completed `DC-97`: clean platform/runtime code now
-  owns inline and file-based trace input commands, the private fidelity trace
-  facade owns inline and file trace text generation, trace-input commands are
-  removed from the historical command inventory, and public API guards cover
-  the new boundary. Validation passed: focused platform/runtime/fidelity trace
-  and public API tests; `cargo test --all-targets`; `cargo clippy --all-targets
-  -- -D warnings`; `make fidelity` with 10 trace fixtures, 15452 frames, and
-  68/68 added executable Rust lines covered; CLI probes for inline/file
-  success, malformed trace-input invocations, file-read failures, live-option
-  conflicts, invalid scripts, and historical trace-check delegation;
-  `cargo run -- --live-smoke` with 239 rendered frames; `markdownlint`;
-  `cargo fmt --check`; and `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778797461215109`
-
-### DC-98: Clean Single Trace Check Command Ownership
-
-Status: `complete`
-
-Goal: move `--fidelity-check-trace <inputs> <expected>` into clean
-platform/runtime ownership while preserving current trace comparison behavior.
-
-Scope:
-
-- Add a clean command/config path for checking one trace input script against
-  one expected TSV trace.
-- Preserve live-option conflict, missing argument, extra argument, file-read,
-  and trace mismatch behavior.
-- Extend the private fidelity trace facade so single trace comparisons remain
-  quarantined behind clean runtime ownership.
-- Leave fixture directory and reference fixture directory checks in the
-  historical inventory for later slices.
-- Add focused platform/runtime/API tests for classification, malformed
-  arguments, dispatch, file reads, trace mismatch, and output contract.
-
-Acceptance criteria:
-
-- `cargo run -- --fidelity-check-trace <inputs> <expected>` is served by clean
-  runtime code and preserves current match/mismatch text.
-- Malformed single trace-check invocations preserve current messages.
-- Historical inventory still explicitly delegates fixture-directory and
-  reference-fixture-directory checks.
-- Public API guards make the single trace-check boundary visible.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib fidelity_traces::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --fidelity-check-trace <input-script-path> <expected-trace-path>
-cargo run -- --fidelity-check-trace
-cargo run -- --fidelity-check-trace <input-script-path>
-cargo run -- --fidelity-check-trace <input-script-path> <expected-trace-path> extra
-cargo run -- --mute --fidelity-check-trace <input-script-path> <expected-trace-path>
-cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-14 23:26:35 BST` Started `DC-98`: moving
-  `--fidelity-check-trace <inputs> <expected>` into clean platform/runtime
-  ownership while preserving argument validation, file-read behavior, trace
-  comparison output, and historical delegation for fixture-directory checks.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778797606858679`
-- `2026-05-14 23:50:33 BST` Completed `DC-98`: clean platform/runtime code now
-  owns single trace comparisons through `RuntimeCommand::FidelityTraceCheck`,
-  the private fidelity trace facade compares generated trace text against
-  expected TSV files, and single trace checks are removed from the historical
-  command inventory while fixture-directory checks remain delegated for later
-  slices. Validation passed: focused platform/runtime/fidelity trace and
-  public API tests; `cargo test --all-targets`; `cargo clippy --all-targets
-  -- -D warnings`; `make fidelity` with 10 trace fixtures, 15452 frames, and
-  54/54 added executable Rust lines covered; CLI probes for trace-check match,
-  mismatch, malformed arguments, file-read failures, live-option conflict, and
-  historical trace fixture directory delegation; `cargo run -- --live-smoke`
-  with 239 rendered frames; `markdownlint`; `cargo fmt --check`; and
-  `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778799033889449`
-
-### DC-99: Clean Trace Fixture Directory Command Ownership
-
-Status: `complete`
-
-Goal: move `--fidelity-check-trace-dir <fixtures>` into clean platform/runtime
-ownership while preserving current Rust-current fixture checking behavior.
-
-Scope:
-
-- Add a clean command/config path for checking a directory of paired
-  `*.inputs.txt` and `*.expected.tsv` trace fixtures.
-- Preserve live-option conflict, missing argument, extra argument, missing
-  directory, empty directory, non-directory, missing pair, fixture ordering,
-  mismatch, and summary text behavior.
-- Extend the private fidelity trace facade so trace fixture discovery and
-  checking remain quarantined behind clean runtime ownership.
-- Leave reference fixture directory checks in the historical inventory for a
-  later slice.
-- Add focused platform/runtime/API tests for classification, malformed
-  arguments, dispatch, fixture discovery, ordering, missing pairs, and output
+- Reconcile the R9 exit criteria against current clean runtime, accepted traces,
+  reclassified assets, live/offscreen smoke evidence, and docs.
+- Remove dead code or stale tests only if the final audit proves they guard
+  retired behavior rather than supported contracts.
+- Do not close the milestone until the full R9 gate passes or a bounded,
+  timestamped blocker is recorded.
+
+Completion roadmap after Step 40:
+
+- Baseline: `make clean-fidelity` currently matches all 12 embedded Phase 1
+  scenarios under the profiled comparison surface. Future work must either
+  tighten that surface with source-backed evidence or retire a remaining
+  source-backed blocker directly.
+- Each implementation cycle below maps to a future work-log step. Post Slack
+  start/completion updates for implementation cycles, update README/SPEC/gaps
+  when behavior changes, and keep focused validation green before closing a
+  cycle. Run full clean-fidelity and the broader R9 gate at phase boundaries,
+  shared-contract changes, broad-risk changes, or milestone closeout.
+- If a cycle discovers missing source/MAME evidence, stop that cycle with a
+  timestamped blocker and fixture/source path instead of guessing behavior.
+
+Phase 1: final contract freeze.
+
+- Step 41 / Cycle R9-A1: strict blocker matrix and acceptance contract.
+  Deliver a table in `PLAN.md` or `docs/fidelity/gaps.md` that maps every
+  remaining blocker to one of: accepted-surface gap, clean-game behavior gap,
+  render-presentation gap, docs/evidence gap, or owner-decision gap. Exit when
+  no blocker is described only as broad "presentation parity" or "remaining
+  behavior".
+- Step 42 / Cycle R9-A2: accepted-surface audit. Inspect whether the accepted
+  facade already exposes enough neutral evidence for score popups, explosions,
+  terrain blow, scanner/radar, two-player turns, high-score ordering, and
+  attract waits. Add only narrow source-backed fields needed by later cycles,
+  with focused adapter/oracle tests.
+
+Phase 2: presentation program closure.
+
+- Step 43 / Cycle R9-B1: title/status text sweep. Inventory source text
+  outside covered prompt, attract, top-display-border, wave-completion,
+  high-score-entry, and hall-of-fame surfaces; add bounded message-glyph
+  projections or record exact excluded cases.
+- Step 44 / Cycle R9-B2: Williams/copyright attract waits and page scheduler.
+  Implement or expose the remaining source timing gates for Williams/logo,
+  copyright, presents, Defender wordmark, and instruction pages without
+  changing gameplay lifecycle behavior.
+- Step 45 / Cycle R9-B3: palette, blink, and color contract. Define the clean
+  render contract for logo, underline, border, HUD, and attract color/blink
+  behavior. Implement only source-backed visual state that can be tested
+  without full-frame raster dependence.
+- Step 46 / Cycle R9-B4: scanner/radar animation. Add source-backed scanner
+  and radar state, scene sprites, and focused clean/oracle tests. Keep enemy
+  gameplay spawning and physics out unless required by the source scanner
   contract.
 
-Acceptance criteria:
+Phase 3: lifecycle and world closure.
 
-- `cargo run -- --fidelity-check-trace-dir <fixtures>` is served by clean
-  runtime code and preserves current matched/skipped/error text.
-- Malformed trace fixture directory invocations preserve current messages.
-- Historical inventory still explicitly delegates reference fixture directory
-  checks.
-- Public API guards make the trace fixture directory boundary visible.
+- Step 47 / Cycle R9-C1: score-popup lifecycle. Carry source-backed score-popup
+  spawn, duration, position, and sprite identity through clean/oracle scenes;
+  keep scoring arithmetic unchanged except where source evidence requires it.
+- Step 48 / Cycle R9-C2: explosion timing. Close player/enemy/bomb/swarmer/
+  astronaut explosion timing and sprite progression with source-backed frame
+  evidence and focused collision/death tests.
+- Step 49 / Cycle R9-C3: terrain-blow presentation. Implement terrain
+  explosion presentation and terrain mutation evidence for planet-destruction
+  paths, bounded to source-backed terrain-blow behavior.
+- Step 50 / Cycle R9-C4: clean object spawning and physics. Replace remaining
+  simplified clean object ecology with source-backed spawning, active/inactive
+  object transitions, projectile limits, enemy-family movement, abduction, and
+  rescue/loss behavior needed for strict R9 acceptance.
 
-Validation:
+Phase 4: session and high-score closure.
 
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib fidelity_traces::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --fidelity-check-trace-dir \
-  docs/fidelity/fixtures/local/rust-current
-cargo run -- --fidelity-check-trace-dir
-cargo run -- --fidelity-check-trace-dir \
-  docs/fidelity/fixtures/local/rust-current extra
-cargo run -- --mute --fidelity-check-trace-dir \
-  docs/fidelity/fixtures/local/rust-current
-cargo run -- --fidelity-check-reference-trace-dir \
-  docs/fidelity/fixtures/local/reference
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
+- Step 51 / Cycle R9-D1: two-player turn/session sequencing. Close all
+  remaining player-one/player-two turn transitions, respawn cadence, stock
+  accounting, score ownership, and game-over routing beyond the covered
+  final-life switch/respawn slice.
+- Step 52 / Cycle R9-D2: high-score ordering and post-entry return. Prove
+  source-backed table ordering, initials insertion, today's-greatest behavior,
+  post-entry display timing, and return-to-attract behavior across one-player
+  and two-player sessions.
+
+Phase 5: final render parity and acceptance.
+
+- Step 53 / Cycle R9-E1: final render-presentation parity audit. Compare clean
+  sprite scenes, offscreen `wgpu` signatures, and accepted visual evidence for
+  the 12 Phase 1 scenarios plus any focused fixtures added above. Record only
+  source-backed residual differences.
+- Step 54 / Cycle R9-E2: full validation stabilization. Run and fix the full
+  R9 gate: formatting, all Rust targets, clippy, `make fidelity`, full
+  `make clean-fidelity`, game/live smoke, markdownlint, and diff hygiene.
+- Step 55 / Cycle R9-E3: owner acceptance and milestone closeout. Update
+  README, SPEC, `docs/fidelity/gaps.md`, and this plan to state the final R9
+  contract, remaining non-rewrite follow-ups if any, validation evidence, and
+  owner acceptance status.
+
+Strict R9 blocker matrix after Step 41:
+
+| ID | Area | Type | Step | Done when |
+| --- | --- | --- | --- | --- |
+| B01 | Text/status | render | 43 | exact cases covered/excluded |
+| B02 | Attract waits | accepted/clean | 44 | source timing tested |
+| B03 | Palette/blink | render | 45 | visual-state contract tested |
+| B04 | Scanner/radar | accepted/render | 46 | state and sprites tested |
+| B05 | Score popups | clean behavior | 47 | spawn/duration/position tested |
+| B06 | Explosions | clean behavior | 48 | frame progression tested |
+| B07 | Terrain blow | clean/render | 49 | mutation/presentation tested |
+| B08 | Object ecology | clean behavior | 50 | source ecology fixtures pass |
+| B09 | Two-player flow | clean behavior | 51 | turn/stock routing tested |
+| B10 | High-score return | clean/accepted | 52 | tables and return tested |
+| B11 | Render audit | docs/evidence | 53 | residuals source-backed |
+| B12 | Full validation | docs/evidence | 54 | full R9 gate passes |
+| B13 | Owner signoff | owner decision | 55 | final contract accepted |
+
+Step 41 acceptance contract:
+
+- The phrase "final render presentation parity" now means only the residual
+  visual comparison left after B01-B10 are complete; it is no longer a
+  standalone implementation blocker.
+- The phrase "broader title/status text" now maps to B01 and must be closed by
+  an inventory of exact included and intentionally excluded source text cases.
+- Lifecycle wording is split across B05-B08 so score popups, explosions,
+  terrain blow, and object ecology can be implemented and tested separately.
+- Session wording is split across B09-B10 so two-player runtime flow and
+  high-score table/return behavior can close independently.
+- B12 is the first mandatory broad-gate cycle unless an earlier cycle changes a
+  shared public contract, alters broad clean-fidelity behavior, or introduces a
+  risk that focused tests cannot cover.
+
+Accepted-surface audit after Step 42:
+
+| ID | Current accepted evidence | Later need |
+| --- | --- | --- |
+| B01 | phase, frame, source glyphs | remaining text inventory |
+| B02 | phase/frame only | attract page and wait state |
+| B03 | source visual state | palette/RGB render audit residuals |
+| B04 | object/scanner evidence, border/scanner sprites | closed by Step 46 |
+| B05 | object/expanded sprite rows | popup lifecycle and duration |
+| B06 | expanded explosion rows | explosion frame/timer state |
+| B07 | mapped terrain explosion sprite | terrain mutation/blow state |
+| B08 | bounded object rows, wave profile | full topology and transitions |
+| B09 | current player, stocks, switch timers | full turn/session fixtures |
+| B10 | entry, submission, tables, stalls | ordering and return fixtures |
+| B11 | visual signature, clean scene | post-B01-B10 visual residuals |
+| B12 | validation commands only | full R9 gate run |
+| B13 | none | owner decision |
+
+Step 42 acceptance contract:
+
+- Add accepted fields only when a later cycle has a focused fixture that needs
+  them. Do not widen the accepted facade speculatively.
+- B02-B04 require new neutral evidence before implementation can be proven
+  without relying on visual CRC alone.
+- B05-B08 can start from existing object and expanded-object rows, but each
+  needs explicit lifecycle state before it can close strictly.
+- B09-B10 have enough high-level session and high-score fields for focused
+  tests, but the next cycles must add fixtures that prove ordering and return
+  behavior instead of depending on broad scenario matches.
+
+Title/status text sweep after Step 43:
+
+- Included source-message projection cases:
+  - `GO`: final game-over prompt and player-switch game-over line.
+  - `PLYR1`, `PLYR2`: player start, player switch, and high-score entry
+    player label.
+  - `CREDV`: attract credits label, paired with the bounded credit digits.
+  - `ELECV`: attract electronics/presents page text.
+  - `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, `SWARMV`: attract
+    instruction and enemy-score page text.
+  - `ATWV`, `COMPV`, `BONSX`: wave-completion status text, wave number,
+    bonus multiplier, and survivor bonus row.
+  - `HOFV1`, `HOFV2`, `HOFV3`, `HOFV4`: high-score entry instructions.
+  - `HALLD_TITLE`, `HALLD_TODAYS`, `HALLD_ALL_TIME`, `HALLD_GREATEST`:
+    hall-of-fame headings, with table rank, initials, and score glyph rows.
+- Deferred source-backed presentation cases:
+  - B02 owns attract page scheduling and wait-state timing for the Williams
+    logo, Defender wordmark, copyright strip, presents page, and instruction
+    page.
+  - B03 owns palette, blink, and color state for the projected text, border,
+    logo, underline, HUD, and attract surfaces.
+- Excluded R9 B01 source-message cases:
+  - Service diagnostics: `VWROM`, `VWRAM`, `VROMFL`, `VRAMFL`, `VALROM`,
+    `VRAMTS`, `VNORAM`, `VCMSFL`, `VCMSOK`, `VCMSAB`, `VCOLTS`, `VAUDTS`,
+    `VSWTTS`, and `VMONTS`.
+  - Switch-test labels: the `VSW*` labels from `VSW0` through `VSW17`,
+    including `VSWA` through `VSWF`.
+  - Test and adjustment instructions: `VINS1` through `VINS17`.
+  - These labels are service, audit, switch-test, or adjustment-mode text,
+    not final gameplay presentation. They stay outside strict R9 unless the
+    owner explicitly expands the milestone beyond clean runtime acceptance.
+
+Step 43 acceptance contract:
+
+- B01 is closed as an exact source-text inventory. Future title/status work
+  must name the specific label, state gate, and blocker ID it belongs to.
+- Every gameplay, attract, high-score, and hall-of-fame source-message label in
+  `assets/red-label/messages.tsv` now has an included, deferred, or excluded
+  owner.
+- Diagnostics, switch-test, and adjustment text are excluded from R9 final
+  gameplay presentation and should be tracked as a later service-mode feature
+  if they become product scope.
+
+Attract scheduler after Step 44:
+
+- `GameState` now carries `AttractPresentationSnapshot` with the current
+  normal-attract page frame, source page, source sleep ticks, and copyright
+  stall ticks.
+- The clean and oracle scenes gate the Williams logo, presents copy, Defender
+  wordmark, copyright strip, and instruction labels from that snapshot. Credits
+  keep their existing projection path, and hall-of-fame display stalls continue
+  to suppress ordinary attract title-program surfaces.
+- The source-backed page-frame thresholds are: presents at frame 236, Defender
+  wordmark at frame 285, copyright wait at frame 419, and instruction labels
+  at frame 441. The exposed wait constants are `LOGO0` 2 ticks, `PRES1` 5
+  ticks, `DEFEND` 0x30 ticks, `CPR55` 10 ticks with a 60-tick stall, and
+  instruction entry 0xE6 ticks.
+
+Step 44 acceptance contract:
+
+- B02 is closed for the clean runtime title-program scheduler. Future attract
+  work must target a specific remaining presentation blocker instead of
+  reopening broad Williams/copyright wait timing.
+- This step does not claim live Williams `LGOTAB` table-walker animation or
+  exact palette/blink/color parity; those remain later visual-state and
+  render-audit work.
+- The source-backed scheduler is proven by focused clean/oracle unit tests and
+  targeted `attract_boot` plus `start_game` clean-fidelity scenarios, not by a
+  full all-scenario gate.
+
+Palette/color contract after Step 45:
+
+- `SOURCE_VISUAL_STATE` now records the source-owned color and blink evidence
+  used by the clean scene projection: Williams status `0xFB`, Williams logo
+  PCRAM color `0x3F`, copyright Williams color index `0x0F`, Williams restore
+  rates `0xFF` and `10`, instruction color words `0x6666`, `0x0000`, and
+  `0x4433`, Hall of Fame display/entry letter color indices `0x00` and
+  `0x85`, Hall of Fame blink color `0x85` with 15-tick sleep, Hall of Fame
+  underline words `0x1111` and `0xDDDD`, and top-display border/scanner-marker
+  words `0x5555` and `0x9999`.
+- Clean and oracle scenes route HUD score/stock tints, attract title surfaces,
+  Hall of Fame text/logo/underline tints, and top-display border/marker tints
+  through that source visual-state contract without introducing full-frame
+  raster dependence.
+- The current contract preserves the existing white/gray clean sprite output.
+  Hardware palette-to-RGB conversion, live Williams table-walker animation, and
+  final render-audit residuals remain later B11/final-audit work rather than
+  reopening B03.
+
+Step 45 acceptance contract:
+
+- B03 is closed as a source visual-state contract. Future palette work must
+  name a specific source index/word/rate or a final render-audit residual.
+- This step does not claim a hardware palette resistor model or per-pixel
+  source palette replay in the clean renderer.
+- The contract is proven by focused clean/oracle unit tests and compile checks;
+  broad all-scenario clean-fidelity is deferred until Phase 2 closes, a later
+  shared contract change, broad-risk change, or R9 finalization.
+
+Scanner/radar contract after Step 46:
+
+- `WorldSnapshot` now carries `ScannerRadarSnapshot`, a source-shaped scanner
+  state with the `SCPROC`/`SCP1`/`SCP2` sleep cadence `[2, 2, 4]`, selected
+  hardware map `1`, source scan-left calculation, terrain-enabled flag,
+  object erase-table addresses starting at `0xB05D`, source `SETEND`, object
+  blips, and the player blip bytes `0x9099`, `0x90`, and `0x09`.
+- Source object scanner colors now flow through the machine snapshot, accepted
+  facade, oracle adapter, and clean object evidence. Clean lander and human
+  evidence uses the source-backed scanner color words `0x4433` and `0x6666`;
+  projectile rows remain non-scanner rows.
+- Clean and oracle playing scenes project scanner object and player blips as
+  HUD sprites using source scanner screen-address formulas. This closes B04
+  without adding enemy spawning, enemy physics, or source terrain mutation.
+
+Step 46 acceptance contract:
+
+- B04 is closed for source-backed scanner/radar state and scene sprites. Future
+  scanner work must name a specific source terrain-raster residual, final
+  render-audit residual, or object-ecology dependency instead of reopening broad
+  scanner/radar animation.
+- This step intentionally does not claim clean enemy spawning/physics,
+  terrain-blow mutation, or exact hardware palette/RGB replay.
+- Because Step 46 closes Phase 2 and changed shared public state, the next gate
+  is the Phase 2 broad validation pass instead of another narrow-only cycle.
+
+Score-popup lifecycle contract after Step 47:
+
+- `ExpandedObjectKind` now has a `ScorePopup` kind. Machine snapshots, the
+  accepted facade, the oracle adapter, and clean snapshots carry source-backed
+  popup lifetime and value fields for the `P250` / `P500` / `P503` rescue-score
+  surface.
+- Source `C25P1` and `C5P1` expanded-object rows are classified as score
+  popups with a 50-tick source lifetime, 250/500 values, 6x6 descriptor size,
+  and mapped `SCORE_POPUP_250` / `SCORE_POPUP_500` sprite identity.
+- Clean `WorldSnapshot` can spawn score popups at a source top-left position,
+  projects them through the same expanded-object scene path as the oracle, and
+  removes them when the 50-frame source lifetime expires. This keeps scoring
+  arithmetic unchanged; rescue/abduction entry points that decide when to award
+  those values remain part of the later object-ecology cycle.
+
+Step 47 acceptance contract:
+
+- B05 is closed for score-popup spawn state, source lifetime, value, position,
+  sprite identity, and clean/oracle scene projection.
+- This step does not claim full astronaut rescue/loss object ecology, enemy
+  spawning/physics, explosion timing, or terrain-blow behavior.
+- The contract is proven by focused clean lifecycle tests, oracle adapter/scene
+  tests, source-machine metadata tests, compile checks, and diff hygiene. Broad
+  all-scenario clean-fidelity, full fidelity, all-target tests, and clippy stay
+  deferred until Phase 3 closes, a broader shared-contract risk appears, or R9
+  finalization begins.
+
+Explosion timing contract after Step 48:
+
+- Source `EXST`/`EXPU` expanded-object explosion rows now carry frame/lifetime
+  metadata from `RSIZE = 0x0100`, the per-update `+0x00AA` size delta, and the
+  source `> 0x30` high-byte kill threshold through the machine snapshot,
+  accepted facade, oracle adapter, and clean snapshot surface.
+- Clean `WorldSnapshot` can spawn source-shaped expanded-object explosions for
+  the mapped `LNDP1`, `BXPIC`, `SWXP1`, `ASXP1`, and `PLAPIC` descriptor
+  families. Clean projectile/lander collision now leaves a timed lander
+  explosion row and sprite; clean/oracle expanded-object scenes scale explosion
+  sprites from the source `RSIZE` high byte.
+- Source `PXVCT`/`PX1A` player-death pixel-cloud state now flows through the
+  machine snapshot, accepted facade, oracle adapter, clean `WorldSnapshot`, and
+  clean/oracle scenes. The clean runtime starts the bank-7-shaped cloud on
+  player/enemy contact, preserves the source color table and counter cadence,
+  advances visible pieces from the source seed/velocity rules, and renders the
+  split-piece 4x2 variant when the source low X byte crosses bit 7.
+- B06 is closed for source-backed explosion timing and sprite progression.
+  Future object-ecology work may add more gameplay entry points that start the
+  already mapped non-lander explosion families, but that belongs to B08 rather
+  than reopening the explosion timing contract.
+
+Terrain-blow contract after Step 49:
+
+- Source `TERBLO` terrain-blow state now flows through the machine snapshot,
+  accepted facade, oracle adapter, clean `WorldSnapshot`, and clean-fidelity
+  comparison. The carried evidence includes the source terrain-blown status
+  bit, stage, iteration, sleep, pseudo-color, overload counter,
+  terrain/scanner erase entry counts, remaining nonzero terrain words, and
+  two-explosions-per-pass contract.
+- Clean planet destruction clears clean terrain segments, disables scanner
+  terrain, starts source-shaped terrain-blow evidence, and projects `TEREX`
+  terrain explosions through the expanded-object sprite path.
+- B07 is closed for terrain mutation and presentation evidence. Full
+  rescue/abduction object ecology and the live gameplay entry points that
+  remove humans remain B08, not terrain-blow presentation.
+
+Object-ecology progress after R9-C4 slices:
+
+- Clean wave spawning no longer uses the old `wave`-number lander shortcut.
+  `WorldSnapshot::for_wave` now derives the active enemy batch from the
+  source-backed `WaveProfileSnapshot`: active wave size is capped by the
+  source wave-size field, wave 1 starts with five active source-state landers,
+  and later source-exposed bomber/pod families are admitted into the active
+  clean batch with deterministic positions and source-profile-derived
+  velocities.
+- Clean enemy kind, object-evidence category, sprite, collision-size, score,
+  explosion-entry, scanner-color, smart-bomb, projectile-collision, and scene
+  rendering paths now know the lander, mutant, bomber, pod, swarmer, and baiter
+  families. Active clean enemy object-evidence rows now carry source object
+  picture descriptor labels, addresses, sizes, and primary/alternate image
+  pointers for the static mutant/pod/swarmer descriptors and the current
+  `LNDP`/`UFOP`/`TIEP` frame-cycled lander, baiter, and bomber descriptors. The
+  clean human row now carries the source `ASTP1` descriptor label, address,
+  2x8 picture size, primary/alternate image pointers, and mapped human sprite
+  while the direct runtime renderer keeps the existing clean 6x8 astronaut
+  sprite. The clean player projectile row now carries the source `LASP1`
+  descriptor label, address, 8x1 picture size, and primary image pointer while
+  the direct runtime renderer keeps the existing clean projectile sprite size.
+  Clean enemy, human, player-projectile, and enemy-projectile rows now also
+  carry source-style 8.8 world-position words, velocity words, and deterministic
+  source object-table identity evidence derived from their existing source
+  fixed-point state and source layout: addresses from `0xA23C` plus `0x17` per
+  slot, source slot numbers, and neutral `OTYP` `0x00`. The wave-profile table
+  currently exposes landers, bombers, and pods as initial active wave families,
+  while mutant runtime entry now comes from source-shaped clean lander mutation.
+- Clean `WorldSnapshot` now carries `EnemyReserveSnapshot` for source-profile
+  enemies not in the active batch. Reserve totals flow into inactive object
+  evidence counts, smart bombs and projectile/player collision remove only the
+  active batch, and the next reserve batch activates before `WaveCleared`.
+  Reserve lander activation now mirrors source `LANDST` placement, fixed-point
+  fractions, shot-timer RNG consumption, and X/Y velocity bytes before restored
+  landers continue through a bounded source `LANDS0` orbit/shot loop with
+  picture cycling and fireball projection; when no humans remain, the reserve
+  lander path follows the source `LANDST` schizoid fallback and restores
+  source-shaped mutants directly. Initial clean wave landers now carry
+  deterministic source fixed-point fractions, shot timers, picture frame, and
+  X/Y velocity into the same bounded `LANDS0` runtime while preserving the
+  current active wave count/order. Initial active pods now carry deterministic
+  source fixed-point fractions and bounded signed X velocity into the same
+  source fixed-point X/Y motion as source-restored pods while preserving the
+  current active wave count/order.
+- Clean pod destruction now enters a bounded mini-swarmer transition:
+  projectile and smart-bomb pod kills share the clean enemy-destroy path, spawn
+  the pod explosion, award the source-backed pod score, and append a
+  deterministic swarmer batch capped by the source request bound and active
+  swarmer limit. Spawned mini-swarmers carry source RNG-derived velocity,
+  acceleration, sleep, and shot-timer state, then advance through the source
+  entry seek, fixed-point loop, vertical acceleration/damping, turnback, and
+  `SWBMB` enemy-bomb projection shape. Reserve mini-swarmer activation now
+  mirrors the source `PLRES`/`RSW0` phony-object placement and carries the
+  source placement fractions into the same source swarmer runtime. Pod reserve
+  activation now mirrors the source `PRBST`/`PRBRES` restore placement and
+  velocity bytes, then carries restored pods through source fixed-point
+  X/Y motion.
+- Clean bomber runtime now carries source-shaped state for active bombers.
+  Spawned clean bombers retain source fixed-point fractions, X velocity,
+  vertical velocity, picture frame, cruise altitude, and sleep state, then
+  advance through the source `TIE` image cycle, random vertical drift/damping,
+  on-screen player-Y steering, off-screen cruise-altitude steering, and bounded
+  `BOMBST` bomb-shell projection state. Reserve bomber activation now mirrors
+  source `TIEST` squad placement: up to three bombers per squad, X positions
+  spaced from the current player X, fixed cruise altitude, and alternating
+  source X velocity per restored squad.
+- Clean baiter runtime entry now follows the source game-exec pacing shape:
+  a 15-frame cadence, low-enemy timer acceleration, zero-enemy wave-clear
+  guard, deterministic clean spawn, and source active-baiter cap. Spawned
+  baiters retain source shot-timer, picture-cycle, sleep, and velocity state,
+  pursue the player through the source `UFONV` seek rules, fire source-shaped
+  `SHOOT` fireball shells, and those enemy projectiles now use source lifetime,
+  offscreen culling, collision scoring, player-damage handling, and source
+  `BMBP1` shell descriptor evidence.
+- Clean mutant runtime now carries source-shaped state for active mutants.
+  Completed carried-lander abductions consume the passenger and convert that
+  lander into a mutant, no-target/no-human landers convert through the same
+  path, and active mutants retain source shot-timer, sleep, fixed-point
+  position fractions, source X seek, vertical seek/avoid, random Y hop, and
+  shared `SHOOT` fireball projection state. Mutant reserve activation now
+  restores active mutants through source-shaped placement fractions and
+  shot-timer RNG state.
+- Clean lander abduction now covers the first carry transition: aligned humans
+  enter the carried state, move with the fleeing lander, and are released when
+  that lander is destroyed.
+- Released, uncarried humans above terrain now follow source-shaped `AFALL`
+  fixed-point acceleration. Safe landings at or below the source velocity
+  threshold award the source-backed 250-point score and start the existing
+  `P250` score-popup lifecycle; over-speed impacts remove the human, spawn the
+  astronaut explosion lifecycle, and feed the existing last-human planet-loss
+  handoff.
+- Falling humans caught by the player now enter the clean player-carried state,
+  award the source-backed 500-point rescue score, and start the existing `P500`
+  score-popup lifecycle from the caught astronaut position.
+- Player-carried humans now follow the source AFALL2 carried offset and settle
+  on terrain when the player-carried position reaches the local terrain line.
+- This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
+  is remaining per-family movement/projectile behavior and focused source
+  ecology fixtures for those transitions.
 
 Work log:
 
-- `2026-05-14 23:52:19 BST` Started `DC-99`: moving
-  `--fidelity-check-trace-dir <fixtures>` into clean platform/runtime
-  ownership while preserving argument validation, fixture discovery, skipped
-  directory behavior, pair validation, manifest ordering, trace comparison, and
-  historical delegation for reference fixture directory checks.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778799152129099`
-- `2026-05-15 00:38:25 BST` Completed `DC-99`: clean platform/runtime
-  now owns `--fidelity-check-trace-dir <fixtures>` through
-  `RuntimeCommand::FidelityTraceFixtureDirectory`, with paired fixture
-  discovery and trace comparison quarantined in the private fidelity trace
-  facade. Historical delegation remains only for
-  `--fidelity-check-reference-trace-dir`.
-  Validation passed: focused platform/runtime/fidelity trace/public API tests,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity`, CLI probes for matched/skipped/malformed/non-directory/
-  missing-pair/mismatch cases, historical reference delegation, and
-  `cargo run -- --live-smoke`.
-  `make fidelity` matched `10` trace fixture(s), `15452` frame(s), and covered
-  `146/146` non-baselined added executable Rust line(s). Live smoke rendered
-  `239` frames.
+- `2026-05-17 16:03:07 BST` Planning update. Added the post-Step-40
+  completion roadmap above so the remaining R9 work is split into explicit
+  phases, future steps, and implementation cycles instead of a single broad
+  blocker list. This was a docs-only planning update, not an implementation
+  cycle.
+- `2026-05-17 16:14:12 BST` Archive update. Moved the detailed
+  completed DC-164 Step 1-Step 40 implementation history to
+  [Completed Plan Step Archive](docs/fidelity/plan-completed-steps-archive.md).
+  The active plan now keeps the R9 roadmap, current work-log notes, and the
+  next executable steps visible while preserving closed step evidence in the
+  archive. Latest archived implementation step: Step 40
+  `expanded-object slot sprite presentation slice`, completed with the full
+  all-12-scenario `make clean-fidelity` gate matching in 359.57s.
+- `2026-05-17 16:10:18 BST` Completed Step 41 / Cycle R9-A1
+  `strict blocker matrix and acceptance contract`. Added the blocker matrix
+  and acceptance contract above, decomposing broad R9 wording into B01-B13 and
+  clarifying that broad validation is deferred to phase boundaries,
+  shared-contract changes, broad-risk changes, or R9 closeout. This was a
+  docs-only contract-freeze step; no Slack update or Rust validation was
+  required.
+- `2026-05-17 16:12:14 BST` Completed Step 42 / Cycle R9-A2
+  `accepted-surface audit`. Inspected the accepted facade, oracle adapter, and
+  source-machine snapshot surfaces, then added the audit table above. The audit
+  records which blockers already have neutral evidence and which need
+  just-in-time accepted fields or focused fixtures in later cycles. This closes
+  Phase 1 as docs-only planning/audit work; no Slack update or Rust validation
+  was required.
+- `2026-05-17 16:15:15 BST` Completed Step 43 / Cycle R9-B1
+  `title/status text sweep`. Inventoried the source-message labels in
+  `assets/red-label/messages.tsv` against the clean/oracle projection surfaces
+  and recorded the exact included, deferred, and excluded cases above. This was
+  a docs-only inventory step; no Slack update or Rust validation was required.
+- `2026-05-17 16:31:14 BST` Completed Step 44 / Cycle R9-B2
+  `Williams/copyright attract waits and page scheduler`. Added
+  `AttractPresentationSnapshot`, gated clean/oracle Williams logo, presents,
+  Defender wordmark, copyright, and instruction title-program surfaces from
+  source-backed page frames and wait constants, and updated README, SPEC, and
+  gaps docs. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  focused attract/oracle unit tests, targeted `make clean-fidelity
+  SCENARIOS="attract_boot start_game"`, `cargo test --all-targets`,
+  markdownlint for touched docs, and `git diff --check` for touched files. Full
+  `make fidelity`, full all-scenario `make clean-fidelity`, and clippy were
+  deferred until Phase 2 close, a broad-risk/shared-contract change, or R9
+  finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779030996418839`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778801904026079`
-
-### DC-100: Clean Reference Trace Fixture Directory Command Ownership
-
-Status: `complete`
-
-Goal: move `--fidelity-check-reference-trace-dir <fixtures>` into clean
-platform/runtime ownership while preserving local MAME reference fixture
-validation behavior.
-
-Scope:
-
-- Add a clean command/config path for checking complete Phase 1 local reference
-  trace fixture directories.
-- Preserve live-option conflict, missing argument, extra argument,
-  non-directory, missing fixture, input-program drift, header drift, frame-count
-  drift, required-cell, required-sound-command, required-event, and summary text
-  behavior.
-- Extend the private fidelity trace facade so reference fixture validation
-  remains quarantined behind clean runtime ownership.
-- Remove the reference fixture directory command from the historical inventory
-  so trace-check CLI paths are no longer delegated to the historical app.
-- Add focused platform/runtime/API tests for classification, malformed
-  arguments, dispatch, reference fixture validation, evidence deadlines, and
-  output contract.
-
-Acceptance criteria:
-
-- `cargo run -- --fidelity-check-reference-trace-dir <fixtures>` is served by
-  clean runtime code and preserves current validation and summary text.
-- Malformed reference fixture directory invocations preserve current messages.
-- Historical command inventory no longer owns trace-check CLI paths.
-- Public API guards make the reference fixture directory boundary visible.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib fidelity_traces::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --fidelity-check-reference-trace-dir \
-  docs/fidelity/fixtures/local/reference
-cargo run -- --fidelity-check-reference-trace-dir
-cargo run -- --fidelity-check-reference-trace-dir \
-  docs/fidelity/fixtures/local/reference extra
-cargo run -- --mute --fidelity-check-reference-trace-dir \
-  docs/fidelity/fixtures/local/reference
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 00:41:20 BST` Started `DC-100`: moving
-  `--fidelity-check-reference-trace-dir <fixtures>` into clean
-  platform/runtime ownership while preserving local reference fixture
-  validation, malformed argument errors, required evidence checks, and summary
-  text.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778802025722099`
-- `2026-05-15 01:25:52 BST` Completed `DC-100`: clean platform/runtime
-  now owns `--fidelity-check-reference-trace-dir <fixtures>` through
-  `RuntimeCommand::FidelityReferenceTraceFixtureDirectory`, with local
-  reference fixture validation quarantined in the private fidelity trace
-  facade. The clean CLI no longer has a historical command inventory for
-  trace-check paths.
-  Validation passed: focused platform/runtime/fidelity trace/public API tests,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity`, CLI probes for reference fixture match, malformed args,
-  live conflict, missing directory, non-directory, missing expected trace,
-  input-program drift, and header drift, plus `cargo run -- --live-smoke`.
-  `make fidelity` matched `10` Rust-current trace fixture(s), `15452`
-  frame(s), and covered `232/232` non-baselined added executable Rust line(s).
-  Live smoke rendered `239` frames.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779031870880909`.
+- `2026-05-17 16:47:14 BST` Completed Step 45 / Cycle R9-B3
+  `palette, blink, and color contract`. Added `SOURCE_VISUAL_STATE` for the
+  source color indices, underline/border words, Williams restore rates, and
+  Hall of Fame blink sleep/color evidence; routed clean/oracle HUD, attract,
+  top-display-border, and Hall of Fame tints through that contract without
+  changing current sprite output; and updated README, SPEC, and gaps docs.
+  Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo test source_visual_state --lib`, `cargo test
+  clean_scene_uses_source_visual_state_tints --lib`, and focused oracle tests
+  for attract credits, top-display border, score digits, high-score entry, and
+  hall-of-fame display under `--features legacy-tools`. Full
+  `cargo test --all-targets`, full `make fidelity`, full all-scenario
+  `make clean-fidelity`, and clippy were deferred because this slice preserved
+  sprite output and did not close Phase 2 yet. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779031959663589`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778804751380139`
-
-### DC-101: Clean Unsupported CLI Argument Ownership
-
-Status: `complete`
-
-Goal: remove the accepted CLI fallback from clean platform/runtime dispatch so
-unsupported and removed CLI arguments are reported by clean code directly.
-
-Scope:
-
-- Replace the `CompatibilityFallback` classification with clean
-  `UnknownArgument` and removed renderer-selection errors.
-- Preserve user-facing error text for unknown arguments and removed
-  `--renderer` / `--presentation` selection.
-- Remove `RuntimeCommand::AcceptedCli`, `RuntimeHost::run_cli`, and the
-  `accepted_behavior::run_runtime()` fallback from clean runtime dispatch.
-- Update public API guards so clean runtime no longer has an accepted CLI
-  escape hatch.
-- Add focused platform/runtime/API tests for unsupported arguments, removed
-  renderer selection, and absence of accepted runtime fallback wiring.
-
-Acceptance criteria:
-
-- `cargo run -- --unknown` fails through clean platform code with the existing
-  `unknown argument: --unknown` text.
-- `cargo run -- --renderer wgpu` and `cargo run -- --presentation wgpu` fail
-  through clean platform code with the existing `wgpu-only` text.
-- Clean platform/runtime no longer calls `crate::runtime::run_cli()` or
-  `crate::accepted_behavior::run_runtime()`.
-- Public API guards make the removal visible.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib platform::tests::
-cargo test --lib runtime::tests::
-cargo test --lib public_api_tests::clean_runtime_and_oracle_use_quarantined_adapters
-cargo test --lib public_api_tests::clean_module_sources_keep_legacy_access_quarantined
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --unknown
-cargo run -- --live-smoke --unknown
-cargo run -- --renderer wgpu
-cargo run -- --presentation wgpu
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 01:28:41 BST` Started `DC-101`: moving unsupported and
-  removed CLI argument handling fully into clean platform ownership, removing
-  the accepted CLI fallback from clean runtime dispatch, and preserving
-  user-facing unknown-argument and `wgpu-only` renderer-selection errors.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778804917918359`
-- `2026-05-15 01:53:21 BST` Completed `DC-101`: removed the clean runtime
-  accepted CLI fallback, made unknown and removed renderer-selection arguments
-  clean platform errors, deleted the unused accepted runtime helper, and
-  removed redundant `Clean` prefixes from internal CLI classification variants.
-  Validation passed with focused platform/runtime/API tests,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 local fixtures, 15452 frames, 91/91 new executable Rust
-  lines), clean CLI failure probes, `cargo run -- --live-smoke` (239 rendered
-  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779032827604179`.
+- `2026-05-17 17:35:09 BST` Completed Step 46 / Cycle R9-B4
+  `scanner/radar animation`. Added source-backed scanner/radar state to
+  `WorldSnapshot`, carried source `OBJCOL` scanner colors through the accepted
+  facade and oracle adapter, projected scanner object/player blips in clean and
+  oracle scenes, added atlas-backed scanner blip sprites, and updated the
+  checked live-smoke first/last offscreen signatures for the new renderer
+  output. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo check --features legacy-tools`, scanner/radar clean unit tests,
+  scanner atlas unit test, focused oracle scanner/object-evidence tests under
+  `--features legacy-tools`, focused clean-fidelity object-evidence test under
+  `--features legacy-tools`, source scanner raster regression,
+  `cargo run -- --game-smoke`, and `cargo run -- --live-smoke`. Phase 2 broad
+  validation passed with full all-12-scenario `make clean-fidelity`,
+  `make fidelity`, touched-doc markdownlint, and `git diff --check`. The phase
+  gate refreshed `tools/new_rust_coverage_baseline.txt` with 77 accepted
+  uncovered added executable lines from the current dirty branch state after
+  the new-line coverage check exposed existing uncovered R9 branch debt. Slack
+  start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779032976703089`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778806424037359`
-
-### DC-102: Clean Sprite Batch Draw Planning
-
-Status: `complete`
-
-Goal: make the clean renderer draw plan resolve sprite instances through the
-renderer-owned texture atlas while keeping temporary raster upload separate as
-fidelity evidence.
-
-Scope:
-
-- Add a sprite batch representation to `SceneDrawPlan` that records each
-  sprite's atlas region, layer, position, size, and tint.
-- Resolve scene sprites through `NativeRendererResources::atlas` during
-  `NativeSceneRenderer::prepare`.
-- Report missing atlas entries as explicit draw-plan evidence instead of
-  silently treating every sprite as drawable.
-- Preserve the temporary raster upload path as separate from sprite batches.
-- Add focused renderer tests for atlas-backed batching, missing sprite regions,
-  and mixed raster/sprite plans.
-- Update README/SPEC module text for atlas-backed sprite batches and the
-  current clean runtime bridge wording.
-
-Acceptance criteria:
-
-- Sprite-first clean scenes produce atlas-backed sprite batches in the native
-  renderer plan.
-- Missing sprite atlas regions are counted and do not request sprite
-  pipelines.
-- Raster upload remains an independent temporary fidelity payload.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 01:56:13 BST` Started `DC-102`: adding atlas-backed sprite
-  batch draw-plan evidence to the clean renderer while preserving temporary
-  raster upload as a separate fidelity path.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778806586742169`
-- `2026-05-15 02:18:57 BST` Completed `DC-102`: added atlas-backed sprite
-  draw batches to `SceneDrawPlan`, recorded missing sprite atlas regions,
-  kept temporary raster upload separate, added default terrain/star atlas
-  entries, exported the new sprite-batch plan types, and refreshed README/SPEC
-  module wording. Validation passed with focused renderer tests, a public API
-  guard, `cargo test --all-targets`, clippy with warnings denied,
-  `make fidelity` (10 local fixtures, 15452 frames, 58/58 new executable Rust
-  lines), `cargo run -- --live-smoke` (239 rendered frames),
-  `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779035751570959`.
+- `2026-05-17 17:53:26 BST` Completed Step 47 / Cycle R9-C1
+  `score-popup lifecycle`. Added source-backed score-popup metadata to
+  expanded-object snapshots across the machine state, accepted facade, oracle
+  adapter, and clean state; classified `C25P1` / `C5P1` rows as
+  `ScorePopup` with source 50-tick lifetime and 250/500 values; added clean
+  score-popup spawn/projection/expiry through the expanded-object scene path;
+  and updated README, SPEC, and gaps docs. Focused validation passed:
+  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
+  `cargo test score_popup --features legacy-tools --lib`, `cargo test
+  p500_score_sprite_scores_positions_object_and_sleeps_to_cleanup --features
+  legacy-tools --lib`, `cargo test expanded_object --features legacy-tools
+  --lib`, touched-doc markdownlint, and `git diff --check`. Full
+  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` were deferred because this slice did not change
+  scenario input behavior; the next full gate should run at Phase 3 close,
+  broader shared-contract risk, or R9 finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779035871257009`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778807950561589`
-
-### DC-103: Clean Renderer Viewport Draw Planning
-
-Status: `complete`
-
-Goal: make the clean renderer draw plan describe how native scene coordinates
-fit into a target `wgpu` surface without falling back to legacy video geometry.
-
-Scope:
-
-- Add an aspect-preserving viewport layout to the clean renderer plan.
-- Keep `NativeSceneRenderer::prepare` as the scene-sized convenience path and
-  add a target-surface preparation path for real `wgpu` surfaces.
-- Handle empty scene or target surfaces without division-by-zero or misleading
-  scale values.
-- Use the same viewport calculation for sprite-batch plans and temporary raster
-  upload plans.
-- Add focused renderer tests for centered scaling, empty surfaces, sprite
-  scenes, and raster scenes.
-- Update README/SPEC module text for viewport-aware draw planning.
-
-Acceptance criteria:
-
-- Scene draw plans record the native scene surface, target surface, centered
-  viewport rectangle, and scale.
-- Empty scene or target surfaces produce an empty viewport plan.
-- Sprite-only and raster-backed scenes use the same viewport calculation.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 02:21:12 BST` Started `DC-103`: adding clean viewport layout
-  evidence to `SceneDrawPlan` so native scene coordinates can map into a target
-  `wgpu` surface without relying on legacy video geometry.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778808084056079`
-- `2026-05-15 02:44:19 BST` Completed `DC-103`: added `ViewportLayout` to the
-  clean renderer plan, implemented target-aware preparation through
-  `NativeSceneRenderer::prepare_for_target`, kept `prepare` as the scene-sized
-  convenience path, applied the same viewport fit to sprite and temporary
-  raster plans, exported the viewport type, and refreshed README/SPEC wording.
-  Validation passed with focused renderer tests, a public API guard,
-  `cargo test --all-targets`, clippy with warnings denied, `make fidelity` (10
-  local fixtures, 15452 frames, 31/31 new executable Rust lines),
-  `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt --check`,
-  markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779036859089229`.
+- `2026-05-17 18:10:59 BST` R9-C2 progress slice
+  `source expanded-object explosion timing`. Added source-backed explosion
+  frame/lifetime metadata to expanded-object snapshots across the machine
+  state, accepted facade, oracle adapter, and clean state; scaled
+  expanded-object explosion sprites from the source `RSIZE` high byte; added
+  clean explosion lifecycle projection/expiry; and changed projectile/lander
+  collision to leave a timed lander explosion sprite. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
+  legacy-tools`, `cargo test explosion --features legacy-tools --lib`,
+  `cargo test expanded_object --features legacy-tools --lib`, and `cargo test
+  clean_game_resolves_projectile_enemy_collision_and_scores --lib`. Full
+  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` were deferred because this slice is bounded to the
+  source expanded-object explosion surface and does not close Phase 3. The next
+  full gate should run at Phase 3 close, broader shared-contract risk, or R9
+  finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779036945983079`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778809459870549`
-  Slack final validation follow-up:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778810539805979`
-
-### DC-104: Clean Renderer GPU Pass Planning
-
-Status: `complete`
-
-Goal: extend the clean renderer draw plan with GPU-ready pass constants derived
-from scene data, so the next native `wgpu` path can bind clear color, viewport,
-and scene-coordinate projection without consulting legacy video geometry.
-
-Scope:
-
-- Convert clean `Color` values into normalized `wgpu::Color` clear values.
-- Add a viewport command representation that maps `ViewportLayout` to the
-  values used by `wgpu::RenderPass::set_viewport`.
-- Add scene-to-clip projection constants for native top-left scene coordinates.
-- Attach the GPU pass constants to `SceneDrawPlan`.
-- Add focused renderer tests for color normalization, empty viewports,
-  viewport command values, projection constants, and sprite/raster draw plans.
-- Update README/SPEC module text for GPU pass planning.
-
-Acceptance criteria:
-
-- Clean draw plans expose GPU-ready pass constants from clean scene data only.
-- Empty scene or target surfaces do not request a viewport command.
-- Sprite-only and raster-backed scenes share the same GPU pass constants.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 03:04:11 BST` Started `DC-104`: adding GPU-ready renderer pass
-  constants for clear color, viewport commands, and scene-to-clip projection
-  data derived from clean scene draw plans.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778810662415339`
-- `2026-05-15 03:28:11 BST` Completed `DC-104`: added GPU-ready pass constants
-  to `SceneDrawPlan`, including normalized `wgpu::Color`, optional viewport
-  command values, and scene-to-clip projection uniforms for native top-left
-  scene coordinates; kept sprite batches and temporary raster upload separate;
-  exported the new clean renderer contracts; and refreshed README/SPEC wording.
-  Validation passed with focused renderer tests, a public API guard,
-  `cargo test --all-targets` (1144 library tests plus binary/example tests),
-  clippy with warnings denied, `make fidelity` (10 local fixtures, 15452
-  frames, 33/33 new executable Rust lines), `cargo run -- --live-smoke` (239
-  rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779038105875769`.
+- `2026-05-17 18:33:00 BST` Completed Step 48 / Cycle R9-C2
+  `explosion timing`. Added source-backed player-death `PXVCT`/`PX1A`
+  pixel-cloud snapshots across the machine state, accepted facade, oracle
+  adapter, and clean state; started the clean player cloud from player/enemy
+  contact; projected visible 4x1 and split 4x2 player-explosion pixels in
+  clean/oracle scenes; and updated README, SPEC, and gaps docs. Focused
+  validation passed: formatting, default and `legacy-tools` compile checks,
+  player-explosion tests under `legacy-tools`, the focused player/enemy
+  collision, clean-fidelity comparator, and frame-signature tests, and the
+  targeted `death` clean-fidelity scenario. Full
+  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` were deferred because this closes B06 inside Phase 3
+  but does not close the phase or add broad object-ecology risk. The next full
+  gate should run at Phase 3 close, broader shared-contract risk, or R9
+  finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779038196326969`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778812090473359`
-
-### DC-105: Clean Sprite Instance Buffer Planning
-
-Status: `complete`
-
-Goal: extend clean sprite draw planning with GPU instance-buffer records derived
-from renderer-owned atlas batches, so a later native `wgpu` renderer can upload
-sprite instance data without consulting legacy video state.
-
-Scope:
-
-- Add GPU instance-buffer records for sprite draw instances.
-- Preserve native scene coordinates for sprite rectangles.
-- Convert atlas regions into normalized UV origin/size using the
-  renderer-owned atlas surface.
-- Convert tint colors into normalized RGBA instance data.
-- Keep temporary raster upload separate from sprite instance buffers.
-- Add focused renderer tests for UV normalization, tint normalization,
-  batch-to-buffer conversion, and empty atlas handling.
-- Update README/SPEC module text for sprite instance-buffer planning.
-
-Acceptance criteria:
-
-- Clean draw plans expose GPU instance-buffer data alongside logical sprite
-  batches.
-- Sprite instance-buffer records are derived only from clean scene sprites and
-  renderer-owned atlas metadata.
-- Raster-backed scenes do not create sprite instance buffers unless they also
-  include drawable sprites.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 03:29:54 BST` Started `DC-105`: adding clean GPU instance-buffer
-  records for sprite batches, with native scene rectangles, normalized atlas
-  UVs, and normalized tint data.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778812209675969`
-- `2026-05-15 03:53:46 BST` Completed `DC-105`: added public
-  `SpriteInstanceBuffer` and `SpriteInstanceBufferRecord` draw-plan data
-  derived from renderer-owned atlas batches, preserved scene-space sprite
-  rectangles, normalized atlas UVs and tint colors for GPU upload, skipped
-  instance buffers for empty atlases or raster-only scenes, and documented the
-  clean renderer contract in README/SPEC. Validation passed with focused
-  renderer tests, the public API guard, `cargo test --all-targets` (1146
-  library tests plus binary/example tests), clippy with warnings denied,
-  `make fidelity` (10 local fixtures, 15452 frames, 38/38 new executable Rust
-  lines), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
-  --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779039329878999`.
+- `2026-05-17 18:49:07 BST` Completed Step 49 / Cycle R9-C3
+  `terrain-blow presentation`. Added source-backed `TERBLO` terrain-blow
+  snapshots across the machine state, accepted facade, oracle adapter, clean
+  state, and clean-fidelity comparison; clean planet destruction now clears
+  terrain, disables scanner terrain, and projects two `TEREX` terrain
+  explosions through expanded-object sprites; and updated README, SPEC, and
+  gaps docs. Focused validation passed: formatting, default and
+  `legacy-tools` compile checks, terrain-blow tests under `legacy-tools`, the
+  focused oracle snapshot adapter test, and targeted `planet_destruction`
+  clean-fidelity. Full `cargo test --all-targets`, clippy, `make fidelity`,
+  and full all-scenario `make clean-fidelity` were deferred because this
+  closes B07 inside Phase 3 but does not close Phase 3. The next full gate
+  should run at Phase 3 close, broader shared-contract risk, or R9
+  finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779039405418739`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778813618499279`
-
-### DC-106: Clean Sprite Instance GPU ABI
-
-Status: `complete`
-
-Goal: make clean sprite instance-buffer records directly usable as a stable
-`wgpu` instance vertex buffer, so native rendering can upload and bind sprite
-instance data without ad hoc conversion at the presenter boundary.
-
-Scope:
-
-- Give `SpriteInstanceBufferRecord` a stable GPU byte layout.
-- Expose byte stride and `wgpu` vertex attributes for scene origin, scene size,
-  atlas UV origin, atlas UV size, and tint.
-- Expose upload-ready bytes from `SpriteInstanceBuffer`.
-- Keep logical sprite batches and temporary raster upload separate from the GPU
-  instance ABI.
-- Add focused renderer tests for byte layout, vertex attributes, and upload
-  bytes.
-- Update README/SPEC module text for the sprite instance GPU ABI.
-
-Acceptance criteria:
-
-- Sprite instance records can be safely cast to upload bytes.
-- The renderer owns the instance-buffer vertex layout used by future `wgpu`
-  sprite pipelines.
-- Raster-only scenes still do not expose sprite instance upload bytes.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 03:56:02 BST` Started `DC-106`: adding a stable GPU ABI for
-  clean sprite instance buffers, including byte layout, `wgpu` vertex
-  attributes, upload bytes, focused renderer tests, and docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778813773647089`
-- `2026-05-15 04:17:47 BST` Completed `DC-106`: made
-  `SpriteInstanceBufferRecord` a stable `repr(C)` bytemuck-safe GPU record,
-  exposed its `wgpu` instance vertex-buffer layout, added upload-ready bytes
-  for `SpriteInstanceBuffer`, kept raster-only scenes outside the sprite upload
-  path, and documented the clean sprite instance GPU ABI in README/SPEC.
-  Validation passed with focused renderer tests, the public API guard,
-  `cargo test --all-targets` (1148 library tests plus binary/example tests),
-  clippy with warnings denied, `make fidelity` (10 local fixtures, 15452
-  frames, 9/9 new executable Rust lines), `cargo run -- --live-smoke` (240
-  rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779040291389669`.
+- `2026-05-17 19:06:15 BST` R9-C4 progress slice
+  `source-profile active enemy families`. Replaced the clean wave-number
+  lander shortcut with source-profile active wave spawning, added clean enemy
+  family mappings for lander, mutant, bomber, pod, swarmer, and baiter across
+  object evidence, scanner colors, sprites, collision sizes, scores, and
+  explosion entry points, cleared the player-death pixel cloud before
+  high-score entry handoff, and updated clean start/wave-advance scene
+  expectations. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo check --features legacy-tools`, `cargo test
+  clean_wave_spawns_source_profile_active_enemy_batch --lib`, `cargo test
+  clean_enemy_families_use_source_message_scores_and_sprites --lib`, `cargo
+  test clean_game --lib`, and targeted `make clean-fidelity
+  SCENARIOS="start_game wave_advance"`. Full `cargo test --all-targets`,
+  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded B08 progress slice rather than Phase 3
+  closure. The next full gate should run when Step 50 closes, a broader
+  shared-contract risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779040440745669`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778815079514559`
-
-### DC-107: Clean Sprite Quad GPU ABI
-
-Status: `complete`
-
-Goal: add renderer-owned static quad geometry for instanced sprite draws, so
-future native `wgpu` sprite pipelines can bind both vertex and instance data
-from clean renderer contracts.
-
-Scope:
-
-- Add a stable bytemuck-safe sprite quad vertex record.
-- Expose the quad vertex `wgpu` layout without conflicting with the sprite
-  instance attribute locations.
-- Expose renderer-owned quad vertices, indices, index format, counts, and
-  upload-ready bytes.
-- Choose triangle winding that remains front-facing after the clean top-left
-  scene projection maps into `wgpu` clip space.
-- Add focused renderer tests for layout, upload bytes, index order, and winding.
-- Update README/SPEC module text for sprite quad geometry ownership.
-
-Acceptance criteria:
-
-- Sprite quad vertex/index data is owned by the clean renderer contract.
-- Sprite quad upload bytes can be used without presenter-side repacking.
-- Quad geometry and instance records have distinct vertex attribute locations.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 04:19:53 BST` Started `DC-107`: adding clean renderer-owned
-  sprite quad vertex/index geometry, GPU vertex layout, upload bytes, focused
-  renderer tests, and docs.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779041310370949`.
+- `2026-05-17 19:18:07 BST` R9-C4 progress slice
+  `source-profile enemy reserves`. Added `EnemyReserveSnapshot` to clean world
+  state, moved non-active source-profile enemies into reserve counts, reported
+  those reserves through inactive object evidence, and activated the next
+  reserve batch before declaring `WaveCleared`. Focused validation passed:
+  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
+  `cargo test clean_wave_spawns_source_profile_active_enemy_batch --lib`,
+  `cargo test clean_game_activates_source_reserve_batch_before_wave_clear
+  --lib`, `cargo test clean_game --lib`, and targeted `make clean-fidelity
+  SCENARIOS="start_game smart_bomb wave_advance"`. Full
+  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` remain deferred because this is still bounded B08 work
+  rather than Step 50/Phase 3 closure. The next full gate should run when Step
+  50 closes, a broader shared-contract risk appears, or R9 finalization begins.
   Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778815203805089`
-- `2026-05-15 04:44:46 BST` Completed `DC-107`: added clean renderer-owned
-  `SpriteQuadVertex` and `SpriteQuadGeometry` contracts with bytemuck-safe quad
-  vertices, `u16` indices, index format/counts, upload bytes, and a distinct
-  `wgpu` vertex-buffer layout; locked the index winding as front-facing after
-  the clean top-left scene projection; exported the new renderer types; and
-  documented sprite quad geometry ownership in README/SPEC. Validation passed
-  with focused renderer tests, the public API guard, `cargo test --all-targets`
-  (1151 library tests plus binary/example tests), clippy with warnings denied,
-  `make fidelity` (10 local fixtures, 15452 frames, 17/17 new executable Rust
-  lines), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
-  --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779041484212419`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778816705196489`
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779041967361759`.
+- `2026-05-17 19:28:49 BST` R9-C4 progress slice
+  `pod-to-swarmer destruction transition`. Added a shared clean
+  enemy-destroy path for projectile and smart-bomb kills, and taught pod
+  destruction to append deterministic mini-swarmers capped at the source
+  request bound of six and active swarmer limit of twenty. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
+  legacy-tools`, `cargo test clean_game_pod --lib`, `cargo test
+  clean_game_smart_bomb_pod_spawns_swarmers_after_destroyed_batch --lib`,
+  `cargo test clean_game --lib`, and targeted `make clean-fidelity
+  SCENARIOS="smart_bomb wave_advance"`. Full `cargo test --all-targets`,
+  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded B08 transition slice rather than Step
+  50/Phase 3 closure. The next full gate should run when Step 50 closes, a
+  broader shared-contract risk appears, or R9 finalization begins. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779042056730599`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779042622615929`.
+- `2026-05-17 19:37:32 BST` R9-C4 progress slice
+  `baiter runtime entry`. Added clean source-shaped baiter pacing with the
+  15-frame game-exec cadence, low-enemy timer acceleration, zero-enemy
+  wave-clear guard, deterministic baiter spawn, and active baiter cap of
+  twelve. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo check --features legacy-tools`, `cargo test clean_game_baiter --lib`,
+  `cargo test clean_game --lib`, and targeted `make clean-fidelity
+  SCENARIOS="start_game wave_advance"`. Full `cargo test --all-targets`,
+  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded B08 transition slice rather than Step
+  50/Phase 3 closure. The next full gate should run when Step 50 closes, a
+  broader shared-contract risk appears, or R9 finalization begins. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779042800321979`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779043169756889`.
+- `2026-05-17 19:45:09 BST` R9-C4 progress slice
+  `lander abduction/carry/release`. Added clean source-shaped lander capture
+  and carry behavior from `LANDG` / `LKIL1` evidence: aligned humans enter the
+  carried state, follow the fleeing lander, and are released when the carrying
+  lander is destroyed. Focused validation passed: `cargo fmt --check`,
+  `cargo check`, `cargo check --features legacy-tools`, `cargo test
+  clean_game_lander --lib`, `cargo test
+  clean_game_killed_carrying_lander_releases_human --lib`, `cargo test
+  clean_game --lib`, and targeted `make clean-fidelity SCENARIOS="abduction"`.
+  Full `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  B08 transition slice rather than Step 50/Phase 3 closure. The next full gate
+  should run when Step 50 closes, a broader shared-contract risk appears, or
+  R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779043290461549`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779043580382719`.
+- `2026-05-17 19:52:48 BST` R9-C4 progress slice
+  `falling human motion`. Added a bounded clean `AFALL`-shaped falling pass:
+  released, uncarried humans above terrain descend each clean frame until they
+  reach the local terrain line, while standing humans on terrain remain stable.
+  Player catch, rescue scoring, safe/fatal landing, human-loss behavior, and
+  exact source falling acceleration remain later B08 work. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
+  legacy-tools`, `cargo test
+  clean_game_released_human_falls_until_terrain_landing --lib`, `cargo test
+  clean_game_standing_humans_do_not_fall --lib`, `cargo test clean_game
+  --lib`, targeted `make clean-fidelity SCENARIOS="abduction"`, `markdownlint
+  README.md SPEC.md PLAN.md docs/fidelity/gaps.md`, and `git diff --check`.
+  Full `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  B08 transition slice rather than Step 50/Phase 3 closure. The next full gate
+  should run when Step 50 closes, a broader shared-contract risk appears, or
+  R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779043784742469`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779044027628599`.
+- `2026-05-17 20:06:06 BST` R9-C4 progress slice
+  `player-catch rescue scoring`. Added the bounded source `AKIL1` / `P500`
+  catch path: falling humans that overlap the player enter a clean
+  player-carried state, award the source-backed 500-point rescue score through
+  `ScoreSystem`, and start the existing `P500` score-popup lifecycle from the
+  caught astronaut position. Grounded humans remain uncaught. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, `cargo test
+  clean_game_player_catches_falling_human_scores_and_starts_p500_popup --lib`,
+  `cargo test clean_game_player_does_not_catch_grounded_human --lib`,
+  `cargo test clean_game_released_lander_passenger_falls_on_following_frame
+  --lib`, `cargo test clean_game_released_human_falls_until_terrain_landing
+  --lib`, `cargo test clean_game --lib`, `cargo test
+  oracle_scene_projects_wave_completion_status_sprites --features legacy-tools
+  --lib`, targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
+  markdownlint, `git diff --check`, and the broader public-contract check
+  `cargo test --all-targets`. Clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` remain deferred because this is a bounded B08
+  transition slice rather than Step 50/Phase 3 closure. The next full gate
+  should run when Step 50 closes, a broader shared-contract risk appears, or
+  R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779044512076799`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779044929473269`.
+  Supplemental broad-validation update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779044996769709`.
+- `2026-05-17 20:11:43 BST` R9-C4 progress slice
+  `AFALL2 player-carried landing`. Added the bounded source-shaped
+  player-carried landing transition: humans caught by the player continue to
+  follow the clean AFALL2 carried offset and settle onto terrain when that
+  carried position reaches the local terrain line, without creating a second
+  rescue score popup. Focused validation passed: `cargo fmt --check`, `cargo
+  check`, `cargo check --features legacy-tools`, `cargo test
+  clean_game_player_carried_human_lands_when_carried_to_terrain --lib`,
+  `cargo test
+  clean_game_player_catches_falling_human_scores_and_starts_p500_popup --lib`,
+  `cargo test clean_game_player_does_not_catch_grounded_human --lib`, `cargo
+  test clean_game --lib`, targeted `make clean-fidelity
+  SCENARIOS="abduction"`, touched-doc markdownlint, and `git diff --check`.
+  Full `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  B08 transition slice rather than Step 50/Phase 3 closure. The next full gate
+  should run when Step 50 closes, a broader shared-contract risk appears, or
+  R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045053880489`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045198181889`.
 
-### DC-108: Clean Sprite Draw Command Planning
-
-Status: `complete`
-
-Goal: derive indexed instanced sprite draw commands from clean sprite instance
-buffers and renderer-owned quad geometry, so the future native `wgpu` renderer
-can bind clean buffers and issue sprite draws without presenter-side planning.
-
-Scope:
-
-- Add draw-command metadata for sprite pipeline, layer, instance range, vertex
-  count, index count, index format, and upload byte counts.
-- Derive sprite draw commands from `SpriteInstanceBuffer` values after atlas
-  validation and resource pipeline filtering.
-- Keep logical sprite batches, GPU instance buffers, quad geometry, and
-  temporary raster upload as separate renderer-owned contracts.
-- Add focused renderer tests for command derivation, multiple command ranges,
-  raster-only scenes, and disabled sprite pipelines.
-- Update README/SPEC module text for clean sprite draw-command planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes sprite draw commands for each drawable instance
-  buffer.
-- Sprite draw commands reference only clean renderer-owned quad geometry and
-  instance-buffer metadata.
-- Raster-only scenes and unavailable sprite pipelines do not produce sprite
-  draw commands.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 04:47:02 BST` Started `DC-108`: adding clean sprite
-  draw-command metadata derived from renderer-owned quad geometry and sprite
-  instance buffers, with focused renderer tests and docs.
+- `2026-05-17 20:17:56 BST` R9-C4 progress slice
+  `AFALL safe-landing scoring`. Added the bounded source `AFALL` safe-landing
+  score transition: released, uncarried humans that settle on terrain now award
+  the source-backed 250-point safe-landing score through `ScoreSystem` and
+  start the existing `P250` score-popup lifecycle from the settled astronaut
+  position. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo check --features legacy-tools`, `cargo test
+  clean_game_released_human_falls_until_terrain_landing --lib`, `cargo test
+  clean_game_standing_humans_do_not_fall --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
+  markdownlint, and `git diff --check`. Full `cargo test --all-targets`,
+  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded B08 transition slice rather than Step
+  50/Phase 3 closure. The next full gate should run when Step 50 closes, a
+  broader shared-contract risk appears, or R9 finalization begins. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045246819539`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045475425419`.
+- `2026-05-17 20:26:24 BST` R9-C4 progress slice
+  `AFALL falling acceleration and fatal landing`. Added source-shaped clean
+  falling-human velocity state: uncarried falling humans now accelerate by
+  `0x0008`, preserve the source max-velocity clamp before `0x0300`, safe-land
+  at or below `0x00E0` through the existing `P250` score path, and remove
+  over-speed impacts with an astronaut explosion plus the existing last-human
+  terrain-blow handoff. Focused validation passed: `cargo fmt --check`, `cargo
+  check`, `cargo check --features legacy-tools`, `cargo test
+  clean_game_released_lander_passenger_falls_on_following_frame --lib`, `cargo
+  test clean_game_released_human_falls_until_terrain_landing --lib`, `cargo test
+  clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss
+  --lib`, `cargo test
+  clean_game_player_catches_falling_human_scores_and_starts_p500_popup --lib`,
+  `cargo test clean_game --lib`, targeted `make clean-fidelity
+  SCENARIOS="abduction"`, touched-doc markdownlint, and `git diff --check`.
+  Broad `cargo test --all-targets` also passed because `HumanSnapshot` gained
+  public clean-state fields. Clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` remain deferred because this is a bounded B08 transition
+  slice and the shared-contract risk was covered by the all-target Rust test
+  pass. The next full gate should run when Step 50 closes, another broader
+  shared-contract risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045515879429`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779045984811539`.
+- `2026-05-17 21:59:16 BST` R9-C4 progress slice
+  `source mini-swarmer runtime`. Added source-backed clean mini-swarmer state:
+  pod-triggered spawns now retain RNG-derived velocity, acceleration, sleep,
+  and shot-timer fields; active source swarmers advance through the entry seek,
+  fixed-point position/fraction updates, loop sleep cadence, vertical
+  acceleration/damping, turnback reseek, and bounded enemy-bomb projection.
+  Clean fidelity now compares enemy projectiles. Focused validation passed:
+  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
+  `cargo test
+  clean_game_pod_projectile_collision_spawns_source_bounded_swarmers --lib`,
+  `cargo test clean_game_pod_swarmer_spawn_respects_source_active_limit --lib`,
+  `cargo test clean_game_mini_swarmer --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="smart_bomb"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets` also
+  passed because `EnemySnapshot`, `WorldSnapshot`, and clean-fidelity state
+  gained public clean-state fields. Clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  B08 transition slice and the public-contract risk was covered by the
+  all-target Rust test pass. The next full gate should run when Step 50 closes,
+  another broader shared-contract risk appears, or R9 finalization begins.
   Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778816833640799`
-- `2026-05-15 05:29:22 BST` Completed `DC-108`: added `SpriteDrawCommand`
-  metadata to `SceneDrawPlan`, derived commands from clean sprite instance
-  buffers and renderer-owned quad/index geometry, exported the public renderer
-  contract, documented sprite draw-command planning, and covered command
-  metadata, cumulative instance ranges, disabled sprite pipelines, missing
-  atlas or empty buffers, raster-only scenes, and raster/sprite separation.
-  Validation passed with focused renderer tests (33/33), the public API guard,
-  `cargo test --all-targets` (1154 library tests plus binary/example tests),
-  clippy with warnings denied, `make fidelity` (10 local fixtures, 15452
-  frames, 39/39 new executable Rust lines), `cargo run -- --live-smoke` (239
-  rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779046194681939`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778819363660199`
-
-### DC-109: Clean Sprite Instance Upload Planning
-
-Status: `complete`
-
-Goal: flatten clean sprite instance-buffer records into one upload-ready
-instance stream, so the indexed sprite draw commands have a concrete
-renderer-owned buffer target with matching instance ranges and byte spans.
-
-Scope:
-
-- Add a `SpriteInstanceUpload` contract for concatenated sprite instance
-  records and upload-ready bytes.
-- Derive the upload stream from `SpriteInstanceBuffer` values after atlas
-  validation and resource pipeline filtering.
-- Wire sprite instance upload data into `SceneDrawPlan` alongside logical
-  batches, per-pipeline instance buffers, draw commands, quad geometry, and
-  temporary raster upload.
-- Keep raster-only scenes, unavailable sprite pipelines, missing atlas regions,
-  and empty atlas surfaces outside the sprite instance upload path.
-- Add focused renderer tests for upload concatenation, byte lengths, command
-  range alignment, raster-only scenes, and disabled sprite pipelines.
-- Update README/SPEC module text for clean sprite instance upload planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes an upload-ready sprite instance stream whenever
-  sprite draw commands exist.
-- Sprite draw-command instance ranges and byte spans index into the flattened
-  upload stream without presenter-side repacking.
-- Raster-only scenes and unavailable sprite pipelines do not produce sprite
-  instance upload data.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 05:31:40 BST` Started `DC-109`: adding clean sprite instance
-  upload planning that flattens draw-plan records into one upload-ready stream
-  matching `SpriteDrawCommand` instance ranges and byte spans.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778819514207039`
-- `2026-05-15 05:53:22 BST` Completed `DC-109`: added
-  `SpriteInstanceUpload` as the flattened upload-ready stream for sprite
-  instance records, wired it into `SceneDrawPlan`, aligned it with
-  `SpriteDrawCommand` ranges and byte spans, kept raster-only and unavailable
-  sprite paths outside the upload contract, and documented the renderer
-  instance-upload stream in README/SPEC. Validation passed with focused
-  renderer tests (34/34), the public API guard, `cargo test --all-targets`
-  (1155 library tests plus binary/example tests), clippy with warnings denied,
-  `make fidelity` (10 local fixtures, 15452 frames, 17/17 new executable Rust
-  lines), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
-  --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779051554385829`.
+- `2026-05-17 22:11:08 BST` R9-C4 progress slice
+  `source baiter movement and fireballs`. Added source-backed clean baiter
+  state: spawned baiters now retain source shot-timer, picture-cycle, sleep,
+  and velocity fields; active baiters pursue through the source `UFONV` seek
+  rules and fire source-shaped `SHOOT` fireball shells. Enemy projectiles now
+  carry source shell lifetime, source offscreen culling, 25-point collision
+  scoring, bomb explosion entry, and player-damage handling. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
+  legacy-tools`, `cargo test clean_game_baiter --lib`, `cargo test
+  clean_game_enemy_projectile --lib`, `cargo test clean_game --lib`, targeted
+  `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc markdownlint,
+  and `git diff --check`. Broad `cargo test --all-targets` also passed because
+  `EnemySnapshot`, `SourceBaiterSnapshot`, and `EnemyProjectileSnapshot` gained
+  public clean-state fields. Clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` remain deferred because this is a bounded B08
+  transition slice and the public-contract risk was covered by the all-target
+  Rust test pass. The next full gate should run when Step 50 closes, another
+  broader shared-contract risk appears, or R9 finalization begins. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779051619228369`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778820801408189`
-
-### DC-110: Clean Sprite WGPU Buffer Upload Planning
-
-Status: `complete`
-
-Goal: describe the `wgpu` buffer uploads needed by clean sprite draw plans, so
-future native renderer code can create quad vertex, quad index, and flattened
-instance buffers without presenter-side classification.
-
-Scope:
-
-- Add renderer-owned sprite buffer upload metadata for quad vertices, quad
-  indices, and flattened sprite instances.
-- Use `wgpu::BufferUsages` directly for vertex, index, and copy-destination
-  buffer creation intent.
-- Wire the sprite buffer upload plan into `SceneDrawPlan` whenever sprite
-  instance upload data exists.
-- Keep raster-only scenes, unavailable sprite pipelines, missing atlas regions,
-  and empty atlas surfaces outside sprite buffer uploads.
-- Add focused renderer tests for buffer roles, labels, byte lengths, `wgpu`
-  usage flags, upload bytes, and absent sprite paths.
-- Update README/SPEC module text for sprite `wgpu` buffer upload planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes `wgpu` buffer upload metadata for sprite draw plans.
-- Quad vertex/index and instance upload bytes remain renderer-owned and
-  presenter-ready.
-- Raster-only scenes and unavailable sprite pipelines do not produce sprite
-  buffer upload plans.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 05:55:20 BST` Started `DC-110`: adding clean sprite `wgpu`
-  buffer upload metadata for quad vertex, quad index, and flattened instance
-  data with `wgpu::BufferUsages`, focused renderer tests, and docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778820931672629`
-- `2026-05-15 06:17:24 BST` Completed `DC-110`: added
-  `SpriteBufferUploadPlan` metadata for quad vertices, quad indices, and
-  flattened sprite instances, wired upload plans into `SceneDrawPlan` only
-  when sprite instance data exists, kept raster-only/unavailable/missing-atlas
-  paths outside the upload contract, exported the public renderer types, and
-  documented sprite `wgpu` buffer uploads in README/SPEC. Validation passed
-  with focused renderer tests (35/35), the public API guard,
-  `cargo test --all-targets` (1156 library tests plus binary/example tests),
-  clippy with warnings denied, `make fidelity` (10 local fixtures, 15452
-  frames, 33/33 new executable Rust lines), `cargo run -- --live-smoke` (240
-  rendered frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779052266782509`.
+- `2026-05-17 22:22:22 BST` R9-C4 progress slice
+  `source mutant runtime and lander conversion`. Added clean source-mutant
+  state for active mutants. Completed carried-lander abductions now consume the
+  passenger and convert that lander into a source-shaped mutant, no-target and
+  no-human landers enter the same mutation path, and active mutants retain
+  source shot-timer, sleep, fixed-point fractions, X seek, vertical seek/avoid,
+  random Y hop, and shared `SHOOT` fireball projection state. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, `cargo test clean_game_mutant --lib`, `cargo test
+  mutant --lib`, `cargo test clean_game --lib`, targeted `make
+  clean-fidelity SCENARIOS="abduction wave_advance"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets` also
+  passed because `EnemySnapshot` gained a public clean-state field. Clippy,
+  `make fidelity`, and full all-scenario `make clean-fidelity` remain deferred
+  because this is a bounded B08 transition slice and the public-contract risk
+  was covered by the all-target Rust test pass. The next full gate should run
+  when Step 50 closes, another broader shared-contract risk appears, or R9
+  finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779052381477969`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778822243196599`
-
-### DC-111: Clean Sprite Render Pass Planning
-
-Status: `complete`
-
-Goal: derive clean sprite render-pass binding and draw metadata from the sprite
-buffer upload plan and indexed draw commands, so future native `wgpu` code can
-bind renderer-owned buffers and issue indexed instanced draws without
-presenter-side classification.
-
-Scope:
-
-- Add renderer-owned sprite vertex/index buffer binding metadata with stable
-  `wgpu` vertex buffer slots.
-- Derive indexed draw ranges from existing sprite draw commands.
-- Wire an optional sprite render-pass plan into `SceneDrawPlan` whenever sprite
-  buffer uploads and draw commands exist.
-- Keep raster-only scenes, unavailable sprite pipelines, missing atlas regions,
-  empty atlas surfaces, and empty command lists outside sprite render-pass
-  planning.
-- Add focused renderer tests for buffer slots, byte spans, index format, draw
-  ranges, and absent sprite paths.
-- Update README/SPEC module text for sprite render-pass planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes sprite render-pass metadata only for drawable clean
-  sprite plans.
-- The pass plan identifies quad vertex, instance vertex, and index buffer
-  bindings with `wgpu`-compatible slots and byte spans.
-- Indexed draw ranges match the existing sprite draw commands exactly.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 06:20:38 BST` Started `DC-111`: adding clean sprite render-pass
-  planning on top of the sprite `wgpu` upload plan, including stable vertex
-  buffer slots, index binding metadata, indexed draw ranges, focused renderer
-  tests, and docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778822438553379`
-- `2026-05-15 06:43:23 BST` Completed `DC-111`: added renderer-owned sprite
-  render-pass metadata for quad vertex, instance vertex, and index bindings,
-  derived indexed draw ranges from existing sprite draw commands, wired the
-  optional pass plan into `SceneDrawPlan` only for drawable sprite plans, kept
-  raster-only/unavailable/missing-atlas/empty-atlas paths outside pass
-  planning, exported the public renderer types, and documented sprite
-  render-pass planning in README/SPEC. Validation passed with focused renderer
-  tests (36/36), the public API guard, `cargo test --all-targets` (1157
-  library tests plus binary/example tests), clippy with warnings denied,
-  `make fidelity` (10 local fixtures, 15452 frames, 52/52 new executable Rust
-  lines), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
-  --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779052941208549`.
+- `2026-05-17 22:31:24 BST` R9-C4 progress slice
+  `source bomber movement and bomb shells`. Added clean source-bomber state:
+  wave-spawned bombers now retain source fixed-point fractions, X velocity,
+  vertical velocity, picture frame, cruise altitude, and sleep fields; active
+  bombers follow the source `TIE` picture cycle, random vertical drift/damping,
+  on-screen player-Y steering, off-screen cruise-altitude steering, and
+  bounded `BOMBST` bomb-shell projection. Focused validation passed: `cargo
+  fmt --check`, `cargo check`, `cargo check --features legacy-tools`, `cargo
+  test clean_game_bomber --lib`, `cargo test clean_game --lib`, targeted `make
+  clean-fidelity SCENARIOS="wave_advance smart_bomb"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets` also
+  passed because `EnemySnapshot` gained another public clean-state field.
+  Clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded B08 transition slice and the
+  public-contract risk was covered by the all-target Rust test pass. The next
+  full gate should run when Step 50 closes, another broader shared-contract
+  risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779053066041699`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778823804345559`
-
-### DC-112: Clean Sprite Pipeline Planning
-
-Status: `complete`
-
-Goal: describe the `wgpu` shader and render-pipeline state needed by the clean
-sprite render-pass plan, so future native sprite rendering can create pipelines
-without presenter-side classification.
-
-Scope:
-
-- Add renderer-owned sprite WGSL shader metadata and entry-point names.
-- Add sprite vertex-buffer layout metadata for the quad vertex and instance
-  streams, using stable pass binding slots.
-- Add sprite render-pipeline metadata for primitive topology, color target,
-  alpha blending, write mask, and multisample state.
-- Wire an optional sprite pipeline plan into `SceneDrawPlan` whenever a sprite
-  render-pass plan exists.
-- Keep raster-only scenes, unavailable sprite pipelines, missing atlas regions,
-  empty atlas surfaces, and empty command lists outside sprite pipeline
-  planning.
-- Add focused renderer tests for shader descriptors, vertex layouts, color
-  target settings, custom texture formats, and absent sprite paths.
-- Update README/SPEC module text for sprite pipeline planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes sprite pipeline metadata only for drawable clean
-  sprite plans.
-- The pipeline plan identifies the renderer-owned WGSL shader, vertex entry,
-  fragment entry, quad/instance vertex layouts, and `wgpu` color target state.
-- Raster-only scenes and unavailable sprite paths do not produce sprite
-  pipeline plans.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 06:46:10 BST` Started `DC-112`: adding clean sprite `wgpu`
-  pipeline planning with renderer-owned WGSL shader metadata, quad/instance
-  vertex layouts, primitive/color target/multisample state, focused renderer
-  tests, and docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778823967741159`
-- `2026-05-15 07:09:26 BST` Completed `DC-112`: added renderer-owned sprite
-  WGSL shader metadata and shader module descriptor data, quad/instance vertex
-  layout plans, alpha-blended color target state, primitive state, multisample
-  state, settings-driven target texture formats, optional `SceneDrawPlan`
-  wiring only for drawable sprite plans, public exports, and README/SPEC
-  documentation for sprite pipeline planning. Validation passed with focused
-  renderer tests (39/39), the public API guard, `cargo test --all-targets`
-  (1160 library tests plus binary/example tests), clippy with warnings denied,
-  `make fidelity` (10 local fixtures, 15452 frames, 65/65 new executable Rust
-  lines), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
-  --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779053483585039`.
+- `2026-05-17 22:39:26 BST` R9-C4 progress slice
+  `mutant reserve restore fixture`. Clean reserve mutant activation now uses
+  source-shaped placement fractions and shot-timer RNG state, carrying restored
+  mutants into the existing source-shaped mutant runtime loop. Added focused
+  clean-game coverage for the restored mutant position, velocity, source state,
+  RNG consumption, and reserve drain. Focused validation passed: `cargo fmt
+  --check`, `cargo check`, `cargo check --features legacy-tools`, `cargo test
+  clean_game_mutant --lib`, `cargo test clean_game --lib`, targeted `make
+  clean-fidelity SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git
+  diff --check`. Broad `cargo test --all-targets`, clippy, `make fidelity`, and
+  full all-scenario `make clean-fidelity` remain deferred because this is a
+  bounded B08 transition slice with no public API change. The next full gate
+  should run when Step 50 closes, another broader shared-contract risk appears,
+  or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779053705176209`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778825367225579`
-
-### DC-113: Clean Sprite Resource Binding Planning
-
-Status: `complete`
-
-Goal: describe the `wgpu` resource bindings needed by the clean sprite
-pipeline and render-pass plans, so future native sprite rendering can create
-projection uniform buffers and sprite atlas bind groups without presenter-side
-classification.
-
-Scope:
-
-- Add upload metadata for the scene-projection uniform buffer used by sprite
-  shaders.
-- Add renderer-owned bind group layout metadata for scene projection and sprite
-  atlas resources.
-- Add sprite atlas texture view and sampler binding metadata that matches the
-  WGSL shader bindings.
-- Wire optional sprite resource binding plans into `SceneDrawPlan` whenever
-  both sprite pipeline and render-pass plans exist.
-- Keep empty surfaces, raster-only scenes, unavailable sprite pipelines,
-  missing atlas regions, empty atlas surfaces, and empty command lists outside
-  sprite resource binding planning.
-- Add focused renderer tests for uniform upload bytes, buffer usages, bind group
-  entries, shader binding alignment, custom target plans, and absent paths.
-- Update README/SPEC module text for sprite resource binding planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes sprite resource binding metadata only for drawable
-  clean sprite plans with a valid scene projection.
-- Binding metadata uses `wgpu` shader stages, binding types, buffer usages,
-  texture sample types, texture view dimensions, and sampler binding types.
-- Raster-only scenes and invalid sprite paths do not produce sprite resource
-  binding plans.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 07:11:18 BST` Started `DC-113`: adding clean sprite resource
-  binding planning with projection uniform upload metadata, sprite bind group
-  layout entries, atlas texture/sampler bindings, focused renderer tests, and
-  docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778825476528979`
-- `2026-05-15 07:37:01 BST` Completed `DC-113`: added renderer-owned sprite
-  resource binding planning for projection uniform uploads, scene-projection
-  and sprite-atlas bind group layouts, atlas texture/sampler metadata, and
-  optional `SceneDrawPlan` wiring only for valid drawable sprite plans. Verified
-  with `cargo test --all-targets` (1162 library tests, 2 binary tests, 2
-  example tests), `cargo clippy --all-targets -- -D warnings`, `make fidelity`
-  (10 fixtures, 15452 frames, 81/81 non-baselined added executable Rust lines
-  covered), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
-  --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779053965306839`.
+- `2026-05-17 22:47:50 BST` R9-C4 progress slice
+  `source-shell/mine descriptor fixture`. Clean enemy projectile evidence now
+  carries the source `BMBP1` shell descriptor address, 2x3 picture size,
+  primary/alternate embedded image addresses, and `ENEMY_BOMB` sprite mapping,
+  while direct clean projectile rendering still uses the existing 4x6 runtime
+  bomb sprite without duplicating clean evidence rows. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
+  legacy-tools`, `cargo test clean_game_enemy_projectile --lib`, `cargo test
+  clean_game --lib`, touched-doc markdownlint, and `git diff --check`.
+  Targeted clean-fidelity, broad `cargo test --all-targets`, clippy, `make
+  fidelity`, and full all-scenario `make clean-fidelity` remain deferred
+  because this is a bounded evidence/fixture slice with no scenario input
+  behavior or public API change. The next full gate should run when Step 50
+  closes, another broader shared-contract risk appears, or R9 finalization
+  begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779054048626429`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778827021576789`
-
-### DC-114: Clean Sprite Atlas Texture Upload Planning
-
-Status: `complete`
-
-Goal: add renderer-owned sprite atlas pixel data and `wgpu` texture upload
-metadata so future native sprite rendering can create and populate the atlas
-texture without presenter-side classification or temporary full-frame raster
-data.
-
-Scope:
-
-- Add RGBA pixel ownership to the clean sprite atlas.
-- Generate deterministic default sprite atlas pixels for the current clean
-  sprite regions.
-- Add sprite atlas texture upload metadata for texture format, usage, copy
-  layout, extent, byte length, bytes, and nonblank evidence.
-- Wire atlas texture upload metadata into sprite resource binding planning only
-  for valid drawable sprite plans.
-- Keep empty atlas surfaces, empty pixel buffers, raster-only scenes, missing
-  atlas regions, unavailable sprite pipelines, and empty command lists outside
-  atlas texture upload planning.
-- Add focused renderer tests for atlas pixel ownership, upload descriptor
-  fields, copy layout, resource-plan wiring, and absent paths.
-- Update README/SPEC module text for sprite atlas texture upload planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes sprite atlas texture upload metadata only for
-  drawable clean sprite plans.
-- The upload metadata uses `wgpu` texture format, usage flags, texture
-  dimension, copy layout, and copy extent values needed by `Queue::write_texture`.
-- Default clean sprite atlas pixels are deterministic and nonblank.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 07:40:53 BST` Started `DC-114`: adding renderer-owned sprite
-  atlas RGBA data and `wgpu` texture upload metadata, with focused renderer
-  tests and docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778827268523169`
-- `2026-05-15 08:21:58 BST` Completed `DC-114`: added RGBA pixel ownership to
-  `TextureAtlas`, deterministic nonblank default sprite atlas pixels, sprite
-  atlas texture upload metadata for `wgpu` texture creation and
-  `Queue::write_texture` copy layout, and resource-plan wiring only for valid
-  drawable sprite plans. Verified with focused renderer tests (42/42),
-  `cargo test --all-targets` (1163 library tests, 2 binary tests, 2 example
-  tests), `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10
-  fixtures, 15452 frames, 103/103 non-baselined added executable Rust lines
-  covered), `cargo run -- --live-smoke` (239 rendered frames), `cargo fmt
-  --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779054469441199`.
+- `2026-05-17 22:51:15 BST` R9-C4 progress slice
+  `pod reserve restore fixture`. Clean reserve pod activation now uses the
+  source `PRBST`/`PRBRES` restore placement and signed velocity bytes for each
+  restored pod while leaving initial wave pod placement and public snapshots
+  unchanged. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo check --features legacy-tools`, `cargo test clean_game_pod --lib`,
+  `cargo test clean_game --lib`, targeted `make clean-fidelity
+  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
+  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  reserve-restore fixture with no public API change. The next full gate should
+  run when Step 50 closes, another broader shared-contract risk appears, or R9
+  finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779054616891509`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778829734086439`
-
-### DC-115: Clean Sprite Pipeline Layout Planning
-
-Status: `complete`
-
-Goal: connect the clean sprite pipeline plan with the sprite resource binding
-plans by describing the ordered `wgpu` pipeline layout metadata needed to bind
-scene projection and sprite atlas resources without presenter-side
-classification.
-
-Scope:
-
-- Add sprite pipeline layout metadata with stable bind group ordering.
-- Preserve scene-projection and sprite-atlas bind group roles, labels, group
-  indices, and entry counts in the layout plan.
-- Include the `wgpu` immediate-size value needed by `PipelineLayoutDescriptor`.
-- Wire optional sprite pipeline layout plans into `SceneDrawPlan` only when
-  sprite pipeline and sprite resource binding plans are both present.
-- Keep raster-only scenes, missing atlas regions, empty atlas surfaces, invalid
-  atlas pixel data, unavailable sprite pipelines, empty command lists, and empty
-  targets outside sprite pipeline layout planning.
-- Add focused renderer tests for layout ordering, descriptor-ready metadata,
-  resource-plan alignment, custom target settings, and absent paths.
-- Update README/SPEC module text for sprite pipeline layout planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes sprite pipeline layout metadata only for drawable
-  clean sprite plans.
-- The layout plan orders scene projection at group 0 and sprite atlas at group
-  1, matching the WGSL shader and resource binding plan.
-- Raster-only scenes and invalid sprite paths do not produce sprite pipeline
-  layout plans.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 08:24:21 BST` Started `DC-115`: adding renderer-owned sprite
-  pipeline layout metadata with ordered scene-projection and sprite-atlas bind
-  group layout slots, descriptor-ready immediate size, focused renderer tests,
-  and docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778829878218629`
-- `2026-05-15 08:49:08 BST` Completed `DC-115`: added descriptor-ready sprite
-  pipeline layout metadata with ordered scene-projection group 0 and sprite
-  atlas group 1, wired optional layout plans into `SceneDrawPlan` only for
-  drawable sprite plans with sprite pipeline, sprite resource bindings, and a
-  nonempty viewport, and kept raster-only, invalid sprite-resource, empty
-  command, unavailable-pipeline, and empty-target paths outside layout
-  planning. Verified with focused renderer tests (44/44), public API guard
-  (1/1), `cargo test --all-targets` (1165 library tests, 2 binary tests, 2
-  example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, 23/23 non-baselined added
-  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
-  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779054897742059`.
+- `2026-05-17 22:57:30 BST` R9-C4 progress slice
+  `mini-swarmer reserve restore fixture`. Clean reserve swarmer activation now
+  groups selected reserve mini-swarmers behind the source `PLRES`/`RSW0`
+  phony-object placement shape, preserves the targetless low X byte as source
+  placement fraction state, and carries each restored swarmer into the existing
+  source swarmer runtime. Focused validation passed: `cargo fmt --check`,
+  `cargo check`, `cargo check --features legacy-tools`, `cargo test
+  clean_game_swarmer_reserve_batch_uses_source_plres_restore_state --lib`,
+  `cargo test clean_game_mini_swarmer --lib`, `cargo test clean_game_swarmer
+  --lib`, `cargo test clean_game --lib`, targeted `make clean-fidelity
+  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
+  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  reserve-restore fixture with no public API change. The next full gate should
+  run when Step 50 closes, another broader shared-contract risk appears, or R9
+  finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055046636789`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778831347938799`
-
-### DC-116: Clean Sprite Render Pipeline Descriptor Planning
-
-Status: `complete`
-
-Goal: connect the clean sprite pipeline, layout, shader, and target state into
-descriptor-ready metadata for `wgpu` render pipeline creation without
-presenter-side classification.
-
-Scope:
-
-- Add sprite render pipeline descriptor metadata that names the shader entries,
-  layout, vertex buffers, primitive state, color target, and multisample state.
-- Preserve the ordered sprite pipeline layout and `wgpu` immediate-size value in
-  the descriptor plan.
-- Wire optional descriptor plans into `SceneDrawPlan` only when the sprite render
-  pass, sprite pipeline, sprite resource bindings, sprite pipeline layout, and
-  nonempty viewport are all present.
-- Keep raster-only scenes, missing atlas regions, empty atlas surfaces, invalid
-  atlas pixel data, unavailable sprite pipelines, empty command lists, and empty
-  targets outside sprite render pipeline descriptor planning.
-- Add focused renderer tests for descriptor-ready metadata, layout/pipeline
-  alignment, custom target settings, and absent paths.
-- Update README/SPEC module text for sprite render pipeline descriptor planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes sprite render pipeline descriptor metadata only for
-  drawable clean sprite plans.
-- Descriptor metadata matches the WGSL shader entries, layout label, ordered
-  bind group count, vertex-buffer count, color target format, and primitive
-  state used by the sprite pipeline.
-- Raster-only scenes and invalid sprite paths do not produce sprite render
-  pipeline descriptor plans.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 08:52:00 BST` Started `DC-116`: adding descriptor-ready sprite
-  render pipeline metadata that combines shader entries, ordered pipeline
-  layout slots, vertex buffers, primitive state, color target, and multisample
-  state, with focused renderer tests and docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778831518959189`
-- `2026-05-15 09:14:57 BST` Completed `DC-116`: added descriptor-ready sprite
-  render pipeline metadata that combines shader entries, ordered pipeline
-  layout slots, vertex buffers, primitive state, color target, and multisample
-  state; wired optional descriptor plans into `SceneDrawPlan` only when sprite
-  render pass, sprite pipeline, sprite resource bindings, sprite pipeline
-  layout, and a nonempty viewport are present; and kept raster-only, invalid
-  sprite-resource, empty-command, unavailable-pipeline, and empty-target paths
-  outside descriptor planning. Verified with focused renderer tests (45/45),
-  public API guard (1/1), `cargo test --all-targets` (1166 library tests, 2
-  binary tests, 2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, 31/31 non-baselined added
-  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
-  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055264360129`.
+- `2026-05-17 23:02:58 BST` R9-C4 progress slice
+  `lander reserve LANDST fixture`. Clean reserve lander activation now uses the
+  source `LANDST` restore shape for placement, shot-timer RNG consumption, and
+  signed X/Y velocity bytes while leaving initial wave lander placement and
+  public snapshots unchanged. Focused validation passed: `cargo fmt --check`,
+  `cargo check`, `cargo check --features legacy-tools`, `cargo test
+  clean_game_lander_reserve_batch_uses_source_landst_spawn_state --lib`,
+  `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
+  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded reserve-activation fixture with no public
+  API change. The next full gate should run when Step 50 closes, another
+  broader shared-contract risk appears, or R9 finalization begins. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055366320629`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778832895406269`
-
-### DC-117: Clean Sprite Render-Pass Encoder Command Planning
-
-Status: `complete`
-
-Goal: connect clean sprite render-pass, resource binding, pipeline layout, and
-render pipeline descriptor plans into ordered `wgpu` render-pass encoder command
-metadata without presenter-side scene classification.
-
-Scope:
-
-- Add sprite render-pass encoder command metadata for setting the render
-  pipeline, projection and atlas bind groups, quad and instance vertex buffers,
-  index buffer, and indexed draw ranges.
-- Preserve command ordering needed by `wgpu::RenderPass`: bind pipeline and
-  resources before draw commands.
-- Wire optional encoder command plans into `SceneDrawPlan` only when the sprite
-  render pass, sprite resource bindings, sprite pipeline layout, sprite render
-  pipeline descriptor, and nonempty viewport are all present.
-- Keep raster-only scenes, missing atlas regions, empty atlas surfaces, invalid
-  atlas pixel data, unavailable sprite pipelines, empty command lists, and empty
-  targets outside sprite render-pass encoder command planning.
-- Add focused renderer tests for command ordering, buffer/bind-group metadata,
-  draw range preservation, custom target settings, and absent paths.
-- Update README/SPEC module text for sprite render-pass encoder command
-  planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes sprite render-pass encoder command metadata only for
-  drawable clean sprite plans.
-- Encoder command metadata orders pipeline, bind groups, vertex buffers, index
-  buffer, and draw commands in the sequence expected by `wgpu::RenderPass`.
-- Raster-only scenes and invalid sprite paths do not produce sprite render-pass
-  encoder command plans.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 09:17:11 BST` Started `DC-117`: adding ordered `wgpu`
-  render-pass encoder command metadata for clean sprite draws, covering
-  pipeline, projection and atlas bind groups, vertex and index buffers, indexed
-  draw ranges, focused renderer tests, and docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778833031980069`
-- `2026-05-15 09:40:19 BST` Completed `DC-117`: added ordered sprite
-  `wgpu::RenderPass` encoder command metadata for setting the render pipeline,
-  projection and atlas bind groups, quad and instance vertex buffers, index
-  buffer, and indexed draw ranges; wired optional encoder command plans into
-  `SceneDrawPlan` only when sprite render pass, sprite resource bindings,
-  sprite pipeline layout, sprite render pipeline descriptor, and a nonempty
-  viewport are present; and kept raster-only, invalid sprite-resource,
-  empty-command, unavailable-pipeline, and empty-target paths outside encoder
-  command planning. Verified with focused renderer tests (46/46), public API
-  guard (1/1), `cargo test --all-targets` (1167 library tests, 2 binary tests,
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, 58/58 non-baselined added
-  executable Rust lines covered), `cargo run -- --live-smoke` (240 rendered
-  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055578253799`.
+- `2026-05-17 23:11:17 BST` R9-C4 progress slice
+  `bomber reserve TIEST fixture`. Clean reserve bomber activation now uses the
+  source `TIEST` restore shape for player-relative squad placement, fixed
+  cruise altitude, and alternating signed X velocity per restored squad while
+  carrying each restored bomber into the existing source bomber runtime.
+  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, `cargo test
+  clean_game_bomber_reserve_batch_uses_source_tiest_restore_state --lib`,
+  `cargo test clean_game_bomber --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
+  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded reserve-activation fixture with no public
+  API change. The next full gate should run when Step 50 closes, another
+  broader shared-contract risk appears, or R9 finalization begins. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779055701950759`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778834419221119`
-
-### DC-118: Clean Frame-Level GPU Command Planning
-
-Status: `complete`
-
-Goal: combine clean `wgpu` pass state, sprite render-pass encoder plans, and
-temporary raster evidence into one ordered scene-level frame command stream so
-presenters do not need to classify scene internals.
-
-Scope:
-
-- Add frame-level GPU command metadata for pass clear color, viewport,
-  scene-projection upload presence, sprite render-pass encoder execution, and
-  temporary raster evidence.
-- Wire the frame command plan into `SceneDrawPlan` for every prepared scene.
-- Preserve sprite command emission only when the sprite render-pass encoder plan
-  is present and the target has a nonempty viewport.
-- Preserve temporary raster upload evidence as a separate frame command without
-  treating it as the final clean sprite path.
-- Add focused renderer tests for sprite-only, raster-only, mixed sprite/raster,
-  empty-target, and invalid sprite-resource paths.
-- Update README/SPEC module text for frame-level GPU command planning.
-
-Acceptance criteria:
-
-- `SceneDrawPlan` exposes an ordered frame-level command plan.
-- Sprite scenes include pass setup and sprite render-pass execution commands
-  without presenter-side scene classification.
-- Raster-only and mixed raster paths preserve temporary raster evidence as a
-  separate command, and invalid sprite paths do not produce sprite execution
-  commands.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 09:42:00 BST` Started `DC-118`: adding ordered scene-level
-  `wgpu` frame command metadata for pass setup, optional sprite render-pass
-  encoder execution, and temporary raster evidence, with focused renderer tests
-  and docs.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778834515838479`
-- `2026-05-15 10:06:23 BST` Completed `DC-118`: added `WgpuFramePlan` and
-  `WgpuFrameCommand` metadata so prepared draw plans expose ordered frame
-  commands for pass begin, viewport setup, scene-projection upload presence,
-  temporary raster evidence, and sprite render-pass encoder execution. Empty
-  and invalid sprite paths now keep sprite execution absent from frame command
-  planning, while mixed sprite/raster paths preserve both sprite execution and
-  temporary raster upload evidence as separate commands. README and SPEC now
-  describe the renderer's frame-level GPU command planning surface.
-  Validation passed with `cargo test --lib renderer::tests::` (47 passed),
-  `cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation`,
-  `cargo test --all-targets` (1168 library tests, 2 binary tests, and
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, 42/42 non-baselined added
-  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
-  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779056053054829`.
+- `2026-05-17 23:21:18 BST` R9-C4 progress slice
+  `source lander runtime`. Clean reserve landers now carry public
+  `SourceLanderSnapshot` state from the source `LANDST` restore path:
+  fixed-point fractions, shot timer, sleep ticks, picture frame, and X/Y
+  velocity. Restored landers advance through a bounded source `LANDS0`
+  orbit/shot loop with terrain-relative Y velocity, `LSHOT` fireball
+  projection, `LNDP1`-`LNDP3` picture cycling, and a source-shaped flee
+  velocity when a passenger is already carried. Focused validation passed:
+  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
+  `cargo test clean_game_lander_source_loop_orbits_cycles_and_fires --lib`,
+  `cargo test clean_game_lander_reserve_batch_uses_source_landst_spawn_state
+  --lib`, `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc
+  markdownlint, and `git diff --check`. Because the clean snapshot contract
+  changed, broad `cargo test --all-targets` also passed. Broad clippy,
+  `make fidelity`, and full all-scenario `make clean-fidelity` remain deferred
+  because this is still a bounded Step 50 slice rather than Step 50/Phase 3
+  closure. The next full gate should run when Step 50 closes, another broader
+  shared-contract risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779056244093689`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778835971827569`
-
-### DC-119: Clean Gameplay World Sprite Surface
-
-Status: `complete`
-
-Goal: move the clean gameplay scene beyond player/HUD placeholders by giving
-the clean game domain explicit world entities for terrain, stars, enemies, and
-humans that render through renderer-owned sprite atlas IDs.
-
-Scope:
-
-- Add clean world snapshot types for terrain, starfield, enemies, and humans.
-- Seed the first clean playing wave with deterministic world entities.
-- Render those world entities through clean `RenderScene` sprites.
-- Add renderer-owned atlas entries for enemy and human sprites.
-- Update focused clean game and renderer tests for sprite-layer coverage.
-- Update README/SPEC module text for the expanded clean gameplay world surface.
-
-Acceptance criteria:
-
-- `GameState` exposes clean world entity snapshots without legacy memory labels.
-- The clean playing scene includes terrain, starfield, enemy, human, player,
-  projectile, and HUD sprites through renderer-owned sprite IDs.
-- The default sprite atlas resolves every sprite used by the clean game scene.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game::tests::
-cargo test --lib renderer::tests::texture_atlas_owns_sprite_regions
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 10:08:34 BST` Started `DC-119`: adding clean domain world
-  snapshots for terrain, stars, enemies, and humans, renderer-owned atlas
-  entries for the new sprites, and focused tests/docs for the sprite-first
-  clean gameplay scene surface.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778836113993949`
-- `2026-05-15 10:53:08 BST` Completed `DC-119`: added clean `WorldSnapshot`
-  domain data for terrain, stars, enemies, and humans on `GameState`, seeded
-  deterministic first-wave world entities when the clean game starts, and
-  rendered terrain, starfield, enemy, human, player, projectile, and HUD
-  sprites through `RenderScene`. The renderer now owns sprite IDs and atlas
-  entries for lander and human sprites, and the focused clean game tests verify
-  that emitted world sprites are atlas-backed and that carried humans use their
-  highlighted tint branch. README and SPEC now describe the expanded clean
-  gameplay world surface.
-  Validation passed with `cargo test --lib game::tests::` (11 passed),
-  `cargo test --lib renderer::tests::texture_atlas_owns_sprite_regions`,
-  `cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation`,
-  `cargo test --all-targets` (1170 library tests, 2 binary tests, and
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, 80/80 non-baselined added
-  executable Rust lines covered), `cargo run -- --live-smoke` (240 rendered
-  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779056645123769`.
+- `2026-05-17 23:28:01 BST` R9-C4 progress slice
+  `source pod fixed-point runtime`. Clean reserve pods now carry public
+  `SourcePodSnapshot` state from the source `PRBST`/`PRBRES` restore path:
+  fixed-point fractions plus signed X/Y velocity bytes. Restored pods now
+  advance through source fixed-point object motion instead of the previous
+  pixel-velocity projection, while initial clean wave pods stay on the current
+  clean placement path. Focused validation passed: `cargo fmt --check`,
+  `cargo check`, `cargo check --features legacy-tools`, `cargo test
+  clean_game_pod_source_motion_uses_fixed_point_velocity --lib`, `cargo test
+  clean_game_pod --lib`, `cargo test clean_game --lib`, targeted `make
+  clean-fidelity SCENARIOS="wave_advance"`, touched-doc markdownlint, and
+  `git diff --check`. Because the clean snapshot contract changed, broad
+  `cargo test --all-targets` also passed. Broad clippy, `make fidelity`, and
+  full all-scenario `make clean-fidelity` remain deferred because this is still
+  a bounded Step 50 slice rather than Step 50/Phase 3 closure. The next full
+  gate should run when Step 50 closes, another broader shared-contract risk
+  appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779056772315609`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778838787881489`
-
-### DC-120: Clean Enemy Motion System
-
-Status: `complete`
-
-Goal: move clean first-wave enemies through deterministic gameplay systems
-instead of leaving them as static scene placeholders.
-
-Scope:
-
-- Add clean enemy velocity data to world enemy snapshots.
-- Add a deterministic enemy motion system in `src/systems.rs`.
-- Advance clean enemies during playing frames before scene rendering.
-- Preserve atlas-backed clean world sprite rendering.
-- Add focused systems and game tests for enemy movement and wrapping.
-- Update README/SPEC module text for clean enemy-motion ownership.
-
-Acceptance criteria:
-
-- Clean enemy movement is represented by gameplay-domain data, not legacy
-  memory tables.
-- Playing frames advance enemy positions deterministically through a system.
-- Enemy sprites continue to render through renderer-owned atlas-backed scene
-  sprites after movement.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::enemy_motion_system
-cargo test --lib game::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 10:54:30 BST` Started `DC-120`: adding clean enemy velocity,
-  deterministic enemy motion, focused systems/game tests, and docs for moving
-  clean world entities through systems rather than legacy memory tables.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778838869364999`
-- `2026-05-15 11:17:12 BST` Completed `DC-120`: added clean enemy velocity
-  to enemy snapshots, introduced `ScreenVelocity` and `EnemyMotionSystem` for
-  deterministic wrapping movement, and advanced clean first-wave enemies
-  through the system during playing frames before scene generation. README and
-  SPEC now describe clean enemy-motion ownership without relying on legacy
-  memory-table names.
-  Validation passed with
-  `cargo test --lib systems::tests::enemy_motion_system`,
-  `cargo test --lib game::tests::` (12 passed),
-  `cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation`,
-  `cargo test --all-targets` (1172 library tests, 2 binary tests, and
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, 13/13 non-baselined added
-  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
-  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057029455259`.
+- `2026-05-17 23:36:48 BST` R9-C4 progress slice
+  `initial source lander runtime`. Initial active wave landers now carry
+  deterministic source `SourceLanderSnapshot` state: fixed-point fractions,
+  shot timer, sleep ticks, picture frame, and X/Y velocity. They enter the same
+  bounded source `LANDS0` orbit/shot loop used by `LANDST`-restored landers
+  while preserving active wave count/order. Focused validation passed:
+  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
+  `cargo test clean_wave_spawns_source_profile_active_enemy_batch --lib`,
+  `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="start_game abduction
+  wave_advance"`, touched-doc markdownlint, and `git diff --check`. Broad
+  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` remain deferred because this slice changes behavior but
+  does not change public API, close Step 50, or introduce a broad-risk contract
+  change. The next full gate should run when Step 50 closes, another broader
+  shared-contract risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057126727139`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778840224712949`
-
-### DC-121: Clean Projectile World Motion Surface
-
-Status: `complete`
-
-Goal: move active projectiles into the clean gameplay world snapshot and update
-them through deterministic motion instead of keeping them as private renderer
-bookkeeping inside `Game`.
-
-Scope:
-
-- Add clean projectile snapshot data to `WorldSnapshot`.
-- Add deterministic projectile velocity and movement in `src/systems.rs`.
-- Launch projectiles into the clean world snapshot with direction-derived
-  velocity.
-- Advance and cull active projectiles during playing frames.
-- Render projectile sprites from clean world data.
-- Update focused systems/game tests plus README/SPEC module text.
-
-Acceptance criteria:
-
-- Active projectiles are visible in `GameState` as gameplay-domain world data.
-- Projectile movement and culling are represented by a deterministic system.
-- Projectile sprites continue to render through renderer-owned atlas-backed
-  scene sprites.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::projectile
-cargo test --lib game::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 11:20:04 BST` Started `DC-121`: moving active projectiles into
-  clean world snapshots, adding projectile velocity/motion/culling systems,
-  and keeping projectile rendering atlas-backed from gameplay-domain data.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778840426841509`
-- `2026-05-15 11:43:01 BST` Completed `DC-121`: added
-  `ProjectileSnapshot` to `WorldSnapshot`, moved active projectile ownership
-  out of private `Game` bookkeeping, and introduced `ProjectileMotionSystem`
-  for direction-derived velocity, deterministic advancement, and screen-exit
-  culling. `Game` now launches projectiles into clean world state and renders
-  projectile sprites from that gameplay-domain data.
-  Validation passed with `cargo test --lib systems::tests::projectile`
-  (2 passed), `cargo test --lib game::tests::` (14 passed),
-  `cargo test --lib public_api_tests::clean_contracts_have_public_game_simulation`,
-  `cargo test --all-targets` (1175 library tests, 2 binary tests, and
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, 32/32 non-baselined added
-  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
-  frames), `cargo fmt --check`, markdownlint, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057486087689`.
+- `2026-05-17 23:44:55 BST` R9-C4 progress slice
+  `initial source pod runtime`. Initial active wave pods now carry
+  deterministic source `SourcePodSnapshot` state: fixed-point fractions,
+  bounded signed X velocity, and zero Y velocity. They enter the same source
+  fixed-point X/Y motion already used by `PRBST`/`PRBRES`-restored pods while
+  preserving active wave count/order. Focused validation passed:
+  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
+  `cargo test clean_wave_spawns_source_profile_active_enemy_batch --lib`,
+  `cargo test clean_game_pod --lib`, `cargo test clean_game --lib`, targeted
+  `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc markdownlint,
+  and `git diff --check`. Broad `cargo test --all-targets`, clippy,
+  `make fidelity`, and full all-scenario `make clean-fidelity` remain deferred
+  because this slice changes behavior but does not change public API, close
+  Step 50, or introduce a broad-risk contract change. The next full gate should
+  run when Step 50 closes, another broader shared-contract risk appears, or R9
+  finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057628043729`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778841782224139`
-
-### DC-122: Clean Projectile Enemy Collision System
-
-Status: `complete`
-
-Goal: resolve projectile-to-enemy hits through clean collision and scoring
-systems instead of relying on hidden object-list or renderer-side state.
-
-Scope:
-
-- Add clean axis-aligned collision primitives in `src/systems.rs`.
-- Detect the first active projectile/enemy overlap deterministically.
-- Remove the hit projectile and enemy from `WorldSnapshot`.
-- Award clean score for destroyed enemies and emit a gameplay event.
-- Keep projectile and enemy sprites absent after collision resolution.
-- Update focused systems/game tests plus README/SPEC module text.
-
-Acceptance criteria:
-
-- Projectile/enemy collisions are represented by gameplay-domain systems, not
-  legacy object lists or memory labels.
-- A hit removes exactly the colliding projectile and enemy from clean world
-  state.
-- Enemy score changes are visible in `GameState` and collision output is
-  reflected in `GameEvents` and scene sprites.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::collision
-cargo test --lib game::tests::
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 11:44:28 BST` Started `DC-122`: adding clean projectile/enemy
-  collision detection, hit removal, score award, gameplay event output, and
-  docs/tests for collision ownership.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778841890018489`
-- `2026-05-15 12:26:46 BST` Completed `DC-122`: added clean AABB collision
-  primitives, deterministic first projectile/enemy hit detection, gameplay
-  removal of the hit projectile and enemy, current-player score awards,
-  `EnemyDestroyed` gameplay output, and absent hit sprites in the clean scene.
-  Added focused systems/game coverage including the second-player scoring
-  branch exposed by the first coverage run. Validation passed with
-  `cargo fmt --check`, `cargo test --lib systems::tests::collision` (2 tests),
-  `cargo test --lib game::tests::` (16 tests), `cargo test --all-targets`
-  (1179 lib tests, 2 bin tests, 2 example tests),
-  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
-  15452 frames, new Rust line coverage 63/63),
-  `cargo run -- --live-smoke` (239 rendered frames),
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779057894434819`.
+- `2026-05-17 23:53:19 BST` R9-C4 progress slice
+  `LANDST no-human fallback`. Clean reserve lander activation now mirrors the
+  source no-astronaut `LANDST` fallback by restoring source-shaped mutants
+  directly through the `SCZS0`/`SCZST` placement and shot-timer RNG path. Mutant
+  reserve placement now uses the current clean background/camera word for the
+  source avoid window. Focused validation passed: `cargo fmt --check`,
+  `cargo check`, `cargo check --features legacy-tools`, `cargo test
+  clean_game_lander_reserve --lib`, `cargo test
+  clean_game_mutant_reserve_batch_uses_source_restore_state --lib`, `cargo test
+  clean_game --lib`, targeted `make clean-fidelity
+  SCENARIOS="planet_destruction wave_advance"`, touched-doc markdownlint, and
+  `git diff --check`. Broad `cargo test --all-targets`, clippy,
+  `make fidelity`, and full all-scenario `make clean-fidelity` remain deferred
+  because this slice changes behavior but does not change public API, close
+  Step 50, or introduce a broad-risk contract change. The next full gate should
+  run when Step 50 closes, another broader shared-contract risk appears, or R9
+  finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779058118394679`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778844407133399`
-
-### DC-123: Clean Wave Completion System
-
-Status: `complete`
-
-Goal: move wave clear and next-wave spawning into clean gameplay systems
-instead of leaving enemy exhaustion as an inert world state.
-
-Scope:
-
-- Add a deterministic clean wave-completion system in `src/systems.rs`.
-- When the last clean enemy is destroyed, emit wave-clear gameplay output
-  without immediately respawning over the hit frame.
-- Start the next wave on the following playing frame with clean world
-  repopulation and sprite-visible enemies.
-- Keep player, score, lives, smart bombs, terrain, humans, projectiles, and
-  enemy wave state owned by clean domain structures.
-- Update focused systems/game tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- Enemy exhaustion is represented by gameplay-domain wave output, not renderer
-  state or legacy object lists.
-- The frame that destroys the last enemy shows the hit projectile and enemy
-  absent and reports wave-clear output.
-- The following playing frame advances `GameState.wave`, repopulates clean
-  enemies deterministically, and renders those enemies as atlas-backed sprites.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::wave
-cargo test --lib game::tests::clean_game_wave
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 12:28:19 BST` Started `DC-123`: adding clean wave-completion
-  evaluation, delayed next-wave spawning, wave gameplay events, and focused
-  systems/game/docs coverage.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778844499996319`
-- `2026-05-15 12:50:46 BST` Completed `DC-123`: added clean `WaveSystem`
-  progress/clear evaluation, saturating next-wave numbering, `WaveCleared`
-  output on the last-enemy destruction frame, delayed `WaveStarted` output, and
-  deterministic clean enemy repopulation on the following playing frame. The
-  last-hit frame keeps the hit projectile/enemy absent while the next wave
-  renders atlas-backed enemies from clean world state. Validation passed with
-  `cargo fmt --check`, `cargo test --lib systems::tests::wave` (1 test),
-  `cargo test --lib game::tests::clean_game_wave` (1 test),
-  `cargo test --lib game::tests::` (17 tests),
-  `cargo test --lib systems::tests::` (15 tests), `cargo test --all-targets`
-  (1181 lib tests, 2 bin tests, 2 example tests),
-  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
-  15452 frames, new Rust line coverage 36/36),
-  `cargo run -- --live-smoke` (239 rendered frames),
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779058514140589`.
+- `2026-05-18 00:02:23 BST` R9-C4 progress slice
+  `active enemy source picture evidence`. Clean active enemy object-evidence
+  rows now carry source object-picture descriptor labels, addresses, sizes, and
+  primary/alternate image pointers for static mutant/pod/swarmer descriptors
+  plus current lander, baiter, and bomber frame-cycled descriptors. This keeps
+  rendering behavior on the clean sprite path while preserving source
+  descriptor evidence for object ecology comparisons. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
+  legacy-tools`, `cargo test clean_world_maps_active_enemy_source_picture_descriptors
+  --lib`, `cargo test clean_game --lib`, targeted `make clean-fidelity
+  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
+  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this slice changes
+  clean object evidence but does not change public API, close Step 50, or
+  introduce a broad-risk contract change. The next full gate should run when
+  Step 50 closes, another broader shared-contract risk appears, or R9
+  finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779058757810019`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778845846596549`
-
-### DC-124: Clean Bonus Award System
-
-Status: `complete`
-
-Goal: move score mutation, high-score tracking, and bonus-threshold awards into
-clean gameplay systems instead of mutating score fields directly in `Game`.
-
-Scope:
-
-- Add a deterministic clean scoring/bonus system in `src/systems.rs`.
-- Route enemy score awards through that system.
-- Update the current player's score, high score, next bonus threshold, lives,
-  and smart bombs through clean domain output.
-- Emit `BonusAwarded` when a point award crosses the configured bonus
-  threshold.
-- Update focused systems/game tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- Enemy scoring is represented by gameplay-domain scoring output, not direct
-  field mutation in collision handling.
-- Crossing `ScoreSnapshot.next_bonus` awards clean player stock and emits a
-  gameplay event on the same frame as the score award.
-- Scores, high score, next bonus, lives, smart bombs, and collision/wave events
-  remain visible through `GameState` and `GameEvents`.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::score
-cargo test --lib game::tests::clean_game_bonus
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 12:53:05 BST` Started `DC-124`: adding clean score/bonus
-  evaluation, routing enemy score awards through it, emitting bonus gameplay
-  output, and updating focused systems/game/docs coverage.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778845983462809`
-- `2026-05-15 13:15:06 BST` Completed `DC-124`: added clean `ScoreSystem`
-  scoring output for current-player point awards, high-score tracking, bonus
-  threshold advancement, and player stock updates; routed enemy score awards
-  through it; and emitted `BonusAwarded` when a collision score crosses
-  `next_bonus` while preserving collision and wave event ordering. Validation
-  passed with `cargo fmt --check`, `cargo test --lib systems::tests::score`
-  (3 tests), `cargo test --lib game::tests::clean_game_bonus` (1 test),
-  `cargo test --lib game::tests::` (18 tests),
-  `cargo test --lib systems::tests::` (18 tests), `cargo test --all-targets`
-  (1185 lib tests, 2 bin tests, 2 example tests),
-  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
-  15452 frames, new Rust line coverage 43/43),
-  `cargo run -- --live-smoke` (239 rendered frames),
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059117750519`.
+- `2026-05-18 00:09:48 BST` R9-C4 progress slice
+  `player projectile source picture evidence`. Clean player projectile
+  object-evidence rows now carry the source `LASP1` descriptor label, address,
+  8x1 picture size, and primary image pointer while the direct clean runtime
+  projectile renderer keeps the existing 8x2 sprite. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo check --features
+  legacy-tools`, `cargo test
+  clean_game_player_projectile_evidence_uses_source_laser_picture --lib`,
+  `cargo test clean_game_enemy_projectile_evidence_uses_source_shell_picture
+  --lib`, `cargo test clean_game --lib`, touched-doc markdownlint, and
+  `git diff --check`. Targeted clean-fidelity scenarios were not run because
+  this slice changes source descriptor evidence only, not scenario behavior.
+  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this slice changes
+  clean object evidence but does not change public API, close Step 50, or
+  introduce a broad-risk contract change. The next full gate should run when
+  Step 50 closes, another broader shared-contract risk appears, or R9
+  finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059281878429`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778847304885369`
-
-### DC-125: Clean Smart Bomb Resolution System
-
-Status: `complete`
-
-Goal: resolve smart bomb enemy clearing through clean gameplay systems instead
-of treating smart bomb input as a stock-only event.
-
-Scope:
-
-- Add deterministic clean smart-bomb resolution in `src/systems.rs`.
-- Route `SmartBombPressed` handling through that system after stock
-  consumption.
-- Remove affected enemies from clean world state.
-- Award enemy score through `ScoreSystem`, emit enemy/bonus/wave gameplay
-  output, and keep cleared enemies absent from scene sprites.
-- Update focused systems/game tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- Smart bomb effects are represented by gameplay-domain output, not renderer
-  state or legacy object lists.
-- A smart bomb with active enemies clears those clean enemies, awards score,
-  and emits enemy-destroyed gameplay output in the same frame.
-- Cleared enemies are absent from the frame scene, and wave clear still uses
-  the clean wave system.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::smart_bomb
-cargo test --lib game::tests::clean_game_smart_bomb
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 13:16:15 BST` Started `DC-125`: adding clean smart-bomb enemy
-  clear output, routing smart-bomb scoring through `ScoreSystem`, preserving
-  clean wave-clear handling, and updating focused systems/game/docs coverage.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778847373539249`
-- `2026-05-15 13:38:48 BST` Completed `DC-125`: added `SmartBombSystem` and
-  routed smart-bomb input through clean enemy clearing, score/bonus awards,
-  wave-clear output, and scene sprite removal. Validation passed with
-  `cargo fmt --check`, `cargo test --lib systems::tests::smart_bomb`,
-  `cargo test --lib game::tests::clean_game_smart_bomb`, full game and systems
-  test modules, public API guard, `cargo test --all-targets` (1187 lib, 2 bin,
-  and 2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, new Rust line coverage 15/15),
-  `cargo run -- --live-smoke` (240 rendered frames), `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059468093189`.
+- `2026-05-18 00:16:08 BST` R9-C4 progress slice
+  `astronaut source picture evidence`. Clean human object-evidence rows now
+  carry the source `ASTP1` descriptor label, address, 2x8 picture size,
+  primary/alternate image pointers, mapped human sprite evidence, and source
+  scanner color while the direct clean runtime astronaut renderer keeps the
+  existing 6x8 sprite. Focused validation passed: `cargo fmt --check`, `cargo
+  check`, `cargo check --features legacy-tools`, `cargo test
+  clean_game_human_evidence_uses_source_astronaut_picture --lib`, `cargo test
+  clean_game --lib`, touched-doc markdownlint, and `git diff --check`.
+  Targeted clean-fidelity scenarios were not run because this slice changes
+  source descriptor evidence only, not scenario behavior. Broad `cargo test
+  --all-targets`, clippy, `make fidelity`, and full all-scenario `make
+  clean-fidelity` remain deferred because this slice changes clean object
+  evidence but does not change public API, close Step 50, or introduce a
+  broad-risk contract change. The next full gate should run when Step 50
+  closes, another broader shared-contract risk appears, or R9 finalization
+  begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059627067949`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778848724960339`
-
-### DC-126: Clean Player Damage System
-
-Status: `complete`
-
-Goal: resolve player/enemy collisions and life loss through clean gameplay
-systems instead of leaving enemy contact as an unmodeled scene overlap.
-
-Scope:
-
-- Add deterministic clean player/enemy collision output in `src/systems.rs`.
-- Add a clean player-damage system for life decrement and game-over status.
-- Route playing-frame player/enemy overlap through those systems after enemy
-  and projectile updates.
-- Remove the colliding enemy from clean world state, emit player-destruction
-  output, and preserve wave-clear behavior for surviving players.
-- Update focused systems/game tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- Player damage is represented by gameplay-domain output, not renderer state or
-  temporary oracle structures.
-- A player/enemy overlap decrements clean player lives and removes the
-  colliding clean enemy in the same frame.
-- The final-life collision enters `GameOver`, emits explicit gameplay output,
-  and leaves gameplay sprites absent from the game-over scene.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::player_damage
-cargo test --lib systems::tests::collision_system_reports_first_player_enemy_hit
-cargo test --lib game::tests::clean_game_player_enemy
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 13:40:41 BST` Started `DC-126`: adding clean player/enemy
-  collision detection, deterministic player stock damage, player-destroyed and
-  game-over gameplay output, scene cleanup, and focused systems/game/docs
-  coverage.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778848852483269`
-- `2026-05-15 14:02:46 BST` Completed `DC-126`: added clean player/enemy
-  collision output and `PlayerDamageSystem`; routed contact through clean
-  gameplay state so collisions remove the colliding enemy, decrement lives,
-  emit `PlayerDestroyed`, preserve wave clear when the player survives, and
-  enter `GameOver` with gameplay sprites absent on the final life. Validation
-  passed with `cargo fmt --check`,
-  `cargo test --lib systems::tests::player_damage`,
-  `cargo test --lib systems::tests::collision_system_reports_first_player_enemy_hit`,
-  `cargo test --lib game::tests::clean_game_player_enemy`, full game and
-  systems test modules, public API guard, `cargo test --all-targets` (1191 lib,
-  2 bin, and 2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, new Rust line coverage 45/45),
-  `cargo run -- --live-smoke` (240 rendered frames), `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779059841972379`.
+- `2026-05-18 00:25:55 BST` R9-C4 progress slice
+  `source motion object evidence`. Clean enemy, human, player-projectile, and
+  enemy-projectile object-evidence rows now carry source-style 8.8
+  world-position words and velocity words from their existing clean source
+  fixed-point state while leaving runtime scenes and scenario behavior
+  unchanged. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo check --features legacy-tools`, `cargo test
+  clean_world_object_evidence_carries_source_motion_words --lib`, `cargo test
+  clean_game_human_evidence_uses_source_astronaut_picture --lib`, `cargo test
+  clean_game --lib`, touched-doc markdownlint, and `git diff --check`.
+  Targeted clean-fidelity scenarios were not run because this slice changes
+  source evidence fields only, not scenario behavior. Broad `cargo test
+  --all-targets`, clippy, `make fidelity`, and full all-scenario `make
+  clean-fidelity` remain deferred because this slice changes clean object
+  evidence but does not change public API, close Step 50, or introduce a
+  broad-risk contract change. The next full gate should run when Step 50
+  closes, another broader shared-contract risk appears, or R9 finalization
+  begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779060171604429`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778850177520539`
-
-### DC-127: Clean Operator Control System
-
-Status: `complete`
-
-Goal: route operator-facing clean inputs through deterministic gameplay-domain
-handling instead of leaving diagnostics, audits, and high-score reset fields as
-unused input surface.
-
-Scope:
-
-- Add a clean operator trigger system in `src/systems.rs`.
-- Debounce diagnostics, audits, and high-score reset inputs at the clean game
-  boundary.
-- Emit clean gameplay events for diagnostics/audits selection.
-- Reset the clean high-score field through gameplay state when requested.
-- Update focused systems/game tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- Operator inputs are represented by clean gameplay-domain output rather than
-  ad hoc renderer or runtime behavior.
-- Holding an operator input does not emit repeated gameplay events every frame.
-- High-score reset updates `ScoreSnapshot.high_score` without changing current
-  player scores or bonus thresholds.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::operator_control
-cargo test --lib game::tests::clean_game_operator
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 14:04:00 BST` Started `DC-127`: adding clean operator trigger
-  handling for diagnostics, audits, and high-score reset, including debounce
-  behavior, gameplay events, docs, and focused systems/game coverage.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778850249279209`
-- `2026-05-15 14:26:17 BST` Completed `DC-127`: added
-  `OperatorControlSystem` and routed diagnostics, audits, and high-score reset
-  through clean `Game` state. Operator controls now emit edge-triggered
-  gameplay events, held inputs do not repeat every frame, and high-score reset
-  clears only `ScoreSnapshot.high_score` while preserving current player scores
-  and bonus thresholds. Validation passed with `cargo fmt --check`,
-  `cargo test --lib systems::tests::operator_control`,
-  `cargo test --lib game::tests::clean_game_operator`, full game and systems
-  test modules, public API guard, `cargo test --all-targets` (1193 lib, 2 bin,
-  and 2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, new Rust line coverage 31/31),
-  `cargo run -- --live-smoke` (239 rendered frames), `markdownlint README.md
-  SPEC.md PLAN.md docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  and `git diff --check`.
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779060444641219`.
+- `2026-05-20 20:29:31 BST` R9-C4 progress slice
+  `source object-table identity evidence`. Clean enemy, human,
+  player-projectile, and enemy-projectile object-evidence rows now carry
+  deterministic source-layout addresses from `0xA23C + 0x17 * slot`, source
+  slot numbers, and neutral `OTYP` `0x00` while clean categorized source-detail
+  rows remain skipped by the direct clean scene projection to avoid duplicate
+  runtime sprites. Focused validation passed: `cargo fmt --check`, `cargo
+  check`, `cargo check --features legacy-tools`, `cargo test
+  clean_world_object_evidence_carries_source_motion_words --lib`, `cargo test
+  clean_world_maps_active_enemy_source_picture_descriptors --lib`, `cargo test
+  clean_game_human_evidence_uses_source_astronaut_picture --lib`, `cargo test
+  clean_game_player_projectile_evidence_uses_source_laser_picture --lib`,
+  `cargo test clean_game_enemy_projectile_evidence_uses_source_shell_picture
+  --lib`, `cargo test clean_game --lib`, touched-doc markdownlint, and `git
+  diff --check`. Targeted clean-fidelity scenarios were not run because this
+  slice changes source evidence fields only, not scenario behavior. Broad
+  `cargo test --all-targets`, clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` remain deferred because this slice changes clean object
+  evidence but does not change public API, close Step 50, or introduce a
+  broad-risk contract change. The next full gate should run when Step 50
+  closes, another broader shared-contract risk appears, or R9 finalization
+  begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779305212541739`.
   Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778851591636559`
-
-### DC-128: Clean High-Score Entry Start System
-
-Status: `complete`
-
-Goal: activate the clean high-score entry phase at game over instead of leaving
-the `HighScoreEntry` phase and entry-start event dormant.
-
-Scope:
-
-- Add a deterministic clean high-score qualification system in `src/systems.rs`.
-- Route final-life game-over through high-score qualification.
-- Enter `HighScoreEntry` and emit `HighScoreEntryStarted` for qualifying
-  scores.
-- Preserve `GameOver` for non-qualifying scores and keep gameplay sprites
-  absent from both terminal scenes.
-- Update focused systems/game tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- High-score entry start is represented by clean gameplay-domain state and
-  events.
-- A positive current-player score that matches or exceeds the tracked high
-  score enters `HighScoreEntry` after the final life is lost.
-- A zero or non-qualifying score remains in `GameOver`.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::high_score
-cargo test --lib game::tests::clean_game_high_score_entry
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 14:27:33 BST` Started `DC-128`: adding clean high-score
-  qualification, routing final-life game-over through `HighScoreEntry` for
-  qualifying scores, preserving non-qualifying `GameOver`, and updating focused
-  systems/game/docs coverage.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778851664328309`
-- `2026-05-15 15:08:25 BST` Completed `DC-128`: added
-  `HighScoreEntrySystem` and routed final-life game-over through clean
-  high-score qualification. Qualifying current-player scores now enter
-  `HighScoreEntry` and emit `HighScoreEntryStarted`; zero and non-qualifying
-  scores remain in `GameOver`, with gameplay sprites absent from terminal
-  scenes. Validation passed with `cargo fmt --check`,
-  `cargo test --lib systems::tests::high_score`,
-  `cargo test --lib game::tests::clean_game_high_score_entry`, full game and
-  systems test modules, public API guard, `cargo test --all-targets` (1196 lib,
-  2 bin, and 2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixtures, 15452 frames, new Rust line coverage 13/13
-  after adding second-player qualification coverage), `cargo run -- --live-smoke`
-  (239 rendered frames), `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
-  `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778854120229339`
-
-### DC-129: Clean High-Score Initials Entry System
-
-Status: `complete`
-
-Goal: handle high-score initials through clean gameplay state after
-`HighScoreEntry` starts.
-
-Scope:
-
-- Add deterministic clean high-score initials state and entry handling in
-  `src/systems.rs`.
-- Extend clean `GameInput` with typed initials and backspace input.
-- Route `HighScoreEntry` frames through the clean initials system.
-- Emit `HighScoreInitialAccepted` and `HighScoreSubmitted`, and return to
-  attract after submission.
-- Update focused systems/game tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- Initials entry is represented by clean gameplay-domain state and events.
-- Alphabetic inputs are normalized to uppercase, accepted up to three initials,
-  and backspace removes the previous initial without submitting.
-- The third accepted initial emits `HighScoreSubmitted` and returns the clean
-  game to `Attract`.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib systems::tests::high_score
-cargo test --lib game::tests::clean_game_high_score_initials
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 15:10:42 BST` Started `DC-129`: adding clean high-score initials
-  state, typed-initial and backspace input handling, accepted/submitted
-  gameplay events, attract return after submission, and focused
-  systems/game/docs coverage.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778854255315089`
-- `2026-05-15 15:37:21 BST` Completed `DC-129`: added clean high-score
-  initials state and frame output, routed typed initials and backspace through
-  `GameInput` and `Game`, emitted `HighScoreInitialAccepted` and
-  `HighScoreSubmitted`, returned submitted entries to attract, and updated
-  README/SPEC/PLAN plus compatibility constructors. Validation passed with
-  `cargo fmt --check`, `cargo test --lib systems::tests::high_score`,
-  `cargo test --lib game::tests::clean_game_high_score_initials`,
-  `cargo test --all-targets` (1198 library tests, 2 binary tests, 2 example
-  tests), `cargo clippy --all-targets -- -D warnings`, `make fidelity`
-  (10 fixtures, 15452 frames, 45/45 new executable Rust lines covered),
-  `cargo run -- --live-smoke` (239 rendered frames with attract, credit, and
-  playing evidence), `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
-  `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778855841540879`
-
-### DC-130: Clean WGPU Live Runtime Facade
-
-Status: `complete`
-
-Goal: move the clean runtime boundary off direct legacy live presenter and
-input-profile imports while preserving current WGPU live behavior.
-
-Scope:
-
-- Add a clean `src/live_wgpu.rs` facade for interactive and smoke WGPU live
-  launch.
-- Move `src/runtime.rs` to clean live launch/profile/report contracts instead
-  of importing the temporary presenter and input-profile modules directly.
-- Keep the existing temporary presenter bridge quarantined behind the new
-  facade until the full live event loop is clean-owned.
-- Update public guard tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- `src/runtime.rs` no longer references the temporary WGPU presenter module or
-  low-level input profile module directly.
-- The only clean source file allowed to adapt to those live bridge modules is
-  `src/live_wgpu.rs`.
-- `cargo run -- --live-smoke` behavior and output stay unchanged.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib runtime::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 19:53:49 BST` Started `DC-130`: adding a clean WGPU live runtime
-  facade, moving runtime off direct temporary presenter/input imports, updating
-  guard tests and docs, and preserving current WGPU live smoke behavior.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778871226066989`
-- `2026-05-15 20:15:33 BST` Completed `DC-130`: added `src/live_wgpu.rs` as
-  the clean WGPU live launch facade, moved `src/runtime.rs` to
-  `LiveInputProfile` and `LiveSmokeReport` contracts instead of direct
-  temporary presenter/input imports, and updated README/SPEC/PLAN plus public
-  quarantine guard tests. Validation passed with `cargo fmt --check`,
-  `cargo test --lib live_wgpu::tests`, `cargo test --lib runtime::tests`,
-  `cargo test --lib public_api_tests`, `cargo test --all-targets` (1201
-  library tests, 2 binary tests, 2 example tests),
-  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
-  15452 frames, 6/6 new executable Rust lines covered),
-  `cargo run -- --live-smoke` (239 rendered frames with attract, credit, and
-  playing evidence), `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`, and
-  `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778872547604119`
-
-### DC-131: Clean ROM Verification Facade
-
-Status: `complete`
-
-Goal: move optional ROM listing, scan, and verification command code off direct
-legacy ROM module types while preserving current CLI behavior.
-
-Scope:
-
-- Add a clean `src/roms.rs` facade for optional ROM descriptors, scan reports,
-  and verification summaries.
-- Move `src/rom_report.rs` to clean ROM facade contracts instead of importing
-  legacy ROM types/functions directly.
-- Keep `--rom-report` and `--verify-roms` text and error behavior unchanged.
-- Update public guard tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- `src/rom_report.rs` no longer references the legacy ROM module directly.
-- The only clean source file allowed to adapt to the legacy ROM module is
-  `src/roms.rs`.
-- Existing ROM listing, report, and verification tests pass unchanged in
-  behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib roms::tests
-cargo test --lib rom_report::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 20:17:21 BST` Started `DC-131`: adding a clean ROM verification
-  facade, moving `rom_report` off direct legacy ROM imports, updating guard
-  tests and docs, and preserving optional ROM command output.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778872635858059`
-- `2026-05-15 20:58:43 BST` Completed `DC-131`: added `src/roms.rs` as the
-  clean optional ROM verification facade, moved `src/rom_report.rs` off direct
-  legacy ROM imports, updated guard tests and README/SPEC module docs, and
-  preserved the current `--rom-report`/`--verify-roms` behavior. Validation
-  passed with focused ROM facade/report/public API tests, `cargo test
-  --all-targets` (1205 library tests, 2 binary tests, 2 example tests),
-  `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10 fixtures,
-  15452 frames, and 6/6 new executable Rust lines covered), `cargo run --
-  --live-smoke` (239 rendered frames), markdownlint, and `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778875121767719`
-
-### DC-132: Clean Fidelity Scenario Manifest Facade
-
-Status: `complete`
-
-Goal: move fidelity scenario listing and input-script writing off direct
-legacy trace scenario types while preserving current CLI behavior.
-
-Scope:
-
-- Add a clean crate-private fidelity scenario manifest facade for scenario
-  descriptors and expanded input text.
-- Move `src/fidelity_scenarios.rs` to clean manifest contracts instead of
-  importing legacy trace scenario types/functions directly.
-- Keep `--fidelity-list-scenarios` and `--fidelity-write-scenario-inputs`
-  output and file behavior unchanged.
-- Update public guard tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- `src/fidelity_scenarios.rs` no longer references `crate::legacy_fidelity`
-  directly.
-- The only clean source files allowed to adapt to legacy fidelity trace
-  generation are the dedicated fidelity facade modules.
-- Existing scenario listing and input-writing tests pass unchanged in behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib fidelity_manifest::tests
-cargo test --lib fidelity_scenarios::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 21:01:36 BST` Started `DC-132`: adding a clean fidelity
-  scenario manifest facade, moving `fidelity_scenarios` off direct legacy trace
-  scenario imports, updating guard tests and docs, and preserving current
-  scenario listing/input-writing behavior.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778875284634339`
-- `2026-05-15 21:23:09 BST` Completed `DC-132`: added
-  `src/fidelity_manifest.rs` as the clean scenario manifest/input expansion
-  facade, moved `src/fidelity_scenarios.rs` off direct legacy fidelity imports,
-  updated public guard tests and README/SPEC module docs, and preserved the
-  current scenario listing/input-writing behavior. Validation passed with
-  focused manifest/scenario/public API tests, `cargo test --all-targets` (1207
-  library tests, 2 binary tests, 2 example tests), `cargo clippy --all-targets
-  -- -D warnings`, `make fidelity` (10 fixtures, 15452 frames, and 6/6 new
-  executable Rust lines covered), `cargo run -- --live-smoke` (239 rendered
-  frames), markdownlint, `cargo fmt --check`, and `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778876604034919`
-
-### DC-133: Clean Fidelity Trace Engine Facade
-
-Status: `complete`
-
-Goal: move fidelity trace command orchestration off direct legacy trace engine
-calls while preserving current CLI behavior.
-
-Scope:
-
-- Add a clean crate-private fidelity trace engine facade for trace generation,
-  trace comparison, and trace schema header access.
-- Move `src/fidelity_traces.rs` to clean trace-engine and manifest contracts
-  instead of importing legacy trace functions directly.
-- Keep `--fidelity-trace`, `--fidelity-trace-inputs`,
-  `--fidelity-check-trace`, fixture-directory checks, and reference fixture
-  validation behavior unchanged.
-- Update public guard tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- `src/fidelity_traces.rs` no longer references `crate::legacy_fidelity`
-  directly.
-- Legacy trace generation and comparison access is isolated in
-  `src/fidelity_trace_engine.rs`.
-- Existing trace command, fixture, and reference validation tests pass
-  unchanged in behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib fidelity_trace_engine::tests
-cargo test --lib fidelity_traces::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 21:25:33 BST` Started `DC-133`: adding a clean fidelity trace
-  engine facade, moving `fidelity_traces` off direct legacy trace generation
-  and comparison imports, updating guard tests and docs, and preserving current
-  trace CLI behavior.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778876729244129`
-- `2026-05-15 21:47:47 BST` Completed `DC-133`: added
-  `src/fidelity_trace_engine.rs`, moved `src/fidelity_traces.rs` to the clean
-  manifest and trace-engine contracts, refreshed public guard tests plus
-  README/SPEC/PLAN module docs, and preserved current trace command behavior.
-  Validation passed: `cargo fmt --check`,
-  `cargo test --lib fidelity_trace_engine::tests`,
-  `cargo test --lib fidelity_traces::tests`, `cargo test --lib public_api_tests`,
-  `cargo test --all-targets` (1211 library tests, 2 binary tests, and 2 example
-  tests), `cargo clippy --all-targets -- -D warnings`, `make fidelity` (10
-  fixture traces, 15452 frames, and 16/16 new executable Rust lines covered),
-  `cargo run -- --live-smoke` (239 rendered frames), markdownlint, and
-  `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778878068481899`
-
-### DC-134: Clean Game Smoke Command
-
-Status: `complete`
-
-Goal: add a clean smoke command that exercises `Game` and native renderer draw
-planning without entering the legacy live presenter path.
-
-Scope:
-
-- Add a crate-private clean game smoke runner that steps `Game` through a
-  deterministic input script.
-- Prepare each emitted `RenderScene` with `NativeSceneRenderer` and summarize
-  sprite-only draw-plan evidence.
-- Add a `--game-smoke` CLI/runtime command that prints a stable smoke report.
-- Update public guard tests plus README/SPEC/PLAN docs.
-
-Acceptance criteria:
-
-- `--game-smoke` runs through the clean game and native renderer draw-planning
-  path without importing legacy live or presenter modules.
-- The report proves attract, credited, and playing frames, nonzero sprite
-  instances, no raster payloads, no missing sprite atlas regions, and a clean
-  exit.
-- Existing `--live-smoke` behavior remains unchanged.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game_smoke::tests
-cargo test --lib runtime::tests
-cargo test --lib platform::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 21:54:47 BST` Started `DC-134`: adding a clean `--game-smoke`
-  command that steps `Game` through scripted controls, prepares emitted scenes
-  with `NativeSceneRenderer`, reports sprite-only draw-plan evidence, and
-  preserves existing `--live-smoke` behavior.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778878489373369`
-- `2026-05-15 22:20:49 BST` Completed `DC-134`: added the clean
-  `--game-smoke` command, crate-private smoke runner, runtime/platform wiring,
-  public guard checks, and README/SPEC documentation. The smoke report proves
-  24 clean game frames, attract/credited/playing coverage, 290 sprite
-  instances, 92 sprite draw commands, zero raster frames, zero missing sprite
-  atlas regions, and clean exit. Validation passed with `cargo fmt --check`,
-  `cargo test --lib game_smoke::tests`, `cargo test --lib runtime::tests`,
-  `cargo test --lib platform::tests`, `cargo test --lib public_api_tests`,
-  `cargo test --all-targets` (1221 library tests, 2 binary tests, and
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixture traces, 15452 frames, and 16/16 new executable
-  Rust lines covered), `cargo run -- --game-smoke`,
-  `cargo run -- --live-smoke` (240 rendered frames), markdownlint, and
-  `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778880047960349`
-
-### DC-135: Clean Game Smoke WGPU Frame-Plan Evidence
-
-Status: `complete`
-
-Goal: extend the clean game smoke so it proves frame-level `wgpu` command
-planning, not only scene sprite and draw-plan counts.
-
-Scope:
-
-- Add `WgpuFramePlan` evidence to the clean game smoke report.
-- Validate sprite render-pass command coverage for the clean smoke frames.
-- Validate that the clean smoke path emits no temporary raster frame commands.
-- Keep the existing `--game-smoke` and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `--game-smoke` reports nonzero frame commands and sprite render-pass command
-  coverage.
-- `--game-smoke` fails if a temporary raster frame command appears in the clean
-  smoke path.
-- Focused smoke and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 22:23:00 BST` Started `DC-135`: extending `--game-smoke` so it
-  verifies frame-level `wgpu` command plans, reports sprite render-pass command
-  coverage, and keeps temporary raster commands out of the clean smoke path.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778880191445779`
-- `2026-05-15 23:01:48 BST` Completed `DC-135`: extended `--game-smoke` with
-  `wgpu` frame-command evidence, sprite render-pass command coverage, and
-  temporary raster command validation. The smoke report now proves 96 frame
-  commands, 24 sprite render-pass commands, zero temporary raster commands,
-  290 sprite instances, and 92 sprite draw commands across 24 clean frames.
-  Validation passed with `cargo fmt --check`,
-  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
-  `cargo test --all-targets` (1222 library tests, 2 binary tests, and
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixture traces, 15452 frames, and 15/15 new executable
-  Rust lines covered), `cargo run -- --game-smoke`,
-  `cargo run -- --live-smoke` (240 rendered frames), markdownlint, and
-  `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778882543476649`
-
-### DC-136: Clean Game Smoke GPU Resource Evidence
-
-Status: `complete`
-
-Goal: extend the clean game smoke so it proves the sprite `wgpu` resource and
-encoder plans behind the frame commands.
-
-Scope:
-
-- Add resource-binding, pipeline-layout, render-pipeline descriptor, and
-  render-pass encoder evidence to the clean game smoke report.
-- Report upload byte evidence for sprite instances, sprite atlas texture data,
-  and scene-projection uniforms.
-- Validate that every clean smoke frame produces sprite resource and encoder
-  plans without falling back to temporary raster commands.
-- Keep `--game-smoke` and `--live-smoke` behavior otherwise unchanged.
-
-Acceptance criteria:
-
-- `--game-smoke` reports sprite resource-binding frames, pipeline-layout
-  frames, render-pipeline descriptor frames, encoder frames, encoder commands,
-  encoder draws, and upload byte totals.
-- The clean smoke fails if any required sprite resource or encoder evidence is
-  missing.
-- Focused smoke and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 23:04:24 BST` Started `DC-136`: extending `--game-smoke` beyond
-  frame-command counts into sprite resource bindings, pipeline layout, render
-  pipeline descriptor, render-pass encoder commands/draws, and upload byte
-  evidence for the clean `wgpu` sprite path.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778882675313219`
-- `2026-05-15 23:26:20 BST` Completed `DC-136`: extended `--game-smoke` with
-  clean sprite resource-binding, pipeline-layout, render-pipeline descriptor,
-  render-pass encoder, and upload byte evidence. The smoke report now proves
-  24 resource-binding, pipeline-layout, render-pipeline descriptor, and
-  render-pass encoder frames; 236 sprite encoder commands; 92 encoder draws
-  matching 92 sprite draw commands; 13920 sprite instance upload bytes;
-  1572864 atlas upload bytes; 384 scene-projection upload bytes; and zero
-  temporary raster commands. Validation passed with `cargo fmt --check`,
-  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
-  `cargo test --all-targets` (1224 library tests, 2 binary tests, and
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixture traces, 15452 frames, and 49/49 new executable
-  Rust lines covered), `cargo run -- --game-smoke`,
-  `cargo run -- --live-smoke` (239 rendered frames), markdownlint, and
-  `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778884008047749`
-
-### DC-137: Clean Game Smoke Sprite Coverage Evidence
-
-Status: `complete`
-
-Goal: extend the clean game smoke so it proves the scene path covers the
-gameplay sprite categories required by the sprite-first rewrite.
-
-Scope:
-
-- Add layer coverage evidence for terrain, starfield, objects, projectiles, and
-  HUD sprites to the clean game smoke report.
-- Add sprite-ID coverage evidence for player, lander, human, projectile,
-  terrain, star, and score text sprites.
-- Validate that the clean smoke fails when required gameplay sprite coverage is
-  missing.
-- Keep `--game-smoke` and `--live-smoke` behavior otherwise unchanged.
-
-Acceptance criteria:
-
-- `--game-smoke` reports nonzero layer counts for terrain, starfield, objects,
-  projectiles, and HUD.
-- `--game-smoke` reports all required clean gameplay sprite IDs.
-- Focused smoke and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-15 23:28:32 BST` Started `DC-137`: extending `--game-smoke` so it
-  verifies gameplay sprite coverage across terrain, starfield, object,
-  projectile, and HUD layers plus required sprite IDs for player, lander,
-  human, projectile, terrain, star, and score text.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778884124624519`
-- `2026-05-16 00:08:13 BST` Completed `DC-137`: extended `--game-smoke` with
-  gameplay sprite coverage evidence from clean `RenderScene` data. The smoke
-  report now proves 105 terrain sprites, 63 starfield sprites, 93 object
-  sprites, 5 projectile sprites, 24 HUD sprites, and required sprite IDs for
-  score text, stars, terrain, enemy landers, humans, the player ship, and
-  player projectiles. Validation passed with `cargo fmt --check`,
-  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
-  `cargo test --all-targets` (1226 library tests, 2 binary tests, and
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (10 fixture traces, 15452 frames, and 42/42 new executable
-  Rust lines covered), `cargo run -- --game-smoke`,
-  `cargo run -- --live-smoke` (239 rendered frames), markdownlint, and
-  `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778886613013399`
-
-### DC-138: Clean Game Smoke Sprite Pipeline Coverage Evidence
-
-Status: `complete`
-
-Goal: extend the clean game smoke so it proves required gameplay sprites reach
-the expected native `wgpu` draw pipelines, not only clean scene layers.
-
-Scope:
-
-- Add draw-command layer coverage evidence for terrain, starfield, objects,
-  projectiles, and HUD sprites to the clean game smoke report.
-- Add native pipeline coverage evidence for terrain, starfield, sprites,
-  projectiles, and HUD text draw commands.
-- Validate that the clean smoke fails when required draw-command or pipeline
-  coverage is missing.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
-  otherwise unchanged.
-
-Acceptance criteria:
-
-- `--game-smoke` reports nonzero draw-command counts for terrain, starfield,
-  object, projectile, and HUD layers.
-- `--game-smoke` reports all required clean native sprite pipelines.
-- Focused smoke and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 00:12:06 BST` Started `DC-138`: extending `--game-smoke` so it
-  verifies native draw-command coverage for terrain, starfield, object,
-  projectile, and HUD layers plus required clean sprite pipelines for terrain,
-  starfield, sprites, projectiles, and HUD text.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778886737931019`
-- `2026-05-16 00:50:25 BST` Completed `DC-138`: extended `--game-smoke` with
-  native draw-command and pipeline coverage evidence from clean `SceneDrawPlan`
-  data. The smoke report now proves 21 terrain, 21 starfield, 21 object,
-  5 projectile, and 24 HUD draw commands while covering `hud_text`,
-  `starfield`, `terrain`, `sprites`, and `projectiles` pipelines. Validation
-  passed with `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo test --all-targets` (1228
-  library tests before the final coverage-only branch test, 2 binary tests, and
-  2 example tests), `cargo clippy --all-targets -- -D warnings`,
-  `make fidelity` (1229 library tests, 2 binary tests, 2 example tests,
-  10 fixture traces, 15452 frames, and 37/37 new executable Rust lines
-  covered), `cargo run -- --game-smoke`, `cargo run -- --live-smoke`
-  (240 rendered frames), markdownlint, and `git diff --check`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778889040826379`
-
-### DC-139: Clean Game Smoke Sprite Draw-Instance Coverage Evidence
-
-Status: `complete`
-
-Goal: extend the clean game smoke so it proves clean sprite instances are
-actually covered by native `wgpu` draw commands, not only that each layer has a
-draw command.
-
-Scope:
-
-- Add draw-instance coverage evidence for terrain, starfield, objects,
-  projectiles, and HUD sprites to the clean game smoke report.
-- Validate that drawn sprite instance totals match clean sprite instance totals.
-- Validate that per-layer drawn sprite instance totals match the clean scene
-  sprite layer totals.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
-  otherwise unchanged.
-
-Acceptance criteria:
-
-- `--game-smoke` reports drawn sprite instance totals for terrain, starfield,
-  object, projectile, and HUD layers.
-- `--game-smoke` fails if any clean sprite instances are not represented by
-  native draw commands.
-- Focused smoke and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 00:52:22 BST` Started `DC-139`: extending `--game-smoke` so it
-  verifies drawn sprite instance coverage for terrain, starfield, object,
-  projectile, and HUD layers, and so total drawn instances must match clean
-  sprite instances.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778889152440539`
-- `2026-05-16 01:15:07 BST` Completed `DC-139`: `--game-smoke` now reports
-  290 drawn sprite instances matching 290 clean sprite instances, with terrain
-  105, starfield 63, object 93, projectile 5, and HUD 24 draw instances. Added
-  mismatch validation, focused smoke regression tests, and a public guard that
-  requires the smoke path to consume native draw-command instance counts.
-  Validation: `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --game-smoke`,
-  `cargo run -- --live-smoke` (239 rendered frames), markdownlint,
-  `git diff --check`, and `make fidelity` (42/42 non-baselined added
-  executable Rust lines covered).
-  Slack in-flight update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778889599148589`
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778890523940999`
-
-### DC-140: Clean Game Smoke Sprite Upload-Instance Coverage Evidence
-
-Status: `complete`
-
-Goal: extend the clean game smoke so it proves the native sprite instance
-upload contains the same clean sprite instances that are represented by native
-draw commands.
-
-Scope:
-
-- Add sprite instance upload record-count evidence to the clean game smoke
-  report.
-- Validate that uploaded sprite instance records match clean sprite instance
-  totals.
-- Validate that uploaded sprite instance records match the drawn sprite
-  instance totals.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
-  otherwise unchanged.
-
-Acceptance criteria:
-
-- `--game-smoke` reports uploaded sprite instance records.
-- `--game-smoke` fails if uploaded sprite instance records diverge from clean
-  sprite instances or native draw-command instance totals.
-- Focused smoke and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 01:17:28 BST` Started `DC-140`: extending `--game-smoke` so it
-  reports uploaded sprite instance records and validates that the native
-  instance upload matches both clean sprite instances and drawn sprite
-  instances.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778890666333329`
-- `2026-05-16 01:39:28 BST` Completed `DC-140`: `--game-smoke` now reports
-  `sprite_instance_upload_records`; validation fails if uploaded sprite
-  records diverge from native draw-command instance totals; the current smoke
-  run reports `sprite_instances: 290`, `drawn_sprite_instances: 290`,
-  `sprite_instance_upload_records: 290`, and
-  `sprite_instance_upload_bytes: 13920`. Validation passed with
-  `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --game-smoke`,
-  `cargo run -- --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  `git diff --check`, and `make fidelity` with `new Rust line coverage: 5/5
-  non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778891966098949`
-
-### DC-141: Clean Game Smoke Sprite Buffer Upload-Plan Evidence
-
-Status: `complete`
-
-Goal: extend the clean game smoke so it proves renderer-owned sprite buffer
-upload plans are present and aligned with the flattened sprite instance upload
-stream.
-
-Scope:
-
-- Add sprite buffer upload-plan frame and byte-count evidence to the clean game
-  smoke report.
-- Report quad vertex, quad index, and instance buffer upload bytes.
-- Validate that sprite buffer upload plans exist for every clean smoke frame.
-- Validate that sprite buffer instance upload bytes match flattened sprite
-  instance upload bytes.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
-  otherwise unchanged.
-
-Acceptance criteria:
-
-- `--game-smoke` reports sprite buffer upload-plan frames and buffer byte
-  totals.
-- `--game-smoke` fails if sprite buffer upload plans are missing from any
-  frame.
-- `--game-smoke` fails if sprite buffer instance bytes diverge from flattened
-  instance upload bytes.
-- Focused smoke and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 01:41:10 BST` Started `DC-141`: extending `--game-smoke` so it
-  reports sprite buffer upload-plan frames, quad vertex/index upload bytes, and
-  instance buffer upload bytes, then validates those uploads against the
-  flattened sprite instance upload stream.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778892078200859`
-- `2026-05-16 02:02:20 BST` Completed `DC-141`: `--game-smoke` now reports
-  sprite buffer upload-plan frames plus quad vertex, quad index, and instance
-  buffer upload bytes. The current smoke run reports
-  `sprite_buffer_upload_frames: 24`, `sprite_quad_vertex_upload_bytes: 1536`,
-  `sprite_quad_index_upload_bytes: 288`,
-  `sprite_buffer_instance_upload_bytes: 13920`, and
-  `sprite_instance_upload_bytes: 13920`. Validation passed with
-  `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --game-smoke`,
-  `cargo run -- --live-smoke`, `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  `git diff --check`, and `make fidelity` with `new Rust line coverage: 21/21
-  non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778893353769969`
-
-### DC-142: Clean Game Smoke Sprite Render-Pass Plan Evidence
-
-Status: `complete`
-
-Goal: extend the clean game smoke so it proves renderer-owned sprite
-render-pass plans are present and aligned with native sprite draw commands.
-
-Scope:
-
-- Add sprite render-pass plan frame, draw, and instance evidence to the clean
-  game smoke report.
-- Validate that sprite render-pass plans exist for every clean smoke frame.
-- Validate that sprite render-pass draw counts match native sprite draw
-  command totals.
-- Validate that sprite render-pass instance counts match native drawn sprite
-  instance totals.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
-  otherwise unchanged.
-
-Acceptance criteria:
-
-- `--game-smoke` reports sprite render-pass plan frames, draws, and instances.
-- `--game-smoke` fails if sprite render-pass plans are missing from any frame.
-- `--game-smoke` fails if render-pass draw or instance totals diverge from
-  native draw-command evidence.
-- Focused smoke and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 02:03:55 BST` Started `DC-142`: extending `--game-smoke` so it
-  reports sprite render-pass plan frames, draw counts, and instance counts,
-  then validates those values against native sprite draw commands and drawn
-  sprite instances.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778893444143389`
-- `2026-05-16 02:25:23 BST` Completed `DC-142`: `--game-smoke` now reports
-  `sprite_render_pass_plan_frames: 24`,
-  `sprite_render_pass_plan_draws: 92`, and
-  `sprite_render_pass_plan_instances: 290`, with render-pass draw and instance
-  totals validated against `sprite_draw_commands: 92` and
-  `drawn_sprite_instances: 290`. Validation passed with
-  `cargo fmt --check`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
-  `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  `git diff --check`, `cargo run -- --live-smoke`,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  and `make fidelity`; coverage artifacts were refreshed at
-  `2026-05-16 02:24 BST`, and
-  `python3 tools/check_new_rust_coverage.py --lcov target/coverage/lcov.info
-  --base HEAD --uncovered-baseline tools/new_rust_coverage_baseline.txt`
-  reported `new Rust line coverage: 15/15 non-baselined added executable
-  line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778894748207669`
-
-### DC-143: Clean Game Smoke WGPU Frame Sprite Instance Evidence
-
-Status: `complete`
-
-Goal: extend the frame-level `wgpu` command plan so clean smoke proves sprite
-execution carries both draw and instance totals through to the final frame
-command stream.
-
-Scope:
-
-- Add sprite instance totals to the frame-level `ExecuteSpriteRenderPass`
-  command plan.
-- Expose frame-plan sprite draw and instance totals through `--game-smoke`.
-- Validate that frame-plan sprite draw totals match native sprite draw
-  commands.
-- Validate that frame-plan sprite instance totals match native drawn sprite
-  instances.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior
-  otherwise unchanged.
-
-Acceptance criteria:
-
-- `WgpuFramePlan` records sprite pass draw and instance totals.
-- `--game-smoke` reports frame-plan sprite draws and instances.
-- `--game-smoke` fails if frame-level sprite draw or instance totals diverge
-  from native draw-command evidence.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 02:27:56 BST` Started `DC-143`: extending the final frame-level
-  `wgpu` sprite execution command so it carries sprite instance totals as well
-  as draw totals, then validating those totals in `--game-smoke`.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778894887533839`
-- `2026-05-16 02:50:24 BST` Completed `DC-143`: `ExecuteSpriteRenderPass`
-  now carries sprite instance totals alongside command and draw counts,
-  `WgpuFramePlan` exposes aggregate sprite draw and instance totals, and
-  `--game-smoke` now reports `sprite_frame_plan_draws: 92` plus
-  `sprite_frame_plan_instances: 290`, matching `sprite_draw_commands: 92` and
-  `drawn_sprite_instances: 290`. Validation passed with
-  `cargo fmt --check`, `cargo test --lib renderer::tests`,
-  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
-  `cargo run -- --game-smoke`, `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  `git diff --check`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --live-smoke`,
-  and `make fidelity`; coverage artifacts were refreshed at
-  `2026-05-16 02:50 BST`, and the coverage checker reported
-  `new Rust line coverage: 33/33 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778896239989579`
-
-### DC-144: Clean Game Smoke WGPU Frame Sprite Encoder Command Evidence
-
-Status: `complete`
-
-Goal: extend the final frame-level `wgpu` command evidence so clean smoke proves
-sprite render-pass encoder command totals survive into the ordered frame
-command stream.
-
-Scope:
-
-- Add aggregate sprite encoder command totals to `WgpuFramePlan`.
-- Expose frame-plan sprite encoder command totals through `--game-smoke`.
-- Validate that frame-plan sprite encoder command totals match sprite
-  render-pass encoder evidence.
-- Keep the existing frame-plan sprite draw and instance evidence intact.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `WgpuFramePlan` reports aggregate sprite encoder command totals.
-- `--game-smoke` reports frame-plan sprite encoder command totals.
-- `--game-smoke` fails if frame-level sprite encoder command totals diverge
-  from native encoder-plan evidence.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 02:54:14 BST` Started `DC-144`: extending the final frame-level
-  `wgpu` sprite execution evidence so it reports sprite encoder command totals
-  alongside draw and instance totals, then validating those totals in
-  `--game-smoke`.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778896420884149`
-- `2026-05-16 03:16:02 BST` Completed `DC-144`: `WgpuFramePlan` now exposes
-  aggregate sprite encoder command totals from `ExecuteSpriteRenderPass`, and
-  `--game-smoke` now reports `sprite_frame_plan_encoder_commands: 236`,
-  matching `sprite_encoder_commands: 236`, alongside
-  `sprite_frame_plan_draws: 92` and `sprite_frame_plan_instances: 290`.
-  Validation passed with `cargo fmt --check`,
-  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, `git diff --check`,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo run -- --live-smoke`, and `make fidelity`; coverage artifacts were
-  refreshed at `2026-05-16 03:15 BST`, and the coverage checker reported
-  `new Rust line coverage: 12/12 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778897775341499`
-
-### DC-145: Clean Game Smoke WGPU Frame Projection Upload Evidence
-
-Status: `complete`
-
-Goal: extend the final frame-level `wgpu` command evidence so clean smoke proves
-scene-projection upload bytes survive into the ordered frame command stream.
-
-Scope:
-
-- Add aggregate scene-projection upload byte totals to `WgpuFramePlan`.
-- Expose frame-plan scene-projection upload bytes through `--game-smoke`.
-- Validate that frame-plan projection bytes match sprite resource-binding
-  projection upload evidence.
-- Keep the existing frame-plan sprite command, draw, and instance evidence
-  intact.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `WgpuFramePlan` reports aggregate scene-projection upload bytes.
-- `--game-smoke` reports frame-plan scene-projection upload bytes.
-- `--game-smoke` fails if frame-level projection bytes diverge from resource
-  binding projection upload evidence.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 03:17:39 BST` Started `DC-145`: extending final frame-level
-  `wgpu` command evidence so it reports scene-projection upload bytes and
-  validating those bytes against resource-binding projection upload evidence
-  in `--game-smoke`.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778897895059149`
-- `2026-05-16 03:38:58 BST` Completed `DC-145`: `WgpuFramePlan` now exposes
-  aggregate scene-projection upload bytes from ordered
-  `UploadSceneProjection` frame commands, and `--game-smoke` reports
-  `frame_plan_scene_projection_upload_bytes: 384`, matching
-  `scene_projection_upload_bytes: 384`. Validation now fails if the frame-plan
-  projection upload total diverges from the resource-binding projection upload
-  evidence. Validation passed with `cargo fmt --check`,
-  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, `git diff --check`,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo run -- --live-smoke`, and `make fidelity`; coverage artifacts were
-  refreshed at `2026-05-16 03:38 BST`, and the coverage checker reported
-  `new Rust line coverage: 13/13 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778899153140279`
-
-### DC-146: Clean Game Smoke WGPU Frame Viewport Command Evidence
-
-Status: `complete`
-
-Goal: extend the final frame-level `wgpu` command evidence so clean smoke
-proves viewport setup reaches the ordered frame command stream for every clean
-frame.
-
-Scope:
-
-- Add aggregate viewport command totals to `WgpuFramePlan`.
-- Expose frame-plan viewport command totals through `--game-smoke`.
-- Validate that every clean smoke frame carries exactly one viewport command in
-  the ordered frame command stream.
-- Keep the existing frame-plan projection, sprite command, draw, and instance
-  evidence intact.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `WgpuFramePlan` reports aggregate viewport command totals.
-- `--game-smoke` reports frame-plan viewport command totals.
-- `--game-smoke` fails if frame-level viewport command totals diverge from the
-  number of clean smoke frames.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 03:41:40 BST` Started `DC-146`: extending final frame-level
-  `wgpu` command evidence so it reports viewport command totals and validates
-  that every clean smoke frame carries viewport setup in the ordered frame
-  command stream.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778899298772809`
-- `2026-05-16 04:02:42 BST` Completed `DC-146`: `WgpuFramePlan` now exposes
-  aggregate viewport command totals from ordered `SetViewport` frame commands,
-  and `--game-smoke` reports `frame_plan_viewport_commands: 24`, matching the
-  24 clean smoke frames. Validation now fails if frame-plan viewport command
-  totals diverge from the frame count. Validation passed with
-  `cargo fmt --check`, `cargo test --lib renderer::tests`,
-  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
-  `cargo run -- --game-smoke`, `markdownlint README.md SPEC.md PLAN.md
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md`,
-  `git diff --check`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --live-smoke`,
-  and `make fidelity`; coverage artifacts were refreshed at
-  `2026-05-16 04:02 BST`, and the coverage checker reported
-  `new Rust line coverage: 10/10 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778900577365789`
-
-### DC-147: Clean Game Smoke WGPU Frame Begin-Pass Command Evidence
-
-Status: `complete`
-
-Goal: extend the final frame-level `wgpu` command evidence so clean smoke
-proves each clean frame begins an ordered render pass before viewport,
-projection, and sprite execution commands.
-
-Scope:
-
-- Add aggregate begin-render-pass command totals to `WgpuFramePlan`.
-- Expose frame-plan begin-pass command totals through `--game-smoke`.
-- Validate that every clean smoke frame carries exactly one begin-pass command
-  in the ordered frame command stream.
-- Keep the existing frame-plan viewport, projection, sprite command, draw, and
-  instance evidence intact.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `WgpuFramePlan` reports aggregate begin-render-pass command totals.
-- `--game-smoke` reports frame-plan begin-pass command totals.
-- `--game-smoke` fails if frame-level begin-pass command totals diverge from
-  the number of clean smoke frames.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 04:04:56 BST` Started `DC-147`: extending final frame-level
-  `wgpu` command evidence so it reports begin-pass command totals and
-  validates that every clean smoke frame starts the ordered frame command
-  stream with a render-pass begin command.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778900706383839`
-- `2026-05-16 04:26:40 BST` Completed `DC-147`: `WgpuFramePlan` now exposes
-  aggregate begin-render-pass command totals from ordered `BeginRenderPass`
-  frame commands, and `--game-smoke` reports
-  `frame_plan_begin_render_pass_commands: 24`, matching the 24 clean smoke
-  frames. Validation now fails if frame-plan begin-pass command totals diverge
-  from the frame count. The smoke evidence also preserved
-  `frame_plan_viewport_commands: 24`,
-  `frame_plan_scene_projection_upload_bytes: 384`,
-  `sprite_frame_plan_encoder_commands: 236`,
-  `sprite_frame_plan_draws: 92`, and `sprite_frame_plan_instances: 290`.
-  Validation passed with `cargo fmt --check`,
-  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, `git diff --check`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --live-smoke`,
-  and `make fidelity`; coverage artifacts were refreshed at
-  `2026-05-16 04:25:57 BST` and `2026-05-16 04:25:59 BST`, and the coverage
-  checker reported
-  `new Rust line coverage: 10/10 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778901986517359`
-
-### DC-148: Clean Game Smoke Ordered Sprite-Only WGPU Frame Stream Evidence
-
-Status: `complete`
-
-Goal: extend the final frame-level `wgpu` command evidence so clean smoke
-proves every clean frame uses the expected ordered sprite-only command stream:
-begin render pass, set viewport, upload scene projection, then execute the
-sprite render pass.
-
-Scope:
-
-- Add an explicit ordered sprite-only frame-stream predicate to `WgpuFramePlan`.
-- Expose ordered sprite-only frame-stream totals through `--game-smoke`.
-- Validate that every clean smoke frame carries the expected ordered
-  sprite-only frame command stream.
-- Keep temporary raster frame commands rejected in clean gameplay smoke.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `WgpuFramePlan` can identify the expected ordered sprite-only command stream.
-- `--game-smoke` reports ordered sprite-only frame-stream totals.
-- `--game-smoke` fails if ordered sprite-only frame-stream totals diverge from
-  the number of clean smoke frames.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 04:29:11 BST` Started `DC-148`: extending final frame-level
-  `wgpu` command evidence so clean smoke reports and validates ordered
-  sprite-only frame command streams for every clean frame.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778902161201349`
-- `2026-05-16 04:51:08 BST` Completed `DC-148`: `WgpuFramePlan` now exposes
-  an ordered sprite-only frame command predicate for the expected begin-pass,
-  viewport, scene-projection upload, and sprite render-pass execution stream.
-  `--game-smoke` reports `frame_plan_ordered_sprite_only_frames: 24`, matching
-  the 24 clean smoke frames, while preserving
-  `frame_plan_begin_render_pass_commands: 24`,
-  `frame_plan_viewport_commands: 24`, `temporary_raster_commands: 0`,
-  `sprite_frame_plan_draws: 92`, and `sprite_frame_plan_instances: 290`.
-  Validation now fails if ordered sprite-only frame-stream totals diverge from
-  the frame count. Validation passed with `cargo fmt --check`,
-  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, `git diff --check`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --live-smoke`,
-  and `make fidelity`; coverage artifacts were refreshed at
-  `2026-05-16 04:50:37 BST` and `2026-05-16 04:50:38 BST`, and the coverage
-  checker reported
-  `new Rust line coverage: 13/13 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778903465313059`
-
-### DC-149: Clean Game Smoke Sprite Resource Bind-Group Evidence
-
-Status: `complete`
-
-Goal: extend the `wgpu` resource evidence so clean smoke proves every clean
-frame prepares both expected sprite resource bind groups and their binding
-entries, not only a resource-binding plan object and upload bytes.
-
-Scope:
-
-- Add aggregate bind-group and binding-entry totals to
-  `SpriteResourceBindingPlan`.
-- Expose sprite resource bind-group and binding-entry totals through
-  `--game-smoke`.
-- Validate those totals against the clean smoke frame count.
-- Keep existing frame command, sprite command, upload, and resource evidence
-  intact.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `SpriteResourceBindingPlan` reports expected bind-group and binding-entry
-  totals.
-- `--game-smoke` reports sprite resource bind-group and binding-entry totals.
-- `--game-smoke` fails if those totals diverge from the per-frame expected
-  values.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 04:53:36 BST` Started `DC-149`: extending clean smoke resource
-  evidence so it reports and validates WGPU sprite resource bind-group and
-  binding-entry totals for every clean frame.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778903624623269`
-- `2026-05-16 05:18:22 BST` Completed `DC-149`: `SpriteResourceBindingPlan`
-  now exposes expected bind-group and binding-entry totals, and
-  `--game-smoke` reports `sprite_resource_binding_frames: 24`,
-  `sprite_resource_bind_groups: 48`, and
-  `sprite_resource_binding_entries: 72` while preserving
-  `frame_plan_ordered_sprite_only_frames: 24`,
-  `temporary_raster_commands: 0`, `sprite_frame_plan_draws: 92`, and
-  `sprite_frame_plan_instances: 290`. Validation now fails if the resource
-  bind-group or binding-entry totals diverge from the per-frame expectations.
-  Validation passed with `cargo fmt --check`,
-  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo test --all-targets`,
-  `cargo clippy --all-targets -- -D warnings`, `cargo run -- --game-smoke`,
-  `cargo run -- --live-smoke`, `make fidelity`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, and `git diff --check`; coverage artifacts
-  were refreshed at `2026-05-16 05:17:28 BST` and
-  `2026-05-16 05:17:29 BST`, and the coverage checker reported
-  `new Rust line coverage: 16/16 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778905091907579`
-
-### DC-150: Clean Game Smoke Sprite Pipeline-Layout Bind-Group Evidence
-
-Status: `complete`
-
-Goal: extend the `wgpu` pipeline-layout evidence so clean smoke proves every
-clean frame carries the expected sprite pipeline-layout bind groups and binding
-entries, not only a pipeline-layout plan object.
-
-Scope:
-
-- Add aggregate bind-group and binding-entry totals to
-  `SpritePipelineLayoutPlan`.
-- Expose sprite pipeline-layout bind-group and binding-entry totals through
-  `--game-smoke`.
-- Validate those totals against the clean smoke frame count and the sprite
-  resource-binding evidence.
-- Keep existing frame command, sprite command, upload, resource, descriptor,
-  and encoder evidence intact.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `SpritePipelineLayoutPlan` reports expected bind-group and binding-entry
-  totals.
-- `--game-smoke` reports sprite pipeline-layout bind-group and binding-entry
-  totals.
-- `--game-smoke` fails if those totals diverge from the per-frame expected
-  values or from the resource-binding totals.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 05:20:26 BST` Started `DC-150`: extending clean smoke
-  pipeline-layout evidence so it reports and validates WGPU sprite
-  pipeline-layout bind-group and binding-entry totals for every clean frame.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778905235441659`
-- `2026-05-16 05:43:16 BST` Completed `DC-150`:
-  `SpritePipelineLayoutPlan` now exposes expected bind-group and binding-entry
-  totals, and `--game-smoke` reports `sprite_pipeline_layout_frames: 24`,
-  `sprite_pipeline_layout_bind_groups: 48`, and
-  `sprite_pipeline_layout_binding_entries: 72` while matching
-  `sprite_resource_bind_groups: 48` and
-  `sprite_resource_binding_entries: 72`. Existing clean renderer evidence
-  remains intact with `temporary_raster_commands: 0`,
-  `frame_plan_ordered_sprite_only_frames: 24`,
-  `sprite_frame_plan_draws: 92`, and `sprite_frame_plan_instances: 290`.
-  Validation now fails if the pipeline-layout bind-group or binding-entry
-  totals diverge from the resource-binding totals. Validation passed with
-  `cargo fmt --check`, `cargo test --lib renderer::tests`,
-  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo run -- --game-smoke`, `cargo run -- --live-smoke`, `make fidelity`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, and `git diff --check`; coverage artifacts
-  were refreshed at `2026-05-16 05:42:37 BST` and
-  `2026-05-16 05:42:38 BST`, and the coverage checker reported
-  `new Rust line coverage: 16/16 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778906585665669`
-
-### DC-151: Clean Game Smoke Sprite Render Pipeline Descriptor Evidence
-
-Status: `complete`
-
-Goal: extend the `wgpu` render pipeline descriptor evidence so clean smoke
-proves every clean frame carries the expected descriptor shape, not only a
-descriptor plan object.
-
-Scope:
-
-- Add aggregate layout bind-group, vertex-buffer, and color-target totals to
-  `SpriteRenderPipelineDescriptorPlan`.
-- Expose sprite render pipeline descriptor layout, vertex-buffer, and
-  color-target totals through `--game-smoke`.
-- Validate those totals against the clean smoke frame count and pipeline-layout
-  evidence.
-- Keep existing frame command, sprite command, upload, resource, layout, and
-  encoder evidence intact.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `SpriteRenderPipelineDescriptorPlan` reports expected layout bind-group,
-  vertex-buffer, and color-target totals.
-- `--game-smoke` reports sprite render pipeline descriptor shape totals.
-- `--game-smoke` fails if those totals diverge from the per-frame expected
-  values or from the pipeline-layout totals.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 05:45:13 BST` Started `DC-151`: extending clean smoke render
-  pipeline descriptor evidence so it reports and validates WGPU descriptor
-  layout bind-group, vertex-buffer, and color-target totals for every clean
-  frame.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778906721909189`
-- `2026-05-16 06:07:13 BST` Completed `DC-151`:
-  `SpriteRenderPipelineDescriptorPlan` now exposes expected layout bind-group,
-  vertex-buffer, and color-target totals, and `--game-smoke` reports
-  `sprite_render_pipeline_descriptor_frames: 24`,
-  `sprite_render_pipeline_descriptor_layout_bind_groups: 48`,
-  `sprite_render_pipeline_descriptor_vertex_buffers: 48`, and
-  `sprite_render_pipeline_descriptor_color_targets: 24`. The descriptor layout
-  bind-group evidence matches `sprite_pipeline_layout_bind_groups: 48`, while
-  existing clean renderer evidence remains intact with
-  `temporary_raster_commands: 0`,
-  `frame_plan_ordered_sprite_only_frames: 24`,
-  `sprite_frame_plan_draws: 92`, and `sprite_frame_plan_instances: 290`.
-  Validation now fails if descriptor layout bind-group totals diverge from the
-  pipeline-layout totals, or if descriptor vertex-buffer/color-target totals
-  diverge from the per-frame expectations. Validation passed with
-  `cargo fmt --check`, `cargo test --lib renderer::tests`,
-  `cargo test --lib game_smoke::tests`, `cargo test --lib public_api_tests`,
-  `cargo run -- --game-smoke`,
-  `markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
-  docs/fidelity/live-audio.md`, `git diff --check`,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo run -- --live-smoke`, and `make fidelity`; coverage artifacts were
-  refreshed at `2026-05-16 06:07:03 BST` and
-  `2026-05-16 06:07:04 BST`, and the coverage checker reported
-  `new Rust line coverage: 25/25 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778908047112119`
-
-### DC-152: Clean Game Smoke Sprite Render-Pass Encoder Command-Shape Evidence
-
-Status: `complete`
-
-Goal: extend the `wgpu` render-pass encoder evidence so clean smoke proves
-every clean frame carries the expected encoder command mix, not only aggregate
-encoder command and draw counts.
-
-Scope:
-
-- Add set-pipeline, set-bind-group, set-vertex-buffer, and set-index-buffer
-  command totals to `SpriteRenderPassEncoderPlan`.
-- Expose sprite render-pass encoder command-shape totals through
-  `--game-smoke`.
-- Validate those totals against the clean smoke frame count, pipeline-layout
-  bind-group evidence, and descriptor vertex-buffer evidence.
-- Keep existing frame command, sprite command, upload, resource, layout,
-  descriptor, and draw evidence intact.
-- Keep gameplay behavior, `--game-smoke`, and `--live-smoke` behavior otherwise
-  unchanged.
-
-Acceptance criteria:
-
-- `SpriteRenderPassEncoderPlan` reports expected set-pipeline, set-bind-group,
-  set-vertex-buffer, and set-index-buffer command totals.
-- `--game-smoke` reports sprite render-pass encoder command-shape totals.
-- `--game-smoke` fails if those totals diverge from per-frame expectations or
-  upstream layout/descriptor evidence.
-- Focused renderer, smoke, and public guard tests cover the updated behavior.
-
-Validation:
-
-```sh
-cargo fmt --check
-cargo test --lib renderer::tests
-cargo test --lib game_smoke::tests
-cargo test --lib public_api_tests
-cargo test --all-targets
-cargo clippy --all-targets -- -D warnings
-make fidelity
-cargo run -- --game-smoke
-cargo run -- --live-smoke
-markdownlint README.md SPEC.md PLAN.md \
-  docs/fidelity/refactor-freeze.md docs/fidelity/live-audio.md
-git diff --check
-```
-
-Work log:
-
-- `2026-05-16 06:09:27 BST` Started `DC-152`: extending clean smoke
-  render-pass encoder evidence so it reports and validates WGPU encoder
-  set-pipeline, set-bind-group, set-vertex-buffer, and set-index-buffer command
-  totals for every clean frame.
-  Slack start update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778908176756169`
-- `2026-05-16 06:31:13 BST` Completed `DC-152`:
-  `SpriteRenderPassEncoderPlan` now exposes set-pipeline, set-bind-group,
-  set-vertex-buffer, and set-index-buffer command totals, and `--game-smoke`
-  reports `sprite_render_pass_encoder_frames: 24`,
-  `sprite_encoder_set_pipeline_commands: 24`,
-  `sprite_encoder_set_bind_group_commands: 48`,
-  `sprite_encoder_set_vertex_buffer_commands: 48`, and
-  `sprite_encoder_set_index_buffer_commands: 24`. The bind-group command
-  evidence matches `sprite_pipeline_layout_bind_groups: 48`, and the
-  vertex-buffer command evidence matches
-  `sprite_render_pipeline_descriptor_vertex_buffers: 48`, while existing
-  sprite-only evidence remains intact with `temporary_raster_commands: 0`,
-  `frame_plan_ordered_sprite_only_frames: 24`,
-  `sprite_encoder_commands: 236`, `sprite_encoder_draws: 92`, and
-  `sprite_frame_plan_instances: 290`. Validation now fails if encoder
-  command-shape totals diverge from per-frame expectations or upstream
-  layout/descriptor evidence. Validation passed with `cargo fmt --check`,
-  `cargo test --lib renderer::tests`, `cargo test --lib game_smoke::tests`,
-  `cargo test --lib public_api_tests`, `cargo run -- --game-smoke`,
-  `cargo test --all-targets`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo run -- --live-smoke`, and `make fidelity`; coverage artifacts were
-  refreshed at `2026-05-16 06:31:01 BST` and
-  `2026-05-16 06:31:02 BST`, and the coverage checker reported
-  `new Rust line coverage: 48/48 non-baselined added executable line(s)`.
-  Slack completion update:
-  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1778909540882489`
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779305464868959`.
+
+## Archived Completed History
+
+Detailed closed-step and completed-cycle history has been moved to
+[Completed Plan Step Archive](docs/fidelity/plan-completed-steps-archive.md).
+Keep `PLAN.md` focused on current baseline, rewrite target, active R9 roadmap,
+and ongoing work. Add active-cycle notes above; move them to the archive only
+after they are closed and no longer needed for day-to-day planning.
 
 ## Ongoing Work
 

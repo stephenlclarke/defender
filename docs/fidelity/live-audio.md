@@ -2,10 +2,12 @@
 
 Status: `DC-51` accepted the contract on `2026-05-13`; `DC-52` added the
 first bounded runtime on `2026-05-13`; `DC-59` moved the active runtime surface
-to gameplay-facing `SoundEvent` batches on `2026-05-13`.
+to gameplay-facing `SoundEvent` batches on `2026-05-13`; `DC-162` added the
+first default synthesized device backend on `2026-05-16`.
 
-This note defines the source-backed contract for adding live audio runtime code.
-It does not add audible output by itself.
+This note defines the source-backed contract for live audio runtime code.
+R7 adds audible synthesized device output, while exact analog waveform fidelity
+remains out of scope.
 
 ## Accepted Surface
 
@@ -27,22 +29,25 @@ cycle-accurate 6808 CPU or analog sample duration.
 
 ## Runtime Contract
 
-- The live core thread remains the only owner of `ArcadeMachine`.
+- Default live play owns clean `Game` frames and does not compile or step the
+  legacy `ArcadeMachine`.
 - The audio path receives copies of gameplay-facing `SoundEvent` batches; it
-  must not call `ArcadeMachine::step`, mutate machine state, or affect trace
+  must not call legacy machine code, mutate gameplay state, or affect trace
   output.
 - Audio delivery must be best effort. A missing device, backend creation
   failure, queue overflow, or shutdown race may silence audio, but must not
   change gameplay, CMOS persistence, live smoke behavior, or process exit
   semantics.
-- The audio backend is behind a trait with disabled and null no-device paths
-  for tests, smoke mode, unsupported platforms, and explicit disablement.
+- The audio backend is behind a trait with a synthesized device path plus
+  disabled and null no-device paths for tests, smoke mode, unsupported
+  platforms, missing devices, and explicit disablement.
 - The active runtime implements this as `src/audio.rs`: `LiveAudioRuntime`
   queues copied `LiveAudioEventBatch` values on a bounded non-blocking channel,
-  `LiveAudioBackend` owns backend behavior, and `NullLiveAudioBackend` opens no
-  device and emits no audible output.
-- Sound events retain core-frame order. Within one frame, the compatibility
-  adapter preserves the command order exposed by `FrameOutput::sound_commands()`.
+  `LiveAudioBackend` owns backend behavior, `DeviceLiveAudioBackend` owns host
+  output, and `NullLiveAudioBackend` opens no device and emits no audible
+  output.
+- Sound events retain core-frame order. Accepted command timing remains
+  available only through explicit `legacy-tools` fidelity/oracle checks.
 - The audio queue is bounded and non-blocking from the presentation and core
   worker perspective. If the queue cannot accept work, the backend records the
   dropped event batch and continues without blocking the core.
@@ -74,6 +79,9 @@ spacing.
   without delaying CMOS save.
 - Smoke mode: use a disabled no-device audio path. `--live-smoke` must not
   require or open an audio device, and smoke reports must stay deterministic.
+- Normal interactive mode: attempt the synthesized device backend by default.
+  If no host output device or supported sample format is available, fall back to
+  the null backend without changing gameplay or process exit semantics.
 - Explicit disablement: `--mute` disables live audio event delivery entirely.
 - CMOS persistence: audio owns no CMOS state. The final core-owned CMOS snapshot
   after live shutdown remains the persistence source.

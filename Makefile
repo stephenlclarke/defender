@@ -1,8 +1,22 @@
-.PHONY: fmt test clippy fidelity ci ci-doctor trace-doctor coverage-doctor smoke-doctor trace-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check coverage coverage-new-code coverage-new-code-baseline sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu readme-media
+.PHONY: fmt test legacy-tools-test clippy legacy-tools-clippy fidelity clean-fidelity ci ci-doctor trace-doctor coverage-doctor smoke-doctor trace-script-test trace-fixtures reference-inputs reference-traces reference-fixtures-check coverage coverage-new-code coverage-new-code-baseline sq sq-ci sonar run run-wgpu live live-wgpu smoke-wgpu readme-media
 
 SONAR_SCANNER ?= sonar-scanner
 SONAR_ARGS ?= -Dsonar.qualitygate.wait=true
 FIDELITY_TRACE_FIXTURES ?= docs/fidelity/fixtures/local/rust-current
+PHASE_ONE_SCENARIOS := \
+	attract_boot \
+	start_game \
+	first_300_frames \
+	firing \
+	thrust_reverse \
+	smart_bomb \
+	hyperspace \
+	abduction \
+	death \
+	wave_advance \
+	planet_destruction \
+	high_score_entry
+SCENARIOS ?= $(PHASE_ONE_SCENARIOS)
 DEFENDER_MAME ?= mame
 DEFENDER_ROM_DIR ?= assets/roms
 DEFENDER_REFERENCE_TRACE_DIR ?= docs/fidelity/fixtures/local/reference
@@ -24,7 +38,16 @@ test:
 clippy:
 	cargo clippy --all-targets -- -D warnings
 
-fidelity: fmt test clippy trace-script-test trace-fixtures coverage
+legacy-tools-test:
+	cargo test --all-targets --features legacy-tools
+
+legacy-tools-clippy:
+	cargo clippy --all-targets --features legacy-tools -- -D warnings
+
+fidelity: fmt test clippy legacy-tools-test legacy-tools-clippy trace-script-test trace-fixtures coverage
+
+clean-fidelity:
+	CLEAN_FIDELITY_SCENARIOS="$(SCENARIOS)" cargo test --lib --features legacy-tools clean_fidelity_reports_selected_scenarios -- --ignored --nocapture
 
 ci: fidelity smoke-wgpu
 
@@ -76,16 +99,16 @@ trace-script-test: trace-doctor
 	$(PYTHON) -m unittest tools/check_new_rust_coverage_test.py
 
 trace-fixtures:
-	cargo run --quiet -- --fidelity-check-trace-dir "$(FIDELITY_TRACE_FIXTURES)"
+	cargo run --quiet --features legacy-tools -- --fidelity-check-trace-dir "$(FIDELITY_TRACE_FIXTURES)"
 
 reference-inputs:
-	cargo run --quiet -- --fidelity-write-scenario-inputs "$(DEFENDER_REFERENCE_TRACE_DIR)"
+	cargo run --quiet --features legacy-tools -- --fidelity-write-scenario-inputs "$(DEFENDER_REFERENCE_TRACE_DIR)"
 
 reference-traces:
 	$(PYTHON) tools/generate_reference_traces.py --mame "$(DEFENDER_MAME)" --rom-dir "$(DEFENDER_ROM_DIR)" --out-dir "$(DEFENDER_REFERENCE_TRACE_DIR)"
 
 reference-fixtures-check:
-	cargo run --quiet -- --fidelity-check-reference-trace-dir "$(DEFENDER_REFERENCE_TRACE_DIR)"
+	cargo run --quiet --features legacy-tools -- --fidelity-check-reference-trace-dir "$(DEFENDER_REFERENCE_TRACE_DIR)"
 
 coverage: coverage-doctor
 	mkdir -p target/coverage
@@ -148,4 +171,4 @@ smoke-wgpu:
 	cargo run -- --live-smoke
 
 readme-media:
-	cargo run --quiet --example generate_readme_media -- "$(README_START_SEQUENCE_GIF)"
+	cargo run --quiet --features legacy-tools --example generate_readme_media -- "$(README_START_SEQUENCE_GIF)"

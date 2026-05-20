@@ -103,9 +103,11 @@ impl ArcadeMachine {
             phase: self.phase,
             credits: projection.credits,
             current_player: projection.current_player,
+            player_count: projection.player_count,
             wave: projection.wave,
             rng: projection.rng,
             player: projection.player,
+            player_stocks: projection.player_stocks,
             scores: projection.scores,
             last_input_bits: self.last_input_bits,
             wave_profile: red_label_wave_table().profile_for_wave(projection.wave),
@@ -114,16 +116,68 @@ impl ArcadeMachine {
             xyzzy_auto_fire: self.compatibility.xyzzy_auto_fire,
             high_score_entry: self.high_score_entry,
             high_score_submission: self.high_score_submission,
+            high_score_tables: self.memory.high_score_tables().unwrap_or_default(),
+            game_over: self.game_over_snapshot(),
+            object_lists: self.memory.object_list_state().unwrap_or_default(),
+            expanded_objects: self.memory.expanded_object_state().unwrap_or_default(),
+            player_explosion: self.memory.player_explosion_cloud().unwrap_or(None),
+            terrain_blow: self.memory.terrain_blow_snapshot().unwrap_or(None),
         }
+    }
+
+    fn game_over_snapshot(&self) -> GameOverState {
+        let mut state = GameOverState::default();
+        let hall_of_fame_stall_remaining = self
+            .memory
+            .read_byte(RED_LABEL_HOF_STALL_TIMER_RAM)
+            .ok()
+            .filter(|remaining| *remaining != 0);
+
+        if let Ok((routine_address, sleep_remaining)) = self.current_process_routine_and_timer() {
+            if routine_address == red_label_routine_address("PLE3").unwrap_or_default() {
+                state.player_death_sleep_remaining = Some(sleep_remaining);
+                return state;
+            }
+            if routine_address == red_label_routine_address("PLE02").unwrap_or_default() {
+                let from_player = self.current_high_score_player();
+                state.player_switch_sleep_remaining = Some(sleep_remaining);
+                state.player_switch_from = Some(from_player);
+                state.player_switch_to = Some(if from_player == 2 { 1 } else { 2 });
+                return state;
+            }
+            if routine_address == red_label_routine_address("HALL13").unwrap_or_default() {
+                state.no_entry_delay_remaining = Some(sleep_remaining);
+                return state;
+            }
+        }
+
+        if matches!(self.phase, GamePhase::Attract | GamePhase::GameOver) {
+            state.hall_of_fame_stall_remaining = hall_of_fame_stall_remaining;
+        }
+        state
+    }
+
+    fn current_process_routine_and_timer(&self) -> Result<(u16, u8), String> {
+        let layout = red_label_ram_layout()?;
+        let process_address = self.memory.current_process_address(&layout)?;
+        let routine_address = self
+            .memory
+            .read_process_word(&layout, process_address, "PADDR")?;
+        let sleep_remaining = self
+            .memory
+            .read_process_byte(&layout, process_address, "PTIME")?;
+        Ok((routine_address, sleep_remaining))
     }
 
     pub(super) fn cached_snapshot_projection(&self) -> RedLabelSnapshotProjection {
         RedLabelSnapshotProjection {
             credits: self.credits,
             current_player: self.current_player,
+            player_count: 1,
             wave: self.wave,
             rng: self.rng,
             player: self.player,
+            player_stocks: [PlayerStockState::from(self.player); 2],
             scores: self.scores,
         }
     }
@@ -139,6 +193,9 @@ impl ArcadeMachine {
         let current_player = self
             .memory
             .read_field_byte(&layout, "base_page", "CURPLR")?;
+        let player_count = self
+            .memory
+            .read_field_byte(&layout, "base_page", "PLRCNT")?;
         if current_player == 0 || u16::from(current_player) > player_table.entries {
             return Err(format!(
                 "red-label snapshot current player {current_player} is outside player table"
@@ -146,6 +203,10 @@ impl ArcadeMachine {
         }
 
         let player_index = u16::from(current_player - 1);
+        let player_stocks = [
+            self.red_label_player_stock(&layout, 0)?,
+            self.red_label_player_stock(&layout, 1)?,
+        ];
         let player_x16 = self
             .memory
             .read_field_word(&layout, "base_page", "PLAX16")?;
@@ -167,6 +228,7 @@ impl ArcadeMachine {
         Ok(RedLabelSnapshotProjection {
             credits: bcd_byte_to_u16(credit).min(u16::from(u8::MAX)) as u8,
             current_player,
+            player_count,
             wave: self
                 .memory
                 .read_player_field_byte(&layout, player_index, "PWAV")?,
@@ -192,7 +254,23 @@ impl ArcadeMachine {
                     .memory
                     .read_player_field_byte(&layout, player_index, "PSBC")?,
             },
+            player_stocks,
             scores,
+        })
+    }
+
+    fn red_label_player_stock(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        player_index: u16,
+    ) -> Result<PlayerStockState, String> {
+        Ok(PlayerStockState {
+            lives: self
+                .memory
+                .read_player_field_byte(layout, player_index, "PLAS")?,
+            smart_bombs: self
+                .memory
+                .read_player_field_byte(layout, player_index, "PSBC")?,
         })
     }
 
@@ -305,11 +383,26 @@ impl ArcadeMachine {
         self.memory
             .write_field_byte(&layout, "base_page", "CURPLR", current_player)?;
         self.memory
+            .write_field_byte(&layout, "base_page", "PLRCNT", snapshot.player_count)?;
+        self.memory
             .write_field_word(&layout, "base_page", "PLRX", player_address)?;
         self.memory
             .write_player_score_value(&layout, 0, snapshot.scores.player_one)?;
         self.memory
             .write_player_score_value(&layout, 1, snapshot.scores.player_two)?;
+        for (index, stock) in snapshot.player_stocks.iter().enumerate() {
+            let player_index =
+                u16::try_from(index).expect("stock display player index should fit u16");
+            self.memory
+                .write_field(&layout, "player", "PLAS", player_index, &[stock.lives])?;
+            self.memory.write_field(
+                &layout,
+                "player",
+                "PSBC",
+                player_index,
+                &[stock.smart_bombs],
+            )?;
+        }
         self.memory.write_player_runtime_snapshot(
             &layout,
             player_index,

@@ -18,7 +18,12 @@ arcade behavior. The runtime is self-contained: red-label tables, ROM metadata,
 trace schema, video data, and sound command fixtures are embedded at build
 time, so normal play does not need a local ROM or asset directory.
 
-Live play uses a windowed `wgpu` renderer.
+Live play uses a clean windowed `wgpu` renderer: it steps clean `Game` frames,
+submits clean audio events, and executes `NativeSceneRenderer` sprite draw
+plans. `--live-smoke` is the clean runtime smoke path and reports
+sprite/temporary-raster evidence plus offscreen `wgpu` render/readback
+signatures, including checked first/last frame signatures, without using the
+legacy live presenter for frame generation.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -50,22 +55,26 @@ cargo run -- --cmos-path ~/.local/state/defender/red-label-cmos.bin
 cargo run -- --live-smoke
 cargo run -- --game-smoke
 cargo run -- --mute
-cargo run -- --rom-report
-cargo run -- --rom-report /path/to/roms
-cargo run -- --verify-roms /path/to/roms
+cargo run --features legacy-tools -- --rom-report
+cargo run --features legacy-tools -- --rom-report /path/to/roms
+cargo run --features legacy-tools -- --verify-roms /path/to/roms
 ```
 
 Fidelity and trace tooling:
 
 ```sh
-cargo run -- --fidelity-trace 300
-cargo run -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'
-cargo run -- --fidelity-trace-inputs-file /path/to/inputs.txt
-cargo run -- --fidelity-check-trace /path/to/inputs.txt /path/to/expected.tsv
-cargo run -- --fidelity-check-trace-dir docs/fidelity/fixtures/local/rust-current
-cargo run -- --fidelity-list-scenarios
-cargo run -- --fidelity-write-scenario-inputs docs/fidelity/fixtures/local/reference
-cargo run -- --fidelity-check-reference-trace-dir docs/fidelity/fixtures/local/reference
+cargo run --features legacy-tools -- --fidelity-trace 300
+cargo run --features legacy-tools -- --fidelity-trace-inputs 'coin,start_one;fire,thrust;none'
+cargo run --features legacy-tools -- --fidelity-trace-inputs-file /path/to/inputs.txt
+cargo run --features legacy-tools -- --fidelity-check-trace \
+  /path/to/inputs.txt /path/to/expected.tsv
+cargo run --features legacy-tools -- --fidelity-check-trace-dir \
+  docs/fidelity/fixtures/local/rust-current
+cargo run --features legacy-tools -- --fidelity-list-scenarios
+cargo run --features legacy-tools -- --fidelity-write-scenario-inputs \
+  docs/fidelity/fixtures/local/reference
+cargo run --features legacy-tools -- --fidelity-check-reference-trace-dir \
+  docs/fidelity/fixtures/local/reference
 ```
 
 Make targets:
@@ -81,6 +90,7 @@ make trace-doctor
 make coverage-doctor
 make smoke-doctor
 make fidelity
+make clean-fidelity
 make trace-script-test
 make trace-fixtures
 make reference-inputs
@@ -94,8 +104,8 @@ make sq
 make readme-media
 ```
 
-`make readme-media` regenerates `docs/start-sequence.gif` from the current
-renderer.
+`make readme-media` builds the explicit `legacy-tools` tooling path and
+regenerates `docs/start-sequence.gif` from the current renderer.
 
 ## Controls
 
@@ -163,15 +173,80 @@ cargo fmt --check
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 make fidelity
+make clean-fidelity
 cargo run -- --game-smoke
 cargo run -- --live-smoke
 markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md
 ```
 
-`make fidelity` runs formatting, all Rust targets, clippy, Lua trace exporter
+`make fidelity` runs formatting, default Rust targets, default clippy,
+`legacy-tools` Rust targets, `legacy-tools` clippy, Lua trace exporter
 self-tests, Python helper tests, local Rust trace fixture comparison, coverage,
-and new-Rust-line coverage. The new-line gate compares against
+and new-Rust-line coverage. The default Rust target set excludes the parked
+legacy oracle/tooling adapters; the explicit `legacy-tools` pass validates
+those developer tools. The new-line gate compares against
 `NEW_CODE_COVERAGE_BASE` when set, otherwise `HEAD` for local dirty worktrees.
+`make clean-fidelity` builds with `legacy-tools` and runs the clean rewrite
+harness against all 12 embedded Phase 1 scenario input programs by default. It
+compares the real clean `Game` to the accepted oracle and prints a TSV
+first-divergence report. The oracle now carries source-backed high-score,
+game-over timing, wave-profile, neutral object-list counts, bounded source
+object-position/detail evidence, red-label object-picture descriptor metadata,
+explicit clean sprite targets, source object-detail sprite projection,
+expanded-object appearance/explosion/score-popup slot evidence plus sprite
+projection, source-backed score-popup lifetime/value/position evidence, and
+source-backed expanded-object explosion frame/lifetime/size-scale evidence,
+source-backed player-death bank-7 pixel-cloud color/counter/piece evidence,
+source-backed terrain-blow mutation/process evidence with `TEREX` presentation,
+and source `BORDER` top-display frame geometry; lifecycle transitions outside
+the score-popup, `EXST`/`EXPU` expanded-object explosion, player-death
+pixel-cloud, and terrain-blow surfaces, remaining two-player session flow
+beyond the source-backed final-life switch/respawn slice,
+wave-completion survivor-bonus loop/cadence beyond current presentation, live
+Williams logo table-walker animation, hardware palette/RGB render audit
+residuals, and full visual presentation remain strict R9 blockers.
+Player-one/player-two score digits, life/smart-bomb stock drawing, two-player
+start admission/top-display initialization, the two-player player-start
+prompt, and the two-player final-life `PLE02` switch/respawn handoff plus its
+source message-glyph prompt are now clean-owned. The final player-death
+game-over sleep also draws the source `GAME OVER` prompt at the translated
+`PLE2` screen position, and active
+high-score entry scenes draw the source hall-of-fame player label,
+instructions, entered initials, and source-shaped active/inactive underline
+words at their translated screen positions.
+Normal attract scenes draw the source-backed `CREDITS:` label and visible
+credit count throughout ordinary attract. The title program now carries a
+source-backed page scheduler: Williams logo, presents copy, Defender wordmark,
+copyright wait, and instruction labels are gated by clean attract page frames
+and source wait constants while the hall-of-fame display stall stays
+suppressed.
+Wave-cleared scenes draw the source-backed `ATTACK WAVE`, `COMPLETED`, and
+`BONUS X` status text with source-shaped wave and multiplier digits, plus
+source-positioned survivor bonus icons for the clean survivors currently
+remaining on that frame.
+Playing scenes also project the source `BORDER` top-display frame as clean HUD
+sprites: the lower display line, scanner side/top boundaries, and scanner
+marker bars at translated source screen positions. Playing scenes also project
+source-backed scanner/radar object and player blips from the scanner sleep
+cadence, scan-left calculation, object erase table, player blip bytes, and
+source `OBJCOL` scanner color words. Scanner terrain-raster residuals and
+hardware palette/RGB render audit residuals remain later render-parity work.
+Playing scenes also project bounded source object-detail rows that carry
+`screen_position`, `picture_size`, and a mapped clean sprite: active rows draw
+on the object layer, projectile rows draw on the projectile layer, and inactive
+or transparent null-object rows remain evidence-only.
+Playing scenes also project bounded source expanded-object detail rows that
+carry `top_left`, source descriptor size, and a mapped clean sprite onto the
+object layer. Missing-size rows and transparent null-object rows remain
+evidence-only.
+Hall-of-fame display scenes also draw source-backed headings, the expanded
+Defender logo, underline bars, and both visible high-score tables as rank,
+initials, and score text. Pass `SCENARIOS="attract_boot start_game"` to narrow
+the scenario set during focused work.
+`cargo run -- --live-smoke` runs the clean live-smoke frame source and reports
+`frame_source: clean_game`, `legacy_presenter_used: false`, sprite counts,
+temporary-raster counts, and offscreen `wgpu` frame readback counts with
+checked first/last frame signatures.
 `make coverage-new-code` requires an explicit base and subtracts the accepted
 uncovered-line baseline in `tools/new_rust_coverage_baseline.txt`; refresh that
 baseline only when intentionally accepting existing uncovered debt. `make ci`
@@ -196,19 +271,22 @@ make sq
 ## Architecture
 
 The primary source tree is now the clean rewrite under `src/`; the converted
-implementation is parked under `src_legacy/` and remains wired through
-`src/lib.rs` as the internal gameplay oracle and runtime bridge. Clean
-runtime launch goes through the private `src/runtime.rs` bridge, while the
-internal oracle reaches accepted behavior through the crate-private
-`src/accepted.rs` facade before `src/oracle.rs` adapts it to gameplay state.
+implementation is parked under `src_legacy/` and is compiled only when the
+explicit `legacy-tools` feature is enabled. Clean runtime launch goes through
+the private `src/runtime.rs` bridge without compiling the accepted machine,
+legacy live core, CMOS storage, or retired raster presenter in default builds.
+The internal oracle reaches accepted behavior through the crate-private
+`src/accepted.rs` facade before `src/oracle.rs` adapts it to gameplay state
+when `legacy-tools` is enabled.
 The actual legacy machine bridge lives in `src_legacy/accepted_behavior.rs`,
 keeping legacy imports out of the clean accepted-behavior surface. The root
-legacy adapters remain crate-private; README media generation uses the doc-hidden
-`defender::readme_media` facade instead of low-level machine, input, or video
-exports. Machine process/state contracts, red-label math types, and low-level
-asset, board, memory, ROM, sound, live, PIA, and `wgpu` modules stay
-crate-private. Generated long-trace sample fixtures are private to the legacy
-machine oracle, not root-wired through the clean crate.
+legacy adapters that remain active are feature-gated and crate-private; README
+media generation uses the doc-hidden, feature-gated `defender::readme_media`
+facade instead of low-level machine, input, or video exports. Machine
+process/state contracts, red-label math types, and low-level asset, board,
+memory, ROM, sound, PIA, and video modules stay crate-private. Generated
+long-trace sample fixtures are private to the legacy machine oracle, not
+root-wired through the clean crate.
 
 Clean rewrite modules:
 
@@ -216,9 +294,12 @@ Clean rewrite modules:
   the temporary adapter.
 - `src/game.rs`: gameplay-facing `Game`, `GameState`, `GameInput`,
   `GameFrame`, `GameEvents`, world, terrain, starfield, enemy, human, score,
-  projectile, player, direction, and sound-event contracts without accepted
-  command-byte mapping. The clean `Game` shell emits sprite-first scene frames
-  without touching the accepted machine adapter.
+  source-backed wave profile, high-score entry/session/table, game-over return
+  timing, player-switch/final game-over/high-score entry prompt scene sprites,
+  hall-of-fame display heading/table scene sprites, projectile, player,
+  direction, and sound-event contracts without accepted command-byte mapping.
+  The clean `Game` shell emits sprite-first scene frames without touching the
+  accepted machine adapter.
 - `src/game_smoke.rs`: the crate-private clean game smoke command that steps
   `Game` through scripted controls, verifies sprite plus native pipeline and
   draw-instance coverage, verifies sprite buffer upload-plan, render-pass plan,
@@ -247,8 +328,10 @@ Clean rewrite modules:
 - `src/runtime.rs`: the crate-private launch bridge that translates clean
   runtime configuration into launch commands and routes config-driven `wgpu`
   live and smoke launches.
-- `src/live_wgpu.rs`: the crate-private WGPU live launch facade that owns the
-  temporary presenter/input-profile bridge for interactive and smoke runs.
+- `src/live_wgpu.rs`: the crate-private WGPU live launcher that owns the
+  `winit` event loop, `wgpu` surface/device lifecycle, clean input mapping,
+  clean `Game` stepping, clean audio event submission, native sprite draw-plan
+  execution, and the clean `Game` frame source for `--live-smoke`.
 - `src/roms.rs`: the crate-private optional ROM verification facade that owns
   the temporary ROM metadata, scan, and loader bridge.
 - `src/audio.rs`: gameplay-facing sound events, the bounded live-audio runtime,
@@ -258,6 +341,9 @@ Clean rewrite modules:
   gameplay events, sound events, and render summaries. Clean fidelity tests use
   oracle-owned reference probes instead of importing accepted facade types
   directly.
+- `src/clean_fidelity.rs`: test-only clean rewrite harness that steps the real
+  clean `Game` against the accepted oracle and emits first-divergence TSV
+  reports for selected Phase 1 scenario input streams.
 - `src/fidelity_manifest.rs`: the crate-private fidelity scenario manifest
   facade that owns temporary scenario metadata and input expansion.
 - `src/fidelity_trace_engine.rs`: the crate-private fidelity trace engine
@@ -269,27 +355,29 @@ Clean rewrite modules:
 Legacy source-shaped modules under `src_legacy/` still own the accepted arcade
 behavior, assets, hardware models, ROM verification, rendering, input,
 sound-board command evidence, legacy fidelity trace generation and threaded
-fixture checks, the threaded live core runtime boundary, `wgpu` window
-ownership, CMOS storage, and test helpers. `src_legacy/accepted_behavior.rs`
-owns the temporary accepted-machine adapter for the internal oracle, and
-`src/live_wgpu.rs` owns the temporary presenter/input-profile bridge used by
-config-driven `wgpu` live and smoke launches. `src/roms.rs` owns the temporary
-ROM metadata, scan, and loader bridge for optional verification commands.
+fixture checks, plus parked historical live, CMOS, and presenter code that is
+no longer compiled from `src/lib.rs`. `src_legacy/accepted_behavior.rs` owns
+the temporary accepted-machine adapter for the internal oracle.
+`src/live_wgpu.rs` owns clean config-driven interactive `wgpu` launches and
+routes `--live-smoke` through clean `Game` smoke frames. `src/roms.rs` owns the
+temporary ROM metadata, scan, and loader bridge for optional verification
+commands.
 `src/fidelity_manifest.rs` owns the temporary scenario manifest and input
 expansion bridge for fidelity scenario commands. `src/fidelity_trace_engine.rs`
 owns the temporary trace generation, comparison, and schema bridge for fidelity
 trace commands.
-Legacy-specific clean equivalence
-regressions are also wired from `src_legacy/` so `src/accepted.rs` and
-`src/oracle.rs` stay focused on clean gameplay contracts. They remain wired as
-doc-hidden legacy bridge modules rather than supported public API.
+These ROM, scenario, trace, and oracle modules are explicit `legacy-tools`
+developer tooling rather than default production runtime wiring.
+Legacy-specific clean equivalence regressions are also wired from `src_legacy/`
+under that feature so `src/accepted.rs` and `src/oracle.rs` stay focused on
+clean gameplay contracts. They remain wired as doc-hidden legacy bridge modules
+rather than supported public API.
 Internal clean equivalence regressions use crate-private oracle wiring, while
 clean frame-signature gates live under `src/fidelity.rs` and compare clean
-render signatures rather than exposing memory-oriented CRC labels. Legacy live
-code adapts frame outputs into clean audio frames before submitting to
-`src/audio.rs`. README media tooling uses the narrow doc-hidden
-`defender::readme_media` facade. The binary enters through the clean platform
-boundary before delegating to the runtime bridge. `--game-smoke` steps the clean
+render signatures rather than exposing memory-oriented CRC labels. README media
+tooling uses the narrow doc-hidden `defender::readme_media` facade only through
+`legacy-tools`. The binary enters through the clean platform boundary before
+delegating to the runtime bridge. `--game-smoke` steps the clean
 game through scripted controls, verifies required gameplay sprite layers,
 sprite IDs, native draw-command pipeline and instance coverage, sprite buffer
 upload-plan coverage, render-pass plan coverage, and frame-command sprite
@@ -297,9 +385,15 @@ command/draw/instance plus ordered sprite-only begin-pass, viewport, and
 projection upload coverage, and prepares sprite-only native draw plans plus
 frame-level `wgpu` command, resource bind-group, pipeline-layout bind-group,
 pipeline descriptor shape, encoder command-shape, and upload plans without
-entering the legacy live presenter. The clean `Game` world seeds
-terrain, starfield, enemy, human, and projectile snapshots for the first playing
-wave and renders them as atlas-backed scene sprites. Operator controls are
+entering the legacy live presenter. Interactive live play uses the same clean
+gameplay frames and executes the native sprite draw plans through `wgpu`
+buffers, bind groups, and indexed draws. `--live-smoke` reuses that clean frame
+source, renders the smoke frames through an offscreen `wgpu` target, reads back
+pixel signatures, checks the selected first/last signatures, and reports
+live-smoke evidence with `legacy_presenter_used: false`.
+The clean `Game` world seeds terrain, starfield, source-profile active enemy
+batches, human, and projectile snapshots for playing waves and renders them as
+atlas-backed scene sprites. Operator controls are
 sampled through `OperatorControlSystem`, emitting diagnostics, audits, and
 high-score reset gameplay events on button edges while preserving current
 player scores and bonus thresholds during high-score reset. Clean enemy
@@ -310,18 +404,103 @@ culled through gameplay state before rendering. Clean collision boxes resolve
 projectile/enemy hits through `CollisionSystem`, remove the hit entities from
 world state, and award score through `ScoreSystem` before rendering. Crossing
 the clean bonus threshold updates player stock and emits `BonusAwarded`. Clean
+wave state carries source-backed enemy counts, active wave size, velocities,
+shot timers, and baiter timing from the checked-in wave table. The clean active
+wave batch now uses that profile to spawn lander, bomber, and pod families when
+the source wave exposes them, with family-specific sprite, collision-size, and
+score mappings. Initial wave landers retain deterministic source fixed-point
+fractions, shot timers, picture frame, and X/Y velocity, then advance through
+the same bounded source `LANDS0` orbit/shot loop as source-restored landers.
+Initial active pods retain deterministic source fixed-point fractions and
+bounded signed X velocity, then advance through the same source fixed-point
+X/Y motion as source-restored pods.
+Remaining source-profile enemies stay in
+`EnemyReserveSnapshot`, flow into inactive object-evidence counts, and activate
+as the next clean batch before `WaveCleared`; reserve landers now use source
+`LANDST` placement, fixed-point fractions, shot-timer RNG, velocity bytes, and
+then advance through a bounded source `LANDS0` orbit/shot loop with picture
+cycling and source-shaped fireball projection. When no humans remain, the
+reserve lander path follows the source `LANDST` schizoid fallback and restores
+source-shaped mutants directly. Reserve pods now use source `PRBST`/`PRBRES`
+placement, fixed-point fractions, and signed velocity bytes before entering
+source fixed-point X/Y motion. Destroyed pods now spawn a
+deterministic clean mini-swarmer batch using the source request bound and
+active-swarmer cap across projectile and smart-bomb kills. Spawned
+mini-swarmers carry source RNG-derived velocity, acceleration, sleep, and
+shot-timer state, and reserve mini-swarmer activation now uses source
+`PLRES`/`RSW0` phony-object placement before the same source swarmer runtime.
+Mini-swarmers advance through the source entry seek, fixed-point loop, vertical
+acceleration/damping, turnback, and enemy-bomb projection shape. Clean
+baiter entry now advances on the source game-exec pacing cadence, accelerates
+when the remaining enemy total is low, and respects the source active-baiter
+cap. Spawned baiters retain source shot-timer, picture-cycle, sleep, and
+velocity state, pursue the player through source seek rules, fire source-shaped
+fireball shells, and those enemy projectiles use source lifetime, offscreen
+culling, collision scoring, and player-damage handling.
+Clean landers now abduct aligned humans, carry them with the fleeing lander,
+and release the passenger when that lander is destroyed. Released, uncarried
+humans above terrain now use source-shaped `AFALL` fixed-point acceleration,
+settle safely at or below the source threshold with the 250-point safe-landing
+score and existing `P250` score-popup lifecycle, or die on over-speed impact
+with an astronaut explosion and the existing last-human planet-loss handoff;
+falling humans caught by the player enter the clean player-carried state, award
+the source-backed 500-point rescue score, and start the existing `P500`
+score-popup lifecycle; player-carried humans settle on terrain when the
+player-carried offset reaches the local terrain line.
+Completed carried-lander abductions now consume the passenger and convert the
+lander into a source-shaped mutant. No-target/no-human landers enter the same
+mutation path, and active clean mutants retain source shot-timer, sleep,
+fixed-point fractions, X seek, vertical seek/avoid, random Y hop, and shared
+fireball projection state; reserve mutants now restore through source-shaped
+placement fractions and shot-timer RNG state. Clean bombers now retain source
+fixed-point fractions, X velocity, vertical velocity, picture frame, cruise
+altitude, and sleep state, then advance through source `TIE` image cycling,
+random vertical drift/damping, player-Y steering, off-screen cruise steering,
+and bounded `BOMBST` bomb-shell projection. Pod reserve activation now uses
+source `PRBST`/`PRBRES` placement, fixed-point fractions, and velocity bytes
+before entering source fixed-point X/Y motion, and reserve bombers now use
+source `TIEST`
+player-relative squad placement and alternating X velocity before entering the
+source bomber runtime. Enemy projectile evidence now carries source `BMBP1`
+shell descriptor fields for the standalone mine/source-shell fixture, and
+active clean enemy evidence now carries source object-picture descriptor
+labels, addresses, dimensions, and primary/alternate image pointers for the
+current lander, baiter, bomber, mutant, pod, and swarmer presentations. Clean
+player projectile evidence now carries the source `LASP1` descriptor label,
+address, 8x1 size, and primary image pointer while the direct runtime
+projectile renderer remains unchanged. Clean enemy, human, player-projectile,
+and enemy-projectile object evidence also carries source-style 8.8
+world-position words, velocity words, and deterministic source object-table
+identity evidence from the clean source fixed-point state and source layout:
+addresses from `0xA23C` plus `0x17` per slot, source slot numbers, and neutral
+`OTYP` `0x00`. Runtime scene sprites remain on the direct clean render path.
+Remaining per-family movement/projectile behavior and focused source ecology
+fixtures remain later object-ecology work.
+Clean
 smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave
-cleared enemies absent from the scene. Enemy contact with the player is
-resolved through clean collision and `PlayerDamageSystem`, decrementing lives,
-removing the colliding enemy, and entering `GameOver` on the final life.
+destroyed active enemy sprites absent from the scene while source reserves can
+enter as the next active batch. Playing scenes draw current-player
+life-stock and smart-bomb-stock HUD sprites with source-backed display caps,
+positions, and the reclassified stock sprite targets. Enemy contact with the
+player is resolved through clean collision and `PlayerDamageSystem`,
+decrementing lives, removing the colliding enemy, and entering `GameOver` on
+the final life. The player-death pixel cloud is cleared before high-score entry
+handoff so high-score scenes remain prompt/table-only.
 Qualifying final scores are routed through `HighScoreEntrySystem` into
 `HighScoreEntry` with `HighScoreEntryStarted` output. High-score entry accepts
 alphabetic initials through clean input, normalizes them to uppercase, supports
 backspace, emits `HighScoreInitialAccepted`, and emits `HighScoreSubmitted`
-when the third initial returns the clean game to attract. Enemy exhaustion is
-reported through `WaveSystem`, keeping the last-hit frame empty and spawning
-the next clean wave on the following playing frame. Native draw planning
+when the third initial enters the source-shaped hall-of-fame display stall
+before the clean game returns to attract. Active high-score entry scenes draw
+the source-backed player label, four hall-of-fame instruction lines, and
+entered initials with message glyph sprites plus source-shaped active/inactive
+underline words. During the hall-of-fame display stall, scenes draw the
+source-backed display headings plus both visible high-score tables with rank
+digits, initials, score fields, and source-shaped underline bars. Enemy
+exhaustion is reported through `WaveSystem`, keeping the last-hit frame empty
+and spawning the next clean wave on the following playing frame. Native draw
+planning
 resolves scene sprites
 through
 renderer-owned atlas regions into sprite batches and records GPU
@@ -344,10 +523,10 @@ target texture format. Sprite resource
 binding plans describe the scene-projection uniform upload, projection bind
 group layout, atlas texture binding, atlas sampler binding, atlas texture
 upload metadata, and expected bind-group and binding-entry totals used by that
-shader. The default clean sprite atlas owns
-deterministic nonblank RGBA pixels plus the `wgpu` texture format, usage,
-extent, and copy layout needed to populate it. Sprite pipeline layout plans
-then order those projection and atlas bind groups for `wgpu`
+shader. The default clean sprite atlas decodes the reclassified temporary R2
+PNG inputs into nonblank renderer-owned regions plus the `wgpu` texture format,
+usage, extent, and copy layout needed to populate it. Sprite pipeline layout
+plans then order those projection and atlas bind groups for `wgpu`
 `PipelineLayoutDescriptor` creation and expose the expected bind-group and
 binding-entry totals carried into that layout. Sprite render pipeline
 descriptor plans combine that layout with shader entries, vertex buffers,
@@ -364,18 +543,16 @@ command, draw, and instance totals, an ordered sprite-only stream predicate,
 and temporary raster evidence into one ordered scene
 command stream. It also records the centered viewport layout plus GPU-ready
 clear color, viewport command, and scene-projection constants for the target
-surface. The live worker still wraps
-accepted visual output as a clean `RenderScene` raster payload before the
-presenter draws it. Kitty graphics and
-terminal-session code remain parked there as historical compatibility evidence,
-but they are no longer active runtime or compatibility API paths. The legacy
-video renderer owns its remaining `TerminalGeometry` value type directly so it
-does not pull terminal session setup into active builds. Generated long-trace
-sample data is nested under the legacy machine oracle because it is historical
-fixture evidence, not a clean root adapter. A public API guard scans clean
-module sources so new production code cannot import low-level legacy root
-modules, bypass the accepted-behavior facade, or reintroduce legacy
-implementation terminology.
+surface. Live presentation now steps clean gameplay frames directly; parked
+Kitty graphics, terminal-session code, legacy live code, CMOS storage, and the
+old `wgpu` presenter remain historical compatibility evidence outside default
+crate wiring. The legacy video renderer owns its remaining `TerminalGeometry`
+value type directly so it does not pull terminal session setup into active
+builds. Generated long-trace sample data is nested under the legacy machine
+oracle because it is historical fixture evidence, not a clean root adapter. A
+public API guard scans clean module sources so new production code cannot
+import low-level legacy root modules, bypass the accepted-behavior facade, or
+reintroduce legacy implementation terminology.
 
 ## Assets And ROMs
 
@@ -387,21 +564,95 @@ sound command timelines, the live-audio acceptance matrix, and fidelity trace
 schemas.
 
 Local ROM files are optional verification inputs for `--rom-report` and
-`--verify-roms`. They are not needed for normal play.
+`--verify-roms` when built with `--features legacy-tools`. They are not needed
+for normal play.
 
-Legacy prototype images and sounds under `assets/arcade/` and `assets/sounds/`
-are retained only as references unless a module explicitly reclassifies them
-with source or ROM provenance.
+Legacy prototype cue WAVs under `assets/arcade/` are retained only as
+references unless a module explicitly reclassifies them with source or ROM
+provenance. Sprite and sprite-sheet PNGs live under `assets/sprites/`. `DC-156`
+temporarily reclassifies `ship1.png`, `lander1.png`, `humanoid1.png`,
+`player-shot.png`, and `font-sheet.png` as R2 clean sprite-atlas inputs; they
+are transitional art inputs, not authoritative gameplay evidence. `DC-164`
+maps matching red-label picture labels for those inputs into clean sprite
+evidence and extends that bridge to the existing enemy-family prototype sprites
+`mutant1.png`, `baiter1.png`, `bomber1.png`, `pod1.png`, and `swarmer1.png`.
+It also maps bounded bomb, explosion, score-popup, life-stock, and smart-bomb
+stock picture labels to existing transitional sprites. The residual `ASXP1`,
+`NULOB`, and `TEREX` picture labels are atlas-backed from
+`assets/red-label/object-images.tsv` bytes because no PNG has been reclassified
+for them. The accepted oracle also exposes source object-detail rows as sprite
+presentation evidence, expanded-object appearance/explosion slots as sprite
+presentation evidence, and source `BORDER` top-display frame geometry, but
+clean gameplay lifecycle behavior outside the source-backed score-popup
+surface, source expanded-object explosion timing, and source-backed
+player-death pixel-cloud and terrain-blow surfaces, remaining two-player
+session flow beyond the final-life switch/respawn handoff,
+wave-completion survivor-bonus loop/cadence beyond current presentation, live
+Williams logo table-walker animation, exact palette-to-RGB rendering, and
+broader render presentation parity remain unmapped.
+Red-label message glyphs now back the
+two-player player-start `PLAYER ONE` / `PLAYER TWO` prompt, player-switch
+`PLAYER ONE` / `PLAYER TWO` plus `GAME OVER` prompt, the ordinary final
+`GAME OVER` prompt, attract `CREDITS:` text, attract
+`ELECTRONICS INC.` / `PRESENTS` text through source message row-feed and
+horizontal-cursor controls, attract `SCANNER` and enemy score labels,
+wave-completion `ATTACK WAVE` / `COMPLETED` / `BONUS X` status text, active
+high-score entry player label/instruction/initial glyphs, and hall-of-fame
+display heading/table text; survivor bonus icons use the source `ASTP3`
+shape at the translated wave-cleared frame positions. The entry and display
+underline words use a small atlas-backed clean sprite at the source-shaped
+word positions. The
+hall-of-fame Defender logo and normal attract Defender wordmark are generated
+from the compressed source logo bytes into the clean sprite atlas. The normal
+attract title program is now scheduled through clean page-frame gates backed
+by source wait constants. The Williams logo is generated from the source
+`LGOTAB` final pixel pattern, and the normal attract copyright strip is
+generated from the source `CPRTAB` bitmap bytes.
+The playing top-display border uses a small atlas-backed clean border word
+sprite projected from the source `BORDER` geometry: bottom line, scanner side
+boundaries, top scanner boundary, and scanner marker bars.
+Scanner/radar object and player blips use small atlas-backed HUD sprites at the
+source scanner screen positions. Object blips are derived from bounded
+active/inactive object evidence and source scanner color words; projectile rows
+remain non-scanner rows.
+Clean human object-detail rows now carry the source `ASTP1` descriptor label,
+address, 2x8 picture size, primary/alternate image pointers, and mapped clean
+human sprite evidence while the runtime playfield keeps drawing the clean 6x8
+astronaut sprite. Clean object-detail rows also carry source-layout object
+addresses, slots, and neutral `OTYP` evidence while the clean scene path skips
+those source-detail rows to avoid duplicate runtime sprites.
+HUD, attract title, top-display border, Hall of Fame logo/text, underline, and
+blink-adjacent surfaces now share a source visual-state contract for the
+source PCRAM/color indices, border words, underline words, Williams restore
+rates, and Hall of Fame blink sleep/color evidence while preserving the current
+clean white/gray sprite output.
+Mapped active and projectile source object-detail rows are projected from their
+source screen positions and descriptor sizes into the object/projectile layers;
+inactive and transparent null-object rows remain comparison evidence only.
+Mapped source expanded-object appearance/explosion detail rows are projected
+from their source top-left positions into the object layer. Appearance rows use
+descriptor sizes directly; explosion rows scale descriptor sizes from the source
+`RSIZE` high byte and remain visible until the source kill threshold is crossed.
+Missing-size and transparent null-object rows remain comparison evidence only.
+Player-one and player-two score digits and stock drawing now use
+source-backed clean scene
+sprites, two-player credited-start admission initializes the two-player top
+display, and final-life two-player handoff follows the source `PLE02` switch
+sleep before respawning the other player. New sprite
+files should stay under `assets/sprites/`, new non-legacy sound artifacts should
+stay under `assets/sounds/`, and pre-existing legacy `.wav` cues should remain
+under
+`assets/arcade/`.
 
 ## Platform Support
 
 - Live backend: `wgpu`, through `cargo run` or `defender`.
 - Live audio consumes gameplay-facing `SoundEvent` batches through a bounded
-  non-blocking runtime with worker diagnostics. The built-in backend is a null
-  backend that opens no audio device; `--mute` disables the runtime path.
-  Audible device output is still future work. The accepted implementation
-  contract is in
-  `docs/fidelity/live-audio.md`.
+  non-blocking runtime with worker diagnostics. Normal interactive play
+  attempts a synthesized device backend and falls back to the no-device null
+  backend if host output is unavailable; `--mute` disables the runtime path.
+  Smoke mode remains no-device and deterministic. The accepted implementation
+  contract is in `docs/fidelity/live-audio.md`.
 
 ## References
 

@@ -2,11 +2,846 @@
 
 This file records behavior that must not be guessed in arcade-core code.
 
-Status as of `2026-05-07 22:51:20 BST`: no active ROM-complete/playability
-blocker remains open for the accepted red-label target. The entries below are
-closed fidelity history, local-reference/tooling notes, archived prototype
-cleanup, or post-acceptance validation records; new behavior gaps must be added
-here before changing source-shaped arcade-core behavior.
+Status as of `2026-05-17`: the accepted red-label target remains the oracle for
+the rewrite. The profiled clean-fidelity gate now matches all 12 embedded Phase
+1 scenario input programs, but strict R9 final acceptance is still blocked by
+the bounded accepted-surface limits below. Older entries remain closed fidelity
+history, local-reference/tooling notes, archived prototype cleanup, or
+post-acceptance validation records.
+
+## Clean Rewrite Equivalence
+
+- `DC-153` adds the first clean-vs-accepted harness. The harness compares the
+  real clean `Game` to the accepted oracle with shared embedded Phase 1 scenario
+  inputs and reports the first divergent frame and fields as TSV. The initial
+  R0 expectation is that `attract_boot` and `start_game` diverge immediately in
+  accepted boot/default state (`wave`, `lives`, high score) and render evidence
+  because the clean runtime starts from its simplified domain defaults while the
+  accepted oracle adapts source-backed cabinet state and visual signatures.
+  Later R1-R9 work must either make selected scenarios pass or replace this
+  broad entry with source-backed, scenario-specific gaps before changing
+  gameplay behavior.
+- `2026-05-16 22:06:05 BST`: `DC-164` expands the default
+  `make clean-fidelity` gate from the R3 cabinet pair to all 12 embedded Phase 1
+  scenarios. The full profiled gate matches `attract_boot`, `start_game`,
+  `first_300_frames`, `firing`, `thrust_reverse`, `smart_bomb`, `hyperspace`,
+  `abduction`, `death`, `wave_advance`, `planet_destruction`, and
+  `high_score_entry`. This is R9 gate hardening, not strict rewrite closure: the
+  long-scenario profiles still compare only the source-backed surfaces currently
+  exposed by the accepted adapter.
+- `2026-05-16 22:14:41 BST`: `DC-164` adds a first high-score accepted-surface
+  slice. Active accepted high-score initials now flow from
+  `MachineSnapshot::high_score_entry` through the neutral accepted facade and
+  into the clean oracle `HighScoreInitialsState`, so future clean-fidelity
+  profiles can fail on real initials drift instead of silently seeing an empty
+  oracle value.
+- `2026-05-16 22:32:17 BST`: `DC-164` extends that high-score accepted-surface
+  slice with entry score/rank metadata and submitted player/score metadata.
+  The clean `GameState`, accepted facade, oracle adapter, and clean-fidelity
+  comparator now carry these fields, and the `high_score_entry` fixture still
+  matches across 3428 frames. Full R9 high-score closure remains blocked on
+  source-backed submitted table insertion and post-entry return evidence, not
+  on the active entry/session metadata surface.
+- `2026-05-16 22:51:40 BST`: `DC-164` adds source-shaped high-score table
+  snapshots for the all-time and today's-greatest eight-row tables. Clean
+  submission now inserts completed initials into both tables, updates the
+  visible high score from the all-time table top row, and the accepted facade
+  carries the same source-owned table snapshot from the machine memory. The
+  `high_score_entry` fixture still matches across 3428 frames with
+  `state.high_score_tables` compared. Full R9 high-score closure remains
+  blocked on source-backed post-entry return timing/display evidence, not on
+  submitted table insertion.
+- `2026-05-16 23:48:56 BST`: `DC-164` adds source-shaped game-over return
+  timing to the clean/accepted comparison surface. Clean final-life game over
+  now waits through the source-backed 40-tick player-death sleep before
+  qualifying high-score entry, non-qualifying scores wait through the 0xFF
+  `HALL13` delay before the hall-of-fame display, and submitted initials enter
+  the 60-tick hall-of-fame display stall before returning to attract. The
+  machine snapshot, accepted facade, oracle adapter, and clean-fidelity
+  comparator now carry `state.game_over`; the `death` and `high_score_entry`
+  fixtures match with that field compared. Generic attract-mode hall-of-fame
+  rotation timers are normalized out unless the clean runtime is also in a
+  game-over return display, so this slice does not force unrelated attract
+  choreography into the game-over contract.
+- `2026-05-16 23:59:12 BST`: `DC-164` adds source-backed wave/enemy profile
+  data to the clean/accepted comparison surface. Clean `GameState` now carries
+  a `WaveProfileSnapshot` derived from `assets/red-label/wave-table.tsv`, the
+  accepted facade maps the same fields from `MachineSnapshot::wave_profile`,
+  and clean-fidelity compares `state.wave_profile`. This covers source-owned
+  enemy counts, wave timing, velocities, shot timers, baiter delay, and related
+  `WVTAB` profile fields without inventing live object positions or sprite
+  identities. The targeted `start_game`, `first_300_frames`, `wave_advance`,
+  and `planet_destruction` scenarios match with the new field compared.
+- `2026-05-17 00:22:37 BST`: `DC-164` adds a neutral source object-list
+  evidence surface. `MachineSnapshot` now carries source object active,
+  inactive, projectile-list, visible-active counts plus a stable object-data
+  evidence CRC; the accepted facade maps that into the clean oracle as
+  `state.world.object_evidence`. The strict/full clean-fidelity profile can now
+  fail on object-list evidence drift instead of seeing an empty accepted world
+  placeholder. The current profiled R9 scenarios still do not compare live
+  object positions, source picture/type identities, lifecycle transitions, or
+  visual sprite presentation; those remain the active strict R9 blockers.
+- `2026-05-17 00:45:07 BST`: `DC-164` extends that object evidence with bounded
+  source object detail. The accepted surface now carries the first source object
+  entries from the active, inactive, and projectile lists, including object
+  address/slot, screen position, raw world position, raw velocity, picture
+  address, and type byte. Clean `WorldSnapshot` derives comparable detail rows
+  only from clean-owned enemies, humans, and projectiles. This promotes object
+  positions and raw object-table detail into the strict/full comparison surface
+  without assigning arcade identity to `OPICT`/`OTYP`; source object/sprite
+  identity mapping, lifecycle transitions, and visual sprite presentation remain
+  active strict R9 blockers.
+- `2026-05-17 00:59:30 BST`: `DC-164` extends the bounded object-detail evidence
+  with source object-picture descriptor metadata. Source details now carry the
+  red-label picture label, descriptor size, primary image address, and alternate
+  image address whenever the object `OPICT` word resolves to
+  `assets/red-label/object-pictures.tsv`; clean details carry only explicit
+  clean-domain categories such as lander, human, and player projectile. This
+  exposes source picture identity without guessing the clean-to-arcade sprite
+  mapping or turning descriptor metadata into render presentation parity.
+- `2026-05-17 01:15:11 BST`: `DC-164` adds the first bounded source
+  picture-to-clean sprite bridge. Red-label `PLAPIC`/`PLBPIC`, `LNDP1`-`LNDP3`,
+  `ASTP1`-`ASTP4`, and `LASP1` labels now map to the clean sprite IDs backed by
+  the already reclassified `ship1.png`, `lander1.png`, `humanoid1.png`, and
+  `player-shot.png` assets. Source object-detail rows expose that mapped clean
+  sprite when the label is in this explicit set, and clean rows expose the
+  sprite rendered from their clean-domain category. Probe, swarmer, bomber,
+  pod, baiter, mine, explosion, score-popup, mini-player, smart-bomb, and
+  lifecycle mappings remain active blockers until their assets or source render
+  paths are reclassified with stronger evidence.
+- `2026-05-17 01:32:42 BST`: `DC-164` expands that bridge to the remaining
+  enemy-family source pictures that already have prototype PNGs in
+  `assets/sprites/`: `SCZP1` maps to `ENEMY_MUTANT`/`mutant1.png`,
+  `UFOP1`-`UFOP3` to `ENEMY_BAITER`/`baiter1.png`, `TIEP1`-`TIEP4` to
+  `ENEMY_BOMBER`/`bomber1.png`, `PRBP1` to `ENEMY_POD`/`pod1.png`, and
+  `SWPIC1` to `ENEMY_SWARMER`/`swarmer1.png`. Bomb shells, explosions, score
+  popups, miniplayer, smart-bomb visuals, real lifecycle transitions, and final
+  render presentation remain active R9 blockers.
+- `2026-05-17 01:45:10 BST`: `DC-164` extends the picture-to-clean sprite
+  bridge again for non-enemy display/reward labels with existing transitional
+  PNGs in `assets/sprites/`: `BMBP1`/`BMBP2` map to
+  `ENEMY_BOMB`/`bomb1.png`, `BXPIC` to `BOMB_EXPLOSION`/`podexpl.png`,
+  `SWXP1` to `SWARMER_EXPLOSION`/`swarmexpl.png`, `C25P1` to
+  `SCORE_POPUP_250`/`score250_1.png`, `C5P1` to
+  `SCORE_POPUP_500`/`score500_1.png`, `PLAMIN` to
+  `PLAYER_LIFE_STOCK`/`littleship.png`, and `SBPIC` to
+  `SMART_BOMB_STOCK`/`smartbomb.png`. `ASXP1`, `NULOB`, and `TEREX` remain
+  unmapped until a later cycle has stronger asset/render evidence. Real bomb
+  lifecycle, explosion timing, score-popup lifecycle, stock-count drawing,
+  terrain-blow presentation, and final render presentation remain active R9
+  blockers.
+- `2026-05-17 01:59:29 BST`: `DC-164` closes the residual object-picture
+  bridge labels with source object-image bytes instead of prototype PNGs:
+  `ASXP1` maps to `ASTRONAUT_EXPLOSION` from `ASXD10`, `NULOB` maps to a
+  transparent `NULL_OBJECT` from `NULD10`, and `TEREX` maps to
+  `TERRAIN_EXPLOSION` from `TERX0`. All labels in
+  `assets/red-label/object-pictures.tsv` now have an explicit clean sprite
+  evidence target or transparent null target. This still does not implement
+  astronaut death lifecycle behavior, null-object allocation behavior,
+  terrain-blow timing/presentation, explosion lifecycle, or final render
+  presentation parity.
+- `2026-05-17 02:17:41 BST`: `DC-164` adds neutral expanded-object lifecycle
+  evidence to the accepted comparison surface. Source appearance/explosion
+  slots now flow through `MachineSnapshot`, the accepted facade, and the oracle
+  into `state.world.expanded_objects`, including active count, last slot, slot
+  kind, descriptor address, mapped clean sprite when the descriptor bridge knows
+  one, erase pointer, center/top-left bytes, and attached object address when
+  present. This promotes source expanded-object slot state into the strict/full
+  surface without implementing explosion timing, score-popup lifecycle,
+  terrain-blow behavior, stock-count drawing, clean spawning/physics, or final
+  render presentation parity.
+- `2026-05-17 02:34:43 BST`: `DC-164` moves current-player stock-count drawing
+  from evidence-only into the clean sprite scene. Playing clean and oracle
+  scenes now draw life stock from `PLAMIN`/`PLAYER_LIFE_STOCK` with the
+  source-backed five-icon cap and smart-bomb stock from
+  `SBPIC`/`SMART_BOMB_STOCK` with the three-icon cap, using the documented
+  source display positions and steps. This removes the current-player stock
+  drawing blocker, but does not implement two-player top-display parity,
+  score-popup lifecycle, explosion timing, terrain-blow presentation, clean
+  spawning/physics, or final render presentation parity.
+- `2026-05-17 02:45:24 BST`: `DC-164` extends stock-count drawing to the
+  two-player top-display positions. Clean and oracle playing scenes now draw
+  player-two life stock from `PLAMIN`/`PLAYER_LIFE_STOCK` at the source-backed
+  player-two life-stock origin and player-two smart-bomb stock from
+  `SBPIC`/`SMART_BOMB_STOCK` at the source-backed player-two smart-bomb origin,
+  using the same caps and steps as the source top-display path. This removes
+  the P2 stock-icon portion of two-player top-display parity, but does not
+  implement two-player score/text rendering, full turn/session switching,
+  score-popup lifecycle, explosion timing, terrain-blow presentation, clean
+  spawning/physics, or final render presentation parity.
+- `2026-05-17 03:11:43 BST`: `DC-164` replaces the clean/oracle monolithic score
+  placeholder with source-backed score digit sprites. The default atlas now
+  decodes `NUMBR0`-`NUMBR9` from `assets/red-label/score-digits.tsv`, and clean
+  plus oracle scenes draw player-one and player-two score fields at the
+  top-display origins with six-position transfer order, two trailing zeroes, and
+  leading-zero blanking. This removes the score-field portion of two-player
+  top-display parity, but does not implement full two-player turn/session
+  switching, remaining title/status/high-score text rendering, score-popup
+  lifecycle, explosion timing, terrain-blow presentation, clean spawning/physics,
+  or final render presentation parity.
+- `2026-05-17 03:27:29 BST`: `DC-164` promotes source-backed `ST2`
+  credited-start admission into the clean game. `start_two` now requires two
+  credits, consumes both credits, enters play as player one with
+  `player_count == 2`, and immediately exposes the existing player-one and
+  player-two score/stock top-display fields. This removes the admission portion
+  of the two-player flow blocker, but does not implement full two-player
+  turn/session switching after player death, player-two respawn flow, remaining
+  title/status/high-score text rendering, score-popup lifecycle, explosion
+  timing, terrain-blow presentation, clean spawning/physics, or final render
+  presentation parity.
+- `2026-05-17 07:53:14 BST`: `DC-164` adds the source-backed final-life
+  two-player switch/respawn slice. Clean final-life death now enters the
+  `PLE02` `0x60`-tick player-switch sleep when the other player still has
+  stock, records the source-shaped switch-from/switch-to players in
+  `state.game_over`, then hands off to the other player through the clean
+  playfield entry path. `MachineSnapshot`, the accepted facade, and the oracle
+  adapter now carry the same switch timing evidence. Remaining R9 blockers are
+  later two-player turn/session sequencing and high-score ordering, remaining
+  title/status/high-score text rendering, score-popup lifecycle, explosion
+  timing, terrain-blow presentation, clean spawning/physics, and final render
+  presentation parity.
+- `2026-05-17 08:26:47 BST`: `DC-164` adds the source-backed player-switch
+  prompt text slice. Clean and oracle scenes now draw `PLYR1`/`PLYR2` as
+  `PLAYER ONE`/`PLAYER TWO` at `0x3C78` plus `GO` as `GAME OVER` at `0x3E88`
+  during the translated `PLE02` switch sleep, using
+  `assets/red-label/messages.tsv` and `assets/red-label/message-glyphs.tsv`
+  for message text, glyph dimensions, and atlas pixels. Remaining R9 blockers
+  are later two-player turn/session sequencing and high-score ordering,
+  remaining title/status/high-score text rendering, score-popup lifecycle,
+  explosion timing, terrain-blow presentation, clean spawning/physics, and
+  final render presentation parity.
+- `2026-05-17 08:30:58 BST`: `DC-164` adds the source-backed final
+  game-over prompt text slice. Clean and oracle scenes now draw `GO` as
+  `GAME OVER` at `0x3E80` during the final `PLE2` player-death game-over
+  sleep, reusing `assets/red-label/messages.tsv` and
+  `assets/red-label/message-glyphs.tsv` for text and glyph pixels. Remaining
+  R9 blockers are later two-player turn/session sequencing and high-score
+  ordering, remaining title/status/high-score text rendering, score-popup
+  lifecycle, explosion timing, terrain-blow presentation, clean
+  spawning/physics, and final render presentation parity.
+- `2026-05-17 08:47:49 BST`: `DC-164` adds the source-backed high-score entry
+  prompt text slice. Clean and oracle scenes now draw the active entry player
+  label at `0x3E38`, `HOFV1`-`HOFV4` instruction lines from `0x1458` with the
+  source vertical offsets, and entered initials from `0x46AC` with the source
+  horizontal offsets while `GamePhase::HighScoreEntry` is active. This reuses
+  `assets/red-label/messages.tsv` and `assets/red-label/message-glyphs.tsv`
+  for text and glyph pixels. Remaining R9 blockers are later two-player
+  turn/session sequencing and high-score ordering, remaining title/status and
+  high-score display text outside the entry prompt, score-popup lifecycle,
+  explosion timing, terrain-blow presentation, clean spawning/physics, and
+  final render presentation parity.
+- `2026-05-17 09:07:31 BST`: `DC-164` adds the source-backed hall-of-fame
+  display text slice. Clean and oracle scenes now draw `HALDIS` headings from
+  `HALLD_TITLE`, `HALLD_TODAYS`, `HALLD_ALL_TIME`, and `HALLD_GREATEST` at the
+  translated screen addresses, plus both visible high-score tables with rank
+  digits, initials, and six-character score fields while
+  `hall_of_fame_stall_remaining` is active. The table rows use the source table
+  starts, `0x0A` row step, initials offset, score offset, and leading-blank
+  score rules, reusing `assets/red-label/messages.tsv`,
+  `assets/red-label/message-glyphs.tsv`, and `assets/red-label/score-digits.tsv`.
+  Remaining R9 blockers are later two-player turn/session sequencing and
+  high-score ordering, title/status text plus high-score underline/logo
+  presentation, score-popup lifecycle, explosion timing, terrain-blow
+  presentation, clean spawning/physics, and final render presentation parity.
+- `2026-05-17 09:25:24 BST`: `DC-164` adds the source-backed high-score entry
+  underline word slice. Clean and oracle scenes now draw the `HOFUL`
+  initials-entry underline words while `GamePhase::HighScoreEntry` is active,
+  using the source start `0x45B7`, `0x0800` initial step, and
+  `[0x0400,0x0300,0x0200,0x0100]` word offsets. The clean scene marks the
+  active cursor underline separately from inactive underline words with a small
+  atlas-backed sprite. Remaining R9 blockers are later two-player
+  turn/session sequencing and high-score ordering, title/status text,
+  hall-of-fame display underline/logo presentation, exact entry underline
+  palette/blink/color behavior, score-popup lifecycle, explosion timing,
+  terrain-blow presentation, clean spawning/physics, and final render
+  presentation parity.
+- `2026-05-17 09:40:02 BST`: `DC-164` adds the source-backed hall-of-fame
+  display underline word slice. Clean and oracle scenes now draw the `HALDIS`
+  display underline words while `hall_of_fame_stall_remaining` is active,
+  using the source left base `0x1E7B` and the two verified offset segments
+  `0x5F..0x41` and `0x1E..0x00`, producing underline word positions from
+  `0x7D7B` through `0x1E7B`. The display underline words reuse the small
+  atlas-backed clean sprite from the entry underline slice. Remaining R9
+  blockers are later two-player turn/session sequencing and high-score
+  ordering, title/status text, expanded hall-of-fame logo presentation, exact
+  underline palette/blink/color behavior, score-popup lifecycle, explosion
+  timing, terrain-blow presentation, clean spawning/physics, and final render
+  presentation parity.
+- `2026-05-17 09:57:07 BST`: `DC-164` adds the source-backed attract credits
+  text slice. Clean and oracle scenes now draw the `CREDV` `CREDITS:` label at
+  source screen address `0x28E5` and the visible credit count digits at
+  `0x48E5` during normal `GamePhase::Attract`, while suppressing that overlay
+  during the hall-of-fame display stall. Remaining R9 blockers are later
+  two-player turn/session sequencing and high-score ordering, title/status
+  text beyond attract credits, expanded hall-of-fame logo presentation, exact
+  underline palette/blink/color behavior, score-popup lifecycle, explosion
+  timing, terrain-blow presentation, clean spawning/physics, and final render
+  presentation parity.
+- `2026-05-17 10:14:55 BST`: `DC-164` adds the source-backed hall-of-fame
+  Defender logo slice. Clean and oracle scenes now draw the `HALDIS` expanded
+  logo while `hall_of_fame_stall_remaining` is active, using source screen
+  address `0x3038`, dimensions `0x3C` by `0x18`, and an atlas-backed sprite
+  generated from the compressed source logo bytes used by the accepted adapter.
+  Remaining R9 blockers are later two-player turn/session sequencing and
+  high-score ordering, title/status text beyond attract credits, exact
+  logo/underline palette/blink/color behavior, score-popup lifecycle,
+  explosion timing, terrain-blow presentation, clean spawning/physics, and
+  final render presentation parity.
+- `2026-05-17 10:36:53 BST`: `DC-164` adds the source-backed attract presents
+  text slice. Clean and oracle scenes now draw the translated attract
+  `ELECTRONICS INC.` and `PRESENTS` text at source screen addresses `0x3258`
+  and `0x3E6C` during ordinary attract frames, while suppressing it during the
+  hall-of-fame display stall. Remaining R9 blockers are later two-player
+  turn/session sequencing and high-score ordering, broader title/status text
+  outside attract credits/presents, exact logo/underline palette/blink/color
+  behavior, score-popup lifecycle, explosion timing, terrain-blow
+  presentation, clean spawning/physics, and final render presentation parity.
+- `2026-05-17 10:50:59 BST`: `DC-164` routes that attract presents projection
+  through a clean source-message control helper. The clean renderer now applies
+  the `ELECV` row-feed and horizontal-cursor controls, so the same source
+  message text positions `ELECTRONICS INC.` at `0x3258` and `PRESENTS` at
+  `0x3E6C` in both clean and oracle scenes. Remaining R9 blockers are later
+  two-player turn/session sequencing and high-score ordering, broader
+  title/status text outside attract credits/presents, exact logo/underline
+  palette/blink/color behavior, score-popup lifecycle, explosion timing,
+  terrain-blow presentation, clean spawning/physics, and final render
+  presentation parity.
+- `2026-05-17 11:06:23 BST`: `DC-164` adds the source-backed attract
+  instruction text slice. Clean and oracle scenes now draw `SCANV`, `LANDV`,
+  `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and `SWARMV` through the source message
+  control helper at source screen addresses `0x4330`, `0x1C70`, `0x3C70`,
+  `0x5F70`, `0x1CA8`, `0x40A8`, and `0x5CA8` during ordinary attract frames,
+  while suppressing them during the hall-of-fame display stall. Remaining R9
+  blockers are later two-player turn/session sequencing and high-score
+  ordering, broader title/status text outside attract credits/presents/
+  instruction labels, attract logo/page timing, exact logo/underline
+  palette/blink/color behavior, score-popup lifecycle, explosion timing,
+  terrain-blow presentation, clean spawning/physics, and final render
+  presentation parity.
+- `2026-05-17 11:20:46 BST`: `DC-164` adds the source-backed two-player start
+  prompt slice. Clean and oracle scenes now draw `PLYR1`/`PLYR2` as
+  `PLAYER ONE`/`PLAYER TWO` at source screen address `0x3C80` while a
+  two-player start handoff is pending. The slice intentionally leaves
+  one-player start, broader player-switch/session sequencing, palette/blink/
+  color behavior, and gameplay lifecycle rules unchanged. Remaining R9
+  blockers are later two-player turn/session sequencing and high-score
+  ordering, broader title/status text outside covered prompt/attract surfaces,
+  attract logo/page timing, exact logo/underline palette/blink/color behavior,
+  score-popup lifecycle, explosion timing, terrain-blow presentation, clean
+  spawning/physics, and final render presentation parity.
+- `2026-05-17 11:33:30 BST`: `DC-164` adds the source-backed wave-completion
+  status text slice. Clean and oracle scenes now draw `ATWV` `ATTACK WAVE` at
+  `0x3850`, the source-shaped wave number at `0x6550`, `COMPV` `COMPLETED` at
+  `0x3D60`, `BONSX` `BONUS X` at `0x3C90`, and the source-shaped multiplier
+  digit at `0x5890` on the existing clean wave-cleared frame. The slice does
+  not add the source survivor bonus loop, source sleep timing, score-popup
+  lifecycle, explosion timing, terrain-blow behavior, or wave lifecycle state.
+  Remaining R9 blockers are later two-player turn/session sequencing and
+  high-score ordering, broader title/status text outside covered prompt/
+  attract/wave-completion surfaces, attract logo/page timing, exact
+  logo/underline palette/blink/color behavior, score-popup lifecycle,
+  explosion timing, terrain-blow presentation, clean spawning/physics, and
+  final render presentation parity.
+- `2026-05-17 11:49:32 BST`: `DC-164` adds the source-backed survivor bonus
+  icon presentation slice. Clean and oracle scenes now draw one source `ASTP3`
+  survivor icon for each remaining clean human on the existing wave-cleared
+  frame, starting at source screen address `0x3CA0` and stepping by
+  `+0x0400`. The slice does not add the source survivor bonus loop,
+  per-survivor scoring cadence, source sleep timing, score-popup lifecycle,
+  explosion timing, terrain-blow behavior, or wave lifecycle state. Remaining
+  R9 blockers are later two-player turn/session sequencing and high-score
+  ordering, broader title/status text outside covered prompt/attract/
+  wave-completion surfaces, attract logo/page timing, exact logo/underline
+  palette/blink/color behavior, score-popup lifecycle, explosion timing,
+  terrain-blow presentation, clean spawning/physics, and final render
+  presentation parity.
+- `2026-05-17 12:03:01 BST`: `DC-164` adds the source-backed normal-attract
+  Defender wordmark presentation slice. Clean and oracle scenes now draw the
+  existing source-expanded Defender logo sprite at source restore screen
+  address `0x3090` during normal attract, while suppressing it during the
+  hall-of-fame display stall. The slice does not add the Williams logo table
+  walker, `PRES`/`DEFEND` page scheduler behavior, copyright bitmap
+  presentation, exact palette/blink/color behavior, object appearance
+  sequencing, gameplay lifecycle changes, or the survivor bonus loop/cadence.
+  Remaining R9 blockers are later two-player turn/session sequencing and
+  high-score ordering, broader title/status text outside covered prompt/
+  attract/wave-completion surfaces, Williams/copyright attract page timing,
+  exact logo/underline palette/blink/color behavior, score-popup lifecycle,
+  explosion timing, terrain-blow presentation, clean spawning/physics, and
+  final render presentation parity.
+- `2026-05-17 12:15:25 BST`: `DC-164` adds the source-backed normal-attract
+  copyright bitmap presentation slice. The clean renderer now owns an
+  atlas-backed copyright strip sprite generated from the checked-in `CPRTAB`
+  bytes, and clean plus oracle normal attract scenes draw it at source screen
+  address `0x3BD0` while suppressing it during the hall-of-fame display stall.
+  The slice does not add the Williams logo table walker, `PRES`/`DEFEND` page
+  scheduler behavior, copyright wait gates, exact palette/blink/color
+  behavior, object appearance sequencing, gameplay lifecycle changes, or the
+  survivor bonus loop/cadence. Remaining R9 blockers are later two-player
+  turn/session sequencing and high-score ordering, broader title/status text
+  outside covered prompt/attract/wave-completion surfaces,
+  Williams/copyright attract wait timing, exact logo/underline
+  palette/blink/color behavior, score-popup lifecycle, explosion timing,
+  terrain-blow presentation, clean spawning/physics, and final render
+  presentation parity.
+- `2026-05-17 12:37:10 BST`: `DC-164` adds the source-backed normal-attract
+  Williams logo presentation slice. The clean renderer now owns an
+  atlas-backed Williams logo sprite generated from the checked-in `LGOTAB`
+  final pixel pattern, and clean plus oracle normal attract scenes draw it at
+  source screen address `0x363C` while suppressing it during the
+  hall-of-fame display stall. The slice does not add the live `LGOTAB`
+  table-walker timing, fast/normal page-rate switch, `PRES`/`DEFEND` page
+  scheduler behavior, copyright wait gates, exact palette/blink/color
+  behavior, object appearance sequencing, gameplay lifecycle changes, or the
+  survivor bonus loop/cadence. Remaining R9 blockers are later two-player
+  turn/session sequencing and high-score ordering, broader title/status text
+  outside covered prompt/attract/wave-completion surfaces,
+  Williams/copyright attract wait timing, exact logo/underline
+  palette/blink/color behavior, score-popup lifecycle, explosion timing,
+  terrain-blow presentation, clean spawning/physics, and final render
+  presentation parity.
+- `2026-05-17 12:54:07 BST`: `DC-164` adds the source-backed top-display border
+  presentation slice. The clean renderer now owns an atlas-backed border word
+  sprite, and clean plus oracle playing scenes draw the source `BORDER`
+  geometry: the bottom display line, scanner side boundaries, top scanner
+  boundary, and scanner marker bars at translated source screen positions. The
+  slice does not add scanner/radar animation, score-popup lifecycle, explosion
+  timing, terrain-blow lifecycle, clean spawning/physics, live top-display
+  scheduling, exact palette/blink/color behavior, or broader title/status text.
+  Remaining R9 blockers are later two-player turn/session sequencing and
+  high-score ordering, broader title/status text outside covered
+  prompt/attract/top-display-border/wave-completion surfaces,
+  Williams/copyright attract wait timing, exact logo/underline/border
+  palette/blink/color behavior, score-popup lifecycle, explosion timing,
+  terrain-blow presentation, clean spawning/physics, scanner/radar animation,
+  and final render presentation parity.
+- `2026-05-17 13:13:55 BST`: `DC-164` adds the bounded source object-detail
+  sprite presentation slice. Clean and oracle playing scenes now project source
+  object-detail rows that already carry `screen_position`, `picture_size`, and a
+  mapped clean `SpriteId`: active rows draw on the object layer and projectile
+  rows draw on the projectile layer. Inactive rows and transparent `NULOB`
+  details remain evidence-only. The slice does not add clean spawning/physics,
+  lifecycle transitions, expanded-object slot rendering, score-popup lifecycle,
+  explosion timing, terrain-blow presentation, scanner/radar animation, or exact
+  palette/blink/color behavior. Remaining R9 blockers are later two-player
+  turn/session sequencing and high-score ordering, broader title/status text
+  outside covered prompt/attract/top-display-border/wave-completion surfaces,
+  Williams/copyright attract wait timing, exact logo/underline/border
+  palette/blink/color behavior, score-popup lifecycle, explosion timing,
+  terrain-blow presentation, clean spawning/physics, scanner/radar animation,
+  expanded-object slot rendering, and final render presentation parity.
+- `2026-05-17 16:28:43 BST`: `DC-164` adds the clean attract page scheduler
+  slice for R9-B2. `GameState` now carries `AttractPresentationSnapshot`
+  page-frame evidence for the Williams logo, presents copy, Defender wordmark,
+  copyright wait, and instruction-page surfaces. Clean and oracle scenes gate
+  the title-program sprites from that snapshot while leaving the existing
+  credits projection and hall-of-fame stall suppression intact. Focused
+  `attract_boot` and `start_game` clean-fidelity scenarios match with this
+  scheduler. Remaining R9 blockers are later two-player turn/session
+  sequencing and high-score ordering, exact logo/underline/border
+  palette/blink/color behavior, live Williams logo table-walker animation,
+  score-popup lifecycle, explosion timing, terrain-blow presentation, clean
+  spawning/physics, scanner/radar animation, and final render presentation
+  parity.
+- `2026-05-17 16:47:14 BST`: `DC-164` adds the source visual-state contract
+  slice for R9-B3. Clean `SOURCE_VISUAL_STATE` records the source Williams
+  status/color/rate evidence, attract instruction color words, Hall of Fame
+  display and entry color indices, Hall of Fame blink color and 15-tick sleep,
+  Hall of Fame active/inactive underline words, and top-display border/scanner
+  marker words. Clean and oracle scenes route HUD, attract title, top-display
+  border, Hall of Fame logo/text, and underline tints through that contract
+  while preserving the current white/gray clean sprite output. Remaining R9
+  blockers are later two-player turn/session sequencing and high-score
+  ordering, live Williams logo table-walker animation, hardware palette/RGB
+  render audit residuals, score-popup lifecycle, explosion timing,
+  terrain-blow presentation, clean spawning/physics, scanner/radar animation,
+  and final render presentation parity.
+- `2026-05-17 17:35:09 BST`: `DC-164` adds the source scanner/radar state and
+  sprite slice for R9-B4. Clean `WorldSnapshot` now carries
+  `ScannerRadarSnapshot` with the source scanner process cadence `[2, 2, 4]`,
+  selected scanner map `1`, scan-left calculation, object erase-table addresses,
+  source `SETEND`, object blips, and player blip bytes. Source `OBJCOL`
+  scanner colors now flow through the machine snapshot, accepted facade, oracle
+  adapter, and clean object evidence, and clean/oracle scenes draw
+  atlas-backed scanner object/player HUD blips at translated source scanner
+  screen positions. Phase 2 validation passed with the full all-scenario
+  clean-fidelity gate and the broad fidelity gate. Remaining R9 blockers are
+  score-popup lifecycle, explosion timing, terrain-blow presentation, clean
+  spawning/physics, later two-player turn/session sequencing and high-score
+  ordering, hardware palette/RGB render audit residuals, and final render
+  presentation parity.
+- `2026-05-17 17:51:14 BST`: R9-C1 adds source-backed score-popup lifecycle
+  evidence and clean projection. `C25P1` and `C5P1` expanded-object rows are
+  now classified as score popups with source 50-tick lifetime metadata,
+  250/500 values, 6x6 descriptor sizes, and mapped `SCORE_POPUP_250` /
+  `SCORE_POPUP_500` sprite identity through the machine snapshot, accepted
+  facade, oracle adapter, and clean scene path. Clean `WorldSnapshot` can spawn
+  score popups at a source top-left position, project them as expanded-object
+  sprites, and remove them when the 50-frame lifetime expires without changing
+  score arithmetic. Remaining R9 blockers are explosion timing,
+  terrain-blow presentation, clean spawning/physics and rescue/abduction entry
+  points, later two-player turn/session sequencing and high-score ordering,
+  hardware palette/RGB render audit residuals, and final render presentation
+  parity.
+- `2026-05-17 18:10:59 BST`: R9-C2 adds the source expanded-object explosion
+  timing slice. `EXST`/`EXPU` rows now carry source frame/lifetime metadata
+  from `RSIZE = 0x0100`, `+0x00AA` per update, and the `> 0x30` high-byte kill
+  threshold through the machine snapshot, accepted facade, oracle adapter, and
+  clean `WorldSnapshot`. Clean lander projectile collisions spawn timed
+  expanded-object explosions, clean world helpers cover the mapped
+  `LNDP1`/`BXPIC`/`SWXP1`/`ASXP1`/`PLAPIC` descriptor families, and clean/oracle
+  scenes scale explosion sprites from the source `RSIZE` high byte. Remaining
+  B06 work is the bank-7 `PXVCT`/`PX1A` player death pixel-cloud and any later
+  object-ecology entry points that must start non-lander explosion families in
+  real gameplay.
+- `2026-05-17 18:33:00 BST`: Step 48 / R9-C2 closes B06 by adding the
+  player-death bank-7 `PXVCT`/`PX1A` pixel-cloud surface. Machine snapshots,
+  the accepted facade, the oracle adapter, clean `WorldSnapshot`, and
+  clean/oracle scenes now carry the source color table, color counter,
+  frame index, visible piece positions, and 4x1 versus split 4x2 pixel shape.
+  Clean player/enemy contact starts that cloud from the source-shaped player
+  center offset. Future object-ecology work may add more gameplay entry points
+  that start already mapped non-lander explosion descriptor families, but that
+  belongs to B08 rather than the explosion timing blocker.
+- `2026-05-17 18:49:07 BST`: Step 49 / R9-C3 closes B07 by adding
+  source-backed terrain-blow mutation and presentation evidence. Machine
+  snapshots, the accepted facade, the oracle adapter, clean `WorldSnapshot`,
+  and clean-fidelity comparison now carry the source `TERBLO` terrain-blown
+  status bit, stage, iteration, sleep, pseudo-color, overload counter,
+  terrain/scanner erase entry counts, and remaining nonzero terrain words.
+  Clean planet destruction clears terrain segments, disables scanner terrain,
+  and projects the two-per-pass `TEREX` terrain explosions through the
+  expanded-object sprite path. Full rescue/abduction object ecology and the
+  gameplay entry points that remove humans remain B08 work.
+- `2026-05-17 19:06:15 BST`: R9-C4 adds the first clean object-ecology
+  progress slice. Clean wave startup now derives the active enemy batch from
+  `WaveProfileSnapshot` instead of using the previous wave-number lander
+  shortcut: wave 1 starts with five active landers from the source wave-size
+  field, and later source-exposed bomber/pod families enter the clean active
+  batch with deterministic positions and source-profile-derived pixel
+  velocities. Clean object evidence, scanner colors, scene sprites, collision
+  sizes, scores, and explosion entry points now recognize lander, mutant,
+  bomber, pod, swarmer, and baiter families. The player-death pixel cloud is
+  also cleared before high-score entry handoff so high-score scenes remain
+  prompt/table-only after the final death sleep. Remaining B08 work is
+  reserve/inactive transitions, exact family movement/projectile behavior,
+  abduction/carry/fall/catch/rescue/loss, pod-to-swarmer spawning, and baiter
+  runtime entry points.
+- `2026-05-17 19:18:07 BST`: R9-C4 adds source-profile reserve accounting and
+  active/reserve transitions. Clean `WorldSnapshot` now carries
+  `EnemyReserveSnapshot` counts for source-profile enemies outside the active
+  batch, clean object evidence reports those counts as inactive objects, and
+  gameplay activates the next reserve batch before emitting `WaveCleared`.
+  Targeted clean-fidelity still matches `start_game`, `smart_bomb`, and
+  `wave_advance`. Remaining B08 work is exact per-family movement/projectile
+  behavior, abduction/carry/fall/catch/rescue/loss, pod-to-swarmer spawning,
+  and baiter runtime entry points.
+- `2026-05-17 19:28:49 BST`: R9-C4 adds the clean pod-to-swarmer destruction
+  transition. Projectile and smart-bomb pod kills now reuse the shared clean
+  enemy-destroy path, spawn the pod explosion, award the 1000-point pod score,
+  and append a deterministic mini-swarmer batch bounded by the source `MMSW`
+  request limit of six and the active swarmer cap of twenty. Focused clean
+  tests cover projectile pod kills, smart-bomb pod kills, and the active
+  swarmer cap; targeted clean-fidelity still matches `smart_bomb` and
+  `wave_advance`. Remaining B08 work is exact per-family movement/projectile
+  behavior, source RNG/velocity/sleep/shot-timer parity for mini-swarmers,
+  abduction/carry/fall/catch/rescue/loss, and baiter runtime entry points.
+- `2026-05-17 19:37:32 BST`: R9-C4 adds the clean baiter runtime entry
+  transition. Clean `Game` now carries the source `GEXEC`/`UFOST` timer shape:
+  baiter entry advances on the 15-frame game-exec cadence, accelerates when
+  source enemy totals fall to eight or fewer, skips the zero-enemy wave-clear
+  case, and caps active baiters at twelve. The clean spawn is deterministic and
+  uses the existing baiter sprite, object evidence, scanner, collision, score,
+  and scene paths. Focused tests cover timer-edge spawn, active-cap behavior,
+  and low-enemy acceleration; targeted clean-fidelity still matches
+  `start_game` and `wave_advance`. Remaining B08 work is exact per-family
+  movement/projectile behavior, source RNG/velocity/sleep/shot-timer parity
+  for mini-swarmers, exact baiter velocity/shot behavior, and
+  abduction/carry/fall/catch/rescue/loss.
+- `2026-05-17 19:45:09 BST`: R9-C4 adds the clean lander
+  abduction/carry/release slice from source `LANDG` / `LKIL1` evidence. Clean
+  landers now capture aligned humans into the carried state, move carried
+  humans with the fleeing lander, tint carried humans through the existing
+  scene path, and release the passenger when the carrying lander is destroyed.
+  Focused tests cover capture/carry motion and passenger release on lander
+  kill; targeted clean-fidelity still matches `abduction`. Remaining B08 work
+  is exact per-family movement/projectile behavior,
+  source RNG/velocity/sleep/shot-timer parity for mini-swarmers, exact baiter
+  velocity/shot behavior, falling astronaut motion, player catch, rescue
+  scoring, safe/fatal landing, and human-loss transitions.
+- `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
+  `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
+  terrain now move downward each clean frame until reaching the local terrain
+  line and then remain uncarried at rest. Focused tests cover falling motion,
+  terrain settlement, and standing-human stability; targeted clean-fidelity
+  still matches `abduction`. Remaining B08 work is exact per-family
+  movement/projectile behavior, source RNG/velocity/sleep/shot-timer parity
+  for mini-swarmers, exact baiter velocity/shot behavior, exact source falling
+  acceleration, player catch, rescue scoring, safe/fatal landing, and
+  human-loss transitions.
+- `2026-05-17 20:06:06 BST`: R9-C4 adds the bounded player-catch rescue
+  scoring slice from source `AKIL1` / `P500` evidence. Falling humans that
+  overlap the player now enter a clean player-carried state, award the
+  source-backed 500-point rescue score through `ScoreSystem`, and start the
+  existing `P500` score-popup lifecycle from the caught astronaut position.
+  Focused tests cover caught-human scoring/popup projection and grounded humans
+  remaining uncaught. Remaining B08 work is exact per-family
+  movement/projectile behavior, source RNG/velocity/sleep/shot-timer parity
+  for mini-swarmers, exact baiter velocity/shot behavior, exact source falling
+  acceleration, source AFALL2 carried-descent landing, safe/fatal landing, and
+  human-loss transitions.
+- `2026-05-17 20:11:43 BST`: R9-C4 adds the bounded source `AFALL2`
+  carried-landing slice. Player-carried humans follow the clean
+  player-carried offset and settle back onto terrain when that carried position
+  reaches the local terrain line, without creating a second rescue score popup.
+  Focused tests cover player-carried landing, preserving the existing
+  catch-time rescue score, and leaving grounded humans uncaught. Remaining B08
+  work is exact per-family movement/projectile behavior,
+  source RNG/velocity/sleep/shot-timer parity for mini-swarmers, exact baiter
+  velocity/shot behavior, exact source falling acceleration, safe/fatal
+  landing, and human-loss transitions.
+- `2026-05-17 20:15:06 BST`: R9-C4 adds the bounded source `AFALL` safe-landing
+  score slice. Released, uncarried humans that reach terrain now award the
+  source-backed 250-point safe-landing score through `ScoreSystem` and start the
+  existing `P250` score-popup lifecycle from the settled astronaut position,
+  while standing humans on terrain remain stable and unscored. Remaining B08
+  work is exact per-family movement/projectile behavior,
+  source RNG/velocity/sleep/shot-timer parity for mini-swarmers, exact baiter
+  velocity/shot behavior, exact source falling acceleration, fatal landing, and
+  human-loss transitions.
+- `2026-05-17 20:24:17 BST`: R9-C4 adds the bounded source `AFALL`
+  acceleration and fatal-landing slice. Clean falling humans now retain source
+  fixed-point fall velocity/fraction state, accelerate by `0x0008`, preserve the
+  source max-velocity clamp before `0x0300`, treat landings at or below `0x00E0`
+  as safe, and remove over-speed impacts with an astronaut explosion plus the
+  existing last-human terrain-blow handoff. Remaining B08 work is exact
+  per-family movement/projectile behavior, source RNG/velocity/sleep/shot-timer
+  parity for mini-swarmers, exact baiter velocity/shot behavior, and focused
+  source ecology fixtures for those transitions.
+- `2026-05-17 21:59:16 BST`: R9-C4 adds the bounded source
+  mini-swarmer runtime slice. Pod-triggered mini-swarmer spawns now retain
+  source RNG-derived velocity, acceleration, sleep, and shot-timer state.
+  Source-backed mini-swarmers advance through the entry seek, loop sleep
+  cadence, fixed-point position/fraction updates, vertical
+  acceleration/damping, turnback reseek, and bounded enemy-bomb projection.
+  Remaining B08 work is exact per-family movement/projectile behavior, exact
+  baiter velocity/shot behavior, enemy projectile collision/lifetime parity,
+  and focused source ecology fixtures for those transitions.
+- `2026-05-17 22:10:48 BST`: R9-C4 adds the bounded source baiter
+  movement/fireball slice. Clean baiters now retain source shot-timer,
+  picture-cycle, sleep, and velocity state after the source-paced runtime entry;
+  their active loop follows the source `UFOLP` shot timer, `UFOP1`-`UFOP3`
+  cycle, and `UFONV` seek update rules. Baiter shots use the shared source
+  `SHOOT` fireball setup, enemy projectiles now carry source shell lifetime,
+  source offscreen culling, and player collisions remove the shell, award the
+  source-backed 25-point bomb score, start the bomb explosion, and enter the
+  existing player-damage flow. Remaining B08 work is remaining per-family
+  movement/projectile behavior, mutant runtime spawning, and focused source
+  ecology fixtures for those transitions.
+- `2026-05-17 22:19:34 BST`: R9-C4 adds the bounded source mutant
+  runtime/conversion slice. Clean completed carried-lander abductions now
+  consume the passenger and convert that lander into a source-shaped mutant;
+  no-target/no-human landers enter the same clean mutation path. Active clean
+  mutants now carry source shot-timer, sleep, fixed-point fraction, X seek,
+  vertical seek/avoid, random Y hop, and shared `SHOOT` fireball projection
+  state. Remaining B08 work is remaining per-family movement/projectile
+  behavior, mutant reserve/restore fixtures, mines, and focused source ecology
+  fixtures for those transitions.
+- `2026-05-17 22:29:45 BST`: R9-C4 adds the bounded source bomber
+  movement/bomb-shell slice. Clean wave-spawned bombers now retain source
+  fixed-point fractions, X velocity, vertical velocity, picture frame, cruise
+  altitude, and sleep state. Active clean bombers advance through the source
+  `TIE` image cycle, random vertical drift/damping, on-screen player-Y
+  steering, off-screen cruise-altitude steering, and bounded `BOMBST`
+  bomb-shell projection. Remaining B08 work is remaining per-family
+  movement/projectile behavior, mutant reserve/restore fixtures, standalone
+  mine/source-shell fixtures, and focused source ecology fixtures for those
+  transitions.
+- `2026-05-17 22:38:04 BST`: R9-C4 adds the bounded source mutant reserve
+  restore fixture slice. Clean reserve activation now restores active mutants
+  through source-shaped placement fractions and shot-timer RNG state, carrying
+  that state into the existing source-shaped mutant runtime loop. The targeted
+  `wave_advance` clean-fidelity scenario still matches. Remaining B08 work is
+  remaining per-family movement/projectile behavior, standalone
+  mine/source-shell fixtures, and focused source ecology fixtures for those
+  transitions.
+- `2026-05-17 22:46:48 BST`: R9-C4 adds the bounded source-shell/mine
+  descriptor fixture slice. Clean enemy projectile evidence now carries the
+  source `BMBP1` shell descriptor address, 2x3 picture size, embedded primary
+  and alternate shell image addresses, and `ENEMY_BOMB` mapping while the
+  direct clean projectile renderer continues to draw the existing 4x6 runtime
+  bomb sprite. Remaining B08 work is remaining per-family movement/projectile
+  behavior and focused source ecology fixtures for those transitions.
+- `2026-05-17 22:51:15 BST`: R9-C4 adds the bounded pod reserve restore
+  fixture slice. Clean reserve pod activation now mirrors source
+  `PRBST`/`PRBRES` placement and signed velocity bytes for each restored pod,
+  while initial clean wave pod placement and public snapshots stay unchanged.
+  Remaining B08 work is remaining per-family movement/projectile behavior and
+  focused source ecology fixtures for those transitions.
+- `2026-05-17 22:57:30 BST`: R9-C4 adds the bounded mini-swarmer reserve
+  restore fixture slice. Clean reserve swarmer activation now mirrors source
+  `PLRES`/`RSW0` phony-object placement for the selected reserve mini-swarmer
+  batch, preserves the targetless low X byte as source placement fraction
+  state, and carries each restored swarmer into the existing source swarmer
+  runtime. Remaining B08 work is remaining per-family movement/projectile
+  behavior and focused source ecology fixtures for those transitions.
+- `2026-05-17 23:02:58 BST`: R9-C4 adds the bounded lander reserve `LANDST`
+  fixture slice. Clean reserve lander activation now mirrors source placement,
+  shot-timer RNG consumption, and signed X/Y velocity bytes for restored
+  landers, while initial clean wave lander placement and public snapshots stay
+  unchanged. Remaining B08 work is remaining per-family movement/projectile
+  behavior and focused source ecology fixtures for those transitions.
+- `2026-05-17 23:11:17 BST`: R9-C4 adds the bounded bomber reserve `TIEST`
+  fixture slice. Clean reserve bomber activation now mirrors source
+  player-relative squad placement, fixed cruise altitude, and alternating
+  signed X velocity per restored squad while carrying each restored bomber into
+  the existing source bomber runtime. Remaining B08 work is remaining
+  per-family movement/projectile behavior and focused source ecology fixtures
+  for those transitions.
+- `2026-05-17 23:21:18 BST`: R9-C4 adds the bounded source lander runtime
+  slice for `LANDST`-restored landers. Clean reserve landers now retain source
+  fixed-point fractions, shot-timer, sleep, picture-frame, and velocity state,
+  then advance through source-shaped `LANDS0` terrain-relative orbit velocity,
+  `LSHOT` fireball projection, and `LNDP1`-`LNDP3` picture cycling. Initial
+  clean wave landers remain on the existing clean placement path in this slice.
+  Remaining B08 work is remaining per-family movement/projectile behavior and
+  focused source ecology fixtures for those transitions.
+- `2026-05-17 23:28:01 BST`: R9-C4 adds the bounded source pod/probe runtime
+  slice for `PRBST`/`PRBRES`-restored pods. Clean reserve pods now retain
+  source fixed-point fractions and signed X/Y velocity bytes, then advance
+  through source fixed-point object motion instead of the previous one-pixel
+  clean velocity projection. Initial clean wave pods remain on the existing
+  clean placement path. Remaining B08 work is remaining per-family
+  movement/projectile behavior and focused source ecology fixtures for those
+  transitions.
+- `2026-05-17 23:36:48 BST`: R9-C4 adds the bounded initial source lander
+  runtime slice. Initial clean wave landers now retain deterministic source
+  fixed-point fractions, shot-timer, sleep, picture-frame, and X/Y velocity
+  state, then advance through the same bounded `LANDS0` orbit/shot loop as
+  source-restored landers while preserving the active wave count/order.
+  Targeted `start_game`, `abduction`, and `wave_advance` clean-fidelity
+  scenarios still match. Remaining B08 work is remaining per-family
+  movement/projectile behavior and focused source ecology fixtures for those
+  transitions.
+- `2026-05-17 23:43:40 BST`: R9-C4 adds the bounded initial source pod/probe
+  runtime slice. Initial active wave pods now retain deterministic source
+  fixed-point fractions and bounded signed X velocity state, then advance
+  through the same source fixed-point X/Y motion used by `PRBST`/`PRBRES`
+  restored pods while preserving the active wave count/order. Targeted
+  `wave_advance` clean-fidelity still matches. Remaining B08 work is remaining
+  per-family movement/projectile behavior and focused source ecology fixtures
+  for those transitions.
+- `2026-05-17 23:53:19 BST`: R9-C4 adds the bounded source `LANDST`
+  no-human fallback slice. Clean reserve lander activation now detects the
+  source no-astronaut case and restores source-shaped mutants directly through
+  the `SCZS0`/`SCZST` placement and shot-timer RNG path instead of spawning
+  landers that convert on a later frame. Targeted `planet_destruction` and
+  `wave_advance` clean-fidelity still match. Remaining B08 work is remaining
+  per-family movement/projectile behavior and focused source ecology fixtures
+  for those transitions.
+- `2026-05-18 00:02:23 BST`: R9-C4 adds the bounded active-enemy
+  source-picture descriptor evidence slice. Clean active enemy
+  object-evidence rows now carry the source object-picture label, address,
+  dimensions, and primary/alternate image pointers for static
+  `SCZP1`/`PRBP1`/`SWPIC1` enemies and the current `LNDP1`-`LNDP3`,
+  `UFOP1`-`UFOP3`, and `TIEP1`-`TIEP4` frame-cycled presentations. Runtime
+  behavior and scenario paths are unchanged. Remaining B08 work is remaining
+  per-family movement/projectile behavior and focused source ecology fixtures
+  for those transitions.
+- `2026-05-18 00:09:48 BST`: R9-C4 adds the bounded player-shot descriptor
+  evidence slice. Clean player projectile object-evidence rows now carry the
+  source `LASP1` object-picture label, descriptor address, 8x1 picture size,
+  and primary image pointer while leaving the direct clean runtime projectile
+  renderer at its existing 8x2 sprite size. Runtime behavior and scenario paths
+  are unchanged. Remaining B08 work is remaining per-family
+  movement/projectile behavior and focused source ecology fixtures for those
+  transitions.
+- `2026-05-18 00:16:08 BST`: R9-C4 adds the bounded astronaut descriptor
+  evidence slice. Clean human object-evidence rows now carry the source
+  `ASTP1` object-picture label, descriptor address, 2x8 picture size,
+  primary/alternate image pointers, mapped clean human sprite evidence, and
+  the existing source human scanner color while leaving the direct clean
+  runtime astronaut renderer at its existing 6x8 sprite size. Runtime behavior
+  and scenario paths are unchanged. Remaining B08 work is remaining
+  per-family movement/projectile behavior and focused source ecology fixtures
+  for those transitions.
+- `2026-05-20 20:29:31 BST`: R9-C4 adds the bounded source object-table identity
+  evidence slice. Clean enemy, human, player-projectile, and enemy-projectile
+  object-evidence rows now carry deterministic source-layout addresses from
+  `0xA23C` plus `0x17` per slot, source slot numbers, and neutral `OTYP`
+  `0x00`, while clean categorized source-detail rows remain skipped by the
+  direct clean scene path to avoid duplicate runtime sprites. Runtime behavior
+  and scenario paths are unchanged. Remaining B08 work is remaining per-family
+  movement/projectile behavior and focused source ecology fixtures for those
+  transitions.
+- `2026-05-18 00:25:55 BST`: R9-C4 adds the bounded source motion evidence
+  slice. Clean enemy, human, player-projectile, and enemy-projectile
+  object-evidence rows now carry source-style 8.8 world-position words and
+  velocity words derived from the existing clean source fixed-point state:
+  enemy source fractions and velocities, falling-human Y fraction/velocity,
+  player projectile pixel velocity converted to fixed words, and enemy shell
+  source fractions/velocities. Runtime behavior and scenario paths are
+  unchanged. Remaining B08 work is remaining per-family movement/projectile
+  behavior and focused source ecology fixtures for those transitions.
+- `2026-05-17 13:31:44 BST`: `DC-164` adds the bounded expanded-object slot
+  sprite presentation slice. Source expanded-object detail rows now carry
+  descriptor `picture_size` through the machine snapshot, accepted facade, and
+  oracle adapter. Clean and oracle playing scenes project bounded
+  expanded-object appearance/explosion rows that already carry `top_left`,
+  descriptor size, and a mapped clean `SpriteId` onto the object layer; missing
+  size rows and transparent `NULOB` details remain evidence-only. The slice
+  does not add clean spawning/physics, lifecycle transitions, score-popup
+  lifecycle, explosion timing, terrain-blow presentation, scanner/radar
+  animation, or exact palette/blink/color behavior. Remaining R9 blockers are
+  later two-player turn/session sequencing and high-score ordering, broader
+  title/status text outside covered prompt/attract/top-display-border/
+  wave-completion surfaces, Williams/copyright attract wait timing, exact
+  logo/underline/border palette/blink/color behavior, score-popup lifecycle,
+  explosion timing, terrain-blow presentation, clean spawning/physics,
+  scanner/radar animation, and final render presentation parity.
+- `2026-05-16 21:10:08 BST`: `DC-160` adds the R5
+  `LongPlayfieldFlow` clean-fidelity profile for `abduction`, `death`,
+  `wave_advance`, and `planet_destruction`. This profile validates long-run
+  cabinet/player continuity, frame/surface/raster contracts, and credited-start
+  event and sound evidence. It intentionally does not compare world topology,
+  enemy/humanoid state, object positions, sprite identities, lifecycle
+  transitions, or gameplay object render detail. Full R5 enemy ecology remains
+  blocked until those mechanics are promoted through source-backed accepted
+  surfaces and matching clean domain contracts, or a narrower source/MAME
+  fixture is added for them.
+- `2026-05-16 21:15:04 BST`: `DC-161` extends that long-scenario accepted
+  surface to the R6 `high_score_entry` fixture. The embedded trace requirement
+  for this fixture still only requires credited-start sound commands and
+  `credit_added` / `game_started` events. The accepted adapter now exposes
+  active high-score initials, entry score/rank metadata, submitted
+  player/score metadata, all-time/today's-greatest table state, game-over
+  return timers, source-backed wave profile fields, and neutral object-list
+  evidence when the source machine owns those states. Full R6 session
+  completion remains blocked on live object positions, object/sprite
+  identities, lifecycle transitions, and broader visual presentation surfaces,
+  or a narrower source/MAME fixture that promotes those mechanics into strict
+  comparison.
+
+## Runtime Asset Provenance
+
+- `2026-05-16 18:10:01 BST`: `DC-156` reclassifies a bounded subset of
+  prototype PNGs, now stored under `assets/sprites/`, as temporary R2
+  clean-runtime atlas inputs:
+  `ship1.png`, `lander1.png`, `humanoid1.png`, `player-shot.png`, and
+  `font-sheet.png`. These files come from the archived prototype asset set and
+  are not authoritative Williams red-label art. They are accepted only as
+  transitional production-atlas inputs so R2 can retire the solid-color default
+  sprite atlas while later cycles replace them with source-cited red-label,
+  ROM/MAME-derived, or generated assets with stronger provenance. Gameplay
+  behavior must not be inferred from these PNGs.
+- `2026-05-16 18:41:27 BST`: Future sprite and audio runtime files must remain
+  under the repo `assets/` tree. Existing `assets/sprites/` PNGs should be
+  reused before adding duplicate transitional sprites, but each runtime use
+  still requires an explicit reclassification entry here.
+- `2026-05-16 20:37:18 BST`: Sprite PNGs were moved from legacy
+  `assets/arcade/` into `assets/sprites/`, and pre-existing prototype `.wav`
+  cue files were moved to the legacy `assets/arcade/` directory. New
+  non-legacy sound artifacts remain reserved for `assets/sounds/`.
 
 ## Live Visual Fidelity
 
@@ -774,7 +1609,8 @@ here before changing source-shaped arcade-core behavior.
   thrust-flame bytes in video RAM. `OPROC` can erase and redraw active-object
   descriptor pictures in the caller's scanline band. `STOUT` / `SBLNK` can
   write, clear, blink, and hyperspace-shift the source star-map bytes in video
-  RAM. The `BONUS`
+  RAM. Clean player-switch prompt sprites now mirror the source `PDTH5R`
+  `PLYR1`/`PLYR2` plus `GO` messages during `PLE02` switch sleep. The `BONUS`
   `MESS` / `WNBV` calls can write the wave-complete text and numbers used by
   the survivor bonus screen. `HALLOF` / `HOFIN` now writes the initials-entry
   player label, hall-of-fame instructions, initials block, active underline

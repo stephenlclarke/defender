@@ -1,23 +1,34 @@
 //! Runtime boundary for gameplay-facing sound events.
 
 use std::any::Any;
+use std::f32::consts::TAU;
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     mpsc::{self, SyncSender},
 };
 use std::thread::{self, JoinHandle};
+
+#[cfg(not(coverage))]
+use anyhow::{Context, anyhow};
+#[cfg(not(coverage))]
+use cpal::{
+    FromSample, Sample, SampleFormat, SizedSample, Stream, StreamConfig, SupportedStreamConfig,
+    traits::{DeviceTrait, HostTrait, StreamTrait},
+};
 
 use crate::game::{GameFrame, SoundEvent};
 
 pub const LIVE_AUDIO_TEST_SAMPLE_RATE_HZ: u32 = 48_000;
 pub const LIVE_AUDIO_QUEUE_CAPACITY: usize = 8;
 pub const LIVE_AUDIO_EVENT_CAPACITY: usize = 8;
+const LIVE_AUDIO_MAX_SYNTH_VOICES: usize = 16;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum LiveAudioMode {
     Disabled,
     #[default]
+    Device,
     Null,
 }
 
@@ -72,6 +83,222 @@ pub struct NullLiveAudioBackend;
 
 impl LiveAudioBackend for NullLiveAudioBackend {
     fn handle_event_batch(&mut self, _batch: LiveAudioEventBatch) {}
+}
+
+#[cfg(not(coverage))]
+pub struct DeviceLiveAudioBackend {
+    sample_rate_hz: u32,
+    mixer: Arc<Mutex<SynthMixer>>,
+    _stream: Stream,
+}
+
+#[cfg(not(coverage))]
+impl DeviceLiveAudioBackend {
+    pub fn try_new() -> anyhow::Result<Self> {
+        let host = cpal::default_host();
+        let device = host
+            .default_output_device()
+            .ok_or_else(|| anyhow!("no default audio output device"))?;
+        let supported_config = device
+            .default_output_config()
+            .context("querying default audio output config")?;
+        let sample_rate_hz = supported_config.sample_rate();
+        let mixer = Arc::new(Mutex::new(SynthMixer::new(sample_rate_hz)));
+        let stream = build_device_stream(&device, &supported_config, Arc::clone(&mixer))?;
+
+        stream.play().context("starting audio output stream")?;
+        Ok(Self {
+            sample_rate_hz,
+            mixer,
+            _stream: stream,
+        })
+    }
+}
+
+#[cfg(not(coverage))]
+impl LiveAudioBackend for DeviceLiveAudioBackend {
+    fn sample_rate_hz(&self) -> u32 {
+        self.sample_rate_hz
+    }
+
+    fn handle_event_batch(&mut self, batch: LiveAudioEventBatch) {
+        if let Ok(mut mixer) = self.mixer.lock() {
+            for event in batch.events() {
+                mixer.queue_event(event);
+            }
+        }
+    }
+
+    fn flush(&mut self) {
+        if let Ok(mut mixer) = self.mixer.lock() {
+            mixer.clear();
+        }
+    }
+}
+
+#[cfg(not(coverage))]
+fn build_device_stream(
+    device: &cpal::Device,
+    supported_config: &SupportedStreamConfig,
+    mixer: Arc<Mutex<SynthMixer>>,
+) -> anyhow::Result<Stream> {
+    let sample_format = supported_config.sample_format();
+    let config = supported_config.clone().into();
+
+    match sample_format {
+        SampleFormat::F32 => build_typed_device_stream::<f32>(device, &config, mixer),
+        SampleFormat::I16 => build_typed_device_stream::<i16>(device, &config, mixer),
+        SampleFormat::U16 => build_typed_device_stream::<u16>(device, &config, mixer),
+        sample_format => Err(anyhow!(
+            "unsupported default audio output sample format {sample_format}"
+        )),
+    }
+}
+
+#[cfg(not(coverage))]
+fn build_typed_device_stream<T>(
+    device: &cpal::Device,
+    config: &StreamConfig,
+    mixer: Arc<Mutex<SynthMixer>>,
+) -> anyhow::Result<Stream>
+where
+    T: SizedSample + FromSample<f32>,
+{
+    let channels = usize::from(config.channels).max(1);
+
+    device
+        .build_output_stream(
+            config,
+            move |output: &mut [T], _| write_mixed_samples(output, channels, &mixer),
+            move |_error| {},
+            None,
+        )
+        .context("building audio output stream")
+}
+
+#[cfg(not(coverage))]
+fn write_mixed_samples<T>(output: &mut [T], channels: usize, mixer: &Arc<Mutex<SynthMixer>>)
+where
+    T: Sample + FromSample<f32>,
+{
+    let mut mixer = mixer.lock().ok();
+    for frame in output.chunks_mut(channels) {
+        let sample = mixer
+            .as_mut()
+            .map(|mixer| mixer.next_sample())
+            .unwrap_or(0.0);
+        let sample = T::from_sample(sample);
+        for output_sample in frame {
+            *output_sample = sample;
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct SynthClipSpec {
+    frequency_hz: f32,
+    duration_ms: u32,
+    amplitude: f32,
+}
+
+impl SynthClipSpec {
+    const fn new(frequency_hz: f32, duration_ms: u32, amplitude: f32) -> Self {
+        Self {
+            frequency_hz,
+            duration_ms,
+            amplitude,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SynthVoice {
+    phase: f32,
+    phase_step: f32,
+    remaining_samples: u32,
+    amplitude: f32,
+}
+
+impl SynthVoice {
+    fn new(sample_rate_hz: u32, spec: SynthClipSpec) -> Self {
+        let sample_rate = sample_rate_hz.max(1) as f32;
+        let remaining_samples = ((u64::from(sample_rate_hz.max(1)) * u64::from(spec.duration_ms))
+            / 1_000)
+            .clamp(1, u64::from(u32::MAX)) as u32;
+        Self {
+            phase: 0.0,
+            phase_step: TAU * spec.frequency_hz / sample_rate,
+            remaining_samples,
+            amplitude: spec.amplitude,
+        }
+    }
+
+    fn next_sample(&mut self) -> f32 {
+        if self.remaining_samples == 0 {
+            return 0.0;
+        }
+
+        let sample = self.phase.sin() * self.amplitude;
+        self.phase = (self.phase + self.phase_step) % TAU;
+        self.remaining_samples = self.remaining_samples.saturating_sub(1);
+        sample
+    }
+
+    const fn is_active(&self) -> bool {
+        self.remaining_samples > 0
+    }
+}
+
+#[derive(Debug)]
+struct SynthMixer {
+    sample_rate_hz: u32,
+    voices: Vec<SynthVoice>,
+}
+
+impl SynthMixer {
+    fn new(sample_rate_hz: u32) -> Self {
+        Self {
+            sample_rate_hz: sample_rate_hz.max(1),
+            voices: Vec::new(),
+        }
+    }
+
+    fn queue_event(&mut self, event: SoundEvent) {
+        self.queue_clip(synth_clip_for_event(event));
+    }
+
+    fn queue_clip(&mut self, spec: SynthClipSpec) {
+        if self.voices.len() >= LIVE_AUDIO_MAX_SYNTH_VOICES {
+            self.voices.remove(0);
+        }
+        self.voices.push(SynthVoice::new(self.sample_rate_hz, spec));
+    }
+
+    fn clear(&mut self) {
+        self.voices.clear();
+    }
+
+    fn next_sample(&mut self) -> f32 {
+        let mut mixed = 0.0;
+        for voice in &mut self.voices {
+            mixed += voice.next_sample();
+        }
+        self.voices.retain(SynthVoice::is_active);
+        mixed.clamp(-0.85, 0.85)
+    }
+}
+
+fn synth_clip_for_event(event: SoundEvent) -> SynthClipSpec {
+    match event {
+        SoundEvent::Startup => SynthClipSpec::new(220.0, 120, 0.18),
+        SoundEvent::CreditAdded => SynthClipSpec::new(880.0, 90, 0.20),
+        SoundEvent::GameStarted => SynthClipSpec::new(660.0, 160, 0.22),
+        SoundEvent::ThrustStarted => SynthClipSpec::new(140.0, 110, 0.16),
+        SoundEvent::ThrustStopped => SynthClipSpec::new(95.0, 70, 0.12),
+        SoundEvent::UnmappedSoundCommand { command } => {
+            SynthClipSpec::new(300.0 + f32::from(command), 80, 0.12)
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -189,7 +416,22 @@ impl LiveAudioRuntime {
     pub fn for_mode(mode: LiveAudioMode) -> Self {
         match mode {
             LiveAudioMode::Disabled => Self::disabled(),
+            LiveAudioMode::Device => Self::device_or_null(),
             LiveAudioMode::Null => Self::spawn(NullLiveAudioBackend),
+        }
+    }
+
+    fn device_or_null() -> Self {
+        #[cfg(not(coverage))]
+        {
+            match DeviceLiveAudioBackend::try_new() {
+                Ok(backend) => Self::spawn(backend),
+                Err(_) => Self::spawn(NullLiveAudioBackend),
+            }
+        }
+        #[cfg(coverage)]
+        {
+            Self::spawn(NullLiveAudioBackend)
         }
     }
 
@@ -317,6 +559,7 @@ mod tests {
         audio::{
             LIVE_AUDIO_TEST_SAMPLE_RATE_HZ, LiveAudioBackend, LiveAudioEventBatch, LiveAudioMode,
             LiveAudioRuntime, LiveAudioStats, LiveAudioWorkerError, LiveAudioWorkerState,
+            SynthClipSpec, SynthMixer, SynthVoice, synth_clip_for_event,
         },
         game::{
             Direction, GameEvents, GameFrame, GamePhase, GameState, PlayerSnapshot, ScoreSnapshot,
@@ -366,7 +609,9 @@ mod tests {
                 phase: GamePhase::Attract,
                 credits: 0,
                 current_player: 1,
+                player_count: 1,
                 wave: 0,
+                wave_profile: crate::WaveProfileSnapshot::for_wave(0),
                 player: PlayerSnapshot {
                     position: (WorldVector::default(), WorldVector::default()),
                     velocity: (WorldVector::default(), WorldVector::default()),
@@ -374,13 +619,21 @@ mod tests {
                     lives: 3,
                     smart_bombs: 3,
                 },
+                player_stocks: [crate::PlayerStockSnapshot::new(3, 3); 2],
                 scores: ScoreSnapshot {
                     player_one: 0,
                     player_two: 0,
                     high_score: 0,
                     next_bonus: 10_000,
                 },
+                attract: crate::AttractPresentationSnapshot::for_page_frame(
+                    u16::try_from(frame).unwrap_or(u16::MAX),
+                ),
                 high_score_initials: crate::systems::HighScoreInitialsState::EMPTY,
+                high_score_entry: None,
+                high_score_submission: None,
+                high_score_tables: crate::HighScoreTablesSnapshot::DEFAULT,
+                game_over: crate::GameOverSnapshot::NONE,
                 world: WorldSnapshot::default(),
             },
             events: GameEvents::new(Vec::new(), sounds),
@@ -389,9 +642,93 @@ mod tests {
     }
 
     #[test]
-    fn live_audio_mode_defaults_to_null_backend() {
-        assert_eq!(LiveAudioMode::default(), LiveAudioMode::Null);
+    fn live_audio_mode_defaults_to_device_backend() {
+        assert_eq!(LiveAudioMode::default(), LiveAudioMode::Device);
+    }
+
+    #[test]
+    fn null_live_audio_mode_keeps_no_device_test_backend() {
         let mut runtime = LiveAudioRuntime::for_mode(LiveAudioMode::Null);
+
+        assert!(runtime.is_enabled());
+        assert_eq!(
+            runtime.diagnostics().backend_sample_rate_hz,
+            Some(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ)
+        );
+        assert!(runtime.shutdown().worker_error.is_none());
+    }
+
+    #[test]
+    fn synth_clip_specs_cover_clean_sound_events() {
+        assert_eq!(
+            synth_clip_for_event(SoundEvent::Startup).frequency_hz,
+            220.0
+        );
+        assert_eq!(
+            synth_clip_for_event(SoundEvent::CreditAdded).frequency_hz,
+            880.0
+        );
+        assert_eq!(
+            synth_clip_for_event(SoundEvent::GameStarted).frequency_hz,
+            660.0
+        );
+        assert_eq!(
+            synth_clip_for_event(SoundEvent::ThrustStarted).frequency_hz,
+            140.0
+        );
+        assert_eq!(
+            synth_clip_for_event(SoundEvent::ThrustStopped).frequency_hz,
+            95.0
+        );
+        assert_eq!(
+            synth_clip_for_event(SoundEvent::UnmappedSoundCommand { command: 0xE9 }).frequency_hz,
+            533.0
+        );
+    }
+
+    #[test]
+    fn synth_mixer_renders_nonzero_audio_and_drains() {
+        let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
+
+        mixer.queue_event(SoundEvent::CreditAdded);
+        assert_eq!(mixer.voices.len(), 1);
+
+        let mut saw_nonzero_sample = false;
+        for _ in 0..LIVE_AUDIO_TEST_SAMPLE_RATE_HZ {
+            saw_nonzero_sample |= mixer.next_sample().abs() > f32::EPSILON;
+        }
+
+        assert!(saw_nonzero_sample);
+        assert_eq!(mixer.voices.len(), 0);
+    }
+
+    #[test]
+    fn synth_voice_returns_silence_after_duration() {
+        let mut voice = SynthVoice::new(1_000, SynthClipSpec::new(440.0, 1, 0.5));
+
+        let _ = voice.next_sample();
+        assert!(!voice.is_active());
+        assert_eq!(voice.next_sample(), 0.0);
+    }
+
+    #[test]
+    fn synth_mixer_bounds_overlapping_voice_count() {
+        let mut mixer = SynthMixer::new(LIVE_AUDIO_TEST_SAMPLE_RATE_HZ);
+
+        for _ in 0..(super::LIVE_AUDIO_MAX_SYNTH_VOICES + 4) {
+            mixer.queue_event(SoundEvent::ThrustStarted);
+        }
+
+        assert_eq!(mixer.voices.len(), super::LIVE_AUDIO_MAX_SYNTH_VOICES);
+
+        mixer.clear();
+        assert_eq!(mixer.voices.len(), 0);
+    }
+
+    #[cfg(coverage)]
+    #[test]
+    fn device_live_audio_mode_uses_null_backend_under_coverage() {
+        let mut runtime = LiveAudioRuntime::for_mode(LiveAudioMode::Device);
 
         assert!(runtime.is_enabled());
         assert_eq!(

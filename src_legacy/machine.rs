@@ -82,8 +82,9 @@ use self::machine_world::decimal_to_bcd_byte;
 // `machine_state` directly.
 pub use crate::machine_process::{RedLabelCpuRegisters, RedLabelScheduledProcess};
 pub use crate::machine_state::{
-    CompatibilityState, FrameOutput, GamePhase, HighScoreEntryState, HighScoreSubmissionState,
-    MachineEvent, MachineSnapshot, PlayerState, RED_LABEL_INITIALS_ENTRY_CHARS,
+    CompatibilityState, FrameOutput, GameOverState, GamePhase, HighScoreEntryState,
+    HighScoreSubmissionState, HighScoreTableEntryState, HighScoreTablesState, MachineEvent,
+    MachineSnapshot, PlayerState, PlayerStockState, RED_LABEL_INITIALS_ENTRY_CHARS,
     RedLabelMainBoardSnapshot, RedLabelSoundBoardSnapshot, RedLabelTraceState, ScoreState,
     XyzzyOverlayHook,
 };
@@ -32796,9 +32797,11 @@ pub struct ArcadeMachine {
 struct RedLabelSnapshotProjection {
     credits: u8,
     current_player: u8,
+    player_count: u8,
     wave: u8,
     rng: RandState,
     player: PlayerState,
+    player_stocks: [PlayerStockState; 2],
     scores: ScoreState,
 }
 
@@ -32892,7 +32895,7 @@ mod tests {
         input::{CabinetInput, DefenderInputPorts},
         legacy_fidelity::TraceFrame,
         machine::{
-            ArcadeMachine, CompatibilityState, GamePhase, MachineEvent,
+            ArcadeMachine, CompatibilityState, GameOverState, GamePhase, MachineEvent,
             RED_LABEL_ATTRACT_PROCESS_TYPE, RED_LABEL_COIN_PROCESS_TYPE,
             RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS, RED_LABEL_INVERTED_IRQ_LIVE_VERTCT,
             RED_LABEL_INVERTED_IRQ_PALETTE_COPY_LIMIT, RED_LABEL_INVERTED_WATCHDOG_DATA,
@@ -39750,11 +39753,19 @@ mod tests {
 
         assert_message_glyph_first_column(&machine, 0x3E80, 'G');
         assert_eq!(machine.snapshot().scores.player_one, 50_000);
+        assert_eq!(
+            machine.snapshot().game_over.player_death_sleep_remaining,
+            Some(40)
+        );
 
         for expected_timer in (1..40).rev() {
             let sleeping = machine.step_with_typed_chars(CabinetInput::NONE, &['d']);
             assert_eq!(sleeping.snapshot.phase, GamePhase::GameOver);
             assert_eq!(sleeping.snapshot.high_score_entry, None);
+            assert_eq!(
+                sleeping.snapshot.game_over.player_death_sleep_remaining,
+                Some(expected_timer)
+            );
             assert!(
                 !sleeping
                     .events()
@@ -39769,6 +39780,7 @@ mod tests {
         let handoff = machine.step(CabinetInput::NONE);
 
         assert_eq!(handoff.snapshot.phase, GamePhase::HighScoreEntry);
+        assert_eq!(handoff.snapshot.game_over, GameOverState::default());
         assert_eq!(
             handoff.snapshot.high_score_entry.expect("entry started"),
             super::HighScoreEntryState {
@@ -39808,14 +39820,22 @@ mod tests {
             assert_eq!(output.snapshot.high_score_entry, None);
         }
         assert_eq!(
+            machine.snapshot().game_over.no_entry_delay_remaining,
+            Some(RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS)
+        );
+        assert_eq!(
             machine.red_label_ram_range(process + 0x02..process + 0x05),
             Some(&[0xC1, 0x44, RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS][..])
         );
 
-        for _ in 0..254 {
+        for expected_timer in (1..RED_LABEL_HALL_OF_FAME_NO_ENTRY_DELAY_TICKS).rev() {
             let output = machine.step(CabinetInput::NONE);
             assert_eq!(output.snapshot.phase, GamePhase::GameOver);
             assert_eq!(output.snapshot.high_score_entry, None);
+            assert_eq!(
+                output.snapshot.game_over.no_entry_delay_remaining,
+                Some(expected_timer)
+            );
         }
         assert_eq!(
             machine.red_label_ram_range(process + 0x04..process + 0x05),
@@ -39826,6 +39846,10 @@ mod tests {
 
         assert_eq!(hall.snapshot.phase, GamePhase::Attract);
         assert_eq!(hall.snapshot.high_score_entry, None);
+        assert_eq!(
+            hall.snapshot.game_over.hall_of_fame_stall_remaining,
+            Some(RED_LABEL_HALL_OF_FAME_STALL_TICKS)
+        );
         assert_message_glyph_first_column(&machine, RED_LABEL_HALL_OF_FAME_HEADINGS_SCREEN, 'H');
         assert_score_digit_first_column(&machine, RED_LABEL_HALL_OF_FAME_TODAYS_TABLE_SCREEN, 1);
         assert_eq!(
@@ -40335,6 +40359,12 @@ mod tests {
         ));
         assert_message_glyph_first_column(&machine, RED_LABEL_PLAYER_SWITCH_LABEL_SCREEN, 'P');
         assert_message_glyph_first_column(&machine, RED_LABEL_PLAYER_SWITCH_GAME_OVER_SCREEN, 'G');
+        assert_eq!(
+            machine.snapshot().game_over.player_switch_sleep_remaining,
+            Some(0x60)
+        );
+        assert_eq!(machine.snapshot().game_over.player_switch_from, Some(1));
+        assert_eq!(machine.snapshot().game_over.player_switch_to, Some(2));
 
         let respawn = machine
             .red_label_dispatch_translated_process_routine(
@@ -44661,6 +44691,16 @@ mod tests {
             machine.red_label_ram_range(0x9C00..0x9C0A),
             Some(&[0x01, 0xAA, 0xF9, 0x51, 0x9C, 0x40, 0x14, 0x05, 0x0C, 0x05][..])
         );
+        let snapshot = machine.snapshot();
+        assert_eq!(snapshot.expanded_objects.detail_count, 1);
+        assert_eq!(
+            snapshot.expanded_objects.details[0].explosion_frame,
+            Some(1)
+        );
+        assert_eq!(
+            snapshot.expanded_objects.details[0].explosion_lifetime_frames,
+            Some(crate::game::SOURCE_EXPLOSION_LIFETIME_FRAMES)
+        );
     }
 
     #[test]
@@ -48196,6 +48236,32 @@ mod tests {
                 ][..]
             )
         );
+        let snapshot = machine.snapshot();
+        assert_eq!(snapshot.expanded_objects.active_count, 1);
+        assert_eq!(snapshot.expanded_objects.last_slot_address, Some(0x9C00));
+        assert_eq!(snapshot.expanded_objects.detail_count, 1);
+        assert_eq!(
+            snapshot.expanded_objects.details[0],
+            crate::machine_state::ExpandedObjectDetailState {
+                kind: crate::machine_state::ExpandedObjectKindState::Explosion,
+                slot_address: 0x9C00,
+                size: 0x0100,
+                descriptor_address: 0xF9C1,
+                picture_label: Some("PLAPIC"),
+                picture_size: Some((8, 6)),
+                mapped_sprite: Some(crate::renderer::SpriteId::PLAYER_SHIP.0),
+                erase_address: 0x9C40,
+                center_x: 0x0A,
+                center_y: 0x46,
+                top_left_x: 0x08,
+                top_left_y: 0x44,
+                object_address: None,
+                score_popup_lifetime_ticks: None,
+                score_popup_value: None,
+                explosion_frame: Some(0),
+                explosion_lifetime_frames: Some(crate::game::SOURCE_EXPLOSION_LIFETIME_FRAMES),
+            }
+        );
     }
 
     #[test]
@@ -48247,6 +48313,115 @@ mod tests {
         assert_eq!(
             machine.red_label_ram_range(0x9C06..0x9C0A),
             Some(&[0x0C, 0x47, 0x08, 0x44][..])
+        );
+    }
+
+    #[test]
+    fn expanded_object_state_reports_score_popup_lifecycle_metadata() {
+        let mut machine = ArcadeMachine::new();
+        machine
+            .memory
+            .write_word(0x9C00, 0x8000)
+            .expect("set C25P1 size");
+        machine
+            .memory
+            .write_word(
+                0x9C02,
+                red_label_object_picture_address("C25P1").expect("C25P1 address"),
+            )
+            .expect("set C25P1 descriptor");
+        machine
+            .memory
+            .write_word(0x9C04, 0x9C40)
+            .expect("set C25P1 erase");
+        machine
+            .memory
+            .write_word(0x9C06, 0x0A46)
+            .expect("set C25P1 center");
+        machine
+            .memory
+            .write_word(0x9C08, 0x0844)
+            .expect("set C25P1 top-left");
+        machine
+            .memory
+            .write_word(0x9C0A, 0xA253)
+            .expect("set C25P1 object pointer");
+        machine
+            .memory
+            .write_word(0x9C40, 0x8000)
+            .expect("set C5P1 size");
+        machine
+            .memory
+            .write_word(
+                0x9C42,
+                red_label_object_picture_address("C5P1").expect("C5P1 address"),
+            )
+            .expect("set C5P1 descriptor");
+        machine
+            .memory
+            .write_word(0x9C44, 0x9C80)
+            .expect("set C5P1 erase");
+        machine
+            .memory
+            .write_word(0x9C46, 0x2454)
+            .expect("set C5P1 center");
+        machine
+            .memory
+            .write_word(0x9C48, 0x2151)
+            .expect("set C5P1 top-left");
+        machine
+            .memory
+            .write_word(0x9C4A, 0xA266)
+            .expect("set C5P1 object pointer");
+
+        let snapshot = machine.snapshot();
+
+        assert_eq!(snapshot.expanded_objects.active_count, 2);
+        assert_eq!(snapshot.expanded_objects.detail_count, 2);
+        assert_eq!(
+            snapshot.expanded_objects.details[0],
+            crate::machine_state::ExpandedObjectDetailState {
+                kind: crate::machine_state::ExpandedObjectKindState::ScorePopup,
+                slot_address: 0x9C00,
+                size: 0x8000,
+                descriptor_address: red_label_object_picture_address("C25P1")
+                    .expect("C25P1 address"),
+                picture_label: Some("C25P1"),
+                picture_size: Some((6, 6)),
+                mapped_sprite: Some(crate::renderer::SpriteId::SCORE_POPUP_250.0),
+                erase_address: 0x9C40,
+                center_x: 0x0A,
+                center_y: 0x46,
+                top_left_x: 0x08,
+                top_left_y: 0x44,
+                object_address: Some(0xA253),
+                score_popup_lifetime_ticks: Some(50),
+                score_popup_value: Some(250),
+                explosion_frame: None,
+                explosion_lifetime_frames: None,
+            }
+        );
+        assert_eq!(
+            snapshot.expanded_objects.details[1],
+            crate::machine_state::ExpandedObjectDetailState {
+                kind: crate::machine_state::ExpandedObjectKindState::ScorePopup,
+                slot_address: 0x9C40,
+                size: 0x8000,
+                descriptor_address: red_label_object_picture_address("C5P1").expect("C5P1 address"),
+                picture_label: Some("C5P1"),
+                picture_size: Some((6, 6)),
+                mapped_sprite: Some(crate::renderer::SpriteId::SCORE_POPUP_500.0),
+                erase_address: 0x9C80,
+                center_x: 0x24,
+                center_y: 0x54,
+                top_left_x: 0x21,
+                top_left_y: 0x51,
+                object_address: Some(0xA266),
+                score_popup_lifetime_ticks: Some(50),
+                score_popup_value: Some(500),
+                explosion_frame: None,
+                explosion_lifetime_frames: None,
+            }
         );
     }
 
@@ -50741,6 +50916,23 @@ mod tests {
             machine.red_label_ram_range(0xA0B0..0xA0B5),
             Some(&[0xD4, 0xE2, 0xE0, 0x01, 0x01][..])
         );
+
+        let snapshot = machine.snapshot();
+        let terrain_blow = snapshot.terrain_blow.expect("terrain blow snapshot");
+        assert_eq!(
+            terrain_blow.stage,
+            crate::game::TerrainBlowStage::ExplosionPassSleeping
+        );
+        assert!(terrain_blow.status_terrain_blown);
+        assert_eq!(terrain_blow.source_iteration, 0);
+        assert_eq!(terrain_blow.source_sleep_remaining, Some(2));
+        assert_eq!(terrain_blow.source_pseudo_color, 0x3C);
+        assert_eq!(terrain_blow.source_overload_counter, 8);
+        assert_eq!(terrain_blow.terrain_erase_entries, 0x98);
+        assert_eq!(terrain_blow.scanner_terrain_erase_entries, 0x40);
+        assert_eq!(terrain_blow.terrain_words_remaining, 0);
+        assert_eq!(terrain_blow.scanner_terrain_words_remaining, 0);
+        assert_eq!(terrain_blow.explosions_per_pass, 2);
     }
 
     #[test]
@@ -62743,6 +62935,16 @@ mod tests {
             machine.red_label_ram_range(process + 0x02..process + 0x05),
             Some(&[0xC6, 0x49, 0x01][..])
         );
+        let snapshot = machine.snapshot();
+        let cloud = snapshot
+            .player_explosion
+            .expect("machine snapshot player explosion");
+        assert_eq!(cloud.source_color, 0xFF);
+        assert_eq!(cloud.source_color_counter, 55);
+        assert_eq!(cloud.source_color_index, 0);
+        assert_eq!(cloud.frame, 1);
+        assert_eq!(cloud.piece_count, live_pieces);
+        assert!(cloud.piece_count > 0);
     }
 
     #[test]
@@ -64776,7 +64978,7 @@ mod tests {
         );
         assert_eq!(
             machine.red_label_ram_range(0xA08B..0xA08F),
-            Some(&[0x02, 0x00, 0xA1, 0xFF][..])
+            Some(&[0x02, 0x01, 0xA1, 0xFF][..])
         );
         assert_eq!(
             machine.red_label_ram_range(0xA1C2..0xA1C6),
@@ -64806,8 +65008,8 @@ mod tests {
                 player_one_score: 123_456,
                 player_two_score: 654_321,
                 wave: 0,
-                lives: 0,
-                smart_bombs: 0,
+                lives: 3,
+                smart_bombs: 3,
                 seed: 0x12,
                 hseed: 0x34,
                 lseed: 0x56,

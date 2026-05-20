@@ -5,6 +5,19 @@ use super::machine_sound::*;
 use super::machine_video::*;
 use super::machine_world::*;
 use super::*;
+use crate::game::{
+    PLAYER_EXPLOSION_PIECE_LIMIT, PlayerExplosionCloudSnapshot, PlayerExplosionPieceSnapshot,
+    SOURCE_EXPLOSION_LIFETIME_FRAMES, SOURCE_PLAYER_EXPLOSION_COLORS,
+    SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS, SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
+    SOURCE_TERRAIN_BLOW_STATUS_BIT, TerrainBlowSnapshot, TerrainBlowStage,
+    source_explosion_frame_index, source_player_explosion_color_index_for_pointer,
+};
+use crate::machine_state::{
+    EXPANDED_OBJECT_DETAIL_LIMIT, ExpandedObjectDetailState, ExpandedObjectKindState,
+    ExpandedObjectState, OBJECT_LIST_DETAIL_LIMIT, ObjectListDetailState, ObjectListNameState,
+    ObjectListState,
+};
+use crate::renderer::SpriteId;
 
 impl RedLabelRuntimeMemory {
     pub fn new_cold_boot() -> Result<Self, String> {
@@ -357,6 +370,30 @@ impl RedLabelRuntimeMemory {
         Ok(RuntimeHighScoreEntry { score, initials })
     }
 
+    pub(super) fn high_score_tables(&self) -> Result<HighScoreTablesState, String> {
+        Ok(HighScoreTablesState {
+            all_time: self.high_score_table_snapshot(RuntimeHighScoreTable::AllTime)?,
+            todays_greatest: self
+                .high_score_table_snapshot(RuntimeHighScoreTable::TodaysGreatest)?,
+        })
+    }
+
+    fn high_score_table_snapshot(
+        &self,
+        table: RuntimeHighScoreTable,
+    ) -> Result<[HighScoreTableEntryState; RED_LABEL_HIGH_SCORE_ENTRIES], String> {
+        let mut entries = [HighScoreTableEntryState::EMPTY; RED_LABEL_HIGH_SCORE_ENTRIES];
+        for (index, entry) in entries.iter_mut().enumerate() {
+            let source = self.high_score_entry(table, index)?;
+            *entry = HighScoreTableEntryState {
+                rank: u8::try_from(index + 1).expect("red-label high-score rank should fit in u8"),
+                score: source.score,
+                initials: source.initials,
+            };
+        }
+        Ok(entries)
+    }
+
     pub(super) fn write_high_score_entry(
         &mut self,
         table: RuntimeHighScoreTable,
@@ -405,6 +442,368 @@ impl RedLabelRuntimeMemory {
 
     pub fn object_table_crc32(&self) -> u32 {
         crc32(&self.ram[self.object_table_range.clone()])
+    }
+
+    pub(super) fn object_list_state(&self) -> Result<ObjectListState, String> {
+        let layout = red_label_ram_layout()?;
+        let lists = red_label_linked_lists()?;
+        let mut state = ObjectListState {
+            active_count: self.object_list_count(&layout, &lists, "active_object")?,
+            inactive_count: self.object_list_count(&layout, &lists, "inactive_object")?,
+            projectile_count: self.object_list_count(&layout, &lists, "shell_object")?,
+            visible_count: self.visible_active_object_count(&layout, &lists)?,
+            evidence_crc32: self.object_table_crc32(),
+            detail_count: 0,
+            details: [ObjectListDetailState::EMPTY; OBJECT_LIST_DETAIL_LIMIT],
+        };
+
+        self.collect_object_list_details(
+            &layout,
+            &lists,
+            "active_object",
+            ObjectListNameState::Active,
+            &mut state,
+        )?;
+        self.collect_object_list_details(
+            &layout,
+            &lists,
+            "inactive_object",
+            ObjectListNameState::Inactive,
+            &mut state,
+        )?;
+        self.collect_object_list_details(
+            &layout,
+            &lists,
+            "shell_object",
+            ObjectListNameState::Projectile,
+            &mut state,
+        )?;
+
+        Ok(state)
+    }
+
+    fn object_list_count(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        lists: &[RedLabelLinkedList],
+        list: &str,
+    ) -> Result<u16, String> {
+        let object_table = table_descriptor(layout, "object")?;
+        let mut object_address = self.read_word(linked_list(lists, list)?.head_address)?;
+        let mut count = 0u16;
+
+        for _ in 0..object_table.entries {
+            if object_address == 0 {
+                return Ok(count);
+            }
+            object_table_for_address(layout, object_address)?;
+            count = count.saturating_add(1);
+            object_address = self.read_object_word(layout, object_address, "OLINK")?;
+        }
+
+        Err(format!(
+            "red-label {list} object list did not terminate within object table size"
+        ))
+    }
+
+    fn visible_active_object_count(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        lists: &[RedLabelLinkedList],
+    ) -> Result<u16, String> {
+        let object_table = table_descriptor(layout, "object")?;
+        let mut object_address =
+            self.read_word(linked_list(lists, "active_object")?.head_address)?;
+        let mut count = 0u16;
+
+        for _ in 0..object_table.entries {
+            if object_address == 0 {
+                return Ok(count);
+            }
+            object_table_for_address(layout, object_address)?;
+            let screen_address = self.read_object_screen_address(layout, object_address)?;
+            let picture_address = self.read_object_word(layout, object_address, "OPICT")?;
+            if screen_address != 0 && red_label_object_picture(picture_address).is_ok() {
+                count = count.saturating_add(1);
+            }
+            object_address = self.read_object_word(layout, object_address, "OLINK")?;
+        }
+
+        Err(String::from(
+            "red-label active object list did not terminate within object table size",
+        ))
+    }
+
+    fn collect_object_list_details(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        lists: &[RedLabelLinkedList],
+        list: &str,
+        list_name: ObjectListNameState,
+        state: &mut ObjectListState,
+    ) -> Result<(), String> {
+        let object_table = table_descriptor(layout, "object")?;
+        let mut object_address = self.read_word(linked_list(lists, list)?.head_address)?;
+
+        for _ in 0..object_table.entries {
+            if object_address == 0 || usize::from(state.detail_count) >= OBJECT_LIST_DETAIL_LIMIT {
+                return Ok(());
+            }
+            object_table_for_address(layout, object_address)?;
+            state.details[usize::from(state.detail_count)] =
+                self.object_list_detail(layout, object_table, list_name, object_address)?;
+            state.detail_count += 1;
+            object_address = self.read_object_word(layout, object_address, "OLINK")?;
+        }
+
+        Err(format!(
+            "red-label {list} object list did not terminate within object table size"
+        ))
+    }
+
+    fn object_list_detail(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        object_table: &RedLabelRamLayoutEntry,
+        list: ObjectListNameState,
+        object_address: u16,
+    ) -> Result<ObjectListDetailState, String> {
+        let screen = self.read_object_screen_address(layout, object_address)?;
+        let [screen_x, screen_y] = screen.to_be_bytes();
+        let picture_address = self.read_object_word(layout, object_address, "OPICT")?;
+        let picture = red_label_object_picture(picture_address).ok();
+        Ok(ObjectListDetailState {
+            list,
+            address: object_address,
+            slot: entry_index_for_address(object_table, object_address)?,
+            screen_x,
+            screen_y,
+            world_x: self.read_object_word(layout, object_address, "OX16")?,
+            world_y: self.read_object_word(layout, object_address, "OY16")?,
+            velocity_x: self.read_object_word(layout, object_address, "OXV")?,
+            velocity_y: self.read_object_word(layout, object_address, "OYV")?,
+            picture_address,
+            picture_label: picture.map(|picture| picture.label.as_str()),
+            picture_size: picture.map(|picture| (picture.width, picture.height)),
+            primary_image_address: picture.map(|picture| picture.primary_image),
+            alternate_image_address: picture.and_then(|picture| picture.alternate_image),
+            mapped_sprite: picture
+                .and_then(|picture| SpriteId::for_object_picture_label(&picture.label))
+                .map(|sprite| sprite.0),
+            object_type: self.read_object_byte(layout, object_address, "OTYP")?,
+            scanner_color: self.read_object_word(layout, object_address, "OBJCOL")?,
+        })
+    }
+
+    pub(super) fn expanded_object_state(&self) -> Result<ExpandedObjectState, String> {
+        let layout = red_label_ram_layout()?;
+        let table = table_descriptor(&layout, "appearance_ram")?;
+        let last_slot = self.read_field_word(&layout, "base_page", "LSEXPL")?;
+        let mut state = ExpandedObjectState {
+            active_count: 0,
+            last_slot_address: (last_slot != 0).then_some(last_slot),
+            detail_count: 0,
+            details: [ExpandedObjectDetailState::EMPTY; EXPANDED_OBJECT_DETAIL_LIMIT],
+        };
+
+        for entry_index in 0..table.entries {
+            let slot_address = table
+                .base
+                .wrapping_add(entry_index.wrapping_mul(table.entry_size));
+            let size = self.read_appearance_word(&layout, slot_address, "RSIZE")?;
+            if size == 0 {
+                continue;
+            }
+
+            state.active_count = state.active_count.saturating_add(1);
+            if usize::from(state.detail_count) >= EXPANDED_OBJECT_DETAIL_LIMIT {
+                continue;
+            }
+
+            state.details[usize::from(state.detail_count)] =
+                self.expanded_object_detail(&layout, slot_address, size)?;
+            state.detail_count += 1;
+        }
+
+        Ok(state)
+    }
+
+    fn expanded_object_detail(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+        slot_address: u16,
+        size: u16,
+    ) -> Result<ExpandedObjectDetailState, String> {
+        let descriptor_address = self.read_appearance_word(layout, slot_address, "OBDESC")?;
+        let picture = red_label_object_picture(descriptor_address).ok();
+        let picture_label = picture.map(|picture| picture.label.as_str());
+        let score_popup = score_popup_metadata_for_picture_label(picture_label);
+        let kind = expanded_object_kind_for_detail(size, picture_label);
+        let explosion_frame = source_expanded_explosion_frame(kind, size);
+        let erase_address = self.read_appearance_word(layout, slot_address, "ERASES")?;
+        let [center_x, center_y] = self
+            .read_appearance_word(layout, slot_address, "CENTER")?
+            .to_be_bytes();
+        let [top_left_x, top_left_y] = self
+            .read_appearance_word(layout, slot_address, "TOPLFT")?
+            .to_be_bytes();
+        let object_address = self.read_appearance_word(layout, slot_address, "OBJPTR")?;
+
+        Ok(ExpandedObjectDetailState {
+            kind,
+            slot_address,
+            size,
+            descriptor_address,
+            picture_label,
+            picture_size: picture.map(|picture| (picture.width, picture.height)),
+            mapped_sprite: picture
+                .and_then(|picture| SpriteId::for_object_picture_label(&picture.label))
+                .map(|sprite| sprite.0),
+            erase_address,
+            center_x,
+            center_y,
+            top_left_x,
+            top_left_y,
+            object_address: (object_address != 0).then_some(object_address),
+            score_popup_lifetime_ticks: score_popup.map(|metadata| metadata.lifetime_ticks),
+            score_popup_value: score_popup.map(|metadata| metadata.value),
+            explosion_frame,
+            explosion_lifetime_frames: explosion_frame.map(|_| SOURCE_EXPLOSION_LIFETIME_FRAMES),
+        })
+    }
+
+    pub(super) fn player_explosion_cloud(
+        &self,
+    ) -> Result<Option<PlayerExplosionCloudSnapshot>, String> {
+        let layout = red_label_ram_layout()?;
+        let color_table_address = red_label_player_death_table("PXCOL")?.address;
+        let color_pointer = self.read_field_word(&layout, "player_explosion_state", "PCOLP")?;
+        let Some(source_color_index) =
+            source_player_explosion_color_index_for_pointer(color_pointer, color_table_address)
+        else {
+            return Ok(None);
+        };
+        let source_color = SOURCE_PLAYER_EXPLOSION_COLORS[usize::from(source_color_index)];
+        if source_color == 0 {
+            return Ok(None);
+        }
+
+        let source_color_counter =
+            self.read_field_byte(&layout, "player_explosion_state", "PCOLC")?;
+        let mut snapshot = PlayerExplosionCloudSnapshot {
+            source_color,
+            source_color_counter,
+            source_color_index,
+            frame: source_player_explosion_frame(source_color_index, source_color_counter),
+            ..PlayerExplosionCloudSnapshot::EMPTY
+        };
+        let table = table_descriptor(&layout, "player_explosion_table")?;
+
+        for entry_index in 0..table.entries.min(PLAYER_EXPLOSION_PIECE_LIMIT as u16) {
+            let piece_address = table.base + entry_index * table.entry_size;
+            let screen_address = self.read_player_explosion_word(&layout, piece_address, "PSCR")?;
+            if screen_address == 0 {
+                continue;
+            }
+            let x_position = self.read_player_explosion_word(&layout, piece_address, "PXPOST")?;
+            let split = x_position.to_be_bytes()[1] & 0x80 != 0;
+            if !self.player_explosion_screen_piece_visible(screen_address, split) {
+                continue;
+            }
+
+            snapshot.push_piece(PlayerExplosionPieceSnapshot {
+                position: crate::systems::ScreenPosition::from_packed(screen_address),
+                split,
+            });
+        }
+
+        Ok(Some(snapshot))
+    }
+
+    fn player_explosion_screen_piece_visible(&self, screen_address: u16, split: bool) -> bool {
+        let primary_visible = matches!(self.read_word(screen_address), Ok(word) if word != 0);
+        let secondary_visible = split
+            && matches!(
+                self.read_word(screen_address.wrapping_add(0x0100)),
+                Ok(word) if word != 0
+            );
+        primary_visible || secondary_visible
+    }
+
+    pub(super) fn terrain_blow_snapshot(&self) -> Result<Option<TerrainBlowSnapshot>, String> {
+        let layout = red_label_ram_layout()?;
+        let status = self.read_field_byte(&layout, "base_page", "STATUS")?;
+        if status & SOURCE_TERRAIN_BLOW_STATUS_BIT == 0 {
+            return Ok(None);
+        }
+
+        let terrain_table = field_range(&layout, "terrain_screen_table", "STBL")?;
+        let scanner_table = field_range(&layout, "scanner_terrain_erase", "STETAB")?;
+        let (stage, source_iteration, source_sleep_remaining) =
+            self.terrain_blow_process_state(&layout).unwrap_or((
+                TerrainBlowStage::Completed,
+                SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
+                None,
+            ));
+
+        Ok(Some(TerrainBlowSnapshot {
+            stage,
+            status_terrain_blown: true,
+            source_iteration,
+            source_iteration_limit: SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
+            source_sleep_remaining,
+            source_pseudo_color: self
+                .read_byte(field_range(&layout, "base_page", "PCRAM")?.start)?,
+            source_overload_counter: self.read_field_byte(&layout, "base_page", "OVCNT")?,
+            terrain_erase_entries: table_word_entries(&terrain_table)?,
+            scanner_terrain_erase_entries: table_word_entries(&scanner_table)?,
+            terrain_words_remaining: self.indirect_nonzero_words_in_table(terrain_table)?,
+            scanner_terrain_words_remaining: self.indirect_nonzero_words_in_table(scanner_table)?,
+            explosions_per_pass: SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS,
+        }))
+    }
+
+    fn terrain_blow_process_state(
+        &self,
+        layout: &[RedLabelRamLayoutEntry],
+    ) -> Result<(TerrainBlowStage, u8, Option<u8>), String> {
+        let process_address = self.current_process_address(layout)?;
+        let routine_address = self.read_process_word(layout, process_address, "PADDR")?;
+        let iteration = self.read_process_byte(layout, process_address, "PD")?;
+        let sleep_remaining = Some(self.read_process_byte(layout, process_address, "PTIME")?);
+
+        if routine_address == red_label_routine_address("TERBLO")?
+            || routine_address == red_label_routine_address("TBL3")?
+        {
+            return Ok((
+                TerrainBlowStage::ExplosionPassSleeping,
+                iteration,
+                sleep_remaining,
+            ));
+        }
+        if routine_address == red_label_routine_address("TBL4")? {
+            return Ok((
+                TerrainBlowStage::FlashClearedSleeping,
+                iteration,
+                sleep_remaining,
+            ));
+        }
+
+        Ok((TerrainBlowStage::Completed, iteration, None))
+    }
+
+    fn indirect_nonzero_words_in_table(&self, table: std::ops::Range<u16>) -> Result<u16, String> {
+        table_word_entries(&table)?;
+        let mut remaining = 0u16;
+        let mut cursor = table.start;
+        while cursor != table.end {
+            let screen_address = self.read_word(cursor)?;
+            if screen_address != 0 && self.read_word(screen_address)? != 0 {
+                remaining = remaining.saturating_add(1);
+            }
+            cursor = cursor.wrapping_add(2);
+        }
+        Ok(remaining)
     }
 
     pub fn process_table_crc32(&self) -> u32 {
@@ -20710,4 +21109,70 @@ impl RedLabelRuntimeMemory {
             .ok_or_else(|| format!("red-label RAM word write 0x{address:04X} overflows"))?;
         self.write_byte(low_address, low)
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ScorePopupMetadata {
+    lifetime_ticks: u8,
+    value: u16,
+}
+
+fn expanded_object_kind_for_detail(
+    size: u16,
+    picture_label: Option<&str>,
+) -> ExpandedObjectKindState {
+    if score_popup_metadata_for_picture_label(picture_label).is_some() {
+        return ExpandedObjectKindState::ScorePopup;
+    }
+    if size & 0x8000 != 0 {
+        ExpandedObjectKindState::Appearance
+    } else {
+        ExpandedObjectKindState::Explosion
+    }
+}
+
+fn score_popup_metadata_for_picture_label(
+    picture_label: Option<&str>,
+) -> Option<ScorePopupMetadata> {
+    match picture_label {
+        Some("C25P1") => Some(ScorePopupMetadata {
+            lifetime_ticks: 50,
+            value: 250,
+        }),
+        Some("C5P1") => Some(ScorePopupMetadata {
+            lifetime_ticks: 50,
+            value: 500,
+        }),
+        _ => None,
+    }
+}
+
+fn source_expanded_explosion_frame(kind: ExpandedObjectKindState, size: u16) -> Option<u8> {
+    if kind != ExpandedObjectKindState::Explosion {
+        return None;
+    }
+    source_explosion_frame_index(size)
+}
+
+fn source_player_explosion_frame(source_color_index: u8, source_color_counter: u8) -> u16 {
+    if source_color_index == 0 {
+        return u16::from(56u8.saturating_sub(source_color_counter));
+    }
+
+    let completed_initial_color_frames = 56u16;
+    let completed_reload_color_frames =
+        u16::from(source_color_index.saturating_sub(1)).saturating_mul(4);
+    completed_initial_color_frames
+        .saturating_add(completed_reload_color_frames)
+        .saturating_add(u16::from(4u8.saturating_sub(source_color_counter)))
+}
+
+fn table_word_entries(table: &std::ops::Range<u16>) -> Result<u16, String> {
+    if !(table.end - table.start).is_multiple_of(2) {
+        return Err(format!(
+            "red-label table range 0x{:04X}..0x{:04X} must contain word entries",
+            table.start, table.end
+        ));
+    }
+    Ok((table.end - table.start) / 2)
 }

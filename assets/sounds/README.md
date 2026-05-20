@@ -1,10 +1,20 @@
 # Sounds
 
-This directory now holds legacy reference cue assets only.
+This directory is reserved for new non-legacy sound artifacts.
 
-The clean-slate runtime does not decode these `.wav` files and does not embed
-them into the shipped binary. They remain checked in only as archived prototype
-reference cues.
+Pre-existing prototype `.wav` cue files are legacy assets and live under
+`assets/arcade/`. Do not move those archived cues here unless a later cycle
+explicitly reclassifies them with stronger provenance. Source-derived command
+and timing evidence still belongs under `assets/red-label/`.
+
+The clean-slate runtime does not decode archived prototype `.wav` files and
+does not embed them into the shipped binary. They remain checked in only as
+legacy reference cues under `assets/arcade/`.
+
+R7 live audio uses synthesized device output from clean `SoundEvent` batches.
+That backend does not introduce new sound artifacts and does not reclassify the
+archived prototype `.wav` cues. Missing host output falls back to the no-device
+null backend; `--mute` disables audio delivery entirely.
 
 Exact audio must be implemented from raw main-board sound command writes and
 translated Williams sound-board routines from `VSNDRM1.SRC`. The clean-slate
