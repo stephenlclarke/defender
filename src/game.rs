@@ -3962,9 +3962,13 @@ fn advance_source_mini_swarmer(
     } else {
         source_swarmer.shot_timer = source_swarmer.shot_timer.wrapping_sub(1);
         if source_swarmer.shot_timer == 0 {
-            if let Some(projectile) =
-                source_mini_swarmer_bomb(position, *source_swarmer, player_position, source_rng)
-            {
+            if let Some(projectile) = source_mini_swarmer_bomb(
+                position,
+                *source_swarmer,
+                player_position,
+                source_rng,
+                enemy_projectiles.len(),
+            ) {
                 enemy_projectiles.push(projectile);
             }
             source_swarmer.shot_timer =
@@ -4026,11 +4030,16 @@ fn source_mini_swarmer_bomb(
     source_swarmer: SourceSwarmerSnapshot,
     player_position: ScreenPosition,
     source_rng: &mut SourceRandSnapshot,
+    active_shells: usize,
 ) -> Option<EnemyProjectileSnapshot> {
     let player_delta = (u16::from(player_position.x) << 8)
         .wrapping_sub(u16::from_be_bytes([position.x, source_swarmer.x_fraction]));
     if (player_delta.to_be_bytes()[0] ^ source_swarmer.x_velocity.to_be_bytes()[0]) & 0x80 != 0 {
         source_rng.advance();
+        return None;
+    }
+
+    if active_shells >= SOURCE_SHELL_LIMIT {
         return None;
     }
 
@@ -8877,6 +8886,81 @@ mod tests {
                 && sprite.position == [32.0, 96.0]
                 && sprite.size == [4.0, 6.0]
         }));
+    }
+
+    #[test]
+    fn clean_game_mini_swarmer_bomb_respects_source_shell_limit() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2200), super::world_word(0x7000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::source_swarmer(
+            ScreenPosition::new(32, 96),
+            ScreenVelocity::new(1, 1),
+            SourceSwarmerSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0x0020,
+                y_velocity: 0x0100,
+                acceleration: 0x20,
+                shot_timer: 1,
+                sleep_ticks: 0,
+                horizontal_seek_pending: false,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans.clear();
+        game.state.world.enemy_projectiles = (0..super::SOURCE_SHELL_LIMIT)
+            .map(|_| {
+                super::EnemyProjectileSnapshot::source_fireball(
+                    ScreenPosition::new(0x90, 0xE0),
+                    0,
+                    0,
+                )
+            })
+            .collect();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x80,
+            hseed: 0x00,
+            lseed: 0x40,
+        };
+        game.baiter_timer_ticks = None;
+        let expected_rng = game.state.world.source_rng;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame.state.world.enemy_projectiles.len(),
+            super::SOURCE_SHELL_LIMIT
+        );
+        assert_eq!(frame.state.world.source_rng, expected_rng);
+        let swarmer = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source swarmer should remain active");
+        let source = swarmer
+            .source_swarmer
+            .expect("source swarmer state should be retained");
+        assert_eq!(
+            source.shot_timer,
+            super::source_rmax(
+                game.state.wave_profile.swarmer_shot_time as u8,
+                expected_rng.seed
+            )
+        );
+        assert_eq!(
+            frame.state.world.object_evidence.projectile_count,
+            super::SOURCE_SHELL_LIMIT as u16
+        );
+        assert!(
+            frame
+                .state
+                .world
+                .enemy_projectiles
+                .iter()
+                .all(|projectile| projectile.position != ScreenPosition::new(32, 96))
+        );
     }
 
     #[test]

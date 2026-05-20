@@ -627,6 +627,14 @@ post-acceptance validation records.
   Remaining B08 work is exact per-family movement/projectile behavior, exact
   baiter velocity/shot behavior, enemy projectile collision/lifetime parity,
   and focused source ecology fixtures for those transitions.
+- `2026-05-20 20:44:12 BST`: R9-C4 adds the bounded mini-swarmer source shell
+  cap slice. The clean `SWBMB` fireball path now receives the current active
+  enemy-projectile count and refuses to append another shell when the source
+  shell free-list cap is already full, preserving the existing direction gate,
+  shot-timer reset, and source RNG behavior. Runtime behavior changes only for
+  the full-shell edge case. Remaining B08 work is remaining per-family
+  movement/projectile behavior and focused source ecology fixtures for those
+  transitions.
 - `2026-05-17 22:10:48 BST`: R9-C4 adds the bounded source baiter
   movement/fireball slice. Clean baiters now retain source shot-timer,
   picture-cycle, sleep, and velocity state after the source-paced runtime entry;

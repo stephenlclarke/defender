@@ -979,9 +979,10 @@ Object-ecology progress after R9-C4 slices:
   swarmer limit. Spawned mini-swarmers carry source RNG-derived velocity,
   acceleration, sleep, and shot-timer state, then advance through the source
   entry seek, fixed-point loop, vertical acceleration/damping, turnback, and
-  `SWBMB` enemy-bomb projection shape. Reserve mini-swarmer activation now
-  mirrors the source `PLRES`/`RSW0` phony-object placement and carries the
-  source placement fractions into the same source swarmer runtime. Pod reserve
+  `SWBMB` enemy-bomb projection shape with the same source shell free-list cap
+  as other fireball paths. Reserve mini-swarmer activation now mirrors the
+  source `PLRES`/`RSW0` phony-object placement and carries the source placement
+  fractions into the same source swarmer runtime. Pod reserve
   activation now mirrors the source `PRBST`/`PRBRES` restore placement and
   velocity bytes, then carries restored pods through source fixed-point
   X/Y motion.
@@ -1813,6 +1814,24 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779305752169999`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779306028776519`.
+- `2026-05-20 20:44:12 BST` R9-C4 progress slice
+  `mini-swarmer source shell cap`. The clean `SWBMB` fireball path now receives
+  the current enemy-projectile count and refuses to append another shell when
+  the source shell free-list cap is already full. This preserves the existing
+  direction gate, shot-timer reset, and source RNG behavior while closing the
+  full-shell edge case for mini-swarmer bombs. Focused validation passed:
+  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
+  `cargo test clean_game_mini_swarmer --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="wave_advance"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
+  clippy, `make fidelity`, and full all-scenario `make clean-fidelity` remain
+  deferred because this is a bounded Step 50 projectile-cap slice, not Step 50
+  or Phase 3 closure. The next full gate should run when Step 50 closes,
+  another broader shared-contract risk appears, or R9 finalization begins.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779306259354109`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779307987920709`.
 
 ## Archived Completed History
 
