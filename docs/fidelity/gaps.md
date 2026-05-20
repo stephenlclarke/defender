@@ -765,6 +765,16 @@ post-acceptance validation records.
   and scenario paths are unchanged. Remaining B08 work is remaining
   per-family movement/projectile behavior and focused source ecology fixtures
   for those transitions.
+- `2026-05-20 20:35:45 BST`: R9-C4 adds the bounded reserve inactive
+  object-evidence detail slice. Clean `EnemyReserveSnapshot` totals still own
+  reserve counts, and clean object evidence now expands those counts into
+  capped `ObjectEvidenceList::Inactive` rows after active and projectile rows.
+  Those rows carry reserved family categories, source object-picture
+  descriptors, deterministic source object-table identity, mapped clean
+  sprites, and source scanner colors while leaving position and velocity empty
+  until activation. Runtime behavior and scenario paths are unchanged.
+  Remaining B08 work is remaining per-family movement/projectile behavior and
+  focused source ecology fixtures for those transitions.
 - `2026-05-20 20:29:31 BST`: R9-C4 adds the bounded source object-table identity
   evidence slice. Clean enemy, human, player-projectile, and enemy-projectile
   object-evidence rows now carry deterministic source-layout addresses from

@@ -925,6 +925,16 @@ impl EnemyReserveSnapshot {
         self.total() == 0
     }
 
+    fn source_family_counts(self) -> [(EnemyKind, u8); 5] {
+        [
+            (EnemyKind::Lander, self.landers),
+            (EnemyKind::Bomber, self.bombers),
+            (EnemyKind::Pod, self.pods),
+            (EnemyKind::Mutant, self.mutants),
+            (EnemyKind::Swarmer, self.swarmers),
+        ]
+    }
+
     fn take(&mut self, kind: EnemyKind) -> bool {
         let remaining = match kind {
             EnemyKind::Lander => &mut self.landers,
@@ -2374,6 +2384,7 @@ impl WorldSnapshot {
         for projectile in &self.enemy_projectiles {
             object_evidence.push_clean_enemy_projectile_detail(*projectile);
         }
+        object_evidence.push_clean_reserve_details(self.enemy_reserve);
         self.object_evidence = object_evidence;
     }
 
@@ -2618,6 +2629,42 @@ impl ObjectEvidenceSnapshot {
         };
         self.detail_count += 1;
     }
+
+    fn push_clean_reserve_details(&mut self, reserve: EnemyReserveSnapshot) {
+        for (kind, count) in reserve.source_family_counts() {
+            for _ in 0..count {
+                self.push_clean_reserve_detail(kind);
+            }
+        }
+    }
+
+    fn push_clean_reserve_detail(&mut self, kind: EnemyKind) {
+        let index = usize::from(self.detail_count);
+        if index >= OBJECT_EVIDENCE_DETAIL_LIMIT {
+            return;
+        }
+        let descriptor = source_reserve_picture_descriptor(kind);
+        let identity = source_object_table_identity(index);
+        let object_category = kind.object_category();
+        self.details[index] = ObjectEvidenceDetailSnapshot {
+            list: ObjectEvidenceList::Inactive,
+            object_category: Some(object_category),
+            address: Some(identity.address),
+            slot: Some(identity.slot),
+            screen_position: None,
+            world_position: None,
+            velocity: None,
+            picture_address: Some(descriptor.address),
+            picture_label: Some(descriptor.label),
+            picture_size: Some(descriptor.size),
+            primary_image_address: Some(descriptor.primary_image_address),
+            alternate_image_address: descriptor.alternate_image_address,
+            mapped_sprite: Some(descriptor.mapped_sprite),
+            object_type: Some(identity.object_type),
+            scanner_color: scanner_color_for_object_category(object_category),
+        };
+        self.detail_count += 1;
+    }
 }
 
 fn scanner_radar_stage_for_frame(frame: u64) -> ScannerRadarStage {
@@ -2699,6 +2746,17 @@ fn source_object_table_identity(detail_index: usize) -> SourceObjectTableIdentit
             .wrapping_add(SOURCE_OBJECT_TABLE_STRIDE.wrapping_mul(slot)),
         slot,
         object_type: SOURCE_OBJECT_DEFAULT_TYPE,
+    }
+}
+
+fn source_reserve_picture_descriptor(kind: EnemyKind) -> SourceObjectPictureDescriptor {
+    match kind {
+        EnemyKind::Lander => source_lander_picture_descriptor(0),
+        EnemyKind::Mutant => SOURCE_MUTANT_PICTURE_DESCRIPTOR,
+        EnemyKind::Bomber => source_bomber_picture_descriptor(0),
+        EnemyKind::Pod => SOURCE_POD_PICTURE_DESCRIPTOR,
+        EnemyKind::Swarmer => SOURCE_SWARMER_PICTURE_DESCRIPTOR,
+        EnemyKind::Baiter => source_baiter_picture_descriptor(0),
     }
 }
 
@@ -7172,7 +7230,7 @@ mod tests {
         );
         assert_eq!(first.object_evidence.active_count, 7);
         assert_eq!(first.object_evidence.inactive_count, 10);
-        assert_eq!(first.object_evidence.detail_count, 7);
+        assert_eq!(first.object_evidence.detail_count, 16);
 
         let second = WorldSnapshot::for_wave(2);
 
@@ -7413,6 +7471,107 @@ mod tests {
             assert_eq!(detail.primary_image_address, Some(expected.4));
             assert_eq!(detail.alternate_image_address, Some(expected.5));
             assert_eq!(detail.mapped_sprite, Some(expected.6));
+        }
+    }
+
+    #[test]
+    fn clean_world_object_evidence_carries_reserve_inactive_source_details() {
+        let mut world = WorldSnapshot {
+            enemies: vec![EnemySnapshot::new(
+                EnemyKind::Lander,
+                ScreenPosition::new(0x40, 0x60),
+                ScreenVelocity::new(0, 0),
+            )],
+            enemy_reserve: EnemyReserveSnapshot {
+                landers: 1,
+                bombers: 1,
+                pods: 1,
+                mutants: 1,
+                swarmers: 1,
+            },
+            ..WorldSnapshot::default()
+        };
+
+        world.refresh_object_evidence();
+
+        assert_eq!(world.object_evidence.active_count, 1);
+        assert_eq!(world.object_evidence.inactive_count, 5);
+        assert_eq!(world.object_evidence.detail_count, 6);
+        assert_eq!(
+            world.object_evidence.details[0].list,
+            ObjectEvidenceList::Active
+        );
+
+        let expected = [
+            (
+                ObjectEvidenceCategory::Lander,
+                "LNDP1",
+                0xF985,
+                (5, 8),
+                0xCCE0,
+                0xCD08,
+                SpriteId::ENEMY_LANDER,
+            ),
+            (
+                ObjectEvidenceCategory::Bomber,
+                "TIEP1",
+                0xF929,
+                (4, 8),
+                0xFB4B,
+                0xFB6B,
+                SpriteId::ENEMY_BOMBER,
+            ),
+            (
+                ObjectEvidenceCategory::Pod,
+                "PRBP1",
+                0xF8F7,
+                (4, 8),
+                0xFA8B,
+                0xFAAB,
+                SpriteId::ENEMY_POD,
+            ),
+            (
+                ObjectEvidenceCategory::Mutant,
+                "SCZP1",
+                0xF8CE,
+                (5, 8),
+                0xF9FB,
+                0xFA23,
+                SpriteId::ENEMY_MUTANT,
+            ),
+            (
+                ObjectEvidenceCategory::Swarmer,
+                "SWPIC1",
+                0xF97B,
+                (3, 4),
+                0xCCC8,
+                0xCCD4,
+                SpriteId::ENEMY_SWARMER,
+            ),
+        ];
+
+        for (offset, expected) in expected.into_iter().enumerate() {
+            let index = offset + 1;
+            let detail = world.object_evidence.details[index];
+            let identity = super::source_object_table_identity(index);
+            assert_eq!(detail.list, ObjectEvidenceList::Inactive);
+            assert_eq!(detail.object_category, Some(expected.0));
+            assert_eq!(detail.address, Some(identity.address));
+            assert_eq!(detail.slot, Some(identity.slot));
+            assert_eq!(detail.object_type, Some(identity.object_type));
+            assert_eq!(detail.screen_position, None);
+            assert_eq!(detail.world_position, None);
+            assert_eq!(detail.velocity, None);
+            assert_eq!(detail.picture_label, Some(expected.1));
+            assert_eq!(detail.picture_address, Some(expected.2));
+            assert_eq!(detail.picture_size, Some(expected.3));
+            assert_eq!(detail.primary_image_address, Some(expected.4));
+            assert_eq!(detail.alternate_image_address, Some(expected.5));
+            assert_eq!(detail.mapped_sprite, Some(expected.6));
+            assert_eq!(
+                detail.scanner_color,
+                super::scanner_color_for_object_category(expected.0)
+            );
         }
     }
 
@@ -7836,7 +7995,7 @@ mod tests {
         assert_eq!(active.state.world.object_evidence.projectile_count, 0);
         assert_eq!(active.state.world.object_evidence.visible_count, 7);
         assert_eq!(active.state.world.object_evidence.evidence_crc32, None);
-        assert_eq!(active.state.world.object_evidence.detail_count, 7);
+        assert_eq!(active.state.world.object_evidence.detail_count, 16);
         assert_eq!(
             active.state.world.object_evidence.details[0].screen_position,
             Some(active.state.world.enemies[0].position)
@@ -8020,7 +8179,7 @@ mod tests {
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
         assert_eq!(frame.state.world.object_evidence.visible_count, 8);
         assert_eq!(frame.state.world.object_evidence.evidence_crc32, None);
-        assert_eq!(frame.state.world.object_evidence.detail_count, 8);
+        assert_eq!(frame.state.world.object_evidence.detail_count, 13);
         assert_eq!(
             frame.state.world.object_evidence.details[7].screen_position,
             Some(frame.state.world.projectiles[0].position)

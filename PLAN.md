@@ -954,8 +954,12 @@ Object-ecology progress after R9-C4 slices:
   while mutant runtime entry now comes from source-shaped clean lander mutation.
 - Clean `WorldSnapshot` now carries `EnemyReserveSnapshot` for source-profile
   enemies not in the active batch. Reserve totals flow into inactive object
-  evidence counts, smart bombs and projectile/player collision remove only the
-  active batch, and the next reserve batch activates before `WaveCleared`.
+  evidence counts plus bounded inactive source-detail rows carrying reserved
+  family categories, source object-picture descriptors, deterministic source
+  object-table identity, mapped clean sprites, and source scanner colors while
+  position and velocity remain empty until activation. Smart bombs and
+  projectile/player collision remove only the active batch, and the next
+  reserve batch activates before `WaveCleared`.
   Reserve lander activation now mirrors source `LANDST` placement, fixed-point
   fractions, shot-timer RNG consumption, and X/Y velocity bytes before restored
   landers continue through a bounded source `LANDS0` orbit/shot loop with
@@ -1785,6 +1789,30 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779305212541739`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779305464868959`.
+- `2026-05-20 20:35:45 BST` R9-C4 progress slice
+  `reserve inactive object-evidence details`. Clean reserve enemy totals now
+  expand into bounded `ObjectEvidenceList::Inactive` detail rows after the
+  active/projectile detail rows. The inactive reserve rows carry reserved
+  family categories, source object-picture descriptors, deterministic
+  source-layout addresses from `0xA23C + 0x17 * slot`, source slot numbers,
+  neutral `OTYP` `0x00`, mapped clean sprites, and source scanner colors while
+  leaving screen/world position and velocity empty until activation. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, `cargo test
+  clean_world_object_evidence_carries_reserve_inactive_source_details --lib`,
+  `cargo test object_evidence --lib`, `cargo test clean_game --lib`, `cargo
+  test clean_wave_spawns_source_profile_active_enemy_batch --lib`, touched-doc
+  markdownlint, and `git diff --check`. Targeted clean-fidelity scenarios were
+  not run because this slice changes source evidence fields only, not scenario
+  behavior. Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this slice changes
+  clean object evidence but does not close Step 50 or introduce a broad-risk
+  contract change. The next full gate should run when Step 50 closes, another
+  broader shared-contract risk appears, or R9 finalization begins. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779305752169999`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779306028776519`.
 
 ## Archived Completed History
 

@@ -415,15 +415,19 @@ Initial active pods retain deterministic source fixed-point fractions and
 bounded signed X velocity, then advance through the same source fixed-point
 X/Y motion as source-restored pods.
 Remaining source-profile enemies stay in
-`EnemyReserveSnapshot`, flow into inactive object-evidence counts, and activate
-as the next clean batch before `WaveCleared`; reserve landers now use source
-`LANDST` placement, fixed-point fractions, shot-timer RNG, velocity bytes, and
-then advance through a bounded source `LANDS0` orbit/shot loop with picture
-cycling and source-shaped fireball projection. When no humans remain, the
-reserve lander path follows the source `LANDST` schizoid fallback and restores
-source-shaped mutants directly. Reserve pods now use source `PRBST`/`PRBRES`
-placement, fixed-point fractions, and signed velocity bytes before entering
-source fixed-point X/Y motion. Destroyed pods now spawn a
+`EnemyReserveSnapshot`, flow into inactive object-evidence counts plus bounded
+inactive source-detail rows, and activate as the next clean batch before
+`WaveCleared`; those inactive rows carry the reserved family category, source
+object-picture descriptor, deterministic source object-table identity, mapped
+clean sprite, and source scanner color while leaving position and velocity
+empty until activation. Reserve landers now use source `LANDST` placement,
+fixed-point fractions, shot-timer RNG, velocity bytes, and then advance through
+a bounded source `LANDS0` orbit/shot loop with picture cycling and
+source-shaped fireball projection. When no humans remain, the reserve lander
+path follows the source `LANDST` schizoid fallback and restores source-shaped
+mutants directly. Reserve pods now use source `PRBST`/`PRBRES` placement,
+fixed-point fractions, and signed velocity bytes before entering source
+fixed-point X/Y motion. Destroyed pods now spawn a
 deterministic clean mini-swarmer batch using the source request bound and
 active-swarmer cap across projectile and smart-bomb kills. Spawned
 mini-swarmers carry source RNG-derived velocity, acceleration, sleep, and

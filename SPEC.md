@@ -226,12 +226,16 @@ timers, picture frame, and X/Y velocity, then advance through a bounded source
 projection; initial active pods retain deterministic source fixed-point
 fractions and bounded signed X velocity before entering source fixed-point X/Y
 motion. Remaining source-profile enemies stay in `EnemyReserveSnapshot`, flow
-into inactive object-evidence counts, and activate as the next clean batch
-before `WaveCleared`. Reserve landers now use source `LANDST` placement,
-fixed-point fractions, shot-timer RNG, and velocity bytes, then enter the same
-bounded `LANDS0` runtime; when no humans remain, the same reserve lander path
-follows the source `LANDST` schizoid fallback and restores source-shaped
-mutants directly. Destroyed pods now spawn a deterministic clean
+into inactive object-evidence counts plus bounded inactive source-detail rows,
+and activate as the next clean batch before `WaveCleared`. The inactive rows
+carry the reserved family category, source object-picture descriptor,
+deterministic source object-table identity, mapped clean sprite, and source
+scanner color while position and velocity remain empty until activation.
+Reserve landers now use source `LANDST` placement, fixed-point fractions,
+shot-timer RNG, and velocity bytes, then enter the same bounded `LANDS0`
+runtime; when no humans remain, the same reserve lander path follows the
+source `LANDST` schizoid fallback and restores source-shaped mutants directly.
+Destroyed pods now spawn a deterministic clean
 mini-swarmer batch using the source spawn request bound and active-swarmer cap,
 including projectile and smart-bomb destruction paths. Spawned mini-swarmers
 carry source RNG-derived velocity, acceleration, sleep, and shot-timer state,
