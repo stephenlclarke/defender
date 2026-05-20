@@ -971,7 +971,10 @@ Object-ecology progress after R9-C4 slices:
   current active wave count/order. Initial active pods now carry deterministic
   source fixed-point fractions and bounded signed X velocity into the same
   source fixed-point X/Y motion as source-restored pods while preserving the
-  current active wave count/order.
+  current active wave count/order. Active source enemy fixed-point Y motion now
+  wraps through the source `VELO` `YMIN`/`YMAX` bounds for landers, pods,
+  bombers, mutants, swarmers, and baiters while X motion keeps raw fixed-point
+  wrapping.
 - Clean pod destruction now enters a bounded mini-swarmer transition:
   projectile and smart-bomb pod kills share the clean enemy-destroy path, spawn
   the pod explosion, award the source-backed pod score, and append a
@@ -1889,6 +1892,25 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309053099619`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309277857069`.
+- `2026-05-20 21:43:08 BST` R9-C4 progress slice
+  `active source enemy Y-wrap parity`. Clean active source enemy fixed-point Y
+  motion now mirrors source `VELO` Y-bound handling for landers, pods, bombers,
+  mutants, swarmers, and baiters, wrapping through source `YMIN`/`YMAX` after
+  velocity application while preserving raw fixed-point X wrapping. Added a
+  focused clean-game regression for top and bottom active-object Y-bound
+  wrapping, and updated README, SPEC, and the fidelity gap ledger. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, the focused Y-wrap regression test,
+  `cargo test clean_game --lib`, targeted `make clean-fidelity
+  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
+  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  Step 50 active-enemy movement-edge slice, not Step 50 or Phase 3 closure.
+  The next full gate should run when Step 50 closes, another broader
+  shared-contract risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309445529489`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309785054869`.
 
 ## Archived Completed History
 

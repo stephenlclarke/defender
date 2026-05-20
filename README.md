@@ -427,7 +427,9 @@ source-shaped fireball projection. When no humans remain, the reserve lander
 path follows the source `LANDST` schizoid fallback and restores source-shaped
 mutants directly. Reserve pods now use source `PRBST`/`PRBRES` placement,
 fixed-point fractions, and signed velocity bytes before entering source
-fixed-point X/Y motion. Destroyed pods now spawn a
+fixed-point X/Y motion. Active source enemy Y motion now uses the source
+`VELO` `YMIN`/`YMAX` wrap for landers, pods, bombers, mutants, swarmers, and
+baiters. Destroyed pods now spawn a
 deterministic clean mini-swarmer batch using the source request bound and
 active-swarmer cap across projectile and smart-bomb kills. Spawned
 mini-swarmers carry source RNG-derived velocity, acceleration, sleep, and
@@ -466,8 +468,8 @@ random vertical drift/damping, player-Y steering, off-screen cruise steering,
 and bounded `BOMBST` bomb-shell projection with source `GETSHL` placement
 bounds. Pod reserve activation now uses
 source `PRBST`/`PRBRES` placement, fixed-point fractions, and velocity bytes
-before entering source fixed-point X/Y motion, and reserve bombers now use
-source `TIEST`
+before entering source fixed-point X/Y motion with the same source `VELO`
+Y-bound wrap, and reserve bombers now use source `TIEST`
 player-relative squad placement and alternating X velocity before entering the
 source bomber runtime. Enemy projectile evidence now carries source `BMBP1`
 shell descriptor fields for the standalone mine/source-shell fixture, and

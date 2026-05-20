@@ -1939,7 +1939,7 @@ impl WorldSnapshot {
                     source_lander.x_fraction,
                     source_lander.x_velocity,
                 );
-                let (y, y_fraction) = source_fixed_axis_step(
+                let (y, y_fraction) = source_active_object_y_step(
                     enemy.position.y,
                     source_lander.y_fraction,
                     source_lander.y_velocity,
@@ -1958,7 +1958,7 @@ impl WorldSnapshot {
                     source_pod.x_fraction,
                     source_pod.x_velocity,
                 );
-                let (y, y_fraction) = source_fixed_axis_step(
+                let (y, y_fraction) = source_active_object_y_step(
                     enemy.position.y,
                     source_pod.y_fraction,
                     source_pod.y_velocity,
@@ -1984,7 +1984,7 @@ impl WorldSnapshot {
                     source_bomber.x_fraction,
                     source_bomber.x_velocity,
                 );
-                let (y, y_fraction) = source_fixed_axis_step(
+                let (y, y_fraction) = source_active_object_y_step(
                     enemy.position.y,
                     source_bomber.y_fraction,
                     source_bomber.y_velocity,
@@ -2012,7 +2012,7 @@ impl WorldSnapshot {
                     source_mutant.x_fraction,
                     source_mutant.x_velocity,
                 );
-                let (y, y_fraction) = source_fixed_axis_step(
+                let (y, y_fraction) = source_active_object_y_step(
                     enemy.position.y,
                     source_mutant.y_fraction,
                     source_mutant.y_velocity,
@@ -2039,7 +2039,7 @@ impl WorldSnapshot {
                     source_swarmer.x_fraction,
                     source_swarmer.x_velocity,
                 );
-                let (y, y_fraction) = source_fixed_axis_step(
+                let (y, y_fraction) = source_active_object_y_step(
                     enemy.position.y,
                     source_swarmer.y_fraction,
                     source_swarmer.y_velocity,
@@ -2068,7 +2068,7 @@ impl WorldSnapshot {
                     source_baiter.x_fraction,
                     source_baiter_screen_x_velocity(source_baiter.x_velocity),
                 );
-                let (y, y_fraction) = source_fixed_axis_step(
+                let (y, y_fraction) = source_active_object_y_step(
                     enemy.position.y,
                     source_baiter.y_fraction,
                     source_baiter.y_velocity,
@@ -3256,6 +3256,18 @@ fn source_fixed_axis_step(position: u8, fraction: u8, velocity: u16) -> (u8, u8)
     let [position, fraction] = u16::from_be_bytes([position, fraction])
         .wrapping_add(velocity)
         .to_be_bytes();
+    (position, fraction)
+}
+
+fn source_active_object_y_step(position: u8, fraction: u8, velocity: u16) -> (u8, u8) {
+    let [mut position, fraction] = u16::from_be_bytes([position, fraction])
+        .wrapping_add(velocity)
+        .to_be_bytes();
+    if position < SOURCE_PLAYFIELD_Y_MIN {
+        position = SOURCE_PLAYFIELD_Y_MAX;
+    } else if position > SOURCE_PLAYFIELD_Y_MAX {
+        position = SOURCE_PLAYFIELD_Y_MIN;
+    }
     (position, fraction)
 }
 
@@ -11426,6 +11438,68 @@ mod tests {
             sprite.sprite == SpriteId::ENEMY_LANDER
                 && sprite.position == [f32::from(enemy.position.x), f32::from(enemy.position.y)]
         }));
+    }
+
+    #[test]
+    fn clean_game_source_enemy_y_motion_wraps_through_source_playfield_bounds() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x8000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![
+            EnemySnapshot::source_pod(
+                ScreenPosition::new(0xD0, SOURCE_PLAYFIELD_Y_MIN),
+                ScreenVelocity::new(0, -1),
+                SourcePodSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0xFFFF,
+                },
+            ),
+            EnemySnapshot::source_pod(
+                ScreenPosition::new(0xE0, super::SOURCE_PLAYFIELD_Y_MAX),
+                ScreenVelocity::new(0, 1),
+                SourcePodSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0,
+                    y_velocity: 0x0100,
+                },
+            ),
+        ];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.projectiles.clear();
+        game.state.world.enemy_projectiles.clear();
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        let [top_wrap, bottom_wrap] = frame.state.world.enemies.as_slice() else {
+            panic!("expected both source pods to stay active");
+        };
+        let top_source = top_wrap
+            .source_pod
+            .expect("top-wrapping pod should retain source state");
+        let bottom_source = bottom_wrap
+            .source_pod
+            .expect("bottom-wrapping pod should retain source state");
+        let (top_y, top_fraction) =
+            super::source_active_object_y_step(SOURCE_PLAYFIELD_Y_MIN, 0, 0xFFFF);
+        let (bottom_y, bottom_fraction) =
+            super::source_active_object_y_step(super::SOURCE_PLAYFIELD_Y_MAX, 0, 0x0100);
+
+        assert_eq!(top_wrap.position, ScreenPosition::new(0xD0, top_y));
+        assert_eq!(top_source.y_fraction, top_fraction);
+        assert_eq!(
+            top_wrap.velocity,
+            super::source_pod_screen_velocity(top_source)
+        );
+        assert_eq!(bottom_wrap.position, ScreenPosition::new(0xE0, bottom_y));
+        assert_eq!(bottom_source.y_fraction, bottom_fraction);
+        assert_eq!(
+            bottom_wrap.velocity,
+            super::source_pod_screen_velocity(bottom_source)
+        );
     }
 
     #[test]

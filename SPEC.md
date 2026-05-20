@@ -225,7 +225,9 @@ timers, picture frame, and X/Y velocity, then advance through a bounded source
 `LANDS0` orbit/shot loop with picture cycling and source-shaped fireball
 projection; initial active pods retain deterministic source fixed-point
 fractions and bounded signed X velocity before entering source fixed-point X/Y
-motion. Remaining source-profile enemies stay in `EnemyReserveSnapshot`, flow
+motion. Active source enemy Y motion now uses the source `VELO` `YMIN`/`YMAX`
+wrap for landers, pods, bombers, mutants, swarmers, and baiters. Remaining
+source-profile enemies stay in `EnemyReserveSnapshot`, flow
 into inactive object-evidence counts plus bounded inactive source-detail rows,
 and activate as the next clean batch before `WaveCleared`. The inactive rows
 carry the reserved family category, source object-picture descriptor,
@@ -242,8 +244,9 @@ carry source RNG-derived velocity, acceleration, sleep, and shot-timer state,
 and reserve mini-swarmer activation now uses source `PLRES`/`RSW0`
 phony-object placement before the same source swarmer runtime. Reserve pod
 activation now uses source `PRBST`/`PRBRES` placement, fixed-point fractions,
-and velocity bytes before entering source fixed-point X/Y motion. Mini-swarmers
-advance through the source entry seek, fixed-point loop, vertical
+and velocity bytes before entering source fixed-point X/Y motion with the same
+source `VELO` Y-bound wrap. Mini-swarmers advance through the source entry
+seek, fixed-point loop, vertical
 acceleration/damping, turnback, and enemy-bomb projection shape while sharing
 the source shell free-list cap with the other fireball paths, including source
 `RMAX` RNG consumption on shot-timer resets when allocation fails. Clean baiter

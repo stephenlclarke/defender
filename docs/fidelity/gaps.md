@@ -679,6 +679,11 @@ post-acceptance validation records.
   `(previous BGL - current BGL) << 2` to fixed-point X motion when the
   camera/background moves, preserving the existing source lifetime and
   offscreen culling behavior.
+- `2026-05-20 21:40:30 BST`: R9-C4 aligns clean active source-enemy Y motion
+  with source `VELO` bounds. Landers, pods, bombers, mutants, swarmers, and
+  baiters now wrap fixed-point Y positions through source `YMIN`/`YMAX` after
+  velocity application instead of letting the high byte wrap through `0`/`255`.
+  Runtime behavior changes only at active-object vertical edge bounds.
 - `2026-05-17 22:38:04 BST`: R9-C4 adds the bounded source mutant reserve
   restore fixture slice. Clean reserve activation now restores active mutants
   through source-shaped placement fractions and shot-timer RNG state, carrying
