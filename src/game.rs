@@ -65,6 +65,8 @@ const SOURCE_LSHSND_SOUND_COMMAND: u8 = 0xFC;
 const SOURCE_SSHSND_SOUND_COMMAND: u8 = 0xF6;
 const SOURCE_USHSND_SOUND_COMMAND: u8 = 0xFC;
 const SOURCE_SWSSND_SOUND_COMMAND: u8 = 0xF3;
+const SOURCE_LPKSND_SOUND_COMMAND: u8 = 0xF4;
+const SOURCE_LSKSND_SOUND_COMMAND: u8 = 0xF1;
 const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
 const SOURCE_ALSND_SOUND_COMMAND: u8 = 0xE0;
 const SOURCE_ASCSND_SOUND_COMMAND: u8 = 0xE5;
@@ -1992,6 +1994,9 @@ impl WorldSnapshot {
                     enemy.position,
                     *source_lander,
                 );
+                let starts_pull_sound = carried_human_index.is_some()
+                    && source_lander_pull_edge(enemy.position)
+                    && source_lander.y_velocity != 0;
                 let target_position = if carried_human_index.is_none() {
                     source_lander_ensure_live_target(
                         source_lander,
@@ -2048,6 +2053,9 @@ impl WorldSnapshot {
                         || clean_lander_pull_position_matches(enemy.position, humans[human_index])
                     {
                         if advance.phase == SourceLanderAdvancePhase::PullingPassenger {
+                            if starts_pull_sound {
+                                sound_events.push(source_lander_suck_sound_event());
+                            }
                             humans[human_index].position = clean_lander_pull_passenger_position(
                                 enemy.position,
                                 humans[human_index].position,
@@ -2247,6 +2255,7 @@ impl WorldSnapshot {
         profile: WaveProfileSnapshot,
         player_position: ScreenPosition,
         player_velocity: (WorldVector, WorldVector),
+        sound_events: &mut Vec<SoundEvent>,
     ) {
         self.sync_carried_humans_to_landers();
         self.restore_landers_with_cleared_pull_targets();
@@ -2267,6 +2276,7 @@ impl WorldSnapshot {
         self.humans[human_index].carried = true;
         self.humans[human_index].position = clean_carried_human_position(lander_position);
         self.humans[human_index].clear_source_fall();
+        sound_events.push(source_lander_pickup_sound_event());
     }
 
     fn restore_landers_with_cleared_pull_targets(&mut self) {
@@ -5975,6 +5985,7 @@ impl Game {
             self.state.wave_profile,
             motion.screen_position,
             motion.state.velocity,
+            sound_events,
         );
         let falling_advance = self.state.world.advance_falling_humans();
         for landing_position in falling_advance.safe_landings {
@@ -7587,6 +7598,18 @@ fn source_enemy_shot_sound_command(kind: EnemyKind) -> Option<u8> {
     }
 }
 
+fn source_lander_pickup_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_LPKSND_SOUND_COMMAND,
+    }
+}
+
+fn source_lander_suck_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_LSKSND_SOUND_COMMAND,
+    }
+}
+
 fn source_astronaut_release_sound_event() -> SoundEvent {
     SoundEvent::UnmappedSoundCommand {
         command: SOURCE_ASCSND_SOUND_COMMAND,
@@ -8055,6 +8078,7 @@ mod tests {
         WaveProfileSnapshot, WorldSnapshot, WorldVector, source_astronaut_catch_sound_event,
         source_astronaut_release_sound_event, source_astronaut_safe_landing_sound_event,
         source_enemy_hit_sound_event, source_enemy_shot_sound_event,
+        source_lander_pickup_sound_event, source_lander_suck_sound_event,
     };
 
     #[test]
@@ -11838,6 +11862,10 @@ mod tests {
                 && sprite.position == [102.0, 92.0]
                 && sprite.tint == Color::from_rgba(0xFF, 0xF8, 0x80, 0xFF)
         }));
+        assert_eq!(
+            captured.events.sounds(),
+            &[source_lander_pickup_sound_event()]
+        );
 
         let carried = game.step(GameInput::NONE);
 
@@ -11903,6 +11931,10 @@ mod tests {
             }
         );
         assert!(captured.state.world.enemy_projectiles.is_empty());
+        assert_eq!(
+            captured.events.sounds(),
+            &[source_lander_pickup_sound_event()]
+        );
     }
 
     #[test]
@@ -12023,6 +12055,55 @@ mod tests {
             }
         );
         assert!(frame.state.world.enemy_projectiles.is_empty());
+        assert_eq!(frame.events.sounds(), &[source_lander_suck_sound_event()]);
+    }
+
+    #[test]
+    fn clean_game_source_lander_pull_sound_does_not_repeat() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, SOURCE_PLAYFIELD_Y_MIN + 8);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(0),
+        };
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            lander_start,
+            ScreenVelocity::new(0, 0),
+            source_lander,
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot {
+            carried: true,
+            ..HumanSnapshot::new(ScreenPosition::new(
+                super::clean_carried_human_position(lander_start).x,
+                super::clean_carried_human_position(lander_start)
+                    .y
+                    .saturating_sub(1),
+            ))
+        }];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        let lander = frame.state.world.enemies.first().expect("pulling lander");
+        assert_eq!(lander.position, lander_start);
+        assert_eq!(lander.source_lander, Some(source_lander));
+        assert_eq!(
+            frame.state.world.humans[0].position,
+            ScreenPosition::new(
+                super::clean_carried_human_position(lander_start).x,
+                super::clean_carried_human_position(lander_start)
+                    .y
+                    .saturating_sub(2),
+            )
+        );
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]

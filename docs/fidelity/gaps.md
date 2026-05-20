@@ -651,6 +651,14 @@ post-acceptance validation records.
   movement/projectile behavior beyond the covered enemy-hit, enemy-shot, and
   astronaut command evidence plus focused source ecology fixtures for those
   transitions.
+- `2026-05-21 00:45:16 BST`: R9-C4 adds bounded source lander abduction
+  sound-command evidence for the covered pickup and top-edge pull-in
+  transitions. Clean lander pickup now surfaces `LPKSND` (`0xF4`), and the
+  source-shaped pull-in transition now surfaces `LSKSND` (`0xF1`) without
+  repeating it on follow-up pull frames. Remaining B08 work is exact
+  per-family movement/projectile behavior beyond the covered enemy-hit,
+  enemy-shot, lander-abduction, and astronaut command evidence plus focused
+  source ecology fixtures for those transitions.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain

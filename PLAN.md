@@ -1032,11 +1032,13 @@ Object-ecology progress after R9-C4 slices:
 - Clean lander abduction now covers the first carry transition: aligned humans
   enter the carried state, source-shaped landers can retain explicit
   selected-human target state, `LANDS0` enters the `LANDG` target-approach step
-  only for that selected target, carried passengers stay associated with the
-  lander that captured them while it flees, pull upward through the source
-  `LANDF` / `LNDFXA` top-edge shape before conversion, give up from the top
-  pull edge when the passenger target is cleared, and are released when that
-  lander is destroyed. Initial clean humans now restore the source `PLRES` /
+  only for that selected target, source `LPKSND` command evidence is emitted on
+  pickup, carried passengers stay associated with the lander that captured them
+  while it flees, pull upward through the source `LANDF` / `LNDFXA` top-edge
+  shape with source `LSKSND` command evidence on pull-in entry before
+  conversion, give up from the top pull edge when the passenger target is
+  cleared, and are released when that lander is destroyed. Initial clean humans
+  now restore the source `PLRES` /
   `TLIST` startup shape: ten humans are placed through the source target-list
   grouping rules, carry deterministic slot addresses from `0xA11A`, and raise
   the initial active object/sprite evidence accordingly. Clean source lander
@@ -1070,8 +1072,8 @@ Object-ecology progress after R9-C4 slices:
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
   is remaining per-family movement/projectile behavior beyond the covered
-  enemy-hit and enemy-shot command evidence and focused source ecology fixtures
-  for those transitions.
+  enemy-hit, enemy-shot, lander-abduction, and astronaut command evidence plus
+  focused source ecology fixtures for those transitions.
 
 Work log:
 
@@ -2301,6 +2303,28 @@ Work log:
   run when Step 50 closes, another broader shared-contract risk appears, or R9
   finalization begins. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779319957438009`.
+
+- `2026-05-21 00:47:17 BST` R9-C4 progress slice
+  `source lander abduction sound commands`. Clean lander pickup now emits the
+  source `LPKSND` command, and source-shaped top-edge pull-in emits the source
+  `LSKSND` command once when the pull transition starts. Follow-up pull frames
+  stay silent. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo test clean_game_lander_abducts_aligned_human_and_carries_upward
+  --lib`, `cargo test
+  clean_game_source_lander_capture_seeds_source_flee_state --lib`, `cargo test
+  clean_game_source_lander_pulls_passenger_at_top_edge --lib`, `cargo test
+  clean_game_source_lander_pull_sound_does_not_repeat --lib`, `cargo test
+  clean_game_killed_source_lander_pull_passenger_releases_human --lib`,
+  `cargo test clean_game_killed_carrying_lander_releases_human --lib`,
+  targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
+  markdownlint, and `git diff --check`. Broad `cargo test --all-targets`,
+  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
+  clippy remain deferred because this is a bounded Step 50 lander
+  sound-command slice, not Step 50 or Phase 3 closure, and it does not change
+  the public API. The next full gate should run when Step 50 closes, another
+  broader shared-contract risk appears, or R9 finalization begins. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779320546837389`.
 
 ## Archived Completed History
 
