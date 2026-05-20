@@ -1769,6 +1769,7 @@ pub struct WorldSnapshot {
     pub enemies: Vec<EnemySnapshot>,
     pub enemy_reserve: EnemyReserveSnapshot,
     pub humans: Vec<HumanSnapshot>,
+    pub source_target_list_cursor_address: Option<u16>,
     pub projectiles: Vec<ProjectileSnapshot>,
     pub enemy_projectiles: Vec<EnemyProjectileSnapshot>,
     pub score_popups: Vec<ScorePopupSnapshot>,
@@ -1795,11 +1796,15 @@ impl WorldSnapshot {
         let wave_profile = WaveProfileSnapshot::for_wave(wave);
         let mut enemy_reserve = EnemyReserveSnapshot::from_profile(wave_profile);
         let mut source_rng = SourceRandSnapshot::default();
+        let humans = source_initial_target_list_humans();
+        let mut source_target_list_cursor_address = Some(SOURCE_TARGET_LIST_BASE);
         let enemies = clean_wave_enemy_spawns(
             &mut enemy_reserve,
             wave_profile,
             &mut source_rng,
             CleanWaveSpawnContext::Initial,
+            &humans,
+            &mut source_target_list_cursor_address,
         );
         let mut world = Self {
             terrain: vec![
@@ -1831,7 +1836,8 @@ impl WorldSnapshot {
             ],
             enemies,
             enemy_reserve,
-            humans: source_initial_target_list_humans(),
+            humans,
+            source_target_list_cursor_address,
             projectiles: Vec::new(),
             enemy_projectiles: Vec::new(),
             score_popups: Vec::new(),
@@ -1870,6 +1876,8 @@ impl WorldSnapshot {
                 background_absolute_x,
                 targetable_humans,
             },
+            &self.humans,
+            &mut self.source_target_list_cursor_address,
         );
         !self.enemies.is_empty()
     }
@@ -1922,6 +1930,7 @@ impl WorldSnapshot {
         let enemy_projectiles = &mut self.enemy_projectiles;
         let terrain = &self.terrain;
         let humans = &mut self.humans;
+        let source_target_list_cursor_address = &mut self.source_target_list_cursor_address;
         let selected_bomber_slot = source_tie_selected_slot(source_rng.seed);
         let mut bomber_slot = 0usize;
         for enemy in &mut self.enemies {
@@ -1934,7 +1943,11 @@ impl WorldSnapshot {
                     *source_lander,
                 );
                 let target_position = if carried_human_index.is_none() {
-                    source_lander_ensure_live_target(source_lander, humans)
+                    source_lander_ensure_live_target(
+                        source_lander,
+                        humans,
+                        source_target_list_cursor_address,
+                    )
                 } else {
                     None
                 };
@@ -3131,6 +3144,62 @@ fn source_target_list_slot_address(slot_index: usize) -> u16 {
     )
 }
 
+fn source_target_list_slot_index(address: u16) -> Option<usize> {
+    let offset = address.checked_sub(SOURCE_TARGET_LIST_BASE)?;
+    if offset % SOURCE_TARGET_LIST_ENTRY_STRIDE != 0 {
+        return None;
+    }
+    let index = usize::from(offset / SOURCE_TARGET_LIST_ENTRY_STRIDE);
+    (index < SOURCE_TARGET_LIST_ENTRY_COUNT).then_some(index)
+}
+
+fn source_target_list_next_slot_address(cursor_address: u16) -> u16 {
+    let cursor_address = source_target_list_slot_index(cursor_address)
+        .map(source_target_list_slot_address)
+        .unwrap_or(SOURCE_TARGET_LIST_BASE);
+    let next_address = cursor_address.wrapping_add(SOURCE_TARGET_LIST_ENTRY_STRIDE);
+    if source_target_list_slot_index(next_address).is_some() {
+        next_address
+    } else {
+        SOURCE_TARGET_LIST_BASE
+    }
+}
+
+fn source_select_lander_target_index(
+    source_target_list_cursor_address: &mut Option<u16>,
+    humans: &[HumanSnapshot],
+) -> Option<usize> {
+    if !humans.iter().any(source_lander_targetable_human) {
+        return None;
+    }
+
+    let original_cursor = source_target_list_cursor_address
+        .and_then(|address| {
+            source_target_list_slot_index(address).map(source_target_list_slot_address)
+        })
+        .unwrap_or(SOURCE_TARGET_LIST_BASE);
+    let mut cursor = original_cursor;
+    for _ in 0..SOURCE_TARGET_LIST_ENTRY_COUNT {
+        cursor = source_target_list_next_slot_address(cursor);
+        if let Some(target_index) = humans.iter().position(|human| {
+            source_lander_targetable_human(human)
+                && human.source_target_slot_address == Some(cursor)
+        }) {
+            *source_target_list_cursor_address = Some(cursor);
+            return Some(target_index);
+        }
+        if cursor == original_cursor {
+            break;
+        }
+    }
+
+    None
+}
+
+fn source_lander_targetable_human(human: &HumanSnapshot) -> bool {
+    human.source_target_slot_address.is_some() && !human.carried && !human.carried_by_player
+}
+
 fn source_target_list_human(position: ScreenPosition, slot_index: usize) -> HumanSnapshot {
     HumanSnapshot {
         source_target_slot_address: Some(source_target_list_slot_address(slot_index)),
@@ -3208,6 +3277,8 @@ fn clean_wave_enemy_spawns(
     profile: WaveProfileSnapshot,
     source_rng: &mut SourceRandSnapshot,
     context: CleanWaveSpawnContext,
+    humans: &[HumanSnapshot],
+    source_target_list_cursor_address: &mut Option<u16>,
 ) -> Vec<EnemySnapshot> {
     let mut enemies = Vec::new();
     let kinds = clean_wave_active_enemy_kinds(reserve, profile);
@@ -3265,7 +3336,7 @@ fn clean_wave_enemy_spawns(
         }
 
         let position = CLEAN_WAVE_SPAWN_POSITIONS[index];
-        enemies.push(match kind {
+        let mut enemy = match kind {
             EnemyKind::Lander
                 if matches!(context, CleanWaveSpawnContext::ReserveActivation { .. }) =>
             {
@@ -3307,11 +3378,28 @@ fn clean_wave_enemy_spawns(
                 position,
                 clean_enemy_initial_velocity(kind, profile, index),
             ),
-        });
+        };
+        assign_source_lander_target(&mut enemy, humans, source_target_list_cursor_address);
+        enemies.push(enemy);
         index += 1;
     }
 
     enemies
+}
+
+fn assign_source_lander_target(
+    enemy: &mut EnemySnapshot,
+    humans: &[HumanSnapshot],
+    source_target_list_cursor_address: &mut Option<u16>,
+) {
+    if enemy.kind != EnemyKind::Lander {
+        return;
+    }
+    let Some(source_lander) = enemy.source_lander.as_mut() else {
+        return;
+    };
+    source_lander.target_human_index =
+        source_select_lander_target_index(source_target_list_cursor_address, humans);
 }
 
 fn clean_wave_active_enemy_kinds(
@@ -4651,14 +4739,14 @@ fn source_lander_grab_active(source_lander: SourceLanderSnapshot) -> bool {
 fn source_lander_ensure_live_target(
     source_lander: &mut SourceLanderSnapshot,
     humans: &[HumanSnapshot],
+    source_target_list_cursor_address: &mut Option<u16>,
 ) -> Option<ScreenPosition> {
-    let current_target_index = source_lander.target_human_index?;
     if let Some(target_index) = source_lander_live_target_index(*source_lander, humans) {
         return Some(humans[target_index].position);
     }
 
     source_lander.target_human_index =
-        source_lander_next_target_index(Some(current_target_index), humans);
+        source_select_lander_target_index(source_target_list_cursor_address, humans);
     source_lander
         .target_human_index
         .map(|target_index| humans[target_index].position)
@@ -4671,25 +4759,6 @@ fn source_lander_live_target_index(
     let target_index = source_lander.target_human_index?;
     let human = humans.get(target_index)?;
     (!human.carried && !human.carried_by_player).then_some(target_index)
-}
-
-fn source_lander_next_target_index(
-    current_target_index: Option<usize>,
-    humans: &[HumanSnapshot],
-) -> Option<usize> {
-    if humans.is_empty() {
-        return None;
-    }
-
-    let start_index = current_target_index
-        .map(|index| (index + 1) % humans.len())
-        .unwrap_or(0);
-    (0..humans.len())
-        .map(|offset| (start_index + offset) % humans.len())
-        .find(|&index| {
-            let human = humans[index];
-            !human.carried && !human.carried_by_player
-        })
 }
 
 fn source_lander_grab_x_matches(
@@ -7758,6 +7827,41 @@ mod tests {
     }
 
     #[test]
+    fn clean_source_lander_target_selection_advances_tlist_cursor() {
+        let mut humans = super::source_initial_target_list_humans();
+        let mut cursor = Some(super::SOURCE_TARGET_LIST_BASE);
+
+        assert_eq!(
+            super::source_select_lander_target_index(&mut cursor, &humans),
+            Some(1)
+        );
+        assert_eq!(cursor, Some(super::source_target_list_slot_address(1)));
+
+        humans[2].carried_by_player = true;
+        assert_eq!(
+            super::source_select_lander_target_index(&mut cursor, &humans),
+            Some(3)
+        );
+        assert_eq!(cursor, Some(super::source_target_list_slot_address(3)));
+
+        cursor = Some(super::source_target_list_slot_address(9));
+        assert_eq!(
+            super::source_select_lander_target_index(&mut cursor, &humans),
+            Some(0)
+        );
+        assert_eq!(cursor, Some(super::source_target_list_slot_address(0)));
+
+        for human in &mut humans {
+            human.carried = true;
+        }
+        assert_eq!(
+            super::source_select_lander_target_index(&mut cursor, &humans),
+            None
+        );
+        assert_eq!(cursor, Some(super::source_target_list_slot_address(0)));
+    }
+
+    #[test]
     fn clean_wave_spawns_source_profile_active_enemy_batch() {
         let first = WorldSnapshot::for_wave(1);
         assert_eq!(first.enemies.len(), 5);
@@ -7772,6 +7876,21 @@ mod tests {
                 .enemies
                 .iter()
                 .all(|enemy| enemy.source_lander.is_some())
+        );
+        assert_eq!(
+            first
+                .enemies
+                .iter()
+                .map(|enemy| enemy
+                    .source_lander
+                    .expect("source lander")
+                    .target_human_index)
+                .collect::<Vec<_>>(),
+            vec![Some(1), Some(2), Some(3), Some(4), Some(5)]
+        );
+        assert_eq!(
+            first.source_target_list_cursor_address,
+            Some(super::source_target_list_slot_address(5))
         );
         assert_eq!(
             first.enemy_reserve,
@@ -7813,10 +7932,32 @@ mod tests {
             super::CLEAN_WAVE_SPAWN_POSITIONS[0],
             0,
         );
+        let mut expected_initial_source_lander = expected_initial_lander
+            .source_lander
+            .expect("initial source lander");
+        expected_initial_source_lander.target_human_index = Some(1);
         assert_eq!(second.enemies[0].velocity, expected_initial_lander.velocity);
         assert_eq!(
             second.enemies[0].source_lander,
-            expected_initial_lander.source_lander
+            Some(expected_initial_source_lander)
+        );
+        assert_eq!(
+            second.enemies[3]
+                .source_lander
+                .expect("second source lander")
+                .target_human_index,
+            Some(2)
+        );
+        assert_eq!(
+            second.enemies[4]
+                .source_lander
+                .expect("third source lander")
+                .target_human_index,
+            Some(3)
+        );
+        assert_eq!(
+            second.source_target_list_cursor_address,
+            Some(super::source_target_list_slot_address(3))
         );
         assert_eq!(second.enemies[1].velocity, ScreenVelocity::new(-1, 0));
         assert_eq!(
@@ -10509,12 +10650,25 @@ mod tests {
 
         let mut expected_rng = game.state.world.source_rng;
         let expected_landers = (0..3)
-            .map(|_| super::source_lander_restore_spawn(&mut expected_rng, game.state.wave_profile))
+            .map(|index| {
+                let mut lander =
+                    super::source_lander_restore_spawn(&mut expected_rng, game.state.wave_profile);
+                lander
+                    .source_lander
+                    .as_mut()
+                    .expect("restored source lander")
+                    .target_human_index = Some(index + 6);
+                lander
+            })
             .collect::<Vec<_>>();
 
         let frame = game.step(GameInput::NONE);
 
         assert_eq!(frame.state.world.enemies, expected_landers);
+        assert_eq!(
+            frame.state.world.source_target_list_cursor_address,
+            Some(super::source_target_list_slot_address(8))
+        );
         assert!(frame.state.world.enemies.iter().all(|enemy| {
             enemy.kind == EnemyKind::Lander
                 && enemy.position.y == SOURCE_PLAYFIELD_Y_MIN.wrapping_add(2)

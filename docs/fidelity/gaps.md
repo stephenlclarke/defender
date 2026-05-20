@@ -602,14 +602,18 @@ post-acceptance validation records.
 - `2026-05-20 23:11:39 BST`: R9-C4 adds the bounded clean-human `TLIST`
   metadata prerequisite. Initial clean humans now carry deterministic source
   target-list slot addresses starting at `0xA11A` with a two-byte stride.
-  Runtime lander target assignment and object-evidence comparison remain
-  unchanged until source target-list placement/count parity is modeled.
+  Runtime lander target assignment remained unchanged until the later
+  source target-list cursor slice.
 - `2026-05-20 23:33:42 BST`: R9-C4 adds the bounded source-restored clean
   human placement/count slice. Initial clean worlds now restore ten
   source-shaped humans through the `PLRES` / `TLIST` target-group algorithm,
   keep deterministic target-list slot addresses, and update initial active
-  object/sprite evidence counts. Default source lander spawns still leave
-  selected targets unset until the source target-list cursor assignment slice.
+  object/sprite evidence counts.
+- `2026-05-20 23:44:06 BST`: R9-C4 adds the bounded source target-list cursor
+  assignment slice. Clean worlds now carry the source `TPTR`-shaped cursor,
+  initial and reserve source lander spawns select restored `TLIST` humans by
+  advancing that cursor before scanning, and retargeting reuses the same cursor
+  when a selected target is no longer live.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain

@@ -1032,9 +1032,10 @@ Object-ecology progress after R9-C4 slices:
   lander is destroyed. Initial clean humans now restore the source `PLRES` /
   `TLIST` startup shape: ten humans are placed through the source target-list
   grouping rules, carry deterministic slot addresses from `0xA11A`, and raise
-  the initial active object/sprite evidence accordingly. Default clean source
-  lander spawns still leave selected targets unset until source target-list
-  cursor assignment is modeled.
+  the initial active object/sprite evidence accordingly. Clean source lander
+  spawns now advance the source `TPTR`-shaped cursor through those `TLIST`
+  slots for initial, reserve, and retarget selection while preserving the
+  separate source enemy RNG cadence.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -2143,6 +2144,27 @@ Work log:
   The next full gate should run when Step 50 closes, another broader
   shared-contract risk appears, or R9 finalization begins. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779315947806819`.
+
+- `2026-05-20 23:44:06 BST` R9-C4 progress slice
+  `source target-list cursor assignment`. Clean `WorldSnapshot` now carries
+  the source `TPTR`-shaped target-list cursor, initial and reserve source
+  lander spawns select restored `TLIST` humans by advancing that cursor before
+  scanning, and retargeting reuses the same cursor when a selected target is no
+  longer live. This closes the default targetless source-lander startup gap
+  while preserving the separate source enemy RNG cadence. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo test
+  clean_source_lander_target_selection_advances_tlist_cursor --lib`, `cargo
+  test clean_wave_spawns_source_profile_active_enemy_batch --lib`, `cargo test
+  clean_game_source_lander --lib`, `cargo test clean_game_lander --lib`,
+  `cargo test clean_game --lib`, targeted `make clean-fidelity
+  SCENARIOS="start_game abduction wave_advance"`, broad `cargo test
+  --all-targets` for the public snapshot-field change, touched-doc
+  markdownlint, and `git diff --check`. Full `make fidelity`, full
+  all-scenario `make clean-fidelity`, and full clippy remain deferred because
+  this is a bounded Step 50 target-cursor slice, not Step 50 or Phase 3
+  closure. The next full gate should run when Step 50 closes, another broader
+  shared-contract risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779316591648309`.
 
 ## Archived Completed History
 
