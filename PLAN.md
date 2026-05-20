@@ -1003,8 +1003,8 @@ Object-ecology progress after R9-C4 slices:
   baiters retain source shot-timer, picture-cycle, sleep, and velocity state,
   pursue the player through the source `UFONV` seek rules, fire source-shaped
   `SHOOT` fireball shells, and those enemy projectiles now use source lifetime,
-  offscreen culling, collision scoring, player-damage handling, and source
-  `BMBP1` shell descriptor evidence.
+  scroll-adjusted fixed-point motion, offscreen culling, collision scoring,
+  player-damage handling, and source `BMBP1` shell descriptor evidence.
 - Clean mutant runtime now carries source-shaped state for active mutants.
   Completed carried-lander abductions consume the passenger and convert that
   lander into a mutant, no-target/no-human landers convert through the same
@@ -1871,6 +1871,24 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308693691909`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779308862431699`.
+- `2026-05-20 21:34:41 BST` R9-C4 progress slice
+  `source SHELL scroll delta`. Clean hostile shell movement now applies the
+  source `SHELL` X scroll term, adding `(previous BGL - current BGL) << 2` to
+  fixed-point X motion when the clean camera/background moves. Added focused
+  clean-game coverage for camera-scroll shell movement while preserving source
+  lifetime, Y/X culling, collision, and shell evidence behavior. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, `cargo test clean_game_enemy_projectile --lib`,
+  `cargo test clean_game --lib`, targeted `make clean-fidelity
+  SCENARIOS="wave_advance"`, touched-doc markdownlint, and `git diff --check`.
+  Broad `cargo test --all-targets`, clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  Step 50 hostile-shell motion slice, not Step 50 or Phase 3 closure. The next
+  full gate should run when Step 50 closes, another broader shared-contract
+  risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309053099619`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779309277857069`.
 
 ## Archived Completed History
 

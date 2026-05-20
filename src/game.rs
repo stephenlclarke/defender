@@ -2713,6 +2713,15 @@ fn source_word_from_world_vector(vector: WorldVector) -> u16 {
     (vector.subpixels() >> 8) as u16
 }
 
+fn source_shell_scroll_delta(
+    previous_camera_left: WorldVector,
+    current_camera_left: WorldVector,
+) -> u16 {
+    source_word_from_world_vector(previous_camera_left)
+        .wrapping_sub(source_word_from_world_vector(current_camera_left))
+        .wrapping_shl(2)
+}
+
 fn source_world_position(position: ScreenPosition, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
     (
         u16::from_be_bytes([position.x, x_fraction]),
@@ -5137,6 +5146,7 @@ impl Game {
             gameplay_events.push(GameEvent::ReversePressed);
         }
 
+        let previous_camera_left = self.camera_left;
         let motion = PlayerMotionSystem::step(
             PlayerMotionState::new(
                 self.state.player.position,
@@ -5149,12 +5159,13 @@ impl Game {
         self.state.player.position = motion.state.position;
         self.state.player.velocity = motion.state.velocity;
         self.camera_left = motion.state.camera_left;
+        let shell_scroll_delta = source_shell_scroll_delta(previous_camera_left, self.camera_left);
         self.state
             .world
             .sync_player_carried_humans(motion.screen_position);
 
         self.advance_projectiles();
-        self.advance_enemy_projectiles();
+        self.advance_enemy_projectiles(shell_scroll_delta);
 
         if controls.triggers.fire {
             gameplay_events.push(GameEvent::FirePressed);
@@ -5287,7 +5298,7 @@ impl Game {
         });
     }
 
-    fn advance_enemy_projectiles(&mut self) {
+    fn advance_enemy_projectiles(&mut self, shell_scroll_delta: u16) {
         self.state.world.enemy_projectiles.retain_mut(|projectile| {
             projectile.source_lifetime_ticks = projectile.source_lifetime_ticks.saturating_sub(1);
             if projectile.source_lifetime_ticks == 0 {
@@ -5296,6 +5307,7 @@ impl Game {
 
             let [x, x_fraction] =
                 u16::from_be_bytes([projectile.position.x, projectile.source_x_fraction])
+                    .wrapping_add(shell_scroll_delta)
                     .wrapping_add(projectile.source_x_velocity)
                     .to_be_bytes();
             if x >= SOURCE_SHELL_X_MAX {
@@ -9928,6 +9940,54 @@ mod tests {
 
         assert!(offscreen.state.world.enemy_projectiles.is_empty());
         assert!(offscreen.events.gameplay().is_empty());
+    }
+
+    #[test]
+    fn clean_game_enemy_projectile_applies_source_shell_scroll_delta() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x8000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.player.direction = Direction::Right;
+        game.camera_left = WorldVector::default();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(200, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans.clear();
+        game.baiter_timer_ticks = None;
+        game.state.world.enemy_projectiles = vec![super::EnemyProjectileSnapshot::source_fireball(
+            ScreenPosition::new(0x50, 0x60),
+            0,
+            0,
+        )];
+
+        let frame = game.step(GameInput {
+            thrust: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(
+            super::source_word_from_world_vector(frame.state.player.position.0),
+            0x2000
+        );
+        assert_eq!(
+            super::source_word_from_world_vector(game.camera_left),
+            0x0003
+        );
+        assert_eq!(frame.state.world.enemy_projectiles.len(), 1);
+        let projectile = frame.state.world.enemy_projectiles[0];
+        assert_eq!(projectile.position, ScreenPosition::new(0x4F, 0x60));
+        assert_eq!(projectile.source_x_fraction, 0xF4);
+        assert_eq!(projectile.source_y_fraction, 0);
+        assert_eq!(
+            projectile.source_lifetime_ticks,
+            super::SOURCE_SHELL_LIFETIME_TICKS - 1
+        );
+        assert_eq!(projectile.source_x_velocity, 0);
+        assert_eq!(projectile.source_y_velocity, 0);
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
     }
 
     #[test]

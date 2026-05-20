@@ -674,6 +674,11 @@ post-acceptance validation records.
   now refuse allocation when the firing bomber is outside the source shell
   screen range or at/above the source playfield top, in addition to the
   existing ten-shell `BOMBST` cap.
+- `2026-05-20 21:32:03 BST`: R9-C4 aligns clean enemy shell movement with the
+  source `SHELL` scroll delta. Clean hostile shells now add
+  `(previous BGL - current BGL) << 2` to fixed-point X motion when the
+  camera/background moves, preserving the existing source lifetime and
+  offscreen culling behavior.
 - `2026-05-17 22:38:04 BST`: R9-C4 adds the bounded source mutant reserve
   restore fixture slice. Clean reserve activation now restores active mutants
   through source-shaped placement fractions and shot-timer RNG state, carrying
