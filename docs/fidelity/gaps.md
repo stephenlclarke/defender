@@ -599,6 +599,11 @@ post-acceptance validation records.
   retarget from cleared or player-carried target slots. Default source lander
   spawns still leave the target unset until source target-list restoration is
   modeled for clean humans.
+- `2026-05-20 23:11:39 BST`: R9-C4 adds the bounded clean-human `TLIST`
+  metadata prerequisite. Initial clean humans now carry deterministic source
+  target-list slot addresses starting at `0xA11A` with a two-byte stride.
+  Runtime lander target assignment and object-evidence comparison remain
+  unchanged until source target-list placement/count parity is modeled.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain
@@ -828,9 +833,9 @@ post-acceptance validation records.
   primary/alternate image pointers, mapped clean human sprite evidence, and
   the existing source human scanner color while leaving the direct clean
   runtime astronaut renderer at its existing 6x8 sprite size. Runtime behavior
-  and scenario paths are unchanged. Remaining B08 work is remaining
-  per-family movement/projectile behavior and focused source ecology fixtures
-  for those transitions.
+  and scenario paths are unchanged. Remaining B08 work is remaining per-family
+  movement/projectile behavior and focused source ecology fixtures for those
+  transitions.
 - `2026-05-20 20:35:45 BST`: R9-C4 adds the bounded reserve inactive
   object-evidence detail slice. Clean `EnemyReserveSnapshot` totals still own
   reserve counts, and clean object evidence now expands those counts into

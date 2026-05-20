@@ -960,6 +960,7 @@ pub struct HumanSnapshot {
     pub carried_by_player: bool,
     pub source_fall_velocity: u16,
     pub source_fall_y_fraction: u8,
+    pub source_target_slot_address: Option<u16>,
 }
 
 impl HumanSnapshot {
@@ -970,6 +971,7 @@ impl HumanSnapshot {
             carried_by_player: false,
             source_fall_velocity: 0,
             source_fall_y_fraction: 0,
+            source_target_slot_address: None,
         }
     }
 
@@ -1830,8 +1832,8 @@ impl WorldSnapshot {
             enemies,
             enemy_reserve,
             humans: vec![
-                HumanSnapshot::new(ScreenPosition::new(72, 216)),
-                HumanSnapshot::new(ScreenPosition::new(180, 218)),
+                source_target_list_human(ScreenPosition::new(72, 216), 0),
+                source_target_list_human(ScreenPosition::new(180, 218), 1),
             ],
             projectiles: Vec::new(),
             enemy_projectiles: Vec::new(),
@@ -3048,6 +3050,9 @@ const CLEAN_WAVE_SPAWN_POSITIONS: [ScreenPosition; SOURCE_MAX_ACTIVE_WAVE_ENEMIE
 ];
 
 const SOURCE_MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
+const SOURCE_TARGET_LIST_BASE: u16 = 0xA11A;
+const SOURCE_TARGET_LIST_ENTRY_STRIDE: u16 = 2;
+const SOURCE_TARGET_LIST_ENTRY_COUNT: usize = 32;
 const SOURCE_OBJECT_TABLE_BASE: u16 = 0xA23C;
 const SOURCE_OBJECT_TABLE_STRIDE: u16 = 0x17;
 const SOURCE_OBJECT_DEFAULT_TYPE: u8 = 0x00;
@@ -3115,6 +3120,24 @@ const HUMAN_SPRITE_SIZE: (u8, u8) = (6, 8);
 const SOURCE_FALLING_HUMAN_Y_ACCELERATION: u16 = 0x0008;
 const SOURCE_FALLING_HUMAN_MAX_Y_VELOCITY: u16 = 0x0300;
 const SOURCE_FALLING_HUMAN_SAFE_LANDING_MAX_Y_VELOCITY: u16 = 0x00E0;
+
+fn source_target_list_slot_address(slot_index: usize) -> u16 {
+    assert!(
+        slot_index < SOURCE_TARGET_LIST_ENTRY_COUNT,
+        "source target-list slot should fit TLIST"
+    );
+    SOURCE_TARGET_LIST_BASE.wrapping_add(
+        SOURCE_TARGET_LIST_ENTRY_STRIDE
+            .wrapping_mul(u16::try_from(slot_index).expect("source target-list slot fits u16")),
+    )
+}
+
+fn source_target_list_human(position: ScreenPosition, slot_index: usize) -> HumanSnapshot {
+    HumanSnapshot {
+        source_target_slot_address: Some(source_target_list_slot_address(slot_index)),
+        ..HumanSnapshot::new(position)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CleanWaveSpawnContext {
@@ -7641,6 +7664,22 @@ mod tests {
         let fifth = WaveProfileSnapshot::for_wave(5);
         assert_eq!(fifth.lander_x_velocity, 48);
         assert_eq!(fifth.baiter_delay, 144);
+    }
+
+    #[test]
+    fn clean_initial_humans_carry_source_target_list_slots() {
+        let first = WorldSnapshot::for_wave(1);
+
+        assert_eq!(first.humans.len(), 2);
+        assert_eq!(
+            first.humans[0].source_target_slot_address,
+            Some(super::source_target_list_slot_address(0))
+        );
+        assert_eq!(
+            first.humans[1].source_target_slot_address,
+            Some(super::source_target_list_slot_address(1))
+        );
+        assert_eq!(super::source_target_list_slot_address(31), 0xA158);
     }
 
     #[test]

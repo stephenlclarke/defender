@@ -942,7 +942,9 @@ Object-ecology progress after R9-C4 slices:
   clean human row now carries the source `ASTP1` descriptor label, address,
   2x8 picture size, primary/alternate image pointers, and mapped human sprite
   while the direct runtime renderer keeps the existing clean 6x8 astronaut
-  sprite. The clean player projectile row now carries the source `LASP1`
+  sprite. Initial clean humans also carry deterministic source `TLIST` slot
+  addresses from `0xA11A` with a two-byte stride. The clean player projectile
+  row now carries the source `LASP1`
   descriptor label, address, 8x1 picture size, and primary image pointer while
   the direct runtime renderer keeps the existing clean projectile sprite size.
   Clean enemy, human, player-projectile, and enemy-projectile rows now also
@@ -1028,7 +1030,9 @@ Object-ecology progress after R9-C4 slices:
   `LANDF` / `LNDFXA` top-edge shape before conversion, give up from the top
   pull edge when the passenger target is cleared, and are released when that
   lander is destroyed. Default clean source lander spawns still leave targets
-  unset until source target-list restoration is modeled for clean humans.
+  unset until source target-list placement/count parity is modeled for clean
+  humans; the clean runtime now carries source `TLIST` slot metadata as the
+  bounded prerequisite.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -2092,6 +2096,29 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779313687150899`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779314721297099`.
+
+- `2026-05-20 23:19:31 BST` R9-C4 progress slice
+  `clean-human TLIST slot metadata`. Initial clean humans now carry
+  deterministic source target-list slot addresses from `TLIST` base `0xA11A`
+  with a two-byte stride through `HumanSnapshot`, without assigning default
+  clean source lander targets yet. Default lander spawns intentionally remain
+  targetless until source target-list placement/count parity is modeled, so the
+  previous `wave_advance` spawn-target regression stays avoided. Focused
+  validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo check --features legacy-tools`,
+  `cargo test clean_initial_humans_carry_source_target_list_slots --lib`,
+  `cargo test clean_game_human_evidence_uses_source_astronaut_picture --lib`,
+  `cargo test clean_game_source_lander --lib`,
+  `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="start_game abduction
+  wave_advance"`, `cargo test --all-targets`, touched-doc markdownlint, and
+  `git diff --check`. `cargo test --all-targets` ran because `HumanSnapshot`
+  changed its public shape. Broad clippy, `make fidelity`, and full
+  all-scenario `make clean-fidelity` remain deferred because this is a bounded
+  Step 50 clean-human target-list metadata slice, not Step 50 or Phase 3
+  closure. The next full gate should run when Step 50 closes, another broader
+  shared-contract risk appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779314945871669`.
 
 ## Archived Completed History
 
