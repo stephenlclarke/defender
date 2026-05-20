@@ -1021,12 +1021,14 @@ Object-ecology progress after R9-C4 slices:
   restores active mutants through source-shaped placement fractions and
   shot-timer RNG state.
 - Clean lander abduction now covers the first carry transition: aligned humans
-  enter the carried state, source-shaped landers already in the `LANDG` grab
-  state take the source one-step target approach toward aligned uncarried
-  humans, carried passengers stay associated with the lander that captured
-  them while it flees, pull upward through the source `LANDF` / `LNDFXA`
-  top-edge shape before conversion, give up from the top pull edge when the
-  passenger target is cleared, and are released when that lander is destroyed.
+  enter the carried state, source-shaped landers can retain explicit
+  selected-human target state, `LANDS0` enters the `LANDG` target-approach step
+  only for that selected target, carried passengers stay associated with the
+  lander that captured them while it flees, pull upward through the source
+  `LANDF` / `LNDFXA` top-edge shape before conversion, give up from the top
+  pull edge when the passenger target is cleared, and are released when that
+  lander is destroyed. Default clean source lander spawns still leave targets
+  unset until source target-list restoration is modeled for clean humans.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -2066,6 +2068,30 @@ Work log:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779312865691409`.
   Slack completion update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779313419246769`.
+
+- `2026-05-20 22:53:13 BST` R9-C4 progress slice
+  `LANDS0 selected-target association`. Source-shaped clean landers now carry
+  an explicit optional `target_human_index`, use it to enter `LANDG` only when
+  the selected human passes the source close-X check, keep source captures
+  target-specific, and reindex or retarget around cleared human slots. Default
+  clean source lander spawns intentionally keep targets unset until source
+  target-list restoration is modeled for clean humans; the first spawn-target
+  attempt was narrowed after targeted `wave_advance` fidelity caught a
+  frame-2732 game-over regression. Focused validation passed:
+  `cargo fmt --check`, `cargo check`, `cargo check --features legacy-tools`,
+  `cargo test clean_game_source_lander --lib`,
+  `cargo test clean_game_lander --lib`, `cargo test clean_game --lib`,
+  targeted `make clean-fidelity SCENARIOS="start_game abduction wave_advance"`,
+  `cargo test --all-targets`, touched-doc markdownlint, and `git diff --check`.
+  `cargo test --all-targets` ran because `SourceLanderSnapshot` changed its
+  public shape. Broad clippy, `make fidelity`, and full all-scenario
+  `make clean-fidelity` remain deferred because this is a bounded Step 50
+  lander target-state slice, not Step 50 or Phase 3 closure. The next full
+  gate should run when Step 50 closes, another broader shared-contract risk
+  appears, or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779313687150899`.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779314721297099`.
 
 ## Archived Completed History
 

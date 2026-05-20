@@ -764,6 +764,7 @@ pub struct SourceLanderSnapshot {
     pub shot_timer: u8,
     pub sleep_ticks: u8,
     pub picture_frame: u8,
+    pub target_human_index: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1857,7 +1858,10 @@ impl WorldSnapshot {
             return false;
         }
 
-        let targetable_humans = !self.humans.is_empty();
+        let targetable_humans = self
+            .humans
+            .iter()
+            .any(|human| !human.carried && !human.carried_by_player);
         self.enemies = clean_wave_enemy_spawns(
             &mut self.enemy_reserve,
             profile,
@@ -1925,12 +1929,21 @@ impl WorldSnapshot {
             if enemy.kind == EnemyKind::Lander
                 && let Some(source_lander) = enemy.source_lander.as_mut()
             {
-                let carried_human_index =
-                    clean_carried_human_index_for_lander(humans, enemy.position);
-                let grab_target = source_lander_grab_active(*source_lander)
-                    .then(|| clean_source_lander_grab_target(humans, enemy.position))
-                    .flatten()
-                    .filter(|_| carried_human_index.is_none());
+                let carried_human_index = clean_carried_human_index_for_source_lander(
+                    humans,
+                    enemy.position,
+                    *source_lander,
+                );
+                let target_position = if carried_human_index.is_none() {
+                    source_lander_ensure_live_target(source_lander, humans)
+                } else {
+                    None
+                };
+                let grab_target = target_position.filter(|target_position| {
+                    carried_human_index.is_none()
+                        && (source_lander_grab_active(*source_lander)
+                            || source_lander_grab_x_matches(enemy.position, *target_position))
+                });
                 let advance = advance_source_lander(
                     enemy.position,
                     source_lander,
@@ -2158,6 +2171,9 @@ impl WorldSnapshot {
         };
 
         let lander_position = start_lander_human_capture(&mut self.enemies[lander_index], profile);
+        if let Some(source_lander) = self.enemies[lander_index].source_lander.as_mut() {
+            source_lander.target_human_index = Some(human_index);
+        }
         self.humans[human_index].carried = true;
         self.humans[human_index].position = clean_carried_human_position(lander_position);
         self.humans[human_index].clear_source_fall();
@@ -2184,12 +2200,27 @@ impl WorldSnapshot {
     ) {
         while let Some((lander_index, human_index)) = self.completed_lander_abduction() {
             self.humans.remove(human_index);
+            self.reindex_source_lander_targets_after_human_removed(human_index);
             self.convert_lander_to_source_mutant(
                 lander_index,
                 profile,
                 player_position,
                 player_velocity,
             );
+        }
+    }
+
+    fn reindex_source_lander_targets_after_human_removed(&mut self, removed_index: usize) {
+        for source_lander in self
+            .enemies
+            .iter_mut()
+            .filter_map(|enemy| enemy.source_lander.as_mut())
+        {
+            source_lander.target_human_index = match source_lander.target_human_index {
+                Some(target_index) if target_index == removed_index => None,
+                Some(target_index) if target_index > removed_index => Some(target_index - 1),
+                target_index => target_index,
+            };
         }
     }
 
@@ -2384,6 +2415,19 @@ impl WorldSnapshot {
             .enumerate()
             .filter(|(_, enemy)| enemy.kind == EnemyKind::Lander)
         {
+            if let Some(source_lander) = lander.source_lander {
+                let Some(human_index) =
+                    source_lander_live_target_index(source_lander, &self.humans)
+                else {
+                    continue;
+                };
+                let human = self.humans[human_index];
+                if clean_lander_capture_aligned(lander.position, human.position) {
+                    return Some((lander_index, human_index));
+                }
+                continue;
+            }
+
             for (human_index, human) in self
                 .humans
                 .iter()
@@ -3358,6 +3402,7 @@ fn source_lander_restore_spawn(
         shot_timer,
         sleep_ticks: 0,
         picture_frame: 0,
+        target_human_index: None,
     };
 
     EnemySnapshot::source_lander(
@@ -3380,6 +3425,7 @@ fn source_lander_initial_spawn(
         shot_timer: profile.lander_shot_time as u8,
         sleep_ticks: 0,
         picture_frame: 0,
+        target_human_index: None,
     };
 
     EnemySnapshot::source_lander(
@@ -4493,6 +4539,31 @@ fn clean_carried_human_index_for_lander(
     })
 }
 
+fn clean_carried_human_index_for_source_lander(
+    humans: &[HumanSnapshot],
+    lander_position: ScreenPosition,
+    source_lander: SourceLanderSnapshot,
+) -> Option<usize> {
+    if let Some(target_index) = source_lander.target_human_index {
+        return humans
+            .get(target_index)
+            .is_some_and(|human| clean_carried_human_matches_lander(lander_position, *human))
+            .then_some(target_index);
+    }
+
+    clean_carried_human_index_for_lander(humans, lander_position)
+}
+
+fn clean_carried_human_matches_lander(
+    lander_position: ScreenPosition,
+    human: HumanSnapshot,
+) -> bool {
+    human.carried
+        && !human.carried_by_player
+        && (human.position == clean_carried_human_position(lander_position)
+            || clean_lander_pull_position_matches(lander_position, human))
+}
+
 fn source_lander_grab_active(source_lander: SourceLanderSnapshot) -> bool {
     source_lander.sleep_ticks == 0
         && source_lander.x_velocity == 0
@@ -4500,15 +4571,48 @@ fn source_lander_grab_active(source_lander: SourceLanderSnapshot) -> bool {
         && source_lander.picture_frame == 0
 }
 
-fn clean_source_lander_grab_target(
+fn source_lander_ensure_live_target(
+    source_lander: &mut SourceLanderSnapshot,
     humans: &[HumanSnapshot],
-    lander_position: ScreenPosition,
 ) -> Option<ScreenPosition> {
-    humans
-        .iter()
-        .filter(|human| !human.carried && !human.carried_by_player)
-        .map(|human| human.position)
-        .find(|human_position| source_lander_grab_x_matches(lander_position, *human_position))
+    let current_target_index = source_lander.target_human_index?;
+    if let Some(target_index) = source_lander_live_target_index(*source_lander, humans) {
+        return Some(humans[target_index].position);
+    }
+
+    source_lander.target_human_index =
+        source_lander_next_target_index(Some(current_target_index), humans);
+    source_lander
+        .target_human_index
+        .map(|target_index| humans[target_index].position)
+}
+
+fn source_lander_live_target_index(
+    source_lander: SourceLanderSnapshot,
+    humans: &[HumanSnapshot],
+) -> Option<usize> {
+    let target_index = source_lander.target_human_index?;
+    let human = humans.get(target_index)?;
+    (!human.carried && !human.carried_by_player).then_some(target_index)
+}
+
+fn source_lander_next_target_index(
+    current_target_index: Option<usize>,
+    humans: &[HumanSnapshot],
+) -> Option<usize> {
+    if humans.is_empty() {
+        return None;
+    }
+
+    let start_index = current_target_index
+        .map(|index| (index + 1) % humans.len())
+        .unwrap_or(0);
+    (0..humans.len())
+        .map(|offset| (start_index + offset) % humans.len())
+        .find(|&index| {
+            let human = humans[index];
+            !human.carried && !human.carried_by_player
+        })
 }
 
 fn source_lander_grab_x_matches(
@@ -4619,6 +4723,12 @@ fn source_lander_pull_target_cleared(enemy: &EnemySnapshot, humans: &[HumanSnaps
     };
     if source_lander.y_velocity != 0 || !source_lander_pull_edge(enemy.position) {
         return false;
+    }
+
+    if let Some(target_index) = source_lander.target_human_index {
+        return !humans
+            .get(target_index)
+            .is_some_and(|human| clean_lander_pull_position_matches(enemy.position, *human));
     }
 
     !humans
@@ -7658,6 +7768,7 @@ mod tests {
                         shot_timer: 0,
                         sleep_ticks: 0,
                         picture_frame: 2,
+                        target_human_index: None,
                     },
                 ),
                 EnemySnapshot::source_baiter(
@@ -9716,6 +9827,7 @@ mod tests {
                 shot_timer: 1,
                 sleep_ticks: 0,
                 picture_frame: 2,
+                target_human_index: Some(0),
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
@@ -9758,6 +9870,7 @@ mod tests {
             ),
             sleep_ticks: SOURCE_LANDER_ORBIT_SLEEP_TICKS,
             picture_frame: 0,
+            target_human_index: Some(0),
         };
 
         let frame = game.step(GameInput::NONE);
@@ -9784,6 +9897,152 @@ mod tests {
     }
 
     #[test]
+    fn clean_game_source_lander_orbit_enters_grab_for_selected_target() {
+        let mut game = credited_started_game();
+        let player_position = ScreenPosition::new(0x20, 0x80);
+        let player_velocity = (WorldVector::default(), WorldVector::default());
+        game.state.player.position = (
+            super::world_word(u16::from(player_position.x) << 8),
+            super::world_word(u16::from(player_position.y) << 8),
+        );
+        game.state.player.velocity = player_velocity;
+        let lander_start = ScreenPosition::new(100, 80);
+        let target_position = ScreenPosition::new(100, 214);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0x0040,
+            y_velocity: 0x0100,
+            shot_timer: 2,
+            sleep_ticks: 0,
+            picture_frame: 2,
+            target_human_index: Some(0),
+        };
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            lander_start,
+            super::source_lander_screen_velocity(source_lander),
+            source_lander,
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot::new(target_position)];
+        game.baiter_timer_ticks = None;
+
+        let y_step = super::source_lander_base_y_velocity(game.state.wave_profile);
+        let (expected_y, expected_y_fraction) =
+            super::source_fixed_axis_step(lander_start.y, source_lander.y_fraction, y_step);
+        let expected_source = SourceLanderSnapshot {
+            y_fraction: expected_y_fraction,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: super::SOURCE_LANDER_GRAB_SLEEP_TICKS,
+            picture_frame: 0,
+            ..source_lander
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        let lander = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source lander should enter grab step");
+        assert_eq!(
+            lander.position,
+            ScreenPosition::new(lander_start.x, expected_y)
+        );
+        assert_eq!(
+            lander.velocity,
+            super::source_lander_screen_velocity(expected_source)
+        );
+        assert_eq!(lander.source_lander, Some(expected_source));
+        assert_eq!(
+            frame.state.world.humans,
+            vec![HumanSnapshot::new(target_position)]
+        );
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+    }
+
+    #[test]
+    fn clean_game_source_lander_ignores_untargeted_aligned_human() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, 80);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0x0040,
+            y_velocity: 0,
+            shot_timer: 5,
+            sleep_ticks: 0,
+            picture_frame: 1,
+            target_human_index: Some(1),
+        };
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            lander_start,
+            super::source_lander_screen_velocity(source_lander),
+            source_lander,
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![
+            HumanSnapshot::new(ScreenPosition::new(100, 92)),
+            HumanSnapshot::new(ScreenPosition::new(140, 214)),
+        ];
+        game.baiter_timer_ticks = None;
+
+        let expected_y_velocity = super::source_lander_orbit_y_velocity(
+            game.state.wave_profile,
+            lander_start,
+            &game.state.world.terrain,
+        );
+        let (expected_x, expected_x_fraction) =
+            super::source_fixed_axis_step(lander_start.x, source_lander.x_fraction, 0x0040);
+        let (expected_y, expected_y_fraction) = super::source_active_object_y_step(
+            lander_start.y,
+            source_lander.y_fraction,
+            expected_y_velocity,
+        );
+        let expected_source = SourceLanderSnapshot {
+            x_fraction: expected_x_fraction,
+            y_fraction: expected_y_fraction,
+            y_velocity: expected_y_velocity,
+            shot_timer: 4,
+            sleep_ticks: super::SOURCE_LANDER_ORBIT_SLEEP_TICKS,
+            picture_frame: 2,
+            ..source_lander
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        let lander = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("source lander should keep orbiting");
+        assert_eq!(lander.position, ScreenPosition::new(expected_x, expected_y));
+        assert_eq!(lander.source_lander, Some(expected_source));
+        assert_eq!(
+            frame.state.world.humans,
+            vec![
+                HumanSnapshot {
+                    source_fall_velocity: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION,
+                    source_fall_y_fraction: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION
+                        .to_be_bytes()[1],
+                    ..HumanSnapshot::new(ScreenPosition::new(100, 92))
+                },
+                HumanSnapshot {
+                    source_fall_velocity: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION,
+                    source_fall_y_fraction: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION
+                        .to_be_bytes()[1],
+                    ..HumanSnapshot::new(ScreenPosition::new(140, 214))
+                },
+            ]
+        );
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+    }
+
+    #[test]
     fn clean_game_source_lander_grab_step_seeks_target_before_capture() {
         let mut game = credited_started_game();
         let player_position = ScreenPosition::new(0x20, 0x80);
@@ -9803,6 +10062,7 @@ mod tests {
             shot_timer: 2,
             sleep_ticks: 0,
             picture_frame: 0,
+            target_human_index: Some(0),
         };
         game.state.world.enemies = vec![EnemySnapshot::source_lander(
             lander_start,
@@ -9870,6 +10130,7 @@ mod tests {
             shot_timer: 5,
             sleep_ticks: 0,
             picture_frame: 0,
+            target_human_index: Some(0),
         };
         game.state.world.enemies = vec![
             EnemySnapshot::source_lander(first_start, ScreenVelocity::new(0, 0), source_lander),
@@ -9907,6 +10168,7 @@ mod tests {
                 shot_timer: 4,
                 sleep_ticks: SOURCE_LANDER_ORBIT_SLEEP_TICKS,
                 picture_frame: 1,
+                target_human_index: None,
                 ..source_lander
             })
         );
@@ -10711,6 +10973,7 @@ mod tests {
                     shot_timer: 0,
                     sleep_ticks: 0,
                     picture_frame: 0,
+                    target_human_index: None,
                 },
             )],
             humans: vec![HumanSnapshot {
@@ -10853,6 +11116,7 @@ mod tests {
             shot_timer: 5,
             sleep_ticks: 1,
             picture_frame: 0,
+            target_human_index: Some(0),
         };
         game.state.world.enemies = vec![EnemySnapshot::source_lander(
             lander_start,
@@ -10972,6 +11236,7 @@ mod tests {
             shot_timer: 1,
             sleep_ticks: 0,
             picture_frame: 0,
+            target_human_index: Some(0),
         };
         game.state.world.enemies = vec![EnemySnapshot::source_lander(
             lander_start,
@@ -11024,6 +11289,7 @@ mod tests {
             shot_timer: 1,
             sleep_ticks: 0,
             picture_frame: 0,
+            target_human_index: Some(0),
         };
         game.state.world.enemies = vec![EnemySnapshot::source_lander(
             lander_start,
@@ -11102,6 +11368,7 @@ mod tests {
             shot_timer: 1,
             sleep_ticks: 1,
             picture_frame: 0,
+            target_human_index: Some(0),
         };
         game.state.world.enemies = vec![
             EnemySnapshot::source_lander(lander_start, ScreenVelocity::new(0, 0), source_lander),

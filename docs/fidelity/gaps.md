@@ -592,6 +592,13 @@ post-acceptance validation records.
   now perform the one-step source approach toward the aligned uncarried human,
   clear active velocity, sleep for one frame, and keep running the lander shot
   timer before capture.
+- `2026-05-20 22:53:13 BST`: R9-C4 adds bounded explicit selected-human
+  target state to clean source landers. Source-shaped clean landers can retain
+  a target human index, enter `LANDG` from `LANDS0` only when that selected
+  target passes the source close-X check, keep captures target-specific, and
+  retarget from cleared or player-carried target slots. Default source lander
+  spawns still leave the target unset until source target-list restoration is
+  modeled for clean humans.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain
