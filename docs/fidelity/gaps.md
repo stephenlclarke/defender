@@ -604,6 +604,12 @@ post-acceptance validation records.
   target-list slot addresses starting at `0xA11A` with a two-byte stride.
   Runtime lander target assignment and object-evidence comparison remain
   unchanged until source target-list placement/count parity is modeled.
+- `2026-05-20 23:33:42 BST`: R9-C4 adds the bounded source-restored clean
+  human placement/count slice. Initial clean worlds now restore ten
+  source-shaped humans through the `PLRES` / `TLIST` target-group algorithm,
+  keep deterministic target-list slot addresses, and update initial active
+  object/sprite evidence counts. Default source lander spawns still leave
+  selected targets unset until the source target-list cursor assignment slice.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain

@@ -1831,10 +1831,7 @@ impl WorldSnapshot {
             ],
             enemies,
             enemy_reserve,
-            humans: vec![
-                source_target_list_human(ScreenPosition::new(72, 216), 0),
-                source_target_list_human(ScreenPosition::new(180, 218), 1),
-            ],
+            humans: source_initial_target_list_humans(),
             projectiles: Vec::new(),
             enemy_projectiles: Vec::new(),
             score_popups: Vec::new(),
@@ -3050,6 +3047,8 @@ const CLEAN_WAVE_SPAWN_POSITIONS: [ScreenPosition; SOURCE_MAX_ACTIVE_WAVE_ENEMIE
 ];
 
 const SOURCE_MAX_ACTIVE_WAVE_ENEMIES: usize = 5;
+const SOURCE_START_HUMAN_COUNT: u8 = 10;
+const SOURCE_ASTRO_RESTORE_Y: u8 = 0xE0;
 const SOURCE_TARGET_LIST_BASE: u16 = 0xA11A;
 const SOURCE_TARGET_LIST_ENTRY_STRIDE: u16 = 2;
 const SOURCE_TARGET_LIST_ENTRY_COUNT: usize = 32;
@@ -3137,6 +3136,61 @@ fn source_target_list_human(position: ScreenPosition, slot_index: usize) -> Huma
         source_target_slot_address: Some(source_target_list_slot_address(slot_index)),
         ..HumanSnapshot::new(position)
     }
+}
+
+fn source_initial_target_list_humans() -> Vec<HumanSnapshot> {
+    let mut target_rng = SourceRandSnapshot::default();
+    source_target_list_restore_humans(&mut target_rng, SOURCE_START_HUMAN_COUNT)
+}
+
+fn source_target_list_restore_humans(
+    source_rng: &mut SourceRandSnapshot,
+    target_count: u8,
+) -> Vec<HumanSnapshot> {
+    let mut humans = Vec::with_capacity(usize::from(target_count));
+    let mut slot_index = 0usize;
+    let mut remainder = target_count;
+
+    if target_count > 7 {
+        let quadrant_count = target_count >> 2;
+        for x_bank in [0x00, 0x40, 0x80, 0xC0] {
+            slot_index = source_target_list_restore_human_group(
+                &mut humans,
+                source_rng,
+                quadrant_count,
+                x_bank,
+                slot_index,
+            );
+        }
+        remainder = target_count.wrapping_sub(quadrant_count << 2);
+    }
+
+    for _ in 0..remainder {
+        let x_bank = source_rng.hseed;
+        slot_index =
+            source_target_list_restore_human_group(&mut humans, source_rng, 1, x_bank, slot_index);
+    }
+
+    humans
+}
+
+fn source_target_list_restore_human_group(
+    humans: &mut Vec<HumanSnapshot>,
+    source_rng: &mut SourceRandSnapshot,
+    count: u8,
+    x_bank: u8,
+    mut slot_index: usize,
+) -> usize {
+    for _ in 0..count {
+        let state = source_rng.advance();
+        let source_x = (state.hseed & 0x1F).wrapping_add(x_bank);
+        humans.push(source_target_list_human(
+            ScreenPosition::new(source_x, SOURCE_ASTRO_RESTORE_Y),
+            slot_index,
+        ));
+        slot_index += 1;
+    }
+    slot_index
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -7669,16 +7723,37 @@ mod tests {
     #[test]
     fn clean_initial_humans_carry_source_target_list_slots() {
         let first = WorldSnapshot::for_wave(1);
+        let expected_positions = [
+            ScreenPosition::new(0x12, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x09, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x54, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x5A, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x8D, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x86, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0xC3, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0xD1, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x09, super::SOURCE_ASTRO_RESTORE_Y),
+            ScreenPosition::new(0x14, super::SOURCE_ASTRO_RESTORE_Y),
+        ];
 
-        assert_eq!(first.humans.len(), 2);
         assert_eq!(
-            first.humans[0].source_target_slot_address,
-            Some(super::source_target_list_slot_address(0))
+            first.humans.len(),
+            usize::from(super::SOURCE_START_HUMAN_COUNT)
         );
         assert_eq!(
-            first.humans[1].source_target_slot_address,
-            Some(super::source_target_list_slot_address(1))
+            first
+                .humans
+                .iter()
+                .map(|human| human.position)
+                .collect::<Vec<_>>(),
+            expected_positions.to_vec()
         );
+        for (index, human) in first.humans.iter().enumerate() {
+            assert_eq!(
+                human.source_target_slot_address,
+                Some(super::source_target_list_slot_address(index))
+            );
+        }
         assert_eq!(super::source_target_list_slot_address(31), 0xA158);
     }
 
@@ -7705,7 +7780,7 @@ mod tests {
                 ..EnemyReserveSnapshot::default()
             }
         );
-        assert_eq!(first.object_evidence.active_count, 7);
+        assert_eq!(first.object_evidence.active_count, 15);
         assert_eq!(first.object_evidence.inactive_count, 10);
         assert_eq!(first.object_evidence.detail_count, 16);
 
@@ -8466,12 +8541,12 @@ mod tests {
                     .expect("initial lander should carry source state")
             )
         );
-        assert_eq!(active.state.world.humans.len(), 2);
+        assert_eq!(active.state.world.humans.len(), 10);
         assert!(active.state.world.projectiles.is_empty());
-        assert_eq!(active.state.world.object_evidence.active_count, 7);
+        assert_eq!(active.state.world.object_evidence.active_count, 15);
         assert_eq!(active.state.world.object_evidence.inactive_count, 10);
         assert_eq!(active.state.world.object_evidence.projectile_count, 0);
-        assert_eq!(active.state.world.object_evidence.visible_count, 7);
+        assert_eq!(active.state.world.object_evidence.visible_count, 15);
         assert_eq!(active.state.world.object_evidence.evidence_crc32, None);
         assert_eq!(active.state.world.object_evidence.detail_count, 16);
         assert_eq!(
@@ -8491,12 +8566,12 @@ mod tests {
             RenderLayerCounts {
                 terrain: 5,
                 starfield: 3,
-                objects: 8,
-                hud: 22,
+                objects: 16,
+                hud: 30,
                 ..RenderLayerCounts::default()
             }
         );
-        assert_eq!(active.scene.summary().sprite_count, 38);
+        assert_eq!(active.scene.summary().sprite_count, 54);
     }
 
     #[test]
@@ -8572,12 +8647,12 @@ mod tests {
             RenderLayerCounts {
                 terrain: 5,
                 starfield: 3,
-                objects: 8,
-                hud: 30,
+                objects: 16,
+                hud: 38,
                 ..RenderLayerCounts::default()
             }
         );
-        assert_eq!(active.scene.summary().sprite_count, 46);
+        assert_eq!(active.scene.summary().sprite_count, 62);
     }
 
     #[test]
@@ -8652,22 +8727,22 @@ mod tests {
                 ..EnemyReserveSnapshot::default()
             }
         );
-        assert_eq!(frame.state.world.object_evidence.active_count, 8);
+        assert_eq!(frame.state.world.object_evidence.active_count, 16);
         assert_eq!(frame.state.world.object_evidence.inactive_count, 5);
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
-        assert_eq!(frame.state.world.object_evidence.visible_count, 8);
+        assert_eq!(frame.state.world.object_evidence.visible_count, 16);
         assert_eq!(frame.state.world.object_evidence.evidence_crc32, None);
-        assert_eq!(frame.state.world.object_evidence.detail_count, 13);
+        assert_eq!(frame.state.world.object_evidence.detail_count, 16);
         assert_eq!(
-            frame.state.world.object_evidence.details[7].screen_position,
+            frame.state.world.object_evidence.details[15].screen_position,
             Some(frame.state.world.projectiles[0].position)
         );
         assert_eq!(
-            frame.state.world.object_evidence.details[7].object_category,
+            frame.state.world.object_evidence.details[15].object_category,
             Some(ObjectEvidenceCategory::PlayerProjectile)
         );
         assert_eq!(
-            frame.state.world.object_evidence.details[7].mapped_sprite,
+            frame.state.world.object_evidence.details[15].mapped_sprite,
             Some(SpriteId::PLAYER_PROJECTILE)
         );
         assert_eq!(
@@ -8694,9 +8769,9 @@ mod tests {
             RenderLayerCounts {
                 terrain: 5,
                 starfield: 3,
-                objects: 13,
+                objects: 21,
                 projectiles: 1,
-                hud: 22,
+                hud: 30,
                 overlay: 0,
             }
         );
@@ -8837,7 +8912,7 @@ mod tests {
         assert_eq!(smart_bomb_stock[2].position, [70.0, 28.0]);
         assert_eq!(smart_bomb_stock[3].position, [266.0, 20.0]);
         assert_eq!(smart_bomb_stock[4].position, [266.0, 24.0]);
-        assert_eq!(frame.scene.summary().layers.hud, 31);
+        assert_eq!(frame.scene.summary().layers.hud, 39);
     }
 
     #[test]
@@ -8945,9 +9020,9 @@ mod tests {
             }
         );
         assert!(frame.events.gameplay().is_empty());
-        assert_eq!(frame.state.world.object_evidence.active_count, 7);
+        assert_eq!(frame.state.world.object_evidence.active_count, 15);
         assert_eq!(frame.state.world.object_evidence.inactive_count, 5);
-        assert_eq!(frame.state.world.object_evidence.visible_count, 7);
+        assert_eq!(frame.state.world.object_evidence.visible_count, 15);
     }
 
     #[test]
@@ -9132,7 +9207,7 @@ mod tests {
         assert!(frame.state.world.projectiles.is_empty());
         assert_eq!(frame.state.scores.player_one, 1_000);
         assert_eq!(frame.events.gameplay(), &[GameEvent::EnemyDestroyed]);
-        assert_eq!(frame.state.world.object_evidence.active_count, 8);
+        assert_eq!(frame.state.world.object_evidence.active_count, 16);
         assert_eq!(frame.state.world.object_evidence.projectile_count, 0);
         assert_eq!(
             frame.state.world.object_evidence.details[0].object_category,
@@ -9481,7 +9556,7 @@ mod tests {
         );
         assert_eq!(baiter.source_baiter, Some(expected_source_baiter));
         assert!(frame.events.gameplay().is_empty());
-        assert_eq!(frame.state.world.object_evidence.active_count, 8);
+        assert_eq!(frame.state.world.object_evidence.active_count, 16);
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_BAITER
                 && sprite.layer == RenderLayer::Objects
@@ -12355,7 +12430,7 @@ mod tests {
                 .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER
                     && sprite.size == [12.0, 8.0])
         );
-        assert_eq!(cleared.scene.summary().layers.overlay, 29);
+        assert_eq!(cleared.scene.summary().layers.overlay, 37);
         assert!(cleared.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_A
                 && sprite.layer == RenderLayer::Overlay
@@ -12423,7 +12498,7 @@ mod tests {
         );
         assert!(next_wave.state.world.projectiles.is_empty());
         assert_eq!(next_wave.state.world.terrain.len(), 5);
-        assert_eq!(next_wave.state.world.humans.len(), 2);
+        assert_eq!(next_wave.state.world.humans.len(), 10);
         assert_eq!(next_wave.events.gameplay(), &[GameEvent::WaveStarted]);
         assert_eq!(
             next_wave
