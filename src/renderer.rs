@@ -889,6 +889,17 @@ impl ObjectPicturePalette {
         }
     }
 
+    fn defender_logo() -> Self {
+        Self {
+            one: WHITE_RGBA,
+            a: WHITE_RGBA,
+            c: pseudo_color_rgba(0x3F),
+            d: WHITE_RGBA,
+            e: WHITE_RGBA,
+            f: WHITE_RGBA,
+        }
+    }
+
     fn ship() -> Self {
         let white = pseudo_color_rgba(PICTURE_COLOR_TABLE[9]);
         Self {
@@ -989,6 +1000,8 @@ const SOURCE_OBJECT_COLOR_TABLE: [u8; 37] = [
     0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
     0xBF, 0x3F, 0x3E, 0x3C, 0x00,
 ];
+const SOURCE_WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
+const SOURCE_WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
 const FONT_SHEET_PNG: &[u8] = include_bytes!("../assets/sprites/font-sheet.png");
 const ARCADE_SCORE_DIGITS_TSV: &str = include_str!("../assets/red-label/score-digits.tsv");
 const SOURCE_MESSAGE_GLYPHS_TSV: &str = include_str!("../assets/red-label/message-glyphs.tsv");
@@ -2085,7 +2098,7 @@ fn decode_source_defender_logo_rgba() -> EmbeddedSprite {
         u32::from(SOURCE_DEFENDER_LOGO_ROWS),
     );
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
-    let palette = ObjectPicturePalette::white();
+    let palette = ObjectPicturePalette::defender_logo();
 
     for column in 0..usize::from(SOURCE_DEFENDER_LOGO_COLUMNS) {
         let source_column = column * usize::from(SOURCE_DEFENDER_LOGO_ROWS);
@@ -2350,19 +2363,15 @@ fn pseudo_color_rgba(value: u8) -> [u8; 4] {
     }
 
     [
-        scale_color_channel(value & 0x07, 7),
-        scale_color_channel((value >> 3) & 0x07, 7),
-        scale_color_channel((value >> 6) & 0x03, 3),
+        SOURCE_WILLIAMS_RED_GREEN_LEVELS[usize::from(value & 0x07)],
+        SOURCE_WILLIAMS_RED_GREEN_LEVELS[usize::from((value >> 3) & 0x07)],
+        SOURCE_WILLIAMS_BLUE_LEVELS[usize::from((value >> 6) & 0x03)],
         255,
     ]
 }
 
 fn source_object_cycle_color(phase: usize) -> [u8; 4] {
     pseudo_color_rgba(SOURCE_OBJECT_COLOR_TABLE[phase % (SOURCE_OBJECT_COLOR_TABLE.len() - 1)])
-}
-
-fn scale_color_channel(value: u8, max: u8) -> u8 {
-    ((u16::from(value) * 255) / u16::from(max.max(1))) as u8
 }
 
 fn blit_default_region(

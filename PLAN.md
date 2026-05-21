@@ -871,7 +871,10 @@ Reopened B13 repair schedule:
   tint or non-source coalescence cadence. In progress: the Williams
   handwriting reveal now uses source `LOGO0` table-operation cadence and
   completes at the `PRES` handoff instead of using a linear 160-frame pixel
-  ramp. Remaining R9-E3.13 work is the title color/coalescence visual repair.
+  ramp; title text, source pseudo-colors, object sprite palettes, and the
+  source-expanded Defender logo now use Williams resistor palette conversion
+  with source `COLTAB`/`TCTAB` cycling. Remaining R9-E3.13 work is Defender
+  coalescence visual repair.
 - R9-E3.14: scoring sprite, scanner, and terrain visual pass. Compare the
   protected scoring-sequence frames against clean candidate frames and repair
   the remaining source sprite palettes, score-card object placement, scanner
@@ -3349,6 +3352,25 @@ Work log:
   full gate should run at R9-E3.15 candidate closeout, or sooner if the
   remaining title/scoring visual repairs change shared contracts or broad
   scenario behavior.
+
+- `2026-05-22 00:39:16 BST` R9-E3.13 title palette subpass. The clean title
+  path now converts source pseudo-color bytes through the Williams resistor
+  palette instead of the earlier linear RGB placeholder. Williams title text
+  uses source `COLTAB` cycling, the Williams logo uses source `TCTAB` slot
+  cycling, source object palettes inherit the same resistor conversion, and the
+  source-expanded Defender logo preserves its internal yellow/red source
+  palette instead of being treated as a white logo tinted as a whole. Focused
+  validation passed with `cargo fmt --check`, `cargo check`, focused source
+  visual-state, Williams logo, Defender wordmark, title scene, and renderer
+  atlas tests, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
+  `make readme-media`. Candidate media remains repair evidence only:
+  reference 347 frames, candidate 347 frames, equal 4600cs duration, sampled
+  RMS full 47.30, title 54.45, Hall of Fame 59.73, numeric glyphs 61.72,
+  sprites 45.23, terrain 38.75, and scoring 52.24. Broad gates remain deferred
+  because this is a bounded visual repair subpass. The next full gate should
+  run at R9-E3.15 candidate closeout, or sooner if the remaining
+  Defender/coalescence or scoring visual repairs change shared contracts or
+  broad scenario behavior.
 
 ## Archived Completed History
 

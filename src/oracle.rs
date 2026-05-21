@@ -541,7 +541,7 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
             text,
             source_screen_position(SOURCE_ATTRACT_CREDITS_LABEL_SCREEN),
             RenderLayer::Overlay,
-            SOURCE_VISUAL_STATE.attract_title_text_tint(),
+            SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
         );
     }
 
@@ -551,7 +551,7 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
         &digits[..digit_count],
         source_screen_position(SOURCE_ATTRACT_CREDITS_NUMBER_SCREEN),
         RenderLayer::Overlay,
-        SOURCE_VISUAL_STATE.attract_title_text_tint(),
+        SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
     );
 }
 
@@ -578,7 +578,7 @@ fn push_attract_presents_sprites(scene: &mut RenderScene, state: &GameState) {
             text,
             SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
             RenderLayer::Overlay,
-            SOURCE_VISUAL_STATE.attract_title_text_tint(),
+            SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
         );
     }
 }

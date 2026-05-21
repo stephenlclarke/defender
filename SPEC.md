@@ -66,9 +66,11 @@ R9-E3.7 clean media:
   the protected reference at 347 frames / 4600cs and suppresses stray
   Williams-title score HUD / zero-credit text. R9-E3.13 has started title
   repair by switching the Williams handwriting reveal from a linear pixel ramp
-  to source `LOGO0` table-operation cadence through the `PRES` handoff, but
-  the latest contact sheet still shows title color/coalescence and scoring
-  visual drift. Until signoff, changes that alter public
+  to source `LOGO0` table-operation cadence through the `PRES` handoff, then
+  by moving source pseudo-colors, title text, object sprites, and Defender logo
+  decoding onto the Williams resistor palette with source `COLTAB`/`TCTAB`
+  title color cycling. The latest contact sheet still shows Defender
+  coalescence and scoring visual drift. Until signoff, changes that alter public
   contracts, scenario semantics, runtime behavior, or final acceptance evidence
   must trigger focused checks and, when broad risk is introduced, a renewed full
   gate.
@@ -520,10 +522,11 @@ score-card reveal before cycling back to the Williams page. This projection is
 suppressed during the hall-of-fame display stall. README media captures now
 preserve sampled frame cadence and match the protected reference duration and
 frame count. The Williams handwriting reveal advances by source `LOGO0`
-table-operation slices, but B13 still requires title color/coalescence and
-scoring visual repair before owner acceptance. During a pending two-player
-start handoff, scenes
-draw the source-backed `PLYR1`/`PLYR2` player label at `0x3C80`. On the
+table-operation slices and uses source `TCTAB`/Williams resistor palette title
+colors; `ELECV` title text uses source `COLTAB` cycling. B13 still requires
+Defender coalescence and scoring visual repair before owner acceptance. During
+a pending two-player start handoff, scenes draw the source-backed
+`PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,
 and `BONSX` status text at `0x3850`, `0x3D60`, and `0x3C90`, plus the wave
 number at `0x6550` and multiplier digit at `0x5890`; source numeric glyphs

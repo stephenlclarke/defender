@@ -24,10 +24,11 @@ table path and by removing gameplay ground from non-scoring attract pages. B13
 R9-E3.12 has repaired media cadence/order enough for the candidate to match the
 protected reference at 347 frames / 4600cs and removed title HUD/zero-credit
 contamination. R9-E3.13 has started title repair by moving Williams
-handwriting reveal timing to source `LOGO0` table-operation cadence, but B13
-remains open for Williams color/handwriting polish, Defender coalescence
-parity, scoring sprite/terrain visual drift, candidate media, and owner-review
-steps.
+handwriting reveal timing to source `LOGO0` table-operation cadence and by
+moving title/source sprite pseudo-colors onto Williams resistor palette
+conversion with source `COLTAB`/`TCTAB` title cycling. B13 remains open for
+Defender coalescence parity, scoring sprite/terrain visual drift, candidate
+media, and owner-review steps.
 Older entries remain closed fidelity history, local-reference/tooling notes,
 archived prototype cleanup, or post-acceptance validation records. Historical
 entries that mention remaining blockers describe the state at the time they

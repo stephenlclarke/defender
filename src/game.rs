@@ -35,7 +35,8 @@ const COIN_CREDIT_SOUND_DELAY_FRAMES: u8 = 1;
 const START_SOUND_DELAY_FRAMES: u8 = 1;
 const START_PLAYFIELD_DELAY_FRAMES: u8 = 2;
 const ATTRACT_PRESENTS_START_FRAME: u16 = 236;
-pub(crate) const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 = 285;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 =
+    ATTRACT_PRESENTS_START_FRAME + ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS as u16 + 1;
 const ATTRACT_COPYRIGHT_START_FRAME: u16 = 419;
 const ATTRACT_HALL_OF_FAME_START_FRAME: u16 = 441;
 const ATTRACT_HALL_OF_FAME_STALL_TICK_FRAMES: u16 = 10;
@@ -118,6 +119,15 @@ const SOURCE_COLTAB_COLOR_BYTES: [u8; 37] = [
     0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
     0xBF, 0x3F, 0x3E, 0x3C, 0x00,
 ];
+const SOURCE_TIE_COLOR_BYTES: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07];
+const SOURCE_COLTAB_ACTIVE_BYTES: usize = SOURCE_COLTAB_COLOR_BYTES.len() - 1;
+const SOURCE_ATTRACT_TITLE_TEXT_COLOR_FRAME_DIVISOR: u16 = 8;
+const SOURCE_ATTRACT_TITLE_TEXT_COLOR_OFFSET: usize = 18;
+const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES: u16 = 6;
+const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES: u16 = 6;
+const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET: usize = 2;
+const SOURCE_WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
+const SOURCE_WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
 const SOURCE_TERRAIN_DATA_TSV: &str = include_str!("../assets/red-label/terrain-data.tsv");
 const SOURCE_TERRAIN_TDATA_LABEL: &str = "TDATA";
 const SOURCE_TERRAIN_TDATA_ADDRESS: u16 = 0xC350;
@@ -406,9 +416,12 @@ impl SourceVisualStateSnapshot {
         Color::WHITE
     }
 
-    pub(crate) const fn attract_title_text_tint(self) -> Color {
+    pub(crate) fn attract_title_text_tint_for_frame(self, page_frame: u16) -> Color {
         let _source_status = self.attract_williams_status;
-        Color::WHITE
+        let color_index = (usize::from(page_frame / SOURCE_ATTRACT_TITLE_TEXT_COLOR_FRAME_DIVISOR)
+            + SOURCE_ATTRACT_TITLE_TEXT_COLOR_OFFSET)
+            % SOURCE_COLTAB_ACTIVE_BYTES;
+        source_pseudo_color_tint(SOURCE_COLTAB_COLOR_BYTES[color_index])
     }
 
     pub(crate) const fn attract_instruction_text_tint(self, screen_address: u16) -> Color {
@@ -420,9 +433,13 @@ impl SourceVisualStateSnapshot {
     }
 
     pub(crate) fn attract_williams_logo_tint_for_frame(self, page_frame: u16) -> Color {
-        let _source_rate_tick =
-            page_frame / u16::from(self.attract_williams_normal_logo_rate.max(1));
-        source_pseudo_color_tint(self.attract_williams_logo_color_index)
+        let source_rate_tick = page_frame
+            .saturating_sub(SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES)
+            / SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES.max(1);
+        let tie_triplet = usize::from(source_rate_tick % 3) * 3;
+        source_pseudo_color_tint(
+            SOURCE_TIE_COLOR_BYTES[tie_triplet + SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET],
+        )
     }
 
     pub(crate) const fn attract_williams_logo_should_render(self) -> bool {
@@ -432,8 +449,9 @@ impl SourceVisualStateSnapshot {
     }
 
     pub(crate) fn attract_defender_wordmark_tint(self) -> Color {
-        let _source_index = self.attract_copyright_williams_color_index;
-        source_pseudo_color_tint(self.attract_williams_logo_color_index)
+        let _source_indices = self.attract_copyright_williams_color_index
+            ^ u16::from(self.attract_williams_logo_color_index);
+        Color::WHITE
     }
 
     pub(crate) const fn attract_copyright_tint(self) -> Color {
@@ -7101,7 +7119,7 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
             text,
             source_screen_position(SOURCE_ATTRACT_CREDITS_LABEL_SCREEN),
             RenderLayer::Overlay,
-            SOURCE_VISUAL_STATE.attract_title_text_tint(),
+            SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
         );
     }
 
@@ -7111,7 +7129,7 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
         &digits[..digit_count],
         source_screen_position(SOURCE_ATTRACT_CREDITS_NUMBER_SCREEN),
         RenderLayer::Overlay,
-        SOURCE_VISUAL_STATE.attract_title_text_tint(),
+        SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
     );
 }
 
@@ -7138,7 +7156,7 @@ fn push_attract_presents_sprites(scene: &mut RenderScene, state: &GameState) {
             text,
             SOURCE_ATTRACT_PRESENTS_ELECTRONICS_SCREEN,
             RenderLayer::Overlay,
-            SOURCE_VISUAL_STATE.attract_title_text_tint(),
+            SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
         );
     }
 }
@@ -7678,15 +7696,11 @@ fn source_pseudo_color_tint(value: u8) -> Color {
     }
 
     Color::from_rgba(
-        source_scale_color_channel(value & 0x07, 7),
-        source_scale_color_channel((value >> 3) & 0x07, 7),
-        source_scale_color_channel((value >> 6) & 0x03, 3),
+        SOURCE_WILLIAMS_RED_GREEN_LEVELS[usize::from(value & 0x07)],
+        SOURCE_WILLIAMS_RED_GREEN_LEVELS[usize::from((value >> 3) & 0x07)],
+        SOURCE_WILLIAMS_BLUE_LEVELS[usize::from((value >> 6) & 0x03)],
         0xFF,
     )
-}
-
-fn source_scale_color_channel(value: u8, max: u8) -> u8 {
-    ((u16::from(value) * 255) / u16::from(max.max(1))) as u8
 }
 
 fn push_attract_williams_logo_sprite(scene: &mut RenderScene, state: &GameState) {
@@ -10979,7 +10993,7 @@ mod tests {
             .expect("handwritten Williams pixel")
             .tint;
         assert_eq!(early_pixels[0].tint, next_tint);
-        assert_eq!(next_tint, Color::from_rgba(0xFF, 0xFF, 0x00, 0xFF));
+        assert_eq!(next_tint, super::source_pseudo_color_tint(0x2F));
 
         game.state.attract = AttractPresentationSnapshot::for_page_frame(160);
         let source_first_pass_scene = game.scene();
@@ -11041,20 +11055,21 @@ mod tests {
         assert_eq!(visual.top_display_scanner_marker_tint(), Color::WHITE);
         assert_eq!(
             visual.attract_williams_logo_tint_for_frame(0),
-            Color::from_rgba(0xFF, 0xFF, 0x00, 0xFF)
+            super::source_pseudo_color_tint(0x2F)
         );
         assert_eq!(
             visual.attract_williams_logo_tint_for_frame(10),
-            Color::from_rgba(0xFF, 0xFF, 0x00, 0xFF)
+            super::source_pseudo_color_tint(0x2F)
         );
         assert_eq!(
             visual.attract_williams_logo_tint_for_frame(20),
-            Color::from_rgba(0xFF, 0xFF, 0x00, 0xFF)
+            super::source_pseudo_color_tint(0x07)
         );
         assert_eq!(
-            visual.attract_defender_wordmark_tint(),
-            Color::from_rgba(0xFF, 0xFF, 0x00, 0xFF)
+            visual.attract_title_text_tint_for_frame(236),
+            super::source_pseudo_color_tint(0x1F)
         );
+        assert_eq!(visual.attract_defender_wordmark_tint(), Color::WHITE);
         assert_eq!(visual.attract_copyright_tint(), Color::WHITE);
         assert_eq!(visual.hall_of_fame_logo_tint(), Color::WHITE);
         assert_eq!(
