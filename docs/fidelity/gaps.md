@@ -833,6 +833,13 @@ post-acceptance validation records.
   Together with the existing final-life switch, non-final rotation,
   post-rotation score/bonus ownership, no-other-stock game-over, and
   current-player high-score routing fixtures, Step 51/B09 is closed.
+- `2026-05-21 09:03:00 BST`: R9-D2.1 starts B10 with a focused two-player
+  high-score submission fixture. It drives player two through final game-over
+  high-score entry, submits initials, records player-two submission metadata,
+  inserts the score into all-time and today's-greatest tables at different ranks,
+  preserves the all-time top high score, proves shifted row ranks, counts down
+  the hall-of-fame display stall, and returns to attract. No public accepted
+  facade or snapshot shape change was needed.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

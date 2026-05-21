@@ -712,6 +712,17 @@ Phase 4: session and high-score closure.
   source-backed table ordering, initials insertion, today's-greatest behavior,
   post-entry display timing, and return-to-attract behavior across one-player
   and two-player sessions.
+- R9-D2.1: two-player submission/table-return fixture. Completed 2026-05-21.
+  A focused fixture now drives player two through final game-over high-score
+  entry, submits initials, proves the player-two submission metadata, inserts the
+  score into all-time and today's-greatest tables at different ranks, preserves
+  the all-time top high score, verifies shifted row ranks, and advances the
+  hall-of-fame display stall back to attract.
+- R9-D2.2: Step 52 / B10 closure audit. Pending. Audit one-player qualifying
+  submission return, non-qualifying no-entry return, table ordering edge cases,
+  and accepted `high_score_entry` scenario evidence. Add only the focused fixture
+  or bounded behavior fix needed by that audit, then close B10 with the
+  phase-level validation gate.
 
 Phase 5: final render parity and acceptance.
 
@@ -2872,6 +2883,17 @@ Work log:
   score/bonus stock ownership, final game-over routing when no other stock
   remains, and current-player high-score routing. B09 is closed; Step 52 / R9-D2
   high-score ordering and post-entry return is the next active roadmap step.
+
+- `2026-05-21 09:03:00 BST` Completed R9-D2.1 two-player high-score
+  submission/table-return fixture hardening. The new focused fixture drives a
+  player-two final game-over into high-score entry, submits `PLR`, records
+  player-two submission metadata, inserts the score into all-time and
+  today's-greatest tables at different ranks, proves the shifted row ranks,
+  preserves the all-time top high score, counts down the hall-of-fame display
+  stall, and returns to attract. No runtime or public snapshot shape change was
+  needed. Broad validation remains deferred because this is a bounded B10 fixture
+  slice, not Step 52 closure. The next full gate should run when R9-D2 closes, a
+  public contract changes, or R9 reaches Step 54.
 
 ## Archived Completed History
 

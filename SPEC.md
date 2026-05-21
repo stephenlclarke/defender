@@ -445,7 +445,9 @@ Qualifying final scores are routed through `HighScoreEntrySystem` into
 alphabetic initials through clean input, normalizes them to uppercase, supports
 backspace, emits `HighScoreInitialAccepted`, and emits `HighScoreSubmitted`
 when the third initial enters the source-shaped hall-of-fame display stall
-before the clean game returns to attract. Normal attract scenes draw the
+before the clean game returns to attract. Submitted initials insert into both
+all-time and today's-greatest tables by score rank while preserving the
+current-player submission metadata. Normal attract scenes draw the
 source-backed `CREDV` credits label at `0x28E5` and the visible credit count
 digits at `0x48E5`. The title program is gated by
 `AttractPresentationSnapshot`: the source `LGOTAB` Williams logo appears first

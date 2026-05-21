@@ -14301,6 +14301,138 @@ mod tests {
     }
 
     #[test]
+    fn clean_game_two_player_high_score_submission_orders_tables_and_returns_to_attract() {
+        let mut game = two_player_started_game();
+        let submitted_score = 15_000;
+        game.state.current_player = 2;
+        game.state.player = super::PlayerSnapshot {
+            position: (super::world_word(0x2000), super::world_word(0x8000)),
+            velocity: (WorldVector::default(), WorldVector::default()),
+            direction: Direction::Right,
+            lives: 1,
+            smart_bombs: 1,
+        };
+        game.state.player_stocks = [
+            PlayerStockSnapshot::new(0, 3),
+            PlayerStockSnapshot::new(1, 1),
+        ];
+        game.state.scores.player_one = 19_000;
+        game.state.scores.player_two = submitted_score;
+        game.state.scores.high_score = 50_000;
+        game.state.high_score_tables = HighScoreTablesSnapshot {
+            all_time: [
+                table_entry(1, 50_000, ['A', 'A', 'A']),
+                table_entry(2, 30_000, ['B', 'B', 'B']),
+                table_entry(3, 20_000, ['C', 'C', 'C']),
+                table_entry(4, 10_000, ['D', 'D', 'D']),
+                table_entry(5, 8_000, ['E', 'E', 'E']),
+                table_entry(6, 6_000, ['F', 'F', 'F']),
+                table_entry(7, 4_000, ['G', 'G', 'G']),
+                table_entry(8, 2_000, ['H', 'H', 'H']),
+            ],
+            todays_greatest: [
+                table_entry(1, 14_000, ['T', 'O', 'P']),
+                table_entry(2, 13_000, ['T', 'W', 'O']),
+                table_entry(3, 12_000, ['T', 'H', 'R']),
+                table_entry(4, 11_000, ['F', 'O', 'R']),
+                table_entry(5, 9_000, ['F', 'I', 'V']),
+                table_entry(6, 7_000, ['S', 'I', 'X']),
+                table_entry(7, 5_000, ['S', 'E', 'V']),
+                table_entry(8, 3_000, ['E', 'G', 'T']),
+            ],
+        };
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let collision = game.step(GameInput::NONE);
+        assert_eq!(collision.state.phase, GamePhase::GameOver);
+        assert_eq!(
+            collision.state.game_over,
+            GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES)
+        );
+
+        let handoff = advance_player_death_game_over_sleep(&mut game);
+
+        assert_eq!(handoff.state.phase, GamePhase::HighScoreEntry);
+        assert_eq!(handoff.state.current_player, 2);
+        assert_eq!(
+            handoff.state.high_score_entry,
+            Some(HighScoreEntrySnapshot {
+                score: submitted_score,
+                rank: 1,
+            })
+        );
+
+        for initial in ['p', 'l'] {
+            let accepted = game.step(GameInput {
+                high_score_initial: Some(initial),
+                ..GameInput::NONE
+            });
+            assert_eq!(
+                accepted.events.gameplay(),
+                &[GameEvent::HighScoreInitialAccepted]
+            );
+        }
+
+        let submitted = game.step(GameInput {
+            high_score_initial: Some('r'),
+            ..GameInput::NONE
+        });
+
+        assert_eq!(submitted.state.phase, GamePhase::GameOver);
+        assert_eq!(
+            submitted.state.high_score_submission,
+            Some(HighScoreSubmissionSnapshot {
+                player: 2,
+                score: submitted_score,
+            })
+        );
+        assert_eq!(submitted.state.scores.high_score, 50_000);
+        assert_eq!(
+            submitted.state.high_score_tables.all_time[3],
+            table_entry(4, submitted_score, ['P', 'L', 'R'])
+        );
+        assert_eq!(
+            submitted.state.high_score_tables.all_time[4],
+            table_entry(5, 10_000, ['D', 'D', 'D'])
+        );
+        assert_eq!(
+            submitted.state.high_score_tables.todays_greatest[0],
+            table_entry(1, submitted_score, ['P', 'L', 'R'])
+        );
+        assert_eq!(
+            submitted.state.high_score_tables.todays_greatest[1],
+            table_entry(2, 14_000, ['T', 'O', 'P'])
+        );
+        assert_eq!(
+            submitted.state.game_over,
+            GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES)
+        );
+        assert_eq!(
+            submitted.events.gameplay(),
+            &[
+                GameEvent::HighScoreInitialAccepted,
+                GameEvent::HighScoreSubmitted,
+            ]
+        );
+
+        for expected_timer in (1..HALL_OF_FAME_STALL_FRAMES).rev() {
+            let waiting = game.step(GameInput::NONE);
+            assert_eq!(waiting.state.phase, GamePhase::GameOver);
+            assert_eq!(
+                waiting.state.game_over,
+                GameOverSnapshot::hall_of_fame_display(expected_timer)
+            );
+            assert!(waiting.events.is_empty());
+        }
+
+        let returned = game.step(GameInput::NONE);
+        assert_eq!(returned.state.phase, GamePhase::Attract);
+        assert_eq!(returned.state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(returned.state.high_score_entry, None);
+    }
+
+    #[test]
     fn clean_game_high_score_initials_accept_backspace_and_submit() {
         let mut game = credited_started_game();
         game.state.phase = GamePhase::HighScoreEntry;
@@ -15651,6 +15783,14 @@ mod tests {
     fn keep_first_enemy_only(game: &mut Game) {
         game.state.world.enemies.truncate(1);
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+    }
+
+    fn table_entry(rank: u8, score: u32, initials: [char; 3]) -> HighScoreTableEntrySnapshot {
+        HighScoreTableEntrySnapshot {
+            rank,
+            score,
+            initials: initials.map(Some),
+        }
     }
 
     fn advance_player_switch_sleep(game: &mut Game, from_player: u8, to_player: u8) -> GameFrame {

@@ -583,10 +583,12 @@ Qualifying final scores are routed through `HighScoreEntrySystem` into
 alphabetic initials through clean input, normalizes them to uppercase, supports
 backspace, emits `HighScoreInitialAccepted`, and emits `HighScoreSubmitted`
 when the third initial enters the source-shaped hall-of-fame display stall
-before the clean game returns to attract. Active high-score entry scenes draw
-the source-backed player label, four hall-of-fame instruction lines, and
-entered initials with message glyph sprites plus source-shaped active/inactive
-underline words. During the hall-of-fame display stall, scenes draw the
+before the clean game returns to attract. Submitted initials insert into both
+all-time and today's-greatest tables by score rank while preserving the
+current-player submission metadata. Active high-score entry scenes draw the
+source-backed player label, four hall-of-fame instruction lines, and entered
+initials with message glyph sprites plus source-shaped active/inactive underline
+words. During the hall-of-fame display stall, scenes draw the
 source-backed display headings plus both visible high-score tables with rank
 digits, initials, score fields, and source-shaped underline bars. Enemy
 exhaustion is reported through `WaveSystem`, keeping the last-hit frame empty
