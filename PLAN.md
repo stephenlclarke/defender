@@ -658,12 +658,9 @@ R9-C4 closure checklist:
   audit found no immediate bounded runtime gap to queue before fixture
   hardening; R9-C4.2 should run only if R9-C4.3 fixture work exposes a concrete
   movement/projectile drift.
-- R9-C4.2: close any bounded family behavior gaps found by the audit. Batch only
-  tightly related fixes, such as one family loop, one shared shell-list edge, or
-  one collision/kill side-effect path. Each implementation slice must include
-  focused Rust tests for the touched family/helper and the narrow clean-fidelity
-  scenario that exercises the changed behavior. Use Slack start/completion
-  updates and push after the validated implementation slice.
+- R9-C4.2: conditional bounded family repair. Not run for B08 closure because
+  R9-C4.1, R9-C4.3, and R9-C4.5 exposed no concrete movement/projectile,
+  shell-list, or collision/kill drift that required a runtime fix.
 - R9-C4.3: harden source ecology fixtures. Completed 2026-05-21. Targeted
   clean-fidelity coverage passed for `start_game`, `smart_bomb`, `hyperspace`,
   `abduction`, `death`, `wave_advance`, and `planet_destruction`, proving the
@@ -676,13 +673,14 @@ R9-C4 closure checklist:
   evidence, sound evidence, or scenario field changes; README, SPEC,
   `docs/fidelity/gaps.md`, and this plan now record that B08 is ready for the
   Step 50 closure gate without widening public contracts.
-- R9-C4.5: close Step 50 / B08 with one Phase 3 gate. Run the focused checks
-  from the closing slice plus the broad phase-close set: `cargo fmt --check`,
-  `cargo test --all-targets`, full all-scenario `make clean-fidelity`, `make
-  fidelity`, full clippy, touched/all relevant markdownlint, and `git
-  diff --check`. Step 51 must not start until B08 is marked closed or any
-  residual object-ecology differences are explicitly source-backed and moved out
-  of strict R9.
+- R9-C4.5: Step 50 / B08 closure gate. Completed 2026-05-21. The closing slice
+  kept runtime behavior unchanged while satisfying the phase-close clippy and
+  coverage gates: source-lander advance parameters were bundled into a context,
+  carried-human sync collapsed its nested condition, source explosion frame
+  indexing uses `is_multiple_of`, and the lander grab tests now cover upward and
+  downward target tracking. Full all-scenario `make clean-fidelity` matched all
+  12 scenarios, `make fidelity` passed, and B08 is closed. Step 51 / R9-D1 is
+  the next unstarted roadmap step.
 
 Phase 4: session and high-score closure.
 
@@ -720,7 +718,7 @@ Strict R9 blocker matrix after Step 41:
 | B05 | Score popups | clean behavior | 47 | spawn/duration/position tested |
 | B06 | Explosions | clean behavior | 48 | frame progression tested |
 | B07 | Terrain blow | clean/render | 49 | mutation/presentation tested |
-| B08 | Object ecology | clean behavior | 50 | source ecology fixtures pass |
+| B08 | Object ecology | clean behavior | 50 | closed 2026-05-21 |
 | B09 | Two-player flow | clean behavior | 51 | turn/stock routing tested |
 | B10 | High-score return | clean/accepted | 52 | tables and return tested |
 | B11 | Render audit | docs/evidence | 53 | residuals source-backed |
@@ -1150,12 +1148,11 @@ Object-ecology progress after R9-C4 slices:
   command evidence.
 - Player-carried humans now follow the source AFALL2 carried offset and settle
   on terrain when the player-carried position reaches the local terrain line.
-- This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
-  is the Step 50 closure gate. The R9-C4.1 residual ecology audit classifies
-  the per-family movement/projectile runtime surfaces as covered by current
-  clean runtime and focused unit tests; R9-C4.3 targeted source ecology
-  fixtures all match; R9-C4.2 remains a conditional repair slot only if the
-  closure gate exposes drift.
+- R9-C4 / Step 50 is closed. The R9-C4.1 residual ecology audit classified the
+  per-family movement/projectile runtime surfaces as covered by current clean
+  runtime and focused unit tests; R9-C4.3 targeted source ecology fixtures all
+  matched; R9-C4.5 passed the broad Step 50 closure gate without exposing drift,
+  so R9-C4.2 stayed unused.
 
 R9-C4 residual ecology audit after R9-C4.1:
 
@@ -1191,10 +1188,11 @@ R9-C4 residual ecology audit after R9-C4.1:
   later closure-gate mismatch that points to one family loop, shared shell edge,
   or collision/kill side effect should reopen R9-C4.2 for a bounded
   implementation slice.
-- Still required for B08 closure: run R9-C4.5 / Step 50 with the broad Phase 3
-  closure gate. B08 should close only if that gate passes or any remaining
-  object-ecology residual is explicitly source-backed and moved out of strict
-  R9.
+- B08 closure evidence: R9-C4.5 passed the focused source-lander grab coverage
+  test, default and legacy all-target Rust suites, full clippy, the local
+  reference trace fixture check, the new-Rust coverage delta check, full
+  all-scenario `make clean-fidelity`, full `make fidelity`, touched docs
+  markdownlint, and `git diff --check`.
 - Deferred outside B08: cycle-accurate CPU/golden-trace scheduling, non-gameplay
   render-presentation residuals, two-player session routing, and high-score
   table/return behavior remain owned by later R9-D/R9-E steps rather than
@@ -2800,6 +2798,22 @@ Work log:
   field changes were required, so README, SPEC, `docs/fidelity/gaps.md`, and
   this plan were updated only to record closure readiness. Broad Step 50 closure
   validation remains R9-C4.5.
+
+- `2026-05-21 08:17:59 BST` Completed R9-C4.5 and closed Step 50 / B08. The
+  only runtime-source edit was a behavior-preserving clippy cleanup in
+  `src/game.rs`: source lander advancement now uses a context struct instead of
+  a long parameter list, carried-human sync uses one condition, source explosion
+  frame indexing uses `is_multiple_of`, and a source-lander upward grab unit test
+  covers the new context line that the coverage gate flagged. Focused validation
+  passed with `cargo test
+  clean_game_source_lander_grab_step_seeks_upward_target --lib`. Broad closure
+  validation passed with `cargo fmt --check`, `cargo test --all-targets`, `cargo
+  clippy --all-targets --features legacy-tools -- -D warnings`, full
+  all-scenario `make clean-fidelity`, full `make fidelity`, `markdownlint
+  PLAN.md README.md SPEC.md docs/fidelity/gaps.md`, and `git diff --check`.
+  R9-C4.2 stayed unused because no source ecology drift surfaced. The next full
+  gate should run when Step 51/R9-D1 closes, a shared public contract changes,
+  or R9 reaches the final Step 54 validation gate.
 
 ## Archived Completed History
 

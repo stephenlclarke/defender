@@ -2076,14 +2076,16 @@ impl WorldSnapshot {
                 let advance = advance_source_lander(
                     enemy.position,
                     source_lander,
-                    profile,
-                    terrain,
-                    carried_human_index.is_some(),
-                    grab_target,
-                    player_position,
-                    player_velocity,
-                    source_rng,
-                    enemy_projectiles,
+                    SourceLanderAdvanceContext {
+                        profile,
+                        terrain,
+                        carrying_passenger: carried_human_index.is_some(),
+                        grab_target,
+                        player_position,
+                        player_velocity,
+                        source_rng,
+                        enemy_projectiles,
+                    },
                 );
                 push_source_enemy_shot_sound_if_fired(
                     EnemyKind::Lander,
@@ -2559,15 +2561,15 @@ impl WorldSnapshot {
         }
 
         for human in &mut self.humans {
-            if human.carried && !human.carried_by_player {
-                if let Some(lander_position) =
+            if human.carried
+                && !human.carried_by_player
+                && let Some(lander_position) =
                     clean_nearest_lander_for_carried_human(&lander_positions, human.position)
-                {
-                    if !clean_lander_pull_position_matches(lander_position, *human) {
-                        human.position = clean_carried_human_position(lander_position);
-                    }
-                    human.clear_source_fall();
+            {
+                if !clean_lander_pull_position_matches(lander_position, *human) {
+                    human.position = clean_carried_human_position(lander_position);
                 }
+                human.clear_source_fall();
             }
         }
     }
@@ -4029,57 +4031,54 @@ impl SourceLanderAdvance {
     }
 }
 
-fn advance_source_lander(
-    position: ScreenPosition,
-    source_lander: &mut SourceLanderSnapshot,
+struct SourceLanderAdvanceContext<'a, 'b> {
     profile: WaveProfileSnapshot,
-    terrain: &[TerrainSegment],
+    terrain: &'a [TerrainSegment],
     carrying_passenger: bool,
     grab_target: Option<ScreenPosition>,
     player_position: ScreenPosition,
     player_velocity: (WorldVector, WorldVector),
-    source_rng: &mut SourceRandSnapshot,
-    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+    source_rng: &'b mut SourceRandSnapshot,
+    enemy_projectiles: &'b mut Vec<EnemyProjectileSnapshot>,
+}
+
+fn advance_source_lander(
+    position: ScreenPosition,
+    source_lander: &mut SourceLanderSnapshot,
+    mut context: SourceLanderAdvanceContext<'_, '_>,
 ) -> SourceLanderAdvance {
     if source_lander.sleep_ticks > 0 {
         source_lander.sleep_ticks = source_lander.sleep_ticks.saturating_sub(1);
         return SourceLanderAdvance::velocity(SourceLanderAdvancePhase::Sleeping);
     }
 
-    if carrying_passenger && source_lander_pull_edge(position) {
+    if context.carrying_passenger && source_lander_pull_edge(position) {
         source_lander.y_velocity = 0;
         return SourceLanderAdvance::velocity(SourceLanderAdvancePhase::PullingPassenger);
     }
 
-    if !carrying_passenger && let Some(target_position) = grab_target {
-        return advance_source_lander_grab(
-            position,
-            source_lander,
-            profile,
-            target_position,
-            player_position,
-            player_velocity,
-            source_rng,
-            enemy_projectiles,
-        );
+    if !context.carrying_passenger
+        && let Some(target_position) = context.grab_target
+    {
+        return advance_source_lander_grab(position, source_lander, target_position, &mut context);
     }
 
-    source_lander.y_velocity = if carrying_passenger {
-        !source_lander_base_y_velocity(profile)
+    source_lander.y_velocity = if context.carrying_passenger {
+        !source_lander_base_y_velocity(context.profile)
     } else {
-        source_lander_orbit_y_velocity(profile, position, terrain)
+        source_lander_orbit_y_velocity(context.profile, position, context.terrain)
     };
     source_lander_run_shot_timer(
         position,
         source_lander,
-        profile,
-        player_position,
-        player_velocity,
-        source_rng,
-        enemy_projectiles,
+        context.profile,
+        context.player_position,
+        context.player_velocity,
+        context.source_rng,
+        context.enemy_projectiles,
     );
 
-    if carrying_passenger {
+    if context.carrying_passenger {
         source_lander.sleep_ticks = SOURCE_LANDER_FLEE_SLEEP_TICKS;
         SourceLanderAdvance::velocity(SourceLanderAdvancePhase::Fleeing)
     } else {
@@ -4093,12 +4092,8 @@ fn advance_source_lander(
 fn advance_source_lander_grab(
     position: ScreenPosition,
     source_lander: &mut SourceLanderSnapshot,
-    profile: WaveProfileSnapshot,
     target_position: ScreenPosition,
-    player_position: ScreenPosition,
-    player_velocity: (WorldVector, WorldVector),
-    source_rng: &mut SourceRandSnapshot,
-    enemy_projectiles: &mut Vec<EnemyProjectileSnapshot>,
+    context: &mut SourceLanderAdvanceContext<'_, '_>,
 ) -> SourceLanderAdvance {
     let mut x16 = u16::from_be_bytes([position.x, source_lander.x_fraction]);
     let target_x16 = u16::from(target_position.x) << 8;
@@ -4117,9 +4112,9 @@ fn advance_source_lander_grab(
         .wrapping_sub(CLEAN_LANDER_PASSENGER_OFFSET_Y);
     if target_y != position.y {
         let y_step = if target_y < position.y {
-            !source_lander_base_y_velocity(profile)
+            !source_lander_base_y_velocity(context.profile)
         } else {
-            source_lander_base_y_velocity(profile)
+            source_lander_base_y_velocity(context.profile)
         };
         y16 = y16.wrapping_add(y_step);
     }
@@ -4135,11 +4130,11 @@ fn advance_source_lander_grab(
     source_lander_run_shot_timer(
         next_position,
         source_lander,
-        profile,
-        player_position,
-        player_velocity,
-        source_rng,
-        enemy_projectiles,
+        context.profile,
+        context.player_position,
+        context.player_velocity,
+        context.source_rng,
+        context.enemy_projectiles,
     );
     source_lander.sleep_ticks = SOURCE_LANDER_GRAB_SLEEP_TICKS;
     SourceLanderAdvance::direct(SourceLanderAdvancePhase::Grabbing, next_position)
@@ -7638,7 +7633,7 @@ pub(crate) fn source_explosion_frame_index(size: u16) -> Option<u8> {
         return None;
     }
     let offset = size.wrapping_sub(SOURCE_EXPLOSION_INITIAL_SIZE);
-    if offset % SOURCE_EXPLOSION_SIZE_DELTA != 0 {
+    if !offset.is_multiple_of(SOURCE_EXPLOSION_SIZE_DELTA) {
         return None;
     }
     u8::try_from(offset / SOURCE_EXPLOSION_SIZE_DELTA).ok()
@@ -11680,6 +11675,71 @@ mod tests {
     }
 
     #[test]
+    fn clean_game_source_lander_grab_step_seeks_upward_target() {
+        let mut game = credited_started_game();
+        let lander_start = ScreenPosition::new(100, 80);
+        let target_position = ScreenPosition::new(100, 60);
+        let source_lander = SourceLanderSnapshot {
+            x_fraction: 0,
+            y_fraction: 0,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 2,
+            sleep_ticks: 0,
+            picture_frame: 0,
+            target_human_index: Some(0),
+        };
+        game.state.world.enemies = vec![EnemySnapshot::source_lander(
+            lander_start,
+            super::source_lander_screen_velocity(source_lander),
+            source_lander,
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot::new(target_position)];
+        game.baiter_timer_ticks = None;
+
+        let y_step = !super::source_lander_base_y_velocity(game.state.wave_profile);
+        let (expected_y, expected_y_fraction) =
+            super::source_fixed_axis_step(lander_start.y, source_lander.y_fraction, y_step);
+        let expected_source = SourceLanderSnapshot {
+            y_fraction: expected_y_fraction,
+            x_velocity: 0,
+            y_velocity: 0,
+            shot_timer: 1,
+            sleep_ticks: super::SOURCE_LANDER_GRAB_SLEEP_TICKS,
+            picture_frame: 0,
+            ..source_lander
+        };
+
+        let frame = game.step(GameInput::NONE);
+
+        let lander = frame
+            .state
+            .world
+            .enemies
+            .first()
+            .expect("grabbing source lander");
+        assert_eq!(
+            lander.position,
+            ScreenPosition::new(lander_start.x, expected_y)
+        );
+        assert_eq!(
+            lander.velocity,
+            super::source_lander_screen_velocity(expected_source)
+        );
+        assert_eq!(lander.source_lander, Some(expected_source));
+        assert_eq!(
+            frame.state.world.humans,
+            vec![HumanSnapshot {
+                source_fall_velocity: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION,
+                source_fall_y_fraction: super::SOURCE_FALLING_HUMAN_Y_ACCELERATION.to_be_bytes()[1],
+                ..HumanSnapshot::new(target_position)
+            }]
+        );
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+    }
+
+    #[test]
     fn clean_game_source_lander_flee_state_stays_with_carried_passenger() {
         let mut game = credited_started_game();
         let player_position = ScreenPosition::new(0x20, 0x80);
@@ -13646,7 +13706,7 @@ mod tests {
             assert_eq!(human.source_fall_y_fraction, 0);
             assert!(
                 super::clean_human_ground_y(&frame.state.world.terrain, human.position.x)
-                    .map_or(true, |ground_y| human.position.y >= ground_y)
+                    .is_none_or(|ground_y| human.position.y >= ground_y)
             );
         }
     }

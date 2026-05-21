@@ -799,6 +799,15 @@ post-acceptance validation records.
   and no accepted facade, oracle, `WorldSnapshot`, object evidence, sound
   evidence, or scenario fields changed. Remaining B08 work is the R9-C4.5 /
   Step 50 broad closure gate.
+- `2026-05-21 08:17:59 BST`: R9-C4.5 closes Step 50 / B08. The closing code
+  change was behavior-preserving: source lander advancement now uses a context
+  struct for the clippy gate, carried-human sync collapses the nested condition,
+  source explosion frame indexing uses `is_multiple_of`, and an upward
+  source-lander grab test covers the new source-lander context line flagged by
+  the coverage gate. Full all-scenario `make clean-fidelity` matched all 12
+  scenarios, full `make fidelity` passed, and no fixture/public evidence drift
+  surfaced. R9-C4.2 stayed unused; remaining strict R9 behavior work moves to
+  B09 two-player flow.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

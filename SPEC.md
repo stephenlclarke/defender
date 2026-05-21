@@ -361,9 +361,9 @@ The R9-C4 residual ecology audit now classifies the per-family
 movement/projectile runtime surfaces as covered by the current clean runtime
 and focused unit tests, and targeted source ecology fixture hardening matches
 the `start_game`, `smart_bomb`, `hyperspace`, `abduction`, `death`,
-`wave_advance`, and `planet_destruction` clean-fidelity scenarios. Remaining
-object-ecology work is the Step 50 closure gate, with R9-C4.2 reserved for any
-closure-gate drift.
+`wave_advance`, and `planet_destruction` clean-fidelity scenarios. The R9-C4.5
+closure gate closes Step 50/B08 without exposing drift, so R9-C4.2 stayed
+unused and the next strict R9 behavior work is Step 51/R9-D1 two-player flow.
 Clean
 smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave
