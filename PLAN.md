@@ -695,6 +695,18 @@ Phase 4: session and high-score closure.
   `PLE02` loop shape: two-player sessions rotate to the other stocked player
   after any non-final death, and one-player sessions wrap back to player one.
   The existing final-life two-player switch-sleep prompt remains unchanged.
+- R9-D1.2: post-rotation score/stock ownership. Completed 2026-05-21. A focused
+  two-player fixture now drives player one through a non-final death, rotates to
+  player two, awards player-two points across the replay threshold, and proves
+  player-one score/stock remain untouched while player-two score, high score,
+  bonus threshold, and life/smart-bomb stock update together. The
+  current-second-player high-score fixture now models an actual two-player
+  final-session route with player one out of stock.
+- R9-D1.3: Step 51 / B09 closure gate. Pending. Audit whether the existing
+  final-life switch, non-final rotation, high-score-current-player, and
+  post-rotation ownership fixtures cover all remaining two-player turn/session
+  routes. Add only a source-backed fixture if the audit exposes a concrete route
+  gap, then close B09 with the phase-level validation gate.
 - Step 52 / Cycle R9-D2: high-score ordering and post-entry return. Prove
   source-backed table ordering, initials insertion, today's-greatest behavior,
   post-entry display timing, and return-to-attract behavior across one-player
@@ -2833,6 +2845,19 @@ Work log:
   validation remains deferred because this is a bounded B09 respawn-cadence
   slice with no public snapshot shape change. The next full gate should run when
   R9-D1 closes, a public contract changes, or R9 reaches Step 54.
+
+- `2026-05-21 08:53:00 BST` Completed R9-D1.2 post-rotation score/stock
+  ownership. A focused fixture covers a player-one non-final death, player-two
+  respawn, player-two scoring over the replay threshold, high-score update, bonus
+  threshold advance, and frame-boundary stock synchronization that updates
+  player-two life/smart-bomb stock while leaving player-one stock and score
+  unchanged. The existing current-second-player high-score fixture was also
+  corrected to use a real two-player final-session setup with player one out of
+  stock, instead of an inconsistent one-player session forced to player two.
+  Broad validation remains deferred because this is a bounded B09
+  stock-accounting/game-over fixture slice with no runtime or public snapshot
+  shape change. The next full gate should run when R9-D1 closes, a public
+  contract changes, or R9 reaches Step 54.
 
 ## Archived Completed History
 

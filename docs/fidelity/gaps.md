@@ -816,6 +816,13 @@ post-acceptance validation records.
   rotate to the next stocked player after non-final deaths; one-player sessions
   wrap back to player one. The existing final-life two-player switch-sleep
   prompt path is unchanged.
+- `2026-05-21 08:53:00 BST`: R9-D1.2 tightens B09 post-rotation score and stock
+  ownership. The focused two-player fixture drives player one through a
+  non-final death, respawns player two, crosses the replay threshold on player
+  two, and proves player-one score/stock remain untouched while player-two score,
+  high score, bonus threshold, and frame-boundary life/smart-bomb stock update
+  together. The current-second-player high-score fixture now models an actual
+  two-player final-session route with player one out of stock.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

@@ -85,7 +85,8 @@ tree:
   snapshots, source-backed terrain-blow snapshots, projectile, player,
   direction, two-player start
   admission, source-backed score digit scene sprites, player-count stock
-  HUD scene sprites, two-player final-life switch/respawn
+  HUD scene sprites, current-player score/bonus stock synchronization,
+  two-player final-life switch/respawn
   state, two-player start prompt, player-switch, final game-over,
   player-death pixel-cloud snapshots, and attract presentation page-frame state
   for the Williams, presents, Defender wordmark,
@@ -363,7 +364,8 @@ and focused unit tests, and targeted source ecology fixture hardening matches
 the `start_game`, `smart_bomb`, `hyperspace`, `abduction`, `death`,
 `wave_advance`, and `planet_destruction` clean-fidelity scenarios. The R9-C4.5
 closure gate closes Step 50/B08 without exposing drift, so R9-C4.2 stayed
-unused and the next strict R9 behavior work is Step 51/R9-D1 two-player flow.
+unused. Step 51/R9-D1 has started two-player flow closure with non-final
+death-rotation and post-rotation stock/score ownership fixtures.
 Clean
 smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave
@@ -426,7 +428,10 @@ playfield entry path. During that switch sleep, scenes draw source-backed
 the final game-over return path. Non-final deaths with remaining stock enter a
 death-cloud pause and then respawn the next stocked player through the same
 clean player-start path; two-player games rotate to the other stocked player per
-the source `PLE02` loop, and one-player games wrap back to player one. During
+the source `PLE02` loop, and one-player games wrap back to player one. After
+rotation, score and replay bonus awards sync the active player's public stock
+snapshot, so player-one and player-two scores, lives, and smart-bomb stocks stay
+owned by the active player. During
 that final game-over sleep, scenes draw
 source-backed `GO` message glyphs at the translated `PLE2` screen address
 `0x3E80`. The player-death pixel cloud is cleared before high-score entry

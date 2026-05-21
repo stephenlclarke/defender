@@ -206,7 +206,8 @@ top-display frame geometry; lifecycle transitions outside the score-popup,
 `EXST`/`EXPU` expanded-object explosion, player-death pixel-cloud,
 terrain-blow, and covered enemy-hit/projectile-collision command surfaces,
 remaining two-player session flow beyond the source-backed final-life
-switch/respawn and non-final death-rotation slices,
+switch/respawn, non-final death-rotation, and post-rotation stock/score ownership
+slices,
 wave-completion survivor-bonus loop/cadence beyond current presentation, live
 Williams logo table-walker animation, hardware palette/RGB render audit
 residuals, and full visual presentation remain strict R9 blockers.
@@ -215,7 +216,9 @@ start admission/top-display initialization, the two-player player-start
 prompt, and the two-player final-life `PLE02` switch/respawn handoff plus its
 source message-glyph prompt are now clean-owned. Non-final player deaths now
 pause active play through the source-backed player-death cloud, then respawn the
-next stocked player through the existing player-start handoff. The final
+next stocked player through the existing player-start handoff; score and replay
+bonus awards sync the active player's public stock snapshot so player-one and
+player-two stock ownership stays isolated after rotation. The final
 player-death
 game-over sleep also draws the source `GAME OVER` prompt at the translated
 `PLE2` screen position, and active

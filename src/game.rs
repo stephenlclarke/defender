@@ -14030,6 +14030,80 @@ mod tests {
     }
 
     #[test]
+    fn clean_game_two_player_rotation_keeps_score_and_bonus_stock_ownership() {
+        let mut game = two_player_started_game();
+        game.state.player.lives = 2;
+        game.state.player_stocks[1] = PlayerStockSnapshot::new(3, 3);
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let collision = game.step(GameInput::NONE);
+        assert_eq!(
+            collision.state.player_stocks[0],
+            PlayerStockSnapshot::new(1, 3)
+        );
+
+        advance_pending_respawn(&mut game);
+        let active = advance_to_started_playfield(&mut game);
+        assert_eq!(active.state.current_player, 2);
+        assert_eq!(
+            active.state.player_stocks[0],
+            PlayerStockSnapshot::new(1, 3)
+        );
+        assert_eq!(
+            active.state.player_stocks[1],
+            PlayerStockSnapshot::new(2, 3)
+        );
+
+        game.state.scores.player_one = 9_000;
+        game.state.scores.player_two = 9_900;
+        game.state.scores.high_score = 9_900;
+        game.state.scores.next_bonus = 10_000;
+        keep_first_enemy_only(&mut game);
+        game.state.world.enemies[0].position = ScreenPosition::new(100, 80);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+        game.state.world.enemies.push(EnemySnapshot::new(
+            EnemyKind::Mutant,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        ));
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, 83),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+
+        let scored = game.step(GameInput::NONE);
+
+        assert_eq!(scored.state.current_player, 2);
+        assert_eq!(scored.state.scores.player_one, 9_000);
+        assert_eq!(scored.state.scores.player_two, 10_050);
+        assert_eq!(scored.state.scores.high_score, 10_050);
+        assert_eq!(scored.state.scores.next_bonus, 20_000);
+        assert_eq!(
+            scored.state.player,
+            super::PlayerSnapshot {
+                position: (super::world_word(0x2000), super::world_word(0x8000)),
+                velocity: (WorldVector::default(), WorldVector::default()),
+                direction: Direction::Right,
+                lives: 3,
+                smart_bombs: 4,
+            }
+        );
+        assert_eq!(
+            scored.state.player_stocks[0],
+            PlayerStockSnapshot::new(1, 3)
+        );
+        assert_eq!(
+            scored.state.player_stocks[1],
+            PlayerStockSnapshot::new(3, 4)
+        );
+        assert_eq!(
+            scored.events.gameplay(),
+            &[GameEvent::EnemyDestroyed, GameEvent::BonusAwarded]
+        );
+    }
+
+    #[test]
     fn clean_game_two_player_final_death_ends_game_when_other_player_has_no_stock() {
         let mut game = two_player_started_game();
         game.state.player.lives = 1;
@@ -14167,9 +14241,13 @@ mod tests {
 
     #[test]
     fn clean_game_high_score_entry_uses_current_second_player_score() {
-        let mut game = credited_started_game();
+        let mut game = two_player_started_game();
         game.state.current_player = 2;
         game.state.player.lives = 1;
+        game.state.player_stocks = [
+            PlayerStockSnapshot::new(0, 3),
+            PlayerStockSnapshot::new(1, 3),
+        ];
         game.state.scores.player_one = 1_000;
         game.state.scores.player_two = 2_001;
         game.state.scores.high_score = 2_000;
