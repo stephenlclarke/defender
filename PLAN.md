@@ -1022,8 +1022,8 @@ Object-ecology progress after R9-C4 slices:
   player through the source `UFONV` seek rules, fire source-shaped `SHOOT`
   fireball shells, and those enemy projectiles now use source `SHSCAN` lifetime
   decrement/wrap behavior, scroll-adjusted fixed-point motion, offscreen
-  culling, collision scoring, player-damage handling, and source `BMBP1` shell
-  descriptor evidence.
+  culling, collision scoring, player-damage handling with source `BKIL` /
+  `AHSND` command evidence, and source `BMBP1` shell descriptor evidence.
 - Clean mutant runtime now carries source-shaped state for active mutants.
   Completed carried-lander abductions consume the passenger and convert that
   lander into a mutant, no-target/no-human landers convert through the same
@@ -1089,8 +1089,8 @@ Object-ecology progress after R9-C4 slices:
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
   is remaining per-family movement/projectile behavior beyond the covered
   enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup/rematerialize,
-  lander-abduction, and astronaut command evidence plus focused source ecology
-  fixtures for those transitions.
+  lander-abduction, astronaut command, and shell-collision command evidence
+  plus focused source ecology fixtures for those transitions.
 
 Work log:
 
@@ -2444,6 +2444,20 @@ Work log:
   Step 50 source wave-enemy bookkeeping slice, not a Step 50 / Phase 3 closure
   or R9 finalization. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779323162206699`.
+
+- `2026-05-21 01:38:33 BST` R9-C4 progress slice
+  `source bomb-shell collision sound command`. Clean enemy-projectile/player
+  collision now surfaces the source `BKIL` / `AHSND` command evidence while
+  preserving the existing source-backed shell removal, 25-point score, bomb
+  explosion, and player-damage handoff. Focused validation passed: `cargo fmt
+  --check`, `cargo check`, `cargo test clean_game_enemy_projectile --lib`,
+  targeted `make clean-fidelity SCENARIOS="death"`, touched-doc
+  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
+  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
+  clippy remain deferred because this is a bounded Step 50 shell-collision
+  command slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack
+  start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779323774753699`.
 
 ## Archived Completed History
 

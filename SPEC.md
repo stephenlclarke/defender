@@ -262,10 +262,11 @@ retain source shot-timer, picture-cycle, sleep, and velocity state, pursue the
 player through source seek rules, fire source-shaped fireball shells with
 source `USHSND` command evidence, and those enemy projectiles use source
 `SHSCAN` lifetime decrement/wrap behavior, scroll-adjusted fixed-point motion,
-offscreen culling, collision scoring, and player-damage handling. Accepted
-clean hyperspace inputs clear active enemy projectiles through the source
-`HYP02` / `KILSHL` shell-list cleanup while leaving player projectiles outside
-that shell-object list. They then reload source rematerialization state from
+offscreen culling, collision scoring, and player-damage handling with source
+`BKIL` / `AHSND` command evidence when a shell hits the player. Accepted clean
+hyperspace inputs clear active enemy projectiles through the source `HYP02` /
+`KILSHL` shell-list cleanup while leaving player projectiles outside that
+shell-object list. They then reload source rematerialization state from
 the current clean source `SEED`/`HSEED`: the clean camera/background word,
 player X/facing branch, player Y high byte, cleared velocity, and source
 `APSND` appearance command. Their clean `HYP2` tail follows the source

@@ -701,6 +701,15 @@ post-acceptance validation records.
   beyond the covered baiter bookkeeping, enemy-hit, enemy-shot, player-action,
   hyperspace, lander-abduction, and astronaut command evidence plus focused
   source ecology fixtures for those transitions.
+- `2026-05-21 01:38:33 BST`: R9-C4 adds the bounded source bomb-shell
+  collision sound-command slice. Clean enemy-projectile/player collisions
+  already removed the source shell, awarded the source-backed 25-point score,
+  started the bomb explosion, and entered player damage; they now also surface
+  the source `BKIL` / `AHSND` command evidence for that collision. Remaining
+  B08 work is exact per-family movement/projectile behavior beyond the covered
+  baiter bookkeeping, enemy-hit, enemy-shot, player-action, hyperspace,
+  lander-abduction, astronaut command, and shell-collision command evidence
+  plus focused source ecology fixtures for those transitions.
 - `2026-05-21 01:10:37 BST`: R9-C4 adds bounded source `HYP02`
   rematerialization state for accepted clean hyperspace inputs. Clean
   hyperspace now reloads camera/background from the source `SEED`/`HSEED` word,

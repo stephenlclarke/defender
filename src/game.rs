@@ -72,6 +72,7 @@ const SOURCE_SBSND_SOUND_COMMAND: u8 = 0xEE;
 const SOURCE_APSND_SOUND_COMMAND: u8 = 0xEA;
 const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
 const SOURCE_ALSND_SOUND_COMMAND: u8 = 0xE0;
+const SOURCE_AHSND_SOUND_COMMAND: u8 = 0xEE;
 const SOURCE_ASCSND_SOUND_COMMAND: u8 = 0xE5;
 pub(crate) const SOURCE_EXPLOSION_INITIAL_SIZE: u16 = 0x0100;
 pub(crate) const SOURCE_EXPLOSION_SIZE_DELTA: u16 = 0x00AA;
@@ -6092,8 +6093,11 @@ impl Game {
         let mut hit_player =
             self.resolve_player_enemy_collision(player_screen_position, gameplay_events);
         if !hit_player && self.state.phase == GamePhase::Playing {
-            hit_player = self
-                .resolve_player_enemy_projectile_collision(player_screen_position, gameplay_events);
+            hit_player = self.resolve_player_enemy_projectile_collision(
+                player_screen_position,
+                gameplay_events,
+                sound_events,
+            );
         }
         if hyperspace_death_risk && !hit_player && self.state.phase == GamePhase::Playing {
             self.apply_player_hit(player_screen_position, gameplay_events);
@@ -6310,6 +6314,7 @@ impl Game {
         &mut self,
         player_position: ScreenPosition,
         gameplay_events: &mut Vec<GameEvent>,
+        sound_events: &mut Vec<SoundEvent>,
     ) -> bool {
         let player = CollisionBox::new(player_position, PLAYER_SPRITE_SIZE);
         let projectile_boxes = self
@@ -6329,6 +6334,7 @@ impl Game {
             .world
             .spawn_explosion(ExplosionKind::Bomb, projectile.position);
         self.award_points(SOURCE_ENEMY_PROJECTILE_SCORE_POINTS, gameplay_events);
+        sound_events.push(source_bomb_collision_sound_event());
         self.apply_player_hit(player_position, gameplay_events);
         true
     }
@@ -7729,6 +7735,12 @@ fn source_astronaut_safe_landing_sound_event() -> SoundEvent {
     }
 }
 
+fn source_bomb_collision_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_AHSND_SOUND_COMMAND,
+    }
+}
+
 impl Default for Game {
     fn default() -> Self {
         Self::new()
@@ -8178,10 +8190,10 @@ mod tests {
         SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage,
         WaveProfileSnapshot, WorldSnapshot, WorldVector, source_astronaut_catch_sound_event,
         source_astronaut_release_sound_event, source_astronaut_safe_landing_sound_event,
-        source_enemy_hit_sound_event, source_enemy_shot_sound_event,
-        source_hyperspace_appearance_sound_event, source_lander_pickup_sound_event,
-        source_lander_suck_sound_event, source_laser_fire_sound_event,
-        source_smart_bomb_sound_event,
+        source_bomb_collision_sound_event, source_enemy_hit_sound_event,
+        source_enemy_shot_sound_event, source_hyperspace_appearance_sound_event,
+        source_lander_pickup_sound_event, source_lander_suck_sound_event,
+        source_laser_fire_sound_event, source_smart_bomb_sound_event,
     };
 
     #[test]
@@ -12209,6 +12221,10 @@ mod tests {
         assert_eq!(frame.state.scores.player_one, 25);
         assert_eq!(frame.state.player.lives, 1);
         assert_eq!(frame.events.gameplay(), &[GameEvent::PlayerDestroyed]);
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_bomb_collision_sound_event()]
+        );
         assert_eq!(frame.state.world.expanded_objects.active_count, 1);
         assert_eq!(
             frame.state.world.expanded_objects.details[0].mapped_sprite,

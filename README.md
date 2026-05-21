@@ -198,11 +198,13 @@ projection, source-backed score-popup lifetime/value/position evidence, and
 source-backed expanded-object explosion frame/lifetime/size-scale evidence,
 source-backed player-death bank-7 pixel-cloud color/counter/piece evidence,
 source-backed terrain-blow mutation/process evidence with `TEREX` presentation,
-source-backed per-family enemy hit sound-command evidence, and source `BORDER`
+source-backed per-family enemy hit sound-command evidence, source-backed
+enemy-projectile collision sound-command evidence, and source `BORDER`
 top-display frame geometry; lifecycle transitions outside the score-popup,
 `EXST`/`EXPU` expanded-object explosion, player-death pixel-cloud,
-terrain-blow, and covered enemy-hit command surfaces, remaining two-player
-session flow beyond the source-backed final-life switch/respawn slice,
+terrain-blow, and covered enemy-hit/projectile-collision command surfaces,
+remaining two-player session flow beyond the source-backed final-life
+switch/respawn slice,
 wave-completion survivor-bonus loop/cadence beyond current presentation, live
 Williams logo table-walker animation, hardware palette/RGB render audit
 residuals, and full visual presentation remain strict R9 blockers.
@@ -451,7 +453,8 @@ state, pursue the player through source seek rules, fire source-shaped
 fireball shells with source `USHSND` command evidence, and those enemy
 projectiles use source `SHSCAN` lifetime decrement/wrap behavior,
 scroll-adjusted fixed-point motion, offscreen culling, collision scoring, and
-player-damage handling.
+player-damage handling with source `BKIL` / `AHSND` command evidence when a
+shell hits the player.
 Clean landers now abduct aligned humans, can carry explicit selected-human
 target state for source-shaped landers, enter the source `LANDG`
 target-approach step only when that selected target passes the source `LANDS0`
