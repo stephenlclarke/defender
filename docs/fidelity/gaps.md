@@ -680,9 +680,18 @@ post-acceptance validation records.
   edge now surfaces `APSND` (`0xEA`) from the visible `HYP02` rematerialization
   path after the shell-list cleanup. Remaining B08 work is exact per-family
   movement/projectile behavior beyond the covered enemy-hit, enemy-shot,
-  player-action, hyperspace shell-cleanup/appearance, lander-abduction, and
-  astronaut command evidence plus focused source ecology fixtures for those
-  transitions.
+  player-action, hyperspace shell-cleanup/rematerialize/death-risk,
+  lander-abduction, and astronaut command evidence plus focused source ecology
+  fixtures for those transitions.
+- `2026-05-21 01:19:26 BST`: R9-C4 adds the bounded source `HYP2`
+  hyperspace death-risk tail. After accepted clean hyperspace clears source
+  shells, reloads rematerialization state, and surfaces `APSND`, the clean tail
+  now enters the existing clean player damage path when `LSEED > 0xC0`, while
+  `0xC0` and below complete safely. Remaining B08 work is exact per-family
+  movement/projectile behavior beyond the covered enemy-hit, enemy-shot,
+  player-action, hyperspace shell-cleanup/rematerialize/death-risk,
+  lander-abduction, and astronaut command evidence plus focused source ecology
+  fixtures for those transitions.
 - `2026-05-21 01:10:37 BST`: R9-C4 adds bounded source `HYP02`
   rematerialization state for accepted clean hyperspace inputs. Clean
   hyperspace now reloads camera/background from the source `SEED`/`HSEED` word,

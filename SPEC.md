@@ -265,7 +265,9 @@ clean hyperspace inputs clear active enemy projectiles through the source
 that shell-object list. They then reload source rematerialization state from
 the current clean source `SEED`/`HSEED`: the clean camera/background word,
 player X/facing branch, player Y high byte, cleared velocity, and source
-`APSND` appearance command.
+`APSND` appearance command. Their clean `HYP2` tail follows the source
+`LSEED > 0xC0` death-risk branch into the existing player damage path, while
+`0xC0` and below complete safely.
 Clean landers now abduct aligned humans, can carry explicit selected-human
 target state for source-shaped landers, enter the source `LANDG`
 target-approach step only when that selected target passes the source `LANDS0`

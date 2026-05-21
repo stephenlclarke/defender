@@ -93,6 +93,7 @@ const SOURCE_PLAYER_EXPLOSION_COLOR_COUNTER_RELOAD: u8 = 4;
 const SOURCE_PLAYER_EXPLOSION_Y_MIN: u8 = 42;
 const SOURCE_PLAYER_EXPLOSION_X_MAX: u8 = 0x98;
 const SOURCE_PLAYER_EXPLOSION_VELOCITY_LIMIT: u16 = 0x016A;
+const SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD: u8 = 0xC0;
 pub(crate) const SOURCE_PLAYER_EXPLOSION_COLORS: [u8; 15] = [
     0xFF, 0x7F, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x00,
 ];
@@ -2936,6 +2937,7 @@ struct SourceHyperspaceRematerialization {
     direction: Direction,
     camera_left: WorldVector,
     screen_position: ScreenPosition,
+    death_risk: bool,
 }
 
 fn source_hyperspace_rematerialization(
@@ -2958,6 +2960,7 @@ fn source_hyperspace_rematerialization(
         direction,
         camera_left: world_word(seed_word),
         screen_position: ScreenPosition::new(player_x16.to_be_bytes()[0], player_y),
+        death_risk: source_rng.lseed > SOURCE_HYPERSPACE_DEATH_LSEED_THRESHOLD,
     }
 }
 
@@ -5973,6 +5976,7 @@ impl Game {
         let mut player_screen_position = motion.screen_position;
         let mut player_velocity = motion.state.velocity;
         let mut player_x = motion.state.position.0;
+        let mut hyperspace_death_risk = false;
         self.state
             .world
             .sync_player_carried_humans(player_screen_position);
@@ -6020,6 +6024,7 @@ impl Game {
             player_screen_position = hyperspace.screen_position;
             player_velocity = hyperspace.velocity;
             player_x = hyperspace.position.0;
+            hyperspace_death_risk = hyperspace.death_risk;
             sound_events.push(source_hyperspace_appearance_sound_event());
         }
 
@@ -6066,14 +6071,18 @@ impl Game {
         }
         self.advance_baiter_entry(player_screen_position, player_velocity);
         self.resolve_projectile_enemy_collisions(gameplay_events, sound_events);
-        let hit_enemy =
+        let mut hit_player =
             self.resolve_player_enemy_collision(player_screen_position, gameplay_events);
-        if !hit_enemy && self.state.phase == GamePhase::Playing {
-            self.resolve_player_enemy_projectile_collision(player_screen_position, gameplay_events);
+        if !hit_player && self.state.phase == GamePhase::Playing {
+            hit_player = self
+                .resolve_player_enemy_projectile_collision(player_screen_position, gameplay_events);
+        }
+        if hyperspace_death_risk && !hit_player && self.state.phase == GamePhase::Playing {
+            self.apply_player_hit(player_screen_position, gameplay_events);
         }
         self.resolve_planet_destruction();
 
-        if self.state.phase == GamePhase::Playing {
+        if self.state.phase == GamePhase::Playing && !hyperspace_death_risk {
             self.queue_wave_clear_if_needed(gameplay_events, player_x);
         }
     }
@@ -11705,7 +11714,7 @@ mod tests {
         game.state.world.source_rng = SourceRandSnapshot {
             seed: 0x12,
             hseed: 0x6C,
-            lseed: 0xA5,
+            lseed: 0xC0,
         };
         game.state.world.enemies = vec![EnemySnapshot::new(
             EnemyKind::Lander,
@@ -11738,6 +11747,49 @@ mod tests {
             frame.events.sounds(),
             &[source_hyperspace_appearance_sound_event()]
         );
+    }
+
+    #[test]
+    fn clean_game_hyperspace_lseed_high_enters_source_death_path() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2345), super::world_word(0x8134));
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x12,
+            hseed: 0x6C,
+            lseed: 0xC1,
+        };
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.player.lives, 1);
+        assert_eq!(
+            frame.state.player.position,
+            (super::world_word(0x7000), super::world_word(0x6034))
+        );
+        assert_eq!(
+            frame.state.player.velocity,
+            (WorldVector::default(), WorldVector::default())
+        );
+        assert_eq!(
+            frame.events.gameplay(),
+            &[GameEvent::HyperspacePressed, GameEvent::PlayerDestroyed]
+        );
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_hyperspace_appearance_sound_event()]
+        );
+        assert!(frame.state.world.player_explosion.is_some());
     }
 
     #[test]

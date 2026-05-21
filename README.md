@@ -525,6 +525,8 @@ shell-list cleanup while leaving player projectiles outside that shell-object
 list. They then reload source rematerialization state from the current clean
 source `SEED`/`HSEED`: the clean camera/background word, player X/facing branch,
 player Y high byte, cleared velocity, and source `APSND` appearance command.
+Their clean `HYP2` tail follows the source `LSEED > 0xC0` death-risk branch
+into the existing player damage path, while `0xC0` and below complete safely.
 Playing scenes draw
 current-player
 life-stock and smart-bomb-stock HUD sprites with source-backed display caps,

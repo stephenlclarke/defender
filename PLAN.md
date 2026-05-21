@@ -1068,7 +1068,9 @@ Object-ecology progress after R9-C4 slices:
   `SEED`/`HSEED` seed the clean background/camera word, `HSEED` selects the
   source player X/facing branch, the player Y high byte is restored from
   `HSEED >> 1 + YMIN`, player velocity is cleared, and `APSND` surfaces the
-  appearance command loaded by that path.
+  appearance command loaded by that path. The clean `HYP2` tail now treats
+  `LSEED > 0xC0` as the source death-risk branch into the existing player
+  damage path while `0xC0` and below complete safely.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -2408,6 +2410,21 @@ Work log:
   this is a bounded Step 50 hyperspace rematerialization-state slice, not a Step
   50 / Phase 3 closure or R9 finalization. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779322205988939`.
+
+- `2026-05-21 01:19:26 BST` R9-C4 progress slice
+  `source hyperspace HYP2 death risk`. Accepted clean hyperspace inputs now
+  carry the bounded source `HYP2` tail after rematerialization: `LSEED > 0xC0`
+  enters the existing clean player damage path, while `0xC0` and below remain
+  safe after shell cleanup, rematerialization, and `APSND`. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo test clean_game_hyperspace
+  --lib`, `cargo test clean_game_applies_playing_controls_through_systems
+  --lib`, `cargo test clean_game_player_enemy_collision --lib`, targeted `make
+  clean-fidelity SCENARIOS="hyperspace"`, touched-doc `markdownlint`, and `git
+  diff --check`. Broad `cargo test --all-targets`, full `make fidelity`, full
+  all-scenario `make clean-fidelity`, and full clippy remain deferred because
+  this is a bounded Step 50 hyperspace `HYP2` tail slice, not a Step 50 / Phase
+  3 closure or R9 finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779322705904049`.
 
 ## Archived Completed History
 
