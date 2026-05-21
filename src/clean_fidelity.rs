@@ -653,12 +653,12 @@ mod tests {
         ObjectEvidenceCategory, ObjectEvidenceDetailSnapshot, ObjectEvidenceList,
         ObjectEvidenceSnapshot, SoundEvent, TerrainBlowSnapshot, TerrainBlowStage,
     };
-    use crate::renderer::SpriteId;
+    use crate::renderer::{RenderLayerCounts, RenderSceneSummary, SpriteId, SurfaceSize};
 
     use super::{
         CleanFidelityFieldMismatch, CleanFidelityMismatch, CleanFidelityProfile,
-        CleanFidelityReport, cabinet_gameplay_events, cabinet_sound_events, compare_scenario,
-        compare_state, parse_expanded_input_text, profile_for_scenario,
+        CleanFidelityReport, cabinet_gameplay_events, cabinet_sound_events, compare_render,
+        compare_scenario, compare_state, parse_expanded_input_text, profile_for_scenario,
     };
 
     const PHASE_ONE_SCENARIOS: &str = concat!(
@@ -754,6 +754,41 @@ mod tests {
     }
 
     #[test]
+    fn clean_fidelity_render_audit_records_source_backed_scope() {
+        let scenarios = crate::fidelity_manifest::scenarios().expect("scenario manifest");
+        let visual_signature_scenarios = scenarios
+            .iter()
+            .filter(|scenario| {
+                render_fields_for(profile_for_scenario(&scenario.name))
+                    .contains(&"render.visual_signature")
+            })
+            .map(|scenario| scenario.name.as_str())
+            .collect::<Vec<_>>();
+        let raster_count_scenarios = scenarios
+            .iter()
+            .filter(|scenario| {
+                render_fields_for(profile_for_scenario(&scenario.name))
+                    .contains(&"render.raster_count")
+            })
+            .count();
+
+        assert_eq!(scenarios.len(), 12);
+        assert_eq!(visual_signature_scenarios, ["attract_boot", "start_game"]);
+        assert_eq!(raster_count_scenarios, scenarios.len());
+        for scenario in scenarios {
+            let fields = render_fields_for(profile_for_scenario(&scenario.name));
+            assert!(!fields.contains(&"render.sprite_count"));
+            assert!(!fields.contains(&"render.layers"));
+        }
+
+        let strict_fields = render_fields_for(CleanFidelityProfile::Full);
+        assert!(strict_fields.contains(&"render.visual_signature"));
+        assert!(strict_fields.contains(&"render.raster_count"));
+        assert!(strict_fields.contains(&"render.sprite_count"));
+        assert!(strict_fields.contains(&"render.layers"));
+    }
+
+    #[test]
     fn clean_fidelity_compares_high_score_session_state() {
         let mut clean = Game::new().state();
         let mut accepted = clean.clone();
@@ -809,6 +844,36 @@ mod tests {
                 .any(|field| field.field == "state.high_score_tables")
         );
         assert!(fields.iter().any(|field| field.field == "state.game_over"));
+    }
+
+    fn render_fields_for(profile: CleanFidelityProfile) -> Vec<&'static str> {
+        let clean = RenderSceneSummary {
+            frame: 7,
+            surface: SurfaceSize::new(292, 240),
+            visual_signature: Some(0x1111_1111),
+            raster_count: 0,
+            sprite_count: 3,
+            layers: RenderLayerCounts {
+                terrain: 1,
+                ..RenderLayerCounts::default()
+            },
+        };
+        let accepted = RenderSceneSummary {
+            frame: 7,
+            surface: SurfaceSize::new(292, 240),
+            visual_signature: Some(0x2222_2222),
+            raster_count: 1,
+            sprite_count: 4,
+            layers: RenderLayerCounts {
+                hud: 1,
+                ..RenderLayerCounts::default()
+            },
+        };
+        let mut fields = Vec::new();
+
+        compare_render(profile, &mut fields, &clean, &accepted);
+
+        fields.into_iter().map(|field| field.field).collect()
     }
 
     #[test]

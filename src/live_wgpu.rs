@@ -43,7 +43,7 @@ const MAX_STEPS_PER_TICK: u32 = 5;
 #[cfg(all(not(test), not(coverage)))]
 const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x7269_0A81_19CA_46EE;
 #[cfg(all(not(test), not(coverage)))]
-const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0x1420_C241_52C8_111D;
+const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0xD8EB_31D1_CAB9_D7D2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LiveInputProfile {

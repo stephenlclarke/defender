@@ -848,6 +848,18 @@ post-acceptance validation records.
   passed with `make clean-fidelity SCENARIOS="high_score_entry"` matching
   3428/3428 frames. Full broad validation remains deferred to Step 54 because no
   public accepted facade or runtime behavior changed.
+- `2026-05-21 09:19:27 BST`: R9-E1 closes Step 53/B11 with a source-backed
+  render-presentation audit instead of a runtime behavior change. Local
+  reference fixtures carry accepted `video_crc32` evidence for every frame of
+  all 12 Phase 1 scenarios. The clean-fidelity render comparator now has a
+  focused audit test proving frame, surface, and raster absence are compared for
+  all scenarios, while strict `render.visual_signature` comparison remains
+  source-backed to `attract_boot` and `start_game`. `--game-smoke` covers clean
+  sprite/draw-plan evidence, and `--live-smoke` covers offscreen `wgpu` readback
+  with checked first/last signatures. Exact per-scenario pixel CRC parity,
+  strict long-scenario sprite count/layer parity, and per-scenario offscreen
+  `wgpu` signatures remain recorded audit residuals, not additional R9 runtime
+  blockers.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

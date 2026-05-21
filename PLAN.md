@@ -729,10 +729,18 @@ Phase 4: session and high-score closure.
 
 Phase 5: final render parity and acceptance.
 
-- Step 53 / Cycle R9-E1: final render-presentation parity audit. Compare clean
-  sprite scenes, offscreen `wgpu` signatures, and accepted visual evidence for
-  the 12 Phase 1 scenarios plus any focused fixtures added above. Record only
-  source-backed residual differences.
+- Step 53 / Cycle R9-E1: final render-presentation parity audit. Completed
+  2026-05-21. The audit records source-backed residual boundaries instead of
+  widening runtime behavior: all 12 local Phase 1 reference scenarios carry
+  accepted `video_crc32` evidence for every frame; clean-fidelity render
+  comparison covers frame, surface, and raster absence for every scenario and
+  strict visual signatures for `attract_boot`/`start_game`; clean sprite draw
+  evidence stays covered by `--game-smoke`; offscreen `wgpu` readback evidence
+  stays covered by `--live-smoke` with checked first/last signatures. Exact
+  per-scenario pixel CRC parity, strict long-scenario sprite count/layer parity,
+  and per-scenario offscreen `wgpu` signatures are source-backed audit residuals,
+  not additional R9 runtime blockers. B11 is closed; Step 54 / R9-E2 is the next
+  active roadmap step.
 - Step 54 / Cycle R9-E2: full validation stabilization. Run and fix the full
   R9 gate: formatting, all Rust targets, clippy, `make fidelity`, full
   `make clean-fidelity`, game/live smoke, markdownlint, and diff hygiene.
@@ -755,7 +763,7 @@ Strict R9 blocker matrix after Step 41:
 | B08 | Object ecology | clean behavior | 50 | closed 2026-05-21 |
 | B09 | Two-player flow | clean behavior | 51 | closed 2026-05-21 |
 | B10 | High-score return | clean/accepted | 52 | closed 2026-05-21 |
-| B11 | Render audit | docs/evidence | 53 | residuals source-backed |
+| B11 | Render audit | docs/evidence | 53 | closed 2026-05-21 |
 | B12 | Full validation | docs/evidence | 54 | full R9 gate passes |
 | B13 | Owner signoff | owner decision | 55 | final contract accepted |
 
@@ -788,7 +796,7 @@ Accepted-surface audit after Step 42:
 | B08 | bounded object rows, wave profile | full topology and transitions |
 | B09 | current player, stocks, switch timers | closed by Step 51 fixtures |
 | B10 | entry, submission, tables, stalls | closed by Step 52 fixtures |
-| B11 | visual signature, clean scene | post-B01-B10 visual residuals |
+| B11 | visual signature, clean scene | closed by Step 53 audit |
 | B12 | validation commands only | full R9 gate run |
 | B13 | none | owner decision |
 
@@ -2912,6 +2920,23 @@ Work log:
   all-scenario `make clean-fidelity`, and legacy clippy remain deferred to Step
   54 because this was fixture-only hardening with no public contract or runtime
   behavior change.
+
+- `2026-05-21 09:19:27 BST` Completed R9-E1 Step 53/B11 render-presentation
+  parity audit. The new render-audit test locks the current clean-fidelity
+  comparison boundary across all 12 Phase 1 scenarios: frame, surface, and
+  raster absence are compared everywhere, while strict visual signatures remain
+  source-backed to `attract_boot` and `start_game`. Local reference fixtures
+  carry accepted `video_crc32` evidence for every frame of all 12 scenarios.
+  `--game-smoke` still proves clean sprite/draw-plan coverage and `--live-smoke`
+  proves offscreen `wgpu` readback with 24 nonblank frames, 12 distinct offscreen
+  signatures, first signature `72690a8119ca46ee`, and refreshed last signature
+  `d8eb31d1cab9d7d2`. Exact per-scenario pixel CRC parity, strict
+  long-scenario sprite count/layer parity, and per-scenario offscreen `wgpu`
+  signatures are recorded as source-backed audit residuals rather than
+  additional runtime blockers. B11 is closed. Broad all-target tests, full
+  `make fidelity`, full all-scenario `make clean-fidelity`, and legacy clippy
+  remain deferred to Step 54 because this slice changed validation evidence and
+  docs only.
 
 ## Archived Completed History
 

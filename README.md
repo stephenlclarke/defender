@@ -680,8 +680,9 @@ clean gameplay lifecycle behavior outside the source-backed score-popup
 surface, source expanded-object explosion timing, and source-backed
 player-death pixel-cloud and terrain-blow surfaces,
 wave-completion survivor-bonus loop/cadence beyond current presentation, live
-Williams logo table-walker animation, exact palette-to-RGB rendering, and
-broader render presentation parity remain unmapped.
+Williams logo table-walker animation, and exact palette-to-RGB rendering remain
+source-backed audit residuals. R9-E1 records exact per-scenario pixel/offscreen
+render parity as audit evidence rather than another clean runtime surface.
 Red-label message glyphs now back the
 two-player player-start `PLAYER ONE` / `PLAYER TWO` prompt, player-switch
 `PLAYER ONE` / `PLAYER TWO` plus `GAME OVER` prompt, the ordinary final
