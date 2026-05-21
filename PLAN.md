@@ -748,10 +748,71 @@ Phase 5: final render parity and acceptance.
   `cargo run -- --live-smoke` passed; core-doc markdownlint and diff hygiene
   passed. B12 is closed; Step 55 / R9-E3 is the next active roadmap step.
 - Step 55 / Cycle R9-E3: owner acceptance and milestone closeout. In progress
-  2026-05-21. README, SPEC, `docs/fidelity/gaps.md`, and this plan now state
-  the final R9 contract, remaining non-rewrite follow-ups, validation evidence,
-  and owner acceptance status. Owner signoff remains pending; B13 stays open
-  until the owner explicitly accepts the final contract.
+  2026-05-21. README, SPEC, `docs/fidelity/gaps.md`, and this plan state the
+  final R9 contract, remaining non-rewrite follow-ups, validation evidence, and
+  owner acceptance status from the Step 54 gate. Owner review rejected the
+  current clean visual presentation after comparing it with
+  `docs/start-sequence.gif`: the clean Williams screen colors are wrong, the
+  Williams logo is static rather than handwritten, the Defender wordmark does
+  not coalesce, gameplay sprites are corrupted/wrong-colored, and the attract
+  sequence order should be Williams -> High Scores -> scoring sequence. B13
+  stays open and now owns the corrective visual acceptance schedule below.
+
+R9-E3 corrective visual acceptance schedule:
+
+- R9-E3.1: reference comparison and acceptance reset. Record
+  `docs/start-sequence.gif` as the immediate visual reference for Step 55, mark
+  the earlier post-R9 classification of Williams/palette/sprite polish as
+  superseded for owner acceptance, and keep B01-B12 closed only for their
+  previously validated behavior/evidence surfaces. Validation: markdownlint for
+  touched docs and `git diff --check`.
+- R9-E3.2: clean attract order repair. Change the clean attract presentation
+  state machine so the visible loop follows Williams title/coalescence -> Hall
+  of Fame -> scoring/action sequence instead of falling through to the current
+  static instruction page. Reuse the existing Hall of Fame display renderer
+  where possible, add explicit clean tests for the page order, and run focused
+  `cargo test clean_attract --lib`, `cargo test
+  oracle_scene_projects_attract_credit_text_sprites --lib` if oracle scene
+  mirrors change, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
+  `git diff --check`.
+- R9-E3.3: Williams handwritten logo and color cadence. Replace the clean
+  static Williams-title sprite path with source-table-walker rendering based on
+  `LGOTAB`/`WILLIR` evidence, with frame-gated draw progress and source-backed
+  color cycling that matches the early `start-sequence.gif` frames closely
+  enough for visual review. Add focused scene tests for partial/full logo draw
+  and tint progression. Validation: `cargo fmt --check`, focused attract visual
+  tests, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
+  `git diff --check`.
+- R9-E3.4: Defender wordmark coalescence. Implement the clean `DEFEND` /
+  `DEFENS` appearance phase so the Defender wordmark visibly coalesces before
+  the settled logo, including the source refresh behavior that prevents
+  post-coalescence blanking or stray dot bands. Add regression coverage around
+  pre-coalescence, coalesced, and refreshed frames. Validation: focused attract
+  scene tests, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
+  `git diff --check`.
+- R9-E3.5: source-backed sprite and palette repair. Replace the remaining
+  prototype/corrupted gameplay sprite atlas entries with red-label object
+  picture/table decoders or source-backed bitmap fixtures, and map clean
+  sprite colors through a source-backed palette contract instead of the current
+  mostly-white placeholder tints. Scope the first pass to sprites visible in
+  the start/attract and early gameplay review path. Validation: focused
+  renderer atlas tests, `cargo run -- --game-smoke`, targeted
+  `make clean-fidelity SCENARIOS="attract_boot start_game"`, and
+  `git diff --check`.
+- R9-E3.6: clean scoring/action attract sequence. Add the scoring/action
+  attract segment that follows Hall of Fame in the reference sequence, using
+  existing clean world/object presentation where it is source-backed and adding
+  gaps rather than guessing when source/MAME evidence is missing. Validation:
+  focused attract/action tests, targeted clean-fidelity for affected scenarios,
+  `cargo run -- --game-smoke`, and `git diff --check`.
+- R9-E3.7: visual acceptance closeout gate. Regenerate or capture the
+  acceptance media from the clean renderer, compare it against
+  `docs/start-sequence.gif`, update README/SPEC/gaps with the new visual
+  contract, request owner review, and run the broad gate only once this
+  corrective sequence is ready: `cargo test --all-targets`, default and
+  `legacy-tools` clippy, full `make fidelity`, full all-scenario
+  `make clean-fidelity`, `cargo run -- --game-smoke`, `cargo run --
+  --live-smoke`, core-doc markdownlint, and `git diff --check`.
 
 Strict R9 blocker matrix after Step 41:
 
@@ -769,7 +830,7 @@ Strict R9 blocker matrix after Step 41:
 | B10 | High-score return | clean/accepted | 52 | closed 2026-05-21 |
 | B11 | Render audit | docs/evidence | 53 | closed 2026-05-21 |
 | B12 | Full validation | docs/evidence | 54 | closed 2026-05-21 |
-| B13 | Owner signoff | owner decision | 55 | pending owner signoff |
+| B13 | Owner visual | owner/render | 55 | accepts corrected sequence |
 
 Step 41 acceptance contract:
 
@@ -2969,6 +3030,19 @@ Work log:
   public-contract, runtime-behavior, or scenario-semantics change lands. Slack
   start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779352737331829`.
+
+- `2026-05-21 20:23:44 BST` R9-E3 visual acceptance schedule update. Compared
+  the clean attract path against `docs/start-sequence.gif` and recorded owner
+  visual rejection as active Step 55/B13 work rather than post-R9 polish. The
+  scheduled corrective slices now cover the reference comparison reset, clean
+  attract order repair, Williams handwritten logo/color cadence, Defender
+  coalescence, source-backed sprite/palette repair, scoring/action attract
+  sequence, and one final broad visual acceptance gate. No runtime behavior,
+  public API, or scenario semantics changed in this planning update. Focused
+  validation is limited to touched-doc markdownlint and `git diff --check`;
+  broad validation remains deferred until the corrective visual implementation
+  reaches R9-E3.7 or an earlier shared contract/runtime change introduces broad
+  risk.
 
 ## Archived Completed History
 
