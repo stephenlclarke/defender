@@ -2,7 +2,9 @@
 
 use crate::{
     renderer::{
-        Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
+        ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS, ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT,
+        ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS, ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE, Color,
+        RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
         push_source_controlled_message_sprites, push_source_message_sprites,
         push_source_text_bytes_sprites, source_attract_williams_logo_pixel_path,
         source_message_text, source_screen_position, source_screen_position_with_offset,
@@ -31,7 +33,7 @@ const COIN_CREDIT_SOUND_DELAY_FRAMES: u8 = 1;
 const START_SOUND_DELAY_FRAMES: u8 = 1;
 const START_PLAYFIELD_DELAY_FRAMES: u8 = 2;
 const ATTRACT_PRESENTS_START_FRAME: u16 = 236;
-const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 = 285;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 = 285;
 const ATTRACT_COPYRIGHT_START_FRAME: u16 = 419;
 const ATTRACT_HALL_OF_FAME_START_FRAME: u16 = 441;
 const ATTRACT_SCORING_SEQUENCE_START_FRAME: u16 = 4_200;
@@ -42,6 +44,7 @@ const ATTRACT_COPYRIGHT_SLEEP_TICKS: u8 = 10;
 const ATTRACT_COPYRIGHT_STALL_TICKS: u8 = 60;
 const ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS: u8 = 0xE6;
 pub(crate) const ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES: u16 = 160;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES: u16 = 0x30;
 const SOURCE_SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4];
 const SOURCE_SCANNER_SELECTED_MAP: u8 = 1;
 const SOURCE_SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
@@ -7034,6 +7037,31 @@ fn push_attract_defender_wordmark_sprite(scene: &mut RenderScene, state: &GameSt
         return;
     }
 
+    let visible_block_count = attract_defender_wordmark_visible_block_count(&state.attract);
+    if visible_block_count < ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT {
+        let origin = source_screen_position(SOURCE_ATTRACT_DEFENDER_WORDMARK_SCREEN);
+        for order in 0..visible_block_count {
+            let block_index = attract_defender_wordmark_block_index_for_order(order);
+            let block_column = block_index % ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS;
+            let block_row = block_index / ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS;
+            let Some(sprite) = SpriteId::attract_defender_wordmark_block(block_index) else {
+                continue;
+            };
+
+            scene.push_sprite(SceneSprite {
+                sprite,
+                layer: RenderLayer::Overlay,
+                position: [
+                    origin[0] + (block_column as f32 * ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE[0]),
+                    origin[1] + (block_row as f32 * ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE[1]),
+                ],
+                size: ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE,
+                tint: SOURCE_VISUAL_STATE.attract_defender_wordmark_tint(),
+            });
+        }
+        return;
+    }
+
     scene.push_sprite(SceneSprite {
         sprite: SpriteId::HALL_OF_FAME_DEFENDER_LOGO,
         layer: RenderLayer::Overlay,
@@ -7041,6 +7069,37 @@ fn push_attract_defender_wordmark_sprite(scene: &mut RenderScene, state: &GameSt
         size: SOURCE_DEFENDER_WORDMARK_SIZE,
         tint: SOURCE_VISUAL_STATE.attract_defender_wordmark_tint(),
     });
+}
+
+fn attract_defender_wordmark_visible_block_count(attract: &AttractPresentationSnapshot) -> usize {
+    if attract.page != AttractPresentationPage::DefenderWordmark {
+        return ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT;
+    }
+
+    let elapsed = attract
+        .page_frame
+        .saturating_sub(ATTRACT_DEFENDER_WORDMARK_START_FRAME);
+    if elapsed >= ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES {
+        return ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT;
+    }
+
+    let reveal_frames = usize::from(ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES);
+    let page_frame = usize::from(elapsed.saturating_add(1));
+    (ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT * page_frame / reveal_frames)
+        .clamp(1, ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT)
+}
+
+fn attract_defender_wordmark_block_index_for_order(order: usize) -> usize {
+    let row = order % ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
+    let column_step = order / ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
+    let center_left = ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS / 2 - 1;
+    let column = if column_step % 2 == 0 {
+        center_left.saturating_sub(column_step / 2)
+    } else {
+        ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS / 2 + column_step / 2
+    };
+
+    row * ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS + column
 }
 
 fn push_attract_copyright_strip_sprite(scene: &mut RenderScene, state: &GameState) {
@@ -8460,8 +8519,9 @@ fn accepted_r3_visual_signature(frame: u64) -> Option<u32> {
 mod tests {
     use crate::{
         renderer::{
-            Color, RenderLayer, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize,
-            TextureAtlas, source_attract_williams_logo_pixel_path,
+            ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT, ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE, Color,
+            RenderLayer, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize, TextureAtlas,
+            source_attract_williams_logo_pixel_path,
         },
         systems::{
             GameSimulation, HighScoreInitialsState, PlayerControlIntent, PlayerMotionState,
@@ -8473,6 +8533,7 @@ mod tests {
 
     use super::{
         ATTRACT_COPYRIGHT_SLEEP_TICKS, ATTRACT_COPYRIGHT_STALL_TICKS,
+        ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES, ATTRACT_DEFENDER_WORDMARK_START_FRAME,
         ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES, AttractPresentationPage, AttractPresentationSnapshot,
         COIN_CREDIT_DELAY_FRAMES, COIN_CREDIT_SOUND_DELAY_FRAMES, DEFAULT_CABINET_WAVE,
         DEFAULT_HIGH_SCORE, DEFAULT_PLAYER_LIVES, DEFAULT_REPLAY_SCORE, Direction,
@@ -9325,6 +9386,76 @@ mod tests {
         assert!(!scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
                 || sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP
+        }));
+    }
+
+    #[test]
+    fn clean_attract_defender_wordmark_coalesces_before_settled_logo() {
+        let mut game = Game::new();
+        let first_block = SpriteId::attract_defender_wordmark_block(14)
+            .expect("first center Defender block sprite");
+
+        game.state.attract =
+            AttractPresentationSnapshot::for_page_frame(ATTRACT_DEFENDER_WORDMARK_START_FRAME);
+        let early_scene = game.scene();
+        let early_blocks = early_scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                (SpriteId::ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE.0
+                    ..SpriteId::ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE.0
+                        + ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT as u16)
+                    .contains(&sprite.sprite.0)
+            })
+            .collect::<Vec<_>>();
+        assert!(!early_blocks.is_empty());
+        assert!(early_blocks.len() < ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT);
+        assert!(early_blocks.iter().any(|sprite| {
+            sprite.sprite == first_block
+                && sprite.layer == RenderLayer::Overlay
+                && sprite.position == [152.0, 144.0]
+                && sprite.size == ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE
+                && sprite.tint == SOURCE_VISUAL_STATE.attract_defender_wordmark_tint()
+        }));
+        assert!(
+            !early_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO)
+        );
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(
+            ATTRACT_DEFENDER_WORDMARK_START_FRAME + ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES / 2,
+        );
+        let mid_scene = game.scene();
+        let mid_blocks = mid_scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                (SpriteId::ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE.0
+                    ..SpriteId::ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE.0
+                        + ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT as u16)
+                    .contains(&sprite.sprite.0)
+            })
+            .count();
+        assert!(mid_blocks > early_blocks.len());
+        assert!(mid_blocks < ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT);
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(
+            ATTRACT_DEFENDER_WORDMARK_START_FRAME + ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES,
+        );
+        let settled_scene = game.scene();
+        assert!(settled_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.position == [96.0, 144.0]
+                && sprite.size == [120.0, 24.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.attract_defender_wordmark_tint()
+        }));
+        assert!(!settled_scene.sprites.iter().any(|sprite| {
+            (SpriteId::ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE.0
+                ..SpriteId::ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE.0
+                    + ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT as u16)
+                .contains(&sprite.sprite.0)
         }));
     }
 

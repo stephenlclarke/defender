@@ -37,8 +37,8 @@ core-document markdownlint, and `git diff --check`.
 
 R9 owner signoff is still pending. Owner review of `docs/start-sequence.gif`
 reopened visual acceptance for the clean renderer. Williams handwriting/color
-cadence and the Hall of Fame attract order are now repaired in clean runtime;
-Defender wordmark coalescence, gameplay sprite/palette fidelity, and the later
+cadence, Defender wordmark coalescence, and the Hall of Fame attract order are
+now repaired in clean runtime; gameplay sprite/palette fidelity and the later
 scoring/action attract segment remain active B13 work. Evidence-only follow-ups
 after acceptance remain exact per-scenario pixel CRC parity, strict
 long-scenario sprite count/layer parity, per-scenario offscreen `wgpu`
@@ -226,8 +226,8 @@ top-display frame geometry. R9 now treats exact per-scenario pixel/offscreen
 render parity, strict long-scenario sprite count/layer parity,
 and wave-completion survivor-bonus loop/cadence beyond current presentation as
 post-R9 audit follow-ups rather than active B01-B12 blockers. Owner-reviewed
-Defender coalescence, sprite/palette, and scoring/action attract fidelity
-remain active B13 visual acceptance work.
+sprite/palette and scoring/action attract fidelity remain active B13 visual
+acceptance work.
 Player-one/player-two score digits, life/smart-bomb stock drawing, two-player
 start admission/top-display initialization, the two-player player-start
 prompt, and the two-player final-life `PLE02` switch/respawn handoff plus its
@@ -699,10 +699,9 @@ clean gameplay lifecycle behavior outside the source-backed score-popup
 surface, source expanded-object explosion timing, and source-backed
 player-death pixel-cloud and terrain-blow surfaces, and wave-completion
 survivor-bonus loop/cadence beyond current presentation remain source-backed
-audit residuals. Owner-reviewed Defender coalescence and sprite/palette
-fidelity remain active B13 visual acceptance work. R9-E1 records exact
-per-scenario pixel/offscreen render parity as audit evidence rather than
-another clean runtime surface.
+audit residuals. Owner-reviewed sprite/palette fidelity remains active B13
+visual acceptance work. R9-E1 records exact per-scenario pixel/offscreen render
+parity as audit evidence rather than another clean runtime surface.
 Red-label message glyphs now back the
 two-player player-start `PLAYER ONE` / `PLAYER TWO` prompt, player-switch
 `PLAYER ONE` / `PLAYER TWO` plus `GAME OVER` prompt, the ordinary final
@@ -722,8 +721,10 @@ source wait constants, now ordering the title/copyright surfaces before the
 Hall of Fame display and later scoring/action text. The Williams logo is
 generated from the source `LGOTAB` final pixel pattern and early title frames
 draw a source-ordered handwritten reveal with source-rate color cadence. The
-normal attract copyright strip is generated from the source `CPRTAB` bitmap
-bytes.
+normal attract Defender wordmark now uses 4x12 source-logo atlas blocks during
+the `DEFEND` / `DEFENS` appearance window before returning to the full
+source-expanded wordmark for settled frames. The normal attract copyright strip
+is generated from the source `CPRTAB` bitmap bytes.
 The playing top-display border uses a small atlas-backed clean border word
 sprite projected from the source `BORDER` geometry: bottom line, scanner side
 boundaries, top scanner boundary, and scanner marker bars.

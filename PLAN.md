@@ -778,13 +778,12 @@ R9-E3 corrective visual acceptance schedule:
   source-rate color cadence before falling back to the completed source
   Williams logo. Focused renderer/game/oracle tests cover the pixel path, atlas
   region, reveal threshold, and tint cadence.
-- R9-E3.4: Defender wordmark coalescence. Implement the clean `DEFEND` /
-  `DEFENS` appearance phase so the Defender wordmark visibly coalesces before
-  the settled logo, including the source refresh behavior that prevents
-  post-coalescence blanking or stray dot bands. Add regression coverage around
-  pre-coalescence, coalesced, and refreshed frames. Validation: focused attract
-  scene tests, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
-  `git diff --check`.
+- R9-E3.4: Defender wordmark coalescence. Completed 2026-05-21. Clean and
+  oracle attract scenes now render the `DEFEND` / `DEFENS` appearance phase as
+  4x12 atlas-backed wordmark blocks before switching back to the full
+  source-expanded Defender logo for settled and refreshed frames. Focused
+  renderer/game/oracle tests cover block atlas regions, pre-coalescence,
+  coalesced, and refreshed frames.
 - R9-E3.5: source-backed sprite and palette repair. Replace the remaining
   prototype/corrupted gameplay sprite atlas entries with red-label object
   picture/table decoders or source-backed bitmap fixtures, and map clean
@@ -3075,6 +3074,22 @@ Work log:
   because this was a bounded visual repair, not the R9-E3.7 closeout gate. The
   next full gate should run at R9-E3.7 or sooner if the Defender coalescence,
   sprite/palette, or scoring/action slices introduce broad runtime risk.
+
+- `2026-05-21 21:13:04 BST` Completed R9-E3.4 Defender wordmark coalescence.
+  Renderer code now exposes 4x12 block regions over the source-expanded
+  Defender logo. Clean and oracle attract scenes use those blocks during the
+  bounded `DEFEND` / `DEFENS` appearance window, then return to the whole
+  wordmark sprite for settled and copyright-refresh frames so no stray
+  appearance bands survive past coalescence. README, SPEC,
+  `docs/fidelity/gaps.md`, and this plan now narrow remaining B13 visual work
+  to gameplay sprite/palette fidelity and the later scoring/action attract
+  segment. Focused validation passed with `cargo fmt --check`, `cargo check`,
+  focused renderer/game/oracle tests, targeted `make clean-fidelity
+  SCENARIOS="attract_boot"`, and `git diff --check`. Full `make fidelity`,
+  full all-scenario `make clean-fidelity`, full clippy, and `--live-smoke`
+  remain deferred because this was a bounded attract title repair, not the
+  R9-E3.7 closeout gate. The next full gate should run at R9-E3.7 or sooner if
+  the sprite/palette or scoring/action slices introduce broad runtime risk.
 
 ## Archived Completed History
 

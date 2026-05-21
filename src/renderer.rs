@@ -299,6 +299,7 @@ impl SpriteId {
     pub const SCANNER_PLAYER_BLIP: Self = Self(71);
     pub const PLAYER_EXPLOSION_PIXEL: Self = Self(72);
     pub const ATTRACT_WILLIAMS_LOGO_PIXEL: Self = Self(73);
+    pub const ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE: Self = Self(74);
     pub const SCORE_DIGITS: [Self; 10] = [
         Self::SCORE_DIGIT_0,
         Self::SCORE_DIGIT_1,
@@ -344,6 +345,18 @@ impl SpriteId {
         Self::MESSAGE_GLYPH_Y,
         Self::MESSAGE_GLYPH_Z,
     ];
+
+    pub(crate) fn attract_defender_wordmark_block(index: usize) -> Option<Self> {
+        if index < ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT {
+            Some(Self(
+                Self::ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE.0
+                    + u16::try_from(index).expect("Defender wordmark block index fits in u16"),
+            ))
+        } else {
+            None
+        }
+    }
+
     const MESSAGE_GLYPH_SPECS: [(char, Self, [u32; 2]); 31] = [
         (' ', Self::MESSAGE_GLYPH_SPACE, [2, 8]),
         (',', Self::MESSAGE_GLYPH_COMMA, [2, 8]),
@@ -956,6 +969,11 @@ const SOURCE_DEFENDER_LOGO_COLUMNS: u8 = 0x3C;
 const SOURCE_DEFENDER_LOGO_ROWS: u8 = 0x18;
 const SOURCE_DEFENDER_LOGO_BYTES: usize =
     SOURCE_DEFENDER_LOGO_COLUMNS as usize * SOURCE_DEFENDER_LOGO_ROWS as usize;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS: usize = 30;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS: usize = 2;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT: usize =
+    ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS * ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE: [f32; 2] = [4.0, 12.0];
 const SOURCE_ATTRACT_COPYRIGHT_COLUMNS: u8 = 40;
 const SOURCE_ATTRACT_COPYRIGHT_ROWS: u8 = 8;
 const SOURCE_ATTRACT_COPYRIGHT_BYTES: [u8; 80] = [
@@ -1267,6 +1285,7 @@ impl TextureAtlas {
                 size: [1, 1],
             },
         ];
+        regions.extend(attract_defender_wordmark_block_regions());
         regions.extend(message_glyph_atlas_regions(surface));
         let pixels = default_sprite_atlas_pixels(surface, &regions);
 
@@ -1321,6 +1340,24 @@ fn message_glyph_atlas_regions(surface: SurfaceSize) -> Vec<AtlasRegion> {
             size,
         });
         origin[0] += size[0] + MESSAGE_GLYPH_ATLAS_GAP;
+    }
+    regions
+}
+
+fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
+    let mut regions = Vec::with_capacity(ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT);
+    for index in 0..ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT {
+        let column = index % ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS;
+        let row = index / ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS;
+        regions.push(AtlasRegion {
+            sprite: SpriteId::attract_defender_wordmark_block(index)
+                .expect("Defender wordmark block sprite"),
+            origin: [
+                u32::try_from(column).expect("Defender wordmark block column fits") * 4,
+                128 + u32::try_from(row).expect("Defender wordmark block row fits") * 12,
+            ],
+            size: [4, 12],
+        });
     }
     regions
 }
@@ -3934,20 +3971,21 @@ impl Default for GpuRendererSettings {
 #[cfg(test)]
 mod tests {
     use super::{
-        AtlasRegion, Color, GpuRendererSettings, NativeRenderPipeline, NativeRendererResources,
-        NativeSceneRenderer, RenderLayer, RenderLayerCounts, RenderScene, SceneDrawPlan,
-        SceneProjectionUniformUpload, SceneProjectionUniforms, SceneRaster, SceneRasterError,
-        SceneRasterUpload, SceneSprite, SpriteAtlasTextureUpload, SpriteBindGroupLayoutPlan,
-        SpriteBindGroupRole, SpriteBufferRole, SpriteBufferUpload, SpriteBufferUploadPlan,
-        SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding,
-        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload,
-        SpritePipelineLayoutBindGroup, SpritePipelineLayoutPlan, SpritePipelinePlan,
-        SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassEncoderCommand,
-        SpriteRenderPassEncoderPlan, SpriteRenderPassPlan, SpriteRenderPipelineDescriptorPlan,
-        SpriteResourceBindingPlan, SpriteResourceBindingRole, SpriteSamplerBindingPlan,
-        SpriteShaderPlan, SpriteTextureBindingPlan, SpriteVertexBufferBinding,
-        SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuFrameCommand,
-        WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand, push_source_controlled_message_sprites,
+        ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT, AtlasRegion, Color, GpuRendererSettings,
+        NativeRenderPipeline, NativeRendererResources, NativeSceneRenderer, RenderLayer,
+        RenderLayerCounts, RenderScene, SceneDrawPlan, SceneProjectionUniformUpload,
+        SceneProjectionUniforms, SceneRaster, SceneRasterError, SceneRasterUpload, SceneSprite,
+        SpriteAtlasTextureUpload, SpriteBindGroupLayoutPlan, SpriteBindGroupRole, SpriteBufferRole,
+        SpriteBufferUpload, SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand,
+        SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding, SpriteInstanceBuffer,
+        SpriteInstanceBufferRecord, SpriteInstanceUpload, SpritePipelineLayoutBindGroup,
+        SpritePipelineLayoutPlan, SpritePipelinePlan, SpriteQuadGeometry, SpriteQuadVertex,
+        SpriteRenderPassDraw, SpriteRenderPassEncoderCommand, SpriteRenderPassEncoderPlan,
+        SpriteRenderPassPlan, SpriteRenderPipelineDescriptorPlan, SpriteResourceBindingPlan,
+        SpriteResourceBindingRole, SpriteSamplerBindingPlan, SpriteShaderPlan,
+        SpriteTextureBindingPlan, SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan,
+        SurfaceSize, TextureAtlas, ViewportLayout, WgpuFrameCommand, WgpuFramePlan, WgpuPassPlan,
+        WgpuViewportCommand, push_source_controlled_message_sprites,
         push_source_text_bytes_sprites, source_message_text, source_screen_position,
         source_screen_position_with_offset,
     };
@@ -5643,6 +5681,44 @@ mod tests {
             })
         );
         assert_visible_region(&atlas, SpriteId::HALL_OF_FAME_DEFENDER_LOGO);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_defender_wordmark_block_regions() {
+        let atlas = TextureAtlas::default_sprites();
+        let first = SpriteId::attract_defender_wordmark_block(0).expect("first block sprite");
+        let center = SpriteId::attract_defender_wordmark_block(14).expect("center block sprite");
+        let last = SpriteId::attract_defender_wordmark_block(
+            ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT.saturating_sub(1),
+        )
+        .expect("last block sprite");
+
+        assert_eq!(
+            atlas.region(first),
+            Some(AtlasRegion {
+                sprite: first,
+                origin: [0, 128],
+                size: [4, 12],
+            })
+        );
+        assert_eq!(
+            atlas.region(center),
+            Some(AtlasRegion {
+                sprite: center,
+                origin: [56, 128],
+                size: [4, 12],
+            })
+        );
+        assert_eq!(
+            atlas.region(last),
+            Some(AtlasRegion {
+                sprite: last,
+                origin: [116, 140],
+                size: [4, 12],
+            })
+        );
+        assert_visible_region(&atlas, center);
+        assert_visible_region(&atlas, last);
     }
 
     #[test]

@@ -42,9 +42,9 @@ accepted final contract is ready for owner review:
   `git diff --check`.
 - Owner signoff remains pending as B13. Owner review of
   `docs/start-sequence.gif` reopened visual acceptance. Williams handwriting
-  and color cadence plus the Hall of Fame attract order are now repaired in
-  clean runtime; Defender wordmark coalescence, gameplay sprite/palette
-  fidelity, and the later scoring/action attract segment remain active. Until
+  and color cadence, Defender wordmark coalescence, and the Hall of Fame
+  attract order are now repaired in clean runtime; gameplay sprite/palette
+  fidelity and the later scoring/action attract segment remain active. Until
   signoff, changes that alter public contracts, scenario semantics, runtime
   behavior, or final acceptance evidence must trigger focused checks and, when
   broad risk is introduced, a renewed full gate.
@@ -480,8 +480,9 @@ source-backed `CREDV` credits label at `0x28E5` and the visible credit count
 digits at `0x48E5`. The title program is gated by
 `AttractPresentationSnapshot`: the source `LGOTAB` Williams logo appears first
 at `0x363C`, `ELECV` presents copy appears at `0x3258`/`0x3E6C`, the
-source-expanded Defender wordmark appears at `0x3090`, the source copyright
-strip appears at `0x3BD0` during the copyright wait gate, and the
+source-expanded Defender wordmark coalesces through 4x12 source-logo blocks at
+`0x3090` before the settled wordmark refreshes, the source copyright strip
+appears at `0x3BD0` during the copyright wait gate, and the
 instruction-page `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and
 `SWARMV` labels appear at `0x4330`, `0x1C70`, `0x3C70`, `0x5F70`, `0x1CA8`,
 `0x40A8`, and `0x5CA8`. This projection is suppressed during the hall-of-fame
