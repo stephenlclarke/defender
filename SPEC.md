@@ -212,8 +212,8 @@ high-score reset gameplay events on button edges while preserving current
 player scores and bonus thresholds during high-score reset. Clean enemy
 snapshots carry gameplay-domain velocity and advance through
 `EnemyMotionSystem` during playing frames. Clean projectile snapshots carry
-direction-derived velocity, advance through `ProjectileMotionSystem`, and are
-culled through gameplay state before rendering. Clean collision boxes resolve
+source `LASR0` / `LASL0` laser-loop motion: five source screen columns per
+step with source edge-stop bounds before rendering. Clean collision boxes resolve
 projectile/enemy hits through `CollisionSystem`, remove the hit entities from
 world state, and award score through `ScoreSystem` before rendering. Crossing
 the clean bonus threshold updates player stock and emits `BonusAwarded`. Clean
@@ -336,15 +336,17 @@ per source cadence, applies source fixed-point X motion, steps Y toward
 terrain-relative source targets, and cycles evidence from `ASTP1` through
 `ASTP4`. Clean player projectile evidence now carries the source `LASP1`
 descriptor label, address, 8x1 size, and primary image pointer while the direct
-runtime projectile renderer remains unchanged.
+runtime projectile renderer keeps the existing 8x2 sprite. Clean player
+projectiles advance through the source `LASR0` / `LASL0` five-column loop step
+and source right/left edge-stop bounds.
 Clean enemy, human, player-projectile, and enemy-projectile object evidence
 also carries source-style 8.8 world-position words, velocity words, and
 deterministic source object-table identity evidence from the clean source
 fixed-point state and source layout: addresses from `0xA23C` plus `0x17` per
 slot, source slot numbers, and neutral `OTYP` `0x00`. Runtime scene sprites
 remain on the direct clean render path.
-Remaining per-family movement/projectile behavior and focused source ecology
-fixtures remain later object-ecology work.
+Remaining per-family enemy movement/projectile behavior and focused source
+ecology fixtures remain later object-ecology work.
 Clean
 smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave

@@ -961,6 +961,9 @@ Object-ecology progress after R9-C4 slices:
   The clean player projectile row now carries the source `LASP1`
   descriptor label, address, 8x1 picture size, and primary image pointer while
   the direct runtime renderer keeps the existing clean projectile sprite size.
+  Clean player projectiles now advance through the source `LASR0` / `LASL0`
+  laser-loop step shape: five source screen columns per step and source
+  right/left edge termination at `0x98` / `0x05`.
   Clean enemy, human, player-projectile, and enemy-projectile rows now also
   carry source-style 8.8 world-position words, velocity words, and deterministic
   source object-table identity evidence derived from their existing source
@@ -1101,12 +1104,12 @@ Object-ecology progress after R9-C4 slices:
 - Player-carried humans now follow the source AFALL2 carried offset and settle
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
-  is remaining per-family movement/projectile behavior beyond the covered
-  enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup/rematerialize,
-  lander-abduction, astronaut command, shell-collision command, and fatal
-  astronaut-impact command evidence, player-death command evidence, and
-  terrain-blow start/completion command evidence plus focused source ecology
-  fixtures for those transitions.
+  is remaining per-family enemy movement/projectile behavior beyond the
+  covered enemy-hit, enemy-shot, player-action, hyperspace
+  shell-cleanup/rematerialize, lander-abduction, astronaut command,
+  shell-collision command, fatal astronaut-impact command, player-death command,
+  terrain-blow start/completion command, and laser-loop movement evidence plus
+  focused source ecology fixtures for those transitions.
 
 Work log:
 
@@ -2557,6 +2560,21 @@ Work log:
   because this is a bounded Step 50 player-action sound-edge slice, not a Step
   50 / Phase 3 closure or R9 finalization. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779326284552149`.
+
+- `2026-05-21 02:28:56 BST` R9-C4 progress slice
+  `source laser loop movement`. Clean player projectiles now use the source
+  `LASR0` / `LASL0` loop shape: five source screen columns per step, no
+  vertical motion, and source right/left edge termination at `0x98` / `0x05`.
+  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
+  projectile --lib`, `cargo test
+  clean_game_applies_playing_controls_through_systems --lib`, `cargo test
+  clean_world_object_evidence_carries_source_motion_words --lib`, targeted
+  `make clean-fidelity SCENARIOS="firing"`, touched-doc `markdownlint`, and
+  `git diff --check`. Broad `cargo test --all-targets`, full `make fidelity`,
+  full all-scenario `make clean-fidelity`, and full clippy remain deferred
+  because this is a bounded Step 50 laser movement slice, not a Step 50 / Phase
+  3 closure or R9 finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779326852491929`.
 
 ## Archived Completed History
 

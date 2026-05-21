@@ -410,15 +410,27 @@ pub struct ProjectileMotionFrame {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ProjectileMotionSystem;
 
+const SOURCE_LASER_STEP_COLUMNS: i8 = 5;
+const SOURCE_RIGHT_LASER_EDGE_X: u8 = 0x98;
+const SOURCE_LEFT_LASER_EDGE_X: u8 = 0x05;
+
 impl ProjectileMotionSystem {
     pub const fn velocity_for_direction(direction: Direction) -> ScreenVelocity {
         match direction {
-            Direction::Left => ScreenVelocity::new(-8, 0),
-            Direction::Right => ScreenVelocity::new(8, 0),
+            Direction::Left => ScreenVelocity::new(-SOURCE_LASER_STEP_COLUMNS, 0),
+            Direction::Right => ScreenVelocity::new(SOURCE_LASER_STEP_COLUMNS, 0),
         }
     }
 
     pub fn step(position: ScreenPosition, velocity: ScreenVelocity) -> ProjectileMotionFrame {
+        if source_laser_reached_screen_edge(position, velocity) {
+            return ProjectileMotionFrame {
+                position,
+                velocity,
+                active: false,
+            };
+        }
+
         let next_x = i16::from(position.x) + i16::from(velocity.dx);
         let next_y = i16::from(position.y) + i16::from(velocity.dy);
         let active = (0..=i16::from(u8::MAX)).contains(&next_x)
@@ -433,6 +445,19 @@ impl ProjectileMotionSystem {
             velocity,
             active,
         }
+    }
+}
+
+const fn source_laser_reached_screen_edge(
+    position: ScreenPosition,
+    velocity: ScreenVelocity,
+) -> bool {
+    if velocity.dx > 0 {
+        position.x >= SOURCE_RIGHT_LASER_EDGE_X
+    } else if velocity.dx < 0 {
+        position.x <= SOURCE_LEFT_LASER_EDGE_X
+    } else {
+        false
     }
 }
 
@@ -1306,26 +1331,44 @@ mod tests {
     fn projectile_motion_system_advances_directional_velocity_and_culls_screen_exit() {
         assert_eq!(
             ProjectileMotionSystem::velocity_for_direction(Direction::Right),
-            ScreenVelocity::new(8, 0)
+            ScreenVelocity::new(5, 0)
         );
         assert_eq!(
             ProjectileMotionSystem::velocity_for_direction(Direction::Left),
-            ScreenVelocity::new(-8, 0)
+            ScreenVelocity::new(-5, 0)
         );
 
         let moved = ProjectileMotionSystem::step(
             ScreenPosition::new(0x40, 0x50),
-            ScreenVelocity::new(8, 0),
+            ScreenVelocity::new(5, 0),
         );
 
-        assert_eq!(moved.position, ScreenPosition::new(0x48, 0x50));
-        assert_eq!(moved.velocity, ScreenVelocity::new(8, 0));
+        assert_eq!(moved.position, ScreenPosition::new(0x45, 0x50));
+        assert_eq!(moved.velocity, ScreenVelocity::new(5, 0));
         assert!(moved.active);
 
-        let off_right =
-            ProjectileMotionSystem::step(ScreenPosition::new(252, 0x50), ScreenVelocity::new(8, 0));
-        let off_left =
-            ProjectileMotionSystem::step(ScreenPosition::new(3, 0x50), ScreenVelocity::new(-8, 0));
+        let right_edge = ProjectileMotionSystem::step(
+            ScreenPosition::new(0x97, 0x50),
+            ScreenVelocity::new(5, 0),
+        );
+        assert_eq!(right_edge.position, ScreenPosition::new(0x9C, 0x50));
+        assert!(right_edge.active);
+
+        let left_edge = ProjectileMotionSystem::step(
+            ScreenPosition::new(0x06, 0x50),
+            ScreenVelocity::new(-5, 0),
+        );
+        assert_eq!(left_edge.position, ScreenPosition::new(0x01, 0x50));
+        assert!(left_edge.active);
+
+        let off_right = ProjectileMotionSystem::step(
+            ScreenPosition::new(0x98, 0x50),
+            ScreenVelocity::new(5, 0),
+        );
+        let off_left = ProjectileMotionSystem::step(
+            ScreenPosition::new(0x05, 0x50),
+            ScreenVelocity::new(-5, 0),
+        );
 
         assert!(!off_right.active);
         assert!(!off_left.active);

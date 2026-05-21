@@ -9577,7 +9577,7 @@ mod tests {
         );
         assert_eq!(
             frame.state.world.projectiles[0].velocity,
-            ScreenVelocity::new(-8, 0)
+            ScreenVelocity::new(-5, 0)
         );
         assert_eq!(
             frame.events.gameplay(),
@@ -9882,7 +9882,7 @@ mod tests {
         });
         let projectile = fired.state.world.projectiles[0];
 
-        assert_eq!(projectile.velocity, ScreenVelocity::new(8, 0));
+        assert_eq!(projectile.velocity, ScreenVelocity::new(5, 0));
         assert_eq!(fired.events.sounds(), &[source_laser_fire_sound_event()]);
         assert!(fired.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_PROJECTILE
@@ -9898,7 +9898,7 @@ mod tests {
 
         assert_eq!(
             moved_projectile.position.x,
-            projectile.position.x.wrapping_add(8)
+            projectile.position.x.wrapping_add(5)
         );
         assert_eq!(moved_projectile.position.y, projectile.position.y);
         assert_eq!(moved_projectile.velocity, projectile.velocity);
@@ -9958,8 +9958,8 @@ mod tests {
     fn clean_game_culls_projectiles_that_leave_the_screen() {
         let mut game = credited_started_game();
         game.state.world.projectiles.push(ProjectileSnapshot {
-            position: ScreenPosition::new(252, 80),
-            velocity: ScreenVelocity::new(8, 0),
+            position: ScreenPosition::new(0x98, 80),
+            velocity: ScreenVelocity::new(5, 0),
         });
 
         let frame = game.step(GameInput::NONE);
@@ -12206,7 +12206,7 @@ mod tests {
         game.baiter_timer_ticks = None;
         game.state.world.projectiles = vec![ProjectileSnapshot {
             position: ScreenPosition::new(0x34, 0x78),
-            velocity: ScreenVelocity::new(8, 0),
+            velocity: ScreenVelocity::new(5, 0),
         }];
 
         game.sync_world_presentation();
@@ -12333,7 +12333,7 @@ mod tests {
             }],
             projectiles: vec![ProjectileSnapshot {
                 position: ScreenPosition::new(0x20, 0x70),
-                velocity: ScreenVelocity::new(8, -1),
+                velocity: ScreenVelocity::new(5, 0),
             }],
             enemy_projectiles: vec![enemy_projectile],
             ..WorldSnapshot::default()
@@ -12366,7 +12366,7 @@ mod tests {
             Some(ObjectEvidenceCategory::PlayerProjectile)
         );
         assert_eq!(details[2].world_position, Some((0x2000, 0x7000)));
-        assert_eq!(details[2].velocity, Some((0x0800, 0xFF00)));
+        assert_eq!(details[2].velocity, Some((0x0500, 0x0000)));
         assert_eq!(
             details[3].object_category,
             Some(ObjectEvidenceCategory::EnemyBomb)
