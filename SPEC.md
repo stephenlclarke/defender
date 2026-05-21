@@ -263,15 +263,16 @@ player through source seek rules, fire source-shaped fireball shells with
 source `USHSND` command evidence, and those enemy projectiles use source
 `SHSCAN` lifetime decrement/wrap behavior, scroll-adjusted fixed-point motion,
 offscreen culling, collision scoring, and player-damage handling with source
-`BKIL` / `AHSND` command evidence when a shell hits the player. Accepted clean
-hyperspace inputs clear active enemy projectiles through the source `HYP02` /
-`KILSHL` shell-list cleanup while leaving player projectiles outside that
-shell-object list. They then reload source rematerialization state from
+`BKIL` / `AHSND` command evidence when a shell hits the player plus source
+`PLEND` / `PDSND` command evidence when the player-hit path starts. Accepted
+clean hyperspace inputs clear active enemy projectiles through the source
+`HYP02` / `KILSHL` shell-list cleanup while leaving player projectiles outside
+that shell-object list. They then reload source rematerialization state from
 the current clean source `SEED`/`HSEED`: the clean camera/background word,
 player X/facing branch, player Y high byte, cleared velocity, and source
 `APSND` appearance command. Their clean `HYP2` tail follows the source
-`LSEED > 0xC0` death-risk branch into the existing player damage path, while
-`0xC0` and below complete safely.
+`LSEED > 0xC0` death-risk branch into the existing player damage path with
+source `PDSND` command evidence, while `0xC0` and below complete safely.
 Clean landers now abduct aligned humans, can carry explicit selected-human
 target state for source-shaped landers, enter the source `LANDG`
 target-approach step only when that selected target passes the source `LANDS0`

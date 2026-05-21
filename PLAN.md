@@ -151,7 +151,9 @@ new source-backed fidelity gap is accepted in `docs/fidelity/gaps.md`.
   placement/velocity bytes, source `PRBST`/`PRBRES` pod reserve restore
   placement/velocity bytes, plus
   source-shell/mine descriptor fixtures for `BMBP1` projectile evidence. They
-  do not yet cover the full attract program, full two-player flow,
+  also surface source `PLEND` / `PDSND` command evidence when the clean
+  player-hit path starts. They do not yet cover the full attract program,
+  full two-player flow,
   tilt/service behavior, or source-faithful
   death/respawn cadence.
 - The clean renderer owns sprite scene contracts and detailed `wgpu` planning.
@@ -1024,7 +1026,8 @@ Object-ecology progress after R9-C4 slices:
   fireball shells, and those enemy projectiles now use source `SHSCAN` lifetime
   decrement/wrap behavior, scroll-adjusted fixed-point motion, offscreen
   culling, collision scoring, player-damage handling with source `BKIL` /
-  `AHSND` command evidence, and source `BMBP1` shell descriptor evidence.
+  `AHSND` command evidence, source `PLEND` / `PDSND` player-hit command
+  evidence, and source `BMBP1` shell descriptor evidence.
 - Clean mutant runtime now carries source-shaped state for active mutants.
   Completed carried-lander abductions consume the passenger and convert that
   lander into a mutant, no-target/no-human landers convert through the same
@@ -1074,7 +1077,8 @@ Object-ecology progress after R9-C4 slices:
   `HSEED >> 1 + YMIN`, player velocity is cleared, and `APSND` surfaces the
   appearance command loaded by that path. The clean `HYP2` tail now treats
   `LSEED > 0xC0` as the source death-risk branch into the existing player
-  damage path while `0xC0` and below complete safely.
+  damage path with source `PDSND` command evidence while `0xC0` and below
+  complete safely.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -1092,8 +1096,8 @@ Object-ecology progress after R9-C4 slices:
   is remaining per-family movement/projectile behavior beyond the covered
   enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup/rematerialize,
   lander-abduction, astronaut command, shell-collision command, and fatal
-  astronaut-impact command evidence plus focused source ecology fixtures for
-  those transitions.
+  astronaut-impact command evidence, and player-death command evidence plus
+  focused source ecology fixtures for those transitions.
 
 Work log:
 
@@ -2479,6 +2483,23 @@ Work log:
   Step 50 fatal-impact command slice, not a Step 50 / Phase 3 closure or R9
   finalization. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779324213060339`.
+
+- `2026-05-21 01:54:16 BST` R9-C4 progress slice
+  `source player-death sound command`. Clean player-hit entry now surfaces the
+  source `PLEND` / `PDSND` command evidence while preserving stock decrement,
+  player explosion spawning, two-player switch routing, game-over sleep
+  routing, and the `HYP2` death-risk branch. Focused validation passed: `cargo
+  fmt --check`, `cargo check`, `cargo test
+  clean_game_player_enemy_final_collision_enters_game_over --lib`, `cargo test
+  clean_game_enemy_projectile_collision_scores_and_destroys_player --lib`,
+  `cargo test clean_game_hyperspace_lseed_high_enters_source_death_path
+  --lib`, targeted `make clean-fidelity SCENARIOS="death hyperspace"`,
+  touched-doc `markdownlint`, and `git diff --check`. Broad `cargo test
+  --all-targets`, full `make fidelity`, full all-scenario `make
+  clean-fidelity`, and full clippy remain deferred because this is a bounded
+  Step 50 player-death command slice, not a Step 50 / Phase 3 closure or R9
+  finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779324665834879`.
 
 ## Archived Completed History
 
