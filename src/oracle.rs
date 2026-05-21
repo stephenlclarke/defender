@@ -527,6 +527,9 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
     if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
         return;
     }
+    if state.attract.shows_hall_of_fame() {
+        return;
+    }
 
     if let Some(text) = source_message_text("CREDV") {
         push_source_message_sprites_with_tint(
@@ -890,7 +893,9 @@ fn push_high_score_entry_underline_sprites(scene: &mut RenderScene, active_initi
 }
 
 fn push_hall_of_fame_display_sprites(scene: &mut RenderScene, state: &GameState) {
-    if state.game_over.hall_of_fame_stall_remaining.is_none() {
+    let shows_attract_hall_of_fame =
+        state.phase == GamePhase::Attract && state.attract.shows_hall_of_fame();
+    if state.game_over.hall_of_fame_stall_remaining.is_none() && !shows_attract_hall_of_fame {
         return;
     }
 
@@ -1425,23 +1430,44 @@ mod tests {
         }));
 
         state.attract = AttractPresentationSnapshot::for_page_frame(441);
-        let instruction_scene = super::adapt_scene(&state, Some(0xC0ED_4410));
-        let instruction_sprites = instruction_scene
+        let hall_scene = super::adapt_scene(&state, Some(0xC0ED_4410));
+        let hall_sprites = hall_scene
             .sprites
             .iter()
             .filter(|sprite| sprite.layer == RenderLayer::Overlay)
             .collect::<Vec<_>>();
-        assert!(instruction_sprites.iter().any(|sprite| {
+        assert!(hall_sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
+                && sprite.position == [96.0, 56.0]
+                && sprite.size == [120.0, 24.0]
+        }));
+        assert!(hall_sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_H
+                && sprite.position == [112.0, 84.0]
+                && sprite.size == [6.0, 8.0]
+        }));
+        assert!(!hall_sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_C && sprite.position == [80.0, 229.0]
+        }));
+
+        state.attract = AttractPresentationSnapshot::for_page_frame(4_200);
+        let scoring_scene = super::adapt_scene(&state, Some(0xC0ED_4200));
+        let scoring_sprites = scoring_scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.layer == RenderLayer::Overlay)
+            .collect::<Vec<_>>();
+        assert!(scoring_sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_S
                 && sprite.position == [134.0, 48.0]
                 && sprite.size == [6.0, 8.0]
         }));
-        assert!(instruction_sprites.iter().any(|sprite| {
+        assert!(scoring_sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_L
                 && sprite.position == [56.0, 112.0]
                 && sprite.size == [6.0, 8.0]
         }));
-        assert!(!instruction_sprites.iter().any(|sprite| {
+        assert!(!scoring_sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
                 || sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP
         }));

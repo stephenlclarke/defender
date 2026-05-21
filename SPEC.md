@@ -40,15 +40,17 @@ accepted final contract is ready for owner review:
   `make clean-fidelity`, `cargo run -- --game-smoke`,
   `cargo run -- --live-smoke`, core-document markdownlint, and
   `git diff --check`.
-- Owner signoff remains pending as B13. Until signoff, changes that alter
-  public contracts, scenario semantics, runtime behavior, or final acceptance
-  evidence must trigger focused checks and, when broad risk is introduced, a
-  renewed full gate.
+- Owner signoff remains pending as B13. Owner review of
+  `docs/start-sequence.gif` reopened visual acceptance for Williams/title
+  colors, Williams handwriting, Defender wordmark coalescence, gameplay
+  sprite/palette fidelity, and the Williams -> High Scores -> scoring/action
+  attract order. Until signoff, changes that alter public contracts, scenario
+  semantics, runtime behavior, or final acceptance evidence must trigger
+  focused checks and, when broad risk is introduced, a renewed full gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite
-count/layer parity, per-scenario offscreen `wgpu` signatures, Williams logo
-table-walker animation, hardware palette/RGB audit residuals, and optional
+count/layer parity, per-scenario offscreen `wgpu` signatures, and optional
 local MAME/reference trace refreshes where local ROM inputs are available.
 
 ## Implementation Rules
@@ -505,8 +507,8 @@ left base `0x1E7B`, with the two source-shaped offset segments `0x5F..0x41`
 and `0x1E..0x00`. Logo/underline palette/blink/color source evidence is
 captured as a visual-state contract for color indices, underline words,
 Williams restore rates, and Hall of Fame blink sleep/color evidence; hardware
-palette-to-RGB rendering remains source-backed render-audit evidence rather
-than a clean gameplay contract. Enemy exhaustion is reported through
+palette-to-RGB rendering remains B13 visual acceptance work rather than a
+closed clean gameplay contract. Enemy exhaustion is reported through
 `WaveSystem`,
 keeping the last-hit frame empty and spawning the next clean wave on the
 following playing frame. It flattens those per-batch records into one

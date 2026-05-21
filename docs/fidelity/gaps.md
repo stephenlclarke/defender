@@ -5,18 +5,20 @@ This file records behavior that must not be guessed in arcade-core code.
 Status as of `2026-05-21`: the accepted red-label target remains the oracle for
 the rewrite. The profiled clean-fidelity gate matches all 12 embedded Phase 1
 scenario input programs, and the R9-E2 full validation gate has passed. Strict
-R9 behavior/evidence blockers are closed through B12; final acceptance is
-pending owner signoff and milestone closeout. Older entries remain closed
-fidelity history, local-reference/tooling notes, archived prototype cleanup, or
-post-acceptance validation records. Historical entries that mention remaining
-blockers describe the state at the time they were written; they are not active
-R9 blockers unless restated in this status block.
+R9 behavior/evidence blockers are closed through B12, but owner review of
+`docs/start-sequence.gif` reopened B13 visual acceptance for the clean renderer:
+Williams/title colors, Williams handwriting, Defender wordmark coalescence,
+gameplay sprite/palette fidelity, and the Williams -> High Scores ->
+scoring/action attract order. Older entries remain closed fidelity history,
+local-reference/tooling notes, archived prototype cleanup, or post-acceptance
+validation records. Historical entries that mention remaining blockers describe
+the state at the time they were written; they are not active R9 blockers unless
+restated in this status block.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items: exact
 per-scenario pixel CRC parity, strict long-scenario sprite count/layer parity,
-per-scenario offscreen `wgpu` signatures, Williams logo table-walker animation,
-hardware palette/RGB audit residuals, and optional local MAME/reference trace
-refreshes where local ROM inputs are available.
+per-scenario offscreen `wgpu` signatures, and optional local MAME/reference
+trace refreshes where local ROM inputs are available.
 
 ## Clean Rewrite Equivalence
 

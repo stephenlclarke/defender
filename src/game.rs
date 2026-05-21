@@ -33,7 +33,8 @@ const START_PLAYFIELD_DELAY_FRAMES: u8 = 2;
 const ATTRACT_PRESENTS_START_FRAME: u16 = 236;
 const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 = 285;
 const ATTRACT_COPYRIGHT_START_FRAME: u16 = 419;
-const ATTRACT_INSTRUCTION_START_FRAME: u16 = 441;
+const ATTRACT_HALL_OF_FAME_START_FRAME: u16 = 441;
+const ATTRACT_SCORING_SEQUENCE_START_FRAME: u16 = 4_200;
 const ATTRACT_LOGO_SLEEP_TICKS: u8 = 2;
 const ATTRACT_PRESENTS_SLEEP_TICKS: u8 = 5;
 const ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS: u8 = 0x30;
@@ -141,6 +142,8 @@ pub enum AttractPresentationPage {
     Presents,
     DefenderWordmark,
     CopyrightWait,
+    HallOfFame,
+    ScoringSequence,
     Instruction,
 }
 
@@ -162,11 +165,17 @@ impl AttractPresentationSnapshot {
 
     pub fn for_page_frame(page_frame: u16) -> Self {
         let (page, source_sleep_ticks, source_stall_ticks) =
-            if page_frame >= ATTRACT_INSTRUCTION_START_FRAME {
+            if page_frame >= ATTRACT_SCORING_SEQUENCE_START_FRAME {
                 (
-                    AttractPresentationPage::Instruction,
+                    AttractPresentationPage::ScoringSequence,
                     Some(ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS),
                     None,
+                )
+            } else if page_frame >= ATTRACT_HALL_OF_FAME_START_FRAME {
+                (
+                    AttractPresentationPage::HallOfFame,
+                    None,
+                    Some(HALL_OF_FAME_STALL_FRAMES),
                 )
             } else if page_frame >= ATTRACT_COPYRIGHT_START_FRAME {
                 (
@@ -232,8 +241,19 @@ impl AttractPresentationSnapshot {
         matches!(self.page, AttractPresentationPage::CopyrightWait)
     }
 
+    pub const fn shows_hall_of_fame(self) -> bool {
+        matches!(self.page, AttractPresentationPage::HallOfFame)
+    }
+
+    pub const fn shows_scoring_sequence_text(self) -> bool {
+        matches!(
+            self.page,
+            AttractPresentationPage::ScoringSequence | AttractPresentationPage::Instruction
+        )
+    }
+
     pub const fn shows_instruction_text(self) -> bool {
-        matches!(self.page, AttractPresentationPage::Instruction)
+        self.shows_scoring_sequence_text()
     }
 }
 
@@ -6867,6 +6887,9 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
     if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
         return;
     }
+    if state.attract.shows_hall_of_fame() {
+        return;
+    }
 
     if let Some(text) = source_message_text("CREDV") {
         push_source_message_sprites_with_tint(
@@ -7248,7 +7271,9 @@ fn push_high_score_entry_underline_sprites(scene: &mut RenderScene, active_initi
 }
 
 fn push_hall_of_fame_display_sprites(scene: &mut RenderScene, state: &GameState) {
-    if state.game_over.hall_of_fame_stall_remaining.is_none() {
+    let shows_attract_hall_of_fame =
+        state.phase == GamePhase::Attract && state.attract.shows_hall_of_fame();
+    if state.game_over.hall_of_fame_stall_remaining.is_none() && !shows_attract_hall_of_fame {
         return;
     }
 
@@ -9186,10 +9211,22 @@ mod tests {
         );
         assert!(copyright.shows_copyright());
 
-        let instruction = AttractPresentationSnapshot::for_page_frame(441);
-        assert_eq!(instruction.page, AttractPresentationPage::Instruction);
-        assert!(instruction.shows_instruction_text());
-        assert!(!instruction.shows_williams_logo());
+        let hall_of_fame = AttractPresentationSnapshot::for_page_frame(441);
+        assert_eq!(hall_of_fame.page, AttractPresentationPage::HallOfFame);
+        assert_eq!(hall_of_fame.source_sleep_ticks, None);
+        assert_eq!(
+            hall_of_fame.source_stall_ticks,
+            Some(HALL_OF_FAME_STALL_FRAMES)
+        );
+        assert!(hall_of_fame.shows_hall_of_fame());
+        assert!(!hall_of_fame.shows_williams_logo());
+        assert!(!hall_of_fame.shows_instruction_text());
+
+        let scoring = AttractPresentationSnapshot::for_page_frame(4_200);
+        assert_eq!(scoring.page, AttractPresentationPage::ScoringSequence);
+        assert!(scoring.shows_scoring_sequence_text());
+        assert!(scoring.shows_instruction_text());
+        assert!(!scoring.shows_hall_of_fame());
     }
 
     #[test]
@@ -9217,11 +9254,27 @@ mod tests {
         }));
 
         game.state.attract = AttractPresentationSnapshot::for_page_frame(441);
-        let instruction_scene = game.scene();
-        assert!(instruction_scene.sprites.iter().any(|sprite| {
+        let hall_scene = game.scene();
+        assert!(hall_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO && sprite.position == [96.0, 56.0]
+        }));
+        assert!(hall_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_H && sprite.position == [112.0, 84.0]
+        }));
+        assert!(!hall_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_C && sprite.position == [80.0, 229.0]
+        }));
+        assert!(!hall_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
+                || sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP
+        }));
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(4_200);
+        let scoring_scene = game.scene();
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [134.0, 48.0]
         }));
-        assert!(!instruction_scene.sprites.iter().any(|sprite| {
+        assert!(!scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
                 || sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP
         }));

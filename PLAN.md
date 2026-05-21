@@ -760,21 +760,18 @@ Phase 5: final render parity and acceptance.
 
 R9-E3 corrective visual acceptance schedule:
 
-- R9-E3.1: reference comparison and acceptance reset. Record
-  `docs/start-sequence.gif` as the immediate visual reference for Step 55, mark
-  the earlier post-R9 classification of Williams/palette/sprite polish as
-  superseded for owner acceptance, and keep B01-B12 closed only for their
-  previously validated behavior/evidence surfaces. Validation: markdownlint for
-  touched docs and `git diff --check`.
-- R9-E3.2: clean attract order repair. Change the clean attract presentation
-  state machine so the visible loop follows Williams title/coalescence -> Hall
-  of Fame -> scoring/action sequence instead of falling through to the current
-  static instruction page. Reuse the existing Hall of Fame display renderer
-  where possible, add explicit clean tests for the page order, and run focused
-  `cargo test clean_attract --lib`, `cargo test
-  oracle_scene_projects_attract_credit_text_sprites --lib` if oracle scene
-  mirrors change, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
-  `git diff --check`.
+- R9-E3.1: reference comparison and acceptance reset. Completed 2026-05-21.
+  `docs/start-sequence.gif` is the immediate visual reference for Step 55. The
+  earlier post-R9 classification of Williams/palette/sprite polish is
+  superseded for owner acceptance, while B01-B12 stay closed only for their
+  previously validated behavior/evidence surfaces.
+- R9-E3.2: clean attract order repair. Completed 2026-05-21. Clean
+  `AttractPresentationSnapshot` now orders title/copyright surfaces before an
+  attract Hall of Fame page and delays the existing scoring/action text surface
+  until the later scoring-sequence page. The clean and oracle scenes reuse the
+  Hall of Fame display renderer during the attract Hall of Fame page and
+  suppress title credits on that page. Focused tests cover the new page order
+  and rendered surfaces.
 - R9-E3.3: Williams handwritten logo and color cadence. Replace the clean
   static Williams-title sprite path with source-table-walker rendering based on
   `LGOTAB`/`WILLIR` evidence, with frame-gated draw progress and source-backed
@@ -3043,6 +3040,26 @@ Work log:
   broad validation remains deferred until the corrective visual implementation
   reaches R9-E3.7 or an earlier shared contract/runtime change introduces broad
   risk.
+
+- `2026-05-21 20:39:29 BST` Completed R9-E3.1 and R9-E3.2 visual acceptance
+  repair slice. README, SPEC, `docs/fidelity/gaps.md`, and this plan now state
+  that Williams/logo, palette, sprite, and attract-order fidelity are active
+  B13 visual acceptance work rather than post-R9 polish. Clean and oracle
+  attract presentation now add explicit Hall of Fame and scoring-sequence
+  pages: the visible title/copyright surfaces lead into the Hall of Fame table,
+  credits are suppressed on that Hall of Fame page, and the existing
+  scoring/action text surface is delayed to the later scoring-sequence page.
+  Focused validation passed with `cargo fmt --check`, `cargo check`, `cargo
+  test clean_attract --lib`, `cargo test
+  oracle_scene_projects_attract_credit_text_sprites --lib --features
+  legacy-tools`, targeted `make clean-fidelity SCENARIOS="attract_boot"`
+  matching 900/900 frames, `cargo test --all-targets`, core-doc markdownlint,
+  and `git diff --check`. Full `make fidelity`, full all-scenario
+  `make clean-fidelity`, full clippy, and live/game smoke remain deferred
+  because this was the first bounded visual-order repair, not the R9-E3.7
+  visual closeout gate. The next full gate should run at R9-E3.7 or sooner if
+  the Williams handwriting, Defender coalescence, sprite/palette, or
+  scoring/action slices introduce broad runtime risk.
 
 ## Archived Completed History
 
