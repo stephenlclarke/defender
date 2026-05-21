@@ -12585,7 +12585,8 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.phase, GamePhase::GameOver);
+        assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
         assert_eq!(frame.state.player.lives, 1);
         assert_eq!(
             frame.state.player.position,
@@ -14160,6 +14161,26 @@ mod tests {
         assert_eq!(switched.state.current_player, 1);
         assert_eq!(switched.state.player.lives, 1);
         assert_eq!(switched.state.player.smart_bombs, 1);
+        assert_eq!(switched.state.world, WorldSnapshot::default());
+        assert_eq!(
+            game.start_playfield_delay,
+            Some(START_PLAYFIELD_DELAY_FRAMES)
+        );
+
+        let active = advance_to_started_playfield(&mut game);
+
+        assert_eq!(active.state.phase, GamePhase::Playing);
+        assert_eq!(active.state.current_player, 1);
+        assert_eq!(active.state.player.lives, 0);
+        assert_eq!(active.state.player.smart_bombs, 1);
+        assert_eq!(
+            active.state.player_stocks,
+            [
+                PlayerStockSnapshot::new(0, 1),
+                PlayerStockSnapshot::new(0, 2),
+            ]
+        );
+        assert_eq!(active.state.world.enemies.len(), 5);
     }
 
     #[test]

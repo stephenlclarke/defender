@@ -823,6 +823,16 @@ post-acceptance validation records.
   high score, bonus threshold, and frame-boundary life/smart-bomb stock update
   together. The current-second-player high-score fixture now models an actual
   two-player final-session route with player one out of stock.
+- `2026-05-21 09:02:00 BST`: R9-D1.3 closes B09 two-player flow. The closure
+  audit found one remaining fixture gap: the second-player final-life
+  switch-back test stopped before the following player-one start cadence. That
+  fixture now advances through the player-start handoff, proves player-one stock
+  decrement, preserves exhausted player-two stock, and starts the playfield.
+  The hyperspace source-death fixture now also expects the D1 death-cloud pause
+  for non-final deaths.
+  Together with the existing final-life switch, non-final rotation,
+  post-rotation score/bonus ownership, no-other-stock game-over, and
+  current-player high-score routing fixtures, Step 51/B09 is closed.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

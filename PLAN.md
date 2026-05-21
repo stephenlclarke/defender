@@ -702,11 +702,12 @@ Phase 4: session and high-score closure.
   bonus threshold, and life/smart-bomb stock update together. The
   current-second-player high-score fixture now models an actual two-player
   final-session route with player one out of stock.
-- R9-D1.3: Step 51 / B09 closure gate. Pending. Audit whether the existing
-  final-life switch, non-final rotation, high-score-current-player, and
-  post-rotation ownership fixtures cover all remaining two-player turn/session
-  routes. Add only a source-backed fixture if the audit exposes a concrete route
-  gap, then close B09 with the phase-level validation gate.
+- R9-D1.3: Step 51 / B09 closure gate. Completed 2026-05-21. The audit found
+  one fixture gap: the second-player final-life switch-back path stopped before
+  the following player-one start cadence. The existing fixture now advances
+  through the player-start handoff, proves player-one stock decrement, preserves
+  player-two exhausted stock, and starts the playfield. B09 is closed; Step 52 /
+  R9-D2 is the next active roadmap step.
 - Step 52 / Cycle R9-D2: high-score ordering and post-entry return. Prove
   source-backed table ordering, initials insertion, today's-greatest behavior,
   post-entry display timing, and return-to-attract behavior across one-player
@@ -738,7 +739,7 @@ Strict R9 blocker matrix after Step 41:
 | B06 | Explosions | clean behavior | 48 | frame progression tested |
 | B07 | Terrain blow | clean/render | 49 | mutation/presentation tested |
 | B08 | Object ecology | clean behavior | 50 | closed 2026-05-21 |
-| B09 | Two-player flow | clean behavior | 51 | turn/stock routing tested |
+| B09 | Two-player flow | clean behavior | 51 | closed 2026-05-21 |
 | B10 | High-score return | clean/accepted | 52 | tables and return tested |
 | B11 | Render audit | docs/evidence | 53 | residuals source-backed |
 | B12 | Full validation | docs/evidence | 54 | full R9 gate passes |
@@ -771,7 +772,7 @@ Accepted-surface audit after Step 42:
 | B06 | expanded explosion rows | explosion frame/timer state |
 | B07 | mapped terrain explosion sprite | terrain mutation/blow state |
 | B08 | bounded object rows, wave profile | full topology and transitions |
-| B09 | current player, stocks, switch timers | full turn/session fixtures |
+| B09 | current player, stocks, switch timers | closed by Step 51 fixtures |
 | B10 | entry, submission, tables, stalls | ordering and return fixtures |
 | B11 | visual signature, clean scene | post-B01-B10 visual residuals |
 | B12 | validation commands only | full R9 gate run |
@@ -2858,6 +2859,19 @@ Work log:
   stock-accounting/game-over fixture slice with no runtime or public snapshot
   shape change. The next full gate should run when R9-D1 closes, a public
   contract changes, or R9 reaches Step 54.
+
+- `2026-05-21 09:02:00 BST` Completed R9-D1.3 and closed Step 51 / B09. The
+  closure audit found one route fixture gap in the second-player final-life
+  switch-back test: it proved the switch sleep but not the following player-one
+  start cadence. The fixture now advances through the player-start handoff,
+  proves player-one stock decrements to zero, preserves player-two exhausted
+  stock, and starts the playfield. The closure gate also updated the hyperspace
+  source-death fixture to expect the D1 death-cloud pause for non-final deaths.
+  Existing D1 fixtures cover two-player start admission/top display, final-life
+  switch in both directions, non-final death-cloud rotation, post-rotation
+  score/bonus stock ownership, final game-over routing when no other stock
+  remains, and current-player high-score routing. B09 is closed; Step 52 / R9-D2
+  high-score ordering and post-entry return is the next active roadmap step.
 
 ## Archived Completed History
 

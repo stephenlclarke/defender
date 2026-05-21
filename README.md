@@ -204,10 +204,8 @@ hit sound-command evidence, source-backed
 enemy-projectile collision sound-command evidence, and source `BORDER`
 top-display frame geometry; lifecycle transitions outside the score-popup,
 `EXST`/`EXPU` expanded-object explosion, player-death pixel-cloud,
-terrain-blow, and covered enemy-hit/projectile-collision command surfaces,
-remaining two-player session flow beyond the source-backed final-life
-switch/respawn, non-final death-rotation, and post-rotation stock/score ownership
-slices,
+terrain-blow, covered enemy-hit/projectile-collision command surfaces, and
+covered two-player turn/session routing,
 wave-completion survivor-bonus loop/cadence beyond current presentation, live
 Williams logo table-walker animation, hardware palette/RGB render audit
 residuals, and full visual presentation remain strict R9 blockers.
@@ -218,7 +216,10 @@ source message-glyph prompt are now clean-owned. Non-final player deaths now
 pause active play through the source-backed player-death cloud, then respawn the
 next stocked player through the existing player-start handoff; score and replay
 bonus awards sync the active player's public stock snapshot so player-one and
-player-two stock ownership stays isolated after rotation. The final
+player-two stock ownership stays isolated after rotation. Second-player
+final-life switch-back follows the same player-start handoff and stock decrement
+path for player one, and final two-player game-over routes high-score entry from
+the current player's score. The final
 player-death
 game-over sleep also draws the source `GAME OVER` prompt at the translated
 `PLE2` screen position, and active
@@ -550,7 +551,9 @@ and focused unit tests, and targeted source ecology fixture hardening matches
 the `start_game`, `smart_bomb`, `hyperspace`, `abduction`, `death`,
 `wave_advance`, and `planet_destruction` clean-fidelity scenarios. The R9-C4.5
 closure gate closes Step 50/B08 without exposing drift, so R9-C4.2 stayed
-unused and the next strict R9 behavior work is Step 51/R9-D1 two-player flow.
+unused. Step 51/R9-D1 now closes B09 two-player flow with focused fixtures for
+final-life switch in both directions, non-final death rotation, stock and score
+ownership, and current-player final game-over/high-score routing.
 Clean
 smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave
@@ -673,9 +676,7 @@ presentation evidence, expanded-object appearance/explosion slots as sprite
 presentation evidence, and source `BORDER` top-display frame geometry, but
 clean gameplay lifecycle behavior outside the source-backed score-popup
 surface, source expanded-object explosion timing, and source-backed
-player-death pixel-cloud and terrain-blow surfaces, remaining two-player
-session flow beyond the final-life switch/respawn handoff and non-final
-death-rotation handoff,
+player-death pixel-cloud and terrain-blow surfaces,
 wave-completion survivor-bonus loop/cadence beyond current presentation, live
 Williams logo table-walker animation, exact palette-to-RGB rendering, and
 broader render presentation parity remain unmapped.
@@ -736,7 +737,8 @@ sprites, two-player credited-start admission initializes the two-player top
 display, and final-life two-player handoff follows the source `PLE02` switch
 sleep before respawning the other player. Non-final deaths now wait through the
 player-death cloud and rotate to the next stocked player before the clean
-player-start handoff. New sprite
+player-start handoff. Two-player stock, score, switch, and final game-over
+routing is covered by focused B09 fixtures. New sprite
 files should stay under `assets/sprites/`, new non-legacy sound artifacts should
 stay under `assets/sounds/`, and pre-existing legacy `.wav` cues should remain
 under
