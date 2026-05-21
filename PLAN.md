@@ -854,7 +854,27 @@ Reopened B13 repair schedule:
   Williams -> High Scores -> scoring sequence. Use source waits and
   pre-rewrite trace behavior to align page lengths, object placement, scoring
   card reveal, demo sprites, terrain, scanner blips, and wrap back to Williams.
-- R9-E3.13: candidate media gate and owner review. Generate a clean candidate
+  Completed 2026-05-21. The README media generator now preserves sampled
+  attract cadence instead of collapsing repeated frames, the candidate matches
+  the protected reference at 347 frames / 4600cs, the Williams/title page no
+  longer carries score HUD or zero-credit text, attract credits are limited to
+  Hall of Fame / scoring contexts unless credits are nonzero, and Hall of Fame
+  text now uses the source `0x85` entry/blink color evidence. B13 remains open:
+  the latest reference/candidate contact sheet still shows Williams
+  color/handwriting drift, incomplete Defender coalescence parity, and
+  scoring sprite/terrain palette and placement drift.
+- R9-E3.13: title color and coalescence visual pass. Use the protected GIF,
+  red-label `LOGO`/`LOGO0`, `CBOMB`/`CBMB1`, `DEFENS`, `DEF33`/`DEF50`, and
+  `WILLIR`/`WILR1` evidence plus pre-rewrite trace behavior to repair the
+  remaining Williams color cadence and Defender appearance/coalescence
+  geometry. Add focused scene/atlas/media tests that fail on uniform title
+  tint or non-source coalescence cadence.
+- R9-E3.14: scoring sprite, scanner, and terrain visual pass. Compare the
+  protected scoring-sequence frames against clean candidate frames and repair
+  the remaining source sprite palettes, score-card object placement, scanner
+  colors, and terrain/ground visual drift without reopening broad gameplay
+  ecology unless a runtime scenario field changes.
+- R9-E3.15: candidate media gate and owner review. Generate a clean candidate
   without overwriting the protected reference, compare it to the restored GIF,
   run focused visual tests plus targeted clean-fidelity scenarios affected by
   the changes, then run the broad R9 closeout gate once this phase is ready.
@@ -3243,7 +3263,7 @@ Work log:
   sampled RMS mismatches across full, title, Hall of Fame, numeric glyph,
   sprite, terrain, and scoring regions. Broad all-target/all-scenario gates
   remain deferred because B13 is still in the middle of bounded visual repair.
-  The next full gate should run at R9-E3.13 candidate closeout, or sooner if
+  The next full gate should run at R9-E3.15 candidate closeout, or sooner if
   the numeric glyph/sprite/terrain/timing repairs change shared contracts.
 
 - `2026-05-21 23:32:17 BST` Completed R9-E3.10 source text and numeric glyph
@@ -3264,7 +3284,7 @@ Work log:
   RMS full 52.52, title 62.84, Hall of Fame 63.88, numeric glyphs 72.64,
   sprites 44.89, terrain 46.39, and scoring 55.09. Broad all-target and
   all-scenario gates remain deferred because this is still a bounded B13 visual
-  repair slice. The next full gate should run at R9-E3.13 candidate closeout,
+  repair slice. The next full gate should run at R9-E3.15 candidate closeout,
   or sooner if source sprite/terrain/timing work changes shared contracts.
 
 - `2026-05-21 23:32:23 BST` Completed R9-E3.11 source sprite and
@@ -3282,8 +3302,33 @@ Work log:
   of Fame 63.88, numeric glyphs 72.64, sprites 44.89, terrain 41.87, and
   scoring 55.09. Broad all-target and all-scenario gates remain deferred
   because this is still a bounded B13 visual repair slice. The next full gate
-  should run at R9-E3.13 candidate closeout, or sooner if R9-E3.12 timing work
-  changes shared contracts.
+  should run at R9-E3.15 candidate closeout, or sooner if timing/title/scoring
+  visual work changes shared contracts.
+
+- `2026-05-21 23:56:29 BST` Completed R9-E3.12 attract timing and
+  scoring/action cadence repair. README media generation now preserves the
+  sampled frame cadence while merging the initial reference hold, so the clean
+  candidate matches the protected original at 347 frames and 4600cs. The
+  Williams/title page no longer renders the score HUD or zero-credit text, the
+  attract credit line is limited to Hall of Fame / scoring contexts unless a
+  real credit is present, and Hall of Fame display/entry/blink text uses the
+  source `0x85` color evidence. Focused validation passed with
+  `cargo fmt --check`, `cargo check`, the focused README media cadence test,
+  focused source visual-state, attract scene, credit, score-digit, and scoring
+  sequence unit tests, targeted
+  `make clean-fidelity SCENARIOS="attract_boot"`, and `make readme-media`.
+  Candidate metrics remain failed B13 evidence even though timing now matches:
+  sampled RMS full 49.21, title 56.66, Hall of Fame 61.87, numeric glyphs
+  61.73, sprites 47.58, terrain 41.62, and scoring 53.98. A protected
+  reference versus candidate contact sheet still shows Williams
+  color/handwriting drift,
+  Defender coalescence mismatch, and scoring sprite/terrain palette and
+  placement drift, so the candidate gate has been moved to R9-E3.15 after
+  dedicated R9-E3.13/R9-E3.14 visual repairs. Broad all-target and
+  all-scenario gates remain deferred because this was a bounded visual/media
+  repair slice. The next full gate should run at R9-E3.15 candidate closeout,
+  or sooner if the title or scoring visual repairs change shared contracts or
+  broad scenario behavior.
 
 ## Archived Completed History
 

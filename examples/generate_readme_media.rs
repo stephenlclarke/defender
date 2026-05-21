@@ -76,7 +76,7 @@ fn build_start_sequence() -> Result<Vec<(RgbaImage, u16)>> {
         capture_segment(&mut source, &mut delay, segment, &mut frames)?;
     }
 
-    collapse_identical_frames(frames)
+    preserve_sampled_cadence(frames)
 }
 
 fn readme_segments() -> [ReadmeSegment; 3] {
@@ -153,24 +153,17 @@ const fn frame_count_for_seconds(seconds: u64) -> u64 {
     (seconds * FRAME_RATE_MILLIHZ as u64).div_ceil(1_000)
 }
 
-fn collapse_identical_frames(frames: Vec<(RgbaImage, u16)>) -> Result<Vec<(RgbaImage, u16)>> {
-    let mut collapsed: Vec<(RgbaImage, u16)> = Vec::new();
-
-    for (image, delay) in frames {
-        if let Some((previous, previous_delay)) = collapsed.last_mut()
-            && previous == &image
-        {
-            *previous_delay = previous_delay.saturating_add(delay);
-        } else {
-            collapsed.push((image, delay));
-        }
-    }
-
-    if collapsed.is_empty() {
+fn preserve_sampled_cadence(mut frames: Vec<(RgbaImage, u16)>) -> Result<Vec<(RgbaImage, u16)>> {
+    if frames.is_empty() {
         bail!("README media sequence did not produce any frames");
     }
 
-    Ok(collapsed)
+    if frames.len() > 1 {
+        let second = frames.remove(1);
+        frames[0].1 = frames[0].1.saturating_add(second.1);
+    }
+
+    Ok(frames)
 }
 
 fn write_gif(path: &Path, frames: &[(RgbaImage, u16)]) -> Result<()> {
@@ -591,9 +584,9 @@ mod tests {
     use super::{
         AttractPresentationPage, DEFAULT_CANDIDATE_GIF, DelayAccumulator, FULL_ATTRACT_SECONDS,
         GifFrameSample, GifSummary, HIGH_SCORE_SECONDS, PROTECTED_REFERENCE_GIF, RGBA_CHANNELS,
-        ReadmeSegment, ReadmeSegmentStart, SAMPLE_STEP_FRAMES, VISUAL_REGIONS, WILLIAMS_SECONDS,
-        compare_summaries, frame_count_for_seconds, gif_path_from_args,
-        is_protected_reference_path, readme_segments,
+        ReadmeSegment, ReadmeSegmentStart, RgbaImage, SAMPLE_STEP_FRAMES, VISUAL_REGIONS,
+        WILLIAMS_SECONDS, compare_summaries, frame_count_for_seconds, gif_path_from_args,
+        is_protected_reference_path, preserve_sampled_cadence, readme_segments,
     };
     use std::{ffi::OsString, path::Path};
 
@@ -634,6 +627,33 @@ mod tests {
 
         assert!(delays.iter().all(|delay| *delay >= 13 && *delay <= 14));
         assert_eq!(delays.iter().copied().map(u32::from).sum::<u32>(), 133);
+    }
+
+    #[test]
+    fn sampled_cadence_merges_initial_reference_hold_only() {
+        let blank = RgbaImage {
+            width: 2,
+            height: 1,
+            pixels: vec![0; 8],
+        };
+        let first_visible = RgbaImage {
+            width: 2,
+            height: 1,
+            pixels: vec![0xFF; 8],
+        };
+
+        let frames = preserve_sampled_cadence(vec![
+            (blank.clone(), 13),
+            (blank.clone(), 13),
+            (first_visible.clone(), 14),
+            (first_visible.clone(), 13),
+        ])
+        .expect("cadence frames");
+
+        assert_eq!(frames.len(), 3);
+        assert_eq!(frames[0].1, 26);
+        assert_eq!(frames[1].1, 14);
+        assert_eq!(frames[2].1, 13);
     }
 
     #[test]

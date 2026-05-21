@@ -54,14 +54,19 @@ R9-E3.7 clean media:
   owner has explicitly approved replacing the reference. R9-E3.9 now sources
   the Williams/Defender title surface from `LGOTAB`, `DEFENS`, `DEF33`,
   `DEF50`, `APVCT`, and `WILLIR`/`WILR1` descriptor evidence; the remaining
-  B13 work is sprite/terrain repair, attract timing, candidate comparison, and
-  owner acceptance. R9-E3.10 now decodes the source `NUMBR0`-`NUMBR9` numeric
+  B13 work is title color/coalescence polish, scoring sprite/terrain visual
+  repair, candidate comparison, and owner acceptance. R9-E3.10 now decodes the
+  source `NUMBR0`-`NUMBR9` numeric
   glyph records in source column-major order for score, credit, Hall of Fame,
   and scoring/action text surfaces. R9-E3.11 now draws terrain/ground from the
   source `TDATA` terrain stream and source `BGINIT`/`BGOUT` 0x98-word output
   table instead of the font-sheet terrain helper; gameplay and attract scoring
   use the source terrain projection, while Williams/title and Hall of Fame pages
-  do not inherit gameplay ground. Until signoff, changes that alter public
+  do not inherit gameplay ground. R9-E3.12 aligns candidate media cadence with
+  the protected reference at 347 frames / 4600cs and suppresses stray
+  Williams-title score HUD / zero-credit text, but the latest contact sheet
+  still shows title color/coalescence and scoring visual drift. Until signoff,
+  changes that alter public
   contracts, scenario semantics, runtime behavior, or final acceptance evidence
   must trigger focused checks and, when broad risk is introduced, a renewed full
   gate.
@@ -494,7 +499,9 @@ before the clean game returns to attract. Submitted initials insert into both
 all-time and today's-greatest tables by score rank while preserving the
 current-player submission metadata. Normal attract scenes draw the
 source-backed `CREDV` credits label at `0x28E5` and the visible credit count
-digits at `0x48E5`. The title program is gated by
+digits at `0x48E5` during Hall of Fame / scoring contexts and whenever a real
+credit exists; the zero-credit line is suppressed on the Williams title pages.
+The title program is gated by
 `AttractPresentationSnapshot`: the source `LGOTAB` Williams logo appears first
 at `0x363C`, `ELECV` presents copy appears at `0x3258`/`0x3E6C`, the Defender
 wordmark coalesces through the 15 source `DEFENS` 4-byte by 12-row `APVCT`
@@ -508,7 +515,10 @@ instruction-page `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and
 scoring/action page replays the source instruction-page rescue sequence,
 scanner blips, player laser, 500-point rescue popup, and `ENMYTB` enemy
 score-card reveal before cycling back to the Williams page. This projection is
-suppressed during the hall-of-fame display stall. During a pending two-player
+suppressed during the hall-of-fame display stall. README media captures now
+preserve sampled frame cadence and match the protected reference duration and
+frame count, but B13 still requires title color/coalescence and scoring visual
+repair before owner acceptance. During a pending two-player
 start handoff, scenes
 draw the source-backed `PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,

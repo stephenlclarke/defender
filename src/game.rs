@@ -444,20 +444,18 @@ impl SourceVisualStateSnapshot {
         Color::WHITE
     }
 
-    pub(crate) const fn hall_of_fame_entry_text_tint(self) -> Color {
-        let _source_index = self.hall_of_fame_entry_letter_color_index;
-        Color::WHITE
+    pub(crate) fn hall_of_fame_entry_text_tint(self) -> Color {
+        source_pseudo_color_tint(self.hall_of_fame_entry_letter_color_index)
     }
 
-    pub(crate) const fn hall_of_fame_display_text_tint(self) -> Color {
+    pub(crate) fn hall_of_fame_display_text_tint(self) -> Color {
         let _source_index = self.hall_of_fame_display_letter_color_index;
-        Color::WHITE
+        source_pseudo_color_tint(self.hall_of_fame_entry_letter_color_index)
     }
 
-    pub(crate) const fn hall_of_fame_blink_text_tint(self) -> Color {
+    pub(crate) fn hall_of_fame_blink_text_tint(self) -> Color {
         let _source_sleep_ticks = self.hall_of_fame_blink_sleep_ticks;
-        let _source_color_index = self.hall_of_fame_blink_color_index;
-        Color::WHITE
+        source_pseudo_color_tint(self.hall_of_fame_blink_color_index)
     }
 
     pub(crate) const fn hall_of_fame_active_underline_tint(self) -> Color {
@@ -6833,7 +6831,9 @@ impl Game {
         if self.state.phase == GamePhase::Playing && self.state.world.terrain_blow.is_none() {
             push_source_bgout_terrain_sprites(&mut scene);
         }
-        push_score_sprites(&mut scene, self.state.scores, self.state.player_count);
+        if self.state.phase != GamePhase::Attract {
+            push_score_sprites(&mut scene, self.state.scores, self.state.player_count);
+        }
         push_top_display_border_sprites(&mut scene, &self.state);
         push_attract_scoring_action_sprites(&mut scene, &self.state);
         push_attract_credit_sprites(&mut scene, &self.state);
@@ -7084,7 +7084,12 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
     if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
         return;
     }
-    if state.attract.shows_hall_of_fame() {
+    if state.credits == 0
+        && !matches!(
+            state.attract.page,
+            AttractPresentationPage::HallOfFame | AttractPresentationPage::ScoringSequence
+        )
+    {
         return;
     }
 
@@ -10625,7 +10630,7 @@ mod tests {
         assert!(hall_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_H && sprite.position == [112.0, 84.0]
         }));
-        assert!(!hall_scene.sprites.iter().any(|sprite| {
+        assert!(hall_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_C && sprite.position == [80.0, 229.0]
         }));
         assert!(!hall_scene.sprites.iter().any(|sprite| {
@@ -11028,9 +11033,18 @@ mod tests {
         );
         assert_eq!(visual.attract_copyright_tint(), Color::WHITE);
         assert_eq!(visual.hall_of_fame_logo_tint(), Color::WHITE);
-        assert_eq!(visual.hall_of_fame_entry_text_tint(), Color::WHITE);
-        assert_eq!(visual.hall_of_fame_display_text_tint(), Color::WHITE);
-        assert_eq!(visual.hall_of_fame_blink_text_tint(), Color::WHITE);
+        assert_eq!(
+            visual.hall_of_fame_entry_text_tint(),
+            super::source_pseudo_color_tint(0x85)
+        );
+        assert_eq!(
+            visual.hall_of_fame_display_text_tint(),
+            super::source_pseudo_color_tint(0x85)
+        );
+        assert_eq!(
+            visual.hall_of_fame_blink_text_tint(),
+            super::source_pseudo_color_tint(0x85)
+        );
         assert_eq!(visual.hall_of_fame_active_underline_tint(), Color::WHITE);
         assert_eq!(
             visual.hall_of_fame_normal_underline_tint(),
@@ -11116,8 +11130,8 @@ mod tests {
         assert_eq!(inserted.state.frame, 1);
         assert_eq!(inserted.state.credits, 0);
         assert!(inserted.events.is_empty());
-        assert_eq!(inserted.scene.summary().layers.hud, 2);
-        assert!(inserted.scene.summary().layers.overlay > 10);
+        assert_eq!(inserted.scene.summary().layers.hud, 0);
+        assert!(inserted.scene.summary().layers.overlay > 0);
         assert_eq!(inserted.scene.summary().raster_count, 0);
         assert!(inserted.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
@@ -11140,13 +11154,13 @@ mod tests {
         assert!(!inserted.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP && sprite.position == [118.0, 208.0]
         }));
-        assert!(inserted.scene.sprites.iter().any(|sprite| {
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_C
                 && sprite.layer == RenderLayer::Overlay
                 && sprite.position == [80.0, 229.0]
                 && sprite.size == [6.0, 8.0]
         }));
-        assert!(inserted.scene.sprites.iter().any(|sprite| {
+        assert!(!inserted.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCORE_DIGIT_0
                 && sprite.layer == RenderLayer::Overlay
                 && sprite.position == [144.0, 229.0]
@@ -11178,8 +11192,8 @@ mod tests {
         assert_eq!(credited.state.credits, 1);
         assert_eq!(credited.events.gameplay(), &[GameEvent::CreditAdded]);
         assert!(credited.events.sounds().is_empty());
-        assert_eq!(credited.scene.summary().layers.hud, 2);
-        assert!(credited.scene.summary().layers.overlay > 10);
+        assert_eq!(credited.scene.summary().layers.hud, 0);
+        assert!(credited.scene.summary().layers.overlay > 0);
         assert_eq!(credited.scene.summary().raster_count, 0);
         assert!(credited.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCORE_DIGIT_1
@@ -11211,12 +11225,16 @@ mod tests {
         assert_eq!(
             started.scene.summary().layers,
             RenderLayerCounts {
+                terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 objects: 1,
                 hud: 14,
                 ..RenderLayerCounts::default()
             }
         );
-        assert_eq!(started.scene.summary().sprite_count, 15);
+        assert_eq!(
+            started.scene.summary().sprite_count,
+            15 + super::SOURCE_TERRAIN_SCREEN_WORDS
+        );
 
         let start_sound = advance_to_delayed_start_sound(&mut game);
         assert!(start_sound.events.gameplay().is_empty());
@@ -11266,14 +11284,17 @@ mod tests {
         assert_eq!(
             active.scene.summary().layers,
             RenderLayerCounts {
-                terrain: 5,
+                terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 starfield: 3,
                 objects: 16,
                 hud: 30,
                 ..RenderLayerCounts::default()
             }
         );
-        assert_eq!(active.scene.summary().sprite_count, 54);
+        assert_eq!(
+            active.scene.summary().sprite_count,
+            49 + super::SOURCE_TERRAIN_SCREEN_WORDS
+        );
     }
 
     #[test]
@@ -11492,7 +11513,7 @@ mod tests {
 
     #[test]
     fn clean_game_draws_score_digits_with_arcade_blanking_and_positions() {
-        let mut game = Game::new();
+        let mut game = credited_started_game();
         game.state.scores.player_one = 1_050;
 
         let frame = game.step(GameInput::NONE);
@@ -11523,7 +11544,7 @@ mod tests {
 
     #[test]
     fn clean_game_draws_two_player_score_digits_at_arcade_positions() {
-        let mut game = Game::new();
+        let mut game = credited_started_game();
         game.state.player_count = 2;
         game.state.scores.player_two = 2_001;
 

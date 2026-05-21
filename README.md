@@ -50,8 +50,11 @@ title projection back onto source `LGOTAB`/`DEFENS` descriptor evidence, but
 R9-E3.10 has repaired source numeric digit decoding. R9-E3.11 has replaced the
 remaining font-sheet terrain helper with source `TDATA`/`BGINIT`/`BGOUT`
 terrain-word projection and removed stray gameplay ground from non-scoring
-attract pages. Attract timing/scoring flow and final media acceptance remain
-open.
+attract pages. R9-E3.12 now matches the protected GIF frame cadence and total
+delay at 347 frames / 4600cs, suppresses stray title HUD/zero-credit text, and
+uses source Hall of Fame color evidence. Final B13 visual acceptance remains
+open for Williams color/handwriting cadence, Defender coalescence parity, and
+scoring sprite/terrain palette and placement drift.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -261,11 +264,12 @@ high-score entry scenes draw the source hall-of-fame player label,
 instructions, entered initials, and source-shaped active/inactive underline
 words at their translated screen positions.
 Normal attract scenes draw the source-backed `CREDITS:` label and visible
-credit count throughout ordinary attract. The title program now carries a
-source-backed page scheduler: Williams logo, presents copy, Defender wordmark,
-copyright wait, and instruction labels are gated by clean attract page frames
-and source wait constants while the hall-of-fame display stall stays
-suppressed.
+credit count during Hall of Fame / scoring contexts and whenever a real credit
+is present; the zero-credit line is suppressed on the Williams title pages.
+The title program now carries a source-backed page scheduler: Williams logo,
+presents copy, Defender wordmark, copyright wait, and instruction labels are
+gated by clean attract page frames and source wait constants while the
+hall-of-fame display stall stays suppressed.
 Wave-cleared scenes draw the source-backed `ATTACK WAVE`, `COMPLETED`, and
 `BONUS X` status text with source-shaped wave and multiplier digits, plus
 source-positioned survivor bonus icons for the clean survivors currently
@@ -738,7 +742,9 @@ sequence replays the source instruction-page rescue demo, scanner blips,
 laser/explosion/500-point rescue beat, and `ENMYTB` enemy score-card reveal
 before cycling back to the Williams page. The Williams logo is generated from
 the source `LGOTAB` final pixel pattern and early title frames draw a
-source-ordered handwritten reveal with the source `0x3F` title color index.
+source-ordered handwritten reveal with the source `0x3F` title color index;
+B13 still requires a follow-up title pass for the protected GIF's
+Williams color cadence and coalescence timing.
 The normal attract Defender wordmark now uses the 15 source `DEFENS` 4-byte by
 12-row `APVCT` appearance slots and descriptor addresses during the appearance
 window before returning to the full `0x3C` by `0x18` source-expanded wordmark
