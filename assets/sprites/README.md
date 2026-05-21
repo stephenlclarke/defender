@@ -16,10 +16,11 @@ explicitly reclassifies an individual file.
 
 `DC-156` temporarily reclassified `ship1.png`, `lander1.png`,
 `humanoid1.png`, `player-shot.png`, and `font-sheet.png` as clean-runtime R2
-atlas inputs to retire solid placeholders. After R9-E3.5, only the font sheet
-remains an active runtime PNG input for text/status/terrain helper regions.
-`ASXP1`, `NULOB`, `TEREX`, and the R9-E3.5 runtime sprite set are decoded from
-`assets/red-label/object-images.tsv` bytes.
+atlas inputs to retire solid placeholders. After R9-E3.11, the font sheet only
+remains an active runtime PNG input for legacy score/status helper regions; the
+terrain helper now decodes source `TDATA` / `BGOUT` terrain words directly.
+`ASXP1`, `NULOB`, `TEREX`, terrain words, and the R9-E3.5 runtime sprite set
+are decoded from red-label source data.
 
 Do not add duplicate sprite files under `assets/arcade/`, `docs/`, or source
 directories. New non-legacy sound artifacts belong under `assets/sounds/`;

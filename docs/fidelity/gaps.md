@@ -16,10 +16,13 @@ remain active B13 gaps. The README media path now writes candidate GIFs outside
 `docs/` and reports sampled comparison metrics against the protected reference.
 R9-E3.9 has repaired the title projection to use source `LGOTAB` Williams
 pixels, the source `0x3F` title color index, the 15 `DEFENS` 4-byte by 12-row
-appearance slots, and the `DEF33` whole-wordmark descriptor evidence; B13
-R9-E3.10 has repaired the shared `NUMBR0`-`NUMBR9` numeric glyph decode to use
-source column-major byte order. B13 remains open until the later
-sprite/terrain, timing, candidate media, and owner-review steps close.
+appearance slots, and the `DEF33` whole-wordmark descriptor evidence. R9-E3.10
+has repaired the shared `NUMBR0`-`NUMBR9` numeric glyph decode to use source
+column-major byte order. R9-E3.11 has repaired the remaining terrain
+helper by projecting source `TDATA` through the clean `BGINIT`/`BGOUT` terrain
+table path and by removing gameplay ground from non-scoring attract pages. B13
+remains open until the later timing, candidate media, and owner-review steps
+close.
 Older entries remain closed fidelity history, local-reference/tooling notes,
 archived prototype cleanup, or post-acceptance validation records. Historical
 entries that mention remaining blockers describe the state at the time they

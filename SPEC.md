@@ -57,10 +57,14 @@ R9-E3.7 clean media:
   B13 work is sprite/terrain repair, attract timing, candidate comparison, and
   owner acceptance. R9-E3.10 now decodes the source `NUMBR0`-`NUMBR9` numeric
   glyph records in source column-major order for score, credit, Hall of Fame,
-  and scoring/action text surfaces. Until signoff, changes
-  that alter public contracts, scenario semantics, runtime behavior, or final
-  acceptance evidence must trigger focused checks and, when broad risk is
-  introduced, a renewed full gate.
+  and scoring/action text surfaces. R9-E3.11 now draws terrain/ground from the
+  source `TDATA` terrain stream and source `BGINIT`/`BGOUT` 0x98-word output
+  table instead of the font-sheet terrain helper; gameplay and attract scoring
+  use the source terrain projection, while Williams/title and Hall of Fame pages
+  do not inherit gameplay ground. Until signoff, changes that alter public
+  contracts, scenario semantics, runtime behavior, or final acceptance evidence
+  must trigger focused checks and, when broad risk is introduced, a renewed full
+  gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite

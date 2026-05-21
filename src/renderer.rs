@@ -300,6 +300,7 @@ impl SpriteId {
     pub const PLAYER_EXPLOSION_PIXEL: Self = Self(72);
     pub const ATTRACT_WILLIAMS_LOGO_PIXEL: Self = Self(73);
     pub const ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE: Self = Self(74);
+    pub const TERRAIN_TILE_ALT: Self = Self(89);
     pub const SCORE_DIGITS: [Self; 10] = [
         Self::SCORE_DIGIT_0,
         Self::SCORE_DIGIT_1,
@@ -1163,6 +1164,11 @@ impl TextureAtlas {
                 size: [8, 8],
             },
             AtlasRegion {
+                sprite: SpriteId::TERRAIN_TILE_ALT,
+                origin: [8, 64],
+                size: [8, 8],
+            },
+            AtlasRegion {
                 sprite: SpriteId::STAR,
                 origin: [16, 64],
                 size: [1, 1],
@@ -1465,6 +1471,8 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
     let hall_of_fame_logo = decode_source_defender_logo_rgba();
     let attract_copyright_strip = decode_source_attract_copyright_strip_rgba();
     let attract_williams_logo = decode_source_attract_williams_logo_rgba();
+    let terrain_word_7007 = decode_source_terrain_word_rgba(0x7007);
+    let terrain_word_0770 = decode_source_terrain_word_rgba(0x0770);
     let font_sheet = decode_embedded_png_rgba("font-sheet.png", FONT_SHEET_PNG);
 
     blit_default_region(
@@ -1694,20 +1702,47 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
             size: [64, 8],
         },
     );
-    blit_default_region_from_source(
+    blit_default_region(
         &mut pixels,
         surface,
         regions,
         SpriteId::TERRAIN_TILE,
-        &font_sheet,
-        SpriteAssetSource {
-            origin: [0, 16],
-            size: [8, 8],
-        },
+        &terrain_word_7007,
+    );
+    blit_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::TERRAIN_TILE_ALT,
+        &terrain_word_0770,
     );
     blit_star_region(&mut pixels, surface, regions, &font_sheet);
 
     pixels
+}
+
+fn decode_source_terrain_word_rgba(word: u16) -> EmbeddedSprite {
+    const WIDTH: u32 = 8;
+    const HEIGHT: u32 = 8;
+    let mut pixels = vec![0; (WIDTH * HEIGHT * 4) as usize];
+
+    for source_pixel in 0..4 {
+        let shift = 12 - source_pixel * 4;
+        let nibble = ((word >> shift) & 0x000F) as u8;
+        let color = picture_palette_color(nibble, ObjectPicturePalette::white());
+        for y in 0..HEIGHT {
+            for repeat_x in 0..2 {
+                let x = source_pixel as u32 * 2 + repeat_x;
+                let start = ((y * WIDTH + x) * 4) as usize;
+                pixels[start..start + 4].copy_from_slice(&color);
+            }
+        }
+    }
+
+    EmbeddedSprite {
+        surface: SurfaceSize::new(WIDTH, HEIGHT),
+        pixels,
+    }
 }
 
 fn decode_embedded_png_rgba(name: &'static str, bytes: &[u8]) -> EmbeddedSprite {
@@ -4113,21 +4148,22 @@ mod tests {
     use super::{
         ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT, AtlasRegion, Color, GpuRendererSettings,
         NativeRenderPipeline, NativeRendererResources, NativeSceneRenderer, ObjectPicturePalette,
-        PALE_YELLOW_RGBA, PURPLE_RGBA, RenderLayer, RenderLayerCounts, RenderScene, SceneDrawPlan,
-        SceneProjectionUniformUpload, SceneProjectionUniforms, SceneRaster, SceneRasterError,
-        SceneRasterUpload, SceneSprite, SpriteAtlasTextureUpload, SpriteBindGroupLayoutPlan,
-        SpriteBindGroupRole, SpriteBufferRole, SpriteBufferUpload, SpriteBufferUploadPlan,
-        SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding,
-        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload,
-        SpritePipelineLayoutBindGroup, SpritePipelineLayoutPlan, SpritePipelinePlan,
-        SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassEncoderCommand,
-        SpriteRenderPassEncoderPlan, SpriteRenderPassPlan, SpriteRenderPipelineDescriptorPlan,
-        SpriteResourceBindingPlan, SpriteResourceBindingRole, SpriteSamplerBindingPlan,
-        SpriteShaderPlan, SpriteTextureBindingPlan, SpriteVertexBufferBinding,
-        SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuFrameCommand,
-        WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand, decode_source_object_image_rgba,
-        push_source_controlled_message_sprites, push_source_text_bytes_sprites,
-        source_message_text, source_screen_position, source_screen_position_with_offset,
+        PALE_YELLOW_RGBA, PICTURE_COLOR_TABLE, PURPLE_RGBA, RenderLayer, RenderLayerCounts,
+        RenderScene, SceneDrawPlan, SceneProjectionUniformUpload, SceneProjectionUniforms,
+        SceneRaster, SceneRasterError, SceneRasterUpload, SceneSprite, SpriteAtlasTextureUpload,
+        SpriteBindGroupLayoutPlan, SpriteBindGroupRole, SpriteBufferRole, SpriteBufferUpload,
+        SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId,
+        SpriteIndexBufferBinding, SpriteInstanceBuffer, SpriteInstanceBufferRecord,
+        SpriteInstanceUpload, SpritePipelineLayoutBindGroup, SpritePipelineLayoutPlan,
+        SpritePipelinePlan, SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw,
+        SpriteRenderPassEncoderCommand, SpriteRenderPassEncoderPlan, SpriteRenderPassPlan,
+        SpriteRenderPipelineDescriptorPlan, SpriteResourceBindingPlan, SpriteResourceBindingRole,
+        SpriteSamplerBindingPlan, SpriteShaderPlan, SpriteTextureBindingPlan,
+        SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas,
+        ViewportLayout, WgpuFrameCommand, WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand,
+        decode_source_object_image_rgba, pseudo_color_rgba, push_source_controlled_message_sprites,
+        push_source_text_bytes_sprites, source_message_text, source_screen_position,
+        source_screen_position_with_offset,
     };
     use crate::renderer::{
         EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba,
@@ -5695,6 +5731,7 @@ mod tests {
         assert!(default_atlas.contains(SpriteId::STATUS_TEXT));
         assert!(default_atlas.contains(SpriteId::PLAYER_PROJECTILE));
         assert!(default_atlas.contains(SpriteId::TERRAIN_TILE));
+        assert!(default_atlas.contains(SpriteId::TERRAIN_TILE_ALT));
         assert!(default_atlas.contains(SpriteId::STAR));
         assert!(default_atlas.contains(SpriteId::ENEMY_LANDER));
         assert!(default_atlas.contains(SpriteId::HUMAN));
@@ -5747,6 +5784,7 @@ mod tests {
         assert_non_placeholder_region(&atlas, SpriteId::STATUS_TEXT);
         assert_visible_region(&atlas, SpriteId::PLAYER_PROJECTILE);
         assert_non_placeholder_region(&atlas, SpriteId::TERRAIN_TILE);
+        assert_non_placeholder_region(&atlas, SpriteId::TERRAIN_TILE_ALT);
         assert_non_placeholder_region(&atlas, SpriteId::ENEMY_LANDER);
         assert_non_placeholder_region(&atlas, SpriteId::HUMAN);
         assert_non_placeholder_region(&atlas, SpriteId::ENEMY_MUTANT);
@@ -5762,6 +5800,39 @@ mod tests {
         assert_non_placeholder_region(&atlas, SpriteId::PLAYER_LIFE_STOCK);
         assert_non_placeholder_region(&atlas, SpriteId::SMART_BOMB_STOCK);
         assert_visible_region(&atlas, SpriteId::STAR);
+    }
+
+    #[test]
+    fn default_sprite_atlas_decodes_source_terrain_word_patterns() {
+        let atlas = TextureAtlas::default_sprites();
+        let terrain_7007 = atlas_region_pixels(&atlas, SpriteId::TERRAIN_TILE);
+        let terrain_0770 = atlas_region_pixels(&atlas, SpriteId::TERRAIN_TILE_ALT);
+        let is_visible = |pixels: &[[u8; 4]], x: usize| pixels[x][3] != 0;
+
+        assert_eq!(
+            atlas.region(SpriteId::TERRAIN_TILE).expect("terrain").size,
+            [8, 8]
+        );
+        assert_eq!(
+            atlas
+                .region(SpriteId::TERRAIN_TILE_ALT)
+                .expect("terrain alt")
+                .size,
+            [8, 8]
+        );
+        assert_eq!(
+            (0..8)
+                .map(|x| is_visible(&terrain_7007, x))
+                .collect::<Vec<_>>(),
+            vec![true, true, false, false, false, false, true, true]
+        );
+        assert_eq!(
+            (0..8)
+                .map(|x| is_visible(&terrain_0770, x))
+                .collect::<Vec<_>>(),
+            vec![false, false, true, true, true, true, false, false]
+        );
+        assert_eq!(terrain_7007[0], pseudo_color_rgba(PICTURE_COLOR_TABLE[7]));
     }
 
     #[test]

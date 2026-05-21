@@ -841,7 +841,14 @@ Reopened B13 repair schedule:
   decoding, correct color-word/palette mapping, orientation, dimensions, and
   transparency. Replace the font-sheet terrain/ground placeholder with
   source-backed `BGINIT`/`BGOUT`/`TDATA` terrain projection or accepted
-  pre-rewrite frame evidence, including scanner/ground color checks.
+  pre-rewrite frame evidence, including scanner/ground color checks. Completed
+  2026-05-21. The clean renderer now decodes the source terrain words
+  `0x7007`/`0x0770` into atlas-backed terrain patterns instead of using the
+  font-sheet helper tile, and both gameplay and attract scoring project the
+  source `TDATA` -> `BGINIT` -> `BGOUT` default 0x98-word terrain table. The
+  Williams/title and Hall of Fame pages no longer inherit gameplay ground.
+  Candidate terrain RMS improved, but B13 remains open for timing/scoring flow
+  and final owner acceptance.
 - R9-E3.12: attract sequence timing and scoring/action parity. Reconcile the
   clean attract scheduler with the reference ordering and timing:
   Williams -> High Scores -> scoring sequence. Use source waits and
@@ -3259,6 +3266,24 @@ Work log:
   all-scenario gates remain deferred because this is still a bounded B13 visual
   repair slice. The next full gate should run at R9-E3.13 candidate closeout,
   or sooner if source sprite/terrain/timing work changes shared contracts.
+
+- `2026-05-21 23:32:23 BST` Completed R9-E3.11 source sprite and
+  terrain/ground repair. Replaced the remaining font-sheet terrain placeholder
+  with source terrain word atlas regions for `0x7007` and `0x0770`, added a
+  clean source `TDATA` parser plus `BGINIT`/`BGOUT` terrain-table projection,
+  drew the 0x98 source terrain words in gameplay and attract scoring, and
+  removed stray gameplay ground from Williams/title and Hall of Fame attract
+  pages. Focused validation passed with `cargo fmt --check`, `cargo check`,
+  focused source terrain record/scene/atlas tests, adjacent attract and
+  terrain-blow scene tests, targeted
+  `make clean-fidelity SCENARIOS="attract_boot"`, and `make readme-media`.
+  Candidate metrics remain failed B13 evidence: reference 347 frames, candidate
+  257 frames, equal 4600cs duration, sampled RMS full 51.30, title 62.84, Hall
+  of Fame 63.88, numeric glyphs 72.64, sprites 44.89, terrain 41.87, and
+  scoring 55.09. Broad all-target and all-scenario gates remain deferred
+  because this is still a bounded B13 visual repair slice. The next full gate
+  should run at R9-E3.13 candidate closeout, or sooner if R9-E3.12 timing work
+  changes shared contracts.
 
 ## Archived Completed History
 

@@ -47,8 +47,11 @@ wrong, and the attract flow did not match Williams -> High Scores -> scoring
 sequence. B13 now requires source-backed visual repair and a fresh candidate
 review before R9 can be signed off. R9-E3.9 has moved the Williams/Defender
 title projection back onto source `LGOTAB`/`DEFENS` descriptor evidence, but
-R9-E3.10 has repaired source numeric digit decoding. Sprite/terrain
-presentation, attract timing, and final media acceptance remain open.
+R9-E3.10 has repaired source numeric digit decoding. R9-E3.11 has replaced the
+remaining font-sheet terrain helper with source `TDATA`/`BGINIT`/`BGOUT`
+terrain-word projection and removed stray gameplay ground from non-scoring
+attract pages. Attract timing/scoring flow and final media acceptance remain
+open.
 
 ![Defender gameplay frame](docs/defender.png)
 
