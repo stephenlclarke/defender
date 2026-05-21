@@ -6079,6 +6079,7 @@ impl Game {
             self.state
                 .world
                 .spawn_explosion(ExplosionKind::Astronaut, landing_position);
+            sound_events.push(source_astronaut_hit_sound_event());
         }
         if self
             .state
@@ -7735,6 +7736,12 @@ fn source_astronaut_safe_landing_sound_event() -> SoundEvent {
     }
 }
 
+fn source_astronaut_hit_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_AHSND_SOUND_COMMAND,
+    }
+}
+
 fn source_bomb_collision_sound_event() -> SoundEvent {
     SoundEvent::UnmappedSoundCommand {
         command: SOURCE_AHSND_SOUND_COMMAND,
@@ -8189,11 +8196,12 @@ mod tests {
         SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
         SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage,
         WaveProfileSnapshot, WorldSnapshot, WorldVector, source_astronaut_catch_sound_event,
-        source_astronaut_release_sound_event, source_astronaut_safe_landing_sound_event,
-        source_bomb_collision_sound_event, source_enemy_hit_sound_event,
-        source_enemy_shot_sound_event, source_hyperspace_appearance_sound_event,
-        source_lander_pickup_sound_event, source_lander_suck_sound_event,
-        source_laser_fire_sound_event, source_smart_bomb_sound_event,
+        source_astronaut_hit_sound_event, source_astronaut_release_sound_event,
+        source_astronaut_safe_landing_sound_event, source_bomb_collision_sound_event,
+        source_enemy_hit_sound_event, source_enemy_shot_sound_event,
+        source_hyperspace_appearance_sound_event, source_lander_pickup_sound_event,
+        source_lander_suck_sound_event, source_laser_fire_sound_event,
+        source_smart_bomb_sound_event,
     };
 
     #[test]
@@ -12867,7 +12875,7 @@ mod tests {
     fn clean_game_released_human_falls_until_terrain_landing() {
         let mut game = credited_started_game();
         game.state.world.enemies = vec![EnemySnapshot::new(
-            EnemyKind::Baiter,
+            EnemyKind::Lander,
             ScreenPosition::new(220, 80),
             ScreenVelocity::new(0, 0),
         )];
@@ -12957,7 +12965,7 @@ mod tests {
             explosion.kind == ExplosionKind::Astronaut
                 && explosion.position == ScreenPosition::new(100, ground_y)
         }));
-        assert!(frame.events.sounds().is_empty());
+        assert_eq!(frame.events.sounds(), &[source_astronaut_hit_sound_event()]);
     }
 
     #[test]

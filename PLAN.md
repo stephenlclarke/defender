@@ -140,7 +140,8 @@ new source-backed fidelity gap is accepted in `docs/fidelity/gaps.md`.
   projectiles, smart bombs, scoring, bonus stock, player damage, wave advance,
   high-score initials, bounded lander abduction/carry/release, source-shaped
   falling-human acceleration, player-catch rescue scoring, AFALL2 carried
-  landing, safe-landing scoring, fatal landing/human-loss handoff,
+  landing, safe-landing scoring, fatal landing/human-loss handoff with source
+  `ASTKIL` / `AHSND` command evidence,
   pod-triggered source mini-swarmer spawn/motion/bomb projection, and
   source-shaped baiter movement/fireball shell behavior, source-shaped mutant
   runtime conversion/movement/fireballs plus reserve restore placement and
@@ -1079,7 +1080,8 @@ Object-ecology progress after R9-C4 slices:
   threshold award the source-backed 250-point score and start the existing
   `P250` score-popup lifecycle with source `ALSND` command evidence;
   over-speed impacts remove the human, spawn the astronaut explosion lifecycle,
-  and feed the existing last-human planet-loss handoff.
+  surface source `ASTKIL` / `AHSND` command evidence, and feed the existing
+  last-human planet-loss handoff.
 - Falling humans caught by the player now enter the clean player-carried state,
   award the source-backed 500-point rescue score, and start the existing `P500`
   score-popup lifecycle from the caught astronaut position with source `ACSND`
@@ -1089,8 +1091,9 @@ Object-ecology progress after R9-C4 slices:
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
   is remaining per-family movement/projectile behavior beyond the covered
   enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup/rematerialize,
-  lander-abduction, astronaut command, and shell-collision command evidence
-  plus focused source ecology fixtures for those transitions.
+  lander-abduction, astronaut command, shell-collision command, and fatal
+  astronaut-impact command evidence plus focused source ecology fixtures for
+  those transitions.
 
 Work log:
 
@@ -2458,6 +2461,24 @@ Work log:
   command slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack
   start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779323774753699`.
+
+- `2026-05-21 01:47:47 BST` R9-C4 progress slice
+  `source fatal astronaut impact sound command`. Clean fatal falling-human
+  impact now surfaces the source `ASTKIL` / `AHSND` command evidence while
+  preserving human removal, astronaut explosion spawning, and the existing
+  last-human terrain-loss handoff. The adjacent safe-landing fixture now keeps
+  a source-counted enemy alive so the test does not accidentally advance the
+  wave after active baiters were excluded from source wave totals. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo test
+  clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss
+  --lib`, `cargo test clean_game_released_human_falls_until_terrain_landing
+  --lib`, targeted `make clean-fidelity SCENARIOS="planet_destruction"`,
+  touched-doc `markdownlint`, and `git diff --check`. Broad `cargo test
+  --all-targets`, full `make fidelity`, full all-scenario `make
+  clean-fidelity`, and full clippy remain deferred because this is a bounded
+  Step 50 fatal-impact command slice, not a Step 50 / Phase 3 closure or R9
+  finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779324213060339`.
 
 ## Archived Completed History
 

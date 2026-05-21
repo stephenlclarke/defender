@@ -295,12 +295,13 @@ Released, uncarried humans
 above terrain now use source-shaped `AFALL` fixed-point acceleration, settle
 safely at or below the source threshold with the 250-point safe-landing score
 and existing `P250` score-popup lifecycle plus source `ALSND` command evidence,
-or die on over-speed impact with an astronaut explosion and the existing
-last-human planet-loss handoff; falling humans caught by the player enter the
-clean player-carried state, award the source-backed 500-point rescue score,
-emit source `ACSND` command evidence, and start the existing `P500` score-popup
-lifecycle; player-carried humans settle on terrain when the player-carried
-offset reaches the local terrain line.
+or die on over-speed impact with an astronaut explosion, source `ASTKIL` /
+`AHSND` command evidence, and the existing last-human planet-loss handoff;
+falling humans caught by the player enter the clean player-carried state,
+award the source-backed 500-point rescue score, emit source `ACSND` command
+evidence, and start the existing `P500` score-popup lifecycle; player-carried
+humans settle on terrain when the player-carried offset reaches the local
+terrain line.
 Completed carried-lander abductions now consume the pulled-in passenger and
 convert the lander into a source-shaped mutant. No-target/no-human landers
 enter the same mutation path, and active clean mutants retain source

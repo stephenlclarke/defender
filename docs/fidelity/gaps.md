@@ -710,6 +710,15 @@ post-acceptance validation records.
   baiter bookkeeping, enemy-hit, enemy-shot, player-action, hyperspace,
   lander-abduction, astronaut command, and shell-collision command evidence
   plus focused source ecology fixtures for those transitions.
+- `2026-05-21 01:44:09 BST`: R9-C4 adds bounded source fatal astronaut impact
+  sound-command evidence. Clean fatal falling-human impacts already removed
+  the human, spawned the astronaut explosion, and fed the terrain-loss handoff;
+  they now also surface the source `ASTKIL` / `AHSND` command evidence for
+  that impact. Remaining B08 work is exact per-family movement/projectile
+  behavior beyond the covered baiter bookkeeping, enemy-hit, enemy-shot,
+  player-action, hyperspace, lander-abduction, astronaut command,
+  shell-collision command, and fatal astronaut-impact command evidence plus
+  focused source ecology fixtures for those transitions.
 - `2026-05-21 01:10:37 BST`: R9-C4 adds bounded source `HYP02`
   rematerialization state for accepted clean hyperspace inputs. Clean
   hyperspace now reloads camera/background from the source `SEED`/`HSEED` word,
