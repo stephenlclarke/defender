@@ -740,6 +740,17 @@ post-acceptance validation records.
   hyperspace, lander-abduction, astronaut command, shell-collision command,
   fatal astronaut-impact command, player-death command, and terrain-blow start
   command evidence plus focused source ecology fixtures for those transitions.
+- `2026-05-21 02:11:05 BST`: R9-C4 adds bounded clean `TBL3` / `TBL4`
+  terrain-blow lifecycle progression. Clean terrain blow now sleeps from the
+  source entry pass, clears pseudo color for the flash step, restarts bounded
+  `TEREX` passes while advancing the source iteration, and surfaces source
+  `TBSND` completion command evidence at iteration 16. Remaining B08 work is
+  exact per-family movement/projectile behavior beyond the covered baiter
+  bookkeeping, enemy-hit, enemy-shot, player-action, hyperspace,
+  lander-abduction, astronaut command, shell-collision command,
+  fatal astronaut-impact command, player-death command, and terrain-blow
+  lifecycle command evidence plus focused source ecology fixtures for those
+  transitions.
 - `2026-05-21 01:10:37 BST`: R9-C4 adds bounded source `HYP02`
   rematerialization state for accepted clean hyperspace inputs. Clean
   hyperspace now reloads camera/background from the source `SEED`/`HSEED` word,

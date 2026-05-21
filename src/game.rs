@@ -75,6 +75,7 @@ const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
 const SOURCE_ALSND_SOUND_COMMAND: u8 = 0xE0;
 const SOURCE_AHSND_SOUND_COMMAND: u8 = 0xEE;
 const SOURCE_ASCSND_SOUND_COMMAND: u8 = 0xE5;
+const SOURCE_TBSND_SOUND_COMMAND: u8 = 0xEB;
 pub(crate) const SOURCE_EXPLOSION_INITIAL_SIZE: u16 = 0x0100;
 pub(crate) const SOURCE_EXPLOSION_SIZE_DELTA: u16 = 0x00AA;
 pub(crate) const SOURCE_EXPLOSION_KILL_SIZE_HIGH: u8 = 0x30;
@@ -87,6 +88,10 @@ pub(crate) const SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER: u8 = 8;
 pub(crate) const SOURCE_TERRAIN_BLOW_TERRAIN_ERASE_ENTRIES: u16 = 0x98;
 pub(crate) const SOURCE_TERRAIN_BLOW_SCANNER_ERASE_ENTRIES: u16 = 0x40;
 const SOURCE_TERRAIN_BLOW_INITIAL_PSEUDO_COLOR: u8 = 0x3C;
+const SOURCE_TERRAIN_BLOW_PSEUDO_COLORS: [u8; 32] = [
+    0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x47, 0x47, 0x87,
+    0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
+];
 pub const PLAYER_EXPLOSION_PIECE_LIMIT: usize = 128;
 const SOURCE_PLAYER_EXPLOSION_INITIAL_X_SEED: u16 = 0x0808;
 const SOURCE_PLAYER_EXPLOSION_INITIAL_Y_SEED: u16 = 0x1732;
@@ -2652,6 +2657,69 @@ impl WorldSnapshot {
         }
     }
 
+    fn advance_terrain_blow(&mut self, sound_events: &mut Vec<SoundEvent>) {
+        let Some(terrain_blow) = self.terrain_blow else {
+            return;
+        };
+
+        let Some(source_sleep_remaining) = terrain_blow.source_sleep_remaining else {
+            return;
+        };
+        if source_sleep_remaining > 1 {
+            if let Some(terrain_blow) = self.terrain_blow.as_mut() {
+                terrain_blow.source_sleep_remaining = Some(source_sleep_remaining - 1);
+            }
+            return;
+        }
+
+        match terrain_blow.stage {
+            TerrainBlowStage::ExplosionPassSleeping => {
+                let sleep_max = (terrain_blow.source_iteration >> 3).wrapping_add(1);
+                let sleep_time = source_advance_rmax(&mut self.source_rng, sleep_max);
+                if let Some(terrain_blow) = self.terrain_blow.as_mut() {
+                    terrain_blow.stage = TerrainBlowStage::FlashClearedSleeping;
+                    terrain_blow.source_sleep_remaining = Some(sleep_time);
+                    terrain_blow.source_pseudo_color = 0;
+                    terrain_blow.source_overload_counter = SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER;
+                }
+            }
+            TerrainBlowStage::FlashClearedSleeping => {
+                let source_iteration = terrain_blow.source_iteration.saturating_add(1);
+                if source_iteration >= terrain_blow.source_iteration_limit {
+                    if let Some(terrain_blow) = self.terrain_blow.as_mut() {
+                        terrain_blow.stage = TerrainBlowStage::Completed;
+                        terrain_blow.source_iteration = source_iteration;
+                        terrain_blow.source_sleep_remaining = None;
+                    }
+                    sound_events.push(source_terrain_blow_complete_sound_event());
+                    return;
+                }
+
+                let source_pseudo_color = self.spawn_source_terrain_blow_explosion_pass();
+                if let Some(terrain_blow) = self.terrain_blow.as_mut() {
+                    terrain_blow.stage = TerrainBlowStage::ExplosionPassSleeping;
+                    terrain_blow.source_iteration = source_iteration;
+                    terrain_blow.source_sleep_remaining = Some(SOURCE_TERRAIN_BLOW_SLEEP_TICKS);
+                    terrain_blow.source_pseudo_color = source_pseudo_color;
+                    terrain_blow.source_overload_counter = SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER;
+                }
+                sound_events.push(source_terrain_blow_start_sound_event());
+            }
+            TerrainBlowStage::Completed => {}
+        }
+    }
+
+    fn spawn_source_terrain_blow_explosion_pass(&mut self) -> u8 {
+        let mut source_x_register = SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS;
+        for _ in 0..SOURCE_TERRAIN_BLOW_EXPLOSIONS_PER_PASS {
+            let rand_state = self.source_rng.advance();
+            let position = source_terrain_blow_explosion_position(rand_state, source_x_register);
+            source_x_register = position.x;
+            self.spawn_explosion(ExplosionKind::Terrain, position);
+        }
+        source_terrain_blow_pseudo_color(self.source_rng.seed)
+    }
+
     fn advance_score_popups(&mut self) {
         for popup in &mut self.score_popups {
             popup.frames_remaining = popup.frames_remaining.saturating_sub(1);
@@ -3764,6 +3832,21 @@ fn source_rmax(max: u8, mut seed: u8) -> u8 {
 fn source_advance_rmax(source_rng: &mut SourceRandSnapshot, max: u8) -> u8 {
     let state = source_rng.advance();
     source_rmax(max, state.seed)
+}
+
+fn source_terrain_blow_pseudo_color(seed: u8) -> u8 {
+    SOURCE_TERRAIN_BLOW_PSEUDO_COLORS[usize::from(seed & 0x1F)]
+}
+
+fn source_terrain_blow_explosion_position(
+    rand_state: SourceRandSnapshot,
+    source_x_register: u8,
+) -> ScreenPosition {
+    let x = rand_state.seed.wrapping_add(source_x_register);
+    let y = rand_state
+        .hseed
+        .clamp(0x40, SOURCE_PLAYFIELD_Y_MAX.saturating_sub(0x10));
+    ScreenPosition::new(x, y)
 }
 
 fn source_sign_extend_u8_to_u16(value: u8) -> u16 {
@@ -6107,6 +6190,7 @@ impl Game {
         if hyperspace_death_risk && !hit_player && self.state.phase == GamePhase::Playing {
             self.apply_player_hit(player_screen_position, gameplay_events, sound_events);
         }
+        self.state.world.advance_terrain_blow(sound_events);
         self.resolve_planet_destruction(sound_events);
 
         if self.state.phase == GamePhase::Playing && !hyperspace_death_risk {
@@ -7762,6 +7846,12 @@ fn source_terrain_blow_start_sound_event() -> SoundEvent {
     }
 }
 
+fn source_terrain_blow_complete_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_TBSND_SOUND_COMMAND,
+    }
+}
+
 fn source_bomb_collision_sound_event() -> SoundEvent {
     SoundEvent::UnmappedSoundCommand {
         command: SOURCE_AHSND_SOUND_COMMAND,
@@ -8210,19 +8300,21 @@ mod tests {
         SOURCE_MINI_SWARMER_LOOP_SLEEP_TICKS, SOURCE_MUTANT_LOOP_SLEEP_TICKS,
         SOURCE_PLAYFIELD_Y_MIN, SOURCE_POD_SWARMER_REQUEST_LIMIT, SOURCE_PRHSND_SOUND_COMMAND,
         SOURCE_SCHSND_SOUND_COMMAND, SOURCE_SCORE_POPUP_LIFETIME_TICKS,
-        SOURCE_SWHSND_SOUND_COMMAND, SOURCE_TIHSND_SOUND_COMMAND, SOURCE_UFHSND_SOUND_COMMAND,
-        SOURCE_VISUAL_STATE, START_PLAYFIELD_DELAY_FRAMES, START_SOUND_DELAY_FRAMES,
-        ScannerRadarBlipKind, ScannerRadarSnapshot, ScannerRadarStage, ScorePopupKind, SoundEvent,
-        SourceBaiterSnapshot, SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot,
-        SourcePodSnapshot, SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage,
-        WaveProfileSnapshot, WorldSnapshot, WorldVector, source_astronaut_catch_sound_event,
+        SOURCE_SWHSND_SOUND_COMMAND, SOURCE_TERRAIN_BLOW_ITERATION_LIMIT,
+        SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER, SOURCE_TERRAIN_BLOW_SLEEP_TICKS,
+        SOURCE_TIHSND_SOUND_COMMAND, SOURCE_UFHSND_SOUND_COMMAND, SOURCE_VISUAL_STATE,
+        START_PLAYFIELD_DELAY_FRAMES, START_SOUND_DELAY_FRAMES, ScannerRadarBlipKind,
+        ScannerRadarSnapshot, ScannerRadarStage, ScorePopupKind, SoundEvent, SourceBaiterSnapshot,
+        SourceBomberSnapshot, SourceLanderSnapshot, SourceMutantSnapshot, SourcePodSnapshot,
+        SourceRandSnapshot, SourceSwarmerSnapshot, TerrainBlowStage, WaveProfileSnapshot,
+        WorldSnapshot, WorldVector, source_astronaut_catch_sound_event,
         source_astronaut_hit_sound_event, source_astronaut_release_sound_event,
         source_astronaut_safe_landing_sound_event, source_bomb_collision_sound_event,
         source_enemy_hit_sound_event, source_enemy_shot_sound_event,
         source_hyperspace_appearance_sound_event, source_lander_pickup_sound_event,
         source_lander_suck_sound_event, source_laser_fire_sound_event,
         source_player_death_sound_event, source_smart_bomb_sound_event,
-        source_terrain_blow_start_sound_event,
+        source_terrain_blow_complete_sound_event, source_terrain_blow_start_sound_event,
     };
 
     #[test]
@@ -14535,6 +14627,78 @@ mod tests {
             frame.events.sounds(),
             &[source_terrain_blow_start_sound_event()]
         );
+    }
+
+    #[test]
+    fn clean_world_advances_source_terrain_blow_to_completion_sound() {
+        let mut game = credited_started_game();
+        game.state.world.humans.clear();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Pod,
+            ScreenPosition::new(200, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+
+        let start = game.step(GameInput::NONE);
+        assert_eq!(
+            start.events.sounds(),
+            &[source_terrain_blow_start_sound_event()]
+        );
+
+        let mut saw_flash_clear = false;
+        let mut saw_restart_pass = false;
+        let mut saw_completion = false;
+        for _ in 0..96 {
+            let frame = game.step(GameInput::NONE);
+            let terrain_blow = frame
+                .state
+                .world
+                .terrain_blow
+                .expect("terrain blow snapshot");
+
+            match terrain_blow.stage {
+                TerrainBlowStage::ExplosionPassSleeping if terrain_blow.source_iteration > 0 => {
+                    if frame.events.sounds() == [source_terrain_blow_start_sound_event()].as_slice()
+                    {
+                        saw_restart_pass = true;
+                        assert_eq!(
+                            terrain_blow.source_sleep_remaining,
+                            Some(SOURCE_TERRAIN_BLOW_SLEEP_TICKS)
+                        );
+                        assert_ne!(terrain_blow.source_pseudo_color, 0);
+                        assert_eq!(
+                            terrain_blow.source_overload_counter,
+                            SOURCE_TERRAIN_BLOW_OVERLOAD_COUNTER
+                        );
+                    }
+                }
+                TerrainBlowStage::FlashClearedSleeping => {
+                    saw_flash_clear = true;
+                    assert_eq!(terrain_blow.source_pseudo_color, 0);
+                    assert!(matches!(terrain_blow.source_sleep_remaining, Some(1..=3)));
+                    assert!(frame.events.sounds().is_empty());
+                }
+                TerrainBlowStage::Completed => {
+                    saw_completion = true;
+                    assert_eq!(
+                        terrain_blow.source_iteration,
+                        SOURCE_TERRAIN_BLOW_ITERATION_LIMIT
+                    );
+                    assert_eq!(terrain_blow.source_sleep_remaining, None);
+                    assert_eq!(
+                        frame.events.sounds(),
+                        &[source_terrain_blow_complete_sound_event()]
+                    );
+                    break;
+                }
+                TerrainBlowStage::ExplosionPassSleeping => {}
+            }
+        }
+
+        assert!(saw_flash_clear);
+        assert!(saw_restart_pass);
+        assert!(saw_completion);
     }
 
     #[test]

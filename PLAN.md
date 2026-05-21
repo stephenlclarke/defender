@@ -922,7 +922,10 @@ Terrain-blow contract after Step 49:
 - Clean planet destruction clears clean terrain segments, disables scanner
   terrain, starts source-shaped terrain-blow evidence, and projects `TEREX`
   terrain explosions through the expanded-object sprite path with source
-  `TERBLO` / `AHSND` command evidence on entry.
+  `TERBLO` / `AHSND` command evidence on entry. The clean terrain-blow process
+  now advances through the source-shaped `TBL3` / `TBL4` sleep, pseudo-color,
+  and iteration lifecycle, restarts bounded `TEREX` passes until iteration 16,
+  and surfaces source `TBSND` completion command evidence.
 - B07 is closed for terrain mutation and presentation evidence. Full
   rescue/abduction object ecology and the live gameplay entry points that
   remove humans remain B08, not terrain-blow presentation.
@@ -1099,8 +1102,8 @@ Object-ecology progress after R9-C4 slices:
   enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup/rematerialize,
   lander-abduction, astronaut command, shell-collision command, and fatal
   astronaut-impact command evidence, player-death command evidence, and
-  terrain-blow start command evidence plus focused source ecology fixtures for
-  those transitions.
+  terrain-blow start/completion command evidence plus focused source ecology
+  fixtures for those transitions.
 
 Work log:
 
@@ -2519,6 +2522,23 @@ Work log:
   Step 50 terrain-blow start command slice, not a Step 50 / Phase 3 closure or
   R9 finalization. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779325031424119`.
+
+- `2026-05-21 02:11:05 BST` R9-C4 progress slice
+  `source terrain-blow completion sound command`. Clean terrain blow now
+  advances through bounded source-shaped `TBL3` / `TBL4` sleep, pseudo-color,
+  and iteration lifecycle after the last-human handoff, restarts `TEREX`
+  passes through iteration 15, and emits source `TBSND` completion command
+  evidence at iteration 16. Focused validation passed: `cargo fmt --check`,
+  `cargo check`, `cargo test
+  clean_world_starts_source_terrain_blow_and_projects_terex --lib`, `cargo
+  test clean_world_advances_source_terrain_blow_to_completion_sound --lib`,
+  targeted `make clean-fidelity SCENARIOS="planet_destruction"`, touched-doc
+  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
+  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
+  clippy remain deferred because this is a bounded Step 50 terrain-blow
+  lifecycle command slice, not a Step 50 / Phase 3 closure or R9 finalization.
+  Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779325526692779`.
 
 ## Archived Completed History
 

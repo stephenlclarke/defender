@@ -390,8 +390,9 @@ piece positions into clean/oracle scenes. Planet destruction starts a
 source-backed terrain-blow snapshot: terrain rows are removed from the clean
 scene, scanner terrain is disabled, `TEREX` explosions are projected through
 expanded-object evidence, and the source status bit, iteration, erase-table
-counts, pseudo color, overload counter, and source `TERBLO` / `AHSND` command
-evidence are carried for fidelity checks.
+counts, pseudo color, overload counter, source `TERBLO` / `AHSND` entry
+command evidence, and source `TBSND` completion command evidence are carried
+for fidelity checks.
 Enemy contact with the player is
 resolved through clean collision and
 `PlayerDamageSystem`,
