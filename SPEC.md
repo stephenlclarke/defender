@@ -318,16 +318,16 @@ image cycling, random vertical drift/damping, player-Y steering, off-screen
 cruise steering, and bounded silent `BOMBST` bomb-shell projection with source
 `GETSHL` placement bounds, the separate `BMBCNT` ten-bomb cap, and the total
 20-cell source shell-list cap. Bomber picture/Y/bomb state updates now honor
-the source `TIE` `SEED & 0x06` squad-slot selection, leaving empty selected
-slots sleeping while active bomber positions continue through source velocity.
-Reserve bombers now use source `TIEST` player-relative squad placement and
-alternating X velocity before entering the source bomber runtime. Enemy
-projectile evidence now distinguishes source `FBOUT` fireballs from source
-`BMBOUT` bomber bomb shells and carries source `BMBP1` shell descriptor fields
-for the standalone mine/source-shell fixture. Enemy-projectile/player
-collision uses the source `BMBP1` 2x3 footprint while the direct runtime
-projectile renderer keeps the existing 4x6 bomb sprite. Active clean enemy
-evidence now carries source
+the source `TIE` `SEED & 0x06` four-slot squad selection from persistent
+source slots, leaving killed or empty selected slots sleeping while active
+bomber positions continue through source velocity. Reserve bombers now use
+source `TIEST` four-slot player-relative squad placement and alternating X
+velocity before entering the source bomber runtime. Enemy projectile evidence
+now distinguishes source `FBOUT` fireballs from source `BMBOUT` bomber bomb
+shells and carries source `BMBP1` shell descriptor fields for the standalone
+mine/source-shell fixture. Enemy-projectile/player collision uses the source
+`BMBP1` 2x3 footprint while the direct runtime projectile renderer keeps the
+existing 4x6 bomb sprite. Active clean enemy evidence now carries source
 object-picture descriptor labels, addresses, dimensions, and primary/alternate
 image pointers for the current lander, baiter, bomber, mutant, pod, and
 swarmer presentations, and clean projectile/enemy plus player/enemy collision

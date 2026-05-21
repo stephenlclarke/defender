@@ -761,6 +761,20 @@ post-acceptance validation records.
   collision-footprint evidence, rescue collision-footprint evidence, and bomber
   shell-counter evidence plus focused source ecology fixtures for those
   transitions.
+- `2026-05-21 03:30:14 BST`: R9-C4 adds bounded source bomber squad-slot
+  evidence. Clean source-bomber state now carries the persistent source `TIE`
+  squad slot, reserve `TIEST` batches use four source slots per squad, and the
+  selected `SEED & 0x06` slot no longer shifts when a bomber has been killed
+  or an empty slot is selected. Remaining B08 work is exact per-family enemy
+  movement/projectile behavior beyond the covered baiter bookkeeping,
+  enemy-hit, enemy-shot, player-action, hyperspace, lander-abduction,
+  astronaut command, shell-collision command, fatal astronaut-impact command,
+  player-death command, terrain-blow lifecycle command evidence, laser-loop
+  movement evidence, laser collision-footprint evidence, bomb-shell
+  collision-footprint evidence, enemy collision-footprint evidence, player
+  collision-footprint evidence, rescue collision-footprint evidence, bomber
+  shell-counter evidence, and bomber squad-slot evidence plus focused source
+  ecology fixtures for those transitions.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path
@@ -961,9 +975,9 @@ post-acceptance validation records.
   existing ten-shell `BOMBST` cap.
 - `2026-05-20 21:50:25 BST`: R9-C4 aligns clean bomber `TIE` state updates
   with source `SEED & 0x06` squad-slot selection. Clean bombers now run the
-  picture/Y/bomb step only for the selected source squad slot, so empty
-  selected slots sleep without changing bomber state while active bomber
-  positions still advance through source velocity.
+  picture/Y/bomb step only for the selected persistent source squad slot, so
+  empty or killed selected slots sleep without changing bomber state while
+  active bomber positions still advance through source velocity.
 - `2026-05-20 21:58:01 BST`: R9-C4 aligns clean enemy shell lifetime scanning
   with source `SHSCAN` decrement/wrap behavior. Live clean hostile shells now
   decrement `source_lifetime_ticks` with wrapping arithmetic, so a timer byte

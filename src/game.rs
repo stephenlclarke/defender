@@ -812,6 +812,7 @@ pub struct SourceBomberSnapshot {
     pub picture_frame: u8,
     pub cruise_altitude: u8,
     pub sleep_ticks: u8,
+    pub source_slot: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2045,7 +2046,6 @@ impl WorldSnapshot {
         let humans = &mut self.humans;
         let source_target_list_cursor_address = &mut self.source_target_list_cursor_address;
         let selected_bomber_slot = source_tie_selected_slot(source_rng.seed);
-        let mut bomber_slot = 0usize;
         for enemy in &mut self.enemies {
             if enemy.kind == EnemyKind::Lander
                 && let Some(source_lander) = enemy.source_lander.as_mut()
@@ -2151,8 +2151,8 @@ impl WorldSnapshot {
             if enemy.kind == EnemyKind::Bomber
                 && let Some(source_bomber) = enemy.source_bomber.as_mut()
             {
-                let should_run_tie_step = bomber_slot == selected_bomber_slot;
-                bomber_slot = (bomber_slot + 1) % SOURCE_BOMBER_SQUAD_SIZE;
+                let should_run_tie_step =
+                    usize::from(source_bomber.source_slot) == selected_bomber_slot;
                 if should_run_tie_step {
                     advance_source_bomber(
                         enemy.position,
@@ -3374,7 +3374,7 @@ const SOURCE_MINI_SWARMER_TURN_WINDOW_HALF: u16 = 150 * 32;
 const SOURCE_MINI_SWARMER_RESTORE_X_LOW: u8 = 0x07;
 const SOURCE_BOMBER_LOOP_SLEEP_TICKS: u8 = 1;
 const SOURCE_BOMBER_PICTURE_FRAME_COUNT: u8 = 4;
-const SOURCE_BOMBER_SQUAD_SIZE: usize = 3;
+const SOURCE_BOMBER_SQUAD_SIZE: usize = 4;
 const SOURCE_BOMBER_CRUISE_ALTITUDE: u8 = 0x50;
 const SOURCE_BOMBER_MIN_CRUISE_ALTITUDE: u8 = 0x40;
 const SOURCE_BOMBER_MAX_CRUISE_ALTITUDE: u8 = 0x68;
@@ -4218,6 +4218,7 @@ fn source_bomber_spawn(profile: WaveProfileSnapshot, spawn_index: usize) -> Sour
         picture_frame: 0,
         cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
         sleep_ticks: 0,
+        source_slot: (spawn_index % SOURCE_BOMBER_SQUAD_SIZE) as u8,
     }
 }
 
@@ -4244,7 +4245,7 @@ fn source_bomber_restore_spawns(
     let mut positive_x_velocity = true;
 
     while remaining > 0 {
-        let squad_count = remaining.min(3);
+        let squad_count = remaining.min(SOURCE_BOMBER_SQUAD_SIZE);
         let velocity_low = if positive_x_velocity {
             profile.bomber_x_velocity
         } else {
@@ -4266,6 +4267,7 @@ fn source_bomber_restore_spawns(
                 picture_frame: 0,
                 cruise_altitude: SOURCE_BOMBER_CRUISE_ALTITUDE,
                 sleep_ticks: 0,
+                source_slot: (squad_remaining - 1) as u8,
             };
             bombers.push(EnemySnapshot::source_bomber(
                 ScreenPosition::new(x, SOURCE_BOMBER_CRUISE_ALTITUDE),
@@ -8798,6 +8800,7 @@ mod tests {
                         picture_frame: 3,
                         cruise_altitude: 0,
                         sleep_ticks: 0,
+                        source_slot: 0,
                     },
                 ),
                 EnemySnapshot::source_mutant(
@@ -10908,6 +10911,7 @@ mod tests {
                 picture_frame: 0,
                 cruise_altitude: 0x50,
                 sleep_ticks: 0,
+                source_slot: 0,
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
@@ -10932,6 +10936,7 @@ mod tests {
                 picture_frame: 1,
                 cruise_altitude: 0x50,
                 sleep_ticks: super::SOURCE_BOMBER_LOOP_SLEEP_TICKS,
+                source_slot: 0,
             },
             game.state.world.source_rng,
             0,
@@ -10956,6 +10961,7 @@ mod tests {
             picture_frame: 1,
             cruise_altitude: 0x50,
             sleep_ticks: super::SOURCE_BOMBER_LOOP_SLEEP_TICKS,
+            source_slot: 0,
         };
 
         let frame = game.step(GameInput::NONE);
@@ -11002,6 +11008,7 @@ mod tests {
                 picture_frame: 2,
                 cruise_altitude: 0x50,
                 sleep_ticks: 0,
+                source_slot: 0,
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
@@ -11030,6 +11037,7 @@ mod tests {
             picture_frame: 2,
             cruise_altitude: 0x50,
             sleep_ticks: 0,
+            source_slot: 0,
         };
         assert_eq!(bomber.kind, EnemyKind::Bomber);
         assert_eq!(bomber.position, ScreenPosition::new(0x41, 0x61));
@@ -11038,6 +11046,99 @@ mod tests {
             super::source_bomber_screen_velocity(expected_source)
         );
         assert_eq!(bomber.source_bomber, Some(expected_source));
+    }
+
+    #[test]
+    fn clean_game_bomber_tie_selection_preserves_dead_squad_slot() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x5000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![
+            EnemySnapshot::source_bomber(
+                ScreenPosition::new(0x40, 0x60),
+                ScreenVelocity::new(1, 0),
+                SourceBomberSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0x0100,
+                    y_velocity: 0,
+                    picture_frame: 1,
+                    cruise_altitude: 0x50,
+                    sleep_ticks: 0,
+                    source_slot: 0,
+                },
+            ),
+            EnemySnapshot::source_bomber(
+                ScreenPosition::new(0x50, 0x70),
+                ScreenVelocity::new(1, 0),
+                SourceBomberSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0x0100,
+                    y_velocity: 0,
+                    picture_frame: 2,
+                    cruise_altitude: 0x50,
+                    sleep_ticks: 0,
+                    source_slot: 2,
+                },
+            ),
+        ];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        keep_single_grounded_human(&mut game);
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x02,
+            hseed: 0x40,
+            lseed: 0,
+        };
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .map(|enemy| enemy.position)
+                .collect::<Vec<_>>(),
+            vec![
+                ScreenPosition::new(0x41, 0x60),
+                ScreenPosition::new(0x51, 0x70)
+            ]
+        );
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .map(|enemy| enemy.source_bomber.expect("source bomber"))
+                .collect::<Vec<_>>(),
+            vec![
+                SourceBomberSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0x0100,
+                    y_velocity: 0,
+                    picture_frame: 1,
+                    cruise_altitude: 0x50,
+                    sleep_ticks: 0,
+                    source_slot: 0,
+                },
+                SourceBomberSnapshot {
+                    x_fraction: 0,
+                    y_fraction: 0,
+                    x_velocity: 0x0100,
+                    y_velocity: 0,
+                    picture_frame: 2,
+                    cruise_altitude: 0x50,
+                    sleep_ticks: 0,
+                    source_slot: 2,
+                },
+            ]
+        );
     }
 
     #[test]
@@ -11060,6 +11161,7 @@ mod tests {
                 picture_frame: 0,
                 cruise_altitude: 0x50,
                 sleep_ticks: 0,
+                source_slot: 0,
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
@@ -11084,6 +11186,7 @@ mod tests {
             picture_frame: 1,
             cruise_altitude: 0x50,
             sleep_ticks: super::SOURCE_BOMBER_LOOP_SLEEP_TICKS,
+            source_slot: 0,
         };
 
         let frame = game.step(GameInput::NONE);
@@ -11127,6 +11230,7 @@ mod tests {
                 picture_frame: 0,
                 cruise_altitude: 0x50,
                 sleep_ticks: 0,
+                source_slot: 0,
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
@@ -11188,6 +11292,7 @@ mod tests {
                 picture_frame: 0,
                 cruise_altitude: 0x50,
                 sleep_ticks: 0,
+                source_slot: 0,
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
@@ -11233,6 +11338,7 @@ mod tests {
                 picture_frame: 0,
                 cruise_altitude: 0x50,
                 sleep_ticks: 0,
+                source_slot: 0,
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
@@ -12011,9 +12117,20 @@ mod tests {
         );
         assert_eq!(
             source_bombers[3].x_velocity,
+            super::source_sign_extend_u8_to_u16(game.state.wave_profile.bomber_x_velocity)
+        );
+        assert_eq!(
+            source_bombers[4].x_velocity,
             super::source_sign_extend_u8_to_u16(
                 0u8.wrapping_sub(game.state.wave_profile.bomber_x_velocity)
             )
+        );
+        assert_eq!(
+            source_bombers
+                .iter()
+                .map(|source_bomber| source_bomber.source_slot)
+                .collect::<Vec<_>>(),
+            vec![3, 2, 1, 0, 0]
         );
         assert_eq!(
             frame.state.world.enemy_reserve,

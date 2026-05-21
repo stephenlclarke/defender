@@ -1027,12 +1027,13 @@ Object-ecology progress after R9-C4 slices:
   on-screen player-Y steering, off-screen cruise-altitude steering, and bounded
   `BOMBST` bomb-shell projection state with source `GETSHL` placement bounds.
   The clean bomber state update now honors the source `TIE` `SEED & 0x06`
-  squad-slot selection so empty selected slots sleep while active bomber
-  positions still advance through source velocity.
+  four-slot squad selection from persistent source slots, so killed or empty
+  selected slots sleep while active bomber positions still advance through
+  source velocity.
   Reserve bomber activation now mirrors
-  source `TIEST` squad placement: up to three bombers per squad, X positions
-  spaced from the current player X, fixed cruise altitude, and alternating
-  source X velocity per restored squad.
+  source `TIEST` squad placement: up to four bombers per squad, X positions
+  spaced from the current player X, fixed cruise altitude, persistent source
+  slots, and alternating source X velocity per restored squad.
 - Clean baiter runtime entry now follows the source game-exec pacing shape:
   a 15-frame cadence, low-enemy timer acceleration, zero-enemy wave-clear
   guard, deterministic clean spawn, and source active-baiter cap. The clean
@@ -1122,8 +1123,9 @@ Object-ecology progress after R9-C4 slices:
   terrain-blow start/completion command, laser-loop movement, and laser
   collision-footprint evidence, bomb-shell collision-footprint evidence, and
   enemy collision-footprint evidence, player collision-footprint evidence,
-  rescue collision-footprint evidence, and bomber shell-counter evidence plus
-  focused source ecology fixtures for those transitions.
+  rescue collision-footprint evidence, bomber shell-counter evidence, and
+  bomber squad-slot evidence plus focused source ecology fixtures for those
+  transitions.
 
 Work log:
 
@@ -2689,6 +2691,19 @@ Work log:
   Step 50 shell-counter slice; `cargo test --all-targets` was run because the
   public clean projectile snapshot shape changed. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779329168264399`.
+
+- `2026-05-21 03:30:14 BST` R9-C4 progress slice
+  `source bomber squad slots`. Clean source-bomber state now carries the
+  persistent source `TIE` squad slot, reserve `TIEST` batches use four source
+  slots per squad, and the selected `SEED & 0x06` slot no longer shifts when a
+  bomber has been killed or an empty slot is selected. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo test clean_game_bomber
+  --lib`, `cargo test --all-targets`, touched-doc `markdownlint`, and `git
+  diff --check`. Broad `make fidelity`, full all-scenario `make
+  clean-fidelity`, and full clippy remain deferred because this is a bounded
+  Step 50 bomber-squad slice; `cargo test --all-targets` was run because the
+  public clean source-bomber snapshot shape changed. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779330459202089`.
 
 ## Archived Completed History
 
