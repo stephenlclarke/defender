@@ -31,23 +31,21 @@ As of 2026-05-21, the R9 behavior and evidence blockers B01-B12 are closed.
 The clean runtime is the production runtime: normal play steps clean `Game`
 frames through clean platform, audio, and renderer modules, while the accepted
 machine remains feature-gated behind `legacy-tools` for developer evidence. The
-final R9 validation gate passed with `make fidelity`, full all-scenario
+last full R9 validation gate passed with `make fidelity`, full all-scenario
 `make clean-fidelity`, `cargo run -- --game-smoke`, `cargo run -- --live-smoke`,
 core-document markdownlint, and `git diff --check`.
 
-R9 owner signoff is still pending. Owner review of the previous
-`docs/start-sequence.gif` reopened visual acceptance for the clean renderer.
-Williams handwriting/color cadence, Defender wordmark coalescence, gameplay
-sprite/palette fidelity, Hall of Fame attract order, and the scoring/action
-attract segment are now repaired in clean runtime. R9-E3.7 regenerated
-`docs/start-sequence.gif` from clean `Game` frames and the clean sprite
-scene/atlas media path and passed the closeout validation gate; B13 now waits
-on owner signoff for that acceptance media. Evidence-only follow-ups after
-acceptance remain exact per-scenario
-pixel CRC parity, strict
-long-scenario sprite count/layer parity, per-scenario offscreen `wgpu`
-signatures, and optional local MAME/reference trace refreshes where local ROM
-inputs are available.
+R9 owner signoff is still pending, and B13 visual acceptance is reopened.
+Owner review rejected the regenerated R9-E3.7 clean media after comparison
+with the original `docs/start-sequence.gif`. The original GIF has been restored
+from git and is the protected visual reference until an owner-approved
+replacement exists. The rejected clean candidate was shorter and visually
+wrong: Williams screen colors and handwriting cadence were off, the Defender
+wordmark did not coalesce like the source title program, screen number glyphs
+were scrambled, sprites and sprite colors were corrupted, terrain/ground was
+wrong, and the attract flow did not match Williams -> High Scores -> scoring
+sequence. B13 now requires source-backed visual repair and a fresh candidate
+review before R9 can be signed off.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -130,7 +128,9 @@ make readme-media
 
 `make readme-media` builds the explicit `legacy-tools` tooling path, steps
 clean `Game` frames, rasterizes the clean sprite scene/atlas media path, and
-regenerates `docs/start-sequence.gif` from the clean renderer.
+writes a clean GIF. Until reopened B13 is fixed, treat that output as a
+candidate only; `docs/start-sequence.gif` is the protected original reference
+and must not be replaced without owner approval.
 
 ## Controls
 
@@ -231,7 +231,9 @@ top-display frame geometry. R9 now treats exact per-scenario pixel/offscreen
 render parity, strict long-scenario sprite count/layer parity,
 and wave-completion survivor-bonus loop/cadence beyond current presentation as
 post-R9 audit follow-ups rather than active B01-B12 blockers. Owner-reviewed
-B13 visual acceptance now depends on the final R9-E3.7 media/gate review.
+B13 visual acceptance is reopened. It depends on source-backed repair of the
+Williams title, Defender coalescence, numeric glyphs, sprites, terrain/ground,
+and scoring attract media before a new gate/review.
 Player-one/player-two score digits, life/smart-bomb stock drawing, two-player
 start admission/top-display initialization, the two-player player-start
 prompt, and the two-player final-life `PLE02` switch/respawn handoff plus its

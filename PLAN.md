@@ -747,18 +747,16 @@ Phase 5: final render parity and acceptance.
   all 12 embedded Phase 1 scenarios; `cargo run -- --game-smoke` and
   `cargo run -- --live-smoke` passed; core-doc markdownlint and diff hygiene
   passed. B12 is closed; Step 55 / R9-E3 is the next active roadmap step.
-- Step 55 / Cycle R9-E3: owner acceptance and milestone closeout.
-  Implementation complete 2026-05-21; owner signoff is pending. README, SPEC,
-  `docs/fidelity/gaps.md`, and this plan state the final R9 contract,
-  remaining non-rewrite follow-ups, validation evidence, and owner acceptance
-  status from the Step 54 gate. Owner review rejected the earlier clean visual
-  presentation after comparing it with
-  `docs/start-sequence.gif`: the clean Williams screen colors are wrong, the
-  Williams logo is static rather than handwritten, the Defender wordmark does
-  not coalesce, gameplay sprites are corrupted/wrong-colored, and the attract
-  sequence order should be Williams -> High Scores -> scoring sequence. The
-  corrective implementation and closeout gate are now complete; B13 stays open
-  only for owner signoff on the regenerated clean acceptance media.
+- Step 55 / Cycle R9-E3: owner acceptance and milestone closeout. Reopened
+  2026-05-21 after owner review rejected the regenerated R9-E3.7 clean media.
+  README, SPEC, `docs/fidelity/gaps.md`, and this plan keep B01-B12 closed
+  for their validated behavior/evidence surfaces, but B13 is active again.
+  `docs/start-sequence.gif` has been restored from git and is the protected
+  original visual reference. The rejected clean candidate is local comparison
+  evidence only. Active B13 repair now covers Williams title colors and
+  handwritten cadence, ROM/source Defender wordmark coalescence, scrambled
+  screen number glyphs, sprite shapes/colors, terrain/ground presentation, and
+  Williams -> High Scores -> scoring sequence order.
 
 R9-E3 corrective visual acceptance schedule:
 
@@ -800,16 +798,50 @@ R9-E3 corrective visual acceptance schedule:
   the `ENMYTB` enemy score-card reveal, then wraps back to the Williams page.
   Focused attract/action tests cover the source timing, text reveal, demo
   objects, scanner sprites, and cycle wrap.
-- R9-E3.7: visual acceptance closeout gate. Completed 2026-05-21. README
-  media generation now steps clean `Game` frames and rasterizes the clean sprite
-  scene/atlas media path; `docs/start-sequence.gif` has been regenerated from
-  that clean capture after comparison with the previous reference GIF. The
-  closeout gate passed with `make fidelity`, full all-scenario
-  `make clean-fidelity`, `cargo run -- --game-smoke`, `cargo run
-  -- --live-smoke`, core-doc markdownlint, and `git diff --check`.
-  `--live-smoke` now records first offscreen signature `3b0828b85a4f1bce` and
-  last signature `d8eb31d1cab9d7d2`. B13 now waits only on owner review of the
-  regenerated clean media.
+- R9-E3.7: visual acceptance closeout gate. Completed 2026-05-21, then
+  rejected by owner review. The regenerated clean GIF had 277 frames versus
+  347 frames in the restored original reference and visually diverged on the
+  Williams title, Defender coalescence, numeric glyphs, sprites, terrain, and
+  scoring/action flow. Treat this slice as failed B13 evidence; it does not
+  close owner visual acceptance.
+
+Reopened B13 repair schedule:
+
+- R9-E3.8: protected reference and visual-diff harness. Next implementation
+  slice. Keep `docs/start-sequence.gif` immutable as the original reference
+  until owner approval. Change media generation to write clean candidates under
+  `target/` or another explicit candidate path, then compare candidate frames
+  against the protected reference with coalesced frame sheets and targeted
+  crop/perceptual metrics for title, Hall of Fame, scoring/action, numeric
+  glyphs, sprite, and terrain regions.
+- R9-E3.9: ROM-backed Williams/Defender title program. Rebuild the clean title
+  projection from ROM/pre-rewrite evidence instead of the current block
+  approximation: source `LOGO`/`LGOTAB` Williams handwriting, `DEFEND`,
+  `DEFENS`, `DEF33`, `DEF44`, `DEF50`, `APVCT`, and `WILLIR`/`WILR1`
+  descriptor/appearance-slot behavior. Add focused tests for the 15-source
+  Defender appearance slots, source restore path, color cadence, and transition
+  to the settled wordmark.
+- R9-E3.10: source text and numeric glyph repair. Fix the scrambled screen
+  number fonts by auditing score digits, credit digits, Hall of Fame/scoring
+  numbers, wave/multiplier digits, and any `MESS`/`WNBV` glyph path against
+  source bit order, dimensions, palette words, and screen addresses. Add crop
+  comparisons for the visible score/credit/Hall of Fame/scoring digits.
+- R9-E3.11: source sprite and terrain/ground repair. Replace remaining
+  prototype or mis-decoded runtime art with source-backed object-image
+  decoding, correct color-word/palette mapping, orientation, dimensions, and
+  transparency. Replace the font-sheet terrain/ground placeholder with
+  source-backed `BGINIT`/`BGOUT`/`TDATA` terrain projection or accepted
+  pre-rewrite frame evidence, including scanner/ground color checks.
+- R9-E3.12: attract sequence timing and scoring/action parity. Reconcile the
+  clean attract scheduler with the reference ordering and timing:
+  Williams -> High Scores -> scoring sequence. Use source waits and
+  pre-rewrite trace behavior to align page lengths, object placement, scoring
+  card reveal, demo sprites, terrain, scanner blips, and wrap back to Williams.
+- R9-E3.13: candidate media gate and owner review. Generate a clean candidate
+  without overwriting the protected reference, compare it to the restored GIF,
+  run focused visual tests plus targeted clean-fidelity scenarios affected by
+  the changes, then run the broad R9 closeout gate once this phase is ready.
+  Only replace `docs/start-sequence.gif` after owner approval.
 
 Strict R9 blocker matrix after Step 41:
 
@@ -827,7 +859,7 @@ Strict R9 blocker matrix after Step 41:
 | B10 | High-score return | clean/accepted | 52 | closed 2026-05-21 |
 | B11 | Render audit | docs/evidence | 53 | closed 2026-05-21 |
 | B12 | Full validation | docs/evidence | 54 | closed 2026-05-21 |
-| B13 | Owner visual | owner/render | 55 | owner accepts media |
+| B13 | Owner visual | owner/render | 55 | owner accepts repaired media |
 
 Step 41 acceptance contract:
 
@@ -3143,6 +3175,23 @@ Work log:
   deferred for the R9-E3.7 closeout. The next full gate should run only if owner
   review requests another visual/runtime change, a public contract changes, or
   scenario behavior changes before final owner signoff.
+
+- `2026-05-21 22:40:36 BST` Reopened B13 after owner rejection of the R9-E3.7
+  media. Restored the original `docs/start-sequence.gif` from git and confirmed
+  it matches the saved reference copy. The restored original has 347 frames;
+  the rejected clean candidate has 277 frames and diverges on Williams
+  handwriting/colors, Defender coalescence, numeric glyphs, sprites,
+  terrain/ground, and attract ordering. README, SPEC,
+  `docs/fidelity/gaps.md`, and this plan now mark the original GIF as the
+  protected reference and schedule source-backed repairs using ROM/pre-rewrite
+  title, glyph, sprite, terrain, and scoring/action evidence. Focused
+  validation passed with `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/gaps.md` and `git diff --check`. Broad Rust/fidelity gates were
+  intentionally deferred because this slice restored media and updated
+  docs/status only. The next full gate should run when the reopened B13 runtime
+  repair reaches candidate closeout, or sooner if a shared public contract or
+  scenario behavior changes. No Slack update was sent because this was a
+  docs/reference planning correction rather than an implementation cycle.
 
 ## Archived Completed History
 

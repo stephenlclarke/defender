@@ -28,29 +28,31 @@ sources or by an accepted fixture.
 
 ## R9 Acceptance Contract
 
-As of 2026-05-21, R9 behavior and evidence blockers B01-B12 are closed. The
-accepted final contract is ready for owner review:
+As of 2026-05-21, R9 behavior and evidence blockers B01-B12 are closed. B13
+visual acceptance is reopened after owner review rejected the regenerated
+R9-E3.7 clean media:
 
 - Normal runtime uses clean `Game` frames through clean platform, audio, and
   renderer modules; the accepted machine remains feature-gated behind
   `legacy-tools` for developer evidence.
 - Clean fidelity compares the real clean `Game` with the accepted oracle across
   all 12 embedded Phase 1 scenario input programs.
-- The full R9 validation gate passed with `make fidelity`, full all-scenario
+- The last full R9 validation gate passed with `make fidelity`, full
+  all-scenario
   `make clean-fidelity`, `cargo run -- --game-smoke`,
   `cargo run -- --live-smoke`, core-document markdownlint, and
   `git diff --check`.
-- Owner signoff remains pending as B13. Owner review of the previous
-  `docs/start-sequence.gif` reopened visual acceptance. Williams handwriting
-  and color cadence, Defender wordmark coalescence, gameplay sprite/palette
-  fidelity, the Hall of Fame attract order, and the scoring/action attract
-  segment are now repaired in clean runtime. R9-E3.7 regenerated
-  `docs/start-sequence.gif` from clean `Game` frames and the clean sprite
-  scene/atlas media path and passed the closeout validation gate. B13 now
-  depends on owner signoff for that acceptance media. Until signoff, changes
-  that alter public contracts, scenario
-  semantics, runtime behavior, or final acceptance evidence must trigger
-  focused checks and, when broad risk is introduced, a renewed full gate.
+- Owner signoff remains pending as B13. `docs/start-sequence.gif` has been
+  restored from git and is the protected original visual reference until an
+  owner-approved replacement exists. The rejected clean media differs in frame
+  count and presentation: Williams color/handwriting cadence, Defender
+  wordmark coalescence, numeric glyphs, sprite colors/shapes, terrain/ground,
+  and Williams -> High Scores -> scoring sequence ordering must be repaired
+  from source-backed ROM/pre-rewrite evidence before a new candidate can
+  replace the protected reference. Until signoff, changes that alter public
+  contracts, scenario semantics, runtime behavior, or final acceptance
+  evidence must trigger focused checks and, when broad risk is introduced, a
+  renewed full gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite
