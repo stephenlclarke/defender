@@ -791,6 +791,14 @@ post-acceptance validation records.
   `hyperspace`, `abduction`, `death`, `wave_advance`, and
   `planet_destruction`, followed by the Step 50 closure gate. R9-C4.2 is
   reserved for any bounded runtime fix exposed by those fixture runs.
+- `2026-05-21 07:57:55 BST`: R9-C4.3 hardens the focused source ecology
+  fixture set and R9-C4.4 reconciles documentation without widening public
+  evidence contracts. Targeted `make clean-fidelity SCENARIOS="start_game
+  smart_bomb hyperspace abduction death wave_advance planet_destruction"`
+  matched all seven scenarios, so no bounded R9-C4.2 runtime repair was opened
+  and no accepted facade, oracle, `WorldSnapshot`, object evidence, sound
+  evidence, or scenario fields changed. Remaining B08 work is the R9-C4.5 /
+  Step 50 broad closure gate.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

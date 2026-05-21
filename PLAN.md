@@ -664,20 +664,18 @@ R9-C4 closure checklist:
   focused Rust tests for the touched family/helper and the narrow clean-fidelity
   scenario that exercises the changed behavior. Use Slack start/completion
   updates and push after the validated implementation slice.
-- R9-C4.3: harden source ecology fixtures. Ensure the focused fixture set proves
-  startup ecology, reserve activation, smart-bomb destruction, pod-to-swarmer
-  release, bomber shell limits, baiter/mutant/lander projectile paths,
-  lander-human carry/release/conversion, human fall/catch/loss, hyperspace shell
-  cleanup, and planet-destruction handoff. The expected targeted clean-fidelity
-  coverage is `start_game`, `smart_bomb`, `hyperspace`, `abduction`, `death`,
-  `wave_advance`, and `planet_destruction`; add narrower unit tests where those
-  scenarios do not isolate the edge.
-- R9-C4.4: reconcile public evidence and docs. If closing fixes add or rename
-  accepted facade, oracle, `WorldSnapshot`, object evidence, sound evidence, or
-  scenario fields, align README, SPEC, `docs/fidelity/gaps.md`, and this plan in
-  the same slice. If no behavior changes are needed after the audit, record the
-  B08 closure basis in this plan and `docs/fidelity/gaps.md` without widening
-  public contracts.
+- R9-C4.3: harden source ecology fixtures. Completed 2026-05-21. Targeted
+  clean-fidelity coverage passed for `start_game`, `smart_bomb`, `hyperspace`,
+  `abduction`, `death`, `wave_advance`, and `planet_destruction`, proving the
+  covered startup ecology, reserve activation, smart-bomb destruction,
+  pod-to-swarmer release, bomber shell limits, baiter/mutant/lander projectile
+  paths, lander-human carry/release/conversion, human fall/catch/loss,
+  hyperspace shell cleanup, and planet-destruction handoff surfaces.
+- R9-C4.4: reconcile public evidence and docs. Completed 2026-05-21. R9-C4.1
+  and R9-C4.3 required no public facade, oracle, `WorldSnapshot`, object
+  evidence, sound evidence, or scenario field changes; README, SPEC,
+  `docs/fidelity/gaps.md`, and this plan now record that B08 is ready for the
+  Step 50 closure gate without widening public contracts.
 - R9-C4.5: close Step 50 / B08 with one Phase 3 gate. Run the focused checks
   from the closing slice plus the broad phase-close set: `cargo fmt --check`,
   `cargo test --all-targets`, full all-scenario `make clean-fidelity`, `make
@@ -1153,10 +1151,11 @@ Object-ecology progress after R9-C4 slices:
 - Player-carried humans now follow the source AFALL2 carried offset and settle
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
-  is focused source ecology fixture hardening and the Step 50 closure gate. The
-  R9-C4.1 residual ecology audit classifies the per-family movement/projectile
-  runtime surfaces as covered by current clean runtime and focused unit tests;
-  R9-C4.2 remains a conditional repair slot if fixture hardening exposes drift.
+  is the Step 50 closure gate. The R9-C4.1 residual ecology audit classifies
+  the per-family movement/projectile runtime surfaces as covered by current
+  clean runtime and focused unit tests; R9-C4.3 targeted source ecology
+  fixtures all match; R9-C4.2 remains a conditional repair slot only if the
+  closure gate exposes drift.
 
 R9-C4 residual ecology audit after R9-C4.1:
 
@@ -1186,11 +1185,16 @@ R9-C4 residual ecology audit after R9-C4.1:
   acceleration, safe/fatal landing, `AFALL2` player-carried landing, `P250` /
   `P500` score popups, astronaut catch/release/landing/impact sound commands,
   last-human source `TERBLO` start, and `TBL3` / `TBL4` terrain-blow completion.
-- Still required for B08 closure: R9-C4.3 must harden focused source ecology
-  fixtures across `start_game`, `smart_bomb`, `hyperspace`, `abduction`,
-  `death`, `wave_advance`, and `planet_destruction`. Any fixture mismatch that
-  points to one family loop, shared shell edge, or collision/kill side effect
-  should reopen R9-C4.2 for a bounded implementation slice.
+- Covered fixture surfaces: targeted `make clean-fidelity
+  SCENARIOS="start_game smart_bomb hyperspace abduction death wave_advance
+  planet_destruction"` matched all seven R9-C4 source ecology scenarios. Any
+  later closure-gate mismatch that points to one family loop, shared shell edge,
+  or collision/kill side effect should reopen R9-C4.2 for a bounded
+  implementation slice.
+- Still required for B08 closure: run R9-C4.5 / Step 50 with the broad Phase 3
+  closure gate. B08 should close only if that gate passes or any remaining
+  object-ecology residual is explicitly source-backed and moved out of strict
+  R9.
 - Deferred outside B08: cycle-accurate CPU/golden-trace scheduling, non-gameplay
   render-presentation residuals, two-player session routing, and high-score
   table/return behavior remain owned by later R9-D/R9-E steps rather than
@@ -2787,6 +2791,15 @@ Work log:
   hardening, so R9-C4.2 is now conditional on concrete drift from R9-C4.3.
   This was a docs/status update, so no Slack update or Rust validation was
   required.
+
+- `2026-05-21 07:57:55 BST` Completed R9-C4.3 source ecology fixture
+  hardening and R9-C4.4 documentation reconciliation. Targeted `make
+  clean-fidelity SCENARIOS="start_game smart_bomb hyperspace abduction death
+  wave_advance planet_destruction"` matched all seven scenarios. No public
+  facade, oracle, `WorldSnapshot`, object evidence, sound evidence, or scenario
+  field changes were required, so README, SPEC, `docs/fidelity/gaps.md`, and
+  this plan were updated only to record closure readiness. Broad Step 50 closure
+  validation remains R9-C4.5.
 
 ## Archived Completed History
 
