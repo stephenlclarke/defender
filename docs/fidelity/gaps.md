@@ -8,7 +8,15 @@ scenario input programs, and the R9-E2 full validation gate has passed. Strict
 R9 behavior/evidence blockers are closed through B12; final acceptance is
 pending owner signoff and milestone closeout. Older entries remain closed
 fidelity history, local-reference/tooling notes, archived prototype cleanup, or
-post-acceptance validation records.
+post-acceptance validation records. Historical entries that mention remaining
+blockers describe the state at the time they were written; they are not active
+R9 blockers unless restated in this status block.
+
+Post-R9 non-rewrite follow-ups are evidence and polish items: exact
+per-scenario pixel CRC parity, strict long-scenario sprite count/layer parity,
+per-scenario offscreen `wgpu` signatures, Williams logo table-walker animation,
+hardware palette/RGB audit residuals, and optional local MAME/reference trace
+refreshes where local ROM inputs are available.
 
 ## Clean Rewrite Equivalence
 

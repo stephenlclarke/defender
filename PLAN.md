@@ -174,8 +174,7 @@ new source-backed fidelity gap is accepted in `docs/fidelity/gaps.md`.
   profiles. R9-E2 has passed the full validation gate for formatting, all Rust
   targets, clippy, fidelity, all-scenario clean-fidelity, game/live smoke,
   markdownlint, and diff hygiene. Strict R9 behavior/evidence blockers B01-B12
-  are closed; final acceptance now depends on owner decision and milestone
-  closeout in Step 55.
+  are closed; final acceptance now depends on explicit owner signoff in Step 55.
 - `DC-163` gates remaining oracle, ROM, trace, and README media adapters behind
   the explicit `legacy-tools` feature. Default production builds no longer
   compile the accepted machine, legacy live core, CMOS storage, or retired
@@ -507,8 +506,9 @@ Deliverables:
   smoke, and live smoke.
 - Record final visual, audio, and playability evidence in `README.md`,
   `SPEC.md`, and `docs/fidelity/`.
-- Update `PLAN.md` to state the rewrite is complete and remove the old
-  completed-cycle narrative from active planning.
+- Update `PLAN.md` to state the rewrite is acceptance-ready, record owner
+  signoff status, and remove the old completed-cycle narrative from active
+  planning once the owner accepts the final contract.
 
 Exit gate:
 
@@ -525,8 +525,8 @@ markdownlint README.md SPEC.md PLAN.md docs/fidelity/refactor-freeze.md \
 git diff --check
 ```
 
-R9 is complete when there are no active rewrite gaps and the clean runtime is
-the only production runtime.
+R9 is complete when there are no active rewrite gaps, the clean runtime is the
+only production runtime, and the owner accepts the final contract.
 
 ### Work Sequencing Rules
 
@@ -747,10 +747,11 @@ Phase 5: final render parity and acceptance.
   all 12 embedded Phase 1 scenarios; `cargo run -- --game-smoke` and
   `cargo run -- --live-smoke` passed; core-doc markdownlint and diff hygiene
   passed. B12 is closed; Step 55 / R9-E3 is the next active roadmap step.
-- Step 55 / Cycle R9-E3: owner acceptance and milestone closeout. Update
-  README, SPEC, `docs/fidelity/gaps.md`, and this plan to state the final R9
-  contract, remaining non-rewrite follow-ups if any, validation evidence, and
-  owner acceptance status.
+- Step 55 / Cycle R9-E3: owner acceptance and milestone closeout. In progress
+  2026-05-21. README, SPEC, `docs/fidelity/gaps.md`, and this plan now state
+  the final R9 contract, remaining non-rewrite follow-ups, validation evidence,
+  and owner acceptance status. Owner signoff remains pending; B13 stays open
+  until the owner explicitly accepts the final contract.
 
 Strict R9 blocker matrix after Step 41:
 
@@ -768,7 +769,7 @@ Strict R9 blocker matrix after Step 41:
 | B10 | High-score return | clean/accepted | 52 | closed 2026-05-21 |
 | B11 | Render audit | docs/evidence | 53 | closed 2026-05-21 |
 | B12 | Full validation | docs/evidence | 54 | closed 2026-05-21 |
-| B13 | Owner signoff | owner decision | 55 | final contract accepted |
+| B13 | Owner signoff | owner decision | 55 | pending owner signoff |
 
 Step 41 acceptance contract:
 
@@ -2954,6 +2955,20 @@ Work log:
   changes final contract docs, or if any later public-contract or scenario
   behavior change lands. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779351845907799`.
+
+- `2026-05-21 09:39:47 BST` R9-E3 Step 55 owner-acceptance closeout prep.
+  README, SPEC, `docs/fidelity/gaps.md`, and this plan now state the final R9
+  contract, Step 54 validation evidence, remaining non-rewrite follow-ups, and
+  owner acceptance status. B01-B12 are closed; B13 remains pending explicit
+  owner signoff. No runtime behavior, public API, or scenario semantics changed.
+  Focused validation passed with `markdownlint README.md SPEC.md PLAN.md
+  docs/fidelity/gaps.md` and `git diff --check`.
+  Broad validation remains deferred because Step 54 already ran the full R9
+  gate and this slice is docs/status only. The next full gate should run if the
+  final owner-acceptance pass requests a fresh broad gate, or if any
+  public-contract, runtime-behavior, or scenario-semantics change lands. Slack
+  start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779352737331829`.
 
 ## Archived Completed History
 

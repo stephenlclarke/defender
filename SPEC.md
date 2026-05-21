@@ -26,6 +26,31 @@ Use these references when behavior is unclear:
 Current Rust behavior is not authoritative unless it is backed by one of those
 sources or by an accepted fixture.
 
+## R9 Acceptance Contract
+
+As of 2026-05-21, R9 behavior and evidence blockers B01-B12 are closed. The
+accepted final contract is ready for owner review:
+
+- Normal runtime uses clean `Game` frames through clean platform, audio, and
+  renderer modules; the accepted machine remains feature-gated behind
+  `legacy-tools` for developer evidence.
+- Clean fidelity compares the real clean `Game` with the accepted oracle across
+  all 12 embedded Phase 1 scenario input programs.
+- The full R9 validation gate passed with `make fidelity`, full all-scenario
+  `make clean-fidelity`, `cargo run -- --game-smoke`,
+  `cargo run -- --live-smoke`, core-document markdownlint, and
+  `git diff --check`.
+- Owner signoff remains pending as B13. Until signoff, changes that alter
+  public contracts, scenario semantics, runtime behavior, or final acceptance
+  evidence must trigger focused checks and, when broad risk is introduced, a
+  renewed full gate.
+
+Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
+blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite
+count/layer parity, per-scenario offscreen `wgpu` signatures, Williams logo
+table-walker animation, hardware palette/RGB audit residuals, and optional
+local MAME/reference trace refreshes where local ROM inputs are available.
+
 ## Implementation Rules
 
 - Implement red-label Defender behavior, not a Defender-like approximation.

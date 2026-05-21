@@ -25,6 +25,23 @@ sprite/temporary-raster evidence plus offscreen `wgpu` render/readback
 signatures, including checked first/last frame signatures, without using the
 legacy live presenter for frame generation.
 
+## R9 Acceptance Status
+
+As of 2026-05-21, the R9 behavior and evidence blockers B01-B12 are closed.
+The clean runtime is the production runtime: normal play steps clean `Game`
+frames through clean platform, audio, and renderer modules, while the accepted
+machine remains feature-gated behind `legacy-tools` for developer evidence. The
+final R9 validation gate passed with `make fidelity`, full all-scenario
+`make clean-fidelity`, `cargo run -- --game-smoke`, `cargo run -- --live-smoke`,
+core-document markdownlint, and `git diff --check`.
+
+R9 owner signoff is still pending. Non-rewrite follow-ups after acceptance are
+evidence and polish items rather than active R9 blockers: exact per-scenario
+pixel CRC parity, strict long-scenario sprite count/layer parity,
+per-scenario offscreen `wgpu` signatures, Williams logo table-walker animation,
+hardware palette/RGB audit residuals, and optional local MAME/reference trace
+refreshes where local ROM inputs are available.
+
 ![Defender gameplay frame](docs/defender.png)
 
 ![Defender attract sequence](docs/start-sequence.gif)
@@ -202,13 +219,11 @@ source `TERBLO` / `AHSND` entry command evidence, and source `TBSND`
 completion command evidence, source-backed per-family enemy
 hit sound-command evidence, source-backed
 enemy-projectile collision sound-command evidence, and source `BORDER`
-top-display frame geometry; lifecycle transitions outside the score-popup,
-`EXST`/`EXPU` expanded-object explosion, player-death pixel-cloud,
-terrain-blow, covered enemy-hit/projectile-collision command surfaces, and
-covered two-player turn/session routing,
+top-display frame geometry. R9 now treats exact per-scenario pixel/offscreen
+render parity, strict long-scenario sprite count/layer parity,
 wave-completion survivor-bonus loop/cadence beyond current presentation, live
-Williams logo table-walker animation, hardware palette/RGB render audit
-residuals, and full visual presentation remain strict R9 blockers.
+Williams logo table-walker animation, and hardware palette/RGB render audit
+residuals as post-R9 audit follow-ups rather than active B01-B12 blockers.
 Player-one/player-two score digits, life/smart-bomb stock drawing, two-player
 start admission/top-display initialization, the two-player player-start
 prompt, and the two-player final-life `PLE02` switch/respawn handoff plus its
