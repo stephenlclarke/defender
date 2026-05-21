@@ -692,6 +692,15 @@ post-acceptance validation records.
   player-action, hyperspace shell-cleanup/rematerialize/death-risk,
   lander-abduction, and astronaut command evidence plus focused source ecology
   fixtures for those transitions.
+- `2026-05-21 01:26:39 BST`: R9-C4 aligns clean source wave-enemy
+  bookkeeping with source `WVCHK` / `GEXEC` by excluding active baiters
+  (`UFOCNT`) from the wave-enemy total. Active baiters no longer inflate
+  low-enemy baiter pacing, block reserve activation when only baiters remain
+  active, or block wave clear when no source-counted enemies or reserves
+  remain. Remaining B08 work is exact per-family movement/projectile behavior
+  beyond the covered baiter bookkeeping, enemy-hit, enemy-shot, player-action,
+  hyperspace, lander-abduction, and astronaut command evidence plus focused
+  source ecology fixtures for those transitions.
 - `2026-05-21 01:10:37 BST`: R9-C4 adds bounded source `HYP02`
   rematerialization state for accepted clean hyperspace inputs. Clean
   hyperspace now reloads camera/background from the source `SEED`/`HSEED` word,

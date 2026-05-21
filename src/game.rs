@@ -1890,15 +1890,21 @@ impl WorldSnapshot {
         player_absolute_x: u16,
         background_absolute_x: u16,
     ) -> bool {
-        if !self.enemies.is_empty() || self.enemy_reserve.is_empty() {
+        if self.active_source_wave_enemy_count() != 0 || self.enemy_reserve.is_empty() {
             return false;
         }
 
+        let mut active_baiters = self
+            .enemies
+            .iter()
+            .copied()
+            .filter(|enemy| enemy.kind == EnemyKind::Baiter)
+            .collect::<Vec<_>>();
         let targetable_humans = self
             .humans
             .iter()
             .any(|human| !human.carried && !human.carried_by_player);
-        self.enemies = clean_wave_enemy_spawns(
+        let mut reserve_batch = clean_wave_enemy_spawns(
             &mut self.enemy_reserve,
             profile,
             &mut self.source_rng,
@@ -1910,6 +1916,8 @@ impl WorldSnapshot {
             &self.humans,
             &mut self.source_target_list_cursor_address,
         );
+        active_baiters.append(&mut reserve_batch);
+        self.enemies = active_baiters;
         !self.enemies.is_empty()
     }
 
@@ -1963,9 +1971,19 @@ impl WorldSnapshot {
     }
 
     fn source_enemy_total(&self) -> usize {
-        self.enemies
-            .len()
+        self.active_source_wave_enemy_count()
             .saturating_add(usize::from(self.enemy_reserve.total()))
+    }
+
+    fn active_source_wave_enemy_count(&self) -> usize {
+        self.enemies
+            .iter()
+            .filter(|enemy| enemy.kind != EnemyKind::Baiter)
+            .count()
+    }
+
+    fn clear_source_non_wave_enemies(&mut self) {
+        self.enemies.retain(|enemy| enemy.kind != EnemyKind::Baiter);
     }
 
     fn active_enemy_count(&self, kind: EnemyKind) -> usize {
@@ -6373,10 +6391,11 @@ impl Game {
         if matches!(
             WaveSystem::evaluate(WaveState::new(
                 self.state.wave,
-                self.state.world.enemies.len()
+                self.state.world.source_enemy_total()
             )),
             WaveStatus::Cleared { .. }
         ) {
+            self.state.world.clear_source_non_wave_enemies();
             self.pending_wave_start = true;
             gameplay_events.push(GameEvent::WaveCleared);
         }
@@ -10315,6 +10334,11 @@ mod tests {
                 )
             })
             .collect();
+        game.state.world.enemies.push(EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        ));
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.baiter_timer_ticks = Some(1);
         game.baiter_pacing_frames_remaining = 1;
@@ -10332,6 +10356,116 @@ mod tests {
             SOURCE_ACTIVE_BAITER_LIMIT
         );
         assert!(frame.events.gameplay().is_empty());
+    }
+
+    #[test]
+    fn clean_game_baiter_timer_ignores_active_baiters_for_source_enemy_total() {
+        let mut game = credited_started_game();
+        let mut enemies = (0..8)
+            .map(|index| {
+                EnemySnapshot::new(
+                    EnemyKind::Lander,
+                    ScreenPosition::new(160 + index as u8, 80),
+                    ScreenVelocity::new(0, 0),
+                )
+            })
+            .collect::<Vec<_>>();
+        enemies.extend((0..5).map(|index| {
+            EnemySnapshot::new(
+                EnemyKind::Baiter,
+                ScreenPosition::new(40 + index as u8, 60),
+                ScreenVelocity::new(0, 0),
+            )
+        }));
+        game.state.world.enemies = enemies;
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = Some(game.state.wave_profile.baiter_delay);
+        game.baiter_pacing_frames_remaining = 1;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            game.baiter_timer_ticks,
+            Some(game.state.wave_profile.baiter_delay / 2)
+        );
+        assert!(frame.events.gameplay().is_empty());
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .filter(|enemy| enemy.kind == EnemyKind::Baiter)
+                .count(),
+            5
+        );
+    }
+
+    #[test]
+    fn clean_game_baiters_do_not_block_source_reserve_activation() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Baiter,
+            ScreenPosition::new(120, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot {
+            landers: 1,
+            ..EnemyReserveSnapshot::default()
+        };
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.events.gameplay().is_empty());
+        assert_eq!(
+            frame.state.world.enemy_reserve,
+            EnemyReserveSnapshot::default()
+        );
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .filter(|enemy| enemy.kind == EnemyKind::Baiter)
+                .count(),
+            1
+        );
+        assert_eq!(
+            frame
+                .state
+                .world
+                .enemies
+                .iter()
+                .filter(|enemy| enemy.kind == EnemyKind::Lander)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn clean_game_baiters_do_not_block_source_wave_clear() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Baiter,
+            ScreenPosition::new(120, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.enemies.is_empty());
+        assert_eq!(frame.events.gameplay(), &[GameEvent::WaveCleared]);
+        assert!(
+            !frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_BAITER)
+        );
     }
 
     #[test]
@@ -10373,6 +10507,11 @@ mod tests {
                 picture_frame: 2,
             },
         )];
+        game.state.world.enemies.push(EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        ));
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.state.world.source_rng = SourceRandSnapshot {
             seed: 0x90,

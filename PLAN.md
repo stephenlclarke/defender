@@ -1014,13 +1014,16 @@ Object-ecology progress after R9-C4 slices:
   source X velocity per restored squad.
 - Clean baiter runtime entry now follows the source game-exec pacing shape:
   a 15-frame cadence, low-enemy timer acceleration, zero-enemy wave-clear
-  guard, deterministic clean spawn, and source active-baiter cap. Spawned
-  baiters retain source shot-timer, picture-cycle, sleep, and velocity state,
-  pursue the player through the source `UFONV` seek rules, fire source-shaped
-  `SHOOT` fireball shells, and those enemy projectiles now use source `SHSCAN`
-  lifetime decrement/wrap behavior, scroll-adjusted fixed-point motion,
-  offscreen culling, collision scoring, player-damage handling, and source
-  `BMBP1` shell descriptor evidence.
+  guard, deterministic clean spawn, and source active-baiter cap. The clean
+  source wave-enemy total follows `WVCHK` by excluding active baiters, so
+  baiters do not inflate low-enemy pacing, block reserve activation, or block
+  wave clear when no source-counted enemies remain. Spawned baiters retain
+  source shot-timer, picture-cycle, sleep, and velocity state, pursue the
+  player through the source `UFONV` seek rules, fire source-shaped `SHOOT`
+  fireball shells, and those enemy projectiles now use source `SHSCAN` lifetime
+  decrement/wrap behavior, scroll-adjusted fixed-point motion, offscreen
+  culling, collision scoring, player-damage handling, and source `BMBP1` shell
+  descriptor evidence.
 - Clean mutant runtime now carries source-shaped state for active mutants.
   Completed carried-lander abductions consume the passenger and convert that
   lander into a mutant, no-target/no-human landers convert through the same
@@ -2425,6 +2428,22 @@ Work log:
   this is a bounded Step 50 hyperspace `HYP2` tail slice, not a Step 50 / Phase
   3 closure or R9 finalization. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779322705904049`.
+
+- `2026-05-21 01:26:39 BST` R9-C4 progress slice
+  `source wave-enemy total excludes baiters`. Clean source wave bookkeeping now
+  follows the source `WVCHK` / `GEXEC` count by excluding active baiters
+  (`UFOCNT`) from the wave-enemy total. Active baiters no longer inflate
+  low-enemy baiter pacing, block reserve activation when only baiters remain
+  active, or block wave clear when no source-counted enemies or reserves
+  remain. Focused validation passed: `cargo fmt --check`, `cargo check`,
+  `cargo test clean_game_baiter --lib`, `cargo test clean_game_wave_clear
+  --lib`, targeted `make clean-fidelity SCENARIOS="wave_advance smart_bomb"`,
+  touched-doc `markdownlint`, and `git diff --check`. Broad `cargo test
+  --all-targets`, full `make fidelity`, full all-scenario `make
+  clean-fidelity`, and full clippy remain deferred because this is a bounded
+  Step 50 source wave-enemy bookkeeping slice, not a Step 50 / Phase 3 closure
+  or R9 finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779323162206699`.
 
 ## Archived Completed History
 

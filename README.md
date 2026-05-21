@@ -442,7 +442,10 @@ the source shell free-list cap with the other fireball paths, including source
 `RMAX` RNG consumption on shot-timer resets when allocation fails, and emit
 source `SWSSND` command evidence when allocation succeeds. Clean baiter entry
 now advances on the source game-exec pacing cadence, accelerates when the
-remaining enemy total is low, and respects the source active-baiter cap.
+remaining source wave-enemy total is low, excludes active baiters from that
+source `WVCHK` count, and respects the source active-baiter cap. Active baiters
+therefore do not block reserve activation or wave clear when no source-counted
+enemies remain.
 Spawned baiters retain source shot-timer, picture-cycle, sleep, and velocity
 state, pursue the player through source seek rules, fire source-shaped
 fireball shells with source `USHSND` command evidence, and those enemy
