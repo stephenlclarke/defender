@@ -14,6 +14,11 @@ cadence, Defender wordmark coalescence, numeric glyphs, sprite colors/shapes,
 terrain/ground, and Williams -> High Scores -> scoring sequence ordering all
 remain active B13 gaps. The README media path now writes candidate GIFs outside
 `docs/` and reports sampled comparison metrics against the protected reference.
+R9-E3.9 has repaired the title projection to use source `LGOTAB` Williams
+pixels, the source `0x3F` title color index, the 15 `DEFENS` 4-byte by 12-row
+appearance slots, and the `DEF33` whole-wordmark descriptor evidence; B13
+remains open until the later numeric glyph, sprite/terrain, timing, candidate
+media, and owner-review steps close.
 Older entries remain closed fidelity history, local-reference/tooling notes,
 archived prototype cleanup, or post-acceptance validation records. Historical
 entries that mention remaining blockers describe the state at the time they

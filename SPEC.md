@@ -51,7 +51,11 @@ R9-E3.7 clean media:
   from source-backed ROM/pre-rewrite evidence before a new candidate can
   replace the protected reference. Media generation must write candidate files
   outside `docs/` and compare them against the protected reference unless the
-  owner has explicitly approved replacing the reference. Until signoff, changes
+  owner has explicitly approved replacing the reference. R9-E3.9 now sources
+  the Williams/Defender title surface from `LGOTAB`, `DEFENS`, `DEF33`,
+  `DEF50`, `APVCT`, and `WILLIR`/`WILR1` descriptor evidence; the remaining
+  B13 work is numeric glyph repair, sprite/terrain repair, attract timing,
+  candidate comparison, and owner acceptance. Until signoff, changes
   that alter public contracts, scenario semantics, runtime behavior, or final
   acceptance evidence must trigger focused checks and, when broad risk is
   introduced, a renewed full gate.
@@ -486,10 +490,12 @@ current-player submission metadata. Normal attract scenes draw the
 source-backed `CREDV` credits label at `0x28E5` and the visible credit count
 digits at `0x48E5`. The title program is gated by
 `AttractPresentationSnapshot`: the source `LGOTAB` Williams logo appears first
-at `0x363C`, `ELECV` presents copy appears at `0x3258`/`0x3E6C`, the
-source-expanded Defender wordmark coalesces through 4x12 source-logo blocks at
-`0x3090` before the settled wordmark refreshes, the source copyright strip
-appears at `0x3BD0` during the copyright wait gate, and the
+at `0x363C`, `ELECV` presents copy appears at `0x3258`/`0x3E6C`, the Defender
+wordmark coalesces through the 15 source `DEFENS` 4-byte by 12-row `APVCT`
+appearance slots starting at object table `0xB304`, picture table `0xB3D6`,
+data `0xB412`, and screen address `0x3090` before the full `0x3C` by `0x18`
+wordmark descriptor refreshes, the source copyright strip appears at `0x3BD0`
+during the copyright wait gate, and the
 instruction-page `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and
 `SWARMV` labels appear at `0x4330`, `0x1C70`, `0x3C70`, `0x5F70`, `0x1CA8`,
 `0x40A8`, and `0x5CA8`. After the hall-of-fame display stall, the

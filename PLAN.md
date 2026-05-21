@@ -814,15 +814,18 @@ Reopened B13 repair schedule:
   `DEFENDER_ALLOW_REFERENCE_MEDIA_OVERWRITE=1` is explicitly set after owner
   approval, and reports sampled frame/timing/RMS comparison metrics against the
   protected reference for title, Hall of Fame, numeric glyphs, sprites,
-  terrain, and scoring regions. The current rejected candidate still measures
+  terrain, and scoring regions. The pre-repair rejected candidate measured
   277 frames versus the 347-frame reference and remains active repair evidence.
-- R9-E3.9: ROM-backed Williams/Defender title program. Next implementation
-  slice. Rebuild the clean title projection from ROM/pre-rewrite evidence
-  instead of the current block approximation: source `LOGO`/`LGOTAB` Williams
-  handwriting, `DEFEND`, `DEFENS`, `DEF33`, `DEF44`, `DEF50`, `APVCT`, and
-  `WILLIR`/`WILR1` descriptor/appearance-slot behavior. Add focused tests for
-  the 15-source Defender appearance slots, source restore path, color cadence,
-  and transition to the settled wordmark.
+- R9-E3.9: ROM-backed Williams/Defender title program. Completed 2026-05-21.
+  The clean title projection now uses source-backed `LOGO`/`LGOTAB` Williams
+  handwriting with the source `0x3F` title color, the 15 `DEFENS` 4-byte by
+  12-row `APVCT` appearance slots, source object/picture/data/appearance-slot
+  addresses, the `DEF33` whole-wordmark `0x3C` by `0x18` descriptor, and the
+  settled wordmark transition. Focused tests cover the source slot descriptors,
+  shrink/coalescence phase, source color contract, and atlas regions. The
+  latest candidate still fails B13 media parity at 257 frames versus the
+  347-frame protected reference, so R9-E3.10 remains active for numeric glyph
+  repair before another closeout gate.
 - R9-E3.10: source text and numeric glyph repair. Fix the scrambled screen
   number fonts by auditing score digits, credit digits, Hall of Fame/scoring
   numbers, wave/multiplier digits, and any `MESS`/`WNBV` glyph path against
@@ -3212,6 +3215,24 @@ Work log:
   scenario behavior. The next full gate should run when the reopened B13 visual
   runtime repairs reach candidate closeout, or sooner if shared contracts or
   scenario behavior change.
+
+- `2026-05-21 23:23:42 BST` Completed R9-E3.9 ROM-backed
+  Williams/Defender title program. Replaced the clean Defender wordmark block
+  approximation with the 15 source `DEFENS` object/picture/data/appearance
+  slots, source `APVCT` shrink geometry, the `DEF33` whole-wordmark
+  descriptor, and source title color handling for the Williams and Defender
+  title surfaces. Focused validation passed with `cargo fmt --check`,
+  `cargo check`, `cargo test clean_attract_defender_wordmark --lib`,
+  `cargo test clean_attract_williams_logo --lib`, the focused source
+  visual-state contract test, the focused Defender wordmark atlas-region test,
+  targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
+  `make readme-media`. The generated candidate remains repair evidence only:
+  reference 347 frames, candidate 257 frames, equal 4600cs duration, and
+  sampled RMS mismatches across full, title, Hall of Fame, numeric glyph,
+  sprite, terrain, and scoring regions. Broad all-target/all-scenario gates
+  remain deferred because B13 is still in the middle of bounded visual repair.
+  The next full gate should run at R9-E3.13 candidate closeout, or sooner if
+  the numeric glyph/sprite/terrain/timing repairs change shared contracts.
 
 ## Archived Completed History
 

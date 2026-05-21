@@ -1032,11 +1032,11 @@ const SOURCE_DEFENDER_LOGO_COLUMNS: u8 = 0x3C;
 const SOURCE_DEFENDER_LOGO_ROWS: u8 = 0x18;
 const SOURCE_DEFENDER_LOGO_BYTES: usize =
     SOURCE_DEFENDER_LOGO_COLUMNS as usize * SOURCE_DEFENDER_LOGO_ROWS as usize;
-pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS: usize = 30;
-pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS: usize = 2;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS: usize = 15;
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS: usize = 1;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT: usize =
     ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS * ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
-pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE: [f32; 2] = [4.0, 12.0];
+pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE: [f32; 2] = [8.0, 12.0];
 const SOURCE_ATTRACT_COPYRIGHT_COLUMNS: u8 = 40;
 const SOURCE_ATTRACT_COPYRIGHT_ROWS: u8 = 8;
 const SOURCE_ATTRACT_COPYRIGHT_BYTES: [u8; 80] = [
@@ -1416,10 +1416,10 @@ fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
             sprite: SpriteId::attract_defender_wordmark_block(index)
                 .expect("Defender wordmark block sprite"),
             origin: [
-                u32::try_from(column).expect("Defender wordmark block column fits") * 4,
+                u32::try_from(column).expect("Defender wordmark block column fits") * 8,
                 128 + u32::try_from(row).expect("Defender wordmark block row fits") * 12,
             ],
-            size: [4, 12],
+            size: [8, 12],
         });
     }
     regions
@@ -5849,7 +5849,7 @@ mod tests {
     fn default_sprite_atlas_uses_defender_wordmark_block_regions() {
         let atlas = TextureAtlas::default_sprites();
         let first = SpriteId::attract_defender_wordmark_block(0).expect("first block sprite");
-        let center = SpriteId::attract_defender_wordmark_block(14).expect("center block sprite");
+        let center = SpriteId::attract_defender_wordmark_block(7).expect("center block sprite");
         let last = SpriteId::attract_defender_wordmark_block(
             ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT.saturating_sub(1),
         )
@@ -5860,7 +5860,7 @@ mod tests {
             Some(AtlasRegion {
                 sprite: first,
                 origin: [0, 128],
-                size: [4, 12],
+                size: [8, 12],
             })
         );
         assert_eq!(
@@ -5868,19 +5868,19 @@ mod tests {
             Some(AtlasRegion {
                 sprite: center,
                 origin: [56, 128],
-                size: [4, 12],
+                size: [8, 12],
             })
         );
         assert_eq!(
             atlas.region(last),
             Some(AtlasRegion {
                 sprite: last,
-                origin: [116, 140],
-                size: [4, 12],
+                origin: [112, 128],
+                size: [8, 12],
             })
         );
+        assert_visible_region(&atlas, first);
         assert_visible_region(&atlas, center);
-        assert_visible_region(&atlas, last);
     }
 
     #[test]

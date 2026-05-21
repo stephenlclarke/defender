@@ -45,7 +45,10 @@ wordmark did not coalesce like the source title program, screen number glyphs
 were scrambled, sprites and sprite colors were corrupted, terrain/ground was
 wrong, and the attract flow did not match Williams -> High Scores -> scoring
 sequence. B13 now requires source-backed visual repair and a fresh candidate
-review before R9 can be signed off.
+review before R9 can be signed off. R9-E3.9 has moved the Williams/Defender
+title projection back onto source `LGOTAB`/`DEFENS` descriptor evidence, but
+numeric glyphs, sprite/terrain presentation, attract timing, and final media
+acceptance remain open.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -730,13 +733,14 @@ source wait constants, now ordering the title/copyright surfaces before the
 Hall of Fame display and source scoring/action sequence. The scoring/action
 sequence replays the source instruction-page rescue demo, scanner blips,
 laser/explosion/500-point rescue beat, and `ENMYTB` enemy score-card reveal
-before cycling back to the Williams page. The Williams logo is
-generated from the source `LGOTAB` final pixel pattern and early title frames
-draw a source-ordered handwritten reveal with source-rate color cadence. The
-normal attract Defender wordmark now uses 4x12 source-logo atlas blocks during
-the `DEFEND` / `DEFENS` appearance window before returning to the full
-source-expanded wordmark for settled frames. The normal attract copyright strip
-is generated from the source `CPRTAB` bitmap bytes.
+before cycling back to the Williams page. The Williams logo is generated from
+the source `LGOTAB` final pixel pattern and early title frames draw a
+source-ordered handwritten reveal with the source `0x3F` title color index.
+The normal attract Defender wordmark now uses the 15 source `DEFENS` 4-byte by
+12-row `APVCT` appearance slots and descriptor addresses during the appearance
+window before returning to the full `0x3C` by `0x18` source-expanded wordmark
+for settled frames. The normal attract copyright strip is generated from the
+source `CPRTAB` bitmap bytes.
 The playing top-display border uses a small atlas-backed clean border word
 sprite projected from the source `BORDER` geometry: bottom line, scanner side
 boundaries, top scanner boundary, and scanner marker bars.
