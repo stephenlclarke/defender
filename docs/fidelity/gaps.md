@@ -775,6 +775,22 @@ post-acceptance validation records.
   collision-footprint evidence, rescue collision-footprint evidence, bomber
   shell-counter evidence, and bomber squad-slot evidence plus focused source
   ecology fixtures for those transitions.
+- `2026-05-21 07:50:00 BST`: R9-C4.1 audits the residual Step 50 object
+  ecology surface against the current clean runtime and focused test inventory.
+  The audit classifies source wave spawning/reserve transitions, object-table
+  identity, source picture evidence, fixed-point object motion, lander
+  `LANDST` / `LANDS0` / `LANDG` / `LANDF` / `LSHOT`, pod `PRBST` / `PRBRES`,
+  mini-swarmer `PLRES` / `RSW0` / `SWBMB`, bomber `TIEST` / `TIE` /
+  `GETSHL` / `BOMBST` / `BMBCNT`, baiter `GEXEC` / `UFOST` / `UFONV` /
+  `SHOOT`, mutant conversion/restore/seek/shot, `LASR0` / `LASL0`, `SHSCAN`,
+  `SHELL`, `BMBP1`, `PLAPIC` / `PLBPIC`, source hit/shot/action sound
+  commands, hyperspace shell cleanup/rematerialization/death-risk, `TLIST`,
+  `ASTRO`, `AFALL`, `AFALL2`, and source terrain-loss handoff as covered by
+  current clean runtime plus focused tests. Remaining B08 work is focused
+  source ecology fixture hardening across `start_game`, `smart_bomb`,
+  `hyperspace`, `abduction`, `death`, `wave_advance`, and
+  `planet_destruction`, followed by the Step 50 closure gate. R9-C4.2 is
+  reserved for any bounded runtime fix exposed by those fixture runs.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

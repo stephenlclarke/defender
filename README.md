@@ -538,8 +538,11 @@ world-position words, velocity words, and deterministic source object-table
 identity evidence from the clean source fixed-point state and source layout:
 addresses from `0xA23C` plus `0x17` per slot, source slot numbers, and neutral
 `OTYP` `0x00`. Runtime scene sprites remain on the direct clean render path.
-Remaining per-family enemy movement/projectile behavior and focused source
-ecology fixtures remain later object-ecology work.
+The R9-C4 residual ecology audit now classifies the per-family
+movement/projectile runtime surfaces as covered by the current clean runtime
+and focused unit tests; remaining object-ecology work is focused source ecology
+fixture hardening and the Step 50 closure gate, with R9-C4.2 reserved for any
+fixture-exposed drift.
 Clean
 smart bombs consume player stock, clear active enemies through
 `SmartBombSystem`, route score through the same scoring system, and leave

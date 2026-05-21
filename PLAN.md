@@ -651,13 +651,13 @@ Phase 3: lifecycle and world closure.
 
 R9-C4 closure checklist:
 
-- R9-C4.1: residual ecology audit. Compare the current clean object runtime and
-  `docs/fidelity/gaps.md` R9-C4 notes against the covered source labels for
-  landers, mutants, bombers, pods, swarmers, baiters, enemy shells, player
-  lasers, humans, and terrain-loss handoff. Before further runtime edits, mark
-  each remaining movement/projectile concern as covered, needs a bounded fix, or
-  intentionally deferred outside B08 with source-backed rationale. Validation
-  for a docs-only audit is touched-doc `markdownlint` plus `git diff --check`.
+- R9-C4.1: residual ecology audit. Completed 2026-05-21. The current clean
+  object runtime and `docs/fidelity/gaps.md` R9-C4 notes were compared against
+  the covered source labels for landers, mutants, bombers, pods, swarmers,
+  baiters, enemy shells, player lasers, humans, and terrain-loss handoff. The
+  audit found no immediate bounded runtime gap to queue before fixture
+  hardening; R9-C4.2 should run only if R9-C4.3 fixture work exposes a concrete
+  movement/projectile drift.
 - R9-C4.2: close any bounded family behavior gaps found by the audit. Batch only
   tightly related fixes, such as one family loop, one shared shell-list edge, or
   one collision/kill side-effect path. Each implementation slice must include
@@ -1153,16 +1153,48 @@ Object-ecology progress after R9-C4 slices:
 - Player-carried humans now follow the source AFALL2 carried offset and settle
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
-  is remaining per-family enemy movement/projectile behavior beyond the
-  covered enemy-hit, enemy-shot, player-action, hyperspace
-  shell-cleanup/rematerialize, lander-abduction, astronaut command,
-  shell-collision command, fatal astronaut-impact command, player-death command,
-  terrain-blow start/completion command, laser-loop movement, and laser
-  collision-footprint evidence, bomb-shell collision-footprint evidence, and
-  enemy collision-footprint evidence, player collision-footprint evidence,
-  rescue collision-footprint evidence, bomber shell-counter evidence, and
-  bomber squad-slot evidence plus focused source ecology fixtures for those
-  transitions.
+  is focused source ecology fixture hardening and the Step 50 closure gate. The
+  R9-C4.1 residual ecology audit classifies the per-family movement/projectile
+  runtime surfaces as covered by current clean runtime and focused unit tests;
+  R9-C4.2 remains a conditional repair slot if fixture hardening exposes drift.
+
+R9-C4 residual ecology audit after R9-C4.1:
+
+- Covered with no immediate bounded runtime fix queued: source wave spawning,
+  inactive reserve accounting, reserve activation, source object-table
+  identity, active/inactive object-picture evidence, source fixed-point
+  positions/velocities, and source `VELO` Y-bound wrapping for active source
+  enemies.
+- Covered family runtime surfaces: lander `LANDST` / `LANDS0` / `LANDG` /
+  `LANDF` / `LSHOT` targeting, carry, pull, give-up, release, and conversion;
+  pod `PRBST` / `PRBRES` fixed-point motion and pod-to-swarmer release; mini
+  swarmer `PLRES` / `RSW0` restore, seek, acceleration, turnback, `SWBMB`
+  shell cap, and full-shell RNG reset; bomber `TIEST` restore, persistent
+  four-slot `TIE` selection, picture/Y steering, `GETSHL`, `BOMBST`, `BMBCNT`,
+  and total shell-list caps; baiter `GEXEC` / `UFOST` pacing, source wave-enemy
+  bookkeeping, `UFONV` seek, picture cycle, and shared `SHOOT`; mutant
+  conversion, restore, X/Y seek, random hop, and shared `SHOOT`.
+- Covered shared projectile/collision/player-action surfaces: `LASR0` /
+  `LASL0` laser movement and `LASP1` collision footprint; source `SHSCAN`
+  lifetime and `SHELL` scroll-adjusted motion; source `BMBP1` enemy-shell
+  footprint; source enemy, player, and rescue collision footprints; source
+  family hit and shot sound commands; smart-bomb sound ordering; thrust
+  start/stop commands; hyperspace source shell cleanup, rematerialization, and
+  death-risk branch.
+- Covered human and terrain-loss surfaces: source `TLIST` startup humans,
+  target-list cursor retargeting, `ASTRO` walking/picture cadence, `AFALL`
+  acceleration, safe/fatal landing, `AFALL2` player-carried landing, `P250` /
+  `P500` score popups, astronaut catch/release/landing/impact sound commands,
+  last-human source `TERBLO` start, and `TBL3` / `TBL4` terrain-blow completion.
+- Still required for B08 closure: R9-C4.3 must harden focused source ecology
+  fixtures across `start_game`, `smart_bomb`, `hyperspace`, `abduction`,
+  `death`, `wave_advance`, and `planet_destruction`. Any fixture mismatch that
+  points to one family loop, shared shell edge, or collision/kill side effect
+  should reopen R9-C4.2 for a bounded implementation slice.
+- Deferred outside B08: cycle-accurate CPU/golden-trace scheduling, non-gameplay
+  render-presentation residuals, two-player session routing, and high-score
+  table/return behavior remain owned by later R9-D/R9-E steps rather than
+  object ecology.
 
 Work log:
 
@@ -2747,6 +2779,14 @@ Work log:
   source-ecology fixture, documentation, and Phase 3 gate steps before R9-D1 can
   start. This was a docs-only planning update, so no Slack update or Rust
   validation was required.
+
+- `2026-05-21 07:50:00 BST` Completed R9-C4.1 residual ecology audit.
+  Classified the remaining Step 50 object-ecology surface against the current
+  clean runtime, focused tests, and `docs/fidelity/gaps.md` notes. The audit
+  found no immediate bounded movement/projectile runtime gap before fixture
+  hardening, so R9-C4.2 is now conditional on concrete drift from R9-C4.3.
+  This was a docs/status update, so no Slack update or Rust validation was
+  required.
 
 ## Archived Completed History
 
