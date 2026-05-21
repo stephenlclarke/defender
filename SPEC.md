@@ -262,8 +262,10 @@ source `USHSND` command evidence, and those enemy projectiles use source
 offscreen culling, collision scoring, and player-damage handling. Accepted
 clean hyperspace inputs clear active enemy projectiles through the source
 `HYP02` / `KILSHL` shell-list cleanup while leaving player projectiles outside
-that shell-object list, and surface the source `APSND` appearance command
-loaded by that rematerialization path.
+that shell-object list. They then reload source rematerialization state from
+the current clean source `SEED`/`HSEED`: the clean camera/background word,
+player X/facing branch, player Y high byte, cleared velocity, and source
+`APSND` appearance command.
 Clean landers now abduct aligned humans, can carry explicit selected-human
 target state for source-shaped landers, enter the source `LANDG`
 target-approach step only when that selected target passes the source `LANDS0`

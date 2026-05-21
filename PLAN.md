@@ -1064,8 +1064,11 @@ Object-ecology progress after R9-C4 slices:
 - Accepted clean hyperspace inputs now mirror the visible source `HYP02` /
   `KILSHL` shell-list cleanup by clearing active enemy projectiles while
   leaving clean player projectiles outside that source shell-object list, and
-  surface the source `APSND` appearance command loaded by that rematerialization
-  path.
+  then reload source rematerialization state from the current clean source RNG:
+  `SEED`/`HSEED` seed the clean background/camera word, `HSEED` selects the
+  source player X/facing branch, the player Y high byte is restored from
+  `HSEED >> 1 + YMIN`, player velocity is cleared, and `APSND` surfaces the
+  appearance command loaded by that path.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -1080,7 +1083,7 @@ Object-ecology progress after R9-C4 slices:
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
   is remaining per-family movement/projectile behavior beyond the covered
-  enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup/appearance,
+  enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup/rematerialize,
   lander-abduction, and astronaut command evidence plus focused source ecology
   fixtures for those transitions.
 
@@ -2389,6 +2392,22 @@ Work log:
   should run when Step 50 closes, another broader shared-contract risk appears,
   or R9 finalization begins. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779321920441349`.
+
+- `2026-05-21 01:10:37 BST` R9-C4 progress slice
+  `source hyperspace rematerialization state`. Accepted clean hyperspace inputs
+  now reload the bounded visible `HYP02` player/background state from current
+  clean source `SEED`/`HSEED`: clean camera/background uses the seed word,
+  player X and facing use the `HSEED` low-bit branch, player Y restores the
+  source high byte while preserving the low byte, and player velocity clears.
+  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
+  clean_game_hyperspace --lib`, `cargo test
+  clean_game_applies_playing_controls_through_systems --lib`, targeted `make
+  clean-fidelity SCENARIOS="hyperspace"`, touched-doc `markdownlint`, and `git
+  diff --check`. Broad `cargo test --all-targets`, full `make fidelity`, full
+  all-scenario `make clean-fidelity`, and full clippy remain deferred because
+  this is a bounded Step 50 hyperspace rematerialization-state slice, not a Step
+  50 / Phase 3 closure or R9 finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779322205988939`.
 
 ## Archived Completed History
 

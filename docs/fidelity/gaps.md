@@ -683,6 +683,16 @@ post-acceptance validation records.
   player-action, hyperspace shell-cleanup/appearance, lander-abduction, and
   astronaut command evidence plus focused source ecology fixtures for those
   transitions.
+- `2026-05-21 01:10:37 BST`: R9-C4 adds bounded source `HYP02`
+  rematerialization state for accepted clean hyperspace inputs. Clean
+  hyperspace now reloads camera/background from the source `SEED`/`HSEED` word,
+  selects player X/facing from the `HSEED` low bit, restores the player Y high
+  byte from `HSEED >> 1 + YMIN`, preserves the prior player Y low byte, and
+  clears player velocity. Remaining B08 work is exact per-family
+  movement/projectile behavior beyond the covered enemy-hit, enemy-shot,
+  player-action, hyperspace shell-cleanup/rematerialize, lander-abduction, and
+  astronaut command evidence plus focused source ecology fixtures for those
+  transitions.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain

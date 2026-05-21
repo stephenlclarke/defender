@@ -2929,6 +2929,38 @@ fn source_shell_scroll_delta(
         .wrapping_shl(2)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceHyperspaceRematerialization {
+    position: (WorldVector, WorldVector),
+    velocity: (WorldVector, WorldVector),
+    direction: Direction,
+    camera_left: WorldVector,
+    screen_position: ScreenPosition,
+}
+
+fn source_hyperspace_rematerialization(
+    source_rng: SourceRandSnapshot,
+    previous_player_y: WorldVector,
+) -> SourceHyperspaceRematerialization {
+    let seed_word = u16::from_be_bytes([source_rng.seed, source_rng.hseed]);
+    let (player_x16, direction) = if source_rng.hseed & 1 != 0 {
+        (0x2000, Direction::Right)
+    } else {
+        (0x7000, Direction::Left)
+    };
+    let previous_y_low = source_word_from_world_vector(previous_player_y).to_be_bytes()[1];
+    let player_y = (source_rng.hseed >> 1).wrapping_add(SOURCE_PLAYFIELD_Y_MIN);
+    let player_y16 = u16::from_be_bytes([player_y, previous_y_low]);
+
+    SourceHyperspaceRematerialization {
+        position: (world_word(player_x16), world_word(player_y16)),
+        velocity: (WorldVector::default(), WorldVector::default()),
+        direction,
+        camera_left: world_word(seed_word),
+        screen_position: ScreenPosition::new(player_x16.to_be_bytes()[0], player_y),
+    }
+}
+
 fn source_world_position(position: ScreenPosition, x_fraction: u8, y_fraction: u8) -> (u16, u16) {
     (
         u16::from_be_bytes([position.x, x_fraction]),
@@ -5938,9 +5970,12 @@ impl Game {
         self.state.player.velocity = motion.state.velocity;
         self.camera_left = motion.state.camera_left;
         let shell_scroll_delta = source_shell_scroll_delta(previous_camera_left, self.camera_left);
+        let mut player_screen_position = motion.screen_position;
+        let mut player_velocity = motion.state.velocity;
+        let mut player_x = motion.state.position.0;
         self.state
             .world
-            .sync_player_carried_humans(motion.screen_position);
+            .sync_player_carried_humans(player_screen_position);
 
         self.advance_projectiles();
         self.advance_enemy_projectiles(shell_scroll_delta);
@@ -5974,6 +6009,17 @@ impl Game {
             // Source HYP02 walks KILSHL over the shell-object list before
             // rematerialization; clean enemy projectiles model that list.
             self.state.world.enemy_projectiles.clear();
+            let hyperspace = source_hyperspace_rematerialization(
+                self.state.world.source_rng,
+                self.state.player.position.1,
+            );
+            self.state.player.position = hyperspace.position;
+            self.state.player.velocity = hyperspace.velocity;
+            self.state.player.direction = hyperspace.direction;
+            self.camera_left = hyperspace.camera_left;
+            player_screen_position = hyperspace.screen_position;
+            player_velocity = hyperspace.velocity;
+            player_x = hyperspace.position.0;
             sound_events.push(source_hyperspace_appearance_sound_event());
         }
 
@@ -5985,15 +6031,15 @@ impl Game {
 
         self.state.world.advance_enemies(
             self.state.wave_profile,
-            motion.screen_position,
-            motion.state.velocity,
+            player_screen_position,
+            player_velocity,
             sound_events,
         );
 
         self.state.world.resolve_lander_human_abductions(
             self.state.wave_profile,
-            motion.screen_position,
-            motion.state.velocity,
+            player_screen_position,
+            player_velocity,
             sound_events,
         );
         let falling_advance = self.state.world.advance_falling_humans();
@@ -6013,22 +6059,22 @@ impl Game {
         if self
             .state
             .world
-            .resolve_player_human_rescue(motion.screen_position)
+            .resolve_player_human_rescue(player_screen_position)
         {
             self.award_rescue_score(gameplay_events);
             sound_events.push(source_astronaut_catch_sound_event());
         }
-        self.advance_baiter_entry(motion.screen_position, motion.state.velocity);
+        self.advance_baiter_entry(player_screen_position, player_velocity);
         self.resolve_projectile_enemy_collisions(gameplay_events, sound_events);
         let hit_enemy =
-            self.resolve_player_enemy_collision(motion.screen_position, gameplay_events);
+            self.resolve_player_enemy_collision(player_screen_position, gameplay_events);
         if !hit_enemy && self.state.phase == GamePhase::Playing {
-            self.resolve_player_enemy_projectile_collision(motion.screen_position, gameplay_events);
+            self.resolve_player_enemy_projectile_collision(player_screen_position, gameplay_events);
         }
         self.resolve_planet_destruction();
 
         if self.state.phase == GamePhase::Playing {
-            self.queue_wave_clear_if_needed(gameplay_events, motion.state.position.0);
+            self.queue_wave_clear_if_needed(gameplay_events, player_x);
         }
     }
 
@@ -9310,10 +9356,13 @@ mod tests {
             ..GameInput::NONE
         });
 
-        assert_eq!(frame.state.player.direction, Direction::Left);
+        assert_eq!(frame.state.player.direction, Direction::Right);
         assert_eq!(frame.state.player.smart_bombs, 2);
         assert_eq!(frame.state.scores.player_one, 750);
-        assert!(frame.state.player.velocity.1.subpixels() < 0);
+        assert_eq!(
+            frame.state.player.velocity,
+            (WorldVector::default(), WorldVector::default())
+        );
         assert_eq!(frame.state.world.projectiles.len(), 1);
         assert_eq!(frame.state.world.enemies.len(), 5);
         assert_eq!(
@@ -11640,6 +11689,51 @@ mod tests {
             ScreenPosition::new(64, 80)
         );
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_hyperspace_appearance_sound_event()]
+        );
+    }
+
+    #[test]
+    fn clean_game_hyperspace_uses_source_rematerialization_state() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2345), super::world_word(0x8134));
+        game.state.player.velocity = (super::world_word(0x0100), super::world_word(0xFF00));
+        game.state.player.direction = Direction::Right;
+        game.camera_left = super::world_word(0x2222);
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0x12,
+            hseed: 0x6C,
+            lseed: 0xA5,
+        };
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(
+            frame.state.player.position,
+            (super::world_word(0x7000), super::world_word(0x6034))
+        );
+        assert_eq!(
+            frame.state.player.velocity,
+            (WorldVector::default(), WorldVector::default())
+        );
+        assert_eq!(frame.state.player.direction, Direction::Left);
+        assert_eq!(
+            super::source_word_from_world_vector(game.camera_left),
+            0x126C
+        );
+        assert_eq!(frame.events.gameplay(), &[GameEvent::HyperspacePressed]);
         assert_eq!(
             frame.events.sounds(),
             &[source_hyperspace_appearance_sound_event()]
