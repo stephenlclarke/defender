@@ -791,12 +791,13 @@ R9-E3 corrective visual acceptance schedule:
   so atlas palette colors are not forced through the previous prototype tints.
   Focused renderer tests cover red-label image decoding and the source-backed
   runtime atlas regions.
-- R9-E3.6: clean scoring/action attract sequence. Add the scoring/action
-  attract segment that follows Hall of Fame in the reference sequence, using
-  existing clean world/object presentation where it is source-backed and adding
-  gaps rather than guessing when source/MAME evidence is missing. Validation:
-  focused attract/action tests, targeted clean-fidelity for affected scenarios,
-  `cargo run -- --game-smoke`, and `git diff --check`.
+- R9-E3.6: clean scoring/action attract sequence. Completed 2026-05-21. The
+  clean attract scheduler now starts the scoring/action segment after the
+  source-shaped Hall of Fame stall, replays the source instruction-page rescue
+  demo with scanner blips, terrain, player laser, 500-point rescue popup, and
+  the `ENMYTB` enemy score-card reveal, then wraps back to the Williams page.
+  Focused attract/action tests cover the source timing, text reveal, demo
+  objects, scanner sprites, and cycle wrap.
 - R9-E3.7: visual acceptance closeout gate. Regenerate or capture the
   acceptance media from the clean renderer, compare it against
   `docs/start-sequence.gif`, update README/SPEC/gaps with the new visual
@@ -3107,6 +3108,24 @@ Work log:
   repair, not the R9-E3.7 closeout gate. The next full gate should run at
   R9-E3.7 or sooner if the scoring/action attract slice introduces broad
   runtime risk.
+
+- `2026-05-21 21:48:26 BST` Completed R9-E3.6 clean scoring/action attract
+  sequence. The clean attract scheduler now starts the scoring/action page after
+  the source-shaped Hall of Fame stall instead of leaving the instruction text
+  as a distant static page. The page replays the source instruction-page rescue
+  demo from `SCINIT`/`BORDER`/`SCPROC`/`TEXTP` evidence: amber terrain,
+  scanner/player/object blips, source-positioned player/human/lander action,
+  laser/explosion/500-point rescue popup, the `ENMYTB` enemy score-card table,
+  source `COLTAB` text color cycling, and cycle wrap back to Williams. README,
+  SPEC, and `docs/fidelity/gaps.md` now identify scoring/action attract as
+  implemented and narrow B13 to the R9-E3.7 visual acceptance closeout. Focused
+  validation passed with `cargo test clean_attract_scoring_sequence --lib`,
+  `cargo test clean_attract --lib`, `cargo check`, `cargo fmt --check`,
+  targeted `make clean-fidelity SCENARIOS="attract_boot start_game"`,
+  `cargo run -- --game-smoke`, touched-document markdownlint, and
+  `git diff --check`. Full `make fidelity`, full all-scenario
+  `make clean-fidelity`, full clippy, and `--live-smoke` remain deferred until
+  R9-E3.7 unless the closeout uncovers a broad runtime risk.
 
 ## Archived Completed History
 

@@ -43,11 +43,12 @@ accepted final contract is ready for owner review:
 - Owner signoff remains pending as B13. Owner review of
   `docs/start-sequence.gif` reopened visual acceptance. Williams handwriting
   and color cadence, Defender wordmark coalescence, gameplay sprite/palette
-  fidelity, and the Hall of Fame attract order are now repaired in clean
-  runtime; the later scoring/action attract segment remains active. Until
-  signoff, changes that alter public contracts, scenario semantics, runtime
-  behavior, or final acceptance evidence must trigger focused checks and, when
-  broad risk is introduced, a renewed full gate.
+  fidelity, the Hall of Fame attract order, and the scoring/action attract
+  segment are now repaired in clean runtime. B13 now depends on the R9-E3.7
+  visual acceptance closeout and owner signoff. Until signoff, changes that
+  alter public contracts, scenario semantics, runtime behavior, or final
+  acceptance evidence must trigger focused checks and, when broad risk is
+  introduced, a renewed full gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite
@@ -485,8 +486,12 @@ source-expanded Defender wordmark coalesces through 4x12 source-logo blocks at
 appears at `0x3BD0` during the copyright wait gate, and the
 instruction-page `SCANV`, `LANDV`, `MUTV`, `BAITV`, `BOMBV`, `SWRMPV`, and
 `SWARMV` labels appear at `0x4330`, `0x1C70`, `0x3C70`, `0x5F70`, `0x1CA8`,
-`0x40A8`, and `0x5CA8`. This projection is suppressed during the hall-of-fame
-display stall. During a pending two-player start handoff, scenes
+`0x40A8`, and `0x5CA8`. After the hall-of-fame display stall, the
+scoring/action page replays the source instruction-page rescue sequence,
+scanner blips, player laser, 500-point rescue popup, and `ENMYTB` enemy
+score-card reveal before cycling back to the Williams page. This projection is
+suppressed during the hall-of-fame display stall. During a pending two-player
+start handoff, scenes
 draw the source-backed `PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,
 and `BONSX` status text at `0x3850`, `0x3D60`, and `0x3C90`, plus the wave

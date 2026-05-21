@@ -38,9 +38,11 @@ core-document markdownlint, and `git diff --check`.
 R9 owner signoff is still pending. Owner review of `docs/start-sequence.gif`
 reopened visual acceptance for the clean renderer. Williams handwriting/color
 cadence, Defender wordmark coalescence, gameplay sprite/palette fidelity, and
-the Hall of Fame attract order are now repaired in clean runtime; the later
-scoring/action attract segment remains active B13 work. Evidence-only follow-ups
-after acceptance remain exact per-scenario pixel CRC parity, strict
+the Hall of Fame attract order are now repaired in clean runtime. The clean
+scoring/action attract segment now follows Hall of Fame with the source-backed
+rescue, scanner, and enemy score-card demo; B13 now waits on the R9-E3.7 visual
+acceptance closeout and owner signoff. Evidence-only follow-ups after
+acceptance remain exact per-scenario pixel CRC parity, strict
 long-scenario sprite count/layer parity, per-scenario offscreen `wgpu`
 signatures, and optional local MAME/reference trace refreshes where local ROM
 inputs are available.
@@ -226,7 +228,7 @@ top-display frame geometry. R9 now treats exact per-scenario pixel/offscreen
 render parity, strict long-scenario sprite count/layer parity,
 and wave-completion survivor-bonus loop/cadence beyond current presentation as
 post-R9 audit follow-ups rather than active B01-B12 blockers. Owner-reviewed
-scoring/action attract fidelity remains active B13 visual acceptance work.
+B13 visual acceptance now depends on the final R9-E3.7 media/gate review.
 Player-one/player-two score digits, life/smart-bomb stock drawing, two-player
 start admission/top-display initialization, the two-player player-start
 prompt, and the two-player final-life `PLE02` switch/respawn handoff plus its
@@ -716,7 +718,10 @@ hall-of-fame Defender logo and normal attract Defender wordmark are generated
 from the compressed source logo bytes into the clean sprite atlas. The normal
 attract title program is scheduled through clean page-frame gates backed by
 source wait constants, now ordering the title/copyright surfaces before the
-Hall of Fame display and later scoring/action text. The Williams logo is
+Hall of Fame display and source scoring/action sequence. The scoring/action
+sequence replays the source instruction-page rescue demo, scanner blips,
+laser/explosion/500-point rescue beat, and `ENMYTB` enemy score-card reveal
+before cycling back to the Williams page. The Williams logo is
 generated from the source `LGOTAB` final pixel pattern and early title frames
 draw a source-ordered handwritten reveal with source-rate color cadence. The
 normal attract Defender wordmark now uses 4x12 source-logo atlas blocks during

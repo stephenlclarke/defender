@@ -36,7 +36,9 @@ const ATTRACT_PRESENTS_START_FRAME: u16 = 236;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 = 285;
 const ATTRACT_COPYRIGHT_START_FRAME: u16 = 419;
 const ATTRACT_HALL_OF_FAME_START_FRAME: u16 = 441;
-const ATTRACT_SCORING_SEQUENCE_START_FRAME: u16 = 4_200;
+const ATTRACT_HALL_OF_FAME_STALL_TICK_FRAMES: u16 = 10;
+const ATTRACT_SCORING_SEQUENCE_START_FRAME: u16 = ATTRACT_HALL_OF_FAME_START_FRAME
+    + (HALL_OF_FAME_STALL_FRAMES as u16 * ATTRACT_HALL_OF_FAME_STALL_TICK_FRAMES);
 const ATTRACT_LOGO_SLEEP_TICKS: u8 = 2;
 const ATTRACT_PRESENTS_SLEEP_TICKS: u8 = 5;
 const ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS: u8 = 0x30;
@@ -45,6 +47,59 @@ const ATTRACT_COPYRIGHT_STALL_TICKS: u8 = 60;
 const ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS: u8 = 0xE6;
 pub(crate) const ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES: u16 = 160;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES: u16 = 0x30;
+const ATTRACT_SCORING_RESCUE_DESCENT_TICKS: u16 = 0xE6;
+const ATTRACT_SCORING_RESCUE_ASCENT_TICKS: u16 = 0xA0;
+const ATTRACT_SCORING_RESCUE_LASER_TICKS: u16 = 0x15;
+const ATTRACT_SCORING_RESCUE_FALL_TICKS: u16 = 0x2D * 2;
+const ATTRACT_SCORING_RESCUE_SCORE_TICKS: u16 = 0x50;
+const ATTRACT_SCORING_RESCUE_RETURN_TICKS: u16 = 0x60;
+const ATTRACT_SCORING_LEGEND_APPROACH_TICKS: u16 = 0x5F;
+const ATTRACT_SCORING_LEGEND_LASER_TICKS: u16 = 0x17;
+const ATTRACT_SCORING_LEGEND_TRANSFER_TICKS: u16 = 0x20;
+const ATTRACT_SCORING_LEGEND_REVEAL_TICKS: u16 = 0x20;
+const ATTRACT_SCORING_LEGEND_ENTRY_TICKS: u16 = ATTRACT_SCORING_LEGEND_APPROACH_TICKS
+    + ATTRACT_SCORING_LEGEND_LASER_TICKS
+    + ATTRACT_SCORING_LEGEND_TRANSFER_TICKS
+    + ATTRACT_SCORING_LEGEND_REVEAL_TICKS;
+const ATTRACT_SCORING_LEGEND_HOLD_TICKS: u16 = 0xFF + 0xFF;
+const ATTRACT_SCORING_LEGEND_ENTRY_COUNT: u16 = 6;
+const ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS: u16 = ATTRACT_SCORING_RESCUE_DESCENT_TICKS
+    + ATTRACT_SCORING_RESCUE_ASCENT_TICKS
+    + ATTRACT_SCORING_RESCUE_LASER_TICKS
+    + ATTRACT_SCORING_RESCUE_FALL_TICKS
+    + ATTRACT_SCORING_RESCUE_SCORE_TICKS
+    + ATTRACT_SCORING_RESCUE_RETURN_TICKS;
+const ATTRACT_SCORING_DEMO_TOTAL_TICKS: u16 = ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS
+    + (ATTRACT_SCORING_LEGEND_ENTRY_TICKS * ATTRACT_SCORING_LEGEND_ENTRY_COUNT)
+    + ATTRACT_SCORING_LEGEND_HOLD_TICKS;
+const ATTRACT_CYCLE_FRAME_COUNT: u16 =
+    ATTRACT_SCORING_SEQUENCE_START_FRAME + ATTRACT_SCORING_DEMO_TOTAL_TICKS;
+const ATTRACT_SCORING_PLAYER_X16: i32 = 0x0800;
+const ATTRACT_SCORING_PLAYER_Y16: i32 = 0x5000;
+const ATTRACT_SCORING_HUMAN_X16: i32 = 0x1E00;
+const ATTRACT_SCORING_HUMAN_Y16: i32 = 0xDB00;
+const ATTRACT_SCORING_LANDER_X16: i32 = 0x1DA0;
+const ATTRACT_SCORING_LANDER_Y16: i32 = 0x4000;
+const ATTRACT_SCORING_SCORE_500_X16: i32 = 0x1DFF;
+const ATTRACT_SCORING_SCORE_500_Y16: i32 = 0x9000;
+const ATTRACT_SCORING_SCORE_500_DROP_X16: i32 = 0x1C00;
+const ATTRACT_SCORING_SCORE_500_DROP_Y16: i32 = 0xE000;
+const ATTRACT_SCORING_CAUGHT_HUMAN_X16: i32 = 0x1E80;
+const ATTRACT_SCORING_CAUGHT_HUMAN_Y16: i32 = 0xA2E0;
+const ATTRACT_SCORING_GROUNDED_HUMAN_Y16: i32 = 0xDEE0;
+const ATTRACT_SCORING_RESCUE_SHIP_XV16: i32 = 0x0040;
+const ATTRACT_SCORING_RESCUE_SHIP_YV16: i32 = 0x00D4;
+const ATTRACT_SCORING_RESCUE_HUMAN_ACCEL16: i32 = 0x0008;
+const ATTRACT_SCORING_RESCUE_DROP_YV16: i32 = 0x00C0;
+const ATTRACT_SCORING_RESCUE_RETURN_XV16: i32 = -0x0040;
+const ATTRACT_SCORING_RESCUE_RETURN_YV16: i32 = -0x0180;
+const ATTRACT_SCORING_LEGEND_SOURCE_X16: i32 = 0x1F00;
+const ATTRACT_SCORING_LEGEND_SOURCE_START_Y16: i32 = 0xA000;
+const SOURCE_COLTAB_COLOR_BYTES: [u8; 37] = [
+    0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x47, 0x47, 0x87,
+    0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
+    0xBF, 0x3F, 0x3E, 0x3C, 0x00,
+];
 const SOURCE_SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4];
 const SOURCE_SCANNER_SELECTED_MAP: u8 = 1;
 const SOURCE_SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
@@ -168,6 +223,11 @@ impl AttractPresentationSnapshot {
     };
 
     pub fn for_page_frame(page_frame: u16) -> Self {
+        let page_frame = if ATTRACT_CYCLE_FRAME_COUNT == 0 {
+            page_frame
+        } else {
+            page_frame % ATTRACT_CYCLE_FRAME_COUNT
+        };
         let (page, source_sleep_ticks, source_stall_ticks) =
             if page_frame >= ATTRACT_SCORING_SEQUENCE_START_FRAME {
                 (
@@ -258,6 +318,17 @@ impl AttractPresentationSnapshot {
 
     pub const fn shows_instruction_text(self) -> bool {
         self.shows_scoring_sequence_text()
+    }
+
+    pub const fn scoring_sequence_frame(self) -> Option<u16> {
+        if matches!(self.page, AttractPresentationPage::ScoringSequence) {
+            Some(
+                self.page_frame
+                    .saturating_sub(ATTRACT_SCORING_SEQUENCE_START_FRAME),
+            )
+        } else {
+            None
+        }
     }
 }
 
@@ -6750,6 +6821,7 @@ impl Game {
         }
         push_score_sprites(&mut scene, self.state.scores, self.state.player_count);
         push_top_display_border_sprites(&mut scene, &self.state);
+        push_attract_scoring_action_sprites(&mut scene, &self.state);
         push_attract_credit_sprites(&mut scene, &self.state);
         push_attract_presents_sprites(&mut scene, &self.state);
         push_attract_instruction_text_sprites(&mut scene, &self.state);
@@ -6893,6 +6965,107 @@ fn tint_new_sprites(scene: &mut RenderScene, first_sprite: usize, tint: Color) {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AttractScoringLegendEntry {
+    kind: EnemyKind,
+    table_x16: i32,
+    table_y16: i32,
+    scanner_color_word: u16,
+}
+
+const ATTRACT_SCORING_LEGEND: [AttractScoringLegendEntry;
+    ATTRACT_SCORING_LEGEND_ENTRY_COUNT as usize] = [
+    AttractScoringLegendEntry {
+        kind: EnemyKind::Lander,
+        table_x16: 0x0900,
+        table_y16: 0x6000,
+        scanner_color_word: 0x4433,
+    },
+    AttractScoringLegendEntry {
+        kind: EnemyKind::Mutant,
+        table_x16: 0x1100,
+        table_y16: 0x6000,
+        scanner_color_word: 0xCC33,
+    },
+    AttractScoringLegendEntry {
+        kind: EnemyKind::Baiter,
+        table_x16: 0x1980,
+        table_y16: 0x6200,
+        scanner_color_word: 0x3333,
+    },
+    AttractScoringLegendEntry {
+        kind: EnemyKind::Bomber,
+        table_x16: 0x0960,
+        table_y16: 0x9800,
+        scanner_color_word: 0x8888,
+    },
+    AttractScoringLegendEntry {
+        kind: EnemyKind::Pod,
+        table_x16: 0x1160,
+        table_y16: 0x9800,
+        scanner_color_word: 0xCCCC,
+    },
+    AttractScoringLegendEntry {
+        kind: EnemyKind::Swarmer,
+        table_x16: 0x19E0,
+        table_y16: 0x9A00,
+        scanner_color_word: 0x2424,
+    },
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AttractScoringDemoStage {
+    RescueDescend,
+    RescueAscend,
+    RescueLaser,
+    RescueFall,
+    RescueScore,
+    RescueReturn,
+    LegendApproach(usize),
+    LegendLaser(usize),
+    LegendTransfer(usize),
+    LegendReveal(usize),
+    LegendHold,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AttractScoringObjectKind {
+    PlayerShip,
+    Human,
+    PlayerShot,
+    Enemy(EnemyKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AttractScoringVisual {
+    Sprite,
+    Explosion,
+    Materialize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AttractScoringObject {
+    kind: AttractScoringObjectKind,
+    x16: i32,
+    y16: i32,
+    visual: AttractScoringVisual,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AttractScoringBonus {
+    sprite: SpriteId,
+    x16: i32,
+    y16: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AttractScoringFrame {
+    demo_tick: u16,
+    objects: Vec<AttractScoringObject>,
+    scanner_objects: Vec<AttractScoringObject>,
+    bonus: Option<AttractScoringBonus>,
+}
+
 fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
     if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
         return;
@@ -6957,17 +7130,542 @@ fn push_attract_instruction_text_sprites(scene: &mut RenderScene, state: &GameSt
         return;
     }
 
-    for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES {
+    let scoring_tick = state.attract.scoring_sequence_frame();
+    let visible_line_count = scoring_tick
+        .map_or(SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES.len(), |tick| {
+            1 + attract_scoring_visible_legend_text_entries(tick)
+        });
+    let scoring_tint = scoring_tick.map(attract_scoring_color_cycle_tint);
+
+    for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES
+        .iter()
+        .take(visible_line_count)
+    {
         if let Some(text) = source_message_text(label) {
             push_source_controlled_message_sprites_with_tint(
                 scene,
                 text,
                 *screen_address,
                 RenderLayer::Overlay,
-                SOURCE_VISUAL_STATE.attract_instruction_text_tint(*screen_address),
+                scoring_tint.unwrap_or_else(|| {
+                    SOURCE_VISUAL_STATE.attract_instruction_text_tint(*screen_address)
+                }),
             );
         }
     }
+}
+
+fn attract_scoring_frame(scoring_tick: u16) -> AttractScoringFrame {
+    let (stage, local_tick) = attract_scoring_demo_stage_for_tick(scoring_tick);
+    let objects = attract_scoring_objects_for_stage(stage, local_tick);
+    let scanner_tick = scoring_tick - (scoring_tick % 4);
+    let (scanner_stage, scanner_local_tick) = attract_scoring_demo_stage_for_tick(scanner_tick);
+    let scanner_objects = attract_scoring_objects_for_stage(scanner_stage, scanner_local_tick);
+
+    AttractScoringFrame {
+        demo_tick: scoring_tick,
+        objects,
+        scanner_objects,
+        bonus: attract_scoring_bonus_for_stage(stage, local_tick),
+    }
+}
+
+fn attract_scoring_demo_stage_for_tick(mut tick: u16) -> (AttractScoringDemoStage, u16) {
+    for (stage, duration) in ATTRACT_SCORING_RESCUE_TIMELINE {
+        if tick < duration {
+            return (stage, tick);
+        }
+        tick -= duration;
+    }
+
+    for index in 0..ATTRACT_SCORING_LEGEND.len() {
+        for (stage, duration) in attract_scoring_legend_timeline(index) {
+            if tick < duration {
+                return (stage, tick);
+            }
+            tick -= duration;
+        }
+    }
+
+    (
+        AttractScoringDemoStage::LegendHold,
+        tick.min(ATTRACT_SCORING_LEGEND_HOLD_TICKS.saturating_sub(1)),
+    )
+}
+
+fn attract_scoring_demo_tick_for_stage(
+    target_stage: AttractScoringDemoStage,
+    local_tick: u16,
+) -> u16 {
+    let mut elapsed = 0;
+    for (stage, duration) in ATTRACT_SCORING_RESCUE_TIMELINE {
+        if stage == target_stage {
+            return elapsed + local_tick.min(duration.saturating_sub(1));
+        }
+        elapsed += duration;
+    }
+
+    for index in 0..ATTRACT_SCORING_LEGEND.len() {
+        for (stage, duration) in attract_scoring_legend_timeline(index) {
+            if stage == target_stage {
+                return elapsed + local_tick.min(duration.saturating_sub(1));
+            }
+            elapsed += duration;
+        }
+    }
+
+    elapsed + local_tick.min(ATTRACT_SCORING_LEGEND_HOLD_TICKS.saturating_sub(1))
+}
+
+const ATTRACT_SCORING_RESCUE_TIMELINE: [(AttractScoringDemoStage, u16); 6] = [
+    (
+        AttractScoringDemoStage::RescueDescend,
+        ATTRACT_SCORING_RESCUE_DESCENT_TICKS,
+    ),
+    (
+        AttractScoringDemoStage::RescueAscend,
+        ATTRACT_SCORING_RESCUE_ASCENT_TICKS,
+    ),
+    (
+        AttractScoringDemoStage::RescueLaser,
+        ATTRACT_SCORING_RESCUE_LASER_TICKS,
+    ),
+    (
+        AttractScoringDemoStage::RescueFall,
+        ATTRACT_SCORING_RESCUE_FALL_TICKS,
+    ),
+    (
+        AttractScoringDemoStage::RescueScore,
+        ATTRACT_SCORING_RESCUE_SCORE_TICKS,
+    ),
+    (
+        AttractScoringDemoStage::RescueReturn,
+        ATTRACT_SCORING_RESCUE_RETURN_TICKS,
+    ),
+];
+
+fn attract_scoring_legend_timeline(index: usize) -> [(AttractScoringDemoStage, u16); 4] {
+    [
+        (
+            AttractScoringDemoStage::LegendApproach(index),
+            ATTRACT_SCORING_LEGEND_APPROACH_TICKS,
+        ),
+        (
+            AttractScoringDemoStage::LegendLaser(index),
+            ATTRACT_SCORING_LEGEND_LASER_TICKS,
+        ),
+        (
+            AttractScoringDemoStage::LegendTransfer(index),
+            ATTRACT_SCORING_LEGEND_TRANSFER_TICKS,
+        ),
+        (
+            AttractScoringDemoStage::LegendReveal(index),
+            ATTRACT_SCORING_LEGEND_REVEAL_TICKS,
+        ),
+    ]
+}
+
+fn attract_scoring_visible_legend_text_entries(scoring_tick: u16) -> usize {
+    ATTRACT_SCORING_LEGEND
+        .iter()
+        .enumerate()
+        .take_while(|(index, _)| {
+            let reveal_tick = attract_scoring_demo_tick_for_stage(
+                AttractScoringDemoStage::LegendReveal(*index),
+                0,
+            );
+            scoring_tick >= next_attract_scoring_text_process_tick(reveal_tick)
+        })
+        .count()
+}
+
+fn next_attract_scoring_text_process_tick(tick: u16) -> u16 {
+    let remainder = tick % 6;
+    if remainder == 0 {
+        tick
+    } else {
+        tick + (6 - remainder)
+    }
+}
+
+fn attract_scoring_revealed_table_entries(stage: AttractScoringDemoStage) -> usize {
+    match stage {
+        AttractScoringDemoStage::LegendReveal(index) => index + 1,
+        AttractScoringDemoStage::LegendHold => ATTRACT_SCORING_LEGEND.len(),
+        AttractScoringDemoStage::LegendApproach(index)
+        | AttractScoringDemoStage::LegendLaser(index)
+        | AttractScoringDemoStage::LegendTransfer(index) => index,
+        _ => 0,
+    }
+}
+
+fn attract_scoring_objects_for_stage(
+    stage: AttractScoringDemoStage,
+    local_tick: u16,
+) -> Vec<AttractScoringObject> {
+    let mut objects = Vec::new();
+    match stage {
+        AttractScoringDemoStage::RescueDescend => {
+            objects.push(attract_scoring_enemy_object(
+                EnemyKind::Lander,
+                ATTRACT_SCORING_LANDER_X16,
+                ATTRACT_SCORING_LANDER_Y16 + i32::from(local_tick) * 0x00A0,
+            ));
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::Human,
+                ATTRACT_SCORING_HUMAN_X16,
+                ATTRACT_SCORING_HUMAN_Y16,
+            ));
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::PlayerShip,
+                ATTRACT_SCORING_PLAYER_X16,
+                ATTRACT_SCORING_PLAYER_Y16,
+            ));
+        }
+        AttractScoringDemoStage::RescueAscend | AttractScoringDemoStage::RescueLaser => {
+            let total_rise_tick = if matches!(stage, AttractScoringDemoStage::RescueAscend) {
+                local_tick
+            } else {
+                ATTRACT_SCORING_RESCUE_ASCENT_TICKS + local_tick
+            };
+            let enemy_y = ATTRACT_SCORING_LANDER_Y16
+                + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_TICKS) * 0x00A0
+                - i32::from(total_rise_tick) * 0x00B0;
+            let human_y = ATTRACT_SCORING_HUMAN_Y16 - i32::from(total_rise_tick) * 0x00B0;
+            objects.push(attract_scoring_enemy_object(
+                EnemyKind::Lander,
+                ATTRACT_SCORING_LANDER_X16,
+                enemy_y,
+            ));
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::Human,
+                ATTRACT_SCORING_HUMAN_X16,
+                human_y,
+            ));
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::PlayerShip,
+                ATTRACT_SCORING_PLAYER_X16,
+                ATTRACT_SCORING_PLAYER_Y16,
+            ));
+            if matches!(stage, AttractScoringDemoStage::RescueLaser) {
+                add_attract_scoring_laser_column(
+                    &mut objects,
+                    ATTRACT_SCORING_PLAYER_X16,
+                    ATTRACT_SCORING_PLAYER_Y16,
+                    ATTRACT_SCORING_LANDER_X16,
+                    enemy_y,
+                );
+            }
+        }
+        AttractScoringDemoStage::RescueFall => {
+            let (ship_x, ship_y, human_y) = attract_scoring_rescue_intercept_state(local_tick);
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::PlayerShip,
+                ship_x,
+                ship_y,
+            ));
+            if local_tick < 12 {
+                let explosion_y = ATTRACT_SCORING_LANDER_Y16
+                    + i32::from(ATTRACT_SCORING_RESCUE_DESCENT_TICKS) * 0x00A0
+                    - i32::from(
+                        ATTRACT_SCORING_RESCUE_ASCENT_TICKS + ATTRACT_SCORING_RESCUE_LASER_TICKS,
+                    ) * 0x00B0;
+                objects.push(attract_scoring_visual_enemy_object(
+                    EnemyKind::Lander,
+                    ATTRACT_SCORING_LANDER_X16,
+                    explosion_y,
+                    AttractScoringVisual::Explosion,
+                ));
+            }
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::Human,
+                ATTRACT_SCORING_HUMAN_X16,
+                human_y,
+            ));
+        }
+        AttractScoringDemoStage::RescueScore => {
+            let (ship_x, ship_y, human_y) = attract_scoring_rescue_drop_state(local_tick);
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::PlayerShip,
+                ship_x,
+                ship_y,
+            ));
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::Human,
+                ATTRACT_SCORING_CAUGHT_HUMAN_X16,
+                human_y,
+            ));
+        }
+        AttractScoringDemoStage::RescueReturn => {
+            let (ship_start_x, ship_start_y, _) =
+                attract_scoring_rescue_drop_state(ATTRACT_SCORING_RESCUE_SCORE_TICKS);
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::PlayerShip,
+                ship_start_x + i32::from(local_tick) * ATTRACT_SCORING_RESCUE_RETURN_XV16,
+                ship_start_y + i32::from(local_tick) * ATTRACT_SCORING_RESCUE_RETURN_YV16,
+            ));
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::Human,
+                ATTRACT_SCORING_CAUGHT_HUMAN_X16,
+                ATTRACT_SCORING_GROUNDED_HUMAN_Y16,
+            ));
+        }
+        AttractScoringDemoStage::LegendApproach(_)
+        | AttractScoringDemoStage::LegendLaser(_)
+        | AttractScoringDemoStage::LegendTransfer(_)
+        | AttractScoringDemoStage::LegendReveal(_)
+        | AttractScoringDemoStage::LegendHold => {
+            let (drop_ship_x, drop_ship_y, _) =
+                attract_scoring_rescue_drop_state(ATTRACT_SCORING_RESCUE_SCORE_TICKS);
+            let player_x = drop_ship_x
+                + i32::from(ATTRACT_SCORING_RESCUE_RETURN_TICKS)
+                    * ATTRACT_SCORING_RESCUE_RETURN_XV16;
+            let player_y = drop_ship_y
+                + i32::from(ATTRACT_SCORING_RESCUE_RETURN_TICKS)
+                    * ATTRACT_SCORING_RESCUE_RETURN_YV16;
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::PlayerShip,
+                player_x,
+                player_y,
+            ));
+            objects.push(attract_scoring_object(
+                AttractScoringObjectKind::Human,
+                ATTRACT_SCORING_CAUGHT_HUMAN_X16,
+                ATTRACT_SCORING_GROUNDED_HUMAN_Y16,
+            ));
+            append_attract_scoring_legend_objects(
+                &mut objects,
+                stage,
+                local_tick,
+                player_x,
+                player_y,
+            );
+        }
+    }
+    objects
+}
+
+fn append_attract_scoring_legend_objects(
+    objects: &mut Vec<AttractScoringObject>,
+    stage: AttractScoringDemoStage,
+    local_tick: u16,
+    player_x16: i32,
+    player_y16: i32,
+) {
+    let source_y = ATTRACT_SCORING_LEGEND_SOURCE_START_Y16
+        - i32::from(ATTRACT_SCORING_LEGEND_APPROACH_TICKS) * 0x00C0;
+    for entry in ATTRACT_SCORING_LEGEND
+        .iter()
+        .take(attract_scoring_revealed_table_entries(stage))
+    {
+        objects.push(attract_scoring_enemy_object(
+            entry.kind,
+            entry.table_x16,
+            entry.table_y16,
+        ));
+    }
+
+    let current_index = match stage {
+        AttractScoringDemoStage::LegendApproach(index)
+        | AttractScoringDemoStage::LegendLaser(index)
+        | AttractScoringDemoStage::LegendTransfer(index)
+        | AttractScoringDemoStage::LegendReveal(index) => Some(index),
+        AttractScoringDemoStage::LegendHold => None,
+        _ => return,
+    };
+    let Some(index) = current_index else {
+        return;
+    };
+    let entry = ATTRACT_SCORING_LEGEND[index];
+    match stage {
+        AttractScoringDemoStage::LegendApproach(_) => {
+            let enemy_y = ATTRACT_SCORING_LEGEND_SOURCE_START_Y16 - i32::from(local_tick) * 0x00C0;
+            objects.push(attract_scoring_enemy_object(
+                entry.kind,
+                ATTRACT_SCORING_LEGEND_SOURCE_X16,
+                enemy_y,
+            ));
+        }
+        AttractScoringDemoStage::LegendLaser(_) => {
+            objects.push(attract_scoring_enemy_object(
+                entry.kind,
+                ATTRACT_SCORING_LEGEND_SOURCE_X16,
+                source_y,
+            ));
+            add_attract_scoring_laser_column(
+                objects,
+                player_x16,
+                player_y16,
+                ATTRACT_SCORING_LEGEND_SOURCE_X16,
+                source_y,
+            );
+        }
+        AttractScoringDemoStage::LegendTransfer(_) => {
+            objects.push(attract_scoring_visual_enemy_object(
+                entry.kind,
+                ATTRACT_SCORING_LEGEND_SOURCE_X16,
+                source_y,
+                AttractScoringVisual::Explosion,
+            ));
+            objects.push(attract_scoring_visual_enemy_object(
+                entry.kind,
+                entry.table_x16,
+                entry.table_y16,
+                AttractScoringVisual::Materialize,
+            ));
+        }
+        AttractScoringDemoStage::LegendReveal(_) => objects.push(attract_scoring_enemy_object(
+            entry.kind,
+            entry.table_x16,
+            entry.table_y16,
+        )),
+        AttractScoringDemoStage::LegendHold => {}
+        _ => {}
+    }
+}
+
+fn attract_scoring_bonus_for_stage(
+    stage: AttractScoringDemoStage,
+    local_tick: u16,
+) -> Option<AttractScoringBonus> {
+    match stage {
+        AttractScoringDemoStage::RescueScore => Some(AttractScoringBonus {
+            sprite: SpriteId::SCORE_POPUP_500,
+            x16: ATTRACT_SCORING_SCORE_500_X16,
+            y16: ATTRACT_SCORING_SCORE_500_Y16,
+        }),
+        AttractScoringDemoStage::RescueReturn => Some(AttractScoringBonus {
+            sprite: SpriteId::SCORE_POPUP_500,
+            x16: ATTRACT_SCORING_SCORE_500_DROP_X16,
+            y16: ATTRACT_SCORING_SCORE_500_DROP_Y16,
+        }),
+        AttractScoringDemoStage::LegendTransfer(index) if local_tick == 0 => {
+            let entry = ATTRACT_SCORING_LEGEND[index];
+            Some(AttractScoringBonus {
+                sprite: SpriteId::SCORE_POPUP_250,
+                x16: entry.table_x16,
+                y16: entry.table_y16,
+            })
+        }
+        _ => None,
+    }
+}
+
+fn attract_scoring_rescue_intercept_state(fall_tick: u16) -> (i32, i32, i32) {
+    let mut ship_x = ATTRACT_SCORING_PLAYER_X16;
+    let mut ship_y = ATTRACT_SCORING_PLAYER_Y16;
+    let mut human_y = ATTRACT_SCORING_HUMAN_Y16
+        - i32::from(ATTRACT_SCORING_RESCUE_ASCENT_TICKS + ATTRACT_SCORING_RESCUE_LASER_TICKS)
+            * 0x00B0;
+    let mut tick_cursor = 0;
+    let mut human_velocity = 0;
+
+    for _ in 0..(ATTRACT_SCORING_RESCUE_FALL_TICKS / 2) {
+        human_velocity += ATTRACT_SCORING_RESCUE_HUMAN_ACCEL16;
+        for _ in 0..2 {
+            if tick_cursor >= fall_tick {
+                return (ship_x, ship_y, human_y);
+            }
+            ship_x += ATTRACT_SCORING_RESCUE_SHIP_XV16;
+            ship_y += ATTRACT_SCORING_RESCUE_SHIP_YV16;
+            human_y += human_velocity;
+            tick_cursor += 1;
+        }
+    }
+
+    (ship_x, ship_y, human_y)
+}
+
+fn attract_scoring_rescue_drop_state(score_tick: u16) -> (i32, i32, i32) {
+    let (ship_x, ship_y, _) =
+        attract_scoring_rescue_intercept_state(ATTRACT_SCORING_RESCUE_FALL_TICKS);
+    (
+        ship_x,
+        ship_y + i32::from(score_tick) * ATTRACT_SCORING_RESCUE_DROP_YV16,
+        ATTRACT_SCORING_CAUGHT_HUMAN_Y16 + i32::from(score_tick) * ATTRACT_SCORING_RESCUE_DROP_YV16,
+    )
+}
+
+fn add_attract_scoring_laser_column(
+    objects: &mut Vec<AttractScoringObject>,
+    ship_x16: i32,
+    ship_y16: i32,
+    target_x16: i32,
+    target_y16: i32,
+) {
+    let dx = target_x16 - ship_x16;
+    let dy = target_y16 - ship_y16;
+    let steps = ((dx.abs().max(dy.abs()) + 0x07FF) / 0x0800).max(1);
+
+    for step in 1..=steps {
+        objects.push(attract_scoring_object(
+            AttractScoringObjectKind::PlayerShot,
+            ship_x16 + (dx * step) / steps,
+            ship_y16 + (dy * step) / steps,
+        ));
+    }
+}
+
+fn attract_scoring_enemy_object(kind: EnemyKind, x16: i32, y16: i32) -> AttractScoringObject {
+    attract_scoring_object(AttractScoringObjectKind::Enemy(kind), x16, y16)
+}
+
+fn attract_scoring_visual_enemy_object(
+    kind: EnemyKind,
+    x16: i32,
+    y16: i32,
+    visual: AttractScoringVisual,
+) -> AttractScoringObject {
+    AttractScoringObject {
+        kind: AttractScoringObjectKind::Enemy(kind),
+        x16,
+        y16,
+        visual,
+    }
+}
+
+fn attract_scoring_object(
+    kind: AttractScoringObjectKind,
+    x16: i32,
+    y16: i32,
+) -> AttractScoringObject {
+    AttractScoringObject {
+        kind,
+        x16,
+        y16,
+        visual: AttractScoringVisual::Sprite,
+    }
+}
+
+fn attract_scoring_object_position(x16: i32, y16: i32) -> [f32; 2] {
+    [
+        ((x16 + 0x10) >> 5).clamp(0, 319) as f32,
+        ((y16 + 0x80) >> 8).clamp(0, 255) as f32,
+    ]
+}
+
+fn attract_scoring_color_cycle_tint(demo_tick: u16) -> Color {
+    source_pseudo_color_tint(
+        SOURCE_COLTAB_COLOR_BYTES
+            [(usize::from(demo_tick / 2)) % (SOURCE_COLTAB_COLOR_BYTES.len() - 1)],
+    )
+}
+
+fn source_pseudo_color_tint(value: u8) -> Color {
+    if value == 0 {
+        return Color::from_rgba(0, 0, 0, 0);
+    }
+
+    Color::from_rgba(
+        source_scale_color_channel(value & 0x07, 7),
+        source_scale_color_channel((value >> 3) & 0x07, 7),
+        source_scale_color_channel((value >> 6) & 0x03, 3),
+        0xFF,
+    )
+}
+
+fn source_scale_color_channel(value: u8, max: u8) -> u8 {
+    ((u16::from(value) * 255) / u16::from(max.max(1))) as u8
 }
 
 fn push_attract_williams_logo_sprite(scene: &mut RenderScene, state: &GameState) {
@@ -7117,6 +7815,182 @@ fn push_attract_copyright_strip_sprite(scene: &mut RenderScene, state: &GameStat
         size: SOURCE_ATTRACT_COPYRIGHT_STRIP_SIZE,
         tint: SOURCE_VISUAL_STATE.attract_copyright_tint(),
     });
+}
+
+fn push_attract_scoring_action_sprites(scene: &mut RenderScene, state: &GameState) {
+    if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
+        return;
+    }
+    let Some(scoring_tick) = state.attract.scoring_sequence_frame() else {
+        return;
+    };
+
+    let frame = attract_scoring_frame(scoring_tick);
+    push_attract_scoring_terrain_sprites(scene, frame.demo_tick);
+    push_attract_scoring_scanner_sprites(scene, &frame);
+
+    for object in &frame.objects {
+        push_attract_scoring_object_sprite(scene, *object, frame.demo_tick);
+    }
+
+    if let Some(bonus) = frame.bonus {
+        let size = match bonus.sprite {
+            SpriteId::SCORE_POPUP_250 => [12.0, 8.0],
+            SpriteId::SCORE_POPUP_500 => [12.0, 6.0],
+            _ => [8.0, 8.0],
+        };
+        scene.push_sprite(SceneSprite {
+            sprite: bonus.sprite,
+            layer: RenderLayer::Objects,
+            position: attract_scoring_object_position(bonus.x16, bonus.y16),
+            size,
+            tint: Color::WHITE,
+        });
+    }
+}
+
+fn push_attract_scoring_terrain_sprites(scene: &mut RenderScene, demo_tick: u16) {
+    let tint = match (demo_tick / 8) % 3 {
+        0 => Color::from_rgba(0xF0, 0x9A, 0x00, 0xFF),
+        1 => Color::from_rgba(0xD0, 0x74, 0x00, 0xFF),
+        _ => Color::from_rgba(0xFF, 0xB8, 0x20, 0xFF),
+    };
+    for (position, size) in [
+        (ScreenPosition::new(0, 224), (64, 8)),
+        (ScreenPosition::new(64, 222), (64, 8)),
+        (ScreenPosition::new(128, 226), (64, 8)),
+        (ScreenPosition::new(192, 220), (56, 8)),
+        (ScreenPosition::new(248, 224), (44, 8)),
+    ] {
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::TERRAIN_TILE,
+            layer: RenderLayer::Terrain,
+            position: [f32::from(position.x), f32::from(position.y)],
+            size: [size.0 as f32, size.1 as f32],
+            tint,
+        });
+    }
+}
+
+fn push_attract_scoring_scanner_sprites(scene: &mut RenderScene, frame: &AttractScoringFrame) {
+    for object in &frame.scanner_objects {
+        let Some((sprite, size, color_word)) = attract_scoring_scanner_sprite(*object) else {
+            continue;
+        };
+        scene.push_sprite(SceneSprite {
+            sprite,
+            layer: RenderLayer::Hud,
+            position: attract_scoring_scanner_position(*object),
+            size,
+            tint: source_pseudo_color_tint((color_word & 0x00FF) as u8),
+        });
+    }
+}
+
+fn attract_scoring_scanner_sprite(
+    object: AttractScoringObject,
+) -> Option<(SpriteId, [f32; 2], u16)> {
+    match object.kind {
+        AttractScoringObjectKind::PlayerShip => {
+            Some((SpriteId::SCANNER_PLAYER_BLIP, [3.0, 2.0], 0x9099))
+        }
+        AttractScoringObjectKind::Human => {
+            Some((SpriteId::SCANNER_OBJECT_BLIP, [2.0, 2.0], 0x6666))
+        }
+        AttractScoringObjectKind::Enemy(kind) => ATTRACT_SCORING_LEGEND
+            .iter()
+            .find(|entry| entry.kind == kind)
+            .map(|entry| {
+                (
+                    SpriteId::SCANNER_OBJECT_BLIP,
+                    [2.0, 2.0],
+                    entry.scanner_color_word,
+                )
+            }),
+        AttractScoringObjectKind::PlayerShot => None,
+    }
+}
+
+fn attract_scoring_scanner_position(object: AttractScoringObject) -> [f32; 2] {
+    let [native_x, native_y] = attract_scoring_object_position(object.x16, object.y16);
+    [
+        96.0 + native_x * 128.0 / 320.0,
+        8.0 + native_y * 32.0 / 256.0,
+    ]
+}
+
+fn push_attract_scoring_object_sprite(
+    scene: &mut RenderScene,
+    object: AttractScoringObject,
+    demo_tick: u16,
+) {
+    let (sprite, layer, size, tint) = attract_scoring_object_sprite(object, demo_tick);
+    scene.push_sprite(SceneSprite {
+        sprite,
+        layer,
+        position: attract_scoring_object_position(object.x16, object.y16),
+        size,
+        tint,
+    });
+}
+
+fn attract_scoring_object_sprite(
+    object: AttractScoringObject,
+    demo_tick: u16,
+) -> (SpriteId, RenderLayer, [f32; 2], Color) {
+    if matches!(object.visual, AttractScoringVisual::Explosion) {
+        return (
+            SpriteId::BOMB_EXPLOSION,
+            RenderLayer::Objects,
+            [10.0, 10.0],
+            attract_scoring_color_cycle_tint(demo_tick),
+        );
+    }
+
+    let tint = if matches!(object.visual, AttractScoringVisual::Materialize) {
+        attract_scoring_color_cycle_tint(demo_tick)
+    } else {
+        Color::WHITE
+    };
+
+    match object.kind {
+        AttractScoringObjectKind::PlayerShip => (
+            SpriteId::PLAYER_SHIP,
+            RenderLayer::Objects,
+            [
+                f32::from(PLAYER_SPRITE_SIZE.0),
+                f32::from(PLAYER_SPRITE_SIZE.1),
+            ],
+            tint,
+        ),
+        AttractScoringObjectKind::Human => (
+            SpriteId::HUMAN,
+            RenderLayer::Objects,
+            [
+                f32::from(HUMAN_SPRITE_SIZE.0),
+                f32::from(HUMAN_SPRITE_SIZE.1),
+            ],
+            tint,
+        ),
+        AttractScoringObjectKind::PlayerShot => (
+            SpriteId::PLAYER_PROJECTILE,
+            RenderLayer::Projectiles,
+            [
+                f32::from(PROJECTILE_SPRITE_SIZE.0),
+                f32::from(PROJECTILE_SPRITE_SIZE.1),
+            ],
+            tint,
+        ),
+        AttractScoringObjectKind::Enemy(kind) => {
+            let size = enemy_sprite_size(kind);
+            (
+                enemy_sprite(kind),
+                RenderLayer::Objects,
+                [f32::from(size.0), f32::from(size.1)],
+                tint,
+            )
+        }
+    }
 }
 
 fn requested_start_player_count(input: GameInput) -> Option<u8> {
@@ -7618,7 +8492,9 @@ fn push_stock_sprite_series(
 }
 
 fn push_top_display_border_sprites(scene: &mut RenderScene, state: &GameState) {
-    if state.phase != GamePhase::Playing {
+    if state.phase != GamePhase::Playing
+        && !(state.phase == GamePhase::Attract && state.attract.scoring_sequence_frame().is_some())
+    {
         return;
     }
 
@@ -9331,11 +10207,18 @@ mod tests {
         assert!(!hall_of_fame.shows_williams_logo());
         assert!(!hall_of_fame.shows_instruction_text());
 
-        let scoring = AttractPresentationSnapshot::for_page_frame(4_200);
+        let scoring = AttractPresentationSnapshot::for_page_frame(
+            super::ATTRACT_SCORING_SEQUENCE_START_FRAME,
+        );
         assert_eq!(scoring.page, AttractPresentationPage::ScoringSequence);
+        assert_eq!(scoring.scoring_sequence_frame(), Some(0));
         assert!(scoring.shows_scoring_sequence_text());
         assert!(scoring.shows_instruction_text());
         assert!(!scoring.shows_hall_of_fame());
+
+        let wrapped = AttractPresentationSnapshot::for_page_frame(super::ATTRACT_CYCLE_FRAME_COUNT);
+        assert_eq!(wrapped.page_frame, 0);
+        assert_eq!(wrapped.page, AttractPresentationPage::WilliamsLogo);
     }
 
     #[test]
@@ -9378,14 +10261,138 @@ mod tests {
                 || sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP
         }));
 
-        game.state.attract = AttractPresentationSnapshot::for_page_frame(4_200);
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(
+            super::ATTRACT_SCORING_SEQUENCE_START_FRAME,
+        );
         let scoring_scene = game.scene();
         assert!(scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [134.0, 48.0]
         }));
+        assert!(
+            scoring_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::PLAYER_SHIP)
+        );
+        assert!(
+            scoring_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD)
+        );
         assert!(!scoring_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
                 || sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP
+        }));
+    }
+
+    #[test]
+    fn clean_attract_scoring_sequence_projects_source_rescue_demo() {
+        let mut game = Game::new();
+        let rescue_score_tick = super::attract_scoring_demo_tick_for_stage(
+            super::AttractScoringDemoStage::RescueScore,
+            0,
+        );
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(
+            super::ATTRACT_SCORING_SEQUENCE_START_FRAME + rescue_score_tick,
+        );
+
+        let scene = game.scene();
+        let score_position = super::attract_scoring_object_position(
+            super::ATTRACT_SCORING_SCORE_500_X16,
+            super::ATTRACT_SCORING_SCORE_500_Y16,
+        );
+
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_POPUP_500
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == score_position
+        }));
+        assert!(
+            scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::PLAYER_SHIP)
+        );
+        assert!(
+            scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::HUMAN)
+        );
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TERRAIN_TILE
+                && sprite.layer == RenderLayer::Terrain
+                && sprite.tint != Color::from_rgba(0x26, 0xAE, 0x00, 0xFF)
+        }));
+        assert!(
+            scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP)
+        );
+        assert!(
+            scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP)
+        );
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [134.0, 48.0]
+        }));
+        assert!(!scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_L && sprite.position == [56.0, 112.0]
+        }));
+    }
+
+    #[test]
+    fn clean_attract_scoring_sequence_reveals_source_score_card() {
+        let first_reveal_tick = super::attract_scoring_demo_tick_for_stage(
+            super::AttractScoringDemoStage::LegendReveal(0),
+            0,
+        );
+        let first_text_tick = super::next_attract_scoring_text_process_tick(first_reveal_tick);
+        assert_eq!(
+            super::attract_scoring_visible_legend_text_entries(first_text_tick),
+            1
+        );
+
+        let hold_tick = super::attract_scoring_demo_tick_for_stage(
+            super::AttractScoringDemoStage::LegendHold,
+            0,
+        );
+        assert_eq!(
+            super::attract_scoring_visible_legend_text_entries(hold_tick),
+            super::ATTRACT_SCORING_LEGEND.len()
+        );
+
+        let mut game = Game::new();
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(
+            super::ATTRACT_SCORING_SEQUENCE_START_FRAME + hold_tick,
+        );
+        let scene = game.scene();
+
+        for sprite in [
+            SpriteId::ENEMY_LANDER,
+            SpriteId::ENEMY_MUTANT,
+            SpriteId::ENEMY_BAITER,
+            SpriteId::ENEMY_BOMBER,
+            SpriteId::ENEMY_POD,
+            SpriteId::ENEMY_SWARMER,
+        ] {
+            assert!(
+                scene
+                    .sprites
+                    .iter()
+                    .any(|scene_sprite| scene_sprite.sprite == sprite),
+                "score-card scene should contain {sprite:?}"
+            );
+        }
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [184.0, 168.0]
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_DIGIT_1 && sprite.position[1] >= 168.0
         }));
     }
 
