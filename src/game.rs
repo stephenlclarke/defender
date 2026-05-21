@@ -4,8 +4,8 @@ use crate::{
     renderer::{
         Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
         push_source_controlled_message_sprites, push_source_message_sprites,
-        push_source_text_bytes_sprites, source_message_text, source_screen_position,
-        source_screen_position_with_offset,
+        push_source_text_bytes_sprites, source_attract_williams_logo_pixel_path,
+        source_message_text, source_screen_position, source_screen_position_with_offset,
     },
     systems::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, HighScoreEntrySystem,
@@ -41,6 +41,7 @@ const ATTRACT_DEFENDER_ENTRY_SLEEP_TICKS: u8 = 0x30;
 const ATTRACT_COPYRIGHT_SLEEP_TICKS: u8 = 10;
 const ATTRACT_COPYRIGHT_STALL_TICKS: u8 = 60;
 const ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS: u8 = 0xE6;
+pub(crate) const ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES: u16 = 160;
 const SOURCE_SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4];
 const SOURCE_SCANNER_SELECTED_MAP: u8 = 1;
 const SOURCE_SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
@@ -317,9 +318,15 @@ impl SourceVisualStateSnapshot {
         Color::WHITE
     }
 
-    pub(crate) const fn attract_williams_logo_tint(self) -> Color {
-        let _source_index = self.attract_williams_logo_color_index;
-        Color::WHITE
+    pub(crate) fn attract_williams_logo_tint_for_frame(self, page_frame: u16) -> Color {
+        let cadence = u16::from(self.attract_williams_normal_logo_rate.max(1));
+        match (page_frame / cadence) % 5 {
+            0 => Color::from_rgba(0xFF, 0xD8, 0x20, 0xFF),
+            1 => Color::from_rgba(0xFF, 0x40, 0x40, 0xFF),
+            2 => Color::from_rgba(0x40, 0xF0, 0xFF, 0xFF),
+            3 => Color::from_rgba(0x60, 0xFF, 0x70, 0xFF),
+            _ => Color::from_rgba(0xB0, 0x70, 0xFF, 0xFF),
+        }
     }
 
     pub(crate) const fn attract_williams_logo_should_render(self) -> bool {
@@ -6971,13 +6978,52 @@ fn push_attract_williams_logo_sprite(scene: &mut RenderScene, state: &GameState)
         return;
     }
 
+    let tint = SOURCE_VISUAL_STATE.attract_williams_logo_tint_for_frame(state.attract.page_frame);
+    let pixel_path = source_attract_williams_logo_pixel_path();
+    let visible_pixel_count =
+        attract_williams_logo_visible_pixel_count(&state.attract, pixel_path.len());
+    if visible_pixel_count < pixel_path.len() {
+        let origin = source_screen_position(SOURCE_ATTRACT_WILLIAMS_LOGO_SCREEN);
+        for [pixel_x, pixel_y] in pixel_path.iter().take(visible_pixel_count) {
+            scene.push_sprite(SceneSprite {
+                sprite: SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
+                layer: RenderLayer::Overlay,
+                position: [
+                    origin[0] + f32::from(*pixel_x),
+                    origin[1] + f32::from(*pixel_y),
+                ],
+                size: [1.0, 1.0],
+                tint,
+            });
+        }
+        return;
+    }
+
     scene.push_sprite(SceneSprite {
         sprite: SpriteId::ATTRACT_WILLIAMS_LOGO,
         layer: RenderLayer::Overlay,
         position: source_screen_position(SOURCE_ATTRACT_WILLIAMS_LOGO_SCREEN),
         size: SOURCE_ATTRACT_WILLIAMS_LOGO_SIZE,
-        tint: SOURCE_VISUAL_STATE.attract_williams_logo_tint(),
+        tint,
     });
+}
+
+fn attract_williams_logo_visible_pixel_count(
+    attract: &AttractPresentationSnapshot,
+    total_pixels: usize,
+) -> usize {
+    if total_pixels == 0 {
+        return 0;
+    }
+    if attract.page != AttractPresentationPage::WilliamsLogo
+        || attract.page_frame >= ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES
+    {
+        return total_pixels;
+    }
+
+    let reveal_frames = usize::from(ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES);
+    let page_frame = usize::from(attract.page_frame.max(1));
+    (total_pixels * page_frame / reveal_frames).clamp(1, total_pixels)
 }
 
 fn push_attract_defender_wordmark_sprite(scene: &mut RenderScene, state: &GameState) {
@@ -8414,7 +8460,8 @@ fn accepted_r3_visual_signature(frame: u64) -> Option<u32> {
 mod tests {
     use crate::{
         renderer::{
-            Color, RenderLayer, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize, TextureAtlas,
+            Color, RenderLayer, RenderLayerCounts, RenderScene, SpriteId, SurfaceSize,
+            TextureAtlas, source_attract_williams_logo_pixel_path,
         },
         systems::{
             GameSimulation, HighScoreInitialsState, PlayerControlIntent, PlayerMotionState,
@@ -8425,10 +8472,11 @@ mod tests {
     use super::PlayerStockSnapshot;
 
     use super::{
-        ATTRACT_COPYRIGHT_SLEEP_TICKS, ATTRACT_COPYRIGHT_STALL_TICKS, AttractPresentationPage,
-        AttractPresentationSnapshot, COIN_CREDIT_DELAY_FRAMES, COIN_CREDIT_SOUND_DELAY_FRAMES,
-        DEFAULT_CABINET_WAVE, DEFAULT_HIGH_SCORE, DEFAULT_PLAYER_LIVES, DEFAULT_REPLAY_SCORE,
-        Direction, EXPANDED_OBJECT_DETAIL_LIMIT, EnemyKind, EnemyReserveSnapshot, EnemySnapshot,
+        ATTRACT_COPYRIGHT_SLEEP_TICKS, ATTRACT_COPYRIGHT_STALL_TICKS,
+        ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES, AttractPresentationPage, AttractPresentationSnapshot,
+        COIN_CREDIT_DELAY_FRAMES, COIN_CREDIT_SOUND_DELAY_FRAMES, DEFAULT_CABINET_WAVE,
+        DEFAULT_HIGH_SCORE, DEFAULT_PLAYER_LIVES, DEFAULT_REPLAY_SCORE, Direction,
+        EXPANDED_OBJECT_DETAIL_LIMIT, EnemyKind, EnemyReserveSnapshot, EnemySnapshot,
         ExpandedObjectDetailSnapshot, ExpandedObjectEvidenceSnapshot, ExpandedObjectKind,
         ExplosionKind, Game, GameEvent, GameEvents, GameFrame, GameInput, GameOverSnapshot,
         GamePhase, HALL_OF_FAME_NO_ENTRY_DELAY_FRAMES, HALL_OF_FAME_STALL_FRAMES,
@@ -9281,6 +9329,55 @@ mod tests {
     }
 
     #[test]
+    fn clean_attract_williams_logo_uses_handwritten_reveal_and_color_cadence() {
+        let mut game = Game::new();
+        let logo_pixel_count = source_attract_williams_logo_pixel_path().len();
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(1);
+        let early_scene = game.scene();
+        let early_pixels = early_scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL)
+            .collect::<Vec<_>>();
+        assert!(!early_pixels.is_empty());
+        assert!(early_pixels.len() < logo_pixel_count);
+        assert!(
+            !early_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO)
+        );
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(11);
+        let next_tint_scene = game.scene();
+        let next_tint = next_tint_scene
+            .sprites
+            .iter()
+            .find(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL)
+            .expect("handwritten Williams pixel")
+            .tint;
+        assert_ne!(early_pixels[0].tint, next_tint);
+
+        game.state.attract =
+            AttractPresentationSnapshot::for_page_frame(ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES);
+        let complete_scene = game.scene();
+        assert!(complete_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
+                && sprite.position == [108.0, 60.0]
+                && sprite.tint
+                    == SOURCE_VISUAL_STATE
+                        .attract_williams_logo_tint_for_frame(ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES)
+        }));
+        assert!(
+            !complete_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL)
+        );
+    }
+
+    #[test]
     fn source_visual_state_tracks_palette_words_rates_and_blink_contract() {
         let visual = SOURCE_VISUAL_STATE;
 
@@ -9305,7 +9402,18 @@ mod tests {
         assert_eq!(visual.hud_tint(), Color::WHITE);
         assert_eq!(visual.top_display_border_tint(), Color::WHITE);
         assert_eq!(visual.top_display_scanner_marker_tint(), Color::WHITE);
-        assert_eq!(visual.attract_williams_logo_tint(), Color::WHITE);
+        assert_eq!(
+            visual.attract_williams_logo_tint_for_frame(0),
+            Color::from_rgba(0xFF, 0xD8, 0x20, 0xFF)
+        );
+        assert_eq!(
+            visual.attract_williams_logo_tint_for_frame(10),
+            Color::from_rgba(0xFF, 0x40, 0x40, 0xFF)
+        );
+        assert_eq!(
+            visual.attract_williams_logo_tint_for_frame(20),
+            Color::from_rgba(0x40, 0xF0, 0xFF, 0xFF)
+        );
         assert_eq!(visual.attract_defender_wordmark_tint(), Color::WHITE);
         assert_eq!(visual.attract_copyright_tint(), Color::WHITE);
         assert_eq!(visual.hall_of_fame_logo_tint(), Color::WHITE);
@@ -9350,7 +9458,7 @@ mod tests {
         let attract_scene = game.scene();
         assert!(attract_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
-                && sprite.tint == SOURCE_VISUAL_STATE.attract_williams_logo_tint()
+                && sprite.tint == SOURCE_VISUAL_STATE.attract_williams_logo_tint_for_frame(419)
         }));
         assert!(attract_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
@@ -9398,15 +9506,22 @@ mod tests {
         assert_eq!(inserted.state.credits, 0);
         assert!(inserted.events.is_empty());
         assert_eq!(inserted.scene.summary().layers.hud, 2);
-        assert_eq!(inserted.scene.summary().layers.overlay, 10);
+        assert!(inserted.scene.summary().layers.overlay > 10);
         assert_eq!(inserted.scene.summary().raster_count, 0);
         assert!(inserted.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
                 && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [108.0, 60.0]
-                && sprite.size == [92.0, 19.0]
-                && sprite.tint == Color::WHITE
+                && sprite.position == [116.0, 64.0]
+                && sprite.size == [1.0, 1.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.attract_williams_logo_tint_for_frame(1)
         }));
+        assert!(
+            !inserted
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| { sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO })
+        );
         assert!(!inserted.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
                 && sprite.position == [96.0, 144.0]
@@ -9453,7 +9568,7 @@ mod tests {
         assert_eq!(credited.events.gameplay(), &[GameEvent::CreditAdded]);
         assert!(credited.events.sounds().is_empty());
         assert_eq!(credited.scene.summary().layers.hud, 2);
-        assert_eq!(credited.scene.summary().layers.overlay, 10);
+        assert!(credited.scene.summary().layers.overlay > 10);
         assert_eq!(credited.scene.summary().raster_count, 0);
         assert!(credited.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::SCORE_DIGIT_1

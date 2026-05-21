@@ -772,14 +772,12 @@ R9-E3 corrective visual acceptance schedule:
   Hall of Fame display renderer during the attract Hall of Fame page and
   suppress title credits on that page. Focused tests cover the new page order
   and rendered surfaces.
-- R9-E3.3: Williams handwritten logo and color cadence. Replace the clean
-  static Williams-title sprite path with source-table-walker rendering based on
-  `LGOTAB`/`WILLIR` evidence, with frame-gated draw progress and source-backed
-  color cycling that matches the early `start-sequence.gif` frames closely
-  enough for visual review. Add focused scene tests for partial/full logo draw
-  and tint progression. Validation: `cargo fmt --check`, focused attract visual
-  tests, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
-  `git diff --check`.
+- R9-E3.3: Williams handwritten logo and color cadence. Completed 2026-05-21.
+  The clean title path now uses the source `LGOTAB` pixel order for an early
+  handwritten reveal, backed by a 1x1 Williams-logo atlas pixel and a
+  source-rate color cadence before falling back to the completed source
+  Williams logo. Focused renderer/game/oracle tests cover the pixel path, atlas
+  region, reveal threshold, and tint cadence.
 - R9-E3.4: Defender wordmark coalescence. Implement the clean `DEFEND` /
   `DEFENS` appearance phase so the Defender wordmark visibly coalesces before
   the settled logo, including the source refresh behavior that prevents
@@ -3060,6 +3058,23 @@ Work log:
   visual closeout gate. The next full gate should run at R9-E3.7 or sooner if
   the Williams handwriting, Defender coalescence, sprite/palette, or
   scoring/action slices introduce broad runtime risk.
+
+- `2026-05-21 20:56:03 BST` Completed R9-E3.3 Williams handwritten logo and
+  color-cadence repair. Renderer code now exposes the source `LGOTAB`
+  Williams-logo pixel path and a 1x1 atlas-backed Williams-logo pixel. Clean
+  and oracle attract scenes use that source-ordered path for early title frames
+  with source-rate color cycling, then switch back to the completed Williams
+  logo sprite after the reveal threshold. README, SPEC,
+  `docs/fidelity/gaps.md`, and this plan now narrow remaining B13 visual work
+  to Defender coalescence, gameplay sprite/palette fidelity, and the later
+  scoring/action attract segment. Focused validation passed with `cargo fmt
+  --check`, `cargo check`, focused renderer/game/oracle tests, targeted
+  `make clean-fidelity SCENARIOS="attract_boot"` matching 900/900 frames, and
+  `cargo run -- --game-smoke`. Full `make fidelity`, full all-scenario
+  `make clean-fidelity`, full clippy, and `--live-smoke` remain deferred
+  because this was a bounded visual repair, not the R9-E3.7 closeout gate. The
+  next full gate should run at R9-E3.7 or sooner if the Defender coalescence,
+  sprite/palette, or scoring/action slices introduce broad runtime risk.
 
 ## Archived Completed History
 

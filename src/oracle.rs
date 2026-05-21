@@ -15,20 +15,21 @@ use crate::accepted::{
 };
 
 use crate::game::{
-    AttractPresentationSnapshot, Direction, EXPANDED_OBJECT_DETAIL_LIMIT,
-    ExpandedObjectDetailSnapshot, ExpandedObjectEvidenceSnapshot, ExpandedObjectKind, GameEvent,
-    GameEvents, GameFrame, GameOverSnapshot, GamePhase, GameState, HIGH_SCORE_TABLE_ENTRIES,
-    HighScoreEntrySnapshot, HighScoreSubmissionSnapshot, HighScoreTableEntrySnapshot,
-    HighScoreTablesSnapshot, OBJECT_EVIDENCE_DETAIL_LIMIT, ObjectEvidenceDetailSnapshot,
-    ObjectEvidenceList, ObjectEvidenceSnapshot, PlayerSnapshot, PlayerStockSnapshot,
-    SOURCE_VISUAL_STATE, ScannerRadarSnapshot, ScoreSnapshot, SoundEvent, WaveProfileSnapshot,
-    WorldSnapshot, WorldVector, expanded_object_sprite_size, push_scanner_radar_sprites,
+    ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES, AttractPresentationPage, AttractPresentationSnapshot,
+    Direction, EXPANDED_OBJECT_DETAIL_LIMIT, ExpandedObjectDetailSnapshot,
+    ExpandedObjectEvidenceSnapshot, ExpandedObjectKind, GameEvent, GameEvents, GameFrame,
+    GameOverSnapshot, GamePhase, GameState, HIGH_SCORE_TABLE_ENTRIES, HighScoreEntrySnapshot,
+    HighScoreSubmissionSnapshot, HighScoreTableEntrySnapshot, HighScoreTablesSnapshot,
+    OBJECT_EVIDENCE_DETAIL_LIMIT, ObjectEvidenceDetailSnapshot, ObjectEvidenceList,
+    ObjectEvidenceSnapshot, PlayerSnapshot, PlayerStockSnapshot, SOURCE_VISUAL_STATE,
+    ScannerRadarSnapshot, ScoreSnapshot, SoundEvent, WaveProfileSnapshot, WorldSnapshot,
+    WorldVector, expanded_object_sprite_size, push_scanner_radar_sprites,
 };
 use crate::renderer::{
     Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
     push_source_controlled_message_sprites, push_source_message_sprites,
-    push_source_text_bytes_sprites, source_message_text, source_screen_position,
-    source_screen_position_with_offset,
+    push_source_text_bytes_sprites, source_attract_williams_logo_pixel_path, source_message_text,
+    source_screen_position, source_screen_position_with_offset,
 };
 #[cfg(test)]
 use crate::{game::GameInput, systems::GameSimulation};
@@ -611,13 +612,52 @@ fn push_attract_williams_logo_sprite(scene: &mut RenderScene, state: &GameState)
         return;
     }
 
+    let tint = SOURCE_VISUAL_STATE.attract_williams_logo_tint_for_frame(state.attract.page_frame);
+    let pixel_path = source_attract_williams_logo_pixel_path();
+    let visible_pixel_count =
+        attract_williams_logo_visible_pixel_count(&state.attract, pixel_path.len());
+    if visible_pixel_count < pixel_path.len() {
+        let origin = source_screen_position(SOURCE_ATTRACT_WILLIAMS_LOGO_SCREEN);
+        for [pixel_x, pixel_y] in pixel_path.iter().take(visible_pixel_count) {
+            scene.push_sprite(SceneSprite {
+                sprite: SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
+                layer: RenderLayer::Overlay,
+                position: [
+                    origin[0] + f32::from(*pixel_x),
+                    origin[1] + f32::from(*pixel_y),
+                ],
+                size: [1.0, 1.0],
+                tint,
+            });
+        }
+        return;
+    }
+
     scene.push_sprite(SceneSprite {
         sprite: SpriteId::ATTRACT_WILLIAMS_LOGO,
         layer: RenderLayer::Overlay,
         position: source_screen_position(SOURCE_ATTRACT_WILLIAMS_LOGO_SCREEN),
         size: SOURCE_ATTRACT_WILLIAMS_LOGO_SIZE,
-        tint: SOURCE_VISUAL_STATE.attract_williams_logo_tint(),
+        tint,
     });
+}
+
+fn attract_williams_logo_visible_pixel_count(
+    attract: &AttractPresentationSnapshot,
+    total_pixels: usize,
+) -> usize {
+    if total_pixels == 0 {
+        return 0;
+    }
+    if attract.page != AttractPresentationPage::WilliamsLogo
+        || attract.page_frame >= ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES
+    {
+        return total_pixels;
+    }
+
+    let reveal_frames = usize::from(ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES);
+    let page_frame = usize::from(attract.page_frame.max(1));
+    (total_pixels * page_frame / reveal_frames).clamp(1, total_pixels)
 }
 
 fn push_attract_defender_wordmark_sprite(scene: &mut RenderScene, state: &GameState) {
@@ -1384,7 +1424,8 @@ mod tests {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
                 && sprite.position == [108.0, 60.0]
                 && sprite.size == [92.0, 19.0]
-                && sprite.tint == Color::WHITE
+                && sprite.tint
+                    == crate::game::SOURCE_VISUAL_STATE.attract_williams_logo_tint_for_frame(419)
         }));
         assert!(overlay_sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO

@@ -6,14 +6,15 @@ Status as of `2026-05-21`: the accepted red-label target remains the oracle for
 the rewrite. The profiled clean-fidelity gate matches all 12 embedded Phase 1
 scenario input programs, and the R9-E2 full validation gate has passed. Strict
 R9 behavior/evidence blockers are closed through B12, but owner review of
-`docs/start-sequence.gif` reopened B13 visual acceptance for the clean renderer:
-Williams/title colors, Williams handwriting, Defender wordmark coalescence,
-gameplay sprite/palette fidelity, and the Williams -> High Scores ->
-scoring/action attract order. Older entries remain closed fidelity history,
-local-reference/tooling notes, archived prototype cleanup, or post-acceptance
-validation records. Historical entries that mention remaining blockers describe
-the state at the time they were written; they are not active R9 blockers unless
-restated in this status block.
+`docs/start-sequence.gif` reopened B13 visual acceptance for the clean renderer.
+Williams handwriting/color cadence and the Hall of Fame attract order are now
+repaired in clean runtime; Defender wordmark coalescence, gameplay
+sprite/palette fidelity, and the later scoring/action attract segment remain
+active. Older entries remain closed fidelity history, local-reference/tooling
+notes, archived prototype cleanup, or post-acceptance validation records.
+Historical entries that mention remaining blockers describe the state at the
+time they were written; they are not active R9 blockers unless restated in this
+status block.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items: exact
 per-scenario pixel CRC parity, strict long-scenario sprite count/layer parity,

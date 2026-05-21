@@ -298,6 +298,7 @@ impl SpriteId {
     pub const SCANNER_OBJECT_BLIP: Self = Self(70);
     pub const SCANNER_PLAYER_BLIP: Self = Self(71);
     pub const PLAYER_EXPLOSION_PIXEL: Self = Self(72);
+    pub const ATTRACT_WILLIAMS_LOGO_PIXEL: Self = Self(73);
     pub const SCORE_DIGITS: [Self; 10] = [
         Self::SCORE_DIGIT_0,
         Self::SCORE_DIGIT_1,
@@ -966,6 +967,8 @@ const SOURCE_ATTRACT_COPYRIGHT_BYTES: [u8; 80] = [
 ];
 const SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS: u8 = 46;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS: u8 = 19;
+const SOURCE_ATTRACT_WILLIAMS_LOGO_PIXELS: usize =
+    SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS as usize * 2 * SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS as usize;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_COLUMN: u8 = 0x36;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_ROW: u8 = 0x3C;
 const SOURCE_ATTRACT_WILLIAMS_LOGO_TABLE: [u8; 351] = [
@@ -1258,6 +1261,11 @@ impl TextureAtlas {
                 origin: [108, 160],
                 size: [4, 2],
             },
+            AtlasRegion {
+                sprite: SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
+                origin: [112, 160],
+                size: [1, 1],
+            },
         ];
         regions.extend(message_glyph_atlas_regions(surface));
         let pixels = default_sprite_atlas_pixels(surface, &regions);
@@ -1538,6 +1546,13 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
         surface,
         regions,
         SpriteId::PLAYER_EXPLOSION_PIXEL,
+        WHITE_RGBA,
+    );
+    fill_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
         WHITE_RGBA,
     );
     for (character, sprite) in &message_glyphs {
@@ -1910,6 +1925,18 @@ fn decode_source_attract_williams_logo_rgba() -> EmbeddedSprite {
         u32::from(SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS),
     );
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
+
+    for [pixel_x, pixel_y] in source_attract_williams_logo_pixel_path() {
+        let offset = ((usize::from(pixel_y) * surface.width as usize) + usize::from(pixel_x)) * 4;
+        pixels[offset..offset + 4].copy_from_slice(&WHITE_RGBA);
+    }
+
+    EmbeddedSprite { surface, pixels }
+}
+
+pub(crate) fn source_attract_williams_logo_pixel_path() -> Vec<[u8; 2]> {
+    let mut path = Vec::new();
+    let mut seen = [false; SOURCE_ATTRACT_WILLIAMS_LOGO_PIXELS];
     let mut pointer = 0usize;
     let mut cursor = 0u16;
 
@@ -1932,7 +1959,7 @@ fn decode_source_attract_williams_logo_rgba() -> EmbeddedSprite {
             };
             pointer += 2;
             cursor = u16::from_be_bytes([cursor_high, cursor_low]);
-            plot_source_attract_williams_logo_pixel(&mut pixels, surface, cursor);
+            push_source_attract_williams_logo_pixel(&mut path, &mut seen, cursor);
         } else {
             let mut accumulator = opcode;
             loop {
@@ -1944,7 +1971,7 @@ fn decode_source_attract_williams_logo_rgba() -> EmbeddedSprite {
                     source_attract_williams_logo_vertical_bit(accumulator, &mut cursor, true);
                 accumulator =
                     source_attract_williams_logo_vertical_bit(accumulator, &mut cursor, false);
-                plot_source_attract_williams_logo_pixel(&mut pixels, surface, cursor);
+                push_source_attract_williams_logo_pixel(&mut path, &mut seen, cursor);
                 if accumulator == 0 {
                     break;
                 }
@@ -1952,7 +1979,7 @@ fn decode_source_attract_williams_logo_rgba() -> EmbeddedSprite {
         }
     }
 
-    EmbeddedSprite { surface, pixels }
+    path
 }
 
 fn source_attract_williams_logo_horizontal_bit(
@@ -1993,26 +2020,38 @@ fn source_attract_williams_logo_vertical_bit(
     accumulator
 }
 
-fn plot_source_attract_williams_logo_pixel(pixels: &mut [u8], surface: SurfaceSize, cursor: u16) {
+fn push_source_attract_williams_logo_pixel(
+    path: &mut Vec<[u8; 2]>,
+    seen: &mut [bool],
+    cursor: u16,
+) {
+    let Some([pixel_x, pixel_y]) = source_attract_williams_logo_pixel(cursor) else {
+        return;
+    };
+    let index = usize::from(pixel_y) * usize::from(SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS) * 2
+        + usize::from(pixel_x);
+    if !seen[index] {
+        seen[index] = true;
+        path.push([pixel_x, pixel_y]);
+    }
+}
+
+fn source_attract_williams_logo_pixel(cursor: u16) -> Option<[u8; 2]> {
     let [x, y] = cursor.to_be_bytes();
     let column = x >> 1;
-    let Some(relative_column) = column.checked_sub(SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_COLUMN)
-    else {
-        return;
-    };
-    let Some(relative_row) = y.checked_sub(SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_ROW) else {
-        return;
-    };
+    let relative_column = column.checked_sub(SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_COLUMN)?;
+    let relative_row = y.checked_sub(SOURCE_ATTRACT_WILLIAMS_LOGO_FIRST_ROW)?;
     if relative_column >= SOURCE_ATTRACT_WILLIAMS_LOGO_COLUMNS
         || relative_row >= SOURCE_ATTRACT_WILLIAMS_LOGO_ROWS
     {
-        return;
+        return None;
     }
 
     let pixel_x = usize::from(relative_column) * 2 + usize::from(x & 1);
-    let pixel_y = usize::from(relative_row);
-    let offset = ((pixel_y * surface.width as usize) + pixel_x) * 4;
-    pixels[offset..offset + 4].copy_from_slice(&WHITE_RGBA);
+    Some([
+        u8::try_from(pixel_x).expect("Williams logo pixel x fits in u8"),
+        relative_row,
+    ])
 }
 
 fn expand_source_defender_logo_bytes() -> [u8; SOURCE_DEFENDER_LOGO_BYTES] {
@@ -3912,7 +3951,10 @@ mod tests {
         push_source_text_bytes_sprites, source_message_text, source_screen_position,
         source_screen_position_with_offset,
     };
-    use crate::renderer::{EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba};
+    use crate::renderer::{
+        EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba,
+        source_attract_williams_logo_pixel_path,
+    };
 
     #[test]
     fn surface_size_reports_empty_edges() {
@@ -5688,10 +5730,30 @@ mod tests {
     }
 
     #[test]
+    fn default_sprite_atlas_uses_attract_williams_logo_pixel_region() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(
+            atlas.region(SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL),
+            Some(AtlasRegion {
+                sprite: SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
+                origin: [112, 160],
+                size: [1, 1],
+            })
+        );
+        assert_visible_region(&atlas, SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL);
+    }
+
+    #[test]
     fn source_attract_williams_logo_decodes_table_pixels() {
         let sprite = decode_source_attract_williams_logo_rgba();
+        let path = source_attract_williams_logo_pixel_path();
 
         assert_eq!(sprite.surface, SurfaceSize::new(92, 19));
+        assert_eq!(path.len(), 660);
+        assert_eq!(path.first().copied(), Some([8, 4]));
+        assert!(path.contains(&[8, 4]));
+        assert!(path.contains(&[89, 9]));
         assert_eq!(
             sprite
                 .pixels

@@ -41,12 +41,13 @@ accepted final contract is ready for owner review:
   `cargo run -- --live-smoke`, core-document markdownlint, and
   `git diff --check`.
 - Owner signoff remains pending as B13. Owner review of
-  `docs/start-sequence.gif` reopened visual acceptance for Williams/title
-  colors, Williams handwriting, Defender wordmark coalescence, gameplay
-  sprite/palette fidelity, and the Williams -> High Scores -> scoring/action
-  attract order. Until signoff, changes that alter public contracts, scenario
-  semantics, runtime behavior, or final acceptance evidence must trigger
-  focused checks and, when broad risk is introduced, a renewed full gate.
+  `docs/start-sequence.gif` reopened visual acceptance. Williams handwriting
+  and color cadence plus the Hall of Fame attract order are now repaired in
+  clean runtime; Defender wordmark coalescence, gameplay sprite/palette
+  fidelity, and the later scoring/action attract segment remain active. Until
+  signoff, changes that alter public contracts, scenario semantics, runtime
+  behavior, or final acceptance evidence must trigger focused checks and, when
+  broad risk is introduced, a renewed full gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite
