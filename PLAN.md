@@ -1072,6 +1072,9 @@ Object-ecology progress after R9-C4 slices:
 - Clean player action edges now emit source-backed sound command evidence:
   successful `LFIRE` laser launches surface `LASSND`, and accepted `SBOMB`
   inputs surface the first `SBSND` command before the enemy destruction sounds.
+  The clean thrust gate now emits the source start/stop sound events:
+  `SNDS01` / `0xE9` on the accepted thrust press and `SNDS00` / `0xF0` on the
+  release edge.
 - Accepted clean hyperspace inputs now mirror the visible source `HYP02` /
   `KILSHL` shell-list cleanup by clearing active enemy projectiles while
   leaving clean player projectiles outside that source shell-object list, and
@@ -2539,6 +2542,21 @@ Work log:
   lifecycle command slice, not a Step 50 / Phase 3 closure or R9 finalization.
   Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779325526692779`.
+
+- `2026-05-21 02:19:50 BST` R9-C4 progress slice
+  `source thrust stop sound edge`. Clean held thrust now latches the existing
+  source `SNDS01` / `0xE9` start event on the accepted press edge and emits
+  the source `SNDS00` / `0xF0` stop event once when thrust is released. The
+  latch resets across playfield, turn, wave, and player-damage transitions.
+  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
+  clean_game_thrust_release_emits_source_stop_sound --lib`, `cargo test
+  clean_game_applies_playing_controls_through_systems --lib`, targeted `make
+  clean-fidelity SCENARIOS="thrust_reverse"`, touched-doc `markdownlint`, and
+  `git diff --check`. Broad `cargo test --all-targets`, full `make fidelity`,
+  full all-scenario `make clean-fidelity`, and full clippy remain deferred
+  because this is a bounded Step 50 player-action sound-edge slice, not a Step
+  50 / Phase 3 closure or R9 finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779326284552149`.
 
 ## Archived Completed History
 

@@ -531,8 +531,9 @@ smart bombs consume player stock, clear active enemies through
 destroyed active enemy sprites absent from the scene while source reserves can
 enter as the next active batch. Successful clean laser launches emit source
 `LASSND` command evidence, and accepted smart-bomb inputs emit the first source
-`SBSND` command before enemy destruction sounds. Accepted clean hyperspace
-inputs clear active enemy projectiles through the source `HYP02` / `KILSHL`
+`SBSND` command before enemy destruction sounds; accepted thrust inputs emit
+the source start/stop sound events on press and release. Accepted clean
+hyperspace inputs clear active enemy projectiles through the source `HYP02` / `KILSHL`
 shell-list cleanup while leaving player projectiles outside that shell-object
 list. They then reload source rematerialization state from the current clean
 source `SEED`/`HSEED`: the clean camera/background word, player X/facing branch,

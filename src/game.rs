@@ -5638,6 +5638,7 @@ pub struct Game {
     baiter_pacing_frames_remaining: u8,
     game_over_candidate_score: Option<u32>,
     player_explosion: Option<PlayerExplosionRuntime>,
+    thrust_sound_active: bool,
 }
 
 impl Game {
@@ -5656,6 +5657,7 @@ impl Game {
             baiter_pacing_frames_remaining: SOURCE_GAME_EXEC_SLEEP_FRAMES,
             game_over_candidate_score: None,
             player_explosion: None,
+            thrust_sound_active: false,
         }
     }
 
@@ -5847,6 +5849,7 @@ impl Game {
         self.state.game_over = GameOverSnapshot::NONE;
         self.state.world = WorldSnapshot::default();
         self.player_explosion = None;
+        self.thrust_sound_active = false;
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
         self.pending_wave_start = false;
@@ -5873,6 +5876,7 @@ impl Game {
         self.sync_current_player_stock();
         self.state.world = WorldSnapshot::first_wave();
         self.player_explosion = None;
+        self.thrust_sound_active = false;
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
         self.pending_wave_start = false;
@@ -6008,6 +6012,7 @@ impl Game {
         self.state.wave_profile = WaveProfileSnapshot::for_wave(DEFAULT_CABINET_WAVE);
         self.state.world = WorldSnapshot::default();
         self.player_explosion = None;
+        self.thrust_sound_active = false;
         self.state.game_over = GameOverSnapshot::NONE;
         self.state.high_score_entry = None;
         self.state.high_score_submission = None;
@@ -6131,9 +6136,11 @@ impl Game {
             sound_events.push(source_hyperspace_appearance_sound_event());
         }
 
-        if controls.triggers.thrust {
-            sound_events.push(SoundEvent::ThrustStarted);
-        }
+        self.step_thrust_sound(
+            controls.intent.thrust,
+            controls.triggers.thrust,
+            sound_events,
+        );
 
         self.state.world.advance_source_astronaut_process();
 
@@ -6195,6 +6202,21 @@ impl Game {
 
         if self.state.phase == GamePhase::Playing && !hyperspace_death_risk {
             self.queue_wave_clear_if_needed(gameplay_events, player_x);
+        }
+    }
+
+    fn step_thrust_sound(
+        &mut self,
+        thrust_held: bool,
+        thrust_pressed: bool,
+        sound_events: &mut Vec<SoundEvent>,
+    ) {
+        if thrust_pressed {
+            self.thrust_sound_active = true;
+            sound_events.push(SoundEvent::ThrustStarted);
+        } else if self.thrust_sound_active && !thrust_held {
+            self.thrust_sound_active = false;
+            sound_events.push(SoundEvent::ThrustStopped);
         }
     }
 
@@ -6435,6 +6457,7 @@ impl Game {
         gameplay_events: &mut Vec<GameEvent>,
         sound_events: &mut Vec<SoundEvent>,
     ) {
+        self.thrust_sound_active = false;
         self.spawn_player_explosion(player_position.wrapping_offset(4, 3));
         sound_events.push(source_player_death_sound_event());
         let frame = PlayerDamageSystem::apply_hit(PlayerStock::new(
@@ -6507,6 +6530,7 @@ impl Game {
         self.state.wave_profile = WaveProfileSnapshot::for_wave(next_wave);
         self.state.world = WorldSnapshot::for_wave(next_wave);
         self.player_explosion = None;
+        self.thrust_sound_active = false;
         self.pending_wave_start = false;
         self.reset_baiter_timer();
         gameplay_events.push(GameEvent::WaveStarted);
@@ -9878,6 +9902,36 @@ mod tests {
         );
         assert_eq!(moved_projectile.position.y, projectile.position.y);
         assert_eq!(moved_projectile.velocity, projectile.velocity);
+    }
+
+    #[test]
+    fn clean_game_thrust_release_emits_source_stop_sound() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(200, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.baiter_timer_ticks = None;
+
+        let started = game.step(GameInput {
+            thrust: true,
+            ..GameInput::NONE
+        });
+        assert_eq!(started.events.sounds(), &[SoundEvent::ThrustStarted]);
+
+        let held = game.step(GameInput {
+            thrust: true,
+            ..GameInput::NONE
+        });
+        assert!(held.events.sounds().is_empty());
+
+        let stopped = game.step(GameInput::NONE);
+        assert_eq!(stopped.events.sounds(), &[SoundEvent::ThrustStopped]);
+
+        let idle = game.step(GameInput::NONE);
+        assert!(idle.events.sounds().is_empty());
     }
 
     #[test]

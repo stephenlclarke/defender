@@ -668,6 +668,16 @@ post-acceptance validation records.
   movement/projectile behavior beyond the covered enemy-hit, enemy-shot,
   player-action, lander-abduction, and astronaut command evidence plus focused
   source ecology fixtures for those transitions.
+- `2026-05-21 02:19:50 BST`: R9-C4 adds bounded source thrust sound-gate
+  evidence. Clean held-thrust input now emits the existing source
+  `SNDS01` / `0xE9` start event once on the accepted press edge and emits the
+  source `SNDS00` / `0xF0` stop event once when thrust is released. Remaining
+  B08 work is exact per-family movement/projectile behavior beyond the covered
+  baiter bookkeeping, enemy-hit, enemy-shot, player-action, hyperspace,
+  lander-abduction, astronaut command, shell-collision command,
+  fatal astronaut-impact command, player-death command, and terrain-blow
+  lifecycle command evidence plus focused source ecology fixtures for those
+  transitions.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path
