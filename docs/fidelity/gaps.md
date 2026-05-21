@@ -5,14 +5,15 @@ This file records behavior that must not be guessed in arcade-core code.
 Status as of `2026-05-21`: the accepted red-label target remains the oracle for
 the rewrite. The profiled clean-fidelity gate matches all 12 embedded Phase 1
 scenario input programs, and the R9-E2 full validation gate has passed. Strict
-R9 behavior/evidence blockers are closed through B12, but owner review of
-`docs/start-sequence.gif` reopened B13 visual acceptance for the clean renderer.
-Williams handwriting/color cadence, Defender wordmark coalescence, gameplay
-sprite/palette fidelity, and the Hall of Fame attract order are now repaired
-in clean runtime. The clean scoring/action attract segment now follows Hall of
-Fame with source-backed rescue, scanner, and enemy score-card presentation; B13
-now waits on R9-E3.7 visual acceptance closeout and owner signoff. Older entries
-remain closed fidelity history, local-reference/tooling
+R9 behavior/evidence blockers are closed through B12, but owner review of the
+previous `docs/start-sequence.gif` reopened B13 visual acceptance for the clean
+renderer. Williams handwriting/color cadence, Defender wordmark coalescence,
+gameplay sprite/palette fidelity, Hall of Fame attract order, and the
+scoring/action attract segment are now repaired in clean runtime. R9-E3.7
+regenerated `docs/start-sequence.gif` from clean `Game` frames and the clean
+sprite scene/atlas media path and passed the closeout validation gate; B13 now
+waits on owner signoff for that acceptance media. Older entries remain closed
+fidelity history, local-reference/tooling
 notes, archived prototype cleanup, or post-acceptance validation records.
 Historical entries that mention remaining blockers describe the state at the
 time they were written; they are not active R9 blockers unless restated in this

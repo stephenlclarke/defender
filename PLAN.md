@@ -747,16 +747,18 @@ Phase 5: final render parity and acceptance.
   all 12 embedded Phase 1 scenarios; `cargo run -- --game-smoke` and
   `cargo run -- --live-smoke` passed; core-doc markdownlint and diff hygiene
   passed. B12 is closed; Step 55 / R9-E3 is the next active roadmap step.
-- Step 55 / Cycle R9-E3: owner acceptance and milestone closeout. In progress
-  2026-05-21. README, SPEC, `docs/fidelity/gaps.md`, and this plan state the
-  final R9 contract, remaining non-rewrite follow-ups, validation evidence, and
-  owner acceptance status from the Step 54 gate. Owner review rejected the
-  current clean visual presentation after comparing it with
+- Step 55 / Cycle R9-E3: owner acceptance and milestone closeout.
+  Implementation complete 2026-05-21; owner signoff is pending. README, SPEC,
+  `docs/fidelity/gaps.md`, and this plan state the final R9 contract,
+  remaining non-rewrite follow-ups, validation evidence, and owner acceptance
+  status from the Step 54 gate. Owner review rejected the earlier clean visual
+  presentation after comparing it with
   `docs/start-sequence.gif`: the clean Williams screen colors are wrong, the
   Williams logo is static rather than handwritten, the Defender wordmark does
   not coalesce, gameplay sprites are corrupted/wrong-colored, and the attract
-  sequence order should be Williams -> High Scores -> scoring sequence. B13
-  stays open and now owns the corrective visual acceptance schedule below.
+  sequence order should be Williams -> High Scores -> scoring sequence. The
+  corrective implementation and closeout gate are now complete; B13 stays open
+  only for owner signoff on the regenerated clean acceptance media.
 
 R9-E3 corrective visual acceptance schedule:
 
@@ -798,14 +800,16 @@ R9-E3 corrective visual acceptance schedule:
   the `ENMYTB` enemy score-card reveal, then wraps back to the Williams page.
   Focused attract/action tests cover the source timing, text reveal, demo
   objects, scanner sprites, and cycle wrap.
-- R9-E3.7: visual acceptance closeout gate. Regenerate or capture the
-  acceptance media from the clean renderer, compare it against
-  `docs/start-sequence.gif`, update README/SPEC/gaps with the new visual
-  contract, request owner review, and run the broad gate only once this
-  corrective sequence is ready: `cargo test --all-targets`, default and
-  `legacy-tools` clippy, full `make fidelity`, full all-scenario
-  `make clean-fidelity`, `cargo run -- --game-smoke`, `cargo run --
-  --live-smoke`, core-doc markdownlint, and `git diff --check`.
+- R9-E3.7: visual acceptance closeout gate. Completed 2026-05-21. README
+  media generation now steps clean `Game` frames and rasterizes the clean sprite
+  scene/atlas media path; `docs/start-sequence.gif` has been regenerated from
+  that clean capture after comparison with the previous reference GIF. The
+  closeout gate passed with `make fidelity`, full all-scenario
+  `make clean-fidelity`, `cargo run -- --game-smoke`, `cargo run
+  -- --live-smoke`, core-doc markdownlint, and `git diff --check`.
+  `--live-smoke` now records first offscreen signature `3b0828b85a4f1bce` and
+  last signature `d8eb31d1cab9d7d2`. B13 now waits only on owner review of the
+  regenerated clean media.
 
 Strict R9 blocker matrix after Step 41:
 
@@ -823,7 +827,7 @@ Strict R9 blocker matrix after Step 41:
 | B10 | High-score return | clean/accepted | 52 | closed 2026-05-21 |
 | B11 | Render audit | docs/evidence | 53 | closed 2026-05-21 |
 | B12 | Full validation | docs/evidence | 54 | closed 2026-05-21 |
-| B13 | Owner visual | owner/render | 55 | accepts corrected sequence |
+| B13 | Owner visual | owner/render | 55 | owner accepts media |
 
 Step 41 acceptance contract:
 
@@ -3126,6 +3130,19 @@ Work log:
   `git diff --check`. Full `make fidelity`, full all-scenario
   `make clean-fidelity`, full clippy, and `--live-smoke` remain deferred until
   R9-E3.7 unless the closeout uncovers a broad runtime risk.
+
+- `2026-05-21 22:24:24 BST` Completed R9-E3.7 visual acceptance closeout
+  gate. README media generation now steps clean `Game` frames, rasterizes the
+  clean sprite scene/atlas path, and regenerates `docs/start-sequence.gif` from
+  that clean capture. The closeout also refreshed the live offscreen first-frame
+  signature to `3b0828b85a4f1bce` after the accepted visual repair, with the
+  last signature still `d8eb31d1cab9d7d2`. Full validation passed with
+  `make fidelity`; full all-scenario `make clean-fidelity` matching all 12
+  Phase 1 scenarios; `cargo run -- --game-smoke`; `cargo run -- --live-smoke`;
+  core-doc markdownlint; and `git diff --check`. No broad validation is
+  deferred for the R9-E3.7 closeout. The next full gate should run only if owner
+  review requests another visual/runtime change, a public contract changes, or
+  scenario behavior changes before final owner signoff.
 
 ## Archived Completed History
 

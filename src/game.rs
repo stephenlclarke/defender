@@ -37,7 +37,7 @@ pub(crate) const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 = 285;
 const ATTRACT_COPYRIGHT_START_FRAME: u16 = 419;
 const ATTRACT_HALL_OF_FAME_START_FRAME: u16 = 441;
 const ATTRACT_HALL_OF_FAME_STALL_TICK_FRAMES: u16 = 10;
-const ATTRACT_SCORING_SEQUENCE_START_FRAME: u16 = ATTRACT_HALL_OF_FAME_START_FRAME
+pub(crate) const ATTRACT_SCORING_SEQUENCE_START_FRAME: u16 = ATTRACT_HALL_OF_FAME_START_FRAME
     + (HALL_OF_FAME_STALL_FRAMES as u16 * ATTRACT_HALL_OF_FAME_STALL_TICK_FRAMES);
 const ATTRACT_LOGO_SLEEP_TICKS: u8 = 2;
 const ATTRACT_PRESENTS_SLEEP_TICKS: u8 = 5;
@@ -7791,7 +7791,7 @@ fn attract_defender_wordmark_block_index_for_order(order: usize) -> usize {
     let row = order % ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
     let column_step = order / ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
     let center_left = ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS / 2 - 1;
-    let column = if column_step % 2 == 0 {
+    let column = if column_step.is_multiple_of(2) {
         center_left.saturating_sub(column_step / 2)
     } else {
         ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS / 2 + column_step / 2

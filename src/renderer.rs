@@ -1809,7 +1809,7 @@ fn source_object_image_bytes(label: &'static str) -> Vec<u8> {
 
 fn decode_source_hex_bytes(label: &'static str, hex_bytes: &str) -> Vec<u8> {
     assert!(
-        hex_bytes.len() % 2 == 0,
+        hex_bytes.len().is_multiple_of(2),
         "source object image {label} hex byte string must be even length"
     );
 
@@ -5764,7 +5764,7 @@ mod tests {
     }
 
     #[test]
-    fn source_object_images_decode_red_label_bytes_and_palettes() {
+    fn source_object_images_decode_arcade_bytes_and_palettes() {
         let ship = decode_source_object_image_rgba("PLD10", 6, 8, ObjectPicturePalette::ship());
         let shot =
             decode_source_object_image_rgba("LASD10", 1, 8, ObjectPicturePalette::player_shot());

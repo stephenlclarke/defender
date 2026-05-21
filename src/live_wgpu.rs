@@ -41,7 +41,7 @@ const INITIAL_WINDOW_HEIGHT: u32 = 768;
 #[cfg(all(not(test), not(coverage)))]
 const MAX_STEPS_PER_TICK: u32 = 5;
 #[cfg(all(not(test), not(coverage)))]
-const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x7269_0A81_19CA_46EE;
+const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x3B08_28B8_5A4F_1BCE;
 #[cfg(all(not(test), not(coverage)))]
 const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0xD8EB_31D1_CAB9_D7D2;
 

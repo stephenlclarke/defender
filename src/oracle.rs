@@ -727,7 +727,7 @@ fn attract_defender_wordmark_block_index_for_order(order: usize) -> usize {
     let row = order % ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
     let column_step = order / ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
     let center_left = ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS / 2 - 1;
-    let column = if column_step % 2 == 0 {
+    let column = if column_step.is_multiple_of(2) {
         center_left.saturating_sub(column_step / 2)
     } else {
         ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS / 2 + column_step / 2
@@ -1421,13 +1421,13 @@ mod tests {
             AcceptedWaveProfile,
         },
         game::{
-            ATTRACT_DEFENDER_WORDMARK_START_FRAME, AttractPresentationSnapshot,
-            EXPANDED_OBJECT_DETAIL_LIMIT, ExpandedObjectDetailSnapshot,
-            ExpandedObjectEvidenceSnapshot, ExpandedObjectKind, GameOverSnapshot,
-            HighScoreEntrySnapshot, HighScoreSubmissionSnapshot, HighScoreTableEntrySnapshot,
-            HighScoreTablesSnapshot, OBJECT_EVIDENCE_DETAIL_LIMIT, ObjectEvidenceDetailSnapshot,
-            ObjectEvidenceList, ObjectEvidenceSnapshot, PlayerStockSnapshot,
-            SOURCE_EXPLOSION_INITIAL_SIZE, SOURCE_EXPLOSION_LIFETIME_FRAMES,
+            ATTRACT_DEFENDER_WORDMARK_START_FRAME, ATTRACT_SCORING_SEQUENCE_START_FRAME,
+            AttractPresentationSnapshot, EXPANDED_OBJECT_DETAIL_LIMIT,
+            ExpandedObjectDetailSnapshot, ExpandedObjectEvidenceSnapshot, ExpandedObjectKind,
+            GameOverSnapshot, HighScoreEntrySnapshot, HighScoreSubmissionSnapshot,
+            HighScoreTableEntrySnapshot, HighScoreTablesSnapshot, OBJECT_EVIDENCE_DETAIL_LIMIT,
+            ObjectEvidenceDetailSnapshot, ObjectEvidenceList, ObjectEvidenceSnapshot,
+            PlayerStockSnapshot, SOURCE_EXPLOSION_INITIAL_SIZE, SOURCE_EXPLOSION_LIFETIME_FRAMES,
             SOURCE_EXPLOSION_SIZE_DELTA, SOURCE_SCORE_POPUP_LIFETIME_TICKS, ScannerRadarSnapshot,
             TerrainBlowSnapshot, TerrainBlowStage, WaveProfileSnapshot, WorldVector,
         },
@@ -1572,8 +1572,9 @@ mod tests {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_C && sprite.position == [80.0, 229.0]
         }));
 
-        state.attract = AttractPresentationSnapshot::for_page_frame(4_200);
-        let scoring_scene = super::adapt_scene(&state, Some(0xC0ED_4200));
+        state.attract =
+            AttractPresentationSnapshot::for_page_frame(ATTRACT_SCORING_SEQUENCE_START_FRAME);
+        let scoring_scene = super::adapt_scene(&state, Some(0xC0ED_E370));
         let scoring_sprites = scoring_scene
             .sprites
             .iter()

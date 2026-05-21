@@ -35,14 +35,16 @@ final R9 validation gate passed with `make fidelity`, full all-scenario
 `make clean-fidelity`, `cargo run -- --game-smoke`, `cargo run -- --live-smoke`,
 core-document markdownlint, and `git diff --check`.
 
-R9 owner signoff is still pending. Owner review of `docs/start-sequence.gif`
-reopened visual acceptance for the clean renderer. Williams handwriting/color
-cadence, Defender wordmark coalescence, gameplay sprite/palette fidelity, and
-the Hall of Fame attract order are now repaired in clean runtime. The clean
-scoring/action attract segment now follows Hall of Fame with the source-backed
-rescue, scanner, and enemy score-card demo; B13 now waits on the R9-E3.7 visual
-acceptance closeout and owner signoff. Evidence-only follow-ups after
-acceptance remain exact per-scenario pixel CRC parity, strict
+R9 owner signoff is still pending. Owner review of the previous
+`docs/start-sequence.gif` reopened visual acceptance for the clean renderer.
+Williams handwriting/color cadence, Defender wordmark coalescence, gameplay
+sprite/palette fidelity, Hall of Fame attract order, and the scoring/action
+attract segment are now repaired in clean runtime. R9-E3.7 regenerated
+`docs/start-sequence.gif` from clean `Game` frames and the clean sprite
+scene/atlas media path and passed the closeout validation gate; B13 now waits
+on owner signoff for that acceptance media. Evidence-only follow-ups after
+acceptance remain exact per-scenario
+pixel CRC parity, strict
 long-scenario sprite count/layer parity, per-scenario offscreen `wgpu`
 signatures, and optional local MAME/reference trace refreshes where local ROM
 inputs are available.
@@ -126,8 +128,9 @@ make sq
 make readme-media
 ```
 
-`make readme-media` builds the explicit `legacy-tools` tooling path and
-regenerates `docs/start-sequence.gif` from the current renderer.
+`make readme-media` builds the explicit `legacy-tools` tooling path, steps
+clean `Game` frames, rasterizes the clean sprite scene/atlas media path, and
+regenerates `docs/start-sequence.gif` from the clean renderer.
 
 ## Controls
 
@@ -408,8 +411,9 @@ Internal clean equivalence regressions use crate-private oracle wiring, while
 clean frame-signature gates live under `src/fidelity.rs` and compare clean
 render signatures rather than exposing memory-oriented CRC labels. README media
 tooling uses the narrow doc-hidden `defender::readme_media` facade only through
-`legacy-tools`. The binary enters through the clean platform boundary before
-delegating to the runtime bridge. `--game-smoke` steps the clean
+`legacy-tools`, but that facade now captures clean `Game` frames and the clean
+sprite scene/atlas media path. The binary enters through the clean platform
+boundary before delegating to the runtime bridge. `--game-smoke` steps the clean
 game through scripted controls, verifies required gameplay sprite layers,
 sprite IDs, native draw-command pipeline and instance coverage, sprite buffer
 upload-plan coverage, render-pass plan coverage, and frame-command sprite

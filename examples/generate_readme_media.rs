@@ -4,15 +4,14 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use defender::AttractPresentationPage;
 use defender::readme_media::{FRAME_RATE_MILLIHZ, ReadmeMediaFrame, ReadmeMediaFrameSource};
 use gif::{Encoder, Frame, Repeat};
 
 const OUTPUT_WIDTH: u32 = 768;
 const OUTPUT_HEIGHT: u32 = 576;
 const SAMPLE_STEP_FRAMES: u64 = 8;
-const WILLIAMS_START_FRAME: u64 = 1;
-const HIGH_SCORE_START_FRAME: u64 = 3_000;
-const FULL_ATTRACT_START_FRAME: u64 = 4_200;
+const PAGE_SEARCH_LIMIT_FRAMES: u64 = 10_000;
 const WILLIAMS_SECONDS: u64 = 8;
 const HIGH_SCORE_SECONDS: u64 = 8;
 const FULL_ATTRACT_SECONDS: u64 = 30;
@@ -33,19 +32,12 @@ fn main() -> Result<()> {
 
 fn build_start_sequence() -> Result<Vec<(RgbaImage, u16)>> {
     let mut source = ReadmeMediaFrameSource::new(OUTPUT_WIDTH, OUTPUT_HEIGHT);
-    let mut machine_frame = 0;
     let mut delay = DelayAccumulator::new();
     let mut frames = Vec::new();
 
     for segment in readme_segments() {
-        step_until_frame(&mut source, &mut machine_frame, segment.start_frame);
-        capture_segment(
-            &mut source,
-            &mut machine_frame,
-            &mut delay,
-            segment,
-            &mut frames,
-        )?;
+        step_until_segment_start(&mut source, segment.start)?;
+        capture_segment(&mut source, &mut delay, segment, &mut frames)?;
     }
 
     collapse_identical_frames(frames)
@@ -54,33 +46,53 @@ fn build_start_sequence() -> Result<Vec<(RgbaImage, u16)>> {
 fn readme_segments() -> [ReadmeSegment; 3] {
     [
         ReadmeSegment::new(
-            WILLIAMS_START_FRAME,
+            ReadmeSegmentStart::Current,
             frame_count_for_seconds(WILLIAMS_SECONDS),
         ),
         ReadmeSegment::new(
-            HIGH_SCORE_START_FRAME,
+            ReadmeSegmentStart::AttractPage(AttractPresentationPage::HallOfFame),
             frame_count_for_seconds(HIGH_SCORE_SECONDS),
         ),
         ReadmeSegment::new(
-            FULL_ATTRACT_START_FRAME,
+            ReadmeSegmentStart::AttractPage(AttractPresentationPage::ScoringSequence),
             frame_count_for_seconds(FULL_ATTRACT_SECONDS),
         ),
     ]
 }
 
+fn step_until_segment_start(
+    source: &mut ReadmeMediaFrameSource,
+    start: ReadmeSegmentStart,
+) -> Result<()> {
+    match start {
+        ReadmeSegmentStart::Current => Ok(()),
+        ReadmeSegmentStart::AttractPage(page) => step_until_attract_page(source, page),
+    }
+}
+
+fn step_until_attract_page(
+    source: &mut ReadmeMediaFrameSource,
+    page: AttractPresentationPage,
+) -> Result<()> {
+    for _ in 0..PAGE_SEARCH_LIMIT_FRAMES {
+        if source.attract_page() == page {
+            return Ok(());
+        }
+        source.step();
+    }
+
+    bail!("README media source did not reach {page:?} within {PAGE_SEARCH_LIMIT_FRAMES} frames")
+}
+
 fn capture_segment(
     source: &mut ReadmeMediaFrameSource,
-    machine_frame: &mut u64,
     delay: &mut DelayAccumulator,
     segment: ReadmeSegment,
     frames: &mut Vec<(RgbaImage, u16)>,
 ) -> Result<()> {
-    let segment_end = segment
-        .start_frame
-        .checked_add(segment.frame_count)
-        .context("README media segment frame range overflowed")?;
-    while *machine_frame < segment_end {
-        let step_frames = SAMPLE_STEP_FRAMES.min(segment_end - *machine_frame);
+    let mut remaining = segment.frame_count;
+    while remaining > 0 {
+        let step_frames = SAMPLE_STEP_FRAMES.min(remaining);
         frames.push((
             source
                 .render_frame()
@@ -88,26 +100,16 @@ fn capture_segment(
                 .into(),
             delay.centiseconds_for_frames(step_frames),
         ));
-        step_for_frames(source, machine_frame, step_frames);
+        step_for_frames(source, step_frames);
+        remaining -= step_frames;
     }
 
     Ok(())
 }
 
-fn step_until_frame(
-    source: &mut ReadmeMediaFrameSource,
-    machine_frame: &mut u64,
-    target_frame: u64,
-) {
-    if target_frame > *machine_frame {
-        step_for_frames(source, machine_frame, target_frame - *machine_frame);
-    }
-}
-
-fn step_for_frames(source: &mut ReadmeMediaFrameSource, machine_frame: &mut u64, frames: u64) {
+fn step_for_frames(source: &mut ReadmeMediaFrameSource, frames: u64) {
     for _ in 0..frames {
         source.step();
-        *machine_frame += 1;
     }
 }
 
@@ -164,17 +166,20 @@ fn ensure_parent_dir(path: &Path) -> Result<()> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReadmeSegmentStart {
+    Current,
+    AttractPage(AttractPresentationPage),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ReadmeSegment {
-    start_frame: u64,
+    start: ReadmeSegmentStart,
     frame_count: u64,
 }
 
 impl ReadmeSegment {
-    const fn new(start_frame: u64, frame_count: u64) -> Self {
-        Self {
-            start_frame,
-            frame_count,
-        }
+    const fn new(start: ReadmeSegmentStart, frame_count: u64) -> Self {
+        Self { start, frame_count }
     }
 }
 
@@ -216,19 +221,33 @@ impl From<ReadmeMediaFrame> for RgbaImage {
 #[cfg(test)]
 mod tests {
     use super::{
-        DelayAccumulator, FULL_ATTRACT_SECONDS, HIGH_SCORE_SECONDS, ReadmeSegment,
-        SAMPLE_STEP_FRAMES, WILLIAMS_SECONDS, frame_count_for_seconds, readme_segments,
+        AttractPresentationPage, DelayAccumulator, FULL_ATTRACT_SECONDS, HIGH_SCORE_SECONDS,
+        ReadmeSegment, ReadmeSegmentStart, SAMPLE_STEP_FRAMES, WILLIAMS_SECONDS,
+        frame_count_for_seconds, readme_segments,
     };
 
     #[test]
-    fn readme_segments_hold_first_two_screens_for_eight_seconds() {
+    fn readme_segments_follow_clean_acceptance_order() {
         assert_eq!(
             readme_segments()[0],
-            ReadmeSegment::new(1, frame_count_for_seconds(WILLIAMS_SECONDS))
+            ReadmeSegment::new(
+                ReadmeSegmentStart::Current,
+                frame_count_for_seconds(WILLIAMS_SECONDS)
+            )
         );
         assert_eq!(
             readme_segments()[1],
-            ReadmeSegment::new(3_000, frame_count_for_seconds(HIGH_SCORE_SECONDS))
+            ReadmeSegment::new(
+                ReadmeSegmentStart::AttractPage(AttractPresentationPage::HallOfFame),
+                frame_count_for_seconds(HIGH_SCORE_SECONDS)
+            )
+        );
+        assert_eq!(
+            readme_segments()[2],
+            ReadmeSegment::new(
+                ReadmeSegmentStart::AttractPage(AttractPresentationPage::ScoringSequence),
+                frame_count_for_seconds(FULL_ATTRACT_SECONDS)
+            )
         );
         assert_eq!(WILLIAMS_SECONDS, 8);
         assert_eq!(HIGH_SCORE_SECONDS, 8);

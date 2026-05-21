@@ -40,15 +40,17 @@ accepted final contract is ready for owner review:
   `make clean-fidelity`, `cargo run -- --game-smoke`,
   `cargo run -- --live-smoke`, core-document markdownlint, and
   `git diff --check`.
-- Owner signoff remains pending as B13. Owner review of
+- Owner signoff remains pending as B13. Owner review of the previous
   `docs/start-sequence.gif` reopened visual acceptance. Williams handwriting
   and color cadence, Defender wordmark coalescence, gameplay sprite/palette
   fidelity, the Hall of Fame attract order, and the scoring/action attract
-  segment are now repaired in clean runtime. B13 now depends on the R9-E3.7
-  visual acceptance closeout and owner signoff. Until signoff, changes that
-  alter public contracts, scenario semantics, runtime behavior, or final
-  acceptance evidence must trigger focused checks and, when broad risk is
-  introduced, a renewed full gate.
+  segment are now repaired in clean runtime. R9-E3.7 regenerated
+  `docs/start-sequence.gif` from clean `Game` frames and the clean sprite
+  scene/atlas media path and passed the closeout validation gate. B13 now
+  depends on owner signoff for that acceptance media. Until signoff, changes
+  that alter public contracts, scenario
+  semantics, runtime behavior, or final acceptance evidence must trigger
+  focused checks and, when broad risk is introduced, a renewed full gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite
@@ -591,8 +593,9 @@ reintroduce legacy implementation terminology.
   files against embedded metadata when built with `--features legacy-tools`.
 - Fidelity commands emit and compare deterministic TSV traces from the Rust
   core and local fixture directories when built with `--features legacy-tools`.
-- README media is generated from the current native renderer with
-  `make readme-media`, which uses the explicit `legacy-tools` tooling path.
+- README media is generated from clean `Game` frames and the clean sprite
+  scene/atlas media path with `make readme-media`, which still uses the
+  explicit `legacy-tools` tooling path.
 
 ## Compatibility Features
 
@@ -655,6 +658,7 @@ explicit `make coverage-new-code-baseline NEW_CODE_COVERAGE_BASE=...` command.
   that still needs accepted-behavior evidence should use the crate-private
   `accepted` facade under `legacy-tools` until the clean system replaces that
   responsibility. Temporary README media tooling may use the doc-hidden
-  `readme_media` facade under `legacy-tools`; root legacy modules must remain
-  feature-gated and crate-private. This boundary is guarded by source-level
-  public API tests.
+  `readme_media` facade under `legacy-tools`, but that facade must capture
+  clean `Game` frames and clean sprite scene/atlas media rather than the
+  accepted machine. Root legacy modules must remain feature-gated and
+  crate-private. This boundary is guarded by source-level public API tests.
