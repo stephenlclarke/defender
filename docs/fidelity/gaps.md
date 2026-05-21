@@ -747,6 +747,20 @@ post-acceptance validation records.
   collision-footprint evidence, enemy collision-footprint evidence, player
   collision-footprint evidence, and rescue collision-footprint evidence plus
   focused source ecology fixtures for those transitions.
+- `2026-05-21 03:21:02 BST`: R9-C4 adds bounded source bomber shell-counter
+  evidence. Clean enemy projectiles now distinguish source `FBOUT` fireballs
+  from source `BMBOUT` bomber bomb shells, and bomber `BOMBST` creation honors
+  both the separate source `BMBCNT` ten-bomb cap and the total 20-cell
+  shell-list cap. Remaining B08 work is exact per-family enemy
+  movement/projectile behavior beyond the covered baiter bookkeeping,
+  enemy-hit, enemy-shot, player-action, hyperspace, lander-abduction,
+  astronaut command, shell-collision command, fatal astronaut-impact command,
+  player-death command, terrain-blow lifecycle command evidence, laser-loop
+  movement evidence, laser collision-footprint evidence, bomb-shell
+  collision-footprint evidence, enemy collision-footprint evidence, player
+  collision-footprint evidence, rescue collision-footprint evidence, and bomber
+  shell-counter evidence plus focused source ecology fixtures for those
+  transitions.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

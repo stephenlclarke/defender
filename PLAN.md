@@ -1121,9 +1121,9 @@ Object-ecology progress after R9-C4 slices:
   shell-collision command, fatal astronaut-impact command, player-death command,
   terrain-blow start/completion command, laser-loop movement, and laser
   collision-footprint evidence, bomb-shell collision-footprint evidence, and
-  enemy collision-footprint evidence, and player collision-footprint evidence
-  plus rescue collision-footprint evidence and focused source ecology fixtures
-  for those transitions.
+  enemy collision-footprint evidence, player collision-footprint evidence,
+  rescue collision-footprint evidence, and bomber shell-counter evidence plus
+  focused source ecology fixtures for those transitions.
 
 Work log:
 
@@ -2672,6 +2672,23 @@ Work log:
   slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
   update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779328490473229`.
+
+- `2026-05-21 03:21:02 BST` R9-C4 progress slice
+  `source bomber shell counters`. Clean enemy projectiles now distinguish
+  source `FBOUT` fireballs from source `BMBOUT` bomber bomb shells, and bomber
+  `BOMBST` creation honors both the separate source `BMBCNT` ten-bomb cap and
+  the total 20-cell shell-list cap. Focused validation passed: `cargo
+  fmt --check`, `cargo check`, `cargo test clean_game_bomber --lib`,
+  `cargo test clean_game_mini_swarmer --lib`, `cargo test
+  clean_game_mutant_source_loop_hops_fires_and_sleeps --lib`, `cargo test
+  clean_game_source_lander_gives_up_when_pull_target_cleared --lib`, `cargo
+  test clean_game_released_lander_passenger_falls_on_following_frame --lib`,
+  `cargo test --all-targets`, touched-doc `markdownlint`, and `git
+  diff --check`. Broad `make fidelity`, full all-scenario `make
+  clean-fidelity`, and full clippy remain deferred because this is a bounded
+  Step 50 shell-counter slice; `cargo test --all-targets` was run because the
+  public clean projectile snapshot shape changed. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779329168264399`.
 
 ## Archived Completed History
 

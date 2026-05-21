@@ -880,9 +880,25 @@ impl SourceRandSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnemyProjectileSourceKind {
+    Fireball,
+    BomberBombShell,
+}
+
+impl EnemyProjectileSourceKind {
+    pub const fn output_routine_address(self) -> u16 {
+        match self {
+            Self::Fireball => SOURCE_FIREBALL_OUTPUT_ROUTINE_ADDRESS,
+            Self::BomberBombShell => SOURCE_BOMB_SHELL_OUTPUT_ROUTINE_ADDRESS,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EnemyProjectileSnapshot {
     pub position: ScreenPosition,
     pub velocity: ScreenVelocity,
+    pub source_kind: EnemyProjectileSourceKind,
     pub source_x_fraction: u8,
     pub source_y_fraction: u8,
     pub source_x_velocity: u16,
@@ -895,12 +911,28 @@ impl EnemyProjectileSnapshot {
         Self {
             position,
             velocity: source_screen_velocity(x_velocity, y_velocity),
+            source_kind: EnemyProjectileSourceKind::Fireball,
             source_x_fraction: 0,
             source_y_fraction: 0,
             source_x_velocity: x_velocity,
             source_y_velocity: y_velocity,
             source_lifetime_ticks: SOURCE_SHELL_LIFETIME_TICKS,
         }
+    }
+
+    fn source_bomb_shell(position: ScreenPosition) -> Self {
+        Self {
+            source_kind: EnemyProjectileSourceKind::BomberBombShell,
+            ..Self::source_fireball(position, 0, 0)
+        }
+    }
+
+    pub const fn source_output_routine_address(self) -> u16 {
+        self.source_kind.output_routine_address()
+    }
+
+    const fn is_source_bomb_shell(self) -> bool {
+        matches!(self.source_kind, EnemyProjectileSourceKind::BomberBombShell)
     }
 
     const fn source_bomb_picture_label(self) -> &'static str {
@@ -3349,6 +3381,8 @@ const SOURCE_BOMBER_MAX_CRUISE_ALTITUDE: u8 = 0x68;
 const SOURCE_BOMBER_CRUISE_WINDOW: u8 = 0x20;
 const SOURCE_BOMBER_CRUISE_WINDOW_HALF: u8 = 0x10;
 const SOURCE_BOMBER_BOMB_SHELL_LIMIT: usize = 10;
+const SOURCE_BOMB_SHELL_OUTPUT_ROUTINE_ADDRESS: u16 = 0xE498;
+const SOURCE_FIREBALL_OUTPUT_ROUTINE_ADDRESS: u16 = 0xE4D9;
 const SOURCE_BOMB_SHELL_PICTURE_LABEL: &str = "BMBP1";
 const SOURCE_BOMB_SHELL_PICTURE_ADDRESS: u16 = 0xF95B;
 const SOURCE_BOMB_SHELL_PRIMARY_IMAGE_ADDRESS: u16 = 0xCCB0;
@@ -4281,6 +4315,7 @@ fn advance_source_bomber(
                 position,
                 *source_bomber,
                 source_rng,
+                source_bomb_shell_count(enemy_projectiles),
                 enemy_projectiles.len(),
             )
         {
@@ -4366,20 +4401,29 @@ fn source_bomber_bomb_shell(
     position: ScreenPosition,
     source_bomber: SourceBomberSnapshot,
     source_rng: SourceRandSnapshot,
+    active_bomb_shells: usize,
     active_shells: usize,
 ) -> Option<EnemyProjectileSnapshot> {
-    if active_shells >= SOURCE_BOMBER_BOMB_SHELL_LIMIT
+    if active_bomb_shells >= SOURCE_BOMBER_BOMB_SHELL_LIMIT
+        || active_shells >= SOURCE_SHELL_LIMIT
         || position.x >= SOURCE_SHELL_X_MAX
         || position.y <= SOURCE_PLAYFIELD_Y_MIN
     {
         return None;
     }
 
-    let mut projectile = EnemyProjectileSnapshot::source_fireball(position, 0, 0);
+    let mut projectile = EnemyProjectileSnapshot::source_bomb_shell(position);
     projectile.source_x_fraction = source_bomber.x_fraction;
     projectile.source_y_fraction = source_bomber.y_fraction;
     projectile.source_lifetime_ticks = (source_rng.seed & 0x1F).wrapping_add(1);
     Some(projectile)
+}
+
+fn source_bomb_shell_count(enemy_projectiles: &[EnemyProjectileSnapshot]) -> usize {
+    enemy_projectiles
+        .iter()
+        .filter(|projectile| projectile.is_source_bomb_shell())
+        .count()
 }
 
 fn source_mutant_from_lander_conversion(profile: WaveProfileSnapshot) -> SourceMutantSnapshot {
@@ -10299,7 +10343,7 @@ mod tests {
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans.clear();
+        keep_single_grounded_human(&mut game);
         game.baiter_timer_ticks = None;
 
         let frame = game.step(GameInput::NONE);
@@ -10355,7 +10399,7 @@ mod tests {
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans.clear();
+        keep_single_grounded_human(&mut game);
         game.state.world.source_rng = SourceRandSnapshot {
             seed: 0x80,
             hseed: 0x00,
@@ -10422,14 +10466,14 @@ mod tests {
             frame.events.sounds(),
             &[source_enemy_shot_sound_event(EnemyKind::Swarmer).expect("swarmer shot sound")]
         );
-        assert_eq!(frame.state.world.object_evidence.active_count, 2);
+        assert_eq!(frame.state.world.object_evidence.active_count, 3);
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
         assert_eq!(
-            frame.state.world.object_evidence.details[1].object_category,
+            frame.state.world.object_evidence.details[2].object_category,
             Some(ObjectEvidenceCategory::EnemyBomb)
         );
         assert_eq!(
-            frame.state.world.object_evidence.details[1].mapped_sprite,
+            frame.state.world.object_evidence.details[2].mapped_sprite,
             Some(SpriteId::ENEMY_BOMB)
         );
         assert!(frame.scene.sprites.iter().any(|sprite| {
@@ -10460,7 +10504,7 @@ mod tests {
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans.clear();
+        keep_single_grounded_human(&mut game);
         game.state.world.enemy_projectiles = (0..super::SOURCE_SHELL_LIMIT)
             .map(|_| {
                 super::EnemyProjectileSnapshot::source_fireball(
@@ -10867,7 +10911,7 @@ mod tests {
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans.clear();
+        keep_single_grounded_human(&mut game);
         game.state.world.source_rng = SourceRandSnapshot {
             seed: 0,
             hseed: 0x80,
@@ -10891,8 +10935,17 @@ mod tests {
             },
             game.state.world.source_rng,
             0,
+            0,
         )
         .expect("bomber bomb shell");
+        assert_eq!(
+            expected_projectile.source_kind,
+            super::EnemyProjectileSourceKind::BomberBombShell
+        );
+        assert_eq!(
+            expected_projectile.source_output_routine_address(),
+            super::SOURCE_BOMB_SHELL_OUTPUT_ROUTINE_ADDRESS
+        );
         let (expected_y, expected_y_fraction) =
             super::source_fixed_axis_step(0x60, 0, expected_y_velocity);
         let expected_source = SourceBomberSnapshot {
@@ -10952,7 +11005,7 @@ mod tests {
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans.clear();
+        keep_single_grounded_human(&mut game);
         game.state.world.source_rng = SourceRandSnapshot {
             seed: 0x06,
             hseed: 0x40,
@@ -11010,7 +11063,7 @@ mod tests {
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans.clear();
+        keep_single_grounded_human(&mut game);
         game.state.world.source_rng = SourceRandSnapshot {
             seed: 0,
             hseed: 0x80,
@@ -11052,6 +11105,164 @@ mod tests {
         assert_eq!(bomber.source_bomber, Some(expected_source));
         assert!(frame.state.world.enemy_projectiles.is_empty());
         assert_eq!(frame.state.world.object_evidence.projectile_count, 0);
+    }
+
+    #[test]
+    fn clean_game_bomber_bomb_counts_bmbout_shells_separately_from_fireballs() {
+        let mut game = credited_started_game();
+        let player_position = ScreenPosition::new(0x20, 0x50);
+        game.state.player.position = (
+            super::world_word(u16::from(player_position.x) << 8),
+            super::world_word(u16::from(player_position.y) << 8),
+        );
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::source_bomber(
+            ScreenPosition::new(0x08, 0x60),
+            ScreenVelocity::new(0, 0),
+            SourceBomberSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: 0x50,
+                sleep_ticks: 0,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        keep_single_grounded_human(&mut game);
+        game.state.world.enemy_projectiles = (0..super::SOURCE_BOMBER_BOMB_SHELL_LIMIT)
+            .map(|_| {
+                super::EnemyProjectileSnapshot::source_fireball(
+                    ScreenPosition::new(0x90, 0xE0),
+                    0,
+                    0,
+                )
+            })
+            .collect();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0,
+            hseed: 0x80,
+            lseed: 0,
+        };
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame.state.world.enemy_projectiles.len(),
+            super::SOURCE_BOMBER_BOMB_SHELL_LIMIT + 1
+        );
+        assert_eq!(
+            super::source_bomb_shell_count(&frame.state.world.enemy_projectiles),
+            1
+        );
+        assert!(
+            frame
+                .state
+                .world
+                .enemy_projectiles
+                .iter()
+                .any(|projectile| {
+                    projectile.source_kind == super::EnemyProjectileSourceKind::BomberBombShell
+                        && projectile.source_output_routine_address()
+                            == super::SOURCE_BOMB_SHELL_OUTPUT_ROUTINE_ADDRESS
+                        && projectile.position == ScreenPosition::new(0x08, 0x60)
+                })
+        );
+    }
+
+    #[test]
+    fn clean_game_bomber_bomb_respects_source_bmbcnt_limit() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x5000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::source_bomber(
+            ScreenPosition::new(0x08, 0x60),
+            ScreenVelocity::new(0, 0),
+            SourceBomberSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: 0x50,
+                sleep_ticks: 0,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        keep_single_grounded_human(&mut game);
+        game.state.world.enemy_projectiles = (0..super::SOURCE_BOMBER_BOMB_SHELL_LIMIT)
+            .map(|_| {
+                super::EnemyProjectileSnapshot::source_bomb_shell(ScreenPosition::new(0x90, 0xE0))
+            })
+            .collect();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0,
+            hseed: 0x80,
+            lseed: 0,
+        };
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame.state.world.enemy_projectiles.len(),
+            super::SOURCE_BOMBER_BOMB_SHELL_LIMIT
+        );
+        assert_eq!(
+            super::source_bomb_shell_count(&frame.state.world.enemy_projectiles),
+            super::SOURCE_BOMBER_BOMB_SHELL_LIMIT
+        );
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 10);
+    }
+
+    #[test]
+    fn clean_game_bomber_bomb_respects_total_source_shell_limit() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x5000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::source_bomber(
+            ScreenPosition::new(0x08, 0x60),
+            ScreenVelocity::new(0, 0),
+            SourceBomberSnapshot {
+                x_fraction: 0,
+                y_fraction: 0,
+                x_velocity: 0,
+                y_velocity: 0,
+                picture_frame: 0,
+                cruise_altitude: 0x50,
+                sleep_ticks: 0,
+            },
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        keep_single_grounded_human(&mut game);
+        game.state.world.enemy_projectiles = (0..super::SOURCE_SHELL_LIMIT)
+            .map(|_| {
+                super::EnemyProjectileSnapshot::source_fireball(
+                    ScreenPosition::new(0x90, 0xE0),
+                    0,
+                    0,
+                )
+            })
+            .collect();
+        game.state.world.source_rng = SourceRandSnapshot {
+            seed: 0,
+            hseed: 0x80,
+            lseed: 0,
+        };
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(
+            frame.state.world.enemy_projectiles.len(),
+            super::SOURCE_SHELL_LIMIT
+        );
+        assert_eq!(
+            super::source_bomb_shell_count(&frame.state.world.enemy_projectiles),
+            0
+        );
     }
 
     #[test]
@@ -11460,7 +11671,7 @@ mod tests {
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans.clear();
+        keep_single_grounded_human(&mut game);
         game.baiter_timer_ticks = None;
         let (expected_x, expected_x_fraction) = super::source_fixed_axis_step(0x40, 0xF0, 0x0020);
         let (expected_y, expected_y_fraction) = super::source_fixed_axis_step(0x60, 0x10, 0xFFE0);
@@ -11516,7 +11727,7 @@ mod tests {
             },
         )];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
-        game.state.world.humans.clear();
+        keep_single_grounded_human(&mut game);
         game.state.world.source_rng = SourceRandSnapshot {
             seed: 0x80,
             hseed: 0x00,
@@ -12910,17 +13121,18 @@ mod tests {
             shot_timer: 1,
             sleep_ticks: 1,
             picture_frame: 0,
-            target_human_index: Some(0),
+            target_human_index: Some(usize::MAX),
         };
         game.state.world.enemies = vec![
             EnemySnapshot::source_lander(lander_start, ScreenVelocity::new(0, 0), source_lander),
             EnemySnapshot::new(
-                EnemyKind::Baiter,
+                EnemyKind::Mutant,
                 ScreenPosition::new(220, 80),
                 ScreenVelocity::new(0, 0),
             ),
         ];
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        keep_single_grounded_human(&mut game);
         game.state.world.source_astronaut_sleep_ticks = 1;
         let humans = game.state.world.humans.clone();
         game.baiter_timer_ticks = None;
@@ -12928,7 +13140,7 @@ mod tests {
         let frame = game.step(GameInput::NONE);
 
         assert_eq!(frame.state.world.enemies.len(), 1);
-        assert_eq!(frame.state.world.enemies[0].kind, EnemyKind::Baiter);
+        assert_eq!(frame.state.world.enemies[0].kind, EnemyKind::Mutant);
         assert_eq!(frame.state.world.enemy_reserve.landers, 1);
         assert_eq!(frame.state.world.humans, humans);
         assert!(frame.state.world.enemy_projectiles.is_empty());
@@ -13040,7 +13252,10 @@ mod tests {
                 ScreenVelocity::new(0, 0),
             ),
         ];
-        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.enemy_reserve = EnemyReserveSnapshot {
+            landers: 1,
+            ..EnemyReserveSnapshot::default()
+        };
         let released_position = super::clean_carried_human_position(ScreenPosition::new(100, 80));
         game.state.world.humans = vec![HumanSnapshot {
             carried: true,
@@ -15027,6 +15242,12 @@ mod tests {
         advance_to_delayed_start_sound(&mut game);
         advance_to_started_playfield(&mut game);
         game
+    }
+
+    fn keep_single_grounded_human(game: &mut Game) {
+        let x = 0x40;
+        let y = super::clean_human_ground_y(&game.state.world.terrain, x).unwrap_or(0xC0);
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(x, y))];
     }
 
     fn two_player_started_game() -> Game {
