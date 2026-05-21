@@ -330,7 +330,9 @@ object-picture descriptor labels, addresses, dimensions, and primary/alternate
 image pointers for the current lander, baiter, bomber, mutant, pod, and
 swarmer presentations, and clean projectile/enemy plus player/enemy collision
 uses those source enemy picture sizes while direct runtime enemy rendering
-keeps the current clean sprite sizes. Clean
+keeps the current clean sprite sizes. Clean hostile player collision uses the
+source `PLAPIC` / `PLBPIC` 8x6 player picture footprint while the direct
+runtime player renderer keeps the current 16x8 ship sprite. Clean
 human evidence carries per-human source astronaut picture descriptors: default
 `ASTP1` rows and source-restored `ASTP3` rows selected from the `PLRES`
 `LSEED` low bit, with restored `LSEED` X low bytes retained as source X

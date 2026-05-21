@@ -519,7 +519,9 @@ addresses, dimensions, and primary/alternate image pointers for the current
 lander, baiter, bomber, mutant, pod, and swarmer presentations, and clean
 projectile/enemy plus player/enemy collision uses those source enemy picture
 sizes while direct runtime enemy rendering keeps the current clean sprite
-sizes. Clean
+sizes. Clean hostile player collision uses the source `PLAPIC` / `PLBPIC` 8x6
+player picture footprint while the direct runtime player renderer keeps the
+current 16x8 ship sprite. Clean
 player projectile evidence now carries the source `LASP1` descriptor label,
 address, 8x1 size, and primary image pointer while the direct runtime
 projectile renderer keeps the existing 8x2 sprite. Clean player projectiles

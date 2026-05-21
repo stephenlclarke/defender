@@ -948,7 +948,9 @@ Object-ecology progress after R9-C4 slices:
   `LNDP`/`UFOP`/`TIEP` frame-cycled lander, baiter, and bomber descriptors. The
   clean projectile/enemy and player/enemy collision boxes now use those source
   enemy picture sizes while direct runtime enemy rendering keeps the current
-  clean sprite sizes. The
+  clean sprite sizes. Clean hostile player collision boxes now use the source
+  `PLAPIC` / `PLBPIC` 8x6 player picture footprint while direct runtime player
+  rendering keeps the current 16x8 ship sprite. The
   clean human row now carries per-human source astronaut picture descriptor
   evidence: default `ASTP1` rows and source-restored `ASTP3` rows selected from
   the `PLRES` `LSEED` low bit, with descriptor labels, addresses, 2x8 picture
@@ -1116,8 +1118,8 @@ Object-ecology progress after R9-C4 slices:
   shell-collision command, fatal astronaut-impact command, player-death command,
   terrain-blow start/completion command, laser-loop movement, and laser
   collision-footprint evidence, bomb-shell collision-footprint evidence, and
-  enemy collision-footprint evidence plus focused source ecology fixtures for
-  those transitions.
+  enemy collision-footprint evidence, and player collision-footprint evidence
+  plus focused source ecology fixtures for those transitions.
 
 Work log:
 
@@ -2630,6 +2632,25 @@ Work log:
   slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
   update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779327961109169`.
+
+- `2026-05-21 02:51:32 BST` R9-C4 progress slice
+  `source player collision footprint`. Clean player/enemy and
+  enemy-projectile/player collision now use the source `PLAPIC` / `PLBPIC` 8x6
+  player picture footprint while keeping the direct runtime player renderer on
+  the current 16x8 ship sprite size. Focused validation passed: `cargo fmt
+  --check`, `cargo check`, `cargo test
+  clean_game_player_enemy_uses_source_player_collision_footprint --lib`, `cargo
+  test clean_game_enemy_projectile_uses_source_player_collision_footprint
+  --lib`, `cargo test clean_game_player_enemy_collision_loses_life_and_removes_enemy
+  --lib`, `cargo test
+  clean_game_enemy_projectile_collision_scores_and_destroys_player --lib`,
+  targeted `make clean-fidelity SCENARIOS="death"`, touched-doc
+  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
+  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
+  clippy remain deferred because this is a bounded Step 50 player collision
+  slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779328230577129`.
 
 ## Archived Completed History
 

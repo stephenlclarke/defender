@@ -6401,7 +6401,7 @@ impl Game {
         gameplay_events: &mut Vec<GameEvent>,
         sound_events: &mut Vec<SoundEvent>,
     ) -> bool {
-        let player = CollisionBox::new(player_position, PLAYER_SPRITE_SIZE);
+        let player = CollisionBox::new(player_position, PLAYER_COLLISION_SIZE);
         let enemy_boxes = self
             .state
             .world
@@ -6430,7 +6430,7 @@ impl Game {
         gameplay_events: &mut Vec<GameEvent>,
         sound_events: &mut Vec<SoundEvent>,
     ) -> bool {
-        let player = CollisionBox::new(player_position, PLAYER_SPRITE_SIZE);
+        let player = CollisionBox::new(player_position, PLAYER_COLLISION_SIZE);
         let projectile_boxes = self
             .state
             .world
@@ -7657,6 +7657,7 @@ const PLAYER_PROJECTILE_COLLISION_SIZE: (u8, u8) = (8, 1);
 const ENEMY_PROJECTILE_SPRITE_SIZE: (u8, u8) = (4, 6);
 const ENEMY_PROJECTILE_COLLISION_SIZE: (u8, u8) = SOURCE_BOMB_SHELL_PICTURE_SIZE;
 const PLAYER_SPRITE_SIZE: (u8, u8) = (16, 8);
+const PLAYER_COLLISION_SIZE: (u8, u8) = (8, 6);
 const SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
 const SCORE_DISPLAY_MAX: u32 = 999_999;
 const PLAYER_ONE_SCORE_ORIGIN: [f32; 2] = [18.0, 21.0];
@@ -12503,6 +12504,38 @@ mod tests {
     }
 
     #[test]
+    fn clean_game_enemy_projectile_uses_source_player_collision_footprint() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x8000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(200, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.enemy_projectiles = vec![super::EnemyProjectileSnapshot::source_fireball(
+            ScreenPosition::new(0x28, 0x82),
+            0,
+            0,
+        )];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemy_projectiles.len(), 1);
+        assert_eq!(
+            frame.state.world.enemy_projectiles[0].position,
+            ScreenPosition::new(0x28, 0x82)
+        );
+        assert_eq!(frame.state.scores.player_one, 0);
+        assert_eq!(frame.state.player.lives, 2);
+        assert!(frame.events.gameplay().is_empty());
+        assert!(frame.events.sounds().is_empty());
+        assert!(frame.state.world.player_explosion.is_none());
+    }
+
+    #[test]
     fn clean_game_lander_abducts_aligned_human_and_carries_upward() {
         let mut game = credited_started_game();
         game.state.world.enemies = vec![EnemySnapshot::new(
@@ -13323,6 +13356,28 @@ mod tests {
         game.state.world.enemies[0] = EnemySnapshot::new(
             EnemyKind::Lander,
             ScreenPosition::new(21, 128),
+            ScreenVelocity::new(0, 0),
+        );
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.player.lives, 2);
+        assert_eq!(frame.state.world.enemies.len(), 1);
+        assert!(frame.state.world.player_explosion.is_none());
+        assert!(frame.events.gameplay().is_empty());
+        assert!(frame.events.sounds().is_empty());
+    }
+
+    #[test]
+    fn clean_game_player_enemy_uses_source_player_collision_footprint() {
+        let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x8000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies[0] = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(40, 128),
             ScreenVelocity::new(0, 0),
         );
 
