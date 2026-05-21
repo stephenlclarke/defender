@@ -6319,7 +6319,9 @@ impl Game {
             .world
             .projectiles
             .iter()
-            .map(|projectile| CollisionBox::new(projectile.position, PROJECTILE_SPRITE_SIZE))
+            .map(|projectile| {
+                CollisionBox::new(projectile.position, PLAYER_PROJECTILE_COLLISION_SIZE)
+            })
             .collect::<Vec<_>>();
         let enemy_boxes = self
             .state
@@ -7649,6 +7651,7 @@ fn enemy_sprite(kind: EnemyKind) -> SpriteId {
 }
 
 const PROJECTILE_SPRITE_SIZE: (u8, u8) = (8, 2);
+const PLAYER_PROJECTILE_COLLISION_SIZE: (u8, u8) = (8, 1);
 const ENEMY_PROJECTILE_SPRITE_SIZE: (u8, u8) = (4, 6);
 const PLAYER_SPRITE_SIZE: (u8, u8) = (16, 8);
 const SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
@@ -10033,6 +10036,29 @@ mod tests {
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::PLAYER_PROJECTILE)
         );
+    }
+
+    #[test]
+    fn clean_game_player_projectile_uses_source_lasp1_collision_height() {
+        let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
+        game.state.world.enemies[0] = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(100, 89),
+            ScreenVelocity::new(0, 0),
+        );
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(101, 88),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemies.len(), 1);
+        assert_eq!(frame.state.world.projectiles.len(), 1);
+        assert_eq!(frame.state.scores.player_one, 0);
+        assert!(frame.events.gameplay().is_empty());
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]

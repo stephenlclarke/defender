@@ -963,7 +963,8 @@ Object-ecology progress after R9-C4 slices:
   the direct runtime renderer keeps the existing clean projectile sprite size.
   Clean player projectiles now advance through the source `LASR0` / `LASL0`
   laser-loop step shape: five source screen columns per step and source
-  right/left edge termination at `0x98` / `0x05`.
+  right/left edge termination at `0x98` / `0x05`, and enemy-hit collision uses
+  the source `LASP1` 8x1 picture footprint rather than the 8x2 render sprite.
   Clean enemy, human, player-projectile, and enemy-projectile rows now also
   carry source-style 8.8 world-position words, velocity words, and deterministic
   source object-table identity evidence derived from their existing source
@@ -1108,8 +1109,9 @@ Object-ecology progress after R9-C4 slices:
   covered enemy-hit, enemy-shot, player-action, hyperspace
   shell-cleanup/rematerialize, lander-abduction, astronaut command,
   shell-collision command, fatal astronaut-impact command, player-death command,
-  terrain-blow start/completion command, and laser-loop movement evidence plus
-  focused source ecology fixtures for those transitions.
+  terrain-blow start/completion command, laser-loop movement, and laser
+  collision-footprint evidence plus focused source ecology fixtures for those
+  transitions.
 
 Work log:
 
@@ -2575,6 +2577,21 @@ Work log:
   because this is a bounded Step 50 laser movement slice, not a Step 50 / Phase
   3 closure or R9 finalization. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779326852491929`.
+
+- `2026-05-21 02:34:58 BST` R9-C4 progress slice
+  `source laser collision footprint`. Clean projectile/enemy collision now uses
+  the source `LASP1` 8x1 picture footprint while keeping the direct runtime
+  projectile renderer at its existing 8x2 sprite size. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo test
+  clean_game_player_projectile_uses_source_lasp1_collision_height --lib`,
+  `cargo test clean_game_resolves_projectile_enemy_collision_and_scores
+  --lib`, targeted `make clean-fidelity SCENARIOS="firing"`, touched-doc
+  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
+  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
+  clippy remain deferred because this is a bounded Step 50 laser collision
+  slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779327240528909`.
 
 ## Archived Completed History
 

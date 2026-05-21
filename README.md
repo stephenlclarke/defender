@@ -519,7 +519,8 @@ player projectile evidence now carries the source `LASP1` descriptor label,
 address, 8x1 size, and primary image pointer while the direct runtime
 projectile renderer keeps the existing 8x2 sprite. Clean player projectiles
 advance through the source `LASR0` / `LASL0` five-column loop step and source
-right/left edge-stop bounds. Clean enemy, human, player-projectile, and
+right/left edge-stop bounds and use the source `LASP1` 8x1 collision
+footprint for enemy hits. Clean enemy, human, player-projectile, and
 enemy-projectile object evidence also carries source-style 8.8
 world-position words, velocity words, and deterministic source object-table
 identity evidence from the clean source fixed-point state and source layout:
