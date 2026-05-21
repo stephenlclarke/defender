@@ -6328,7 +6328,7 @@ impl Game {
             .world
             .enemies
             .iter()
-            .map(|enemy| CollisionBox::new(enemy.position, enemy_sprite_size(enemy.kind)))
+            .map(|enemy| CollisionBox::new(enemy.position, enemy_collision_size(*enemy)))
             .collect::<Vec<_>>();
 
         let Some(hit) =
@@ -6407,7 +6407,7 @@ impl Game {
             .world
             .enemies
             .iter()
-            .map(|enemy| CollisionBox::new(enemy.position, enemy_sprite_size(enemy.kind)))
+            .map(|enemy| CollisionBox::new(enemy.position, enemy_collision_size(*enemy)))
             .collect::<Vec<_>>();
 
         let Some(hit) = CollisionSystem::first_player_enemy_hit(player, &enemy_boxes) else {
@@ -7750,6 +7750,10 @@ fn enemy_sprite_size(kind: EnemyKind) -> (u8, u8) {
         EnemyKind::Swarmer => (8, 6),
         EnemyKind::Baiter => (12, 8),
     }
+}
+
+fn enemy_collision_size(enemy: EnemySnapshot) -> (u8, u8) {
+    enemy.source_picture_descriptor().size
 }
 
 fn enemy_score(kind: EnemyKind) -> u32 {
@@ -10052,6 +10056,29 @@ mod tests {
         );
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 88),
+            velocity: ScreenVelocity::new(0, 0),
+        });
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemies.len(), 1);
+        assert_eq!(frame.state.world.projectiles.len(), 1);
+        assert_eq!(frame.state.scores.player_one, 0);
+        assert!(frame.events.gameplay().is_empty());
+        assert!(frame.events.sounds().is_empty());
+    }
+
+    #[test]
+    fn clean_game_projectile_enemy_uses_source_enemy_collision_width() {
+        let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
+        game.state.world.enemies[0] = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(100, 80),
+            ScreenVelocity::new(0, 0),
+        );
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(106, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -13285,6 +13312,28 @@ mod tests {
                 && sprite.layer == RenderLayer::Objects
                 && sprite.tint == Color::WHITE
         }));
+    }
+
+    #[test]
+    fn clean_game_player_enemy_uses_source_enemy_collision_width() {
+        let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x8000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies[0] = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(21, 128),
+            ScreenVelocity::new(0, 0),
+        );
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.player.lives, 2);
+        assert_eq!(frame.state.world.enemies.len(), 1);
+        assert!(frame.state.world.player_explosion.is_none());
+        assert!(frame.events.gameplay().is_empty());
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]

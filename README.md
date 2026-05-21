@@ -516,7 +516,10 @@ enemy-projectile/player collision uses the source `BMBP1` 2x3 footprint while
 the direct runtime projectile renderer keeps the existing 4x6 bomb sprite.
 Active clean enemy evidence now carries source object-picture descriptor labels,
 addresses, dimensions, and primary/alternate image pointers for the current
-lander, baiter, bomber, mutant, pod, and swarmer presentations. Clean
+lander, baiter, bomber, mutant, pod, and swarmer presentations, and clean
+projectile/enemy plus player/enemy collision uses those source enemy picture
+sizes while direct runtime enemy rendering keeps the current clean sprite
+sizes. Clean
 player projectile evidence now carries the source `LASP1` descriptor label,
 address, 8x1 size, and primary image pointer while the direct runtime
 projectile renderer keeps the existing 8x2 sprite. Clean player projectiles
