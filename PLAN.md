@@ -784,15 +784,13 @@ R9-E3 corrective visual acceptance schedule:
   source-expanded Defender logo for settled and refreshed frames. Focused
   renderer/game/oracle tests cover block atlas regions, pre-coalescence,
   coalesced, and refreshed frames.
-- R9-E3.5: source-backed sprite and palette repair. Replace the remaining
-  prototype/corrupted gameplay sprite atlas entries with red-label object
-  picture/table decoders or source-backed bitmap fixtures, and map clean
-  sprite colors through a source-backed palette contract instead of the current
-  mostly-white placeholder tints. Scope the first pass to sprites visible in
-  the start/attract and early gameplay review path. Validation: focused
-  renderer atlas tests, `cargo run -- --game-smoke`, targeted
-  `make clean-fidelity SCENARIOS="attract_boot start_game"`, and
-  `git diff --check`.
+- R9-E3.5: source-backed sprite and palette repair. Completed 2026-05-21. The
+  default clean atlas now decodes the early-gameplay/player/enemy/reward sprite
+  set from `assets/red-label/object-images.tsv` with source palette overrides,
+  while clean gameplay enemy and ordinary human sprites render with white tint
+  so atlas palette colors are not forced through the previous prototype tints.
+  Focused renderer tests cover red-label image decoding and the source-backed
+  runtime atlas regions.
 - R9-E3.6: clean scoring/action attract sequence. Add the scoring/action
   attract segment that follows Hall of Fame in the reference sequence, using
   existing clean world/object presentation where it is source-backed and adding
@@ -3090,6 +3088,25 @@ Work log:
   remain deferred because this was a bounded attract title repair, not the
   R9-E3.7 closeout gate. The next full gate should run at R9-E3.7 or sooner if
   the sprite/palette or scoring/action slices introduce broad runtime risk.
+
+- `2026-05-21 21:24:47 BST` Completed R9-E3.5 source-backed sprite/palette
+  repair. The clean default atlas now decodes player ship, projectile,
+  player-stock, smart-bomb, enemy, bomb, explosion, and score-popup runtime
+  sprites from `assets/red-label/object-images.tsv` instead of the transitional
+  prototype PNGs, using source palette overrides for ship, projectile, bomb,
+  bomber, and score/reward families. Clean gameplay enemy sprites and ordinary
+  human sprites now use white tint so the source atlas colors remain visible.
+  README, SPEC, `docs/fidelity/gaps.md`, and `assets/sprites/README.md` now
+  identify sprite/palette fidelity as repaired and narrow remaining B13 visual
+  work to the later scoring/action attract segment. Focused validation passed
+  with `cargo fmt --check`, `cargo check`, focused renderer atlas/source-image
+  tests, `cargo run -- --game-smoke`, targeted `make clean-fidelity
+  SCENARIOS="attract_boot start_game"`, and `git diff --check`. Full
+  `make fidelity`, full all-scenario `make clean-fidelity`, full clippy, and
+  `--live-smoke` remain deferred because this was a bounded sprite/palette
+  repair, not the R9-E3.7 closeout gate. The next full gate should run at
+  R9-E3.7 or sooner if the scoring/action attract slice introduces broad
+  runtime risk.
 
 ## Archived Completed History
 

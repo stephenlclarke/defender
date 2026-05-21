@@ -888,6 +888,77 @@ impl ObjectPicturePalette {
         }
     }
 
+    fn ship() -> Self {
+        let white = pseudo_color_rgba(PICTURE_COLOR_TABLE[9]);
+        Self {
+            one: white,
+            a: white,
+            c: PURPLE_RGBA,
+            d: PURPLE_RGBA,
+            e: GRAY_RGBA,
+            f: WHITE_RGBA,
+        }
+    }
+
+    const fn player_shot() -> Self {
+        Self {
+            one: WHITE_RGBA,
+            a: WHITE_RGBA,
+            c: WHITE_RGBA,
+            d: WHITE_RGBA,
+            e: WHITE_RGBA,
+            f: PALE_YELLOW_RGBA,
+        }
+    }
+
+    fn bomb(phase: usize) -> Self {
+        let color = source_object_cycle_color(phase);
+        Self {
+            one: WHITE_RGBA,
+            a: color,
+            c: WHITE_RGBA,
+            d: WHITE_RGBA,
+            e: WHITE_RGBA,
+            f: WHITE_RGBA,
+        }
+    }
+
+    fn tie(phase: usize) -> Self {
+        let offset = (phase % 3) * 3;
+        Self {
+            one: WHITE_RGBA,
+            a: WHITE_RGBA,
+            c: WHITE_RGBA,
+            d: pseudo_color_rgba(SOURCE_TIE_COLOR_TABLE[offset]),
+            e: pseudo_color_rgba(SOURCE_TIE_COLOR_TABLE[offset + 1]),
+            f: pseudo_color_rgba(SOURCE_TIE_COLOR_TABLE[offset + 2]),
+        }
+    }
+
+    const fn score_250(phase: usize) -> Self {
+        const CYCLE: [[u8; 4]; 3] = [BLUE_RGBA, YELLOW_RGBA, WHITE_RGBA];
+        Self {
+            one: CYCLE[phase % CYCLE.len()],
+            a: WHITE_RGBA,
+            c: WHITE_RGBA,
+            d: WHITE_RGBA,
+            e: WHITE_RGBA,
+            f: WHITE_RGBA,
+        }
+    }
+
+    const fn score_500(phase: usize) -> Self {
+        const CYCLE: [[u8; 4]; 3] = [RED_RGBA, BLUE_RGBA, YELLOW_RGBA];
+        Self {
+            one: WHITE_RGBA,
+            a: WHITE_RGBA,
+            c: WHITE_RGBA,
+            d: CYCLE[phase % CYCLE.len()],
+            e: CYCLE[(phase + 1) % CYCLE.len()],
+            f: CYCLE[(phase + 2) % CYCLE.len()],
+        }
+    }
+
     const fn burst() -> Self {
         Self {
             one: WHITE_RGBA,
@@ -905,31 +976,23 @@ const YELLOW_RGBA: [u8; 4] = [255, 188, 0, 255];
 const RED_RGBA: [u8; 4] = [255, 80, 80, 255];
 const BLUE_RGBA: [u8; 4] = [40, 56, 220, 255];
 const GRAY_RGBA: [u8; 4] = [170, 170, 186, 255];
+const PURPLE_RGBA: [u8; 4] = [182, 48, 255, 255];
+const PALE_YELLOW_RGBA: [u8; 4] = [255, 234, 128, 255];
 const TRANSPARENT_RGBA: [u8; 4] = [0, 0, 0, 0];
 const PICTURE_COLOR_TABLE: [u8; 16] = [
     0x00, 0x00, 0x07, 0x28, 0x2F, 0x81, 0xA4, 0x15, 0xC7, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-
-const PLAYER_SHIP_PNG: &[u8] = include_bytes!("../assets/sprites/ship1.png");
-const PLAYER_PROJECTILE_PNG: &[u8] = include_bytes!("../assets/sprites/player-shot.png");
-const ENEMY_LANDER_PNG: &[u8] = include_bytes!("../assets/sprites/lander1.png");
-const HUMAN_PNG: &[u8] = include_bytes!("../assets/sprites/humanoid1.png");
-const ENEMY_MUTANT_PNG: &[u8] = include_bytes!("../assets/sprites/mutant1.png");
-const ENEMY_BAITER_PNG: &[u8] = include_bytes!("../assets/sprites/baiter1.png");
-const ENEMY_BOMBER_PNG: &[u8] = include_bytes!("../assets/sprites/bomber1.png");
-const ENEMY_POD_PNG: &[u8] = include_bytes!("../assets/sprites/pod1.png");
-const ENEMY_SWARMER_PNG: &[u8] = include_bytes!("../assets/sprites/swarmer1.png");
-const ENEMY_BOMB_PNG: &[u8] = include_bytes!("../assets/sprites/bomb1.png");
-const BOMB_EXPLOSION_PNG: &[u8] = include_bytes!("../assets/sprites/podexpl.png");
-const SWARMER_EXPLOSION_PNG: &[u8] = include_bytes!("../assets/sprites/swarmexpl.png");
-const SCORE_POPUP_250_PNG: &[u8] = include_bytes!("../assets/sprites/score250_1.png");
-const SCORE_POPUP_500_PNG: &[u8] = include_bytes!("../assets/sprites/score500_1.png");
-const PLAYER_LIFE_STOCK_PNG: &[u8] = include_bytes!("../assets/sprites/littleship.png");
-const SMART_BOMB_STOCK_PNG: &[u8] = include_bytes!("../assets/sprites/smartbomb.png");
+const SOURCE_TIE_COLOR_TABLE: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07];
+const SOURCE_OBJECT_COLOR_TABLE: [u8; 37] = [
+    0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x37, 0x2F, 0x27, 0x1F, 0x17, 0x47, 0x47, 0x87,
+    0x87, 0xC7, 0xC7, 0xC6, 0xC5, 0xCC, 0xCB, 0xCA, 0xDA, 0xE8, 0xF8, 0xF9, 0xFA, 0xFB, 0xFD, 0xFF,
+    0xBF, 0x3F, 0x3E, 0x3C, 0x00,
+];
 const FONT_SHEET_PNG: &[u8] = include_bytes!("../assets/sprites/font-sheet.png");
 const ARCADE_SCORE_DIGITS_TSV: &str = include_str!("../assets/red-label/score-digits.tsv");
 const SOURCE_MESSAGE_GLYPHS_TSV: &str = include_str!("../assets/red-label/message-glyphs.tsv");
 const SOURCE_MESSAGES_TSV: &str = include_str!("../assets/red-label/messages.tsv");
+const SOURCE_OBJECT_IMAGES_TSV: &str = include_str!("../assets/red-label/object-images.tsv");
 const SOURCE_SCORE_DIGIT_SIZE: [u32; 2] = [6, 8];
 const MESSAGE_GLYPH_ATLAS_START: [u32; 2] = [0, 104];
 const MESSAGE_GLYPH_ATLAS_ROW_STEP: u32 = 16;
@@ -1365,22 +1428,34 @@ fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
 fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) -> Vec<u8> {
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
-    let player_ship = decode_embedded_png_rgba("ship1.png", PLAYER_SHIP_PNG);
-    let player_projectile = decode_embedded_png_rgba("player-shot.png", PLAYER_PROJECTILE_PNG);
-    let enemy_lander = decode_embedded_png_rgba("lander1.png", ENEMY_LANDER_PNG);
-    let human = decode_embedded_png_rgba("humanoid1.png", HUMAN_PNG);
-    let enemy_mutant = decode_embedded_png_rgba("mutant1.png", ENEMY_MUTANT_PNG);
-    let enemy_baiter = decode_embedded_png_rgba("baiter1.png", ENEMY_BAITER_PNG);
-    let enemy_bomber = decode_embedded_png_rgba("bomber1.png", ENEMY_BOMBER_PNG);
-    let enemy_pod = decode_embedded_png_rgba("pod1.png", ENEMY_POD_PNG);
-    let enemy_swarmer = decode_embedded_png_rgba("swarmer1.png", ENEMY_SWARMER_PNG);
-    let enemy_bomb = decode_embedded_png_rgba("bomb1.png", ENEMY_BOMB_PNG);
-    let bomb_explosion = decode_embedded_png_rgba("podexpl.png", BOMB_EXPLOSION_PNG);
-    let swarmer_explosion = decode_embedded_png_rgba("swarmexpl.png", SWARMER_EXPLOSION_PNG);
-    let score_popup_250 = decode_embedded_png_rgba("score250_1.png", SCORE_POPUP_250_PNG);
-    let score_popup_500 = decode_embedded_png_rgba("score500_1.png", SCORE_POPUP_500_PNG);
-    let player_life_stock = decode_embedded_png_rgba("littleship.png", PLAYER_LIFE_STOCK_PNG);
-    let smart_bomb_stock = decode_embedded_png_rgba("smartbomb.png", SMART_BOMB_STOCK_PNG);
+    let player_ship = decode_source_object_image_rgba("PLD10", 6, 8, ObjectPicturePalette::ship());
+    let player_projectile =
+        decode_source_object_image_rgba("LASD10", 1, 8, ObjectPicturePalette::player_shot());
+    let enemy_lander =
+        decode_source_object_image_rgba("LND10", 8, 5, ObjectPicturePalette::white());
+    let human = decode_source_object_image_rgba("ASTD10", 8, 2, ObjectPicturePalette::white());
+    let enemy_mutant =
+        decode_source_object_image_rgba("SCZD10", 8, 5, ObjectPicturePalette::white());
+    let enemy_baiter =
+        decode_source_object_image_rgba("UFOD10", 4, 6, ObjectPicturePalette::white());
+    let enemy_bomber =
+        decode_source_object_image_rgba("TIED10", 8, 4, ObjectPicturePalette::tie(0));
+    let enemy_pod = decode_source_object_image_rgba("PRBD10", 8, 4, ObjectPicturePalette::white());
+    let enemy_swarmer =
+        decode_source_object_image_rgba("SWMD10", 4, 3, ObjectPicturePalette::white());
+    let enemy_bomb = decode_source_object_image_rgba("BMBD10", 3, 2, ObjectPicturePalette::bomb(0));
+    let bomb_explosion =
+        decode_source_object_image_rgba("BXD10", 8, 4, ObjectPicturePalette::burst());
+    let swarmer_explosion =
+        decode_source_object_image_rgba("SWXD10", 8, 4, ObjectPicturePalette::burst());
+    let score_popup_250 =
+        decode_source_object_image_rgba("C25D10", 6, 6, ObjectPicturePalette::score_250(0));
+    let score_popup_500 =
+        decode_source_object_image_rgba("C5D10", 6, 6, ObjectPicturePalette::score_500(0));
+    let player_life_stock =
+        decode_source_object_image_rgba("PLAM0", 4, 5, ObjectPicturePalette::ship());
+    let smart_bomb_stock =
+        decode_source_object_image_rgba("SBD10", 3, 3, ObjectPicturePalette::white());
     let astronaut_explosion = decode_picture_grid_rgba("ASXP1", ASTRONAUT_EXPLOSION_GRID);
     let null_object = decode_picture_grid_rgba("NULOB", NULL_OBJECT_GRID);
     let terrain_explosion = decode_picture_grid_rgba("TEREX", TERRAIN_EXPLOSION_GRID);
@@ -1665,20 +1740,46 @@ fn decode_embedded_png_rgba(name: &'static str, bytes: &[u8]) -> EmbeddedSprite 
 }
 
 fn decode_picture_grid_rgba(name: &'static str, grid: ObjectPictureGrid) -> EmbeddedSprite {
-    let expected = usize::from(grid.rows) * usize::from(grid.bytes_per_row);
+    decode_picture_bytes_rgba(
+        name,
+        grid.rows,
+        grid.bytes_per_row,
+        grid.bytes,
+        grid.palette,
+    )
+}
+
+fn decode_source_object_image_rgba(
+    label: &'static str,
+    rows: u8,
+    bytes_per_row: u8,
+    palette: ObjectPicturePalette,
+) -> EmbeddedSprite {
+    let bytes = source_object_image_bytes(label);
+    decode_picture_bytes_rgba(label, rows, bytes_per_row, &bytes, palette)
+}
+
+fn decode_picture_bytes_rgba(
+    name: &'static str,
+    rows: u8,
+    bytes_per_row: u8,
+    bytes: &[u8],
+    palette: ObjectPicturePalette,
+) -> EmbeddedSprite {
+    let expected = usize::from(rows) * usize::from(bytes_per_row);
     assert_eq!(
-        grid.bytes.len(),
+        bytes.len(),
         expected,
         "object picture {name} byte grid must match its declared dimensions"
     );
-    let surface = SurfaceSize::new(u32::from(grid.bytes_per_row) * 2, u32::from(grid.rows));
+    let surface = SurfaceSize::new(u32::from(bytes_per_row) * 2, u32::from(rows));
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
-    for row in 0..usize::from(grid.rows) {
-        for byte_index in 0..usize::from(grid.bytes_per_row) {
-            let value = grid.bytes[row * usize::from(grid.bytes_per_row) + byte_index];
-            let left = picture_palette_color(value >> 4, grid.palette);
-            let right = picture_palette_color(value & 0x0F, grid.palette);
+    for row in 0..usize::from(rows) {
+        for byte_index in 0..usize::from(bytes_per_row) {
+            let value = bytes[row * usize::from(bytes_per_row) + byte_index];
+            let left = picture_palette_color(value >> 4, palette);
+            let right = picture_palette_color(value & 0x0F, palette);
             let offset = ((row * surface.width as usize) + byte_index * 2) * 4;
             pixels[offset..offset + 4].copy_from_slice(&left);
             pixels[offset + 4..offset + 8].copy_from_slice(&right);
@@ -1686,6 +1787,40 @@ fn decode_picture_grid_rgba(name: &'static str, grid: ObjectPictureGrid) -> Embe
     }
 
     EmbeddedSprite { surface, pixels }
+}
+
+fn source_object_image_bytes(label: &'static str) -> Vec<u8> {
+    for line in SOURCE_OBJECT_IMAGES_TSV.lines().skip(1) {
+        let mut columns = line.split('\t');
+        let Some(image_label) = columns.next() else {
+            continue;
+        };
+        let _address = columns.next();
+        let Some(hex_bytes) = columns.next() else {
+            continue;
+        };
+        if image_label == label {
+            return decode_source_hex_bytes(label, hex_bytes);
+        }
+    }
+
+    panic!("source object image {label} must exist in object-images.tsv");
+}
+
+fn decode_source_hex_bytes(label: &'static str, hex_bytes: &str) -> Vec<u8> {
+    assert!(
+        hex_bytes.len() % 2 == 0,
+        "source object image {label} hex byte string must be even length"
+    );
+
+    (0..hex_bytes.len())
+        .step_by(2)
+        .map(|start| {
+            u8::from_str_radix(&hex_bytes[start..start + 2], 16).unwrap_or_else(|error| {
+                panic!("source object image {label} hex must parse: {error}")
+            })
+        })
+        .collect()
 }
 
 fn decode_score_digit_sprites(name: &'static str, tsv: &str) -> Vec<EmbeddedSprite> {
@@ -2164,6 +2299,10 @@ fn pseudo_color_rgba(value: u8) -> [u8; 4] {
         scale_color_channel((value >> 6) & 0x03, 3),
         255,
     ]
+}
+
+fn source_object_cycle_color(phase: usize) -> [u8; 4] {
+    pseudo_color_rgba(SOURCE_OBJECT_COLOR_TABLE[phase % (SOURCE_OBJECT_COLOR_TABLE.len() - 1)])
 }
 
 fn scale_color_channel(value: u8, max: u8) -> u8 {
@@ -3972,22 +4111,22 @@ impl Default for GpuRendererSettings {
 mod tests {
     use super::{
         ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT, AtlasRegion, Color, GpuRendererSettings,
-        NativeRenderPipeline, NativeRendererResources, NativeSceneRenderer, RenderLayer,
-        RenderLayerCounts, RenderScene, SceneDrawPlan, SceneProjectionUniformUpload,
-        SceneProjectionUniforms, SceneRaster, SceneRasterError, SceneRasterUpload, SceneSprite,
-        SpriteAtlasTextureUpload, SpriteBindGroupLayoutPlan, SpriteBindGroupRole, SpriteBufferRole,
-        SpriteBufferUpload, SpriteBufferUploadPlan, SpriteDrawBatch, SpriteDrawCommand,
-        SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding, SpriteInstanceBuffer,
-        SpriteInstanceBufferRecord, SpriteInstanceUpload, SpritePipelineLayoutBindGroup,
-        SpritePipelineLayoutPlan, SpritePipelinePlan, SpriteQuadGeometry, SpriteQuadVertex,
-        SpriteRenderPassDraw, SpriteRenderPassEncoderCommand, SpriteRenderPassEncoderPlan,
-        SpriteRenderPassPlan, SpriteRenderPipelineDescriptorPlan, SpriteResourceBindingPlan,
-        SpriteResourceBindingRole, SpriteSamplerBindingPlan, SpriteShaderPlan,
-        SpriteTextureBindingPlan, SpriteVertexBufferBinding, SpriteVertexBufferLayoutPlan,
-        SurfaceSize, TextureAtlas, ViewportLayout, WgpuFrameCommand, WgpuFramePlan, WgpuPassPlan,
-        WgpuViewportCommand, push_source_controlled_message_sprites,
-        push_source_text_bytes_sprites, source_message_text, source_screen_position,
-        source_screen_position_with_offset,
+        NativeRenderPipeline, NativeRendererResources, NativeSceneRenderer, ObjectPicturePalette,
+        PALE_YELLOW_RGBA, PURPLE_RGBA, RenderLayer, RenderLayerCounts, RenderScene, SceneDrawPlan,
+        SceneProjectionUniformUpload, SceneProjectionUniforms, SceneRaster, SceneRasterError,
+        SceneRasterUpload, SceneSprite, SpriteAtlasTextureUpload, SpriteBindGroupLayoutPlan,
+        SpriteBindGroupRole, SpriteBufferRole, SpriteBufferUpload, SpriteBufferUploadPlan,
+        SpriteDrawBatch, SpriteDrawCommand, SpriteDrawInstance, SpriteId, SpriteIndexBufferBinding,
+        SpriteInstanceBuffer, SpriteInstanceBufferRecord, SpriteInstanceUpload,
+        SpritePipelineLayoutBindGroup, SpritePipelineLayoutPlan, SpritePipelinePlan,
+        SpriteQuadGeometry, SpriteQuadVertex, SpriteRenderPassDraw, SpriteRenderPassEncoderCommand,
+        SpriteRenderPassEncoderPlan, SpriteRenderPassPlan, SpriteRenderPipelineDescriptorPlan,
+        SpriteResourceBindingPlan, SpriteResourceBindingRole, SpriteSamplerBindingPlan,
+        SpriteShaderPlan, SpriteTextureBindingPlan, SpriteVertexBufferBinding,
+        SpriteVertexBufferLayoutPlan, SurfaceSize, TextureAtlas, ViewportLayout, WgpuFrameCommand,
+        WgpuFramePlan, WgpuPassPlan, WgpuViewportCommand, decode_source_object_image_rgba,
+        push_source_controlled_message_sprites, push_source_text_bytes_sprites,
+        source_message_text, source_screen_position, source_screen_position_with_offset,
     };
     use crate::renderer::{
         EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba,
@@ -5599,29 +5738,52 @@ mod tests {
     }
 
     #[test]
-    fn default_sprite_atlas_uses_png_backed_regions() {
+    fn default_sprite_atlas_uses_source_backed_runtime_regions() {
         let atlas = TextureAtlas::default_sprites();
 
-        assert_png_backed_region(&atlas, SpriteId::PLAYER_SHIP);
-        assert_png_backed_region(&atlas, SpriteId::SCORE_TEXT);
-        assert_png_backed_region(&atlas, SpriteId::STATUS_TEXT);
-        assert_png_backed_region(&atlas, SpriteId::PLAYER_PROJECTILE);
-        assert_png_backed_region(&atlas, SpriteId::TERRAIN_TILE);
-        assert_png_backed_region(&atlas, SpriteId::ENEMY_LANDER);
-        assert_png_backed_region(&atlas, SpriteId::HUMAN);
-        assert_png_backed_region(&atlas, SpriteId::ENEMY_MUTANT);
-        assert_png_backed_region(&atlas, SpriteId::ENEMY_BAITER);
-        assert_png_backed_region(&atlas, SpriteId::ENEMY_BOMBER);
-        assert_png_backed_region(&atlas, SpriteId::ENEMY_POD);
-        assert_png_backed_region(&atlas, SpriteId::ENEMY_SWARMER);
-        assert_png_backed_region(&atlas, SpriteId::ENEMY_BOMB);
-        assert_png_backed_region(&atlas, SpriteId::BOMB_EXPLOSION);
-        assert_png_backed_region(&atlas, SpriteId::SWARMER_EXPLOSION);
-        assert_png_backed_region(&atlas, SpriteId::SCORE_POPUP_250);
-        assert_png_backed_region(&atlas, SpriteId::SCORE_POPUP_500);
-        assert_png_backed_region(&atlas, SpriteId::PLAYER_LIFE_STOCK);
-        assert_png_backed_region(&atlas, SpriteId::SMART_BOMB_STOCK);
+        assert_non_placeholder_region(&atlas, SpriteId::PLAYER_SHIP);
+        assert_non_placeholder_region(&atlas, SpriteId::SCORE_TEXT);
+        assert_non_placeholder_region(&atlas, SpriteId::STATUS_TEXT);
+        assert_visible_region(&atlas, SpriteId::PLAYER_PROJECTILE);
+        assert_non_placeholder_region(&atlas, SpriteId::TERRAIN_TILE);
+        assert_non_placeholder_region(&atlas, SpriteId::ENEMY_LANDER);
+        assert_non_placeholder_region(&atlas, SpriteId::HUMAN);
+        assert_non_placeholder_region(&atlas, SpriteId::ENEMY_MUTANT);
+        assert_non_placeholder_region(&atlas, SpriteId::ENEMY_BAITER);
+        assert_non_placeholder_region(&atlas, SpriteId::ENEMY_BOMBER);
+        assert_non_placeholder_region(&atlas, SpriteId::ENEMY_POD);
+        assert_non_placeholder_region(&atlas, SpriteId::ENEMY_SWARMER);
+        assert_non_placeholder_region(&atlas, SpriteId::ENEMY_BOMB);
+        assert_non_placeholder_region(&atlas, SpriteId::BOMB_EXPLOSION);
+        assert_non_placeholder_region(&atlas, SpriteId::SWARMER_EXPLOSION);
+        assert_non_placeholder_region(&atlas, SpriteId::SCORE_POPUP_250);
+        assert_non_placeholder_region(&atlas, SpriteId::SCORE_POPUP_500);
+        assert_non_placeholder_region(&atlas, SpriteId::PLAYER_LIFE_STOCK);
+        assert_non_placeholder_region(&atlas, SpriteId::SMART_BOMB_STOCK);
         assert_visible_region(&atlas, SpriteId::STAR);
+    }
+
+    #[test]
+    fn source_object_images_decode_red_label_bytes_and_palettes() {
+        let ship = decode_source_object_image_rgba("PLD10", 6, 8, ObjectPicturePalette::ship());
+        let shot =
+            decode_source_object_image_rgba("LASD10", 1, 8, ObjectPicturePalette::player_shot());
+        let human = decode_source_object_image_rgba("ASTD10", 8, 2, ObjectPicturePalette::white());
+
+        assert_eq!(ship.surface, SurfaceSize::new(16, 6));
+        assert!(
+            ship.pixels
+                .chunks_exact(4)
+                .any(|pixel| pixel == PURPLE_RGBA.as_slice())
+        );
+        assert_eq!(shot.surface, SurfaceSize::new(16, 1));
+        assert!(
+            shot.pixels
+                .chunks_exact(4)
+                .all(|pixel| pixel == PALE_YELLOW_RGBA.as_slice())
+        );
+        assert_eq!(human.surface, SurfaceSize::new(4, 8));
+        assert!(human.pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
     }
 
     #[test]
@@ -6168,11 +6330,11 @@ mod tests {
         );
     }
 
-    fn assert_png_backed_region(atlas: &TextureAtlas, sprite: SpriteId) {
+    fn assert_non_placeholder_region(atlas: &TextureAtlas, sprite: SpriteId) {
         let pixels = atlas_region_pixels(atlas, sprite);
         assert!(
             pixels.iter().any(|pixel| pixel[3] != 0),
-            "sprite {:?} region must contain visible PNG pixels",
+            "sprite {:?} region must contain visible pixels",
             sprite
         );
         let distinct_pixels = pixels

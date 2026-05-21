@@ -6782,7 +6782,7 @@ impl Game {
                     layer: RenderLayer::Objects,
                     position: [f32::from(enemy.position.x), f32::from(enemy.position.y)],
                     size: [f32::from(size.0), f32::from(size.1)],
-                    tint: Color::from_rgba(0xF4, 0x5B, 0x5B, 0xFF),
+                    tint: Color::WHITE,
                 });
             }
             for human in &self.state.world.humans {
@@ -6797,7 +6797,7 @@ impl Game {
                     tint: if human.carried || human.carried_by_player {
                         Color::from_rgba(0xFF, 0xF8, 0x80, 0xFF)
                     } else {
-                        Color::from_rgba(0x7C, 0xD7, 0xFF, 0xFF)
+                        Color::WHITE
                     },
                 });
             }

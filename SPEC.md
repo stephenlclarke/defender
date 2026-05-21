@@ -42,9 +42,9 @@ accepted final contract is ready for owner review:
   `git diff --check`.
 - Owner signoff remains pending as B13. Owner review of
   `docs/start-sequence.gif` reopened visual acceptance. Williams handwriting
-  and color cadence, Defender wordmark coalescence, and the Hall of Fame
-  attract order are now repaired in clean runtime; gameplay sprite/palette
-  fidelity and the later scoring/action attract segment remain active. Until
+  and color cadence, Defender wordmark coalescence, gameplay sprite/palette
+  fidelity, and the Hall of Fame attract order are now repaired in clean
+  runtime; the later scoring/action attract segment remains active. Until
   signoff, changes that alter public contracts, scenario semantics, runtime
   behavior, or final acceptance evidence must trigger focused checks and, when
   broad risk is introduced, a renewed full gate.
@@ -509,8 +509,8 @@ left base `0x1E7B`, with the two source-shaped offset segments `0x5F..0x41`
 and `0x1E..0x00`. Logo/underline palette/blink/color source evidence is
 captured as a visual-state contract for color indices, underline words,
 Williams restore rates, and Hall of Fame blink sleep/color evidence; hardware
-palette-to-RGB rendering remains B13 visual acceptance work rather than a
-closed clean gameplay contract. Enemy exhaustion is reported through
+palette-to-RGB rendering remains a post-acceptance render audit follow-up
+rather than a closed clean gameplay contract. Enemy exhaustion is reported through
 `WaveSystem`,
 keeping the last-hit frame empty and spawning the next clean wave on the
 following playing frame. It flattens those per-batch records into one

@@ -7,10 +7,10 @@ the rewrite. The profiled clean-fidelity gate matches all 12 embedded Phase 1
 scenario input programs, and the R9-E2 full validation gate has passed. Strict
 R9 behavior/evidence blockers are closed through B12, but owner review of
 `docs/start-sequence.gif` reopened B13 visual acceptance for the clean renderer.
-Williams handwriting/color cadence, Defender wordmark coalescence, and the
-Hall of Fame attract order are now repaired in clean runtime; gameplay
-sprite/palette fidelity and the later scoring/action attract segment remain
-active. Older entries remain closed fidelity history, local-reference/tooling
+Williams handwriting/color cadence, Defender wordmark coalescence, gameplay
+sprite/palette fidelity, and the Hall of Fame attract order are now repaired
+in clean runtime; the later scoring/action attract segment remains active.
+Older entries remain closed fidelity history, local-reference/tooling
 notes, archived prototype cleanup, or post-acceptance validation records.
 Historical entries that mention remaining blockers describe the state at the
 time they were written; they are not active R9 blockers unless restated in this
