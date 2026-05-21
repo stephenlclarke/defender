@@ -423,7 +423,11 @@ other player still has stock, then hands off to that player and starts the clean
 playfield entry path. During that switch sleep, scenes draw source-backed
 `PLYR1`/`PLYR2` and `GO` message glyphs at the red-label screen addresses
 `0x3C78` and `0x3E88`; if no player has remaining stock, the clean game enters
-the final game-over return path. During that final game-over sleep, scenes draw
+the final game-over return path. Non-final deaths with remaining stock enter a
+death-cloud pause and then respawn the next stocked player through the same
+clean player-start path; two-player games rotate to the other stocked player per
+the source `PLE02` loop, and one-player games wrap back to player one. During
+that final game-over sleep, scenes draw
 source-backed `GO` message glyphs at the translated `PLE2` screen address
 `0x3E80`. The player-death pixel cloud is cleared before high-score entry
 handoff so high-score scenes remain prompt/table-only.

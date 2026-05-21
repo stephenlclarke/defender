@@ -206,14 +206,17 @@ top-display frame geometry; lifecycle transitions outside the score-popup,
 `EXST`/`EXPU` expanded-object explosion, player-death pixel-cloud,
 terrain-blow, and covered enemy-hit/projectile-collision command surfaces,
 remaining two-player session flow beyond the source-backed final-life
-switch/respawn slice,
+switch/respawn and non-final death-rotation slices,
 wave-completion survivor-bonus loop/cadence beyond current presentation, live
 Williams logo table-walker animation, hardware palette/RGB render audit
 residuals, and full visual presentation remain strict R9 blockers.
 Player-one/player-two score digits, life/smart-bomb stock drawing, two-player
 start admission/top-display initialization, the two-player player-start
 prompt, and the two-player final-life `PLE02` switch/respawn handoff plus its
-source message-glyph prompt are now clean-owned. The final player-death
+source message-glyph prompt are now clean-owned. Non-final player deaths now
+pause active play through the source-backed player-death cloud, then respawn the
+next stocked player through the existing player-start handoff. The final
+player-death
 game-over sleep also draws the source `GAME OVER` prompt at the translated
 `PLE2` screen position, and active
 high-score entry scenes draw the source hall-of-fame player label,
@@ -668,7 +671,8 @@ presentation evidence, and source `BORDER` top-display frame geometry, but
 clean gameplay lifecycle behavior outside the source-backed score-popup
 surface, source expanded-object explosion timing, and source-backed
 player-death pixel-cloud and terrain-blow surfaces, remaining two-player
-session flow beyond the final-life switch/respawn handoff,
+session flow beyond the final-life switch/respawn handoff and non-final
+death-rotation handoff,
 wave-completion survivor-bonus loop/cadence beyond current presentation, live
 Williams logo table-walker animation, exact palette-to-RGB rendering, and
 broader render presentation parity remain unmapped.
@@ -727,7 +731,9 @@ Player-one and player-two score digits and stock drawing now use
 source-backed clean scene
 sprites, two-player credited-start admission initializes the two-player top
 display, and final-life two-player handoff follows the source `PLE02` switch
-sleep before respawning the other player. New sprite
+sleep before respawning the other player. Non-final deaths now wait through the
+player-death cloud and rotate to the next stocked player before the clean
+player-start handoff. New sprite
 files should stay under `assets/sprites/`, new non-legacy sound artifacts should
 stay under `assets/sounds/`, and pre-existing legacy `.wav` cues should remain
 under

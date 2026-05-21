@@ -808,6 +808,14 @@ post-acceptance validation records.
   scenarios, full `make fidelity` passed, and no fixture/public evidence drift
   surfaced. R9-C4.2 stayed unused; remaining strict R9 behavior work moves to
   B09 two-player flow.
+- `2026-05-21 08:26:46 BST`: R9-D1.1 starts B09 by aligning clean non-final
+  death/respawn rotation with the source `PLE02` selection shape. Player deaths
+  with remaining stock now leave active play, keep the source-backed
+  player-death cloud visible during a `GameOver` pause, and respawn through the
+  existing player-start handoff once that cloud finishes. Two-player sessions
+  rotate to the next stocked player after non-final deaths; one-player sessions
+  wrap back to player one. The existing final-life two-player switch-sleep
+  prompt path is unchanged.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

@@ -688,6 +688,13 @@ Phase 4: session and high-score closure.
   remaining player-one/player-two turn transitions, respawn cadence, stock
   accounting, score ownership, and game-over routing beyond the covered
   final-life switch/respawn slice.
+- R9-D1.1: non-final death/respawn rotation. Completed 2026-05-21. Clean player
+  deaths with remaining stock now leave active play, wait for the source
+  player-death explosion cloud to finish, then respawn through the existing
+  player-start handoff. The next stocked player is selected with the source
+  `PLE02` loop shape: two-player sessions rotate to the other stocked player
+  after any non-final death, and one-player sessions wrap back to player one.
+  The existing final-life two-player switch-sleep prompt remains unchanged.
 - Step 52 / Cycle R9-D2: high-score ordering and post-entry return. Prove
   source-backed table ordering, initials insertion, today's-greatest behavior,
   post-entry display timing, and return-to-attract behavior across one-player
@@ -2814,6 +2821,18 @@ Work log:
   R9-C4.2 stayed unused because no source ecology drift surfaced. The next full
   gate should run when Step 51/R9-D1 closes, a shared public contract changes,
   or R9 reaches the final Step 54 validation gate.
+
+- `2026-05-21 08:26:46 BST` Completed R9-D1.1 non-final death/respawn rotation.
+  Clean player deaths with remaining stock now enter a `GameOver` death-cloud
+  pause instead of continuing active play immediately. Once the source-backed
+  player explosion cloud finishes, the clean game resumes through the existing
+  player-start path for the next stocked player, matching the source `PLE02`
+  selection shape for one-player wrap and two-player rotation. Focused
+  validation passed with `cargo test non_final_death --lib` and `cargo test
+  clean_game_player_enemy_collision_loses_life_and_removes_enemy --lib`. Broad
+  validation remains deferred because this is a bounded B09 respawn-cadence
+  slice with no public snapshot shape change. The next full gate should run when
+  R9-D1 closes, a public contract changes, or R9 reaches Step 54.
 
 ## Archived Completed History
 

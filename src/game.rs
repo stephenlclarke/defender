@@ -5682,6 +5682,7 @@ pub struct Game {
     baiter_pacing_frames_remaining: u8,
     game_over_candidate_score: Option<u32>,
     player_explosion: Option<PlayerExplosionRuntime>,
+    pending_respawn_player: Option<u8>,
     thrust_sound_active: bool,
 }
 
@@ -5701,6 +5702,7 @@ impl Game {
             baiter_pacing_frames_remaining: SOURCE_GAME_EXEC_SLEEP_FRAMES,
             game_over_candidate_score: None,
             player_explosion: None,
+            pending_respawn_player: None,
             thrust_sound_active: false,
         }
     }
@@ -5893,6 +5895,7 @@ impl Game {
         self.state.game_over = GameOverSnapshot::NONE;
         self.state.world = WorldSnapshot::default();
         self.player_explosion = None;
+        self.pending_respawn_player = None;
         self.thrust_sound_active = false;
         self.camera_left = WorldVector::default();
         self.controls = PlayerControlSystem::new();
@@ -5973,6 +5976,11 @@ impl Game {
     }
 
     fn step_game_over(&mut self, gameplay_events: &mut Vec<GameEvent>) {
+        if let Some(player) = self.pending_respawn_player {
+            self.step_pending_respawn(player);
+            return;
+        }
+
         if let Some(remaining) = self.state.game_over.player_death_sleep_remaining {
             self.step_player_death_game_over_sleep(remaining, gameplay_events);
             return;
@@ -5991,6 +5999,15 @@ impl Game {
         if let Some(remaining) = self.state.game_over.hall_of_fame_stall_remaining {
             self.step_hall_of_fame_display(remaining);
         }
+    }
+
+    fn step_pending_respawn(&mut self, player: u8) {
+        if self.player_explosion.is_some() {
+            return;
+        }
+
+        self.pending_respawn_player = None;
+        self.start_next_player_turn(player);
     }
 
     fn step_player_death_game_over_sleep(
@@ -6057,6 +6074,7 @@ impl Game {
         self.state.world = WorldSnapshot::default();
         self.player_explosion = None;
         self.thrust_sound_active = false;
+        self.pending_respawn_player = None;
         self.state.game_over = GameOverSnapshot::NONE;
         self.state.high_score_entry = None;
         self.state.high_score_submission = None;
@@ -6506,6 +6524,7 @@ impl Game {
         sound_events: &mut Vec<SoundEvent>,
     ) {
         self.thrust_sound_active = false;
+        self.pending_respawn_player = None;
         self.spawn_player_explosion(player_position.wrapping_offset(4, 3));
         sound_events.push(source_player_death_sound_event());
         let frame = PlayerDamageSystem::apply_hit(PlayerStock::new(
@@ -6523,6 +6542,7 @@ impl Game {
             self.state.high_score_entry = None;
             self.state.high_score_submission = None;
             if let Some(next_player) = self.next_surviving_player() {
+                self.pending_respawn_player = None;
                 self.state.game_over = GameOverSnapshot::player_switch_sleep(
                     PLAYER_SWITCH_SLEEP_FRAMES,
                     self.state.current_player,
@@ -6535,6 +6555,17 @@ impl Game {
                 self.state.game_over =
                     GameOverSnapshot::player_death_sleep(PLAYER_DEATH_GAME_OVER_SLEEP_FRAMES);
             }
+        } else {
+            self.pending_wave_start = false;
+            self.sync_current_player_stock();
+            let Some(next_player) = self.next_respawn_player() else {
+                return;
+            };
+            self.state.phase = GamePhase::GameOver;
+            self.state.high_score_entry = None;
+            self.state.high_score_submission = None;
+            self.state.game_over = GameOverSnapshot::NONE;
+            self.pending_respawn_player = Some(next_player);
         }
     }
 
@@ -6637,9 +6668,16 @@ impl Game {
     }
 
     fn next_surviving_player(&self) -> Option<u8> {
+        let next_player = self.next_respawn_player()?;
+        (next_player != self.state.current_player).then_some(next_player)
+    }
+
+    fn next_respawn_player(&self) -> Option<u8> {
         let player_count = self.state.player_count.clamp(1, 2);
         if player_count < 2 {
-            return None;
+            let current = self.state.current_player.clamp(1, 1);
+            return (self.state.player_stocks[player_stock_index(current)].lives > 0)
+                .then_some(current);
         }
 
         let current = self.state.current_player.clamp(1, player_count);
@@ -6648,9 +6686,7 @@ impl Game {
             if candidate > player_count {
                 candidate = candidate.saturating_sub(player_count);
             }
-            if candidate != current
-                && self.state.player_stocks[player_stock_index(candidate)].lives > 0
-            {
+            if self.state.player_stocks[player_stock_index(candidate)].lives > 0 {
                 return Some(candidate);
             }
         }
@@ -13720,15 +13756,13 @@ mod tests {
 
         let frame = game.step(GameInput::NONE);
 
-        assert_eq!(frame.state.phase, GamePhase::Playing);
+        assert_eq!(frame.state.phase, GamePhase::GameOver);
+        assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
         assert_eq!(frame.state.player.lives, 1);
         assert_eq!(frame.state.player.smart_bombs, 3);
         assert_eq!(frame.state.scores.player_one, 0);
         assert!(frame.state.world.enemies.is_empty());
-        assert_eq!(
-            frame.events.gameplay(),
-            &[GameEvent::PlayerDestroyed, GameEvent::WaveCleared]
-        );
+        assert_eq!(frame.events.gameplay(), &[GameEvent::PlayerDestroyed]);
         assert!(
             !frame
                 .scene
@@ -13736,7 +13770,7 @@ mod tests {
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
         );
-        assert!(frame.scene.sprites.iter().any(|sprite| {
+        assert!(!frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::PLAYER_SHIP && sprite.layer == RenderLayer::Objects
         }));
         assert_eq!(
@@ -13768,6 +13802,26 @@ mod tests {
                 && sprite.layer == RenderLayer::Objects
                 && sprite.tint == Color::WHITE
         }));
+
+        let respawn = advance_pending_respawn(&mut game);
+        assert_eq!(respawn.state.phase, GamePhase::Playing);
+        assert_eq!(respawn.state.current_player, 1);
+        assert_eq!(respawn.state.player.lives, 1);
+        assert_eq!(respawn.state.world, WorldSnapshot::default());
+        assert_eq!(
+            game.start_playfield_delay,
+            Some(START_PLAYFIELD_DELAY_FRAMES)
+        );
+
+        let active = advance_to_started_playfield(&mut game);
+        assert_eq!(active.state.phase, GamePhase::Playing);
+        assert_eq!(active.state.current_player, 1);
+        assert_eq!(active.state.player.lives, 0);
+        assert_eq!(
+            active.state.player_stocks[0],
+            PlayerStockSnapshot::new(0, 3)
+        );
+        assert_eq!(active.state.world.enemies.len(), 5);
     }
 
     #[test]
@@ -13913,6 +13967,62 @@ mod tests {
             active.state.player_stocks,
             [
                 PlayerStockSnapshot::new(0, 3),
+                PlayerStockSnapshot::new(2, 3),
+            ]
+        );
+        assert_eq!(active.state.world.enemies.len(), 5);
+    }
+
+    #[test]
+    fn clean_game_two_player_non_final_death_rotates_to_next_player() {
+        let mut game = two_player_started_game();
+        game.state.player.lives = 2;
+        game.state.player_stocks[1] = PlayerStockSnapshot::new(3, 3);
+        game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
+        game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
+
+        let collision = game.step(GameInput::NONE);
+
+        assert_eq!(collision.state.phase, GamePhase::GameOver);
+        assert_eq!(collision.state.current_player, 1);
+        assert_eq!(collision.state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(collision.state.player.lives, 1);
+        assert_eq!(
+            collision.state.player_stocks,
+            [
+                PlayerStockSnapshot::new(1, 3),
+                PlayerStockSnapshot::new(3, 3),
+            ]
+        );
+        assert_eq!(collision.events.gameplay(), &[GameEvent::PlayerDestroyed]);
+        assert!(!collision.scene.sprites.iter().any(|sprite| {
+            matches!(
+                sprite.sprite,
+                SpriteId::MESSAGE_GLYPH_P | SpriteId::MESSAGE_GLYPH_G
+            ) && sprite.layer == RenderLayer::Overlay
+        }));
+
+        let respawn = advance_pending_respawn(&mut game);
+
+        assert_eq!(respawn.state.phase, GamePhase::Playing);
+        assert_eq!(respawn.state.current_player, 2);
+        assert_eq!(respawn.state.player.lives, 3);
+        assert_eq!(respawn.state.player.smart_bombs, 3);
+        assert_eq!(respawn.state.world, WorldSnapshot::default());
+        assert_eq!(
+            game.start_playfield_delay,
+            Some(START_PLAYFIELD_DELAY_FRAMES)
+        );
+
+        let active = advance_to_started_playfield(&mut game);
+
+        assert_eq!(active.state.phase, GamePhase::Playing);
+        assert_eq!(active.state.current_player, 2);
+        assert_eq!(active.state.player.lives, 2);
+        assert_eq!(
+            active.state.player_stocks,
+            [
+                PlayerStockSnapshot::new(1, 3),
                 PlayerStockSnapshot::new(2, 3),
             ]
         );
@@ -15456,6 +15566,21 @@ mod tests {
         }
 
         game.step(GameInput::NONE)
+    }
+
+    fn advance_pending_respawn(game: &mut Game) -> GameFrame {
+        for _ in 0..200 {
+            let frame = game.step(GameInput::NONE);
+            if frame.state.phase == GamePhase::Playing {
+                return frame;
+            }
+
+            assert_eq!(frame.state.phase, GamePhase::GameOver);
+            assert_eq!(frame.state.game_over, GameOverSnapshot::NONE);
+            assert!(frame.events.is_empty());
+        }
+
+        panic!("pending respawn did not finish");
     }
 
     fn advance_player_death_game_over_sleep(game: &mut Game) -> GameFrame {
