@@ -64,9 +64,11 @@ R9-E3.7 clean media:
   use the source terrain projection, while Williams/title and Hall of Fame pages
   do not inherit gameplay ground. R9-E3.12 aligns candidate media cadence with
   the protected reference at 347 frames / 4600cs and suppresses stray
-  Williams-title score HUD / zero-credit text, but the latest contact sheet
-  still shows title color/coalescence and scoring visual drift. Until signoff,
-  changes that alter public
+  Williams-title score HUD / zero-credit text. R9-E3.13 has started title
+  repair by switching the Williams handwriting reveal from a linear pixel ramp
+  to source `LOGO0` table-operation cadence through the `PRES` handoff, but
+  the latest contact sheet still shows title color/coalescence and scoring
+  visual drift. Until signoff, changes that alter public
   contracts, scenario semantics, runtime behavior, or final acceptance evidence
   must trigger focused checks and, when broad risk is introduced, a renewed full
   gate.
@@ -517,8 +519,9 @@ scanner blips, player laser, 500-point rescue popup, and `ENMYTB` enemy
 score-card reveal before cycling back to the Williams page. This projection is
 suppressed during the hall-of-fame display stall. README media captures now
 preserve sampled frame cadence and match the protected reference duration and
-frame count, but B13 still requires title color/coalescence and scoring visual
-repair before owner acceptance. During a pending two-player
+frame count. The Williams handwriting reveal advances by source `LOGO0`
+table-operation slices, but B13 still requires title color/coalescence and
+scoring visual repair before owner acceptance. During a pending two-player
 start handoff, scenes
 draw the source-backed `PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,

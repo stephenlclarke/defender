@@ -868,7 +868,10 @@ Reopened B13 repair schedule:
   `WILLIR`/`WILR1` evidence plus pre-rewrite trace behavior to repair the
   remaining Williams color cadence and Defender appearance/coalescence
   geometry. Add focused scene/atlas/media tests that fail on uniform title
-  tint or non-source coalescence cadence.
+  tint or non-source coalescence cadence. In progress: the Williams
+  handwriting reveal now uses source `LOGO0` table-operation cadence and
+  completes at the `PRES` handoff instead of using a linear 160-frame pixel
+  ramp. Remaining R9-E3.13 work is the title color/coalescence visual repair.
 - R9-E3.14: scoring sprite, scanner, and terrain visual pass. Compare the
   protected scoring-sequence frames against clean candidate frames and repair
   the remaining source sprite palettes, score-card object placement, scanner
@@ -3329,6 +3332,23 @@ Work log:
   repair slice. The next full gate should run at R9-E3.15 candidate closeout,
   or sooner if the title or scoring visual repairs change shared contracts or
   broad scenario behavior.
+
+- `2026-05-22 00:09:42 BST` R9-E3.13 title cadence subpass. The Williams
+  handwriting reveal now follows source `LOGO0` table-operation cadence:
+  three table operations per two-frame sleep slice, with completion at the
+  source `PRES` handoff instead of the previous linear 160-frame pixel ramp.
+  Focused validation passed with `cargo fmt --check`, `cargo check`, focused
+  Williams logo, source visual-state, Defender wordmark, and renderer
+  `LGOTAB` operation-count unit tests, targeted
+  `make clean-fidelity SCENARIOS="attract_boot"`, and `make readme-media`.
+  Candidate media remains repair evidence only but moved slightly in the right
+  direction: reference 347 frames, candidate 347 frames, equal 4600cs
+  duration, sampled RMS full 49.18, title 56.59, Hall of Fame 61.82, numeric
+  glyphs 61.73, sprites 47.52, terrain 41.62, and scoring 53.93. Broad gates
+  remain deferred because this is a bounded visual repair subpass. The next
+  full gate should run at R9-E3.15 candidate closeout, or sooner if the
+  remaining title/scoring visual repairs change shared contracts or broad
+  scenario behavior.
 
 ## Archived Completed History
 

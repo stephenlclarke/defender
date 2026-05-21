@@ -2143,7 +2143,22 @@ fn decode_source_attract_williams_logo_rgba() -> EmbeddedSprite {
 }
 
 pub(crate) fn source_attract_williams_logo_pixel_path() -> Vec<[u8; 2]> {
+    source_attract_williams_logo_walk().pixels
+}
+
+pub(crate) fn source_attract_williams_logo_operation_pixel_counts() -> Vec<usize> {
+    source_attract_williams_logo_walk().operation_pixel_counts
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceAttractWilliamsLogoWalk {
+    pixels: Vec<[u8; 2]>,
+    operation_pixel_counts: Vec<usize>,
+}
+
+fn source_attract_williams_logo_walk() -> SourceAttractWilliamsLogoWalk {
     let mut path = Vec::new();
+    let mut operation_pixel_counts = Vec::new();
     let mut seen = [false; SOURCE_ATTRACT_WILLIAMS_LOGO_PIXELS];
     let mut pointer = 0usize;
     let mut cursor = 0u16;
@@ -2168,6 +2183,7 @@ pub(crate) fn source_attract_williams_logo_pixel_path() -> Vec<[u8; 2]> {
             pointer += 2;
             cursor = u16::from_be_bytes([cursor_high, cursor_low]);
             push_source_attract_williams_logo_pixel(&mut path, &mut seen, cursor);
+            operation_pixel_counts.push(path.len());
         } else {
             let mut accumulator = opcode;
             loop {
@@ -2184,10 +2200,14 @@ pub(crate) fn source_attract_williams_logo_pixel_path() -> Vec<[u8; 2]> {
                     break;
                 }
             }
+            operation_pixel_counts.push(path.len());
         }
     }
 
-    path
+    SourceAttractWilliamsLogoWalk {
+        pixels: path,
+        operation_pixel_counts,
+    }
 }
 
 fn source_attract_williams_logo_horizontal_bit(
@@ -4167,6 +4187,7 @@ mod tests {
     };
     use crate::renderer::{
         EmbeddedSprite, WHITE_RGBA, decode_source_attract_williams_logo_rgba,
+        source_attract_williams_logo_operation_pixel_counts,
         source_attract_williams_logo_pixel_path,
     };
 
@@ -6080,9 +6101,22 @@ mod tests {
     fn source_attract_williams_logo_decodes_table_pixels() {
         let sprite = decode_source_attract_williams_logo_rgba();
         let path = source_attract_williams_logo_pixel_path();
+        let operation_counts = source_attract_williams_logo_operation_pixel_counts();
 
         assert_eq!(sprite.surface, SurfaceSize::new(92, 19));
         assert_eq!(path.len(), 660);
+        assert!(!operation_counts.is_empty());
+        assert_eq!(operation_counts.last().copied(), Some(path.len()));
+        assert!(
+            operation_counts
+                .windows(2)
+                .all(|window| window[0] <= window[1])
+        );
+        assert!(
+            operation_counts
+                .get(2)
+                .is_some_and(|count| *count < path.len())
+        );
         assert_eq!(path.first().copied(), Some([8, 4]));
         assert!(path.contains(&[8, 4]));
         assert!(path.contains(&[89, 9]));

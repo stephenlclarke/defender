@@ -52,8 +52,10 @@ remaining font-sheet terrain helper with source `TDATA`/`BGINIT`/`BGOUT`
 terrain-word projection and removed stray gameplay ground from non-scoring
 attract pages. R9-E3.12 now matches the protected GIF frame cadence and total
 delay at 347 frames / 4600cs, suppresses stray title HUD/zero-credit text, and
-uses source Hall of Fame color evidence. Final B13 visual acceptance remains
-open for Williams color/handwriting cadence, Defender coalescence parity, and
+uses source Hall of Fame color evidence. R9-E3.13 has started title repair by
+switching the Williams handwriting reveal to source `LOGO0` table-operation
+cadence through the `PRES` handoff. Final B13 visual acceptance remains open
+for Williams color/handwriting polish, Defender coalescence parity, and
 scoring sprite/terrain palette and placement drift.
 
 ![Defender gameplay frame](docs/defender.png)
@@ -743,7 +745,8 @@ laser/explosion/500-point rescue beat, and `ENMYTB` enemy score-card reveal
 before cycling back to the Williams page. The Williams logo is generated from
 the source `LGOTAB` final pixel pattern and early title frames draw a
 source-ordered handwritten reveal with the source `0x3F` title color index;
-B13 still requires a follow-up title pass for the protected GIF's
+the reveal cadence follows source `LOGO0` table operations instead of a linear
+pixel ramp. B13 still requires a follow-up title pass for the protected GIF's
 Williams color cadence and coalescence timing.
 The normal attract Defender wordmark now uses the 15 source `DEFENS` 4-byte by
 12-row `APVCT` appearance slots and descriptor addresses during the appearance

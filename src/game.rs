@@ -7,8 +7,9 @@ use crate::{
         ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT, ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE, Color,
         RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
         push_source_controlled_message_sprites, push_source_message_sprites,
-        push_source_text_bytes_sprites, source_attract_williams_logo_pixel_path,
-        source_message_text, source_screen_position, source_screen_position_with_offset,
+        push_source_text_bytes_sprites, source_attract_williams_logo_operation_pixel_counts,
+        source_attract_williams_logo_pixel_path, source_message_text, source_screen_position,
+        source_screen_position_with_offset,
     },
     systems::{
         CollisionBox, CollisionSystem, EnemyMotionSystem, GameSimulation, HighScoreEntrySystem,
@@ -47,7 +48,8 @@ const ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS: u8 = 0x2E;
 const ATTRACT_COPYRIGHT_SLEEP_TICKS: u8 = 10;
 const ATTRACT_COPYRIGHT_STALL_TICKS: u8 = 60;
 const ATTRACT_INSTRUCTION_ENTRY_SLEEP_TICKS: u8 = 0xE6;
-pub(crate) const ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES: u16 = 160;
+const SOURCE_ATTRACT_WILLIAMS_INITIAL_BYTES_PER_SLICE: usize = 3;
+pub(crate) const ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES: u16 = ATTRACT_PRESENTS_START_FRAME;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES: u16 =
     ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS as u16;
 const SOURCE_ATTRACT_DEFENDER_DESCRIPTOR: u16 = 0xB300;
@@ -7741,9 +7743,16 @@ fn attract_williams_logo_visible_pixel_count(
         return total_pixels;
     }
 
-    let reveal_frames = usize::from(ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES);
-    let page_frame = usize::from(attract.page_frame.max(1));
-    (total_pixels * page_frame / reveal_frames).clamp(1, total_pixels)
+    let sleep_ticks = usize::from(ATTRACT_LOGO_SLEEP_TICKS.max(1));
+    let slices_elapsed = usize::from(attract.page_frame) / sleep_ticks + 1;
+    let operation_index = slices_elapsed
+        .saturating_mul(SOURCE_ATTRACT_WILLIAMS_INITIAL_BYTES_PER_SLICE)
+        .saturating_sub(1);
+    source_attract_williams_logo_operation_pixel_counts()
+        .get(operation_index)
+        .copied()
+        .unwrap_or(total_pixels)
+        .clamp(1, total_pixels)
 }
 
 fn push_attract_defender_wordmark_sprite(scene: &mut RenderScene, state: &GameState) {
@@ -10971,6 +10980,21 @@ mod tests {
             .tint;
         assert_eq!(early_pixels[0].tint, next_tint);
         assert_eq!(next_tint, Color::from_rgba(0xFF, 0xFF, 0x00, 0xFF));
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(160);
+        let source_first_pass_scene = game.scene();
+        assert!(
+            source_first_pass_scene
+                .sprites
+                .iter()
+                .any(|sprite| { sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL })
+        );
+        assert!(
+            !source_first_pass_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO)
+        );
 
         game.state.attract =
             AttractPresentationSnapshot::for_page_frame(ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES);
