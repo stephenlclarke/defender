@@ -69,6 +69,7 @@ const SOURCE_LPKSND_SOUND_COMMAND: u8 = 0xF4;
 const SOURCE_LSKSND_SOUND_COMMAND: u8 = 0xF1;
 const SOURCE_LASSND_SOUND_COMMAND: u8 = 0xEB;
 const SOURCE_SBSND_SOUND_COMMAND: u8 = 0xEE;
+const SOURCE_APSND_SOUND_COMMAND: u8 = 0xEA;
 const SOURCE_ACSND_SOUND_COMMAND: u8 = 0xF7;
 const SOURCE_ALSND_SOUND_COMMAND: u8 = 0xE0;
 const SOURCE_ASCSND_SOUND_COMMAND: u8 = 0xE5;
@@ -5973,6 +5974,7 @@ impl Game {
             // Source HYP02 walks KILSHL over the shell-object list before
             // rematerialization; clean enemy projectiles model that list.
             self.state.world.enemy_projectiles.clear();
+            sound_events.push(source_hyperspace_appearance_sound_event());
         }
 
         if controls.triggers.thrust {
@@ -7629,6 +7631,12 @@ fn source_smart_bomb_sound_event() -> SoundEvent {
     }
 }
 
+fn source_hyperspace_appearance_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_APSND_SOUND_COMMAND,
+    }
+}
+
 fn source_astronaut_release_sound_event() -> SoundEvent {
     SoundEvent::UnmappedSoundCommand {
         command: SOURCE_ASCSND_SOUND_COMMAND,
@@ -8097,8 +8105,9 @@ mod tests {
         WaveProfileSnapshot, WorldSnapshot, WorldVector, source_astronaut_catch_sound_event,
         source_astronaut_release_sound_event, source_astronaut_safe_landing_sound_event,
         source_enemy_hit_sound_event, source_enemy_shot_sound_event,
-        source_lander_pickup_sound_event, source_lander_suck_sound_event,
-        source_laser_fire_sound_event, source_smart_bomb_sound_event,
+        source_hyperspace_appearance_sound_event, source_lander_pickup_sound_event,
+        source_lander_suck_sound_event, source_laser_fire_sound_event,
+        source_smart_bomb_sound_event,
     };
 
     #[test]
@@ -9355,6 +9364,7 @@ mod tests {
             source_smart_bomb_sound_event(),
         ];
         expected_sounds.extend(vec![source_enemy_hit_sound_event(EnemyKind::Lander); 5]);
+        expected_sounds.push(source_hyperspace_appearance_sound_event());
         expected_sounds.push(SoundEvent::ThrustStarted);
         assert_eq!(frame.events.sounds(), expected_sounds.as_slice());
         assert_eq!(
@@ -11630,7 +11640,10 @@ mod tests {
             ScreenPosition::new(64, 80)
         );
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
-        assert!(frame.events.sounds().is_empty());
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_hyperspace_appearance_sound_event()]
+        );
     }
 
     #[test]

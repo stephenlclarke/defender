@@ -522,7 +522,8 @@ enter as the next active batch. Successful clean laser launches emit source
 `SBSND` command before enemy destruction sounds. Accepted clean hyperspace
 inputs clear active enemy projectiles through the source `HYP02` / `KILSHL`
 shell-list cleanup while leaving player projectiles outside that shell-object
-list. Playing scenes draw
+list, and surface the source `APSND` appearance command loaded by that
+rematerialization path. Playing scenes draw
 current-player
 life-stock and smart-bomb-stock HUD sprites with source-backed display caps,
 positions, and the reclassified stock sprite targets. Enemy contact with the

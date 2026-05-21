@@ -675,6 +675,14 @@ post-acceptance validation records.
   enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup,
   lander-abduction, and astronaut command evidence plus focused source ecology
   fixtures for those transitions.
+- `2026-05-21 01:05:23 BST`: R9-C4 adds bounded source hyperspace appearance
+  sound-command evidence for accepted clean hyperspace inputs. The clean input
+  edge now surfaces `APSND` (`0xEA`) from the visible `HYP02` rematerialization
+  path after the shell-list cleanup. Remaining B08 work is exact per-family
+  movement/projectile behavior beyond the covered enemy-hit, enemy-shot,
+  player-action, hyperspace shell-cleanup/appearance, lander-abduction, and
+  astronaut command evidence plus focused source ecology fixtures for those
+  transitions.
 - `2026-05-17 19:52:48 BST`: R9-C4 adds the next bounded
   `AFALL`-shaped clean falling-human slice. Released, uncarried humans above
   terrain now move downward each clean frame until reaching the local terrain
