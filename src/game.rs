@@ -6436,7 +6436,9 @@ impl Game {
             .world
             .enemy_projectiles
             .iter()
-            .map(|projectile| CollisionBox::new(projectile.position, ENEMY_PROJECTILE_SPRITE_SIZE))
+            .map(|projectile| {
+                CollisionBox::new(projectile.position, ENEMY_PROJECTILE_COLLISION_SIZE)
+            })
             .collect::<Vec<_>>();
 
         let Some(hit) = CollisionSystem::first_player_enemy_hit(player, &projectile_boxes) else {
@@ -7653,6 +7655,7 @@ fn enemy_sprite(kind: EnemyKind) -> SpriteId {
 const PROJECTILE_SPRITE_SIZE: (u8, u8) = (8, 2);
 const PLAYER_PROJECTILE_COLLISION_SIZE: (u8, u8) = (8, 1);
 const ENEMY_PROJECTILE_SPRITE_SIZE: (u8, u8) = (4, 6);
+const ENEMY_PROJECTILE_COLLISION_SIZE: (u8, u8) = SOURCE_BOMB_SHELL_PICTURE_SIZE;
 const PLAYER_SPRITE_SIZE: (u8, u8) = (16, 8);
 const SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
 const SCORE_DISPLAY_MAX: u32 = 999_999;
@@ -12438,6 +12441,38 @@ mod tests {
             Some(SpriteId::BOMB_EXPLOSION)
         );
         assert!(frame.state.world.player_explosion.is_some());
+    }
+
+    #[test]
+    fn clean_game_enemy_projectile_uses_source_bmbp1_collision_footprint() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x2000), super::world_word(0x8000));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(200, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.enemy_projectiles = vec![super::EnemyProjectileSnapshot::source_fireball(
+            ScreenPosition::new(0x1D, 0x7D),
+            0,
+            0,
+        )];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.world.enemy_projectiles.len(), 1);
+        assert_eq!(
+            frame.state.world.enemy_projectiles[0].position,
+            ScreenPosition::new(0x1D, 0x7D)
+        );
+        assert_eq!(frame.state.scores.player_one, 0);
+        assert_eq!(frame.state.player.lives, 2);
+        assert!(frame.events.gameplay().is_empty());
+        assert!(frame.events.sounds().is_empty());
+        assert!(frame.state.world.player_explosion.is_none());
     }
 
     #[test]

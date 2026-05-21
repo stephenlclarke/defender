@@ -965,6 +965,8 @@ Object-ecology progress after R9-C4 slices:
   laser-loop step shape: five source screen columns per step and source
   right/left edge termination at `0x98` / `0x05`, and enemy-hit collision uses
   the source `LASP1` 8x1 picture footprint rather than the 8x2 render sprite.
+  Enemy projectile/player collision uses the source `BMBP1` 2x3 picture
+  footprint rather than the 4x6 render sprite.
   Clean enemy, human, player-projectile, and enemy-projectile rows now also
   carry source-style 8.8 world-position words, velocity words, and deterministic
   source object-table identity evidence derived from their existing source
@@ -1110,8 +1112,8 @@ Object-ecology progress after R9-C4 slices:
   shell-cleanup/rematerialize, lander-abduction, astronaut command,
   shell-collision command, fatal astronaut-impact command, player-death command,
   terrain-blow start/completion command, laser-loop movement, and laser
-  collision-footprint evidence plus focused source ecology fixtures for those
-  transitions.
+  collision-footprint evidence, and bomb-shell collision-footprint evidence
+  plus focused source ecology fixtures for those transitions.
 
 Work log:
 
@@ -2592,6 +2594,21 @@ Work log:
   slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
   update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779327240528909`.
+
+- `2026-05-21 02:41:17 BST` R9-C4 progress slice
+  `source bomb-shell collision footprint`. Clean enemy-projectile/player
+  collision now uses the source `BMBP1` 2x3 picture footprint while keeping the
+  direct runtime projectile renderer at its existing 4x6 bomb sprite size.
+  Focused validation passed: `cargo fmt --check`, `cargo check`, `cargo test
+  clean_game_enemy_projectile_uses_source_bmbp1_collision_footprint --lib`,
+  `cargo test clean_game_enemy_projectile_collision_scores_and_destroys_player
+  --lib`, targeted `make clean-fidelity SCENARIOS="death"`, touched-doc
+  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
+  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
+  clippy remain deferred because this is a bounded Step 50 shell collision
+  slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779327599920269`.
 
 ## Archived Completed History
 

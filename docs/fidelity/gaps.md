@@ -698,6 +698,17 @@ post-acceptance validation records.
   astronaut-impact command, player-death command, terrain-blow lifecycle
   command evidence, laser-loop movement evidence, and laser collision-footprint
   evidence plus focused source ecology fixtures for those transitions.
+- `2026-05-21 02:41:17 BST`: R9-C4 adds bounded source `BMBP1`
+  collision-footprint evidence. Clean enemy-projectile/player collision now
+  uses the source 2x3 bomb-shell picture footprint while the direct runtime
+  renderer keeps the existing 4x6 bomb sprite. Remaining B08 work is exact
+  per-family enemy movement/projectile behavior beyond the covered baiter
+  bookkeeping, enemy-hit, enemy-shot, player-action, hyperspace,
+  lander-abduction, astronaut command, shell-collision command, fatal
+  astronaut-impact command, player-death command, terrain-blow lifecycle
+  command evidence, laser-loop movement evidence, laser collision-footprint
+  evidence, and bomb-shell collision-footprint evidence plus focused source
+  ecology fixtures for those transitions.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

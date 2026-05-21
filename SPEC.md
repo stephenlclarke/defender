@@ -323,10 +323,12 @@ active bomber positions continue through source velocity. Reserve bombers now
 use source `TIEST` player-relative squad placement and alternating X velocity
 before entering the source bomber runtime. Enemy projectile evidence now
 carries source `BMBP1` shell descriptor fields for the standalone
-mine/source-shell fixture, and
-active clean enemy evidence now carries source object-picture descriptor
-labels, addresses, dimensions, and primary/alternate image pointers for the
-current lander, baiter, bomber, mutant, pod, and swarmer presentations. Clean
+mine/source-shell fixture, and enemy-projectile/player collision uses the
+source `BMBP1` 2x3 footprint while the direct runtime projectile renderer keeps
+the existing 4x6 bomb sprite. Active clean enemy evidence now carries source
+object-picture descriptor labels, addresses, dimensions, and primary/alternate
+image pointers for the current lander, baiter, bomber, mutant, pod, and
+swarmer presentations. Clean
 human evidence carries per-human source astronaut picture descriptors: default
 `ASTP1` rows and source-restored `ASTP3` rows selected from the `PLRES`
 `LSEED` low bit, with restored `LSEED` X low bytes retained as source X

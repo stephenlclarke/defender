@@ -512,9 +512,11 @@ source `VELO` Y-bound wrap, and reserve bombers now use source `TIEST`
 player-relative squad placement and alternating X velocity before entering the
 source bomber runtime. Enemy projectile evidence now carries source `BMBP1`
 shell descriptor fields for the standalone mine/source-shell fixture, and
-active clean enemy evidence now carries source object-picture descriptor
-labels, addresses, dimensions, and primary/alternate image pointers for the
-current lander, baiter, bomber, mutant, pod, and swarmer presentations. Clean
+enemy-projectile/player collision uses the source `BMBP1` 2x3 footprint while
+the direct runtime projectile renderer keeps the existing 4x6 bomb sprite.
+Active clean enemy evidence now carries source object-picture descriptor labels,
+addresses, dimensions, and primary/alternate image pointers for the current
+lander, baiter, bomber, mutant, pod, and swarmer presentations. Clean
 player projectile evidence now carries the source `LASP1` descriptor label,
 address, 8x1 size, and primary image pointer while the direct runtime
 projectile renderer keeps the existing 8x2 sprite. Clean player projectiles
