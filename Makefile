@@ -25,7 +25,7 @@ NEW_CODE_COVERAGE_EFFECTIVE_BASE = $(or $(strip $(NEW_CODE_COVERAGE_BASE)),HEAD)
 NEW_CODE_COVERAGE_BASELINE ?= tools/new_rust_coverage_baseline.txt
 LUA ?= lua
 PYTHON ?= python3
-README_START_SEQUENCE_GIF ?= docs/start-sequence.gif
+README_START_SEQUENCE_GIF ?= target/readme-media/start-sequence-candidate.gif
 XVFB_RUN ?= xvfb-run
 VULKANINFO ?= vulkaninfo
 

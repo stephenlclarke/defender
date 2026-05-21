@@ -128,9 +128,12 @@ make readme-media
 
 `make readme-media` builds the explicit `legacy-tools` tooling path, steps
 clean `Game` frames, rasterizes the clean sprite scene/atlas media path, and
-writes a clean GIF. Until reopened B13 is fixed, treat that output as a
-candidate only; `docs/start-sequence.gif` is the protected original reference
-and must not be replaced without owner approval.
+writes `target/readme-media/start-sequence-candidate.gif`. It then compares the
+candidate against the protected original `docs/start-sequence.gif` with sampled
+frame, timing, title, Hall of Fame, numeric-glyph, sprite, terrain, and scoring
+metrics. Until reopened B13 is fixed, `docs/start-sequence.gif` must not be
+replaced without owner approval; set
+`DEFENDER_ALLOW_REFERENCE_MEDIA_OVERWRITE=1` only after that approval.
 
 ## Controls
 

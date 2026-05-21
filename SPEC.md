@@ -49,10 +49,12 @@ R9-E3.7 clean media:
   wordmark coalescence, numeric glyphs, sprite colors/shapes, terrain/ground,
   and Williams -> High Scores -> scoring sequence ordering must be repaired
   from source-backed ROM/pre-rewrite evidence before a new candidate can
-  replace the protected reference. Until signoff, changes that alter public
-  contracts, scenario semantics, runtime behavior, or final acceptance
-  evidence must trigger focused checks and, when broad risk is introduced, a
-  renewed full gate.
+  replace the protected reference. Media generation must write candidate files
+  outside `docs/` and compare them against the protected reference unless the
+  owner has explicitly approved replacing the reference. Until signoff, changes
+  that alter public contracts, scenario semantics, runtime behavior, or final
+  acceptance evidence must trigger focused checks and, when broad risk is
+  introduced, a renewed full gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite

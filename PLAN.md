@@ -807,20 +807,22 @@ R9-E3 corrective visual acceptance schedule:
 
 Reopened B13 repair schedule:
 
-- R9-E3.8: protected reference and visual-diff harness. Next implementation
-  slice. Keep `docs/start-sequence.gif` immutable as the original reference
-  until owner approval. Change media generation to write clean candidates under
-  `target/` or another explicit candidate path, then compare candidate frames
-  against the protected reference with coalesced frame sheets and targeted
-  crop/perceptual metrics for title, Hall of Fame, scoring/action, numeric
-  glyphs, sprite, and terrain regions.
-- R9-E3.9: ROM-backed Williams/Defender title program. Rebuild the clean title
-  projection from ROM/pre-rewrite evidence instead of the current block
-  approximation: source `LOGO`/`LGOTAB` Williams handwriting, `DEFEND`,
-  `DEFENS`, `DEF33`, `DEF44`, `DEF50`, `APVCT`, and `WILLIR`/`WILR1`
-  descriptor/appearance-slot behavior. Add focused tests for the 15-source
-  Defender appearance slots, source restore path, color cadence, and transition
-  to the settled wordmark.
+- R9-E3.8: protected reference and visual-diff harness. Completed 2026-05-21.
+  `make readme-media` now writes
+  `target/readme-media/start-sequence-candidate.gif` by default, refuses to
+  overwrite `docs/start-sequence.gif` unless
+  `DEFENDER_ALLOW_REFERENCE_MEDIA_OVERWRITE=1` is explicitly set after owner
+  approval, and reports sampled frame/timing/RMS comparison metrics against the
+  protected reference for title, Hall of Fame, numeric glyphs, sprites,
+  terrain, and scoring regions. The current rejected candidate still measures
+  277 frames versus the 347-frame reference and remains active repair evidence.
+- R9-E3.9: ROM-backed Williams/Defender title program. Next implementation
+  slice. Rebuild the clean title projection from ROM/pre-rewrite evidence
+  instead of the current block approximation: source `LOGO`/`LGOTAB` Williams
+  handwriting, `DEFEND`, `DEFENS`, `DEF33`, `DEF44`, `DEF50`, `APVCT`, and
+  `WILLIR`/`WILR1` descriptor/appearance-slot behavior. Add focused tests for
+  the 15-source Defender appearance slots, source restore path, color cadence,
+  and transition to the settled wordmark.
 - R9-E3.10: source text and numeric glyph repair. Fix the scrambled screen
   number fonts by auditing score digits, credit digits, Hall of Fame/scoring
   numbers, wave/multiplier digits, and any `MESS`/`WNBV` glyph path against
@@ -3192,6 +3194,24 @@ Work log:
   repair reaches candidate closeout, or sooner if a shared public contract or
   scenario behavior changes. No Slack update was sent because this was a
   docs/reference planning correction rather than an implementation cycle.
+
+- `2026-05-21 23:00:53 BST` Completed R9-E3.8 protected reference and
+  visual-diff harness. `make readme-media` now writes
+  `target/readme-media/start-sequence-candidate.gif` by default, the generator
+  blocks accidental writes to `docs/start-sequence.gif` unless
+  `DEFENDER_ALLOW_REFERENCE_MEDIA_OVERWRITE=1` is explicitly set, and candidate
+  generation reports sampled comparison metrics against the protected original.
+  The current candidate report shows the known active mismatch: reference
+  347 frames, candidate 277 frames, equal 4600cs duration, and sampled RMS
+  mismatches across full, title, Hall of Fame, numeric glyph, sprite, terrain,
+  and scoring regions. Focused validation passed with `cargo fmt --check`,
+  `cargo test --example generate_readme_media --features legacy-tools`, the
+  protected-overwrite guard smoke, `make readme-media`, touched-document
+  markdownlint, and `git diff --check`. Broad Rust/fidelity gates remain
+  deferred because this slice changed media tooling and docs but not runtime
+  scenario behavior. The next full gate should run when the reopened B13 visual
+  runtime repairs reach candidate closeout, or sooner if shared contracts or
+  scenario behavior change.
 
 ## Archived Completed History
 

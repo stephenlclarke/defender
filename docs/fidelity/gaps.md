@@ -12,11 +12,13 @@ original reference until an owner-approved replacement exists. The rejected
 clean candidate was shorter and visually wrong: Williams color/handwriting
 cadence, Defender wordmark coalescence, numeric glyphs, sprite colors/shapes,
 terrain/ground, and Williams -> High Scores -> scoring sequence ordering all
-remain active B13 gaps. Older entries remain closed fidelity history,
-local-reference/tooling notes, archived prototype cleanup, or post-acceptance
-validation records. Historical entries that mention remaining blockers describe
-the state at the time they were written; they are not active R9 blockers unless
-restated in this status block.
+remain active B13 gaps. The README media path now writes candidate GIFs outside
+`docs/` and reports sampled comparison metrics against the protected reference.
+Older entries remain closed fidelity history, local-reference/tooling notes,
+archived prototype cleanup, or post-acceptance validation records. Historical
+entries that mention remaining blockers describe the state at the time they
+were written; they are not active R9 blockers unless restated in this status
+block.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items: exact
 per-scenario pixel CRC parity, strict long-scenario sprite count/layer parity,
