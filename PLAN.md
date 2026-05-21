@@ -950,7 +950,10 @@ Object-ecology progress after R9-C4 slices:
   enemy picture sizes while direct runtime enemy rendering keeps the current
   clean sprite sizes. Clean hostile player collision boxes now use the source
   `PLAPIC` / `PLBPIC` 8x6 player picture footprint while direct runtime player
-  rendering keeps the current 16x8 ship sprite. The
+  rendering keeps the current 16x8 ship sprite; falling-human rescue collision
+  uses that player footprint plus source `ASTP1`-`ASTP4` 2x8 astronaut
+  footprints while direct runtime human rendering keeps the current 6x8 sprite.
+  The
   clean human row now carries per-human source astronaut picture descriptor
   evidence: default `ASTP1` rows and source-restored `ASTP3` rows selected from
   the `PLRES` `LSEED` low bit, with descriptor labels, addresses, 2x8 picture
@@ -1119,7 +1122,8 @@ Object-ecology progress after R9-C4 slices:
   terrain-blow start/completion command, laser-loop movement, and laser
   collision-footprint evidence, bomb-shell collision-footprint evidence, and
   enemy collision-footprint evidence, and player collision-footprint evidence
-  plus focused source ecology fixtures for those transitions.
+  plus rescue collision-footprint evidence and focused source ecology fixtures
+  for those transitions.
 
 Work log:
 
@@ -2651,6 +2655,23 @@ Work log:
   slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
   update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779328230577129`.
+
+- `2026-05-21 02:55:23 BST` R9-C4 progress slice
+  `source rescue collision footprints`. Clean falling-human rescue collision
+  now uses the source `PLAPIC` / `PLBPIC` 8x6 player footprint plus
+  `ASTP1`-`ASTP4` 2x8 astronaut footprints while keeping direct runtime
+  player/human rendering on the current clean sprite sizes. Focused validation
+  passed: `cargo fmt --check`, `cargo check`, `cargo test
+  clean_game_player_rescue_uses_source_collision_footprints --lib`, `cargo test
+  clean_game_player_catches_falling_human_scores_and_starts_p500_popup --lib`,
+  `cargo test clean_game_player_does_not_catch_grounded_human --lib`,
+  targeted `make clean-fidelity SCENARIOS="abduction"`, touched-doc
+  `markdownlint`, and `git diff --check`. Broad `cargo test --all-targets`,
+  full `make fidelity`, full all-scenario `make clean-fidelity`, and full
+  clippy remain deferred because this is a bounded Step 50 rescue collision
+  slice, not a Step 50 / Phase 3 closure or R9 finalization. Slack start
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779328490473229`.
 
 ## Archived Completed History
 

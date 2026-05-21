@@ -734,6 +734,19 @@ post-acceptance validation records.
   collision-footprint evidence, enemy collision-footprint evidence, and player
   collision-footprint evidence plus focused source ecology fixtures for those
   transitions.
+- `2026-05-21 02:55:23 BST`: R9-C4 adds bounded source rescue
+  collision-footprint evidence. Clean falling-human rescue collision now uses
+  the source `PLAPIC` / `PLBPIC` 8x6 player footprint plus `ASTP1`-`ASTP4` 2x8
+  astronaut footprints while direct runtime player/human rendering keeps the
+  current clean sprite sizes. Remaining B08 work is exact per-family enemy
+  movement/projectile behavior beyond the covered baiter bookkeeping,
+  enemy-hit, enemy-shot, player-action, hyperspace, lander-abduction,
+  astronaut command, shell-collision command, fatal astronaut-impact command,
+  player-death command, terrain-blow lifecycle command evidence, laser-loop
+  movement evidence, laser collision-footprint evidence, bomb-shell
+  collision-footprint evidence, enemy collision-footprint evidence, player
+  collision-footprint evidence, and rescue collision-footprint evidence plus
+  focused source ecology fixtures for those transitions.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

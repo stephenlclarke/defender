@@ -521,7 +521,9 @@ projectile/enemy plus player/enemy collision uses those source enemy picture
 sizes while direct runtime enemy rendering keeps the current clean sprite
 sizes. Clean hostile player collision uses the source `PLAPIC` / `PLBPIC` 8x6
 player picture footprint while the direct runtime player renderer keeps the
-current 16x8 ship sprite. Clean
+current 16x8 ship sprite; falling-human rescue collision uses that player
+footprint plus source `ASTP1`-`ASTP4` 2x8 astronaut footprints while direct
+runtime human rendering keeps the current 6x8 sprite. Clean
 player projectile evidence now carries the source `LASP1` descriptor label,
 address, 8x1 size, and primary image pointer while the direct runtime
 projectile renderer keeps the existing 8x2 sprite. Clean player projectiles

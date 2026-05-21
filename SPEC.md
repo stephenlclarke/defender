@@ -332,7 +332,10 @@ swarmer presentations, and clean projectile/enemy plus player/enemy collision
 uses those source enemy picture sizes while direct runtime enemy rendering
 keeps the current clean sprite sizes. Clean hostile player collision uses the
 source `PLAPIC` / `PLBPIC` 8x6 player picture footprint while the direct
-runtime player renderer keeps the current 16x8 ship sprite. Clean
+runtime player renderer keeps the current 16x8 ship sprite; falling-human
+rescue collision uses that player footprint plus source `ASTP1`-`ASTP4` 2x8
+astronaut footprints while direct runtime human rendering keeps the current 6x8
+sprite. Clean
 human evidence carries per-human source astronaut picture descriptors: default
 `ASTP1` rows and source-restored `ASTP3` rows selected from the `PLRES`
 `LSEED` low bit, with restored `LSEED` X low bytes retained as source X

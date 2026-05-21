@@ -2493,10 +2493,13 @@ impl WorldSnapshot {
     }
 
     fn resolve_player_human_rescue(&mut self, player_position: ScreenPosition) -> bool {
-        let player = CollisionBox::new(player_position, PLAYER_SPRITE_SIZE);
+        let player = CollisionBox::new(player_position, PLAYER_COLLISION_SIZE);
         let Some(human_index) = self.humans.iter().position(|human| {
             clean_human_is_falling(&self.terrain, *human)
-                && player.overlaps(CollisionBox::new(human.position, HUMAN_SPRITE_SIZE))
+                && player.overlaps(CollisionBox::new(
+                    human.position,
+                    human_collision_size(*human),
+                ))
         }) else {
             return false;
         };
@@ -7755,6 +7758,10 @@ fn enemy_sprite_size(kind: EnemyKind) -> (u8, u8) {
 
 fn enemy_collision_size(enemy: EnemySnapshot) -> (u8, u8) {
     enemy.source_picture_descriptor().size
+}
+
+fn human_collision_size(human: HumanSnapshot) -> (u8, u8) {
+    source_human_picture_descriptor(human.source_picture_frame).size
 }
 
 fn enemy_score(kind: EnemyKind) -> u32 {
@@ -13109,6 +13116,30 @@ mod tests {
                 && sprite.layer == RenderLayer::Objects
                 && sprite.position == [104.0, 122.0]
         }));
+    }
+
+    #[test]
+    fn clean_game_player_rescue_uses_source_collision_footprints() {
+        let mut game = credited_started_game();
+        game.state.player.position = (super::world_word(0x6400), super::world_word(0x6400));
+        game.state.player.velocity = (WorldVector::default(), WorldVector::default());
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.humans = vec![HumanSnapshot::new(ScreenPosition::new(108, 98))];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput::NONE);
+
+        assert_eq!(frame.state.scores.player_one, 0);
+        assert_eq!(frame.state.world.humans.len(), 1);
+        assert!(!frame.state.world.humans[0].carried_by_player);
+        assert!(frame.state.world.score_popups.is_empty());
+        assert_eq!(frame.events.gameplay(), &[]);
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]
