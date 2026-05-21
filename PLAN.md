@@ -171,12 +171,11 @@ new source-backed fidelity gap is accepted in `docs/fidelity/gaps.md`.
   currently covered by accepted event timing.
 - The clean-fidelity harness compares the real clean `Game` against the
   accepted oracle across all 12 embedded Phase 1 scenarios under milestone
-  profiles. The profiled gate passes, but strict R9 final acceptance is still
-  blocked by the remaining source-backed lifecycle and acceptance surfaces:
-  later two-player turn/session sequencing and high-score ordering,
-  score-popup lifecycle, explosion timing, terrain-blow presentation, clean
-  object spawning/physics, final render presentation parity, validation
-  stabilization, and owner acceptance of the final R9 contract.
+  profiles. R9-E2 has passed the full validation gate for formatting, all Rust
+  targets, clippy, fidelity, all-scenario clean-fidelity, game/live smoke,
+  markdownlint, and diff hygiene. Strict R9 behavior/evidence blockers B01-B12
+  are closed; final acceptance now depends on owner decision and milestone
+  closeout in Step 55.
 - `DC-163` gates remaining oracle, ROM, trace, and README media adapters behind
   the explicit `legacy-tools` feature. Default production builds no longer
   compile the accepted machine, legacy live core, CMOS storage, or retired
@@ -741,9 +740,13 @@ Phase 5: final render parity and acceptance.
   and per-scenario offscreen `wgpu` signatures are source-backed audit residuals,
   not additional R9 runtime blockers. B11 is closed; Step 54 / R9-E2 is the next
   active roadmap step.
-- Step 54 / Cycle R9-E2: full validation stabilization. Run and fix the full
-  R9 gate: formatting, all Rust targets, clippy, `make fidelity`, full
-  `make clean-fidelity`, game/live smoke, markdownlint, and diff hygiene.
+- Step 54 / Cycle R9-E2: full validation stabilization. Completed 2026-05-21.
+  The full R9 gate passed: `make fidelity` covered formatting, all Rust
+  targets, default and `legacy-tools` clippy, Lua/Python helper tests, local
+  Rust-current trace fixtures, and coverage; full `make clean-fidelity` matched
+  all 12 embedded Phase 1 scenarios; `cargo run -- --game-smoke` and
+  `cargo run -- --live-smoke` passed; core-doc markdownlint and diff hygiene
+  passed. B12 is closed; Step 55 / R9-E3 is the next active roadmap step.
 - Step 55 / Cycle R9-E3: owner acceptance and milestone closeout. Update
   README, SPEC, `docs/fidelity/gaps.md`, and this plan to state the final R9
   contract, remaining non-rewrite follow-ups if any, validation evidence, and
@@ -764,7 +767,7 @@ Strict R9 blocker matrix after Step 41:
 | B09 | Two-player flow | clean behavior | 51 | closed 2026-05-21 |
 | B10 | High-score return | clean/accepted | 52 | closed 2026-05-21 |
 | B11 | Render audit | docs/evidence | 53 | closed 2026-05-21 |
-| B12 | Full validation | docs/evidence | 54 | full R9 gate passes |
+| B12 | Full validation | docs/evidence | 54 | closed 2026-05-21 |
 | B13 | Owner signoff | owner decision | 55 | final contract accepted |
 
 Step 41 acceptance contract:
@@ -797,7 +800,7 @@ Accepted-surface audit after Step 42:
 | B09 | current player, stocks, switch timers | closed by Step 51 fixtures |
 | B10 | entry, submission, tables, stalls | closed by Step 52 fixtures |
 | B11 | visual signature, clean scene | closed by Step 53 audit |
-| B12 | validation commands only | full R9 gate run |
+| B12 | validation commands only | closed by Step 54 gate |
 | B13 | none | owner decision |
 
 Step 42 acceptance contract:
@@ -2937,6 +2940,20 @@ Work log:
   `make fidelity`, full all-scenario `make clean-fidelity`, and legacy clippy
   remain deferred to Step 54 because this slice changed validation evidence and
   docs only.
+
+- `2026-05-21 09:35:05 BST` Completed R9-E2 Step 54/B12 full validation
+  stabilization. The full R9 gate passed: `make fidelity`; full all-scenario
+  `make clean-fidelity` matching all 12 embedded Phase 1 scenarios; `cargo run
+  -- --game-smoke` with 24 sprite frames, 892 sprite instances, 68 sprite draw
+  commands, and zero temporary raster commands; `cargo run -- --live-smoke` with
+  24 clean-game/offscreen frames, 24 nonblank offscreen frames, 12 distinct
+  offscreen signatures, first signature `72690a8119ca46ee`, last signature
+  `d8eb31d1cab9d7d2`, and `legacy_presenter_used: false`; core-doc
+  markdownlint; and `git diff --check`. No broad validation is deferred for
+  B12. The next full gate should run when Step 55 owner-acceptance closeout
+  changes final contract docs, or if any later public-contract or scenario
+  behavior change lands. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779351845907799`.
 
 ## Archived Completed History
 

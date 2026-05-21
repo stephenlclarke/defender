@@ -2,11 +2,12 @@
 
 This file records behavior that must not be guessed in arcade-core code.
 
-Status as of `2026-05-17`: the accepted red-label target remains the oracle for
-the rewrite. The profiled clean-fidelity gate now matches all 12 embedded Phase
-1 scenario input programs, but strict R9 final acceptance is still blocked by
-the bounded accepted-surface limits below. Older entries remain closed fidelity
-history, local-reference/tooling notes, archived prototype cleanup, or
+Status as of `2026-05-21`: the accepted red-label target remains the oracle for
+the rewrite. The profiled clean-fidelity gate matches all 12 embedded Phase 1
+scenario input programs, and the R9-E2 full validation gate has passed. Strict
+R9 behavior/evidence blockers are closed through B12; final acceptance is
+pending owner signoff and milestone closeout. Older entries remain closed
+fidelity history, local-reference/tooling notes, archived prototype cleanup, or
 post-acceptance validation records.
 
 ## Clean Rewrite Equivalence
@@ -860,6 +861,20 @@ post-acceptance validation records.
   strict long-scenario sprite count/layer parity, and per-scenario offscreen
   `wgpu` signatures remain recorded audit residuals, not additional R9 runtime
   blockers.
+- `2026-05-21 09:35:05 BST`: R9-E2 closes Step 54/B12 with the full validation
+  stabilization gate. `make fidelity` passed, covering formatting, all Rust
+  targets, default and `legacy-tools` clippy, Lua/Python helper tests, local
+  Rust-current trace fixture comparison, and coverage. Full all-scenario
+  `make clean-fidelity` matched all 12 embedded Phase 1 scenarios. The clean
+  game smoke passed with 24 sprite frames, 892 sprite instances, 68 sprite draw
+  commands, and zero temporary raster commands. The live smoke passed with 24
+  clean-game/offscreen frames, 24 nonblank offscreen frames, 12 distinct
+  offscreen frame signatures, first signature `72690a8119ca46ee`, last
+  signature `d8eb31d1cab9d7d2`, and `legacy_presenter_used: false`.
+  Core-doc markdownlint and diff hygiene passed. No broad validation is
+  deferred for B12; the next full gate is Step 55 owner-acceptance closeout if
+  it changes final contract docs, or any later public-contract or scenario
+  behavior change.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path
