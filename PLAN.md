@@ -1061,6 +1061,9 @@ Object-ecology progress after R9-C4 slices:
 - Clean player action edges now emit source-backed sound command evidence:
   successful `LFIRE` laser launches surface `LASSND`, and accepted `SBOMB`
   inputs surface the first `SBSND` command before the enemy destruction sounds.
+- Accepted clean hyperspace inputs now mirror the visible source `HYP02` /
+  `KILSHL` shell-list cleanup by clearing active enemy projectiles while
+  leaving clean player projectiles outside that source shell-object list.
 - Released, uncarried humans above terrain now follow source-shaped `AFALL`
   fixed-point acceleration. Safe landings at or below the source velocity
   threshold award the source-backed 250-point score and start the existing
@@ -1075,8 +1078,9 @@ Object-ecology progress after R9-C4 slices:
   on terrain when the player-carried position reaches the local terrain line.
 - This is a R9-C4 progress slice, not full B08 closure. Remaining Step 50 work
   is remaining per-family movement/projectile behavior beyond the covered
-  enemy-hit, enemy-shot, player-action, lander-abduction, and astronaut command
-  evidence plus focused source ecology fixtures for those transitions.
+  enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup,
+  lander-abduction, and astronaut command evidence plus focused source ecology
+  fixtures for those transitions.
 
 Work log:
 
@@ -2350,6 +2354,23 @@ Work log:
   broader shared-contract risk appears, or R9 finalization begins. Slack start
   update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779321089267019`.
+
+- `2026-05-21 00:59:20 BST` R9-C4 progress slice
+  `source hyperspace shell cleanup`. Accepted clean hyperspace inputs now clear
+  active enemy projectiles to match the visible source `HYP02` / `KILSHL`
+  shell-list cleanup while preserving player projectiles outside that source
+  shell-object list. Focused validation passed: `cargo fmt --check`, `cargo
+  check`, `cargo test clean_game_hyperspace_clears_source_enemy_projectiles
+  --lib`, `cargo test clean_game_enemy_projectile --lib`, `cargo test
+  clean_game_applies_playing_controls_through_systems --lib`, targeted `make
+  clean-fidelity SCENARIOS="hyperspace"`, touched-doc markdownlint, and `git
+  diff --check`. Broad `cargo test --all-targets`, full `make fidelity`, full
+  all-scenario `make clean-fidelity`, and full clippy remain deferred because
+  this is a bounded Step 50 hyperspace shell-cleanup slice, not Step 50 or
+  Phase 3 closure, and it does not change the public API. The next full gate
+  should run when Step 50 closes, another broader shared-contract risk appears,
+  or R9 finalization begins. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779321538791769`.
 
 ## Archived Completed History
 

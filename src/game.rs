@@ -5970,6 +5970,9 @@ impl Game {
 
         if controls.triggers.hyperspace {
             gameplay_events.push(GameEvent::HyperspacePressed);
+            // Source HYP02 walks KILSHL over the shell-object list before
+            // rematerialization; clean enemy projectiles model that list.
+            self.state.world.enemy_projectiles.clear();
         }
 
         if controls.triggers.thrust {
@@ -11593,6 +11596,41 @@ mod tests {
         assert_eq!(projectile.source_x_velocity, 0);
         assert_eq!(projectile.source_y_velocity, 0);
         assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+    }
+
+    #[test]
+    fn clean_game_hyperspace_clears_source_enemy_projectiles() {
+        let mut game = credited_started_game();
+        game.state.world.enemies = vec![EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(220, 80),
+            ScreenVelocity::new(0, 0),
+        )];
+        game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+        game.state.world.projectiles = vec![ProjectileSnapshot {
+            position: ScreenPosition::new(64, 80),
+            velocity: ScreenVelocity::new(0, 0),
+        }];
+        game.state.world.enemy_projectiles = vec![
+            super::EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(80, 80), 0, 0),
+            super::EnemyProjectileSnapshot::source_fireball(ScreenPosition::new(96, 88), 0, 0),
+        ];
+        game.baiter_timer_ticks = None;
+
+        let frame = game.step(GameInput {
+            hyperspace: true,
+            ..GameInput::NONE
+        });
+
+        assert_eq!(frame.events.gameplay(), &[GameEvent::HyperspacePressed]);
+        assert!(frame.state.world.enemy_projectiles.is_empty());
+        assert_eq!(frame.state.world.projectiles.len(), 1);
+        assert_eq!(
+            frame.state.world.projectiles[0].position,
+            ScreenPosition::new(64, 80)
+        );
+        assert_eq!(frame.state.world.object_evidence.projectile_count, 1);
+        assert!(frame.events.sounds().is_empty());
     }
 
     #[test]

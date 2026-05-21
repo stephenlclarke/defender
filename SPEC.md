@@ -259,7 +259,10 @@ retain source shot-timer, picture-cycle, sleep, and velocity state, pursue the
 player through source seek rules, fire source-shaped fireball shells with
 source `USHSND` command evidence, and those enemy projectiles use source
 `SHSCAN` lifetime decrement/wrap behavior, scroll-adjusted fixed-point motion,
-offscreen culling, collision scoring, and player-damage handling.
+offscreen culling, collision scoring, and player-damage handling. Accepted
+clean hyperspace inputs clear active enemy projectiles through the source
+`HYP02` / `KILSHL` shell-list cleanup while leaving player projectiles outside
+that shell-object list.
 Clean landers now abduct aligned humans, can carry explicit selected-human
 target state for source-shaped landers, enter the source `LANDG`
 target-approach step only when that selected target passes the source `LANDS0`
