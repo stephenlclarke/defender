@@ -1861,14 +1861,14 @@ fn decode_score_digit_sprite_row(
         digit < 10,
         "{name}:{line_index} digit must be in the range 0..=9"
     );
-    let bytes_per_row = fields[3]
+    let columns = fields[3]
         .parse::<u8>()
         .unwrap_or_else(|error| panic!("{name}:{line_index} width must parse: {error}"));
     let rows = fields[4]
         .parse::<u8>()
         .unwrap_or_else(|error| panic!("{name}:{line_index} height must parse: {error}"));
     let hex = fields[5].trim();
-    let expected_hex_len = usize::from(bytes_per_row) * usize::from(rows) * 2;
+    let expected_hex_len = usize::from(columns) * usize::from(rows) * 2;
     assert_eq!(
         hex.len(),
         expected_hex_len,
@@ -1885,33 +1885,34 @@ fn decode_score_digit_sprite_row(
     }
     (
         digit,
-        decode_score_digit_rgba(name, digit, rows, bytes_per_row, &bytes),
+        decode_score_digit_rgba(name, digit, columns, rows, &bytes),
     )
 }
 
 fn decode_score_digit_rgba(
     name: &'static str,
     digit: u8,
+    columns: u8,
     rows: u8,
-    bytes_per_row: u8,
     bytes: &[u8],
 ) -> EmbeddedSprite {
-    let expected = usize::from(rows) * usize::from(bytes_per_row);
+    let expected = usize::from(columns) * usize::from(rows);
     assert_eq!(
         bytes.len(),
         expected,
         "{name} digit {digit} byte grid must match its declared dimensions"
     );
-    let surface = SurfaceSize::new(u32::from(bytes_per_row) * 2, u32::from(rows));
+    let surface = SurfaceSize::new(u32::from(columns) * 2, u32::from(rows));
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
     let palette = ObjectPicturePalette::white();
 
-    for row in 0..usize::from(rows) {
-        for byte_index in 0..usize::from(bytes_per_row) {
-            let value = bytes[row * usize::from(bytes_per_row) + byte_index];
+    for column in 0..usize::from(columns) {
+        let source_column = column * usize::from(rows);
+        for row in 0..usize::from(rows) {
+            let value = bytes[source_column + row];
             let left = picture_palette_color(value >> 4, palette);
             let right = picture_palette_color(value & 0x0F, palette);
-            let offset = ((row * surface.width as usize) + byte_index * 2) * 4;
+            let offset = ((row * surface.width as usize) + column * 2) * 4;
             pixels[offset..offset + 4].copy_from_slice(&left);
             pixels[offset + 4..offset + 8].copy_from_slice(&right);
         }
@@ -5813,6 +5814,28 @@ mod tests {
             );
             assert_visible_region(&atlas, *sprite);
         }
+    }
+
+    #[test]
+    fn default_sprite_atlas_decodes_score_digits_in_source_column_order() {
+        let atlas = TextureAtlas::default_sprites();
+        let pixels = atlas_region_pixels(&atlas, SpriteId::SCORE_DIGIT_0);
+        let is_visible = |x: usize, y: usize| pixels[y * 6 + x][3] != 0;
+
+        assert_eq!(pixels[1], WHITE_RGBA);
+        assert_eq!(
+            (0..6).map(|x| is_visible(x, 0)).collect::<Vec<_>>(),
+            vec![false, true, true, true, true, true]
+        );
+        assert_eq!(
+            (0..6).map(|x| is_visible(x, 1)).collect::<Vec<_>>(),
+            vec![false, true, false, false, true, true]
+        );
+        assert_eq!(
+            (0..6).map(|x| is_visible(x, 6)).collect::<Vec<_>>(),
+            vec![false, true, true, true, true, true]
+        );
+        assert!((0..6).all(|x| !is_visible(x, 7)));
     }
 
     #[test]

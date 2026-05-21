@@ -826,11 +826,16 @@ Reopened B13 repair schedule:
   latest candidate still fails B13 media parity at 257 frames versus the
   347-frame protected reference, so R9-E3.10 remains active for numeric glyph
   repair before another closeout gate.
-- R9-E3.10: source text and numeric glyph repair. Fix the scrambled screen
-  number fonts by auditing score digits, credit digits, Hall of Fame/scoring
-  numbers, wave/multiplier digits, and any `MESS`/`WNBV` glyph path against
-  source bit order, dimensions, palette words, and screen addresses. Add crop
-  comparisons for the visible score/credit/Hall of Fame/scoring digits.
+- R9-E3.10: source text and numeric glyph repair. Completed 2026-05-21. The
+  clean renderer now decodes `NUMBR0`-`NUMBR9` score digit image records in
+  the same source column-major byte order already used by message glyphs, so
+  score, credit, Hall of Fame, wave/multiplier, and scoring/action digits use
+  the repaired source shape through the shared digit atlas. Focused tests cover
+  digit atlas regions, the column-order crop for `NUMBR0`, source text mixed
+  digit/glyph layout, score HUD positions, credit rendering, and scoring-card
+  digit surfaces. The latest candidate still fails B13 media parity at
+  257 frames versus the 347-frame protected reference, so R9-E3.11 remains
+  active for source sprite and terrain/ground repair.
 - R9-E3.11: source sprite and terrain/ground repair. Replace remaining
   prototype or mis-decoded runtime art with source-backed object-image
   decoding, correct color-word/palette mapping, orientation, dimensions, and
@@ -3233,6 +3238,27 @@ Work log:
   remain deferred because B13 is still in the middle of bounded visual repair.
   The next full gate should run at R9-E3.13 candidate closeout, or sooner if
   the numeric glyph/sprite/terrain/timing repairs change shared contracts.
+
+- `2026-05-21 23:32:17 BST` Completed R9-E3.10 source text and numeric glyph
+  repair. Changed clean score digit decoding from row-major to source
+  column-major byte order for `assets/red-label/score-digits.tsv`, matching the
+  existing message-glyph decode path and fixing the shared `NUMBR0`-`NUMBR9`
+  atlas used by score, credit, Hall of Fame, wave/multiplier, and
+  scoring/action text surfaces. Added a focused atlas crop regression for
+  `NUMBR0` so the old scrambled row-major shape fails. Focused validation
+  passed with `cargo fmt --check`, `cargo check`,
+  `cargo test default_sprite_atlas_uses_score_digit_regions --lib`,
+  the focused score digit source-column-order atlas test, the focused source
+  text mixed digit/glyph test, score HUD/credit/scoring-sequence focused game
+  tests, targeted `make clean-fidelity SCENARIOS="attract_boot"`, and
+  `make readme-media`.
+  Candidate metrics improved slightly but remain failed B13 evidence:
+  reference 347 frames, candidate 257 frames, equal 4600cs duration, sampled
+  RMS full 52.52, title 62.84, Hall of Fame 63.88, numeric glyphs 72.64,
+  sprites 44.89, terrain 46.39, and scoring 55.09. Broad all-target and
+  all-scenario gates remain deferred because this is still a bounded B13 visual
+  repair slice. The next full gate should run at R9-E3.13 candidate closeout,
+  or sooner if source sprite/terrain/timing work changes shared contracts.
 
 ## Archived Completed History
 

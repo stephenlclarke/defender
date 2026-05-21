@@ -47,8 +47,8 @@ wrong, and the attract flow did not match Williams -> High Scores -> scoring
 sequence. B13 now requires source-backed visual repair and a fresh candidate
 review before R9 can be signed off. R9-E3.9 has moved the Williams/Defender
 title projection back onto source `LGOTAB`/`DEFENS` descriptor evidence, but
-numeric glyphs, sprite/terrain presentation, attract timing, and final media
-acceptance remain open.
+R9-E3.10 has repaired source numeric digit decoding. Sprite/terrain
+presentation, attract timing, and final media acceptance remain open.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -739,8 +739,10 @@ source-ordered handwritten reveal with the source `0x3F` title color index.
 The normal attract Defender wordmark now uses the 15 source `DEFENS` 4-byte by
 12-row `APVCT` appearance slots and descriptor addresses during the appearance
 window before returning to the full `0x3C` by `0x18` source-expanded wordmark
-for settled frames. The normal attract copyright strip is generated from the
-source `CPRTAB` bitmap bytes.
+for settled frames. Source numeric digits decode the `NUMBR0`-`NUMBR9` image
+records in column-major byte order for score, credit, Hall of Fame, and
+scoring/action text surfaces. The normal attract copyright strip is generated
+from the source `CPRTAB` bitmap bytes.
 The playing top-display border uses a small atlas-backed clean border word
 sprite projected from the source `BORDER` geometry: bottom line, scanner side
 boundaries, top scanner boundary, and scanner marker bars.

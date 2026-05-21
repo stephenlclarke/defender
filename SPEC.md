@@ -54,8 +54,10 @@ R9-E3.7 clean media:
   owner has explicitly approved replacing the reference. R9-E3.9 now sources
   the Williams/Defender title surface from `LGOTAB`, `DEFENS`, `DEF33`,
   `DEF50`, `APVCT`, and `WILLIR`/`WILR1` descriptor evidence; the remaining
-  B13 work is numeric glyph repair, sprite/terrain repair, attract timing,
-  candidate comparison, and owner acceptance. Until signoff, changes
+  B13 work is sprite/terrain repair, attract timing, candidate comparison, and
+  owner acceptance. R9-E3.10 now decodes the source `NUMBR0`-`NUMBR9` numeric
+  glyph records in source column-major order for score, credit, Hall of Fame,
+  and scoring/action text surfaces. Until signoff, changes
   that alter public contracts, scenario semantics, runtime behavior, or final
   acceptance evidence must trigger focused checks and, when broad risk is
   introduced, a renewed full gate.
@@ -507,7 +509,9 @@ start handoff, scenes
 draw the source-backed `PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,
 and `BONSX` status text at `0x3850`, `0x3D60`, and `0x3C90`, plus the wave
-number at `0x6550` and multiplier digit at `0x5890`; surviving humans are
+number at `0x6550` and multiplier digit at `0x5890`; source numeric glyphs
+use the `NUMBR0`-`NUMBR9` column-major image records for score, credit,
+Hall of Fame, wave, multiplier, and scoring/action digits; surviving humans are
 also projected as source `ASTP3` bonus icons from `0x3CA0` with the source
 `+0x0400` step. While `HighScoreEntry` is active,
 scenes draw the source-backed `PLYR1`/`PLYR2` player label at `0x3E38`,
