@@ -14433,6 +14433,64 @@ mod tests {
     }
 
     #[test]
+    fn clean_game_high_score_tables_rank_strictly_and_drop_tail() {
+        let mut tables = HighScoreTablesSnapshot {
+            all_time: [
+                table_entry(1, 80_000, ['A', 'A', 'A']),
+                table_entry(2, 70_000, ['B', 'B', 'B']),
+                table_entry(3, 60_000, ['C', 'C', 'C']),
+                table_entry(4, 50_000, ['D', 'D', 'D']),
+                table_entry(5, 40_000, ['E', 'E', 'E']),
+                table_entry(6, 30_000, ['F', 'F', 'F']),
+                table_entry(7, 20_000, ['G', 'G', 'G']),
+                table_entry(8, 10_000, ['H', 'H', 'H']),
+            ],
+            todays_greatest: [
+                table_entry(1, 8_000, ['T', 'O', 'P']),
+                table_entry(2, 7_000, ['T', 'W', 'O']),
+                table_entry(3, 6_000, ['T', 'H', 'R']),
+                table_entry(4, 5_000, ['F', 'O', 'R']),
+                table_entry(5, 4_000, ['F', 'I', 'V']),
+                table_entry(6, 3_000, ['S', 'I', 'X']),
+                table_entry(7, 2_000, ['S', 'E', 'V']),
+                table_entry(8, 1_000, ['E', 'G', 'T']),
+            ],
+        };
+        let unchanged_all_time = tables.all_time;
+
+        assert_eq!(
+            tables.insert_all_time(10_000, ['E', 'Q', 'L'].map(Some)),
+            None
+        );
+        assert_eq!(tables.all_time, unchanged_all_time);
+
+        assert_eq!(
+            tables.insert_all_time(65_000, ['M', 'I', 'D'].map(Some)),
+            Some(3)
+        );
+        assert_eq!(tables.all_time[2], table_entry(3, 65_000, ['M', 'I', 'D']));
+        assert_eq!(tables.all_time[3], table_entry(4, 60_000, ['C', 'C', 'C']));
+        assert_eq!(tables.all_time[7], table_entry(8, 20_000, ['G', 'G', 'G']));
+
+        assert_eq!(
+            tables.insert_todays_greatest(9_000, ['N', 'E', 'W'].map(Some)),
+            Some(1)
+        );
+        assert_eq!(
+            tables.todays_greatest[0],
+            table_entry(1, 9_000, ['N', 'E', 'W'])
+        );
+        assert_eq!(
+            tables.todays_greatest[1],
+            table_entry(2, 8_000, ['T', 'O', 'P'])
+        );
+        assert_eq!(
+            tables.todays_greatest[7],
+            table_entry(8, 2_000, ['S', 'E', 'V'])
+        );
+    }
+
+    #[test]
     fn clean_game_high_score_initials_accept_backspace_and_submit() {
         let mut game = credited_started_game();
         game.state.phase = GamePhase::HighScoreEntry;
@@ -14605,6 +14663,28 @@ mod tests {
                 && sprite.position == [90.0, 134.0]
                 && sprite.size == [6.0, 8.0]
         }));
+
+        for expected_timer in (1..HALL_OF_FAME_STALL_FRAMES).rev() {
+            let waiting = game.step(GameInput::NONE);
+            assert_eq!(waiting.state.phase, GamePhase::GameOver);
+            assert_eq!(
+                waiting.state.game_over,
+                GameOverSnapshot::hall_of_fame_display(expected_timer)
+            );
+            assert!(waiting.events.is_empty());
+        }
+
+        let returned = game.step(GameInput::NONE);
+        assert_eq!(returned.state.phase, GamePhase::Attract);
+        assert_eq!(returned.state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(returned.state.high_score_entry, None);
+        assert_eq!(
+            returned.state.high_score_submission,
+            Some(HighScoreSubmissionSnapshot {
+                player: 1,
+                score: 25_000,
+            })
+        );
     }
 
     #[test]
@@ -14612,6 +14692,7 @@ mod tests {
         let mut game = credited_started_game();
         game.state.player.lives = 1;
         game.state.scores.player_one = 10;
+        let unchanged_tables = game.state.high_score_tables;
         game.state.world.enemies[0].position = ScreenPosition::new(32, 128);
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
 
@@ -14659,6 +14740,24 @@ mod tests {
             ticked_hall.state.game_over,
             GameOverSnapshot::hall_of_fame_display(HALL_OF_FAME_STALL_FRAMES - 1)
         );
+        assert_eq!(ticked_hall.state.high_score_tables, unchanged_tables);
+
+        for expected_timer in (1..HALL_OF_FAME_STALL_FRAMES - 1).rev() {
+            let waiting = game.step(GameInput::NONE);
+            assert_eq!(waiting.state.phase, GamePhase::Attract);
+            assert_eq!(
+                waiting.state.game_over,
+                GameOverSnapshot::hall_of_fame_display(expected_timer)
+            );
+            assert!(waiting.events.is_empty());
+        }
+
+        let returned = game.step(GameInput::NONE);
+        assert_eq!(returned.state.phase, GamePhase::Attract);
+        assert_eq!(returned.state.game_over, GameOverSnapshot::NONE);
+        assert_eq!(returned.state.high_score_entry, None);
+        assert_eq!(returned.state.high_score_submission, None);
+        assert_eq!(returned.state.high_score_tables, unchanged_tables);
     }
 
     #[test]

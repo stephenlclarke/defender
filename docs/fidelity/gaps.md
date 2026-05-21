@@ -840,6 +840,14 @@ post-acceptance validation records.
   preserves the all-time top high score, proves shifted row ranks, counts down
   the hall-of-fame display stall, and returns to attract. No public accepted
   facade or snapshot shape change was needed.
+- `2026-05-21 09:07:17 BST`: R9-D2.2 closes Step 52/B10 with no runtime fix.
+  Focused fixtures now cover one-player qualifying submission return through the
+  full hall-of-fame display stall, non-qualifying no-entry return through the
+  full display stall with unchanged high-score tables, strict high-score table
+  insertion, shifted row ranks, and tail-row dropping. Targeted accepted evidence
+  passed with `make clean-fidelity SCENARIOS="high_score_entry"` matching
+  3428/3428 frames. Full broad validation remains deferred to Step 54 because no
+  public accepted facade or runtime behavior changed.
 - `2026-05-21 00:59:20 BST`: R9-C4 adds bounded source hyperspace shell-list
   cleanup for accepted clean hyperspace inputs. Active enemy projectiles now
   clear through the visible source `HYP02` / `KILSHL` shell-object list path

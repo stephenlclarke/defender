@@ -718,11 +718,14 @@ Phase 4: session and high-score closure.
   score into all-time and today's-greatest tables at different ranks, preserves
   the all-time top high score, verifies shifted row ranks, and advances the
   hall-of-fame display stall back to attract.
-- R9-D2.2: Step 52 / B10 closure audit. Pending. Audit one-player qualifying
-  submission return, non-qualifying no-entry return, table ordering edge cases,
-  and accepted `high_score_entry` scenario evidence. Add only the focused fixture
-  or bounded behavior fix needed by that audit, then close B10 with the
-  phase-level validation gate.
+- R9-D2.2: Step 52 / B10 closure audit. Completed 2026-05-21. The audit found no
+  runtime fix was needed. Focused fixtures now cover one-player qualifying
+  submission return through the full hall-of-fame stall, non-qualifying no-entry
+  return through the full display stall with unchanged tables, strict
+  score-greater-than table insertion, shifted row ranks, and dropped tail rows.
+  Targeted accepted evidence passed with `high_score_entry` matching 3428/3428
+  clean-fidelity frames. B10 is closed; Step 53 / R9-E1 is the next active
+  roadmap step.
 
 Phase 5: final render parity and acceptance.
 
@@ -751,7 +754,7 @@ Strict R9 blocker matrix after Step 41:
 | B07 | Terrain blow | clean/render | 49 | mutation/presentation tested |
 | B08 | Object ecology | clean behavior | 50 | closed 2026-05-21 |
 | B09 | Two-player flow | clean behavior | 51 | closed 2026-05-21 |
-| B10 | High-score return | clean/accepted | 52 | tables and return tested |
+| B10 | High-score return | clean/accepted | 52 | closed 2026-05-21 |
 | B11 | Render audit | docs/evidence | 53 | residuals source-backed |
 | B12 | Full validation | docs/evidence | 54 | full R9 gate passes |
 | B13 | Owner signoff | owner decision | 55 | final contract accepted |
@@ -784,7 +787,7 @@ Accepted-surface audit after Step 42:
 | B07 | mapped terrain explosion sprite | terrain mutation/blow state |
 | B08 | bounded object rows, wave profile | full topology and transitions |
 | B09 | current player, stocks, switch timers | closed by Step 51 fixtures |
-| B10 | entry, submission, tables, stalls | ordering and return fixtures |
+| B10 | entry, submission, tables, stalls | closed by Step 52 fixtures |
 | B11 | visual signature, clean scene | post-B01-B10 visual residuals |
 | B12 | validation commands only | full R9 gate run |
 | B13 | none | owner decision |
@@ -2892,8 +2895,23 @@ Work log:
   preserves the all-time top high score, counts down the hall-of-fame display
   stall, and returns to attract. No runtime or public snapshot shape change was
   needed. Broad validation remains deferred because this is a bounded B10 fixture
-  slice, not Step 52 closure. The next full gate should run when R9-D2 closes, a
-  public contract changes, or R9 reaches Step 54.
+  slice, not Step 52 closure. The next closure gate should run when R9-D2 closes;
+  the next mandatory full broad gate remains Step 54 unless a public contract
+  changes or broad clean-fidelity risk appears first.
+
+- `2026-05-21 09:07:17 BST` Completed R9-D2.2 Step 52/B10 closure audit and
+  fixture hardening. No runtime fix was needed. The one-player submission fixture
+  now advances the post-submission hall-of-fame display back to attract, the
+  non-qualifying no-entry fixture advances the full display stall back to a clear
+  attract state while proving high-score tables stay unchanged, and a direct
+  table-ordering fixture locks strict score-greater-than insertion, shifted row
+  ranks, and tail-row dropping. Focused validation passed with `cargo fmt
+  --check`, `cargo test high_score --lib`, `cargo test hall_of_fame --lib`, and
+  targeted `make clean-fidelity SCENARIOS="high_score_entry"` matching 3428/3428
+  frames. B10 is closed. Broad all-target tests, full `make fidelity`, full
+  all-scenario `make clean-fidelity`, and legacy clippy remain deferred to Step
+  54 because this was fixture-only hardening with no public contract or runtime
+  behavior change.
 
 ## Archived Completed History
 
