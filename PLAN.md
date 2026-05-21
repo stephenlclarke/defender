@@ -649,6 +649,43 @@ Phase 3: lifecycle and world closure.
   object transitions, projectile limits, enemy-family movement, abduction, and
   rescue/loss behavior needed for strict R9 acceptance.
 
+R9-C4 closure checklist:
+
+- R9-C4.1: residual ecology audit. Compare the current clean object runtime and
+  `docs/fidelity/gaps.md` R9-C4 notes against the covered source labels for
+  landers, mutants, bombers, pods, swarmers, baiters, enemy shells, player
+  lasers, humans, and terrain-loss handoff. Before further runtime edits, mark
+  each remaining movement/projectile concern as covered, needs a bounded fix, or
+  intentionally deferred outside B08 with source-backed rationale. Validation
+  for a docs-only audit is touched-doc `markdownlint` plus `git diff --check`.
+- R9-C4.2: close any bounded family behavior gaps found by the audit. Batch only
+  tightly related fixes, such as one family loop, one shared shell-list edge, or
+  one collision/kill side-effect path. Each implementation slice must include
+  focused Rust tests for the touched family/helper and the narrow clean-fidelity
+  scenario that exercises the changed behavior. Use Slack start/completion
+  updates and push after the validated implementation slice.
+- R9-C4.3: harden source ecology fixtures. Ensure the focused fixture set proves
+  startup ecology, reserve activation, smart-bomb destruction, pod-to-swarmer
+  release, bomber shell limits, baiter/mutant/lander projectile paths,
+  lander-human carry/release/conversion, human fall/catch/loss, hyperspace shell
+  cleanup, and planet-destruction handoff. The expected targeted clean-fidelity
+  coverage is `start_game`, `smart_bomb`, `hyperspace`, `abduction`, `death`,
+  `wave_advance`, and `planet_destruction`; add narrower unit tests where those
+  scenarios do not isolate the edge.
+- R9-C4.4: reconcile public evidence and docs. If closing fixes add or rename
+  accepted facade, oracle, `WorldSnapshot`, object evidence, sound evidence, or
+  scenario fields, align README, SPEC, `docs/fidelity/gaps.md`, and this plan in
+  the same slice. If no behavior changes are needed after the audit, record the
+  B08 closure basis in this plan and `docs/fidelity/gaps.md` without widening
+  public contracts.
+- R9-C4.5: close Step 50 / B08 with one Phase 3 gate. Run the focused checks
+  from the closing slice plus the broad phase-close set: `cargo fmt --check`,
+  `cargo test --all-targets`, full all-scenario `make clean-fidelity`, `make
+  fidelity`, full clippy, touched/all relevant markdownlint, and `git
+  diff --check`. Step 51 must not start until B08 is marked closed or any
+  residual object-ecology differences are explicitly source-backed and moved out
+  of strict R9.
+
 Phase 4: session and high-score closure.
 
 - Step 51 / Cycle R9-D1: two-player turn/session sequencing. Close all
@@ -2704,6 +2741,12 @@ Work log:
   Step 50 bomber-squad slice; `cargo test --all-targets` was run because the
   public clean source-bomber snapshot shape changed. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779330459202089`.
+
+- `2026-05-21 07:46:41 BST` Planning update. Added the R9-C4 closure checklist
+  above so Step 50 now has explicit audit, bounded implementation,
+  source-ecology fixture, documentation, and Phase 3 gate steps before R9-D1 can
+  start. This was a docs-only planning update, so no Slack update or Rust
+  validation was required.
 
 ## Archived Completed History
 
