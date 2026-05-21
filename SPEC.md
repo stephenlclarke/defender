@@ -297,7 +297,8 @@ above terrain now use source-shaped `AFALL` fixed-point acceleration, settle
 safely at or below the source threshold with the 250-point safe-landing score
 and existing `P250` score-popup lifecycle plus source `ALSND` command evidence,
 or die on over-speed impact with an astronaut explosion, source `ASTKIL` /
-`AHSND` command evidence, and the existing last-human planet-loss handoff;
+`AHSND` command evidence, and the existing last-human planet-loss handoff that
+starts source `TERBLO` / `AHSND` terrain-blow command evidence;
 falling humans caught by the player enter the clean player-carried state,
 award the source-backed 500-point rescue score, emit source `ACSND` command
 evidence, and start the existing `P500` score-popup lifecycle; player-carried
@@ -389,7 +390,8 @@ piece positions into clean/oracle scenes. Planet destruction starts a
 source-backed terrain-blow snapshot: terrain rows are removed from the clean
 scene, scanner terrain is disabled, `TEREX` explosions are projected through
 expanded-object evidence, and the source status bit, iteration, erase-table
-counts, pseudo color, and overload counter are carried for fidelity checks.
+counts, pseudo color, overload counter, and source `TERBLO` / `AHSND` command
+evidence are carried for fidelity checks.
 Enemy contact with the player is
 resolved through clean collision and
 `PlayerDamageSystem`,

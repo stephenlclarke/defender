@@ -511,8 +511,9 @@ post-acceptance validation records.
   terrain/scanner erase entry counts, and remaining nonzero terrain words.
   Clean planet destruction clears terrain segments, disables scanner terrain,
   and projects the two-per-pass `TEREX` terrain explosions through the
-  expanded-object sprite path. Full rescue/abduction object ecology and the
-  gameplay entry points that remove humans remain B08 work.
+  expanded-object sprite path with source `TERBLO` / `AHSND` command evidence
+  on entry. Full rescue/abduction object ecology and the gameplay entry points
+  that remove humans remain B08 work.
 - `2026-05-17 19:06:15 BST`: R9-C4 adds the first clean object-ecology
   progress slice. Clean wave startup now derives the active enemy batch from
   `WaveProfileSnapshot` instead of using the previous wave-number lander
@@ -729,6 +730,16 @@ post-acceptance validation records.
   astronaut command, shell-collision command, fatal astronaut-impact command,
   and player-death command evidence plus focused source ecology fixtures for
   those transitions.
+- `2026-05-21 01:57:33 BST`: R9-C4 adds bounded source terrain-blow start
+  sound-command evidence for the last-human handoff. Clean planet destruction
+  already clears terrain, disables scanner terrain, carries `TERBLO` state, and
+  projects the first two `TEREX` explosions; it now also surfaces the source
+  `TERBLO` / `AHSND` command evidence when the terrain-blow entry starts.
+  Remaining B08 work is exact per-family movement/projectile behavior beyond
+  the covered baiter bookkeeping, enemy-hit, enemy-shot, player-action,
+  hyperspace, lander-abduction, astronaut command, shell-collision command,
+  fatal astronaut-impact command, player-death command, and terrain-blow start
+  command evidence plus focused source ecology fixtures for those transitions.
 - `2026-05-21 01:10:37 BST`: R9-C4 adds bounded source `HYP02`
   rematerialization state for accepted clean hyperspace inputs. Clean
   hyperspace now reloads camera/background from the source `SEED`/`HSEED` word,

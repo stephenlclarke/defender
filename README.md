@@ -197,8 +197,9 @@ expanded-object appearance/explosion/score-popup slot evidence plus sprite
 projection, source-backed score-popup lifetime/value/position evidence, and
 source-backed expanded-object explosion frame/lifetime/size-scale evidence,
 source-backed player-death bank-7 pixel-cloud color/counter/piece evidence,
-source-backed terrain-blow mutation/process evidence with `TEREX` presentation,
-source-backed per-family enemy hit sound-command evidence, source-backed
+source-backed terrain-blow mutation/process evidence with `TEREX` presentation
+and source `TERBLO` / `AHSND` command evidence, source-backed per-family enemy
+hit sound-command evidence, source-backed
 enemy-projectile collision sound-command evidence, and source `BORDER`
 top-display frame geometry; lifecycle transitions outside the score-popup,
 `EXST`/`EXPU` expanded-object explosion, player-death pixel-cloud,
@@ -480,10 +481,11 @@ above terrain now use source-shaped `AFALL` fixed-point acceleration, settle
 safely at or below the source threshold with the 250-point safe-landing score
 and existing `P250` score-popup lifecycle plus source `ALSND` command evidence,
 or die on over-speed impact with an astronaut explosion, source `ASTKIL` /
-`AHSND` command evidence, and the existing last-human planet-loss handoff;
-falling humans caught by the player enter the clean player-carried state,
-award the source-backed 500-point rescue score, emit source `ACSND` command
-evidence, and start the existing `P500` score-popup lifecycle; player-carried
+`AHSND` command evidence, and the existing last-human planet-loss handoff
+that starts source `TERBLO` / `AHSND` terrain-blow command evidence; falling
+humans caught by the player enter the clean player-carried state, award the
+source-backed 500-point rescue score, emit source `ACSND` command evidence,
+and start the existing `P500` score-popup lifecycle; player-carried
 humans settle on terrain when the player-carried offset reaches the local
 terrain line.
 Completed carried-lander abductions now consume the pulled-in passenger and

@@ -6107,7 +6107,7 @@ impl Game {
         if hyperspace_death_risk && !hit_player && self.state.phase == GamePhase::Playing {
             self.apply_player_hit(player_screen_position, gameplay_events, sound_events);
         }
-        self.resolve_planet_destruction();
+        self.resolve_planet_destruction(sound_events);
 
         if self.state.phase == GamePhase::Playing && !hyperspace_death_risk {
             self.queue_wave_clear_if_needed(gameplay_events, player_x);
@@ -6383,9 +6383,10 @@ impl Game {
         }
     }
 
-    fn resolve_planet_destruction(&mut self) {
+    fn resolve_planet_destruction(&mut self, sound_events: &mut Vec<SoundEvent>) {
         if self.state.world.humans.is_empty() && self.state.world.terrain_blow.is_none() {
             self.state.world.start_terrain_blow();
+            sound_events.push(source_terrain_blow_start_sound_event());
         }
     }
 
@@ -7755,6 +7756,12 @@ fn source_astronaut_hit_sound_event() -> SoundEvent {
     }
 }
 
+fn source_terrain_blow_start_sound_event() -> SoundEvent {
+    SoundEvent::UnmappedSoundCommand {
+        command: SOURCE_AHSND_SOUND_COMMAND,
+    }
+}
+
 fn source_bomb_collision_sound_event() -> SoundEvent {
     SoundEvent::UnmappedSoundCommand {
         command: SOURCE_AHSND_SOUND_COMMAND,
@@ -8215,6 +8222,7 @@ mod tests {
         source_hyperspace_appearance_sound_event, source_lander_pickup_sound_event,
         source_lander_suck_sound_event, source_laser_fire_sound_event,
         source_player_death_sound_event, source_smart_bomb_sound_event,
+        source_terrain_blow_start_sound_event,
     };
 
     #[test]
@@ -12984,7 +12992,13 @@ mod tests {
             explosion.kind == ExplosionKind::Astronaut
                 && explosion.position == ScreenPosition::new(100, ground_y)
         }));
-        assert_eq!(frame.events.sounds(), &[source_astronaut_hit_sound_event()]);
+        assert_eq!(
+            frame.events.sounds(),
+            &[
+                source_astronaut_hit_sound_event(),
+                source_terrain_blow_start_sound_event()
+            ]
+        );
     }
 
     #[test]
@@ -14517,6 +14531,10 @@ mod tests {
                 && sprite.position == [0x44 as f32, 0x70 as f32]
                 && sprite.size == [8.0, 6.0]
         }));
+        assert_eq!(
+            frame.events.sounds(),
+            &[source_terrain_blow_start_sound_event()]
+        );
     }
 
     #[test]

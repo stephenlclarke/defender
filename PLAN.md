@@ -921,7 +921,8 @@ Terrain-blow contract after Step 49:
   two-explosions-per-pass contract.
 - Clean planet destruction clears clean terrain segments, disables scanner
   terrain, starts source-shaped terrain-blow evidence, and projects `TEREX`
-  terrain explosions through the expanded-object sprite path.
+  terrain explosions through the expanded-object sprite path with source
+  `TERBLO` / `AHSND` command evidence on entry.
 - B07 is closed for terrain mutation and presentation evidence. Full
   rescue/abduction object ecology and the live gameplay entry points that
   remove humans remain B08, not terrain-blow presentation.
@@ -1085,7 +1086,8 @@ Object-ecology progress after R9-C4 slices:
   `P250` score-popup lifecycle with source `ALSND` command evidence;
   over-speed impacts remove the human, spawn the astronaut explosion lifecycle,
   surface source `ASTKIL` / `AHSND` command evidence, and feed the existing
-  last-human planet-loss handoff.
+  last-human planet-loss handoff that starts source `TERBLO` / `AHSND`
+  terrain-blow command evidence.
 - Falling humans caught by the player now enter the clean player-carried state,
   award the source-backed 500-point rescue score, and start the existing `P500`
   score-popup lifecycle from the caught astronaut position with source `ACSND`
@@ -1096,8 +1098,9 @@ Object-ecology progress after R9-C4 slices:
   is remaining per-family movement/projectile behavior beyond the covered
   enemy-hit, enemy-shot, player-action, hyperspace shell-cleanup/rematerialize,
   lander-abduction, astronaut command, shell-collision command, and fatal
-  astronaut-impact command evidence, and player-death command evidence plus
-  focused source ecology fixtures for those transitions.
+  astronaut-impact command evidence, player-death command evidence, and
+  terrain-blow start command evidence plus focused source ecology fixtures for
+  those transitions.
 
 Work log:
 
@@ -2500,6 +2503,22 @@ Work log:
   Step 50 player-death command slice, not a Step 50 / Phase 3 closure or R9
   finalization. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779324665834879`.
+
+- `2026-05-21 02:01:15 BST` R9-C4 progress slice
+  `source terrain-blow start sound command`. Clean last-human terrain-blow
+  entry now surfaces the source `TERBLO` / `AHSND` command evidence while
+  preserving terrain erase, scanner terrain disablement, `TEREX` explosion
+  projection, and the existing fatal astronaut / planet-loss handoff. Focused
+  validation passed: `cargo fmt --check`, `cargo check`, `cargo test
+  clean_world_starts_source_terrain_blow_and_projects_terex --lib`, `cargo
+  test clean_game_fatal_falling_human_impact_removes_human_and_starts_human_loss
+  --lib`, targeted `make clean-fidelity SCENARIOS="planet_destruction"`,
+  touched-doc `markdownlint`, and `git diff --check`. Broad `cargo test
+  --all-targets`, full `make fidelity`, full all-scenario `make
+  clean-fidelity`, and full clippy remain deferred because this is a bounded
+  Step 50 terrain-blow start command slice, not a Step 50 / Phase 3 closure or
+  R9 finalization. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779325031424119`.
 
 ## Archived Completed History
 
