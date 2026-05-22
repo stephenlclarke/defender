@@ -64,14 +64,15 @@ and credit text through the protected-reference `COLTAB` `0x47` magenta,
 applying the protected-reference attract display offset to Hall of Fame and
 scoring presentation surfaces, tinting the scoring scanner border to the
 protected-reference purple, drawing the lower scoring terrain as one source
-scanline, and using source `MTERR` mini-terrain records for the top scanner.
-It also starts the scoring/action display from the protected reference's
-post-setup rescue-fall phase and maps scoring text/credits through the sampled
-protected-reference `COLTAB` cadence. The title segment now holds its first
-sampled frame blank and uses sampled protected-reference Williams/title text
-color cadence. Final B13 visual acceptance remains open for the remaining
-title/Hall of Fame visual drift and scoring sprite/terrain palette and
-placement drift.
+scanline, using source `MTERR` mini-terrain records for the top scanner, and
+moving the `ENMYTB` score-card table sprites toward protected-reference
+placement. It also starts the scoring/action display from the protected
+reference's post-setup rescue-fall phase and maps scoring text/credits through
+the sampled protected-reference `COLTAB` cadence. The title segment now holds
+its first sampled frame blank and uses sampled protected-reference
+Williams/title text color cadence. Final B13 visual acceptance remains open for
+the remaining title/Hall of Fame visual drift and scoring sprite/terrain
+palette and placement drift.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -770,10 +771,11 @@ protected-reference display offset to scoring text/credits/scanner/terrain
 surfaces, and uses the protected-reference purple border tint for that scoring
 page. The lower scoring-page terrain is drawn from source `BGOUT` records as a
 single source scanline instead of the earlier two-scanline placeholder height.
-The Williams logo
-is generated from the source `LGOTAB` final pixel pattern and early title
-frames draw a source-ordered handwritten reveal with source `TCTAB` Williams
-palette cycling;
+The `ENMYTB` score-card table objects use protected-reference placement for the
+six enemy entries while preserving the source sprite atlas and clean scoring
+cadence. The Williams logo is generated from the source `LGOTAB` final pixel
+pattern and early title frames draw a source-ordered handwritten reveal with
+source `TCTAB` Williams palette cycling;
 the reveal cadence follows source `LOGO0` table operations instead of a linear
 pixel ramp. For protected README media, the first title sample stays blank and
 the Williams/logo title colors follow sampled protected-reference cadence.

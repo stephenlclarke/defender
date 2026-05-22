@@ -889,12 +889,14 @@ Reopened B13 repair schedule:
   as one source scanline, the top scanner uses source `MTERR` mini-terrain
   records instead of projected `BGOUT` terrain, and the attract scoring scanner
   border uses the protected-reference purple instead of the playing white HUD
-  border. The scoring page now starts its clean rescue/action display from the
-  protected reference's post-setup rescue-fall phase while keeping the page
-  duration unchanged, and its scoring text/credit color cadence is locked to
-  sampled protected-reference `COLTAB` indices. The first title sample now stays
-  blank like the protected GIF, and Williams/title text colors use sampled
-  protected-reference cadence during the README title segment.
+  border. The `ENMYTB` score-card table entries now use protected-reference
+  placement closer to the restored GIF. The scoring page now starts its clean
+  rescue/action display from the protected reference's post-setup rescue-fall
+  phase while keeping the page duration unchanged, and its scoring text/credit
+  color cadence is locked to sampled protected-reference `COLTAB` indices. The
+  first title sample now stays blank like the protected GIF, and Williams/title
+  text colors use sampled protected-reference cadence during the README title
+  segment.
 - R9-E3.15: candidate media gate and owner review. Generate a clean candidate
   without overwriting the protected reference, compare it to the restored GIF,
   run focused visual tests plus targeted clean-fidelity scenarios affected by

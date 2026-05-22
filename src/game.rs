@@ -7173,38 +7173,38 @@ const ATTRACT_SCORING_LEGEND: [AttractScoringLegendEntry;
     ATTRACT_SCORING_LEGEND_ENTRY_COUNT as usize] = [
     AttractScoringLegendEntry {
         kind: EnemyKind::Lander,
-        table_x16: 0x0900,
-        table_y16: 0x6000,
+        table_x16: 0x07A0,
+        table_y16: 0x5900,
         scanner_color_word: 0x4433,
     },
     AttractScoringLegendEntry {
         kind: EnemyKind::Mutant,
-        table_x16: 0x1100,
-        table_y16: 0x6000,
+        table_x16: 0x0FA0,
+        table_y16: 0x5900,
         scanner_color_word: 0xCC33,
     },
     AttractScoringLegendEntry {
         kind: EnemyKind::Baiter,
-        table_x16: 0x1980,
-        table_y16: 0x6200,
+        table_x16: 0x1820,
+        table_y16: 0x5B00,
         scanner_color_word: 0x3333,
     },
     AttractScoringLegendEntry {
         kind: EnemyKind::Bomber,
-        table_x16: 0x0960,
-        table_y16: 0x9800,
+        table_x16: 0x0800,
+        table_y16: 0x9100,
         scanner_color_word: 0x8888,
     },
     AttractScoringLegendEntry {
         kind: EnemyKind::Pod,
-        table_x16: 0x1160,
-        table_y16: 0x9800,
+        table_x16: 0x1000,
+        table_y16: 0x9100,
         scanner_color_word: 0xCCCC,
     },
     AttractScoringLegendEntry {
         kind: EnemyKind::Swarmer,
-        table_x16: 0x19E0,
-        table_y16: 0x9A00,
+        table_x16: 0x1880,
+        table_y16: 0x9300,
         scanner_color_word: 0x2424,
     },
 ];
@@ -11265,6 +11265,18 @@ mod tests {
                 "score-card scene should contain {sprite:?}"
             );
         }
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_LANDER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [61.0, 89.0]
+                && sprite.size == [12.0, 8.0]
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ENEMY_BOMBER
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [64.0, 145.0]
+                && sprite.size == [10.0, 8.0]
+        }));
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [173.0, 161.0]
         }));

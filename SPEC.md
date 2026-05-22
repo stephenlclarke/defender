@@ -78,8 +78,9 @@ R9-E3.7 clean media:
   surfaces, drawing lower scoring terrain as one source scanline, projecting
   source `MTERR` mini-terrain records inside the attract scanner, and applying
   the protected-reference purple scanner border on the scoring page. It also
-  shifts the scoring/action display to the protected reference's post-setup
-  rescue-fall phase while preserving page duration, and maps scoring
+  moves the `ENMYTB` score-card table entries toward protected-reference
+  placement, shifts the scoring/action display to the protected reference's
+  post-setup rescue-fall phase while preserving page duration, and maps scoring
   text/credits through sampled protected-reference `COLTAB` cadence. The title
   segment now keeps the first sampled protected frame blank and maps
   Williams/logo title colors through sampled protected-reference cadence. The
