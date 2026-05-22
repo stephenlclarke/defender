@@ -888,7 +888,10 @@ Reopened B13 repair schedule:
   protected-reference `COLTAB` `0x47` magenta, the scoring page projects source
   `BGOUT` terrain pixels into the top scanner, and the attract scoring scanner
   border uses the protected-reference purple instead of the playing white HUD
-  border.
+  border. The scoring page now starts its clean rescue/action display from the
+  protected reference's post-setup rescue-fall phase while keeping the page
+  duration unchanged, and its scoring text/credit color cadence is locked to
+  sampled protected-reference `COLTAB` indices.
 - R9-E3.15: candidate media gate and owner review. Generate a clean candidate
   without overwriting the protected reference, compare it to the restored GIF,
   run focused visual tests plus targeted clean-fidelity scenarios affected by
@@ -3421,6 +3424,24 @@ Work log:
   full gate should run at R9-E3.15 candidate closeout, or sooner if remaining
   scoring sprite placement/palette work changes shared contracts or broad
   scenario behavior.
+
+- `2026-05-22 02:32:07 BST` R9-E3.14 protected scoring cadence subpass. The
+  clean scoring/action page now starts from the protected reference's
+  post-setup rescue-fall phase while preserving the source scoring-page
+  duration, and scoring-page text/credits now map through sampled
+  protected-reference `COLTAB` color indices instead of a free-running raw tick
+  cycle. Focused validation passed with `cargo fmt --check`, `cargo check`,
+  `cargo test clean_attract_scoring_sequence --lib`, `cargo test
+  source_visual_state_tracks_palette_words_rates_and_blink_contract --lib`,
+  `make readme-media`, targeted `make clean-fidelity
+  SCENARIOS="attract_boot"` matching 900/900 frames, and markdownlint on the
+  touched docs. Candidate media remains failed B13 evidence but improved again:
+  reference 347 frames, candidate 347 frames, equal 4600cs duration, sampled
+  RMS full 30.41, title 25.59, Hall of Fame 37.27, numeric glyphs 23.13,
+  sprites 32.48, terrain 31.59, and scoring 31.56. Broad gates remain deferred
+  because this is a bounded scoring-page visual cadence repair. The next full
+  gate should run at R9-E3.15 candidate closeout, or sooner if remaining visual
+  repairs change shared contracts or broad scenario behavior.
 
 ## Archived Completed History
 

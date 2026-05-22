@@ -77,11 +77,13 @@ R9-E3.7 clean media:
   protected-reference display offset to Hall of Fame and scoring presentation
   surfaces, projecting source `BGOUT` terrain pixels inside the attract
   scanner, and applying the protected-reference purple scanner border on the
-  scoring page. The latest candidate still shows title/Hall of Fame and
-  scoring visual drift. Until signoff, changes that alter public contracts,
-  scenario semantics, runtime behavior, or final acceptance evidence must
-  trigger focused checks and, when broad risk is introduced, a renewed full
-  gate.
+  scoring page. It also shifts the scoring/action display to the protected
+  reference's post-setup rescue-fall phase while preserving page duration, and
+  maps scoring text/credits through sampled protected-reference `COLTAB`
+  cadence. The latest candidate still shows title/Hall of Fame and scoring
+  visual drift. Until signoff, changes that alter public contracts, scenario
+  semantics, runtime behavior, or final acceptance evidence must trigger
+  focused checks and, when broad risk is introduced, a renewed full gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite
@@ -540,8 +542,11 @@ protected-reference display offset while entry/blink evidence stays on `0x85`.
 The attract scoring page applies that protected-reference offset to
 scoring text/credits/scanner/terrain surfaces, projects source `BGOUT` terrain
 pixels inside the top scanner box, and uses the protected-reference purple
-scanner border tint. B13 still requires remaining title/Hall of Fame and
-scoring visual repair before owner acceptance.
+scanner border tint. The clean scoring action starts from the protected
+reference's post-setup rescue-fall phase and scoring text/credits use the
+protected GIF's sampled `COLTAB` cadence while the source scoring-page duration
+is preserved. B13 still requires remaining title/Hall of Fame and scoring
+visual repair before owner acceptance.
 During a pending two-player start handoff, scenes draw the source-backed
 `PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,

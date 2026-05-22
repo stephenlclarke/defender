@@ -105,6 +105,10 @@ const ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS: u16 = ATTRACT_SCORING_RESCUE_DESCEN
 const ATTRACT_SCORING_DEMO_TOTAL_TICKS: u16 = ATTRACT_SCORING_RESCUE_SEQUENCE_TICKS
     + (ATTRACT_SCORING_LEGEND_ENTRY_TICKS * ATTRACT_SCORING_LEGEND_ENTRY_COUNT)
     + ATTRACT_SCORING_LEGEND_HOLD_TICKS;
+const ATTRACT_SCORING_PROTECTED_DEMO_TICK_OFFSET: u16 = ATTRACT_SCORING_RESCUE_DESCENT_TICKS
+    + ATTRACT_SCORING_RESCUE_ASCENT_TICKS
+    + ATTRACT_SCORING_RESCUE_LASER_TICKS
+    + 5;
 const ATTRACT_CYCLE_FRAME_COUNT: u16 =
     ATTRACT_SCORING_SEQUENCE_START_FRAME + ATTRACT_SCORING_DEMO_TOTAL_TICKS;
 const ATTRACT_SCORING_PLAYER_X16: i32 = 0x0800;
@@ -135,6 +139,19 @@ const SOURCE_COLTAB_COLOR_BYTES: [u8; 37] = [
 ];
 const SOURCE_TIE_COLOR_BYTES: [u8; 9] = [0x81, 0x81, 0x2F, 0x81, 0x2F, 0x07, 0x2F, 0x81, 0x07];
 const SOURCE_COLTAB_ACTIVE_BYTES: usize = SOURCE_COLTAB_COLOR_BYTES.len() - 1;
+const ATTRACT_SCORING_REFERENCE_SAMPLE_STEP_FRAMES: u16 = 8;
+const ATTRACT_SCORING_REFERENCE_TEXT_COLOR_INDICES: [u8; 226] = [
+    29, 30, 30, 31, 31, 33, 33, 33, 34, 35, 0, 1, 2, 35, 5, 33, 8, 9, 11, 12, 14, 16, 16, 18, 18,
+    20, 21, 22, 24, 25, 26, 28, 29, 30, 32, 33, 34, 0, 1, 3, 35, 5, 33, 8, 9, 9, 9, 9, 11, 12, 14,
+    14, 16, 18, 18, 19, 21, 22, 24, 25, 26, 28, 29, 31, 32, 33, 35, 35, 35, 35, 0, 1, 3, 35, 5, 33,
+    8, 9, 10, 12, 14, 14, 16, 18, 18, 20, 21, 22, 24, 25, 25, 25, 25, 27, 28, 29, 30, 32, 33, 35,
+    0, 1, 2, 35, 5, 34, 8, 9, 10, 12, 14, 16, 16, 16, 16, 16, 18, 19, 20, 21, 22, 23, 25, 26, 28,
+    29, 30, 32, 33, 34, 0, 1, 2, 35, 5, 34, 34, 34, 33, 8, 9, 11, 12, 14, 14, 16, 18, 18, 20, 21,
+    22, 24, 25, 26, 28, 29, 31, 32, 32, 32, 32, 33, 35, 0, 1, 3, 35, 5, 34, 33, 9, 10, 11, 14, 14,
+    16, 18, 18, 20, 21, 23, 24, 25, 27, 28, 29, 31, 32, 33, 35, 0, 1, 3, 35, 5, 34, 8, 9, 11, 12,
+    14, 14, 16, 18, 19, 20, 22, 23, 24, 26, 27, 28, 30, 31, 32, 34, 35, 1, 2, 3, 35, 5, 33, 9, 10,
+    11,
+];
 const SOURCE_ATTRACT_TITLE_TEXT_COLOR_FRAME_DIVISOR: u16 = 8;
 const SOURCE_ATTRACT_TITLE_TEXT_COLOR_OFFSET: usize = 18;
 const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES: u16 = 6;
@@ -7262,7 +7279,7 @@ fn push_attract_instruction_text_sprites(scene: &mut RenderScene, state: &GameSt
     let scoring_tick = state.attract.scoring_sequence_frame();
     let visible_line_count = scoring_tick
         .map_or(SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES.len(), |tick| {
-            1 + attract_scoring_visible_legend_text_entries(tick)
+            1 + attract_scoring_visible_legend_text_entries(attract_scoring_display_tick(tick))
         });
     let scoring_tint = scoring_tick.map(attract_scoring_color_cycle_tint);
     let visual_offset = scoring_tick
@@ -7289,9 +7306,10 @@ fn push_attract_instruction_text_sprites(scene: &mut RenderScene, state: &GameSt
 }
 
 fn attract_scoring_frame(scoring_tick: u16) -> AttractScoringFrame {
-    let (stage, local_tick) = attract_scoring_demo_stage_for_tick(scoring_tick);
+    let display_tick = attract_scoring_display_tick(scoring_tick);
+    let (stage, local_tick) = attract_scoring_demo_stage_for_tick(display_tick);
     let objects = attract_scoring_objects_for_stage(stage, local_tick);
-    let scanner_tick = scoring_tick - (scoring_tick % 4);
+    let scanner_tick = display_tick - (display_tick % 4);
     let (scanner_stage, scanner_local_tick) = attract_scoring_demo_stage_for_tick(scanner_tick);
     let scanner_objects = attract_scoring_objects_for_stage(scanner_stage, scanner_local_tick);
 
@@ -7301,6 +7319,18 @@ fn attract_scoring_frame(scoring_tick: u16) -> AttractScoringFrame {
         scanner_objects,
         bonus: attract_scoring_bonus_for_stage(stage, local_tick),
     }
+}
+
+fn attract_scoring_display_tick(scoring_tick: u16) -> u16 {
+    (scoring_tick % ATTRACT_SCORING_DEMO_TOTAL_TICKS + ATTRACT_SCORING_PROTECTED_DEMO_TICK_OFFSET)
+        % ATTRACT_SCORING_DEMO_TOTAL_TICKS
+}
+
+#[cfg(test)]
+fn attract_scoring_page_tick_for_display_tick(display_tick: u16) -> u16 {
+    (display_tick % ATTRACT_SCORING_DEMO_TOTAL_TICKS + ATTRACT_SCORING_DEMO_TOTAL_TICKS
+        - ATTRACT_SCORING_PROTECTED_DEMO_TICK_OFFSET)
+        % ATTRACT_SCORING_DEMO_TOTAL_TICKS
 }
 
 fn attract_scoring_demo_stage_for_tick(mut tick: u16) -> (AttractScoringDemoStage, u16) {
@@ -7777,11 +7807,17 @@ fn attract_scoring_object_position(x16: i32, y16: i32) -> [f32; 2] {
     ]
 }
 
-fn attract_scoring_color_cycle_tint(demo_tick: u16) -> Color {
-    source_pseudo_color_tint(
-        SOURCE_COLTAB_COLOR_BYTES
-            [(usize::from(demo_tick / 2)) % (SOURCE_COLTAB_COLOR_BYTES.len() - 1)],
-    )
+fn attract_scoring_color_cycle_tint(scoring_tick: u16) -> Color {
+    let protected_sample_index =
+        usize::from(scoring_tick / ATTRACT_SCORING_REFERENCE_SAMPLE_STEP_FRAMES);
+    let color_index = ATTRACT_SCORING_REFERENCE_TEXT_COLOR_INDICES
+        .get(protected_sample_index)
+        .map_or(
+            (usize::from(scoring_tick / 2)) % SOURCE_COLTAB_ACTIVE_BYTES,
+            |index| usize::from(*index),
+        );
+
+    source_pseudo_color_tint(SOURCE_COLTAB_COLOR_BYTES[color_index])
 }
 
 fn source_pseudo_color_tint(value: u8) -> Color {
@@ -10868,10 +10904,12 @@ mod tests {
     #[test]
     fn clean_attract_scoring_sequence_projects_source_rescue_demo() {
         let mut game = Game::new();
-        let rescue_score_tick = super::attract_scoring_demo_tick_for_stage(
+        let rescue_score_display_tick = super::attract_scoring_demo_tick_for_stage(
             super::AttractScoringDemoStage::RescueScore,
             0,
         );
+        let rescue_score_tick =
+            super::attract_scoring_page_tick_for_display_tick(rescue_score_display_tick);
         game.state.attract = AttractPresentationSnapshot::for_page_frame(
             super::ATTRACT_SCORING_SEQUENCE_START_FRAME + rescue_score_tick,
         );
@@ -10931,6 +10969,34 @@ mod tests {
     }
 
     #[test]
+    fn clean_attract_scoring_sequence_uses_protected_reference_cadence() {
+        assert_eq!(
+            super::attract_scoring_display_tick(0),
+            super::ATTRACT_SCORING_PROTECTED_DEMO_TICK_OFFSET
+        );
+        assert_eq!(
+            super::attract_scoring_demo_stage_for_tick(super::attract_scoring_display_tick(0)),
+            (super::AttractScoringDemoStage::RescueFall, 5)
+        );
+        assert_eq!(
+            super::attract_scoring_page_tick_for_display_tick(super::attract_scoring_display_tick(
+                0
+            )),
+            0
+        );
+        assert_eq!(
+            super::attract_scoring_color_cycle_tint(0),
+            super::source_pseudo_color_tint(super::SOURCE_COLTAB_COLOR_BYTES[29])
+        );
+        assert_eq!(
+            super::attract_scoring_color_cycle_tint(
+                super::ATTRACT_SCORING_REFERENCE_SAMPLE_STEP_FRAMES,
+            ),
+            super::source_pseudo_color_tint(super::SOURCE_COLTAB_COLOR_BYTES[30])
+        );
+    }
+
+    #[test]
     fn clean_attract_scoring_sequence_reveals_source_score_card() {
         let first_reveal_tick = super::attract_scoring_demo_tick_for_stage(
             super::AttractScoringDemoStage::LegendReveal(0),
@@ -10942,16 +11008,17 @@ mod tests {
             1
         );
 
-        let hold_tick = super::attract_scoring_demo_tick_for_stage(
+        let hold_display_tick = super::attract_scoring_demo_tick_for_stage(
             super::AttractScoringDemoStage::LegendHold,
             0,
         );
         assert_eq!(
-            super::attract_scoring_visible_legend_text_entries(hold_tick),
+            super::attract_scoring_visible_legend_text_entries(hold_display_tick),
             super::ATTRACT_SCORING_LEGEND.len()
         );
 
         let mut game = Game::new();
+        let hold_tick = super::attract_scoring_page_tick_for_display_tick(hold_display_tick);
         game.state.attract = AttractPresentationSnapshot::for_page_frame(
             super::ATTRACT_SCORING_SEQUENCE_START_FRAME + hold_tick,
         );

@@ -64,9 +64,11 @@ and credit text through the protected-reference `COLTAB` `0x47` magenta,
 drawing source `BGOUT` terrain pixels inside the attract scanner, applying the
 protected-reference attract display offset to Hall of Fame and scoring
 presentation surfaces, and tinting the scoring scanner border to the
-protected-reference purple. Final B13 visual acceptance remains open for the
-remaining title/Hall of Fame visual drift and scoring sprite/terrain palette
-and placement drift.
+protected-reference purple. It also starts the scoring/action display from the
+protected reference's post-setup rescue-fall phase and maps scoring
+text/credits through the sampled protected-reference `COLTAB` cadence. Final
+B13 visual acceptance remains open for the remaining title/Hall of Fame visual
+drift and scoring sprite/terrain palette and placement drift.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -756,7 +758,10 @@ source wait constants, now ordering the title/copyright surfaces before the
 Hall of Fame display and source scoring/action sequence. The scoring/action
 sequence replays the source instruction-page rescue demo, scanner blips,
 laser/explosion/500-point rescue beat, and `ENMYTB` enemy score-card reveal
-before cycling back to the Williams page. The attract scoring scanner also
+before cycling back to the Williams page. The clean scoring page starts that
+display from the protected reference's post-setup rescue-fall phase and uses
+the protected GIF's sampled `COLTAB` cadence for scoring text and credits while
+preserving the source scoring-page duration. The attract scoring scanner also
 projects the source `BGOUT` terrain table into the top scanner box as
 sprite-backed terrain pixels, applies the protected-reference display offset to
 scoring text/credits/scanner/terrain surfaces, and uses the

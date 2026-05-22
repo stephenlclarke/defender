@@ -34,9 +34,11 @@ Fame display and credit text to the protected-reference `COLTAB` `0x47`
 magenta, applying the protected-reference display offset to Hall of Fame and
 scoring presentation surfaces, drawing source `BGOUT` terrain pixels inside
 the attract scanner, and tinting the scoring scanner border to the
-protected-reference purple. B13 remains open for remaining title/Hall of Fame
-visual drift, scoring sprite/terrain visual drift, candidate media, and
-owner-review steps.
+protected-reference purple. The scoring/action display now starts from the
+protected reference's post-setup rescue-fall phase and scoring text/credits use
+sampled protected-reference `COLTAB` cadence. B13 remains open for remaining
+title/Hall of Fame visual drift, scoring sprite/terrain visual drift, candidate
+media, and owner-review steps.
 Older entries remain closed fidelity history, local-reference/tooling notes,
 archived prototype cleanup, or post-acceptance validation records. Historical
 entries that mention remaining blockers describe the state at the time they
