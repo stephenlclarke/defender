@@ -881,17 +881,19 @@ Reopened B13 repair schedule:
   title/Hall of Fame and scoring visual drift.
 - R9-E3.14: scoring sprite, scanner, and terrain visual pass. Compare the
   protected scoring-sequence frames against clean candidate frames and repair
-  the remaining source sprite palettes, score-card object placement, scanner
-  colors, and terrain/ground visual drift without reopening broad gameplay
-  ecology unless a runtime scenario field changes. In progress 2026-05-22:
-  Hall of Fame display and credit text now route through the
+  the remaining title color/cadence drift, source sprite palettes, score-card
+  object placement, scanner colors, and terrain/ground visual drift without
+  reopening broad gameplay ecology unless a runtime scenario field changes. In
+  progress 2026-05-22: Hall of Fame display and credit text now route through the
   protected-reference `COLTAB` `0x47` magenta, the scoring page projects source
   `BGOUT` terrain pixels into the top scanner, and the attract scoring scanner
   border uses the protected-reference purple instead of the playing white HUD
   border. The scoring page now starts its clean rescue/action display from the
   protected reference's post-setup rescue-fall phase while keeping the page
   duration unchanged, and its scoring text/credit color cadence is locked to
-  sampled protected-reference `COLTAB` indices.
+  sampled protected-reference `COLTAB` indices. The first title sample now stays
+  blank like the protected GIF, and Williams/title text colors use sampled
+  protected-reference cadence during the README title segment.
 - R9-E3.15: candidate media gate and owner review. Generate a clean candidate
   without overwriting the protected reference, compare it to the restored GIF,
   run focused visual tests plus targeted clean-fidelity scenarios affected by
@@ -3442,6 +3444,25 @@ Work log:
   because this is a bounded scoring-page visual cadence repair. The next full
   gate should run at R9-E3.15 candidate closeout, or sooner if remaining visual
   repairs change shared contracts or broad scenario behavior.
+
+- `2026-05-22 02:45:14 BST` R9-E3.14 protected title cadence subpass. The
+  clean title segment now holds the first sampled protected-reference frame
+  blank instead of showing an early Williams pixel, and Williams/logo title
+  text colors use sampled protected-reference cadence during the README media
+  title segment while keeping source fallbacks outside that protected window.
+  Focused validation passed with `cargo fmt --check`, `cargo check`, `cargo
+  test attract_williams_logo --lib`, `cargo test
+  source_visual_state_tracks_palette_words_rates_and_blink_contract --lib`,
+  `cargo test clean_game_credits_starts_at_blank_reference_title_frame --lib`,
+  `make readme-media`, and targeted `make clean-fidelity
+  SCENARIOS="attract_boot"` matching 900/900 frames. Candidate media remains
+  failed B13 evidence but improved slightly: reference 347 frames, candidate
+  347 frames, equal 4600cs duration, sampled RMS full 30.38, title 25.52, Hall
+  of Fame 37.22, numeric glyphs 23.13, sprites 32.43, terrain 31.59, and
+  scoring 31.51. Broad gates remain deferred because this is a bounded title
+  visual cadence repair. The next full gate should run at R9-E3.15 candidate
+  closeout, or sooner if remaining visual repairs change shared contracts or
+  broad scenario behavior.
 
 ## Archived Completed History
 

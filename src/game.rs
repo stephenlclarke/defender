@@ -154,6 +154,75 @@ const ATTRACT_SCORING_REFERENCE_TEXT_COLOR_INDICES: [u8; 226] = [
 ];
 const SOURCE_ATTRACT_TITLE_TEXT_COLOR_FRAME_DIVISOR: u16 = 8;
 const SOURCE_ATTRACT_TITLE_TEXT_COLOR_OFFSET: usize = 18;
+const ATTRACT_TITLE_REFERENCE_SAMPLE_STEP_FRAMES: u16 = 8;
+const ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR: u8 = u8::MAX;
+const ATTRACT_TITLE_REFERENCE_LOGO_COLOR_BYTES: [u8; 59] = [
+    0x00, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F,
+    0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07,
+    0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x2F, 0x2F,
+    0x07, 0x07, 0x07, 0x07, 0x2F, 0x07, 0x07, 0x07, 0x07, 0x07, 0x2F,
+];
+const ATTRACT_TITLE_REFERENCE_TEXT_COLOR_INDICES: [u8; 59] = [
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR,
+    11,
+    12,
+    13,
+    13,
+    15,
+    17,
+    17,
+    20,
+    21,
+    23,
+    24,
+    25,
+    26,
+    28,
+    29,
+    30,
+    31,
+    7,
+    6,
+    0,
+    1,
+    2,
+    3,
+    5,
+    6,
+    7,
+    9,
+    10,
+    11,
+    12,
+    12,
+];
 const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES: u16 = 6;
 const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES: u16 = 6;
 const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET: usize = 2;
@@ -458,6 +527,14 @@ impl SourceVisualStateSnapshot {
 
     pub(crate) fn attract_title_text_tint_for_frame(self, page_frame: u16) -> Color {
         let _source_status = self.attract_williams_status;
+        if let Some(color_index) = ATTRACT_TITLE_REFERENCE_TEXT_COLOR_INDICES
+            .get(attract_title_reference_sample_index(page_frame))
+            .copied()
+            .filter(|index| *index != ATTRACT_TITLE_REFERENCE_NO_TEXT_COLOR)
+        {
+            return source_pseudo_color_tint(SOURCE_COLTAB_COLOR_BYTES[usize::from(color_index)]);
+        }
+
         let color_index = (usize::from(page_frame / SOURCE_ATTRACT_TITLE_TEXT_COLOR_FRAME_DIVISOR)
             + SOURCE_ATTRACT_TITLE_TEXT_COLOR_OFFSET)
             % SOURCE_COLTAB_ACTIVE_BYTES;
@@ -473,6 +550,14 @@ impl SourceVisualStateSnapshot {
     }
 
     pub(crate) fn attract_williams_logo_tint_for_frame(self, page_frame: u16) -> Color {
+        if let Some(color_byte) = ATTRACT_TITLE_REFERENCE_LOGO_COLOR_BYTES
+            .get(attract_title_reference_sample_index(page_frame))
+            .copied()
+            .filter(|color_byte| *color_byte != 0)
+        {
+            return source_pseudo_color_tint(color_byte);
+        }
+
         let source_rate_tick = page_frame
             .saturating_sub(SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES)
             / SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES.max(1);
@@ -7067,6 +7152,10 @@ fn offset_new_sprites(scene: &mut RenderScene, first_sprite: usize, offset: [f32
     }
 }
 
+fn attract_title_reference_sample_index(page_frame: u16) -> usize {
+    usize::from(page_frame / ATTRACT_TITLE_REFERENCE_SAMPLE_STEP_FRAMES).saturating_sub(1)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct AttractScoringLegendEntry {
     kind: EnemyKind,
@@ -7885,6 +7974,9 @@ fn attract_williams_logo_visible_pixel_count(
         || attract.page_frame >= ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES
     {
         return total_pixels;
+    }
+    if attract_title_reference_sample_index(attract.page_frame) == 0 {
+        return 0;
     }
 
     let sleep_ticks = usize::from(ATTRACT_LOGO_SLEEP_TICKS.max(1));
@@ -11150,7 +11242,16 @@ mod tests {
         let mut game = Game::new();
         let logo_pixel_count = source_attract_williams_logo_pixel_path().len();
 
-        game.state.attract = AttractPresentationSnapshot::for_page_frame(1);
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(0);
+        let blank_scene = game.scene();
+        assert!(
+            !blank_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL)
+        );
+
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(16);
         let early_scene = game.scene();
         let early_pixels = early_scene
             .sprites
@@ -11166,7 +11267,7 @@ mod tests {
                 .any(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO)
         );
 
-        game.state.attract = AttractPresentationSnapshot::for_page_frame(11);
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(24);
         let next_tint_scene = game.scene();
         let next_tint = next_tint_scene
             .sprites
@@ -11245,11 +11346,15 @@ mod tests {
         );
         assert_eq!(
             visual.attract_williams_logo_tint_for_frame(20),
-            super::source_pseudo_color_tint(0x07)
+            super::source_pseudo_color_tint(0x2F)
         );
         assert_eq!(
             visual.attract_title_text_tint_for_frame(236),
             super::source_pseudo_color_tint(0x1F)
+        );
+        assert_eq!(
+            visual.attract_title_text_tint_for_frame(328),
+            super::source_pseudo_color_tint(0xF8)
         );
         assert_eq!(visual.attract_defender_wordmark_tint(), Color::WHITE);
         assert_eq!(visual.attract_copyright_tint(), Color::WHITE);
@@ -11347,7 +11452,7 @@ mod tests {
     }
 
     #[test]
-    fn clean_game_credits_starts_and_emits_sprite_frame() {
+    fn clean_game_credits_starts_at_blank_reference_title_frame() {
         let mut game = Game::new();
 
         let inserted = game.step(GameInput {
@@ -11358,15 +11463,15 @@ mod tests {
         assert_eq!(inserted.state.credits, 0);
         assert!(inserted.events.is_empty());
         assert_eq!(inserted.scene.summary().layers.hud, 0);
-        assert!(inserted.scene.summary().layers.overlay > 0);
+        assert_eq!(inserted.scene.summary().layers.overlay, 0);
         assert_eq!(inserted.scene.summary().raster_count, 0);
-        assert!(inserted.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
-                && sprite.layer == RenderLayer::Overlay
-                && sprite.position == [116.0, 64.0]
-                && sprite.size == [1.0, 1.0]
-                && sprite.tint == SOURCE_VISUAL_STATE.attract_williams_logo_tint_for_frame(1)
-        }));
+        assert!(
+            !inserted
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL)
+        );
         assert!(
             !inserted
                 .scene

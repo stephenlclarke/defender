@@ -66,9 +66,11 @@ protected-reference attract display offset to Hall of Fame and scoring
 presentation surfaces, and tinting the scoring scanner border to the
 protected-reference purple. It also starts the scoring/action display from the
 protected reference's post-setup rescue-fall phase and maps scoring
-text/credits through the sampled protected-reference `COLTAB` cadence. Final
-B13 visual acceptance remains open for the remaining title/Hall of Fame visual
-drift and scoring sprite/terrain palette and placement drift.
+text/credits through the sampled protected-reference `COLTAB` cadence. The
+title segment now holds its first sampled frame blank and uses sampled
+protected-reference Williams/title text color cadence. Final B13 visual
+acceptance remains open for the remaining title/Hall of Fame visual drift and
+scoring sprite/terrain palette and placement drift.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -770,8 +772,10 @@ is generated from the source `LGOTAB` final pixel pattern and early title
 frames draw a source-ordered handwritten reveal with source `TCTAB` Williams
 palette cycling;
 the reveal cadence follows source `LOGO0` table operations instead of a linear
-pixel ramp. Title text uses the Williams resistor palette with source `COLTAB`
-cycling. The protected GIF's Defender appearance now uses source `APVCT`
+pixel ramp. For protected README media, the first title sample stays blank and
+the Williams/logo title colors follow sampled protected-reference cadence.
+Title text uses the Williams resistor palette with source `COLTAB` cycling. The
+protected GIF's Defender appearance now uses source `APVCT`
 row-pair coalescence projected as sprite-first clean pixels instead of
 temporary rasters.
 The normal attract Defender wordmark now uses the 15 source `DEFENS` 4-byte by

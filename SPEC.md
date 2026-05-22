@@ -80,6 +80,8 @@ R9-E3.7 clean media:
   scoring page. It also shifts the scoring/action display to the protected
   reference's post-setup rescue-fall phase while preserving page duration, and
   maps scoring text/credits through sampled protected-reference `COLTAB`
+  cadence. The title segment now keeps the first sampled protected frame blank
+  and maps Williams/logo title colors through sampled protected-reference
   cadence. The latest candidate still shows title/Hall of Fame and scoring
   visual drift. Until signoff, changes that alter public contracts, scenario
   semantics, runtime behavior, or final acceptance evidence must trigger
@@ -545,8 +547,10 @@ pixels inside the top scanner box, and uses the protected-reference purple
 scanner border tint. The clean scoring action starts from the protected
 reference's post-setup rescue-fall phase and scoring text/credits use the
 protected GIF's sampled `COLTAB` cadence while the source scoring-page duration
-is preserved. B13 still requires remaining title/Hall of Fame and scoring
-visual repair before owner acceptance.
+is preserved. The clean title segment keeps the first sampled protected frame
+blank and uses sampled protected-reference cadence for Williams/logo title
+colors. B13 still requires remaining title/Hall of Fame and scoring visual
+repair before owner acceptance.
 During a pending two-player start handoff, scenes draw the source-backed
 `PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,
