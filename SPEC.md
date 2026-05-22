@@ -75,17 +75,18 @@ R9-E3.7 clean media:
   repair by routing Hall of Fame display/credits through the
   protected-reference `COLTAB` `0x47` magenta, applying the
   protected-reference display offset to Hall of Fame and scoring presentation
-  surfaces, projecting source `BGOUT` terrain pixels inside the attract
-  scanner, and applying the protected-reference purple scanner border on the
-  scoring page. It also shifts the scoring/action display to the protected
-  reference's post-setup rescue-fall phase while preserving page duration, and
-  maps scoring text/credits through sampled protected-reference `COLTAB`
-  cadence. The title segment now keeps the first sampled protected frame blank
-  and maps Williams/logo title colors through sampled protected-reference
-  cadence. The latest candidate still shows title/Hall of Fame and scoring
-  visual drift. Until signoff, changes that alter public contracts, scenario
-  semantics, runtime behavior, or final acceptance evidence must trigger
-  focused checks and, when broad risk is introduced, a renewed full gate.
+  surfaces, drawing lower scoring terrain as one source scanline, projecting
+  source `MTERR` mini-terrain records inside the attract scanner, and applying
+  the protected-reference purple scanner border on the scoring page. It also
+  shifts the scoring/action display to the protected reference's post-setup
+  rescue-fall phase while preserving page duration, and maps scoring
+  text/credits through sampled protected-reference `COLTAB` cadence. The title
+  segment now keeps the first sampled protected frame blank and maps
+  Williams/logo title colors through sampled protected-reference cadence. The
+  latest candidate still shows title/Hall of Fame and scoring visual drift.
+  Until signoff, changes that alter public contracts, scenario semantics,
+  runtime behavior, or final acceptance evidence must trigger focused checks
+  and, when broad risk is introduced, a renewed full gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite

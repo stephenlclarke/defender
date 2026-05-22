@@ -885,8 +885,9 @@ Reopened B13 repair schedule:
   object placement, scanner colors, and terrain/ground visual drift without
   reopening broad gameplay ecology unless a runtime scenario field changes. In
   progress 2026-05-22: Hall of Fame display and credit text now route through the
-  protected-reference `COLTAB` `0x47` magenta, the scoring page projects source
-  `BGOUT` terrain pixels into the top scanner, and the attract scoring scanner
+  protected-reference `COLTAB` `0x47` magenta, the lower scoring terrain draws
+  as one source scanline, the top scanner uses source `MTERR` mini-terrain
+  records instead of projected `BGOUT` terrain, and the attract scoring scanner
   border uses the protected-reference purple instead of the playing white HUD
   border. The scoring page now starts its clean rescue/action display from the
   protected reference's post-setup rescue-fall phase while keeping the page

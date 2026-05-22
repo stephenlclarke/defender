@@ -239,13 +239,18 @@ const SOURCE_WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217
 const SOURCE_WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
 const SOURCE_TERRAIN_DATA_TSV: &str = include_str!("../assets/red-label/terrain-data.tsv");
 const SOURCE_TERRAIN_TDATA_LABEL: &str = "TDATA";
+const SOURCE_TERRAIN_MTERR_LABEL: &str = "MTERR";
 const SOURCE_TERRAIN_TDATA_ADDRESS: u16 = 0xC350;
 const SOURCE_TERRAIN_TDATA_BYTES: usize = 0x100;
+const SOURCE_TERRAIN_MTERR_ADDRESS: u16 = 0xCD67;
+const SOURCE_TERRAIN_MTERR_BYTES: usize = 0x180;
 const SOURCE_TERRAIN_FLAVOR_RECORDS: usize = 0x98;
 const SOURCE_TERRAIN_SCREEN_WORDS: usize = 0x98;
+const SOURCE_SCANNER_TERRAIN_RECORDS: usize = 0x40;
+const SOURCE_SCANNER_MINI_TERRAIN_RECORDS: usize = SOURCE_TERRAIN_MTERR_BYTES / 3;
 const SOURCE_TERRAIN_WORD_7007: u16 = 0x7007;
 const SOURCE_TERRAIN_WORD_0770: u16 = 0x0770;
-const SOURCE_TERRAIN_WORD_SIZE: [f32; 2] = [4.0, 2.0];
+const SOURCE_TERRAIN_WORD_SIZE: [f32; 2] = [4.0, 1.0];
 const SOURCE_SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4];
 const SOURCE_SCANNER_SELECTED_MAP: u8 = 1;
 const SOURCE_SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
@@ -8162,6 +8167,19 @@ impl SourceTerrainDrawRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourceScannerTerrainRecord {
+    screen_address: u16,
+    word: u16,
+}
+
+impl SourceScannerTerrainRecord {
+    const EMPTY: Self = Self {
+        screen_address: 0,
+        word: 0,
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SourceTerrainBitState {
     data_index: usize,
     data_pointer: u16,
@@ -8208,6 +8226,17 @@ fn source_bgout_default_terrain_records()
     RECORDS.get_or_init(source_generate_bgout_default_terrain_records)
 }
 
+fn source_scanner_mini_terrain_records()
+-> &'static [SourceScannerTerrainRecord; SOURCE_SCANNER_TERRAIN_RECORDS] {
+    static RECORDS: OnceLock<[SourceScannerTerrainRecord; SOURCE_SCANNER_TERRAIN_RECORDS]> =
+        OnceLock::new();
+    RECORDS.get_or_init(|| {
+        source_generate_scanner_mini_terrain_records(
+            0u16.wrapping_sub(SOURCE_SCANNER_SCAN_CENTER_OFFSET),
+        )
+    })
+}
+
 fn source_generate_bgout_default_terrain_records()
 -> [SourceTerrainDrawRecord; SOURCE_TERRAIN_SCREEN_WORDS] {
     let data = source_tdata_bytes();
@@ -8237,6 +8266,30 @@ fn source_generate_bgout_default_terrain_records()
             word: source_record.word,
         };
     }
+    records
+}
+
+fn source_generate_scanner_mini_terrain_records(
+    scan_left: u16,
+) -> [SourceScannerTerrainRecord; SOURCE_SCANNER_TERRAIN_RECORDS] {
+    let bytes = source_mterr_bytes();
+    let first_record = usize::from(scan_left.to_be_bytes()[0] >> 2);
+    assert!(
+        first_record + SOURCE_SCANNER_TERRAIN_RECORDS <= SOURCE_SCANNER_MINI_TERRAIN_RECORDS,
+        "MTERR slice must contain 64 source scanner terrain records"
+    );
+
+    let mut records = [SourceScannerTerrainRecord::EMPTY; SOURCE_SCANNER_TERRAIN_RECORDS];
+    let mut source_column = SOURCE_SCANNER_OBJECT_BASE_SCREEN.to_be_bytes()[0];
+    for (index, record) in records.iter_mut().enumerate() {
+        let source_index = (first_record + index) * 3;
+        *record = SourceScannerTerrainRecord {
+            screen_address: u16::from_be_bytes([source_column, bytes[source_index]]),
+            word: u16::from_be_bytes([bytes[source_index + 1], bytes[source_index + 2]]),
+        };
+        source_column = source_column.wrapping_add(1);
+    }
+
     records
 }
 
@@ -8408,6 +8461,11 @@ fn source_tdata_bytes() -> &'static [u8; SOURCE_TERRAIN_TDATA_BYTES] {
     TDATA.get_or_init(parse_source_tdata_bytes)
 }
 
+fn source_mterr_bytes() -> &'static [u8; SOURCE_TERRAIN_MTERR_BYTES] {
+    static MTERR: OnceLock<[u8; SOURCE_TERRAIN_MTERR_BYTES]> = OnceLock::new();
+    MTERR.get_or_init(parse_source_mterr_bytes)
+}
+
 fn parse_source_tdata_bytes() -> [u8; SOURCE_TERRAIN_TDATA_BYTES] {
     let mut output = [0; SOURCE_TERRAIN_TDATA_BYTES];
     for (line_index, line) in SOURCE_TERRAIN_DATA_TSV.lines().enumerate().skip(1) {
@@ -8436,6 +8494,37 @@ fn parse_source_tdata_bytes() -> [u8; SOURCE_TERRAIN_TDATA_BYTES] {
     }
 
     panic!("terrain-data.tsv must contain the TDATA record")
+}
+
+fn parse_source_mterr_bytes() -> [u8; SOURCE_TERRAIN_MTERR_BYTES] {
+    let mut output = [0; SOURCE_TERRAIN_MTERR_BYTES];
+    for (line_index, line) in SOURCE_TERRAIN_DATA_TSV.lines().enumerate().skip(1) {
+        let mut fields = line.split('\t');
+        let label = fields.next().unwrap_or_default();
+        let address = fields.next().unwrap_or_default();
+        let bytes = fields.next().unwrap_or_default();
+        if label != SOURCE_TERRAIN_MTERR_LABEL {
+            continue;
+        }
+        let expected_address = format!("0x{SOURCE_TERRAIN_MTERR_ADDRESS:04X}");
+        assert_eq!(
+            address,
+            expected_address.as_str(),
+            "terrain-data line {} must preserve MTERR source address",
+            line_index + 1
+        );
+        assert_eq!(
+            bytes.len(),
+            SOURCE_TERRAIN_MTERR_BYTES * 2,
+            "MTERR hex payload must contain exactly 0x180 bytes"
+        );
+        for index in 0..SOURCE_TERRAIN_MTERR_BYTES {
+            output[index] = parse_source_hex_byte(&bytes[index * 2..index * 2 + 2]);
+        }
+        return output;
+    }
+
+    panic!("terrain-data.tsv must contain the MTERR record")
 }
 
 fn parse_source_hex_byte(value: &str) -> u8 {
@@ -8476,29 +8565,25 @@ fn push_attract_scoring_scanner_sprites(scene: &mut RenderScene, frame: &Attract
 }
 
 fn push_attract_scoring_scanner_terrain_sprites(scene: &mut RenderScene) {
-    for record in source_bgout_default_terrain_records() {
-        let position = attract_scoring_scanner_terrain_position(record.screen_address);
-        scene.push_sprite(SceneSprite {
-            sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
-            layer: RenderLayer::Hud,
-            position,
-            size: ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE,
-            tint: ATTRACT_SCORING_SCANNER_TERRAIN_TINT,
-        });
+    for record in source_scanner_mini_terrain_records() {
+        let origin = offset_position(
+            source_screen_position(record.screen_address),
+            ATTRACT_REFERENCE_SCENE_OFFSET,
+        );
+        for nibble_index in 0..4 {
+            let shift = 12 - nibble_index * 4;
+            if (record.word >> shift) & 0x000F == 0 {
+                continue;
+            }
+            scene.push_sprite(SceneSprite {
+                sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
+                layer: RenderLayer::Hud,
+                position: [origin[0] + nibble_index as f32, origin[1]],
+                size: ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE,
+                tint: ATTRACT_SCORING_SCANNER_TERRAIN_TINT,
+            });
+        }
     }
-}
-
-fn attract_scoring_scanner_terrain_position(screen_address: u16) -> [f32; 2] {
-    let source_position = source_screen_position(screen_address);
-    [
-        ATTRACT_SCORING_SCANNER_ORIGIN[0]
-            + source_position[0].rem_euclid(ATTRACT_SCORING_PLAYFIELD_WIDTH)
-                * ATTRACT_SCORING_SCANNER_SIZE[0]
-                / ATTRACT_SCORING_PLAYFIELD_WIDTH,
-        ATTRACT_SCORING_SCANNER_ORIGIN[1]
-            + source_position[1] * ATTRACT_SCORING_SCANNER_SIZE[1]
-                / ATTRACT_SCORING_PLAYFIELD_HEIGHT,
-    ]
 }
 
 fn attract_scoring_scanner_sprite(
@@ -10994,6 +11079,54 @@ mod tests {
     }
 
     #[test]
+    fn source_scanner_mini_terrain_records_match_red_label_slice() {
+        let records = super::source_scanner_mini_terrain_records();
+
+        assert_eq!(records.len(), super::SOURCE_SCANNER_TERRAIN_RECORDS);
+        assert_eq!(
+            &records[..8],
+            &[
+                super::SourceScannerTerrainRecord {
+                    screen_address: 0x3025,
+                    word: 0x7700,
+                },
+                super::SourceScannerTerrainRecord {
+                    screen_address: 0x3124,
+                    word: 0x7700,
+                },
+                super::SourceScannerTerrainRecord {
+                    screen_address: 0x3222,
+                    word: 0x0770,
+                },
+                super::SourceScannerTerrainRecord {
+                    screen_address: 0x3320,
+                    word: 0x0770,
+                },
+                super::SourceScannerTerrainRecord {
+                    screen_address: 0x341E,
+                    word: 0x0770,
+                },
+                super::SourceScannerTerrainRecord {
+                    screen_address: 0x351C,
+                    word: 0x0770,
+                },
+                super::SourceScannerTerrainRecord {
+                    screen_address: 0x361D,
+                    word: 0x7007,
+                },
+                super::SourceScannerTerrainRecord {
+                    screen_address: 0x371F,
+                    word: 0x7007,
+                },
+            ]
+        );
+        assert_eq!(
+            &super::source_mterr_bytes()[..9],
+            &[0x25, 0x70, 0x07, 0x26, 0x77, 0x00, 0x26, 0x07, 0x70]
+        );
+    }
+
+    #[test]
     fn clean_attract_scoring_sequence_projects_source_rescue_demo() {
         let mut game = Game::new();
         let rescue_score_display_tick = super::attract_scoring_demo_tick_for_stage(
@@ -11049,7 +11182,7 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL
                 && sprite.layer == RenderLayer::Hud
-                && sprite.position[1] < 40.0
+                && sprite.position == [85.0, 30.0]
                 && sprite.tint == super::ATTRACT_SCORING_SCANNER_TERRAIN_TINT
         }));
         assert!(scene.sprites.iter().any(|sprite| {

@@ -61,16 +61,17 @@ appearance phase to the source `APVCT` row-pair projection over the 15 `DEFENS`
 chunks while keeping the clean scene sprite-first for fidelity. R9-E3.14 has
 started the scoring/Hall of Fame visual pass by routing Hall of Fame display
 and credit text through the protected-reference `COLTAB` `0x47` magenta,
-drawing source `BGOUT` terrain pixels inside the attract scanner, applying the
-protected-reference attract display offset to Hall of Fame and scoring
-presentation surfaces, and tinting the scoring scanner border to the
-protected-reference purple. It also starts the scoring/action display from the
-protected reference's post-setup rescue-fall phase and maps scoring
-text/credits through the sampled protected-reference `COLTAB` cadence. The
-title segment now holds its first sampled frame blank and uses sampled
-protected-reference Williams/title text color cadence. Final B13 visual
-acceptance remains open for the remaining title/Hall of Fame visual drift and
-scoring sprite/terrain palette and placement drift.
+applying the protected-reference attract display offset to Hall of Fame and
+scoring presentation surfaces, tinting the scoring scanner border to the
+protected-reference purple, drawing the lower scoring terrain as one source
+scanline, and using source `MTERR` mini-terrain records for the top scanner.
+It also starts the scoring/action display from the protected reference's
+post-setup rescue-fall phase and maps scoring text/credits through the sampled
+protected-reference `COLTAB` cadence. The title segment now holds its first
+sampled frame blank and uses sampled protected-reference Williams/title text
+color cadence. Final B13 visual acceptance remains open for the remaining
+title/Hall of Fame visual drift and scoring sprite/terrain palette and
+placement drift.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -763,11 +764,13 @@ laser/explosion/500-point rescue beat, and `ENMYTB` enemy score-card reveal
 before cycling back to the Williams page. The clean scoring page starts that
 display from the protected reference's post-setup rescue-fall phase and uses
 the protected GIF's sampled `COLTAB` cadence for scoring text and credits while
-preserving the source scoring-page duration. The attract scoring scanner also
-projects the source `BGOUT` terrain table into the top scanner box as
-sprite-backed terrain pixels, applies the protected-reference display offset to
-scoring text/credits/scanner/terrain surfaces, and uses the
-protected-reference purple border tint for that scoring page. The Williams logo
+preserving the source scoring-page duration. The attract scoring scanner uses
+the source `MTERR` mini-terrain slice consumed by `SCNRV`, applies the
+protected-reference display offset to scoring text/credits/scanner/terrain
+surfaces, and uses the protected-reference purple border tint for that scoring
+page. The lower scoring-page terrain is drawn from source `BGOUT` records as a
+single source scanline instead of the earlier two-scanline placeholder height.
+The Williams logo
 is generated from the source `LGOTAB` final pixel pattern and early title
 frames draw a source-ordered handwritten reveal with source `TCTAB` Williams
 palette cycling;
