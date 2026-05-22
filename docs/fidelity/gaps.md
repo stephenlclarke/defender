@@ -29,8 +29,14 @@ moving title/source sprite pseudo-colors onto Williams resistor palette
 conversion with source `COLTAB`/`TCTAB` title cycling. R9-E3.13 also restores
 the Defender wordmark appearance to source `APVCT` row-pair coalescence over
 the 15 `DEFENS` chunks while preserving sprite-first clean render contracts.
-B13 remains open for remaining title/Hall of Fame visual drift, scoring
-sprite/terrain visual drift, candidate media, and owner-review steps.
+R9-E3.14 has started the scoring/Hall of Fame visual pass by moving Hall of
+Fame display and credit text to the protected-reference `COLTAB` `0x47`
+magenta, applying the protected-reference display offset to Hall of Fame and
+scoring presentation surfaces, drawing source `BGOUT` terrain pixels inside
+the attract scanner, and tinting the scoring scanner border to the
+protected-reference purple. B13 remains open for remaining title/Hall of Fame
+visual drift, scoring sprite/terrain visual drift, candidate media, and
+owner-review steps.
 Older entries remain closed fidelity history, local-reference/tooling notes,
 archived prototype cleanup, or post-acceptance validation records. Historical
 entries that mention remaining blockers describe the state at the time they

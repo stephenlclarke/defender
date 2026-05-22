@@ -307,6 +307,7 @@ impl SpriteId {
     pub const ATTRACT_WILLIAMS_LOGO_PIXEL: Self = Self(73);
     pub const ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE: Self = Self(74);
     pub const TERRAIN_TILE_ALT: Self = Self(89);
+    pub const ATTRACT_SCANNER_TERRAIN_PIXEL: Self = Self(90);
     pub const SCORE_DIGITS: [Self; 10] = [
         Self::SCORE_DIGIT_0,
         Self::SCORE_DIGIT_1,
@@ -1371,6 +1372,11 @@ impl TextureAtlas {
                 origin: [112, 160],
                 size: [1, 1],
             },
+            AtlasRegion {
+                sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
+                origin: [114, 160],
+                size: [1, 1],
+            },
         ];
         regions.extend(attract_defender_wordmark_block_regions());
         regions.extend(message_glyph_atlas_regions(surface));
@@ -1691,6 +1697,13 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
         surface,
         regions,
         SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
+        WHITE_RGBA,
+    );
+    fill_default_region(
+        &mut pixels,
+        surface,
+        regions,
+        SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
         WHITE_RGBA,
     );
     for (character, sprite) in &message_glyphs {
@@ -6271,6 +6284,21 @@ mod tests {
             })
         );
         assert_visible_region(&atlas, SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL);
+    }
+
+    #[test]
+    fn default_sprite_atlas_uses_attract_scanner_terrain_pixel_region() {
+        let atlas = TextureAtlas::default_sprites();
+
+        assert_eq!(
+            atlas.region(SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL),
+            Some(AtlasRegion {
+                sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
+                origin: [114, 160],
+                size: [1, 1],
+            })
+        );
+        assert_visible_region(&atlas, SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL);
     }
 
     #[test]

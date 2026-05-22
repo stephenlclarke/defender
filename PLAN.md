@@ -859,7 +859,8 @@ Reopened B13 repair schedule:
   the protected reference at 347 frames / 4600cs, the Williams/title page no
   longer carries score HUD or zero-credit text, attract credits are limited to
   Hall of Fame / scoring contexts unless credits are nonzero, and Hall of Fame
-  text now uses the source `0x85` entry/blink color evidence. B13 remains open:
+  text used the then-current source `0x85` entry/blink color evidence before
+  the later R9-E3.14 protected-reference display-color adjustment. B13 remains open:
   the latest reference/candidate contact sheet still shows Williams
   color/handwriting drift, incomplete Defender coalescence parity, and
   scoring sprite/terrain palette and placement drift.
@@ -882,7 +883,12 @@ Reopened B13 repair schedule:
   protected scoring-sequence frames against clean candidate frames and repair
   the remaining source sprite palettes, score-card object placement, scanner
   colors, and terrain/ground visual drift without reopening broad gameplay
-  ecology unless a runtime scenario field changes.
+  ecology unless a runtime scenario field changes. In progress 2026-05-22:
+  Hall of Fame display and credit text now route through the
+  protected-reference `COLTAB` `0x47` magenta, the scoring page projects source
+  `BGOUT` terrain pixels into the top scanner, and the attract scoring scanner
+  border uses the protected-reference purple instead of the playing white HUD
+  border.
 - R9-E3.15: candidate media gate and owner review. Generate a clean candidate
   without overwriting the protected reference, compare it to the restored GIF,
   run focused visual tests plus targeted clean-fidelity scenarios affected by
@@ -1028,7 +1034,7 @@ Palette/color contract after Step 45:
   used by the clean scene projection: Williams status `0xFB`, Williams logo
   PCRAM color `0x3F`, copyright Williams color index `0x0F`, Williams restore
   rates `0xFF` and `10`, instruction color words `0x6666`, `0x0000`, and
-  `0x4433`, Hall of Fame display/entry letter color indices `0x00` and
+  `0x4433`, Hall of Fame display/entry letter color indices `0x47` and
   `0x85`, Hall of Fame blink color `0x85` with 15-tick sleep, Hall of Fame
   underline words `0x1111` and `0xDDDD`, and top-display border/scanner-marker
   words `0x5555` and `0x9999`.
@@ -3393,6 +3399,28 @@ Work log:
   next full gate should run at R9-E3.15 candidate closeout, or sooner if the
   R9-E3.14 title/Hall of Fame/scoring visual repairs change shared contracts or
   broad scenario behavior.
+
+- `2026-05-22 01:58:14 BST` R9-E3.14 Hall of Fame and scoring scanner visual
+  subpass. The clean attract Hall of Fame page now uses the
+  protected-reference `COLTAB` `0x47` magenta for display and credit text and
+  applies the protected-reference display offset to the Hall of Fame logo,
+  table, underlines, and credits. The attract scoring page now applies the same
+  protected-reference presentation offset to scoring text, credits, top display
+  border, and source `BGOUT` terrain; projects source terrain pixels inside the
+  scanner box; and tints the scoring scanner border purple instead of using the
+  playing white HUD border. Focused validation passed with `cargo fmt
+  --check`, `cargo check`, `cargo test clean_attract --lib`, focused source
+  visual-state/scoring-scene/scanner-pixel atlas tests, the focused oracle
+  attract credit test under `--features legacy-tools`, targeted `make
+  clean-fidelity SCENARIOS="attract_boot"` matching 900/900 frames, and
+  `make readme-media`. Candidate media remains failed B13 evidence but improved
+  materially: reference 347 frames, candidate 347 frames, equal 4600cs
+  duration, sampled RMS full 33.71, title 26.94, Hall of Fame 42.30, numeric
+  glyphs 25.75, sprites 36.92, terrain 33.99, and scoring 35.97. Broad gates
+  remain deferred because this is a bounded visual repair subpass. The next
+  full gate should run at R9-E3.15 candidate closeout, or sooner if remaining
+  scoring sprite placement/palette work changes shared contracts or broad
+  scenario behavior.
 
 ## Archived Completed History
 

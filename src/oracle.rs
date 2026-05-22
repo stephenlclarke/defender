@@ -23,8 +23,8 @@ use crate::game::{
     OBJECT_EVIDENCE_DETAIL_LIMIT, ObjectEvidenceDetailSnapshot, ObjectEvidenceList,
     ObjectEvidenceSnapshot, PlayerSnapshot, PlayerStockSnapshot, SOURCE_VISUAL_STATE,
     ScannerRadarSnapshot, ScoreSnapshot, SoundEvent, WaveProfileSnapshot, WorldSnapshot,
-    WorldVector, attract_defender_wordmark_appearance_tick, expanded_object_sprite_size,
-    push_scanner_radar_sprites,
+    WorldVector, attract_credit_text_tint, attract_defender_wordmark_appearance_tick,
+    expanded_object_sprite_size, push_scanner_radar_sprites,
 };
 use crate::renderer::{
     Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
@@ -530,7 +530,12 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
     if state.phase != GamePhase::Attract || state.game_over.hall_of_fame_stall_remaining.is_some() {
         return;
     }
-    if state.attract.shows_hall_of_fame() {
+    if state.credits == 0
+        && !matches!(
+            state.attract.page,
+            AttractPresentationPage::HallOfFame | AttractPresentationPage::ScoringSequence
+        )
+    {
         return;
     }
 
@@ -540,7 +545,7 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
             text,
             source_screen_position(SOURCE_ATTRACT_CREDITS_LABEL_SCREEN),
             RenderLayer::Overlay,
-            SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
+            attract_credit_text_tint(state),
         );
     }
 
@@ -550,7 +555,7 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
         &digits[..digit_count],
         source_screen_position(SOURCE_ATTRACT_CREDITS_NUMBER_SCREEN),
         RenderLayer::Overlay,
-        SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
+        attract_credit_text_tint(state),
     );
 }
 
@@ -1521,8 +1526,10 @@ mod tests {
                 && sprite.position == [112.0, 84.0]
                 && sprite.size == [6.0, 8.0]
         }));
-        assert!(!hall_sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_C && sprite.position == [80.0, 229.0]
+        assert!(hall_sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_C
+                && sprite.position == [80.0, 229.0]
+                && sprite.tint == crate::game::SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint()
         }));
 
         state.attract =

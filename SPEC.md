@@ -71,8 +71,14 @@ R9-E3.7 clean media:
   decoding onto the Williams resistor palette with source `COLTAB`/`TCTAB`
   title color cycling. R9-E3.13 also projects the Defender `APVCT` appearance
   as source row-pair coalescence over the 15 `DEFENS` chunks without using
-  temporary scene rasters. The latest candidate still shows title/Hall of Fame
-  and scoring visual drift. Until signoff, changes that alter public contracts,
+  temporary scene rasters. R9-E3.14 has started scoring/Hall of Fame visual
+  repair by routing Hall of Fame display/credits through the
+  protected-reference `COLTAB` `0x47` magenta, applying the
+  protected-reference display offset to Hall of Fame and scoring presentation
+  surfaces, projecting source `BGOUT` terrain pixels inside the attract
+  scanner, and applying the protected-reference purple scanner border on the
+  scoring page. The latest candidate still shows title/Hall of Fame and
+  scoring visual drift. Until signoff, changes that alter public contracts,
   scenario semantics, runtime behavior, or final acceptance evidence must
   trigger focused checks and, when broad risk is introduced, a renewed full
   gate.
@@ -446,7 +452,8 @@ top scanner boundary from `0x2F07`, and scanner marker bars from `0x4C07` and
 source-backed scanner state: `SCPROC`/`SCP1`/`SCP2` cadence, selected scanner
 map `1`, scan-left calculation, object erase-table addresses, source `SETEND`,
 player blip bytes, and `OBJCOL` scanner colors. Scanner terrain-raster
-residuals, live top-display scheduling, and exact hardware palette/RGB
+residuals for normal playing, live top-display scheduling, and exact hardware
+palette/RGB
 rendering remain separate render-parity work. HUD and border tints are routed
 through the source visual-state contract that records the `0x5555` border words
 and `0x9999` scanner-marker words while preserving the current clean sprite
@@ -527,8 +534,14 @@ frame count. The Williams handwriting reveal advances by source `LOGO0`
 table-operation slices and uses source `TCTAB`/Williams resistor palette title
 colors; `ELECV` title text uses source `COLTAB` cycling. The Defender wordmark
 appearance now uses source `APVCT` row-pair coalescence over the `DEFENS`
-chunks while staying sprite-first in the clean scene. B13 still requires
-remaining title/Hall of Fame and scoring visual repair before owner acceptance.
+chunks while staying sprite-first in the clean scene. Hall of Fame display and
+credit text now use the protected-reference `COLTAB` `0x47` magenta and
+protected-reference display offset while entry/blink evidence stays on `0x85`.
+The attract scoring page applies that protected-reference offset to
+scoring text/credits/scanner/terrain surfaces, projects source `BGOUT` terrain
+pixels inside the top scanner box, and uses the protected-reference purple
+scanner border tint. B13 still requires remaining title/Hall of Fame and
+scoring visual repair before owner acceptance.
 During a pending two-player start handoff, scenes draw the source-backed
 `PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,

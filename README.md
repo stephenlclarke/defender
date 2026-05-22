@@ -58,9 +58,15 @@ cadence through the `PRES` handoff, then moved clean title, source object, and
 Defender logo decoding onto the Williams resistor palette with source
 `COLTAB`/`TCTAB` title color cycling. R9-E3.13 also restores the Defender
 appearance phase to the source `APVCT` row-pair projection over the 15 `DEFENS`
-chunks while keeping the clean scene sprite-first for fidelity. Final B13
-visual acceptance remains open for the remaining title/Hall of Fame visual
-drift and scoring sprite/terrain palette and placement drift.
+chunks while keeping the clean scene sprite-first for fidelity. R9-E3.14 has
+started the scoring/Hall of Fame visual pass by routing Hall of Fame display
+and credit text through the protected-reference `COLTAB` `0x47` magenta,
+drawing source `BGOUT` terrain pixels inside the attract scanner, applying the
+protected-reference attract display offset to Hall of Fame and scoring
+presentation surfaces, and tinting the scoring scanner border to the
+protected-reference purple. Final B13 visual acceptance remains open for the
+remaining title/Hall of Fame visual drift and scoring sprite/terrain palette
+and placement drift.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -272,6 +278,9 @@ words at their translated screen positions.
 Normal attract scenes draw the source-backed `CREDITS:` label and visible
 credit count during Hall of Fame / scoring contexts and whenever a real credit
 is present; the zero-credit line is suppressed on the Williams title pages.
+During the Hall of Fame page, the credit line follows the same
+protected-reference `COLTAB` `0x47` display magenta and protected-reference
+display offset as the table text.
 The title program now carries a source-backed page scheduler: Williams logo,
 presents copy, Defender wordmark, copyright wait, and instruction labels are
 gated by clean attract page frames and source wait constants while the
@@ -285,8 +294,9 @@ sprites: the lower display line, scanner side/top boundaries, and scanner
 marker bars at translated source screen positions. Playing scenes also project
 source-backed scanner/radar object and player blips from the scanner sleep
 cadence, scan-left calculation, object erase table, player blip bytes, and
-source `OBJCOL` scanner color words. Scanner terrain-raster residuals and
-hardware palette/RGB render audit residuals remain later render-parity work.
+source `OBJCOL` scanner color words. Scanner terrain-raster residuals for
+normal playing and hardware palette/RGB render audit residuals remain later
+render-parity work.
 Playing scenes also project bounded source object-detail rows that carry
 `screen_position`, `picture_size`, and a mapped clean sprite: active rows draw
 on the object layer, projectile rows draw on the projectile layer, and inactive
@@ -746,9 +756,14 @@ source wait constants, now ordering the title/copyright surfaces before the
 Hall of Fame display and source scoring/action sequence. The scoring/action
 sequence replays the source instruction-page rescue demo, scanner blips,
 laser/explosion/500-point rescue beat, and `ENMYTB` enemy score-card reveal
-before cycling back to the Williams page. The Williams logo is generated from
-the source `LGOTAB` final pixel pattern and early title frames draw a
-source-ordered handwritten reveal with source `TCTAB` Williams palette cycling;
+before cycling back to the Williams page. The attract scoring scanner also
+projects the source `BGOUT` terrain table into the top scanner box as
+sprite-backed terrain pixels, applies the protected-reference display offset to
+scoring text/credits/scanner/terrain surfaces, and uses the
+protected-reference purple border tint for that scoring page. The Williams logo
+is generated from the source `LGOTAB` final pixel pattern and early title
+frames draw a source-ordered handwritten reveal with source `TCTAB` Williams
+palette cycling;
 the reveal cadence follows source `LOGO0` table operations instead of a linear
 pixel ramp. Title text uses the Williams resistor palette with source `COLTAB`
 cycling. The protected GIF's Defender appearance now uses source `APVCT`

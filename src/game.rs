@@ -140,6 +140,15 @@ const SOURCE_ATTRACT_TITLE_TEXT_COLOR_OFFSET: usize = 18;
 const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_PRIME_FRAMES: u16 = 6;
 const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLEEP_FRAMES: u16 = 6;
 const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET: usize = 2;
+const ATTRACT_SCORING_PLAYFIELD_WIDTH: f32 = 320.0;
+const ATTRACT_SCORING_PLAYFIELD_HEIGHT: f32 = 256.0;
+const ATTRACT_REFERENCE_SCENE_OFFSET: [f32; 2] = [-11.0, -7.0];
+const ATTRACT_HALL_OF_FAME_REFERENCE_OFFSET: [f32; 2] = [-11.0, -6.0];
+const ATTRACT_SCORING_SCANNER_ORIGIN: [f32; 2] = [84.0, 0.0];
+const ATTRACT_SCORING_SCANNER_SIZE: [f32; 2] = [128.0, 32.0];
+const ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE: [f32; 2] = [1.0, 1.0];
+const ATTRACT_SCORING_SCANNER_TERRAIN_TINT: Color = Color::from_rgba(174, 81, 0, 255);
+const ATTRACT_SCORING_SCANNER_BORDER_TINT: Color = Color::from_rgba(38, 0, 160, 255);
 const SOURCE_WILLIAMS_RED_GREEN_LEVELS: [u8; 8] = [0, 38, 81, 118, 137, 174, 217, 255];
 const SOURCE_WILLIAMS_BLUE_LEVELS: [u8; 4] = [0, 95, 160, 255];
 const SOURCE_TERRAIN_DATA_TSV: &str = include_str!("../assets/red-label/terrain-data.tsv");
@@ -225,7 +234,7 @@ pub(crate) const SOURCE_VISUAL_STATE: SourceVisualStateSnapshot = SourceVisualSt
     attract_instruction_man_color_word: 0x6666,
     attract_instruction_ship_color_word: 0x0000,
     attract_instruction_enemy_color_word: 0x4433,
-    hall_of_fame_display_letter_color_index: 0x00,
+    hall_of_fame_display_letter_color_index: 0x47,
     hall_of_fame_logo_color_index: 0x3F,
     hall_of_fame_entry_letter_color_index: 0x85,
     hall_of_fame_blink_color_index: 0x85,
@@ -483,8 +492,7 @@ impl SourceVisualStateSnapshot {
     }
 
     pub(crate) fn hall_of_fame_display_text_tint(self) -> Color {
-        let _source_index = self.hall_of_fame_display_letter_color_index;
-        source_pseudo_color_tint(self.hall_of_fame_entry_letter_color_index)
+        source_pseudo_color_tint(self.hall_of_fame_display_letter_color_index)
     }
 
     pub(crate) fn hall_of_fame_blink_text_tint(self) -> Color {
@@ -7007,9 +7015,38 @@ fn push_source_controlled_message_sprites_with_tint(
     tint_new_sprites(scene, first_sprite, tint);
 }
 
+fn push_source_controlled_message_sprites_with_tint_and_offset(
+    scene: &mut RenderScene,
+    text: &str,
+    top_left_screen_address: u16,
+    layer: RenderLayer,
+    tint: Color,
+    offset: [f32; 2],
+) {
+    let first_sprite = scene.sprites.len();
+    push_source_controlled_message_sprites_with_tint(
+        scene,
+        text,
+        top_left_screen_address,
+        layer,
+        tint,
+    );
+    offset_new_sprites(scene, first_sprite, offset);
+}
+
 fn tint_new_sprites(scene: &mut RenderScene, first_sprite: usize, tint: Color) {
     for sprite in &mut scene.sprites[first_sprite..] {
         sprite.tint = tint;
+    }
+}
+
+fn offset_new_sprites(scene: &mut RenderScene, first_sprite: usize, offset: [f32; 2]) {
+    if offset == [0.0, 0.0] {
+        return;
+    }
+
+    for sprite in &mut scene.sprites[first_sprite..] {
+        sprite.position = offset_position(sprite.position, offset);
     }
 }
 
@@ -7127,13 +7164,17 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
         return;
     }
 
+    let visual_offset = attract_page_visual_offset(state);
     if let Some(text) = source_message_text("CREDV") {
         push_source_message_sprites_with_tint(
             scene,
             text,
-            source_screen_position(SOURCE_ATTRACT_CREDITS_LABEL_SCREEN),
+            offset_position(
+                source_screen_position(SOURCE_ATTRACT_CREDITS_LABEL_SCREEN),
+                visual_offset,
+            ),
             RenderLayer::Overlay,
-            SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
+            attract_credit_text_tint(state),
         );
     }
 
@@ -7141,10 +7182,45 @@ fn push_attract_credit_sprites(scene: &mut RenderScene, state: &GameState) {
     push_source_text_bytes_sprites_with_tint(
         scene,
         &digits[..digit_count],
-        source_screen_position(SOURCE_ATTRACT_CREDITS_NUMBER_SCREEN),
+        offset_position(
+            source_screen_position(SOURCE_ATTRACT_CREDITS_NUMBER_SCREEN),
+            visual_offset,
+        ),
         RenderLayer::Overlay,
-        SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame),
+        attract_credit_text_tint(state),
     );
+}
+
+pub(crate) fn attract_credit_text_tint(state: &GameState) -> Color {
+    if let Some(scoring_tick) = state.attract.scoring_sequence_frame() {
+        return attract_scoring_color_cycle_tint(scoring_tick);
+    }
+
+    if state.attract.shows_hall_of_fame() {
+        return SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint();
+    }
+
+    SOURCE_VISUAL_STATE.attract_title_text_tint_for_frame(state.attract.page_frame)
+}
+
+pub(crate) fn attract_page_visual_offset(state: &GameState) -> [f32; 2] {
+    if state.phase != GamePhase::Attract {
+        return [0.0, 0.0];
+    }
+
+    if state.attract.shows_hall_of_fame() {
+        return ATTRACT_HALL_OF_FAME_REFERENCE_OFFSET;
+    }
+
+    if state.attract.scoring_sequence_frame().is_some() {
+        return ATTRACT_REFERENCE_SCENE_OFFSET;
+    }
+
+    [0.0, 0.0]
+}
+
+fn offset_position(position: [f32; 2], offset: [f32; 2]) -> [f32; 2] {
+    [position[0] + offset[0], position[1] + offset[1]]
 }
 
 fn attract_credit_digits(credits: u8) -> ([u8; 2], usize) {
@@ -7189,13 +7265,16 @@ fn push_attract_instruction_text_sprites(scene: &mut RenderScene, state: &GameSt
             1 + attract_scoring_visible_legend_text_entries(tick)
         });
     let scoring_tint = scoring_tick.map(attract_scoring_color_cycle_tint);
+    let visual_offset = scoring_tick
+        .map(|_| attract_page_visual_offset(state))
+        .unwrap_or([0.0, 0.0]);
 
     for (label, screen_address) in SOURCE_ATTRACT_INSTRUCTION_TEXT_LINES
         .iter()
         .take(visible_line_count)
     {
         if let Some(text) = source_message_text(label) {
-            push_source_controlled_message_sprites_with_tint(
+            push_source_controlled_message_sprites_with_tint_and_offset(
                 scene,
                 text,
                 *screen_address,
@@ -7203,6 +7282,7 @@ fn push_attract_instruction_text_sprites(scene: &mut RenderScene, state: &GameSt
                 scoring_tint.unwrap_or_else(|| {
                     SOURCE_VISUAL_STATE.attract_instruction_text_tint(*screen_address)
                 }),
+                visual_offset,
             );
         }
     }
@@ -8236,10 +8316,23 @@ fn parse_source_hex_byte(value: &str) -> u8 {
 
 fn push_attract_scoring_terrain_sprites(scene: &mut RenderScene, demo_tick: u16) {
     let _source_scproc_timing_evidence = demo_tick;
-    push_source_bgout_terrain_sprites(scene);
+    for record in source_bgout_default_terrain_records() {
+        scene.push_sprite(SceneSprite {
+            sprite: source_terrain_word_sprite(record.word),
+            layer: RenderLayer::Terrain,
+            position: offset_position(
+                source_screen_position(record.screen_address),
+                ATTRACT_REFERENCE_SCENE_OFFSET,
+            ),
+            size: SOURCE_TERRAIN_WORD_SIZE,
+            tint: Color::WHITE,
+        });
+    }
 }
 
 fn push_attract_scoring_scanner_sprites(scene: &mut RenderScene, frame: &AttractScoringFrame) {
+    push_attract_scoring_scanner_terrain_sprites(scene);
+
     for object in &frame.scanner_objects {
         let Some((sprite, size, color_word)) = attract_scoring_scanner_sprite(*object) else {
             continue;
@@ -8252,6 +8345,32 @@ fn push_attract_scoring_scanner_sprites(scene: &mut RenderScene, frame: &Attract
             tint: source_pseudo_color_tint((color_word & 0x00FF) as u8),
         });
     }
+}
+
+fn push_attract_scoring_scanner_terrain_sprites(scene: &mut RenderScene) {
+    for record in source_bgout_default_terrain_records() {
+        let position = attract_scoring_scanner_terrain_position(record.screen_address);
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
+            layer: RenderLayer::Hud,
+            position,
+            size: ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE,
+            tint: ATTRACT_SCORING_SCANNER_TERRAIN_TINT,
+        });
+    }
+}
+
+fn attract_scoring_scanner_terrain_position(screen_address: u16) -> [f32; 2] {
+    let source_position = source_screen_position(screen_address);
+    [
+        ATTRACT_SCORING_SCANNER_ORIGIN[0]
+            + source_position[0].rem_euclid(ATTRACT_SCORING_PLAYFIELD_WIDTH)
+                * ATTRACT_SCORING_SCANNER_SIZE[0]
+                / ATTRACT_SCORING_PLAYFIELD_WIDTH,
+        ATTRACT_SCORING_SCANNER_ORIGIN[1]
+            + source_position[1] * ATTRACT_SCORING_SCANNER_SIZE[1]
+                / ATTRACT_SCORING_PLAYFIELD_HEIGHT,
+    ]
 }
 
 fn attract_scoring_scanner_sprite(
@@ -8281,8 +8400,10 @@ fn attract_scoring_scanner_sprite(
 fn attract_scoring_scanner_position(object: AttractScoringObject) -> [f32; 2] {
     let [native_x, native_y] = attract_scoring_object_position(object.x16, object.y16);
     [
-        96.0 + native_x * 128.0 / 320.0,
-        8.0 + native_y * 32.0 / 256.0,
+        ATTRACT_SCORING_SCANNER_ORIGIN[0]
+            + native_x * ATTRACT_SCORING_SCANNER_SIZE[0] / ATTRACT_SCORING_PLAYFIELD_WIDTH,
+        ATTRACT_SCORING_SCANNER_ORIGIN[1]
+            + native_y * ATTRACT_SCORING_SCANNER_SIZE[1] / ATTRACT_SCORING_PLAYFIELD_HEIGHT,
     ]
 }
 
@@ -8623,33 +8744,40 @@ fn push_hall_of_fame_display_sprites(scene: &mut RenderScene, state: &GameState)
         return;
     }
 
+    let visual_offset = if shows_attract_hall_of_fame {
+        ATTRACT_HALL_OF_FAME_REFERENCE_OFFSET
+    } else {
+        [0.0, 0.0]
+    };
     for (message_label, screen_address) in SOURCE_HALL_OF_FAME_DISPLAY_HEADINGS {
         if let Some(text) = source_message_text(message_label) {
             push_source_message_sprites_with_tint(
                 scene,
                 text,
-                source_screen_position(screen_address),
+                offset_position(source_screen_position(screen_address), visual_offset),
                 RenderLayer::Overlay,
                 SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint(),
             );
         }
     }
 
-    push_hall_of_fame_display_underline_sprites(scene);
-    push_hall_of_fame_defender_logo_sprite(scene);
+    push_hall_of_fame_display_underline_sprites(scene, visual_offset);
+    push_hall_of_fame_defender_logo_sprite(scene, visual_offset);
     push_hall_of_fame_table_sprites(
         scene,
         state.high_score_tables.todays_greatest,
         SOURCE_HALL_OF_FAME_TODAYS_TABLE_SCREEN,
+        visual_offset,
     );
     push_hall_of_fame_table_sprites(
         scene,
         state.high_score_tables.all_time,
         SOURCE_HALL_OF_FAME_ALL_TIME_TABLE_SCREEN,
+        visual_offset,
     );
 }
 
-fn push_hall_of_fame_display_underline_sprites(scene: &mut RenderScene) {
+fn push_hall_of_fame_display_underline_sprites(scene: &mut RenderScene, visual_offset: [f32; 2]) {
     for word_offset in (SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_RIGHT_END
         ..=SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_RIGHT_START)
         .rev()
@@ -8658,10 +8786,13 @@ fn push_hall_of_fame_display_underline_sprites(scene: &mut RenderScene) {
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::HALL_OF_FAME_UNDERLINE_WORD,
             layer: RenderLayer::Overlay,
-            position: source_screen_position_with_offset(
-                SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_SCREEN,
-                word_offset,
-                0,
+            position: offset_position(
+                source_screen_position_with_offset(
+                    SOURCE_HALL_OF_FAME_DISPLAY_UNDERLINE_SCREEN,
+                    word_offset,
+                    0,
+                ),
+                visual_offset,
             ),
             size: SOURCE_HALL_OF_FAME_UNDERLINE_WORD_SIZE,
             tint: SOURCE_VISUAL_STATE.hall_of_fame_normal_underline_tint(),
@@ -8669,11 +8800,14 @@ fn push_hall_of_fame_display_underline_sprites(scene: &mut RenderScene) {
     }
 }
 
-fn push_hall_of_fame_defender_logo_sprite(scene: &mut RenderScene) {
+fn push_hall_of_fame_defender_logo_sprite(scene: &mut RenderScene, visual_offset: [f32; 2]) {
     scene.push_sprite(SceneSprite {
         sprite: SpriteId::HALL_OF_FAME_DEFENDER_LOGO,
         layer: RenderLayer::Overlay,
-        position: source_screen_position(SOURCE_HALL_OF_FAME_LOGO_SCREEN),
+        position: offset_position(
+            source_screen_position(SOURCE_HALL_OF_FAME_LOGO_SCREEN),
+            visual_offset,
+        ),
         size: SOURCE_HALL_OF_FAME_LOGO_SIZE,
         tint: SOURCE_VISUAL_STATE.hall_of_fame_logo_tint(),
     });
@@ -8683,6 +8817,7 @@ fn push_hall_of_fame_table_sprites(
     scene: &mut RenderScene,
     entries: [HighScoreTableEntrySnapshot; HIGH_SCORE_TABLE_ENTRIES],
     top_left_screen_address: u16,
+    visual_offset: [f32; 2],
 ) {
     for (index, entry) in entries.iter().enumerate() {
         let vertical_offset = u8::try_from(index).expect("high-score table index fits in u8")
@@ -8691,17 +8826,23 @@ fn push_hall_of_fame_table_sprites(
         push_source_text_bytes_sprites_with_tint(
             scene,
             &[row_rank],
-            source_screen_position_with_offset(top_left_screen_address, 0, vertical_offset),
+            offset_position(
+                source_screen_position_with_offset(top_left_screen_address, 0, vertical_offset),
+                visual_offset,
+            ),
             RenderLayer::Overlay,
             SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint(),
         );
         push_source_text_bytes_sprites_with_tint(
             scene,
             &high_score_initials_text(entry.initials),
-            source_screen_position_with_offset(
-                top_left_screen_address,
-                SOURCE_HALL_OF_FAME_TABLE_INITIALS_OFFSET,
-                vertical_offset,
+            offset_position(
+                source_screen_position_with_offset(
+                    top_left_screen_address,
+                    SOURCE_HALL_OF_FAME_TABLE_INITIALS_OFFSET,
+                    vertical_offset,
+                ),
+                visual_offset,
             ),
             RenderLayer::Overlay,
             SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint(),
@@ -8709,10 +8850,13 @@ fn push_hall_of_fame_table_sprites(
         push_source_text_bytes_sprites_with_tint(
             scene,
             &hall_of_fame_score_text(entry.score),
-            source_screen_position_with_offset(
-                top_left_screen_address,
-                SOURCE_HALL_OF_FAME_TABLE_SCORE_OFFSET,
-                vertical_offset,
+            offset_position(
+                source_screen_position_with_offset(
+                    top_left_screen_address,
+                    SOURCE_HALL_OF_FAME_TABLE_SCORE_OFFSET,
+                    vertical_offset,
+                ),
+                visual_offset,
             ),
             RenderLayer::Overlay,
             SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint(),
@@ -8865,18 +9009,23 @@ fn push_top_display_border_sprites(scene: &mut RenderScene, state: &GameState) {
         return;
     }
 
+    let visual_offset = attract_page_visual_offset(state);
     for (screen_address, size) in SOURCE_TOP_DISPLAY_BORDER_SEGMENTS {
         scene.push_sprite(SceneSprite {
             sprite: SpriteId::TOP_DISPLAY_BORDER_WORD,
             layer: RenderLayer::Hud,
-            position: source_screen_position(*screen_address),
+            position: offset_position(source_screen_position(*screen_address), visual_offset),
             size: *size,
-            tint: top_display_border_segment_tint(*screen_address),
+            tint: top_display_border_segment_tint(*screen_address, state),
         });
     }
 }
 
-fn top_display_border_segment_tint(screen_address: u16) -> Color {
+fn top_display_border_segment_tint(screen_address: u16, state: &GameState) -> Color {
+    if state.phase == GamePhase::Attract && state.attract.scoring_sequence_frame().is_some() {
+        return ATTRACT_SCORING_SCANNER_BORDER_TINT;
+    }
+
     if matches!(screen_address, 0x4C07 | 0x4C28) {
         SOURCE_VISUAL_STATE.top_display_scanner_marker_tint()
     } else {
@@ -10621,13 +10770,15 @@ mod tests {
         game.state.attract = AttractPresentationSnapshot::for_page_frame(488);
         let hall_scene = game.scene();
         assert!(hall_scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO && sprite.position == [96.0, 56.0]
+            sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO && sprite.position == [85.0, 50.0]
         }));
         assert!(hall_scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_H && sprite.position == [112.0, 84.0]
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_H && sprite.position == [101.0, 78.0]
         }));
         assert!(hall_scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_C && sprite.position == [80.0, 229.0]
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_C
+                && sprite.position == [69.0, 223.0]
+                && sprite.tint == SOURCE_VISUAL_STATE.hall_of_fame_display_text_tint()
         }));
         assert!(!hall_scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO
@@ -10639,7 +10790,11 @@ mod tests {
         );
         let scoring_scene = game.scene();
         assert!(scoring_scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [134.0, 48.0]
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [123.0, 41.0]
+        }));
+        assert!(scoring_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::TOP_DISPLAY_BORDER_WORD
+                && sprite.tint == super::ATTRACT_SCORING_SCANNER_BORDER_TINT
         }));
         assert!(
             scoring_scene
@@ -10762,10 +10917,16 @@ mod tests {
                 .any(|sprite| sprite.sprite == SpriteId::SCANNER_OBJECT_BLIP)
         );
         assert!(scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [134.0, 48.0]
+            sprite.sprite == SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position[1] < 40.0
+                && sprite.tint == super::ATTRACT_SCORING_SCANNER_TERRAIN_TINT
+        }));
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [123.0, 41.0]
         }));
         assert!(!scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_L && sprite.position == [56.0, 112.0]
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_L && sprite.position == [45.0, 105.0]
         }));
     }
 
@@ -10813,10 +10974,10 @@ mod tests {
             );
         }
         assert!(scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [184.0, 168.0]
+            sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [173.0, 161.0]
         }));
         assert!(scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::SCORE_DIGIT_1 && sprite.position[1] >= 168.0
+            sprite.sprite == SpriteId::SCORE_DIGIT_1 && sprite.position[1] >= 161.0
         }));
     }
 
@@ -10994,7 +11155,7 @@ mod tests {
         assert_eq!(visual.attract_instruction_man_color_word, 0x6666);
         assert_eq!(visual.attract_instruction_ship_color_word, 0x0000);
         assert_eq!(visual.attract_instruction_enemy_color_word, 0x4433);
-        assert_eq!(visual.hall_of_fame_display_letter_color_index, 0x00);
+        assert_eq!(visual.hall_of_fame_display_letter_color_index, 0x47);
         assert_eq!(visual.hall_of_fame_logo_color_index, 0x3F);
         assert_eq!(visual.hall_of_fame_entry_letter_color_index, 0x85);
         assert_eq!(visual.hall_of_fame_blink_color_index, 0x85);
@@ -11032,7 +11193,7 @@ mod tests {
         );
         assert_eq!(
             visual.hall_of_fame_display_text_tint(),
-            super::source_pseudo_color_tint(0x85)
+            super::source_pseudo_color_tint(0x47)
         );
         assert_eq!(
             visual.hall_of_fame_blink_text_tint(),
