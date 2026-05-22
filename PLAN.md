@@ -868,13 +868,16 @@ Reopened B13 repair schedule:
   `WILLIR`/`WILR1` evidence plus pre-rewrite trace behavior to repair the
   remaining Williams color cadence and Defender appearance/coalescence
   geometry. Add focused scene/atlas/media tests that fail on uniform title
-  tint or non-source coalescence cadence. In progress: the Williams
+  tint or non-source coalescence cadence. Completed 2026-05-22. The Williams
   handwriting reveal now uses source `LOGO0` table-operation cadence and
   completes at the `PRES` handoff instead of using a linear 160-frame pixel
   ramp; title text, source pseudo-colors, object sprite palettes, and the
   source-expanded Defender logo now use Williams resistor palette conversion
-  with source `COLTAB`/`TCTAB` cycling. Remaining R9-E3.13 work is Defender
-  coalescence visual repair.
+  with source `COLTAB`/`TCTAB` cycling. The Defender appearance now follows the
+  source `APVCT` row-pair projection over the 15 `DEFENS` chunks and renders as
+  normal clean overlay sprites instead of temporary rasters. Candidate metrics
+  improved but still fail B13 visual acceptance, so R9-E3.14 remains active for
+  title/Hall of Fame and scoring visual drift.
 - R9-E3.14: scoring sprite, scanner, and terrain visual pass. Compare the
   protected scoring-sequence frames against clean candidate frames and repair
   the remaining source sprite palettes, score-card object placement, scanner
@@ -3370,6 +3373,25 @@ Work log:
   because this is a bounded visual repair subpass. The next full gate should
   run at R9-E3.15 candidate closeout, or sooner if the remaining
   Defender/coalescence or scoring visual repairs change shared contracts or
+  broad scenario behavior.
+
+- `2026-05-22 01:28:51 BST` R9-E3.13 Defender coalescence subpass. The clean
+  and oracle title paths now project the Defender appearance with the
+  pre-rewrite/source `APVCT` row-pair geometry over the 15 `DEFENS` chunks,
+  including center-word clearing, while emitting normal 1x1 overlay sprites so
+  `attract_boot` remains raster-free. Focused validation passed with
+  `cargo fmt --check`, `cargo check`, `cargo test clean_attract --lib`,
+  `cargo test default_sprite_atlas_uses_defender_wordmark_block_regions --lib`,
+  `cargo test oracle::tests::oracle_scene_projects_attract_credit_text_sprites
+  --lib --features legacy-tools`, targeted `make clean-fidelity
+  SCENARIOS="attract_boot"` matching 900/900 frames, and `make readme-media`.
+  Candidate media remains failed B13 evidence but improved slightly versus the
+  title palette subpass: reference 347 frames, candidate 347 frames, equal
+  4600cs duration, sampled RMS full 46.75, title 54.30, Hall of Fame 58.84,
+  numeric glyphs 61.74, sprites 44.22, terrain 38.49, and scoring 51.51. Broad
+  gates remain deferred because this is a bounded visual repair subpass. The
+  next full gate should run at R9-E3.15 candidate closeout, or sooner if the
+  R9-E3.14 title/Hall of Fame/scoring visual repairs change shared contracts or
   broad scenario behavior.
 
 ## Archived Completed History

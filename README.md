@@ -56,9 +56,11 @@ uses source Hall of Fame color evidence. R9-E3.13 has started title repair by
 switching the Williams handwriting reveal to source `LOGO0` table-operation
 cadence through the `PRES` handoff, then moved clean title, source object, and
 Defender logo decoding onto the Williams resistor palette with source
-`COLTAB`/`TCTAB` title color cycling. Final B13 visual acceptance remains open
-for Defender coalescence parity and scoring sprite/terrain palette and
-placement drift.
+`COLTAB`/`TCTAB` title color cycling. R9-E3.13 also restores the Defender
+appearance phase to the source `APVCT` row-pair projection over the 15 `DEFENS`
+chunks while keeping the clean scene sprite-first for fidelity. Final B13
+visual acceptance remains open for the remaining title/Hall of Fame visual
+drift and scoring sprite/terrain palette and placement drift.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -749,8 +751,9 @@ the source `LGOTAB` final pixel pattern and early title frames draw a
 source-ordered handwritten reveal with source `TCTAB` Williams palette cycling;
 the reveal cadence follows source `LOGO0` table operations instead of a linear
 pixel ramp. Title text uses the Williams resistor palette with source `COLTAB`
-cycling. B13 still requires a follow-up title pass for the protected GIF's
-Defender coalescence timing.
+cycling. The protected GIF's Defender appearance now uses source `APVCT`
+row-pair coalescence projected as sprite-first clean pixels instead of
+temporary rasters.
 The normal attract Defender wordmark now uses the 15 source `DEFENS` 4-byte by
 12-row `APVCT` appearance slots and descriptor addresses during the appearance
 window before returning to the full `0x3C` by `0x18` source-expanded wordmark

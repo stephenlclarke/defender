@@ -1,6 +1,6 @@
 //! Wgpu-oriented scene contracts.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SurfaceSize {
@@ -157,6 +157,12 @@ impl WgpuPassPlan {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color {
     pub rgba: [u8; 4],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SourceAttractDefenderAppearancePixel {
+    pub position: [u16; 2],
+    pub color: [u8; 4],
 }
 
 impl Color {
@@ -1050,7 +1056,6 @@ pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS: usize = 15;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS: usize = 1;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT: usize =
     ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS * ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
-pub(crate) const ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE: [f32; 2] = [8.0, 12.0];
 const SOURCE_ATTRACT_COPYRIGHT_COLUMNS: u8 = 40;
 const SOURCE_ATTRACT_COPYRIGHT_ROWS: u8 = 8;
 const SOURCE_ATTRACT_COPYRIGHT_BYTES: [u8; 80] = [
@@ -1436,9 +1441,9 @@ fn attract_defender_wordmark_block_regions() -> Vec<AtlasRegion> {
                 .expect("Defender wordmark block sprite"),
             origin: [
                 u32::try_from(column).expect("Defender wordmark block column fits") * 8,
-                128 + u32::try_from(row).expect("Defender wordmark block row fits") * 12,
+                128 + u32::try_from(row).expect("Defender wordmark block row fits") * 24,
             ],
-            size: [8, 12],
+            size: [8, 24],
         });
     }
     regions
@@ -2346,6 +2351,168 @@ fn expand_source_defender_logo_bytes() -> [u8; SOURCE_DEFENDER_LOGO_BYTES] {
     }
 
     output
+}
+
+pub(crate) fn source_attract_defender_appearance_pixels(
+    surface: SurfaceSize,
+    appearance_tick: u8,
+) -> Vec<SourceAttractDefenderAppearancePixel> {
+    const LOGO_LEFT_BYTE: i32 = 0x30;
+    const LOGO_TOP_SCANLINE: i32 = 0x90;
+    const CHUNK_WIDTH_BYTES: i32 = 4;
+    const CHUNK_WIDTH_PIXELS: i32 = 8;
+    const CHUNK_ROW_PAIRS: i32 = 12;
+    const CHUNK_CENTER_X_BYTES: i32 = 2;
+    const CHUNK_CENTER_Y_SCANLINES: i32 = 12;
+    const SOURCE_APPEARANCE_FINAL_TICK: u8 = 0x2E;
+
+    let source = expand_source_defender_logo_bytes();
+    let mut pixels = BTreeMap::new();
+    let size = i32::from(SOURCE_APPEARANCE_FINAL_TICK.saturating_sub(appearance_tick)).max(1);
+    let row_pair_step = size * 2;
+
+    for chunk_index in 0..ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT {
+        let chunk_index = i32::try_from(chunk_index).expect("Defender chunk index fits in i32");
+        let logo_left_byte = LOGO_LEFT_BYTE + chunk_index * CHUNK_WIDTH_BYTES;
+        let start_x_byte = logo_left_byte + CHUNK_CENTER_X_BYTES - CHUNK_CENTER_X_BYTES * size;
+        let start_y =
+            LOGO_TOP_SCANLINE + CHUNK_CENTER_Y_SCANLINES - CHUNK_CENTER_Y_SCANLINES * size;
+
+        for byte_column in 0..CHUNK_WIDTH_BYTES {
+            let target_x_byte = start_x_byte + byte_column * size;
+            let source_x = chunk_index * CHUNK_WIDTH_PIXELS + byte_column * 2;
+
+            for row_pair in 0..CHUNK_ROW_PAIRS {
+                let target_y = start_y + row_pair * row_pair_step;
+                let source_y = row_pair * 2;
+                draw_source_defender_logo_word(
+                    &mut pixels,
+                    surface,
+                    &source,
+                    source_x,
+                    source_y,
+                    target_x_byte,
+                    target_y,
+                );
+            }
+        }
+
+        clear_source_defender_logo_word(
+            &mut pixels,
+            logo_left_byte + CHUNK_CENTER_X_BYTES,
+            LOGO_TOP_SCANLINE + CHUNK_CENTER_Y_SCANLINES,
+        );
+    }
+
+    pixels
+        .into_iter()
+        .map(
+            |([native_x, native_y], color)| SourceAttractDefenderAppearancePixel {
+                position: [
+                    u16::try_from(native_x).expect("Defender appearance x fits in u16"),
+                    u16::try_from(native_y).expect("Defender appearance y fits in u16"),
+                ],
+                color,
+            },
+        )
+        .collect()
+}
+
+fn draw_source_defender_logo_word(
+    pixels: &mut BTreeMap<[u32; 2], [u8; 4]>,
+    surface: SurfaceSize,
+    source: &[u8; SOURCE_DEFENDER_LOGO_BYTES],
+    source_x: i32,
+    source_y: i32,
+    target_x_byte: i32,
+    target_y: i32,
+) {
+    let palette = ObjectPicturePalette::defender_logo();
+    for dy in 0..2 {
+        for dx in 0..2 {
+            let Some(nibble) = source_defender_logo_nibble(source, source_x + dx, source_y + dy)
+            else {
+                continue;
+            };
+            if nibble == 0 {
+                continue;
+            }
+            let color = picture_palette_color(nibble, palette);
+            write_native_rgba_pixel(
+                pixels,
+                surface,
+                target_x_byte * i32::from(SOURCE_SCREEN_COLUMN_PIXELS_U8) + dx,
+                target_y + dy,
+                color,
+            );
+        }
+    }
+}
+
+fn clear_source_defender_logo_word(
+    pixels: &mut BTreeMap<[u32; 2], [u8; 4]>,
+    target_x_byte: i32,
+    target_y: i32,
+) {
+    for dy in 0..2 {
+        for dx in 0..2 {
+            let native_x = target_x_byte * i32::from(SOURCE_SCREEN_COLUMN_PIXELS_U8) + dx;
+            let native_y = target_y + dy;
+            if native_x < 0 || native_y < 0 {
+                continue;
+            }
+            let position = [
+                u32::try_from(native_x).expect("native x is non-negative"),
+                u32::try_from(native_y).expect("native y is non-negative"),
+            ];
+            pixels.remove(&position);
+        }
+    }
+}
+
+fn source_defender_logo_nibble(
+    source: &[u8; SOURCE_DEFENDER_LOGO_BYTES],
+    native_x: i32,
+    native_y: i32,
+) -> Option<u8> {
+    if native_x < 0
+        || native_y < 0
+        || native_x >= i32::from(SOURCE_DEFENDER_LOGO_COLUMNS) * 2
+        || native_y >= i32::from(SOURCE_DEFENDER_LOGO_ROWS)
+    {
+        return None;
+    }
+
+    let byte_column = usize::try_from(native_x / 2).ok()?;
+    let row = usize::try_from(native_y).ok()?;
+    let packed = source[byte_column * usize::from(SOURCE_DEFENDER_LOGO_ROWS) + row];
+    if native_x % 2 == 0 {
+        Some(packed >> 4)
+    } else {
+        Some(packed & 0x0F)
+    }
+}
+
+fn write_native_rgba_pixel(
+    pixels: &mut BTreeMap<[u32; 2], [u8; 4]>,
+    surface: SurfaceSize,
+    native_x: i32,
+    native_y: i32,
+    color: [u8; 4],
+) {
+    if native_x < 0
+        || native_y < 0
+        || native_x >= surface.width as i32
+        || native_y >= surface.height as i32
+    {
+        return;
+    }
+
+    let position = [
+        u32::try_from(native_x).expect("native x is non-negative"),
+        u32::try_from(native_y).expect("native y is non-negative"),
+    ];
+    pixels.insert(position, color);
 }
 
 const fn source_defender_logo_color_byte(nibble: u8) -> u8 {
@@ -5984,7 +6151,7 @@ mod tests {
             Some(AtlasRegion {
                 sprite: first,
                 origin: [0, 128],
-                size: [8, 12],
+                size: [8, 24],
             })
         );
         assert_eq!(
@@ -5992,7 +6159,7 @@ mod tests {
             Some(AtlasRegion {
                 sprite: center,
                 origin: [56, 128],
-                size: [8, 12],
+                size: [8, 24],
             })
         );
         assert_eq!(
@@ -6000,7 +6167,7 @@ mod tests {
             Some(AtlasRegion {
                 sprite: last,
                 origin: [112, 128],
-                size: [8, 12],
+                size: [8, 24],
             })
         );
         assert_visible_region(&atlas, first);

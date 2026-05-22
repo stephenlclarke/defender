@@ -15,7 +15,6 @@ use crate::accepted::{
 };
 
 use crate::game::{
-    ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES, ATTRACT_DEFENDER_WORDMARK_START_FRAME,
     ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES, AttractPresentationPage, AttractPresentationSnapshot,
     Direction, EXPANDED_OBJECT_DETAIL_LIMIT, ExpandedObjectDetailSnapshot,
     ExpandedObjectEvidenceSnapshot, ExpandedObjectKind, GameEvent, GameEvents, GameFrame,
@@ -24,13 +23,13 @@ use crate::game::{
     OBJECT_EVIDENCE_DETAIL_LIMIT, ObjectEvidenceDetailSnapshot, ObjectEvidenceList,
     ObjectEvidenceSnapshot, PlayerSnapshot, PlayerStockSnapshot, SOURCE_VISUAL_STATE,
     ScannerRadarSnapshot, ScoreSnapshot, SoundEvent, WaveProfileSnapshot, WorldSnapshot,
-    WorldVector, expanded_object_sprite_size, push_scanner_radar_sprites,
+    WorldVector, attract_defender_wordmark_appearance_tick, expanded_object_sprite_size,
+    push_scanner_radar_sprites,
 };
 use crate::renderer::{
-    ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS, ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT,
-    ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS, ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE, Color, RenderLayer,
-    RenderScene, SceneSprite, SpriteId, SurfaceSize, push_source_controlled_message_sprites,
-    push_source_message_sprites, push_source_text_bytes_sprites,
+    Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
+    push_source_controlled_message_sprites, push_source_message_sprites,
+    push_source_text_bytes_sprites, source_attract_defender_appearance_pixels,
     source_attract_williams_logo_pixel_path, source_message_text, source_screen_position,
     source_screen_position_with_offset,
 };
@@ -671,26 +670,14 @@ fn push_attract_defender_wordmark_sprite(scene: &mut RenderScene, state: &GameSt
         return;
     }
 
-    let visible_block_count = attract_defender_wordmark_visible_block_count(&state.attract);
-    if visible_block_count < ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT {
-        let origin = source_screen_position(SOURCE_ATTRACT_DEFENDER_WORDMARK_SCREEN);
-        for order in 0..visible_block_count {
-            let block_index = attract_defender_wordmark_block_index_for_order(order);
-            let block_column = block_index % ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS;
-            let block_row = block_index / ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS;
-            let Some(sprite) = SpriteId::attract_defender_wordmark_block(block_index) else {
-                continue;
-            };
-
+    if let Some(appearance_tick) = attract_defender_wordmark_appearance_tick(&state.attract) {
+        for pixel in source_attract_defender_appearance_pixels(scene.surface, appearance_tick) {
             scene.push_sprite(SceneSprite {
-                sprite,
+                sprite: SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL,
                 layer: RenderLayer::Overlay,
-                position: [
-                    origin[0] + (block_column as f32 * ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE[0]),
-                    origin[1] + (block_row as f32 * ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE[1]),
-                ],
-                size: ATTRACT_DEFENDER_WORDMARK_BLOCK_SIZE,
-                tint: SOURCE_VISUAL_STATE.attract_defender_wordmark_tint(),
+                position: [f32::from(pixel.position[0]), f32::from(pixel.position[1])],
+                size: [1.0, 1.0],
+                tint: Color { rgba: pixel.color },
             });
         }
         return;
@@ -703,37 +690,6 @@ fn push_attract_defender_wordmark_sprite(scene: &mut RenderScene, state: &GameSt
         size: SOURCE_DEFENDER_WORDMARK_SIZE,
         tint: SOURCE_VISUAL_STATE.attract_defender_wordmark_tint(),
     });
-}
-
-fn attract_defender_wordmark_visible_block_count(attract: &AttractPresentationSnapshot) -> usize {
-    if attract.page != AttractPresentationPage::DefenderWordmark {
-        return ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT;
-    }
-
-    let elapsed = attract
-        .page_frame
-        .saturating_sub(ATTRACT_DEFENDER_WORDMARK_START_FRAME);
-    if elapsed >= ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES {
-        return ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT;
-    }
-
-    let reveal_frames = usize::from(ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES);
-    let page_frame = usize::from(elapsed.saturating_add(1));
-    (ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT * page_frame / reveal_frames)
-        .clamp(1, ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT)
-}
-
-fn attract_defender_wordmark_block_index_for_order(order: usize) -> usize {
-    let row = order % ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
-    let column_step = order / ATTRACT_DEFENDER_WORDMARK_BLOCK_ROWS;
-    let center_left = ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS / 2 - 1;
-    let column = if column_step.is_multiple_of(2) {
-        center_left.saturating_sub(column_step / 2)
-    } else {
-        ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS / 2 + column_step / 2
-    };
-
-    row * ATTRACT_DEFENDER_WORDMARK_BLOCK_COLUMNS + column
 }
 
 fn push_attract_copyright_strip_sprite(scene: &mut RenderScene, state: &GameState) {
@@ -1421,17 +1377,18 @@ mod tests {
             AcceptedWaveProfile,
         },
         game::{
-            ATTRACT_DEFENDER_WORDMARK_START_FRAME, ATTRACT_SCORING_SEQUENCE_START_FRAME,
-            AttractPresentationSnapshot, EXPANDED_OBJECT_DETAIL_LIMIT,
-            ExpandedObjectDetailSnapshot, ExpandedObjectEvidenceSnapshot, ExpandedObjectKind,
-            GameOverSnapshot, HighScoreEntrySnapshot, HighScoreSubmissionSnapshot,
-            HighScoreTableEntrySnapshot, HighScoreTablesSnapshot, OBJECT_EVIDENCE_DETAIL_LIMIT,
-            ObjectEvidenceDetailSnapshot, ObjectEvidenceList, ObjectEvidenceSnapshot,
-            PlayerStockSnapshot, SOURCE_EXPLOSION_INITIAL_SIZE, SOURCE_EXPLOSION_LIFETIME_FRAMES,
+            ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES, ATTRACT_DEFENDER_WORDMARK_START_FRAME,
+            ATTRACT_SCORING_SEQUENCE_START_FRAME, AttractPresentationSnapshot,
+            EXPANDED_OBJECT_DETAIL_LIMIT, ExpandedObjectDetailSnapshot,
+            ExpandedObjectEvidenceSnapshot, ExpandedObjectKind, GameOverSnapshot,
+            HighScoreEntrySnapshot, HighScoreSubmissionSnapshot, HighScoreTableEntrySnapshot,
+            HighScoreTablesSnapshot, OBJECT_EVIDENCE_DETAIL_LIMIT, ObjectEvidenceDetailSnapshot,
+            ObjectEvidenceList, ObjectEvidenceSnapshot, PlayerStockSnapshot,
+            SOURCE_EXPLOSION_INITIAL_SIZE, SOURCE_EXPLOSION_LIFETIME_FRAMES,
             SOURCE_EXPLOSION_SIZE_DELTA, SOURCE_SCORE_POPUP_LIFETIME_TICKS, ScannerRadarSnapshot,
             TerrainBlowSnapshot, TerrainBlowStage, WaveProfileSnapshot, WorldVector,
         },
-        renderer::{ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT, Color, RenderLayer, SpriteId},
+        renderer::{Color, RenderLayer, SpriteId},
         systems::{
             GameSimulation, HighScoreInitialsState, PlayerActionTriggers, advance_one_frame,
         },
@@ -1470,7 +1427,9 @@ mod tests {
         let mut state = crate::game::Game::new().state();
         state.phase = GamePhase::Attract;
         state.credits = 12;
-        state.attract = AttractPresentationSnapshot::for_page_frame(419);
+        state.attract = AttractPresentationSnapshot::for_page_frame(
+            ATTRACT_DEFENDER_WORDMARK_START_FRAME + ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES,
+        );
 
         let scene = super::adapt_scene(&state, Some(0xC0ED_0012));
         let overlay_sprites = scene
@@ -1485,7 +1444,8 @@ mod tests {
                 && sprite.position == [108.0, 60.0]
                 && sprite.size == [92.0, 19.0]
                 && sprite.tint
-                    == crate::game::SOURCE_VISUAL_STATE.attract_williams_logo_tint_for_frame(419)
+                    == crate::game::SOURCE_VISUAL_STATE
+                        .attract_williams_logo_tint_for_frame(state.attract.page_frame)
         }));
         assert!(overlay_sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO
@@ -1493,12 +1453,11 @@ mod tests {
                 && sprite.size == [120.0, 24.0]
                 && sprite.tint == Color::WHITE
         }));
-        assert!(overlay_sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP
-                && sprite.position == [118.0, 208.0]
-                && sprite.size == [80.0, 8.0]
-                && sprite.tint == Color::WHITE
-        }));
+        assert!(
+            !overlay_sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ATTRACT_COPYRIGHT_STRIP)
+        );
         assert!(overlay_sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_C
                 && sprite.position == [80.0, 229.0]
@@ -1533,17 +1492,11 @@ mod tests {
         state.attract =
             AttractPresentationSnapshot::for_page_frame(ATTRACT_DEFENDER_WORDMARK_START_FRAME);
         let early_defender_scene = super::adapt_scene(&state, Some(0xC0ED_2850));
-        let early_defender_blocks = early_defender_scene
-            .sprites
-            .iter()
-            .filter(|sprite| {
-                (SpriteId::ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE.0
-                    ..SpriteId::ATTRACT_DEFENDER_WORDMARK_BLOCK_BASE.0
-                        + ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT as u16)
-                    .contains(&sprite.sprite.0)
-            })
-            .count();
-        assert!((1..ATTRACT_DEFENDER_WORDMARK_BLOCK_COUNT).contains(&early_defender_blocks));
+        assert!(early_defender_scene.raster().is_none());
+        assert!(early_defender_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::ATTRACT_WILLIAMS_LOGO_PIXEL
+                && sprite.layer == RenderLayer::Overlay
+        }));
         assert!(
             !early_defender_scene
                 .sprites
@@ -1551,7 +1504,7 @@ mod tests {
                 .any(|sprite| sprite.sprite == SpriteId::HALL_OF_FAME_DEFENDER_LOGO)
         );
 
-        state.attract = AttractPresentationSnapshot::for_page_frame(441);
+        state.attract = AttractPresentationSnapshot::for_page_frame(488);
         let hall_scene = super::adapt_scene(&state, Some(0xC0ED_4410));
         let hall_sprites = hall_scene
             .sprites

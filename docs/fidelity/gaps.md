@@ -26,9 +26,11 @@ protected reference at 347 frames / 4600cs and removed title HUD/zero-credit
 contamination. R9-E3.13 has started title repair by moving Williams
 handwriting reveal timing to source `LOGO0` table-operation cadence and by
 moving title/source sprite pseudo-colors onto Williams resistor palette
-conversion with source `COLTAB`/`TCTAB` title cycling. B13 remains open for
-Defender coalescence parity, scoring sprite/terrain visual drift, candidate
-media, and owner-review steps.
+conversion with source `COLTAB`/`TCTAB` title cycling. R9-E3.13 also restores
+the Defender wordmark appearance to source `APVCT` row-pair coalescence over
+the 15 `DEFENS` chunks while preserving sprite-first clean render contracts.
+B13 remains open for remaining title/Hall of Fame visual drift, scoring
+sprite/terrain visual drift, candidate media, and owner-review steps.
 Older entries remain closed fidelity history, local-reference/tooling notes,
 archived prototype cleanup, or post-acceptance validation records. Historical
 entries that mention remaining blockers describe the state at the time they
