@@ -3545,6 +3545,12 @@ Work log:
   conventional commit, push the branch, and confirm the owner-review handoff
   state. Slack start update:
   `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779866659803119`.
+- `2026-05-27 08:25:44 BST` R9-E3.15 publish/owner-review handoff completed.
+  Commit `b5ebd93` (`fix(r9): complete candidate media gate`) was pushed to
+  `origin/rewrite`. B13 remains owner-review only, and
+  `docs/start-sequence.gif` remains protected/unmodified. Slack completion
+  update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779866738148289`.
 
 ## Archived Completed History
 
