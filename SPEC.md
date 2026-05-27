@@ -1,6 +1,6 @@
 # Defender Current Specification
 
-Last reviewed: `2026-05-21`
+Last reviewed: `2026-05-27`
 
 ## Purpose
 
@@ -71,7 +71,7 @@ R9-E3.7 clean media:
   decoding onto the Williams resistor palette with source `COLTAB`/`TCTAB`
   title color cycling. R9-E3.13 also projects the Defender `APVCT` appearance
   as source row-pair coalescence over the 15 `DEFENS` chunks without using
-  temporary scene rasters. R9-E3.14 has started scoring/Hall of Fame visual
+  temporary scene rasters. R9-E3.14 completed scoring/Hall of Fame visual
   repair by routing Hall of Fame display/credits through the
   protected-reference `COLTAB` `0x47` magenta, applying the
   protected-reference display offset to Hall of Fame and scoring presentation
@@ -83,11 +83,18 @@ R9-E3.7 clean media:
   post-setup rescue-fall phase while preserving page duration, and maps scoring
   text/credits through sampled protected-reference `COLTAB` cadence. The title
   segment now keeps the first sampled protected frame blank and maps
-  Williams/logo title colors through sampled protected-reference cadence. The
-  latest candidate still shows title/Hall of Fame and scoring visual drift.
-  Until signoff, changes that alter public contracts, scenario semantics,
-  runtime behavior, or final acceptance evidence must trigger focused checks
-  and, when broad risk is introduced, a renewed full gate.
+  Williams/logo title colors through sampled protected-reference cadence.
+  R9-E3.15 regenerated
+  `target/readme-media/start-sequence-candidate.gif` without overwriting the
+  protected reference. It matches the protected GIF at 347 frames, 768x576, and
+  4600cs, with sampled RMS full 29.04, title 24.62, Hall of Fame 36.14,
+  numeric glyphs 20.75, sprites 32.17, terrain 29.02, and scoring 31.23. Full
+  local validation passed, including `make fidelity`, full
+  `make clean-fidelity`, `cargo run -- --game-smoke`, and
+  `cargo run -- --live-smoke`. Final B13 visual acceptance is now an owner
+  decision; until signoff, changes that alter public contracts, scenario
+  semantics, runtime behavior, or final acceptance evidence must trigger
+  focused checks and, when broad risk is introduced, a renewed full gate.
 
 Post-R9 non-rewrite follow-ups are evidence and polish items, not active R9
 blockers: exact per-scenario pixel CRC parity, strict long-scenario sprite
@@ -403,9 +410,9 @@ swarmer presentations, and clean projectile/enemy plus player/enemy collision
 uses those source enemy picture sizes while direct runtime enemy rendering
 keeps the current clean sprite sizes. Clean hostile player collision uses the
 source `PLAPIC` / `PLBPIC` 8x6 player picture footprint while the direct
-runtime player renderer keeps the current 16x8 ship sprite; falling-human
+runtime player renderer keeps the current 16x6 ship sprite; falling-human
 rescue collision uses that player footprint plus source `ASTP1`-`ASTP4` 2x8
-astronaut footprints while direct runtime human rendering keeps the current 6x8
+astronaut footprints while direct runtime human rendering keeps the current 4x8
 sprite. Clean
 human evidence carries per-human source astronaut picture descriptors: default
 `ASTP1` rows and source-restored `ASTP3` rows selected from the `PLRES`
@@ -416,10 +423,11 @@ per source cadence, applies source fixed-point X motion, steps Y toward
 terrain-relative source targets, and cycles evidence from `ASTP1` through
 `ASTP4`. Clean player projectile evidence now carries the source `LASP1`
 descriptor label, address, 8x1 size, and primary image pointer while the direct
-runtime projectile renderer keeps the existing 8x2 sprite. Clean player
-projectiles advance through the source `LASR0` / `LASL0` five-column loop step
-and source right/left edge-stop bounds, and use the source `LASP1` 8x1
-collision footprint for enemy hits.
+runtime projectile renderer projects each live shot as a red-label
+tail-to-tip laser span. Clean player projectiles advance through the source
+`LASR0` / `LASL0` five-column loop step across the full clean playfield, keep
+the trailing beam moving at the source one-column erase cadence, and use the
+leading 16x1 `LASP1` hit span for enemy collisions.
 Clean enemy, human, player-projectile, and enemy-projectile object evidence
 also carries source-style 8.8 world-position words, velocity words, and
 deterministic source object-table identity evidence from the clean source
@@ -474,9 +482,10 @@ appearance/explosion/score-popup detail rows that carry `top_left`, descriptor
 size, and a mapped clean sprite are projected onto the object layer;
 missing-size and transparent null-object rows stay evidence-only. Score-popup
 rows additionally carry source 50-tick lifetime and 250/500 value metadata;
-explosion rows carry source `EXST`/`EXPU` frame/lifetime metadata and scale
-their descriptor size from the source `RSIZE` high byte until the source kill
-threshold. Player death starts a source-backed bank-7 pixel-cloud snapshot
+enemy-family explosion rows carry source `EXST`/`EXPU` frame/lifetime metadata
+and draw as sparse source-style pixel clouds around their mapped sprite center
+until the source kill threshold. Player death starts a source-backed bank-7
+pixel-cloud snapshot
 from `PXVCT`/`PX1A` state, carrying source color/counter metadata and visible
 piece positions into clean/oracle scenes. Planet destruction starts a
 source-backed terrain-blow snapshot: terrain rows are removed from the clean
@@ -544,15 +553,19 @@ chunks while staying sprite-first in the clean scene. Hall of Fame display and
 credit text now use the protected-reference `COLTAB` `0x47` magenta and
 protected-reference display offset while entry/blink evidence stays on `0x85`.
 The attract scoring page applies that protected-reference offset to
-scoring text/credits/scanner/terrain surfaces, projects source `BGOUT` terrain
-pixels inside the top scanner box, and uses the protected-reference purple
-scanner border tint. The clean scoring action starts from the protected
-reference's post-setup rescue-fall phase and scoring text/credits use the
-protected GIF's sampled `COLTAB` cadence while the source scoring-page duration
-is preserved. The clean title segment keeps the first sampled protected frame
-blank and uses sampled protected-reference cadence for Williams/logo title
-colors. B13 still requires remaining title/Hall of Fame and scoring visual
-repair before owner acceptance.
+scoring text/credits/scanner/terrain surfaces, projects source `MTERR`
+mini-terrain records inside the top scanner box, and uses the
+protected-reference purple scanner border tint. The clean scoring action starts
+from the protected reference's post-setup rescue-fall phase and scoring
+text/credits use the protected GIF's sampled `COLTAB` cadence while the source
+scoring-page duration is preserved. The clean title segment keeps the first
+sampled protected frame blank and uses sampled protected-reference cadence for
+Williams/logo title colors. Runtime sprite regions now use source
+object-picture dimensions, player lasers render as source-style tail-to-tip
+spans, explosion presentation uses sparse source-style pixel clouds, and
+score-card object placement has been corrected against the protected scoring
+frames. B13 now requires owner acceptance of the candidate media before
+replacement of `docs/start-sequence.gif`.
 During a pending two-player start handoff, scenes draw the source-backed
 `PLYR1`/`PLYR2` player label at `0x3C80`. On the
 existing clean wave-cleared frame, scenes draw source-backed `ATWV`, `COMPV`,

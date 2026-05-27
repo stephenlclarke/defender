@@ -1032,8 +1032,8 @@ const TERRAIN_EXPLOSION_BYTES: [u8; 48] = [
     0xC7, 0x71, 0x17, 0x70, 0x70, 0x7C, 0xD7, 0x77, 0x77, 0x70, 0x01, 0xCD, 0xFF, 0xD7, 0x70, 0xF0,
 ];
 const ASTRONAUT_EXPLOSION_GRID: ObjectPictureGrid = ObjectPictureGrid {
-    rows: 4,
-    bytes_per_row: 8,
+    rows: 8,
+    bytes_per_row: 4,
     bytes: &ASTRONAUT_EXPLOSION_BYTES,
     palette: ObjectPicturePalette::burst(),
 };
@@ -1044,8 +1044,8 @@ const NULL_OBJECT_GRID: ObjectPictureGrid = ObjectPictureGrid {
     palette: ObjectPicturePalette::white(),
 };
 const TERRAIN_EXPLOSION_GRID: ObjectPictureGrid = ObjectPictureGrid {
-    rows: 8,
-    bytes_per_row: 6,
+    rows: 6,
+    bytes_per_row: 8,
     bytes: &TERRAIN_EXPLOSION_BYTES,
     palette: ObjectPicturePalette::burst(),
 };
@@ -1160,7 +1160,7 @@ impl TextureAtlas {
             AtlasRegion {
                 sprite: SpriteId::PLAYER_SHIP,
                 origin: [0, 0],
-                size: [16, 8],
+                size: [16, 6],
             },
             AtlasRegion {
                 sprite: SpriteId::SCORE_TEXT,
@@ -1175,42 +1175,42 @@ impl TextureAtlas {
             AtlasRegion {
                 sprite: SpriteId::PLAYER_PROJECTILE,
                 origin: [0, 48],
-                size: [8, 2],
+                size: [16, 1],
             },
             AtlasRegion {
                 sprite: SpriteId::TERRAIN_TILE,
                 origin: [0, 64],
-                size: [8, 8],
+                size: [2, 2],
             },
             AtlasRegion {
                 sprite: SpriteId::TERRAIN_TILE_ALT,
-                origin: [8, 64],
-                size: [8, 8],
+                origin: [2, 64],
+                size: [2, 2],
             },
             AtlasRegion {
                 sprite: SpriteId::STAR,
-                origin: [16, 64],
+                origin: [4, 64],
                 size: [1, 1],
             },
             AtlasRegion {
                 sprite: SpriteId::ENEMY_LANDER,
                 origin: [24, 64],
-                size: [12, 8],
+                size: [10, 8],
             },
             AtlasRegion {
                 sprite: SpriteId::HUMAN,
                 origin: [40, 64],
-                size: [6, 8],
+                size: [4, 8],
             },
             AtlasRegion {
                 sprite: SpriteId::ENEMY_MUTANT,
                 origin: [56, 64],
-                size: [12, 10],
+                size: [10, 8],
             },
             AtlasRegion {
                 sprite: SpriteId::ENEMY_BAITER,
                 origin: [72, 64],
-                size: [14, 6],
+                size: [12, 4],
             },
             AtlasRegion {
                 sprite: SpriteId::ENEMY_BOMBER,
@@ -1225,27 +1225,27 @@ impl TextureAtlas {
             AtlasRegion {
                 sprite: SpriteId::ENEMY_SWARMER,
                 origin: [116, 64],
-                size: [6, 6],
+                size: [6, 4],
             },
             AtlasRegion {
                 sprite: SpriteId::ENEMY_BOMB,
                 origin: [0, 80],
-                size: [4, 6],
+                size: [4, 3],
             },
             AtlasRegion {
                 sprite: SpriteId::BOMB_EXPLOSION,
                 origin: [8, 80],
-                size: [10, 10],
+                size: [8, 8],
             },
             AtlasRegion {
                 sprite: SpriteId::SWARMER_EXPLOSION,
                 origin: [24, 80],
-                size: [10, 8],
+                size: [8, 8],
             },
             AtlasRegion {
                 sprite: SpriteId::SCORE_POPUP_250,
                 origin: [40, 80],
-                size: [12, 8],
+                size: [12, 6],
             },
             AtlasRegion {
                 sprite: SpriteId::SCORE_POPUP_500,
@@ -1255,17 +1255,17 @@ impl TextureAtlas {
             AtlasRegion {
                 sprite: SpriteId::PLAYER_LIFE_STOCK,
                 origin: [72, 80],
-                size: [12, 6],
+                size: [10, 4],
             },
             AtlasRegion {
                 sprite: SpriteId::SMART_BOMB_STOCK,
                 origin: [88, 80],
-                size: [8, 6],
+                size: [6, 3],
             },
             AtlasRegion {
                 sprite: SpriteId::ASTRONAUT_EXPLOSION,
                 origin: [0, 96],
-                size: [16, 4],
+                size: [8, 8],
             },
             AtlasRegion {
                 sprite: SpriteId::NULL_OBJECT,
@@ -1275,7 +1275,7 @@ impl TextureAtlas {
             AtlasRegion {
                 sprite: SpriteId::TERRAIN_EXPLOSION,
                 origin: [24, 96],
-                size: [12, 8],
+                size: [16, 6],
             },
             AtlasRegion {
                 sprite: SpriteId::SCORE_DIGIT_0,
@@ -1753,20 +1753,16 @@ fn default_sprite_atlas_pixels(surface: SurfaceSize, regions: &[AtlasRegion]) ->
 }
 
 fn decode_source_terrain_word_rgba(word: u16) -> EmbeddedSprite {
-    const WIDTH: u32 = 8;
-    const HEIGHT: u32 = 8;
+    const WIDTH: u32 = 2;
+    const HEIGHT: u32 = 2;
     let mut pixels = vec![0; (WIDTH * HEIGHT * 4) as usize];
 
-    for source_pixel in 0..4 {
-        let shift = 12 - source_pixel * 4;
-        let nibble = ((word >> shift) & 0x000F) as u8;
-        let color = picture_palette_color(nibble, ObjectPicturePalette::white());
-        for y in 0..HEIGHT {
-            for repeat_x in 0..2 {
-                let x = source_pixel as u32 * 2 + repeat_x;
-                let start = ((y * WIDTH + x) * 4) as usize;
-                pixels[start..start + 4].copy_from_slice(&color);
-            }
+    for (row, byte) in word.to_be_bytes().into_iter().enumerate() {
+        for column in 0..2 {
+            let nibble = if column == 0 { byte >> 4 } else { byte & 0x0F };
+            let color = picture_palette_color(nibble, ObjectPicturePalette::white());
+            let start = (row * WIDTH as usize + column) * 4;
+            pixels[start..start + 4].copy_from_slice(&color);
         }
     }
 
@@ -1841,12 +1837,13 @@ fn decode_picture_bytes_rgba(
     let surface = SurfaceSize::new(u32::from(bytes_per_row) * 2, u32::from(rows));
     let mut pixels = transparent_rgba_pixels(surface).unwrap_or_default();
 
-    for row in 0..usize::from(rows) {
-        for byte_index in 0..usize::from(bytes_per_row) {
-            let value = bytes[row * usize::from(bytes_per_row) + byte_index];
+    for column in 0..usize::from(bytes_per_row) {
+        let source_column = column * usize::from(rows);
+        for row in 0..usize::from(rows) {
+            let value = bytes[source_column + row];
             let left = picture_palette_color(value >> 4, palette);
             let right = picture_palette_color(value & 0x0F, palette);
-            let offset = ((row * surface.width as usize) + byte_index * 2) * 4;
+            let offset = ((row * surface.width as usize) + column * 2) * 4;
             pixels[offset..offset + 4].copy_from_slice(&left);
             pixels[offset + 4..offset + 8].copy_from_slice(&right);
         }
@@ -6017,32 +6014,56 @@ mod tests {
         let atlas = TextureAtlas::default_sprites();
         let terrain_7007 = atlas_region_pixels(&atlas, SpriteId::TERRAIN_TILE);
         let terrain_0770 = atlas_region_pixels(&atlas, SpriteId::TERRAIN_TILE_ALT);
-        let is_visible = |pixels: &[[u8; 4]], x: usize| pixels[x][3] != 0;
 
         assert_eq!(
             atlas.region(SpriteId::TERRAIN_TILE).expect("terrain").size,
-            [8, 8]
+            [2, 2]
         );
         assert_eq!(
             atlas
                 .region(SpriteId::TERRAIN_TILE_ALT)
                 .expect("terrain alt")
                 .size,
-            [8, 8]
+            [2, 2]
         );
         assert_eq!(
-            (0..8)
-                .map(|x| is_visible(&terrain_7007, x))
-                .collect::<Vec<_>>(),
-            vec![true, true, false, false, false, false, true, true]
+            atlas_region_alpha_rows(&atlas, SpriteId::TERRAIN_TILE),
+            vec!["#.", ".#"]
         );
         assert_eq!(
-            (0..8)
-                .map(|x| is_visible(&terrain_0770, x))
-                .collect::<Vec<_>>(),
-            vec![false, false, true, true, true, true, false, false]
+            atlas_region_alpha_rows(&atlas, SpriteId::TERRAIN_TILE_ALT),
+            vec![".#", "#."]
         );
         assert_eq!(terrain_7007[0], pseudo_color_rgba(PICTURE_COLOR_TABLE[7]));
+        assert_eq!(terrain_0770[1], pseudo_color_rgba(PICTURE_COLOR_TABLE[7]));
+    }
+
+    #[test]
+    fn default_sprite_atlas_regions_match_source_object_picture_sizes() {
+        let atlas = TextureAtlas::default_sprites();
+
+        for (sprite, size) in [
+            (SpriteId::PLAYER_SHIP, [16, 6]),
+            (SpriteId::PLAYER_PROJECTILE, [16, 1]),
+            (SpriteId::ENEMY_LANDER, [10, 8]),
+            (SpriteId::HUMAN, [4, 8]),
+            (SpriteId::ENEMY_MUTANT, [10, 8]),
+            (SpriteId::ENEMY_BAITER, [12, 4]),
+            (SpriteId::ENEMY_BOMBER, [8, 8]),
+            (SpriteId::ENEMY_POD, [8, 8]),
+            (SpriteId::ENEMY_SWARMER, [6, 4]),
+            (SpriteId::ENEMY_BOMB, [4, 3]),
+            (SpriteId::BOMB_EXPLOSION, [8, 8]),
+            (SpriteId::SWARMER_EXPLOSION, [8, 8]),
+            (SpriteId::SCORE_POPUP_250, [12, 6]),
+            (SpriteId::SCORE_POPUP_500, [12, 6]),
+            (SpriteId::PLAYER_LIFE_STOCK, [10, 4]),
+            (SpriteId::SMART_BOMB_STOCK, [6, 3]),
+            (SpriteId::ASTRONAUT_EXPLOSION, [8, 8]),
+            (SpriteId::TERRAIN_EXPLOSION, [16, 6]),
+        ] {
+            assert_eq!(atlas.region(sprite).expect("atlas region").size, size);
+        }
     }
 
     #[test]
@@ -6053,6 +6074,17 @@ mod tests {
         let human = decode_source_object_image_rgba("ASTD10", 8, 2, ObjectPicturePalette::white());
 
         assert_eq!(ship.surface, SurfaceSize::new(16, 6));
+        assert_eq!(
+            sprite_alpha_rows(&ship),
+            vec![
+                "..##............",
+                ".####...........",
+                "######..........",
+                ".###########....",
+                "###############.",
+                "..######........",
+            ]
+        );
         assert!(
             ship.pixels
                 .chunks_exact(4)
@@ -6065,6 +6097,12 @@ mod tests {
                 .all(|pixel| pixel == PALE_YELLOW_RGBA.as_slice())
         );
         assert_eq!(human.surface, SurfaceSize::new(4, 8));
+        assert_eq!(
+            sprite_alpha_rows(&human),
+            vec![
+                "##..", "##..", "###.", "###.", "###.", ".#..", ".#..", ".#.."
+            ]
+        );
         assert!(human.pixels.chunks_exact(4).any(|pixel| pixel[3] != 0));
     }
 
@@ -6706,6 +6744,37 @@ mod tests {
         [pixel[0], pixel[1], pixel[2], pixel[3]]
     }
 
+    fn sprite_alpha_rows(sprite: &EmbeddedSprite) -> Vec<String> {
+        (0..sprite.surface.height)
+            .map(|y| {
+                (0..sprite.surface.width)
+                    .map(|x| {
+                        if source_sprite_pixel(sprite, x, y)[3] == 0 {
+                            '.'
+                        } else {
+                            '#'
+                        }
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn atlas_region_alpha_rows(atlas: &TextureAtlas, sprite: SpriteId) -> Vec<String> {
+        let region = atlas.region(sprite).expect("sprite region");
+        let pixels = atlas_region_pixels(atlas, sprite);
+        (0..region.size[1])
+            .map(|y| {
+                (0..region.size[0])
+                    .map(|x| {
+                        let index = (y * region.size[0] + x) as usize;
+                        if pixels[index][3] == 0 { '.' } else { '#' }
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
     fn atlas_region_pixels(atlas: &TextureAtlas, sprite: SpriteId) -> Vec<[u8; 4]> {
         let region = atlas.region(sprite).expect("sprite region");
         let mut pixels = Vec::new();
@@ -6793,7 +6862,7 @@ mod tests {
                     instances: vec![SpriteDrawInstance {
                         sprite: SpriteId::PLAYER_SHIP,
                         atlas_origin: [0, 0],
-                        atlas_size: [16, 8],
+                        atlas_size: [16, 6],
                         layer: RenderLayer::Objects,
                         position: [128.0, 96.0],
                         size: [16.0, 8.0],
@@ -6825,7 +6894,7 @@ mod tests {
                         scene_origin: [128.0, 96.0],
                         scene_size: [16.0, 8.0],
                         atlas_uv_origin: [0.0, 0.0],
-                        atlas_uv_size: [0.125, 0.041666668],
+                        atlas_uv_size: [0.125, 0.03125],
                         tint: [1.0, 1.0, 1.0, 1.0],
                     }],
                 },
@@ -7079,7 +7148,7 @@ mod tests {
         assert_eq!(plan.sprite_batches[0].layer, RenderLayer::Projectiles);
         assert_eq!(plan.sprite_batches[0].instances.len(), 2);
         assert_eq!(plan.sprite_batches[0].instances[0].atlas_origin, [0, 48]);
-        assert_eq!(plan.sprite_batches[0].instances[0].atlas_size, [8, 2]);
+        assert_eq!(plan.sprite_batches[0].instances[0].atlas_size, [16, 1]);
         assert_eq!(plan.sprite_batches[0].instances[1].position, [10.0, 4.0]);
         assert_eq!(plan.sprite_instance_buffers.len(), 1);
         assert_eq!(plan.sprite_instance_buffers[0].records.len(), 2);

@@ -1,6 +1,6 @@
 # Defender Current Plan
 
-Last reviewed: `2026-05-17`
+Last reviewed: `2026-05-27`
 
 ## Current Baseline
 
@@ -883,25 +883,36 @@ Reopened B13 repair schedule:
   protected scoring-sequence frames against clean candidate frames and repair
   the remaining title color/cadence drift, source sprite palettes, score-card
   object placement, scanner colors, and terrain/ground visual drift without
-  reopening broad gameplay ecology unless a runtime scenario field changes. In
-  progress 2026-05-22: Hall of Fame display and credit text now route through the
-  protected-reference `COLTAB` `0x47` magenta, the lower scoring terrain draws
-  as one source scanline, the top scanner uses source `MTERR` mini-terrain
-  records instead of projected `BGOUT` terrain, and the attract scoring scanner
-  border uses the protected-reference purple instead of the playing white HUD
-  border. The `ENMYTB` score-card table entries now use protected-reference
+  reopening broad gameplay ecology unless a runtime scenario field changes.
+  Completed locally 2026-05-27: Hall of Fame display and credit text now route
+  through the protected-reference `COLTAB` `0x47` magenta, the lower scoring
+  terrain draws as one source scanline, the top scanner uses source `MTERR`
+  mini-terrain records instead of projected `BGOUT` terrain, and the attract
+  scoring scanner border uses the protected-reference purple instead of the
+  playing white HUD border. The `ENMYTB` score-card table entries now use
+  protected-reference
   placement closer to the restored GIF. The scoring page now starts its clean
   rescue/action display from the protected reference's post-setup rescue-fall
   phase while keeping the page duration unchanged, and its scoring text/credit
   color cadence is locked to sampled protected-reference `COLTAB` indices. The
   first title sample now stays blank like the protected GIF, and Williams/title
   text colors use sampled protected-reference cadence during the README title
-  segment.
-- R9-E3.15: candidate media gate and owner review. Generate a clean candidate
-  without overwriting the protected reference, compare it to the restored GIF,
-  run focused visual tests plus targeted clean-fidelity scenarios affected by
-  the changes, then run the broad R9 closeout gate once this phase is ready.
-  Only replace `docs/start-sequence.gif` after owner approval.
+  segment. Runtime sprite regions now use source object-picture dimensions,
+  player lasers draw as source-style tail-to-tip spans, explosion presentation
+  uses sparse source-style pixel clouds, and the score-card object placement has
+  been corrected against the protected scoring frames. The candidate remains
+  B13 evidence for owner review rather than an approved replacement.
+- R9-E3.15: candidate media gate and owner review. Completed locally
+  2026-05-27. The candidate was regenerated at
+  `target/readme-media/start-sequence-candidate.gif` without overwriting the
+  protected reference. It matches `docs/start-sequence.gif` at 347 frames,
+  768x576, and 4600cs, with sampled RMS full 29.04, title 24.62, Hall of Fame
+  36.14, numeric glyphs 20.75, sprites 32.17, terrain 29.02, and scoring 31.23.
+  Full local validation passed with `make fidelity`, full `make clean-fidelity`,
+  `cargo run -- --game-smoke`, and `cargo run -- --live-smoke`. B13 now waits
+  on explicit owner visual approval; only replace `docs/start-sequence.gif`
+  after that approval. No further implementation cycle is planned unless owner
+  review rejects the candidate with specific findings.
 
 Strict R9 blocker matrix after Step 41:
 
@@ -3466,6 +3477,74 @@ Work log:
   visual cadence repair. The next full gate should run at R9-E3.15 candidate
   closeout, or sooner if remaining visual repairs change shared contracts or
   broad scenario behavior.
+
+- `2026-05-27 07:26:35 BST` R9-E3.14 continuation start. Slack start posting
+  was retried through the connector and failed with `token_expired` before any
+  channel lookup or message send could complete. Local continuation scope is
+  the remaining bounded B13 visual repair around scoring sprite placement,
+  scanner/terrain presentation, and candidate-readiness checks. Initial
+  validation remains green for `cargo check` and `cargo check --features
+  legacy-tools`.
+- `2026-05-27 07:40 BST` Slack direct-send retry also failed with
+  `token_expired` against the known `xyzzytools.slack.com#codex` channel ID
+  `C0B1RNM8ZJ5`. Continue recording start/end details locally until the Slack
+  connector is re-authenticated.
+- `2026-05-27 07:41 BST` Slack retry after external confirmation still failed
+  from this Codex connector session with `token_expired`. A narrow
+  scoring-object placement correction shifted scoring action sprites onto the
+  protected-reference offset while leaving scoring text, scanner, terrain, and
+  timing unchanged. Focused validation passed with `cargo test --lib
+  clean_attract_scoring_sequence`, `cargo test --lib
+  clean_game_renders_player_laser_as_live_source_span`, `cargo test --lib
+  clean_game_expands_alien_explosion_around_sprite_center`, and `cargo test
+  --lib default_sprite_atlas`. `make readme-media` passed and refreshed the
+  candidate at 347 frames / 4600cs, with sampled RMS full 29.04, title 24.62,
+  Hall of Fame 36.14, numeric glyphs 20.75, sprites 32.17, terrain 29.02, and
+  scoring 31.23.
+- `2026-05-27 07:41:43 BST` R9-E3.14 scoring sprite/scanner/terrain visual
+  pass is ready for R9-E3.15 candidate media/owner review. Final focused
+  validation passed with `cargo fmt --check`, `cargo check`, `cargo check
+  --features legacy-tools`, `cargo test --lib`, `cargo clippy --all-targets
+  -- -D warnings`, `make clean-fidelity SCENARIOS="attract_boot"`, `make
+  readme-media`, `cargo run -- --game-smoke`, touched-doc markdownlint, and
+  `git diff --check`. `cargo run -- --live-smoke` could not run in this
+  environment because wgpu reported no suitable offscreen graphics adapter and
+  no noop backend compiled; treat that as an environment validation blocker for
+  this run, not a code failure. B13 remains open for R9-E3.15 owner review and
+  approval before replacing `docs/start-sequence.gif`.
+- `2026-05-27 07:41 BST` Slack completion posting was retried against
+  `C0B1RNM8ZJ5` and failed from this Codex connector session with
+  `token_expired`; no Slack completion link is available for this cycle.
+- `2026-05-27 08:04 BST` Slack completion retry succeeded:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779864266187489`.
+- `2026-05-27 07:45:11 BST` R9-E3.15 candidate media gate and owner-review
+  prep started. Scope is to regenerate/verify the candidate without touching
+  the protected `docs/start-sequence.gif`, rerun focused visual and
+  clean-fidelity gates, capture owner-review evidence, and leave B13 open until
+  owner approval. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779864341214719`.
+- `2026-05-27 08:20:04 BST` R9-E3.15 candidate media gate completed locally.
+  The candidate at `target/readme-media/start-sequence-candidate.gif` was
+  regenerated without touching `docs/start-sequence.gif`; comparison metrics
+  matched the protected reference at 347 frames, 768x576, and 4600cs, with
+  sampled RMS full 29.04, title 24.62, Hall of Fame 36.14, numeric glyphs
+  20.75, sprites 32.17, terrain 29.02, and scoring 31.23. Validation passed
+  with `make fidelity`, full `make clean-fidelity` across all 12 scenarios,
+  `cargo run -- --game-smoke`, `cargo run -- --live-smoke`, and
+  `make readme-media`. The cycle also fixed two validation regressions found by
+  `legacy-tools`: the oracle scene adapter now shares clean expanded-object
+  explosion geometry, and the README media unit test waits through the
+  intentional blank title reveal before requiring visible pixels. Added focused
+  coverage protects attract scoring lasers, transfer effects, projection edge
+  cases, and source-style pixel-cloud clipping. B13 remains open for owner
+  approval only; no replacement of `docs/start-sequence.gif` is approved yet.
+  Slack completion update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779866563877489`.
+- `2026-05-27 08:24:27 BST` R9-E3.15 publish/owner-review handoff started.
+  Scope is to package the locally completed candidate gate on `rewrite` with a
+  conventional commit, push the branch, and confirm the owner-review handoff
+  state. Slack start update:
+  `https://xyzzytools.slack.com/archives/C0B1RNM8ZJ5/p1779866659803119`.
 
 ## Archived Completed History
 

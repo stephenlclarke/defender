@@ -24,7 +24,7 @@ use crate::game::{
     ObjectEvidenceSnapshot, PlayerSnapshot, PlayerStockSnapshot, SOURCE_VISUAL_STATE,
     ScannerRadarSnapshot, ScoreSnapshot, SoundEvent, WaveProfileSnapshot, WorldSnapshot,
     WorldVector, attract_credit_text_tint, attract_defender_wordmark_appearance_tick,
-    expanded_object_sprite_size, push_scanner_radar_sprites,
+    expanded_object_sprite_geometry, push_scanner_radar_sprites,
 };
 use crate::renderer::{
     Color, RenderLayer, RenderScene, SceneSprite, SpriteId, SurfaceSize,
@@ -498,21 +498,18 @@ fn push_expanded_object_detail_sprites(
         if sprite == SpriteId::NULL_OBJECT {
             continue;
         }
-        let Some(position) = detail.top_left else {
+        let Some((position, size)) = expanded_object_sprite_geometry(detail) else {
             continue;
         };
-        let Some((width, height)) = expanded_object_sprite_size(detail) else {
-            continue;
-        };
-        if width == 0 || height == 0 {
+        if size[0] == 0.0 || size[1] == 0.0 {
             continue;
         }
 
         scene.push_sprite(SceneSprite {
             sprite,
             layer: RenderLayer::Objects,
-            position: [f32::from(position.x), f32::from(position.y)],
-            size: [f32::from(width), f32::from(height)],
+            position,
+            size,
             tint: Color::WHITE,
         });
     }
@@ -1850,8 +1847,8 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::BOMB_EXPLOSION
                 && sprite.layer == RenderLayer::Objects
-                && sprite.position == [30.0, 40.0]
-                && sprite.size == [8.0, 16.0]
+                && sprite.position == [26.0, 36.0]
+                && sprite.size == [16.0, 16.0]
                 && sprite.tint == Color::WHITE
         }));
         assert!(scene.sprites.iter().any(|sprite| {

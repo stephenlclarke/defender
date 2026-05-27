@@ -2,7 +2,7 @@
 
 This file records behavior that must not be guessed in arcade-core code.
 
-Status as of `2026-05-21`: the accepted red-label target remains the oracle for
+Status as of `2026-05-27`: the accepted red-label target remains the oracle for
 the rewrite. The profiled clean-fidelity gate matches all 12 embedded Phase 1
 scenario input programs, and the R9-E2 full validation gate has passed. Strict
 R9 behavior/evidence blockers are closed through B12, but owner review rejected
@@ -29,7 +29,7 @@ moving title/source sprite pseudo-colors onto Williams resistor palette
 conversion with source `COLTAB`/`TCTAB` title cycling. R9-E3.13 also restores
 the Defender wordmark appearance to source `APVCT` row-pair coalescence over
 the 15 `DEFENS` chunks while preserving sprite-first clean render contracts.
-R9-E3.14 has started the scoring/Hall of Fame visual pass by moving Hall of
+R9-E3.14 completed the scoring/Hall of Fame visual pass by moving Hall of
 Fame display and credit text to the protected-reference `COLTAB` `0x47`
 magenta, applying the protected-reference display offset to Hall of Fame and
 scoring presentation surfaces, drawing lower scoring terrain as one source
@@ -40,9 +40,16 @@ to the restored GIF. The scoring/action display now starts from the protected
 reference's post-setup rescue-fall phase and scoring text/credits use sampled
 protected-reference `COLTAB` cadence. The title segment now keeps the first
 sampled protected frame blank and uses sampled protected-reference
-Williams/logo title color cadence. B13 remains open for remaining title/Hall of
-Fame visual drift, scoring sprite/terrain visual drift, candidate media, and
-owner-review steps.
+Williams/logo title color cadence. Runtime sprite regions now use source
+object-picture dimensions, player lasers render as source-style tail-to-tip
+spans, explosion presentation uses sparse source-style pixel clouds, and
+score-card object placement has been corrected against the protected scoring
+frames. R9-E3.15 regenerated
+`target/readme-media/start-sequence-candidate.gif`; it matches the protected
+GIF at 347 frames, 768x576, and 4600cs, with sampled RMS full 29.04, title
+24.62, Hall of Fame 36.14, numeric glyphs 20.75, sprites 32.17, terrain 29.02,
+and scoring 31.23. Full local validation passed. B13 remains open only for
+owner review and explicit approval before replacing `docs/start-sequence.gif`.
 Older entries remain closed fidelity history, local-reference/tooling notes,
 archived prototype cleanup, or post-acceptance validation records. Historical
 entries that mention remaining blockers describe the state at the time they

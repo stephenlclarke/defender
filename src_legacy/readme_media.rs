@@ -303,8 +303,8 @@ impl std::error::Error for ReadmeMediaError {}
 
 #[cfg(test)]
 mod tests {
-    use super::{FRAME_RATE_MILLIHZ, ReadmeMediaFrameSource};
-    use crate::game::AttractPresentationPage;
+    use super::{FRAME_RATE_MILLIHZ, ReadmeMediaFrame, ReadmeMediaFrameSource};
+    use crate::game::{ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES, AttractPresentationPage};
 
     #[test]
     fn frame_rate_matches_clean_cabinet_refresh_contract() {
@@ -315,17 +315,12 @@ mod tests {
     fn source_renders_clean_scaled_rgba_frames() {
         let mut source = ReadmeMediaFrameSource::new(320, 240);
 
-        let frame = source.render_frame().expect("README media frame");
+        let frame = render_first_visible_frame(&mut source);
 
         assert_eq!(frame.width, 320);
         assert_eq!(frame.height, 240);
         assert_eq!(frame.pixels.len(), 320 * 240 * 4);
-        assert!(
-            frame
-                .pixels
-                .chunks_exact(4)
-                .any(|pixel| pixel != [0, 0, 0, 0xFF])
-        );
+        assert!(frame_has_visible_pixels(&frame));
     }
 
     #[test]
@@ -345,5 +340,23 @@ mod tests {
             source.step();
         }
         panic!("clean README media source did not reach {page:?}");
+    }
+
+    fn render_first_visible_frame(source: &mut ReadmeMediaFrameSource) -> ReadmeMediaFrame {
+        for _ in 0..=ATTRACT_WILLIAMS_LOGO_REVEAL_FRAMES {
+            let frame = source.render_frame().expect("README media frame");
+            if frame_has_visible_pixels(&frame) {
+                return frame;
+            }
+            source.step();
+        }
+        panic!("README media source did not render a visible Williams logo frame");
+    }
+
+    fn frame_has_visible_pixels(frame: &ReadmeMediaFrame) -> bool {
+        frame
+            .pixels
+            .chunks_exact(4)
+            .any(|pixel| pixel != [0, 0, 0, 0xFF])
     }
 }

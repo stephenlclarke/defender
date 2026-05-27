@@ -14,6 +14,7 @@ use crate::{
 };
 
 const SMOKE_FRAMES: u32 = 24;
+const SMOKE_VISUAL_WARMUP_FRAMES: u32 = 16;
 const REQUIRED_INPUTS: [&str; 9] = [
     "coin",
     "start_one",
@@ -488,6 +489,11 @@ pub(crate) const fn smoke_frame_count() -> u32 {
 }
 
 #[cfg(all(not(test), not(coverage)))]
+pub(crate) const fn smoke_visual_warmup_frames() -> u32 {
+    SMOKE_VISUAL_WARMUP_FRAMES
+}
+
+#[cfg(all(not(test), not(coverage)))]
 pub(crate) fn smoke_game_input(frame_index: u32) -> GameInput {
     smoke_input(frame_index).value
 }
@@ -504,6 +510,10 @@ pub(crate) fn smoke_report(frames: u32) -> anyhow::Result<GameSmokeReport> {
         ..GameSmokeReport::default()
     };
     let mut signatures = BTreeSet::new();
+
+    for _ in 0..SMOKE_VISUAL_WARMUP_FRAMES {
+        game.step(GameInput::NONE);
+    }
 
     for frame_index in 0..frames {
         let input = smoke_input(frame_index);
@@ -938,10 +948,10 @@ mod tests {
         assert_eq!(
             report.covered_sprites,
             vec![
+                "terrain_tile",
                 "score_digit_0",
                 "player_ship",
                 "star",
-                "terrain_tile",
                 "enemy_lander",
                 "human",
                 "player_projectile",
@@ -960,7 +970,7 @@ mod tests {
         assert_eq!(report.hud_draw_instances, report.hud_sprites);
         assert_eq!(
             report.covered_pipelines,
-            vec!["hud_text", "sprites", "starfield", "terrain", "projectiles",]
+            vec!["terrain", "hud_text", "sprites", "starfield", "projectiles",]
         );
         assert!(report.wgpu_frame_commands > 0);
         assert_eq!(

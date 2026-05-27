@@ -58,8 +58,8 @@ cadence through the `PRES` handoff, then moved clean title, source object, and
 Defender logo decoding onto the Williams resistor palette with source
 `COLTAB`/`TCTAB` title color cycling. R9-E3.13 also restores the Defender
 appearance phase to the source `APVCT` row-pair projection over the 15 `DEFENS`
-chunks while keeping the clean scene sprite-first for fidelity. R9-E3.14 has
-started the scoring/Hall of Fame visual pass by routing Hall of Fame display
+chunks while keeping the clean scene sprite-first for fidelity. R9-E3.14
+completed the scoring/Hall of Fame visual pass by routing Hall of Fame display
 and credit text through the protected-reference `COLTAB` `0x47` magenta,
 applying the protected-reference attract display offset to Hall of Fame and
 scoring presentation surfaces, tinting the scoring scanner border to the
@@ -70,9 +70,16 @@ placement. It also starts the scoring/action display from the protected
 reference's post-setup rescue-fall phase and maps scoring text/credits through
 the sampled protected-reference `COLTAB` cadence. The title segment now holds
 its first sampled frame blank and uses sampled protected-reference
-Williams/title text color cadence. Final B13 visual acceptance remains open for
-the remaining title/Hall of Fame visual drift and scoring sprite/terrain
-palette and placement drift.
+Williams/title text color cadence. R9-E3.15 regenerated the candidate media at
+`target/readme-media/start-sequence-candidate.gif` without replacing the
+protected reference. The candidate matches the protected GIF at 347 frames,
+768x576, and 4600cs, with sampled RMS full 29.04, title 24.62, Hall of Fame
+36.14, numeric glyphs 20.75, sprites 32.17, terrain 29.02, and scoring 31.23.
+Full local validation passed, including `make fidelity`, full
+`make clean-fidelity`, `cargo run -- --game-smoke`, and
+`cargo run -- --live-smoke`. Final B13 visual acceptance is now an owner-review
+decision; `docs/start-sequence.gif` must remain unchanged until the owner
+accepts this or a later candidate.
 
 ![Defender gameplay frame](docs/defender.png)
 
@@ -592,15 +599,17 @@ projectile/enemy plus player/enemy collision uses those source enemy picture
 sizes while direct runtime enemy rendering keeps the current clean sprite
 sizes. Clean hostile player collision uses the source `PLAPIC` / `PLBPIC` 8x6
 player picture footprint while the direct runtime player renderer keeps the
-current 16x8 ship sprite; falling-human rescue collision uses that player
+current 16x6 ship sprite; falling-human rescue collision uses that player
 footprint plus source `ASTP1`-`ASTP4` 2x8 astronaut footprints while direct
-runtime human rendering keeps the current 6x8 sprite. Clean
+runtime human rendering keeps the current 4x8 sprite. Clean
 player projectile evidence now carries the source `LASP1` descriptor label,
 address, 8x1 size, and primary image pointer while the direct runtime
-projectile renderer keeps the existing 8x2 sprite. Clean player projectiles
-advance through the source `LASR0` / `LASL0` five-column loop step and source
-right/left edge-stop bounds and use the source `LASP1` 8x1 collision
-footprint for enemy hits. Clean enemy, human, player-projectile, and
+projectile renderer projects each live shot as a red-label tail-to-tip laser
+span. Clean player projectiles advance through the source `LASR0` / `LASL0`
+five-column loop step across the full clean playfield, keep the trailing beam
+moving at the source one-column erase cadence, and use the leading 16x1
+`LASP1` hit span for enemy collisions. Clean enemy, human,
+player-projectile, and
 enemy-projectile object evidence also carries source-style 8.8
 world-position words, velocity words, and deterministic source object-table
 identity evidence from the clean source fixed-point state and source layout:
@@ -801,7 +810,7 @@ Clean human object-detail rows now carry per-human source astronaut descriptor
 evidence: default `ASTP1` rows and source-restored `ASTP3` rows selected from
 the `PLRES` `LSEED` low bit, including descriptor label, address, 2x8 picture
 size, primary/alternate image pointers, and mapped clean human sprite evidence
-while the runtime playfield keeps drawing the clean 6x8 astronaut sprite.
+while the runtime playfield keeps drawing the clean 4x8 astronaut sprite.
 Source-restored clean humans also retain the `PLRES` `LSEED` X low byte as the
 source X fraction used in object-detail world-position evidence. Clean
 worlds carry a separate source `ASTRO` process cursor/sleep state that walks
@@ -823,8 +832,9 @@ source screen positions and descriptor sizes into the object/projectile layers;
 inactive and transparent null-object rows remain comparison evidence only.
 Mapped source expanded-object appearance/explosion detail rows are projected
 from their source top-left positions into the object layer. Appearance rows use
-descriptor sizes directly; explosion rows scale descriptor sizes from the source
-`RSIZE` high byte and remain visible until the source kill threshold is crossed.
+descriptor sizes directly; enemy-family explosion rows retain source `RSIZE`
+frame/lifetime metadata and draw as sparse source-style pixel clouds around the
+mapped sprite center until the source kill threshold is crossed.
 Missing-size and transparent null-object rows remain comparison evidence only.
 Player-one and player-two score digits and stock drawing now use
 source-backed clean scene

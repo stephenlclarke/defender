@@ -53,11 +53,9 @@ pub(crate) const ATTRACT_DEFENDER_WORDMARK_START_FRAME: u16 = 365;
 const SOURCE_ATTRACT_DEFENDER_APPEARANCE_TICK_NUMERATOR: u16 = 3;
 const SOURCE_ATTRACT_DEFENDER_APPEARANCE_TICK_DENOMINATOR: u16 = 2;
 pub(crate) const ATTRACT_DEFENDER_WORDMARK_REVEAL_FRAMES: u16 =
-    ((ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS as u16
+    (ATTRACT_DEFENDER_APPEAR_SLEEP_TICKS as u16
         * SOURCE_ATTRACT_DEFENDER_APPEARANCE_TICK_DENOMINATOR)
-        + SOURCE_ATTRACT_DEFENDER_APPEARANCE_TICK_NUMERATOR
-        - 1)
-        / SOURCE_ATTRACT_DEFENDER_APPEARANCE_TICK_NUMERATOR;
+        .div_ceil(SOURCE_ATTRACT_DEFENDER_APPEARANCE_TICK_NUMERATOR);
 const SOURCE_ATTRACT_DEFENDER_DESCRIPTOR: u16 = 0xB300;
 #[cfg(test)]
 const SOURCE_ATTRACT_DEFENDER_OBJECTS: u16 = 0xB304;
@@ -229,6 +227,7 @@ const SOURCE_ATTRACT_WILLIAMS_TIE_COLOR_SLOT_OFFSET: usize = 2;
 const ATTRACT_SCORING_PLAYFIELD_WIDTH: f32 = 320.0;
 const ATTRACT_SCORING_PLAYFIELD_HEIGHT: f32 = 256.0;
 const ATTRACT_REFERENCE_SCENE_OFFSET: [f32; 2] = [-11.0, -7.0];
+const ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET: [f32; 2] = [-15.0, -10.0];
 const ATTRACT_HALL_OF_FAME_REFERENCE_OFFSET: [f32; 2] = [-11.0, -6.0];
 const ATTRACT_SCORING_SCANNER_ORIGIN: [f32; 2] = [84.0, 0.0];
 const ATTRACT_SCORING_SCANNER_SIZE: [f32; 2] = [128.0, 32.0];
@@ -250,7 +249,7 @@ const SOURCE_SCANNER_TERRAIN_RECORDS: usize = 0x40;
 const SOURCE_SCANNER_MINI_TERRAIN_RECORDS: usize = SOURCE_TERRAIN_MTERR_BYTES / 3;
 const SOURCE_TERRAIN_WORD_7007: u16 = 0x7007;
 const SOURCE_TERRAIN_WORD_0770: u16 = 0x0770;
-const SOURCE_TERRAIN_WORD_SIZE: [f32; 2] = [4.0, 1.0];
+const SOURCE_TERRAIN_WORD_SIZE: [f32; 2] = [2.0, 2.0];
 const SOURCE_SCANNER_PROCESS_SLEEP_TICKS: [u8; 3] = [2, 2, 4];
 const SOURCE_SCANNER_SELECTED_MAP: u8 = 1;
 const SOURCE_SCANNER_OBJECT_BASE_SCREEN: u16 = 0x3008;
@@ -1327,6 +1326,7 @@ impl HumanSnapshot {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProjectileSnapshot {
     pub position: ScreenPosition,
+    pub source_tail_position: ScreenPosition,
     pub velocity: ScreenVelocity,
 }
 
@@ -3695,7 +3695,7 @@ const CLEAN_LANDER_CAPTURE_Y_TOLERANCE: i16 = 4;
 const CLEAN_LANDER_CAPTURE_Y_VELOCITY: i8 = -1;
 const CLEAN_PLAYER_CARRIED_HUMAN_OFFSET_X: u8 = 0;
 const CLEAN_PLAYER_CARRIED_HUMAN_OFFSET_Y: u8 = 10;
-const HUMAN_SPRITE_SIZE: (u8, u8) = (6, 8);
+const HUMAN_SPRITE_SIZE: (u8, u8) = (4, 8);
 const SOURCE_FALLING_HUMAN_Y_ACCELERATION: u16 = 0x0008;
 const SOURCE_FALLING_HUMAN_MAX_Y_VELOCITY: u16 = 0x0300;
 const SOURCE_FALLING_HUMAN_SAFE_LANDING_MAX_Y_VELOCITY: u16 = 0x00E0;
@@ -6433,6 +6433,7 @@ impl Game {
             ) {
                 self.state.world.projectiles.push(ProjectileSnapshot {
                     position: spawn,
+                    source_tail_position: spawn,
                     velocity: ProjectileMotionSystem::velocity_for_direction(direction),
                 });
                 sound_events.push(source_laser_fire_sound_event());
@@ -6600,6 +6601,7 @@ impl Game {
             let motion = ProjectileMotionSystem::step(projectile.position, projectile.velocity);
             if motion.active {
                 projectile.position = motion.position;
+                projectile.source_tail_position = step_projectile_laser_tail(*projectile);
                 projectile.velocity = motion.velocity;
             }
             motion.active
@@ -7039,10 +7041,7 @@ impl Game {
             scene.push_sprite(SceneSprite {
                 sprite: SpriteId::PLAYER_SHIP,
                 layer: RenderLayer::Objects,
-                position: [
-                    world_vector_pixels(self.state.player.position.0),
-                    world_vector_pixels(self.state.player.position.1),
-                ],
+                position: player_scene_position(self.state.player.position),
                 size: [
                     f32::from(PLAYER_SPRITE_SIZE.0),
                     f32::from(PLAYER_SPRITE_SIZE.1),
@@ -7051,19 +7050,7 @@ impl Game {
             });
 
             for projectile in &self.state.world.projectiles {
-                scene.push_sprite(SceneSprite {
-                    sprite: SpriteId::PLAYER_PROJECTILE,
-                    layer: RenderLayer::Projectiles,
-                    position: [
-                        f32::from(projectile.position.x),
-                        f32::from(projectile.position.y),
-                    ],
-                    size: [
-                        f32::from(PROJECTILE_SPRITE_SIZE.0),
-                        f32::from(PROJECTILE_SPRITE_SIZE.1),
-                    ],
-                    tint: Color::WHITE,
-                });
+                push_player_projectile_sprites(&mut scene, *projectile);
             }
             for projectile in &self.state.world.enemy_projectiles {
                 scene.push_sprite(SceneSprite {
@@ -8123,20 +8110,46 @@ fn push_attract_scoring_action_sprites(scene: &mut RenderScene, state: &GameStat
     push_attract_scoring_terrain_sprites(scene, frame.demo_tick);
     push_attract_scoring_scanner_sprites(scene, &frame);
 
+    let mut player_ship = None;
+    let mut laser_target = None;
+    let mut player_shot_active = false;
     for object in &frame.objects {
-        push_attract_scoring_object_sprite(scene, *object, frame.demo_tick);
+        match object.kind {
+            AttractScoringObjectKind::PlayerShip
+                if matches!(object.visual, AttractScoringVisual::Sprite) =>
+            {
+                player_ship = Some(*object);
+            }
+            AttractScoringObjectKind::Enemy(_)
+                if matches!(object.visual, AttractScoringVisual::Sprite) =>
+            {
+                laser_target = Some(*object);
+            }
+            AttractScoringObjectKind::PlayerShot => {
+                player_shot_active = true;
+                continue;
+            }
+            _ => {}
+        }
+        push_attract_scoring_object_sprites(scene, *object, frame.demo_tick);
+    }
+
+    if player_shot_active
+        && let (Some(player_ship), Some(laser_target)) = (player_ship, laser_target)
+    {
+        push_attract_scoring_laser_beam(scene, player_ship, laser_target, frame.demo_tick);
     }
 
     if let Some(bonus) = frame.bonus {
         let size = match bonus.sprite {
-            SpriteId::SCORE_POPUP_250 => [12.0, 8.0],
+            SpriteId::SCORE_POPUP_250 => [12.0, 6.0],
             SpriteId::SCORE_POPUP_500 => [12.0, 6.0],
             _ => [8.0, 8.0],
         };
         scene.push_sprite(SceneSprite {
             sprite: bonus.sprite,
             layer: RenderLayer::Objects,
-            position: attract_scoring_object_position(bonus.x16, bonus.y16),
+            position: attract_scoring_scene_position(bonus.x16, bonus.y16),
             size,
             tint: Color::WHITE,
         });
@@ -8570,18 +8583,20 @@ fn push_attract_scoring_scanner_terrain_sprites(scene: &mut RenderScene) {
             source_screen_position(record.screen_address),
             ATTRACT_REFERENCE_SCENE_OFFSET,
         );
-        for nibble_index in 0..4 {
-            let shift = 12 - nibble_index * 4;
-            if (record.word >> shift) & 0x000F == 0 {
-                continue;
+        for (row, byte) in record.word.to_be_bytes().into_iter().enumerate() {
+            for column in 0..2 {
+                let nibble = if column == 0 { byte >> 4 } else { byte & 0x0F };
+                if nibble == 0 {
+                    continue;
+                }
+                scene.push_sprite(SceneSprite {
+                    sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
+                    layer: RenderLayer::Hud,
+                    position: [origin[0] + column as f32, origin[1] + row as f32],
+                    size: ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE,
+                    tint: ATTRACT_SCORING_SCANNER_TERRAIN_TINT,
+                });
             }
-            scene.push_sprite(SceneSprite {
-                sprite: SpriteId::ATTRACT_SCANNER_TERRAIN_PIXEL,
-                layer: RenderLayer::Hud,
-                position: [origin[0] + nibble_index as f32, origin[1]],
-                size: ATTRACT_SCORING_SCANNER_TERRAIN_PIXEL_SIZE,
-                tint: ATTRACT_SCORING_SCANNER_TERRAIN_TINT,
-            });
         }
     }
 }
@@ -8612,27 +8627,119 @@ fn attract_scoring_scanner_sprite(
 
 fn attract_scoring_scanner_position(object: AttractScoringObject) -> [f32; 2] {
     let [native_x, native_y] = attract_scoring_object_position(object.x16, object.y16);
-    [
-        ATTRACT_SCORING_SCANNER_ORIGIN[0]
-            + native_x * ATTRACT_SCORING_SCANNER_SIZE[0] / ATTRACT_SCORING_PLAYFIELD_WIDTH,
-        ATTRACT_SCORING_SCANNER_ORIGIN[1]
-            + native_y * ATTRACT_SCORING_SCANNER_SIZE[1] / ATTRACT_SCORING_PLAYFIELD_HEIGHT,
-    ]
+    offset_position(
+        [
+            ATTRACT_SCORING_SCANNER_ORIGIN[0]
+                + native_x * ATTRACT_SCORING_SCANNER_SIZE[0] / ATTRACT_SCORING_PLAYFIELD_WIDTH,
+            ATTRACT_SCORING_SCANNER_ORIGIN[1]
+                + native_y * ATTRACT_SCORING_SCANNER_SIZE[1] / ATTRACT_SCORING_PLAYFIELD_HEIGHT,
+        ],
+        ATTRACT_REFERENCE_SCENE_OFFSET,
+    )
 }
 
-fn push_attract_scoring_object_sprite(
+fn push_attract_scoring_object_sprites(
     scene: &mut RenderScene,
     object: AttractScoringObject,
     demo_tick: u16,
 ) {
+    if matches!(
+        object.visual,
+        AttractScoringVisual::Explosion | AttractScoringVisual::Materialize
+    ) {
+        push_attract_scoring_expanded_pixels(scene, object, demo_tick);
+        return;
+    }
+
     let (sprite, layer, size, tint) = attract_scoring_object_sprite(object, demo_tick);
     scene.push_sprite(SceneSprite {
         sprite,
         layer,
-        position: attract_scoring_object_position(object.x16, object.y16),
+        position: attract_scoring_scene_position(object.x16, object.y16),
         size,
         tint,
     });
+}
+
+fn push_attract_scoring_laser_beam(
+    scene: &mut RenderScene,
+    player_ship: AttractScoringObject,
+    target: AttractScoringObject,
+    demo_tick: u16,
+) {
+    let start = attract_scoring_laser_ship_anchor(attract_scoring_scene_position(
+        player_ship.x16,
+        player_ship.y16,
+    ));
+    let target_position = attract_scoring_scene_position(target.x16, target.y16);
+    let end_x = match target.kind {
+        AttractScoringObjectKind::Enemy(kind) => {
+            attract_scoring_laser_enemy_anchor(kind, target_position)[0]
+        }
+        _ => target_position[0],
+    };
+    push_arcade_laser_beam(
+        scene,
+        start[0],
+        start[1],
+        end_x,
+        SOURCE_ARCADE_LASER_TARGET_HEIGHT,
+        u32::from(demo_tick),
+        RenderLayer::Projectiles,
+    );
+}
+
+fn attract_scoring_laser_ship_anchor(position: [f32; 2]) -> [f32; 2] {
+    [
+        position[0] + f32::from(PLAYER_SPRITE_SIZE.0),
+        position[1] + f32::from(PLAYER_SPRITE_SIZE.1 / 2) + 1.0,
+    ]
+}
+
+fn attract_scoring_laser_enemy_anchor(kind: EnemyKind, position: [f32; 2]) -> [f32; 2] {
+    let (width, height) = enemy_sprite_size(kind);
+    [
+        position[0] + f32::from(width / 4),
+        position[1] + f32::from(height / 2),
+    ]
+}
+
+fn push_attract_scoring_expanded_pixels(
+    scene: &mut RenderScene,
+    object: AttractScoringObject,
+    demo_tick: u16,
+) {
+    let AttractScoringObjectKind::Enemy(kind) = object.kind else {
+        return;
+    };
+    let position = attract_scoring_scene_position(object.x16, object.y16);
+    let size = enemy_sprite_size(kind);
+    let center = [
+        position[0] + f32::from(size.0) / 2.0,
+        position[1] + f32::from(size.1) / 2.0,
+    ];
+    let scale = match object.visual {
+        AttractScoringVisual::Materialize => {
+            1.0 + f32::from((demo_tick / 4) % SOURCE_EXPANDED_PIXEL_SCALE_STEPS)
+        }
+        AttractScoringVisual::Explosion => SOURCE_EXPANDED_PIXEL_EXPLOSION_SCALE,
+        AttractScoringVisual::Sprite => return,
+    };
+    push_source_expanded_pixel_cloud(
+        scene,
+        center,
+        [f32::from(size.0), f32::from(size.1)],
+        scale,
+        u32::from(demo_tick),
+        RenderLayer::Objects,
+    );
+}
+
+fn attract_scoring_scene_position(x16: i32, y16: i32) -> [f32; 2] {
+    offset_position(
+        attract_scoring_object_position(x16, y16),
+        ATTRACT_SCORING_OBJECT_REFERENCE_OFFSET,
+    )
 }
 
 fn attract_scoring_object_sprite(
@@ -8643,7 +8750,7 @@ fn attract_scoring_object_sprite(
         return (
             SpriteId::BOMB_EXPLOSION,
             RenderLayer::Objects,
-            [10.0, 10.0],
+            [8.0, 8.0],
             attract_scoring_color_cycle_tint(demo_tick),
         );
     }
@@ -9331,22 +9438,265 @@ fn push_expanded_object_detail_sprites(
         if sprite == SpriteId::NULL_OBJECT {
             continue;
         }
-        let Some(position) = detail.top_left else {
+        if source_expanded_object_uses_pixel_cloud(detail) {
+            push_expanded_object_explosion_pixels(scene, detail);
+            continue;
+        }
+        let Some((position, size)) = expanded_object_sprite_geometry(detail) else {
             continue;
         };
-        let Some((width, height)) = expanded_object_sprite_size(detail) else {
-            continue;
-        };
-        if width == 0 || height == 0 {
+        if size[0] == 0.0 || size[1] == 0.0 {
             continue;
         }
 
         scene.push_sprite(SceneSprite {
             sprite,
             layer: RenderLayer::Objects,
-            position: [f32::from(position.x), f32::from(position.y)],
-            size: [f32::from(width), f32::from(height)],
+            position,
+            size,
             tint: Color::WHITE,
+        });
+    }
+}
+
+fn source_expanded_object_uses_pixel_cloud(detail: &ExpandedObjectDetailSnapshot) -> bool {
+    detail.kind == ExpandedObjectKind::Explosion
+        && matches!(
+            detail.mapped_sprite,
+            Some(
+                SpriteId::ENEMY_LANDER
+                    | SpriteId::ENEMY_MUTANT
+                    | SpriteId::ENEMY_BOMBER
+                    | SpriteId::ENEMY_POD
+                    | SpriteId::ENEMY_BAITER
+                    | SpriteId::SWARMER_EXPLOSION
+            )
+        )
+}
+
+fn push_expanded_object_explosion_pixels(
+    scene: &mut RenderScene,
+    detail: &ExpandedObjectDetailSnapshot,
+) {
+    let (base_width, base_height) = expanded_object_base_sprite_size(detail).unwrap_or((4, 4));
+    let Some(center) = explosion_sprite_center(detail, (base_width, base_height)) else {
+        return;
+    };
+    let Some(scale) = source_explosion_render_scale(detail.size) else {
+        return;
+    };
+    let tick = u32::from(detail.explosion_frame.unwrap_or(0));
+    push_source_expanded_pixel_cloud(
+        scene,
+        center,
+        [f32::from(base_width), f32::from(base_height)],
+        f32::from(scale),
+        tick,
+        RenderLayer::Objects,
+    );
+}
+
+fn push_player_projectile_sprites(scene: &mut RenderScene, projectile: ProjectileSnapshot) {
+    let direction = projectile.velocity.dx.signum();
+    let x = f32::from(projectile.position.x);
+    let y = f32::from(projectile.position.y);
+    let span = f32::from(PLAYER_PROJECTILE_COLLISION_SIZE.0);
+
+    if direction == 0 {
+        push_laser_segment(scene, x, y, span, Color::WHITE);
+        return;
+    }
+
+    let collision_head = if direction > 0 {
+        (x + span - 1.0).min(scene.surface.width as f32 - 1.0)
+    } else {
+        x.max(0.0)
+    };
+    let source_tail = if direction > 0 {
+        f32::from(projectile.source_tail_position.x)
+    } else {
+        f32::from(projectile.source_tail_position.x) + span - 1.0
+    };
+    push_arcade_laser_beam(
+        scene,
+        source_tail.clamp(0.0, scene.surface.width as f32 - 1.0),
+        y,
+        collision_head,
+        SOURCE_ARCADE_LASER_TARGET_HEIGHT,
+        u32::from(projectile.position.x),
+        RenderLayer::Projectiles,
+    );
+}
+
+fn step_projectile_laser_tail(projectile: ProjectileSnapshot) -> ScreenPosition {
+    let direction = projectile.velocity.dx.signum();
+    if direction == 0 {
+        return projectile.source_tail_position;
+    }
+
+    let next_x = i16::from(projectile.source_tail_position.x) + i16::from(direction);
+    if (0..=i16::from(u8::MAX)).contains(&next_x) {
+        ScreenPosition::new(next_x as u8, projectile.source_tail_position.y)
+    } else {
+        projectile.source_tail_position
+    }
+}
+
+const SOURCE_ARCADE_LASER_TARGET_HEIGHT: i32 = 8;
+const SOURCE_EXPANDED_PIXEL_EXPLOSION_SCALE: f32 = 3.0;
+const SOURCE_EXPANDED_PIXEL_SCALE_STEPS: u16 = 3;
+
+const SOURCE_EXPANDED_PIXEL_OFFSETS: [(i16, i16, f32, f32); 20] = [
+    (0, 0, 3.0, 1.0),
+    (-4, 0, 2.0, 1.0),
+    (4, 0, 2.0, 1.0),
+    (0, -4, 1.0, 1.0),
+    (0, 4, 1.0, 1.0),
+    (-3, -2, 1.0, 1.0),
+    (3, -2, 1.0, 1.0),
+    (-3, 2, 1.0, 1.0),
+    (3, 2, 1.0, 1.0),
+    (-2, -3, 2.0, 1.0),
+    (2, -3, 2.0, 1.0),
+    (-2, 3, 2.0, 1.0),
+    (2, 3, 2.0, 1.0),
+    (-1, -1, 1.0, 1.0),
+    (1, -1, 1.0, 1.0),
+    (-1, 1, 1.0, 1.0),
+    (1, 1, 1.0, 1.0),
+    (-4, -3, 1.0, 1.0),
+    (4, 3, 1.0, 1.0),
+    (0, 2, 2.0, 1.0),
+];
+
+fn push_arcade_laser_beam(
+    scene: &mut RenderScene,
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    target_height: i32,
+    animation_tick: u32,
+    layer: RenderLayer,
+) {
+    let left = x0.min(x1).round() as i32;
+    let right = x0.max(x1).round() as i32;
+    if right <= left {
+        return;
+    }
+
+    let center_y = y0.round() as i32;
+    let target_height = target_height.max(4);
+    let row_spacing = (target_height / 4).max(1);
+    let top_row = center_y - (row_spacing * 3) / 2;
+    let phase = (animation_tick / 2) as usize;
+    let body_end = (right - 6).max(left);
+    let segment_length = (target_height / 2).max(4);
+    let gap = 2;
+
+    for row in 0..4 {
+        let y = top_row + row * row_spacing;
+        let color = source_laser_tint(phase + row as usize);
+        let mut segment_left = left + (row % 2) * 2;
+        while segment_left <= body_end {
+            let segment_right = (segment_left + segment_length - 1).min(body_end);
+            push_laser_span(scene, layer, segment_left, y, segment_right, color);
+            segment_left += segment_length + gap;
+        }
+    }
+
+    let tip_left = (right - 4).max(left);
+    for row in 0..4 {
+        let y = top_row + row * row_spacing;
+        let tip_color = if row % 2 == 0 {
+            Color::WHITE
+        } else {
+            source_laser_tint(phase + 6 + row as usize)
+        };
+        push_laser_span(scene, layer, tip_left, y, right, tip_color);
+    }
+
+    for offset in 0..4 {
+        let x = (tip_left - 2 - offset * 2).max(left);
+        let y = top_row + (((phase + offset as usize) % 4) as i32) * row_spacing;
+        push_laser_span(
+            scene,
+            layer,
+            x,
+            y,
+            x,
+            source_laser_tint(phase + 9 + offset as usize),
+        );
+    }
+}
+
+fn push_laser_span(
+    scene: &mut RenderScene,
+    layer: RenderLayer,
+    left: i32,
+    y: i32,
+    right: i32,
+    tint: Color,
+) {
+    if y < 0 || y >= scene.surface.height as i32 || right < 0 || left >= scene.surface.width as i32
+    {
+        return;
+    }
+    let clamped_left = left.max(0);
+    let clamped_right = right.min(scene.surface.width as i32 - 1);
+    if clamped_right < clamped_left {
+        return;
+    }
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::PLAYER_PROJECTILE,
+        layer,
+        position: [clamped_left as f32, y as f32],
+        size: [(clamped_right - clamped_left + 1) as f32, 1.0],
+        tint,
+    });
+}
+
+fn push_laser_segment(scene: &mut RenderScene, x: f32, y: f32, width: f32, tint: Color) {
+    scene.push_sprite(SceneSprite {
+        sprite: SpriteId::PLAYER_PROJECTILE,
+        layer: RenderLayer::Projectiles,
+        position: [x, y],
+        size: [width, 1.0],
+        tint,
+    });
+}
+
+fn source_laser_tint(phase: usize) -> Color {
+    source_pseudo_color_tint(SOURCE_COLTAB_COLOR_BYTES[phase % SOURCE_COLTAB_ACTIVE_BYTES])
+}
+
+fn push_source_expanded_pixel_cloud(
+    scene: &mut RenderScene,
+    center: [f32; 2],
+    base_size: [f32; 2],
+    scale: f32,
+    tick: u32,
+    layer: RenderLayer,
+) {
+    let radius_x = (base_size[0] * scale / 2.0).max(2.0);
+    let radius_y = (base_size[1] * scale / 2.0).max(2.0);
+    for (index, (offset_x, offset_y, width, height)) in
+        SOURCE_EXPANDED_PIXEL_OFFSETS.iter().copied().enumerate()
+    {
+        if (tick as usize + index * 2).is_multiple_of(7) {
+            continue;
+        }
+        let x = center[0] + f32::from(offset_x) * radius_x / 4.0;
+        let y = center[1] + f32::from(offset_y) * radius_y / 4.0;
+        if x < 0.0 || y < 0.0 || x >= scene.surface.width as f32 || y >= scene.surface.height as f32
+        {
+            continue;
+        }
+        scene.push_sprite(SceneSprite {
+            sprite: SpriteId::PLAYER_EXPLOSION_PIXEL,
+            layer,
+            position: [x.round(), y.round()],
+            size: [width, height],
+            tint: source_laser_tint(tick as usize + index),
         });
     }
 }
@@ -9379,16 +9729,83 @@ const fn player_explosion_tint(source_color: u8) -> Color {
 pub(crate) fn expanded_object_sprite_size(
     detail: &ExpandedObjectDetailSnapshot,
 ) -> Option<(u16, u16)> {
+    let (width, height) = expanded_object_base_sprite_size(detail)?;
+    if detail.kind != ExpandedObjectKind::Explosion {
+        return Some((width, height));
+    }
+
+    let scale = source_explosion_render_scale(detail.size)?;
+    Some((width.saturating_mul(scale), height.saturating_mul(scale)))
+}
+
+pub(crate) fn expanded_object_sprite_geometry(
+    detail: &ExpandedObjectDetailSnapshot,
+) -> Option<([f32; 2], [f32; 2])> {
+    let (width, height) = expanded_object_sprite_size(detail)?;
+    let size = [f32::from(width), f32::from(height)];
+    if detail.kind != ExpandedObjectKind::Explosion {
+        let position = detail.top_left?;
+        return Some(([f32::from(position.x), f32::from(position.y)], size));
+    }
+
+    let (base_width, base_height) = expanded_object_base_sprite_size(detail)?;
+    let center = explosion_sprite_center(detail, (base_width, base_height))?;
+    Some(([center[0] - size[0] / 2.0, center[1] - size[1] / 2.0], size))
+}
+
+fn expanded_object_base_sprite_size(detail: &ExpandedObjectDetailSnapshot) -> Option<(u16, u16)> {
     let (width, height) = detail.picture_size?;
     if detail.kind != ExpandedObjectKind::Explosion {
         return Some((u16::from(width), u16::from(height)));
     }
 
-    let scale = u16::from(source_explosion_size_scale(detail.size)?);
-    Some((
-        u16::from(width).saturating_mul(scale),
-        u16::from(height).saturating_mul(scale),
-    ))
+    detail
+        .mapped_sprite
+        .and_then(explosion_sprite_size)
+        .or(Some((u16::from(width), u16::from(height))))
+}
+
+fn explosion_sprite_center(
+    detail: &ExpandedObjectDetailSnapshot,
+    base_size: (u16, u16),
+) -> Option<[f32; 2]> {
+    if let Some(top_left) = detail.top_left {
+        return Some([
+            f32::from(top_left.x) + f32::from(base_size.0) / 2.0,
+            f32::from(top_left.y) + f32::from(base_size.1) / 2.0,
+        ]);
+    }
+
+    detail
+        .center
+        .map(|center| [f32::from(center.x), f32::from(center.y)])
+}
+
+fn explosion_sprite_size(sprite: SpriteId) -> Option<(u16, u16)> {
+    match sprite {
+        SpriteId::ENEMY_LANDER => Some(u16_sprite_size(enemy_sprite_size(EnemyKind::Lander))),
+        SpriteId::ENEMY_MUTANT => Some(u16_sprite_size(enemy_sprite_size(EnemyKind::Mutant))),
+        SpriteId::ENEMY_BOMBER => Some(u16_sprite_size(enemy_sprite_size(EnemyKind::Bomber))),
+        SpriteId::ENEMY_POD => Some(u16_sprite_size(enemy_sprite_size(EnemyKind::Pod))),
+        SpriteId::ENEMY_BAITER => Some(u16_sprite_size(enemy_sprite_size(EnemyKind::Baiter))),
+        SpriteId::BOMB_EXPLOSION | SpriteId::SWARMER_EXPLOSION | SpriteId::ASTRONAUT_EXPLOSION => {
+            Some((8, 8))
+        }
+        SpriteId::PLAYER_SHIP => Some(u16_sprite_size(PLAYER_SPRITE_SIZE)),
+        SpriteId::TERRAIN_EXPLOSION => Some((16, 6)),
+        _ => None,
+    }
+}
+
+const fn u16_sprite_size(size: (u8, u8)) -> (u16, u16) {
+    (size.0 as u16, size.1 as u16)
+}
+
+const SOURCE_EXPLOSION_RENDER_MAX_SCALE: u8 = 3;
+
+pub(crate) fn source_explosion_render_scale(size: u16) -> Option<u16> {
+    source_explosion_size_scale(size)
+        .map(|scale| u16::from(scale.min(SOURCE_EXPLOSION_RENDER_MAX_SCALE)))
 }
 
 pub(crate) fn source_explosion_size_scale(size: u16) -> Option<u8> {
@@ -9467,11 +9884,11 @@ fn enemy_sprite(kind: EnemyKind) -> SpriteId {
     }
 }
 
-const PROJECTILE_SPRITE_SIZE: (u8, u8) = (8, 2);
-const PLAYER_PROJECTILE_COLLISION_SIZE: (u8, u8) = (8, 1);
-const ENEMY_PROJECTILE_SPRITE_SIZE: (u8, u8) = (4, 6);
+const PROJECTILE_SPRITE_SIZE: (u8, u8) = (16, 1);
+const PLAYER_PROJECTILE_COLLISION_SIZE: (u8, u8) = (16, 1);
+const ENEMY_PROJECTILE_SPRITE_SIZE: (u8, u8) = (4, 3);
 const ENEMY_PROJECTILE_COLLISION_SIZE: (u8, u8) = SOURCE_BOMB_SHELL_PICTURE_SIZE;
-const PLAYER_SPRITE_SIZE: (u8, u8) = (16, 8);
+const PLAYER_SPRITE_SIZE: (u8, u8) = (16, 6);
 const PLAYER_COLLISION_SIZE: (u8, u8) = (8, 6);
 const SCORE_DIGIT_DISPLAY_COUNT: usize = 6;
 const SCORE_DISPLAY_MAX: u32 = 999_999;
@@ -9559,12 +9976,12 @@ const SOURCE_HALL_OF_FAME_SCORE_TEXT_LEN: usize = 6;
 
 fn enemy_sprite_size(kind: EnemyKind) -> (u8, u8) {
     match kind {
-        EnemyKind::Lander => (12, 8),
-        EnemyKind::Mutant => (12, 8),
-        EnemyKind::Bomber => (10, 8),
-        EnemyKind::Pod => (10, 8),
-        EnemyKind::Swarmer => (8, 6),
-        EnemyKind::Baiter => (12, 8),
+        EnemyKind::Lander => (10, 8),
+        EnemyKind::Mutant => (10, 8),
+        EnemyKind::Bomber => (8, 8),
+        EnemyKind::Pod => (8, 8),
+        EnemyKind::Swarmer => (6, 4),
+        EnemyKind::Baiter => (12, 4),
     }
 }
 
@@ -9810,8 +10227,10 @@ fn world_word(word: u16) -> WorldVector {
     WorldVector::from_subpixels(i32::from(word) << 8)
 }
 
-fn world_vector_pixels(vector: WorldVector) -> f32 {
-    vector.subpixels() as f32 / WorldVector::SUBPIXELS_PER_PIXEL as f32
+fn player_scene_position(position: (WorldVector, WorldVector)) -> [f32; 2] {
+    let x = source_word_from_world_vector(position.0).to_be_bytes()[0];
+    let y = source_word_from_world_vector(position.1).to_be_bytes()[0];
+    [f32::from(x), f32::from(y)]
 }
 
 #[cfg(test)]
@@ -10515,12 +10934,12 @@ mod tests {
     #[test]
     fn clean_enemy_families_use_source_message_scores_and_sprites() {
         for (kind, sprite, size, score) in [
-            (EnemyKind::Lander, SpriteId::ENEMY_LANDER, (12, 8), 150),
-            (EnemyKind::Mutant, SpriteId::ENEMY_MUTANT, (12, 8), 150),
-            (EnemyKind::Bomber, SpriteId::ENEMY_BOMBER, (10, 8), 250),
-            (EnemyKind::Pod, SpriteId::ENEMY_POD, (10, 8), 1000),
-            (EnemyKind::Swarmer, SpriteId::ENEMY_SWARMER, (8, 6), 150),
-            (EnemyKind::Baiter, SpriteId::ENEMY_BAITER, (12, 8), 200),
+            (EnemyKind::Lander, SpriteId::ENEMY_LANDER, (10, 8), 150),
+            (EnemyKind::Mutant, SpriteId::ENEMY_MUTANT, (10, 8), 150),
+            (EnemyKind::Bomber, SpriteId::ENEMY_BOMBER, (8, 8), 250),
+            (EnemyKind::Pod, SpriteId::ENEMY_POD, (8, 8), 1000),
+            (EnemyKind::Swarmer, SpriteId::ENEMY_SWARMER, (6, 4), 150),
+            (EnemyKind::Baiter, SpriteId::ENEMY_BAITER, (12, 4), 200),
         ] {
             assert_eq!(super::enemy_sprite(kind), sprite);
             assert_eq!(super::enemy_sprite_size(kind), size);
@@ -11028,7 +11447,7 @@ mod tests {
     }
 
     #[test]
-    fn source_bgout_default_terrain_records_match_red_label_head() {
+    fn source_bgout_default_terrain_records_match_reference_head() {
         let records = super::source_bgout_default_terrain_records();
 
         assert_eq!(records.len(), super::SOURCE_TERRAIN_SCREEN_WORDS);
@@ -11079,7 +11498,7 @@ mod tests {
     }
 
     #[test]
-    fn source_scanner_mini_terrain_records_match_red_label_slice() {
+    fn source_scanner_mini_terrain_records_match_reference_slice() {
         let records = super::source_scanner_mini_terrain_records();
 
         assert_eq!(records.len(), super::SOURCE_SCANNER_TERRAIN_RECORDS);
@@ -11140,7 +11559,7 @@ mod tests {
         );
 
         let scene = game.scene();
-        let score_position = super::attract_scoring_object_position(
+        let score_position = super::attract_scoring_scene_position(
             super::ATTRACT_SCORING_SCORE_500_X16,
             super::ATTRACT_SCORING_SCORE_500_Y16,
         );
@@ -11173,6 +11592,11 @@ mod tests {
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP)
         );
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCANNER_PLAYER_BLIP
+                && sprite.layer == RenderLayer::Hud
+                && sprite.position == [169.8, 12.25]
+        }));
         assert!(
             scene
                 .sprites
@@ -11191,6 +11615,121 @@ mod tests {
         assert!(!scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_L && sprite.position == [45.0, 105.0]
         }));
+    }
+
+    #[test]
+    fn clean_attract_scoring_sequence_projects_source_laser_and_transfer_effects() {
+        let mut game = Game::new();
+        let laser_display_tick = super::attract_scoring_demo_tick_for_stage(
+            super::AttractScoringDemoStage::RescueLaser,
+            0,
+        );
+        let laser_tick = super::attract_scoring_page_tick_for_display_tick(laser_display_tick);
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(
+            super::ATTRACT_SCORING_SEQUENCE_START_FRAME + laser_tick,
+        );
+
+        let laser_scene = game.scene();
+
+        assert!(laser_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                && sprite.layer == RenderLayer::Projectiles
+                && sprite.size[0] >= 1.0
+                && sprite.size[1] == 1.0
+        }));
+
+        let transfer_display_tick = super::attract_scoring_demo_tick_for_stage(
+            super::AttractScoringDemoStage::LegendTransfer(0),
+            0,
+        );
+        let transfer_tick =
+            super::attract_scoring_page_tick_for_display_tick(transfer_display_tick);
+        game.state.attract = AttractPresentationSnapshot::for_page_frame(
+            super::ATTRACT_SCORING_SEQUENCE_START_FRAME + transfer_tick,
+        );
+
+        let transfer_scene = game.scene();
+
+        assert!(transfer_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::SCORE_POPUP_250
+                && sprite.layer == RenderLayer::Objects
+                && sprite.size == [12.0, 6.0]
+        }));
+        assert!(transfer_scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                && sprite.layer == RenderLayer::Objects
+                && sprite.tint.rgba[3] == 0xFF
+        }));
+    }
+
+    #[test]
+    fn clean_attract_scoring_visual_helpers_cover_source_projection_edges() {
+        let mut scene = RenderScene::empty(0, SurfaceSize::new(320, 240));
+        let human_materialize = super::AttractScoringObject {
+            kind: super::AttractScoringObjectKind::Human,
+            x16: 0,
+            y16: 0,
+            visual: super::AttractScoringVisual::Materialize,
+        };
+
+        super::push_attract_scoring_expanded_pixels(&mut scene, human_materialize, 0);
+
+        assert!(scene.sprites.is_empty());
+
+        let enemy_sprite = super::AttractScoringObject {
+            kind: super::AttractScoringObjectKind::Enemy(EnemyKind::Lander),
+            x16: 0x1000,
+            y16: 0x2000,
+            visual: super::AttractScoringVisual::Sprite,
+        };
+
+        super::push_attract_scoring_expanded_pixels(&mut scene, enemy_sprite, 0);
+
+        assert!(scene.sprites.is_empty());
+
+        let player = super::AttractScoringObject {
+            kind: super::AttractScoringObjectKind::PlayerShip,
+            x16: 0x1000,
+            y16: 0x2000,
+            visual: super::AttractScoringVisual::Sprite,
+        };
+        let human_target = super::AttractScoringObject {
+            kind: super::AttractScoringObjectKind::Human,
+            x16: 0x2000,
+            y16: 0x2000,
+            visual: super::AttractScoringVisual::Sprite,
+        };
+
+        super::push_attract_scoring_laser_beam(&mut scene, player, human_target, 2);
+
+        assert!(scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_PROJECTILE && sprite.layer == RenderLayer::Projectiles
+        }));
+        assert_eq!(
+            super::attract_scoring_laser_ship_anchor([20.0, 40.0]),
+            [36.0, 44.0]
+        );
+        assert_eq!(
+            super::attract_scoring_laser_enemy_anchor(EnemyKind::Lander, [20.0, 40.0]),
+            [22.0, 44.0]
+        );
+        assert_eq!(
+            super::attract_scoring_object_sprite(
+                super::AttractScoringObject {
+                    kind: super::AttractScoringObjectKind::Enemy(EnemyKind::Bomber),
+                    x16: 0,
+                    y16: 0,
+                    visual: super::AttractScoringVisual::Explosion,
+                },
+                0,
+            ),
+            (
+                SpriteId::BOMB_EXPLOSION,
+                RenderLayer::Objects,
+                [8.0, 8.0],
+                super::attract_scoring_color_cycle_tint(0),
+            )
+        );
     }
 
     #[test]
@@ -11268,14 +11807,14 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_LANDER
                 && sprite.layer == RenderLayer::Objects
-                && sprite.position == [61.0, 89.0]
-                && sprite.size == [12.0, 8.0]
+                && sprite.position == [46.0, 79.0]
+                && sprite.size == [10.0, 8.0]
         }));
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_BOMBER
                 && sprite.layer == RenderLayer::Objects
-                && sprite.position == [64.0, 145.0]
-                && sprite.size == [10.0, 8.0]
+                && sprite.position == [49.0, 135.0]
+                && sprite.size == [8.0, 8.0]
         }));
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_S && sprite.position == [173.0, 161.0]
@@ -11772,6 +12311,16 @@ mod tests {
             active.scene.summary().sprite_count,
             49 + super::SOURCE_TERRAIN_SCREEN_WORDS
         );
+        assert!(active.scene.sprites.iter().any(|sprite| {
+            sprite.sprite == SpriteId::PLAYER_SHIP
+                && sprite.layer == RenderLayer::Objects
+                && sprite.position == [32.0, 128.0]
+                && sprite.size
+                    == [
+                        f32::from(super::PLAYER_SPRITE_SIZE.0),
+                        f32::from(super::PLAYER_SPRITE_SIZE.1),
+                    ]
+        }));
     }
 
     #[test]
@@ -11788,7 +12337,7 @@ mod tests {
         assert_eq!(blocked.state.credits, 1);
         assert_eq!(blocked.state.player_count, 1);
         assert!(blocked.events.is_empty());
-        assert_eq!(blocked.scene.summary().layers.hud, 2);
+        assert_eq!(blocked.scene.summary().layers.hud, 0);
     }
 
     #[test]
@@ -11814,13 +12363,17 @@ mod tests {
         assert_eq!(
             started.scene.summary().layers,
             RenderLayerCounts {
+                terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 objects: 1,
                 hud: 22,
                 overlay: 9,
                 ..RenderLayerCounts::default()
             }
         );
-        assert_eq!(started.scene.summary().sprite_count, 32);
+        assert_eq!(
+            started.scene.summary().sprite_count,
+            32 + super::SOURCE_TERRAIN_SCREEN_WORDS
+        );
         assert!(started.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_P
                 && sprite.layer == RenderLayer::Overlay
@@ -11845,14 +12398,17 @@ mod tests {
         assert_eq!(
             active.scene.summary().layers,
             RenderLayerCounts {
-                terrain: 5,
+                terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 starfield: 3,
                 objects: 16,
                 hud: 38,
                 ..RenderLayerCounts::default()
             }
         );
-        assert_eq!(active.scene.summary().sprite_count, 62);
+        assert_eq!(
+            active.scene.summary().sprite_count,
+            57 + super::SOURCE_TERRAIN_SCREEN_WORDS
+        );
     }
 
     #[test]
@@ -11977,10 +12533,10 @@ mod tests {
         assert_eq!(
             frame.scene.summary().layers,
             RenderLayerCounts {
-                terrain: 5,
+                terrain: super::SOURCE_TERRAIN_SCREEN_WORDS,
                 starfield: 3,
-                objects: 21,
-                projectiles: 1,
+                objects: 101,
+                projectiles: 16,
                 hud: 30,
                 overlay: 0,
             }
@@ -12166,15 +12722,11 @@ mod tests {
         let mut expected_sounds = vec![source_smart_bomb_sound_event()];
         expected_sounds.extend(vec![source_enemy_hit_sound_event(EnemyKind::Lander); 5]);
         assert_eq!(frame.events.sounds(), expected_sounds.as_slice());
+        assert_eq!(frame.state.world.expanded_objects.active_count, 5);
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_LANDER
                 && sprite.layer == RenderLayer::Objects
-                && sprite.size == [12.0, 8.0]
-        }));
-        assert!(frame.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::ENEMY_LANDER
-                && sprite.layer == RenderLayer::Objects
-                && sprite.size == [5.0, 8.0]
+                && sprite.size == [10.0, 8.0]
         }));
     }
 
@@ -12257,14 +12809,7 @@ mod tests {
 
         assert_eq!(projectile.velocity, ScreenVelocity::new(5, 0));
         assert_eq!(fired.events.sounds(), &[source_laser_fire_sound_event()]);
-        assert!(fired.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::PLAYER_PROJECTILE
-                && sprite.position
-                    == [
-                        f32::from(projectile.position.x),
-                        f32::from(projectile.position.y),
-                    ]
-        }));
+        assert_scene_has_player_laser_beam(&fired.scene, projectile);
 
         let moved = game.step(GameInput::NONE);
         let moved_projectile = moved.state.world.projectiles[0];
@@ -12274,7 +12819,60 @@ mod tests {
             projectile.position.x.wrapping_add(5)
         );
         assert_eq!(moved_projectile.position.y, projectile.position.y);
+        assert_eq!(
+            moved_projectile.source_tail_position.x,
+            projectile.source_tail_position.x.wrapping_add(1)
+        );
         assert_eq!(moved_projectile.velocity, projectile.velocity);
+    }
+
+    #[test]
+    fn clean_game_renders_player_laser_as_live_source_span() {
+        let mut game = credited_started_game();
+
+        let fired = game.step(GameInput {
+            fire: true,
+            ..GameInput::NONE
+        });
+        let fired_projectile = fired.state.world.projectiles[0];
+        let frame = game.step(GameInput::NONE);
+        let projectile = frame.state.world.projectiles[0];
+        let laser_sprites = frame
+            .scene
+            .sprites
+            .iter()
+            .filter(|sprite| sprite.sprite == SpriteId::PLAYER_PROJECTILE)
+            .collect::<Vec<_>>();
+
+        assert!(laser_sprites.len() > 1);
+        assert!(laser_sprites.iter().all(|sprite| {
+            sprite.layer == RenderLayer::Projectiles
+                && sprite.size[0] >= 1.0
+                && sprite.size[1] == 1.0
+                && sprite.tint.rgba[3] == 0xFF
+        }));
+        assert_eq!(
+            projectile.source_tail_position.x,
+            fired_projectile.source_tail_position.x.wrapping_add(1)
+        );
+        let (left, right) = player_laser_visible_bounds(projectile);
+        assert!(left < f32::from(projectile.position.x));
+        assert!(laser_sprites.iter().any(|sprite| {
+            sprite.position[0] == left
+                && (sprite.position[1] - f32::from(projectile.position.y)).abs() <= 4.0
+        }));
+        assert!(laser_sprites.iter().any(|sprite| {
+            sprite.position[0] + sprite.size[0] >= right + 1.0
+                && (sprite.position[1] - f32::from(projectile.position.y)).abs() <= 4.0
+        }));
+        assert!(laser_sprites.iter().all(|sprite| {
+            sprite.position[0] >= left && sprite.position[0] + sprite.size[0] <= right + 1.0
+        }));
+        assert!(
+            laser_sprites
+                .iter()
+                .any(|sprite| sprite.tint != Color::WHITE)
+        );
     }
 
     #[test]
@@ -12313,6 +12911,7 @@ mod tests {
         game.state.world.projectiles = (0..4)
             .map(|index| ProjectileSnapshot {
                 position: ScreenPosition::new(32 + index, 80),
+                source_tail_position: ScreenPosition::new(32 + index, 80),
                 velocity: ScreenVelocity::new(0, 0),
             })
             .collect();
@@ -12331,7 +12930,8 @@ mod tests {
     fn clean_game_culls_projectiles_that_leave_the_screen() {
         let mut game = credited_started_game();
         game.state.world.projectiles.push(ProjectileSnapshot {
-            position: ScreenPosition::new(0x98, 80),
+            position: ScreenPosition::new(0xFE, 80),
+            source_tail_position: ScreenPosition::new(0xFE, 80),
             velocity: ScreenVelocity::new(5, 0),
         });
 
@@ -12348,6 +12948,33 @@ mod tests {
     }
 
     #[test]
+    fn clean_game_laser_reaches_far_side_enemies_before_culling() {
+        let mut game = credited_started_game();
+        keep_first_enemy_only(&mut game);
+        game.state.world.enemies[0] = EnemySnapshot::new(
+            EnemyKind::Lander,
+            ScreenPosition::new(210, 80),
+            ScreenVelocity::new(0, 0),
+        );
+        game.state.world.projectiles.push(ProjectileSnapshot {
+            position: ScreenPosition::new(190, 83),
+            source_tail_position: ScreenPosition::new(190, 83),
+            velocity: ScreenVelocity::new(5, 0),
+        });
+
+        let frame = game.step(GameInput::NONE);
+
+        assert!(frame.state.world.enemies.is_empty());
+        assert!(frame.state.world.projectiles.is_empty());
+        assert_eq!(frame.state.scores.player_one, 150);
+        assert_eq!(
+            frame.events.gameplay(),
+            &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
+        );
+        assert_scene_has_enemy_explosion_cloud(&frame.scene);
+    }
+
+    #[test]
     fn clean_game_resolves_projectile_enemy_collision_and_scores() {
         let mut game = credited_started_game();
         keep_first_enemy_only(&mut game);
@@ -12358,6 +12985,7 @@ mod tests {
         );
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -12392,12 +13020,11 @@ mod tests {
                 ..ExpandedObjectDetailSnapshot::EMPTY
             }
         );
-        assert!(frame.scene.sprites.iter().any(|sprite| {
+        assert_scene_has_enemy_explosion_cloud(&frame.scene);
+        assert!(!frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_LANDER
                 && sprite.layer == RenderLayer::Objects
                 && sprite.position == [100.0, 80.0]
-                && sprite.size == [5.0, 8.0]
-                && sprite.tint == Color::WHITE
         }));
         assert!(
             !frame
@@ -12419,6 +13046,7 @@ mod tests {
         );
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 88),
+            source_tail_position: ScreenPosition::new(101, 88),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -12442,6 +13070,7 @@ mod tests {
         );
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(106, 83),
+            source_tail_position: ScreenPosition::new(106, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -12467,6 +13096,7 @@ mod tests {
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -12549,13 +13179,16 @@ mod tests {
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_SWARMER
                 && sprite.layer == RenderLayer::Objects
-                && sprite.size == [8.0, 6.0]
+                && sprite.size == [6.0, 4.0]
         }));
-        assert!(frame.scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::ENEMY_POD
-                && sprite.layer == RenderLayer::Objects
-                && sprite.size == [4.0, 8.0]
-        }));
+        assert_scene_has_enemy_explosion_cloud(&frame.scene);
+        assert!(
+            !frame
+                .scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_POD)
+        );
     }
 
     #[test]
@@ -12579,6 +13212,7 @@ mod tests {
             game.baiter_timer_ticks = None;
             game.state.world.projectiles.push(ProjectileSnapshot {
                 position: ScreenPosition::new(101, 83),
+                source_tail_position: ScreenPosition::new(101, 83),
                 velocity: ScreenVelocity::new(0, 0),
             });
 
@@ -12615,6 +13249,7 @@ mod tests {
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -12791,7 +13426,7 @@ mod tests {
             sprite.sprite == SpriteId::ENEMY_BOMB
                 && sprite.layer == RenderLayer::Projectiles
                 && sprite.position == [32.0, 96.0]
-                && sprite.size == [4.0, 6.0]
+                && sprite.size == [4.0, 3.0]
         }));
     }
 
@@ -12924,7 +13559,7 @@ mod tests {
         assert!(frame.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::ENEMY_BAITER
                 && sprite.layer == RenderLayer::Objects
-                && sprite.size == [12.0, 8.0]
+                && sprite.size == [12.0, 4.0]
         }));
     }
 
@@ -14768,6 +15403,7 @@ mod tests {
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
         game.state.world.projectiles = vec![ProjectileSnapshot {
             position: ScreenPosition::new(64, 80),
+            source_tail_position: ScreenPosition::new(64, 80),
             velocity: ScreenVelocity::new(0, 0),
         }];
         game.state.world.enemy_projectiles = vec![
@@ -14953,12 +15589,12 @@ mod tests {
         assert!(
             shell_sprites
                 .iter()
-                .any(|sprite| { sprite.position == [32.0, 96.0] && sprite.size == [4.0, 6.0] })
+                .any(|sprite| { sprite.position == [32.0, 96.0] && sprite.size == [4.0, 3.0] })
         );
         assert!(
             shell_sprites
                 .iter()
-                .any(|sprite| { sprite.position == [48.0, 112.0] && sprite.size == [4.0, 6.0] })
+                .any(|sprite| { sprite.position == [48.0, 112.0] && sprite.size == [4.0, 3.0] })
         );
     }
 
@@ -14972,6 +15608,7 @@ mod tests {
         game.baiter_timer_ticks = None;
         game.state.world.projectiles = vec![ProjectileSnapshot {
             position: ScreenPosition::new(0x34, 0x78),
+            source_tail_position: ScreenPosition::new(0x34, 0x78),
             velocity: ScreenVelocity::new(5, 0),
         }];
 
@@ -14997,12 +15634,7 @@ mod tests {
         assert_eq!(detail.mapped_sprite, Some(SpriteId::PLAYER_PROJECTILE));
 
         let scene = game.scene();
-        assert!(scene.sprites.iter().any(|sprite| {
-            sprite.sprite == SpriteId::PLAYER_PROJECTILE
-                && sprite.layer == RenderLayer::Projectiles
-                && sprite.position == [52.0, 120.0]
-                && sprite.size == [8.0, 2.0]
-        }));
+        assert_scene_has_player_laser_beam(&scene, game.state.world.projectiles[0]);
     }
 
     #[test]
@@ -15057,7 +15689,7 @@ mod tests {
             sprite.sprite == SpriteId::HUMAN
                 && sprite.layer == RenderLayer::Objects
                 && sprite.position == [68.0, 216.0]
-                && sprite.size == [6.0, 8.0]
+                && sprite.size == [4.0, 8.0]
         }));
         assert!(!scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::HUMAN
@@ -15099,6 +15731,7 @@ mod tests {
             }],
             projectiles: vec![ProjectileSnapshot {
                 position: ScreenPosition::new(0x20, 0x70),
+                source_tail_position: ScreenPosition::new(0x20, 0x70),
                 velocity: ScreenVelocity::new(5, 0),
             }],
             enemy_projectiles: vec![enemy_projectile],
@@ -15656,6 +16289,7 @@ mod tests {
         }];
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -15708,6 +16342,7 @@ mod tests {
         }];
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, lander_start.y.saturating_add(3)),
+            source_tail_position: ScreenPosition::new(101, lander_start.y.saturating_add(3)),
             velocity: ScreenVelocity::new(0, 0),
         });
         game.baiter_timer_ticks = None;
@@ -15754,6 +16389,7 @@ mod tests {
         }];
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
         game.baiter_timer_ticks = None;
@@ -16347,6 +16983,7 @@ mod tests {
         ));
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -17046,6 +17683,7 @@ mod tests {
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -17072,6 +17710,7 @@ mod tests {
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -17100,6 +17739,7 @@ mod tests {
         game.state.world.enemies[0].velocity = ScreenVelocity::new(0, 0);
         game.state.world.projectiles.push(ProjectileSnapshot {
             position: ScreenPosition::new(101, 83),
+            source_tail_position: ScreenPosition::new(101, 83),
             velocity: ScreenVelocity::new(0, 0),
         });
 
@@ -17111,14 +17751,7 @@ mod tests {
             cleared.events.gameplay(),
             &[GameEvent::EnemyDestroyed, GameEvent::WaveCleared]
         );
-        assert!(
-            !cleared
-                .scene
-                .sprites
-                .iter()
-                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER
-                    && sprite.size == [12.0, 8.0])
-        );
+        assert_eq!(cleared.state.world.expanded_objects.active_count, 1);
         assert_eq!(cleared.scene.summary().layers.overlay, 37);
         assert!(cleared.scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::MESSAGE_GLYPH_A
@@ -17372,6 +18005,10 @@ mod tests {
         assert_eq!(terrain_sprites[0].position, [304.0, 222.0]);
         assert_eq!(terrain_sprites[0].size, super::SOURCE_TERRAIN_WORD_SIZE);
         assert_eq!(terrain_sprites[0].tint, Color::WHITE);
+        assert_eq!(
+            terrain_sprites[1].position[0] + terrain_sprites[1].size[0],
+            terrain_sprites[0].position[0]
+        );
         assert_eq!(terrain_sprites[6].sprite, SpriteId::TERRAIN_TILE_ALT);
         assert_eq!(terrain_sprites[6].position, [292.0, 215.0]);
         assert!(
@@ -17709,8 +18346,8 @@ mod tests {
         assert!(scene.sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::BOMB_EXPLOSION
                 && sprite.layer == RenderLayer::Objects
-                && sprite.position == [30.0, 40.0]
-                && sprite.size == [8.0, 16.0]
+                && sprite.position == [26.0, 36.0]
+                && sprite.size == [16.0, 16.0]
                 && sprite.tint == Color::WHITE
         }));
         assert!(
@@ -17809,7 +18446,7 @@ mod tests {
             sprite.sprite == SpriteId::BOMB_EXPLOSION
                 && sprite.layer == RenderLayer::Objects
                 && sprite.position == [33.0, 81.0]
-                && sprite.size == [4.0, 8.0]
+                && sprite.size == [8.0, 8.0]
                 && sprite.tint == Color::WHITE
         }));
 
@@ -17825,8 +18462,8 @@ mod tests {
         assert_eq!(advanced_detail.explosion_frame, Some(2));
         assert!(game.scene().sprites.iter().any(|sprite| {
             sprite.sprite == SpriteId::BOMB_EXPLOSION
-                && sprite.position == [33.0, 81.0]
-                && sprite.size == [8.0, 16.0]
+                && sprite.position == [29.0, 77.0]
+                && sprite.size == [16.0, 16.0]
         }));
 
         for _ in 2..SOURCE_EXPLOSION_LIFETIME_FRAMES {
@@ -17843,6 +18480,146 @@ mod tests {
                 .sprites
                 .iter()
                 .any(|sprite| sprite.sprite == SpriteId::BOMB_EXPLOSION)
+        );
+    }
+
+    #[test]
+    fn clean_game_visual_projection_helpers_cover_source_edge_cases() {
+        let mut scene = RenderScene::empty(0, SurfaceSize::new(320, 240));
+        let missing_center_detail = ExpandedObjectDetailSnapshot {
+            kind: ExpandedObjectKind::Explosion,
+            size: SOURCE_EXPLOSION_INITIAL_SIZE,
+            picture_size: Some((5, 8)),
+            mapped_sprite: Some(SpriteId::ENEMY_LANDER),
+            ..ExpandedObjectDetailSnapshot::EMPTY
+        };
+
+        super::push_expanded_object_explosion_pixels(&mut scene, &missing_center_detail);
+
+        assert!(scene.sprites.is_empty());
+
+        let invalid_scale_detail = ExpandedObjectDetailSnapshot {
+            size: 0,
+            top_left: Some(ScreenPosition::new(10, 20)),
+            ..missing_center_detail
+        };
+
+        super::push_expanded_object_explosion_pixels(&mut scene, &invalid_scale_detail);
+
+        assert!(scene.sprites.is_empty());
+
+        let center_only_detail = ExpandedObjectDetailSnapshot {
+            kind: ExpandedObjectKind::Explosion,
+            size: SOURCE_EXPLOSION_INITIAL_SIZE,
+            picture_size: Some((1, 1)),
+            mapped_sprite: Some(SpriteId::PLAYER_SHIP),
+            center: Some(ScreenPosition::new(20, 30)),
+            ..ExpandedObjectDetailSnapshot::EMPTY
+        };
+        assert_eq!(
+            super::expanded_object_sprite_geometry(&center_only_detail),
+            Some(([12.0, 27.0], [16.0, 6.0]))
+        );
+
+        let fallback_detail = ExpandedObjectDetailSnapshot {
+            mapped_sprite: Some(SpriteId::SCORE_POPUP_500),
+            picture_size: Some((6, 6)),
+            ..center_only_detail
+        };
+        assert_eq!(
+            super::expanded_object_sprite_geometry(&fallback_detail),
+            Some(([17.0, 27.0], [6.0, 6.0]))
+        );
+
+        let edge_projectile = ProjectileSnapshot {
+            position: ScreenPosition::new(0, 10),
+            source_tail_position: ScreenPosition::new(0, 10),
+            velocity: ScreenVelocity::new(-5, 0),
+        };
+        assert_eq!(
+            super::step_projectile_laser_tail(edge_projectile),
+            edge_projectile.source_tail_position
+        );
+
+        let mut beam_scene = RenderScene::empty(0, SurfaceSize::new(20, 20));
+        super::push_arcade_laser_beam(
+            &mut beam_scene,
+            10.0,
+            4.0,
+            10.0,
+            super::SOURCE_ARCADE_LASER_TARGET_HEIGHT,
+            0,
+            RenderLayer::Projectiles,
+        );
+        super::push_laser_span(
+            &mut beam_scene,
+            RenderLayer::Projectiles,
+            1,
+            -1,
+            3,
+            Color::WHITE,
+        );
+        assert!(beam_scene.sprites.is_empty());
+
+        let mut empty_width_scene = RenderScene::empty(0, SurfaceSize::new(0, 20));
+        super::push_laser_span(
+            &mut empty_width_scene,
+            RenderLayer::Projectiles,
+            -1,
+            4,
+            0,
+            Color::WHITE,
+        );
+        assert!(empty_width_scene.sprites.is_empty());
+
+        let mut small_scene = RenderScene::empty(0, SurfaceSize::new(1, 1));
+        super::push_source_expanded_pixel_cloud(
+            &mut small_scene,
+            [200.0, 200.0],
+            [8.0, 8.0],
+            3.0,
+            0,
+            RenderLayer::Objects,
+        );
+        assert!(small_scene.sprites.is_empty());
+    }
+
+    #[test]
+    fn clean_game_expands_alien_explosion_around_sprite_center() {
+        let mut game = credited_started_game();
+        game.state.world.enemies.clear();
+        game.state
+            .world
+            .spawn_explosion(ExplosionKind::Lander, ScreenPosition::new(100, 80));
+        game.sync_world_presentation();
+
+        let initial_scene = game.scene();
+        assert_scene_has_enemy_explosion_cloud(&initial_scene);
+        assert!(
+            !initial_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
+        );
+
+        for _ in 0..10 {
+            game.state.world.advance_explosions();
+        }
+        game.sync_world_presentation();
+
+        let advanced_detail = game.state.world.expanded_objects.details[0];
+        assert_eq!(
+            advanced_detail.size,
+            SOURCE_EXPLOSION_INITIAL_SIZE + SOURCE_EXPLOSION_SIZE_DELTA * 10
+        );
+        assert_eq!(advanced_detail.explosion_frame, Some(10));
+        let advanced_scene = game.scene();
+        assert_scene_has_enemy_explosion_cloud(&advanced_scene);
+        assert!(
+            !advanced_scene
+                .sprites
+                .iter()
+                .any(|sprite| sprite.sprite == SpriteId::ENEMY_LANDER)
         );
     }
 
@@ -18007,7 +18784,7 @@ mod tests {
             sprite.sprite == SpriteId::TERRAIN_EXPLOSION
                 && sprite.layer == RenderLayer::Objects
                 && sprite.position == [0x44 as f32, 0x70 as f32]
-                && sprite.size == [8.0, 6.0]
+                && sprite.size == [16.0, 6.0]
         }));
         assert_eq!(
             frame.events.sounds(),
@@ -18186,6 +18963,62 @@ mod tests {
     fn keep_first_enemy_only(game: &mut Game) {
         game.state.world.enemies.truncate(1);
         game.state.world.enemy_reserve = EnemyReserveSnapshot::default();
+    }
+
+    fn assert_scene_has_player_laser_beam(scene: &RenderScene, projectile: ProjectileSnapshot) {
+        let laser_sprites = scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_PROJECTILE
+                    && sprite.layer == RenderLayer::Projectiles
+            })
+            .collect::<Vec<_>>();
+        let (left, right) = player_laser_visible_bounds(projectile);
+        assert!(laser_sprites.len() > 1);
+        assert!(laser_sprites.iter().any(|sprite| {
+            sprite.position[0] == left
+                && (sprite.position[1] - f32::from(projectile.position.y)).abs() <= 4.0
+        }));
+        assert!(laser_sprites.iter().all(|sprite| {
+            sprite.position[0] >= left && sprite.position[0] + sprite.size[0] <= right + 1.0
+        }));
+    }
+
+    fn player_laser_visible_bounds(projectile: ProjectileSnapshot) -> (f32, f32) {
+        let direction = projectile.velocity.dx.signum();
+        let span = f32::from(super::PLAYER_PROJECTILE_COLLISION_SIZE.0) - 1.0;
+        if direction < 0 {
+            (
+                f32::from(projectile.position.x),
+                f32::from(projectile.source_tail_position.x) + span,
+            )
+        } else {
+            (
+                f32::from(projectile.source_tail_position.x),
+                f32::from(projectile.position.x) + span,
+            )
+        }
+    }
+
+    fn assert_scene_has_enemy_explosion_cloud(scene: &RenderScene) {
+        let cloud_pixels = scene
+            .sprites
+            .iter()
+            .filter(|sprite| {
+                sprite.sprite == SpriteId::PLAYER_EXPLOSION_PIXEL
+                    && sprite.layer == RenderLayer::Objects
+            })
+            .collect::<Vec<_>>();
+        assert!(cloud_pixels.len() >= 8);
+        assert!(cloud_pixels.iter().all(|sprite| {
+            sprite.size[0] >= 1.0 && sprite.size[1] >= 1.0 && sprite.tint.rgba[3] == 0xFF
+        }));
+        assert!(
+            cloud_pixels
+                .iter()
+                .any(|sprite| sprite.tint != Color::WHITE)
+        );
     }
 
     fn table_entry(rank: u8, score: u32, initials: [char; 3]) -> HighScoreTableEntrySnapshot {

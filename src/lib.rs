@@ -177,7 +177,7 @@ mod public_api_tests {
 
         assert_eq!(frame.state.frame, 1);
         assert_eq!(frame.state.phase, crate::GamePhase::Attract);
-        assert_eq!(frame.scene.summary().layers.hud, 2);
+        assert_eq!(frame.scene.summary().layers.hud, 0);
     }
 
     #[cfg(feature = "legacy-tools")]

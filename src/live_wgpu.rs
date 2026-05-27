@@ -41,9 +41,9 @@ const INITIAL_WINDOW_HEIGHT: u32 = 768;
 #[cfg(all(not(test), not(coverage)))]
 const MAX_STEPS_PER_TICK: u32 = 5;
 #[cfg(all(not(test), not(coverage)))]
-const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x3B08_28B8_5A4F_1BCE;
+const EXPECTED_OFFSCREEN_FIRST_FRAME_SIGNATURE: u64 = 0x8DAE_D38B_41A6_92A9;
 #[cfg(all(not(test), not(coverage)))]
-const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0xD8EB_31D1_CAB9_D7D2;
+const EXPECTED_OFFSCREEN_LAST_FRAME_SIGNATURE: u64 = 0x22E7_1B80_CA40_7CB2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LiveInputProfile {
@@ -628,6 +628,10 @@ async fn render_offscreen_smoke() -> anyhow::Result<OffscreenWgpuSmokeReport> {
     let mut game = Game::new();
     let mut signatures = BTreeSet::new();
     let mut report = OffscreenWgpuSmokeReport::default();
+
+    for _ in 0..crate::game_smoke::smoke_visual_warmup_frames() {
+        game.step(GameInput::NONE);
+    }
 
     for frame_index in 0..crate::game_smoke::smoke_frame_count() {
         let frame = game.step(crate::game_smoke::smoke_game_input(frame_index));
