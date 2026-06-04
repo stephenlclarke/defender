@@ -34,7 +34,7 @@ verification tools.
   data and applies behavior scripts plus hostile spawn positions as play starts
   and waves are cleared. Default actor wave progression now reads
   `assets/red-label/wave-table.tsv` for active wave size, lander speed, and
-  lander fire cadence.
+  lander fire cadence, and uses source first-wave lander restore positions.
 - Primary runtime source is `src/`; the converted implementation is parked in
   `src_legacy/` and should remain optional oracle/tooling evidence only.
 - Normal live play uses clean `Game` frames through clean platform, audio, and

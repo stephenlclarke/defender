@@ -46,6 +46,13 @@ const ACTOR_SOURCE_WAVE_TABLE_HEADER: &str =
 const ACTOR_SOURCE_DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
 const ACTOR_SOURCE_DEFAULT_DIFFICULTY_CEILING: u8 = 15;
 const ACTOR_SOURCE_BACKED_WAVES: u16 = 16;
+const ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS: [Point; 5] = [
+    Point::new(0xFB, 0x2C),
+    Point::new(0x3F, 0x2C),
+    Point::new(0x67, 0x2C),
+    Point::new(0x0D, 0x2C),
+    Point::new(0x41, 0x2C),
+];
 const ACTOR_WAVE_LANDER_SPAWN_SLOTS: [Point; 5] = [
     Point::new(176, 80),
     Point::new(210, 132),
@@ -781,12 +788,17 @@ impl ActorSourceWaveProfile {
         }
     }
 
-    fn lander_spawns(self) -> Vec<Point> {
+    fn lander_spawns(self, wave: u16) -> Vec<Point> {
         let active_landers = self
             .wave_size
             .min(self.landers)
             .min(ACTOR_WAVE_LANDER_SPAWN_SLOTS.len() as u8);
-        ACTOR_WAVE_LANDER_SPAWN_SLOTS
+        let slots = if wave == 1 {
+            &ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS
+        } else {
+            &ACTOR_WAVE_LANDER_SPAWN_SLOTS
+        };
+        slots
             .iter()
             .copied()
             .take(usize::from(active_landers))
@@ -918,7 +930,7 @@ impl ActorWaveScript {
             wave,
             ActorBehaviorScript::default()
                 .with_kind_behavior(ActorKind::Lander, source.lander_behavior()),
-            source.lander_spawns(),
+            source.lander_spawns(wave),
         )
     }
 
@@ -3032,6 +3044,16 @@ mod tests {
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);
         assert_eq!(first.lander_spawns.len(), 5);
+        assert_eq!(
+            first.lander_spawns,
+            vec![
+                Point::new(0xFB, 0x2C),
+                Point::new(0x3F, 0x2C),
+                Point::new(0x67, 0x2C),
+                Point::new(0x0D, 0x2C),
+                Point::new(0x41, 0x2C),
+            ]
+        );
         assert_eq!(first_lander.lander_seek_speed, 2);
         assert_eq!(first_lander.lander_fire_period_steps, 64);
 

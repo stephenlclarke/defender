@@ -107,9 +107,10 @@ the current hostile snapshots are cleared.
 The default actor progression reads `assets/red-label/wave-table.tsv` through
 an actor-owned adapter. The current actor mapping uses source-backed
 `wave_size`, `lander_x_velocity`, and `lander_shot_time` to set active lander
-count, lander movement speed, and lander fire cadence. Spawn positions still
-use deterministic actor slots until a later slice ports the source restore
-positions.
+count, lander movement speed, and lander fire cadence. Wave `1` uses the
+source first-wave lander restore positions from the existing clean evidence.
+Later waves still use deterministic actor slots until a later slice ports the
+remaining source restore positions.
 
 ## Attract Graphics
 
@@ -158,5 +159,5 @@ The actor driver now owns a first Defender gameplay loop:
   driver-owned data.
 
 These mechanics are still intentionally compact. The next fidelity slices
-should port the source restore positions and bind the draw/sound descriptions
-to the source sprite and Williams sound-board assets.
+should port the remaining source restore positions and bind the draw/sound
+descriptions to the source sprite and Williams sound-board assets.
