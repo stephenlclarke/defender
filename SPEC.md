@@ -699,12 +699,13 @@ reintroduce legacy implementation terminology.
   hostile snapshots are cleared. The default actor wave progression reads
   `assets/red-label/wave-table.tsv` for active wave size, lander movement
   speed, and lander fire cadence, and wave `1` uses source first-wave lander
-  restore positions while later-wave restore positions remain a known
-  replacement target. `XYZZY` invincibility is represented as the same temporary
-  player behavior override. The slice now also models initial humans, lander
-  pickup/carry/conversion, falling-human rescue and safe landing scoring, score
-  popups, smart-bomb hostile clearing, and mutant spawn handoff, but it has not
-  replaced the live `Game` runtime yet.
+  restore metadata for fixed-point fractions, velocities, shot timer, sleep
+  ticks, picture frame, and target-human index while later-wave restore
+  positions remain a known replacement target. `XYZZY` invincibility is
+  represented as the same temporary player behavior override. The slice now
+  also models initial humans, lander pickup/carry/conversion, falling-human
+  rescue and safe landing scoring, score popups, smart-bomb hostile clearing,
+  and mutant spawn handoff, but it has not replaced the live `Game` runtime yet.
 
 ## Compatibility Features
 

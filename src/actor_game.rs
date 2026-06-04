@@ -46,12 +46,57 @@ const ACTOR_SOURCE_WAVE_TABLE_HEADER: &str =
 const ACTOR_SOURCE_DEFAULT_DIFFICULTY_INITIAL: u8 = 5;
 const ACTOR_SOURCE_DEFAULT_DIFFICULTY_CEILING: u8 = 15;
 const ACTOR_SOURCE_BACKED_WAVES: u16 = 16;
-const ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS: [Point; 5] = [
-    Point::new(0xFB, 0x2C),
-    Point::new(0x3F, 0x2C),
-    Point::new(0x67, 0x2C),
-    Point::new(0x0D, 0x2C),
-    Point::new(0x41, 0x2C),
+const ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS: [ActorLanderSpawn; 5] = [
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0xFB33,
+        y16: 0x2CE0,
+        x_velocity: 0xFFDE,
+        y_velocity: 0x0070,
+        shot_timer: 0x27,
+        sleep_ticks: 0x04,
+        picture_frame: 1,
+        target_human_index: Some(1),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x3F4A,
+        y16: 0x2CE0,
+        x_velocity: 0xFFEE,
+        y_velocity: 0x0070,
+        shot_timer: 0x3B,
+        sleep_ticks: 0x04,
+        picture_frame: 1,
+        target_human_index: Some(2),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x67FF,
+        y16: 0x2C70,
+        x_velocity: 0x0012,
+        y_velocity: 0x0070,
+        shot_timer: 0x23,
+        sleep_ticks: 0x04,
+        picture_frame: 1,
+        target_human_index: Some(3),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x0D11,
+        y16: 0x2C70,
+        x_velocity: 0x0014,
+        y_velocity: 0x0070,
+        shot_timer: 0x3C,
+        sleep_ticks: 0x04,
+        picture_frame: 0,
+        target_human_index: Some(4),
+    }),
+    ActorLanderSpawn::source_first_wave(ActorSourceFirstWaveLanderStart {
+        x16: 0x41B9,
+        y16: 0x2C70,
+        x_velocity: 0x001A,
+        y_velocity: 0x0070,
+        shot_timer: 0x25,
+        sleep_ticks: 0x04,
+        picture_frame: 1,
+        target_human_index: Some(5),
+    }),
 ];
 const ACTOR_WAVE_LANDER_SPAWN_SLOTS: [Point; 5] = [
     Point::new(176, 80),
@@ -768,6 +813,61 @@ pub struct ActorSourceWaveProfile {
     pub lander_shot_time: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorSourceLanderMetadata {
+    pub x_fraction: u8,
+    pub y_fraction: u8,
+    pub x_velocity: u16,
+    pub y_velocity: u16,
+    pub shot_timer: u8,
+    pub sleep_ticks: u8,
+    pub picture_frame: u8,
+    pub target_human_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActorLanderSpawn {
+    pub position: Point,
+    pub source: Option<ActorSourceLanderMetadata>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActorSourceFirstWaveLanderStart {
+    x16: u16,
+    y16: u16,
+    x_velocity: u16,
+    y_velocity: u16,
+    shot_timer: u8,
+    sleep_ticks: u8,
+    picture_frame: u8,
+    target_human_index: Option<usize>,
+}
+
+impl ActorLanderSpawn {
+    pub const fn new(position: Point) -> Self {
+        Self {
+            position,
+            source: None,
+        }
+    }
+
+    const fn source_first_wave(start: ActorSourceFirstWaveLanderStart) -> Self {
+        Self {
+            position: Point::new((start.x16 >> 8) as i16, (start.y16 >> 8) as i16),
+            source: Some(ActorSourceLanderMetadata {
+                x_fraction: (start.x16 & 0x00FF) as u8,
+                y_fraction: (start.y16 & 0x00FF) as u8,
+                x_velocity: start.x_velocity,
+                y_velocity: start.y_velocity,
+                shot_timer: start.shot_timer,
+                sleep_ticks: start.sleep_ticks,
+                picture_frame: start.picture_frame,
+                target_human_index: start.target_human_index,
+            }),
+        }
+    }
+}
+
 impl ActorSourceWaveProfile {
     pub fn for_wave(wave: u16) -> Self {
         let wave = u8::try_from(wave.min(u16::from(u8::MAX))).unwrap_or(u8::MAX);
@@ -788,19 +888,23 @@ impl ActorSourceWaveProfile {
         }
     }
 
-    fn lander_spawns(self, wave: u16) -> Vec<Point> {
+    fn lander_spawns(self, wave: u16) -> Vec<ActorLanderSpawn> {
         let active_landers = self
             .wave_size
             .min(self.landers)
             .min(ACTOR_WAVE_LANDER_SPAWN_SLOTS.len() as u8);
-        let slots = if wave == 1 {
-            &ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS
-        } else {
-            &ACTOR_WAVE_LANDER_SPAWN_SLOTS
-        };
-        slots
+        if wave == 1 {
+            return ACTOR_SOURCE_FIRST_WAVE_LANDER_SPAWNS
+                .iter()
+                .copied()
+                .take(usize::from(active_landers))
+                .collect();
+        }
+
+        ACTOR_WAVE_LANDER_SPAWN_SLOTS
             .iter()
             .copied()
+            .map(ActorLanderSpawn::new)
             .take(usize::from(active_landers))
             .collect()
     }
@@ -875,16 +979,38 @@ fn apply_actor_wave_delta(value: i32, delta: i32, floor: i32, ceiling: i32) -> i
 pub struct ActorWaveProfile {
     pub wave: u16,
     pub behavior_script: ActorBehaviorScript,
-    pub lander_spawns: Vec<Point>,
+    pub lander_spawns: Vec<ActorLanderSpawn>,
 }
 
 impl ActorWaveProfile {
     pub fn new(wave: u16, behavior_script: ActorBehaviorScript, lander_spawns: Vec<Point>) -> Self {
+        Self::with_lander_spawns(
+            wave,
+            behavior_script,
+            lander_spawns
+                .into_iter()
+                .map(ActorLanderSpawn::new)
+                .collect(),
+        )
+    }
+
+    pub fn with_lander_spawns(
+        wave: u16,
+        behavior_script: ActorBehaviorScript,
+        lander_spawns: Vec<ActorLanderSpawn>,
+    ) -> Self {
         Self {
             wave: wave.max(1),
             behavior_script,
             lander_spawns,
         }
+    }
+
+    pub fn lander_spawn_points(&self) -> Vec<Point> {
+        self.lander_spawns
+            .iter()
+            .map(|spawn| spawn.position)
+            .collect()
     }
 }
 
@@ -926,7 +1052,7 @@ impl ActorWaveScript {
 
     fn source_backed_profile(wave: u16) -> ActorWaveProfile {
         let source = ActorSourceWaveProfile::for_wave(wave);
-        ActorWaveProfile::new(
+        ActorWaveProfile::with_lander_spawns(
             wave,
             ActorBehaviorScript::default()
                 .with_kind_behavior(ActorKind::Lander, source.lander_behavior()),
@@ -985,6 +1111,9 @@ pub enum VisualEffect {
     DefenderCoalescence {
         slot: u8,
         row_pair: u8,
+    },
+    SourceLanderFrame {
+        frame: u8,
     },
     ExplosionCloud {
         age: u16,
@@ -1221,6 +1350,7 @@ pub struct ActorSnapshot {
     pub position: Point,
     pub bounds: Option<Rect>,
     pub alive: bool,
+    pub source_lander: Option<ActorSourceLanderMetadata>,
 }
 
 impl ActorSnapshot {
@@ -1654,6 +1784,12 @@ impl ActorGameDriver {
         id
     }
 
+    fn spawn_lander_from_spawn(&mut self, spawn: ActorLanderSpawn) -> ActorId {
+        let id = self.allocate_actor_id();
+        self.spawn_actor(Lander::from_spawn(id, spawn));
+        id
+    }
+
     fn spawn_mutant(&mut self, position: Point) -> ActorId {
         let id = self.allocate_actor_id();
         self.spawn_actor(Mutant::new(id, position));
@@ -1851,8 +1987,8 @@ impl ActorGameDriver {
             .profile_for_wave(self.wave)
             .lander_spawns
             .clone();
-        for position in lander_spawns {
-            self.spawn_lander(position);
+        for spawn in lander_spawns {
+            self.spawn_lander_from_spawn(spawn);
         }
     }
 
@@ -2021,6 +2157,7 @@ impl AssetActor for AttractDirector {
                 position: Point::new(0, 0),
                 bounds: None,
                 alive: true,
+                source_lander: None,
             },
             commands,
             draws,
@@ -2067,6 +2204,7 @@ impl AssetActor for ScriptedAttractProgram {
                 position: Point::new(0, 0),
                 bounds: None,
                 alive: true,
+                source_lander: None,
             },
             commands: Vec::new(),
             draws,
@@ -2159,6 +2297,7 @@ impl AssetActor for PlayerShip {
                 position: self.position,
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
+                source_lander: None,
             },
             commands,
             draws,
@@ -2172,6 +2311,7 @@ struct Lander {
     position: Point,
     drift: i16,
     mode: LanderMode,
+    source: Option<ActorSourceLanderMetadata>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2185,11 +2325,19 @@ enum LanderMode {
 
 impl Lander {
     fn new(id: ActorId, position: Point) -> Self {
+        Self::from_spawn(id, ActorLanderSpawn::new(position))
+    }
+
+    fn from_spawn(id: ActorId, spawn: ActorLanderSpawn) -> Self {
         Self {
             id,
-            position,
-            drift: -1,
+            position: spawn.position,
+            drift: spawn
+                .source
+                .map(|source| source_lander_drift_from_velocity(source.x_velocity))
+                .unwrap_or(-1),
             mode: LanderMode::Seeking,
+            source: spawn.source,
         }
     }
 
@@ -2208,23 +2356,23 @@ impl AssetActor for Lander {
         let mut draws = Vec::new();
         if prompt.phase == Phase::Playing {
             let behavior = prompt.behavior_for(self.id, ActorKind::Lander);
-            match self.mode {
-                LanderMode::Seeking => self.update_seeking(prompt, behavior, &mut commands),
-                LanderMode::Carrying {
-                    human_id,
-                    pull_sound_sent,
-                } => {
-                    self.update_carrying(human_id, pull_sound_sent, behavior, &mut commands);
+            if !self.tick_source_sleep() {
+                match self.mode {
+                    LanderMode::Seeking => self.update_seeking(prompt, behavior, &mut commands),
+                    LanderMode::Carrying {
+                        human_id,
+                        pull_sound_sent,
+                    } => {
+                        self.update_carrying(human_id, pull_sound_sent, behavior, &mut commands);
+                    }
                 }
+                self.tick_fire_timer(prompt, behavior, &mut commands);
             }
-            let fire_period = behavior.lander_fire_period_steps.max(1);
-            if prompt.step % fire_period == self.id.value() % fire_period {
-                commands.push(GameCommand::PlaySound(SoundCue::Laser));
-            }
-            draws.push(DrawCommand::sprite(
+            draws.push(DrawCommand::sprite_with_effect(
                 self.id,
                 SpriteKey::Lander,
                 self.position,
+                self.draw_effect(),
             ));
         }
         ActorReply {
@@ -2235,6 +2383,7 @@ impl AssetActor for Lander {
                 position: self.position,
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
+                source_lander: self.source,
             },
             commands,
             draws,
@@ -2327,6 +2476,65 @@ impl Lander {
             commands.push(GameCommand::PlaySound(SoundCue::MutantSpawn));
         }
     }
+
+    fn tick_source_sleep(&mut self) -> bool {
+        if let Some(source) = &mut self.source
+            && source.sleep_ticks > 0
+        {
+            source.sleep_ticks = source.sleep_ticks.saturating_sub(1);
+            return true;
+        }
+        false
+    }
+
+    fn tick_fire_timer(
+        &mut self,
+        prompt: &StepPrompt,
+        behavior: ActorBehaviorProfile,
+        commands: &mut Vec<GameCommand>,
+    ) {
+        if let Some(source) = &mut self.source {
+            if source.shot_timer > 0 {
+                source.shot_timer = source.shot_timer.saturating_sub(1);
+            }
+            if source.shot_timer == 0 {
+                commands.push(GameCommand::PlaySound(SoundCue::Laser));
+                source.shot_timer = clamped_source_lander_shot_reset(behavior);
+            }
+            return;
+        }
+
+        let fire_period = behavior.lander_fire_period_steps.max(1);
+        if prompt.step % fire_period == self.id.value() % fire_period {
+            commands.push(GameCommand::PlaySound(SoundCue::Laser));
+        }
+    }
+
+    fn draw_effect(&self) -> VisualEffect {
+        self.source
+            .map(|source| VisualEffect::SourceLanderFrame {
+                frame: source.picture_frame,
+            })
+            .unwrap_or(VisualEffect::Static)
+    }
+}
+
+const fn source_lander_drift_from_velocity(x_velocity: u16) -> i16 {
+    if x_velocity & 0x8000 != 0 {
+        -1
+    } else if x_velocity == 0 {
+        0
+    } else {
+        1
+    }
+}
+
+fn clamped_source_lander_shot_reset(behavior: ActorBehaviorProfile) -> u8 {
+    let clamped = behavior
+        .lander_fire_period_steps
+        .max(1)
+        .min(u64::from(u8::MAX));
+    u8::try_from(clamped).unwrap_or(u8::MAX)
 }
 
 fn pickup_distance(lander: Point, human: Point, behavior: ActorBehaviorProfile) -> bool {
@@ -2395,6 +2603,7 @@ impl AssetActor for Mutant {
                 position: self.position,
                 bounds: Some(self.bounds()),
                 alive: prompt.phase == Phase::Playing,
+                source_lander: None,
             },
             commands: Vec::new(),
             draws,
@@ -2527,6 +2736,7 @@ impl AssetActor for Human {
                 position: self.position,
                 bounds: human_collision_bounds(self.mode, self.position),
                 alive: prompt.phase == Phase::Playing,
+                source_lander: None,
             },
             commands,
             draws,
@@ -2596,6 +2806,7 @@ impl AssetActor for ScorePopup {
                 position: self.position,
                 bounds: None,
                 alive: self.age < behavior.score_popup_lifetime_steps,
+                source_lander: None,
             },
             commands,
             draws,
@@ -2659,6 +2870,7 @@ impl AssetActor for LaserShot {
                 position: self.position,
                 bounds: Some(self.bounds()),
                 alive: self.age < behavior.laser_lifetime_steps,
+                source_lander: None,
             },
             commands,
             draws,
@@ -2712,6 +2924,7 @@ impl AssetActor for Explosion {
                 position: self.position,
                 bounds: None,
                 alive: self.age < behavior.explosion_lifetime_steps,
+                source_lander: None,
             },
             commands,
             draws,
@@ -3045,7 +3258,7 @@ mod tests {
             .behavior_for(ActorId::new(1), ActorKind::Lander);
         assert_eq!(first.lander_spawns.len(), 5);
         assert_eq!(
-            first.lander_spawns,
+            first.lander_spawn_points(),
             vec![
                 Point::new(0xFB, 0x2C),
                 Point::new(0x3F, 0x2C),
@@ -3053,6 +3266,32 @@ mod tests {
                 Point::new(0x0D, 0x2C),
                 Point::new(0x41, 0x2C),
             ]
+        );
+        assert_eq!(
+            first.lander_spawns[0].source,
+            Some(ActorSourceLanderMetadata {
+                x_fraction: 0x33,
+                y_fraction: 0xE0,
+                x_velocity: 0xFFDE,
+                y_velocity: 0x0070,
+                shot_timer: 0x27,
+                sleep_ticks: 0x04,
+                picture_frame: 1,
+                target_human_index: Some(1),
+            })
+        );
+        assert_eq!(
+            first.lander_spawns[3].source,
+            Some(ActorSourceLanderMetadata {
+                x_fraction: 0x11,
+                y_fraction: 0x70,
+                x_velocity: 0x0014,
+                y_velocity: 0x0070,
+                shot_timer: 0x3C,
+                sleep_ticks: 0x04,
+                picture_frame: 0,
+                target_human_index: Some(4),
+            })
         );
         assert_eq!(first_lander.lander_seek_speed, 2);
         assert_eq!(first_lander.lander_fire_period_steps, 64);
@@ -3062,6 +3301,12 @@ mod tests {
             .behavior_script
             .behavior_for(ActorId::new(1), ActorKind::Lander);
         assert_eq!(second.lander_spawns.len(), 5);
+        assert!(
+            second
+                .lander_spawns
+                .iter()
+                .all(|spawn| spawn.source.is_none())
+        );
         assert_eq!(second_lander.lander_seek_speed, 2);
         assert_eq!(second_lander.lander_fire_period_steps, 48);
 
@@ -3071,6 +3316,122 @@ mod tests {
             .behavior_for(ActorId::new(1), ActorKind::Lander);
         assert_eq!(fifth_lander.lander_seek_speed, 3);
         assert_eq!(fifth_lander.lander_fire_period_steps, 30);
+    }
+
+    #[test]
+    fn first_wave_landers_publish_source_metadata_and_picture_frames() {
+        let mut driver = ActorGameDriver::new();
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        let live = driver.step(GameInput::NONE);
+        let lander = live
+            .snapshots
+            .iter()
+            .find(|snapshot| {
+                snapshot.kind == ActorKind::Lander && snapshot.position == Point::new(0xFB, 0x2C)
+            })
+            .expect("source first-wave lander should publish its restore position");
+
+        assert_eq!(
+            lander.source_lander,
+            Some(ActorSourceLanderMetadata {
+                x_fraction: 0x33,
+                y_fraction: 0xE0,
+                x_velocity: 0xFFDE,
+                y_velocity: 0x0070,
+                shot_timer: 0x27,
+                sleep_ticks: 0x03,
+                picture_frame: 1,
+                target_human_index: Some(1),
+            })
+        );
+        assert!(live.draws.iter().any(|draw| {
+            draw.actor == lander.id
+                && draw.sprite == SpriteKey::Lander
+                && matches!(draw.effect, VisualEffect::SourceLanderFrame { frame: 1 })
+        }));
+    }
+
+    #[test]
+    fn source_lander_sleep_ticks_delay_first_wave_motion() {
+        let mut driver = ActorGameDriver::new();
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        let initial = Point::new(0xFB, 0x2C);
+        let mut lander_id = None;
+        for expected_sleep in [3, 2, 1, 0] {
+            let sleeping = driver.step(GameInput::NONE);
+            let lander = sleeping
+                .snapshots
+                .iter()
+                .find(|snapshot| {
+                    let matches_known_lander = match lander_id {
+                        Some(id) => snapshot.id == id,
+                        None => snapshot.position == initial,
+                    };
+                    snapshot.kind == ActorKind::Lander && matches_known_lander
+                })
+                .expect("sleeping source lander should stay visible");
+            lander_id = Some(lander.id);
+            assert_eq!(lander.position, initial);
+            assert_eq!(
+                lander.source_lander.map(|source| source.sleep_ticks),
+                Some(expected_sleep)
+            );
+        }
+
+        let awake = driver.step(GameInput::NONE);
+        let lander = snapshot_for(&awake, lander_id.expect("source lander id should be known"));
+        assert_ne!(lander.position, initial);
+        assert_eq!(
+            lander.source_lander.map(|source| source.sleep_ticks),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn source_lander_shot_timer_controls_first_wave_laser_sound() {
+        let mut driver = ActorGameDriver::new();
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+
+        let mut first_laser_step = None;
+        for live_step in 1..=50 {
+            let report = driver.step(GameInput {
+                xyzzy: XyzzyMode {
+                    active: true,
+                    invincible: true,
+                    ..XyzzyMode::INACTIVE
+                },
+                ..GameInput::NONE
+            });
+            if report.sounds.contains(&SoundCue::Laser) {
+                first_laser_step = Some(live_step);
+                break;
+            }
+        }
+
+        assert_eq!(first_laser_step, Some(39));
     }
 
     #[test]
