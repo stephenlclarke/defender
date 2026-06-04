@@ -695,8 +695,9 @@ reintroduce legacy implementation terminology.
   gravity, timed effects, damage policy, and behavior modes such as human
   seeking versus player chasing without rewriting actor structs.
   `ActorWaveScript` names a driver-owned progression script whose wave profiles
-  apply behavior scripts and hostile spawn positions when play starts and when
-  hostile snapshots are cleared. The default actor wave progression reads
+  apply behavior scripts plus hostile and initial-human spawn records when play
+  starts and when hostile snapshots are cleared. The default actor wave
+  progression reads
   `assets/red-label/wave-table.tsv` for active wave size, lander movement
   speed, and lander fire cadence, and wave `1` uses source first-wave lander
   restore metadata for fixed-point fractions, velocities, shot timer, sleep

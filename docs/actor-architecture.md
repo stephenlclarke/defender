@@ -99,10 +99,10 @@ profile rather than branching on a separate god-mode flag.
 
 `ActorWaveScript` is the driver-owned level progression script. It has a stable
 name plus ordered `ActorWaveProfile` records. Each wave profile supplies the
-`ActorBehaviorScript` for that wave and the hostile spawn positions for the
-wave. The driver applies wave `1` when play starts, carries the wave number in
-`StepPrompt` and `StepReport`, and advances to the next configured profile when
-the current hostile snapshots are cleared.
+`ActorBehaviorScript` for that wave plus hostile and initial-human spawn
+records. The driver applies wave `1` when play starts, carries the wave number
+in `StepPrompt` and `StepReport`, and advances to the next configured profile
+when the current hostile snapshots are cleared.
 
 The default actor progression reads `assets/red-label/wave-table.tsv` through
 an actor-owned adapter. The current actor mapping uses source-backed

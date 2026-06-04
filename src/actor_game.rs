@@ -1104,6 +1104,7 @@ pub struct ActorWaveProfile {
     pub wave: u16,
     pub behavior_script: ActorBehaviorScript,
     pub lander_spawns: Vec<ActorLanderSpawn>,
+    pub human_spawns: Vec<ActorHumanSpawn>,
 }
 
 impl ActorWaveProfile {
@@ -1123,15 +1124,37 @@ impl ActorWaveProfile {
         behavior_script: ActorBehaviorScript,
         lander_spawns: Vec<ActorLanderSpawn>,
     ) -> Self {
+        Self::with_spawns(
+            wave,
+            behavior_script,
+            lander_spawns,
+            ACTOR_SOURCE_FIRST_WAVE_HUMAN_SPAWNS.to_vec(),
+        )
+    }
+
+    pub fn with_spawns(
+        wave: u16,
+        behavior_script: ActorBehaviorScript,
+        lander_spawns: Vec<ActorLanderSpawn>,
+        human_spawns: Vec<ActorHumanSpawn>,
+    ) -> Self {
         Self {
             wave: wave.max(1),
             behavior_script,
             lander_spawns,
+            human_spawns,
         }
     }
 
     pub fn lander_spawn_points(&self) -> Vec<Point> {
         self.lander_spawns
+            .iter()
+            .map(|spawn| spawn.position)
+            .collect()
+    }
+
+    pub fn human_spawn_points(&self) -> Vec<Point> {
+        self.human_spawns
             .iter()
             .map(|spawn| spawn.position)
             .collect()
@@ -2186,7 +2209,12 @@ impl ActorGameDriver {
     }
 
     fn spawn_initial_humans(&mut self) {
-        for spawn in ACTOR_SOURCE_FIRST_WAVE_HUMAN_SPAWNS {
+        let human_spawns = self
+            .wave_script
+            .profile_for_wave(self.wave)
+            .human_spawns
+            .clone();
+        for spawn in human_spawns {
             self.spawn_human_from_spawn(spawn);
         }
     }
@@ -3606,6 +3634,31 @@ mod tests {
                 Point::new(0x41, 0x2C),
             ]
         );
+        assert_eq!(first.human_spawns.len(), 10);
+        assert_eq!(
+            first.human_spawn_points(),
+            vec![
+                Point::new(0x18, 0xE0),
+                Point::new(0x1C, 0xE1),
+                Point::new(0x4E, 0xE0),
+                Point::new(0x57, 0xE0),
+                Point::new(0x9B, 0xE0),
+                Point::new(0x9D, 0xE0),
+                Point::new(0xCE, 0xE0),
+                Point::new(0xD7, 0xE0),
+                Point::new(0xD2, 0xE0),
+                Point::new(0xE8, 0xE0),
+            ]
+        );
+        assert_eq!(
+            first.human_spawns[1].source,
+            Some(ActorSourceHumanMetadata {
+                x_fraction: 0x81,
+                y_fraction: 0x00,
+                picture_frame: 3,
+                target_slot_index: 1,
+            })
+        );
         assert_eq!(
             first.lander_spawns[0].source,
             Some(ActorSourceLanderMetadata {
@@ -4000,6 +4053,40 @@ mod tests {
             .find(|snapshot| snapshot.kind == ActorKind::Lander)
             .expect("wave script should spawn a lander");
         assert_eq!(lander.position, Point::new(74, HUMAN_GROUND_Y - 5));
+    }
+
+    #[test]
+    fn wave_script_can_configure_initial_human_spawns() {
+        let wave_script = ActorWaveScript::new(
+            "single-human-opening",
+            vec![ActorWaveProfile::with_spawns(
+                1,
+                ActorBehaviorScript::default(),
+                vec![ActorLanderSpawn::new(Point::new(220, 80))],
+                vec![ActorHumanSpawn::new(
+                    Point::new(32, HUMAN_GROUND_Y),
+                    HumanMode::Grounded,
+                )],
+            )],
+        );
+        let mut driver = ActorGameDriver::with_wave_script(wave_script);
+
+        driver.step(GameInput {
+            coin: true,
+            ..GameInput::NONE
+        });
+        driver.step(GameInput {
+            start_one: true,
+            ..GameInput::NONE
+        });
+        let settled = driver.step(GameInput::NONE);
+
+        assert_eq!(driver.snapshot_count(ActorKind::Human), 1);
+        assert!(settled.snapshots.iter().any(|snapshot| {
+            snapshot.kind == ActorKind::Human
+                && snapshot.position == Point::new(32, HUMAN_GROUND_Y)
+                && snapshot.source_human.is_none()
+        }));
     }
 
     #[test]

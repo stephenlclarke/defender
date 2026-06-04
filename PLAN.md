@@ -31,8 +31,9 @@ verification tools.
   `ActorBehaviorScript`, with default, actor-kind, and actor-id behavior
   profiles plus script-selectable behavior modes for level difficulty and
   `XYZZY` damage overrides. `ActorWaveScript` now names per-wave progression
-  data and applies behavior scripts plus hostile spawn positions as play starts
-  and waves are cleared. Default actor wave progression now reads
+  data and applies behavior scripts plus hostile and initial-human spawn
+  records as play starts and waves are cleared. Default actor wave progression
+  now reads
   `assets/red-label/wave-table.tsv` for active wave size, lander speed, and
   lander fire cadence, and uses source first-wave lander restore metadata for
   fixed-point fractions, velocities, shot timer, sleep ticks, picture frame,
